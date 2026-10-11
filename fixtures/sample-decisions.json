@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "decisions": [
+    {
+      "key": "short-question",
+      "title": "Ship the new sign-in screen this week?"
+    },
+    {
+      "key": "long-text",
+      "type": "decision",
+      "title": "Split the weekly report into per-region runs?",
+      "about": "The weekly report job currently runs on a single machine and takes about forty minutes. Splitting it into per-region runs would cut the wait for most readers, but it adds three more scheduled jobs to watch. The weekly report job currently runs on a single machine and takes about forty minutes. Splitting it into per-region runs would cut the wait for most readers, but it adds three more scheduled jobs to watch. The weekly report job currently runs on a single machine and takes about forty minutes. Splitting it into per-region runs would cut the wait for most readers, but it adds three more scheduled jobs to watch. The weekly report job currently runs on a single machine and takes about forty minutes. Splitting it into per-region runs would cut the wait for most readers, but it adds three more scheduled jobs to watch. The weekly report job currently runs on a single machine and takes about forty minutes. Splitting it into per-region runs would cut the wait for most readers, but it adds three more scheduled jobs to watch. The weekly report job currently runs on a single machine and takes about forty minutes. Splitting it into per-region runs would cut the wait for most readers, but it adds three more scheduled jobs to watch. The weekly report job currently runs on a single machine and takes about forty minutes. Splitting it into per-region runs would cut the wait for most readers, but it adds three more scheduled jobs to watch. ",
+      "detail": "Unbroken token for wrapping: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "options": [
+        {
+          "value": "yes",
+          "label": "Yes"
+        },
+        {
+          "value": "no",
+          "label": "No"
+        }
+      ]
+    },
+    {
+      "key": "script-title",
+      "title": "<script>alert(1)</script> Keep this literal title?"
+    },
+    {
+      "key": "img-title",
+      "title": "<img src=x onerror=\"window.__pwned=1\"> مرحبا بالعالم 🎉 Show mixed text safely?",
+      "about": "Right-to-left text and emoji should keep their natural order."
+    },
+    {
+      "key": "use-dark-default",
+      "type": "decision",
+      "title": "Turn on dark mode by default for new users?",
+      "about": "Most test users switch to dark within a day.",
+      "detail": "Changes the first-run default only. Existing users keep their setting.",
+      "recommend_value": "yes",
+      "default_if_silent": "no",
+      "close": "done",
+      "asked_at": "2026-10-11T09:00:00Z",
+      "decide_by": "2026-10-13",
+      "reversible": true,
+      "evidence_url": "https://example.com/evidence/run-1"
+    }
+  ]
+}

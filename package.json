@@ -1,0 +1,14 @@
+{
+  "name": "sign-off",
+  "version": "0.1.0",
+  "description": "One local review board for quick yes/no decisions. Works with Firstmate or alone.",
+  "type": "module",
+  "bin": { "sign-off": "dist/cli.js" },
+  "files": ["dist", "web"],
+  "engines": { "node": ">=22.5" },
+  "scripts": {
+    "build": "tsc",
+    "test": "tsc && node --test"
+  },
+  "devDependencies": { "@types/node": "^26.6.5", "typescript": "^7.0.2" }
+}

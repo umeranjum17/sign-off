@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decisions · sign-off</title>
+<style>
+  :root { color-scheme: light dark;
+    --bg: #FFFFFF; --surface: #F7F7F8; --line: #E6E6EA; --text: #1A1A1E; --muted: #5E5E6B;
+    --border: #8A8A96; --accent: #4E5BC9; --on-accent: #FFFFFF; --danger: #B42318; }
+  @media (prefers-color-scheme: dark) { :root {
+    --bg: #0F0F11; --surface: #18181B; --line: #27272C; --text: #EDEDEF; --muted: #9C9CA8;
+    --border: #6E6E7B; --accent: #8E97F2; --on-accent: #0F0F11; --danger: #FF8A80; } }
+  * { box-sizing: border-box; }
+  body { margin: 0 0 3rem; background: var(--bg); color: var(--text); overflow-wrap: anywhere; -webkit-font-smoothing: antialiased;
+    font: 1rem/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { position: sticky; top: 0; z-index: 1; border-bottom: 1px solid var(--line);
+    background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); }
+  .bar, main { max-width: 55rem; margin: 0 auto; padding: 0 1rem; }
+  .bar { display: flex; align-items: center; gap: 0.625rem; min-height: 3.5rem; flex-wrap: wrap; }
+  .bar h1 { font-size: 1rem; font-weight: 600; margin: 0; flex: 1 0 auto; }
+  .count { color: var(--muted); font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+  .banner { margin: 1rem 0 0; padding: 0.75rem 1rem; border: 1px solid var(--danger); border-radius: 0.5rem; color: var(--danger); }
+  h2 { font-size: 0.8125rem; font-weight: 600; color: var(--muted); margin: 2rem 0 0.5rem; letter-spacing: 0.01em; }
+  .list { background: var(--surface); border: 1px solid var(--line); border-radius: 0.75rem; }
+  .row { display: grid; gap: 0.875rem; padding: 1rem; }
+  .row + .row { border-top: 1px solid var(--line); }
+  .row h3 { font-size: 1.0625rem; font-weight: 600; line-height: 1.4; margin: 0; }
+  .about, details p { color: var(--muted); margin: 0.25rem 0 0; max-width: 70ch; }
+  .about { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .row:has(details[open]) .about { display: none; }
+  summary { cursor: pointer; color: var(--accent); font-size: 0.875rem; margin-top: 0.25rem; width: fit-content; }
+  .meta { color: var(--muted); font-size: 0.8125rem; margin: 0.5rem 0 0; }
+  .err:not(:empty) { color: var(--danger); font-size: 0.875rem; margin-top: 0.5rem; }
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+  button { min-height: 2.75rem; padding: 0 1.25rem; border-radius: 0.5rem; border: 1px solid var(--border); cursor: pointer;
+    background: var(--bg); color: var(--text); font: inherit; font-weight: 500; }
+  button.rec { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  button:disabled { opacity: 0.6; cursor: progress; }
+  button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .empty { margin: 0; padding: 1.5rem 1rem; color: var(--muted); text-align: center; }
+  @media (min-width: 45rem) {
+    .bar, main { padding: 0 2rem; }
+    .row { grid-template-columns: 1fr auto; align-items: start; gap: 2rem; padding: 1.125rem 1.25rem; }
+    .choices { grid-template-columns: repeat(2, 5.5rem); }
+  }
+</style>
+</head>
+<body>
+<header><div class="bar">
+  <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6" fill="var(--accent)"/><path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="var(--on-accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <h1>Decisions</h1><span class="count" id="count" aria-live="polite"></span>
+</div></header>
+<main><p class="banner" id="banner" role="alert" hidden></p><div id="board"></div></main>
+<script>
+  let state = { decisions: [], answers: {} };
+  // Text goes in as text nodes, never as HTML, so a title from the file can't run code.
+  const el = (tag, attrs = {}, ...kids) => {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    e.append(...kids);
+    return e;
+  };
+
+  async function call(path, init) {
+    const res = await fetch(path, init);
+    const body = await res.json().catch(() => ({ error: `The server replied ${res.status}` }));
+    if (!res.ok) throw new Error(body.error);
+    state = body;
+    render();
+  }
+
+  function save(d, o, buttons, err) {
+    buttons.forEach((b) => (b.disabled = true));
+    call('/api/answers', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value }),
+    }).catch((e) => {
+      err.textContent = `Couldn't save: ${e.message}`;
+      buttons.forEach((b) => (b.disabled = false));
+    });
+  }
+
+  function row(d) {
+    const meta = [['Recommended', d.recommend_value], ['If no answer', d.default_if_silent]].filter(([, v]) => v);
+    const err = el('div', { class: 'err', role: 'alert' });
+    const buttons = d.options.map((o) => el('button', {
+      class: o.value === d.recommend_value ? 'rec' : '', 'aria-label': `${o.label}, ${d.title}`,
+      'aria-pressed': o.value === state.answers[d.key]?.answer,
+    }, o.label));
+    buttons.forEach((b, i) => (b.onclick = () => save(d, d.options[i], buttons, err)));
+    return el('article', { class: 'row' }, el('div', {},
+      el('h3', { dir: 'auto' }, d.title),
+      d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '',
+      d.detail || d.about?.length > 180 ? el('details', {}, el('summary', {}, 'Show more'),
+        ...[d.about, d.detail].filter(Boolean).map((t) => el('p', { dir: 'auto' }, t))) : '',
+      meta.length ? el('p', { class: 'meta' }, meta.map(([k, v]) => `${k}: ${d.options.find((o) => o.value === v).label}`).join(' · ')) : '',
+      err,
+    ), el('div', { class: 'choices', role: 'group', 'aria-label': d.title }, ...buttons));
+  }
+
+  function render() {
+    const waiting = state.decisions.filter((d) => !state.answers[d.key]);
+    const answered = state.decisions.filter((d) => state.answers[d.key]);
+    document.getElementById('count').textContent = `${waiting.length} waiting · ${answered.length} answered`;
+    const list = (items) => el('div', { class: 'list' }, ...items.map(row));
+    document.getElementById('board').replaceChildren(
+      el('h2', {}, 'Waiting'), waiting.length ? list(waiting) : el('p', { class: 'list empty' }, 'Nothing is waiting on you.'),
+      ...(answered.length ? [el('h2', {}, 'Answered'), list(answered)] : []));
+  }
+
+  const banner = document.getElementById('banner');
+  call('/api/decisions').then(() => (banner.hidden = true), (e) => {
+    banner.textContent = `Can't read the decisions file: ${e.message}`;
+    banner.hidden = false;
+  });
+</script>
+</body>
+</html>
