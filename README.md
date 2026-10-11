@@ -20,7 +20,7 @@
 
 Agents stop and ask: ship this, keep that, turn this on? Those questions scatter across terminals and chats, and an answer typed in the wrong place gets lost.
 
-sign-off puts them on one calm list. The agent writes a small JSON file, you click **Yes** or **No**, and the answer is saved next to the file for the agent to read. It runs only on `127.0.0.1`: no account, no hosting, no runtime dependencies.
+sign-off puts them on one calm list. The agent writes a small JSON file, you inspect the linked done-done run evidence, click **Yes** or **No**, and the answer is saved next to the file for the agent to read. It runs only on `127.0.0.1`: no account, no hosting, no runtime dependencies.
 
 Your answer survives reloads and restarts; you can change it with one more click. Recommendations and silent defaults are shown, never applied for you.
 
@@ -35,6 +35,7 @@ git clone https://github.com/umeranjum17/sign-off && cd sign-off && npm install 
 # 2. Open the page with the demo questions (copy them so the answers stay out of the repo)
 cp fixtures/demo-decisions.json /tmp/decisions.json
 node dist/cli.js serve /tmp/decisions.json       # prints http://127.0.0.1:4410/
+# Optional: add --evidence-root /path/to/done-done/evidence to read proof records/media
 
 # 3. Click an answer, then read it back the way an agent would
 node dist/cli.js answers /tmp/decisions.json     # {"weekly-digest":{"answer":"yes",...}}

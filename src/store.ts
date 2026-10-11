@@ -2,9 +2,10 @@ import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 
 export type Option = { value: string; label: string };
+export type EvidenceLink = { run_id: string; commit: string; outcome: string; repro: string; proof: string; evidence: string };
 export type Decision = {
   key: string; title: string; about?: string; detail?: string; options: Option[];
-  recommend_value?: string; default_if_silent?: string; close: string;
+  recommend_value?: string; default_if_silent?: string; close: string; evidence?: EvidenceLink;
 };
 export type Answer = { key: string; answer: string; label: string; close: string; at: string };
 
@@ -32,13 +33,18 @@ export function loadDecisions(path: string): Decision[] {
     seen.set(d.key, i);
     if (!isText(d.title) || !d.title.trim()) throw bad('title', 'must be non-empty text');
     for (const f of ['about', 'detail']) if (d[f] !== undefined && !isText(d[f])) throw bad(f, 'must be text');
+    if (d.evidence !== undefined && (!d.evidence || !/^[A-Za-z0-9._-]{1,128}$/.test(d.evidence.run_id ?? '')
+      || !/^[a-f0-9]{40}$/.test(d.evidence.commit ?? '')
+      || ['outcome', 'repro', 'proof', 'evidence'].some((f) => !isText(d.evidence[f]) || d.evidence[f].length > 1000))) {
+      throw bad('evidence', 'must name a done-done run, full commit, and four Checks lines');
+    }
     for (const [f, allowed] of Object.entries(ONE_OF)) if (d[f] !== undefined && !allowed.includes(d[f])) throw bad(f, `must be ${allowed.join(' or ')}`);
     const options = d.options ?? YES_NO;
     if (!Array.isArray(options) || options.map((o) => o?.value).sort().join() !== 'no,yes'
       || !options.every((o) => isText(o.label) && o.label.trim())) throw bad('options', 'must be exactly yes and no, each with a label');
     return {
       key: d.key, title: d.title, about: d.about, detail: d.detail, options: options.map((o: Option) => ({ value: o.value, label: o.label })),
-      recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done',
+      recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done', evidence: d.evidence,
     };
   });
 }

@@ -1,18 +1,36 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { appendFileSync, copyFileSync, mkdtempSync } from 'node:fs';
+import { appendFileSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { get } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
-const file = join(mkdtempSync(join(tmpdir(), 'sign-off-')), 'd.json');
+const scratch = mkdtempSync(join(tmpdir(), 'sign-off-'));
+const file = join(scratch, 'd.json');
+const root = join(scratch, 'proof');
+const runId = '20261011T120000Z-a1b2c3d4';
+const commit = '0123456789abcdef0123456789abcdef01234567';
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=', 'base64');
+mkdirSync(join(root, '.done-done', 'runs'), { recursive: true });
+writeFileSync(join(root, 'after.png'), png);
+const makeRecord = (path = 'after.png', bytes = png) => ({ schema: 1, run_id: runId, journey: 'sign-off evidence', command: 'node capture.mjs', commit, tree: 'a'.repeat(40), dirty: false,
+  started_at: '2026-10-11T12:00:00Z', ended_at: '2026-10-11T12:01:00Z', exit: 0,
+  files: [{ path, sha256: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.length }] });
+const recordPath = join(root, '.done-done', 'runs', `${runId}.json`);
+writeFileSync(recordPath, JSON.stringify(makeRecord()));
+const originalRecord = readFileSync(recordPath);
 copyFileSync(new URL('../fixtures/sample-decisions.json', import.meta.url), file);
+const decisions = JSON.parse(readFileSync(file, 'utf8'));
+decisions.decisions[0].title = 'Umer: Ship the new sign-in screen this week?';
+decisions.decisions[0].evidence = { run_id: runId, commit, outcome: 'Umer can see the updated sign-in screen.', repro: 'repro: n/a: no bug', proof: 'verify-sign-off: real browser journey', evidence: 'after.png' };
+writeFileSync(file, JSON.stringify(decisions));
 const procs = [];
 after(() => procs.forEach((p) => p.kill()));
 async function serve() {
-  const proc = spawn('node', [cli, 'serve', file, '--port', '0'], { cwd: tmpdir() });
+  const proc = spawn('node', [cli, 'serve', file, '--port', '0', '--evidence-root', root], { cwd: tmpdir() });
   procs.push(proc);
   return { proc, url: await new Promise((ok) => proc.stdout.once('data', (b) => ok(b.toString().trim()))) };
 }
@@ -21,7 +39,18 @@ const post = (url, body) => fetch(`${url}api/answers`, { method: 'POST', headers
 test('answer journey: save, survive a torn line and a restart, read back', async () => {
   let { proc, url } = await serve();
   assert.match(await (await fetch(url)).text(), /<title>Decisions/);
-  assert.equal((await post(url, { key: 'short-question', answer: 'yes' })).status, 200);
+  const board = await (await fetch(`${url}api/decisions`)).json();
+  assert.equal(board.decisions[0].evidenceCard.result, 'RUN PASS');
+  assert.equal(board.decisions[0].evidenceCard.commit, commit);
+  assert.equal(board.decisions[0].evidenceCard.media[0].path, 'after.png');
+  assert.deepEqual(Buffer.from(await (await fetch(`${url}${board.decisions[0].evidenceCard.media[0].url.slice(1)}`)).arrayBuffer()), png);
+  assert.deepEqual(readFileSync(recordPath), originalRecord);
+  assert.deepEqual(JSON.parse(execFileSync('node', [cli, 'answers', file], { stdio: ['ignore', 'pipe', 'ignore'] })), {});
+  const saved = await post(url, { key: 'short-question', answer: 'yes' });
+  assert.equal(saved.status, 200);
+  const answeredBoard = await saved.json();
+  assert.equal(answeredBoard.decisions[0].evidenceCard.result, 'RUN PASS');
+  assert.equal(answeredBoard.decisions[0].evidenceCard.media.length, 1);
   assert.equal((await post(url, { key: 'short-question', answer: 'maybe' })).status, 400);
   assert.equal((await post(url, { key: 'gone', answer: 'yes' })).status, 404);
   appendFileSync(file.replace('.json', '.answers.jsonl'), '{"key":"torn');
@@ -32,4 +61,23 @@ test('answer journey: save, survive a torn line and a restart, read back', async
   assert.equal((await (await fetch(`${url}api/decisions`)).json()).answers['short-question'].answer, 'yes');
   const printed = JSON.parse(execFileSync('node', [cli, 'answers', file], { stdio: ['ignore', 'pipe', 'ignore'] }));
   assert.deepEqual(Object.keys(printed).sort(), ['short-question', 'use-dark-default']);
+  writeFileSync(recordPath, '{malformed');
+  assert.equal((await (await fetch(`${url}api/decisions`)).json()).decisions[0].evidenceCard.result, 'UNVERIFIED');
+  rmSync(recordPath);
+  assert.equal((await (await fetch(`${url}api/decisions`)).json()).decisions[0].evidenceCard.result, 'UNVERIFIED');
+  const changed = JSON.parse(readFileSync(file, 'utf8'));
+  changed.decisions[0].evidence.commit = 'f'.repeat(40);
+  writeFileSync(file, JSON.stringify(changed));
+  writeFileSync(recordPath, JSON.stringify(makeRecord()));
+  assert.equal((await (await fetch(`${url}api/decisions`)).json()).decisions[0].evidenceCard.result, 'UNVERIFIED');
+  changed.decisions[0].evidence.commit = commit;
+  writeFileSync(file, JSON.stringify(changed));
+  const outside = join(scratch, 'private.png');
+  writeFileSync(outside, 'private bytes');
+  symlinkSync(outside, join(root, 'escape.png'));
+  writeFileSync(join(root, '.done-done', 'runs', `${runId}.json`), JSON.stringify(makeRecord('escape.png', Buffer.from('private bytes'))));
+  const unverified = await (await fetch(`${url}api/decisions`)).json();
+  assert.equal(unverified.decisions[0].evidenceCard.result, 'UNVERIFIED');
+  assert.equal((await fetch(`${url}api/evidence?run=${runId}&file=escape.png`)).status, 404);
+  assert.deepEqual(JSON.parse(execFileSync('node', [cli, 'answers', file], { stdio: ['ignore', 'pipe', 'ignore'] })), printed);
 });
