@@ -7,10 +7,13 @@
 <p align="center"><b>Answer your agents' yes/no questions in one click, from a page on your own machine.</b></p>
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/media/desktop-dark.png">
-    <img src="docs/media/desktop-light.png" width="860" alt="The sign-off decisions page: three questions waiting, each with Yes and No buttons and a recommendation, and one answered question with Yes filled in">
-  </picture>
+  <img src="docs/flow-ask.svg" width="240" alt="1. Agent asks: Keep the digest?">
+  <img src="docs/flow-answer.svg" width="240" alt="2. You click Yes or No on the page.">
+  <img src="docs/flow-receipt.svg" width="240" alt="3. Agent reads your saved answer: yes.">
+</p>
+
+<p align="center">
+  <img src="docs/media/desktop-light-list.png" width="860" alt="Light desktop: three waiting questions with recommendations and Yes/No buttons, and the weekly digest answered Yes">
 </p>
 
 ## Why
@@ -19,17 +22,7 @@ Agents stop and ask: ship this, keep that, turn this on? Those questions scatter
 
 sign-off puts them on one calm list. The agent writes a small JSON file, you click **Yes** or **No**, and the answer is saved next to the file for the agent to read. It runs only on `127.0.0.1`: no account, no hosting, no runtime dependencies.
 
-- **One click.** Each question shows what the agent recommends and what happens if you stay silent. sign-off only shows that default; it never answers for you.
-- **Nothing lost.** Every answer is appended to a file before the page confirms it, so it survives a reload and a server restart. Change your mind with one more click.
-- **Phone and desktop, day and night.** It follows your system theme and fits a narrow phone screen with large text.
-
-## Screenshots
-
-| Phone, light | Phone, dark |
-|---|---|
-| <img src="docs/media/phone-light.png" width="300" alt="Decisions page on a phone in light mode"> | <img src="docs/media/phone-dark.png" width="300" alt="Decisions page on a phone in dark mode"> |
-| **Desktop, light** | **Desktop, dark** |
-| <img src="docs/media/desktop-light.png" width="420" alt="Decisions page on a desktop in light mode"> | <img src="docs/media/desktop-dark.png" width="420" alt="Decisions page on a desktop in dark mode"> |
+Your answer survives reloads and restarts; you can change it with one more click. Recommendations and silent defaults are shown, never applied for you.
 
 ## Quick start
 
@@ -57,39 +50,22 @@ sign-off help
 
 Exit codes: `0` ok, `2` usage or input error (the message names the item, key and field).
 
-## File formats
+Write your own questions using the [file-format reference](docs/file-formats.md).
 
-**Questions**, written by the agent (`decisions.json`):
+## On your screen
 
-```json
-{
-  "schema": 1,
-  "decisions": [
-    {
-      "key": "dark-default",
-      "title": "Turn on dark mode by default for new users?",
-      "about": "Most test users switch to dark within a day.",
-      "detail": "Changes the first-run default only.",
-      "recommend_value": "yes",
-      "default_if_silent": "no"
-    }
-  ]
-}
-```
+Real demo questions, with one Yes already saved. Desktop shots are cropped to the list, not redrawn.
 
-- `key`: 1-128 of `A-Z a-z 0-9 . _ -`, unique in the file. `title`: required.
-- `options`: optional; only `yes` and `no` for now, each with a `label`.
-- `recommend_value`, `default_if_silent`: optional, `yes` or `no`. Shown, never applied.
-- `close`: optional, `done` (default) or `release`; copied into the answer.
-- `type`: optional, `decision` only. Other keys are ignored.
+**Desktop · dark**
 
-**Answers**, written by sign-off next to the questions (`decisions.answers.jsonl`, mode 600, one line per click, the latest line per key wins):
+<img src="docs/media/desktop-dark-list.png" width="860" alt="Dark desktop: the same question list, with the saved Yes highlighted in purple">
 
-```json
-{"key":"dark-default","answer":"yes","label":"Yes","close":"done","at":"2026-10-11T09:14:03Z"}
-```
+**Phone · light and dark**
 
-`*.answers.jsonl` is git-ignored here so an answer is never committed by accident.
+<p>
+  <img src="docs/media/phone-light.png" width="300" alt="Decisions page on a phone in light mode">
+  <img src="docs/media/phone-dark.png" width="300" alt="Decisions page on a phone in dark mode">
+</p>
 
 ## Development
 
