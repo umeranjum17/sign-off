@@ -21,7 +21,11 @@ Use the unique browser session/profile from `SKILL.md`. Set `EVIDENCE` to a fres
    ```sh
    chrome-devtools-axi eval 'async () => { const imgs = [...document.querySelectorAll(".markdown-body img")]; await Promise.all(imgs.map(i => i.decode().catch(() => null))); return {url:location.href,theme:matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",background:getComputedStyle(document.body).backgroundColor,images:imgs.map(i => ({alt:i.alt,src:i.currentSrc,loaded:i.complete && i.naturalWidth > 0,naturalWidth:i.naturalWidth,width:i.getBoundingClientRect().width}))}; }'
    ```
-3. Capture `readme-desktop-light.png`, `readme-desktop-dark.png`, `readme-phone-light.png`, `readme-phone-dark.png` with `chrome-devtools-axi screenshot "$EVIDENCE/<name>.png" --full-page`.
+3. Before EVERY screenshot, reset the page scroll and allow GitHub's sticky file toolbar to settle; restored scroll can otherwise cover the flow in a full-page capture:
+   ```sh
+   chrome-devtools-axi eval 'async () => { window.scrollTo(0,0); await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))); return {scrollY}; }'
+   ```
+   Confirm `scrollY: 0`, then capture `readme-desktop-light.png`, `readme-desktop-dark.png`, `readme-phone-light.png`, `readme-phone-dark.png` with `chrome-devtools-axi screenshot "$EVIDENCE/<name>.png" --full-page`.
 4. In each theme, also inspect `320x700x2,mobile,touch`. Repeat at 130% text size on narrow phone and desktop. This is a text-only browser stress probe, not a production style change:
    ```sh
    chrome-devtools-axi eval '() => { const a=document.querySelector(".markdown-body"); const sizes=[a,...a.querySelectorAll("*")].map(e=>[e,parseFloat(getComputedStyle(e).fontSize)]); sizes.forEach(([e,s])=>e.style.fontSize=`${s*1.3}px`); return {fontScale:1.3}; }'
