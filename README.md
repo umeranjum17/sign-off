@@ -12,6 +12,10 @@
   <img src="docs/flow-receipt.svg" width="240" alt="3. Agent reads your saved answer: yes.">
 </p>
 
+<p align="center">
+  <img src="docs/media/desktop-light-list.png" width="860" alt="Light desktop: three waiting questions with recommendations and Yes/No buttons, and the weekly digest answered Yes">
+</p>
+
 ## Why
 
 Agents stop and ask: ship this, keep that, turn this on? Those questions scatter across terminals and chats, and an answer typed in the wrong place gets lost.
@@ -51,10 +55,6 @@ Write your own questions using the [file-format reference](docs/file-formats.md)
 ## On your screen
 
 Real demo questions, with one Yes already saved. Desktop shots are cropped to the list, not redrawn.
-
-**Desktop · light**
-
-<img src="docs/media/desktop-light-list.png" width="860" alt="Light desktop: three waiting questions with recommendations and Yes/No buttons, and the weekly digest answered Yes">
 
 **Desktop · dark**
 
