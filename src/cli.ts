@@ -340,8 +340,10 @@ async function locked<T>(lock: string, fn: () => T | Promise<T>, busy = 'another
   for (;;) {
     try { writeFileSync(lock, `${process.pid}\n`, { flag: 'wx', mode: 0o600 }); break; } catch (e: any) {
       if (e.code !== 'EEXIST') throw e;
-      if (!tries--) throw fail(busy, 'BUSY', staleLock(lock) ? `A sign-off-axi that stopped mid-write left ${tilde(lock)}: run \`rm ${shellPath(lock)}\` and try again`
-        : `If no sign-off-axi is running, delete ${tilde(lock)} and try again`);
+      if (!tries--) {
+        throw staleLock(lock) ? fail(`a sign-off-axi that stopped mid-write left ${basename(lock)} behind`, 'BUSY', `Run \`rm ${shellPath(lock)}\`, then try again`)
+          : fail(busy, 'BUSY', `If no sign-off-axi is running, delete ${tilde(lock)} and try again`);
+      }
       await new Promise((ok) => setTimeout(ok, 20));
     }
   }

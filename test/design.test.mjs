@@ -463,7 +463,7 @@ test('a lock left by a sign-off-axi that stopped mid-write: raise names it, doct
   writeFileSync(lock, `${spawnSync(process.execPath, ['-e', '']).pid}\n`);
   const busy = run('raise', join(sod, 'decisions.json'), '--title', 'Ship it?');
   assert.deepEqual([busy.code, /code: BUSY/.test(busy.out)], [1, true]);
-  assert.match(busy.out, /stopped mid-write left .*decisions\.json\.lock: run `rm /);
+  assert.match(busy.out, /a sign-off-axi that stopped mid-write left decisions\.json\.lock behind\n[^]*Run `rm /);
   const broken = run('doctor', dir);
   assert.equal(broken.code, 1);
   const fix = /locks: decisions\.json\.lock left by a sign-off-axi that stopped mid-write, so every raise, post and open waits on it\. Run `([^`]+)`/.exec(broken.out)[1];
