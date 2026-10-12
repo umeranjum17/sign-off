@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { appendFileSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -19,7 +19,10 @@ const run = (...args) => {
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=', 'base64');
 const clip = Buffer.from('0123456789 a short recording stand-in');
 const procs = [];
-after(() => procs.forEach((p) => p.kill()));
+after(() => {
+  procs.forEach((p) => p.kill());
+  rmSync(scratch, { recursive: true, force: true });
+});
 
 test('evidence journey: post numbered updates with media, serve them hash-checked, verdict reads back', async () => {
   run('init', scratch);
