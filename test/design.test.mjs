@@ -404,3 +404,12 @@ test('doctor passes a read-only board in a writable setup', { skip: process.getu
     chmodSync(join(sod, 'decisions.json'), 0o600);
   }
 });
+
+test('serve refuses a board that already runs, and the first board keeps its record', async () => {
+  const opened = run('open', board, '--port', '0');
+  const pid = /pid: (\d+)/.exec(opened.out)[1];
+  const second = spawnSync('node', [cli, 'serve', board, '--port', '0'], { encoding: 'utf8', timeout: 5000 });
+  assert.deepEqual([second.status, /code: CONFLICT/.test(second.stdout)], [1, true]);
+  assert.match(run('status', board).out, new RegExp(`pid: ${pid}\\b`));
+  assert.match(run('stop', board).out, /status: stopped/);
+});
