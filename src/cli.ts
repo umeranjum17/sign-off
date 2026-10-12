@@ -9,7 +9,7 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { type Decision, InputError, MEDIA_MAX, NOTE_MAX, answersPath, appendAnswer, appendRound, loadDecisions, readAnswers, readRounds } from './store.js';
+import { CHAPTERS_MAX, type Decision, InputError, MEDIA_MAX, NOTE_MAX, answersPath, appendAnswer, appendRound, loadDecisions, readAnswers, readRounds } from './store.js';
 
 const BOARD = join(homedir(), '.sign-off', 'decisions.json');
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
@@ -24,6 +24,7 @@ examples:
   sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media shot.png
   sign-off-axi post .sign-off/decisions.json --type design --title "Pick the sign-in layout" --option a=A --option b=B --mock a=mocks/a.html --mock b=mocks/b.html --recommend b
   sign-off-axi post .sign-off/decisions.json --type diagram --title "Is this the sign-in flow?" --view mocks/sign-in/flow.svg
+  sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "The new sign-in has 2 steps." --media explainer.mp4 --chapter 0:00=Start
   sign-off-axi init
   sign-off-axi doctor
   sign-off-axi open
@@ -101,6 +102,7 @@ examples:
 `,
   post: `usage: sign-off-axi post [board.json] [--type decision|design|diagram|interactive] --title "<question>" [--key <key>] [--about <text>] [--option <value>=<label>]... [--mock <value>=<path>]... [--view <path>] [--tradeoff <text>] [--recommend <value>] [--default <value>] [--close done|release]
        sign-off-axi post [board.json] --type evidence --title "<what this shows>" --about "<short note>" --media <file>... [--link <commit or URL>] [--detail <text>]
+       sign-off-axi post [board.json] --type explainer --title "<question>" --media <video> [--about <summary>] [--chapter <m:ss>=<title>]... [--key <key>] [--option <value>=<label>]... [--recommend <value>]
 Posts an item for the user. --type decision (the default) is a yes/no or pick-one question, exactly like raise.
 --type design is a pick between up to 6 options shown side by side, each with an optional board-relative mock file
 (.html, .svg, .png, .jpg, .jpeg, .webp), a --tradeoff line and a --recommend badge.
@@ -111,12 +113,15 @@ an image (.svg, .png, .jpg, .jpeg, .webp, 5 MB or less) shown at card width for 
 The page runs in a sandboxed frame: no fetch, no remote files, no access to the dashboard or its tab. Answers work as for a decision.
 --type evidence posts the next numbered update (key update-<number>): 1 to ${MEDIA_MAX} screenshots or recordings (.png, .jpg, .jpeg, .webp, .mp4, .webm, 50 MB each), copied into evidence/<number>/ next to the board, with a short note and an optional commit or PR link.
 The user gives a verdict, pass, fail or needs-work, with an optional note; read it with answers or wait --key update-<number>.
+--type explainer is a decision shown with a narrated video you made: one --media .mp4 or .webm (50 MB or less), copied into evidence/<number>/ like evidence
+and played on the card. --about is its short summary; up to ${CHAPTERS_MAX} --chapter m:ss=<title> (in order) are buttons that jump the video there. Answers work as for a decision.
 examples:
   sign-off-axi post --type design --title "Pick the sign-in layout" --option a="A: single column" --option b="B: split screen" --mock a=mocks/a.html --mock b=mocks/b.html --tradeoff "B scans fastest; A is simplest." --recommend b
   sign-off-axi post .sign-off/decisions.json --type design --key sign-in --title "Pick the sign-in layout" --option a=A --option b=B --option c=C --mock a=mocks/sign-in/index.html?variant=a --mock b=mocks/sign-in/index.html?variant=b --mock c=mocks/sign-in/index.html?variant=c --tradeoff "..." --recommend b
   sign-off-axi post --type decision --title "Keep the weekly digest?" --recommend yes
   sign-off-axi post .sign-off/decisions.json --type interactive --title "Does the sign-in flow feel right?" --view mocks/sign-in/demo.html --option yes=Yes --option no="Needs work"
   sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media phone.png --media flow.mp4 --link https://github.com/acme/app/pull/12
+  sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "The new sign-in has 2 steps." --media explainer.mp4 --chapter 0:00=Start --chapter 0:12="Step 2"
 `,
   init: `usage: sign-off-axi init [dir]
 Writes a repo's sign-off setup under <dir>/.sign-off/ (config, an empty board, mocks/ and evidence/ folders, and a .gitignore keeping media and answer files out of git). A file that is already there is kept, never changed.
@@ -295,19 +300,19 @@ const mockFile = (path: string) => path.split('?')[0];
 /** Posts an item. `raise` is the alias for `post --type decision`: same flags as before, same output. */
 function post(args: string[], cmd = 'post') {
   const typed: Flags = cmd === 'post' ? { type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
-    media: { type: 'string', multiple: true }, link: { type: 'string' }, view: { type: 'string' } } : {};
+    media: { type: 'string', multiple: true }, link: { type: 'string' }, view: { type: 'string' }, chapter: { type: 'string', multiple: true } } : {};
   const { file, values, on } = parse(cmd, args, { from: { type: 'string' }, ...typed,
     ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: f === 'option' }])) });
-  const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'link', 'view'].filter((f) => values[f] !== undefined);
+  const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'link', 'view', 'chapter'].filter((f) => values[f] !== undefined);
   if (values.from !== undefined && given.length) throw fail(`--from cannot be combined with --${given[0]}`, 'VALIDATION_ERROR', `Put every field in the --from file, or ${cmd} with flags only`);
   const type = values.type ?? 'decision';
   if (values.from === undefined && values.title === undefined) {
     throw fail('--title is required (or --from <decisions.json>)', 'VALIDATION_ERROR', type === 'design' ? 'sign-off-axi post --type design --title "<question>" --option a=A --option b=B'
       : type === 'evidence' ? 'sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media <file>' : `sign-off-axi ${cmd} --title "<question>" [--recommend <value>]`);
   }
-  if (!['decision', 'design', 'evidence', 'diagram', 'interactive'].includes(type)) throw fail(`--type must be decision, design, evidence, diagram or interactive`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
-  if (type === 'evidence') return postEvidence(file, on, values);
-  if (values.media !== undefined || values.link !== undefined) throw fail('--media and --link need --type evidence', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
+  if (!['decision', 'design', 'evidence', 'diagram', 'interactive', 'explainer'].includes(type)) throw fail(`--type must be decision, design, evidence, diagram, interactive or explainer`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
+  if (type === 'evidence' || type === 'explainer') return postMedia(file, on, values, type);
+  if (values.media !== undefined || values.link !== undefined || values.chapter !== undefined) throw fail('--media, --link and --chapter need --type evidence or explainer', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (type !== 'design' && (values.tradeoff !== undefined || values.mock !== undefined)) throw fail('--tradeoff and --mock need --type design', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   const view = type === 'diagram' || type === 'interactive';
   if (view !== (values.view !== undefined)) throw fail(view ? `--type ${type} needs --view <path>` : '--view needs --type diagram or interactive', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
@@ -337,16 +342,25 @@ function post(args: string[], cmd = 'post') {
 }
 
 const MEDIA_BYTES = 50_000_000;
-/** Copies the media into evidence/<n>/ next to the board and adds update-<n>, numbered under the board lock. */
-function postEvidence(file: string, on: string, values: Record<string, any>) {
-  const extra = ['key', 'option', 'recommend', 'default', 'mock', 'tradeoff', 'view'].find((f) => values[f] !== undefined);
-  if (extra) throw fail(`--${extra} does not apply to --type evidence`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
-  const example = 'sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media shot.png';
-  if (!values.about?.trim()) throw fail('--about is required for --type evidence: the short note', 'VALIDATION_ERROR', example);
+/** Copies the media into evidence/<n>/ next to the board and adds the item, numbered under the board lock: update-<n>, or an explainer under its own key. */
+function postMedia(file: string, on: string, values: Record<string, any>, type: 'evidence' | 'explainer') {
+  const explainer = type === 'explainer';
+  const extra = (explainer ? ['mock', 'tradeoff', 'view', 'link'] : ['key', 'option', 'recommend', 'default', 'mock', 'tradeoff', 'view', 'chapter']).find((f) => values[f] !== undefined);
+  if (extra) throw fail(`--${extra} does not apply to --type ${type}`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
+  const example = explainer ? 'sign-off-axi post --type explainer --title "<question>" --about "<short summary>" --media explainer.mp4'
+    : 'sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media shot.png';
+  if (!explainer && !values.about?.trim()) throw fail('--about is required for --type evidence: the short note', 'VALIDATION_ERROR', example);
+  if (explainer && values.media?.length !== 1) throw fail('--type explainer needs one --media video (.mp4 or .webm)', 'VALIDATION_ERROR', example);
   if (!values.media?.length || values.media.length > MEDIA_MAX) throw fail(`--type evidence needs 1 to ${MEDIA_MAX} --media files`, 'VALIDATION_ERROR', example);
+  const kinds = explainer ? ['.mp4', '.webm'] : Object.keys(mediaTypes), options = optionsOf(values);
+  const chapters = values.chapter?.map((c: string) => {
+    const m = /^(\d{1,3}):([0-5]\d)=(.+)$/.exec(c);
+    if (!m) throw fail(`--chapter ${c} must be <m:ss>=<title>`, 'VALIDATION_ERROR', 'sign-off-axi post --type explainer ... --chapter 0:00=Start --chapter 0:12="Step 2"');
+    return { at: Number(m[1]) * 60 + Number(m[2]), title: m[3] };
+  });
   const sources: string[] = values.media.map((m: string) => {
     const path = resolve(m), info = statSync(path, { throwIfNoEntry: false });
-    if (!mediaTypes[extname(path).toLowerCase()]) throw fail(`--media ${m} must end in ${Object.keys(mediaTypes).join(', ')}`, 'VALIDATION_ERROR');
+    if (!kinds.includes(extname(path).toLowerCase())) throw fail(`--media ${m} must end in ${kinds.join(', ')}`, 'VALIDATION_ERROR');
     if (!info?.isFile()) throw fail(`--media ${tilde(path)} is not a file`, 'NOT_FOUND');
     if (info.size > MEDIA_BYTES) throw fail(`--media ${tilde(path)} is over 50 MB`, 'VALIDATION_ERROR', 'Trim or compress the recording');
     return path;
@@ -355,20 +369,23 @@ function postEvidence(file: string, on: string, values: Record<string, any>) {
   return locked(`${file}.lock`, () => {
     const doc = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { schema: 1, decisions: [] };
     // Boards in one folder share evidence/, so a number is taken only by creating its folder; one in use is never written into.
-    const store = join(dirname(file), 'evidence'), taken = board(file).map((d) => Number(/^update-(\d+)$/.exec(d.key)?.[1] ?? 0));
+    const current = board(file), store = join(dirname(file), 'evidence'), taken = current.map((d) => Number(/^update-(\d+)$/.exec(d.key)?.[1] ?? 0));
+    const own = explainer && (values.key ?? slug(values.title));
+    if (own && current.some((d) => d.key === own)) throw fail(`key ${own} is already used on ${tilde(file)}`, 'CONFLICT', 'Post it under a new --key');
     mkdirSync(store, { recursive: true, mode: 0o700 });
     let number = Math.max(0, ...taken, ...readdirSync(store).map(Number).filter(Number.isInteger)) + 1;
     for (;; number++) {
       try { mkdirSync(join(store, String(number)), { mode: 0o700 }); break; } catch (e: any) { if (e.code !== 'EEXIST') throw e; }
     }
-    const key = `update-${number}`, dir = join(store, String(number));
+    const key = own || `update-${number}`, dir = join(store, String(number));
     const media = sources.map((src, i) => {
       const bytes = readFileSync(src), path = `evidence/${number}/${i + 1}${extname(src).toLowerCase()}`;
       writeFileSync(join(dir, `${i + 1}${extname(src).toLowerCase()}`), bytes, { mode: 0o600 });
       return { path, sha256: sha256(bytes), bytes: bytes.length };
     });
-    const { title, about, detail, close, link } = values;
-    doc.decisions.push({ key, type: 'evidence', number, title, about, detail, close, link, media });
+    const { title, about, detail, close, link, recommend: recommend_value, default: default_if_silent } = values;
+    doc.decisions.push(explainer ? { key, type, title, about, detail, options, recommend_value, default_if_silent, close, chapters, media }
+      : { key, type, number, title, about, detail, close, link, media });
     const tmp = `${file}.${process.pid}.tmp`;
     writeFileSync(tmp, `${JSON.stringify(doc, null, 2)}\n`, { mode: 0o600 });
     try { loadDecisions(tmp); } catch (e) {
@@ -377,11 +394,17 @@ function postEvidence(file: string, on: string, values: Record<string, any>) {
       throw e instanceof InputError ? new InputError(e.message.replace(basename(tmp), basename(file))) : e;
     }
     renameSync(tmp, file);
+    if (explainer) return toon({ board: tilde(file), raised: [{ key, status: 'raised', title }] }, [`Run \`sign-off-axi open${on}\` so the user can watch and answer`, `Run \`sign-off-axi wait${on} --key ${key}\` to block until they do`]);
     return toon({ board: tilde(file), posted: [{ key, number, media: media.length, title }] },
       [`Run \`sign-off-axi open${on}\` so the user can give a verdict`, `Run \`sign-off-axi wait${on} --key ${key}\` to block until they do`]);
   });
 }
 
+const optionsOf = (values: Record<string, any>) => values.option?.map((o: string) => {
+  const at = o.indexOf('=');
+  if (at < 1) throw fail(`--option ${o} must be <value>=<label>`, 'VALIDATION_ERROR', 'sign-off-axi raise --title "<question>" --option friday=Friday --option next-week="Next week"');
+  return { value: o.slice(0, at), label: o.slice(at + 1) };
+});
 /** Flags are validated by the same loader as a file: write them as a one-decision file first. */
 function buildIncoming(values: Record<string, any>, extra: object = {}): { incoming: Decision[]; raw: object[] } {
   if (values.from !== undefined) {
@@ -392,12 +415,7 @@ function buildIncoming(values: Record<string, any>, extra: object = {}): { incom
   const source = join(scratch, 'flags');
   try {
     const { title, key = slug(title), about, detail, recommend: recommend_value, default: default_if_silent, close } = values;
-    const options = values.option?.map((o: string) => {
-      const at = o.indexOf('=');
-      if (at < 1) throw fail(`--option ${o} must be <value>=<label>`, 'VALIDATION_ERROR', 'sign-off-axi raise --title "<question>" --option friday=Friday --option next-week="Next week"');
-      return { value: o.slice(0, at), label: o.slice(at + 1) };
-    });
-    writeFileSync(source, JSON.stringify({ schema: 1, decisions: [{ key, title, about, detail, options, recommend_value, default_if_silent, close, ...extra }] }));
+    writeFileSync(source, JSON.stringify({ schema: 1, decisions: [{ key, title, about, detail, options: optionsOf(values), recommend_value, default_if_silent, close, ...extra }] }));
     return { incoming: loadDecisions(source), raw: JSON.parse(readFileSync(source, 'utf8')).decisions };
   } finally {
     rmSync(scratch, { recursive: true, force: true });
@@ -685,7 +703,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   }
   if (req.method === 'GET' && req.url?.startsWith('/api/media?')) {
     const q = new URL(req.url, 'http://localhost').searchParams;
-    const m = loadDecisions(file).find((d) => d.type === 'evidence' && d.key === q.get('key'))?.media?.[Number(q.get('i') || NaN)];
+    const m = loadDecisions(file).find((d) => d.key === q.get('key'))?.media?.[Number(q.get('i') || NaN)];
     const type = m && mediaTypes[extname(m.path).toLowerCase()];
     if (!m || !type) return [404, { error: 'Evidence is unavailable' }];
     try {

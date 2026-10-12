@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -76,6 +76,19 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   writeFileSync(join(scratch, 'outside.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>');
   symlinkSync(join(scratch, 'outside.svg'), join(so, 'mocks', 'flow', 'link.svg'));
   assert.equal(run('post', board, '--type', 'diagram', '--title', 'Other?', '--view', 'mocks/flow/link.svg').code, 2);
+  // The explainer rung: one narrated video the agent made, copied into the store and hash-checked like evidence media.
+  const video = join(scratch, 'explainer.mp4'), clip = Buffer.from('0123456789 a narrated video stand-in');
+  writeFileSync(video, clip);
+  const explainer = ['--type', 'explainer', '--key', 'tour', '--title', 'Is the new sign-in clear?'];
+  for (const bad of [[], ['--media', video, '--media', video], ['--media', join(scratch, 'outside.svg')], ['--media', video, '--chapter', '12=Start'],
+    ['--media', video, '--chapter', '0:12=B', '--chapter', '0:05=A'], ['--media', video, '--link', 'https://example.com'], ['--media', video, '--view', 'mocks/flow/flow.svg'], ['--media', video, '--option', 'bad']]) {
+    assert.equal(run('post', board, ...explainer, ...bad).code, 2, bad.join(' '));
+    assert.deepEqual(readdirSync(join(so, 'evidence')), [], bad.join(' '));
+  }
+  assert.equal(run('post', board, '--type', 'decision', '--title', 'Other?', '--chapter', '0:00=A').code, 2);
+  assert.match(run('post', board, ...explainer, '--about', 'The new sign-in has 2 steps.', '--media', video,
+    '--chapter', '0:00=Start', '--chapter', '1:05=Step 2', '--option', 'clear=Clear', '--option', 'unclear=Not clear', '--recommend', 'clear').out, /tour,raised,/);
+  assert.match(run('post', board, ...explainer, '--media', video).out, /key tour is already used/);
   const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: tmpdir() });
   procs.push(proc);
   const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
@@ -88,8 +101,18 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   assert.equal(api.decisions[0].title, 'Pick the sign-in layout');
   assert.equal(api.decisions[0].tradeoff, 'B scans fastest; A is simplest.');
   assert.equal(api.decisions[0].mocks.length, 3);
-  assert.deepEqual(api.decisions.map((d) => d.type), ['design', 'report', 'decision', 'design', 'diagram', 'interactive']);
+  assert.deepEqual(api.decisions.map((d) => d.type), ['design', 'report', 'decision', 'design', 'diagram', 'interactive', 'explainer']);
   assert.equal(api.decisions[4].view, 'mocks/flow/flow.svg');
+  const tour = api.decisions[6];
+  assert.deepEqual([tour.about, tour.chapters, tour.media.length], ['The new sign-in has 2 steps.', [{ at: 0, title: 'Start' }, { at: 65, title: 'Step 2' }], 1]);
+  assert.match(tour.media[0].path, /^evidence\/\d+\/1\.mp4$/);
+  const played = await fetch(`${url}api/media?key=tour&i=0`, { headers: { range: 'bytes=0-3' } });
+  assert.deepEqual([played.status, played.headers.get('content-type'), await played.text()], [206, 'video/mp4', '0123']);
+  assert.match(html, /function chapters/);
+  assert.equal((await post(url, 'api/answers', { key: 'tour', answer: 'unclear', note: 'Umer: step 2 is too fast.' })).status, 200);
+  assert.equal(JSON.parse(run('answers', board, '--key', 'tour', '--json').out).tour.answer, 'unclear');
+  appendFileSync(join(so, tour.media[0].path), 'x');
+  assert.equal((await fetch(`${url}api/media?key=tour&i=0`)).status, 404);
   // Each view is served as its own sandboxed page that can fetch nothing, even opened full size.
   for (const [key, type] of [['flow', 'image/svg+xml'], ['demo', 'text/html'], ['pick-the-sign-in-layout&value=a', 'text/html']]) {
     const res = await fetch(`${url}api/mock?key=${key}`);

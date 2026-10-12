@@ -52,12 +52,18 @@ Build mocks with a cheap model, for example Go Muse, haiku or luna. A mock is th
 
 ## Show it when words are not enough
 
-Use the simplest view that explains the item: plain text, then a diagram, then an interactive page.
+Use the simplest view that explains the item: plain text, then a diagram, then an interactive page, then a narrated video.
 
 - Diagram: draw an SVG (or save a PNG) under `.sign-off/mocks/<key>/`, then post with `--type diagram --view mocks/<key>/flow.svg`.
 - Interactive page: write one self-contained `.html` file (inline CSS and JS, no network) under `.sign-off/mocks/<key>/`, then post with `--type interactive --view mocks/<key>/demo.html`. It runs sandboxed: no fetch, no remote files, no access to the dashboard.
+- Narrated video (an explainer): make it yourself with free local tools only, never a paid or online voice service:
+  1. Write a short script in ASD-STE100 Simplified Technical English: 3 to 5 parts, 1 or 2 short sentences each, about 20 to 40 seconds in total.
+  2. Make one still per part (a screenshot or a simple slide), all the same size, for example 1280x720 PNG.
+  3. Turn each part into speech with a free local engine, for example piper (`pip install piper-tts`) or espeak-ng: `piper -m <voice>.onnx -f 1.wav < 1.txt`.
+  4. Join each still with its speech, then join the parts: `ffmpeg -loop 1 -i 1.png -i 1.wav -c:v libx264 -tune stillimage -pix_fmt yuv420p -c:a aac -shortest 1.mp4`, then `ffmpeg -f concat -i parts.txt -c copy -movflags +faststart explainer.mp4` (`parts.txt` lists `file '1.mp4'` and so on).
+  5. Post it with `--type explainer --media explainer.mp4 --about "<one-line summary>"` and one `--chapter <m:ss>=<title>` per part (`ffprobe -show_entries format=duration` gives each part's length). The video plays on the card; the chapters jump to each part.
 
-Both answer like a decision (Yes/No, or your own `--option`s); wait and read the answer the same way.
+All of these answer like a decision (Yes/No, or your own `--option`s); wait and read the answer the same way.
 
 ## Request
 
