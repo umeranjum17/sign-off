@@ -1,6 +1,6 @@
 {
   "name": "sign-off-axi",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "One local review board where you answer your agents' yes/no and pick-one questions: an AXI CLI agents run with no setup.",
   "type": "module",
   "bin": { "sign-off-axi": "dist/cli.js" },
