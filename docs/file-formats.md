@@ -29,15 +29,29 @@
 ```
 
 - `key`: 1-128 of `A-Z a-z 0-9 . _ -`, unique in the file. `title`: required.
-- `type`: optional, `decision` (default), `design` or `evidence`. A design item
+- `type`: optional, `decision` (default), `design`, `evidence`, `diagram` or
+  `interactive`. A design item
   is a pick between mock options shown side by side. An evidence item is a
   numbered update the person gives a verdict on (below). Any other lowercase
   word (1-32 of `a-z 0-9 -`, starting with a letter) also loads; the dashboard
   shows it as a plain card with its options until that type has its own view.
+- `view`: required on `diagram` and `interactive` items, the path of one file
+  relative to the board file's folder (keep it under `mocks/<key>/`), served only
+  from inside that folder. A diagram is an image (`.svg`, `.png`, `.jpg`,
+  `.jpeg`, `.webp`) shown at card width; tap it to open it full size. An
+  interactive item is one self-contained `.html` page (inline CSS and JS, images
+  as `data:` URLs) run in a sandboxed frame. Every mock and view file is served
+  under a Content-Security-Policy that blocks `fetch`, remote loads, forms and
+  top navigation, and gives the page no access to the dashboard. Both types
+  answer like a decision: Yes/No by default, or their own `options`.
+
+  ```json
+  { "key": "sign-in-flow", "type": "diagram", "title": "Is this the sign-in flow?", "view": "mocks/sign-in-flow/flow.svg" }
+  ```
 - `tradeoff`: optional on design items, plain text up to 1000 characters, shown
   next to the mocks.
 - `mocks`: optional on design items, up to 6 entries of an option `value` and a
-  `path` to a mock file, relative to the board file's folder. Each value must
+  `path` to a mock file (`.html`, `.svg`, `.png`, `.jpg`, `.jpeg`, `.webp`), relative to the board file's folder. Each value must
   name one of the item's own options. Served only from inside that folder. An
   `.html` path may end in `?variant=<name>` (1-64 of `A-Z a-z 0-9 . _ -`): the
   page is loaded with that query, so one page can show each variant.

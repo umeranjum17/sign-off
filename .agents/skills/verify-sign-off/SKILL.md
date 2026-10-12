@@ -78,6 +78,7 @@ Look at every shot before you report: nothing overlaps, no text is cut, no raw p
 | Glance summary and type filters in the URL hash, full trade-off, fitted evidence media, recommended vs picked | [features/glance.md](features/glance.md) |
 | Decisions page: list, one-click answer, durable answers | [features/decisions.md](features/decisions.md) |
 | Design item: init/doctor, A/B/C mock cards, `?variant=` pages, another-round asks, `raise` as `post --type decision` | [features/design.md](features/design.md) |
+| Ladder rungs: diagram item inline at card width, interactive item in a sandboxed frame with no network | [features/ladder.md](features/ladder.md) |
 | Evidence updates: numbered posts with media, hash-checked serving, inline video, verdict | [features/evidence.md](features/evidence.md) |
 | One-of-few options and the answer note, old-format compatibility | [features/options-note.md](features/options-note.md) |
 | README media and rendered README | [features/readme.md](features/readme.md) |

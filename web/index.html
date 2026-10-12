@@ -103,6 +103,14 @@
   .mock figcaption { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-top: auto; padding: 0.625rem 0.75rem 0.75rem; font-size: 0.875rem; }
   .mock figcaption .label { flex: 1 1 6rem; font-weight: 500; }
   .mock figcaption button { flex: 1 0 100%; }
+  /* Ladder rungs: a diagram at card width, an interactive page in a sandboxed frame; a white page so drawings read in dark mode. */
+  .rung { grid-column: 1 / -1; display: grid; gap: 0.25rem; justify-items: start; }
+  .rung .frame { display: block; width: 100%; border: 1px solid var(--line); border-radius: 0.7rem; overflow: hidden; background: #fff; }
+  .rung img { display: block; width: 100%; height: auto; max-height: 80vh; object-fit: contain; }
+  .rung iframe { display: block; width: 100%; height: min(32rem, 75vh); border: 0; }
+  .rung .gone { color: var(--danger); margin: 0; }
+  .rung > .meta { color: var(--accent); margin: 0; }
+  .row:has(> .rung) { row-gap: 0.875rem; }
   .badge { padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; color: var(--accent); border: 1px dashed var(--accent); }
   .round { margin-top: 0.5rem; }
   textarea { display: block; width: 100%; max-width: 70ch; margin-top: 0.25rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border);
@@ -214,7 +222,7 @@
       silent ? el('p', { class: 'meta' }, silent) : '',
       more(d, saved, err),
       err,
-    ), updateMedia(d), el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': d.title }, ...buttons), evidenceCard(d));
+    ), updateMedia(d), rung(d), el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': d.title }, ...buttons), evidenceCard(d));
   }
 
   /** The note and another-round controls, folded away until the person wants them. An evidence update takes a note only. */
@@ -253,6 +261,22 @@
       (node.tagName === 'A' ? node.firstChild : node).onerror = () => node.replaceWith(el('p', { class: 'gone' }, `${name} can't be shown: the file is missing, changed since it was posted, or in a format this browser can't play.`));
       return node;
     }));
+  }
+
+  /** A diagram shows inline at card width; an interactive page runs in a sandboxed frame. A tap or the link opens either full size. */
+  function rung(d) {
+    if (!d.view) return '';
+    const url = `/api/mock?key=${encodeURIComponent(d.key)}`, page = d.type === 'interactive';
+    const open = { href: url, target: '_blank', rel: 'noopener' }, name = page ? 'interactive page' : 'diagram';
+    let body;
+    if (page) body = el('div', { class: 'frame' }, el('iframe', { src: url, title: `Interactive page: ${d.title}`, sandbox: 'allow-scripts', loading: 'lazy' }));
+    else {
+      const img = el('img', { src: url, alt: `Diagram: ${d.title}` });
+      // The picture is a tap target too; keyboard and screen reader users get the one link below.
+      body = el('a', { class: 'frame', ...open, tabindex: '-1' }, img);
+      img.onerror = () => body.replaceWith(el('p', { class: 'gone' }, "The diagram can't be shown: its file is missing or in a format this browser can't draw."));
+    }
+    return el('div', { class: 'rung' }, body, el('a', { class: 'meta', ...open, 'aria-label': `Open the ${name} full size, ${d.title}` }, 'Open full size'));
   }
 
   /** One card per option: the mock preview (tap opens it full size), its label, the Recommended badge and its Pick button. */

@@ -60,6 +60,18 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   assert.equal(run('post', board, ...nav, '--mock', 'c=mocks/c.png?variant=c').code, 2);
   assert.equal(run('post', board, ...nav, '--mock', 'a=mocks/nav/index.html?other=a').code, 2);
   assert.match(run('post', board, ...nav, ...['a', 'b', 'c'].flatMap((v) => ['--mock', `${v}=mocks/nav/index.html?variant=${v}`]), '--tradeoff', 'A is flat; B hides; C is dense.', '--recommend', 'a').out, /nav,raised,/);
+  // Ladder rungs: a diagram image and an interactive page, each a decision shown with a picture.
+  mkdirSync(join(so, 'mocks', 'flow'));
+  writeFileSync(join(so, 'mocks', 'flow', 'flow.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>');
+  writeFileSync(join(so, 'mocks', 'flow', 'demo.html'), '<script>fetch("https://example.com")</script>');
+  assert.match(run('post', board, '--type', 'diagram', '--key', 'flow', '--title', 'Is this the sign-in flow?', '--view', 'mocks/flow/flow.svg').out, /flow,raised,/);
+  assert.match(run('post', board, '--type', 'interactive', '--key', 'demo', '--title', 'Does the flow feel right?', '--view', 'mocks/flow/demo.html',
+    '--option', 'yes=Yes', '--option', 'needs-work=Needs work', '--recommend', 'yes').out, /demo,raised,/);
+  for (const bad of [['--type', 'diagram'], ['--type', 'diagram', '--view', 'mocks/flow/demo.html'], ['--type', 'interactive', '--view', 'mocks/flow/flow.svg'],
+    ['--type', 'diagram', '--view', '../outside.svg'], ['--type', 'decision', '--view', 'mocks/flow/flow.svg'], ['--type', 'diagram', '--view', 'mocks/flow/flow.svg', '--mock', 'a=mocks/a.html']]) {
+    assert.equal(run('post', board, '--title', 'Other?', ...bad).code, 2, bad.join(' '));
+  }
+  assert.equal(run('post', board, '--type', 'diagram', '--title', 'Other?', '--view', 'mocks/flow/missing.svg').code, 1);
   const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: tmpdir() });
   procs.push(proc);
   const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
@@ -72,7 +84,16 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   assert.equal(api.decisions[0].title, 'Pick the sign-in layout');
   assert.equal(api.decisions[0].tradeoff, 'B scans fastest; A is simplest.');
   assert.equal(api.decisions[0].mocks.length, 3);
-  assert.deepEqual(api.decisions.map((d) => d.type), ['design', 'report', 'decision', 'design']);
+  assert.deepEqual(api.decisions.map((d) => d.type), ['design', 'report', 'decision', 'design', 'diagram', 'interactive']);
+  assert.equal(api.decisions[4].view, 'mocks/flow/flow.svg');
+  // Each view is served as its own sandboxed page that can fetch nothing, even opened full size.
+  for (const [key, type] of [['flow', 'image/svg+xml'], ['demo', 'text/html']]) {
+    const res = await fetch(`${url}api/mock?key=${key}`);
+    assert.equal(res.headers.get('content-type'), type);
+    assert.match(res.headers.get('content-security-policy'), /connect-src 'none'.*sandbox allow-scripts/);
+  }
+  assert.equal((await post(url, 'api/answers', { key: 'demo', answer: 'needs-work', note: 'Umer: the back step is lost.' })).status, 200);
+  assert.equal(JSON.parse(run('answers', board, '--key', 'demo', '--json').out).demo.answer, 'needs-work');
   assert.deepEqual(api.rounds, []);
   assert.equal(await (await fetch(`${url}api/mock?key=pick-the-sign-in-layout&value=a`)).text(), '<h1>Mock A</h1>');
   assert.equal((await fetch(`${url}api/mock?key=pick-the-sign-in-layout&value=z`)).status, 404);

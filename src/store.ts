@@ -8,7 +8,7 @@ export type EvidenceLink = { run_id: string; commit: string; outcome: string; re
 export type Decision = {
   key: string; title: string; about?: string; detail?: string; options: Option[];
   recommend_value?: string; default_if_silent?: string; close: string; evidence?: EvidenceLink;
-  type: string; tradeoff?: string; mocks?: MockRef[]; number?: number; media?: MediaRef[]; link?: string;
+  type: string; tradeoff?: string; mocks?: MockRef[]; number?: number; media?: MediaRef[]; link?: string; view?: string;
 };
 export type Answer = { key: string; answer: string; label: string; close: string; at: string; note?: string };
 export type Round = { key: string; note: string; at: string };
@@ -24,6 +24,7 @@ const isKey = (v: unknown) => isText(v) && /^[A-Za-z0-9._-]{1,128}$/.test(v as s
 const ONE_OF: Record<string, unknown[]> = { close: ['done', 'release'] };
 export const NOTE_MAX = 500;
 const TRADEOFF_MAX = 1000;
+const VIEWS: Record<string, [string, RegExp]> = { diagram: ['.svg, .png, .jpg, .jpeg or .webp', /\.(svg|png|jpe?g|webp)$/i], interactive: ['.html', /\.html$/i] };
 
 export function loadDecisions(path: string): Decision[] {
   const name = basename(path);
@@ -58,6 +59,9 @@ export function loadDecisions(path: string): Decision[] {
       }
       if (d.link !== undefined && !(isText(d.link) && /^(https?:\/\/\S{1,500}|[a-f0-9]{7,40})$/.test(d.link))) throw bad('link', 'must be an http(s) link or a commit hash');
     }
+    // A ladder rung: a diagram image, or an interactive page the board frames in a sandbox.
+    const views = Object.hasOwn(VIEWS, d.type ?? '') ? VIEWS[d.type] : undefined;
+    if (views && !(isText(d.view) && d.view.length <= 256 && /^[^?#]+$/.test(d.view) && views[1].test(d.view))) throw bad('view', `must be a board-relative ${views[0]} file`);
     const options = d.options ?? (d.type === 'evidence' ? VERDICTS : YES_NO);
     if (!Array.isArray(options) || options.length < 2 || options.length > 6
       || !options.every((o) => isKey(o?.value) && isText(o.label) && o.label.trim())) {
@@ -80,6 +84,7 @@ export function loadDecisions(path: string): Decision[] {
       key: d.key, title: d.title, about: d.about, detail: d.detail, options: options.map((o: Option) => ({ value: o.value, label: o.label })),
       recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done', evidence: d.evidence,
       type: d.type ?? 'decision', tradeoff: d.tradeoff, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path })),
+      ...(views && { view: d.view }),
       ...(d.type === 'evidence' && { number: d.number, link: d.link, media: d.media.map(({ path, sha256, bytes }: MediaRef) => ({ path, sha256, bytes })) }),
     };
   });
