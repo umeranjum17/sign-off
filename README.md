@@ -65,8 +65,8 @@ differ in structure, a short trade-off and one recommendation, posted, waited
 on and read back.
 
 Boards written by 0.1.0 (`"schema": 1`, including `~/.sign-off/decisions.json`)
-read as decision items with their saved answers. The first `raise` or `post`
-rewrites the board as `"schema": 2` and keeps the old file once beside it as
+read as decision items with their saved answers. The first write that changes
+the board (a `raise` of a new key, or a `post`) rewrites it as `"schema": 2` and keeps the old file once beside it as
 `decisions.json.schema-1.bak`.
 
 ### Manual CLI

@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, linkSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 
 export type Option = { value: string; label: string };
@@ -46,32 +46,17 @@ export function readItems(path: string): { schema: 1 | 2; items: any[] } {
   throw new InputError(`${basename(path)}: needs "schema": 2 and an "items" list`);
 }
 
-/** Creates path only if it is absent, all at once: a crash leaves no file or the whole file. False when it was already there. */
-export function createOnce(path: string, content: string | Buffer): boolean {
-  const tmp = `${path}.${process.pid}.tmp`;
-  writeFileSync(tmp, content, { mode: 0o600 });
-  try {
-    try {
-      linkSync(tmp, path);
-    } catch (e: any) {
-      if (!['EPERM', 'ENOTSUP', 'EXDEV'].includes(e.code)) throw e;
-      if (existsSync(path)) return false;
-      renameSync(tmp, path);
-    }
-    return true;
-  } catch (e: any) {
-    if (e.code === 'EEXIST') return false;
-    throw e;
-  } finally {
-    rmSync(tmp, { force: true });
-  }
-}
-
-/** Writes the board as schema 2 through a temp file and a rename. A schema 1 board is first kept once as <board>.schema-1.bak. */
+/** Writes the board as schema 2 through a temp file and a rename. A schema 1 board is first kept once as <board>.schema-1.bak. Callers hold the board lock. */
 export function writeItems(path: string, items: object[]): void {
-  if (existsSync(path) && readItems(path).schema === 1) createOnce(`${path}.schema-1.bak`, readFileSync(path));
-  writeFileSync(`${path}.${process.pid}.tmp`, `${JSON.stringify({ schema: 2, items }, null, 2)}\n`, { mode: 0o600 });
-  renameSync(`${path}.${process.pid}.tmp`, path);
+  const tmp = `${path}.${process.pid}.tmp`;
+  if (existsSync(path) && readItems(path).schema === 1) {
+    const bak = `${path}.schema-1.bak`, bakTmp = `${bak}.${process.pid}.tmp`;
+    writeFileSync(bakTmp, readFileSync(path), { mode: 0o600 });
+    if (existsSync(bak)) rmSync(bakTmp, { force: true });
+    else renameSync(bakTmp, bak);
+  }
+  writeFileSync(tmp, `${JSON.stringify({ schema: 2, items }, null, 2)}\n`, { mode: 0o600 });
+  renameSync(tmp, path);
 }
 
 export function loadDecisions(path: string): Decision[] {
