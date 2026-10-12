@@ -20,7 +20,7 @@
 
 Agents stop and ask: ship this, keep that, turn this on? Those questions scatter across terminals and chats, and an answer typed in the wrong place gets lost.
 
-sign-off puts them on one calm list. The agent writes a small JSON file, you inspect the linked done-done run evidence, click **Yes** or **No** (or one of up to six choices the agent offers), and the answer is saved next to the file for the agent to read. Add an optional short note if the agent should know why; the note never blocks the click. It runs only on `127.0.0.1`: no account, no hosting.
+sign-off puts them on one calm list. The agent writes a small JSON file, you inspect the linked done-done run evidence, click **Yes** or **No** (or one of up to six choices the agent offers), and the answer is saved next to the file for the agent to read. Add an optional short note if the agent should know why; the note never blocks the click. It runs on your own machine (`127.0.0.1`, or one private address you name with `--bind`): no account, no hosting.
 
 Your answer survives reloads and restarts; you can change it with one more click. Recommendations and silent defaults are shown, never applied for you.
 
