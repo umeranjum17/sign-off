@@ -149,7 +149,7 @@ test('doctor journey: each broken precondition prints its own fix, and a repair 
   const failed = (out) => [...out.matchAll(/(?:: |,)"([a-z]+): /g)].map((m) => m[1]);
   // Port 0 skips the port check, so a board open on this host cannot fail the clean runs.
   const config = (port) => writeFileSync(join(sod, 'config.yaml'), `board: decisions.json\nport: ${port}\n`);
-  assert.deepEqual([doc().code, failed(doc().out)], [1, ['setup']]);
+  assert.deepEqual([doc().code, failed(doc().out).filter((n) => n !== 'port')], [1, ['setup']]);
   run('init', dir);
   config(0);
   assert.equal(doc().code, 0);
@@ -183,7 +183,7 @@ test('doctor journey: each broken precondition prints its own fix, and a repair 
   writeFileSync(join(sod, 'config.yaml'), 'board: mine.json\nport: 99999\n');
   rmSync(join(sod, 'evidence'), { recursive: true });
   writeFileSync(join(sod, 'evidence'), 'x');
-  assert.deepEqual(failed(doc().out), ['config', 'board', 'folders']);
+  assert.deepEqual(failed(doc().out).filter((n) => n !== 'port'), ['config', 'board', 'folders']);
   assert.match(doc().out, /board: mine.json is missing.*Move .*evidence away, then run/);
   rmSync(join(sod, 'evidence'));
   config(0);

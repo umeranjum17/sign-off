@@ -667,7 +667,7 @@ async function doctor(args: string[]) {
         `run \`${rerun}\``,
       ];
       check('folders', problems.join('; ') || 'mocks/ and evidence/ exist', problems.length ? `${steps.join(', then ')}`.replace(/^./, (c) => c.toUpperCase()) : undefined);
-      const unwritable = [so, board, answersPath(board), roundsPath(board)].filter((p) => existsSync(p) && !writable(p));
+      const unwritable = [so, board, answersPath(board), roundsPath(board), join(so, 'evidence')].filter((p) => existsSync(p) && !writable(p));
       check('write', unwritable.length ? `${unwritable.map((p) => basename(p)).join(' and ')} cannot be written` : 'setup can be written',
         unwritable.length ? `Run \`chmod u+w ${unwritable.map((p) => shellPath(p)).join(' ')}\`` : undefined);
     }
