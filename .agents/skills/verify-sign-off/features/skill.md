@@ -6,7 +6,7 @@ Covers `skills/sign-off-axi/SKILL.md`, its generator `src/skill.ts` and `npm run
 
 - Push the branch, then install from it: `npx skills add umeranjum17/sign-off#<branch> --skill sign-off-axi -a <agent> -y` (add `-g` for a global install in a throwaway HOME). Run `npx skills add umeranjum17/sign-off#<branch> --list` too: it must list only `sign-off-axi`.
 - Until `sign-off-axi` is on npm, stand in for the publish: `npm pack --pack-destination "$SCR"`, then `npm i -g` the tarball with `npm_config_prefix="$SCR/prefix"` and pass that same `npm_config_prefix` to the agent. The skill's own `npx -y sign-off-axi` then resolves to the tarball. Say so in the evidence.
-- Put the agent's project outside `/home/umer` (for example `/tmp/<task>-proj`): agents walk up from the project for `.agents/skills` and `.claude/skills` and would load the host's.
+- Put the agent's project outside your home directory (for example `/tmp/<task>-proj`): agents walk up from the project for `.agents/skills` and `.claude/skills` and would load the host's.
 - Clean session: a throwaway HOME (`env -i HOME=...`). Claude Code needs a login: link only the lab credential (see the fleet rules) and run under the credential lock. If that credential is signed out, use the host `claude` with `--setting-sources project,local --strict-mcp-config`, a fresh project and a project-level install, and label the host's user skills as not clean. opencode runs with no login on a free `opencode/*` model.
 - Record each session: `script -q --log-timing "$EVIDENCE/<name>.timing" "$EVIDENCE/<name>.log" -c <setup-and-agent script>` inside a detached `tmux` session; type the ask with `tmux send-keys -l`. Replay with `scriptreplay -t <name>.timing <name>.log`.
 
