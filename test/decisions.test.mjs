@@ -80,4 +80,15 @@ test('answer journey: save, survive a torn line and a restart, read back', async
   assert.equal(unverified.decisions[0].evidenceCard.result, 'UNVERIFIED');
   assert.equal((await fetch(`${url}api/evidence?run=${runId}&file=escape.png`)).status, 404);
   assert.deepEqual(JSON.parse(execFileSync('node', [cli, 'answers', file], { stdio: ['ignore', 'pipe', 'ignore'] })), printed);
+  const checks = JSON.parse(readFileSync(file, 'utf8'));
+  checks.decisions[0].evidence.outcome = '   n/a   ';
+  writeFileSync(file, JSON.stringify(checks));
+  assert.equal((await fetch(`${url}api/decisions`)).status, 200);
+  for (const blank of ['', '   ']) {
+    checks.decisions[0].evidence.outcome = blank;
+    writeFileSync(file, JSON.stringify(checks));
+    const response = await fetch(`${url}api/decisions`);
+    assert.equal(response.status, 422);
+    assert.match((await response.json()).error, /evidence/);
+  }
 });

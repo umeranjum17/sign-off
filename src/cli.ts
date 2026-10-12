@@ -50,7 +50,11 @@ const state = () => ({
 });
 const mediaTypes: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.mp4': 'video/mp4', '.webm': 'video/webm' };
 function contained(path: string): string {
-  const root = realpathSync(evidenceRoot), actual = realpathSync(resolve(root, path));
+  let root: string, actual: string;
+  try {
+    root = realpathSync(evidenceRoot);
+    actual = realpathSync(resolve(root, path));
+  } catch { throw new Error('no matching evidence file'); }
   if (!actual.startsWith(root + sep)) throw new Error('evidence path escapes the selected root');
   return actual;
 }
@@ -69,14 +73,14 @@ function evidenceCard(link: NonNullable<Decision['evidence']>) {
       const type = mediaTypes[extname(f.path ?? '').toLowerCase()];
       if (!type) return [];
       const path = contained(f.path);
-      if (!/^(image|video)\//.test(type) || statSync(path).size > 20_000_000) throw new Error('media is unavailable or too large');
+      if (statSync(path).size > 20_000_000) throw new Error('media is unavailable or too large');
       const bytes = readFileSync(path);
       if (bytes.length !== f.bytes || sha256(bytes) !== f.sha256) throw new Error('evidence hash does not match the run record');
       return [{ path: f.path, url: `/api/evidence?run=${encodeURIComponent(link.run_id)}&file=${encodeURIComponent(f.path)}`, type }];
     });
     const result = !Number.isInteger(run.exit) ? 'INCONCLUSIVE' : run.exit !== 0 || run.dirty || !run.files.length ? 'RUN FAIL' : 'RUN PASS';
     return { status: 'verified', result, commit: run.commit, media };
-  } catch (e: any) { return { status: 'unverified', result: 'UNVERIFIED', reason: e.message, commit: '', media: [] }; }
+  } catch (e: any) { return { status: 'unverified', result: 'UNVERIFIED', reason: e.code ? 'no matching run record or media' : e.message, commit: '', media: [] }; }
 }
 
 async function route(req: IncomingMessage): Promise<[number, unknown]> {

@@ -35,7 +35,7 @@ git clone https://github.com/umeranjum17/sign-off && cd sign-off && npm install 
 # 2. Open the page with the demo questions (copy them so the answers stay out of the repo)
 cp fixtures/demo-decisions.json /tmp/decisions.json
 node dist/cli.js serve /tmp/decisions.json       # prints http://127.0.0.1:4410/
-# Optional: add --evidence-root /path/to/done-done/evidence to read proof records/media
+# Optional: add --evidence-root /path/to/project-store to read proof records/media (the root containing .done-done/)
 
 # 3. Click an answer, then read it back the way an agent would
 node dist/cli.js answers /tmp/decisions.json     # {"weekly-digest":{"answer":"yes",...}}

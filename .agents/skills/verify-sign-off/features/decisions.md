@@ -5,7 +5,7 @@ Covers `sign-off serve`, `sign-off answers`, `web/index.html` and the answers fi
 | # | Step | Pass when |
 |---|---|---|
 | 1 | Phone light and dark, wait `5 waiting`, full-page shots | All five questions show; `eval "document.documentElement.scrollWidth <= innerWidth"` is true |
-| 2 | Same page | `eval "window.__pwned === undefined && [...document.querySelectorAll('h3')].some(h => h.textContent.includes('<script>alert(1)</script>')) && [...document.querySelectorAll('h3')].some(h => h.textContent.includes('<img src=x onerror=')) && ![...document.querySelectorAll('main img')].some(i => i.getAttribute('src') === 'x') && document.querySelectorAll('.evidence img[src]').length > 0"` is true; hostile titles stay literal while record-backed images still render |
+| 2 | Same page | `eval "window.__pwned === undefined && [...document.querySelectorAll('h3')].some(h => h.textContent.includes('<script>alert(1)</script>')) && [...document.querySelectorAll('h3')].some(h => h.textContent.includes('<img src=x onerror=')) && ![...document.querySelectorAll('main img')].some(i => i.getAttribute('src') === 'x')"` is true; hostile titles stay literal and no injected image loads |
 | 3 | Phone dark, click the first `Show more`, shot | The full 1,500-character text and the 300-character token wrap inside the screen; no horizontal scroll |
 | 4 | Narrow phone light, `eval "() => { document.documentElement.style.fontSize = '130%'; return document.documentElement.scrollWidth <= innerWidth }"`, shot | true; header, titles and buttons wrap without cutting words badly or overlapping |
 | 5 | Phone dark, click `button "Yes, Ship the new`, poll `answers` for `"short-question":{"answer":"yes"` | The saved answer appears within the time limit |

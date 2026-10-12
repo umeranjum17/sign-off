@@ -35,7 +35,7 @@ export function loadDecisions(path: string): Decision[] {
     for (const f of ['about', 'detail']) if (d[f] !== undefined && !isText(d[f])) throw bad(f, 'must be text');
     if (d.evidence !== undefined && (!d.evidence || !/^[A-Za-z0-9._-]{1,128}$/.test(d.evidence.run_id ?? '')
       || !/^[a-f0-9]{40}$/.test(d.evidence.commit ?? '')
-      || ['outcome', 'repro', 'proof', 'evidence'].some((f) => !isText(d.evidence[f]) || d.evidence[f].length > 1000))) {
+      || ['outcome', 'repro', 'proof', 'evidence'].some((f) => !isText(d.evidence[f]) || !d.evidence[f].trim() || d.evidence[f].length > 1000))) {
       throw bad('evidence', 'must name a done-done run, full commit, and four Checks lines');
     }
     for (const [f, allowed] of Object.entries(ONE_OF)) if (d[f] !== undefined && !allowed.includes(d[f])) throw bad(f, `must be ${allowed.join(' or ')}`);
