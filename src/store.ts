@@ -55,7 +55,8 @@ export function createOnce(path: string, content: string | Buffer): boolean {
       linkSync(tmp, path);
     } catch (e: any) {
       if (!['EPERM', 'ENOTSUP', 'EXDEV'].includes(e.code)) throw e;
-      writeFileSync(path, content, { flag: 'wx', mode: 0o600 });
+      if (existsSync(path)) return false;
+      renameSync(tmp, path);
     }
     return true;
   } catch (e: any) {
