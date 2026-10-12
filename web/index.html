@@ -56,6 +56,13 @@
   .choices.many { display: flex; flex-wrap: wrap; }
   .choices.many button { flex: 1 1 auto; max-width: 100%; padding: 0.5rem 1rem; }
   .note label { display: block; color: var(--muted); font-size: 0.8125rem; margin-top: 0.5rem; }
+  .tradeoff { color: var(--muted); font-size: 0.875rem; margin: 0.5rem 0 0; max-width: 70ch; }
+  .mocks { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 0.75rem; }
+  .mock { margin: 0; border: 1px solid var(--line); border-radius: 0.7rem; overflow: hidden; background: var(--bg); min-width: 0; }
+  .mock iframe { display: block; width: 100%; height: 16rem; border: 0; background: #fff; }
+  .mock img { display: block; width: 100%; max-height: 16rem; object-fit: contain; background: #111; }
+  .mock figcaption { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; }
+  .round { margin-top: 0.5rem; }
   textarea { display: block; width: 100%; max-width: 70ch; margin-top: 0.25rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border);
     border-radius: 0.5rem; background: var(--bg); color: var(--text); font: inherit; resize: vertical; }
   .saved-note { white-space: pre-line; }
@@ -142,17 +149,45 @@
       'aria-pressed': o.value === state.answers[d.key]?.answer,
     }, o.label));
     buttons.forEach((b, i) => (b.onclick = () => save(d, d.options[i], buttons, err)));
+    const asked = (state.rounds ?? []).filter((r) => r.key === d.key);
+    const roundBtn = el('button', { class: 'round', 'aria-label': `Ask for another round, ${d.title}` }, 'Ask for another round');
+    roundBtn.onclick = () => {
+      roundBtn.disabled = true;
+      const note = (drafts.get(d.key) ?? state.answers[d.key]?.note ?? '').trim();
+      call('/api/rounds', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, note }),
+      }).catch((e) => {
+        err.textContent = `Couldn't ask: ${e.message}`;
+        roundBtn.disabled = false;
+      });
+    };
     return el('article', { class: 'row' }, el('div', {},
       el('h3', { dir: 'auto' }, d.title),
       d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '',
       d.detail || d.about?.length > 180 ? el('details', {}, el('summary', {}, 'Show more'),
         ...[d.about, d.detail].filter(Boolean).map((t) => el('p', { dir: 'auto' }, t))) : '',
+      d.tradeoff ? el('p', { class: 'tradeoff', dir: 'auto' }, `Trade-off: ${d.tradeoff}`) : '',
       meta.length ? el('p', { class: 'meta' }, meta.map(([k, v]) => `${k}: ${d.options.find((o) => o.value === v).label}`).join(' · ')) : '',
       saved?.note ? el('p', { class: 'meta saved-note', dir: 'auto' }, `Your note: ${saved.note}`) : '',
+      asked.length ? el('p', { class: 'meta', dir: 'auto' }, `You asked for another round${asked.length > 1 ? ` (${asked.length})` : ''}: ${asked[asked.length - 1].note}`) : '',
       el('details', { class: 'note', ...(drafts.has(d.key) && { open: '' }) }, el('summary', { 'aria-label': `${noteText}, ${d.title}` }, noteText),
         el('label', { for: box.id }, 'Optional note, sent with the answer you pick'), box),
+      roundBtn,
       err,
-    ), el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': d.title }, ...buttons), evidenceCard(d));
+    ), el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': d.title }, ...buttons), mockCards(d), evidenceCard(d));
+  }
+
+  function mockCards(d) {
+    if (d.type !== 'design' || !d.mocks?.length) return '';
+    return el('div', { class: 'mocks' }, ...d.mocks.map((m) => {
+      const label = d.options.find((o) => o.value === m.value)?.label ?? m.value;
+      const url = `/api/mock?key=${encodeURIComponent(d.key)}&value=${encodeURIComponent(m.value)}`;
+      const view = /\.html?$/i.test(m.path) ? el('iframe', { src: url, title: `Mock ${label}`, loading: 'lazy' })
+        : el('img', { src: url, alt: `Mock: ${label}` });
+      return el('figure', { class: 'mock' }, view, el('figcaption', {},
+        el('span', {}, label),
+        m.value === d.recommend_value ? el('span', { class: 'verdict', 'data-result': 'RUN PASS' }, 'Recommended') : ''));
+    }));
   }
 
   function render() {

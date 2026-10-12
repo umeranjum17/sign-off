@@ -29,6 +29,13 @@
 ```
 
 - `key`: 1-128 of `A-Z a-z 0-9 . _ -`, unique in the file. `title`: required.
+- `type`: optional, `decision` (default) or `design`. A design item is a pick
+  between mock options shown side by side.
+- `tradeoff`: optional on design items, plain text up to 1000 characters, shown
+  next to the mocks.
+- `mocks`: optional on design items, up to 6 entries of an option `value` and a
+  `path` to a mock file, relative to the board file's folder. Each value must
+  name one of the item's own options. Served only from inside that folder.
 - `options`: optional, 2 to 6 choices. Each has a `value` (1-128 of `A-Z a-z 0-9 . _ -`, unique within the question) and a non-empty `label` shown on its button. Leave it out for **Yes** (`yes`) and **No** (`no`); files written before options existed read exactly as before.
 - `recommend_value`, `default_if_silent`: optional, the `value` of one of the question's own options (`yes` or `no` when `options` is left out). Shown, never applied.
 - `close`: optional, `done` (default) or `release`; copied into the answer.
@@ -58,4 +65,14 @@
 - `sign-off-axi answers --json` prints the same fields per key, without `key`, and adds `note` only when the latest line has one.
 
 `*.answers.jsonl` is git-ignored here so an answer is never committed by accident.
+
+**Another-round asks**, written by sign-off next to the questions
+(`decisions.rounds.jsonl`, mode 600, one line per ask, oldest first):
+
+```json
+{"key":"sign-in-layout","note":"Show B with the A header.","at":"2026-10-12T15:40:03Z"}
+```
+
+- Asking wakes a waiting agent the same way an answer does. `answers --json`
+  adds a `rounds` list per answered key only when that key has asks.
 
