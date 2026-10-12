@@ -560,12 +560,19 @@ async function running(file: string) {
 
 /** Loopback, or one private address: 10/8, 172.16/12, 192.168/16, the 100.64/10 range mesh VPNs use, IPv6 fc00::/7. Never all interfaces or a public one. */
 const PRIVATE = /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|::1$|f[cd][0-9a-f]{2}:)/i;
+const privateBind = (host: string) => isIP(host) > 0 && PRIVATE.test(host);
 const loopback = (host: string) => /^127\./.test(host) || host === '::1';
 const urlHost = (host: string) => (isIP(host) === 6 ? `[${host}]` : host);
 /** --bind, else the bind line of config.yaml next to the board, else 127.0.0.1. */
 function bindOf(file: string, given?: string) {
-  const host = given ?? (existsSync(join(dirname(file), 'config.yaml')) ? readSetup(dirname(file)).bind : '127.0.0.1');
-  if (!isIP(host) || !PRIVATE.test(host)) throw fail(`bind address ${host} must be 127.0.0.1 or a private address of this machine, never all interfaces or a public address`,
+  const config = join(dirname(file), 'config.yaml');
+  let host = given ?? '127.0.0.1';
+  if (given === undefined && existsSync(config)) {
+    try { host = readSetup(dirname(file)).bind; } catch (e: any) {
+      throw fail(`${basename(config)} cannot be read (${e.code}), so its bind line is unknown`, 'VALIDATION_ERROR', `Make ${shellPath(config)} readable, or pass --bind`);
+    }
+  }
+  if (!privateBind(host)) throw fail(`bind address ${host} must be 127.0.0.1 or a private address of this machine, never all interfaces or a public address`,
     'VALIDATION_ERROR', 'Pass 127.0.0.1 or a private address of this machine');
   return host;
 }
@@ -656,7 +663,9 @@ function readSetup(so: string) {
   const port = config.port ?? '4410', goodBoard = /^[\w.-]+\.json$/.test(config.board ?? ''), goodPort = /^\d{1,5}$/.test(port) && Number(port) <= 65535;
   if (!goodBoard) problems.push('needs a "board: <name>.json" line');
   if (!goodPort) problems.push(`port ${port} is not a number from 0 to 65535`);
-  return { board: join(so, goodBoard ? config.board : 'decisions.json'), port: goodPort ? Number(port) : 4410, bind: config.bind ?? '127.0.0.1', goodBoard, problems };
+  const bind = config.bind ?? '127.0.0.1';
+  if (!privateBind(bind)) problems.push(`bind ${bind} is not 127.0.0.1 or a private address`);
+  return { board: join(so, goodBoard ? config.board : 'decisions.json'), port: goodPort ? Number(port) : 4410, bind, goodBoard, problems };
 }
 /** --port, else the port in a config.yaml beside the board (init writes one), else 4410. */
 function boardPort(file: string, given?: string) {
@@ -747,7 +756,7 @@ async function doctor(args: string[]) {
         const setup = readSetup(so);
         ({ board, port } = setup);
         if (!setup.problems.length) check('config', `board ${basename(board)}, port ${port}`);
-        else check('config', `${basename(config)}: ${setup.problems.join('; ')}`, `Edit ${shellPath(config)} to hold "board: <name>.json" and "port: <0-65535>" lines, such as board: decisions.json and port: 4410${setup.goodBoard ? '' : `, or delete it and run \`${rerun}\``}`);
+        else check('config', `${basename(config)}: ${setup.problems.join('; ')}`, `Edit ${shellPath(config)} to hold "board: <name>.json", "port: <0-65535>" and "bind: <127.0.0.1 or a private address>" lines, such as board: decisions.json, port: 4410 and bind: 127.0.0.1${setup.goodBoard ? '' : `, or delete it and run \`${rerun}\``}`);
       }
       const boardBad = unusable(board);
       if (boardBad) check('board', ...boardBad);

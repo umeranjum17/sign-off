@@ -332,6 +332,22 @@ test('doctor names a fix for a denied setup path and a port that needs privilege
   assert.match(run('doctor', dir).out, /port: 80 needs privileges to bind \(EACCES\)\. Set \\"port:\\" in .*config\.yaml to a port above 1023/);
 });
 
+test('a refused config bind is named by doctor, and an unreadable config stops open', { skip: process.getuid?.() === 0 && 'root can read every path' }, () => {
+  const dir = join(scratch, 'bind-config'), sod = join(dir, '.sign-off'), config = join(sod, 'config.yaml'), board = join(sod, 'decisions.json');
+  run('init', dir);
+  writeFileSync(config, 'board: decisions.json\nport: 4410\nbind: 0.0.0.0\n');
+  assert.match(run('doctor', dir).out, /config: config\.yaml: bind 0\.0\.0\.0 is not 127\.0\.0\.1 or a private address/);
+  assert.equal(run('open', board, '--port', '0').code, 2);
+  chmodSync(config, 0o000);
+  try {
+    const out = run('open', board, '--port', '0');
+    assert.equal(out.code, 2);
+    assert.match(out.out, /config\.yaml cannot be read/);
+  } finally {
+    chmodSync(config, 0o600);
+  }
+});
+
 test('doctor names a fix when the folder argument is a file', () => {
   const file = join(scratch, 'plain.txt');
   writeFileSync(file, 'x');
