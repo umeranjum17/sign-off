@@ -150,9 +150,10 @@
   let state = { decisions: [], answers: {} };
   // An exported copy carries its state and files inline and is read-only.
   const FROZEN = window.FROZEN, src = (url) => FROZEN?.files[url] ?? url;
-  // Typed notes not yet sent, kept across re-renders and reloads in this browser.
-  const drafts = new Map((() => { try { return JSON.parse(localStorage.getItem('sign-off-drafts')) ?? []; } catch { return []; } })());
-  const keep = () => { try { localStorage.setItem('sign-off-drafts', JSON.stringify([...drafts])); } catch {} };
+  // Typed notes not yet sent, kept across re-renders and reloads in this browser, per board file.
+  const drafts = new Map(), stored = () => `sign-off-drafts ${state.file}`;
+  const keep = () => { try { localStorage.setItem(stored(), JSON.stringify([...drafts])); } catch {} };
+  let loaded = false;
   // Text goes in as text nodes, never as HTML, so a title from the file can't run code.
   const el = (tag, attrs = {}, ...kids) => {
     const e = document.createElement(tag);
@@ -161,38 +162,40 @@
     return e;
   };
 
-  async function call(path, init) {
+  /** sent runs only once the server saved the request, so a draft is dropped only then. */
+  async function call(path, init, sent) {
     const res = await fetch(path, init);
     const body = await res.json().catch(() => ({ error: `The server replied ${res.status}` }));
     if (!res.ok) throw new Error(body.error);
     state = body;
+    if (!loaded) {
+      loaded = true;
+      try { for (const [k, v] of JSON.parse(localStorage.getItem(stored())) ?? []) drafts.set(k, v); } catch {}
+    }
+    sent?.();
     render();
   }
 
   function save(d, o, buttons, err) {
     buttons.forEach((b) => (b.disabled = true));
     const note = drafts.get(d.key) ?? state.answers[d.key]?.note ?? '';
-    drafts.delete(d.key);
-    keep();
     call('/api/answers', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
-    }).catch((e) => {
-      if (!drafts.has(d.key)) drafts.set(d.key, note);
-      keep();
-      err.textContent = `Couldn't save: ${e.message}`;
+    }, () => { drafts.delete(d.key); keep(); }).catch((e) => {
+      shown(err).textContent = `Couldn't save: ${e.message}`;
       buttons.forEach((b) => (b.disabled = false));
     });
   }
 
-  /** Sends a comment or a queued prompt for the agent; the typed text comes back if it fails. */
+  // A render while a request was out replaced the error line; write to the one on screen.
+  const shown = (err) => document.getElementById(err.id) ?? err;
+
+  /** Sends a comment or a queued prompt for the agent; the typed text stays until the server has it. */
   function send(btn, err, body, draft, text) {
     btn.disabled = true;
-    drafts.delete(draft);
-    keep();
-    call('/api/messages', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...body, text }) }).catch((e) => {
-      drafts.set(draft, text);
-      keep();
-      err.textContent = `Couldn't send: ${e.message}`;
+    call('/api/messages', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...body, text }) },
+      () => { drafts.delete(draft); keep(); }).catch((e) => {
+      shown(err).textContent = `Couldn't send: ${e.message}`;
       btn.disabled = false;
     });
   }
@@ -223,7 +226,7 @@
   const kind = (d) => (Object.hasOwn(NAMES, d.type) ? d.type : 'other');
 
   function row(d) {
-    const err = el('div', { class: 'err', role: 'alert' });
+    const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` });
     const saved = Object.hasOwn(state.answers, d.key) ? state.answers[d.key] : undefined;
     const design = d.type === 'design';
     const buttons = d.options.map((o) => {
@@ -271,7 +274,7 @@
       call('/api/rounds', {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, note }),
       }).catch((e) => {
-        err.textContent = `Couldn't ask: ${e.message}`;
+        shown(err).textContent = `Couldn't ask: ${e.message}`;
         roundBtn.disabled = false;
       });
     };
@@ -290,7 +293,7 @@
   /** Free-text prompts for the agent, which it reads with sign-off-axi poll. */
   function ask() {
     const prompts = (state.messages ?? []).filter((m) => m.kind === 'prompt'), queued = prompts.filter((m) => !m.delivered).length;
-    const err = el('div', { class: 'err', role: 'alert' }), box = el('textarea', { id: 'prompt', rows: 3, maxlength: 2000, dir: 'auto' });
+    const err = el('div', { class: 'err', role: 'alert', id: 'prompt-err' }), box = el('textarea', { id: 'prompt', rows: 3, maxlength: 2000, dir: 'auto' });
     box.value = drafts.get('') ?? '';
     box.oninput = () => { drafts.set('', box.value); keep(); };
     const btn = el('button', { 'aria-label': 'Queue the prompt for the agent' }, 'Queue for the agent');

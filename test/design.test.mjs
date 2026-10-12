@@ -1,7 +1,8 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { get } from 'node:http';
 import { networkInterfaces, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -206,6 +207,18 @@ test('private-network bind: token on every route, kept across a restart', { skip
   assert.match(run('stop', board).out, /status: stopped/);
   const reopened = run('open', board, '--port', String(port), '--bind', mine.address);
   assert.equal(new URL(/url: "(.+)"/.exec(reopened.out)[1]).searchParams.get('token'), token);
+  // Another address while it runs is refused, never a silent no-op on the old one.
+  const moved = run('open', board, '--port', String(port), '--bind', '127.0.0.1');
+  assert.deepEqual([moved.code, /code: CONFLICT/.test(moved.out)], [1, true]);
+  assert.ok(!readFileSync(board.replace('.json', '.board.log'), 'utf8').includes(token), 'the log never holds the token');
+  // Deleting the token shuts the old link out at once; status and stop still find the board.
+  rmSync(board.replace('.json', '.token'));
+  // A new connection: fetch would reuse one the stopped board closed.
+  const code = await new Promise((ok, no) => get(`${origin}/api/decisions`, { agent: false, headers: { cookie } }, (r) => (r.resume(), ok(r.statusCode))).on('error', no));
+  assert.equal(code, 401);
   assert.match(run('status', board).out, /status: running/);
+  assert.match(run('stop', board).out, /status: stopped/);
+  const fresh = run('open', board, '--port', String(port), '--bind', mine.address);
+  assert.notEqual(new URL(/url: "(.+)"/.exec(fresh.out)[1]).searchParams.get('token'), token);
   assert.match(run('stop', board).out, /status: stopped/);
 });
