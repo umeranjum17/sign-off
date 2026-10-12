@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync, spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer as createHttpServer, get } from 'node:http';
 import { createServer } from 'node:net';
 import { networkInterfaces, tmpdir } from 'node:os';
@@ -454,6 +454,30 @@ const served = (proc) => new Promise((ok) => {
   proc.once('exit', () => ok(out));
 });
 const hostStatus = (url, host) => new Promise((ok, no) => get(url, { agent: false, headers: { host } }, (r) => (r.resume(), ok(r.statusCode))).on('error', no));
+
+// A real browser draws the board for the frame tests: CI's runner has Chrome; elsewhere they skip when none is on the PATH.
+const chrome = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'].flatMap((b) => process.env.PATH.split(':').map((d) => join(d, b))).find(existsSync);
+
+test('an interactive page that posts its height gets a frame that fits it, each frame only its own and never past 10000px', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'fit'), file = join(dir, 'board.json'), pages = join(dir, 'mocks', 'page');
+  mkdirSync(pages, { recursive: true });
+  const says = (h) => `<p>page</p><script>parent.postMessage({ height: ${h} }, '*')</script>`;
+  writeFileSync(join(pages, 'short.html'), says(240));
+  writeFileSync(join(pages, 'huge.html'), says(99999));
+  writeFileSync(join(pages, 'quiet.html'), '<p>no height</p>');
+  const item = (key) => ({ key, type: 'interactive', title: key, view: `mocks/page/${key}.html` });
+  writeFileSync(file, JSON.stringify({ schema: 2, readonly: true, items: ['short', 'huge', 'quiet'].map(item) }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const dom = await new Promise((ok, no) => execFile(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${join(dir, 'profile')}`,
+    '--window-size=800,4000', '--virtual-time-budget=10000', '--dump-dom', url], { env: { ...process.env, TMPDIR: dir }, maxBuffer: 1 << 24 }, (e, out) => (e ? no(e) : ok(out))));
+  const frame = (key) => new RegExp(`<iframe[^>]*title="Interactive page: ${key}"[^>]*>`).exec(dom)?.[0];
+  assert.match(frame('short'), /style="height: 240px;"/);
+  assert.match(frame('huge'), /style="height: 10000px;"/);
+  assert.doesNotMatch(frame('quiet'), /style=/);
+  proc.kill();
+});
 
 test('a lock left by a sign-off-axi that stopped mid-write: raise names it, doctor prints its fix, the fix clears it', () => {
   const dir = join(scratch, 'crashed'), sod = join(dir, '.sign-off'), lock = join(sod, 'decisions.json.lock');

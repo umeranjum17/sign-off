@@ -432,6 +432,12 @@
     }
   }
   addEventListener('hashchange', render);
+  // An interactive page may post its own height, `{ height: <px> }`, and its frame then fits it with no blank below.
+  // Only a frame's own message sizes that frame, and never past 10000px.
+  addEventListener('message', (e) => {
+    const frame = [...document.querySelectorAll('.rung iframe')].find((f) => f.contentWindow === e.source), h = e.data?.height;
+    if (frame && Number.isFinite(h) && h > 0) frame.style.height = `${Math.ceil(Math.min(h, 10_000))}px`;
+  });
 
   const banner = document.getElementById('banner');
   const failed = (e) => {

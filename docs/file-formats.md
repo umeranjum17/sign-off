@@ -33,7 +33,8 @@
   then a rename). Its cards have no answer, note or comment buttons, there is
   no Ask box, the server refuses every answer, round and comment with 403, and
   the open page checks the file every 20 seconds and redraws when it changed.
-  An `interactive` item on it gets most of the screen's height.
+  An `interactive` item on it gets most of the screen's height, unless its page
+  posts its own height (below).
 - A 0.1.0 file, `"schema": 1` with a `"decisions"` list, still reads: each entry is an item, a decision unless it says otherwise. The first write that changes it (a `raise` of a new key, or a `post`) rewrites it as `"schema": 2` (temp file, then rename) and first keeps the old file once beside it as `<board>.schema-1.bak`. Answer and round files are not touched.
 - `key`: 1-128 of `A-Z a-z 0-9 . _ -`, unique in the file. `title`: required.
 - `type`: optional, `decision` (default), `design`, `evidence`, `diagram`,
@@ -50,7 +51,11 @@
   can load files beside it (see `mocks`). Every mock and view
   file is served under a Content-Security-Policy that blocks `fetch`, remote
   files, nested frames and forms, and gives the page no access to the dashboard
-  or its tab. A link in the page can still open a web page in its full-size tab. Both types
+  or its tab. A link in the page can still open a web page in its full-size tab.
+  To fit its frame to its content, a page can post its height in CSS pixels,
+  `parent.postMessage({ height: document.documentElement.offsetHeight }, '*')`,
+  again whenever it changes; the frame then takes that height, up to 10000px.
+  Only the message from a frame's own page sizes it. Both types
   answer like a decision: Yes/No by default, or their own `options`.
 
   ```json
