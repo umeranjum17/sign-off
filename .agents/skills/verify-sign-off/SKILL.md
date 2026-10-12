@@ -62,7 +62,8 @@ A labeled real Chrome on an Android emulator, reaching the loopback server throu
    - `adb reverse tcp:<port> tcp:<port>` for the server port; the page opens at `http://127.0.0.1:<port>/`, so the loopback Host check holds.
    - `adb forward tcp:<devtools-port> localabstract:chrome_devtools_remote` and drive it with `CHROME_DEVTOOLS_AXI_BROWSER_URL=http://127.0.0.1:<devtools-port>`. Do not `emulate`: the device is the viewport.
    - Theme: `adb shell cmd uimode night yes|no`, then `open` again and check `matchMedia('(prefers-color-scheme: dark)')`.
-   - Next to each page shot, keep a real device shot: `adb exec-out screencap -p > <name>-screen.png`. Name the files `emulator-*`.
+   - Next to each page shot, keep a real device shot: `adb exec-out screencap -p > <name>-screen.png`. Name the files `emulator-*`. On the device `screenshot --full-page` repeats the first viewport down the image, so for the lower page `eval` a `scrollIntoView()` on the row and take another device shot.
+   - The host may be slow with several emulators up: wait for the server's `url:` line with a time limit of a minute, not seconds.
 4. Stop it right after: `adb -s emulator-5610 emu kill`, then delete the AVD.
 
 If the emulator cannot boot, report the concrete blocker. Viewport emulation does not meet the phone bar.
