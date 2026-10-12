@@ -192,8 +192,7 @@ test('doctor journey: each broken precondition prints its own fix, and a repair 
   assert.equal(doc().code, 0);
 });
 
-test('doctor names a fix for a denied setup path and a port that needs privilege', () => {
-  if (process.getuid?.() === 0) return;
+test('doctor names a fix for a denied setup path and a port that needs privilege', { skip: process.getuid?.() === 0 && 'root can read every path' }, () => {
   const dir = join(scratch, 'denied'), sod = join(dir, '.sign-off');
   run('init', dir);
   writeFileSync(join(sod, 'config.yaml'), 'board: decisions.json\nport: 0\n');
@@ -205,6 +204,16 @@ test('doctor names a fix for a denied setup path and a port that needs privilege
   }
   writeFileSync(join(sod, 'config.yaml'), 'board: decisions.json\nport: 80\n');
   assert.match(run('doctor', dir).out, /port: 80 needs privileges to bind \(EACCES\)\. Set \\"port:\\" in .*config\.yaml to a port above 1023/);
+});
+
+test('doctor names a fix when the folder argument is a file', () => {
+  const file = join(scratch, 'plain.txt');
+  writeFileSync(file, 'x');
+  const out = run('doctor', file);
+  assert.equal(out.code, 1);
+  assert.match(out.out, /^code: NOT_FOUND$/m);
+  assert.match(out.out, /plain\.txt is not a folder/);
+  assert.match(out.out, /Pass a folder: `sign-off-axi doctor <folder>`/);
 });
 
 test('doctor prints a fix a shell can run for a path with a space, and fails with NOT_FOUND', () => {
