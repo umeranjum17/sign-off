@@ -176,12 +176,14 @@
     render();
   }
 
+  const clearIfSaved = (key, sent) => () => { if (drafts.get(key) === sent) drafts.delete(key); keep(); };
+
   function save(d, o, buttons, err) {
     buttons.forEach((b) => (b.disabled = true));
     const typed = (drafts.get(d.key) ?? '').trim();
     const note = drafts.get(d.key) ?? state.answers[d.key]?.note ?? '';
     const comment = typed;
-    const drop = () => { drafts.delete(d.key); keep(); };
+    const drop = clearIfSaved(d.key, drafts.get(d.key));
     call('/api/answers', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
     }, comment ? undefined : drop).then(() => comment && call('/api/messages', {
@@ -199,7 +201,7 @@
   function send(btn, err, body, draft, text) {
     btn.disabled = true;
     call('/api/messages', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...body, text }) },
-      () => { drafts.delete(draft); keep(); }).catch((e) => {
+      clearIfSaved(draft, drafts.get(draft))).catch((e) => {
       shown(err).textContent = `Couldn't send: ${e.message}`;
       btn.disabled = false;
     });
@@ -290,8 +292,8 @@
       el('summary', { 'aria-label': `${title}, ${d.title}` }, `${title}${status && ` · ${status}`}`),
       asked.length ? el('p', { class: 'meta saved-note', dir: 'auto' }, `You asked for another round: ${asked[asked.length - 1].note}`) : '',
       ...comments.map((m) => el('p', { class: 'meta saved-note', dir: 'auto' }, `Your comment, ${m.delivered ? 'read by the agent' : 'not read yet'}: ${m.text}`)),
-      el('label', { for: box.id }, update ? 'Optional note, sent with your verdict, or a comment for the agent'
-        : 'Optional note, sent with the answer you pick or the round you ask for, or a comment for the agent'), box,
+      el('label', { for: box.id }, update ? 'Optional note, sent with your verdict, and also to the agent as a comment'
+        : 'Optional note, sent with the answer you pick or the round you ask for, and also to the agent as a comment'), box,
       el('div', { class: 'actions' }, update ? '' : roundBtn, FROZEN ? '' : commentBtn));
   }
 
