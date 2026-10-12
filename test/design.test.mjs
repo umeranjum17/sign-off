@@ -1,7 +1,8 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync, spawn } from 'node:child_process';
+import { execFile, execFileSync, spawn } from 'node:child_process';
 import { appendFileSync, chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createServer as createHttpServer } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -237,4 +238,32 @@ test('doctor ignores config keys it does not use and names a malformed port line
   const broken = run('doctor', dir);
   assert.equal(broken.code, 1);
   assert.match(broken.out, /config: config.yaml: line 2 is not one/);
+});
+
+test('doctor names a fix when the setup folder cannot be written', { skip: process.getuid?.() === 0 && 'root can write every path' }, () => {
+  const dir = join(scratch, 'unwritable'), sod = join(dir, '.sign-off');
+  run('init', dir);
+  writeFileSync(join(sod, 'config.yaml'), 'board: decisions.json\nport: 0\n');
+  chmodSync(sod, 0o500);
+  try {
+    const broken = run('doctor', dir);
+    assert.equal(broken.code, 1);
+    assert.match(broken.out, /write: \.sign-off cannot be written\. Run `chmod u\+w /);
+  } finally {
+    chmodSync(sod, 0o700);
+  }
+  assert.equal(run('doctor', dir).code, 0);
+});
+
+test('doctor reports a port whose server names a non-text file as in use', async () => {
+  const dir = join(scratch, 'odd-port'), sod = join(dir, '.sign-off');
+  run('init', dir);
+  const odd = createHttpServer((req, res) => res.end(JSON.stringify({ file: 5 }))).listen(0, '127.0.0.1');
+  await new Promise((ok) => odd.once('listening', ok));
+  const { port } = odd.address();
+  writeFileSync(join(sod, 'config.yaml'), `board: decisions.json\nport: ${port}\n`);
+  const out = await new Promise((ok) => execFile('node', [cli, 'doctor', dir], { encoding: 'utf8' }, (err, stdout) => ok({ code: err?.code ?? 0, out: stdout || err?.stdout || '' })));
+  odd.close();
+  assert.equal(out.code, 1);
+  assert.match(out.out, new RegExp(`port: ${port} is in use \\(EADDRINUSE\\)`));
 });

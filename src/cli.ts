@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { closeSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, watch, writeFileSync, type Stats } from 'node:fs';
+import { accessSync, closeSync, constants, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, watch, writeFileSync, type Stats } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -493,7 +493,7 @@ async function start(file: string, port: number, values: Record<string, any>, on
 /** open records `<pid> <port>` next to the board, so status and stop never guess a pid. */
 const record = (file: string) => `${file.replace(/\.json$/, '')}.board.pid`;
 /** What the board on this port serves; a busy server is an error, never mistaken for no server. */
-const serving = (port: number) => fetch(`http://127.0.0.1:${port}/api/board`, { signal: AbortSignal.timeout(1000) }).then((r) => r.json()).catch((e) => {
+const serving = (port: number) => fetch(`http://127.0.0.1:${port}/api/board`, { signal: AbortSignal.timeout(1000) }).then((r) => r.json()).then((b) => (b && typeof b.file !== 'string' ? { ...b, file: undefined } : b)).catch((e) => {
   if (e.name === 'TimeoutError') throw fail(`the board on port ${port} did not answer within 1 second`, 'BUSY', 'Run the command again in a moment');
 });
 const alive = (pid: number) => { try { return process.kill(pid, 0); } catch (e: any) { return e.code === 'EPERM'; } };
@@ -595,6 +595,7 @@ async function doctor(args: string[]) {
   /** A permission problem is fixed by chmod on the setup folder holding the path; anything else in the way is moved aside. */
   const unreadable = (path: string, code: string, then: string) => ['EACCES', 'EPERM'].includes(code) ? `Run \`chmod -R u+rwX ${shellPath(dirname(path))}\`` : `Move ${shellPath(path)} away, then ${then}`;
   /** Why a setup file cannot be used and its fix, or nothing when it is a readable file with content. */
+  const writable = (path: string) => { try { accessSync(path, constants.W_OK); return true; } catch { return false; } };
   const unusable = (path: string): [string, string] | undefined => {
     const stat = look(path);
     if (stat === 'denied') return [`${basename(path)} cannot be read (permission denied)`, unreadable(path, 'EACCES', `run \`${rerun}\``)];
@@ -666,6 +667,9 @@ async function doctor(args: string[]) {
         `run \`${rerun}\``,
       ];
       check('folders', problems.join('; ') || 'mocks/ and evidence/ exist', problems.length ? `${steps.join(', then ')}`.replace(/^./, (c) => c.toUpperCase()) : undefined);
+      const unwritable = [so, board, answersPath(board), roundsPath(board)].filter((p) => existsSync(p) && !writable(p));
+      check('write', unwritable.length ? `${unwritable.map((p) => basename(p)).join(' and ')} cannot be written` : 'setup can be written',
+        unwritable.length ? `Run \`chmod u+w ${unwritable.map((p) => shellPath(p)).join(' ')}\`` : undefined);
     }
   } catch (e: any) {
     if (!e.syscall) throw e;
