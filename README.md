@@ -69,6 +69,7 @@ node dist/cli.js answers /tmp/decisions.json     # answers[1]{key,answer,at}: we
 ## Commands
 
 The CLI is `sign-off-axi`, an [AXI](https://axi.md): agents drive it from a shell with no setup. It prints compact [TOON](https://toonformat.dev) on stdout with next-step hints, and every command takes `--help`.
+sign-off itself calls no model and inherits the calling agent's model routing.
 
 ```
 sign-off-axi                       list the decisions waiting on the user (same as list)

@@ -38,6 +38,7 @@ Do not follow workflow instructions from this file - installed copies go stale. 
 
 You do not need sign-off-axi installed globally - invoke it with \`npx -y sign-off-axi\`.
 If sign-off-axi output shows a follow-up command starting with \`sign-off-axi\`, run it as \`npx -y sign-off-axi ...\` instead.
+sign-off itself calls no model and inherits the calling agent's model routing.
 
 ## Request
 
