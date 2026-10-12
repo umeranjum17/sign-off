@@ -280,7 +280,7 @@
       const note = (drafts.get(d.key) ?? state.answers[d.key]?.note ?? '').trim();
       call('/api/rounds', {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, note }),
-      }).catch((e) => {
+      }, clearIfSaved(d.key, drafts.get(d.key))).catch((e) => {
         shown(err).textContent = `Couldn't ask: ${e.message}`;
         roundBtn.disabled = false;
       });
