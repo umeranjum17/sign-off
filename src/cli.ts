@@ -634,7 +634,7 @@ async function doctor(args: string[]) {
       else {
         try {
           const n = loadDecisions(board).length, old = readItems(board).schema === 1;
-          check('board', `${n} items${old ? ' (0.1.0 schema 1: read as decisions; the next raise or post upgrades it and keeps a .schema-1.bak copy)' : ''}`);
+          check('board', `${n} items${old ? ' (0.1.0 schema 1: read as decisions; the first write that changes it upgrades it and keeps a .schema-1.bak copy)' : ''}`);
         } catch (e: any) {
           check('board', e.message, `Edit ${shellPath(board)} to fix that; the format is at ${FORMAT}`);
         }
