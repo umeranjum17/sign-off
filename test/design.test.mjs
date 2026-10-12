@@ -558,3 +558,31 @@ test('a symlinked board: doctor, open and serve all read the config.yaml beside 
   assert.match(await served(proc), new RegExp(`url: "http://127\\.0\\.0\\.1:${here}/"`));
   proc.kill();
 });
+
+test('a read-only board fed by another program: no answers, a link on any item, and each change shows on the next read', async () => {
+  const dir = join(scratch, 'fed'), file = join(dir, 'board.json'), page = join(dir, 'mocks', 'page');
+  mkdirSync(join(page, 'img'), { recursive: true });
+  writeFileSync(join(page, 'index.html'), '<a href="img/dot.png"><img src="img/dot.png"></a>');
+  writeFileSync(join(page, 'img', 'dot.png'), png);
+  const feed = (items) => writeFileSync(file, JSON.stringify({ schema: 2, readonly: true, items }));
+  const pageItem = { key: 'page', type: 'interactive', title: 'Updates', view: 'mocks/page/index.html' };
+  feed([pageItem, { key: 'ask-1', type: 'ask', title: 'Check the sign-in screen', link: 'https://example.com/pr/1' }]);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1], read = async () => (await fetch(`${url}api/decisions`)).json();
+  const first = await read();
+  assert.equal(first.readonly, true);
+  assert.equal(first.decisions[1].link, 'https://example.com/pr/1');
+  assert.equal((await fetch(new URL(`${first.mockBase.slice(1)}page~/img/dot.png`, url))).status, 200);
+  for (const [path, body] of [['api/answers', { key: 'ask-1', answer: 'yes' }], ['api/rounds', { key: 'ask-1', note: 'again' }], ['api/messages', { kind: 'prompt', text: 'hi' }]]) {
+    const res = await post(url, path, body);
+    assert.deepEqual([res.status, (await res.json()).error], [403, 'This board is read-only'], path);
+  }
+  assert.deepEqual(readdirSync(dir).filter((f) => /jsonl$/.test(f)), []);
+  // The feeding program rewrites the file: a new row shows, a removed one is gone, with no restart.
+  feed([pageItem, { key: 'ask-2', type: 'ask', title: 'Pick a release day' }]);
+  assert.deepEqual((await read()).decisions.map((d) => d.key), ['page', 'ask-2']);
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key: 'ask-3', title: 'Bad link?', link: 'ftp://x' }] }));
+  assert.equal((await fetch(`${url}api/decisions`)).status, 422);
+  proc.kill();
+});

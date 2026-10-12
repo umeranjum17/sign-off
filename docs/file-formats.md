@@ -28,6 +28,12 @@
 }
 ```
 
+- `"readonly": true` beside `"schema"` makes a **read-only board**: a page for
+  items another program writes into the file (rewrite it whole: a temp file,
+  then a rename). Its cards have no answer, note or comment buttons, there is
+  no Ask box, the server refuses every answer, round and comment with 403, and
+  the open page checks the file every 20 seconds and redraws when it changed.
+  An `interactive` item on it gets most of the screen's height.
 - A 0.1.0 file, `"schema": 1` with a `"decisions"` list, still reads: each entry is an item, a decision unless it says otherwise. The first write that changes it (a `raise` of a new key, or a `post`) rewrites it as `"schema": 2` (temp file, then rename) and first keeps the old file once beside it as `<board>.schema-1.bak`. Answer and round files are not touched.
 - `key`: 1-128 of `A-Z a-z 0-9 . _ -`, unique in the file. `title`: required.
 - `type`: optional, `decision` (default), `design`, `evidence`, `diagram`,
@@ -78,6 +84,7 @@
 - `options`: optional, 2 to 6 choices. Each has a `value` (1-128 of `A-Z a-z 0-9 . _ -`, unique within the question) and a non-empty `label` shown on its button. Leave it out for **Yes** (`yes`) and **No** (`no`); files written before options existed read exactly as before.
 - `recommend_value`, `default_if_silent`: optional, the `value` of one of the question's own options (`yes` or `no` when `options` is left out). Shown, never applied.
 - `close`: optional, `done` (default) or `release`; copied into the answer.
+- `link`: optional on any item, an `http(s)` link (shown as a link on its card) or a 7-40 character commit hash.
 - Other keys are ignored.
 - `evidence`: optional read-only link to a done-done schema 1 run. Set `run_id`, its full 40-character `commit`, and the four plain-text Checks lines (`outcome`, `repro`, `proof`, `evidence`), each non-empty trimmed text up to 1000 characters. Start `serve` with `--evidence-root <store-root>` (the directory containing `.done-done/`); the board only reads that root and only opens media listed and hash-matched in that run record. The card reports the run command outcome, not a persisted claim-check receipt. done-done has no receipt schema yet; a missing or mismatched record stays **UNVERIFIED**.
 
@@ -111,7 +118,7 @@ also copies each file into `evidence/<number>/` next to the board:
 ```
 
 - `number`: whole number from 1. `post` takes the next number whose `evidence/<number>/` folder and `update-<number>` key are both free (boards in one folder share `evidence/`) and sets `key` to `update-<number>`.
-- `about`: the short note. `link`: optional, an `http(s)` link or a 7-40 character commit hash.
+- `about`: the short note. `link`: optional, as on any item.
 - `media`: 1 to 12 files, each under `evidence/<number>/` and ending in `.png`, `.jpg`, `.jpeg`, `.webp`, `.mp4` or `.webm`, with the `sha256` and `bytes` recorded at post time. The board serves a file only while both still match.
 - `options` defaults to **Pass** (`pass`), **Fail** (`fail`) and **Needs work** (`needs-work`); the verdict and its note are saved as an answer.
 

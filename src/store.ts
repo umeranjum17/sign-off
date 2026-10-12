@@ -94,10 +94,8 @@ export function loadDecisions(path: string): Decision[] {
       || !d.chapters.every((c: any, n: number) => Number.isInteger(c?.at) && c.at >= 0 && (!n || c.at > d.chapters[n - 1].at) && isText(c.title) && c.title.trim() && c.title.length <= 120))) {
       throw bad('chapters', `must list 1 to ${CHAPTERS_MAX} items, each a start in whole seconds after the one before and a title of 120 characters or fewer`);
     }
-    if (d.type === 'evidence') {
-      if (!Number.isInteger(d.number) || d.number < 1) throw bad('number', 'must be a whole number from 1');
-      if (d.link !== undefined && !(isText(d.link) && /^(https?:\/\/\S{1,500}|[a-f0-9]{7,40})$/.test(d.link))) throw bad('link', 'must be an http(s) link or a commit hash');
-    }
+    if (d.type === 'evidence' && !(Number.isInteger(d.number) && d.number >= 1)) throw bad('number', 'must be a whole number from 1');
+    if (d.link !== undefined && !(isText(d.link) && /^(https?:\/\/\S{1,500}|[a-f0-9]{7,40})$/.test(d.link))) throw bad('link', 'must be an http(s) link or a commit hash');
     // A ladder rung: a diagram image, or an interactive page the board frames in a sandbox.
     const views = Object.hasOwn(VIEWS, d.type ?? '') ? VIEWS[d.type] : undefined;
     if (views && !(isText(d.view) && d.view.length <= 256 && /^[^?#]+$/.test(d.view) && views[1].test(d.view))) throw bad('view', `must be a board-relative ${views[0]} file`);
@@ -122,10 +120,10 @@ export function loadDecisions(path: string): Decision[] {
     return {
       key: d.key, title: d.title, about: d.about, detail: d.detail, options: options.map((o: Option) => ({ value: o.value, label: o.label })),
       recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done', evidence: d.evidence,
-      type: d.type ?? 'decision', tradeoff: d.tradeoff, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path })),
+      type: d.type ?? 'decision', tradeoff: d.tradeoff, link: d.link, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path })),
       ...(views && { view: d.view }),
       ...(stored && { media: d.media.map(({ path, sha256, bytes }: MediaRef) => ({ path, sha256, bytes })) }),
-      ...(d.type === 'evidence' && { number: d.number, link: d.link }),
+      ...(d.type === 'evidence' && { number: d.number }),
       ...(d.type === 'explainer' && d.chapters && { chapters: d.chapters.map(({ at, title }: Chapter) => ({ at, title })) }),
     };
   });
