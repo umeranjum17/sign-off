@@ -204,6 +204,8 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   assert.match(frozen, /<meta http-equiv="content-security-policy" content="default-src 'none';/);
   const data = JSON.parse(/window\.FROZEN = (.*);<\/script>/.exec(frozen)[1]);
   assert.equal(data.files['/api/mock?key=pick-the-sign-in-layout&value=a'], `data:text/html;base64,${Buffer.from('<h1>Mock A</h1>').toString('base64')}`);
+  // A one-page mock keeps its ?variant= in the frame URL; the trailing comment hides it from the page text.
+  assert.equal(data.files['/api/mock?key=nav&value=b&variant=b'], `data:text/html;charset=utf-8,${encodeURIComponent('<p>variant page</p>')}%3C!--?variant=b`);
   assert.equal(data.answers['pick-the-sign-in-layout'].answer, 'b');
   assert.equal(data.messages.length, 2);
   // A diagram and an interactive page are inlined too, so the frozen copy shows them with no server.
