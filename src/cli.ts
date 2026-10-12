@@ -97,9 +97,7 @@ const portOf = (value: string) => {
 };
 /** Maps a decisions-file problem to a structured usage error (exit 2). */
 const axi = (cmd: string, run: (args: string[]) => string | Promise<string>) => async (args: string[]) => {
-  try {
-    return await run(args);
-  } catch (e) {
+  try { return await run(args); } catch (e) {
     throw e instanceof InputError ? fail(e.message, 'VALIDATION_ERROR', `Run \`sign-off-axi ${cmd} --help\`; the file format is at ${FORMAT}`) : e;
   }
 };
@@ -109,10 +107,11 @@ function board(file: string) {
   if (!existsSync(file)) return [];
   const decisions = loadDecisions(file), answers = readAnswers(file, warn);
   for (const key of Object.keys(answers)) if (!decisions.some((d) => d.key === key)) warn(`left out the answer for ${key}: that question is no longer in ${basename(file)}`);
-  return decisions.map((d) => ({ ...d, answer: answers[d.key] }));
+  return decisions.map((d) => ({ ...d, answer: Object.hasOwn(answers, d.key) ? answers[d.key] : undefined }));
 }
-function ready(file: string, on: string) {
+function ready(file: string, on: string, root?: string) {
   if (!existsSync(file)) throw fail(`no board yet at ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi raise${on} --title "<question>"\` first`);
+  if (root && !statSync(root, { throwIfNoEntry: false })?.isDirectory()) throw fail(`--evidence-root ${tilde(resolve(root))} is not a folder`, 'VALIDATION_ERROR', 'Pass the folder that holds .done-done/');
   loadDecisions(file);
 }
 
@@ -121,7 +120,7 @@ function list(args: string[]) {
   const rows = board(file), waiting = rows.filter((d) => !d.answer), answered = rows.length - waiting.length;
   if (values.json) return JSON.stringify({ board: file, decisions: rows });
   const help = [
-    ...(waiting.length ? [`Run \`sign-off-axi open${on}\` to show the board to the user at http://127.0.0.1:4410/`] : []),
+    ...(waiting.length ? [`Run \`sign-off-axi open${on}\` to show the board to the user`] : []),
     ...(answered ? [`Run \`sign-off-axi answers${on}\` to read the ${answered} saved answers`] : []),
     `Run \`sign-off-axi raise${on} --title "<question>"\` to ask the user a yes/no question`,
   ];
@@ -147,27 +146,20 @@ function answers(args: string[]) {
     board: tilde(file),
     answers: done.length ? done.map(({ key, answer, at, label, close, title }) => (values.full ? { key, answer, at, label, close, title } : { key, answer, at })) : '0 saved yet',
     waiting,
-  }, waiting ? [`Run \`sign-off-axi open${on}\` so the user can answer the ${waiting} waiting at http://127.0.0.1:4410/`] : []);
+  }, waiting ? [`Run \`sign-off-axi open${on}\` so the user can answer the ${waiting} waiting`] : []);
 }
 
 const slug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 64).replace(/^-+|-+$/g, '') || 'decision';
 /** Runs fn while holding an exclusive lock file, so two agents raising at once never drop a decision. */
 function locked<T>(lock: string, fn: () => T): T {
   for (let tries = 0; ; tries++) {
-    try {
-      closeSync(openSync(lock, 'wx'));
-      break;
-    } catch (e: any) {
+    try { closeSync(openSync(lock, 'wx')); break; } catch (e: any) {
       if (e.code !== 'EEXIST') throw e;
       if (tries === 150) throw fail('another raise is still writing the board', 'BUSY', `If no sign-off-axi is running, delete ${tilde(lock)} and raise again`);
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);
     }
   }
-  try {
-    return fn();
-  } finally {
-    rmSync(lock, { force: true });
-  }
+  try { return fn(); } finally { rmSync(lock, { force: true }); }
 }
 
 function raise(args: string[]) {
@@ -194,7 +186,8 @@ function raise(args: string[]) {
     const current = board(file), doc = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { schema: 1, decisions: [] };
     const raised = incoming.map((d, i) => {
       const had = current.find((c) => c.key === d.key);
-      if (had && JSON.stringify({ ...had, answer: undefined }) !== JSON.stringify(d)) {
+      const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
+      if (had && same(had) !== same(d)) {
         throw fail(`key ${d.key} already holds a different question on ${tilde(file)}`, 'CONFLICT', 'Raise it under a new --key');
       }
       if (!had) doc.decisions.push(raw[i]);
@@ -205,7 +198,7 @@ function raise(args: string[]) {
       renameSync(`${file}.${process.pid}.tmp`, file);
     }
     const key = raised.length === 1 ? ` --key ${raised[0].key}` : '';
-    const open = raised.some((r) => !r.status.startsWith('already answered')) ? [`Run \`sign-off-axi open${on}\` so the user can answer at http://127.0.0.1:4410/`] : [];
+    const open = raised.some((r) => !r.status.startsWith('already answered')) ? [`Run \`sign-off-axi open${on}\` so the user can answer`] : [];
     return toon({ board: tilde(file), raised }, [...open, `Run \`sign-off-axi answers${on}${key}\` to read ${key ? 'the answer' : 'the answers'}`]);
   });
 }
@@ -213,11 +206,14 @@ function raise(args: string[]) {
 async function open(args: string[]) {
   const { file, values, on } = parse('open', args, BOARD_FLAGS);
   const port = portOf(values.port);
-  ready(file, on);
-  const shown = port && await fetch(`http://127.0.0.1:${port}/api/decisions`, { signal: AbortSignal.timeout(1000) }).then((r) => r.json()).then((b) => b.file, () => undefined);
-  if (shown === file) return toon({ board: tilde(file), url: `http://127.0.0.1:${port}/`, status: 'already open (no-op)' });
+  ready(file, on, values['evidence-root']);
+  const shows = () => fetch(`http://127.0.0.1:${port}/api/decisions`, { signal: AbortSignal.timeout(1000) }).then((r) => r.json()).then((b) => b.file, () => undefined);
+  const already = () => toon({ board: tilde(file), url: `http://127.0.0.1:${port}/`, status: 'already open (no-op)' });
+  const shown = port && await shows();
+  if (shown === file) return already();
   if (shown) throw fail(`port ${port} already shows another board: ${tilde(shown)}`, 'CONFLICT', `Run \`sign-off-axi open${on} --port <free port>\``);
-  const log = `${file.replace(/\.json$/, '')}.board.log`, out = openSync(log, 'w', 0o600);
+  // Appended, not truncated: a concurrent open's child may be writing the same log, so read only this child's lines.
+  const log = `${file.replace(/\.json$/, '')}.board.log`, start = existsSync(log) ? statSync(log).size : 0, out = openSync(log, 'a', 0o600);
   const evidence = values['evidence-root'] ? ['--evidence-root', resolve(values['evidence-root'])] : [];
   const child = spawn(process.execPath, [process.argv[1], 'serve', file, '--port', String(port), ...evidence], { detached: true, stdio: ['ignore', out, out] });
   closeSync(out);
@@ -226,9 +222,11 @@ async function open(args: string[]) {
   child.once('exit', (code) => (exit = code));
   for (let waited = 0; waited < 10_000; waited += 50) {
     await new Promise((ok) => setTimeout(ok, 50));
-    const text = readFileSync(log, 'utf8'), url = /http:\/\/127\.0\.0\.1:\d+\//.exec(text)?.[0];
+    const text = readFileSync(log).subarray(start).toString(), url = new RegExp(`url: "(\\S+)"\\npid: ${child.pid}\\n`).exec(text)?.[1];
     if (url) return toon({ board: tilde(file), url, pid: child.pid, status: 'opened' }, [`Tell the user to answer at ${url}`, `Run \`sign-off-axi answers${on}\` to read their answers`, `Run \`kill ${child.pid}\` to close the board`]);
-    if (exit !== undefined) throw fail(/^error: "?(.*?)"?$/m.exec(text)?.[1] ?? `the board stopped with exit ${exit}`, 'SERVE_FAILED', `Read ${tilde(log)}`);
+    if (exit === undefined) continue;
+    if (port && (await shows()) === file) return already();
+    throw fail([...text.matchAll(/^error: "?(.*?)"?$/gm)].pop()?.[1] ?? `the board stopped with exit ${exit}`, 'SERVE_FAILED', `Read ${tilde(log)}`);
   }
   throw fail('the board did not start within 10 seconds', 'SERVE_FAILED', `Read ${tilde(log)}`);
 }
@@ -236,7 +234,7 @@ async function open(args: string[]) {
 let file = '', evidenceRoot = '';
 async function serve(args: string[]) {
   const parsed = parse('serve', args, BOARD_FLAGS), port = portOf(parsed.values.port);
-  ready(parsed.file, parsed.on);
+  ready(parsed.file, parsed.on, parsed.values['evidence-root']);
   [file, evidenceRoot] = [parsed.file, parsed.values['evidence-root'] ? resolve(parsed.values['evidence-root']) : ''];
   await new Promise<void>((ok, no) => server.once('error', no).listen(port, '127.0.0.1', ok)).catch((e) => {
     throw fail(e.code === 'EADDRINUSE' ? `port ${port} is in use; pass --port` : e.message, 'SERVE_FAILED');
@@ -352,5 +350,8 @@ await runAxiCli({
   topLevelHelp: TOP_HELP,
   getCommandHelp: (cmd) => HELP[cmd],
   home: axi('list', list),
-  commands: { list: axi('list', list), raise: axi('raise', raise), answers: axi('answers', answers), open: axi('open', open), serve: axi('serve', serve), help: () => TOP_HELP },
+  commands: { list: axi('list', list), raise: axi('raise', raise), answers: axi('answers', answers), open: axi('open', open), serve: axi('serve', serve), help: ([name, ...rest]) => {
+    if (rest.length || (name && !HELP[name])) throw fail(`unknown command or argument: ${[name, ...rest].join(' ')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi --help` to see the commands');
+    return name ? HELP[name] : TOP_HELP;
+  } },
 });

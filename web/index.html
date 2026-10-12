@@ -133,8 +133,8 @@
   }
 
   function render() {
-    const waiting = state.decisions.filter((d) => !state.answers[d.key]);
-    const answered = state.decisions.filter((d) => state.answers[d.key]);
+    const waiting = state.decisions.filter((d) => !Object.hasOwn(state.answers, d.key));
+    const answered = state.decisions.filter((d) => Object.hasOwn(state.answers, d.key));
     document.getElementById('count').textContent = `${waiting.length} waiting · ${answered.length} answered`;
     const list = (items) => el('div', { class: 'list' }, ...items.map(row));
     document.getElementById('board').replaceChildren(

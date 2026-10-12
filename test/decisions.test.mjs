@@ -121,6 +121,10 @@ test('agent journey: raise, open, answer, read back in TOON and JSON', async () 
   assert.match(run('answers').out, /answers\[1\]\{key,answer,at\}:\n  keep-the-weekly-digest,no,/);
   assert.equal(JSON.parse(run('answers', '--key', 'keep-the-weekly-digest', '--json').out)['keep-the-weekly-digest'].answer, 'no');
   assert.match(run('raise', '--title', 'Keep the weekly digest?', '--recommend', 'yes').out, /already answered no/);
+  run('raise', '--title', 'Only toString?', '--key', 'toString');
+  assert.match(run().out, /waiting\[1\]\{key,title\}:\n  toString,Only toString\?/);
+  assert.match(run('help', 'raise').out, /raise \[board.json\] --title/);
+  assert.deepEqual([run('help', 'nope').code, run('open', '--port', '0', '--evidence-root', join(env.HOME, 'missing')).code], [2, 2]);
   await Promise.all(Array.from({ length: 20 }, (_, i) => new Promise((ok) => spawn('node', [cli, 'raise', '--title', `Parallel question ${i}?`], { env }).on('exit', ok))));
-  assert.match(run().out, /waiting\[20\]/);
+  assert.match(run().out, /waiting\[21\]/);
 });
