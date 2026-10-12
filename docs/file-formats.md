@@ -145,7 +145,8 @@ also copies each file into `evidence/<number>/` next to the board:
 - `text`: 1 to 2000 characters, trimmed.
 
 **Access token** (`decisions.token`, mode 600): made the first time the board is served beyond `127.0.0.1`
-and reused after that. The board reads it on every request, so deleting it shuts old links out at once;
-deleting it, then `stop` and `open` again, makes a new one (`stop` and `open` alone reuse it). `open` prints it in the link; the server log never holds it.
-`init` git-ignores `*.messages.jsonl`, `*.token` and `*.export.html` with the other files sign-off writes.
+and reused after that. The board reads it on every request, so deleting it shuts old links out at once.
+Deleting it, then `stop` and `open` again, makes a new one (`stop` and `open` alone reuse it). `open` prints
+it in the link; the server log never holds it. `init` git-ignores `*.messages.jsonl`, `*.token` and
+`*.export.html` with the other files sign-off writes.
 
