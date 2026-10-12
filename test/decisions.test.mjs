@@ -65,6 +65,12 @@ test('answer journey: save, survive a torn line and a restart, read back', async
   assert.equal((await (await fetch(`${url}api/decisions`)).json()).decisions[0].evidenceCard.result, 'UNVERIFIED');
   rmSync(recordPath);
   assert.equal((await (await fetch(`${url}api/decisions`)).json()).decisions[0].evidenceCard.result, 'UNVERIFIED');
+  for (const bad of ['null', JSON.stringify({ ...makeRecord(), files: [null] })]) {
+    writeFileSync(recordPath, bad);
+    const card = (await (await fetch(`${url}api/decisions`)).json()).decisions[0].evidenceCard;
+    assert.equal(card.result, 'UNVERIFIED');
+    assert.doesNotMatch(card.reason, /Cannot read|TypeError|properties of|\/|\\/);
+  }
   const changed = JSON.parse(readFileSync(file, 'utf8'));
   changed.decisions[0].evidence.commit = 'f'.repeat(40);
   writeFileSync(file, JSON.stringify(changed));

@@ -13,6 +13,7 @@ const USAGE = `usage:
   sign-off help`;
 const warn = (msg: string) => console.error(`sign-off: ${msg}`);
 const fail = (msg: string): never => { warn(msg); return process.exit(2); };
+class EvidenceError extends Error {}
 
 let cmd: string | undefined, file = '', port = 4410, evidenceRoot = '', decisions: Decision[] = [];
 try {
@@ -54,33 +55,39 @@ function contained(path: string): string {
   try {
     root = realpathSync(evidenceRoot);
     actual = realpathSync(resolve(root, path));
-  } catch { throw new Error('no matching evidence file'); }
-  if (!actual.startsWith(root + sep)) throw new Error('evidence path escapes the selected root');
+  } catch { throw new EvidenceError('no matching evidence file'); }
+  if (!actual.startsWith(root + sep)) throw new EvidenceError('evidence path escapes the selected root');
   return actual;
 }
 function evidenceCard(link: NonNullable<Decision['evidence']>) {
   try {
-    if (!evidenceRoot) throw new Error('no evidence root was selected');
+    if (!evidenceRoot) throw new EvidenceError('no evidence root was selected');
     const recordPath = contained(`.done-done/runs/${link.run_id}.json`);
-    if (statSync(recordPath).size > 1_000_000) throw new Error('run record is too large');
+    if (statSync(recordPath).size > 1_000_000) throw new EvidenceError('run record is too large');
     const run = JSON.parse(readFileSync(recordPath, 'utf8'));
+    if (!run || typeof run !== 'object' || Array.isArray(run)) throw new EvidenceError('run record is malformed or its media is unavailable');
     if (run.schema !== 1 || run.run_id !== link.run_id || run.commit !== link.commit || !/^[a-f0-9]{40}$/.test(run.tree ?? '')
       || typeof run.dirty !== 'boolean' || !(run.exit === null || Number.isInteger(run.exit)) || !Array.isArray(run.files)
-      || run.files.some((f: any) => typeof f.path !== 'string' || !/^[a-f0-9]{64}$/.test(f.sha256 ?? '') || !Number.isInteger(f.bytes) || f.bytes < 0)) {
-      throw new Error('run record is malformed or commit does not match');
+      || run.files.some((f: any) => !f || typeof f !== 'object' || typeof f.path !== 'string' || !/^[a-f0-9]{64}$/.test(f.sha256 ?? '') || !Number.isInteger(f.bytes) || f.bytes < 0)) {
+      throw new EvidenceError('run record is malformed or commit does not match');
     }
     const media: { path: string; url: string; type: string }[] = run.files.flatMap((f: any) => {
       const type = mediaTypes[extname(f.path ?? '').toLowerCase()];
       if (!type) return [];
       const path = contained(f.path);
-      if (statSync(path).size > 20_000_000) throw new Error('media is unavailable or too large');
+      if (statSync(path).size > 20_000_000) throw new EvidenceError('media is unavailable or too large');
       const bytes = readFileSync(path);
-      if (bytes.length !== f.bytes || sha256(bytes) !== f.sha256) throw new Error('evidence hash does not match the run record');
+      if (bytes.length !== f.bytes || sha256(bytes) !== f.sha256) throw new EvidenceError('evidence hash does not match the run record');
       return [{ path: f.path, url: `/api/evidence?run=${encodeURIComponent(link.run_id)}&file=${encodeURIComponent(f.path)}`, type }];
     });
     const result = !Number.isInteger(run.exit) ? 'INCONCLUSIVE' : run.exit !== 0 || run.dirty || !run.files.length ? 'RUN FAIL' : 'RUN PASS';
     return { status: 'verified', result, commit: run.commit, media };
-  } catch (e: any) { return { status: 'unverified', result: 'UNVERIFIED', reason: e.code ? 'no matching run record or media' : e.message, commit: '', media: [] }; }
+  } catch (e: any) {
+    const reason = e instanceof EvidenceError ? e.message
+      : e?.code ? 'no matching run record or media'
+      : 'run record is malformed or its media is unavailable';
+    return { status: 'unverified', result: 'UNVERIFIED', reason, commit: '', media: [] };
+  }
 }
 
 async function route(req: IncomingMessage): Promise<[number, unknown]> {
