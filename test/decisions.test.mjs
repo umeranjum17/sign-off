@@ -116,8 +116,21 @@ test('agent journey: raise, open, answer, read back in TOON and JSON', async () 
   assert.match(run().out, /waiting\[1\]\{key,title\}:\n  keep-the-weekly-digest,Keep the weekly digest\?/);
   const opened = run('open', '--port', '0');
   const url = /url: "(.+)"/.exec(opened.out)[1], pid = Number(/pid: (\d+)/.exec(opened.out)[1]);
-  after(() => process.kill(pid));
+  assert.match(opened.out, /sign-off-axi stop/);
+  assert.match(run('status').out, new RegExp(`status: running\npid: ${pid}\n`));
+  // wait blocks until the answer is saved, then returns it straight away.
+  const waiting = spawn('node', [cli, 'wait', '--key', 'keep-the-weekly-digest', '--timeout', '20'], { env });
+  let waited = '';
+  waiting.stdout.on('data', (b) => (waited += b));
+  const exited = new Promise((ok) => waiting.on('exit', ok));
+  await new Promise((ok) => setTimeout(ok, 500));
+  assert.equal(waiting.exitCode, null);
+  const clicked = Date.now();
   assert.equal((await post(url, { key: 'keep-the-weekly-digest', answer: 'no' })).status, 200);
+  assert.equal(await exited, 0);
+  assert.ok(Date.now() - clicked < 1500, `wait took ${Date.now() - clicked}ms after the answer`);
+  assert.match(waited, /answers\[1\]\{key,answer,at\}:\n  keep-the-weekly-digest,no,/);
+  assert.equal(JSON.parse(run('wait', '--key', 'keep-the-weekly-digest', '--json').out)['keep-the-weekly-digest'].answer, 'no');
   assert.match(run('answers').out, /answers\[1\]\{key,answer,at\}:\n  keep-the-weekly-digest,no,/);
   assert.equal(JSON.parse(run('answers', '--key', 'keep-the-weekly-digest', '--json').out)['keep-the-weekly-digest'].answer, 'no');
   assert.match(run('raise', '--title', 'Keep the weekly digest?', '--recommend', 'yes').out, /already answered no/);
@@ -127,4 +140,10 @@ test('agent journey: raise, open, answer, read back in TOON and JSON', async () 
   assert.deepEqual([run('help', 'nope').code, run('open', '--port', '0', '--evidence-root', join(env.HOME, 'missing')).code], [2, 2]);
   await Promise.all(Array.from({ length: 20 }, (_, i) => new Promise((ok) => spawn('node', [cli, 'raise', '--title', `Parallel question ${i}?`], { env }).on('exit', ok))));
   assert.match(run().out, /waiting\[21\]/);
+  const timedOut = run('wait', '--key', 'toString', '--timeout', '1');
+  assert.deepEqual([timedOut.code, /code: TIMEOUT/.test(timedOut.out)], [1, true]);
+  assert.match(run('stop').out, new RegExp(`status: stopped\npid: ${pid}\n`));
+  assert.match(run('status').out, /status: not running/);
+  assert.match(run('stop').out, /not running \(no-op\)/);
+  assert.match(run('raise', '--from', 'missing.json').out, new RegExp(`cannot read ${join(process.cwd(), 'missing.json')}: ENOENT`));
 });

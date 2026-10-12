@@ -55,7 +55,8 @@ examples:
   wait: `usage: sign-off-axi wait [board.json] [--key <key>] [--timeout 600] [--full] [--json]
 Blocks until the user answers, then prints the answer the way answers does. Use it instead of a polling loop.
   --key      wait for that decision; an answer saved before wait starts returns at once
-             without --key, wait for any decision that has no answer yet (or is raised while waiting)
+             and a key not raised yet is waited for too
+             without --key, wait for the next answer to any decision still waiting; NOT_FOUND when nothing is
   --timeout  seconds to wait, 600 (10 minutes) by default; then exits 1 with code TIMEOUT
   --full     adds the button label, close and title
   --json     {"<key>":{"answer","label","close","at"}} for the new answers
@@ -78,7 +79,7 @@ examples:
   sign-off-axi status ./decisions.json --json
 `,
   stop: `usage: sign-off-axi stop [board.json]
-Stops the board that open started for this board file. It checks the pid really is that board's server first; a no-op when none is running.
+Stops the board that open started (or found running) for this board file. It checks the pid really is that board's server first; a no-op when none is running.
 examples:
   sign-off-axi stop
   sign-off-axi stop ./decisions.json
@@ -114,7 +115,9 @@ function parse(cmd: string, args: string[], flags: Flags) {
   const [given, extra] = parsed.positionals;
   if (extra !== undefined) throw fail(`unexpected argument ${extra}: \`${cmd}\` takes one board file`, 'VALIDATION_ERROR', `Run \`sign-off-axi ${cmd} --help\``);
   const on = given === undefined ? '' : ` ${/^[\w./~-]+$/.test(given) ? given : JSON.stringify(given)}`;
-  return { file: given === undefined ? BOARD : resolve(given), values: parsed.values as Record<string, any>, on };
+  // One spelling per board, so a symlinked path finds the same pid record and server.
+  const path = given === undefined ? BOARD : resolve(given), real = existsSync(path) ? realpathSync(path) : path;
+  return { file: real, values: parsed.values as Record<string, any>, on };
 }
 const portOf = (value: string) => {
   if (!/^\d{1,5}$/.test(value) || Number(value) > 65535) throw fail('--port must be a number from 0 to 65535', 'VALIDATION_ERROR');
@@ -171,12 +174,11 @@ function printAnswers(file: string, rows: ReturnType<typeof board>, waiting: num
     waiting,
   }, help);
 }
-const noKey = (key: string, file: string, on: string) => fail(`no decision with key ${key} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi list${on}\` to see the waiting keys`);
 
 function answers(args: string[]) {
   const { file, values, on } = parse('answers', args, { ...TIERS, key: { type: 'string' } });
   const rows = board(file).filter((d) => values.key === undefined || d.key === values.key);
-  if (values.key !== undefined && !rows.length) throw noKey(values.key, file, on);
+  if (values.key !== undefined && !rows.length) throw fail(`no decision with key ${values.key} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi list${on}\` to see the waiting keys`);
   const waiting = rows.filter((d) => !d.answer).length, key = values.key === undefined ? '' : ` --key ${values.key}`;
   return printAnswers(file, rows, waiting, values, waiting ? [`Run \`sign-off-axi open${on}\` so the user can answer the ${waiting} waiting`, `Run \`sign-off-axi wait${on}${key}\` to block until they answer`] : []);
 }
@@ -184,26 +186,27 @@ function answers(args: string[]) {
 async function wait(args: string[]) {
   const { file, values, on } = parse('wait', args, { ...TIERS, key: { type: 'string' }, timeout: { type: 'string', default: '600' } });
   if (!/^\d{1,7}$/.test(values.timeout)) throw fail('--timeout must be whole seconds, 0 or more', 'VALIDATION_ERROR', `Run \`sign-off-axi wait --help\``);
-  ready(file, on);
+  if (values.key === undefined) ready(file, on);
   const seconds = Number(values.timeout), deadline = Date.now() + seconds * 1000, key = values.key === undefined ? '' : ` --key ${values.key}`;
   const before = new Set(board(file).flatMap((d) => (d.answer ? [d.key] : [])));
   // A save wakes the loop at once; the 1 second timer is the fallback where file events are unavailable.
-  let wake = () => {};
-  const name = basename(answersPath(file)), watcher = watch(dirname(file), (_, changed) => changed === name && wake()).on('error', () => {});
+  let wake = () => {}, watcher;
+  const name = basename(answersPath(file));
   try {
+    try { watcher = watch(dirname(file), (_, changed) => changed === name && wake()).on('error', () => {}); } catch {}
     for (let first = true; ; first = false) {
       const rows = board(file, first ? warn : () => {}), waiting = rows.filter((d) => !d.answer).length;
       const hit = rows.filter((d) => (values.key === undefined ? d.answer && !before.has(d.key) : d.key === values.key));
-      if (values.key !== undefined && !hit.length) throw noKey(values.key, file, on);
       if (hit.some((d) => d.answer)) {
         return printAnswers(file, hit, waiting, values,
           [waiting ? `Run \`sign-off-axi wait${on}\` for the next of the ${waiting} waiting` : `Run \`sign-off-axi stop${on}\` to close the board`]);
       }
-      if (!waiting) throw fail(`nothing is waiting on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi answers${on}\` to read the saved answers`, `Run \`sign-off-axi raise${on} --title "<question>"\` to ask a new one`);
+      if (values.key === undefined && !waiting) throw fail(`nothing is waiting on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi answers${on}\` to read the saved answers`, `Run \`sign-off-axi raise${on} --title "<question>"\` to ask a new one`);
       const left = deadline - Date.now();
       if (left <= 0) {
+        if (key && !hit.length) throw fail(`no decision with key ${values.key} was raised on ${tilde(file)} within ${seconds}s`, 'TIMEOUT', `Run \`sign-off-axi list${on}\` to see the waiting keys`);
         throw fail(`no answer${key ? ` for ${values.key}` : ''} within ${seconds}s`, 'TIMEOUT', `Run \`sign-off-axi wait${on}${key} --timeout ${seconds}\` to keep waiting`,
-          ...(await running(file) ? [] : [`Run \`sign-off-axi open${on}\` so the user can answer: the board is not open`]));
+          ...(await running(file).catch(() => true) ? [] : [`Run \`sign-off-axi open${on}\` so the user can answer: the board is not open`]));
       }
       await new Promise<void>((ok) => {
         const timer = setTimeout(ok, Math.min(1000, left));
@@ -211,21 +214,21 @@ async function wait(args: string[]) {
       });
     }
   } finally {
-    watcher.close();
+    watcher?.close();
   }
 }
 
 const slug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 64).replace(/^-+|-+$/g, '') || 'decision';
 /** Runs fn while holding an exclusive lock file, so two agents raising at once never drop a decision. */
-function locked<T>(lock: string, fn: () => T): T {
-  for (let tries = 0; ; tries++) {
+async function locked<T>(lock: string, fn: () => T | Promise<T>, busy = 'another raise is still writing the board', tries = 150): Promise<T> {
+  for (;;) {
     try { closeSync(openSync(lock, 'wx')); break; } catch (e: any) {
       if (e.code !== 'EEXIST') throw e;
-      if (tries === 150) throw fail('another raise is still writing the board', 'BUSY', `If no sign-off-axi is running, delete ${tilde(lock)} and raise again`);
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);
+      if (!tries--) throw fail(busy, 'BUSY', `If no sign-off-axi is running, delete ${tilde(lock)} and try again`);
+      await new Promise((ok) => setTimeout(ok, 20));
     }
   }
-  try { return fn(); } finally { rmSync(lock, { force: true }); }
+  try { return await fn(); } finally { rmSync(lock, { force: true }); }
 }
 
 function raise(args: string[]) {
@@ -273,13 +276,18 @@ async function open(args: string[]) {
   const { file, values, on } = parse('open', args, BOARD_FLAGS);
   const port = portOf(values.port);
   ready(file, on, values['evidence-root']);
-  const shows = async () => (await serving(port))?.file;
+  // The lock makes concurrent opens take turns, so a second one finds the first board instead of starting another.
+  return locked(`${record(file)}.lock`, () => start(file, port, values, on), 'another open is still starting this board', 600);
+}
+async function start(file: string, port: number, values: Record<string, any>, on: string) {
   const live = await running(file);
-  const already = () => toon({ board: tilde(file), url: live?.url ?? `http://127.0.0.1:${port}/`, status: 'already open (no-op)' }, [`Run \`sign-off-axi stop${on}\` to close the board`]);
+  const already = (url = live?.url) => toon({ board: tilde(file), url, status: 'already open (no-op)' }, [`Run \`sign-off-axi stop${on}\` to close the board`]);
   if (live) return already();
-  const shown = port && await shows();
-  if (shown === file) return already();
-  if (shown) throw fail(`port ${port} already shows another board: ${tilde(shown)}`, 'CONFLICT', `Run \`sign-off-axi open${on} --port <free port>\``);
+  // A board serving this file without a record (a foreground serve) is adopted, so stop can close it.
+  const adopt = (b: any) => b?.file === file && (writeFileSync(record(file), `${b.pid} ${port}\n`, { mode: 0o600 }), true);
+  const shown = port ? await serving(port) : undefined;
+  if (adopt(shown)) return already(`http://127.0.0.1:${port}/`);
+  if (shown?.file) throw fail(`port ${port} already shows another board: ${tilde(shown.file)}`, 'CONFLICT', `Run \`sign-off-axi open${on} --port <free port>\``);
   // Appended, not truncated: a concurrent open's child may be writing the same log, so read only this child's lines.
   const log = `${file.replace(/\.json$/, '')}.board.log`, start = existsSync(log) ? statSync(log).size : 0, out = openSync(log, 'a', 0o600);
   const evidence = values['evidence-root'] ? ['--evidence-root', resolve(values['evidence-root'])] : [];
@@ -297,7 +305,7 @@ async function open(args: string[]) {
         [`Tell the user to answer at ${url}`, `Run \`sign-off-axi wait${on}\` to block until they answer`, `Run \`sign-off-axi stop${on}\` to close the board`]);
     }
     if (exit === undefined) continue;
-    if (port && (await shows()) === file) return already();
+    if (port && adopt(await serving(port))) return already(`http://127.0.0.1:${port}/`);
     throw fail([...text.matchAll(/^error: "?(.*?)"?$/gm)].pop()?.[1] ?? `the board stopped with exit ${exit}`, 'SERVE_FAILED', `Read ${tilde(log)}`);
   }
   throw fail('the board did not start within 10 seconds', 'SERVE_FAILED', `Read ${tilde(log)}`);
@@ -305,7 +313,11 @@ async function open(args: string[]) {
 
 /** open records `<pid> <port>` next to the board, so status and stop never guess a pid. */
 const record = (file: string) => `${file.replace(/\.json$/, '')}.board.pid`;
-const serving = (port: number) => fetch(`http://127.0.0.1:${port}/api/board`, { signal: AbortSignal.timeout(1000) }).then((r) => r.json(), () => undefined).catch(() => undefined);
+/** What the board on this port serves; a busy server is an error, never mistaken for no server. */
+const serving = (port: number) => fetch(`http://127.0.0.1:${port}/api/board`, { signal: AbortSignal.timeout(1000) }).then((r) => r.json()).catch((e) => {
+  if (e.name === 'TimeoutError') throw fail(`the board on port ${port} did not answer within 1 second`, 'BUSY', 'Run the command again in a moment');
+});
+const alive = (pid: number) => { try { return process.kill(pid, 0); } catch (e: any) { return e.code === 'EPERM'; } };
 /** The board open started for this file, only while that pid really serves this file on that port. */
 async function running(file: string) {
   const [pid, port] = (existsSync(record(file)) ? readFileSync(record(file), 'utf8') : '').trim().split(' ').map(Number);
@@ -326,7 +338,7 @@ async function stop(args: string[]) {
   const live = await running(file);
   if (live) {
     process.kill(live.pid, 'SIGTERM');
-    for (let waited = 0; await serving(Number(new URL(live.url).port)); waited += 50) {
+    for (let waited = 0; alive(live.pid); waited += 50) {
       if (waited >= 5000) throw fail(`the board (pid ${live.pid}) did not stop within 5 seconds`, 'STOP_FAILED', `Run \`sign-off-axi stop${on}\` again`);
       await new Promise((ok) => setTimeout(ok, 50));
     }
