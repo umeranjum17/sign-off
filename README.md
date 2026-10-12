@@ -56,7 +56,8 @@ board, `mocks/` and `evidence/` folders, and a `.gitignore` keeping media and
 answer files out of git) and `sign-off-axi doctor` checks it: node version,
 config, board, answer files, gitignore lines, folders and the dashboard port.
 Each failure prints one `help:` line with its fix, and doctor exits 1; a clean
-run exits 0. `open` and `serve` use the config's `port:` unless `--port` is given. Re-running `init` keeps files that are already there and adds the
+run exits 0. `open` and `serve` use the config's `port:` unless `--port` is
+given. Re-running `init` keeps files that are already there and adds the
 missing ones, so it repairs an `init` that was cut short. Mock files go under
 `.sign-off/mocks/` and are named board-relative in `post` (for example
 `mocks/a.html`).
