@@ -153,7 +153,7 @@ function list(args: string[]) {
   const help = [
     ...(waiting.length ? [`Run \`sign-off-axi open${on}\` to show the board to the user`] : []),
     ...(answered ? [`Run \`sign-off-axi answers${on}\` to read the ${answered} saved answers`] : []),
-    `Run \`sign-off-axi raise${on} --title "<question>"\` to ask the user a yes/no question`,
+    `Run \`sign-off-axi raise${on} --title "<question>"\` to ask the user a yes/no or pick-one question`,
   ];
   const where = tilde(file) + (existsSync(file) ? '' : ' (no file yet; raise creates it)');
   if (values.full) {
@@ -472,7 +472,7 @@ const argv = process.argv.slice(2);
 // Flags with no command belong to the default list view (sign-off-axi --json).
 if (argv[0]?.startsWith('-') && !['--help', '-v', '-V', '--version'].includes(argv[0])) argv.unshift('list');
 await runAxiCli({
-  description: 'Ask the user yes/no questions on one local board and read their answers back',
+  description: 'Ask the user yes/no or pick-one questions on one local board and read their answers back',
   version: JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version,
   argv,
   topLevelHelp: TOP_HELP,
