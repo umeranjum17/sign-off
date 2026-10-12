@@ -6,11 +6,13 @@
 <title>Dashboard · sign-off</title>
 <style>
   :root { color-scheme: light dark;
-    --bg: #FFFFFF; --surface: #F7F7F8; --line: #E6E6EA; --text: #1A1A1E; --muted: #5E5E6B;
-    --border: #8A8A96; --accent: #4E5BC9; --on-accent: #FFFFFF; --danger: #B42318; }
+    --bg: #F6F3EE; --surface: #FFFFFF; --sunk: #EFEBE4; --line: #E6E0D6; --text: #1F1B16; --muted: #6A6157;
+    --border: #B8AE9F; --accent: #C2410C; --on-accent: #FFFFFF; --danger: #B42318;
+    --shadow: 0 1px 2px rgb(60 40 20 / 0.06), 0 6px 18px rgb(60 40 20 / 0.06); }
   @media (prefers-color-scheme: dark) { :root {
-    --bg: #0F0F11; --surface: #18181B; --line: #27272C; --text: #EDEDEF; --muted: #9C9CA8;
-    --border: #6E6E7B; --accent: #8E97F2; --on-accent: #0F0F11; --danger: #FF8A80; } }
+    --bg: #15120F; --surface: #211D18; --sunk: #1B1814; --line: #342E26; --text: #F3EEE6; --muted: #A99F91;
+    --border: #6E6458; --accent: #FB923C; --on-accent: #1A1009; --danger: #FF8A80;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.25); } }
   * { box-sizing: border-box; }
   body { margin: 0 0 3rem; background: var(--bg); color: var(--text); overflow-wrap: anywhere; -webkit-font-smoothing: antialiased;
     font: 1rem/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
@@ -21,12 +23,32 @@
   .bar h1 { font-size: 1rem; font-weight: 600; margin: 0; flex: 1 0 auto; }
   .count { color: var(--muted); font-size: 0.875rem; font-variant-numeric: tabular-nums; }
   .banner { margin: 1rem 0 0; padding: 0.75rem 1rem; border: 1px solid var(--danger); border-radius: 0.5rem; color: var(--danger); }
-  h2 { font-size: 0.8125rem; font-weight: 600; color: var(--muted); margin: 2rem 0 0.5rem; letter-spacing: 0.01em; }
-  .list { background: var(--surface); border: 1px solid var(--line); border-radius: 0.75rem; }
-  .row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.875rem; padding: 1rem; }
-  .row + .row { border-top: 1px solid var(--line); }
-  .row h3 { font-size: 1.0625rem; font-weight: 600; line-height: 1.4; margin: 0; }
-  .about, details p { color: var(--muted); margin: 0.25rem 0 0; max-width: 70ch; }
+  h2 { font-size: 0.75rem; font-weight: 700; color: var(--muted); margin: 2rem 0 0.625rem; letter-spacing: 0.06em; text-transform: uppercase; }
+  /* The glance: what waits, by type, oldest first; the chips filter the lists below and live in the URL hash. */
+  .glance { padding-top: 1.25rem; }
+  .big { margin: 0; font: 600 1.625rem/1.2 ui-serif, "Iowan Old Style", Georgia, serif; letter-spacing: -0.01em; }
+  .filters { display: flex; flex-wrap: wrap; gap: 0.375rem; margin-top: 0.875rem; }
+  .filters button { min-height: 2.5rem; padding: 0 0.625rem; border-radius: 999px; border-color: var(--line); font-size: 0.875rem; }
+  .filters .n { margin-left: 0.375rem; color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .filters button[aria-pressed="true"] { background: var(--text); border-color: var(--text); color: var(--bg); }
+  .filters button[aria-pressed="true"] .n { color: inherit; }
+  .filters button[aria-pressed="true"]::before { content: none; }
+  .oldest { list-style: none; margin: 0.375rem 0 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 0.875rem; box-shadow: var(--shadow); }
+  .oldest .chip { min-width: 5.75rem; text-align: center; }
+  .oldest li + li { border-top: 1px solid var(--line); }
+  .oldest button { display: flex; align-items: flex-start; gap: 0.625rem; width: 100%; padding: 0.625rem 0.875rem; border: 0; border-radius: 0;
+    background: none; text-align: start; font-weight: 500; }
+  .glance > .meta { margin-top: 1rem; }
+  .list { display: grid; gap: 0.75rem; }
+  .row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.875rem; padding: 1rem; scroll-margin-top: 4.5rem;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 0.875rem; box-shadow: var(--shadow); }
+  /* Waiting cards carry the accent stripe and the shadow; answered ones sit flat and quiet. */
+  .waiting .row { box-shadow: inset 3px 0 0 var(--accent), var(--shadow); }
+  .answered .row { background: transparent; box-shadow: none; }
+  .answered .row h3 { color: var(--muted); font-weight: 500; }
+  .row h3 { font-size: 1.125rem; font-weight: 650; line-height: 1.35; margin: 0; }
+  .about, details p { margin: 0.375rem 0 0; max-width: 70ch; }
+  details p { color: var(--muted); }
   .about { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .row:has(details:not(.note)[open]) .about { display: none; }
   .about.full { display: block; }
@@ -43,31 +65,34 @@
   .check { margin: 0; color: var(--muted); font-size: .875rem; }
   .check strong { color: var(--text); text-transform: capitalize; }
   .commit { color: var(--muted); font: .75rem/1.5 ui-monospace, monospace; overflow-wrap: anywhere; margin: .5rem 0; }
-  .media { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: .75rem; }
-  .media a { display: block; color: var(--accent); }
-  .media img, .media video { display: block; width: 100%; max-height: 20rem; object-fit: contain; border-radius: .7rem; background: #111; }
+  /* Each capture keeps its own shape: the frame is the shot, bounded in height, never letterboxed. */
+  .media { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .75rem; }
+  .media a { display: block; max-width: 100%; color: var(--accent); cursor: zoom-in; }
+  .media img, .media video { display: block; width: auto; height: auto; max-width: 100%; max-height: min(28rem, 70vh);
+    border: 1px solid var(--line); border-radius: .625rem; background: var(--sunk); }
   .unverified, .media .gone { color: var(--danger); margin: .5rem 0; }
   .update-media { grid-column: 1 / -1; }
   .meta a { color: var(--accent); }
   .err:empty { display: none; }
   .err:not(:empty) { color: var(--danger); font-size: 0.875rem; margin-top: 0.5rem; }
   .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+  .choices button { padding: 0 0.75rem; }
   button { min-height: 2.75rem; padding: 0 1.25rem; border-radius: 0.5rem; border: 1px solid var(--border); cursor: pointer;
-    background: var(--bg); color: var(--text); font: inherit; font-weight: 500; }
-  button.rec { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-  button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+    background: var(--surface); color: var(--text); font: inherit; font-weight: 500; }
+  /* Recommended is a dashed accent outline and a tag; picked is filled with a check. They never look alike. */
+  button.rec { border: 1px dashed var(--accent); }
+  .tag { display: inline-block; white-space: nowrap; margin-left: 0.375rem; color: var(--accent); font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+  button[aria-pressed="true"] { background: var(--accent); border: 1px solid var(--accent); color: var(--on-accent); font-weight: 600; }
+  button[aria-pressed="true"]::before { content: "✓" / ""; margin-right: 0.375rem; font-weight: 700; }
+  button[aria-pressed="true"] .tag { color: inherit; }
   button:disabled { opacity: 0.6; cursor: progress; }
   .choices.many { display: flex; flex-wrap: wrap; }
   .choices.many button { flex: 1 1 auto; max-width: 100%; padding: 0.5rem 1rem; }
   .note label { display: block; color: var(--muted); font-size: 0.8125rem; margin-top: 0.5rem; }
-  .tradeoff { color: var(--muted); font-size: 0.875rem; margin: 0.5rem 0 0; max-width: 70ch; }
+  .tradeoff { margin: 0; max-width: 70ch; }
   .head { display: flex; align-items: flex-start; gap: 0.5rem; }
   .chip { flex: none; margin-top: 0.2rem; padding: 0 0.5rem; border: 1px solid var(--line); border-radius: 999px; color: var(--muted);
     font-size: 0.6875rem; font-weight: 600; line-height: 1.25rem; letter-spacing: 0.04em; text-transform: uppercase; }
-  .line summary { color: var(--muted); list-style: none; margin: 0; width: auto; }
-  .line summary::-webkit-details-marker { display: none; }
-  .line:not([open]) summary { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .line strong { color: var(--text); font-weight: 600; }
   .mocks { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 0.75rem; }
   .mock { display: flex; flex-direction: column; margin: 0; border: 1px solid var(--line); border-radius: 0.7rem; overflow: hidden; background: var(--bg); min-width: 0; }
   .mock:has([aria-pressed="true"]) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
@@ -78,18 +103,19 @@
   .mock figcaption { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-top: auto; padding: 0.625rem 0.75rem 0.75rem; font-size: 0.875rem; }
   .mock figcaption .label { flex: 1 1 6rem; font-weight: 500; }
   .mock figcaption button { flex: 1 0 100%; }
-  .badge { padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .badge { padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; color: var(--accent); border: 1px dashed var(--accent); }
   .round { margin-top: 0.5rem; }
   textarea { display: block; width: 100%; max-width: 70ch; margin-top: 0.25rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border);
     border-radius: 0.5rem; background: var(--bg); color: var(--text); font: inherit; resize: vertical; }
   .saved-note { white-space: pre-line; }
-  button:focus-visible, summary:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .empty { margin: 0; padding: 1.5rem 1rem; color: var(--muted); text-align: center; }
+  button:focus-visible, summary:focus-visible, textarea:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .oldest button:focus-visible, .shot:focus-visible { outline-offset: -2px; }
+  .empty { margin: 0; padding: 1.5rem 1rem; color: var(--muted); text-align: center; border: 1px dashed var(--line); border-radius: 0.875rem; }
   @media (min-width: 45rem) {
     .bar, main { padding: 0 2rem; }
     .row { grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 2rem; padding: 1.125rem 1.25rem; }
     .row.design { grid-template-columns: minmax(0, 1fr); gap: 0.875rem; }
-    .choices { grid-template-columns: repeat(2, 5.5rem); }
+    .choices { grid-template-columns: repeat(2, minmax(5.5rem, auto)); }
     .row:has(.choices.many) { row-gap: 0.875rem; }
     .choices.many { grid-column: 1 / -1; }
     .choices.many button { flex: 0 1 auto; min-width: 5.5rem; }
@@ -141,9 +167,8 @@
     const checks = el('div', { class: 'checks' }, ...['outcome', 'repro', 'proof', 'evidence'].map((name) =>
       el('p', { class: 'check' }, el('strong', {}, `${name}: `), document.createTextNode(link[name].replace(new RegExp(`^${name}:\\s*(?=\\S)`, 'i'), '')))));
     const media = el('div', { class: 'media' }, ...(card?.media ?? []).map((item) => {
-      const node = item.type.startsWith('image/') ? el('img', { src: item.url, alt: `Evidence image: ${item.path}` })
-        : el('video', { src: item.url, controls: '', preload: 'metadata', 'aria-label': `Evidence recording: ${item.path}` });
-      return el('a', { href: item.url, target: '_blank', rel: 'noopener', 'aria-label': `Open ${item.path}` }, node);
+      if (!item.type.startsWith('image/')) return el('video', { src: item.url, controls: '', playsinline: '', preload: 'metadata', 'aria-label': `Evidence recording: ${item.path}` });
+      return el('a', { href: item.url, target: '_blank', rel: 'noopener', 'aria-label': `Open ${item.path}` }, el('img', { src: item.url, alt: `Evidence image: ${item.path}` }));
     }));
     return el('section', { class: 'evidence', 'aria-label': 'Read-only proof evidence' }, head,
       card?.commit ? el('p', { class: 'commit' }, `Commit · ${card.commit}`) : '',
@@ -155,35 +180,38 @@
   const NAMES = { decision: 'Decision', design: 'Design', evidence: 'Evidence' };
   // Any other type gets the plain card until it has its own renderer.
   const chip = (d) => el('span', { class: 'chip' }, NAMES[d.type] ?? d.type.replace(/-/g, ' '));
+  const title = (d) => (d.type === 'evidence' ? `Update ${d.number} · ${d.title}` : d.title);
+  const FILTERS = { decision: 'Decisions', design: 'Designs', evidence: 'Evidence', other: 'Other' };
+  const kind = (d) => (Object.hasOwn(NAMES, d.type) ? d.type : 'other');
 
   function row(d) {
     const err = el('div', { class: 'err', role: 'alert' });
     const saved = Object.hasOwn(state.answers, d.key) ? state.answers[d.key] : undefined;
     const design = d.type === 'design';
-    const buttons = d.options.map((o) => el('button', {
-      class: o.value === d.recommend_value && !design ? 'rec' : '', 'aria-label': `${o.label}, ${d.title}`,
-      'aria-pressed': o.value === saved?.answer,
-    }, design ? (o.value === saved?.answer ? 'Picked' : 'Pick') : o.label));
+    const buttons = d.options.map((o) => {
+      const rec = o.value === d.recommend_value && !design;
+      return el('button', { class: rec ? 'rec' : '', 'aria-label': `${o.label}, ${d.title}`, 'aria-pressed': o.value === saved?.answer, ...(rec && { 'aria-describedby': `rec-${d.key}` }) },
+        design ? (o.value === saved?.answer ? 'Picked' : 'Pick') : o.label, rec ? el('span', { class: 'tag', id: `rec-${d.key}` }, 'Recommended') : '');
+    });
     buttons.forEach((b, i) => (b.onclick = () => save(d, d.options[i], buttons, err)));
-    const head = el('div', { class: 'head' }, chip(d), el('h3', { dir: 'auto' }, d.type === 'evidence' ? `Update ${d.number} · ${d.title}` : d.title));
+    const head = el('div', { class: 'head' }, chip(d), el('h3', { dir: 'auto' }, title(d)));
     const silent = d.default_if_silent ? `If no answer: ${d.options.find((o) => o.value === d.default_if_silent).label}` : '';
     if (design) {
-      return el('article', { class: 'row design' }, head,
-        d.tradeoff ? el('details', { class: 'line' }, el('summary', { dir: 'auto' }, el('strong', {}, 'Trade-off '), d.tradeoff)) : '',
+      return el('article', { class: 'row design', id: `item-${d.key}` }, head,
+        d.tradeoff ? el('p', { class: 'tradeoff', dir: 'auto' }, el('strong', {}, 'Trade-off '), d.tradeoff) : '',
         mockCards(d, buttons), silent ? el('p', { class: 'meta' }, silent) : '', more(d, saved, err), err);
     }
     // Yes/No rows keep the two fixed buttons they always had; any other choice set wraps.
     const many = d.options.map((o) => o.value).sort().join() !== 'no,yes';
     const update = d.type === 'evidence';
-    const meta = [d.recommend_value && `Recommended: ${d.options.find((o) => o.value === d.recommend_value).label}`, silent].filter(Boolean);
-    return el('article', { class: 'row' }, el('div', {},
+    return el('article', { class: 'row', id: `item-${d.key}` }, el('div', {},
       head,
       d.about ? el('p', { class: update ? 'about full' : 'about', dir: 'auto' }, d.about) : '',
       d.detail || (!update && d.about?.length > 180) ? el('details', {}, el('summary', {}, 'Show more'),
         ...[d.about, d.detail].filter(Boolean).map((t) => el('p', { dir: 'auto' }, t))) : '',
       d.link ? el('p', { class: 'meta' }, /^https?:/.test(d.link)
         ? el('a', { href: d.link, target: '_blank', rel: 'noopener' }, d.link) : `Commit ${d.link}`) : '',
-      meta.length ? el('p', { class: 'meta' }, meta.join(' · ')) : '',
+      silent ? el('p', { class: 'meta' }, silent) : '',
       more(d, saved, err),
       err,
     ), updateMedia(d), el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': d.title }, ...buttons), evidenceCard(d));
@@ -243,17 +271,50 @@
     }));
   }
 
+  /** The top of the page: how much waits, one-tap type filters with waiting counts, and the oldest waiting items to jump to. */
+  function glance(all, filter, waiting) {
+    const open = all.filter((d) => !Object.hasOwn(state.answers, d.key));
+    const kinds = Object.keys(FILTERS).filter((k) => k === filter || all.some((d) => kind(d) === k));
+    const filterBtn = (k, label, n) => {
+      const b = el('button', { 'aria-pressed': k === filter, 'data-k': k, 'aria-label': `${label}, ${n} waiting` }, label, el('span', { class: 'n' }, String(n)));
+      b.onclick = () => { if (k !== filter) { refocus = k; location.hash = k && `type=${k}`; } };
+      return b;
+    };
+    const jump = (d) => {
+      const b = el('button', { 'aria-label': `Go to ${title(d)}` }, chip(d), el('span', { dir: 'auto' }, title(d)));
+      b.onclick = () => document.getElementById(`item-${d.key}`).scrollIntoView({ behavior: 'smooth' });
+      return el('li', {}, b);
+    };
+    // The board file appends new items at the end, so its order is oldest first.
+    const oldest = [...waiting].reverse(), SHOWN = 5;
+    return el('section', { class: 'glance', 'aria-label': 'At a glance' },
+      el('p', { class: 'big' }, open.length ? `${open.length} waiting on you` : 'Nothing is waiting on you'),
+      kinds.length > 1 || filter ? el('div', { class: 'filters', role: 'group', 'aria-label': 'Show one type' }, filterBtn('', 'All', open.length),
+        ...kinds.map((k) => filterBtn(k, FILTERS[k], open.filter((d) => kind(d) === k).length))) : '',
+      ...(oldest.length ? [el('p', { class: 'meta' }, 'Waiting longest'), el('ol', { class: 'oldest' }, ...oldest.slice(0, SHOWN).map(jump))] : []),
+      oldest.length > SHOWN ? el('p', { class: 'meta' }, `and ${oldest.length - SHOWN} more below`) : '');
+  }
+
+  let refocus = null; // The filter chip that was tapped, focused again after the page redraws.
   function render() {
     // The board file appends new items at the end, so reversed is newest first.
-    const items = [...state.decisions].reverse();
+    const all = [...state.decisions].reverse();
+    const pick = /^#type=([a-z]+)$/.exec(location.hash)?.[1];
+    const filter = Object.hasOwn(FILTERS, pick ?? '') ? pick : '';
+    const items = all.filter((d) => !filter || kind(d) === filter);
     const waiting = items.filter((d) => !Object.hasOwn(state.answers, d.key));
     const answered = items.filter((d) => Object.hasOwn(state.answers, d.key));
-    document.getElementById('count').textContent = `${waiting.length} waiting · ${answered.length} answered`;
-    const list = (items) => el('div', { class: 'list' }, ...items.map(row));
-    document.getElementById('board').replaceChildren(
-      el('h2', {}, 'Waiting'), waiting.length ? list(waiting) : el('p', { class: 'list empty' }, 'Nothing is waiting on you.'),
-      ...(answered.length ? [el('h2', {}, 'Answered'), list(answered)] : []));
+    const done = all.filter((d) => Object.hasOwn(state.answers, d.key)).length;
+    document.getElementById('count').textContent = `${all.length - done} waiting · ${done} answered`;
+    const list = (items, cls) => el('div', { class: `list ${cls}` }, ...items.map(row));
+    document.getElementById('board').replaceChildren(glance(all, filter, waiting),
+      el('h2', {}, 'Waiting'), waiting.length ? list(waiting, 'waiting')
+        : el('p', { class: 'empty' }, filter ? `No ${filter === 'other' ? 'other items' : FILTERS[filter].toLowerCase()} waiting on you.` : 'Nothing is waiting on you.'),
+      ...(answered.length ? [el('h2', {}, 'Answered'), list(answered, 'answered')] : []));
+    if (refocus !== null) document.querySelector(`.filters [data-k="${refocus}"]`)?.focus();
+    refocus = null;
   }
+  addEventListener('hashchange', render);
 
   const banner = document.getElementById('banner');
   call('/api/decisions').then(() => (banner.hidden = true), (e) => {

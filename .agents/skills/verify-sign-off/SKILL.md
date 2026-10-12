@@ -75,6 +75,7 @@ Look at every shot before you report: nothing overlaps, no text is cut, no raw p
 | Feature | Entry |
 |---|---|
 | Dashboard: one list for every item type, newest first, pick on the mock card, plain card for new types | [features/dashboard.md](features/dashboard.md) |
+| Glance summary and type filters in the URL hash, full trade-off, fitted evidence media, recommended vs picked | [features/glance.md](features/glance.md) |
 | Decisions page: list, one-click answer, durable answers | [features/decisions.md](features/decisions.md) |
 | Design item: init/doctor, A/B/C mock cards, `?variant=` pages, another-round asks, `raise` as `post --type decision` | [features/design.md](features/design.md) |
 | Evidence updates: numbered posts with media, hash-checked serving, inline video, verdict | [features/evidence.md](features/evidence.md) |
