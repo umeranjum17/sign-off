@@ -370,19 +370,19 @@ const state = () => ({
   answers: readAnswers(file, warn),
 });
 const mediaTypes: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.mp4': 'video/mp4', '.webm': 'video/webm' };
-function contained(path: string): string {
+function contained(path: string, missing = 'no matching evidence file'): string {
   let root: string, actual: string;
   try {
     root = realpathSync(evidenceRoot);
     actual = realpathSync(resolve(root, path));
-  } catch { throw new EvidenceError('no matching evidence file'); }
+  } catch { throw new EvidenceError(missing); }
   if (!actual.startsWith(root + sep)) throw new EvidenceError('evidence path escapes the selected root');
   return actual;
 }
 function evidenceCard(link: NonNullable<Decision['evidence']>) {
   try {
     if (!evidenceRoot) throw new EvidenceError('no evidence root was selected');
-    const recordPath = contained(`.done-done/runs/${link.run_id}.json`);
+    const recordPath = contained(`.done-done/runs/${link.run_id}.json`, 'run record is missing');
     if (statSync(recordPath).size > 1_000_000) throw new EvidenceError('run record is too large');
     const run = JSON.parse(readFileSync(recordPath, 'utf8'));
     if (!run || typeof run !== 'object' || Array.isArray(run)) throw new EvidenceError('run record is malformed or its media is unavailable');

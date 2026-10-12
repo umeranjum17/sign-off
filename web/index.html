@@ -101,7 +101,7 @@
     if (!link) return '';
     const head = el('div', { class: 'evidence-head' }, el('h4', {}, 'Proof record'), el('span', { class: 'verdict', 'data-result': card?.result ?? 'UNVERIFIED' }, card?.result ?? 'UNVERIFIED'));
     const checks = el('div', { class: 'checks' }, ...['outcome', 'repro', 'proof', 'evidence'].map((name) =>
-      el('p', { class: 'check' }, el('strong', {}, `${name}: `), document.createTextNode(link[name]))));
+      el('p', { class: 'check' }, el('strong', {}, `${name}: `), document.createTextNode(link[name].replace(new RegExp(`^${name}:\\s*(?=\\S)`, 'i'), '')))));
     const media = el('div', { class: 'media' }, ...(card?.media ?? []).map((item) => {
       const node = item.type.startsWith('image/') ? el('img', { src: item.url, alt: `Evidence image: ${item.path}` })
         : el('video', { src: item.url, controls: '', preload: 'metadata', 'aria-label': `Evidence recording: ${item.path}` });
@@ -109,7 +109,7 @@
     }));
     return el('section', { class: 'evidence', 'aria-label': 'Read-only proof evidence' }, head,
       card?.commit ? el('p', { class: 'commit' }, `Commit · ${card.commit}`) : '',
-      el('p', { class: 'meta' }, 'Run status only · this record does not save a claim-check result.'),
+      el('p', { class: 'meta' }, 'Run result only · the lines below were not checked against this run.'),
       card?.status === 'unverified' ? el('p', { class: 'unverified' }, `Evidence unavailable · ${card.reason}`) : '', checks,
       media.childElementCount ? media : el('p', { class: 'meta' }, 'No recorded image or recording.'));
   }
