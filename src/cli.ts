@@ -9,18 +9,20 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { type Decision, InputError, NOTE_MAX, answersPath, appendAnswer, loadDecisions, readAnswers } from './store.js';
+import { type Decision, InputError, NOTE_MAX, answersPath, appendAnswer, appendRound, loadDecisions, readAnswers, readRounds } from './store.js';
 
 const BOARD = join(homedir(), '.sign-off', 'decisions.json');
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
 const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
-commands[9]:
-  (none)=list, raise, answers, wait, open, status, stop, serve, help
+commands[12]:
+  (none)=list, raise, post, answers, wait, open, status, stop, serve, init, doctor, help
 board: ~/.sign-off/decisions.json unless a board file is given; answers are saved next to it
 flags: --full and --json on list, answers and wait, --json on status, --help on every command, -v/--version
 examples:
   sign-off-axi
   sign-off-axi raise --title "Ship the new sign-in screen this week?" --recommend yes
+  sign-off-axi init
+  sign-off-axi doctor
   sign-off-axi open
   sign-off-axi wait --key ship-the-new-sign-in-screen-this-week
   sign-off-axi stop
@@ -92,6 +94,22 @@ examples:
 Runs the board in the foreground until Ctrl-C; --port 0 picks a free port. Use open to run it in the background.
 examples:
   sign-off-axi serve --port 0
+`,
+  post: `usage: sign-off-axi post [board.json] --type design --title "<question>" [--about <text>] [--option <value>=<label>]... [--mock <value>=<path>]... [--tradeoff <text>] [--recommend <value>] [--default <value>] [--close done|release]
+Posts a design item: up to 6 options shown side by side, each with an optional board-relative mock file (.html, .png, .jpg, .jpeg, .webp). Without --type it behaves like raise.
+examples:
+  sign-off-axi post --type design --title "Pick the sign-in layout" --option a="A: single column" --option b="B: split screen" --mock a=mocks/a.html --mock b=mocks/b.html --tradeoff "B scans fastest; A is simplest." --recommend b
+`,
+  init: `usage: sign-off-axi init [dir]
+Writes a repo's sign-off setup under <dir>/.sign-off/ (config, an empty board, mocks/ and evidence/ folders, and a .gitignore keeping media and answer files out of git). A file that is already there is kept, never changed.
+examples:
+  sign-off-axi init
+  sign-off-axi init ./my-project
+`,
+  doctor: `usage: sign-off-axi doctor [dir]
+Checks the repo setup init wrote: node version, config, board file, gitignore coverage, and whether the dashboard port answers. Every failure names its fix.
+examples:
+  sign-off-axi doctor
 `,
 };
 const warn = (msg: string) => console.error(`sign-off-axi: ${msg}`);
@@ -171,11 +189,20 @@ function list(args: string[]) {
 /** The answered rows in the answers shape: TOON, --full adds label, close and title, --json the bare map. */
 function printAnswers(file: string, rows: ReturnType<typeof board>, waiting: number, values: Record<string, any>, help: string[]) {
   const done = rows.flatMap((d) => (d.answer ? [{ ...d.answer, title: d.title }] : []));
-  if (values.json) return JSON.stringify(Object.fromEntries(done.map(({ key, answer, label, close, at, note }) => [key, { answer, label, close, at, note }])));
+  const rounds = readRounds(file).filter((r) => rows.some((d) => d.key === r.key));
+  if (values.json) {
+    const out: Record<string, any> = Object.fromEntries(done.map(({ key, answer, label, close, at, note }) => {
+      const asked = rounds.filter((r) => r.key === key).map(({ note, at }) => ({ note, at }));
+      return [key, { answer, label, close, at, note, ...(asked.length && { rounds: asked }) }];
+    }));
+    for (const r of rounds) if (!out[r.key]) out[r.key] = { rounds: rounds.filter((q) => q.key === r.key).map(({ note, at }) => ({ note, at })) };
+    return JSON.stringify(out);
+  }
   const notes = done.some((a) => a.note);
   return toon({
     board: tilde(file),
     answers: done.length ? done.map(({ key, answer, at, label, close, title, note = '' }) => ({ key, answer, at, ...(values.full && { label, close, title }), ...(notes && { note }) })) : '0 saved yet',
+    ...(rounds.length && { rounds: rounds.map(({ key, note, at }) => ({ key, note, at })) }),
     waiting,
   }, help);
 }
@@ -194,6 +221,9 @@ async function wait(args: string[]) {
   if (values.key === undefined) ready(file, on);
   const seconds = Number(values.timeout), deadline = Date.now() + seconds * 1000, key = values.key === undefined ? '' : ` --key ${values.key}`;
   const before = new Set(board(file).flatMap((d) => (d.answer ? [d.key] : [])));
+  // Rounds seen before waiting starts stay quiet; only a newly asked round wakes the loop.
+  const seenRounds = new Map<string, number>();
+  for (const r of readRounds(file)) seenRounds.set(r.key, (seenRounds.get(r.key) ?? 0) + 1);
   // A save wakes the loop at once; the 1 second timer is the fallback where file events are unavailable.
   let wake = () => {}, watcher;
   const name = basename(answersPath(file));
@@ -202,8 +232,14 @@ async function wait(args: string[]) {
     for (let first = true; ; first = false) {
       const rows = board(file, first ? warn : () => {}), waiting = rows.filter((d) => !d.answer).length;
       const hit = rows.filter((d) => (values.key === undefined ? d.answer && !before.has(d.key) : d.key === values.key));
-      if (hit.some((d) => d.answer)) {
-        return printAnswers(file, hit, waiting, values,
+      const counts = new Map<string, number>();
+      for (const r of readRounds(file, first ? warn : () => {})) counts.set(r.key, (counts.get(r.key) ?? 0) + 1);
+      const fresh = rows.filter((d) => (counts.get(d.key) ?? 0) > (seenRounds.get(d.key) ?? 0)
+        && (values.key === undefined || d.key === values.key));
+      for (const [k, n] of counts) seenRounds.set(k, n);
+      const found = [...new Map([...hit.filter((d) => d.answer), ...fresh].map((d) => [d.key, d] as const)).values()];
+      if (found.length) {
+        return printAnswers(file, found, waiting, values,
           [waiting ? `Run \`sign-off-axi wait${on}\` for the next of the ${waiting} waiting` : `Run \`sign-off-axi stop${on}\` to close the board`]);
       }
       if (values.key === undefined && !waiting) throw fail(`nothing is waiting on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi answers${on}\` to read the saved answers`, `Run \`sign-off-axi raise${on} --title "<question>"\` to ask a new one`);
@@ -241,25 +277,56 @@ function raise(args: string[]) {
   const given = RAISE_FIELDS.filter((f) => values[f] !== undefined);
   if (values.from !== undefined && given.length) throw fail(`--from cannot be combined with --${given[0]}`, 'VALIDATION_ERROR', 'Put every field in the --from file, or raise with flags only');
   if (values.from === undefined && values.title === undefined) throw fail('--title is required (or --from <decisions.json>)', 'VALIDATION_ERROR', 'sign-off-axi raise --title "<question>" [--recommend <value>]');
-  // Flags are validated by the same loader as a file: write them as a one-decision file first.
-  const scratch = values.from === undefined ? mkdtempSync(join(tmpdir(), 'sign-off-')) : '';
-  const source = scratch ? join(scratch, 'flags') : resolve(values.from);
-  let incoming: Decision[], raw: object[];
-  try {
-    if (scratch) {
-      const { title, key = slug(title), about, detail, recommend: recommend_value, default: default_if_silent, close } = values;
-      const options = values.option?.map((o: string) => {
-        const at = o.indexOf('=');
-        if (at < 1) throw fail(`--option ${o} must be <value>=<label>`, 'VALIDATION_ERROR', 'sign-off-axi raise --title "<question>" --option friday=Friday --option next-week="Next week"');
-        return { value: o.slice(0, at), label: o.slice(at + 1) };
-      });
-      writeFileSync(source, JSON.stringify({ schema: 1, decisions: [{ key, title, about, detail, options, recommend_value, default_if_silent, close }] }));
-    }
-    incoming = loadDecisions(source);
-    raw = JSON.parse(readFileSync(source, 'utf8')).decisions;
-  } finally {
-    if (scratch) rmSync(scratch, { recursive: true, force: true });
+  return storeIncoming(file, on, buildIncoming(values));
+}
+
+const MOCK_TYPES = ['.html', '.png', '.jpg', '.jpeg', '.webp'];
+function post(args: string[]) {
+  const { file, values, on } = parse('post', args, { from: { type: 'string' }, type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
+    ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: f === 'option' }])) });
+  const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock'].filter((f) => values[f] !== undefined);
+  if (values.from !== undefined && given.length) throw fail(`--from cannot be combined with --${given[0]}`, 'VALIDATION_ERROR', 'Put every field in the --from file, or post with flags only');
+  if (values.from === undefined && values.title === undefined) throw fail('--title is required (or --from <decisions.json>)', 'VALIDATION_ERROR', 'sign-off-axi post --type design --title "<question>" --option a=A --option b=B');
+  const type = values.type ?? 'decision';
+  if (!['decision', 'design'].includes(type)) throw fail(`--type must be decision or design`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
+  if (type === 'decision' && (values.tradeoff !== undefined || values.mock !== undefined)) {
+    throw fail('--tradeoff and --mock need --type design', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   }
+  const root = resolve(dirname(file));
+  const mocks = values.mock?.map((m: string) => {
+    const at = m.indexOf('=');
+    if (at < 1) throw fail(`--mock ${m} must be <value>=<path>`, 'VALIDATION_ERROR', 'sign-off-axi post --type design --title "<question>" --option a=A --mock a=mocks/a.html');
+    const path = m.slice(at + 1);
+    if (!MOCK_TYPES.includes(extname(path).toLowerCase())) throw fail(`--mock ${path} must end in ${MOCK_TYPES.join(', ')}`, 'VALIDATION_ERROR');
+    if (!resolve(root, path).startsWith(root + sep)) throw fail(`--mock ${path} escapes the board folder`, 'VALIDATION_ERROR', 'Keep mock files next to the board file');
+    return { value: m.slice(0, at), path };
+  });
+  return storeIncoming(file, on, buildIncoming(values, { type, tradeoff: values.tradeoff, mocks }));
+}
+
+/** Flags are validated by the same loader as a file: write them as a one-decision file first. */
+function buildIncoming(values: Record<string, any>, extra: object = {}): { incoming: Decision[]; raw: object[] } {
+  if (values.from !== undefined) {
+    const source = resolve(values.from);
+    return { incoming: loadDecisions(source), raw: JSON.parse(readFileSync(source, 'utf8')).decisions };
+  }
+  const scratch = mkdtempSync(join(tmpdir(), 'sign-off-'));
+  const source = join(scratch, 'flags');
+  try {
+    const { title, key = slug(title), about, detail, recommend: recommend_value, default: default_if_silent, close } = values;
+    const options = values.option?.map((o: string) => {
+      const at = o.indexOf('=');
+      if (at < 1) throw fail(`--option ${o} must be <value>=<label>`, 'VALIDATION_ERROR', 'sign-off-axi raise --title "<question>" --option friday=Friday --option next-week="Next week"');
+      return { value: o.slice(0, at), label: o.slice(at + 1) };
+    });
+    writeFileSync(source, JSON.stringify({ schema: 1, decisions: [{ key, title, about, detail, options, recommend_value, default_if_silent, close, ...extra }] }));
+    return { incoming: loadDecisions(source), raw: JSON.parse(readFileSync(source, 'utf8')).decisions };
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
+function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: Decision[]; raw: object[] }) {
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
     const current = board(file), doc = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { schema: 1, decisions: [] };
@@ -358,6 +425,86 @@ async function stop(args: string[]) {
   return toon({ board: tilde(file), status: live ? 'stopped' : 'not running (no-op)', ...(live && { pid: live.pid }) }, [`Run \`sign-off-axi open${on}\` to start it again`]);
 }
 
+/** The repo dir for init/doctor: one optional positional, defaulting to the working folder. */
+function repoDir(cmd: string, args: string[]) {
+  let parsed;
+  try {
+    parsed = parseArgs({ args, allowPositionals: true, strict: true, options: {} });
+  } catch {
+    throw fail(`\`${cmd}\` takes only a folder`, 'VALIDATION_ERROR', `Run \`sign-off-axi ${cmd} --help\``);
+  }
+  const [dir, extra] = parsed.positionals;
+  if (extra !== undefined) throw fail(`unexpected argument ${extra}: \`${cmd}\` takes one folder`, 'VALIDATION_ERROR', `Run \`sign-off-axi ${cmd} --help\``);
+  return resolve(dir ?? '.');
+}
+
+const GITIGNORE = 'mocks/\nevidence/\n*.answers.jsonl\n*.rounds.jsonl\n*.board.pid\n*.board.log\n';
+function init(args: string[]) {
+  const dir = repoDir('init', args), so = join(dir, '.sign-off');
+  const board = join(so, 'decisions.json');
+  const files: [string, string][] = [
+    [join(so, 'config.yaml'), `# sign-off repo setup. board: path under .sign-off/, port: dashboard port.\nboard: decisions.json\nport: 4410\n`],
+    [board, `{"schema": 1, "decisions": []}\n`],
+    [join(so, '.gitignore'), GITIGNORE],
+  ];
+  mkdirSync(join(so, 'mocks'), { recursive: true });
+  mkdirSync(join(so, 'evidence'), { recursive: true });
+  const created: string[] = [], kept: string[] = [];
+  for (const [path, content] of files) {
+    if (existsSync(path)) kept.push(path.slice(dir.length + 1));
+    else {
+      writeFileSync(path, content, { mode: 0o600 });
+      created.push(path.slice(dir.length + 1));
+    }
+  }
+  return toon({ dir: tilde(dir), created: created.length ? created : 'nothing new (re-run is a no-op)', kept, board: tilde(board) },
+    [`Run \`sign-off-axi post ${tilde(board)} --type design --title "<question>" --option a=A --option b=B\` to ask for a pick`,
+      `Run \`sign-off-axi doctor ${tilde(dir)}\` to check the setup`, `Run \`sign-off-axi open ${tilde(board)}\` to show the board to the user`]);
+}
+
+/** Reads the two `key: value` lines init writes; anything else in the file is ignored. */
+const readConfig = (dir: string) => Object.fromEntries(
+  readFileSync(join(dir, '.sign-off', 'config.yaml'), 'utf8').split('\n')
+    .map((l) => l.split('#')[0].match(/^\s*([A-Za-z]+)\s*:\s*(\S+)\s*$/)?.slice(1))
+    .filter(Boolean) as [string, string][]);
+
+async function doctor(args: string[]) {
+  const dir = repoDir('doctor', args), so = join(dir, '.sign-off');
+  const checks: { name: string; ok: string; fix?: string }[] = [];
+  const [major, minor] = process.versions.node.split('.').map(Number);
+  checks.push(major > 22 || (major === 22 && minor >= 5) ? { name: 'node', ok: `ok (${process.versions.node})` }
+    : { name: 'node', ok: `too old (${process.versions.node})`, fix: 'Install Node 22.5 or newer' });
+  let board = '', port = 4410;
+  try {
+    const config = readConfig(dir);
+    if (!config.board) throw new Error('no board line');
+    board = join(so, config.board);
+    port = Number(config.port ?? 4410);
+  } catch {
+    checks.push({ name: 'config', ok: 'missing or unreadable', fix: `Run \`sign-off-axi init ${tilde(dir)}\`` });
+  }
+  if (board) {
+    try {
+      const n = loadDecisions(board).length;
+      checks.push({ name: 'board', ok: `${n} items` });
+    } catch (e: any) {
+      checks.push({ name: 'board', ok: e instanceof InputError ? e.message : 'unreadable', fix: `Fix ${tilde(board)}, or re-run \`sign-off-axi init ${tilde(dir)}\`` });
+    }
+  }
+  const ignore = existsSync(join(so, '.gitignore')) ? readFileSync(join(so, '.gitignore'), 'utf8') : '';
+  checks.push(ignore.includes('mocks/') && ignore.includes('evidence/') ? { name: 'gitignore', ok: 'mocks/ and evidence/ are ignored' }
+    : { name: 'gitignore', ok: 'mocks/ or evidence/ not ignored', fix: `Run \`sign-off-axi init ${tilde(dir)}\` again` });
+  if (port) {
+    const free = await new Promise((ok) => server.once('error', () => ok(false)).listen(port, '127.0.0.1', () => server.close(() => ok(true))));
+    server.removeAllListeners('error');
+    checks.push(free ? { name: 'port', ok: `${port} is free` } : { name: 'port', ok: `${port} is busy (the board may already be open)` });
+  }
+  const bad = checks.filter((c) => c.fix);
+  if (bad.length) throw fail(`${bad.length} checks need a fix in ${tilde(dir)}`, 'NOT_FOUND', ...bad.map((c) => `${c.name}: ${c.fix}`));
+  return toon({ dir: tilde(dir), checks: checks.map(({ name, ok }) => ({ name, ok })) },
+    [`Run \`sign-off-axi open ${tilde(board)}\` to show the board to the user`]);
+}
+
 let file = '', evidenceRoot = '';
 async function serve(args: string[]) {
   const parsed = parse('serve', args, BOARD_FLAGS), port = portOf(parsed.values.port);
@@ -378,8 +525,20 @@ const state = () => ({
   file,
   decisions: loadDecisions(file).map((d) => ({ ...d, evidenceCard: d.evidence ? evidenceCard(d.evidence) : null })),
   answers: readAnswers(file, warn),
+  rounds: readRounds(file, warn),
 });
 const mediaTypes: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.mp4': 'video/mp4', '.webm': 'video/webm' };
+const mockTypes: Record<string, string> = { '.html': 'text/html', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
+/** A board-relative path resolved inside a root folder; anything else is unavailable. */
+function under(root: string, rel: string): string {
+  let base: string, actual: string;
+  try {
+    base = realpathSync(root);
+    actual = realpathSync(resolve(base, rel));
+  } catch { throw new EvidenceError('no matching mock file'); }
+  if (actual !== base && !actual.startsWith(base + sep)) throw new EvidenceError('mock path escapes the board folder');
+  return actual;
+}
 function contained(path: string, missing = 'no matching evidence file'): string {
   let root: string, actual: string;
   try {
@@ -421,6 +580,17 @@ function evidenceCard(link: NonNullable<Decision['evidence']>) {
 }
 
 async function route(req: IncomingMessage): Promise<[number, unknown]> {
+  if (req.method === 'GET' && req.url?.startsWith('/api/mock?')) {
+    const q = new URL(req.url, 'http://localhost').searchParams;
+    const mock = loadDecisions(file).find((d) => d.key === q.get('key'))?.mocks?.find((m) => m.value === q.get('value'));
+    const type = mock && mockTypes[extname(mock.path).toLowerCase()];
+    if (!mock || !type) return [404, { error: 'Mock is unavailable' }];
+    try {
+      const actual = under(dirname(file), mock.path);
+      if (statSync(actual).size > 5_000_000) return [404, { error: 'Mock is unavailable' }];
+      return [200, { media: readFileSync(actual), type }];
+    } catch { return [404, { error: 'Mock is unavailable' }]; }
+  }
   if (req.method === 'GET' && req.url?.startsWith('/api/evidence?')) {
     const q = new URL(req.url, 'http://localhost').searchParams, runId = q.get('run') ?? '', path = q.get('file') ?? '';
     const decision = loadDecisions(file).find((d) => d.evidence?.run_id === runId);
@@ -434,10 +604,18 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   if (req.method === 'GET' && req.url === '/api/decisions') {
     return [200, state()];
   }
-  if (req.method !== 'POST' || req.url !== '/api/answers') return [404, { error: 'Not found' }];
+  if (req.method !== 'POST' || (req.url !== '/api/answers' && req.url !== '/api/rounds')) return [404, { error: 'Not found' }];
   if (!req.headers['content-type']?.startsWith('application/json')) return [415, { error: 'Send JSON' }];
   let body = '';
   for await (const chunk of req) body += chunk;
+  if (req.url === '/api/rounds') {
+    const { key, note = '' } = JSON.parse(body) ?? {};
+    if (typeof note !== 'string' || [...note.trim()].length > NOTE_MAX) return [400, { error: `The note must be text of ${NOTE_MAX} characters or fewer` }];
+    if (!note.trim()) return [400, { error: 'Write a note first: another round needs your comment' }];
+    if (!loadDecisions(file).some((x) => x.key === key)) return [404, { error: 'This question is no longer in the file' }];
+    appendRound(file, key, note.trim());
+    return [200, state()];
+  }
   const { key, answer, note = '' } = JSON.parse(body) ?? {};
   if (typeof note !== 'string' || [...note.trim()].length > NOTE_MAX) return [400, { error: `The note must be text of ${NOTE_MAX} characters or fewer` }];
   const d = loadDecisions(file).find((x) => x.key === key);
@@ -479,7 +657,7 @@ await runAxiCli({
   topLevelHelp: TOP_HELP,
   getCommandHelp: (cmd) => HELP[cmd],
   home: axi('list', list),
-  commands: { list: axi('list', list), raise: axi('raise', raise), answers: axi('answers', answers), wait: axi('wait', wait), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), help: ([name, ...rest]) => {
+  commands: { list: axi('list', list), raise: axi('raise', raise), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), init: axi('init', init), doctor: axi('doctor', doctor), help: ([name, ...rest]) => {
     if (rest.length || (name && !HELP[name])) throw fail(`unknown command or argument: ${[name, ...rest].join(' ')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi --help` to see the commands');
     return name ? HELP[name] : TOP_HELP;
   } },

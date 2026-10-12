@@ -49,6 +49,14 @@ Or just ask in plain words - "ask me whether to keep the weekly digest and wait 
 
 By default the skill lands in the current project's skills directory (`.claude/skills/`, for example); add `-g` to install it for all projects (`~/.claude/skills/`).
 
+### Repo setup
+
+In a project folder, `sign-off-axi init` writes `.sign-off/` (config, an empty
+board, `mocks/` and `evidence/` folders, and a `.gitignore` keeping media and
+answer files out of git) and `sign-off-axi doctor` checks it. Re-running `init`
+keeps files that are already there. Mock files go under `.sign-off/mocks/` and
+are named board-relative in `post` (for example `mocks/a.html`).
+
 ### Manual CLI
 
 The skill is the recommended path, but you can also run the board by hand from this repository (Node 22.5 or newer):
@@ -74,8 +82,12 @@ sign-off itself calls no model and inherits the calling agent's model routing.
 ```
 sign-off-axi                       list the decisions waiting on the user (same as list)
 sign-off-axi raise --title "<question>" [--key <key>] [--about <text>] [--detail <text>]
-                   [--option <value>=<label>]... [--recommend <value>] [--default <value>] [--close done|release]
+                    [--option <value>=<label>]... [--recommend <value>] [--default <value>] [--close done|release]
 sign-off-axi raise --from <decisions.json>      add every decision in a decisions file
+sign-off-axi post --type design --title "<question>" [--option <value>=<label>]... [--mock <value>=<path>]...
+                    [--tradeoff <text>] [--recommend <value>]   ask for a pick between mocks, shown side by side
+sign-off-axi init [dir]                         write the repo setup under <dir>/.sign-off/ (config, board, mocks/ and evidence/ folders)
+sign-off-axi doctor [dir]                       check that setup; every failure names its fix
 sign-off-axi open  [--port 4410] [--evidence-root <dir>]   start the board in the background; prints its URL and pid
 sign-off-axi status                             is the board open started for this file running? its URL and pid
 sign-off-axi stop                               stop that board
@@ -85,6 +97,8 @@ sign-off-axi wait [--key <key>] [--timeout 600]  block until the user answers, t
 ```
 
 - The board is `~/.sign-off/decisions.json` unless you name a file right after the command (`sign-off-axi answers ./decisions.json`). Answers are saved next to it.
+- `post --type design` asks for a pick between up to 6 mock options, each with an optional `--mock <value>=<path>` file (`.html`, `.png`, `.jpg`, `.jpeg`, `.webp`) shown beside its button, plus a `--tradeoff` line and a `--recommend` badge. Mock paths are relative to the board file's folder and never escape it. Without `--type` it behaves like `raise`.
+- The person can also click **Ask for another round** (with a note), which wakes a waiting agent the same way an answer does; the agent reads it back in `answers --json` under `rounds`.
 - With no `--option` a question is Yes/No; give 2 to 6 `--option` flags for a pick-one question (`--option friday=Friday --option next-week="Next week"`). `--recommend` and `--default` name one of its values.
 - `list` and `answers` take `--full` for every field and `--json` for JSON (`answers --json` prints `{"<key>":{"answer","label","close","at"}}`, plus `"note"` when the user wrote one). `answers` adds a note column when any shown answer has a note.
 - Raising a question that is already on the board is a no-op that reports its status, so an agent can re-run it safely. `--key` defaults to a slug of the title.
