@@ -28,8 +28,9 @@ const run = (...args) => {
 const post = (url, path, body) => fetch(`${url}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=', 'base64');
 const procs = [];
-after(() => {
-  procs.forEach((p) => p.kill());
+after(async () => {
+  // A dying serve removes its own run record; removing the scratch folder under it leaves the folder behind.
+  await Promise.all(procs.map((p) => p.exitCode ?? p.signalCode ?? new Promise((ok) => p.once('exit', ok).kill())));
   rmSync(scratch, { recursive: true, force: true });
 });
 
