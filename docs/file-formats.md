@@ -29,8 +29,9 @@
 ```
 
 - `key`: 1-128 of `A-Z a-z 0-9 . _ -`, unique in the file. `title`: required.
-- `type`: optional, `decision` (default) or `design`. A design item is a pick
-  between mock options shown side by side.
+- `type`: optional, `decision` (default), `design` or `evidence`. A design item
+  is a pick between mock options shown side by side. An evidence item is a
+  numbered update the person gives a verdict on (below).
 - `tradeoff`: optional on design items, plain text up to 1000 characters, shown
   next to the mocks.
 - `mocks`: optional on design items, up to 6 entries of an option `value` and a
@@ -39,7 +40,7 @@
 - `options`: optional, 2 to 6 choices. Each has a `value` (1-128 of `A-Z a-z 0-9 . _ -`, unique within the question) and a non-empty `label` shown on its button. Leave it out for **Yes** (`yes`) and **No** (`no`); files written before options existed read exactly as before.
 - `recommend_value`, `default_if_silent`: optional, the `value` of one of the question's own options (`yes` or `no` when `options` is left out). Shown, never applied.
 - `close`: optional, `done` (default) or `release`; copied into the answer.
-- `type`: optional, `decision` only. Other keys are ignored.
+- Other keys are ignored.
 - `evidence`: optional read-only link to a done-done schema 1 run. Set `run_id`, its full 40-character `commit`, and the four plain-text Checks lines (`outcome`, `repro`, `proof`, `evidence`), each non-empty trimmed text up to 1000 characters. Start `serve` with `--evidence-root <store-root>` (the directory containing `.done-done/`); the board only reads that root and only opens media listed and hash-matched in that run record. The card reports the run command outcome, not a persisted claim-check receipt. done-done has no receipt schema yet; a missing or mismatched record stays **UNVERIFIED**.
 
 ```json
@@ -52,6 +53,29 @@
   "evidence": "after.png, walkthrough.mp4"
 }
 ```
+
+**Evidence updates**, written by `sign-off-axi post --type evidence`, which
+also copies each file into `evidence/<number>/` next to the board:
+
+```json
+{
+  "key": "update-2",
+  "type": "evidence",
+  "number": 2,
+  "title": "Sign-in flow on a phone",
+  "about": "Umer signs in on a phone. The screen loads in 1 second.",
+  "link": "https://github.com/acme/app/pull/12",
+  "media": [
+    { "path": "evidence/2/1.png", "sha256": "<64 hex>", "bytes": 48213 },
+    { "path": "evidence/2/2.mp4", "sha256": "<64 hex>", "bytes": 912004 }
+  ]
+}
+```
+
+- `number`: whole number from 1; `post` takes the next one under the board lock and sets `key` to `update-<number>`.
+- `about`: the short note. `link`: optional, an `http(s)` link or a 7-40 character commit hash.
+- `media`: 1 to 12 files, each under `evidence/<number>/` and ending in `.png`, `.jpg`, `.jpeg`, `.webp`, `.mp4` or `.webm`, with the `sha256` and `bytes` recorded at post time. The board serves a file only while both still match.
+- `options` defaults to **Pass** (`pass`), **Fail** (`fail`) and **Needs work** (`needs-work`); the verdict and its note are saved as an answer.
 
 **Answers**, written by sign-off next to the questions (`decisions.answers.jsonl`, mode 600, one line per click, the latest line per key wins):
 

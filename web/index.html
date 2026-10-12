@@ -45,7 +45,8 @@
   .media { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: .75rem; }
   .media a { display: block; color: var(--accent); }
   .media img, .media video { display: block; width: 100%; max-height: 20rem; object-fit: contain; border-radius: .7rem; background: #111; }
-  .unverified { color: var(--danger); margin: .5rem 0; }
+  .unverified, .media .gone { color: var(--danger); margin: .5rem 0; }
+  .update-media { grid-column: 1 / -1; }
   .err:not(:empty) { color: var(--danger); font-size: 0.875rem; margin-top: 0.5rem; }
   .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
   button { min-height: 2.75rem; padding: 0 1.25rem; border-radius: 0.5rem; border: 1px solid var(--border); cursor: pointer;
@@ -140,6 +141,7 @@
     const saved = Object.hasOwn(state.answers, d.key) ? state.answers[d.key] : undefined;
     // Yes/No rows keep the two fixed buttons they always had; any other choice set wraps.
     const many = d.options.map((o) => o.value).sort().join() !== 'no,yes';
+    const update = d.type === 'evidence';
     const box = el('textarea', { id: `note-${d.key}`, rows: 2, maxlength: 500, dir: 'auto' });
     box.value = drafts.get(d.key) ?? saved?.note ?? '';
     box.oninput = () => drafts.set(d.key, box.value);
@@ -162,19 +164,33 @@
       });
     };
     return el('article', { class: 'row' }, el('div', {},
-      el('h3', { dir: 'auto' }, d.title),
+      el('h3', { dir: 'auto' }, update ? `Update ${d.number} · ${d.title}` : d.title),
       d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '',
       d.detail || d.about?.length > 180 ? el('details', {}, el('summary', {}, 'Show more'),
         ...[d.about, d.detail].filter(Boolean).map((t) => el('p', { dir: 'auto' }, t))) : '',
       d.tradeoff ? el('p', { class: 'tradeoff', dir: 'auto' }, `Trade-off: ${d.tradeoff}`) : '',
+      d.link ? el('p', { class: 'meta' }, /^https?:/.test(d.link)
+        ? el('a', { href: d.link, target: '_blank', rel: 'noopener' }, d.link) : `Commit ${d.link}`) : '',
       meta.length ? el('p', { class: 'meta' }, meta.map(([k, v]) => `${k}: ${d.options.find((o) => o.value === v).label}`).join(' · ')) : '',
       saved?.note ? el('p', { class: 'meta saved-note', dir: 'auto' }, `Your note: ${saved.note}`) : '',
       asked.length ? el('p', { class: 'meta', dir: 'auto' }, `You asked for another round${asked.length > 1 ? ` (${asked.length})` : ''}: ${asked[asked.length - 1].note}`) : '',
       el('details', { class: 'note', ...(drafts.has(d.key) && { open: '' }) }, el('summary', { 'aria-label': `${noteText}, ${d.title}` }, noteText),
-        el('label', { for: box.id }, 'Optional note, sent with the answer you pick'), box),
-      roundBtn,
+        el('label', { for: box.id }, update ? 'Optional note, sent with your verdict' : 'Optional note, sent with the answer you pick'), box),
+      update ? '' : roundBtn,
       err,
-    ), el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': d.title }, ...buttons), mockCards(d), evidenceCard(d));
+    ), updateMedia(d), el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': d.title }, ...buttons), mockCards(d), evidenceCard(d));
+  }
+
+  // Each file is hash-checked by the server; one that changed or went missing says so instead of a broken frame.
+  function updateMedia(d) {
+    if (d.type !== 'evidence') return '';
+    return el('div', { class: 'media update-media' }, ...d.media.map((m, i) => {
+      const url = `/api/media?key=${encodeURIComponent(d.key)}&i=${i}`, name = `Update ${d.number}, capture ${i + 1} of ${d.media.length}`;
+      const node = /\.(mp4|webm)$/i.test(m.path) ? el('video', { src: url, controls: '', playsinline: '', preload: 'metadata', 'aria-label': name })
+        : el('a', { href: url, target: '_blank', rel: 'noopener', 'aria-label': `Open ${name}` }, el('img', { src: url, alt: name }));
+      (node.tagName === 'A' ? node.firstChild : node).onerror = () => node.replaceWith(el('p', { class: 'gone' }, `${name} is missing or changed since it was posted.`));
+      return node;
+    }));
   }
 
   function mockCards(d) {
@@ -191,12 +207,16 @@
   }
 
   function render() {
-    const waiting = state.decisions.filter((d) => !Object.hasOwn(state.answers, d.key));
-    const answered = state.decisions.filter((d) => Object.hasOwn(state.answers, d.key));
-    document.getElementById('count').textContent = `${waiting.length} waiting · ${answered.length} answered`;
+    const asks = state.decisions.filter((d) => d.type !== 'evidence');
+    const updates = state.decisions.filter((d) => d.type === 'evidence').sort((a, b) => b.number - a.number);
+    const waiting = asks.filter((d) => !Object.hasOwn(state.answers, d.key));
+    const answered = asks.filter((d) => Object.hasOwn(state.answers, d.key));
+    const unjudged = updates.filter((d) => !Object.hasOwn(state.answers, d.key)).length;
+    document.getElementById('count').textContent = `${waiting.length + unjudged} waiting · ${answered.length + updates.length - unjudged} answered`;
     const list = (items) => el('div', { class: 'list' }, ...items.map(row));
     document.getElementById('board').replaceChildren(
-      el('h2', {}, 'Waiting'), waiting.length ? list(waiting) : el('p', { class: 'list empty' }, 'Nothing is waiting on you.'),
+      el('h2', {}, 'Waiting'), waiting.length ? list(waiting) : el('p', { class: 'list empty' }, unjudged ? 'No questions waiting.' : 'Nothing is waiting on you.'),
+      ...(updates.length ? [el('h2', {}, 'Evidence updates, newest first'), list(updates)] : []),
       ...(answered.length ? [el('h2', {}, 'Answered'), list(answered)] : []));
   }
 

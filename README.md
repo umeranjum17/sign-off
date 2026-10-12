@@ -86,6 +86,8 @@ sign-off-axi raise --title "<question>" [--key <key>] [--about <text>] [--detail
 sign-off-axi raise --from <decisions.json>      add every decision in a decisions file
 sign-off-axi post --type design --title "<question>" [--option <value>=<label>]... [--mock <value>=<path>]...
                     [--tradeoff <text>] [--recommend <value>]   ask for a pick between mocks, shown side by side
+sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media <file>... [--link <commit or URL>]
+                                                post the next numbered evidence update for a pass/fail/needs-work verdict
 sign-off-axi init [dir]                         write the repo setup under <dir>/.sign-off/ (config, board, mocks/ and evidence/ folders)
 sign-off-axi doctor [dir]                       check that setup; every failure names its fix
 sign-off-axi open  [--port 4410] [--evidence-root <dir>]   start the board in the background; prints its URL and pid
@@ -98,6 +100,7 @@ sign-off-axi wait [--key <key>] [--timeout 600]  block until the user answers, t
 
 - The board is `~/.sign-off/decisions.json` unless you name a file right after the command (`sign-off-axi answers ./decisions.json`). Answers are saved next to it.
 - `post --type design` asks for a pick between up to 6 mock options, each with an optional `--mock <value>=<path>` file (`.html`, `.png`, `.jpg`, `.jpeg`, `.webp`) shown beside its button, plus a `--tradeoff` line and a `--recommend` badge. Mock paths are relative to the board file's folder and never escape it. Without `--type` it behaves like `raise`.
+- `post --type evidence` posts the next numbered update (`update-1`, `update-2`, ...) with 1 to 12 screenshots or recordings (`.png`, `.jpg`, `.jpeg`, `.webp`, `.mp4`, `.webm`, up to 50 MB each), a short note and an optional commit or PR link. The files are copied into `evidence/<number>/` next to the board, so the board is the store: no hosted service. The page shows the updates newest first; each file is served only while its size and SHA-256 still match what was posted, and recordings play inline on a phone. The person gives a verdict, **Pass**, **Fail** or **Needs work**, with an optional note, read back with `answers` or `wait --key update-<number>`.
 - The person can also click **Ask for another round** (with a note), which wakes a waiting agent the same way an answer does; the agent reads it back in `answers --json` under `rounds`.
 - With no `--option` a question is Yes/No; give 2 to 6 `--option` flags for a pick-one question (`--option friday=Friday --option next-week="Next week"`). `--recommend` and `--default` name one of its values.
 - `list` and `answers` take `--full` for every field and `--json` for JSON (`answers --json` prints `{"<key>":{"answer","label","close","at"}}`, plus `"note"` when the user wrote one). `answers` adds a note column when any shown answer has a note.
