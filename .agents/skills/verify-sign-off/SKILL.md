@@ -54,10 +54,10 @@ chrome-devtools-axi wait "<text that only appears in the expected state>"
 A labeled real Chrome on an Android emulator, reaching the loopback server through `adb reverse`:
 
 1. AVD under the scratch folder (`ANDROID_AVD_HOME=$SCR/avd`), image `system-images/android-36/google_apis_playstore/x86_64/` (it ships Chrome), `hw.lcd.width=1170`, `hw.lcd.height=2532`, `hw.lcd.density=480` so Chrome's viewport is 390 CSS px wide.
-2. On a Firstmate host, start it through that host's memory gate (it waits while three emulators run; let it wait); elsewhere run the same `emulator` command directly:
-   `ANDROID_AVD_HOME=$SCR/avd /home/umer/firstmate/config/fm-mem-gate.sh emulator -avd <name> -port 5610 -no-window -gpu swiftshader_indirect -memory 2048 -cores 2 -no-audio -no-boot-anim -no-snapshot-save &`
+2. On a shared host, start the emulator through the host's emulator memory gate, if it has one (it may wait while other emulators run; let it wait); elsewhere drop `<mem-gate>` and run the `emulator` command directly:
+   `ANDROID_AVD_HOME=$SCR/avd <mem-gate> emulator -avd <name> -port 5610 -no-window -gpu swiftshader_indirect -memory 2048 -cores 2 -no-audio -no-boot-anim -no-snapshot-save &`
    Wait for `adb -s emulator-5610 shell getprop sys.boot_completed` to print `1`.
-3. On a Firstmate host, run the whole journey as ONE call under the device lock: `/home/umer/firstmate/config/fm-device-lock.sh emulator-5610 <journey script>`. Inside it, every adb call names `-s emulator-5610`:
+3. On a shared host, run the whole journey as ONE call under the host's device lock, if it has one: `<device-lock> emulator-5610 <journey script>`. Inside it, every adb call names `-s emulator-5610`:
    - Skip Chrome's first run: `adb shell 'echo "_ --disable-fre --no-default-browser-check --no-first-run" > /data/local/tmp/chrome-command-line'`, `adb shell am set-debug-app --persistent com.android.chrome`, then `am start -a android.intent.action.VIEW -d <url> com.android.chrome`.
    - `adb reverse tcp:<port> tcp:<port>` for the server port; the page opens at `http://127.0.0.1:<port>/`, so the loopback Host check holds.
    - `adb forward tcp:<devtools-port> localabstract:chrome_devtools_remote` and drive it with `CHROME_DEVTOOLS_AXI_BROWSER_URL=http://127.0.0.1:<devtools-port>`. Do not `emulate`: the device is the viewport.
