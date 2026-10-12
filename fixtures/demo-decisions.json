@@ -2,6 +2,18 @@
   "schema": 1,
   "decisions": [
     {
+      "key": "release-day",
+      "title": "When should the new settings page go out?",
+      "about": "No new bug reports for three weeks. Support is fully staffed on Friday.",
+      "options": [
+        { "value": "today", "label": "Today" },
+        { "value": "friday", "label": "Friday" },
+        { "value": "next-week", "label": "Next week" }
+      ],
+      "recommend_value": "friday",
+      "default_if_silent": "next-week"
+    },
+    {
       "key": "dark-default",
       "title": "Turn on dark mode by default for new users?",
       "about": "Most test users switch to dark within a day. Changes the first-run default only; existing users keep their setting.",
@@ -21,13 +33,6 @@
       "about": "Most failures are brief network drops. Retries add at most a minute before the error shows.",
       "detail": "The retry waits 5, 15 and 40 seconds. A file that still fails is shown with its real error, and nothing is deleted.",
       "recommend_value": "yes",
-      "default_if_silent": "no"
-    },
-    {
-      "key": "beta-banner",
-      "title": "Remove the beta banner from the settings page?",
-      "about": "The settings page has had no new bug reports for three weeks.",
-      "recommend_value": "no",
       "default_if_silent": "no"
     }
   ]

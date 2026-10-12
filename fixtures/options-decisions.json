@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "decisions": [
+    {
+      "key": "release-window",
+      "title": "When should the new sign-in screen go out?",
+      "about": "The last test run passed on phone and desktop. Support is fully staffed on Friday.",
+      "options": [
+        { "value": "today", "label": "Today" },
+        { "value": "friday", "label": "Friday" },
+        { "value": "next-week", "label": "Next week" }
+      ],
+      "recommend_value": "friday",
+      "default_if_silent": "next-week"
+    },
+    {
+      "key": "report-region",
+      "title": "Which region should run the weekly report first?",
+      "about": "Six choices with the longest labels the board has to fit.",
+      "options": [
+        { "value": "emea", "label": "Europe, the Middle East and Africa, right after the Monday morning backup finishes" },
+        { "value": "na", "label": "North America" },
+        { "value": "latam", "label": "Latin America, once the currency rates for the week have been loaded" },
+        { "value": "apac", "label": "Asia Pacific" },
+        { "value": "token", "label": "Unbroken-label-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" },
+        { "value": "all", "label": "All at once" }
+      ],
+      "recommend_value": "emea",
+      "default_if_silent": "all"
+    },
+    {
+      "key": "old-export",
+      "title": "Keep the old export button?",
+      "options": [
+        { "value": "keep", "label": "Keep it for one more release" },
+        { "value": "remove", "label": "Remove it" }
+      ]
+    },
+    {
+      "key": "plain-yes-no",
+      "title": "Turn on the weekly digest for new users?",
+      "recommend_value": "yes"
+    }
+  ]
+}

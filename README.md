@@ -4,7 +4,7 @@
 
 <h1 align="center">sign-off</h1>
 
-<p align="center"><b>Answer your agents' yes/no questions in one click, from a page on your own machine.</b></p>
+<p align="center"><b>Answer your agents' yes/no and pick-one questions in one click, from a page on your own machine.</b></p>
 
 <p align="center">
   <img src="docs/flow-ask.svg" width="240" alt="1. Agent asks: Keep the digest?">
@@ -13,14 +13,14 @@
 </p>
 
 <p align="center">
-  <img src="docs/media/desktop-light-list.png" width="860" alt="Light desktop: three waiting questions with recommendations and Yes/No buttons, and the weekly digest answered Yes">
+  <img src="docs/media/desktop-light-list.png" width="860" alt="Light desktop: a pick-one question with Today, Friday and Next week, two Yes/No questions, and the weekly digest answered Yes with a note">
 </p>
 
 ## Why
 
 Agents stop and ask: ship this, keep that, turn this on? Those questions scatter across terminals and chats, and an answer typed in the wrong place gets lost.
 
-sign-off puts them on one calm list. The agent writes a small JSON file, you inspect the linked done-done run evidence, click **Yes** or **No**, and the answer is saved next to the file for the agent to read. It runs only on `127.0.0.1`: no account, no hosting.
+sign-off puts them on one calm list. The agent writes a small JSON file, you inspect the linked done-done run evidence, click **Yes** or **No** (or one of up to six choices the agent offers), and the answer is saved next to the file for the agent to read. Add an optional short note if the agent should know why; the note never blocks the click. It runs only on `127.0.0.1`: no account, no hosting.
 
 Your answer survives reloads and restarts; you can change it with one more click. Recommendations and silent defaults are shown, never applied for you.
 
@@ -73,7 +73,7 @@ The CLI is `sign-off-axi`, an [AXI](https://axi.md): agents drive it from a shel
 ```
 sign-off-axi                       list the decisions waiting on the user (same as list)
 sign-off-axi raise --title "<question>" [--key <key>] [--about <text>] [--detail <text>]
-                   [--recommend yes|no] [--default yes|no] [--close done|release]
+                   [--option <value>=<label>]... [--recommend <value>] [--default <value>] [--close done|release]
 sign-off-axi raise --from <decisions.json>      add every decision in a decisions file
 sign-off-axi open  [--port 4410] [--evidence-root <dir>]   start the board in the background; prints its URL and pid
 sign-off-axi status                             is the board open started for this file running? its URL and pid
@@ -84,7 +84,8 @@ sign-off-axi wait [--key <key>] [--timeout 600]  block until the user answers, t
 ```
 
 - The board is `~/.sign-off/decisions.json` unless you name a file right after the command (`sign-off-axi answers ./decisions.json`). Answers are saved next to it.
-- `list` and `answers` take `--full` for every field and `--json` for JSON (`answers --json` prints `{"<key>":{"answer","label","close","at"}}`).
+- With no `--option` a question is Yes/No; give 2 to 6 `--option` flags for a pick-one question (`--option friday=Friday --option next-week="Next week"`). `--recommend` and `--default` name one of its values.
+- `list` and `answers` take `--full` for every field and `--json` for JSON (`answers --json` prints `{"<key>":{"answer","label","close","at"}}`, plus `"note"` when the user wrote one). `answers` adds a note column when any shown answer has a note.
 - Raising a question that is already on the board is a no-op that reports its status, so an agent can re-run it safely. `--key` defaults to a slug of the title.
 - `open` is a no-op when the same board is already open. `--evidence-root` is the folder holding `.done-done/`, for decisions that link run evidence.
 - `wait` replaces a polling loop. With `--key` it returns at once if that decision is already answered, and waits for a key that is not raised yet; without it, it waits for the next answer to any decision still waiting and fails with `NOT_FOUND` when nothing is. It wakes on each save, gives up after `--timeout` seconds (600, ten minutes, by default) with code `TIMEOUT` and exit 1, and takes `--full` and `--json` like `answers`. Ctrl-C stops it without changing anything.
@@ -106,11 +107,11 @@ Write your own questions using the [file-format reference](docs/file-formats.md)
 
 ## On your screen
 
-Real demo questions, with one Yes already saved. Desktop shots are cropped to the list, not redrawn.
+Real demo questions, with one Yes and its note already saved. Desktop shots are cropped to the list, not redrawn.
 
 **Desktop · dark**
 
-<img src="docs/media/desktop-dark-list.png" width="860" alt="Dark desktop: the same question list, with the saved Yes highlighted in purple">
+<img src="docs/media/desktop-dark-list.png" width="860" alt="Dark desktop: the same question list, with the saved Yes highlighted in purple and the note shown under it">
 
 **Phone · light and dark**
 

@@ -7,14 +7,16 @@ export type Decision = {
   key: string; title: string; about?: string; detail?: string; options: Option[];
   recommend_value?: string; default_if_silent?: string; close: string; evidence?: EvidenceLink;
 };
-export type Answer = { key: string; answer: string; label: string; close: string; at: string };
+export type Answer = { key: string; answer: string; label: string; close: string; at: string; note?: string };
 
 /** A problem with the decisions file; the CLI exits 2 and the server answers 422/409 with this message. */
 export class InputError extends Error {}
 
 const YES_NO: Option[] = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
 const isText = (v: unknown) => typeof v === 'string';
-const ONE_OF: Record<string, unknown[]> = { type: ['decision'], close: ['done', 'release'], recommend_value: ['yes', 'no'], default_if_silent: ['yes', 'no'] };
+const isKey = (v: unknown) => isText(v) && /^[A-Za-z0-9._-]{1,128}$/.test(v as string);
+const ONE_OF: Record<string, unknown[]> = { type: ['decision'], close: ['done', 'release'] };
+export const NOTE_MAX = 500;
 
 export function loadDecisions(path: string): Decision[] {
   const name = basename(path);
@@ -28,7 +30,7 @@ export function loadDecisions(path: string): Decision[] {
   const seen = new Map<string, number>();
   return doc.decisions.map((d: any, i: number): Decision => {
     const bad = (field: string, rule: string) => new InputError(`${name}: decisions[${i}] (key ${JSON.stringify(d?.key)}): ${field} ${rule}`);
-    if (!isText(d?.key) || !/^[A-Za-z0-9._-]{1,128}$/.test(d.key)) throw bad('key', 'must be 1-128 of A-Z a-z 0-9 . _ -');
+    if (!isKey(d?.key)) throw bad('key', 'must be 1-128 of A-Z a-z 0-9 . _ -');
     if (seen.has(d.key)) throw bad('key', `repeats decisions[${seen.get(d.key)}]`);
     seen.set(d.key, i);
     if (!isText(d.title) || !d.title.trim()) throw bad('title', 'must be non-empty text');
@@ -40,8 +42,13 @@ export function loadDecisions(path: string): Decision[] {
     }
     for (const [f, allowed] of Object.entries(ONE_OF)) if (d[f] !== undefined && !allowed.includes(d[f])) throw bad(f, `must be ${allowed.join(' or ')}`);
     const options = d.options ?? YES_NO;
-    if (!Array.isArray(options) || options.map((o) => o?.value).sort().join() !== 'no,yes'
-      || !options.every((o) => isText(o.label) && o.label.trim())) throw bad('options', 'must be exactly yes and no, each with a label');
+    if (!Array.isArray(options) || options.length < 2 || options.length > 6
+      || !options.every((o) => isKey(o?.value) && isText(o.label) && o.label.trim())) {
+      throw bad('options', 'must be 2 to 6 items, each a value of 1-128 of A-Z a-z 0-9 . _ - and a label');
+    }
+    const values = options.map((o: Option) => o.value);
+    if (new Set(values).size < values.length) throw bad('options', 'values must be unique');
+    for (const f of ['recommend_value', 'default_if_silent']) if (d[f] !== undefined && !values.includes(d[f])) throw bad(f, `must be one of ${values.join(', ')}`);
     return {
       key: d.key, title: d.title, about: d.about, detail: d.detail, options: options.map((o: Option) => ({ value: o.value, label: o.label })),
       recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done', evidence: d.evidence,
@@ -65,10 +72,11 @@ export function readAnswers(decisionsPath: string, warn: (msg: string) => void =
   return Object.fromEntries(latest);
 }
 
-/** Appends one answer line unless it equals the current answer. Starts a new line after a torn fragment. */
-export function appendAnswer(decisionsPath: string, d: Decision, option: Option): void {
-  if (readAnswers(decisionsPath)[d.key]?.answer === option.value) return;
+/** Appends one answer line unless it equals the current answer and note. Starts a new line after a torn fragment. */
+export function appendAnswer(decisionsPath: string, d: Decision, option: Option, note = ''): void {
+  const current = readAnswers(decisionsPath)[d.key];
+  if (current?.answer === option.value && (current.note ?? '') === note) return;
   const raw = readRaw(answersPath(decisionsPath));
-  const a: Answer = { key: d.key, answer: option.value, label: option.label, close: d.close, at: new Date().toISOString().slice(0, 19) + 'Z' };
+  const a: Answer = { key: d.key, answer: option.value, label: option.label, close: d.close, at: new Date().toISOString().slice(0, 19) + 'Z', ...(note && { note }) };
   appendFileSync(answersPath(decisionsPath), (raw && !raw.endsWith('\n') ? '\n' : '') + JSON.stringify(a) + '\n', { mode: 0o600 });
 }

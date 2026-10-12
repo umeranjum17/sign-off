@@ -1,16 +1,17 @@
 ---
 name: sign-off-axi
-description: "Ask the user yes/no questions on a local review board and read back their answers, using the sign-off-axi CLI. Use when you need a yes/no decision or approval from the user before going on, want the user to review or sign off on something, or need to read back the answers the user already gave."
+description: "Ask the user yes/no or pick-one questions on a local review board and read back their answers, using the sign-off-axi CLI. Use when you need a yes/no decision, a choice between a few options, or approval from the user before going on, want the user to review or sign off on something, or need to read back the answers the user already gave."
 license: MIT
 metadata:
   author: umeranjum17
-  argument-hint: <the yes/no question to ask>
+  argument-hint: <the question to ask>
   hermes:
     tags:
       - decisions
       - approval
       - review
       - yes-no
+      - multiple-choice
       - human-in-the-loop
       - cli
     category: productivity
@@ -18,7 +19,7 @@ metadata:
 
 # sign-off-axi
 
-sign-off-axi puts your yes/no questions on one local page (127.0.0.1) where the user answers each with one click, and saves the answers for you to read back.
+sign-off-axi puts your yes/no and pick-one questions on one local page (127.0.0.1) where the user answers each with one click, and saves the answers for you to read back.
 
 ## Current guidance lives in the CLI
 
