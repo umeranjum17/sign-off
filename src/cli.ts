@@ -669,6 +669,8 @@ let file = '', evidenceRoot = '', bind = '127.0.0.1';
 async function serve(args: string[]) {
   const parsed = parse('serve', args, BOARD_FLAGS), port = portOf(parsed.values.port);
   ready(parsed.file, parsed.on, parsed.values['evidence-root']);
+  const live = await running(parsed.file);
+  if (live) throw fail(`this board is already open at ${live.url}`, 'CONFLICT', `Run \`sign-off-axi stop${parsed.on}\` first`);
   bind = bindOf(parsed.file, parsed.values.bind);
   if (!loopback(bind)) tokenOf(parsed.file, true);
   [file, evidenceRoot] = [parsed.file, parsed.values['evidence-root'] ? resolve(parsed.values['evidence-root']) : ''];
