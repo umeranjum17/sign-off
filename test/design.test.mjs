@@ -1,6 +1,6 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFile, execFileSync, spawn } from 'node:child_process';
+import { execFile, execFileSync, spawn, spawnSync } from 'node:child_process';
 import { appendFileSync, chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer as createHttpServer, get } from 'node:http';
 import { createServer } from 'node:net';
@@ -262,6 +262,8 @@ test('private-network bind: token on every route, kept across a restart', { skip
   const foreground = spawn('node', [cli, 'serve', board, '--port', '0', '--bind', mine.address], { stdio: ['ignore', 'pipe', 'ignore'] });
   await new Promise((ok) => foreground.stdout.once('data', ok));
   const clash = run('open', board, '--port', '0', '--bind', '127.0.0.1');
+  const second = spawnSync('node', [cli, 'serve', board, '--port', '0', '--bind', '127.0.0.1'], { encoding: 'utf8', timeout: 5000 });
+  assert.deepEqual([second.status, /code: CONFLICT/.test(second.stdout)], [1, true]);
   foreground.kill('SIGTERM');
   await new Promise((ok) => foreground.once('exit', ok));
   assert.deepEqual([clash.code, /code: CONFLICT/.test(clash.out)], [1, true]);
