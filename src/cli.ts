@@ -968,10 +968,13 @@ const state = () => ({
   file,
   mockBase: `/mock/${loopback(bind) ? 'local' : mockPass(tokenOf(file))}/`,
   decisions: loadDecisions(file).map((d) => ({ ...d, evidenceCard: d.evidence ? evidenceCard(d.evidence) : null })),
+  readonly: readOnly(),
   answers: readAnswers(file, warn),
   rounds: readRounds(file, warn),
   messages: readMessages(file, warn),
 });
+/** A board whose file says `"readonly": true` shows its items and takes no answers, rounds or comments: another program feeds it. */
+const readOnly = () => readItems(file).extra.readonly === true;
 const mediaTypes: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.mp4': 'video/mp4', '.webm': 'video/webm' };
 const mockTypes: Record<string, string> = { '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
 /** What a mock's folder may serve beside it: pages, styles, scripts, images, fonts and clips; never the board, answers, token or config. */
@@ -1074,6 +1077,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     return [200, state()];
   }
   if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
+  if (readOnly()) return [403, { error: 'This board is read-only' }];
   if (!req.headers['content-type']?.startsWith('application/json')) return [415, { error: 'Send JSON' }];
   let body = '';
   for await (const chunk of req) body += chunk;
