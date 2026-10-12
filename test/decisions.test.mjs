@@ -38,7 +38,9 @@ const post = (url, body) => fetch(`${url}api/answers`, { method: 'POST', headers
 
 test('answer journey: save, survive a torn line and a restart, read back', async () => {
   let { proc, url } = await serve();
-  assert.match(await (await fetch(url)).text(), /<title>Decisions/);
+  const html = await (await fetch(url)).text();
+  assert.match(html, /<title>Decisions/);
+  assert.ok(!html.includes('claim-check'), 'the proof card uses plain words, not "claim-check"');
   const board = await (await fetch(`${url}api/decisions`)).json();
   assert.equal(board.decisions[0].evidenceCard.result, 'RUN PASS');
   assert.equal(board.decisions[0].evidenceCard.commit, commit);
@@ -64,7 +66,8 @@ test('answer journey: save, survive a torn line and a restart, read back', async
   writeFileSync(recordPath, '{malformed');
   assert.equal((await (await fetch(`${url}api/decisions`)).json()).decisions[0].evidenceCard.result, 'UNVERIFIED');
   rmSync(recordPath);
-  assert.equal((await (await fetch(`${url}api/decisions`)).json()).decisions[0].evidenceCard.result, 'UNVERIFIED');
+  const missing = (await (await fetch(`${url}api/decisions`)).json()).decisions[0].evidenceCard;
+  assert.deepEqual([missing.result, missing.reason], ['UNVERIFIED', 'run record is missing']);
   for (const bad of ['null', JSON.stringify({ ...makeRecord(), files: [null] })]) {
     writeFileSync(recordPath, bad);
     const card = (await (await fetch(`${url}api/decisions`)).json()).decisions[0].evidenceCard;
