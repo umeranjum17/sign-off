@@ -560,11 +560,8 @@ const urlHost = (host: string) => (isIP(host) === 6 ? `[${host}]` : host);
 /** --bind, else the bind line of config.yaml next to the board, else 127.0.0.1. */
 function bindOf(file: string, given?: string) {
   const host = given ?? (existsSync(join(dirname(file), 'config.yaml')) ? readSetup(dirname(file)).bind : '127.0.0.1');
-  if (!isIP(host) || !PRIVATE.test(host)) {
-    const mine = Object.values(networkInterfaces()).flat().flatMap((i) => (i && !i.internal && PRIVATE.test(i.address) ? [i.address] : []));
-    throw fail(`bind address ${host} must be 127.0.0.1 or a private address of this machine, never all interfaces or a public address`, 'VALIDATION_ERROR',
-      mine.length ? `Private addresses here: ${mine.join(', ')}` : 'This machine shows no private address; keep 127.0.0.1');
-  }
+  if (!isIP(host) || !PRIVATE.test(host)) throw fail(`bind address ${host} must be 127.0.0.1 or a private address of this machine, never all interfaces or a public address`,
+    'VALIDATION_ERROR', 'Pass 127.0.0.1 or a private address of this machine');
   return host;
 }
 const tokenFile = (file: string) => `${file.replace(/\.json$/, '')}.token`;
@@ -882,7 +879,7 @@ async function exportBoard(args: string[]) {
   const parsed = parse('export', args, { out: { type: 'string' }, 'evidence-root': { type: 'string' } });
   ready(parsed.file, parsed.on, parsed.values['evidence-root']);
   [file, evidenceRoot] = [parsed.file, parsed.values['evidence-root'] ? resolve(parsed.values['evidence-root']) : ''];
-  const { file: _, ...frozen } = state(), files: Record<string, string> = {}, q = encodeURIComponent;
+  const { file: _, messages: _messages, ...frozen } = state(), files: Record<string, string> = {}, q = encodeURIComponent;
   let missing = 0;
   // The same URLs the page asks the server for, read through the same hash and path checks.
   for (const d of frozen.decisions) {

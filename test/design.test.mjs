@@ -210,7 +210,7 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   // A one-page mock keeps its ?variant= in the frame URL; the trailing comment hides it from the page text.
   assert.equal(data.files['/api/mock?key=nav&value=b&variant=b'], `data:text/html;charset=utf-8,${encodeURIComponent('<p>variant page</p>')}%3C!--?variant=b`);
   assert.equal(data.answers['pick-the-sign-in-layout'].answer, 'b');
-  assert.equal(data.messages.length, 2);
+  assert.equal(data.messages, undefined, 'the export leaves out comments and prompts');
   // A diagram and an interactive page are inlined too, so the frozen copy shows them with no server.
   assert.equal(data.files['/api/mock?key=flow'], `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>').toString('base64')}`);
   assert.ok(data.files['/api/mock?key=demo']);
