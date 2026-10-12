@@ -267,3 +267,15 @@ test('doctor reports a port whose server names a non-text file as in use', async
   assert.equal(out.code, 1);
   assert.match(out.out, new RegExp(`port: ${port} is in use \\(EADDRINUSE\\)`));
 });
+
+test('doctor passes a read-only board in a writable setup', { skip: process.getuid?.() === 0 && 'root can write every path' }, () => {
+  const dir = join(scratch, 'readonly-board'), sod = join(dir, '.sign-off');
+  run('init', dir);
+  writeFileSync(join(sod, 'config.yaml'), 'board: decisions.json\nport: 0\n');
+  chmodSync(join(sod, 'decisions.json'), 0o444);
+  try {
+    assert.equal(run('doctor', dir).code, 0);
+  } finally {
+    chmodSync(join(sod, 'decisions.json'), 0o600);
+  }
+});
