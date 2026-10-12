@@ -1,5 +1,5 @@
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
-import { basename } from 'node:path';
+import { basename, resolve } from 'node:path';
 
 export type Option = { value: string; label: string };
 export type EvidenceLink = { run_id: string; commit: string; outcome: string; repro: string; proof: string; evidence: string };
@@ -22,7 +22,7 @@ export function loadDecisions(path: string): Decision[] {
   try {
     doc = JSON.parse(readFileSync(path, 'utf8'));
   } catch (e: any) {
-    throw new InputError(e.code ? `cannot read ${name}: ${e.code}` : `${name}: invalid JSON: ${e.message}`);
+    throw new InputError(e.code ? `cannot read ${resolve(path)}: ${e.code}` : `${name}: invalid JSON: ${e.message}`);
   }
   if (doc?.schema !== 1 || !Array.isArray(doc.decisions)) throw new InputError(`${name}: needs "schema": 1 and a "decisions" list`);
   const seen = new Map<string, number>();

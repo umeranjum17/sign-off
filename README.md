@@ -76,14 +76,19 @@ sign-off-axi raise --title "<question>" [--key <key>] [--about <text>] [--detail
                    [--recommend yes|no] [--default yes|no] [--close done|release]
 sign-off-axi raise --from <decisions.json>      add every decision in a decisions file
 sign-off-axi open  [--port 4410] [--evidence-root <dir>]   start the board in the background; prints its URL and pid
+sign-off-axi status                             is the board open started for this file running? its URL and pid
+sign-off-axi stop                               stop that board
 sign-off-axi serve [--port 4410] [--evidence-root <dir>]   run the board in the foreground (--port 0 picks a free port)
 sign-off-axi answers [--key <key>]              the latest answer per decision, and how many still wait
+sign-off-axi wait [--key <key>] [--timeout 600]  block until the user answers, then print it like answers
 ```
 
 - The board is `~/.sign-off/decisions.json` unless you name a file right after the command (`sign-off-axi answers ./decisions.json`). Answers are saved next to it.
 - `list` and `answers` take `--full` for every field and `--json` for JSON (`answers --json` prints `{"<key>":{"answer","label","close","at"}}`).
 - Raising a question that is already on the board is a no-op that reports its status, so an agent can re-run it safely. `--key` defaults to a slug of the title.
-- `open` is a no-op when the same board is already open on that port. `--evidence-root` is the folder holding `.done-done/`, for decisions that link run evidence.
+- `open` is a no-op when the same board is already open. `--evidence-root` is the folder holding `.done-done/`, for decisions that link run evidence.
+- `wait` replaces a polling loop. With `--key` it returns at once if that decision is already answered, and waits for a key that is not raised yet; without it, it waits for the next answer to any decision still waiting and fails with `NOT_FOUND` when nothing is. It wakes on each save, gives up after `--timeout` seconds (600, ten minutes, by default) with code `TIMEOUT` and exit 1, and takes `--full` and `--json` like `answers`. Ctrl-C stops it without changing anything.
+- `open` records the board's pid and port next to the board file (`decisions.board.pid`). `status` and `stop` read it and only act on a pid that really serves that board, so no one has to guess a pid to kill. `open` on a board already served by `serve` records that server, so `stop` can close it too.
 
 ```
 $ sign-off-axi raise --title "Keep the weekly digest?" --recommend yes
