@@ -21,13 +21,13 @@ Proof comes from the real CLI, the real server and a real browser. A build or a 
 2. `cp fixtures/sample-decisions.json $SCR/d.json`
 3. Start the server in the background and keep its pid:
    `node dist/cli.js serve $SCR/d.json --port 0 > $SCR/serve.log 2>&1 & echo $! > $SCR/srv.pid`
-4. The first line of `$SCR/serve.log` is the URL. Wait for that line; do not sleep a fixed time.
+4. `$SCR/serve.log` prints `url: "http://127.0.0.1:<port>/"`. Wait for that line; do not sleep a fixed time.
 
 The server reads `web/index.html` once at start. Restart it after any page edit.
 
 ## Doctor
 
-- `serve.log` holds `http://127.0.0.1:<port>/`. Anything else is the real error (exit 2 names the file, item, key and field).
+- `serve.log` holds `url: "http://127.0.0.1:<port>/"`. Otherwise its `error:` line is the real error (exit 2 names the file, item, key and field).
 - `curl -s <url>api/decisions` returns `{"decisions":[...],"answers":{...}}`.
 
 ## Drive
@@ -43,7 +43,7 @@ chrome-devtools-axi wait "<text that only appears in the expected state>"
 - Phone: `390x844x3,mobile,touch`. Narrow phone: `320x700x2,mobile,touch`. Desktop: `1440x900x1`.
 - A reload is a fresh `open` of the same URL, then `emulate` again.
 - Get a button ref from a fresh `snapshot --full`; buttons read like `button "Yes, <title>"`.
-- Wait for a saved answer by polling `node dist/cli.js answers $SCR/d.json` until it prints the expected value (for example `"short-question":{"answer":"yes"`), with a time limit. Never accept a fixed sleep, and never wait on the always-present "Answered" or "Waiting" labels.
+- Wait for a saved answer by polling `node dist/cli.js answers $SCR/d.json --json` until it prints the expected value (for example `"short-question":{"answer":"yes"`), with a time limit. Never accept a fixed sleep, and never wait on the always-present "Answered" or "Waiting" labels.
 - Screenshots: `chrome-devtools-axi screenshot <evidence>/<name>.png --full-page`.
 - Finish: `chrome-devtools-axi stop`, kill the server pid, delete `$SCR`.
 
@@ -55,3 +55,4 @@ Look at every shot before you report: nothing overlaps, no text is cut, no raw p
 |---|---|
 | Decisions page: list, one-click answer, durable answers | [features/decisions.md](features/decisions.md) |
 | README media and rendered README | [features/readme.md](features/readme.md) |
+| `sign-off-axi` commands, TOON/`--full`/`--json`, packed tarball via `npx -y` | [features/axi.md](features/axi.md) |

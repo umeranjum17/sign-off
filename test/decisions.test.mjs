@@ -32,7 +32,7 @@ after(() => procs.forEach((p) => p.kill()));
 async function serve() {
   const proc = spawn('node', [cli, 'serve', file, '--port', '0', '--evidence-root', root], { cwd: tmpdir() });
   procs.push(proc);
-  return { proc, url: await new Promise((ok) => proc.stdout.once('data', (b) => ok(b.toString().trim()))) };
+  return { proc, url: await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0]))) };
 }
 const post = (url, body) => fetch(`${url}api/answers`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 
@@ -45,7 +45,7 @@ test('answer journey: save, survive a torn line and a restart, read back', async
   assert.equal(board.decisions[0].evidenceCard.media[0].path, 'after.png');
   assert.deepEqual(Buffer.from(await (await fetch(`${url}${board.decisions[0].evidenceCard.media[0].url.slice(1)}`)).arrayBuffer()), png);
   assert.deepEqual(readFileSync(recordPath), originalRecord);
-  assert.deepEqual(JSON.parse(execFileSync('node', [cli, 'answers', file], { stdio: ['ignore', 'pipe', 'ignore'] })), {});
+  assert.deepEqual(JSON.parse(execFileSync('node', [cli, 'answers', file, '--json'], { stdio: ['ignore', 'pipe', 'ignore'] })), {});
   const saved = await post(url, { key: 'short-question', answer: 'yes' });
   assert.equal(saved.status, 200);
   const answeredBoard = await saved.json();
@@ -59,7 +59,7 @@ test('answer journey: save, survive a torn line and a restart, read back', async
   proc.kill();
   ({ proc, url } = await serve());
   assert.equal((await (await fetch(`${url}api/decisions`)).json()).answers['short-question'].answer, 'yes');
-  const printed = JSON.parse(execFileSync('node', [cli, 'answers', file], { stdio: ['ignore', 'pipe', 'ignore'] }));
+  const printed = JSON.parse(execFileSync('node', [cli, 'answers', file, '--json'], { stdio: ['ignore', 'pipe', 'ignore'] }));
   assert.deepEqual(Object.keys(printed).sort(), ['short-question', 'use-dark-default']);
   writeFileSync(recordPath, '{malformed');
   assert.equal((await (await fetch(`${url}api/decisions`)).json()).decisions[0].evidenceCard.result, 'UNVERIFIED');
@@ -85,7 +85,7 @@ test('answer journey: save, survive a torn line and a restart, read back', async
   const unverified = await (await fetch(`${url}api/decisions`)).json();
   assert.equal(unverified.decisions[0].evidenceCard.result, 'UNVERIFIED');
   assert.equal((await fetch(`${url}api/evidence?run=${runId}&file=escape.png`)).status, 404);
-  assert.deepEqual(JSON.parse(execFileSync('node', [cli, 'answers', file], { stdio: ['ignore', 'pipe', 'ignore'] })), printed);
+  assert.deepEqual(JSON.parse(execFileSync('node', [cli, 'answers', file, '--json'], { stdio: ['ignore', 'pipe', 'ignore'] })), printed);
   const checks = JSON.parse(readFileSync(file, 'utf8'));
   checks.decisions[0].evidence.outcome = '   n/a   ';
   writeFileSync(file, JSON.stringify(checks));
@@ -97,4 +97,34 @@ test('answer journey: save, survive a torn line and a restart, read back', async
     assert.equal(response.status, 422);
     assert.match((await response.json()).error, /evidence/);
   }
+});
+
+test('agent journey: raise, open, answer, read back in TOON and JSON', async () => {
+  const env = { ...process.env, HOME: mkdtempSync(join(tmpdir(), 'sign-off-home-')) };
+  const run = (...args) => {
+    try {
+      return { out: execFileSync('node', [cli, ...args], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }), code: 0 };
+    } catch (e) {
+      return { out: e.stdout, code: e.status };
+    }
+  };
+  assert.match(run().out, /waiting: 0 of 0 decisions/);
+  const raised = run('raise', '--title', 'Keep the weekly digest?', '--recommend', 'yes');
+  assert.match(raised.out, /keep-the-weekly-digest,raised,/);
+  assert.match(run('raise', '--title', 'Keep the weekly digest?', '--recommend', 'yes').out, /already waiting/);
+  assert.deepEqual([run('raise', '--title', 'Keep the weekly digest?').code, run('raise', '--title', 'x', '--recommend', 'maybe').code, run('list', '--stat').code], [1, 2, 2]);
+  assert.match(run().out, /waiting\[1\]\{key,title\}:\n  keep-the-weekly-digest,Keep the weekly digest\?/);
+  const opened = run('open', '--port', '0');
+  const url = /url: "(.+)"/.exec(opened.out)[1], pid = Number(/pid: (\d+)/.exec(opened.out)[1]);
+  after(() => process.kill(pid));
+  assert.equal((await post(url, { key: 'keep-the-weekly-digest', answer: 'no' })).status, 200);
+  assert.match(run('answers').out, /answers\[1\]\{key,answer,at\}:\n  keep-the-weekly-digest,no,/);
+  assert.equal(JSON.parse(run('answers', '--key', 'keep-the-weekly-digest', '--json').out)['keep-the-weekly-digest'].answer, 'no');
+  assert.match(run('raise', '--title', 'Keep the weekly digest?', '--recommend', 'yes').out, /already answered no/);
+  run('raise', '--title', 'Only toString?', '--key', 'toString');
+  assert.match(run().out, /waiting\[1\]\{key,title\}:\n  toString,Only toString\?/);
+  assert.match(run('help', 'raise').out, /raise \[board.json\] --title/);
+  assert.deepEqual([run('help', 'nope').code, run('open', '--port', '0', '--evidence-root', join(env.HOME, 'missing')).code], [2, 2]);
+  await Promise.all(Array.from({ length: 20 }, (_, i) => new Promise((ok) => spawn('node', [cli, 'raise', '--title', `Parallel question ${i}?`], { env }).on('exit', ok))));
+  assert.match(run().out, /waiting\[21\]/);
 });
