@@ -31,6 +31,21 @@
   .row:has(details[open]) .about { display: none; }
   summary { cursor: pointer; color: var(--accent); font-size: 0.875rem; margin-top: 0.25rem; width: fit-content; }
   .meta { color: var(--muted); font-size: 0.8125rem; margin: 0.5rem 0 0; }
+  .evidence { grid-column: 1 / -1; border: 1px solid var(--line); border-radius: 1rem; padding: 1rem; background: color-mix(in srgb, var(--accent) 5%, var(--bg)); }
+  .evidence-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  .evidence-head h4 { margin: 0; font-size: .9rem; letter-spacing: .02em; }
+  .verdict { border-radius: 999px; padding: .2rem .65rem; font-size: .75rem; font-weight: 700; background: var(--line); }
+  .verdict[data-result="RUN PASS"] { color: #147a4a; background: #dff5e9; }
+  .verdict[data-result="RUN FAIL"] { color: #a32020; background: #fde5e2; }
+  .verdict[data-result="INCONCLUSIVE"], .verdict[data-result="UNVERIFIED"] { color: #79510d; background: #fff1cc; }
+  .checks { display: grid; gap: .5rem; margin: .9rem 0; }
+  .check { margin: 0; color: var(--muted); font-size: .875rem; }
+  .check strong { color: var(--text); text-transform: capitalize; }
+  .commit { color: var(--muted); font: .75rem/1.5 ui-monospace, monospace; overflow-wrap: anywhere; margin: .5rem 0; }
+  .media { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: .75rem; }
+  .media a { display: block; color: var(--accent); }
+  .media img, .media video { display: block; width: 100%; max-height: 20rem; object-fit: contain; border-radius: .7rem; background: #111; }
+  .unverified { color: var(--danger); margin: .5rem 0; }
   .err:not(:empty) { color: var(--danger); font-size: 0.875rem; margin-top: 0.5rem; }
   .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
   button { min-height: 2.75rem; padding: 0 1.25rem; border-radius: 0.5rem; border: 1px solid var(--border); cursor: pointer;
@@ -81,6 +96,24 @@
     });
   }
 
+  function evidenceCard(d) {
+    const card = d.evidenceCard, link = d.evidence;
+    if (!link) return '';
+    const head = el('div', { class: 'evidence-head' }, el('h4', {}, 'Proof record'), el('span', { class: 'verdict', 'data-result': card?.result ?? 'UNVERIFIED' }, card?.result ?? 'UNVERIFIED'));
+    const checks = el('div', { class: 'checks' }, ...['outcome', 'repro', 'proof', 'evidence'].map((name) =>
+      el('p', { class: 'check' }, el('strong', {}, `${name}: `), document.createTextNode(link[name]))));
+    const media = el('div', { class: 'media' }, ...(card?.media ?? []).map((item) => {
+      const node = item.type.startsWith('image/') ? el('img', { src: item.url, alt: `Evidence image: ${item.path}` })
+        : el('video', { src: item.url, controls: '', preload: 'metadata', 'aria-label': `Evidence recording: ${item.path}` });
+      return el('a', { href: item.url, target: '_blank', rel: 'noopener', 'aria-label': `Open ${item.path}` }, node);
+    }));
+    return el('section', { class: 'evidence', 'aria-label': 'Read-only proof evidence' }, head,
+      card?.commit ? el('p', { class: 'commit' }, `Commit · ${card.commit}`) : '',
+      el('p', { class: 'meta' }, 'Run status only · this record does not save a claim-check result.'),
+      card?.status === 'unverified' ? el('p', { class: 'unverified' }, `Evidence unavailable · ${card.reason}`) : '', checks,
+      media.childElementCount ? media : el('p', { class: 'meta' }, 'No recorded image or recording.'));
+  }
+
   function row(d) {
     const meta = [['Recommended', d.recommend_value], ['If no answer', d.default_if_silent]].filter(([, v]) => v);
     const err = el('div', { class: 'err', role: 'alert' });
@@ -96,7 +129,7 @@
         ...[d.about, d.detail].filter(Boolean).map((t) => el('p', { dir: 'auto' }, t))) : '',
       meta.length ? el('p', { class: 'meta' }, meta.map(([k, v]) => `${k}: ${d.options.find((o) => o.value === v).label}`).join(' · ')) : '',
       err,
-    ), el('div', { class: 'choices', role: 'group', 'aria-label': d.title }, ...buttons));
+    ), el('div', { class: 'choices', role: 'group', 'aria-label': d.title }, ...buttons), evidenceCard(d));
   }
 
   function render() {

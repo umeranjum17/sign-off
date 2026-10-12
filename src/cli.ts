@@ -1,20 +1,23 @@
 #!/usr/bin/env node
 import { createServer, type IncomingMessage } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { readFileSync, realpathSync, statSync } from 'node:fs';
+import { extname, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 import { type Decision, InputError, appendAnswer, loadDecisions, readAnswers } from './store.js';
 
 const USAGE = `usage:
-  sign-off serve <decisions.json> [--port 4410]   show the decisions page on 127.0.0.1 (--port 0 picks a free port)
+  sign-off serve <decisions.json> [--port 4410] [--evidence-root <dir>]   show the local board
   sign-off answers <decisions.json>               print the latest answers as JSON
   sign-off help`;
 const warn = (msg: string) => console.error(`sign-off: ${msg}`);
 const fail = (msg: string): never => { warn(msg); return process.exit(2); };
+class EvidenceError extends Error {}
 
-let cmd: string | undefined, file = '', port = 4410, decisions: Decision[] = [];
+let cmd: string | undefined, file = '', port = 4410, evidenceRoot = '', decisions: Decision[] = [];
 try {
-  const { positionals, values } = parseArgs({ allowPositionals: true, options: { port: { type: 'string', default: '4410' } } });
+  const { positionals, values } = parseArgs({ allowPositionals: true, options: { port: { type: 'string', default: '4410' }, 'evidence-root': { type: 'string', default: '' } } });
   [cmd, file] = positionals;
   if (cmd === 'help' || !cmd) {
     console.log(USAGE);
@@ -22,6 +25,7 @@ try {
   }
   if ((cmd !== 'serve' && cmd !== 'answers') || !file) throw new InputError(USAGE);
   port = Number(values.port);
+  evidenceRoot = values['evidence-root'] ? resolve(values['evidence-root']) : '';
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new InputError('--port must be a number from 0 to 65535');
   decisions = loadDecisions(file);
 } catch (e: any) {
@@ -40,10 +44,65 @@ if (cmd === 'answers') {
 }
 
 const page = readFileSync(new URL('../web/index.html', import.meta.url));
-const state = () => ({ decisions: loadDecisions(file), answers: readAnswers(file, warn) });
+const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
+const state = () => ({
+  decisions: loadDecisions(file).map((d) => ({ ...d, evidenceCard: d.evidence ? evidenceCard(d.evidence) : null })),
+  answers: readAnswers(file, warn),
+});
+const mediaTypes: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.mp4': 'video/mp4', '.webm': 'video/webm' };
+function contained(path: string): string {
+  let root: string, actual: string;
+  try {
+    root = realpathSync(evidenceRoot);
+    actual = realpathSync(resolve(root, path));
+  } catch { throw new EvidenceError('no matching evidence file'); }
+  if (!actual.startsWith(root + sep)) throw new EvidenceError('evidence path escapes the selected root');
+  return actual;
+}
+function evidenceCard(link: NonNullable<Decision['evidence']>) {
+  try {
+    if (!evidenceRoot) throw new EvidenceError('no evidence root was selected');
+    const recordPath = contained(`.done-done/runs/${link.run_id}.json`);
+    if (statSync(recordPath).size > 1_000_000) throw new EvidenceError('run record is too large');
+    const run = JSON.parse(readFileSync(recordPath, 'utf8'));
+    if (!run || typeof run !== 'object' || Array.isArray(run)) throw new EvidenceError('run record is malformed or its media is unavailable');
+    if (run.schema !== 1 || run.run_id !== link.run_id || run.commit !== link.commit || !/^[a-f0-9]{40}$/.test(run.tree ?? '')
+      || typeof run.dirty !== 'boolean' || !(run.exit === null || Number.isInteger(run.exit)) || !Array.isArray(run.files)
+      || run.files.some((f: any) => !f || typeof f !== 'object' || typeof f.path !== 'string' || !/^[a-f0-9]{64}$/.test(f.sha256 ?? '') || !Number.isInteger(f.bytes) || f.bytes < 0)) {
+      throw new EvidenceError('run record is malformed or commit does not match');
+    }
+    const media: { path: string; url: string; type: string }[] = run.files.flatMap((f: any) => {
+      const type = mediaTypes[extname(f.path ?? '').toLowerCase()];
+      if (!type) return [];
+      const path = contained(f.path);
+      if (statSync(path).size > 20_000_000) throw new EvidenceError('media is unavailable or too large');
+      const bytes = readFileSync(path);
+      if (bytes.length !== f.bytes || sha256(bytes) !== f.sha256) throw new EvidenceError('evidence hash does not match the run record');
+      return [{ path: f.path, url: `/api/evidence?run=${encodeURIComponent(link.run_id)}&file=${encodeURIComponent(f.path)}`, type }];
+    });
+    const result = !Number.isInteger(run.exit) ? 'INCONCLUSIVE' : run.exit !== 0 || run.dirty || !run.files.length ? 'RUN FAIL' : 'RUN PASS';
+    return { status: 'verified', result, commit: run.commit, media };
+  } catch (e: any) {
+    const reason = e instanceof EvidenceError ? e.message
+      : e?.code ? 'no matching run record or media'
+      : 'run record is malformed or its media is unavailable';
+    return { status: 'unverified', result: 'UNVERIFIED', reason, commit: '', media: [] };
+  }
+}
 
 async function route(req: IncomingMessage): Promise<[number, unknown]> {
-  if (req.method === 'GET' && req.url === '/api/decisions') return [200, state()];
+  if (req.method === 'GET' && req.url?.startsWith('/api/evidence?')) {
+    const q = new URL(req.url, 'http://localhost').searchParams, runId = q.get('run') ?? '', path = q.get('file') ?? '';
+    const decision = loadDecisions(file).find((d) => d.evidence?.run_id === runId);
+    if (!decision?.evidence || !path) return [404, { error: 'Evidence is unavailable' }];
+    const card = evidenceCard(decision.evidence);
+    if (card.status !== 'verified' || !card.media.some((m) => m.path === path)) return [404, { error: 'Evidence is unavailable' }];
+    const actual = contained(path), type = mediaTypes[extname(path).toLowerCase()];
+    return [200, { media: readFileSync(actual), type }];
+  }
+  if (req.method === 'GET' && req.url === '/api/decisions') {
+    return [200, state()];
+  }
   if (req.method !== 'POST' || req.url !== '/api/answers') return [404, { error: 'Not found' }];
   if (!req.headers['content-type']?.startsWith('application/json')) return [415, { error: 'Send JSON' }];
   let body = '';
@@ -70,6 +129,10 @@ const server = createServer(async (req, res) => {
   } catch (e: any) {
     status = e instanceof InputError ? (req.method === 'GET' ? 422 : 409) : e instanceof SyntaxError ? 400 : 500;
     body = { error: e.message };
+  }
+  if (body && typeof body === 'object' && 'media' in body) {
+    const media = body as { media: Buffer; type: string };
+    return res.writeHead(status, { 'content-type': media.type, 'x-content-type-options': 'nosniff' }).end(media.media);
   }
   res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body));
 });
