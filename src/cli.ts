@@ -3,13 +3,13 @@ import { createServer, type IncomingMessage } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, renameSync, rmSync, statSync, watch, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, watch, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { type Decision, InputError, NOTE_MAX, answersPath, appendAnswer, appendRound, loadDecisions, readAnswers, readRounds } from './store.js';
+import { type Decision, InputError, MEDIA_MAX, NOTE_MAX, answersPath, appendAnswer, appendRound, loadDecisions, readAnswers, readRounds } from './store.js';
 
 const BOARD = join(homedir(), '.sign-off', 'decisions.json');
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
@@ -21,6 +21,7 @@ flags: --full and --json on list, answers and wait, --json on status, --help on 
 examples:
   sign-off-axi
   sign-off-axi raise --title "Ship the new sign-in screen this week?" --recommend yes
+  sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media shot.png
   sign-off-axi init
   sign-off-axi doctor
   sign-off-axi open
@@ -96,9 +97,13 @@ examples:
   sign-off-axi serve --port 0
 `,
   post: `usage: sign-off-axi post [board.json] --type design --title "<question>" [--about <text>] [--option <value>=<label>]... [--mock <value>=<path>]... [--tradeoff <text>] [--recommend <value>] [--default <value>] [--close done|release]
+       sign-off-axi post [board.json] --type evidence --title "<what this shows>" --about "<short note>" --media <file>... [--link <commit or URL>] [--detail <text>]
 Posts a design item: up to 6 options shown side by side, each with an optional board-relative mock file (.html, .png, .jpg, .jpeg, .webp). Without --type it behaves like raise.
+--type evidence posts the next numbered update (key update-<number>): 1 to ${MEDIA_MAX} screenshots or recordings (.png, .jpg, .jpeg, .webp, .mp4, .webm, 50 MB each), copied into evidence/<number>/ next to the board, with a short note and an optional commit or PR link.
+The user gives a verdict, pass, fail or needs-work, with an optional note; read it with answers or wait --key update-<number>.
 examples:
   sign-off-axi post --type design --title "Pick the sign-in layout" --option a="A: single column" --option b="B: split screen" --mock a=mocks/a.html --mock b=mocks/b.html --tradeoff "B scans fastest; A is simplest." --recommend b
+  sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media phone.png --media flow.mp4 --link https://github.com/acme/app/pull/12
 `,
   init: `usage: sign-off-axi init [dir]
 Writes a repo's sign-off setup under <dir>/.sign-off/ (config, an empty board, mocks/ and evidence/ folders, and a .gitignore keeping media and answer files out of git). A file that is already there is kept, never changed.
@@ -283,12 +288,15 @@ function raise(args: string[]) {
 const MOCK_TYPES = ['.html', '.png', '.jpg', '.jpeg', '.webp'];
 function post(args: string[]) {
   const { file, values, on } = parse('post', args, { from: { type: 'string' }, type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
+    media: { type: 'string', multiple: true }, link: { type: 'string' },
     ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: f === 'option' }])) });
-  const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock'].filter((f) => values[f] !== undefined);
+  const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'link'].filter((f) => values[f] !== undefined);
   if (values.from !== undefined && given.length) throw fail(`--from cannot be combined with --${given[0]}`, 'VALIDATION_ERROR', 'Put every field in the --from file, or post with flags only');
   if (values.from === undefined && values.title === undefined) throw fail('--title is required (or --from <decisions.json>)', 'VALIDATION_ERROR', 'sign-off-axi post --type design --title "<question>" --option a=A --option b=B');
   const type = values.type ?? 'decision';
-  if (!['decision', 'design'].includes(type)) throw fail(`--type must be decision or design`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
+  if (!['decision', 'design', 'evidence'].includes(type)) throw fail(`--type must be decision, design or evidence`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
+  if (type === 'evidence') return postEvidence(file, on, values);
+  if (values.media !== undefined || values.link !== undefined) throw fail('--media and --link need --type evidence', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (type === 'decision' && (values.tradeoff !== undefined || values.mock !== undefined)) {
     throw fail('--tradeoff and --mock need --type design', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   }
@@ -302,6 +310,52 @@ function post(args: string[]) {
     return { value: m.slice(0, at), path };
   });
   return storeIncoming(file, on, buildIncoming(values, { type, tradeoff: values.tradeoff, mocks }));
+}
+
+const MEDIA_BYTES = 50_000_000;
+/** Copies the media into evidence/<n>/ next to the board and adds update-<n>, numbered under the board lock. */
+function postEvidence(file: string, on: string, values: Record<string, any>) {
+  const extra = ['key', 'option', 'recommend', 'default', 'mock', 'tradeoff'].find((f) => values[f] !== undefined);
+  if (extra) throw fail(`--${extra} does not apply to --type evidence`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
+  const example = 'sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media shot.png';
+  if (!values.about?.trim()) throw fail('--about is required for --type evidence: the short note', 'VALIDATION_ERROR', example);
+  if (!values.media?.length || values.media.length > MEDIA_MAX) throw fail(`--type evidence needs 1 to ${MEDIA_MAX} --media files`, 'VALIDATION_ERROR', example);
+  const sources: string[] = values.media.map((m: string) => {
+    const path = resolve(m), info = statSync(path, { throwIfNoEntry: false });
+    if (!mediaTypes[extname(path).toLowerCase()]) throw fail(`--media ${m} must end in ${Object.keys(mediaTypes).join(', ')}`, 'VALIDATION_ERROR');
+    if (!info?.isFile()) throw fail(`--media ${tilde(path)} is not a file`, 'NOT_FOUND');
+    if (info.size > MEDIA_BYTES) throw fail(`--media ${tilde(path)} is over 50 MB`, 'VALIDATION_ERROR', 'Trim or compress the recording');
+    return path;
+  });
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+  return locked(`${file}.lock`, () => {
+    const doc = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { schema: 1, decisions: [] };
+    // Boards in one folder share evidence/, so a number is taken only by creating its folder; one in use is never written into.
+    const store = join(dirname(file), 'evidence'), taken = board(file).map((d) => Number(/^update-(\d+)$/.exec(d.key)?.[1] ?? 0));
+    mkdirSync(store, { recursive: true, mode: 0o700 });
+    let number = Math.max(0, ...taken, ...readdirSync(store).map(Number).filter(Number.isInteger)) + 1;
+    for (;; number++) {
+      try { mkdirSync(join(store, String(number)), { mode: 0o700 }); break; } catch (e: any) { if (e.code !== 'EEXIST') throw e; }
+    }
+    const key = `update-${number}`, dir = join(store, String(number));
+    const media = sources.map((src, i) => {
+      const bytes = readFileSync(src), path = `evidence/${number}/${i + 1}${extname(src).toLowerCase()}`;
+      writeFileSync(join(dir, `${i + 1}${extname(src).toLowerCase()}`), bytes, { mode: 0o600 });
+      return { path, sha256: sha256(bytes), bytes: bytes.length };
+    });
+    const { title, about, detail, close, link } = values;
+    doc.decisions.push({ key, type: 'evidence', number, title, about, detail, close, link, media });
+    const tmp = `${file}.${process.pid}.tmp`;
+    writeFileSync(tmp, `${JSON.stringify(doc, null, 2)}\n`, { mode: 0o600 });
+    try { loadDecisions(tmp); } catch (e) {
+      rmSync(tmp, { force: true });
+      rmSync(dir, { recursive: true, force: true });
+      throw e instanceof InputError ? new InputError(e.message.replace(basename(tmp), basename(file))) : e;
+    }
+    renameSync(tmp, file);
+    return toon({ board: tilde(file), posted: [{ key, number, media: media.length, title }] },
+      [`Run \`sign-off-axi open${on}\` so the user can give a verdict`, `Run \`sign-off-axi wait${on} --key ${key}\` to block until they do`]);
+  });
 }
 
 /** Flags are validated by the same loader as a file: write them as a one-decision file first. */
@@ -600,6 +654,19 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     const actual = contained(path), type = mediaTypes[extname(path).toLowerCase()];
     return [200, { media: readFileSync(actual), type }];
   }
+  if (req.method === 'GET' && req.url?.startsWith('/api/media?')) {
+    const q = new URL(req.url, 'http://localhost').searchParams;
+    const m = loadDecisions(file).find((d) => d.type === 'evidence' && d.key === q.get('key'))?.media?.[Number(q.get('i') || NaN)];
+    const type = m && mediaTypes[extname(m.path).toLowerCase()];
+    if (!m || !type) return [404, { error: 'Evidence is unavailable' }];
+    try {
+      const actual = under(dirname(file), m.path);
+      if (statSync(actual).size !== m.bytes) return [404, { error: 'Evidence file changed since it was posted' }];
+      const bytes = readFileSync(actual);
+      if (sha256(bytes) !== m.sha256) return [404, { error: 'Evidence file changed since it was posted' }];
+      return [200, { media: bytes, type }];
+    } catch { return [404, { error: 'Evidence is unavailable' }]; }
+  }
   if (req.method === 'GET' && req.url === '/api/board') return [200, { file, pid: process.pid }];
   if (req.method === 'GET' && req.url === '/api/decisions') {
     return [200, state()];
@@ -641,8 +708,15 @@ const server = createServer(async (req, res) => {
     body = { error: e.message };
   }
   if (body && typeof body === 'object' && 'media' in body) {
-    const media = body as { media: Buffer; type: string };
-    return res.writeHead(status, { 'content-type': media.type, 'x-content-type-options': 'nosniff' }).end(media.media);
+    const { media, type } = body as { media: Buffer; type: string };
+    const headers = { 'content-type': type, 'x-content-type-options': 'nosniff', 'accept-ranges': 'bytes', 'content-length': media.length };
+    // One byte range, so phone browsers can play and seek a recording.
+    const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? '');
+    if (!range || (!range[1] && !range[2])) return res.writeHead(status, headers).end(media);
+    const start = range[1] ? Number(range[1]) : Math.max(0, media.length - Number(range[2]));
+    const end = range[1] && range[2] ? Math.min(Number(range[2]), media.length - 1) : media.length - 1;
+    if (start > end) return res.writeHead(416, { 'content-range': `bytes */${media.length}` }).end();
+    return res.writeHead(206, { ...headers, 'content-length': end - start + 1, 'content-range': `bytes ${start}-${end}/${media.length}` }).end(media.subarray(start, end + 1));
   }
   res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body));
 });

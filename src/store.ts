@@ -3,11 +3,12 @@ import { basename, resolve } from 'node:path';
 
 export type Option = { value: string; label: string };
 export type MockRef = { value: string; path: string };
+export type MediaRef = { path: string; sha256: string; bytes: number };
 export type EvidenceLink = { run_id: string; commit: string; outcome: string; repro: string; proof: string; evidence: string };
 export type Decision = {
   key: string; title: string; about?: string; detail?: string; options: Option[];
   recommend_value?: string; default_if_silent?: string; close: string; evidence?: EvidenceLink;
-  type: string; tradeoff?: string; mocks?: MockRef[];
+  type: string; tradeoff?: string; mocks?: MockRef[]; number?: number; media?: MediaRef[]; link?: string;
 };
 export type Answer = { key: string; answer: string; label: string; close: string; at: string; note?: string };
 export type Round = { key: string; note: string; at: string };
@@ -16,9 +17,11 @@ export type Round = { key: string; note: string; at: string };
 export class InputError extends Error {}
 
 const YES_NO: Option[] = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
+const VERDICTS: Option[] = [{ value: 'pass', label: 'Pass' }, { value: 'fail', label: 'Fail' }, { value: 'needs-work', label: 'Needs work' }];
+export const MEDIA_MAX = 12;
 const isText = (v: unknown) => typeof v === 'string';
 const isKey = (v: unknown) => isText(v) && /^[A-Za-z0-9._-]{1,128}$/.test(v as string);
-const ONE_OF: Record<string, unknown[]> = { type: ['decision', 'design'], close: ['done', 'release'] };
+const ONE_OF: Record<string, unknown[]> = { type: ['decision', 'design', 'evidence'], close: ['done', 'release'] };
 export const NOTE_MAX = 500;
 const TRADEOFF_MAX = 1000;
 
@@ -45,7 +48,15 @@ export function loadDecisions(path: string): Decision[] {
       throw bad('evidence', 'must name a done-done run, full commit, and four Checks lines');
     }
     for (const [f, allowed] of Object.entries(ONE_OF)) if (d[f] !== undefined && !allowed.includes(d[f])) throw bad(f, `must be ${allowed.join(' or ')}`);
-    const options = d.options ?? YES_NO;
+    if (d.type === 'evidence') {
+      if (!Number.isInteger(d.number) || d.number < 1) throw bad('number', 'must be a whole number from 1');
+      if (!Array.isArray(d.media) || !d.media.length || d.media.length > MEDIA_MAX || !d.media.every((m: any) => isText(m?.path)
+        && /^evidence\/\d+\/\w[\w-]*\.(png|jpe?g|webp|mp4|webm)$/i.test(m.path) && /^[a-f0-9]{64}$/.test(m.sha256 ?? '') && Number.isInteger(m.bytes) && m.bytes >= 0)) {
+        throw bad('media', `must list 1 to ${MEDIA_MAX} files under evidence/<number>/, each with its sha256 and bytes`);
+      }
+      if (d.link !== undefined && !(isText(d.link) && /^(https?:\/\/\S{1,500}|[a-f0-9]{7,40})$/.test(d.link))) throw bad('link', 'must be an http(s) link or a commit hash');
+    }
+    const options = d.options ?? (d.type === 'evidence' ? VERDICTS : YES_NO);
     if (!Array.isArray(options) || options.length < 2 || options.length > 6
       || !options.every((o) => isKey(o?.value) && isText(o.label) && o.label.trim())) {
       throw bad('options', 'must be 2 to 6 items, each a value of 1-128 of A-Z a-z 0-9 . _ - and a label');
@@ -67,6 +78,7 @@ export function loadDecisions(path: string): Decision[] {
       key: d.key, title: d.title, about: d.about, detail: d.detail, options: options.map((o: Option) => ({ value: o.value, label: o.label })),
       recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done', evidence: d.evidence,
       type: d.type ?? 'decision', tradeoff: d.tradeoff, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path })),
+      ...(d.type === 'evidence' && { number: d.number, link: d.link, media: d.media.map(({ path, sha256, bytes }: MediaRef) => ({ path, sha256, bytes })) }),
     };
   });
 }
