@@ -40,6 +40,14 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
     '--link', 'https://github.com/acme/app/pull/12').out, /update-2,2,2/);
   assert.deepEqual(readdirSync(join(so, 'evidence', '2')).sort(), ['1.png', '2.webm']);
   assert.deepEqual(readFileSync(join(so, 'evidence', '2', '2.webm')), clip);
+  // A second board in the same folder shares evidence/: it takes the next free number and never writes into a used one.
+  const other = join(so, 'other.json');
+  assert.match(run('post', other, '--type', 'evidence', '--title', 'Other board', '--about', 'Note.', '--media', rec).out, /update-3,3,1/);
+  run('raise', other, '--title', 'Manual', '--key', 'update-4');
+  assert.match(run('post', other, '--type', 'evidence', '--title', 'After a raised key', '--about', 'Note.', '--media', rec).out, /update-5,5,1/);
+  assert.equal(run('post', other, '--type', 'evidence', '--title', 'Bad link', '--about', 'Note.', '--media', rec, '--link', 'nope').code, 2);
+  assert.deepEqual(readdirSync(join(so, 'evidence')).sort(), ['1', '2', '3', '5']);
+  assert.deepEqual(readFileSync(join(so, 'evidence', '1', '1.png')), png);
 
   const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: tmpdir() });
   procs.push(proc);

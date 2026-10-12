@@ -11,4 +11,4 @@ Media: make two real screenshots and one short real recording in the scratch fol
 | 3 | Phone, `eval` play on the `video` element, wait, then `eval "document.querySelector('video').currentTime > 0"` | true: the recording plays inline at phone width; `curl -r 0-9` on its URL returns `206` |
 | 4 | Desktop light and dark, shots | Captures sit in a grid, verdict buttons below them; nothing overlaps or is cut |
 | 5 | Phone dark, start `wait --key update-2 --json` in the background, type a note, click `button "Needs work, Sign-in`, shot | The wait returns `"answer":"needs-work"` with the note; `answers --json` saved as `answers-verdict.json` |
-| 6 | Append one byte to `evidence/1/1.png`, reload, shot | Update 1 says the capture is missing or changed; `/api/media?key=update-1&i=0` answers 404 |
+| 6 | Append one byte to `evidence/1/1.png`, reload, shot | Update 1 says the capture can't be shown (missing, changed or unplayable); `/api/media?key=update-1&i=0` answers 404 |

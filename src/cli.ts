@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, renameSync, rmSync, statSync, watch, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, watch, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -330,8 +330,14 @@ function postEvidence(file: string, on: string, values: Record<string, any>) {
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
     const doc = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { schema: 1, decisions: [] };
-    const number = Math.max(0, ...board(file).map((d) => d.number ?? 0)) + 1, key = `update-${number}`, dir = join(dirname(file), 'evidence', String(number));
-    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    // Boards in one folder share evidence/, so a number is taken only by creating its folder; one in use is never written into.
+    const store = join(dirname(file), 'evidence'), taken = board(file).map((d) => Number(/^update-(\d+)$/.exec(d.key)?.[1] ?? 0));
+    mkdirSync(store, { recursive: true, mode: 0o700 });
+    let number = Math.max(0, ...taken, ...readdirSync(store).map(Number).filter(Number.isInteger)) + 1;
+    for (;; number++) {
+      try { mkdirSync(join(store, String(number)), { mode: 0o700 }); break; } catch (e: any) { if (e.code !== 'EEXIST') throw e; }
+    }
+    const key = `update-${number}`, dir = join(store, String(number));
     const media = sources.map((src, i) => {
       const bytes = readFileSync(src), path = `evidence/${number}/${i + 1}${extname(src).toLowerCase()}`;
       writeFileSync(join(dir, `${i + 1}${extname(src).toLowerCase()}`), bytes, { mode: 0o600 });
@@ -703,14 +709,14 @@ const server = createServer(async (req, res) => {
   }
   if (body && typeof body === 'object' && 'media' in body) {
     const { media, type } = body as { media: Buffer; type: string };
-    const headers = { 'content-type': type, 'x-content-type-options': 'nosniff', 'accept-ranges': 'bytes' };
+    const headers = { 'content-type': type, 'x-content-type-options': 'nosniff', 'accept-ranges': 'bytes', 'content-length': media.length };
     // One byte range, so phone browsers can play and seek a recording.
     const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? '');
     if (!range || (!range[1] && !range[2])) return res.writeHead(status, headers).end(media);
     const start = range[1] ? Number(range[1]) : Math.max(0, media.length - Number(range[2]));
     const end = range[1] && range[2] ? Math.min(Number(range[2]), media.length - 1) : media.length - 1;
     if (start > end) return res.writeHead(416, { 'content-range': `bytes */${media.length}` }).end();
-    return res.writeHead(206, { ...headers, 'content-range': `bytes ${start}-${end}/${media.length}` }).end(media.subarray(start, end + 1));
+    return res.writeHead(206, { ...headers, 'content-length': end - start + 1, 'content-range': `bytes ${start}-${end}/${media.length}` }).end(media.subarray(start, end + 1));
   }
   res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body));
 });

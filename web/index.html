@@ -29,6 +29,7 @@
   .about, details p { color: var(--muted); margin: 0.25rem 0 0; max-width: 70ch; }
   .about { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .row:has(details:not(.note)[open]) .about { display: none; }
+  .about.full { display: block; }
   summary { cursor: pointer; color: var(--accent); font-size: 0.875rem; margin-top: 0.25rem; width: fit-content; }
   .meta { color: var(--muted); font-size: 0.8125rem; margin: 0.5rem 0 0; }
   .evidence { grid-column: 1 / -1; border: 1px solid var(--line); border-radius: 1rem; padding: 1rem; background: color-mix(in srgb, var(--accent) 5%, var(--bg)); }
@@ -47,6 +48,7 @@
   .media img, .media video { display: block; width: 100%; max-height: 20rem; object-fit: contain; border-radius: .7rem; background: #111; }
   .unverified, .media .gone { color: var(--danger); margin: .5rem 0; }
   .update-media { grid-column: 1 / -1; }
+  .meta a { color: var(--accent); }
   .err:not(:empty) { color: var(--danger); font-size: 0.875rem; margin-top: 0.5rem; }
   .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
   button { min-height: 2.75rem; padding: 0 1.25rem; border-radius: 0.5rem; border: 1px solid var(--border); cursor: pointer;
@@ -165,8 +167,8 @@
     };
     return el('article', { class: 'row' }, el('div', {},
       el('h3', { dir: 'auto' }, update ? `Update ${d.number} · ${d.title}` : d.title),
-      d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '',
-      d.detail || d.about?.length > 180 ? el('details', {}, el('summary', {}, 'Show more'),
+      d.about ? el('p', { class: update ? 'about full' : 'about', dir: 'auto' }, d.about) : '',
+      d.detail || (!update && d.about?.length > 180) ? el('details', {}, el('summary', {}, 'Show more'),
         ...[d.about, d.detail].filter(Boolean).map((t) => el('p', { dir: 'auto' }, t))) : '',
       d.tradeoff ? el('p', { class: 'tradeoff', dir: 'auto' }, `Trade-off: ${d.tradeoff}`) : '',
       d.link ? el('p', { class: 'meta' }, /^https?:/.test(d.link)
@@ -188,7 +190,7 @@
       const url = `/api/media?key=${encodeURIComponent(d.key)}&i=${i}`, name = `Update ${d.number}, capture ${i + 1} of ${d.media.length}`;
       const node = /\.(mp4|webm)$/i.test(m.path) ? el('video', { src: url, controls: '', playsinline: '', preload: 'metadata', 'aria-label': name })
         : el('a', { href: url, target: '_blank', rel: 'noopener', 'aria-label': `Open ${name}` }, el('img', { src: url, alt: name }));
-      (node.tagName === 'A' ? node.firstChild : node).onerror = () => node.replaceWith(el('p', { class: 'gone' }, `${name} is missing or changed since it was posted.`));
+      (node.tagName === 'A' ? node.firstChild : node).onerror = () => node.replaceWith(el('p', { class: 'gone' }, `${name} can't be shown: the file is missing, changed since it was posted, or in a format this browser can't play.`));
       return node;
     }));
   }
