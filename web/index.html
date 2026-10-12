@@ -117,6 +117,8 @@
   .rung > .meta { color: var(--accent); margin: 0; }
   .badge { padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; color: var(--accent); border: 1px dashed var(--accent); }
   .round { margin-top: 0.5rem; }
+  .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+  .ask { margin: 1rem 0 0; padding: 0.25rem 1rem 0.75rem; background: var(--surface); border: 1px solid var(--line); border-radius: 0.75rem; }
   textarea { display: block; width: 100%; max-width: 70ch; margin-top: 0.25rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border);
     border-radius: 0.5rem; background: var(--bg); color: var(--text); font: inherit; resize: vertical; }
   .saved-note { white-space: pre-line; }
@@ -146,7 +148,12 @@
 <main><p class="banner" id="banner" role="alert" hidden></p><div id="board"></div></main>
 <script>
   let state = { decisions: [], answers: {} };
-  const drafts = new Map(); // Typed notes not yet sent, kept across re-renders.
+  // An exported copy carries its state and files inline and is read-only.
+  const FROZEN = window.FROZEN, src = (url) => FROZEN?.files[url] ?? url;
+  // Typed notes not yet sent, kept across re-renders and reloads in this browser, per board file.
+  const drafts = new Map(), stored = () => `sign-off-drafts ${state.file}`;
+  const keep = () => { try { localStorage.setItem(stored(), JSON.stringify([...drafts])); } catch {} };
+  let loaded = false;
   // Text goes in as text nodes, never as HTML, so a title from the file can't run code.
   const el = (tag, attrs = {}, ...kids) => {
     const e = document.createElement(tag);
@@ -155,24 +162,47 @@
     return e;
   };
 
-  async function call(path, init) {
+  /** sent runs only once the server saved the request, so a draft is dropped only then. */
+  async function call(path, init, sent) {
     const res = await fetch(path, init);
     const body = await res.json().catch(() => ({ error: `The server replied ${res.status}` }));
     if (!res.ok) throw new Error(body.error);
     state = body;
+    if (!loaded) {
+      loaded = true;
+      try { for (const [k, v] of JSON.parse(localStorage.getItem(stored())) ?? []) drafts.set(k, v); } catch {}
+    }
+    sent?.();
     render();
   }
 
+  const clearIfSaved = (key, sent) => () => { if (drafts.get(key) === sent) drafts.delete(key); keep(); };
+
   function save(d, o, buttons, err) {
     buttons.forEach((b) => (b.disabled = true));
+    const typed = (drafts.get(d.key) ?? '').trim();
     const note = drafts.get(d.key) ?? state.answers[d.key]?.note ?? '';
-    drafts.delete(d.key);
+    const drop = clearIfSaved(d.key, drafts.get(d.key));
     call('/api/answers', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
-    }).catch((e) => {
-      if (!drafts.has(d.key)) drafts.set(d.key, note);
-      err.textContent = `Couldn't save: ${e.message}`;
+    }, typed ? undefined : drop).then(() => typed && call('/api/messages', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'comment', key: d.key, text: typed }),
+    }, drop)).catch((e) => {
+      shown(err).textContent = `Couldn't save: ${e.message}`;
       buttons.forEach((b) => (b.disabled = false));
+    });
+  }
+
+  // A render while a request was out replaced the error line; write to the one on screen.
+  const shown = (err) => document.getElementById(err.id) ?? err;
+
+  /** Sends a comment or a queued prompt for the agent; the typed text stays until the server has it. */
+  function send(btn, err, body, draft, text) {
+    btn.disabled = true;
+    call('/api/messages', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...body, text }) },
+      clearIfSaved(draft, drafts.get(draft))).catch((e) => {
+      shown(err).textContent = `Couldn't send: ${e.message}`;
+      btn.disabled = false;
     });
   }
 
@@ -183,8 +213,9 @@
     const checks = el('div', { class: 'checks' }, ...['outcome', 'repro', 'proof', 'evidence'].map((name) =>
       el('p', { class: 'check' }, el('strong', {}, `${name}: `), document.createTextNode(link[name].replace(new RegExp(`^${name}:\\s*(?=\\S)`, 'i'), '')))));
     const media = el('div', { class: 'media' }, ...(card?.media ?? []).map((item) => {
-      if (!item.type.startsWith('image/')) return el('video', { src: item.url, controls: '', playsinline: '', preload: 'metadata', 'aria-label': `Evidence recording: ${item.path}` });
-      return el('a', { href: item.url, target: '_blank', rel: 'noopener', 'aria-label': `Open ${item.path}` }, el('img', { src: item.url, alt: `Evidence image: ${item.path}` }));
+      const node = item.type.startsWith('image/') ? el('img', { src: src(item.url), alt: `Evidence image: ${item.path}` })
+        : el('video', { src: src(item.url), controls: '', playsinline: '', preload: 'metadata', 'aria-label': `Evidence recording: ${item.path}` });
+      return item.type.startsWith('image/') ? el('a', { href: src(item.url), target: '_blank', rel: 'noopener', 'aria-label': `Open ${item.path}` }, node) : node;
     }));
     return el('section', { class: 'evidence', 'aria-label': 'Read-only proof evidence' }, head,
       card?.commit ? el('p', { class: 'commit' }, `Commit · ${card.commit}`) : '',
@@ -201,7 +232,7 @@
   const kind = (d) => (Object.hasOwn(NAMES, d.type) ? d.type : 'other');
 
   function row(d) {
-    const err = el('div', { class: 'err', role: 'alert' });
+    const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` });
     const saved = Object.hasOwn(state.answers, d.key) ? state.answers[d.key] : undefined;
     const design = d.type === 'design';
     const buttons = d.options.map((o) => {
@@ -237,33 +268,53 @@
   function more(d, saved, err) {
     const box = el('textarea', { id: `note-${d.key}`, rows: 2, maxlength: 500, dir: 'auto' });
     box.value = drafts.get(d.key) ?? saved?.note ?? '';
-    box.oninput = () => drafts.set(d.key, box.value);
+    box.oninput = () => { drafts.set(d.key, box.value); keep(); };
     const asked = (state.rounds ?? []).filter((r) => r.key === d.key);
-    const roundBtn = el('button', { class: 'round', 'aria-label': `Ask for another round, ${d.title}` }, 'Ask for another round');
+    const comments = (state.messages ?? []).filter((m) => m.kind === 'comment' && m.key === d.key);
+    const commentBtn = el('button', { 'aria-label': `Send as a comment, ${d.title}` }, 'Send as a comment');
+    commentBtn.onclick = () => send(commentBtn, err, { kind: 'comment', key: d.key }, d.key, box.value.trim());
+    const roundBtn = el('button', { 'aria-label': `Ask for another round, ${d.title}` }, 'Ask for another round');
     roundBtn.onclick = () => {
       roundBtn.disabled = true;
       const note = (drafts.get(d.key) ?? state.answers[d.key]?.note ?? '').trim();
       call('/api/rounds', {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, note }),
-      }).catch((e) => {
-        err.textContent = `Couldn't ask: ${e.message}`;
+      }, clearIfSaved(d.key, drafts.get(d.key))).catch((e) => {
+        shown(err).textContent = `Couldn't ask: ${e.message}`;
         roundBtn.disabled = false;
       });
     };
-    const update = d.type === 'evidence', title = update ? 'Note' : 'Note or another round';
-    const status = [saved?.note && 'note saved', asked.length && `${asked.length} ${asked.length > 1 ? 'rounds' : 'round'} asked`].filter(Boolean).join(' · ');
+    const update = d.type === 'evidence', title = update ? 'Note or comment' : 'Note, comment or another round';
+    const status = [saved?.note && 'note saved', asked.length && `${asked.length} ${asked.length > 1 ? 'rounds' : 'round'} asked`,
+      comments.length && `${comments.length} ${comments.length > 1 ? 'comments' : 'comment'}`].filter(Boolean).join(' · ');
     return el('details', { class: 'note', ...(drafts.has(d.key) && { open: '' }) },
       el('summary', { 'aria-label': `${title}, ${d.title}` }, `${title}${status && ` · ${status}`}`),
       asked.length ? el('p', { class: 'meta saved-note', dir: 'auto' }, `You asked for another round: ${asked[asked.length - 1].note}`) : '',
-      el('label', { for: box.id }, update ? 'Optional note, sent with your verdict' : 'Optional note, sent with the answer you pick or the round you ask for'), box,
-      update ? '' : roundBtn);
+      ...comments.map((m) => el('p', { class: 'meta saved-note', dir: 'auto' }, `Your comment, ${m.delivered ? 'read by the agent' : 'not read yet'}: ${m.text}`)),
+      el('label', { for: box.id }, update ? 'Optional note, sent with your verdict, and also to the agent as a comment'
+        : 'Optional note: sent with the answer you pick (and to the agent as a comment), or with the round you ask for'), box,
+      el('div', { class: 'actions' }, update ? '' : roundBtn, FROZEN ? '' : commentBtn));
+  }
+
+  /** Free-text prompts for the agent, which it reads with sign-off-axi poll. */
+  function ask() {
+    const prompts = (state.messages ?? []).filter((m) => m.kind === 'prompt'), queued = prompts.filter((m) => !m.delivered).length;
+    const err = el('div', { class: 'err', role: 'alert', id: 'prompt-err' }), box = el('textarea', { id: 'prompt', rows: 3, maxlength: 2000, dir: 'auto' });
+    box.value = drafts.get('') ?? '';
+    box.oninput = () => { drafts.set('', box.value); keep(); };
+    const btn = el('button', { 'aria-label': 'Queue the prompt for the agent' }, 'Queue for the agent');
+    btn.onclick = () => send(btn, err, { kind: 'prompt' }, '', box.value.trim());
+    return el('details', { class: 'note ask', ...(drafts.get('') && { open: '' }) },
+      el('summary', {}, ['Ask the agent', queued && `${queued} queued`, prompts.length - queued && `${prompts.length - queued} read by the agent`].filter(Boolean).join(' · ')),
+      ...prompts.map((m) => el('p', { class: 'meta saved-note', dir: 'auto' }, `${m.delivered ? 'Read by the agent' : 'Queued'}: ${m.text}`)),
+      el('label', { for: box.id }, 'A prompt the agent reads the next time it checks in'), box, el('div', { class: 'actions' }, btn), err);
   }
 
   // Each file is hash-checked by the server; one that changed or went missing says so instead of a broken frame.
   function updateMedia(d) {
     if (!d.media) return '';
     return el('div', { class: 'media update-media' }, ...d.media.map((m, i) => {
-      const url = `/api/media?key=${encodeURIComponent(d.key)}&i=${i}`;
+      const url = src(`/api/media?key=${encodeURIComponent(d.key)}&i=${i}`);
       const name = d.type === 'evidence' ? `Update ${d.number}, capture ${i + 1} of ${d.media.length}` : `Explainer video, ${d.title}`;
       const node = /\.(mp4|webm)$/i.test(m.path) ? el('video', { src: url, controls: '', playsinline: '', preload: 'metadata', 'aria-label': name })
         : el('a', { href: url, target: '_blank', rel: 'noopener', 'aria-label': `Open ${name}` }, el('img', { src: url, alt: name }));
@@ -292,11 +343,11 @@
   function rung(d) {
     if (!d.view) return '';
     const url = `/api/mock?key=${encodeURIComponent(d.key)}`, page = d.type === 'interactive';
-    const open = { href: url, target: '_blank', rel: 'noopener' }, name = page ? 'interactive page' : 'diagram';
+    const open = { href: src(url), target: '_blank', rel: 'noopener' }, name = page ? 'interactive page' : 'diagram';
     let body;
-    if (page) body = el('div', { class: 'frame' }, el('iframe', { src: url, title: `Interactive page: ${d.title}`, sandbox: 'allow-scripts', loading: 'lazy' }));
+    if (page) body = el('div', { class: 'frame' }, el('iframe', { src: src(url), title: `Interactive page: ${d.title}`, sandbox: 'allow-scripts', loading: 'lazy' }));
     else {
-      const img = el('img', { src: url, alt: `Diagram: ${d.title}` });
+      const img = el('img', { src: src(url), alt: `Diagram: ${d.title}` });
       // The picture is a tap target too; keyboard and screen reader users get the one link below.
       body = el('a', { class: 'frame', ...open, tabindex: '-1' }, img);
       img.onerror = () => body.replaceWith(el('p', { class: 'gone' }, "The diagram can't be shown: its file is missing or in a format this browser can't draw."));
@@ -310,8 +361,8 @@
       const m = d.mocks?.find((x) => x.value === o.value);
       // A `page.html?variant=b` mock keeps its variant in the frame's query, where the page reads it.
       const [path, query] = m?.path.split('?') ?? [];
-      const url = m && `/api/mock?key=${encodeURIComponent(d.key)}&value=${encodeURIComponent(m.value)}${query ? `&${query}` : ''}`;
-      const view = m && (/\.html?$/i.test(path) ? el('iframe', { src: url, title: `Mock ${o.label}`, tabindex: '-1', 'aria-hidden': 'true', loading: 'lazy' })
+      const url = m && src(`/api/mock?key=${encodeURIComponent(d.key)}&value=${encodeURIComponent(m.value)}${query ? `&${query}` : ''}`);
+      const view = m && (/\.html?$/i.test(path) ? el('iframe', { src: url, title: `Mock ${o.label}`, sandbox: 'allow-scripts', tabindex: '-1', 'aria-hidden': 'true', loading: 'lazy' })
         : el('img', { src: url, alt: `Mock: ${o.label}` }));
       return el('figure', { class: 'mock' },
         m ? el('a', { class: 'shot', href: url, target: '_blank', rel: 'noopener', 'aria-label': `Open mock ${o.label} full size` }, view) : '',
@@ -354,19 +405,27 @@
     const waiting = items.filter((d) => !Object.hasOwn(state.answers, d.key));
     const answered = items.filter((d) => Object.hasOwn(state.answers, d.key));
     const done = all.filter((d) => Object.hasOwn(state.answers, d.key)).length;
-    document.getElementById('count').textContent = `${all.length - done} waiting · ${done} answered`;
+    document.getElementById('count').textContent = `${all.length - done} waiting · ${done} answered${FROZEN ? ` · read-only copy, ${FROZEN.exported}` : ''}`;
     const list = (items, cls) => el('div', { class: `list ${cls}` }, ...items.map(row));
-    document.getElementById('board').replaceChildren(glance(all, filter, waiting),
+    // The Ask box is for the live board; the frozen copy has no agent to read it.
+    document.getElementById('board').replaceChildren(glance(all, filter, waiting), ...(FROZEN ? [] : [ask()]),
       el('h2', {}, 'Waiting'), waiting.length ? list(waiting, 'waiting')
         : el('p', { class: 'empty' }, filter ? `No ${filter === 'other' ? 'other items' : FILTERS[filter].toLowerCase()} waiting on you.` : 'Nothing is waiting on you.'),
       ...(answered.length ? [el('h2', {}, 'Answered'), list(answered, 'answered')] : []));
     if (refocus !== null) document.querySelector(`.filters [data-k="${refocus}"]`)?.focus();
     refocus = null;
+    if (FROZEN) {
+      // Answers stay as they are, but nothing in the copy can be sent.
+      document.querySelectorAll('#board .choices button, #board .mock button, #board .note button, #board .note textarea').forEach((e) => (e.disabled = true));
+      // A browser will not open a data: link in a new tab; the inline preview is the copy.
+      document.querySelectorAll('#board a[href^="data:"]').forEach((a) => a.removeAttribute('href'));
+    }
   }
   addEventListener('hashchange', render);
 
   const banner = document.getElementById('banner');
-  call('/api/decisions').then(() => (banner.hidden = true), (e) => {
+  if (FROZEN) (state = FROZEN), render();
+  else call('/api/decisions').then(() => (banner.hidden = true), (e) => {
     banner.textContent = `Can't read the board file: ${e.message}`;
     banner.hidden = false;
   });

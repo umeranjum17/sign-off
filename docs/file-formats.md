@@ -133,3 +133,21 @@ also copies each file into `evidence/<number>/` next to the board:
 - Asking wakes a waiting agent the same way an answer does. `answers --json`
   adds a `rounds` list per answered key only when that key has asks.
 
+**Comments and queued prompts**, written by sign-off next to the questions
+(`decisions.messages.jsonl`, mode 600, oldest first). A comment names its item's `key`; a prompt has none.
+`poll` hands each one over once and marks it with a `delivered` line:
+
+```json
+{"id":"a17530f156b9","kind":"prompt","text":"Also try a dark header.","at":"2026-10-12T16:26:39Z"}
+{"id":"0c1d2e3f4a5b","kind":"comment","key":"sign-in-layout","text":"B's header is too tall.","at":"2026-10-12T16:27:10Z"}
+{"delivered":["a17530f156b9","0c1d2e3f4a5b"],"at":"2026-10-12T16:27:12Z"}
+```
+
+- `text`: 1 to 2000 characters, trimmed.
+
+**Access token** (`decisions.token`, mode 600): made the first time the board is served beyond `127.0.0.1`
+and reused after that. The board reads it on every request, so deleting it shuts old links out at once.
+Deleting it, then `stop` and `open` again, makes a new one (`stop` and `open` alone reuse it). `open` prints
+it in the link; the server log never holds it. `init` git-ignores `*.messages.jsonl`, `*.token` and
+`*.export.html` with the other files sign-off writes.
+

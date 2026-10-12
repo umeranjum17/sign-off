@@ -20,7 +20,7 @@
 
 Agents stop and ask: ship this, keep that, turn this on? Those questions scatter across terminals and chats, and an answer typed in the wrong place gets lost.
 
-sign-off puts them on one calm list. The agent writes a small JSON file, you inspect the linked done-done run evidence, click **Yes** or **No** (or one of up to six choices the agent offers), and the answer is saved next to the file for the agent to read. Add an optional short note if the agent should know why; the note never blocks the click. It runs only on `127.0.0.1`: no account, no hosting.
+sign-off puts them on one calm list. The agent writes a small JSON file, you inspect the linked done-done run evidence, click **Yes** or **No** (or one of up to six choices the agent offers), and the answer is saved next to the file for the agent to read. Add an optional short note if the agent should know why; the note never blocks the click. It runs on your own machine (`127.0.0.1`, or one private address you name with `--bind`): no account, no hosting.
 
 Your answer survives reloads and restarts; you can change it with one more click. Recommendations and silent defaults are shown, never applied for you.
 
@@ -117,12 +117,14 @@ sign-off-axi post --type explainer --title "<question>" --media <video> [--about
 sign-off-axi init [dir] [--agent auto|<name>]   write the repo setup under <dir>/.sign-off/ (config, board, mocks/ and evidence/ folders)
                                                 and install the skill for each chosen coding agent (auto: each one on PATH)
 sign-off-axi doctor [dir]                       check that setup and each agent's skill; every failure names its fix
-sign-off-axi open  [--port 4410] [--evidence-root <dir>]   start the board in the background; prints its URL and pid
+sign-off-axi open  [--port 4410] [--bind <address>] [--evidence-root <dir>]   start the board in the background; prints its URL and pid
 sign-off-axi status                             is the board open started for this file running? its URL and pid
 sign-off-axi stop                               stop that board
-sign-off-axi serve [--port 4410] [--evidence-root <dir>]   run the board in the foreground (--port 0 picks a free port)
+sign-off-axi serve [--port 4410] [--bind <address>] [--evidence-root <dir>]   run the board in the foreground (--port 0 picks a free port)
 sign-off-axi answers [--key <key>]              the latest answer per decision, and how many still wait
 sign-off-axi wait [--key <key>] [--timeout 600]  block until the user answers, then print it like answers
+sign-off-axi poll [--timeout 600]               block until the user comments or queues a prompt, then print each new one once
+sign-off-axi export [--out <file.html>]          write a frozen read-only copy of the board as one HTML file
 ```
 
 - The board is `~/.sign-off/decisions.json` unless you name a file right after the command (`sign-off-axi answers ./decisions.json`). Answers are saved next to it.
@@ -131,12 +133,15 @@ sign-off-axi wait [--key <key>] [--timeout 600]  block until the user answers, t
 - `post --type diagram` and `post --type interactive` show a question with a picture: `--view <path>` names one board-relative file, an image (`.svg`, `.png`, `.jpg`, `.jpeg`, `.webp`) drawn at card width for a diagram, or one self-contained `.html` page that runs in a sandboxed frame for interactive. Every mock and view is served under a Content-Security-Policy with no `fetch`, no remote files and no access to the dashboard or its tab. They answer like a decision.
 - `post --type explainer` shows a question with a narrated video the agent made itself (stills plus speech from a free local engine such as piper or espeak-ng, joined with ffmpeg; the skill has the recipe). `--media` names one `.mp4` or `.webm`, copied into `evidence/<number>/` and served hash-checked like evidence media; it plays on the card with its own controls, at phone width too. `--about` is a short summary and each `--chapter m:ss=<title>` is a button that plays the video from there. sign-off itself never makes the video: it calls no speech engine, no ffmpeg and no network service.
 - The person can also click **Ask for another round** (with a note), which wakes a waiting agent the same way an answer does; the agent reads it back in `answers --json` under `rounds`.
+- The person can comment on any item (**Send as a comment**) and queue a free-text prompt for the agent (**Ask the agent**). `poll` blocks until one arrives and prints every new one once (`--json` prints `{"messages":[{"id","kind","key"?,"text","at"}]}`); the page then shows it as read by the agent. Typed notes that are not sent yet stay in the browser across reloads; everything sent is saved next to the board and survives a restart.
+- The board runs on your own machine only: no hosted service, no recurring cost. It listens on `127.0.0.1` unless `--bind <address>` (or `bind:` in the `config.yaml` that `init` writes) names one private address of this machine, such as its VPN address, so a phone or tablet on your own network can open it. All interfaces and public addresses are refused. Beyond `127.0.0.1` the board makes an access token once (`decisions.token`, mode 600, next to the board), `open` prints it in the link, and every request without it is refused; the link sets a cookie, so the page and its media work after the first load. Delete the token file to shut old links out at once, then `stop` and `open` for a new one.
+- `export` writes one self-contained HTML file (`decisions.export.html` by default): every item, answer, note and another-round request with its local mocks and media inlined; comments and queued prompts are left out. `--out` must end in `.html`, so a wrong path never overwrites the board. It opens from disk with no server, is read-only, and makes no network request.
 - With no `--option` a question is Yes/No; give 2 to 6 `--option` flags for a pick-one question (`--option friday=Friday --option next-week="Next week"`). `--recommend` and `--default` name one of its values.
 - `list` and `answers` take `--full` for every field and `--json` for JSON (`answers --json` prints `{"<key>":{"answer","label","close","at"}}`, plus `"note"` when the user wrote one). `answers` adds a note column when any shown answer has a note.
 - Raising a question that is already on the board is a no-op that reports its status, so an agent can re-run it safely. `--key` defaults to a slug of the title.
-- `open` is a no-op when the same board is already open. `--evidence-root` is the folder holding `.done-done/`, for decisions that link run evidence.
+- `open` is a no-op when the same board is already open on the same address, and fails with `CONFLICT` when it runs on another one. `--evidence-root` is the folder holding `.done-done/`, for decisions that link run evidence.
 - `wait` replaces a polling loop. With `--key` it returns at once if that decision is already answered, and waits for a key that is not raised yet; without it, it waits for the next answer to any decision still waiting and fails with `NOT_FOUND` when nothing is. It wakes on each save, gives up after `--timeout` seconds (600, ten minutes, by default) with code `TIMEOUT` and exit 1, and takes `--full` and `--json` like `answers`. Ctrl-C stops it without changing anything.
-- `open` records the board's pid and port next to the board file (`decisions.board.pid`). `status` and `stop` read it and only act on a pid that really serves that board, so no one has to guess a pid to kill. `open` on a board already served by `serve` records that server, so `stop` can close it too.
+- `open` records the board's pid, port and address next to the board file (`decisions.board.pid`). `status` and `stop` read it and only act on a pid that really serves that board, so no one has to guess a pid to kill. `open` on a board already served by `serve` records that server, so `stop` can close it too.
 
 ```
 $ sign-off-axi raise --title "Keep the weekly digest?" --recommend yes
