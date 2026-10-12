@@ -93,7 +93,8 @@ Starts the board in the background on 127.0.0.1 and prints its URL and pid; a no
 --port defaults to the port in a config.yaml beside the board (init writes one), else 4410.
 --bind serves it on one private address of this machine instead (such as its VPN address), so a phone or tablet on the user's own network can open it;
 the bind line in config.yaml next to the board sets the same. Beyond 127.0.0.1 the board needs an access token: it is made once, kept in <board>.token,
-and printed in the URL here; requests without it are refused.
+and printed in the URL here; requests without it are refused. Delete that file to shut old links out at once; stop and open again for a new one.
+Open on another address while the board runs fails; stop it first.
 --evidence-root is the folder holding .done-done/, for decisions that link run evidence. The server log and its pid file are written next to the board.
 examples:
   sign-off-axi open
@@ -500,6 +501,9 @@ async function open(args: string[]) {
 async function start(file: string, port: number, host: string, values: Record<string, any>, on: string) {
   const live = await running(file);
   const already = (url = live!.url) => toon({ board: tilde(file), url, status: 'already open (no-op)' }, [linkHelp(file, url), `Run \`sign-off-axi stop${on}\` to close the board`]);
+  if (live && !live.url.startsWith(`http://${urlHost(host)}:`)) {
+    throw fail(`this board is already open at ${live.url}, not on ${host}`, 'CONFLICT', `Run \`sign-off-axi stop${on}\`, then open it again on the new address`);
+  }
   if (live) return already();
   // A board serving this file without a record (a foreground serve) is adopted, so stop can close it.
   const adopt = (b: any) => b?.file === file && (writeFileSync(record(file), `${b.pid} ${port} ${host}\n`, { mode: 0o600 }), true);
@@ -519,8 +523,10 @@ async function start(file: string, port: number, host: string, values: Record<st
     const text = readFileSync(log).subarray(start).toString(), url = new RegExp(`url: "(\\S+)"\\npid: ${child.pid}\\n`).exec(text)?.[1];
     if (url) {
       writeFileSync(record(file), `${child.pid} ${new URL(url).port} ${host}\n`, { mode: 0o600 });
-      return toon({ board: tilde(file), url, pid: child.pid, status: 'opened' },
-        [`Tell the user to answer at ${url}`, `Run \`sign-off-axi wait${on}\` to block until they answer`, `Run \`sign-off-axi stop${on}\` to close the board`]);
+      // The token is shown here, never in the log, so a log shared for help does not carry it.
+      const link = loopback(host) ? url : `${url}?token=${tokenOf(file)}`;
+      return toon({ board: tilde(file), url: link, pid: child.pid, status: 'opened' },
+        [`Tell the user to answer at ${link}`, `Run \`sign-off-axi wait${on}\` to block until they answer`, `Run \`sign-off-axi stop${on}\` to close the board`]);
     }
     if (exit === undefined) continue;
     if (port && adopt(await serving(port, host, file))) return already(`http://${urlHost(host)}:${port}/`);
@@ -534,7 +540,7 @@ const record = (file: string) => `${file.replace(/\.json$/, '')}.board.pid`;
 /** What the board on this port serves; a busy server is an error, never mistaken for no server. */
 const serving = (port: number, host: string, file: string) => fetch(`http://${urlHost(host)}:${port}/api/board`, {
   headers: loopback(host) ? {} : { cookie: `sign-off-${port}=${tokenOf(file)}` }, signal: AbortSignal.timeout(1000),
-}).then((r) => r.json()).then((b) => (b && typeof b.file !== 'string' ? { ...b, file: undefined } : b)).catch((e) => {
+}).then((r) => (r.status === 401 ? { locked: true } : r.json())).then((b) => (b && typeof b.file !== 'string' ? { ...b, file: undefined } : b)).catch((e) => {
   if (e.name === 'TimeoutError') throw fail(`the board on port ${port} did not answer within 1 second`, 'BUSY', 'Run the command again in a moment');
 });
 const alive = (pid: number) => { try { return process.kill(pid, 0); } catch (e: any) { return e.code === 'EPERM'; } };
@@ -542,7 +548,9 @@ const alive = (pid: number) => { try { return process.kill(pid, 0); } catch (e: 
 async function running(file: string) {
   const [pid, port, host = '127.0.0.1'] = (existsSync(record(file)) ? readFileSync(record(file), 'utf8') : '').trim().split(' ');
   const b = Number(port) ? await serving(Number(port), host, file) : undefined;
-  return b?.file === file && b?.pid === Number(pid) ? { pid: Number(pid), url: `http://${urlHost(host)}:${port}/` } : undefined;
+  // A board that refuses the token file (deleted or replaced while it runs) is still this board while its pid lives.
+  const ours = b?.locked ? alive(Number(pid)) : b?.file === file && b?.pid === Number(pid);
+  return ours ? { pid: Number(pid), url: `http://${urlHost(host)}:${port}/` } : undefined;
 }
 
 /** Loopback, or one private address: 10/8, 172.16/12, 192.168/16, the 100.64/10 range mesh VPNs use, IPv6 fc00::/7. Never all interfaces or a public one. */
@@ -565,7 +573,8 @@ function tokenOf(file: string, make = false) {
   if (make) {
     try { writeFileSync(tokenFile(file), `${randomBytes(24).toString('base64url')}\n`, { mode: 0o600, flag: 'wx' }); } catch (e: any) { if (e.code !== 'EEXIST') throw e; }
   }
-  const token = existsSync(tokenFile(file)) ? readFileSync(tokenFile(file), 'utf8').trim() : '';
+  let token = '';
+  try { token = readFileSync(tokenFile(file), 'utf8').trim(); } catch {}
   if (make && !/^[\w-]{32,}$/.test(token)) throw fail(`${tilde(tokenFile(file))} holds no usable access token`, 'VALIDATION_ERROR', 'Delete it and open the board again to make a new one');
   return token;
 }
@@ -820,19 +829,19 @@ async function doctor(args: string[]) {
     [`Run \`sign-off-axi open ${shellPath(board)}\` to show the board to the user`]);
 }
 
-let file = '', evidenceRoot = '', bind = '127.0.0.1', token = '';
+let file = '', evidenceRoot = '', bind = '127.0.0.1';
 async function serve(args: string[]) {
   const parsed = parse('serve', args, BOARD_FLAGS), port = boardPort(parsed.file, parsed.values.port);
   ready(parsed.file, parsed.on, parsed.values['evidence-root']);
   bind = bindOf(parsed.file, parsed.values.bind);
-  token = loopback(bind) ? '' : tokenOf(parsed.file, true);
+  if (!loopback(bind)) tokenOf(parsed.file, true);
   [file, evidenceRoot] = [parsed.file, parsed.values['evidence-root'] ? resolve(parsed.values['evidence-root']) : ''];
   await new Promise<void>((ok, no) => server.once('error', no).listen(port, bind, ok)).catch((e) => {
     throw fail(e.code === 'EADDRINUSE' ? `port ${port} is in use; pass --port` : e.code === 'EADDRNOTAVAIL' ? `${bind} is not an address of this machine; pass another --bind` : e.message, 'SERVE_FAILED');
   });
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(0));
-  const url = `http://${urlHost(bind)}:${(server.address() as AddressInfo).port}/${token && `?token=${token}`}`;
-  return toon({ board: tilde(file), url, pid: process.pid }, [`Tell the user to answer at ${url}`, `Run \`sign-off-axi answers${parsed.on}\` to read their answers`]);
+  const url = `http://${urlHost(bind)}:${(server.address() as AddressInfo).port}/`;
+  return toon({ board: tilde(file), url, pid: process.pid }, [linkHelp(file, url), `Run \`sign-off-axi answers${parsed.on}\` to read their answers`]);
 }
 
 /** Every new comment and queued prompt, each handed over once. */
@@ -1035,11 +1044,12 @@ const server = createServer(async (req, res) => {
   const { port: bound } = server.address() as AddressInfo;
   // Only loopback names and the bound address: blocks DNS rebinding from a web page.
   if (![`127.0.0.1:${bound}`, `localhost:${bound}`, `${urlHost(bind)}:${bound}`].includes(req.headers.host ?? '')) return res.writeHead(403).end('Forbidden host');
-  if (token) {
+  if (!loopback(bind)) {
     // Beyond loopback every request carries the token: once in the link, then in a cookie the link sets.
-    const cookie = `sign-off-${bound}`, given = req.url?.startsWith('/?') ? new URL(req.url, 'http://x').searchParams.get('token') : null;
+    // The file is read on every request, so deleting or replacing it shuts old links out at once.
+    const token = tokenOf(file), cookie = `sign-off-${bound}`, given = req.url?.startsWith('/?') ? new URL(req.url, 'http://x').searchParams.get('token') : null;
     const sent = Buffer.from(given ?? req.headers.cookie?.split(/;\s*/).find((c) => c.startsWith(`${cookie}=`))?.slice(cookie.length + 1) ?? ''), want = Buffer.from(token);
-    if (sent.length !== want.length || !timingSafeEqual(sent, want)) {
+    if (!/^[\w-]{32,}$/.test(token) || sent.length !== want.length || !timingSafeEqual(sent, want)) {
       return res.writeHead(401, { 'content-type': 'text/plain; charset=utf-8' }).end('This board needs its access link: run sign-off-axi open on the computer that serves it and open the link it prints.');
     }
     if (given !== null) return res.writeHead(303, { location: '/', 'set-cookie': `${cookie}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=31536000` }).end();
