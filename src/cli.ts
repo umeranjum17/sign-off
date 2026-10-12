@@ -62,7 +62,8 @@ Blocks until the user answers, then prints the answer the way answers does. Use 
              without --key, wait for the next answer to any decision still waiting; NOT_FOUND when nothing is
   --timeout  seconds to wait, 600 (10 minutes) by default; then exits 1 with code TIMEOUT
   --full     adds the button label, close and title
-  --json     {"<key>":{"answer","label","close","at"}} for the new answers
+  --json     {"<key>":{"answer","label","close","at","note"?}} for the new answers; note only when the user wrote one
+A note column appears when any shown answer has a note.
 Ctrl-C stops waiting; nothing is changed.
 examples:
   sign-off-axi wait --key keep-the-weekly-digest
@@ -239,7 +240,7 @@ function raise(args: string[]) {
   const { file, values, on } = parse('raise', args, { from: { type: 'string' }, ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: f === 'option' }])) });
   const given = RAISE_FIELDS.filter((f) => values[f] !== undefined);
   if (values.from !== undefined && given.length) throw fail(`--from cannot be combined with --${given[0]}`, 'VALIDATION_ERROR', 'Put every field in the --from file, or raise with flags only');
-  if (values.from === undefined && values.title === undefined) throw fail('--title is required (or --from <decisions.json>)', 'VALIDATION_ERROR', 'sign-off-axi raise --title "<question>" [--recommend yes|no]');
+  if (values.from === undefined && values.title === undefined) throw fail('--title is required (or --from <decisions.json>)', 'VALIDATION_ERROR', 'sign-off-axi raise --title "<question>" [--recommend <value>]');
   // Flags are validated by the same loader as a file: write them as a one-decision file first.
   const scratch = values.from === undefined ? mkdtempSync(join(tmpdir(), 'sign-off-')) : '';
   const source = scratch ? join(scratch, 'flags') : resolve(values.from);
