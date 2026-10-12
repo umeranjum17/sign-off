@@ -506,7 +506,6 @@ async function start(file: string, port: number, host: string, values: Record<st
     await new Promise((ok) => setTimeout(ok, 50));
     const text = readFileSync(log).subarray(start).toString(), url = new RegExp(`url: "(\\S+)"\\npid: ${child.pid}\\n`).exec(text)?.[1];
     if (url) {
-      writeFileSync(record(file), `${child.pid} ${new URL(url).port} ${host}\n`, { mode: 0o600 });
       // The token is shown here, never in the log, so a log shared for help does not carry it.
       const link = answerLink(url);
       return toon({ board: tilde(file), url: link, pid: child.pid, status: 'opened' },
@@ -676,8 +675,10 @@ async function serve(args: string[]) {
   await new Promise<void>((ok, no) => server.once('error', no).listen(port, bind, ok)).catch((e) => {
     throw fail(e.code === 'EADDRINUSE' ? `port ${port} is in use; pass --port` : e.code === 'EADDRNOTAVAIL' ? `${bind} is not an address of this machine; pass another --bind` : e.message, 'SERVE_FAILED');
   });
+  const bound = (server.address() as AddressInfo).port, url = `http://${urlHost(bind)}:${bound}/`;
+  writeFileSync(record(file), `${process.pid} ${bound} ${bind}\n`, { mode: 0o600 });
+  process.on('exit', () => { if (existsSync(record(file)) && readFileSync(record(file), 'utf8').split(' ')[0] === String(process.pid)) rmSync(record(file), { force: true }); });
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(0));
-  const url = `http://${urlHost(bind)}:${(server.address() as AddressInfo).port}/`;
   return toon({ board: tilde(file), url, pid: process.pid }, [linkHelp(file, url), `Run \`sign-off-axi answers${parsed.on}\` to read their answers`]);
 }
 
@@ -686,31 +687,22 @@ async function poll(args: string[]) {
   const { file, values, on } = parse('poll', args, { json: { type: 'boolean' }, timeout: { type: 'string', default: '600' } });
   if (!/^\d{1,7}$/.test(values.timeout)) throw fail('--timeout must be whole seconds, 0 or more', 'VALIDATION_ERROR', 'Run `sign-off-axi poll --help`');
   ready(file, on);
-  const seconds = Number(values.timeout), deadline = Date.now() + seconds * 1000, name = basename(messagesPath(file));
-  let wake = () => {}, watcher;
-  try {
-    try { watcher = watch(dirname(file), (_, changed) => changed === name && wake()).on('error', () => {}); } catch {}
-    for (let first = true; ; first = false) {
-      // Read and marked under one lock, so two polls never hand the same message over twice.
-      const fresh = await locked(`${messagesPath(file)}.lock`, () => {
-        const got = readMessages(file, first ? warn : () => {}).filter((m) => !m.delivered);
-        if (got.length) markDelivered(file, got.map((m) => m.id));
-        return got;
-      }, 'another poll is still reading the messages');
-      if (fresh.length) {
-        if (values.json) return JSON.stringify({ messages: fresh.map(({ delivered, ...m }) => m) });
-        return toon({ board: tilde(file), messages: fresh.map(({ id, kind, key = '', text, at }) => ({ id, kind, key, text, at })) },
-          [`Run \`sign-off-axi poll${on}\` to wait for the next comment or prompt`, `Run \`sign-off-axi answers${on}\` for the answers`]);
-      }
-      const left = deadline - Date.now();
-      if (left <= 0) throw fail(`no new comment or prompt within ${seconds}s`, 'TIMEOUT', `Run \`sign-off-axi poll${on} --timeout ${seconds}\` to keep waiting`);
-      await new Promise<void>((ok) => {
-        const timer = setTimeout(ok, Math.min(1000, left));
-        wake = () => { clearTimeout(timer); ok(); };
-      });
+  const seconds = Number(values.timeout), deadline = Date.now() + seconds * 1000;
+  for (let first = true; ; first = false) {
+    // Read and marked under one lock, so two polls never hand the same message over twice.
+    const fresh = await locked(`${messagesPath(file)}.lock`, () => {
+      const got = readMessages(file, first ? warn : () => {}).filter((m) => !m.delivered);
+      if (got.length) markDelivered(file, got.map((m) => m.id));
+      return got;
+    }, 'another poll is still reading the messages');
+    if (fresh.length) {
+      if (values.json) return JSON.stringify({ messages: fresh.map(({ delivered, ...m }) => m) });
+      return toon({ board: tilde(file), messages: fresh.map(({ id, kind, key = '', text, at }) => ({ id, kind, key, text, at })) },
+        [`Run \`sign-off-axi poll${on}\` to wait for the next comment or prompt`, `Run \`sign-off-axi answers${on}\` for the answers`]);
     }
-  } finally {
-    watcher?.close();
+    const left = deadline - Date.now();
+    if (left <= 0) throw fail(`no new comment or prompt within ${seconds}s`, 'TIMEOUT', `Run \`sign-off-axi poll${on} --timeout ${seconds}\` to keep waiting`);
+    await new Promise((ok) => setTimeout(ok, Math.min(1000, left)));
   }
 }
 
