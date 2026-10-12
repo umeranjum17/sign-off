@@ -2,12 +2,12 @@
 
 Covers `open --bind` / the `bind:` line of `config.yaml` with the per-board access token, the page's **Ask the agent** prompt box and **Send as a comment** button read back by `poll`, drafts kept across reloads, the restart test, and `export`. Follow Launch and Drive in `SKILL.md` first, with the dashboard board from [dashboard.md](dashboard.md) (yes/no, three-option, design with mocks, one evidence update). Use a fresh scratch folder under `/tmp` and delete it at the end.
 
-Pick this machine's private address from the `help` line that `open --bind 0.0.0.0` prints (prefer the private VPN address). When the machine has none, say so and prove the token check on a second loopback-only port is not possible: the token applies only beyond `127.0.0.1`; report that limit instead of a pass.
+Read this machine's private address from `ip -brief addr` (prefer the private VPN address). When the machine has none, say so and prove the token check on a second loopback-only port is not possible: the token applies only beyond `127.0.0.1`; report that limit instead of a pass.
 
 | # | Step | Pass when |
 |---|---|---|
 | 1 | `open <board> --port 0` | URL is `http://127.0.0.1:<port>/` with no token; `stop` |
-| 2 | `open <board> --bind 0.0.0.0`, then `--bind 8.8.8.8` | Both exit 2 with `VALIDATION_ERROR` and a `Private addresses here:` hint |
+| 2 | `open <board> --bind 0.0.0.0`, then `--bind 8.8.8.8` | Both exit 2 with `VALIDATION_ERROR` and a help line to pass 127.0.0.1 or a private address |
 | 3 | Set `bind: <private address>` in `config.yaml` next to the board, `open <board> --port <p>` (no `--bind`) | URL is `http://<address>:<p>/?token=…`; `<board>.token` exists with mode 600; `ss -ltn` shows the port on that address only; `status` shows the URL without the token and a help line naming the token file; `grep <token> <board>.board.log` finds nothing |
 | 4 | `curl` without the token: `/`, `/api/decisions`, `/api/board`, `/api/mock?…`, `/api/media?…`, `/?token=wrong`, `POST /api/messages`; then `/?token=<token>`; then `/api/media?…` with the `sign-off-<port>` cookie; then the cookie with `Host: evil.example` | Every tokenless request is 401; the token link is 303 to `/` with an `HttpOnly; SameSite=Strict` cookie; the cookie gets 200 with the media type; the foreign Host gets 403; no `access-control-*` header anywhere |
 | 5 | Browser: `open` the token link, phone `390x844x3,mobile,touch` light, wait `4 waiting` | Address bar is `/` with no token; `FIT` (see dashboard.md) is true; **Ask the agent** sits above Waiting |

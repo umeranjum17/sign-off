@@ -178,10 +178,15 @@
 
   function save(d, o, buttons, err) {
     buttons.forEach((b) => (b.disabled = true));
+    const typed = (drafts.get(d.key) ?? '').trim(), saved = (state.answers[d.key]?.note ?? '').trim();
     const note = drafts.get(d.key) ?? state.answers[d.key]?.note ?? '';
+    const comment = typed && typed !== saved ? typed : '';
+    const drop = () => { drafts.delete(d.key); keep(); };
     call('/api/answers', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
-    }, () => { drafts.delete(d.key); keep(); }).catch((e) => {
+    }, comment ? undefined : drop).then(() => comment && call('/api/messages', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'comment', key: d.key, text: comment }),
+    }, drop)).catch((e) => {
       shown(err).textContent = `Couldn't save: ${e.message}`;
       buttons.forEach((b) => (b.disabled = false));
     });
