@@ -1,5 +1,6 @@
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
+import { randomBytes } from 'node:crypto';
 
 export type Option = { value: string; label: string };
 export type MockRef = { value: string; path: string };
@@ -128,9 +129,7 @@ export function readAnswers(decisionsPath: string, warn: (msg: string) => void =
 export function appendAnswer(decisionsPath: string, d: Decision, option: Option, note = ''): void {
   const current = readAnswers(decisionsPath)[d.key];
   if (current?.answer === option.value && (current.note ?? '') === note) return;
-  const raw = readRaw(answersPath(decisionsPath));
-  const a: Answer = { key: d.key, answer: option.value, label: option.label, close: d.close, at: new Date().toISOString().slice(0, 19) + 'Z', ...(note && { note }) };
-  appendFileSync(answersPath(decisionsPath), (raw && !raw.endsWith('\n') ? '\n' : '') + JSON.stringify(a) + '\n', { mode: 0o600 });
+  appendLine(answersPath(decisionsPath), { key: d.key, answer: option.value, label: option.label, close: d.close, at: now(), ...(note && { note }) } satisfies Answer);
 }
 
 /** Another-round asks per key, oldest first. A torn line is skipped and reported through warn. */
@@ -150,7 +149,34 @@ export function readRounds(decisionsPath: string, warn: (msg: string) => void = 
 
 /** Asks the agent for another round on a question, carrying the person's note. */
 export function appendRound(decisionsPath: string, key: string, note: string): void {
-  const raw = readRaw(roundsPath(decisionsPath));
-  const r: Round = { key, note, at: new Date().toISOString().slice(0, 19) + 'Z' };
-  appendFileSync(roundsPath(decisionsPath), (raw && !raw.endsWith('\n') ? '\n' : '') + JSON.stringify(r) + '\n', { mode: 0o600 });
+  appendLine(roundsPath(decisionsPath), { key, note, at: now() } satisfies Round);
+}
+
+/** A comment on one item or a prompt queued for the agent; delivered is when poll handed it over. */
+export type Message = { id: string; kind: 'comment' | 'prompt'; key?: string; text: string; at: string; delivered?: string };
+export const messagesPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.messages.jsonl';
+/** Every message, oldest first; a `{"delivered":[ids]}` line marks them handed over. A torn line is skipped and reported through warn. */
+export function readMessages(decisionsPath: string, warn: (msg: string) => void = () => {}): Message[] {
+  const all = new Map<string, Message>();
+  readRaw(messagesPath(decisionsPath)).split('\n').forEach((line, n) => {
+    try {
+      const m = line && JSON.parse(line);
+      if (Array.isArray(m?.delivered)) for (const id of m.delivered) { if (all.has(id)) all.get(id)!.delivered = m.at; }
+      else if (m && typeof m.id === 'string' && typeof m.text === 'string') all.set(m.id, m);
+      else if (m) warn(`skipped unreadable line ${n + 1} in ${messagesPath(decisionsPath)}`);
+    } catch {
+      warn(`skipped unreadable line ${n + 1} in ${messagesPath(decisionsPath)}`);
+    }
+  });
+  return [...all.values()];
+}
+export const appendMessage = (decisionsPath: string, kind: Message['kind'], text: string, key?: string) =>
+  appendLine(messagesPath(decisionsPath), { id: randomBytes(6).toString('hex'), kind, ...(key && { key }), text, at: now() } satisfies Message);
+export const markDelivered = (decisionsPath: string, ids: string[]) => appendLine(messagesPath(decisionsPath), { delivered: ids, at: now() });
+
+const now = () => new Date().toISOString().slice(0, 19) + 'Z';
+/** Appends one JSON line, starting a new line after a torn fragment. */
+function appendLine(file: string, entry: object) {
+  const raw = readRaw(file);
+  appendFileSync(file, (raw && !raw.endsWith('\n') ? '\n' : '') + JSON.stringify(entry) + '\n', { mode: 0o600 });
 }
