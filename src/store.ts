@@ -33,29 +33,33 @@ export const NOTE_MAX = 500;
 const TRADEOFF_MAX = 1000;
 const VIEWS: Record<string, [string, RegExp]> = { diagram: ['.svg, .png, .jpg, .jpeg or .webp', /\.(svg|png|jpe?g|webp)$/i], interactive: ['.html', /\.html$/i] };
 
-/** A board's raw items: schema 2 `items`, or a 0.1.0 schema 1 `decisions` list, whose entries read as decision items. */
-export function readItems(path: string): { schema: 1 | 2; items: any[] } {
+/** A board's raw items: schema 2 `items`, or a 0.1.0 schema 1 `decisions` list, whose entries read as decision items. `extra` keeps any other top-level fields. */
+export function readItems(path: string): { schema: 1 | 2; items: any[]; extra: Record<string, unknown> } {
   let doc: any;
   try {
     doc = JSON.parse(readFileSync(path, 'utf8'));
   } catch (e: any) {
     throw new InputError(e.code ? `cannot read ${resolve(path)}: ${e.code}` : `${basename(path)}: invalid JSON: ${e.message}`);
   }
-  if (doc?.schema === 2 && Array.isArray(doc.items)) return { schema: 2, items: doc.items };
-  if (doc?.schema === 1 && Array.isArray(doc.decisions)) return { schema: 1, items: doc.decisions };
-  throw new InputError(`${basename(path)}: needs "schema": 2 and an "items" list`);
+  const extra = { ...doc };
+  delete extra.schema;
+  delete extra.items;
+  delete extra.decisions;
+  if (doc?.schema === 2 && Array.isArray(doc.items)) return { schema: 2, items: doc.items, extra };
+  if (doc?.schema === 1 && Array.isArray(doc.decisions)) return { schema: 1, items: doc.decisions, extra };
+  throw new InputError(`${basename(path)}: needs "schema": 2 with an "items" list, or a 0.1.0 board with "schema": 1 and a "decisions" list`);
 }
 
-/** Writes the board as schema 2 through a temp file and a rename. A schema 1 board is first kept once as <board>.schema-1.bak. Callers hold the board lock. */
+/** Writes the board as schema 2 through a temp file and a rename, keeping its other top-level fields. A schema 1 board is first kept once as <board>.schema-1.bak. Callers hold the board lock. */
 export function writeItems(path: string, items: object[]): void {
-  const tmp = `${path}.${process.pid}.tmp`;
-  if (existsSync(path) && readItems(path).schema === 1) {
+  const tmp = `${path}.${process.pid}.tmp`, old = existsSync(path) ? readItems(path) : undefined;
+  if (old?.schema === 1) {
     const bak = `${path}.schema-1.bak`, bakTmp = `${bak}.${process.pid}.tmp`;
     writeFileSync(bakTmp, readFileSync(path), { mode: 0o600 });
     if (existsSync(bak)) rmSync(bakTmp, { force: true });
     else renameSync(bakTmp, bak);
   }
-  writeFileSync(tmp, `${JSON.stringify({ schema: 2, items }, null, 2)}\n`, { mode: 0o600 });
+  writeFileSync(tmp, `${JSON.stringify({ ...old?.extra, schema: 2, items }, null, 2)}\n`, { mode: 0o600 });
   renameSync(tmp, path);
 }
 
