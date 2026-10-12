@@ -162,8 +162,8 @@ examples:
   sign-off-axi poll ./decisions.json --timeout 60 --json
 `,
   export: `usage: sign-off-axi export [board.json] [--out <file.html>] [--evidence-root <dir>]
-Writes a frozen, read-only copy of the board: one HTML file with every item, answer and note, and its local mocks and media inlined.
-It opens from disk with no server and makes no network request. --out defaults to <board>.export.html next to the board.
+Writes a frozen, read-only copy of the board: one HTML file with every item, answer, note and another-round request, and its local mocks and media inlined. Comments and queued prompts are left out.
+It opens from disk with no server and makes no network request. --out defaults to <board>.export.html next to the board and must end in .html.
 examples:
   sign-off-axi export
   sign-off-axi export ./decisions.json --out ~/board-12-oct.html
