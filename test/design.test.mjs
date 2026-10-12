@@ -21,7 +21,10 @@ const run = (...args) => {
 const post = (url, path, body) => fetch(`${url}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=', 'base64');
 const procs = [];
-after(() => procs.forEach((p) => p.kill()));
+after(() => {
+  procs.forEach((p) => p.kill());
+  rmSync(scratch, { recursive: true, force: true });
+});
 
 test('design journey: init, doctor, post A/B/C, pick in the browser, another round wakes wait', async () => {
   assert.match(run('init', repo).out, /created\[3\]/);
