@@ -44,7 +44,7 @@ node dist/cli.js answers /tmp/decisions.json     # {"weekly-digest":{"answer":"y
 ## Commands
 
 ```
-sign-off serve <decisions.json> [--port 4410]   show the page on 127.0.0.1 (--port 0 picks a free port)
+sign-off serve <decisions.json> [--port 4410] [--evidence-root <dir>]   show the page on 127.0.0.1 (--port 0 picks a free port)
 sign-off answers <decisions.json>               print the latest answer per question as JSON
 sign-off help
 ```
