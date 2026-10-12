@@ -4,11 +4,12 @@ import { basename, resolve } from 'node:path';
 export type Option = { value: string; label: string };
 export type MockRef = { value: string; path: string };
 export type MediaRef = { path: string; sha256: string; bytes: number };
+export type Chapter = { at: number; title: string };
 export type EvidenceLink = { run_id: string; commit: string; outcome: string; repro: string; proof: string; evidence: string };
 export type Decision = {
   key: string; title: string; about?: string; detail?: string; options: Option[];
   recommend_value?: string; default_if_silent?: string; close: string; evidence?: EvidenceLink;
-  type: string; tradeoff?: string; mocks?: MockRef[]; number?: number; media?: MediaRef[]; link?: string; view?: string;
+  type: string; tradeoff?: string; mocks?: MockRef[]; number?: number; media?: MediaRef[]; link?: string; view?: string; chapters?: Chapter[];
 };
 export type Answer = { key: string; answer: string; label: string; close: string; at: string; note?: string };
 export type Round = { key: string; note: string; at: string };
@@ -19,6 +20,12 @@ export class InputError extends Error {}
 const YES_NO: Option[] = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
 const VERDICTS: Option[] = [{ value: 'pass', label: 'Pass' }, { value: 'fail', label: 'Fail' }, { value: 'needs-work', label: 'Needs work' }];
 export const MEDIA_MAX = 12;
+/** Item types whose files post copies into evidence/<number>/: how many, and which kinds. An explainer is one narrated video. */
+const STORED: Record<string, [number, string, RegExp]> = {
+  evidence: [MEDIA_MAX, 'files', /\.(png|jpe?g|webp|mp4|webm)$/i],
+  explainer: [1, '.mp4 or .webm video', /\.(mp4|webm)$/i],
+};
+export const CHAPTERS_MAX = 12;
 const isText = (v: unknown) => typeof v === 'string';
 const isKey = (v: unknown) => isText(v) && /^[A-Za-z0-9._-]{1,128}$/.test(v as string);
 const ONE_OF: Record<string, unknown[]> = { close: ['done', 'release'] };
@@ -51,12 +58,20 @@ export function loadDecisions(path: string): Decision[] {
     // Any lowercase type word loads; the page shows a plain card for a type it has no renderer for.
     if (d.type !== undefined && !(isText(d.type) && /^[a-z][a-z0-9-]{0,31}$/.test(d.type))) throw bad('type', 'must be a lowercase word such as decision or design');
     for (const [f, allowed] of Object.entries(ONE_OF)) if (d[f] !== undefined && !allowed.includes(d[f])) throw bad(f, `must be ${allowed.join(' or ')}`);
+    const stored = Object.hasOwn(STORED, d.type ?? '') ? STORED[d.type] : undefined;
+    if (stored) {
+      const [max, kinds, ext] = stored;
+      if (!Array.isArray(d.media) || !d.media.length || d.media.length > max || !d.media.every((m: any) => isText(m?.path)
+        && /^evidence\/\d+\/\w[\w-]*\.\w+$/.test(m.path) && ext.test(m.path) && /^[a-f0-9]{64}$/.test(m.sha256 ?? '') && Number.isInteger(m.bytes) && m.bytes >= 0)) {
+        throw bad('media', `must list ${max > 1 ? `1 to ${max}` : 'one'} ${kinds} under evidence/<number>/, each with its sha256 and bytes`);
+      }
+    }
+    if (d.type === 'explainer' && d.chapters !== undefined && (!Array.isArray(d.chapters) || !d.chapters.length || d.chapters.length > CHAPTERS_MAX
+      || !d.chapters.every((c: any, n: number) => Number.isInteger(c?.at) && c.at >= 0 && (!n || c.at > d.chapters[n - 1].at) && isText(c.title) && c.title.trim() && c.title.length <= 120))) {
+      throw bad('chapters', `must list 1 to ${CHAPTERS_MAX} items, each a start in whole seconds after the one before and a title of 120 characters or fewer`);
+    }
     if (d.type === 'evidence') {
       if (!Number.isInteger(d.number) || d.number < 1) throw bad('number', 'must be a whole number from 1');
-      if (!Array.isArray(d.media) || !d.media.length || d.media.length > MEDIA_MAX || !d.media.every((m: any) => isText(m?.path)
-        && /^evidence\/\d+\/\w[\w-]*\.(png|jpe?g|webp|mp4|webm)$/i.test(m.path) && /^[a-f0-9]{64}$/.test(m.sha256 ?? '') && Number.isInteger(m.bytes) && m.bytes >= 0)) {
-        throw bad('media', `must list 1 to ${MEDIA_MAX} files under evidence/<number>/, each with its sha256 and bytes`);
-      }
       if (d.link !== undefined && !(isText(d.link) && /^(https?:\/\/\S{1,500}|[a-f0-9]{7,40})$/.test(d.link))) throw bad('link', 'must be an http(s) link or a commit hash');
     }
     // A ladder rung: a diagram image, or an interactive page the board frames in a sandbox.
@@ -85,7 +100,9 @@ export function loadDecisions(path: string): Decision[] {
       recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done', evidence: d.evidence,
       type: d.type ?? 'decision', tradeoff: d.tradeoff, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path })),
       ...(views && { view: d.view }),
-      ...(d.type === 'evidence' && { number: d.number, link: d.link, media: d.media.map(({ path, sha256, bytes }: MediaRef) => ({ path, sha256, bytes })) }),
+      ...(stored && { media: d.media.map(({ path, sha256, bytes }: MediaRef) => ({ path, sha256, bytes })) }),
+      ...(d.type === 'evidence' && { number: d.number, link: d.link }),
+      ...(d.type === 'explainer' && d.chapters && { chapters: d.chapters.map(({ at, title }: Chapter) => ({ at, title })) }),
     };
   });
 }

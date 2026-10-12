@@ -29,8 +29,8 @@
 ```
 
 - `key`: 1-128 of `A-Z a-z 0-9 . _ -`, unique in the file. `title`: required.
-- `type`: optional, `decision` (default), `design`, `evidence`, `diagram` or
-  `interactive`. A design item
+- `type`: optional, `decision` (default), `design`, `evidence`, `diagram`,
+  `interactive` or `explainer`. A design item
   is a pick between mock options shown side by side. An evidence item is a
   numbered update the person gives a verdict on (below). Any other lowercase
   word (1-32 of `a-z 0-9 -`, starting with a letter) also loads; the dashboard
@@ -48,6 +48,19 @@
 
   ```json
   { "key": "sign-in-flow", "type": "diagram", "title": "Is this the sign-in flow?", "view": "mocks/sign-in-flow/flow.svg" }
+  ```
+- `explainer` items carry one narrated video the agent made: `media` holds one
+  `.mp4` or `.webm` file under `evidence/<number>/`, with its `sha256` and
+  `bytes`, copied there by `post --type explainer` and served the same
+  hash-checked way as evidence media. `about` is its short summary.
+  `chapters` is optional: 1 to 12 entries of `at` (whole seconds, each later
+  than the one before) and `title` (120 characters or fewer); each shows as a
+  button that plays the video from there. It answers like a decision.
+
+  ```json
+  { "key": "sign-in-tour", "type": "explainer", "title": "Is the new sign-in clear?", "about": "The new sign-in has 2 steps.",
+    "media": [{ "path": "evidence/3/1.mp4", "sha256": "<64 hex>", "bytes": 358743 }],
+    "chapters": [{ "at": 0, "title": "Start" }, { "at": 12, "title": "Step 2" }] }
   ```
 - `tradeoff`: optional on design items, plain text up to 1000 characters, shown
   next to the mocks.

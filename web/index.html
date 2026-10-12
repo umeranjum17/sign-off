@@ -72,6 +72,10 @@
     border: 1px solid var(--line); border-radius: .625rem; background: var(--sunk); }
   .unverified, .media .gone { color: var(--danger); margin: .5rem 0; }
   .update-media { grid-column: 1 / -1; }
+  /* An explainer's chapters: one tap jumps the video to that part and plays it. */
+  .chapters { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0.375rem; margin: -0.25rem 0 0; padding: 0; list-style: none; }
+  .chapters button { min-height: 2.5rem; padding: 0 0.75rem; border-radius: 999px; border-color: var(--line); font-size: 0.875rem; }
+  .chapters .at { margin-right: 0.375rem; color: var(--muted); font-variant-numeric: tabular-nums; }
   .meta a { color: var(--accent); }
   .err:empty { display: none; }
   .err:not(:empty) { color: var(--danger); font-size: 0.875rem; margin-top: 0.5rem; }
@@ -189,11 +193,11 @@
       media.childElementCount ? media : el('p', { class: 'meta' }, 'No recorded image or recording.'));
   }
 
-  const NAMES = { decision: 'Decision', design: 'Design', evidence: 'Evidence', diagram: 'Diagram', interactive: 'Interactive' };
+  const NAMES = { decision: 'Decision', design: 'Design', evidence: 'Evidence', diagram: 'Diagram', interactive: 'Interactive', explainer: 'Explainer' };
   // Any other type gets the plain card until it has its own renderer.
   const chip = (d) => el('span', { class: 'chip' }, NAMES[d.type] ?? d.type.replace(/-/g, ' '));
   const title = (d) => (d.type === 'evidence' ? `Update ${d.number} · ${d.title}` : d.title);
-  const FILTERS = { decision: 'Decisions', design: 'Designs', evidence: 'Evidence', diagram: 'Diagrams', interactive: 'Interactive pages', other: 'Other' };
+  const FILTERS = { decision: 'Decisions', design: 'Designs', evidence: 'Evidence', diagram: 'Diagrams', interactive: 'Interactive pages', explainer: 'Explainers', other: 'Other' };
   const kind = (d) => (Object.hasOwn(NAMES, d.type) ? d.type : 'other');
 
   function row(d) {
@@ -218,15 +222,15 @@
     const update = d.type === 'evidence';
     return el('article', { class: 'row', id: `item-${d.key}` }, el('div', {},
       head,
-      d.about ? el('p', { class: update ? 'about full' : 'about', dir: 'auto' }, d.about) : '',
-      d.detail || (!update && d.about?.length > 180) ? el('details', {}, el('summary', {}, 'Show more'),
+      d.about ? el('p', { class: d.media ? 'about full' : 'about', dir: 'auto' }, d.about) : '',
+      d.detail || (!d.media && d.about?.length > 180) ? el('details', {}, el('summary', {}, 'Show more'),
         ...[d.about, d.detail].filter(Boolean).map((t) => el('p', { dir: 'auto' }, t))) : '',
       d.link ? el('p', { class: 'meta' }, /^https?:/.test(d.link)
         ? el('a', { href: d.link, target: '_blank', rel: 'noopener' }, d.link) : `Commit ${d.link}`) : '',
       silent ? el('p', { class: 'meta' }, silent) : '',
       more(d, saved, err),
       err,
-    ), updateMedia(d), rung(d), el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': d.title }, ...buttons), evidenceCard(d));
+    ), updateMedia(d), chapters(d), rung(d), el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': d.title }, ...buttons), evidenceCard(d));
   }
 
   /** The note and another-round controls, folded away until the person wants them. An evidence update takes a note only. */
@@ -257,13 +261,30 @@
 
   // Each file is hash-checked by the server; one that changed or went missing says so instead of a broken frame.
   function updateMedia(d) {
-    if (d.type !== 'evidence') return '';
+    if (!d.media) return '';
     return el('div', { class: 'media update-media' }, ...d.media.map((m, i) => {
-      const url = `/api/media?key=${encodeURIComponent(d.key)}&i=${i}`, name = `Update ${d.number}, capture ${i + 1} of ${d.media.length}`;
+      const url = `/api/media?key=${encodeURIComponent(d.key)}&i=${i}`;
+      const name = d.type === 'evidence' ? `Update ${d.number}, capture ${i + 1} of ${d.media.length}` : `Explainer video, ${d.title}`;
       const node = /\.(mp4|webm)$/i.test(m.path) ? el('video', { src: url, controls: '', playsinline: '', preload: 'metadata', 'aria-label': name })
         : el('a', { href: url, target: '_blank', rel: 'noopener', 'aria-label': `Open ${name}` }, el('img', { src: url, alt: name }));
       (node.tagName === 'A' ? node.firstChild : node).onerror = () => node.replaceWith(el('p', { class: 'gone' }, `${name} can't be shown: the file is missing, changed since it was posted, or in a format this browser can't play.`));
       return node;
+    }));
+  }
+
+  /** An explainer's chapter list: each button starts the video at that chapter. */
+  function chapters(d) {
+    if (!d.chapters) return '';
+    const at = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    return el('ol', { class: 'chapters', 'aria-label': `Chapters, ${d.title}` }, ...d.chapters.map((c) => {
+      const b = el('button', { 'aria-label': `Play from ${at(c.at)}, ${c.title}` }, el('span', { class: 'at' }, at(c.at)), c.title);
+      b.onclick = () => {
+        const video = document.getElementById(`item-${d.key}`)?.querySelector('video');
+        if (!video) return;
+        video.currentTime = c.at;
+        video.play().catch(() => {});
+      };
+      return el('li', {}, b);
     }));
   }
 
