@@ -293,7 +293,7 @@
       asked.length ? el('p', { class: 'meta saved-note', dir: 'auto' }, `You asked for another round: ${asked[asked.length - 1].note}`) : '',
       ...comments.map((m) => el('p', { class: 'meta saved-note', dir: 'auto' }, `Your comment, ${m.delivered ? 'read by the agent' : 'not read yet'}: ${m.text}`)),
       el('label', { for: box.id }, update ? 'Optional note, sent with your verdict, and also to the agent as a comment'
-        : 'Optional note, sent with the answer you pick or the round you ask for, and also to the agent as a comment'), box,
+        : 'Optional note: sent with the answer you pick (and to the agent as a comment), or with the round you ask for'), box,
       el('div', { class: 'actions' }, update ? '' : roundBtn, FROZEN ? '' : commentBtn));
   }
 
