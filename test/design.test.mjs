@@ -259,6 +259,12 @@ test('private-network bind: token on every route, kept across a restart', { skip
   const fresh = run('open', board, '--port', String(port), '--bind', mine.address);
   assert.notEqual(new URL(/url: "(.+)"/.exec(fresh.out)[1]).searchParams.get('token'), token);
   assert.match(run('stop', board).out, /status: stopped/);
+  const foreground = spawn('node', [cli, 'serve', board, '--port', '0', '--bind', mine.address], { stdio: ['ignore', 'pipe', 'ignore'] });
+  await new Promise((ok) => foreground.stdout.once('data', ok));
+  const clash = run('open', board, '--port', '0', '--bind', '127.0.0.1');
+  foreground.kill('SIGTERM');
+  await new Promise((ok) => foreground.once('exit', ok));
+  assert.deepEqual([clash.code, /code: CONFLICT/.test(clash.out)], [1, true]);
 });
 
 test('doctor journey: each broken precondition prints its own fix, and a repair makes it clean', async () => {
