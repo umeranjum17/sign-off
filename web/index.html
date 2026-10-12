@@ -182,12 +182,11 @@
     buttons.forEach((b) => (b.disabled = true));
     const typed = (drafts.get(d.key) ?? '').trim();
     const note = drafts.get(d.key) ?? state.answers[d.key]?.note ?? '';
-    const comment = typed;
     const drop = clearIfSaved(d.key, drafts.get(d.key));
     call('/api/answers', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
-    }, comment ? undefined : drop).then(() => comment && call('/api/messages', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'comment', key: d.key, text: comment }),
+    }, typed ? undefined : drop).then(() => typed && call('/api/messages', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'comment', key: d.key, text: typed }),
     }, drop)).catch((e) => {
       shown(err).textContent = `Couldn't save: ${e.message}`;
       buttons.forEach((b) => (b.disabled = false));
@@ -363,7 +362,7 @@
       // A `page.html?variant=b` mock keeps its variant in the frame's query, where the page reads it.
       const [path, query] = m?.path.split('?') ?? [];
       const url = m && src(`/api/mock?key=${encodeURIComponent(d.key)}&value=${encodeURIComponent(m.value)}${query ? `&${query}` : ''}`);
-      const view = m && (/\.html?$/i.test(path) ? el('iframe', { src: url, title: `Mock ${o.label}`, tabindex: '-1', 'aria-hidden': 'true', loading: 'lazy' })
+      const view = m && (/\.html?$/i.test(path) ? el('iframe', { src: url, title: `Mock ${o.label}`, sandbox: 'allow-scripts', tabindex: '-1', 'aria-hidden': 'true', loading: 'lazy' })
         : el('img', { src: url, alt: `Mock: ${o.label}` }));
       return el('figure', { class: 'mock' },
         m ? el('a', { class: 'shot', href: url, target: '_blank', rel: 'noopener', 'aria-label': `Open mock ${o.label} full size` }, view) : '',
