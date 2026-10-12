@@ -139,6 +139,11 @@ examples:
 };
 const warn = (msg: string) => console.error(`sign-off-axi: ${msg}`);
 const tilde = (path: string) => (path.startsWith(homedir() + sep) ? `~${path.slice(homedir().length)}` : path);
+/** A path as a shell word for a printed command: quoted when it has anything but plain path characters, with a leading ~/ kept outside the quotes. */
+const shellPath = (path: string) => {
+  const shown = tilde(path), home = shown.startsWith('~/') ? '~/' : '', rest = shown.slice(home.length);
+  return home + (/^[\w./~-]+$/.test(rest) ? rest : `'${rest.replaceAll("'", "'\\''")}'`);
+};
 const fail = (message: string, code: string, ...help: string[]) => new AxiError(message, code, help);
 /** TOON data, then next-step hints one per line, the way the other AXIs print them. */
 const toon = (data: object, help: string[] = []) => [encode(data), ...(help.length ? [`help[${help.length}]:`, ...help.map((h) => `  ${h}`)] : [])].join('\n');
@@ -576,7 +581,7 @@ function init(args: string[]) {
 }
 
 async function doctor(args: string[]) {
-  const dir = repoDir('doctor', args), so = join(dir, '.sign-off'), rerun = `sign-off-axi init ${tilde(dir)}`;
+  const dir = repoDir('doctor', args), so = join(dir, '.sign-off'), rerun = `sign-off-axi init ${shellPath(dir)}`;
   const checks: { name: string; ok: string; fix?: string }[] = [];
   const check = (name: string, ok: string, fix?: string) => checks.push({ name, ok, fix });
   /** Stats a path; one it cannot follow (a link to nothing, a link loop) is 'link', and one it may not reach is 'denied', instead of an error. */
@@ -588,15 +593,15 @@ async function doctor(args: string[]) {
     }
   };
   /** A permission problem is fixed by chmod on the setup folder holding the path; anything else in the way is moved aside. */
-  const unreadable = (path: string, code: string, then: string) => ['EACCES', 'EPERM'].includes(code) ? `Run \`chmod -R u+rwX ${tilde(dirname(path))}\`` : `Move ${tilde(path)} away, then ${then}`;
+  const unreadable = (path: string, code: string, then: string) => ['EACCES', 'EPERM'].includes(code) ? `Run \`chmod -R u+rwX ${shellPath(dirname(path))}\`` : `Move ${shellPath(path)} away, then ${then}`;
   /** Why a setup file cannot be used and its fix, or nothing when it is a readable file with content. */
   const unusable = (path: string): [string, string] | undefined => {
     const stat = look(path);
     if (stat === 'denied') return [`${basename(path)} cannot be read (permission denied)`, unreadable(path, 'EACCES', `run \`${rerun}\``)];
-    if (stat === 'link') return [`${basename(path)} is a broken link`, `Delete the link ${tilde(path)}, then run \`${rerun}\``];
+    if (stat === 'link') return [`${basename(path)} is a broken link`, `Delete the link ${shellPath(path)}, then run \`${rerun}\``];
     if (!stat) return [`${basename(path)} is missing`, `Run \`${rerun}\``];
-    if (!stat.isFile()) return [`${basename(path)} is not a file`, `Move ${tilde(path)} away, then run \`${rerun}\``];
-    if (!stat.size) return [`${basename(path)} is empty (init was cut short)`, `Delete ${tilde(path)}, then run \`${rerun}\``];
+    if (!stat.isFile()) return [`${basename(path)} is not a file`, `Move ${shellPath(path)} away, then run \`${rerun}\``];
+    if (!stat.size) return [`${basename(path)} is empty (init was cut short)`, `Delete ${shellPath(path)}, then run \`${rerun}\``];
     try { closeSync(openSync(path, 'r')); } catch (e: any) { return [`${basename(path)} cannot be read (${e.code})`, unreadable(path, e.code, `run \`${rerun}\``)]; }
   };
   const [major, minor] = process.versions.node.split('.').map(Number);
@@ -604,8 +609,8 @@ async function doctor(args: string[]) {
     major > 22 || (major === 22 && minor >= 5) ? undefined : 'Install Node 22.5 or newer');
   let board = join(so, 'decisions.json'), port = 4410;
   const top = look(so);
-  if (top === 'denied') check('setup', '.sign-off cannot be read (permission denied)', `Run \`chmod u+x ${tilde(dir)}\``);
-  else if (top && (top === 'link' || !top.isDirectory())) check('setup', '.sign-off is not a folder', `Move ${tilde(so)} away, then run \`${rerun}\``);
+  if (top === 'denied') check('setup', '.sign-off cannot be read (permission denied)', `Run \`chmod u+x ${shellPath(dir)}\``);
+  else if (top && (top === 'link' || !top.isDirectory())) check('setup', '.sign-off is not a folder', `Move ${shellPath(so)} away, then run \`${rerun}\``);
   else if (!top) check('setup', 'no .sign-off/ folder', `Run \`${rerun}\``);
   else {
     const config = join(so, 'config.yaml'), configBad = unusable(config);
@@ -614,7 +619,7 @@ async function doctor(args: string[]) {
       const setup = readSetup(so);
       ({ board, port } = setup);
       if (!setup.problems.length) check('config', `board ${basename(board)}, port ${port}`);
-      else check('config', `${basename(config)}: ${setup.problems.join('; ')}`, `Edit ${tilde(config)} to hold "board: <name>.json" and "port: <0-65535>" lines, such as board: decisions.json and port: 4410${setup.goodBoard ? '' : `, or delete it and run \`${rerun}\``}`);
+      else check('config', `${basename(config)}: ${setup.problems.join('; ')}`, `Edit ${shellPath(config)} to hold "board: <name>.json" and "port: <0-65535>" lines, such as board: decisions.json and port: 4410${setup.goodBoard ? '' : `, or delete it and run \`${rerun}\``}`);
     }
     const boardBad = unusable(board);
     if (boardBad) check('board', ...boardBad);
@@ -623,7 +628,7 @@ async function doctor(args: string[]) {
         const n = loadDecisions(board).length, old = readItems(board).schema === 1;
         check('board', `${n} items${old ? ' (0.1.0 schema 1: read as decisions; the next raise or post upgrades it and keeps a .schema-1.bak copy)' : ''}`);
       } catch (e: any) {
-        check('board', e.message, `Edit ${tilde(board)} to fix that; the format is at ${FORMAT}`);
+        check('board', e.message, `Edit ${shellPath(board)} to fix that; the format is at ${FORMAT}`);
       }
     }
     for (const [name, path, fields] of [['answers', answersPath(board), ['key', 'answer']], ['rounds', roundsPath(board), ['key', 'note', 'at']]] as const) {
@@ -636,7 +641,7 @@ async function doctor(args: string[]) {
         try { return !line || fields.every((f) => typeof JSON.parse(line)?.[f] === 'string') ? [] : [n + 1]; } catch { return [n + 1]; }
       });
       check(name, torn.length ? `line${torn.length > 1 ? 's' : ''} ${torn.join(', ')} of ${basename(path)} ${torn.length > 1 ? 'do' : 'does'} not parse` : `${text.split('\n').filter(Boolean).length} lines read`,
-        torn.length ? `Delete line${torn.length > 1 ? 's' : ''} ${torn.join(', ')} from ${tilde(path)} (a cut-short write); the other lines are kept` : undefined);
+        torn.length ? `Delete line${torn.length > 1 ? 's' : ''} ${torn.join(', ')} from ${shellPath(path)} (a cut-short write); the other lines are kept` : undefined);
     }
     const ignore = join(so, '.gitignore'), ignoreBad = unusable(ignore);
     if (ignoreBad) check('gitignore', ...ignoreBad);
@@ -644,19 +649,19 @@ async function doctor(args: string[]) {
       const lines = readFileSync(ignore, 'utf8').split('\n').map((l) => l.trim().replace(/^\/|\/$/g, ''));
       const absent = ['mocks/', 'evidence/'].filter((d) => !lines.includes(d.slice(0, -1)));
       check('gitignore', absent.length ? `${absent.join(' and ')} not ignored` : 'mocks/ and evidence/ are ignored',
-        absent.length ? `Add the line${absent.length > 1 ? 's' : ''} ${absent.join(' and ')} to ${tilde(ignore)}` : undefined);
+        absent.length ? `Add the line${absent.length > 1 ? 's' : ''} ${absent.join(' and ')} to ${shellPath(ignore)}` : undefined);
     }
     const kinds = ['mocks', 'evidence'].map((f) => ({ f, stat: look(join(so, f)) }));
     const denied = kinds.filter(({ stat }) => stat === 'denied').map(({ f }) => `${f}/`);
     const folders = kinds.filter(({ stat }) => stat !== 'denied' && (!stat || stat === 'link' || !stat.isDirectory())).map(({ f }) => f);
-    const blocked = kinds.filter(({ f, stat }) => folders.includes(f) && stat).map(({ f }) => tilde(join(so, f)));
+    const blocked = kinds.filter(({ f, stat }) => folders.includes(f) && stat).map(({ f }) => shellPath(join(so, f)));
     const problems = [
       ...(denied.length ? [`${denied.join(' and ')} cannot be read (permission denied)`] : []),
       ...(folders.length ? [`${folders.map((f) => `${f}/`).join(' and ')} ${blocked.length ? 'not a folder' : 'missing'}`] : []),
     ];
     const steps = [
       ...(blocked.length ? [`move ${blocked.join(' and ')} away`] : []),
-      ...(denied.length ? [`run \`chmod -R u+rwX ${tilde(so)}\``] : []),
+      ...(denied.length ? [`run \`chmod -R u+rwX ${shellPath(so)}\``] : []),
       `run \`${rerun}\``,
     ];
     check('folders', problems.join('; ') || 'mocks/ and evidence/ exist', problems.length ? `${steps.join(', then ')}`.replace(/^./, (c) => c.toUpperCase()) : undefined);
@@ -667,15 +672,15 @@ async function doctor(args: string[]) {
     // A port in use by this very board is fine: the board is already open.
     const shown = error && await serving(port).catch(() => undefined), other = shown?.file && shown.file !== (existsSync(board) ? realpathSync(board) : board);
     if (!error) check('port', `${port} is free`);
-    else if (error.code === 'EACCES') check('port', `${port} needs privileges to bind (EACCES)`, `Set "port:" in ${tilde(join(so, 'config.yaml'))} to a port above 1023 (open and serve use it)`);
+    else if (error.code === 'EACCES') check('port', `${port} needs privileges to bind (EACCES)`, `Set "port:" in ${shellPath(join(so, 'config.yaml'))} to a port above 1023 (open and serve use it)`);
     else if (shown?.file && !other) check('port', `${port} shows this board (already open)`);
-    else check('port', other ? `${port} shows another board, ${tilde(shown.file)}` : `${port} is in use (${error.code})`,
-      `Set "port:" in ${tilde(join(so, 'config.yaml'))} to a free port (open and serve use it), or ${other ? `close that board: \`sign-off-axi stop ${tilde(shown.file)}\`, or Ctrl-C its serve` : `stop the program using port ${port}`}`);
+    else check('port', other ? `${port} shows another board, ${shellPath(shown.file)}` : `${port} is in use (${error.code})`,
+      `Set "port:" in ${shellPath(join(so, 'config.yaml'))} to a free port (open and serve use it), or ${other ? `close that board: \`sign-off-axi stop ${shellPath(shown.file)}\`, or Ctrl-C its serve` : `stop the program using port ${port}`}`);
   }
   const bad = checks.filter((c) => c.fix);
-  if (bad.length) throw fail(`${bad.length} of ${checks.length} checks need a fix in ${tilde(dir)}`, 'SETUP_BROKEN', ...bad.map((c) => `${c.name}: ${c.ok}. ${c.fix}`));
-  return toon({ dir: tilde(dir), checks: checks.map(({ name, ok }) => ({ name, ok })) },
-    [`Run \`sign-off-axi open ${tilde(board)}\` to show the board to the user`]);
+  if (bad.length) throw fail(`${bad.length} of ${checks.length} checks need a fix in ${tilde(dir)}`, 'NOT_FOUND',...bad.map((c) => `${c.name}: ${c.ok}. ${c.fix}`));
+  return toon({ dir: shellPath(dir), checks: checks.map(({ name, ok }) => ({ name, ok })) },
+    [`Run \`sign-off-axi open ${shellPath(board)}\` to show the board to the user`]);
 }
 
 let file = '', evidenceRoot = '';

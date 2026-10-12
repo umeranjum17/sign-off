@@ -206,3 +206,15 @@ test('doctor names a fix for a denied setup path and a port that needs privilege
   writeFileSync(join(sod, 'config.yaml'), 'board: decisions.json\nport: 80\n');
   assert.match(run('doctor', dir).out, /port: 80 needs privileges to bind \(EACCES\)\. Set \\"port:\\" in .*config\.yaml to a port above 1023/);
 });
+
+test('doctor prints a fix a shell can run for a path with a space, and fails with NOT_FOUND', () => {
+  const dir = join(scratch, 'my repo'), cli2 = cli;
+  mkdirSync(dir);
+  const broken = run('doctor', dir);
+  assert.equal(broken.code, 1);
+  assert.match(broken.out, /^code: NOT_FOUND$/m);
+  const fix = /Run `sign-off-axi (init [^`]+)`/.exec(broken.out)[1];
+  execFileSync('sh', ['-c', `node ${cli2} ${fix}`]);
+  writeFileSync(join(dir, '.sign-off', 'config.yaml'), 'board: decisions.json\nport: 0\n');
+  assert.equal(run('doctor', dir).code, 0);
+});
