@@ -4,6 +4,7 @@ import { type AddressInfo, isIP } from 'node:net';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { accessSync, closeSync, constants, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, watch, writeFileSync, type Stats } from 'node:fs';
+import { lookup } from 'node:dns/promises';
 import { homedir, networkInterfaces, tmpdir } from 'node:os';
 import { basename, delimiter, dirname, extname, join, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -92,7 +93,8 @@ examples:
 Starts the board in the background on 127.0.0.1 and prints its URL and pid; a no-op when this board is already open.
 --port defaults to the port in a config.yaml beside the board (init writes one), else 4410.
 --bind serves it on one private address of this machine instead (such as its VPN address), so a phone or tablet on the user's own network can open it;
-the bind line in config.yaml next to the board sets the same. Beyond 127.0.0.1 the board needs an access token: it is made once, kept in <board>.token,
+the bind line in config.yaml next to the board sets the same, and its hosts: line names private DNS names that lead to that address
+(such as its mesh VPN name, commas between them) that may open it too. A symlinked board uses the config.yaml beside the link. Beyond 127.0.0.1 the board needs an access token: it is made once, kept in <board>.token,
 and printed in the URL here; requests without it are refused. Delete that file to shut old links out at once; stop and open again for a new one.
 Open on another address while the board runs fails; stop it first.
 --evidence-root is the folder holding .done-done/, for decisions that link run evidence. The server log and its pid file are written next to the board.
@@ -125,6 +127,7 @@ Posts an item for the user. --type decision (the default) is a yes/no or pick-on
 --type design is a pick between up to 6 options shown side by side, each with an optional board-relative mock file
 (.html, .svg, .png, .jpg, .jpeg, .webp), a --tradeoff line and a --recommend badge.
 One .html page can hold every variant: --mock a=mocks/<key>/index.html?variant=a and so on; the page reads ?variant= to show one.
+An .html mock or view loads the css, scripts, images and fonts beside it by relative name, from its own folder only.
 After the user picks, answers --key <key> --json holds the pick and note; "rounds" holds an ask for another round.
 --type diagram and --type interactive are a decision shown with a picture: --view names one board-relative file,
 an image (.svg, .png, .jpg, .jpeg, .webp, 5 MB or less) shown at card width for a diagram, or one self-contained .html page for interactive.
@@ -163,13 +166,15 @@ examples:
 `,
   export: `usage: sign-off-axi export [board.json] [--out <file.html>] [--evidence-root <dir>]
 Writes a frozen, read-only copy of the board: one HTML file with every item, answer, note and another-round request, and its local mocks and media inlined. Comments and queued prompts are left out.
+A mock page is inlined on its own: the css and images beside it show only on the running board.
 It opens from disk with no server and makes no network request. --out defaults to <board>.export.html next to the board and must end in .html.
 examples:
   sign-off-axi export
   sign-off-axi export ./decisions.json --out ~/board-12-oct.html
 `,
   doctor: `usage: sign-off-axi doctor [dir]
-Checks the repo setup init wrote: node version, config, board file, answer files, gitignore lines, folders, whether the dashboard port is free,
+Checks the repo setup init wrote: node version, config, board file, answer files, a lock a crashed command left behind, gitignore lines, folders, whether the dashboard port is free,
+that each hosts: name in the config leads to the bind address,
 and one line per coding agent in the config's agent: line (auto: each one on PATH) saying whether its skill is installed.
 Each failure prints one help line naming its fix and exits 1; a clean setup exits 0.
 examples:
@@ -206,9 +211,9 @@ function parse(cmd: string, args: string[], flags: Flags) {
   const [given, extra] = parsed.positionals;
   if (extra !== undefined) throw fail(`unexpected argument ${extra}: \`${cmd}\` takes one board file`, 'VALIDATION_ERROR', `Run \`sign-off-axi ${cmd} --help\``);
   const on = given === undefined ? '' : ` ${/^[\w./~-]+$/.test(given) ? given : JSON.stringify(given)}`;
-  // One spelling per board, so a symlinked path finds the same pid record and server.
+  // One spelling per board, so a symlinked path finds the same pid record and server; its config.yaml stays the one beside the name given.
   const path = given === undefined ? BOARD : resolve(given), real = existsSync(path) ? realpathSync(path) : path;
-  return { file: real, values: parsed.values as Record<string, any>, on };
+  return { file: real, named: path, values: parsed.values as Record<string, any>, on };
 }
 const portOf = (value: string) => {
   if (!/^\d{1,5}$/.test(value) || Number(value) > 65535) throw fail('--port must be a number from 0 to 65535', 'VALIDATION_ERROR');
@@ -329,12 +334,14 @@ async function wait(args: string[]) {
 }
 
 const slug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 64).replace(/^-+|-+$/g, '') || 'decision';
-/** Runs fn while holding an exclusive lock file, so two agents raising at once never drop a decision. */
+/** Runs fn while holding an exclusive lock file that names its pid, so two agents raising at once never drop a decision,
+ * and a lock a crash left behind can be told apart from one in use. */
 async function locked<T>(lock: string, fn: () => T | Promise<T>, busy = 'another raise is still writing the board', tries = 150): Promise<T> {
   for (;;) {
-    try { closeSync(openSync(lock, 'wx')); break; } catch (e: any) {
+    try { writeFileSync(lock, `${process.pid}\n`, { flag: 'wx', mode: 0o600 }); break; } catch (e: any) {
       if (e.code !== 'EEXIST') throw e;
-      if (!tries--) throw fail(busy, 'BUSY', `If no sign-off-axi is running, delete ${tilde(lock)} and try again`);
+      if (!tries--) throw fail(busy, 'BUSY', staleLock(lock) ? `A sign-off-axi that stopped mid-write left ${tilde(lock)}: run \`rm ${shellPath(lock)}\` and try again`
+        : `If no sign-off-axi is running, delete ${tilde(lock)} and try again`);
       await new Promise((ok) => setTimeout(ok, 20));
     }
   }
@@ -491,14 +498,14 @@ function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: 
 }
 
 async function open(args: string[]) {
-  const { file, values, on } = parse('open', args, BOARD_FLAGS);
-  const port = boardPort(file, values.port);
+  const { file, named, values, on } = parse('open', args, BOARD_FLAGS);
+  const port = boardPort(named, values.port);
   ready(file, on, values['evidence-root']);
-  const host = bindOf(file, values.bind);
+  const host = bindOf(named, values.bind);
   // The lock makes concurrent opens take turns, so a second one finds the first board instead of starting another.
-  return locked(`${record(file)}.lock`, () => start(file, port, host, values, on), 'another open is still starting this board', 600);
+  return locked(`${record(file)}.lock`, () => start(file, named, port, host, values, on), 'another open is still starting this board', 600);
 }
-async function start(file: string, port: number, host: string, values: Record<string, any>, on: string) {
+async function start(file: string, named: string, port: number, host: string, values: Record<string, any>, on: string) {
   const live = await running(file);
   const answerLink = (url: string) => {
     if (loopback(host)) return url;
@@ -519,7 +526,7 @@ async function start(file: string, port: number, host: string, values: Record<st
   // Appended, not truncated: a concurrent open's child may be writing the same log, so read only this child's lines.
   const log = `${file.replace(/\.json$/, '')}.board.log`, start = existsSync(log) ? statSync(log).size : 0, out = openSync(log, 'a', 0o600);
   const evidence = values['evidence-root'] ? ['--evidence-root', resolve(values['evidence-root'])] : [];
-  const child = spawn(process.execPath, [process.argv[1], 'serve', file, '--port', String(port), '--bind', host, ...evidence], { detached: true, stdio: ['ignore', out, out] });
+  const child = spawn(process.execPath, [process.argv[1], 'serve', named, '--port', String(port), '--bind', host, ...evidence], { detached: true, stdio: ['ignore', out, out] });
   closeSync(out);
   child.unref();
   let exit: number | null | undefined;
@@ -549,6 +556,10 @@ const serving = (port: number, host: string, file: string) => fetch(`http://${ur
   if (e.name === 'TimeoutError') throw fail(`the board on port ${port} did not answer within 1 second`, 'BUSY', 'Run the command again in a moment');
 });
 const alive = (pid: number) => { try { return process.kill(pid, 0); } catch (e: any) { return e.code === 'EPERM'; } };
+/** A lock whose pid is gone (or empty, from before locks held one): a crash left it, and every later write waits on it. */
+const staleLock = (lock: string) => {
+  try { const pid = Number(readFileSync(lock, 'utf8')); return !(pid > 0 && alive(pid)); } catch { return false; }
+};
 /** The board open started for this file, only while that pid really serves this file on that port. */
 async function running(file: string) {
   const [pid, port, host = '127.0.0.1'] = (existsSync(record(file)) ? readFileSync(record(file), 'utf8') : '').trim().split(' ');
@@ -563,15 +574,17 @@ const PRIVATE = /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|
 const privateBind = (host: string) => isIP(host) > 0 && PRIVATE.test(host);
 const loopback = (host: string) => /^127\./.test(host) || host === '::1';
 const urlHost = (host: string) => (isIP(host) === 6 ? `[${host}]` : host);
-/** --bind, else the bind line of config.yaml next to the board, else 127.0.0.1. */
-function bindOf(file: string, given?: string) {
-  const config = join(dirname(file), 'config.yaml');
-  let host = given ?? '127.0.0.1';
-  if (given === undefined && existsSync(config)) {
-    try { host = readSetup(dirname(file)).bind; } catch (e: any) {
-      throw fail(`${basename(config)} cannot be read (${e.code}), so its bind line is unknown`, 'VALIDATION_ERROR', `Make ${shellPath(config)} readable, or pass --bind`);
-    }
+/** The config.yaml beside the board as it is named, never beside the file a symlinked board points to: the one place open, serve and doctor read it. */
+function setupOf(named: string) {
+  const config = join(dirname(named), 'config.yaml');
+  if (!existsSync(config)) return undefined;
+  try { return readSetup(dirname(named)); } catch (e: any) {
+    throw fail(`${basename(config)} cannot be read (${e.code}), so its port, bind and hosts lines are unknown`, 'VALIDATION_ERROR', `Make ${shellPath(config)} readable, or pass --port and --bind`);
   }
+}
+/** --bind, else the bind line of config.yaml next to the board, else 127.0.0.1. */
+function bindOf(named: string, given?: string) {
+  const host = given ?? setupOf(named)?.bind ?? '127.0.0.1';
   if (!privateBind(host)) throw fail(`bind address ${host} must be 127.0.0.1 or a private address of this machine, never all interfaces or a public address`,
     'VALIDATION_ERROR', 'Pass 127.0.0.1 or a private address of this machine');
   return host;
@@ -651,12 +664,19 @@ const SKILL_ADD = ['-y', 'skills', 'add', 'umeranjum17/sign-off', '--skill', 'si
 const skillAdd = (agents: string[]) => `npx ${[...SKILL_ADD, ...agents].join(' ')}`;
 
 const GITIGNORE = 'mocks/\nevidence/\n*.answers.jsonl\n*.rounds.jsonl\n*.messages.jsonl\n*.board.pid\n*.board.log\n*.token\n*.export.html\n';
-/** The board and port in <so>/config.yaml (the `key: value` lines init writes). A bad line falls back on its own default
+/** The board, port, bind and hosts in <so>/config.yaml (the `key: value` lines init writes). A bad line falls back on its own default
  * (decisions.json, 4410) and `problems` says what is wrong; a file that cannot be read throws. */
 function readSetup(so: string) {
-  const config: Record<string, string> = {}, problems: string[] = [];
+  const config: Record<string, string> = {}, problems: string[] = [], hosts: string[] = [];
   readFileSync(join(so, 'config.yaml'), 'utf8').split(/\r?\n/).forEach((l, n) => {
     const line = l.split('#')[0].trim(), kv = line.match(/^([A-Za-z]+)\s*:\s*(\S+)$/), key = line.match(/^(board|port|bind)(\s|:|$)/i);
+    // hosts: private DNS names that reach the bind address (a mesh VPN name), let in besides it; commas or spaces between them.
+    const names = /^hosts\s*:(.*)$/i.exec(line)?.[1].split(/[\s,]+/).filter(Boolean).map((h) => h.toLowerCase().replace(/\.$/, ''));
+    for (const h of names ?? []) {
+      if (/^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/.test(h)) hosts.push(h);
+      else problems.push(`hosts ${h} is not a DNS name`);
+    }
+    if (names) return;
     if (kv && ['board', 'port', 'bind'].includes(kv[1].toLowerCase())) config[kv[1].toLowerCase()] = kv[2];
     else if (key) problems.push(`line ${n + 1} is not one "key: value"`);
   });
@@ -665,13 +685,10 @@ function readSetup(so: string) {
   if (!goodPort) problems.push(`port ${port} is not a number from 0 to 65535`);
   const bind = config.bind ?? '127.0.0.1';
   if (!privateBind(bind)) problems.push(`bind ${bind} is not 127.0.0.1 or a private address`);
-  return { board: join(so, goodBoard ? config.board : 'decisions.json'), port: goodPort ? Number(port) : 4410, bind, goodBoard, problems };
+  return { board: join(so, goodBoard ? config.board : 'decisions.json'), port: goodPort ? Number(port) : 4410, bind, hosts, goodBoard, problems };
 }
 /** --port, else the port in a config.yaml beside the board (init writes one), else 4410. */
-function boardPort(file: string, given?: string) {
-  if (given === undefined) try { given = String(readSetup(dirname(file)).port); } catch { given = '4410'; }
-  return portOf(given);
-}
+const boardPort = (named: string, given?: string) => portOf(given ?? String(setupOf(named)?.port ?? 4410));
 
 function init(args: string[]) {
   const { dir, values } = repoDir('init', args, { agent: { type: 'string' } }), so = join(dir, '.sign-off');
@@ -680,7 +697,7 @@ function init(args: string[]) {
   let board = join(so, 'decisions.json');
   try { board = readSetup(so).board; } catch {}
   const files: [string, string][] = [
-    [join(so, 'config.yaml'), `# sign-off repo setup. board: path under .sign-off/, port: dashboard port, agent: auto or the coding agents to install the skill for.\n# bind: 127.0.0.1 keeps the dashboard on this machine; a private address such as its VPN address lets a phone open it.\nboard: decisions.json\nport: 4410\nbind: 127.0.0.1\nagent: ${agent}\n`],
+    [join(so, 'config.yaml'), `# sign-off repo setup. board: path under .sign-off/, port: dashboard port, agent: auto or the coding agents to install the skill for.\n# bind: 127.0.0.1 keeps the dashboard on this machine; a private address such as its VPN address lets a phone open it.\n# hosts: (optional) private DNS names that lead to that address, such as its mesh VPN name, commas between them.\nboard: decisions.json\nport: 4410\nbind: 127.0.0.1\nagent: ${agent}\n`],
     [board, `{"schema": 2, "items": []}\n`],
     [join(so, '.gitignore'), GITIGNORE],
   ];
@@ -756,7 +773,18 @@ async function doctor(args: string[]) {
         const setup = readSetup(so);
         ({ board, port } = setup);
         if (!setup.problems.length) check('config', `board ${basename(board)}, port ${port}`);
-        else check('config', `${basename(config)}: ${setup.problems.join('; ')}`, `Edit ${shellPath(config)} to hold "board: <name>.json", "port: <0-65535>" and "bind: <127.0.0.1 or a private address>" lines, such as board: decisions.json, port: 4410 and bind: 127.0.0.1${setup.goodBoard ? '' : `, or delete it and run \`${rerun}\``}`);
+        else check('config', `${basename(config)}: ${setup.problems.join('; ')}`, `Edit ${shellPath(config)} to hold "board: <name>.json", "port: <0-65535>" and "bind: <127.0.0.1 or a private address>" lines, such as board: decisions.json, port: 4410 and bind: 127.0.0.1, and hosts: only DNS names${setup.goodBoard ? '' : `, or delete it and run \`${rerun}\``}`);
+        // A hosts: name is only of use when it leads to the bind address.
+        const astray: string[] = [];
+        for (const h of setup.hosts) {
+          const found = await lookup(h, { all: true }).then((a) => a.map((x) => x.address), (e) => e.code as string);
+          if (typeof found === 'string') astray.push(`${h} does not resolve (${found})`);
+          else if (!found.includes(setup.bind)) astray.push(`${h} resolves to ${found.join(', ')}`);
+        }
+        if (setup.hosts.length) {
+          check('hosts', astray.length ? `${astray.join('; ')}, not the bind address ${setup.bind}` : `${setup.hosts.join(', ')} resolve${setup.hosts.length > 1 ? '' : 's'} to ${setup.bind}`,
+            astray.length ? `Point each name at ${setup.bind} in your private network's DNS, or take it off the hosts: line of ${shellPath(config)}` : undefined);
+        }
       }
       const boardBad = unusable(board);
       if (boardBad) check('board', ...boardBad);
@@ -780,6 +808,11 @@ async function doctor(args: string[]) {
         check(name, torn.length ? `line${torn.length > 1 ? 's' : ''} ${torn.join(', ')} of ${basename(path)} ${torn.length > 1 ? 'do' : 'does'} not parse` : `${text.split('\n').filter(Boolean).length} lines read`,
           torn.length ? `Delete line${torn.length > 1 ? 's' : ''} ${torn.join(', ')} from ${shellPath(path)} (a cut-short write); the other lines are kept` : undefined);
       }
+      // The same lock names raise, post, open and poll take, on the board's real path.
+      const real = existsSync(board) ? realpathSync(board) : board;
+      const stale = [`${real}.lock`, `${record(real)}.lock`, `${messagesPath(real)}.lock`].filter(staleLock);
+      check('locks', stale.length ? `${stale.map((l) => basename(l)).join(' and ')} left by a sign-off-axi that stopped mid-write, so every raise, post and open waits on it` : 'none left behind',
+        stale.length ? `Run \`rm ${stale.map(shellPath).join(' ')}\`` : undefined);
       const ignore = join(so, '.gitignore'), ignoreBad = unusable(ignore);
       if (ignoreBad) check('gitignore', ...ignoreBad);
       else {
@@ -840,20 +873,26 @@ async function doctor(args: string[]) {
     [`Run \`sign-off-axi open ${shellPath(board)}\` to show the board to the user`]);
 }
 
-let file = '', evidenceRoot = '', bind = '127.0.0.1';
+let file = '', evidenceRoot = '', bind = '127.0.0.1', hosts: string[] = [];
 async function serve(args: string[]) {
-  const parsed = parse('serve', args, BOARD_FLAGS), port = boardPort(parsed.file, parsed.values.port);
+  const parsed = parse('serve', args, BOARD_FLAGS), port = boardPort(parsed.named, parsed.values.port);
   ready(parsed.file, parsed.on, parsed.values['evidence-root']);
-  const live = await running(parsed.file);
-  if (live) throw fail(`this board is already open at ${live.url}`, 'CONFLICT', `Run \`sign-off-axi stop${parsed.on}\` first`);
-  bind = bindOf(parsed.file, parsed.values.bind);
-  if (!loopback(bind)) tokenOf(parsed.file, true);
-  [file, evidenceRoot] = [parsed.file, parsed.values['evidence-root'] ? resolve(parsed.values['evidence-root']) : ''];
-  await new Promise<void>((ok, no) => server.once('error', no).listen(port, bind, ok)).catch((e) => {
-    throw fail(e.code === 'EADDRINUSE' ? `port ${port} is in use; pass --port` : e.code === 'EADDRNOTAVAIL' ? `${bind} is not an address of this machine; pass another --bind` : e.message, 'SERVE_FAILED');
-  });
-  const bound = (server.address() as AddressInfo).port, url = `http://${urlHost(bind)}:${bound}/`;
-  writeFileSync(record(file), `${process.pid} ${bound} ${bind}\n`, { mode: 0o600 });
+  bind = bindOf(parsed.named, parsed.values.bind);
+  hosts = setupOf(parsed.named)?.hosts ?? [];
+  // Checked and recorded under the board lock, so two serves started at once never both run with one record between them.
+  const bound = await locked(`${parsed.file}.lock`, async () => {
+    const live = await running(parsed.file);
+    if (live) throw fail(`this board is already open at ${live.url}`, 'CONFLICT', `Run \`sign-off-axi stop${parsed.on}\` first`);
+    if (!loopback(bind)) tokenOf(parsed.file, true);
+    [file, evidenceRoot] = [parsed.file, parsed.values['evidence-root'] ? resolve(parsed.values['evidence-root']) : ''];
+    await new Promise<void>((ok, no) => server.once('error', no).listen(port, bind, ok)).catch((e) => {
+      throw fail(e.code === 'EADDRINUSE' ? `port ${port} is in use; pass --port` : e.code === 'EADDRNOTAVAIL' ? `${bind} is not an address of this machine; pass another --bind` : e.message, 'SERVE_FAILED');
+    });
+    const { port: bound } = server.address() as AddressInfo;
+    writeFileSync(record(file), `${process.pid} ${bound} ${bind}\n`, { mode: 0o600 });
+    return bound;
+  }, 'another serve is still starting this board');
+  const url = `http://${urlHost(bind)}:${bound}/`;
   process.on('exit', () => { if (existsSync(record(file)) && readFileSync(record(file), 'utf8').split(' ')[0] === String(process.pid)) rmSync(record(file), { force: true }); });
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(0));
   return toon({ board: tilde(file), url, pid: process.pid }, [linkHelp(file, url), `Run \`sign-off-axi answers${parsed.on}\` to read their answers`]);
@@ -898,13 +937,15 @@ async function exportBoard(args: string[]) {
     // A data: URL keeps a one-page mock's query where the mock page reads it, but also appends it to the page text: a trailing comment hides it.
     files[url] = query && type === 'text/html' ? `data:text/html;charset=utf-8,${q(media.toString())}%3C!--?${query}` : `data:${type};base64,${media.toString('base64')}`;
   };
+  // A mock page is inlined on its own: the css and images beside it load only from the running board.
+  const at = (key: string, value: string, path: string) => `${frozen.mockBase}${key}~${value}/${q(basename(mockFile(path)))}`;
   for (const d of frozen.decisions) {
     for (const m of d.mocks ?? []) {
       const query = m.path.split('?')[1];
-      await inline(`/api/mock?key=${q(d.key)}&value=${q(m.value)}${query ? `&${query}` : ''}`, query);
+      await inline(`${at(d.key, m.value, m.path)}${query ? `?${query}` : ''}`, query);
     }
     // A diagram or an interactive page is the item's own view, inlined the same way.
-    if (d.view) await inline(`/api/mock?key=${q(d.key)}`);
+    if (d.view) await inline(at(d.key, '', d.view));
     for (const i of (d.media ?? []).keys()) await inline(`/api/media?key=${q(d.key)}&i=${i}`);
     for (const m of d.evidenceCard?.media ?? []) await inline(m.url);
   }
@@ -923,6 +964,7 @@ const page = readFileSync(new URL('../web/index.html', import.meta.url));
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 const state = () => ({
   file,
+  mockBase: `/mock/${loopback(bind) ? 'local' : mockPass(tokenOf(file))}/`,
   decisions: loadDecisions(file).map((d) => ({ ...d, evidenceCard: d.evidence ? evidenceCard(d.evidence) : null })),
   answers: readAnswers(file, warn),
   rounds: readRounds(file, warn),
@@ -930,7 +972,11 @@ const state = () => ({
 });
 const mediaTypes: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.mp4': 'video/mp4', '.webm': 'video/webm' };
 const mockTypes: Record<string, string> = { '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
+/** What a mock's folder may serve beside it: pages, styles, scripts, images, fonts and clips; never the board, answers, token or config. */
+const assetTypes: Record<string, string> = { ...mediaTypes, ...mockTypes, '.css': 'text/css', '.js': 'text/javascript', '.mjs': 'text/javascript', '.gif': 'image/gif', '.woff2': 'font/woff2' };
 const MOCK_BYTES = 5_000_000;
+/** A sandboxed mock frame sends no cookie, so beyond loopback its URLs carry this pass in the path: made from the token, it opens mock folders only. */
+const mockPass = (token: string) => sha256(Buffer.from(`mock ${token}`));
 /** Every served file is its own sandboxed page, even opened full size: no fetch, no remote files, no frames, and no reach into the dashboard or its tab. */
 const FRAME_CSP = "default-src 'self' 'unsafe-inline' data: blob:; connect-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'; sandbox allow-scripts";
 /** A board-relative path resolved inside a root folder; anything else is unavailable. */
@@ -985,15 +1031,16 @@ function evidenceCard(link: NonNullable<Decision['evidence']>) {
 
 const MESSAGE_MAX = 2000;
 async function route(req: IncomingMessage): Promise<[number, unknown]> {
-  if (req.method === 'GET' && req.url?.startsWith('/api/mock?')) {
-    const q = new URL(req.url, 'http://localhost').searchParams;
-    // With a value, that option's design mock; without, the item's own view (a diagram or interactive page).
-    const d = loadDecisions(file).find((x) => x.key === q.get('key'));
-    const mock = q.has('value') ? d?.mocks?.find((m) => m.value === q.get('value'))?.path : d?.view;
-    const type = mock && mockTypes[extname(mockFile(mock)).toLowerCase()];
-    if (!mock || !type) return [404, { error: 'Mock is unavailable' }];
+  if (req.method === 'GET' && req.url?.startsWith('/mock/')) {
+    // /mock/<pass>/<key>~<value>/<file>: that option's design mock, or with no value the item's own view (a diagram or interactive page),
+    // and the files beside it in its own folder, so a mock page's relative css, scripts and images load.
+    const [item, ...rest] = new URL(req.url, 'http://localhost').pathname.split('/').slice(3), [key, value] = item?.split('~') ?? [];
+    const d = loadDecisions(file).find((x) => x.key === key);
+    const mock = value ? d?.mocks?.find((m) => m.value === value)?.path : value === '' && d?.view;
     try {
-      const actual = under(dirname(file), mockFile(mock));
+      const path = rest.map(decodeURIComponent).join('/'), type = assetTypes[extname(path).toLowerCase()];
+      if (!mock || !type) return [404, { error: 'Mock is unavailable' }];
+      const actual = under(dirname(under(dirname(file), mockFile(mock))), path);
       if (statSync(actual).size > MOCK_BYTES) return [404, { error: 'Mock is unavailable' }];
       return [200, { media: readFileSync(actual), type }];
     } catch { return [404, { error: 'Mock is unavailable' }]; }
@@ -1056,13 +1103,14 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
 
 const server = createServer(async (req, res) => {
   const { port: bound } = server.address() as AddressInfo;
-  // Only loopback names and the bound address: blocks DNS rebinding from a web page.
-  if (![`127.0.0.1:${bound}`, `localhost:${bound}`, `${urlHost(bind)}:${bound}`].includes(req.headers.host ?? '')) return res.writeHead(403).end('Forbidden host');
+  // Only loopback names, the bound address and the config's hosts: names: blocks DNS rebinding from a web page.
+  if (!['127.0.0.1', 'localhost', urlHost(bind), ...hosts].some((h) => `${h}:${bound}` === req.headers.host?.toLowerCase())) return res.writeHead(403).end('Forbidden host');
   if (!loopback(bind)) {
     // Beyond loopback every request carries the token: once in the link, then in a cookie the link sets.
     // The file is read on every request, so deleting or replacing it shuts old links out at once.
     const token = tokenOf(file), cookie = `sign-off-${bound}`, given = req.url?.startsWith('/?') ? new URL(req.url, 'http://x').searchParams.get('token') : null;
-    const sent = Buffer.from(given ?? req.headers.cookie?.split(/;\s*/).find((c) => c.startsWith(`${cookie}=`))?.slice(cookie.length + 1) ?? ''), want = Buffer.from(token);
+    const pass = /^\/mock\/([^/?]*)\//.exec(req.url ?? '')?.[1], want = Buffer.from(pass === undefined ? token : mockPass(token));
+    const sent = Buffer.from(pass ?? given ?? req.headers.cookie?.split(/;\s*/).find((c) => c.startsWith(`${cookie}=`))?.slice(cookie.length + 1) ?? '');
     if (!/^[\w-]{32,}$/.test(token) || sent.length !== want.length || !timingSafeEqual(sent, want)) {
       return res.writeHead(401, { 'content-type': 'text/plain; charset=utf-8' }).end('This board needs its access link: run sign-off-axi open on the computer that serves it and open the link it prints.');
     }

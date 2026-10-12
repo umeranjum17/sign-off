@@ -148,17 +148,18 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   appendFileSync(join(so, tour.media[0].path), 'x');
   assert.equal((await fetch(`${url}api/media?key=tour&i=0`)).status, 404);
   // Each view is served as its own sandboxed page that can fetch nothing, even opened full size.
-  for (const [key, type] of [['flow', 'image/svg+xml'], ['demo', 'text/html'], ['pick-the-sign-in-layout&value=a', 'text/html']]) {
-    const res = await fetch(`${url}api/mock?key=${key}`);
+  for (const [item, type] of [['flow~/flow.svg', 'image/svg+xml'], ['demo~/demo.html', 'text/html'], ['pick-the-sign-in-layout~a/a.html', 'text/html']]) {
+    const res = await fetch(`${url}mock/local/${item}`);
     assert.equal(res.headers.get('content-type'), type);
     assert.match(res.headers.get('content-security-policy'), /connect-src 'none'.*sandbox allow-scripts/);
   }
   assert.equal((await post(url, 'api/answers', { key: 'demo', answer: 'needs-work', note: 'Umer: the back step is lost.' })).status, 200);
   assert.equal(JSON.parse(run('answers', board, '--key', 'demo', '--json').out).demo.answer, 'needs-work');
   assert.deepEqual(api.rounds, []);
-  assert.equal(await (await fetch(`${url}api/mock?key=pick-the-sign-in-layout&value=a`)).text(), '<h1>Mock A</h1>');
-  assert.equal((await fetch(`${url}api/mock?key=pick-the-sign-in-layout&value=z`)).status, 404);
-  assert.equal(await (await fetch(`${url}api/mock?key=nav&value=b&variant=b`)).text(), '<p>variant page</p>');
+  assert.equal(api.mockBase, '/mock/local/');
+  assert.equal(await (await fetch(`${url}mock/local/pick-the-sign-in-layout~a/a.html`)).text(), '<h1>Mock A</h1>');
+  assert.equal((await fetch(`${url}mock/local/pick-the-sign-in-layout~z/a.html`)).status, 404);
+  assert.equal(await (await fetch(`${url}mock/local/nav~b/index.html?variant=b`)).text(), '<p>variant page</p>');
   assert.equal((await post(url, 'api/rounds', { key: 'pick-the-sign-in-layout', note: '' })).status, 400);
   assert.equal((await post(url, 'api/rounds', { key: 'gone', note: 'hi' })).status, 404);
   const waiting = spawn('node', [cli, 'wait', board, '--key', 'pick-the-sign-in-layout', '--timeout', '20']);
@@ -209,14 +210,14 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   const frozen = readFileSync(out, 'utf8');
   assert.match(frozen, /<meta http-equiv="content-security-policy" content="default-src 'none';/);
   const data = JSON.parse(/window\.FROZEN = (.*);<\/script>/.exec(frozen)[1]);
-  assert.equal(data.files['/api/mock?key=pick-the-sign-in-layout&value=a'], `data:text/html;base64,${Buffer.from('<h1>Mock A</h1>').toString('base64')}`);
+  assert.equal(data.files['/mock/local/pick-the-sign-in-layout~a/a.html'], `data:text/html;base64,${Buffer.from('<h1>Mock A</h1>').toString('base64')}`);
   // A one-page mock keeps its ?variant= in the frame URL; the trailing comment hides it from the page text.
-  assert.equal(data.files['/api/mock?key=nav&value=b&variant=b'], `data:text/html;charset=utf-8,${encodeURIComponent('<p>variant page</p>')}%3C!--?variant=b`);
+  assert.equal(data.files['/mock/local/nav~b/index.html?variant=b'], `data:text/html;charset=utf-8,${encodeURIComponent('<p>variant page</p>')}%3C!--?variant=b`);
   assert.equal(data.answers['pick-the-sign-in-layout'].answer, 'b');
   assert.equal(data.messages, undefined, 'the export leaves out comments and prompts');
   // A diagram and an interactive page are inlined too, so the frozen copy shows them with no server.
-  assert.equal(data.files['/api/mock?key=flow'], `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>').toString('base64')}`);
-  assert.ok(data.files['/api/mock?key=demo']);
+  assert.equal(data.files['/mock/local/flow~/flow.svg'], `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>').toString('base64')}`);
+  assert.ok(data.files['/mock/local/demo~/demo.html']);
   assert.ok(!frozen.includes(board), 'the export leaves out the board path');
 });
 
@@ -229,7 +230,7 @@ test('private-network bind: token on every route, kept across a restart', { skip
   const link = /url: "(.+)"/.exec(opened.out)[1], { origin, port, searchParams } = new URL(link), token = searchParams.get('token');
   assert.equal(token, readFileSync(board.replace('.json', '.token'), 'utf8').trim());
   assert.equal(statSync(board.replace('.json', '.token')).mode & 0o777, 0o600);
-  for (const path of ['/', '/api/decisions', '/api/board', '/api/mock?key=pick-the-sign-in-layout&value=a', '/api/media?key=x&i=0', `/?token=${'x'.repeat(token.length)}`]) {
+  for (const path of ['/', '/api/decisions', '/api/board', '/mock/local/pick-the-sign-in-layout~a/a.html', `/mock/${token}/pick-the-sign-in-layout~a/a.html`, '/api/media?key=x&i=0', `/?token=${'x'.repeat(token.length)}`]) {
     assert.equal((await fetch(`${origin}${path}`)).status, 401, path);
   }
   assert.equal((await post(`${origin}/`, 'api/messages', { kind: 'prompt', text: 'hi' })).status, 401);
@@ -240,7 +241,12 @@ test('private-network bind: token on every route, kept across a restart', { skip
   const api = await fetch(`${origin}/api/decisions`, { headers: { cookie } });
   assert.equal(api.status, 200);
   assert.equal(api.headers.get('access-control-allow-origin'), null);
-  assert.equal((await fetch(`${origin}/api/mock?key=pick-the-sign-in-layout&value=a`, { headers: { cookie } })).status, 200);
+  // A sandboxed mock frame sends no cookie: the mock's folder opens with the pass in its path, and nothing else does.
+  const { mockBase } = await api.json();
+  assert.match(mockBase, /^\/mock\/[a-f0-9]{64}\/$/);
+  assert.equal((await fetch(`${origin}${mockBase}pick-the-sign-in-layout~a/a.html`)).status, 200);
+  assert.equal((await fetch(`${origin}${mockBase}pick-the-sign-in-layout~a/b.html`)).status, 200);
+  assert.equal((await fetch(`${origin}${mockBase.replace('/mock/', '/api/')}decisions`)).status, 401);
   assert.match(run('status', board).out, /status: running/);
   assert.match(run('stop', board).out, /status: stopped/);
   const reopened = run('open', board, '--port', String(port), '--bind', mine.address);
@@ -431,4 +437,123 @@ test('serve refuses a board that already runs, and the first board keeps its rec
   assert.deepEqual([second.status, /code: CONFLICT/.test(second.stdout)], [1, true]);
   assert.match(run('status', board).out, new RegExp(`pid: ${pid}\\b`));
   assert.match(run('stop', board).out, /status: stopped/);
+});
+
+// A free port to name in a config.yaml.
+const freePort = async () => {
+  const s = createServer().listen(0, '127.0.0.1');
+  await new Promise((ok) => s.once('listening', ok));
+  const { port } = s.address();
+  await new Promise((ok) => s.close(ok));
+  return port;
+};
+const served = (proc) => new Promise((ok) => {
+  let out = '';
+  proc.stdout.on('data', (b) => { out += b; if (/pid: \d+/.test(out)) ok(out); });
+  proc.once('exit', () => ok(out));
+});
+const hostStatus = (url, host) => new Promise((ok, no) => get(url, { agent: false, headers: { host } }, (r) => (r.resume(), ok(r.statusCode))).on('error', no));
+
+test('a lock left by a sign-off-axi that stopped mid-write: raise names it, doctor prints its fix, the fix clears it', () => {
+  const dir = join(scratch, 'crashed'), sod = join(dir, '.sign-off'), lock = join(sod, 'decisions.json.lock');
+  run('init', dir);
+  writeFileSync(join(sod, 'config.yaml'), 'board: decisions.json\nport: 0\n');
+  assert.match(run('doctor', dir).out, /locks,none left behind/);
+  // What a crash leaves: the lock with the pid of a process that is gone.
+  writeFileSync(lock, `${spawnSync(process.execPath, ['-e', '']).pid}\n`);
+  const busy = run('raise', join(sod, 'decisions.json'), '--title', 'Ship it?');
+  assert.deepEqual([busy.code, /code: BUSY/.test(busy.out)], [1, true]);
+  assert.match(busy.out, /stopped mid-write left .*decisions\.json\.lock: run `rm /);
+  const broken = run('doctor', dir);
+  assert.equal(broken.code, 1);
+  const fix = /locks: decisions\.json\.lock left by a sign-off-axi that stopped mid-write, so every raise, post and open waits on it\. Run `([^`]+)`/.exec(broken.out)[1];
+  execFileSync('/bin/sh', ['-c', fix]);
+  assert.equal(run('doctor', dir).code, 0);
+  assert.match(run('raise', join(sod, 'decisions.json'), '--title', 'Ship it?').out, /ship-it,raised,/);
+});
+
+test('two serves of one board started at once: one runs, the other is refused', async () => {
+  const dir = join(scratch, 'race'), file = join(dir, '.sign-off', 'decisions.json');
+  run('init', dir);
+  // A stale record naming a port where a slow server shows another board: each serve's check takes 300 ms, so the two checks overlap.
+  const slow = createHttpServer((req, res) => setTimeout(() => res.end(JSON.stringify({ file: '/another/board.json', pid: 1 })), 300)).listen(0, '127.0.0.1');
+  await new Promise((ok) => slow.once('listening', ok));
+  writeFileSync(file.replace('.json', '.board.pid'), `1 ${slow.address().port} 127.0.0.1\n`);
+  const both = [0, 1].map(() => spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] }));
+  procs.push(...both);
+  const outs = await Promise.all(both.map(served)).finally(() => (slow.close(), slow.closeAllConnections()));
+  assert.equal(outs.filter((o) => /url: /.test(o)).length, 1, outs.join('\n'));
+  assert.equal(outs.filter((o) => /code: CONFLICT/.test(o)).length, 1, outs.join('\n'));
+  assert.match(run('status', file).out, new RegExp(`pid: ${/pid: (\d+)/.exec(outs.find((o) => /url: /.test(o)))[1]}\\b`));
+  both.forEach((p) => p.kill());
+});
+
+test('a mock page loads the css and images beside it, and nothing outside its own folder', async () => {
+  const dir = join(scratch, 'siblings'), sod = join(dir, '.sign-off'), file = join(sod, 'decisions.json'), page = join(sod, 'mocks', 'card');
+  run('init', dir);
+  mkdirSync(join(page, 'img'), { recursive: true });
+  writeFileSync(join(page, 'index.html'), '<link rel="stylesheet" href="style.css"><img src="img/dot.png"><p>card</p>');
+  writeFileSync(join(page, 'style.css'), 'p { color: teal }');
+  writeFileSync(join(page, 'img', 'dot.png'), png);
+  writeFileSync(join(page, 'notes.json'), '{}');
+  writeFileSync(join(sod, 'mocks', 'other.css'), 'p { color: red }');
+  assert.match(run('post', file, '--type', 'design', '--key', 'card', '--title', 'Pick the card', '--option', 'a=A', '--option', 'b=B',
+    '--mock', 'a=mocks/card/index.html?variant=a', '--mock', 'b=mocks/card/index.html?variant=b').out, /card,raised,/);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  // The frame's own URL, as the page builds it; the browser resolves the page's relative names against it.
+  const frame = new URL(`${(await (await fetch(`${url}api/decisions`)).json()).mockBase.slice(1)}card~a/index.html?variant=a`, url);
+  assert.match(await (await fetch(frame)).text(), /<p>card<\/p>/);
+  const css = await fetch(new URL('style.css', frame));
+  assert.deepEqual([css.status, css.headers.get('content-type'), await css.text()], [200, 'text/css', 'p { color: teal }']);
+  assert.match(css.headers.get('content-security-policy'), /connect-src 'none'.*sandbox allow-scripts/);
+  const dot = await fetch(new URL('img/dot.png', frame));
+  assert.deepEqual([dot.status, dot.headers.get('content-type')], [200, 'image/png']);
+  for (const escape of ['notes.json', '../other.css', '..%2Fother.css', '..%2F..%2Fdecisions.json', '..%2F..%2Fconfig.yaml', 'missing.css']) {
+    const res = await fetch(`${frame.href.replace(/index\.html.*/, '')}${escape}`);
+    assert.notEqual(res.status, 200, escape);
+  }
+  proc.kill();
+});
+
+test('hosts: a private DNS name in config.yaml is let in besides the bind address, and doctor checks it leads there', async () => {
+  const dir = join(scratch, 'hosts'), sod = join(dir, '.sign-off'), file = join(sod, 'decisions.json'), config = join(sod, 'config.yaml');
+  run('init', dir);
+  writeFileSync(config, 'board: decisions.json\nport: 0\nbind: 127.0.0.1\nhosts: Board.example, box.example.\n');
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1], { port } = new URL(url);
+  assert.deepEqual(await Promise.all([`board.example:${port}`, `box.example:${port}`, `127.0.0.1:${port}`, `evil.example:${port}`, `board.example:1`].map((h) => hostStatus(`${url}api/board`, h))),
+    [200, 200, 200, 403, 403]);
+  proc.kill();
+  writeFileSync(config, 'board: decisions.json\nport: 0\nbind: 127.0.0.1\nhosts: board.invalid\n');
+  const astray = run('doctor', dir);
+  assert.equal(astray.code, 1);
+  assert.match(astray.out, /hosts: board\.invalid does not resolve \([A-Z_]+\), not the bind address 127\.0\.0\.1\. Point each name at 127\.0\.0\.1 in your private network's DNS, or take it off the hosts: line of /);
+  writeFileSync(config, 'board: decisions.json\nport: 0\nbind: 127.0.0.1\nhosts: bad_name!\n');
+  assert.match(run('doctor', dir).out, /config: config\.yaml: hosts bad_name! is not a DNS name/);
+  writeFileSync(config, 'board: decisions.json\nport: 0\nbind: 127.0.0.1\nhosts: localhost\n');
+  assert.match(run('doctor', dir).out, /hosts,localhost resolves to 127\.0\.0\.1/);
+  assert.equal(run('doctor', dir).code, 0);
+});
+
+test('a symlinked board: doctor, open and serve all read the config.yaml beside the link', async () => {
+  const dir = join(scratch, 'linked'), sod = join(dir, '.sign-off'), link = join(sod, 'decisions.json'), away = join(scratch, 'linked-away');
+  run('init', dir);
+  const [here, there] = [await freePort(), await freePort()];
+  mkdirSync(away);
+  writeFileSync(join(away, 'real.json'), '{"schema": 2, "items": []}\n');
+  writeFileSync(join(away, 'config.yaml'), `board: real.json\nport: ${there}\n`);
+  rmSync(link);
+  symlinkSync(join(away, 'real.json'), link);
+  writeFileSync(join(sod, 'config.yaml'), `board: decisions.json\nport: ${here}\n`);
+  assert.match(run('doctor', dir).out, new RegExp(`config,"board decisions\\.json, port ${here}"`));
+  const opened = run('open', link);
+  assert.match(opened.out, new RegExp(`url: "http://127\\.0\\.0\\.1:${here}/"`));
+  assert.match(run('stop', link).out, /status: stopped/);
+  const proc = spawn(process.execPath, [cli, 'serve', link], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  assert.match(await served(proc), new RegExp(`url: "http://127\\.0\\.0\\.1:${here}/"`));
+  proc.kill();
 });
