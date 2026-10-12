@@ -40,8 +40,8 @@
   relative to the board file's folder (keep it under `mocks/<key>/`), served only
   from inside that folder. A diagram is an image (`.svg`, `.png`, `.jpg`,
   `.jpeg`, `.webp`, 5 MB or less) shown at card width; tap it to open it full
-  size. An interactive item is one self-contained `.html` page (inline CSS and
-  JS, images as `data:` URLs) run in a sandboxed frame. Every mock and view
+  size. An interactive item is one `.html` page run in a sandboxed frame; it
+  can load files beside it (see `mocks`). Every mock and view
   file is served under a Content-Security-Policy that blocks `fetch`, remote
   files, nested frames and forms, and gives the page no access to the dashboard
   or its tab. A link in the page can still open a web page in its full-size tab. Both types
@@ -69,7 +69,12 @@
   `path` to a mock file (`.html`, `.svg`, `.png`, `.jpg`, `.jpeg`, `.webp`), relative to the board file's folder. Each value must
   name one of the item's own options. Served only from inside that folder. An
   `.html` path may end in `?variant=<name>` (1-64 of `A-Z a-z 0-9 . _ -`): the
-  page is loaded with that query, so one page can show each variant.
+  page is loaded with that query, so one page can show each variant. An `.html`
+  mock or view loads the files beside it by relative name (`style.css`,
+  `img/dot.png`): the board serves `.html`, `.css`, `.js`, `.mjs`, `.svg`,
+  `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.woff2`, `.mp4` and `.webm` files
+  from inside that page's own folder only, never anything above it. `export`
+  inlines the page itself, so those files show only on the running board.
 - `options`: optional, 2 to 6 choices. Each has a `value` (1-128 of `A-Z a-z 0-9 . _ -`, unique within the question) and a non-empty `label` shown on its button. Leave it out for **Yes** (`yes`) and **No** (`no`); files written before options existed read exactly as before.
 - `recommend_value`, `default_if_silent`: optional, the `value` of one of the question's own options (`yes` or `no` when `options` is left out). Shown, never applied.
 - `close`: optional, `done` (default) or `release`; copied into the answer.

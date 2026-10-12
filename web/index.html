@@ -339,10 +339,12 @@
     }));
   }
 
+  /** A mock or view is served from inside its own folder, so the files beside it load by their relative names. */
+  const mockUrl = (key, value, path) => `${state.mockBase}${key}~${value}/${encodeURIComponent(path.split('?')[0].split('/').pop())}`;
   /** A diagram shows inline at card width; an interactive page runs in a sandboxed frame. A tap or the link opens either full size. */
   function rung(d) {
     if (!d.view) return '';
-    const url = `/api/mock?key=${encodeURIComponent(d.key)}`, page = d.type === 'interactive';
+    const url = mockUrl(d.key, '', d.view), page = d.type === 'interactive';
     const open = { href: src(url), target: '_blank', rel: 'noopener' }, name = page ? 'interactive page' : 'diagram';
     let body;
     if (page) body = el('div', { class: 'frame' }, el('iframe', { src: src(url), title: `Interactive page: ${d.title}`, sandbox: 'allow-scripts', loading: 'lazy' }));
@@ -361,7 +363,7 @@
       const m = d.mocks?.find((x) => x.value === o.value);
       // A `page.html?variant=b` mock keeps its variant in the frame's query, where the page reads it.
       const [path, query] = m?.path.split('?') ?? [];
-      const url = m && src(`/api/mock?key=${encodeURIComponent(d.key)}&value=${encodeURIComponent(m.value)}${query ? `&${query}` : ''}`);
+      const url = m && src(mockUrl(d.key, m.value, path) + (query ? `?${query}` : ''));
       const view = m && (/\.html?$/i.test(path) ? el('iframe', { src: url, title: `Mock ${o.label}`, sandbox: 'allow-scripts', tabindex: '-1', 'aria-hidden': 'true', loading: 'lazy' })
         : el('img', { src: url, alt: `Mock: ${o.label}` }));
       return el('figure', { class: 'mock' },

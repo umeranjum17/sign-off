@@ -28,7 +28,11 @@ decisions.decisions[0].title = 'Umer: Ship the new sign-in screen this week?';
 decisions.decisions[0].evidence = { run_id: runId, commit, outcome: 'Umer can see the updated sign-in screen.', repro: 'repro: n/a: no bug', proof: 'verify-sign-off: real browser journey', evidence: 'after.png' };
 writeFileSync(file, JSON.stringify(decisions));
 const procs = [];
-after(() => procs.forEach((p) => p.kill()));
+after(async () => {
+  // A dying serve removes its own run record; removing the scratch folder under it leaves the folder behind.
+  await Promise.all(procs.map((p) => p.exitCode ?? p.signalCode ?? new Promise((ok) => p.once('exit', ok).kill())));
+  rmSync(scratch, { recursive: true, force: true });
+});
 async function serve(f = file) {
   const proc = spawn('node', [cli, 'serve', f, '--port', '0', '--evidence-root', root], { cwd: tmpdir() });
   procs.push(proc);
@@ -103,7 +107,7 @@ test('answer journey: save, survive a torn line and a restart, read back', async
 });
 
 test('agent journey: raise, open, answer, read back in TOON and JSON', async () => {
-  const env = { ...process.env, HOME: mkdtempSync(join(tmpdir(), 'sign-off-home-')) };
+  const env = { ...process.env, HOME: mkdtempSync(join(scratch, 'home-')) };
   const run = (...args) => {
     try {
       return { out: execFileSync('node', [cli, ...args], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }), code: 0 };
@@ -215,7 +219,7 @@ test('old files and answers read as before; a one-of-few answer with a note surv
   proc.kill();
 
   // An agent raises a one-of-few question from the CLI and reads the note back.
-  const env = { ...process.env, HOME: mkdtempSync(join(tmpdir(), 'sign-off-home-')) };
+  const env = { ...process.env, HOME: mkdtempSync(join(scratch, 'home-')) };
   const run = (...args) => {
     try {
       return { out: execFileSync('node', [cli, ...args], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }), code: 0 };
@@ -232,7 +236,7 @@ test('old files and answers read as before; a one-of-few answer with a note surv
   assert.equal(run('raise', '--from', opts, '--option', 'a=A').code, 2);
   const opened = run('open', '--port', '0');
   const boardUrl = /url: "(.+)"/.exec(opened.out)[1];
-  after(() => process.kill(Number(/pid: (\d+)/.exec(opened.out)[1])));
+  after(() => run('stop'));
   assert.equal((await post(boardUrl, { key: 'when-should-it-ship', answer: 'next-week', note: 'Umer: after the review, please.' })).status, 200);
   assert.match(run('answers').out, /answers\[1\]\{key,answer,at,note\}:\n  when-should-it-ship,next-week,[^,]+,"Umer: after the review, please."/);
   assert.equal(JSON.parse(run('answers', '--json').out)['when-should-it-ship'].note, 'Umer: after the review, please.');
