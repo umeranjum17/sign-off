@@ -9,7 +9,7 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { CHAPTERS_MAX, type Decision, InputError, MEDIA_MAX, NOTE_MAX, answersPath, appendAnswer, appendRound, createOnce, loadDecisions, readAnswers, readItems, readRounds, roundsPath, writeItems } from './store.js';
+import { CHAPTERS_MAX, type Decision, InputError, MEDIA_MAX, NOTE_MAX, answersPath, appendAnswer, appendRound, loadDecisions, readAnswers, readItems, readRounds, roundsPath, writeItems } from './store.js';
 
 const BOARD = join(homedir(), '.sign-off', 'decisions.json');
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
@@ -574,7 +574,13 @@ function init(args: string[]) {
   mkdirSync(join(so, 'mocks'), { recursive: true });
   mkdirSync(join(so, 'evidence'), { recursive: true });
   const created: string[] = [], kept: string[] = [];
-  for (const [path, content] of files) (createOnce(path, content) ? created : kept).push(path.slice(dir.length + 1));
+  for (const [path, content] of files) {
+    if (existsSync(path)) kept.push(path.slice(dir.length + 1));
+    else {
+      writeFileSync(path, content, { mode: 0o600 });
+      created.push(path.slice(dir.length + 1));
+    }
+  }
   return toon({ dir: tilde(dir), created: created.length ? created : 'nothing new (re-run is a no-op)', kept, board: tilde(board) },
     [`Run \`sign-off-axi post ${shellPath(board)} --type design --title "<question>" --option a=A --option b=B\` to ask for a pick`,
       `Run \`sign-off-axi doctor ${shellPath(dir)}\` to check the setup`, `Run \`sign-off-axi open ${shellPath(board)}\` to show the board to the user`]);
@@ -595,7 +601,7 @@ async function doctor(args: string[]) {
   /** A permission problem is fixed by chmod on the setup folder holding the path; anything else in the way is moved aside. */
   const unreadable = (path: string, code: string, then: string) => ['EACCES', 'EPERM'].includes(code) ? `Run \`chmod -R u+rwX ${shellPath(dirname(path))}\`` : `Move ${shellPath(path)} away, then ${then}`;
   /** Why a setup file cannot be used and its fix, or nothing when it is a readable file with content. */
-  const writable = (path: string) => { try { accessSync(path, constants.W_OK); return true; } catch { return false; } };
+  const writeError = (path: string): string | undefined => { try { accessSync(path, constants.W_OK); } catch (e: any) { return e.code; } };
   const unusable = (path: string): [string, string] | undefined => {
     const stat = look(path);
     if (stat === 'denied') return [`${basename(path)} cannot be read (permission denied)`, unreadable(path, 'EACCES', `run \`${rerun}\``)];
@@ -667,9 +673,14 @@ async function doctor(args: string[]) {
         `run \`${rerun}\``,
       ];
       check('folders', problems.join('; ') || 'mocks/ and evidence/ exist', problems.length ? `${steps.join(', then ')}`.replace(/^./, (c) => c.toUpperCase()) : undefined);
-      const unwritable = [so, answersPath(board), roundsPath(board), join(so, 'evidence')].filter((p) => existsSync(p) && !writable(p));
-      check('write', unwritable.length ? `${unwritable.map((p) => basename(p)).join(' and ')} cannot be written` : 'setup can be written',
-        unwritable.length ? `Run \`chmod u+w ${unwritable.map((p) => shellPath(p)).join(' ')}\`` : undefined);
+      const unwritable = [so, answersPath(board), roundsPath(board), join(so, 'evidence')].flatMap((p) => {
+        const code = existsSync(p) ? writeError(p) : undefined;
+        return code ? [{ path: p, code }] : [];
+      });
+      const writeFix = ({ path, code }: { path: string; code: string }) => code === 'EROFS' ? 'the filesystem is read-only: remount it read-write or move the repo'
+        : code === 'EPERM' ? 'chown it to you (or run as its owner)' : `Run \`chmod u+w ${shellPath(path)}\``;
+      check('write', unwritable.length ? `${unwritable.map(({ path }) => basename(path)).join(' and ')} cannot be written` : 'setup can be written',
+        unwritable.length ? [...new Set(unwritable.map(writeFix))].join('; ') : undefined);
     }
   } catch (e: any) {
     if (!e.syscall) throw e;
