@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Decisions · sign-off</title>
+<title>Dashboard · sign-off</title>
 <style>
   :root { color-scheme: light dark;
     --bg: #FFFFFF; --surface: #F7F7F8; --line: #E6E6EA; --text: #1A1A1E; --muted: #5E5E6B;
@@ -23,7 +23,7 @@
   .banner { margin: 1rem 0 0; padding: 0.75rem 1rem; border: 1px solid var(--danger); border-radius: 0.5rem; color: var(--danger); }
   h2 { font-size: 0.8125rem; font-weight: 600; color: var(--muted); margin: 2rem 0 0.5rem; letter-spacing: 0.01em; }
   .list { background: var(--surface); border: 1px solid var(--line); border-radius: 0.75rem; }
-  .row { display: grid; gap: 0.875rem; padding: 1rem; }
+  .row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.875rem; padding: 1rem; }
   .row + .row { border-top: 1px solid var(--line); }
   .row h3 { font-size: 1.0625rem; font-weight: 600; line-height: 1.4; margin: 0; }
   .about, details p { color: var(--muted); margin: 0.25rem 0 0; max-width: 70ch; }
@@ -49,6 +49,7 @@
   .unverified, .media .gone { color: var(--danger); margin: .5rem 0; }
   .update-media { grid-column: 1 / -1; }
   .meta a { color: var(--accent); }
+  .err:empty { display: none; }
   .err:not(:empty) { color: var(--danger); font-size: 0.875rem; margin-top: 0.5rem; }
   .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
   button { min-height: 2.75rem; padding: 0 1.25rem; border-radius: 0.5rem; border: 1px solid var(--border); cursor: pointer;
@@ -60,11 +61,24 @@
   .choices.many button { flex: 1 1 auto; max-width: 100%; padding: 0.5rem 1rem; }
   .note label { display: block; color: var(--muted); font-size: 0.8125rem; margin-top: 0.5rem; }
   .tradeoff { color: var(--muted); font-size: 0.875rem; margin: 0.5rem 0 0; max-width: 70ch; }
-  .mocks { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 0.75rem; }
-  .mock { margin: 0; border: 1px solid var(--line); border-radius: 0.7rem; overflow: hidden; background: var(--bg); min-width: 0; }
-  .mock iframe { display: block; width: 100%; height: 16rem; border: 0; background: #fff; }
-  .mock img { display: block; width: 100%; max-height: 16rem; object-fit: contain; background: #111; }
-  .mock figcaption { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; }
+  .head { display: flex; align-items: flex-start; gap: 0.5rem; }
+  .chip { flex: none; margin-top: 0.2rem; padding: 0 0.5rem; border: 1px solid var(--line); border-radius: 999px; color: var(--muted);
+    font-size: 0.6875rem; font-weight: 600; line-height: 1.25rem; letter-spacing: 0.04em; text-transform: uppercase; }
+  .line summary { color: var(--muted); list-style: none; margin: 0; width: auto; }
+  .line summary::-webkit-details-marker { display: none; }
+  .line:not([open]) summary { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .line strong { color: var(--text); font-weight: 600; }
+  .mocks { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 0.75rem; }
+  .mock { display: flex; flex-direction: column; margin: 0; border: 1px solid var(--line); border-radius: 0.7rem; overflow: hidden; background: var(--bg); min-width: 0; }
+  .mock:has([aria-pressed="true"]) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  /* A preview draws the mock at twice the card width at half size, cropped from the top, so every card is the same height. */
+  .shot { position: relative; display: block; overflow: hidden; height: 11rem; background: #fff; border-bottom: 1px solid var(--line); }
+  .shot iframe { position: absolute; inset: 0 auto auto 0; width: 200%; height: 200%; border: 0; transform: scale(0.5); transform-origin: 0 0; pointer-events: none; }
+  .shot img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+  .mock figcaption { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-top: auto; padding: 0.625rem 0.75rem 0.75rem; font-size: 0.875rem; }
+  .mock figcaption .label { flex: 1 1 6rem; font-weight: 500; }
+  .mock figcaption button { flex: 1 0 100%; }
+  .badge { padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
   .round { margin-top: 0.5rem; }
   textarea { display: block; width: 100%; max-width: 70ch; margin-top: 0.25rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border);
     border-radius: 0.5rem; background: var(--bg); color: var(--text); font: inherit; resize: vertical; }
@@ -73,7 +87,8 @@
   .empty { margin: 0; padding: 1.5rem 1rem; color: var(--muted); text-align: center; }
   @media (min-width: 45rem) {
     .bar, main { padding: 0 2rem; }
-    .row { grid-template-columns: 1fr auto; align-items: start; gap: 2rem; padding: 1.125rem 1.25rem; }
+    .row { grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 2rem; padding: 1.125rem 1.25rem; }
+    .row.design { grid-template-columns: minmax(0, 1fr); gap: 0.875rem; }
     .choices { grid-template-columns: repeat(2, 5.5rem); }
     .row:has(.choices.many) { row-gap: 0.875rem; }
     .choices.many { grid-column: 1 / -1; }
@@ -84,7 +99,7 @@
 <body>
 <header><div class="bar">
   <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6" fill="var(--accent)"/><path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="var(--on-accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-  <h1>Decisions</h1><span class="count" id="count" aria-live="polite"></span>
+  <h1>Dashboard</h1><span class="count" id="count" aria-live="polite"></span>
 </div></header>
 <main><p class="banner" id="banner" role="alert" hidden></p><div id="board"></div></main>
 <script>
@@ -137,22 +152,48 @@
       media.childElementCount ? media : el('p', { class: 'meta' }, 'No recorded image or recording.'));
   }
 
+  const NAMES = { decision: 'Decision', design: 'Design', evidence: 'Evidence' };
+  // Any other type gets the plain card until it has its own renderer.
+  const chip = (d) => el('span', { class: 'chip' }, NAMES[d.type] ?? d.type.replace(/-/g, ' '));
+
   function row(d) {
-    const meta = [['Recommended', d.recommend_value], ['If no answer', d.default_if_silent]].filter(([, v]) => v);
     const err = el('div', { class: 'err', role: 'alert' });
     const saved = Object.hasOwn(state.answers, d.key) ? state.answers[d.key] : undefined;
+    const design = d.type === 'design';
+    const buttons = d.options.map((o) => el('button', {
+      class: o.value === d.recommend_value && !design ? 'rec' : '', 'aria-label': `${o.label}, ${d.title}`,
+      'aria-pressed': o.value === saved?.answer,
+    }, design ? (o.value === saved?.answer ? 'Picked' : 'Pick') : o.label));
+    buttons.forEach((b, i) => (b.onclick = () => save(d, d.options[i], buttons, err)));
+    const head = el('div', { class: 'head' }, chip(d), el('h3', { dir: 'auto' }, d.type === 'evidence' ? `Update ${d.number} · ${d.title}` : d.title));
+    const silent = d.default_if_silent ? `If no answer: ${d.options.find((o) => o.value === d.default_if_silent).label}` : '';
+    if (design) {
+      return el('article', { class: 'row design' }, head,
+        d.tradeoff ? el('details', { class: 'line' }, el('summary', { dir: 'auto' }, el('strong', {}, 'Trade-off '), d.tradeoff)) : '',
+        mockCards(d, buttons), silent ? el('p', { class: 'meta' }, silent) : '', more(d, saved, err), err);
+    }
     // Yes/No rows keep the two fixed buttons they always had; any other choice set wraps.
     const many = d.options.map((o) => o.value).sort().join() !== 'no,yes';
     const update = d.type === 'evidence';
+    const meta = [d.recommend_value && `Recommended: ${d.options.find((o) => o.value === d.recommend_value).label}`, silent].filter(Boolean);
+    return el('article', { class: 'row' }, el('div', {},
+      head,
+      d.about ? el('p', { class: update ? 'about full' : 'about', dir: 'auto' }, d.about) : '',
+      d.detail || (!update && d.about?.length > 180) ? el('details', {}, el('summary', {}, 'Show more'),
+        ...[d.about, d.detail].filter(Boolean).map((t) => el('p', { dir: 'auto' }, t))) : '',
+      d.link ? el('p', { class: 'meta' }, /^https?:/.test(d.link)
+        ? el('a', { href: d.link, target: '_blank', rel: 'noopener' }, d.link) : `Commit ${d.link}`) : '',
+      meta.length ? el('p', { class: 'meta' }, meta.join(' · ')) : '',
+      more(d, saved, err),
+      err,
+    ), updateMedia(d), el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': d.title }, ...buttons), evidenceCard(d));
+  }
+
+  /** The note and another-round controls, folded away until the person wants them. An evidence update takes a note only. */
+  function more(d, saved, err) {
     const box = el('textarea', { id: `note-${d.key}`, rows: 2, maxlength: 500, dir: 'auto' });
     box.value = drafts.get(d.key) ?? saved?.note ?? '';
     box.oninput = () => drafts.set(d.key, box.value);
-    const noteText = saved?.note ? 'Edit note' : 'Add a note';
-    const buttons = d.options.map((o) => el('button', {
-      class: o.value === d.recommend_value ? 'rec' : '', 'aria-label': `${o.label}, ${d.title}`,
-      'aria-pressed': o.value === state.answers[d.key]?.answer,
-    }, o.label));
-    buttons.forEach((b, i) => (b.onclick = () => save(d, d.options[i], buttons, err)));
     const asked = (state.rounds ?? []).filter((r) => r.key === d.key);
     const roundBtn = el('button', { class: 'round', 'aria-label': `Ask for another round, ${d.title}` }, 'Ask for another round');
     roundBtn.onclick = () => {
@@ -165,22 +206,13 @@
         roundBtn.disabled = false;
       });
     };
-    return el('article', { class: 'row' }, el('div', {},
-      el('h3', { dir: 'auto' }, update ? `Update ${d.number} · ${d.title}` : d.title),
-      d.about ? el('p', { class: update ? 'about full' : 'about', dir: 'auto' }, d.about) : '',
-      d.detail || (!update && d.about?.length > 180) ? el('details', {}, el('summary', {}, 'Show more'),
-        ...[d.about, d.detail].filter(Boolean).map((t) => el('p', { dir: 'auto' }, t))) : '',
-      d.tradeoff ? el('p', { class: 'tradeoff', dir: 'auto' }, `Trade-off: ${d.tradeoff}`) : '',
-      d.link ? el('p', { class: 'meta' }, /^https?:/.test(d.link)
-        ? el('a', { href: d.link, target: '_blank', rel: 'noopener' }, d.link) : `Commit ${d.link}`) : '',
-      meta.length ? el('p', { class: 'meta' }, meta.map(([k, v]) => `${k}: ${d.options.find((o) => o.value === v).label}`).join(' · ')) : '',
-      saved?.note ? el('p', { class: 'meta saved-note', dir: 'auto' }, `Your note: ${saved.note}`) : '',
-      asked.length ? el('p', { class: 'meta', dir: 'auto' }, `You asked for another round${asked.length > 1 ? ` (${asked.length})` : ''}: ${asked[asked.length - 1].note}`) : '',
-      el('details', { class: 'note', ...(drafts.has(d.key) && { open: '' }) }, el('summary', { 'aria-label': `${noteText}, ${d.title}` }, noteText),
-        el('label', { for: box.id }, update ? 'Optional note, sent with your verdict' : 'Optional note, sent with the answer you pick'), box),
-      update ? '' : roundBtn,
-      err,
-    ), updateMedia(d), el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': d.title }, ...buttons), mockCards(d), evidenceCard(d));
+    const update = d.type === 'evidence', title = update ? 'Note' : 'Note or another round';
+    const status = [saved?.note && 'note saved', asked.length && `${asked.length} ${asked.length > 1 ? 'rounds' : 'round'} asked`].filter(Boolean).join(' · ');
+    return el('details', { class: 'note', ...(drafts.has(d.key) && { open: '' }) },
+      el('summary', { 'aria-label': `${title}, ${d.title}` }, `${title}${status && ` · ${status}`}`),
+      asked.length ? el('p', { class: 'meta saved-note', dir: 'auto' }, `You asked for another round: ${asked[asked.length - 1].note}`) : '',
+      el('label', { for: box.id }, update ? 'Optional note, sent with your verdict' : 'Optional note, sent with the answer you pick or the round you ask for'), box,
+      update ? '' : roundBtn);
   }
 
   // Each file is hash-checked by the server; one that changed or went missing says so instead of a broken frame.
@@ -195,26 +227,26 @@
     }));
   }
 
-  function mockCards(d) {
-    if (d.type !== 'design' || !d.mocks?.length) return '';
-    return el('div', { class: 'mocks' }, ...d.mocks.map((m) => {
-      const label = d.options.find((o) => o.value === m.value)?.label ?? m.value;
-      const url = `/api/mock?key=${encodeURIComponent(d.key)}&value=${encodeURIComponent(m.value)}`;
-      const view = /\.html?$/i.test(m.path) ? el('iframe', { src: url, title: `Mock ${label}`, loading: 'lazy' })
-        : el('img', { src: url, alt: `Mock: ${label}` });
-      return el('figure', { class: 'mock' }, view, el('figcaption', {},
-        el('span', {}, label),
-        m.value === d.recommend_value ? el('span', { class: 'verdict', 'data-result': 'RUN PASS' }, 'Recommended') : ''));
+  /** One card per option: the mock preview (tap opens it full size), its label, the Recommended badge and its Pick button. */
+  function mockCards(d, buttons) {
+    return el('div', { class: 'mocks', role: 'group', 'aria-label': d.title }, ...d.options.map((o, i) => {
+      const m = d.mocks?.find((x) => x.value === o.value);
+      const url = m && `/api/mock?key=${encodeURIComponent(d.key)}&value=${encodeURIComponent(m.value)}`;
+      const view = m && (/\.html?$/i.test(m.path) ? el('iframe', { src: url, title: `Mock ${o.label}`, tabindex: '-1', 'aria-hidden': 'true', loading: 'lazy' })
+        : el('img', { src: url, alt: `Mock: ${o.label}` }));
+      return el('figure', { class: 'mock' },
+        m ? el('a', { class: 'shot', href: url, target: '_blank', rel: 'noopener', 'aria-label': `Open mock ${o.label} full size` }, view) : '',
+        el('figcaption', {}, el('span', { class: 'label', dir: 'auto' }, o.label),
+          o.value === d.recommend_value ? el('span', { class: 'badge' }, 'Recommended') : '', buttons[i]));
     }));
   }
 
   function render() {
-    const asks = state.decisions.filter((d) => d.type !== 'evidence');
-    const updates = state.decisions.filter((d) => d.type === 'evidence').sort((a, b) => b.number - a.number);
-    const waiting = asks.filter((d) => !Object.hasOwn(state.answers, d.key));
-    const answered = asks.filter((d) => Object.hasOwn(state.answers, d.key));
-    const unjudged = updates.filter((d) => !Object.hasOwn(state.answers, d.key)).length;
-    document.getElementById('count').textContent = `${waiting.length + unjudged} waiting · ${answered.length + updates.length - unjudged} answered`;
+    // The board file appends new items at the end, so reversed is newest first.
+    const items = [...state.decisions].reverse();
+    const waiting = items.filter((d) => !Object.hasOwn(state.answers, d.key));
+    const answered = items.filter((d) => Object.hasOwn(state.answers, d.key));
+    document.getElementById('count').textContent = `${waiting.length} waiting · ${answered.length} answered`;
     const list = (items) => el('div', { class: 'list' }, ...items.map(row));
     document.getElementById('board').replaceChildren(
       el('h2', {}, 'Waiting'), waiting.length ? list(waiting) : el('p', { class: 'list empty' }, unjudged ? 'No questions waiting.' : 'Nothing is waiting on you.'),
@@ -224,7 +256,7 @@
 
   const banner = document.getElementById('banner');
   call('/api/decisions').then(() => (banner.hidden = true), (e) => {
-    banner.textContent = `Can't read the decisions file: ${e.message}`;
+    banner.textContent = `Can't read the board file: ${e.message}`;
     banner.hidden = false;
   });
 </script>

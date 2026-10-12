@@ -21,7 +21,7 @@ const VERDICTS: Option[] = [{ value: 'pass', label: 'Pass' }, { value: 'fail', l
 export const MEDIA_MAX = 12;
 const isText = (v: unknown) => typeof v === 'string';
 const isKey = (v: unknown) => isText(v) && /^[A-Za-z0-9._-]{1,128}$/.test(v as string);
-const ONE_OF: Record<string, unknown[]> = { type: ['decision', 'design', 'evidence'], close: ['done', 'release'] };
+const ONE_OF: Record<string, unknown[]> = { close: ['done', 'release'] };
 export const NOTE_MAX = 500;
 const TRADEOFF_MAX = 1000;
 
@@ -47,6 +47,8 @@ export function loadDecisions(path: string): Decision[] {
       || ['outcome', 'repro', 'proof', 'evidence'].some((f) => !isText(d.evidence[f]) || !d.evidence[f].trim() || d.evidence[f].length > 1000))) {
       throw bad('evidence', 'must name a done-done run, full commit, and four Checks lines');
     }
+    // Any lowercase type word loads; the page shows a plain card for a type it has no renderer for.
+    if (d.type !== undefined && !(isText(d.type) && /^[a-z][a-z0-9-]{0,31}$/.test(d.type))) throw bad('type', 'must be a lowercase word such as decision or design');
     for (const [f, allowed] of Object.entries(ONE_OF)) if (d[f] !== undefined && !allowed.includes(d[f])) throw bad(f, `must be ${allowed.join(' or ')}`);
     if (d.type === 'evidence') {
       if (!Number.isInteger(d.number) || d.number < 1) throw bad('number', 'must be a whole number from 1');

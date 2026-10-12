@@ -44,17 +44,24 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   assert.equal(run('post', board, '--type', 'design', '--title', 'Other?', '--option', 'a=A', '--option', 'b=B', '--mock', 'a=../outside.html').code, 2);
   assert.equal(run('post', board, '--type', 'design', '--title', 'Other?', '--option', 'a=A', '--option', 'b=B', '--mock', 'a=mocks/a.txt').code, 2);
   assert.equal(run('post', board, '--type', 'nope', '--title', 'Other?').code, 2);
+  // A type with no renderer yet still loads, and lands on the page as a plain card.
+  writeFileSync(join(scratch, 'report.json'), JSON.stringify({ schema: 1, decisions: [{ key: 'weekly-report', type: 'report', title: 'Approve the weekly report?' }] }));
+  assert.match(run('raise', board, '--from', join(scratch, 'report.json')).out, /weekly-report,raised,/);
+  writeFileSync(join(scratch, 'bad-type.json'), JSON.stringify({ schema: 1, decisions: [{ key: 'x', type: 'Not A Type', title: 'X?' }] }));
+  assert.equal(run('raise', board, '--from', join(scratch, 'bad-type.json')).code, 2);
   const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: tmpdir() });
   procs.push(proc);
   const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
   const html = await (await fetch(url)).text();
-  assert.match(html, /<title>Decisions/);
+  assert.match(html, /<title>Dashboard/);
   assert.match(html, /mockCards/);
+  assert.match(html, /<h1>Dashboard<\/h1>/);
   const api = await (await fetch(`${url}api/decisions`)).json();
   assert.equal(api.decisions[0].type, 'design');
   assert.equal(api.decisions[0].title, 'Pick the sign-in layout');
   assert.equal(api.decisions[0].tradeoff, 'B scans fastest; A is simplest.');
   assert.equal(api.decisions[0].mocks.length, 3);
+  assert.deepEqual(api.decisions.map((d) => d.type), ['design', 'report']);
   assert.deepEqual(api.rounds, []);
   assert.equal(await (await fetch(`${url}api/mock?key=pick-the-sign-in-layout&value=a`)).text(), '<h1>Mock A</h1>');
   assert.equal((await fetch(`${url}api/mock?key=pick-the-sign-in-layout&value=z`)).status, 404);

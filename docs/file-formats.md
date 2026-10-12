@@ -31,7 +31,9 @@
 - `key`: 1-128 of `A-Z a-z 0-9 . _ -`, unique in the file. `title`: required.
 - `type`: optional, `decision` (default), `design` or `evidence`. A design item
   is a pick between mock options shown side by side. An evidence item is a
-  numbered update the person gives a verdict on (below).
+  numbered update the person gives a verdict on (below). Any other lowercase
+  word (1-32 of `a-z 0-9 -`, starting with a letter) also loads; the dashboard
+  shows it as a plain card with its options until that type has its own view.
 - `tradeoff`: optional on design items, plain text up to 1000 characters, shown
   next to the mocks.
 - `mocks`: optional on design items, up to 6 entries of an option `value` and a
