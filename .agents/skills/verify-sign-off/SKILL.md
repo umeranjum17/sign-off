@@ -86,4 +86,5 @@ Look at every shot before you report: nothing overlaps, no text is cut, no raw p
 | `doctor` failures and fixes, `init` repair, 0.1.0 schema 1 board upgrade | [features/doctor.md](features/doctor.md) |
 | README media and rendered README | [features/readme.md](features/readme.md) |
 | `sign-off-axi` commands, TOON/`--full`/`--json`, packed tarball via `npx -y` | [features/axi.md](features/axi.md) |
+| Coding agents: `init --agent auto|<name>`, config `agent:`, one doctor line per agent, the same journey on several agents | [features/agents.md](features/agents.md) |
 | Agent skill: `skills/sign-off-axi`, the A/B/C mock recipe, `npm run build:skill`, install with `npx skills add` | [features/skill.md](features/skill.md) |

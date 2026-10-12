@@ -2,10 +2,10 @@
 import { createServer, type IncomingMessage } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash } from 'node:crypto';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { accessSync, closeSync, constants, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, watch, writeFileSync, type Stats } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
-import { basename, dirname, extname, join, resolve, sep } from 'node:path';
+import { basename, delimiter, dirname, extname, join, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
@@ -13,6 +13,16 @@ import { CHAPTERS_MAX, type Decision, InputError, MEDIA_MAX, NOTE_MAX, answersPa
 
 const BOARD = join(homedir(), '.sign-off', 'decisions.json');
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
+/** Coding agents init installs the skill for: the `npx skills add -a` name, the command that shows it is installed,
+ * and where its skills live in a project and in the home folder. */
+const [claudeHome, configHome] = [process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'), process.env.XDG_CONFIG_HOME || join(homedir(), '.config')];
+const AGENTS: Record<string, { bin: string; dir: string; home: string }> = {
+  'claude-code': { bin: 'claude', dir: '.claude/skills', home: join(claudeHome, 'skills') },
+  codex: { bin: 'codex', dir: '.agents/skills', home: join(homedir(), '.agents', 'skills') },
+  opencode: { bin: 'opencode', dir: '.agents/skills', home: join(configHome, 'opencode', 'skills') },
+  pi: { bin: 'pi', dir: '.agents/skills', home: join(homedir(), '.agents', 'skills') },
+  'gemini-cli': { bin: 'gemini', dir: '.agents/skills', home: join(homedir(), '.gemini', 'skills') },
+};
 const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
 commands[12]:
   (none)=list, raise, post, answers, wait, open, status, stop, serve, init, doctor, help
@@ -124,14 +134,20 @@ examples:
   sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media phone.png --media flow.mp4 --link https://github.com/acme/app/pull/12
   sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "The new sign-in has 2 steps." --media explainer.mp4 --chapter 0:00=Start --chapter 0:12="Step 2"
 `,
-  init: `usage: sign-off-axi init [dir]
-Writes a repo's sign-off setup under <dir>/.sign-off/ (config, an empty board, mocks/ and evidence/ folders, and a .gitignore keeping media and answer files out of git). A file that is already there is kept, never changed; a re-run adds what is missing.
+  init: `usage: sign-off-axi init [dir] [--agent auto|<name>[,<name>]...]
+Writes a repo's sign-off setup under <dir>/.sign-off/ (config, an empty board, mocks/ and evidence/ folders, and a .gitignore keeping media and answer files out of git). A file that is already there is kept, never changed, except that a given --agent replaces the config's agent: line; a re-run adds what is missing.
+Then installs the sign-off-axi skill into <dir> for each chosen coding agent with \`npx -y skills add\`, skipping agents that already have it.
+  --agent  auto (the default) picks every agent below whose command is on PATH; nothing else is read
+           or one or more of: ${Object.entries(AGENTS).map(([name, a]) => `${name} (${a.bin})`).join(', ')}
+           a given --agent is saved as the agent: line of config.yaml; without it, init uses that line
 examples:
   sign-off-axi init
-  sign-off-axi init ./my-project
+  sign-off-axi init ./my-project --agent opencode
+  sign-off-axi init --agent codex,gemini-cli
 `,
   doctor: `usage: sign-off-axi doctor [dir]
-Checks the repo setup init wrote: node version, config, board file, answer files, gitignore lines, folders, and whether the dashboard port is free.
+Checks the repo setup init wrote: node version, config, board file, answer files, gitignore lines, folders, whether the dashboard port is free,
+and one line per coding agent in the config's agent: line (auto: each one on PATH) saying whether its skill is installed.
 Each failure prints one help line naming its fix and exits 1; a clean setup exits 0.
 examples:
   sign-off-axi doctor
@@ -528,17 +544,40 @@ async function stop(args: string[]) {
 }
 
 /** The repo dir for init/doctor: one optional positional, defaulting to the working folder. */
-function repoDir(cmd: string, args: string[]) {
+function repoDir(cmd: string, args: string[], options: Flags = {}) {
   let parsed;
   try {
-    parsed = parseArgs({ args, allowPositionals: true, strict: true, options: {} });
+    parsed = parseArgs({ args, allowPositionals: true, strict: true, options });
   } catch {
-    throw fail(`\`${cmd}\` takes only a folder`, 'VALIDATION_ERROR', `Run \`sign-off-axi ${cmd} --help\``);
+    throw fail(`\`${cmd}\` takes only a folder${options.agent ? ' and --agent' : ''}`, 'VALIDATION_ERROR', `Run \`sign-off-axi ${cmd} --help\``);
   }
   const [dir, extra] = parsed.positionals;
   if (extra !== undefined) throw fail(`unexpected argument ${extra}: \`${cmd}\` takes one folder`, 'VALIDATION_ERROR', `Run \`sign-off-axi ${cmd} --help\``);
-  return resolve(dir ?? '.');
+  return { dir: resolve(dir ?? '.'), values: parsed.values as Record<string, any> };
 }
+
+/** The value of the agent: line of <so>/config.yaml, spaces dropped; undefined when there is none or it is empty. */
+const configAgent = (so: string) => {
+  try { return /^[ \t]*agent[ \t]*:([^#\n]*)/m.exec(readFileSync(join(so, 'config.yaml'), 'utf8'))?.[1].replace(/\s+/g, '') || undefined; } catch { return undefined; }
+};
+/** Is this command on PATH? The only thing auto detection looks at: no config, credential or network read. */
+const onPath = (bin: string) => (process.env.PATH ?? '').split(delimiter).filter(Boolean).some((d) => {
+  try {
+    accessSync(join(d, bin), constants.X_OK);
+    return statSync(join(d, bin)).isFile();
+  } catch { return false; }
+});
+/** The agents an agent: value names; auto is every known agent whose command is on PATH. */
+function chosenAgents(value: string) {
+  if (value === 'auto') return Object.keys(AGENTS).filter((a) => onPath(AGENTS[a].bin));
+  const names = [...new Set(value.split(',').map((n) => n.trim()))], bad = names.find((n) => !Object.hasOwn(AGENTS, n));
+  if (bad !== undefined) throw fail(`unknown agent ${bad}`, 'VALIDATION_ERROR', `Use auto, or one or more of ${Object.keys(AGENTS).join(', ')} joined by commas`);
+  return names;
+}
+const skillInstalled = (dir: string, agent: string) => [join(dir, AGENTS[agent].dir), AGENTS[agent].home]
+  .some((skills) => existsSync(join(skills, 'sign-off-axi', 'SKILL.md')));
+const SKILL_ADD = ['-y', 'skills', 'add', 'umeranjum17/sign-off', '--skill', 'sign-off-axi', '-y', '-a'];
+const skillAdd = (agents: string[]) => `npx ${[...SKILL_ADD, ...agents].join(' ')}`;
 
 const GITIGNORE = 'mocks/\nevidence/\n*.answers.jsonl\n*.rounds.jsonl\n*.board.pid\n*.board.log\n';
 /** The board and port in <so>/config.yaml (the `key: value` lines init writes). A bad line falls back on its own default
@@ -562,12 +601,13 @@ function boardPort(file: string, given?: string) {
 }
 
 function init(args: string[]) {
-  const dir = repoDir('init', args), so = join(dir, '.sign-off');
+  const { dir, values } = repoDir('init', args, { agent: { type: 'string' } }), so = join(dir, '.sign-off');
+  const had = configAgent(so), agent = (values.agent ?? had ?? 'auto').replace(/\s+/g, ''), agents = chosenAgents(agent);
   // A re-run repairs a cut-short init, including a missing board under the name the config gives.
   let board = join(so, 'decisions.json');
   try { board = readSetup(so).board; } catch {}
   const files: [string, string][] = [
-    [join(so, 'config.yaml'), `# sign-off repo setup. board: path under .sign-off/, port: dashboard port.\nboard: decisions.json\nport: 4410\n`],
+    [join(so, 'config.yaml'), `# sign-off repo setup. board: path under .sign-off/, port: dashboard port, agent: auto or the coding agents to install the skill for.\nboard: decisions.json\nport: 4410\nagent: ${agent}\n`],
     [board, `{"schema": 2, "items": []}\n`],
     [join(so, '.gitignore'), GITIGNORE],
   ];
@@ -581,13 +621,29 @@ function init(args: string[]) {
       created.push(path.slice(dir.length + 1));
     }
   }
-  return toon({ dir: tilde(dir), created: created.length ? created : 'nothing new (re-run is a no-op)', kept, board: tilde(board) },
-    [`Run \`sign-off-axi post ${shellPath(board)} --type design --title "<question>" --option a=A --option b=B\` to ask for a pick`,
+  // A given --agent is the user's choice: record it, so doctor checks the same agents.
+  if (values.agent !== undefined && had !== agent) {
+    const config = join(so, 'config.yaml'), text = readFileSync(config, 'utf8');
+    writeFileSync(config, /^[ \t]*agent[ \t]*:.*$/m.test(text) ? text.replace(/^[ \t]*agent[ \t]*:.*$/m, `agent: ${agent}`) : `${text.replace(/\n?$/, '\n')}agent: ${agent}\n`);
+  }
+  const missing = agents.filter((a) => !skillInstalled(dir, a));
+  if (missing.length) {
+    const r = spawnSync('npx', [...SKILL_ADD, ...missing], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    const cause = r.error?.message ?? `${r.stderr}\n${r.stdout}`.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '').split('\n').map((l) => l.trim()).filter(Boolean).pop();
+    if (r.status !== 0 || missing.some((a) => !skillInstalled(dir, a))) {
+      throw fail(`.sign-off/ is set up, but installing the skill for ${missing.join(', ')} failed: ${cause ?? `exit ${r.status}`}`, 'INSTALL_FAILED', `Run \`${skillAdd(missing)}\` in ${shellPath(dir)}`);
+    }
+  }
+  const skills = agents.length ? agents.map((a) => ({ agent: a, skill: missing.includes(a) ? 'installed' : 'already installed' }))
+    : `no agent found on PATH (${Object.values(AGENTS).map((a) => a.bin).join(', ')})`;
+  return toon({ dir: tilde(dir), created: created.length ? created : 'nothing new (re-run is a no-op)', kept, board: shellPath(board), agent, skills }, [
+    ...(agents.length ? [] : [`Run \`sign-off-axi init ${shellPath(dir)} --agent <name>\` to install the skill for one agent: ${Object.keys(AGENTS).join(', ')}`]),
+    `Run \`sign-off-axi post ${shellPath(board)} --type design --title "<question>" --option a=A --option b=B\` to ask for a pick`,
       `Run \`sign-off-axi doctor ${shellPath(dir)}\` to check the setup`, `Run \`sign-off-axi open ${shellPath(board)}\` to show the board to the user`]);
 }
 
 async function doctor(args: string[]) {
-  const dir = repoDir('doctor', args), so = join(dir, '.sign-off'), rerun = `sign-off-axi init ${shellPath(dir)}`;
+  const { dir } = repoDir('doctor', args), so = join(dir, '.sign-off'), rerun = `sign-off-axi init ${shellPath(dir)}`;
   const checks: { name: string; ok: string; fix?: string }[] = [];
   const check = (name: string, ok: string, fix?: string) => checks.push({ name, ok, fix });
   /** Stats a path; one it cannot follow (a link to nothing, a link loop) is 'link', and one it may not reach is 'denied', instead of an error. */
@@ -697,6 +753,13 @@ async function doctor(args: string[]) {
     else if (shown?.file && !other) check('port', `${port} shows this board (already open)`);
     else check('port', other ? `${port} shows another board, ${shellPath(shown.file)}` : `${port} is in use (${error.code})`,
       `Set "port:" in ${shellPath(join(so, 'config.yaml'))} to a free port (open and serve use it), or ${other ? `close that board: \`sign-off-axi stop ${shellPath(shown.file)}\`, or Ctrl-C its serve` : `stop the program using port ${port}`}`);
+  }
+  try {
+    const agents = chosenAgents(configAgent(so) ?? 'auto');
+    if (!agents.length) check('agent', `auto: no agent found on PATH (${Object.values(AGENTS).map((a) => a.bin).join(', ')})`);
+    for (const a of agents) check(`${a} skill`, skillInstalled(dir, a) ? 'installed' : 'not installed', skillInstalled(dir, a) ? undefined : `Run \`${skillAdd([a])}\` in ${shellPath(dir)}`);
+  } catch (e: any) {
+    check('agent', e.message, `Set agent: in ${shellPath(join(so, 'config.yaml'))} to auto or ${Object.keys(AGENTS).join(', ')}`);
   }
   const bad = checks.filter((c) => c.fix);
   if (bad.length) throw fail(`${bad.length} of ${checks.length} checks need a fix in ${tilde(dir)}`, 'NOT_FOUND',...bad.map((c) => `${c.name}: ${c.ok}. ${c.fix}`));
