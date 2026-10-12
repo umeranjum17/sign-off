@@ -4,13 +4,14 @@
   "description": "One local review board where you answer your agents' yes/no questions. An AXI CLI agents run with no setup.",
   "type": "module",
   "bin": { "sign-off-axi": "dist/cli.js" },
-  "files": ["dist", "web"],
+  "files": ["dist", "!dist/skill.js", "web"],
   "engines": { "node": ">=22.5" },
   "license": "MIT",
   "repository": { "type": "git", "url": "git+https://github.com/umeranjum17/sign-off.git" },
   "keywords": ["axi", "agent", "cli", "toon", "decisions", "review"],
   "scripts": {
     "build": "tsc",
+    "build:skill": "tsc && node dist/skill.js",
     "prepack": "tsc",
     "test": "tsc && node --test"
   },

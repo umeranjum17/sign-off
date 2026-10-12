@@ -1,6 +1,8 @@
 ---
 name: verify-sign-off
 description: Prove sign-off works in a real browser before a PR or ready report. Use for any change to src/, web/ or the README media. Drives the real CLI and page with chrome-devtools-axi on phone and desktop, light and dark.
+metadata:
+  internal: true
 ---
 
 # verify-sign-off
