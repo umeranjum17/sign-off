@@ -1,10 +1,10 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync, spawn } from 'node:child_process';
-import { appendFileSync, chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer as createHttpServer } from 'node:http';
 import { createServer } from 'node:net';
-import { tmpdir } from 'node:os';
+import { networkInterfaces, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
@@ -170,7 +170,75 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   const read = JSON.parse(run('answers', board, '--json').out)['pick-the-sign-in-layout'];
   assert.deepEqual([read.answer, read.note], ['b', 'Umer: B scans best.']);
   assert.deepEqual(read.rounds, [{ note: 'Umer: show B with A header.', at: read.rounds[0].at }]);
+
+  // A comment on an item and a queued prompt reach a polling agent once, and survive a restart.
+  assert.equal((await post(url, 'api/messages', { kind: 'comment', key: 'gone', text: 'hi' })).status, 404);
+  for (const bad of [{ kind: 'prompt', text: '  ' }, { kind: 'shout', text: 'hi' }, { kind: 'prompt', text: 'x'.repeat(2001) }]) {
+    assert.equal((await post(url, 'api/messages', bad)).status, 400, JSON.stringify(bad).slice(0, 40));
+  }
+  const polling = spawn('node', [cli, 'poll', board, '--json', '--timeout', '20']);
+  let polled = '';
+  polling.stdout.on('data', (b) => (polled += b));
+  const pollExited = new Promise((ok) => polling.on('exit', ok));
+  await new Promise((ok) => setTimeout(ok, 500));
+  assert.equal((await post(url, 'api/messages', { kind: 'comment', key: 'pick-the-sign-in-layout', text: 'Umer: B header is too tall.' })).status, 200);
+  assert.equal(await pollExited, 0);
+  assert.deepEqual(JSON.parse(polled).messages.map(({ kind, key, text }) => [kind, key, text]), [['comment', 'pick-the-sign-in-layout', 'Umer: B header is too tall.']]);
+  assert.equal((await post(url, 'api/messages', { kind: 'prompt', text: '  Umer: also try a dark header.  ' })).status, 200);
   proc.kill();
+  const again = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: tmpdir() });
+  procs.push(again);
+  const url2 = await new Promise((ok) => again.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+  const kept = (await (await fetch(`${url2}api/decisions`)).json()).messages;
+  assert.deepEqual(kept.map(({ kind, text, delivered }) => [kind, text, !!delivered]), [['comment', 'Umer: B header is too tall.', true], ['prompt', 'Umer: also try a dark header.', false]]);
+  assert.match(run('poll', board).out, /messages\[1\]\{id,kind,key,text,at\}:\n  \w+,prompt,"","Umer: also try a dark header\."/);
+  const none = run('poll', board, '--timeout', '1');
+  assert.deepEqual([none.code, /code: TIMEOUT/.test(none.out)], [1, true]);
+  again.kill();
+
+  // The export is one read-only file: state and mocks inline, no server and no network.
+  const out = join(scratch, 'frozen.html');
+  // The media tampered with above is left out and counted as missing, the same as the page's own 404.
+  assert.match(run('export', board, '--out', out).out, /items: 7\ninlined: 8\nmissing: 1\n/);
+  const frozen = readFileSync(out, 'utf8');
+  assert.match(frozen, /<meta http-equiv="content-security-policy" content="default-src 'none';/);
+  const data = JSON.parse(/window\.FROZEN = (.*);<\/script>/.exec(frozen)[1]);
+  assert.equal(data.files['/api/mock?key=pick-the-sign-in-layout&value=a'], `data:text/html;base64,${Buffer.from('<h1>Mock A</h1>').toString('base64')}`);
+  assert.equal(data.answers['pick-the-sign-in-layout'].answer, 'b');
+  assert.equal(data.messages.length, 2);
+  // A diagram and an interactive page are inlined too, so the frozen copy shows them with no server.
+  assert.equal(data.files['/api/mock?key=flow'], `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>').toString('base64')}`);
+  assert.ok(data.files['/api/mock?key=demo']);
+  assert.ok(!frozen.includes(board), 'the export leaves out the board path');
+});
+
+// Beyond loopback the board needs its token on every route; a phone on the user's own network gets it in the link.
+const mine = Object.values(networkInterfaces()).flat().find((i) => i.family === 'IPv4' && !i.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.)/.test(i.address));
+test('private-network bind: token on every route, kept across a restart', { skip: !mine && 'this machine has no private IPv4 address' }, async () => {
+  assert.equal(run('open', board, '--port', '0', '--bind', '0.0.0.0').code, 2);
+  assert.equal(run('open', board, '--port', '0', '--bind', '8.8.8.8').code, 2);
+  const opened = run('open', board, '--port', '0', '--bind', mine.address);
+  const link = /url: "(.+)"/.exec(opened.out)[1], { origin, port, searchParams } = new URL(link), token = searchParams.get('token');
+  assert.equal(token, readFileSync(board.replace('.json', '.token'), 'utf8').trim());
+  assert.equal(statSync(board.replace('.json', '.token')).mode & 0o777, 0o600);
+  for (const path of ['/', '/api/decisions', '/api/board', '/api/mock?key=pick-the-sign-in-layout&value=a', '/api/media?key=x&i=0', `/?token=${'x'.repeat(token.length)}`]) {
+    assert.equal((await fetch(`${origin}${path}`)).status, 401, path);
+  }
+  assert.equal((await post(`${origin}/`, 'api/messages', { kind: 'prompt', text: 'hi' })).status, 401);
+  const entry = await fetch(link, { redirect: 'manual' });
+  assert.deepEqual([entry.status, entry.headers.get('location')], [303, '/']);
+  const cookie = entry.headers.get('set-cookie').split(';')[0];
+  assert.match(entry.headers.get('set-cookie'), /HttpOnly; SameSite=Strict/);
+  const api = await fetch(`${origin}/api/decisions`, { headers: { cookie } });
+  assert.equal(api.status, 200);
+  assert.equal(api.headers.get('access-control-allow-origin'), null);
+  assert.equal((await fetch(`${origin}/api/mock?key=pick-the-sign-in-layout&value=a`, { headers: { cookie } })).status, 200);
+  assert.match(run('status', board).out, /status: running/);
+  assert.match(run('stop', board).out, /status: stopped/);
+  const reopened = run('open', board, '--port', String(port), '--bind', mine.address);
+  assert.equal(new URL(/url: "(.+)"/.exec(reopened.out)[1]).searchParams.get('token'), token);
+  assert.match(run('status', board).out, /status: running/);
+  assert.match(run('stop', board).out, /status: stopped/);
 });
 
 test('doctor journey: each broken precondition prints its own fix, and a repair makes it clean', async () => {
