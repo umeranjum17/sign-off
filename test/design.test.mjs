@@ -1,7 +1,8 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -28,7 +29,7 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   writeFileSync(join(so, 'config.yaml'), 'custom: yes\n');
   assert.match(run('init', repo).out, /kept.*config\.yaml/);
   assert.equal(readFileSync(join(so, 'config.yaml'), 'utf8'), 'custom: yes\n');
-  writeFileSync(join(so, 'config.yaml'), 'board: decisions.json\nport: 4410\n');
+  writeFileSync(join(so, 'config.yaml'), 'board: decisions.json\nport: 0\n');
   assert.match(run('doctor', repo).out, /board,0 items/);
   assert.equal(run('doctor', join(scratch, 'missing')).code, 1);
   mkdirSync(join(so, 'mocks'), { recursive: true });
@@ -73,4 +74,53 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   assert.deepEqual([read.answer, read.note], ['b', 'Umer: B scans best.']);
   assert.deepEqual(read.rounds, [{ note: 'Umer: show B with A header.', at: read.rounds[0].at }]);
   proc.kill();
+});
+
+test('doctor journey: each broken precondition prints its own fix, and a repair makes it clean', async () => {
+  const dir = join(scratch, 'broken'), sod = join(dir, '.sign-off'), doc = () => run('doctor', dir);
+  const failed = (out) => [...out.matchAll(/(?:: |,)"([a-z]+): /g)].map((m) => m[1]);
+  // Port 0 skips the port check, so a board open on this host cannot fail the clean runs.
+  const config = (port) => writeFileSync(join(sod, 'config.yaml'), `board: decisions.json\nport: ${port}\n`);
+  assert.deepEqual([doc().code, failed(doc().out)], [1, ['setup']]);
+  run('init', dir);
+  config(0);
+  assert.equal(doc().code, 0);
+  const busy = createServer().listen(0, '127.0.0.1');
+  await new Promise((ok) => busy.once('listening', ok));
+  const { port } = busy.address();
+  config(port);
+  writeFileSync(join(sod, 'decisions.answers.jsonl'), '{"key":"a","answer":"yes"}\n{"key":"to\n');
+  writeFileSync(join(sod, '.gitignore'), 'mocks/\n');
+  rmSync(join(sod, 'evidence'), { recursive: true });
+  const broken = doc();
+  busy.close();
+  assert.equal(broken.code, 1);
+  assert.deepEqual(failed(broken.out), ['answers', 'gitignore', 'folders', 'port']);
+  assert.match(broken.out, /line 2 of decisions.answers.jsonl does not parse\. Delete line 2 from /);
+  assert.match(broken.out, /Add the line evidence\/ to /);
+  assert.match(broken.out, new RegExp(`${port} is in use \\(EADDRINUSE\\)\\. Set \\\\"port:\\\\" in .*config.yaml to a free port`));
+  writeFileSync(join(sod, 'decisions.answers.jsonl'), '{"key":"a","answer":"yes"}\n');
+  writeFileSync(join(sod, '.gitignore'), 'mocks/\nevidence/\n');
+  run('init', dir);
+  config(0);
+  assert.equal(doc().code, 0);
+  writeFileSync(join(sod, 'config.yaml'), '');
+  assert.match(doc().out, /config: config.yaml is empty \(init was cut short\)\. Delete /);
+  rmSync(join(sod, 'config.yaml'));
+  run('init', dir);
+  config(0);
+  writeFileSync(join(sod, 'decisions.json'), '{"schema": 2, "items": [');
+  assert.match(doc().out, /board: decisions.json: invalid JSON: .*Edit .*decisions.json to fix that/);
+  // A bad port line keeps the board the config names; a file where a folder belongs is moved away first.
+  writeFileSync(join(sod, 'config.yaml'), 'board: mine.json\nport: 99999\n');
+  rmSync(join(sod, 'evidence'), { recursive: true });
+  writeFileSync(join(sod, 'evidence'), 'x');
+  assert.deepEqual(failed(doc().out), ['config', 'board', 'folders']);
+  assert.match(doc().out, /board: mine.json is missing.*Move .*evidence away, then run/);
+  rmSync(join(sod, 'evidence'));
+  config(0);
+  rmSync(join(sod, 'decisions.json'));
+  assert.match(doc().out, /board: decisions.json is missing\. Run `sign-off-axi init /);
+  assert.match(run('init', dir).out, /created\[1\]: .sign-off\/decisions.json/);
+  assert.equal(doc().code, 0);
 });

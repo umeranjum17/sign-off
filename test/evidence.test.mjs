@@ -89,7 +89,7 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
 
   // A media path edited to leave the evidence folder makes the board invalid instead of serving it.
   const doc = JSON.parse(readFileSync(board, 'utf8'));
-  doc.decisions[0].media[0].path = 'evidence/1/../../../etc/passwd.png';
+  doc.items[0].media[0].path = 'evidence/1/../../../etc/passwd.png';
   writeFileSync(board, JSON.stringify(doc));
   assert.equal((await fetch(`${url}api/media?key=update-1&i=0`)).status, 422);
   proc.kill();

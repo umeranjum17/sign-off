@@ -4,7 +4,7 @@ Covers `sign-off-axi init`, `sign-off-axi doctor`, `sign-off-axi post --type des
 
 | # | Step | Pass when |
 |---|---|---|
-| 1 | `doctor` output saved as `doctor.json` (TOON) | All four checks ok: node, board, gitignore, port |
+| 1 | `doctor` output saved as `doctor.json` (TOON) | All checks ok and exit 0; failure cases live in [doctor.md](doctor.md) |
 | 2 | Phone light and dark, wait the design title, full-page shots | All three mock cards show beside their buttons, trade-off line and Recommended badge visible; `eval "document.documentElement.scrollWidth <= innerWidth"` is true |
 | 3 | Desktop light and dark, shots | Same cards readable at width; no overlap, no cut text |
 | 4 | Phone dark, type a note, click `Ask for another round`, shot | The row shows the round note; a blocked `wait --key` returns output containing that note |
