@@ -83,6 +83,7 @@ Look at every shot before you report: nothing overlaps, no text is cut, no raw p
 | Explainer rung: a narrated stills video built with free local speech, played inline with chapter buttons, no network | [features/explainer.md](features/explainer.md) |
 | Evidence updates: numbered posts with media, hash-checked serving, inline video, verdict | [features/evidence.md](features/evidence.md) |
 | One-of-few options and the answer note, old-format compatibility | [features/options-note.md](features/options-note.md) |
+| `doctor` failures and fixes, `init` repair, 0.1.0 schema 1 board upgrade | [features/doctor.md](features/doctor.md) |
 | README media and rendered README | [features/readme.md](features/readme.md) |
 | `sign-off-axi` commands, TOON/`--full`/`--json`, packed tarball via `npx -y` | [features/axi.md](features/axi.md) |
 | Agent skill: `skills/sign-off-axi`, the A/B/C mock recipe, `npm run build:skill`, install with `npx skills add` | [features/skill.md](features/skill.md) |

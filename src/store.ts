@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, linkSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 
 export type Option = { value: string; label: string };
@@ -33,20 +33,48 @@ export const NOTE_MAX = 500;
 const TRADEOFF_MAX = 1000;
 const VIEWS: Record<string, [string, RegExp]> = { diagram: ['.svg, .png, .jpg, .jpeg or .webp', /\.(svg|png|jpe?g|webp)$/i], interactive: ['.html', /\.html$/i] };
 
-export function loadDecisions(path: string): Decision[] {
-  const name = basename(path);
+/** A board's raw items: schema 2 `items`, or a 0.1.0 schema 1 `decisions` list, whose entries read as decision items. */
+export function readItems(path: string): { schema: 1 | 2; items: any[] } {
   let doc: any;
   try {
     doc = JSON.parse(readFileSync(path, 'utf8'));
   } catch (e: any) {
-    throw new InputError(e.code ? `cannot read ${resolve(path)}: ${e.code}` : `${name}: invalid JSON: ${e.message}`);
+    throw new InputError(e.code ? `cannot read ${resolve(path)}: ${e.code}` : `${basename(path)}: invalid JSON: ${e.message}`);
   }
-  if (doc?.schema !== 1 || !Array.isArray(doc.decisions)) throw new InputError(`${name}: needs "schema": 1 and a "decisions" list`);
+  if (doc?.schema === 2 && Array.isArray(doc.items)) return { schema: 2, items: doc.items };
+  if (doc?.schema === 1 && Array.isArray(doc.decisions)) return { schema: 1, items: doc.decisions };
+  throw new InputError(`${basename(path)}: needs "schema": 2 and an "items" list`);
+}
+
+/** Creates path only if it is absent, all at once: a crash leaves no file or the whole file. False when it was already there. */
+export function createOnce(path: string, content: string | Buffer): boolean {
+  const tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmp, content, { mode: 0o600 });
+  try {
+    linkSync(tmp, path);
+    return true;
+  } catch (e: any) {
+    if (e.code === 'EEXIST') return false;
+    throw e;
+  } finally {
+    rmSync(tmp, { force: true });
+  }
+}
+
+/** Writes the board as schema 2 through a temp file and a rename. A schema 1 board is first kept once as <board>.schema-1.bak. */
+export function writeItems(path: string, items: object[]): void {
+  if (existsSync(path) && readItems(path).schema === 1) createOnce(`${path}.schema-1.bak`, readFileSync(path));
+  writeFileSync(`${path}.${process.pid}.tmp`, `${JSON.stringify({ schema: 2, items }, null, 2)}\n`, { mode: 0o600 });
+  renameSync(`${path}.${process.pid}.tmp`, path);
+}
+
+export function loadDecisions(path: string): Decision[] {
+  const name = basename(path), { schema, items } = readItems(path), list = schema === 1 ? 'decisions' : 'items';
   const seen = new Map<string, number>();
-  return doc.decisions.map((d: any, i: number): Decision => {
-    const bad = (field: string, rule: string) => new InputError(`${name}: decisions[${i}] (key ${JSON.stringify(d?.key)}): ${field} ${rule}`);
+  return items.map((d: any, i: number): Decision => {
+    const bad = (field: string, rule: string) => new InputError(`${name}: ${list}[${i}] (key ${JSON.stringify(d?.key)}): ${field} ${rule}`);
     if (!isKey(d?.key)) throw bad('key', 'must be 1-128 of A-Z a-z 0-9 . _ -');
-    if (seen.has(d.key)) throw bad('key', `repeats decisions[${seen.get(d.key)}]`);
+    if (seen.has(d.key)) throw bad('key', `repeats ${list}[${seen.get(d.key)}]`);
     seen.set(d.key, i);
     if (!isText(d.title) || !d.title.trim()) throw bad('title', 'must be non-empty text');
     for (const f of ['about', 'detail']) if (d[f] !== undefined && !isText(d[f])) throw bad(f, 'must be text');
