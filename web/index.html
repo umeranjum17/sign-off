@@ -249,8 +249,7 @@
     document.getElementById('count').textContent = `${waiting.length} waiting · ${answered.length} answered`;
     const list = (items) => el('div', { class: 'list' }, ...items.map(row));
     document.getElementById('board').replaceChildren(
-      el('h2', {}, 'Waiting'), waiting.length ? list(waiting) : el('p', { class: 'list empty' }, unjudged ? 'No questions waiting.' : 'Nothing is waiting on you.'),
-      ...(updates.length ? [el('h2', {}, 'Evidence updates, newest first'), list(updates)] : []),
+      el('h2', {}, 'Waiting'), waiting.length ? list(waiting) : el('p', { class: 'list empty' }, 'Nothing is waiting on you.'),
       ...(answered.length ? [el('h2', {}, 'Answered'), list(answered)] : []));
   }
 
