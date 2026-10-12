@@ -23,6 +23,7 @@ examples:
   sign-off-axi raise --title "Ship the new sign-in screen this week?" --recommend yes
   sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media shot.png
   sign-off-axi post .sign-off/decisions.json --type design --title "Pick the sign-in layout" --option a=A --option b=B --mock a=mocks/a.html --mock b=mocks/b.html --recommend b
+  sign-off-axi post .sign-off/decisions.json --type diagram --title "Is this the sign-in flow?" --view mocks/sign-in/flow.svg
   sign-off-axi init
   sign-off-axi doctor
   sign-off-axi open
@@ -98,19 +99,23 @@ Runs the board in the foreground until Ctrl-C; --port 0 picks a free port. Use o
 examples:
   sign-off-axi serve --port 0
 `,
-  post: `usage: sign-off-axi post [board.json] [--type decision|design] --title "<question>" [--key <key>] [--about <text>] [--option <value>=<label>]... [--mock <value>=<path>]... [--tradeoff <text>] [--recommend <value>] [--default <value>] [--close done|release]
+  post: `usage: sign-off-axi post [board.json] [--type decision|design|diagram|interactive] --title "<question>" [--key <key>] [--about <text>] [--option <value>=<label>]... [--mock <value>=<path>]... [--view <path>] [--tradeoff <text>] [--recommend <value>] [--default <value>] [--close done|release]
        sign-off-axi post [board.json] --type evidence --title "<what this shows>" --about "<short note>" --media <file>... [--link <commit or URL>] [--detail <text>]
 Posts an item for the user. --type decision (the default) is a yes/no or pick-one question, exactly like raise.
 --type design is a pick between up to 6 options shown side by side, each with an optional board-relative mock file
-(.html, .png, .jpg, .jpeg, .webp), a --tradeoff line and a --recommend badge.
+(.html, .svg, .png, .jpg, .jpeg, .webp), a --tradeoff line and a --recommend badge.
 One .html page can hold every variant: --mock a=mocks/<key>/index.html?variant=a and so on; the page reads ?variant= to show one.
 After the user picks, answers --key <key> --json holds the pick and note; "rounds" holds an ask for another round.
+--type diagram and --type interactive are a decision shown with a picture: --view names one board-relative file,
+an image (.svg, .png, .jpg, .jpeg, .webp, 5 MB or less) shown at card width for a diagram, or one self-contained .html page for interactive.
+The page runs in a sandboxed frame: no fetch, no remote files, no access to the dashboard or its tab. Answers work as for a decision.
 --type evidence posts the next numbered update (key update-<number>): 1 to ${MEDIA_MAX} screenshots or recordings (.png, .jpg, .jpeg, .webp, .mp4, .webm, 50 MB each), copied into evidence/<number>/ next to the board, with a short note and an optional commit or PR link.
 The user gives a verdict, pass, fail or needs-work, with an optional note; read it with answers or wait --key update-<number>.
 examples:
   sign-off-axi post --type design --title "Pick the sign-in layout" --option a="A: single column" --option b="B: split screen" --mock a=mocks/a.html --mock b=mocks/b.html --tradeoff "B scans fastest; A is simplest." --recommend b
   sign-off-axi post .sign-off/decisions.json --type design --key sign-in --title "Pick the sign-in layout" --option a=A --option b=B --option c=C --mock a=mocks/sign-in/index.html?variant=a --mock b=mocks/sign-in/index.html?variant=b --mock c=mocks/sign-in/index.html?variant=c --tradeoff "..." --recommend b
   sign-off-axi post --type decision --title "Keep the weekly digest?" --recommend yes
+  sign-off-axi post .sign-off/decisions.json --type interactive --title "Does the sign-in flow feel right?" --view mocks/sign-in/demo.html --option yes=Yes --option no="Needs work"
   sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media phone.png --media flow.mp4 --link https://github.com/acme/app/pull/12
 `,
   init: `usage: sign-off-axi init [dir]
@@ -285,35 +290,46 @@ async function locked<T>(lock: string, fn: () => T | Promise<T>, busy = 'another
   try { return await fn(); } finally { rmSync(lock, { force: true }); }
 }
 
-const MOCK_TYPES = ['.html', '.png', '.jpg', '.jpeg', '.webp'];
 /** A mock path without its optional `?variant=<name>` suffix, which picks one variant of a single .html page. */
 const mockFile = (path: string) => path.split('?')[0];
 /** Posts an item. `raise` is the alias for `post --type decision`: same flags as before, same output. */
 function post(args: string[], cmd = 'post') {
   const typed: Flags = cmd === 'post' ? { type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
-    media: { type: 'string', multiple: true }, link: { type: 'string' } } : {};
+    media: { type: 'string', multiple: true }, link: { type: 'string' }, view: { type: 'string' } } : {};
   const { file, values, on } = parse(cmd, args, { from: { type: 'string' }, ...typed,
     ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: f === 'option' }])) });
-  const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'link'].filter((f) => values[f] !== undefined);
+  const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'link', 'view'].filter((f) => values[f] !== undefined);
   if (values.from !== undefined && given.length) throw fail(`--from cannot be combined with --${given[0]}`, 'VALIDATION_ERROR', `Put every field in the --from file, or ${cmd} with flags only`);
   const type = values.type ?? 'decision';
   if (values.from === undefined && values.title === undefined) {
     throw fail('--title is required (or --from <decisions.json>)', 'VALIDATION_ERROR', type === 'design' ? 'sign-off-axi post --type design --title "<question>" --option a=A --option b=B'
       : type === 'evidence' ? 'sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media <file>' : `sign-off-axi ${cmd} --title "<question>" [--recommend <value>]`);
   }
-  if (!['decision', 'design', 'evidence'].includes(type)) throw fail(`--type must be decision, design or evidence`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
+  if (!['decision', 'design', 'evidence', 'diagram', 'interactive'].includes(type)) throw fail(`--type must be decision, design, evidence, diagram or interactive`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (type === 'evidence') return postEvidence(file, on, values);
   if (values.media !== undefined || values.link !== undefined) throw fail('--media and --link need --type evidence', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
-  if (type === 'decision') {
-    if (values.tradeoff !== undefined || values.mock !== undefined) throw fail('--tradeoff and --mock need --type design', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
-    return storeIncoming(file, on, buildIncoming(values));
-  }
+  if (type !== 'design' && (values.tradeoff !== undefined || values.mock !== undefined)) throw fail('--tradeoff and --mock need --type design', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
+  const view = type === 'diagram' || type === 'interactive';
+  if (view !== (values.view !== undefined)) throw fail(view ? `--type ${type} needs --view <path>` : '--view needs --type diagram or interactive', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
+  if (type === 'decision') return storeIncoming(file, on, buildIncoming(values));
   const root = resolve(dirname(file));
+  if (view) {
+    // The same real-path check the board serves with, so a post that passes always renders.
+    const escapes = () => fail(`--view ${values.view} escapes the board folder`, 'VALIDATION_ERROR', 'Keep the file next to the board file, under mocks/<key>/');
+    if (!resolve(root, values.view).startsWith(root + sep)) throw escapes();
+    let actual;
+    try { actual = under(root, values.view); } catch (e: any) {
+      throw e.message === 'no matching mock file' ? fail(`--view ${values.view} is not a file in ${tilde(root)}`, 'NOT_FOUND', 'Paths are relative to the board file\'s folder') : escapes();
+    }
+    const size = statSync(actual);
+    if (!size.isFile() || size.size > MOCK_BYTES) throw fail(`--view ${values.view} must be a file of 5 MB or less`, 'VALIDATION_ERROR');
+    return storeIncoming(file, on, buildIncoming(values, { type, view: values.view }));
+  }
   const mocks = values.mock?.map((m: string) => {
     const at = m.indexOf('=');
     if (at < 1) throw fail(`--mock ${m} must be <value>=<path>`, 'VALIDATION_ERROR', 'sign-off-axi post --type design --title "<question>" --option a=A --mock a=mocks/a.html');
     const path = m.slice(at + 1), name = mockFile(path);
-    if (!MOCK_TYPES.includes(extname(name).toLowerCase())) throw fail(`--mock ${path} must end in ${MOCK_TYPES.join(', ')}`, 'VALIDATION_ERROR');
+    if (!mockTypes[extname(name).toLowerCase()]) throw fail(`--mock ${path} must end in ${Object.keys(mockTypes).join(', ')}`, 'VALIDATION_ERROR');
     if (!resolve(root, name).startsWith(root + sep)) throw fail(`--mock ${path} escapes the board folder`, 'VALIDATION_ERROR', 'Keep mock files next to the board file');
     return { value: m.slice(0, at), path };
   });
@@ -323,7 +339,7 @@ function post(args: string[], cmd = 'post') {
 const MEDIA_BYTES = 50_000_000;
 /** Copies the media into evidence/<n>/ next to the board and adds update-<n>, numbered under the board lock. */
 function postEvidence(file: string, on: string, values: Record<string, any>) {
-  const extra = ['key', 'option', 'recommend', 'default', 'mock', 'tradeoff'].find((f) => values[f] !== undefined);
+  const extra = ['key', 'option', 'recommend', 'default', 'mock', 'tradeoff', 'view'].find((f) => values[f] !== undefined);
   if (extra) throw fail(`--${extra} does not apply to --type evidence`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   const example = 'sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media shot.png';
   if (!values.about?.trim()) throw fail('--about is required for --type evidence: the short note', 'VALIDATION_ERROR', example);
@@ -590,7 +606,10 @@ const state = () => ({
   rounds: readRounds(file, warn),
 });
 const mediaTypes: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.mp4': 'video/mp4', '.webm': 'video/webm' };
-const mockTypes: Record<string, string> = { '.html': 'text/html', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
+const mockTypes: Record<string, string> = { '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
+const MOCK_BYTES = 5_000_000;
+/** Every served file is its own sandboxed page, even opened full size: no fetch, no remote files, no frames, and no reach into the dashboard or its tab. */
+const FRAME_CSP = "default-src 'self' 'unsafe-inline' data: blob:; connect-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'; sandbox allow-scripts";
 /** A board-relative path resolved inside a root folder; anything else is unavailable. */
 function under(root: string, rel: string): string {
   let base: string, actual: string;
@@ -644,12 +663,14 @@ function evidenceCard(link: NonNullable<Decision['evidence']>) {
 async function route(req: IncomingMessage): Promise<[number, unknown]> {
   if (req.method === 'GET' && req.url?.startsWith('/api/mock?')) {
     const q = new URL(req.url, 'http://localhost').searchParams;
-    const mock = loadDecisions(file).find((d) => d.key === q.get('key'))?.mocks?.find((m) => m.value === q.get('value'));
-    const type = mock && mockTypes[extname(mockFile(mock.path)).toLowerCase()];
+    // With a value, that option's design mock; without, the item's own view (a diagram or interactive page).
+    const d = loadDecisions(file).find((x) => x.key === q.get('key'));
+    const mock = q.has('value') ? d?.mocks?.find((m) => m.value === q.get('value'))?.path : d?.view;
+    const type = mock && mockTypes[extname(mockFile(mock)).toLowerCase()];
     if (!mock || !type) return [404, { error: 'Mock is unavailable' }];
     try {
-      const actual = under(dirname(file), mockFile(mock.path));
-      if (statSync(actual).size > 5_000_000) return [404, { error: 'Mock is unavailable' }];
+      const actual = under(dirname(file), mockFile(mock));
+      if (statSync(actual).size > MOCK_BYTES) return [404, { error: 'Mock is unavailable' }];
       return [200, { media: readFileSync(actual), type }];
     } catch { return [404, { error: 'Mock is unavailable' }]; }
   }
@@ -717,7 +738,7 @@ const server = createServer(async (req, res) => {
   }
   if (body && typeof body === 'object' && 'media' in body) {
     const { media, type } = body as { media: Buffer; type: string };
-    const headers = { 'content-type': type, 'x-content-type-options': 'nosniff', 'accept-ranges': 'bytes', 'content-length': media.length };
+    const headers = { 'content-type': type, 'x-content-type-options': 'nosniff', 'content-security-policy': FRAME_CSP, 'accept-ranges': 'bytes', 'content-length': media.length };
     // One byte range, so phone browsers can play and seek a recording.
     const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? '');
     if (!range || (!range[1] && !range[2])) return res.writeHead(status, headers).end(media);

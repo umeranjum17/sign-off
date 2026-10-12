@@ -58,6 +58,15 @@ When the user must choose how something looks or works, do this:
 
 Build mocks with a cheap model, for example Go Muse, haiku or luna. A mock is throwaway work.
 
+## Show it when words are not enough
+
+Use the simplest view that explains the item: plain text, then a diagram, then an interactive page.
+
+- Diagram: draw an SVG (or save a PNG) under \`.sign-off/mocks/<key>/\`, then post with \`--type diagram --view mocks/<key>/flow.svg\`.
+- Interactive page: write one self-contained \`.html\` file (inline CSS and JS, no network) under \`.sign-off/mocks/<key>/\`, then post with \`--type interactive --view mocks/<key>/demo.html\`. It runs sandboxed: no fetch, no remote files, no access to the dashboard.
+
+Both answer like a decision (Yes/No, or your own \`--option\`s); wait and read the answer the same way.
+
 ## Request
 
 $ARGUMENTS
