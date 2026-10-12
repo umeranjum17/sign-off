@@ -154,6 +154,7 @@ test('agent journey: raise, open, answer, read back in TOON and JSON', async () 
 test('old files and answers read as before; a one-of-few answer with a note survives a restart', async () => {
   const old = join(scratch, 'old.json');
   copyFileSync(new URL('../fixtures/sample-decisions.json', import.meta.url), old);
+  writeFileSync(old, JSON.stringify({ ...JSON.parse(readFileSync(old, 'utf8')), owner: 'Umer' }));
   const oldLines = ['{"key":"use-dark-default","answer":"yes","label":"Yes","close":"done","at":"2026-10-10T08:00:00Z"}',
     '{"key":"short-question","answer":"yes","label":"Yes","close":"done","at":"2026-10-11T09:14:03Z"}',
     '{"key":"use-dark-default","answer":"no","label":"No","close":"done","at":"2026-10-11T09:15:00Z"}'];
@@ -166,6 +167,15 @@ test('old files and answers read as before; a one-of-few answer with a note surv
   assert.deepEqual(oldBoard.answers, { 'use-dark-default': JSON.parse(oldLines[2]), 'short-question': JSON.parse(oldLines[1]) });
   assert.ok(oldBoard.decisions.every((d) => JSON.stringify(d.options) === '[{"value":"yes","label":"Yes"},{"value":"no","label":"No"}]'));
   proc.kill();
+  // The first write upgrades the schema 1 board to schema 2 and keeps the old file once beside it; nothing is lost.
+  const before = readFileSync(old), beforeAnswers = execFileSync('node', [cli, 'answers', old, '--json'], { encoding: 'utf8' });
+  execFileSync('node', [cli, 'raise', old, '--title', 'Umer: one more question?'], { stdio: 'ignore' });
+  const upgraded = JSON.parse(readFileSync(old, 'utf8'));
+  assert.deepEqual([upgraded.schema, upgraded.owner, upgraded.items.slice(0, -1)], [2, 'Umer', JSON.parse(before).decisions]);
+  assert.deepEqual(readFileSync(`${old}.schema-1.bak`), before);
+  assert.equal(execFileSync('node', [cli, 'answers', old, '--json'], { encoding: 'utf8' }), beforeAnswers);
+  execFileSync('node', [cli, 'raise', old, '--title', 'Umer: and another?'], { stdio: 'ignore' });
+  assert.deepEqual(readFileSync(`${old}.schema-1.bak`), before);
 
   const opts = join(scratch, 'options.json');
   copyFileSync(new URL('../fixtures/options-decisions.json', import.meta.url), opts);

@@ -1,7 +1,9 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync, spawn } from 'node:child_process';
-import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { execFile, execFileSync, spawn } from 'node:child_process';
+import { appendFileSync, chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createServer as createHttpServer } from 'node:http';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -28,7 +30,7 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   writeFileSync(join(so, 'config.yaml'), 'custom: yes\n');
   assert.match(run('init', repo).out, /kept.*config\.yaml/);
   assert.equal(readFileSync(join(so, 'config.yaml'), 'utf8'), 'custom: yes\n');
-  writeFileSync(join(so, 'config.yaml'), 'board: decisions.json\nport: 4410\n');
+  writeFileSync(join(so, 'config.yaml'), 'board: decisions.json\nport: 0\n');
   assert.match(run('doctor', repo).out, /board,0 items/);
   assert.equal(run('doctor', join(scratch, 'missing')).code, 1);
   mkdirSync(join(so, 'mocks'), { recursive: true });
@@ -140,4 +142,140 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   assert.deepEqual([read.answer, read.note], ['b', 'Umer: B scans best.']);
   assert.deepEqual(read.rounds, [{ note: 'Umer: show B with A header.', at: read.rounds[0].at }]);
   proc.kill();
+});
+
+test('doctor journey: each broken precondition prints its own fix, and a repair makes it clean', async () => {
+  const dir = join(scratch, 'broken'), sod = join(dir, '.sign-off'), doc = () => run('doctor', dir);
+  const failed = (out) => [...out.matchAll(/(?:: |,)"([a-z]+): /g)].map((m) => m[1]);
+  // Port 0 skips the port check, so a board open on this host cannot fail the clean runs.
+  const config = (port) => writeFileSync(join(sod, 'config.yaml'), `board: decisions.json\nport: ${port}\n`);
+  assert.deepEqual([doc().code, failed(doc().out).filter((n) => n !== 'port')], [1, ['setup']]);
+  run('init', dir);
+  config(0);
+  assert.equal(doc().code, 0);
+  const busy = createServer().listen(0, '127.0.0.1');
+  await new Promise((ok) => busy.once('listening', ok));
+  const { port } = busy.address();
+  config(port);
+  writeFileSync(join(sod, 'decisions.answers.jsonl'), '{"key":"a","answer":"yes"}\n{"key":"to\n');
+  writeFileSync(join(sod, '.gitignore'), 'mocks/\n');
+  rmSync(join(sod, 'evidence'), { recursive: true });
+  const broken = doc();
+  busy.close();
+  assert.equal(broken.code, 1);
+  assert.deepEqual(failed(broken.out), ['answers', 'gitignore', 'folders', 'port']);
+  assert.match(broken.out, /line 2 of decisions.answers.jsonl does not parse\. Delete line 2 from /);
+  assert.match(broken.out, /Add the line evidence\/ to /);
+  assert.match(broken.out, new RegExp(`${port} is in use \\(EADDRINUSE\\)\\. Set \\\\"port:\\\\" in .*config.yaml to a free port`));
+  writeFileSync(join(sod, 'decisions.answers.jsonl'), '{"key":"a","answer":"yes"}\n');
+  writeFileSync(join(sod, '.gitignore'), 'mocks/\nevidence/\n');
+  run('init', dir);
+  config(0);
+  assert.equal(doc().code, 0);
+  writeFileSync(join(sod, 'config.yaml'), '');
+  assert.match(doc().out, /config: config.yaml is empty \(init was cut short\)\. Delete /);
+  rmSync(join(sod, 'config.yaml'));
+  run('init', dir);
+  config(0);
+  writeFileSync(join(sod, 'decisions.json'), '{"schema": 2, "items": [');
+  assert.match(doc().out, /board: decisions.json: invalid JSON: .*Edit .*decisions.json to fix that/);
+  // A bad port line keeps the board the config names; a file where a folder belongs is moved away first.
+  writeFileSync(join(sod, 'config.yaml'), 'board: mine.json\nport: 99999\n');
+  rmSync(join(sod, 'evidence'), { recursive: true });
+  writeFileSync(join(sod, 'evidence'), 'x');
+  assert.deepEqual(failed(doc().out).filter((n) => n !== 'port'), ['config', 'board', 'folders']);
+  assert.match(doc().out, /board: mine.json is missing.*Move .*evidence away, then run/);
+  rmSync(join(sod, 'evidence'));
+  config(0);
+  rmSync(join(sod, 'decisions.json'));
+  assert.match(doc().out, /board: decisions.json is missing\. Run `sign-off-axi init /);
+  assert.match(run('init', dir).out, /created\[1\]: .sign-off\/decisions.json/);
+  assert.equal(doc().code, 0);
+});
+
+test('doctor names a fix for a denied setup path and a port that needs privilege', { skip: process.getuid?.() === 0 && 'root can read every path' }, () => {
+  const dir = join(scratch, 'denied'), sod = join(dir, '.sign-off');
+  run('init', dir);
+  writeFileSync(join(sod, 'config.yaml'), 'board: decisions.json\nport: 0\n');
+  chmodSync(sod, 0o600);
+  try {
+    assert.match(run('doctor', dir).out, /config: config\.yaml cannot be read \(permission denied\)\. Run `chmod -R u\+rwX /);
+  } finally {
+    chmodSync(sod, 0o700);
+  }
+  writeFileSync(join(sod, 'config.yaml'), 'board: decisions.json\nport: 80\n');
+  assert.match(run('doctor', dir).out, /port: 80 needs privileges to bind \(EACCES\)\. Set \\"port:\\" in .*config\.yaml to a port above 1023/);
+});
+
+test('doctor names a fix when the folder argument is a file', () => {
+  const file = join(scratch, 'plain.txt');
+  writeFileSync(file, 'x');
+  const out = run('doctor', file);
+  assert.equal(out.code, 1);
+  assert.match(out.out, /^code: NOT_FOUND$/m);
+  assert.match(out.out, /plain\.txt is not a folder/);
+  assert.match(out.out, /Pass a folder: `sign-off-axi doctor <folder>`/);
+});
+
+test('doctor prints a fix a shell can run for a path with a space, and fails with NOT_FOUND', () => {
+  const dir = join(scratch, 'my repo'), cli2 = cli;
+  mkdirSync(dir);
+  const broken = run('doctor', dir);
+  assert.equal(broken.code, 1);
+  assert.match(broken.out, /^code: NOT_FOUND$/m);
+  const fix = /Run `sign-off-axi (init [^`]+)`/.exec(broken.out)[1];
+  execFileSync('sh', ['-c', `node ${cli2} ${fix}`]);
+  writeFileSync(join(dir, '.sign-off', 'config.yaml'), 'board: decisions.json\nport: 0\n');
+  assert.equal(run('doctor', dir).code, 0);
+});
+
+test('doctor ignores config keys it does not use and names a malformed port line', () => {
+  const dir = join(scratch, 'extra-keys'), sod = join(dir, '.sign-off');
+  run('init', dir);
+  writeFileSync(join(sod, 'config.yaml'), 'board: decisions.json\nport: 0\nowner: Umer Anjum\nmax-items: 5\n');
+  assert.equal(run('doctor', dir).code, 0);
+  writeFileSync(join(sod, 'config.yaml'), 'board: decisions.json\nport:\n');
+  const broken = run('doctor', dir);
+  assert.equal(broken.code, 1);
+  assert.match(broken.out, /config: config.yaml: line 2 is not one/);
+});
+
+test('doctor names a fix when the setup folder cannot be written', { skip: process.getuid?.() === 0 && 'root can write every path' }, () => {
+  const dir = join(scratch, 'unwritable'), sod = join(dir, '.sign-off');
+  run('init', dir);
+  writeFileSync(join(sod, 'config.yaml'), 'board: decisions.json\nport: 0\n');
+  chmodSync(sod, 0o500);
+  try {
+    const broken = run('doctor', dir);
+    assert.equal(broken.code, 1);
+    assert.match(broken.out, /write: \.sign-off cannot be written\. Run `chmod u\+w /);
+  } finally {
+    chmodSync(sod, 0o700);
+  }
+  assert.equal(run('doctor', dir).code, 0);
+});
+
+test('doctor reports a port whose server names a non-text file as in use', async () => {
+  const dir = join(scratch, 'odd-port'), sod = join(dir, '.sign-off');
+  run('init', dir);
+  const odd = createHttpServer((req, res) => res.end(JSON.stringify({ file: 5 }))).listen(0, '127.0.0.1');
+  await new Promise((ok) => odd.once('listening', ok));
+  const { port } = odd.address();
+  writeFileSync(join(sod, 'config.yaml'), `board: decisions.json\nport: ${port}\n`);
+  const out = await new Promise((ok) => execFile('node', [cli, 'doctor', dir], { encoding: 'utf8' }, (err, stdout) => ok({ code: err?.code ?? 0, out: stdout || err?.stdout || '' })));
+  odd.close();
+  assert.equal(out.code, 1);
+  assert.match(out.out, new RegExp(`port: ${port} is in use \\(EADDRINUSE\\)`));
+});
+
+test('doctor passes a read-only board in a writable setup', { skip: process.getuid?.() === 0 && 'root can write every path' }, () => {
+  const dir = join(scratch, 'readonly-board'), sod = join(dir, '.sign-off');
+  run('init', dir);
+  writeFileSync(join(sod, 'config.yaml'), 'board: decisions.json\nport: 0\n');
+  chmodSync(join(sod, 'decisions.json'), 0o444);
+  try {
+    assert.equal(run('doctor', dir).code, 0);
+  } finally {
+    chmodSync(join(sod, 'decisions.json'), 0o600);
+  }
 });

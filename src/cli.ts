@@ -3,13 +3,13 @@ import { createServer, type IncomingMessage } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, watch, writeFileSync } from 'node:fs';
+import { accessSync, closeSync, constants, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, watch, writeFileSync, type Stats } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { CHAPTERS_MAX, type Decision, InputError, MEDIA_MAX, NOTE_MAX, answersPath, appendAnswer, appendRound, loadDecisions, readAnswers, readRounds } from './store.js';
+import { CHAPTERS_MAX, type Decision, InputError, MEDIA_MAX, NOTE_MAX, answersPath, appendAnswer, appendRound, loadDecisions, readAnswers, readItems, readRounds, roundsPath, writeItems } from './store.js';
 
 const BOARD = join(homedir(), '.sign-off', 'decisions.json');
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
@@ -78,6 +78,7 @@ examples:
 `,
   open: `usage: sign-off-axi open [board.json] [--port 4410] [--evidence-root <dir>]
 Starts the board in the background on 127.0.0.1 and prints its URL and pid; a no-op when this board is already open.
+--port defaults to the port in a config.yaml beside the board (init writes one), else 4410.
 --evidence-root is the folder holding .done-done/, for decisions that link run evidence. The server log and its pid file are written next to the board.
 examples:
   sign-off-axi open
@@ -96,7 +97,7 @@ examples:
   sign-off-axi stop ./decisions.json
 `,
   serve: `usage: sign-off-axi serve [board.json] [--port 4410] [--evidence-root <dir>]
-Runs the board in the foreground until Ctrl-C; --port 0 picks a free port. Use open to run it in the background.
+Runs the board in the foreground until Ctrl-C; --port 0 picks a free port, and it defaults the way open's does. Use open to run it in the background.
 examples:
   sign-off-axi serve --port 0
 `,
@@ -124,19 +125,25 @@ examples:
   sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "The new sign-in has 2 steps." --media explainer.mp4 --chapter 0:00=Start --chapter 0:12="Step 2"
 `,
   init: `usage: sign-off-axi init [dir]
-Writes a repo's sign-off setup under <dir>/.sign-off/ (config, an empty board, mocks/ and evidence/ folders, and a .gitignore keeping media and answer files out of git). A file that is already there is kept, never changed.
+Writes a repo's sign-off setup under <dir>/.sign-off/ (config, an empty board, mocks/ and evidence/ folders, and a .gitignore keeping media and answer files out of git). A file that is already there is kept, never changed; a re-run adds what is missing.
 examples:
   sign-off-axi init
   sign-off-axi init ./my-project
 `,
   doctor: `usage: sign-off-axi doctor [dir]
-Checks the repo setup init wrote: node version, config, board file, gitignore coverage, and whether the dashboard port answers. Every failure names its fix.
+Checks the repo setup init wrote: node version, config, board file, answer files, gitignore lines, folders, and whether the dashboard port is free.
+Each failure prints one help line naming its fix and exits 1; a clean setup exits 0.
 examples:
   sign-off-axi doctor
 `,
 };
 const warn = (msg: string) => console.error(`sign-off-axi: ${msg}`);
 const tilde = (path: string) => (path.startsWith(homedir() + sep) ? `~${path.slice(homedir().length)}` : path);
+/** A path as a shell word for a printed command: quoted when it has anything but plain path characters, with a leading ~/ kept outside the quotes. */
+const shellPath = (path: string) => {
+  const shown = tilde(path), home = shown.startsWith('~/') ? '~/' : '', rest = shown.slice(home.length);
+  return home + (/^[\w./~-]+$/.test(rest) ? rest : `'${rest.replaceAll("'", "'\\''")}'`);
+};
 const fail = (message: string, code: string, ...help: string[]) => new AxiError(message, code, help);
 /** TOON data, then next-step hints one per line, the way the other AXIs print them. */
 const toon = (data: object, help: string[] = []) => [encode(data), ...(help.length ? [`help[${help.length}]:`, ...help.map((h) => `  ${h}`)] : [])].join('\n');
@@ -144,7 +151,7 @@ class EvidenceError extends Error {}
 
 type Flags = Record<string, { type: 'string' | 'boolean'; default?: string; multiple?: boolean }>;
 const TIERS: Flags = { full: { type: 'boolean' }, json: { type: 'boolean' } };
-const BOARD_FLAGS: Flags = { port: { type: 'string', default: '4410' }, 'evidence-root': { type: 'string' } };
+const BOARD_FLAGS: Flags = { port: { type: 'string' }, 'evidence-root': { type: 'string' } };
 const RAISE_FIELDS = ['title', 'key', 'about', 'detail', 'option', 'recommend', 'default', 'close'];
 
 /** Parses one command's flags strictly; `on` carries a given board file into the next-step hints. */
@@ -367,7 +374,7 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
   });
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
-    const doc = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { schema: 1, decisions: [] };
+    const items = existsSync(file) ? readItems(file).items : [];
     // Boards in one folder share evidence/, so a number is taken only by creating its folder; one in use is never written into.
     const current = board(file), store = join(dirname(file), 'evidence'), taken = current.map((d) => Number(/^update-(\d+)$/.exec(d.key)?.[1] ?? 0));
     const own = explainer && (values.key ?? slug(values.title));
@@ -384,16 +391,18 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
       return { path, sha256: sha256(bytes), bytes: bytes.length };
     });
     const { title, about, detail, close, link, recommend: recommend_value, default: default_if_silent } = values;
-    doc.decisions.push(explainer ? { key, type, title, about, detail, options, recommend_value, default_if_silent, close, chapters, media }
+    items.push(explainer ? { key, type, title, about, detail, options, recommend_value, default_if_silent, close, chapters, media }
       : { key, type, number, title, about, detail, close, link, media });
-    const tmp = `${file}.${process.pid}.tmp`;
-    writeFileSync(tmp, `${JSON.stringify(doc, null, 2)}\n`, { mode: 0o600 });
-    try { loadDecisions(tmp); } catch (e) {
-      rmSync(tmp, { force: true });
+    // The whole board is checked before it is written, so a bad post leaves the board and evidence/ as they were.
+    const check = `${file}.${process.pid}.check`;
+    writeFileSync(check, JSON.stringify({ schema: 2, items }), { mode: 0o600 });
+    try { loadDecisions(check); } catch (e) {
       rmSync(dir, { recursive: true, force: true });
-      throw e instanceof InputError ? new InputError(e.message.replace(basename(tmp), basename(file))) : e;
+      throw e instanceof InputError ? new InputError(e.message.replace(basename(check), basename(file))) : e;
+    } finally {
+      rmSync(check, { force: true });
     }
-    renameSync(tmp, file);
+    writeItems(file, items);
     if (explainer) return toon({ board: tilde(file), raised: [{ key, status: 'raised', title }] }, [`Run \`sign-off-axi open${on}\` so the user can watch and answer`, `Run \`sign-off-axi wait${on} --key ${key}\` to block until they do`]);
     return toon({ board: tilde(file), posted: [{ key, number, media: media.length, title }] },
       [`Run \`sign-off-axi open${on}\` so the user can give a verdict`, `Run \`sign-off-axi wait${on} --key ${key}\` to block until they do`]);
@@ -409,14 +418,14 @@ const optionsOf = (values: Record<string, any>) => values.option?.map((o: string
 function buildIncoming(values: Record<string, any>, extra: object = {}): { incoming: Decision[]; raw: object[] } {
   if (values.from !== undefined) {
     const source = resolve(values.from);
-    return { incoming: loadDecisions(source), raw: JSON.parse(readFileSync(source, 'utf8')).decisions };
+    return { incoming: loadDecisions(source), raw: readItems(source).items };
   }
   const scratch = mkdtempSync(join(tmpdir(), 'sign-off-'));
   const source = join(scratch, 'flags');
   try {
     const { title, key = slug(title), about, detail, recommend: recommend_value, default: default_if_silent, close } = values;
-    writeFileSync(source, JSON.stringify({ schema: 1, decisions: [{ key, title, about, detail, options: optionsOf(values), recommend_value, default_if_silent, close, ...extra }] }));
-    return { incoming: loadDecisions(source), raw: JSON.parse(readFileSync(source, 'utf8')).decisions };
+    writeFileSync(source, JSON.stringify({ schema: 2, items: [{ key, title, about, detail, options: optionsOf(values), recommend_value, default_if_silent, close, ...extra }] }));
+    return { incoming: loadDecisions(source), raw: readItems(source).items };
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
@@ -425,20 +434,17 @@ function buildIncoming(values: Record<string, any>, extra: object = {}): { incom
 function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: Decision[]; raw: object[] }) {
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
-    const current = board(file), doc = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { schema: 1, decisions: [] };
+    const current = board(file), items = existsSync(file) ? readItems(file).items : [];
     const raised = incoming.map((d, i) => {
       const had = current.find((c) => c.key === d.key);
       const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
       if (had && same(had) !== same(d)) {
         throw fail(`key ${d.key} already holds a different question on ${tilde(file)}`, 'CONFLICT', 'Raise it under a new --key');
       }
-      if (!had) doc.decisions.push(raw[i]);
+      if (!had) items.push(raw[i]);
       return { key: d.key, status: !had ? 'raised' : had.answer ? `already answered ${had.answer.answer}` : 'already waiting', title: d.title };
     });
-    if (raised.some((r) => r.status === 'raised')) {
-      writeFileSync(`${file}.${process.pid}.tmp`, `${JSON.stringify(doc, null, 2)}\n`, { mode: 0o600 });
-      renameSync(`${file}.${process.pid}.tmp`, file);
-    }
+    if (raised.some((r) => r.status === 'raised')) writeItems(file, items);
     const key = raised.length === 1 ? ` --key ${raised[0].key}` : '';
     const open = raised.some((r) => !r.status.startsWith('already answered')) ? [`Run \`sign-off-axi open${on}\` so the user can answer`] : [];
     return toon({ board: tilde(file), raised }, [...open, `Run \`sign-off-axi answers${on}${key}\` to read ${key ? 'the answer' : 'the answers'}`]);
@@ -447,7 +453,7 @@ function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: 
 
 async function open(args: string[]) {
   const { file, values, on } = parse('open', args, BOARD_FLAGS);
-  const port = portOf(values.port);
+  const port = boardPort(file, values.port);
   ready(file, on, values['evidence-root']);
   // The lock makes concurrent opens take turns, so a second one finds the first board instead of starting another.
   return locked(`${record(file)}.lock`, () => start(file, port, values, on), 'another open is still starting this board', 600);
@@ -487,7 +493,7 @@ async function start(file: string, port: number, values: Record<string, any>, on
 /** open records `<pid> <port>` next to the board, so status and stop never guess a pid. */
 const record = (file: string) => `${file.replace(/\.json$/, '')}.board.pid`;
 /** What the board on this port serves; a busy server is an error, never mistaken for no server. */
-const serving = (port: number) => fetch(`http://127.0.0.1:${port}/api/board`, { signal: AbortSignal.timeout(1000) }).then((r) => r.json()).catch((e) => {
+const serving = (port: number) => fetch(`http://127.0.0.1:${port}/api/board`, { signal: AbortSignal.timeout(1000) }).then((r) => r.json()).then((b) => (b && typeof b.file !== 'string' ? { ...b, file: undefined } : b)).catch((e) => {
   if (e.name === 'TimeoutError') throw fail(`the board on port ${port} did not answer within 1 second`, 'BUSY', 'Run the command again in a moment');
 });
 const alive = (pid: number) => { try { return process.kill(pid, 0); } catch (e: any) { return e.code === 'EPERM'; } };
@@ -535,12 +541,34 @@ function repoDir(cmd: string, args: string[]) {
 }
 
 const GITIGNORE = 'mocks/\nevidence/\n*.answers.jsonl\n*.rounds.jsonl\n*.board.pid\n*.board.log\n';
+/** The board and port in <so>/config.yaml (the `key: value` lines init writes). A bad line falls back on its own default
+ * (decisions.json, 4410) and `problems` says what is wrong; a file that cannot be read throws. */
+function readSetup(so: string) {
+  const config: Record<string, string> = {}, problems: string[] = [];
+  readFileSync(join(so, 'config.yaml'), 'utf8').split(/\r?\n/).forEach((l, n) => {
+    const line = l.split('#')[0].trim(), kv = line.match(/^([A-Za-z]+)\s*:\s*(\S+)$/), key = line.match(/^(board|port)(\s|:|$)/i);
+    if (kv && ['board', 'port'].includes(kv[1].toLowerCase())) config[kv[1].toLowerCase()] = kv[2];
+    else if (key) problems.push(`line ${n + 1} is not one "key: value"`);
+  });
+  const port = config.port ?? '4410', goodBoard = /^[\w.-]+\.json$/.test(config.board ?? ''), goodPort = /^\d{1,5}$/.test(port) && Number(port) <= 65535;
+  if (!goodBoard) problems.push('needs a "board: <name>.json" line');
+  if (!goodPort) problems.push(`port ${port} is not a number from 0 to 65535`);
+  return { board: join(so, goodBoard ? config.board : 'decisions.json'), port: goodPort ? Number(port) : 4410, goodBoard, problems };
+}
+/** --port, else the port in a config.yaml beside the board (init writes one), else 4410. */
+function boardPort(file: string, given?: string) {
+  if (given === undefined) try { given = String(readSetup(dirname(file)).port); } catch { given = '4410'; }
+  return portOf(given);
+}
+
 function init(args: string[]) {
   const dir = repoDir('init', args), so = join(dir, '.sign-off');
-  const board = join(so, 'decisions.json');
+  // A re-run repairs a cut-short init, including a missing board under the name the config gives.
+  let board = join(so, 'decisions.json');
+  try { board = readSetup(so).board; } catch {}
   const files: [string, string][] = [
     [join(so, 'config.yaml'), `# sign-off repo setup. board: path under .sign-off/, port: dashboard port.\nboard: decisions.json\nport: 4410\n`],
-    [board, `{"schema": 1, "decisions": []}\n`],
+    [board, `{"schema": 2, "items": []}\n`],
     [join(so, '.gitignore'), GITIGNORE],
   ];
   mkdirSync(join(so, 'mocks'), { recursive: true });
@@ -554,56 +582,131 @@ function init(args: string[]) {
     }
   }
   return toon({ dir: tilde(dir), created: created.length ? created : 'nothing new (re-run is a no-op)', kept, board: tilde(board) },
-    [`Run \`sign-off-axi post ${tilde(board)} --type design --title "<question>" --option a=A --option b=B\` to ask for a pick`,
-      `Run \`sign-off-axi doctor ${tilde(dir)}\` to check the setup`, `Run \`sign-off-axi open ${tilde(board)}\` to show the board to the user`]);
+    [`Run \`sign-off-axi post ${shellPath(board)} --type design --title "<question>" --option a=A --option b=B\` to ask for a pick`,
+      `Run \`sign-off-axi doctor ${shellPath(dir)}\` to check the setup`, `Run \`sign-off-axi open ${shellPath(board)}\` to show the board to the user`]);
 }
 
-/** Reads the two `key: value` lines init writes; anything else in the file is ignored. */
-const readConfig = (dir: string) => Object.fromEntries(
-  readFileSync(join(dir, '.sign-off', 'config.yaml'), 'utf8').split('\n')
-    .map((l) => l.split('#')[0].match(/^\s*([A-Za-z]+)\s*:\s*(\S+)\s*$/)?.slice(1))
-    .filter(Boolean) as [string, string][]);
-
 async function doctor(args: string[]) {
-  const dir = repoDir('doctor', args), so = join(dir, '.sign-off');
+  const dir = repoDir('doctor', args), so = join(dir, '.sign-off'), rerun = `sign-off-axi init ${shellPath(dir)}`;
   const checks: { name: string; ok: string; fix?: string }[] = [];
-  const [major, minor] = process.versions.node.split('.').map(Number);
-  checks.push(major > 22 || (major === 22 && minor >= 5) ? { name: 'node', ok: `ok (${process.versions.node})` }
-    : { name: 'node', ok: `too old (${process.versions.node})`, fix: 'Install Node 22.5 or newer' });
-  let board = '', port = 4410;
-  try {
-    const config = readConfig(dir);
-    if (!config.board) throw new Error('no board line');
-    board = join(so, config.board);
-    port = Number(config.port ?? 4410);
-  } catch {
-    checks.push({ name: 'config', ok: 'missing or unreadable', fix: `Run \`sign-off-axi init ${tilde(dir)}\`` });
-  }
-  if (board) {
-    try {
-      const n = loadDecisions(board).length;
-      checks.push({ name: 'board', ok: `${n} items` });
-    } catch (e: any) {
-      checks.push({ name: 'board', ok: e instanceof InputError ? e.message : 'unreadable', fix: `Fix ${tilde(board)}, or re-run \`sign-off-axi init ${tilde(dir)}\`` });
+  const check = (name: string, ok: string, fix?: string) => checks.push({ name, ok, fix });
+  /** Stats a path; one it cannot follow (a link to nothing, a link loop) is 'link', and one it may not reach is 'denied', instead of an error. */
+  const look = (path: string): Stats | 'link' | 'denied' | undefined => {
+    try { return statSync(path, { throwIfNoEntry: false }) ?? (lstatSync(path, { throwIfNoEntry: false }) && 'link'); } catch (e: any) {
+      if (e.code === 'ELOOP') return 'link';
+      if (['EACCES', 'EPERM'].includes(e.code)) return 'denied';
+      throw e;
     }
+  };
+  /** A permission problem is fixed by chmod on the setup folder holding the path; anything else in the way is moved aside. */
+  const unreadable = (path: string, code: string, then: string) => ['EACCES', 'EPERM'].includes(code) ? `Run \`chmod -R u+rwX ${shellPath(dirname(path))}\`` : `Move ${shellPath(path)} away, then ${then}`;
+  /** Why a setup file cannot be used and its fix, or nothing when it is a readable file with content. */
+  const writeError = (path: string): string | undefined => { try { accessSync(path, constants.W_OK); } catch (e: any) { return e.code; } };
+  const unusable = (path: string): [string, string] | undefined => {
+    const stat = look(path);
+    if (stat === 'denied') return [`${basename(path)} cannot be read (permission denied)`, unreadable(path, 'EACCES', `run \`${rerun}\``)];
+    if (stat === 'link') return [`${basename(path)} is a broken link`, `Delete the link ${shellPath(path)}, then run \`${rerun}\``];
+    if (!stat) return [`${basename(path)} is missing`, `Run \`${rerun}\``];
+    if (!stat.isFile()) return [`${basename(path)} is not a file`, `Move ${shellPath(path)} away, then run \`${rerun}\``];
+    if (!stat.size) return [`${basename(path)} is empty (init was cut short)`, `Delete ${shellPath(path)}, then run \`${rerun}\``];
+    try { closeSync(openSync(path, 'r')); } catch (e: any) { return [`${basename(path)} cannot be read (${e.code})`, unreadable(path, e.code, `run \`${rerun}\``)]; }
+  };
+  const [major, minor] = process.versions.node.split('.').map(Number);
+  check('node', major > 22 || (major === 22 && minor >= 5) ? `ok (${process.versions.node})` : `too old (${process.versions.node})`,
+    major > 22 || (major === 22 && minor >= 5) ? undefined : 'Install Node 22.5 or newer');
+  let board = join(so, 'decisions.json'), port = 4410;
+  try {
+    const top = look(so);
+    if (top === 'denied') check('setup', '.sign-off cannot be read (permission denied)', `Run \`chmod u+x ${shellPath(dir)}\``);
+    else if (top && (top === 'link' || !top.isDirectory())) check('setup', '.sign-off is not a folder', `Move ${shellPath(so)} away, then run \`${rerun}\``);
+    else if (!top) check('setup', 'no .sign-off/ folder', `Run \`${rerun}\``);
+    else {
+      const config = join(so, 'config.yaml'), configBad = unusable(config);
+      if (configBad) check('config', ...configBad);
+      else {
+        const setup = readSetup(so);
+        ({ board, port } = setup);
+        if (!setup.problems.length) check('config', `board ${basename(board)}, port ${port}`);
+        else check('config', `${basename(config)}: ${setup.problems.join('; ')}`, `Edit ${shellPath(config)} to hold "board: <name>.json" and "port: <0-65535>" lines, such as board: decisions.json and port: 4410${setup.goodBoard ? '' : `, or delete it and run \`${rerun}\``}`);
+      }
+      const boardBad = unusable(board);
+      if (boardBad) check('board', ...boardBad);
+      else {
+        try {
+          const n = loadDecisions(board).length, old = readItems(board).schema === 1;
+          check('board', `${n} items${old ? ' (0.1.0 schema 1: read as decisions; the first write that changes it upgrades it and keeps a .schema-1.bak copy)' : ''}`);
+        } catch (e: any) {
+          check('board', e.message, `Edit ${shellPath(board)} to fix that; the format is at ${FORMAT}`);
+        }
+      }
+      for (const [name, path, fields] of [['answers', answersPath(board), ['key', 'answer']], ['rounds', roundsPath(board), ['key', 'note', 'at']]] as const) {
+        let text: string;
+        try { text = readFileSync(path, 'utf8'); } catch (e: any) {
+          check(name, e.code === 'ENOENT' ? 'none yet' : `${basename(path)} cannot be read (${e.code})`, e.code === 'ENOENT' ? undefined : unreadable(path, e.code, 'the next save writes a new one'));
+          continue;
+        }
+        const torn = text.split('\n').flatMap((line, n) => {
+          try { return !line || fields.every((f) => typeof JSON.parse(line)?.[f] === 'string') ? [] : [n + 1]; } catch { return [n + 1]; }
+        });
+        check(name, torn.length ? `line${torn.length > 1 ? 's' : ''} ${torn.join(', ')} of ${basename(path)} ${torn.length > 1 ? 'do' : 'does'} not parse` : `${text.split('\n').filter(Boolean).length} lines read`,
+          torn.length ? `Delete line${torn.length > 1 ? 's' : ''} ${torn.join(', ')} from ${shellPath(path)} (a cut-short write); the other lines are kept` : undefined);
+      }
+      const ignore = join(so, '.gitignore'), ignoreBad = unusable(ignore);
+      if (ignoreBad) check('gitignore', ...ignoreBad);
+      else {
+        const lines = readFileSync(ignore, 'utf8').split('\n').map((l) => l.trim().replace(/^\/|\/$/g, ''));
+        const absent = ['mocks/', 'evidence/'].filter((d) => !lines.includes(d.slice(0, -1)));
+        check('gitignore', absent.length ? `${absent.join(' and ')} not ignored` : 'mocks/ and evidence/ are ignored',
+          absent.length ? `Add the line${absent.length > 1 ? 's' : ''} ${absent.join(' and ')} to ${shellPath(ignore)}` : undefined);
+      }
+      const kinds = ['mocks', 'evidence'].map((f) => ({ f, stat: look(join(so, f)) }));
+      const denied = kinds.filter(({ stat }) => stat === 'denied').map(({ f }) => `${f}/`);
+      const folders = kinds.filter(({ stat }) => stat !== 'denied' && (!stat || stat === 'link' || !stat.isDirectory())).map(({ f }) => f);
+      const blocked = kinds.filter(({ f, stat }) => folders.includes(f) && stat).map(({ f }) => f);
+      const problems = [
+        ...(denied.length ? [`${denied.join(' and ')} cannot be read (permission denied)`] : []),
+        ...folders.map((f) => `${f}/ ${blocked.includes(f) ? 'not a folder' : 'missing'}`),
+      ];
+      const steps = [
+        ...(blocked.length ? [`move ${blocked.map((f) => shellPath(join(so, f))).join(' and ')} away`] : []),
+        ...(denied.length ? [`run \`chmod -R u+rwX ${shellPath(so)}\``] : []),
+        `run \`${rerun}\``,
+      ];
+      check('folders', problems.join('; ') || 'mocks/ and evidence/ exist', problems.length ? `${steps.join(', then ')}`.replace(/^./, (c) => c.toUpperCase()) : undefined);
+      const unwritable = [so, answersPath(board), roundsPath(board), join(so, 'evidence')].flatMap((p) => {
+        const code = existsSync(p) ? writeError(p) : undefined;
+        return code ? [{ path: p, code }] : [];
+      });
+      const writeFix = ({ path, code }: { path: string; code: string }) => code === 'EROFS' ? 'the filesystem is read-only: remount it read-write or move the repo'
+        : code === 'EPERM' ? 'chown it to you (or run as its owner)' : `Run \`chmod u+w ${shellPath(path)}\``;
+      check('write', unwritable.length ? `${unwritable.map(({ path }) => basename(path)).join(' and ')} cannot be written` : 'setup can be written',
+        unwritable.length ? [...new Set(unwritable.map(writeFix))].join('; ') : undefined);
+    }
+  } catch (e: any) {
+    if (!e.syscall) throw e;
+    if (e.code === 'ENOTDIR') check('setup', `${tilde(dir)} is not a folder`, 'Pass a folder: `sign-off-axi doctor <folder>`');
+    else check('setup', `${tilde(e.path ?? so)} cannot be inspected (${e.code})`, `Check ${shellPath(e.path ?? so)}, then run \`${rerun}\``);
   }
-  const ignore = existsSync(join(so, '.gitignore')) ? readFileSync(join(so, '.gitignore'), 'utf8') : '';
-  checks.push(ignore.includes('mocks/') && ignore.includes('evidence/') ? { name: 'gitignore', ok: 'mocks/ and evidence/ are ignored' }
-    : { name: 'gitignore', ok: 'mocks/ or evidence/ not ignored', fix: `Run \`sign-off-axi init ${tilde(dir)}\` again` });
   if (port) {
-    const free = await new Promise((ok) => server.once('error', () => ok(false)).listen(port, '127.0.0.1', () => server.close(() => ok(true))));
+    const error = await new Promise<any>((ok) => server.once('error', ok).listen(port, '127.0.0.1', () => server.close(() => ok(undefined))));
     server.removeAllListeners('error');
-    checks.push(free ? { name: 'port', ok: `${port} is free` } : { name: 'port', ok: `${port} is busy (the board may already be open)` });
+    // A port in use by this very board is fine: the board is already open.
+    const shown = error && await serving(port).catch(() => undefined), other = shown?.file && shown.file !== (existsSync(board) ? realpathSync(board) : board);
+    if (!error) check('port', `${port} is free`);
+    else if (error.code === 'EACCES') check('port', `${port} needs privileges to bind (EACCES)`, `Set "port:" in ${shellPath(join(so, 'config.yaml'))} to a port above 1023 (open and serve use it)`);
+    else if (shown?.file && !other) check('port', `${port} shows this board (already open)`);
+    else check('port', other ? `${port} shows another board, ${shellPath(shown.file)}` : `${port} is in use (${error.code})`,
+      `Set "port:" in ${shellPath(join(so, 'config.yaml'))} to a free port (open and serve use it), or ${other ? `close that board: \`sign-off-axi stop ${shellPath(shown.file)}\`, or Ctrl-C its serve` : `stop the program using port ${port}`}`);
   }
   const bad = checks.filter((c) => c.fix);
-  if (bad.length) throw fail(`${bad.length} checks need a fix in ${tilde(dir)}`, 'NOT_FOUND', ...bad.map((c) => `${c.name}: ${c.fix}`));
+  if (bad.length) throw fail(`${bad.length} of ${checks.length} checks need a fix in ${tilde(dir)}`, 'NOT_FOUND',...bad.map((c) => `${c.name}: ${c.ok}. ${c.fix}`));
   return toon({ dir: tilde(dir), checks: checks.map(({ name, ok }) => ({ name, ok })) },
-    [`Run \`sign-off-axi open ${tilde(board)}\` to show the board to the user`]);
+    [`Run \`sign-off-axi open ${shellPath(board)}\` to show the board to the user`]);
 }
 
 let file = '', evidenceRoot = '';
 async function serve(args: string[]) {
-  const parsed = parse('serve', args, BOARD_FLAGS), port = portOf(parsed.values.port);
+  const parsed = parse('serve', args, BOARD_FLAGS), port = boardPort(parsed.file, parsed.values.port);
   ready(parsed.file, parsed.on, parsed.values['evidence-root']);
   [file, evidenceRoot] = [parsed.file, parsed.values['evidence-root'] ? resolve(parsed.values['evidence-root']) : ''];
   await new Promise<void>((ok, no) => server.once('error', no).listen(port, '127.0.0.1', ok)).catch((e) => {

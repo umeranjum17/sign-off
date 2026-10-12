@@ -4,8 +4,8 @@
 
 ```json
 {
-  "schema": 1,
-  "decisions": [
+  "schema": 2,
+  "items": [
     {
       "key": "dark-default",
       "title": "Turn on dark mode by default for new users?",
@@ -28,6 +28,7 @@
 }
 ```
 
+- A 0.1.0 file, `"schema": 1` with a `"decisions"` list, still reads: each entry is an item, a decision unless it says otherwise. The first write that changes it (a `raise` of a new key, or a `post`) rewrites it as `"schema": 2` (temp file, then rename) and first keeps the old file once beside it as `<board>.schema-1.bak`. Answer and round files are not touched.
 - `key`: 1-128 of `A-Z a-z 0-9 . _ -`, unique in the file. `title`: required.
 - `type`: optional, `decision` (default), `design`, `evidence`, `diagram`,
   `interactive` or `explainer`. A design item

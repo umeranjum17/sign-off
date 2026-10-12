@@ -53,11 +53,20 @@ By default the skill lands in the current project's skills directory (`.claude/s
 
 In a project folder, `sign-off-axi init` writes `.sign-off/` (config, an empty
 board, `mocks/` and `evidence/` folders, and a `.gitignore` keeping media and
-answer files out of git) and `sign-off-axi doctor` checks it. Re-running `init`
-keeps files that are already there. Mock files go under `.sign-off/mocks/` and
-are named board-relative in `post` (for example `mocks/a.html`). The skill tells
-the agent how to make them: 3 variants that differ in structure, a short
-trade-off and one recommendation, posted, waited on and read back.
+answer files out of git) and `sign-off-axi doctor` checks it: node version,
+config, board, answer files, gitignore lines, folders and the dashboard port.
+Each failure prints one `help:` line with its fix, and doctor exits 1; a clean
+run exits 0. `open` and `serve` use the config's `port:` unless `--port` is
+given. Re-running `init` keeps files that are already there and adds the
+missing ones, so it repairs an `init` that was cut short. Mock files go under
+`.sign-off/mocks/` and are named board-relative in `post` (for example
+`mocks/a.html`). The skill tells the agent how to make them: 3 variants that
+differ in structure, a short trade-off and one recommendation, posted, waited
+on and read back.
+
+Boards written by 0.1.0 (`"schema": 1`, including `~/.sign-off/decisions.json`)
+still read, with their saved answers, and are upgraded on the first write that
+changes them. The format is in [docs/file-formats.md](docs/file-formats.md).
 
 ### Manual CLI
 

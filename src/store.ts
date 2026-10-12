@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 
 export type Option = { value: string; label: string };
@@ -33,20 +33,43 @@ export const NOTE_MAX = 500;
 const TRADEOFF_MAX = 1000;
 const VIEWS: Record<string, [string, RegExp]> = { diagram: ['.svg, .png, .jpg, .jpeg or .webp', /\.(svg|png|jpe?g|webp)$/i], interactive: ['.html', /\.html$/i] };
 
-export function loadDecisions(path: string): Decision[] {
-  const name = basename(path);
+/** A board's raw items: schema 2 `items`, or a 0.1.0 schema 1 `decisions` list, whose entries read as decision items. `extra` keeps any other top-level fields. */
+export function readItems(path: string): { schema: 1 | 2; items: any[]; extra: Record<string, unknown> } {
   let doc: any;
   try {
     doc = JSON.parse(readFileSync(path, 'utf8'));
   } catch (e: any) {
-    throw new InputError(e.code ? `cannot read ${resolve(path)}: ${e.code}` : `${name}: invalid JSON: ${e.message}`);
+    throw new InputError(e.code ? `cannot read ${resolve(path)}: ${e.code}` : `${basename(path)}: invalid JSON: ${e.message}`);
   }
-  if (doc?.schema !== 1 || !Array.isArray(doc.decisions)) throw new InputError(`${name}: needs "schema": 1 and a "decisions" list`);
+  const extra = { ...doc };
+  delete extra.schema;
+  delete extra.items;
+  delete extra.decisions;
+  if (doc?.schema === 2 && Array.isArray(doc.items)) return { schema: 2, items: doc.items, extra };
+  if (doc?.schema === 1 && Array.isArray(doc.decisions)) return { schema: 1, items: doc.decisions, extra };
+  throw new InputError(`${basename(path)}: needs "schema": 2 with an "items" list, or a 0.1.0 board with "schema": 1 and a "decisions" list`);
+}
+
+/** Writes the board as schema 2 through a temp file and a rename, keeping its other top-level fields. A schema 1 board is first kept once as <board>.schema-1.bak. Callers hold the board lock. */
+export function writeItems(path: string, items: object[]): void {
+  const tmp = `${path}.${process.pid}.tmp`, old = existsSync(path) ? readItems(path) : undefined;
+  if (old?.schema === 1) {
+    const bak = `${path}.schema-1.bak`, bakTmp = `${bak}.${process.pid}.tmp`;
+    writeFileSync(bakTmp, readFileSync(path), { mode: 0o600 });
+    if (existsSync(bak)) rmSync(bakTmp, { force: true });
+    else renameSync(bakTmp, bak);
+  }
+  writeFileSync(tmp, `${JSON.stringify({ ...old?.extra, schema: 2, items }, null, 2)}\n`, { mode: 0o600 });
+  renameSync(tmp, path);
+}
+
+export function loadDecisions(path: string): Decision[] {
+  const name = basename(path), { schema, items } = readItems(path), list = schema === 1 ? 'decisions' : 'items';
   const seen = new Map<string, number>();
-  return doc.decisions.map((d: any, i: number): Decision => {
-    const bad = (field: string, rule: string) => new InputError(`${name}: decisions[${i}] (key ${JSON.stringify(d?.key)}): ${field} ${rule}`);
+  return items.map((d: any, i: number): Decision => {
+    const bad = (field: string, rule: string) => new InputError(`${name}: ${list}[${i}] (key ${JSON.stringify(d?.key)}): ${field} ${rule}`);
     if (!isKey(d?.key)) throw bad('key', 'must be 1-128 of A-Z a-z 0-9 . _ -');
-    if (seen.has(d.key)) throw bad('key', `repeats decisions[${seen.get(d.key)}]`);
+    if (seen.has(d.key)) throw bad('key', `repeats ${list}[${seen.get(d.key)}]`);
     seen.set(d.key, i);
     if (!isText(d.title) || !d.title.trim()) throw bad('title', 'must be non-empty text');
     for (const f of ['about', 'detail']) if (d[f] !== undefined && !isText(d[f])) throw bad(f, 'must be text');
