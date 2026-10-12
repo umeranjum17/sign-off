@@ -534,8 +534,8 @@ function init(args: string[]) {
   const created: string[] = [], kept: string[] = [];
   for (const [path, content] of files) (createOnce(path, content) ? created : kept).push(path.slice(dir.length + 1));
   return toon({ dir: tilde(dir), created: created.length ? created : 'nothing new (re-run is a no-op)', kept, board: tilde(board) },
-    [`Run \`sign-off-axi post ${tilde(board)} --type design --title "<question>" --option a=A --option b=B\` to ask for a pick`,
-      `Run \`sign-off-axi doctor ${tilde(dir)}\` to check the setup`, `Run \`sign-off-axi open ${tilde(board)}\` to show the board to the user`]);
+    [`Run \`sign-off-axi post ${shellPath(board)} --type design --title "<question>" --option a=A --option b=B\` to ask for a pick`,
+      `Run \`sign-off-axi doctor ${shellPath(dir)}\` to check the setup`, `Run \`sign-off-axi open ${shellPath(board)}\` to show the board to the user`]);
 }
 
 async function doctor(args: string[]) {
@@ -566,63 +566,69 @@ async function doctor(args: string[]) {
   check('node', major > 22 || (major === 22 && minor >= 5) ? `ok (${process.versions.node})` : `too old (${process.versions.node})`,
     major > 22 || (major === 22 && minor >= 5) ? undefined : 'Install Node 22.5 or newer');
   let board = join(so, 'decisions.json'), port = 4410;
-  const top = look(so);
-  if (top === 'denied') check('setup', '.sign-off cannot be read (permission denied)', `Run \`chmod u+x ${shellPath(dir)}\``);
-  else if (top && (top === 'link' || !top.isDirectory())) check('setup', '.sign-off is not a folder', `Move ${shellPath(so)} away, then run \`${rerun}\``);
-  else if (!top) check('setup', 'no .sign-off/ folder', `Run \`${rerun}\``);
-  else {
-    const config = join(so, 'config.yaml'), configBad = unusable(config);
-    if (configBad) check('config', ...configBad);
+  try {
+    const top = look(so);
+    if (top === 'denied') check('setup', '.sign-off cannot be read (permission denied)', `Run \`chmod u+x ${shellPath(dir)}\``);
+    else if (top && (top === 'link' || !top.isDirectory())) check('setup', '.sign-off is not a folder', `Move ${shellPath(so)} away, then run \`${rerun}\``);
+    else if (!top) check('setup', 'no .sign-off/ folder', `Run \`${rerun}\``);
     else {
-      const setup = readSetup(so);
-      ({ board, port } = setup);
-      if (!setup.problems.length) check('config', `board ${basename(board)}, port ${port}`);
-      else check('config', `${basename(config)}: ${setup.problems.join('; ')}`, `Edit ${shellPath(config)} to hold "board: <name>.json" and "port: <0-65535>" lines, such as board: decisions.json and port: 4410${setup.goodBoard ? '' : `, or delete it and run \`${rerun}\``}`);
-    }
-    const boardBad = unusable(board);
-    if (boardBad) check('board', ...boardBad);
-    else {
-      try {
-        const n = loadDecisions(board).length, old = readItems(board).schema === 1;
-        check('board', `${n} items${old ? ' (0.1.0 schema 1: read as decisions; the next raise or post upgrades it and keeps a .schema-1.bak copy)' : ''}`);
-      } catch (e: any) {
-        check('board', e.message, `Edit ${shellPath(board)} to fix that; the format is at ${FORMAT}`);
+      const config = join(so, 'config.yaml'), configBad = unusable(config);
+      if (configBad) check('config', ...configBad);
+      else {
+        const setup = readSetup(so);
+        ({ board, port } = setup);
+        if (!setup.problems.length) check('config', `board ${basename(board)}, port ${port}`);
+        else check('config', `${basename(config)}: ${setup.problems.join('; ')}`, `Edit ${shellPath(config)} to hold "board: <name>.json" and "port: <0-65535>" lines, such as board: decisions.json and port: 4410${setup.goodBoard ? '' : `, or delete it and run \`${rerun}\``}`);
       }
-    }
-    for (const [name, path, fields] of [['answers', answersPath(board), ['key', 'answer']], ['rounds', roundsPath(board), ['key', 'note', 'at']]] as const) {
-      let text: string;
-      try { text = readFileSync(path, 'utf8'); } catch (e: any) {
-        check(name, e.code === 'ENOENT' ? 'none yet' : `${basename(path)} cannot be read (${e.code})`, e.code === 'ENOENT' ? undefined : unreadable(path, e.code, 'the next save writes a new one'));
-        continue;
+      const boardBad = unusable(board);
+      if (boardBad) check('board', ...boardBad);
+      else {
+        try {
+          const n = loadDecisions(board).length, old = readItems(board).schema === 1;
+          check('board', `${n} items${old ? ' (0.1.0 schema 1: read as decisions; the next raise or post upgrades it and keeps a .schema-1.bak copy)' : ''}`);
+        } catch (e: any) {
+          check('board', e.message, `Edit ${shellPath(board)} to fix that; the format is at ${FORMAT}`);
+        }
       }
-      const torn = text.split('\n').flatMap((line, n) => {
-        try { return !line || fields.every((f) => typeof JSON.parse(line)?.[f] === 'string') ? [] : [n + 1]; } catch { return [n + 1]; }
-      });
-      check(name, torn.length ? `line${torn.length > 1 ? 's' : ''} ${torn.join(', ')} of ${basename(path)} ${torn.length > 1 ? 'do' : 'does'} not parse` : `${text.split('\n').filter(Boolean).length} lines read`,
-        torn.length ? `Delete line${torn.length > 1 ? 's' : ''} ${torn.join(', ')} from ${shellPath(path)} (a cut-short write); the other lines are kept` : undefined);
+      for (const [name, path, fields] of [['answers', answersPath(board), ['key', 'answer']], ['rounds', roundsPath(board), ['key', 'note', 'at']]] as const) {
+        let text: string;
+        try { text = readFileSync(path, 'utf8'); } catch (e: any) {
+          check(name, e.code === 'ENOENT' ? 'none yet' : `${basename(path)} cannot be read (${e.code})`, e.code === 'ENOENT' ? undefined : unreadable(path, e.code, 'the next save writes a new one'));
+          continue;
+        }
+        const torn = text.split('\n').flatMap((line, n) => {
+          try { return !line || fields.every((f) => typeof JSON.parse(line)?.[f] === 'string') ? [] : [n + 1]; } catch { return [n + 1]; }
+        });
+        check(name, torn.length ? `line${torn.length > 1 ? 's' : ''} ${torn.join(', ')} of ${basename(path)} ${torn.length > 1 ? 'do' : 'does'} not parse` : `${text.split('\n').filter(Boolean).length} lines read`,
+          torn.length ? `Delete line${torn.length > 1 ? 's' : ''} ${torn.join(', ')} from ${shellPath(path)} (a cut-short write); the other lines are kept` : undefined);
+      }
+      const ignore = join(so, '.gitignore'), ignoreBad = unusable(ignore);
+      if (ignoreBad) check('gitignore', ...ignoreBad);
+      else {
+        const lines = readFileSync(ignore, 'utf8').split('\n').map((l) => l.trim().replace(/^\/|\/$/g, ''));
+        const absent = ['mocks/', 'evidence/'].filter((d) => !lines.includes(d.slice(0, -1)));
+        check('gitignore', absent.length ? `${absent.join(' and ')} not ignored` : 'mocks/ and evidence/ are ignored',
+          absent.length ? `Add the line${absent.length > 1 ? 's' : ''} ${absent.join(' and ')} to ${shellPath(ignore)}` : undefined);
+      }
+      const kinds = ['mocks', 'evidence'].map((f) => ({ f, stat: look(join(so, f)) }));
+      const denied = kinds.filter(({ stat }) => stat === 'denied').map(({ f }) => `${f}/`);
+      const folders = kinds.filter(({ stat }) => stat !== 'denied' && (!stat || stat === 'link' || !stat.isDirectory())).map(({ f }) => f);
+      const blocked = kinds.filter(({ f, stat }) => folders.includes(f) && stat).map(({ f }) => f);
+      const problems = [
+        ...(denied.length ? [`${denied.join(' and ')} cannot be read (permission denied)`] : []),
+        ...folders.map((f) => `${f}/ ${blocked.includes(f) ? 'not a folder' : 'missing'}`),
+      ];
+      const steps = [
+        ...(blocked.length ? [`move ${blocked.map((f) => shellPath(join(so, f))).join(' and ')} away`] : []),
+        ...(denied.length ? [`run \`chmod -R u+rwX ${shellPath(so)}\``] : []),
+        `run \`${rerun}\``,
+      ];
+      check('folders', problems.join('; ') || 'mocks/ and evidence/ exist', problems.length ? `${steps.join(', then ')}`.replace(/^./, (c) => c.toUpperCase()) : undefined);
     }
-    const ignore = join(so, '.gitignore'), ignoreBad = unusable(ignore);
-    if (ignoreBad) check('gitignore', ...ignoreBad);
-    else {
-      const lines = readFileSync(ignore, 'utf8').split('\n').map((l) => l.trim().replace(/^\/|\/$/g, ''));
-      const absent = ['mocks/', 'evidence/'].filter((d) => !lines.includes(d.slice(0, -1)));
-      check('gitignore', absent.length ? `${absent.join(' and ')} not ignored` : 'mocks/ and evidence/ are ignored',
-        absent.length ? `Add the line${absent.length > 1 ? 's' : ''} ${absent.join(' and ')} to ${shellPath(ignore)}` : undefined);
-    }
-    const kinds = ['mocks', 'evidence'].map((f) => ({ f, stat: look(join(so, f)) }));
-    const denied = kinds.filter(({ stat }) => stat === 'denied').map(({ f }) => `${f}/`);
-    const folders = kinds.filter(({ stat }) => stat !== 'denied' && (!stat || stat === 'link' || !stat.isDirectory())).map(({ f }) => f);
-    const blocked = kinds.filter(({ f, stat }) => folders.includes(f) && stat).map(({ f }) => shellPath(join(so, f)));
-    const problems = [
-      ...(denied.length ? [`${denied.join(' and ')} cannot be read (permission denied)`] : []),
-      ...(folders.length ? [`${folders.map((f) => `${f}/`).join(' and ')} ${blocked.length ? 'not a folder' : 'missing'}`] : []),
-    ];
-    const steps = [
-      ...(blocked.length ? [`move ${blocked.join(' and ')} away`] : []),
-      ...(denied.length ? [`run \`chmod -R u+rwX ${shellPath(so)}\``] : []),
-      `run \`${rerun}\``,
-    ];
-    check('folders', problems.join('; ') || 'mocks/ and evidence/ exist', problems.length ? `${steps.join(', then ')}`.replace(/^./, (c) => c.toUpperCase()) : undefined);
+  } catch (e: any) {
+    if (!e.syscall) throw e;
+    if (e.code === 'ENOTDIR') check('setup', `${tilde(dir)} is not a folder`, 'Pass a folder: `sign-off-axi doctor <folder>`');
+    else check('setup', `${tilde(e.path ?? so)} cannot be inspected (${e.code})`, `Check ${shellPath(e.path ?? so)}, then run \`${rerun}\``);
   }
   if (port) {
     const error = await new Promise<any>((ok) => server.once('error', ok).listen(port, '127.0.0.1', () => server.close(() => ok(undefined))));
