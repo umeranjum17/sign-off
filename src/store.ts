@@ -51,7 +51,12 @@ export function createOnce(path: string, content: string | Buffer): boolean {
   const tmp = `${path}.${process.pid}.tmp`;
   writeFileSync(tmp, content, { mode: 0o600 });
   try {
-    linkSync(tmp, path);
+    try {
+      linkSync(tmp, path);
+    } catch (e: any) {
+      if (!['EPERM', 'ENOTSUP', 'EXDEV'].includes(e.code)) throw e;
+      writeFileSync(path, content, { flag: 'wx', mode: 0o600 });
+    }
     return true;
   } catch (e: any) {
     if (e.code === 'EEXIST') return false;
