@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -123,4 +123,19 @@ test('doctor journey: each broken precondition prints its own fix, and a repair 
   assert.match(doc().out, /board: decisions.json is missing\. Run `sign-off-axi init /);
   assert.match(run('init', dir).out, /created\[1\]: .sign-off\/decisions.json/);
   assert.equal(doc().code, 0);
+});
+
+test('doctor names a fix for a denied setup path and a port that needs privilege', () => {
+  if (process.getuid?.() === 0) return;
+  const dir = join(scratch, 'denied'), sod = join(dir, '.sign-off');
+  run('init', dir);
+  writeFileSync(join(sod, 'config.yaml'), 'board: decisions.json\nport: 0\n');
+  chmodSync(sod, 0o600);
+  try {
+    assert.match(run('doctor', dir).out, /config: config\.yaml cannot be read \(permission denied\)\. Run `chmod -R u\+rwX /);
+  } finally {
+    chmodSync(sod, 0o700);
+  }
+  writeFileSync(join(sod, 'config.yaml'), 'board: decisions.json\nport: 80\n');
+  assert.match(run('doctor', dir).out, /port: 80 needs privileges to bind \(EACCES\)\. Set \\"port:\\" in .*config\.yaml to a port above 1023/);
 });

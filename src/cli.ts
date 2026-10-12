@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { closeSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, watch, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, watch, writeFileSync, type Stats } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -537,30 +537,33 @@ async function doctor(args: string[]) {
   const dir = repoDir('doctor', args), so = join(dir, '.sign-off'), rerun = `sign-off-axi init ${tilde(dir)}`;
   const checks: { name: string; ok: string; fix?: string }[] = [];
   const check = (name: string, ok: string, fix?: string) => checks.push({ name, ok, fix });
-  /** Stats a path; one it cannot follow (a link to nothing, a link loop) is 'link' instead of an error. */
-  const look = (path: string) => {
+  /** Stats a path; one it cannot follow (a link to nothing, a link loop) is 'link', and one it may not reach is 'denied', instead of an error. */
+  const look = (path: string): Stats | 'link' | 'denied' | undefined => {
     try { return statSync(path, { throwIfNoEntry: false }) ?? (lstatSync(path, { throwIfNoEntry: false }) && 'link'); } catch (e: any) {
       if (e.code === 'ELOOP') return 'link';
+      if (['EACCES', 'EPERM'].includes(e.code)) return 'denied';
       throw e;
     }
   };
-  /** Only a permission problem is fixed by chmod; anything else in the way is moved aside. */
-  const unreadable = (path: string, e: any, then: string) => ['EACCES', 'EPERM'].includes(e.code) ? `Run \`chmod u+rw ${tilde(path)}\`` : `Move ${tilde(path)} away, then ${then}`;
+  /** A permission problem is fixed by chmod on the setup folder holding the path; anything else in the way is moved aside. */
+  const unreadable = (path: string, code: string, then: string) => ['EACCES', 'EPERM'].includes(code) ? `Run \`chmod -R u+rwX ${tilde(dirname(path))}\`` : `Move ${tilde(path)} away, then ${then}`;
   /** Why a setup file cannot be used and its fix, or nothing when it is a readable file with content. */
   const unusable = (path: string): [string, string] | undefined => {
     const stat = look(path);
+    if (stat === 'denied') return [`${basename(path)} cannot be read (permission denied)`, unreadable(path, 'EACCES', `run \`${rerun}\``)];
     if (stat === 'link') return [`${basename(path)} is a broken link`, `Delete the link ${tilde(path)}, then run \`${rerun}\``];
     if (!stat) return [`${basename(path)} is missing`, `Run \`${rerun}\``];
     if (!stat.isFile()) return [`${basename(path)} is not a file`, `Move ${tilde(path)} away, then run \`${rerun}\``];
     if (!stat.size) return [`${basename(path)} is empty (init was cut short)`, `Delete ${tilde(path)}, then run \`${rerun}\``];
-    try { closeSync(openSync(path, 'r')); } catch (e: any) { return [`${basename(path)} cannot be read (${e.code})`, unreadable(path, e, `run \`${rerun}\``)]; }
+    try { closeSync(openSync(path, 'r')); } catch (e: any) { return [`${basename(path)} cannot be read (${e.code})`, unreadable(path, e.code, `run \`${rerun}\``)]; }
   };
   const [major, minor] = process.versions.node.split('.').map(Number);
   check('node', major > 22 || (major === 22 && minor >= 5) ? `ok (${process.versions.node})` : `too old (${process.versions.node})`,
     major > 22 || (major === 22 && minor >= 5) ? undefined : 'Install Node 22.5 or newer');
   let board = join(so, 'decisions.json'), port = 4410;
   const top = look(so);
-  if (top && (top === 'link' || !top.isDirectory())) check('setup', '.sign-off is not a folder', `Move ${tilde(so)} away, then run \`${rerun}\``);
+  if (top === 'denied') check('setup', '.sign-off cannot be read (permission denied)', `Run \`chmod u+x ${tilde(dir)}\``);
+  else if (top && (top === 'link' || !top.isDirectory())) check('setup', '.sign-off is not a folder', `Move ${tilde(so)} away, then run \`${rerun}\``);
   else if (!top) check('setup', 'no .sign-off/ folder', `Run \`${rerun}\``);
   else {
     const config = join(so, 'config.yaml'), configBad = unusable(config);
@@ -584,7 +587,7 @@ async function doctor(args: string[]) {
     for (const [name, path, fields] of [['answers', answersPath(board), ['key', 'answer']], ['rounds', roundsPath(board), ['key', 'note', 'at']]] as const) {
       let text: string;
       try { text = readFileSync(path, 'utf8'); } catch (e: any) {
-        check(name, e.code === 'ENOENT' ? 'none yet' : `${basename(path)} cannot be read (${e.code})`, e.code === 'ENOENT' ? undefined : unreadable(path, e, 'the next save writes a new one'));
+        check(name, e.code === 'ENOENT' ? 'none yet' : `${basename(path)} cannot be read (${e.code})`, e.code === 'ENOENT' ? undefined : unreadable(path, e.code, 'the next save writes a new one'));
         continue;
       }
       const torn = text.split('\n').flatMap((line, n) => {
@@ -601,10 +604,20 @@ async function doctor(args: string[]) {
       check('gitignore', absent.length ? `${absent.join(' and ')} not ignored` : 'mocks/ and evidence/ are ignored',
         absent.length ? `Add the line${absent.length > 1 ? 's' : ''} ${absent.join(' and ')} to ${tilde(ignore)}` : undefined);
     }
-    const folders = ['mocks', 'evidence'].filter((f) => { const stat = look(join(so, f)); return !stat || stat === 'link' || !stat.isDirectory(); });
-    const blocked = folders.filter((f) => lstatSync(join(so, f), { throwIfNoEntry: false })).map((f) => tilde(join(so, f)));
-    check('folders', folders.length ? `${folders.map((f) => `${f}/`).join(' and ')} ${blocked.length ? 'not a folder' : 'missing'}` : 'mocks/ and evidence/ exist',
-      folders.length ? `${blocked.length ? `Move ${blocked.join(' and ')} away, then run` : 'Run'} \`${rerun}\`` : undefined);
+    const kinds = ['mocks', 'evidence'].map((f) => ({ f, stat: look(join(so, f)) }));
+    const denied = kinds.filter(({ stat }) => stat === 'denied').map(({ f }) => `${f}/`);
+    const folders = kinds.filter(({ stat }) => stat !== 'denied' && (!stat || stat === 'link' || !stat.isDirectory())).map(({ f }) => f);
+    const blocked = kinds.filter(({ f, stat }) => folders.includes(f) && stat).map(({ f }) => tilde(join(so, f)));
+    const problems = [
+      ...(denied.length ? [`${denied.join(' and ')} cannot be read (permission denied)`] : []),
+      ...(folders.length ? [`${folders.map((f) => `${f}/`).join(' and ')} ${blocked.length ? 'not a folder' : 'missing'}`] : []),
+    ];
+    const steps = [
+      ...(blocked.length ? [`move ${blocked.join(' and ')} away`] : []),
+      ...(denied.length ? [`run \`chmod -R u+rwX ${tilde(so)}\``] : []),
+      `run \`${rerun}\``,
+    ];
+    check('folders', problems.join('; ') || 'mocks/ and evidence/ exist', problems.length ? `${steps.join(', then ')}`.replace(/^./, (c) => c.toUpperCase()) : undefined);
   }
   if (port) {
     const error = await new Promise<any>((ok) => server.once('error', ok).listen(port, '127.0.0.1', () => server.close(() => ok(undefined))));
@@ -612,6 +625,7 @@ async function doctor(args: string[]) {
     // A port in use by this very board is fine: the board is already open.
     const shown = error && await serving(port).catch(() => undefined), other = shown?.file && shown.file !== (existsSync(board) ? realpathSync(board) : board);
     if (!error) check('port', `${port} is free`);
+    else if (error.code === 'EACCES') check('port', `${port} needs privileges to bind (EACCES)`, `Set "port:" in ${tilde(join(so, 'config.yaml'))} to a port above 1023 (open and serve use it)`);
     else if (shown?.file && !other) check('port', `${port} shows this board (already open)`);
     else check('port', other ? `${port} shows another board, ${tilde(shown.file)}` : `${port} is in use (${error.code})`,
       `Set "port:" in ${tilde(join(so, 'config.yaml'))} to a free port (open and serve use it), or ${other ? `close that board: \`sign-off-axi stop ${tilde(shown.file)}\`, or Ctrl-C its serve` : `stop the program using port ${port}`}`);
