@@ -227,3 +227,14 @@ test('doctor prints a fix a shell can run for a path with a space, and fails wit
   writeFileSync(join(dir, '.sign-off', 'config.yaml'), 'board: decisions.json\nport: 0\n');
   assert.equal(run('doctor', dir).code, 0);
 });
+
+test('doctor ignores config keys it does not use and names a malformed port line', () => {
+  const dir = join(scratch, 'extra-keys'), sod = join(dir, '.sign-off');
+  run('init', dir);
+  writeFileSync(join(sod, 'config.yaml'), 'board: decisions.json\nport: 0\nowner: Umer Anjum\nmax-items: 5\n');
+  assert.equal(run('doctor', dir).code, 0);
+  writeFileSync(join(sod, 'config.yaml'), 'board: decisions.json\nport:\n');
+  const broken = run('doctor', dir);
+  assert.equal(broken.code, 1);
+  assert.match(broken.out, /config: config.yaml: line 2 is not one/);
+});

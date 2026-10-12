@@ -546,9 +546,9 @@ const GITIGNORE = 'mocks/\nevidence/\n*.answers.jsonl\n*.rounds.jsonl\n*.board.p
 function readSetup(so: string) {
   const config: Record<string, string> = {}, problems: string[] = [];
   readFileSync(join(so, 'config.yaml'), 'utf8').split(/\r?\n/).forEach((l, n) => {
-    const kv = l.split('#')[0].match(/^\s*([A-Za-z]+)\s*:\s*(\S+)\s*$/);
-    if (kv) config[kv[1].toLowerCase()] = kv[2];
-    else if (l.split('#')[0].trim()) problems.push(`line ${n + 1} is not one "key: value"`);
+    const line = l.split('#')[0].trim(), kv = line.match(/^([A-Za-z]+)\s*:\s*(\S+)$/), key = line.match(/^(board|port)(\s|:|$)/i);
+    if (kv && ['board', 'port'].includes(kv[1].toLowerCase())) config[kv[1].toLowerCase()] = kv[2];
+    else if (key) problems.push(`line ${n + 1} is not one "key: value"`);
   });
   const port = config.port ?? '4410', goodBoard = /^[\w.-]+\.json$/.test(config.board ?? ''), goodPort = /^\d{1,5}$/.test(port) && Number(port) <= 65535;
   if (!goodBoard) problems.push('needs a "board: <name>.json" line');
@@ -685,7 +685,7 @@ async function doctor(args: string[]) {
   }
   const bad = checks.filter((c) => c.fix);
   if (bad.length) throw fail(`${bad.length} of ${checks.length} checks need a fix in ${tilde(dir)}`, 'NOT_FOUND',...bad.map((c) => `${c.name}: ${c.ok}. ${c.fix}`));
-  return toon({ dir: shellPath(dir), checks: checks.map(({ name, ok }) => ({ name, ok })) },
+  return toon({ dir: tilde(dir), checks: checks.map(({ name, ok }) => ({ name, ok })) },
     [`Run \`sign-off-axi open ${shellPath(board)}\` to show the board to the user`]);
 }
 
