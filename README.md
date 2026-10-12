@@ -66,7 +66,7 @@ board: ~/.sign-off/decisions.json
 raised[1]{key,status,title}:
   keep-the-weekly-digest,raised,Keep the weekly digest?
 help[2]:
-  Run `sign-off-axi open` so the user can answer at http://127.0.0.1:4410/
+  Run `sign-off-axi open` so the user can answer
   Run `sign-off-axi answers --key keep-the-weekly-digest` to read the answer
 ```
 
