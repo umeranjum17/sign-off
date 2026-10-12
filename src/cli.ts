@@ -909,6 +909,8 @@ async function exportBoard(args: string[]) {
     for (const m of d.evidenceCard?.media ?? []) await inline(m.url);
   }
   const out = resolve(parsed.values.out ?? `${parsed.file.replace(/\.json$/, '')}.export.html`);
+  // Only an .html name, so a wrong --out never overwrites the board or a file beside it.
+  if (!/\.html?$/i.test(out)) throw fail(`--out ${tilde(out)} does not end in .html`, 'VALIDATION_ERROR', 'Pass --out <file.html>');
   const data = JSON.stringify({ ...frozen, files, exported: `${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC` }).replace(/</g, '\\u003c');
   const csp = "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; media-src data:; frame-src data:";
   writeFileSync(out, page.toString().replace('</head>', () => `<meta http-equiv="content-security-policy" content="${csp}">\n<script>window.FROZEN = ${data};</script>\n</head>`), { mode: 0o600 });
@@ -1064,7 +1066,7 @@ const server = createServer(async (req, res) => {
     if (!/^[\w-]{32,}$/.test(token) || sent.length !== want.length || !timingSafeEqual(sent, want)) {
       return res.writeHead(401, { 'content-type': 'text/plain; charset=utf-8' }).end('This board needs its access link: run sign-off-axi open on the computer that serves it and open the link it prints.');
     }
-    if (given !== null) return res.writeHead(303, { location: '/', 'set-cookie': `${cookie}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=31536000` }).end();
+    if (given !== null) return res.writeHead(303, { location: '/', 'set-cookie': `${cookie}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000` }).end();
   }
   if (req.method === 'GET' && req.url === '/') {
     return res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'self' 'unsafe-inline'" }).end(page);

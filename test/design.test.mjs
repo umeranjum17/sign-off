@@ -202,6 +202,9 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   // The export is one read-only file: state and mocks inline, no server and no network.
   const out = join(scratch, 'frozen.html');
   // The media tampered with above is left out and counted as missing, the same as the page's own 404.
+  // A wrong --out never overwrites the board.
+  const before = readFileSync(board, 'utf8');
+  assert.deepEqual([run('export', board, '--out', board).code, readFileSync(board, 'utf8')], [2, before]);
   assert.match(run('export', board, '--out', out).out, /items: 7\ninlined: 8\nmissing: 1\n/);
   const frozen = readFileSync(out, 'utf8');
   assert.match(frozen, /<meta http-equiv="content-security-policy" content="default-src 'none';/);
@@ -233,7 +236,7 @@ test('private-network bind: token on every route, kept across a restart', { skip
   const entry = await fetch(link, { redirect: 'manual' });
   assert.deepEqual([entry.status, entry.headers.get('location')], [303, '/']);
   const cookie = entry.headers.get('set-cookie').split(';')[0];
-  assert.match(entry.headers.get('set-cookie'), /HttpOnly; SameSite=Strict/);
+  assert.match(entry.headers.get('set-cookie'), /HttpOnly; SameSite=Lax/);
   const api = await fetch(`${origin}/api/decisions`, { headers: { cookie } });
   assert.equal(api.status, 200);
   assert.equal(api.headers.get('access-control-allow-origin'), null);
