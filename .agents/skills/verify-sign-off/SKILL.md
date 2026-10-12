@@ -83,6 +83,7 @@ Look at every shot before you report: nothing overlaps, no text is cut, no raw p
 | Explainer rung: a narrated stills video built with free local speech, played inline with chapter buttons, no network | [features/explainer.md](features/explainer.md) |
 | Evidence updates: numbered posts with media, hash-checked serving, inline video, verdict | [features/evidence.md](features/evidence.md) |
 | One-of-few options and the answer note, old-format compatibility | [features/options-note.md](features/options-note.md) |
+| Self-hosted reach: `--bind`/config bind with the access token, comments and queued prompts read by `poll`, restart, one-file `export` | [features/selfhost.md](features/selfhost.md) |
 | README media and rendered README | [features/readme.md](features/readme.md) |
 | `sign-off-axi` commands, TOON/`--full`/`--json`, packed tarball via `npx -y` | [features/axi.md](features/axi.md) |
 | Agent skill: `skills/sign-off-axi`, the A/B/C mock recipe, `npm run build:skill`, install with `npx skills add` | [features/skill.md](features/skill.md) |

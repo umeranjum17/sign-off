@@ -296,7 +296,7 @@
     const btn = el('button', { 'aria-label': 'Queue the prompt for the agent' }, 'Queue for the agent');
     btn.onclick = () => send(btn, err, { kind: 'prompt' }, '', box.value.trim());
     return el('details', { class: 'note ask', ...(drafts.get('') && { open: '' }) },
-      el('summary', {}, `Ask the agent${prompts.length ? ` · ${queued} queued · ${prompts.length - queued} read` : ''}`),
+      el('summary', {}, ['Ask the agent', queued && `${queued} queued`, prompts.length - queued && `${prompts.length - queued} read by the agent`].filter(Boolean).join(' · ')),
       ...prompts.map((m) => el('p', { class: 'meta saved-note', dir: 'auto' }, `${m.delivered ? 'Read by the agent' : 'Queued'}: ${m.text}`)),
       el('label', { for: box.id }, 'A prompt the agent reads the next time it checks in'), box, el('div', { class: 'actions' }, btn), err);
   }
