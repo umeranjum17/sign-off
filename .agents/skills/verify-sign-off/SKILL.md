@@ -45,7 +45,7 @@ chrome-devtools-axi wait "<text that only appears in the expected state>"
 - Phone: `390x844x3,mobile,touch`. Narrow phone: `320x700x2,mobile,touch`. Desktop: `1440x900x1`.
 - A reload is a fresh `open` of the same URL, then `emulate` again.
 - Get a button ref from a fresh `snapshot --full`; buttons read like `button "Yes, <title>"`.
-- Wait for a saved answer by polling `node dist/cli.js answers $SCR/d.json --json` until it prints the expected value (for example `"short-question":{"answer":"yes"`), with a time limit. Never accept a fixed sleep, and never wait on the always-present "Answered" or "Waiting" labels.
+- Wait for a saved answer with `node dist/cli.js wait $SCR/d.json --key <key> --timeout 30`; it returns as soon as the answer saves and exits 1 with `code: TIMEOUT` if it never does. Never accept a fixed sleep, and never wait on the always-present "Answered" or "Waiting" labels.
 - Screenshots: `chrome-devtools-axi screenshot <evidence>/<name>.png --full-page`.
 - Finish: `chrome-devtools-axi stop`, kill the server pid, delete `$SCR`.
 
