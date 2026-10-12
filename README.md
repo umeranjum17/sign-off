@@ -28,10 +28,26 @@ Your answer survives reloads and restarts; you can change it with one more click
 
 ### Agent skill (recommended)
 
-Install the sign-off skill in the [Agent Skills](https://agentskills.io) format with [`npx skills`](https://github.com/vercel-labs/skills):
+sign-off works with whichever coding agent you use; it names no vendor, model or account, and calls no model itself. In a project folder:
 
 ```sh
-npx skills add umeranjum17/sign-off --skill sign-off-axi
+npx -y sign-off-axi init
+```
+
+`init` writes the repo setup (below) and installs the sign-off skill for every coding agent whose command is on your `PATH`. Detection reads nothing else (no logins, no network); the install then fetches the skill from this repository. Pick agents yourself with `--agent` (one name, or several joined by commas); the choice is saved as `agent:` in `.sign-off/config.yaml`, and `sign-off-axi doctor` then prints one line per agent saying whether its skill is installed, with the install command when it is not.
+
+| Agent | `--agent` name | Detected by | Skill folder in the project |
+|---|---|---|---|
+| Claude Code | `claude-code` | `claude` | `.claude/skills/` |
+| Codex | `codex` | `codex` | `.agents/skills/` |
+| OpenCode | `opencode` | `opencode` | `.agents/skills/` |
+| Pi | `pi` | `pi` | `.agents/skills/` |
+| Gemini CLI | `gemini-cli` | `gemini` | `.agents/skills/` |
+
+The install is the multi-agent [`npx skills`](https://github.com/vercel-labs/skills) installer for the [Agent Skills](https://agentskills.io) format, so you can also run it by hand, for any agent it supports:
+
+```sh
+npx skills add umeranjum17/sign-off --skill sign-off-axi -a <agent>     # add -g to install for all your projects
 ```
 
 That is the entire setup - no npm install needed.
@@ -39,26 +55,20 @@ The skill teaches your agent to run sign-off through `npx -y sign-off-axi`, so t
 It stays a short stub and sends the agent to `npx -y sign-off-axi --help` for current instructions, so an installed copy cannot go stale against a newer CLI.
 Its frontmatter also includes Hermes Agent metadata, so Hermes-compatible harnesses can categorize and surface it as a first-class productivity skill.
 
-Then, in agents that expose skills as slash commands (Claude Code, for example), invoke it directly:
-
-```
-/sign-off-axi should we keep the weekly digest?
-```
-
-Or just ask in plain words - "ask me whether to keep the weekly digest and wait for my answer" - and the agent loads the skill on its own when it recognizes the task.
-
-By default the skill lands in the current project's skills directory (`.claude/skills/`, for example); add `-g` to install it for all projects (`~/.claude/skills/`).
+Then ask in plain words - "ask me whether to keep the weekly digest and wait for my answer" - and the agent loads the skill on its own when it recognizes the task. Agents that expose skills as slash commands also take `/sign-off-axi should we keep the weekly digest?`.
 
 ### Repo setup
 
-In a project folder, `sign-off-axi init` writes `.sign-off/` (config, an empty
-board, `mocks/` and `evidence/` folders, and a `.gitignore` keeping media and
-answer files out of git) and `sign-off-axi doctor` checks it: node version,
-config, board, answer files, gitignore lines, folders and the dashboard port.
-Each failure prints one `help:` line with its fix, and doctor exits 1; a clean
-run exits 0. `open` and `serve` use the config's `port:` unless `--port` is
-given. Re-running `init` keeps files that are already there and adds the
-missing ones, so it repairs an `init` that was cut short. Mock files go under
+In a project folder, `sign-off-axi init` writes `.sign-off/` (config with the
+board, port and agent choice, an empty board, `mocks/` and `evidence/` folders,
+and a `.gitignore` keeping media and answer files out of git) and
+`sign-off-axi doctor` checks it: node version, config, board, answer files,
+gitignore lines, folders, the dashboard port and each agent's skill. Each
+failure prints one `help:` line with its fix, and doctor exits 1; a clean run
+exits 0. `open` and `serve` use the config's `port:` unless `--port` is given.
+Re-running `init` keeps files that are already there, adds the missing ones (so
+it repairs an `init` that was cut short) and skips agents that already have the
+skill. Mock files go under
 `.sign-off/mocks/` and are named board-relative in `post` (for example
 `mocks/a.html`). The skill tells the agent how to make them: 3 variants that
 differ in structure, a short trade-off and one recommendation, posted, waited
@@ -104,8 +114,9 @@ sign-off-axi post --type diagram|interactive --title "<question>" --view <path> 
                                                 ask with a diagram image, or a sandboxed interactive .html page
 sign-off-axi post --type explainer --title "<question>" --media <video> [--about <summary>] [--chapter <m:ss>=<title>]...
                                                 ask with a narrated video the agent made with free local tools
-sign-off-axi init [dir]                         write the repo setup under <dir>/.sign-off/ (config, board, mocks/ and evidence/ folders)
-sign-off-axi doctor [dir]                       check that setup; every failure names its fix
+sign-off-axi init [dir] [--agent auto|<name>]   write the repo setup under <dir>/.sign-off/ (config, board, mocks/ and evidence/ folders)
+                                                and install the skill for each chosen coding agent (auto: each one on PATH)
+sign-off-axi doctor [dir]                       check that setup and each agent's skill; every failure names its fix
 sign-off-axi open  [--port 4410] [--evidence-root <dir>]   start the board in the background; prints its URL and pid
 sign-off-axi status                             is the board open started for this file running? its URL and pid
 sign-off-axi stop                               stop that board

@@ -9,9 +9,10 @@ const cli = new URL('../dist/cli.js', import.meta.url).pathname;
 const scratch = mkdtempSync(join(tmpdir(), 'sign-off-evidence-'));
 const so = join(scratch, '.sign-off');
 const board = join(so, 'decisions.json');
+// No PATH: init finds no agent to install the skill for.
 const run = (...args) => {
   try {
-    return { out: execFileSync('node', [cli, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }), code: 0 };
+    return { out: execFileSync(process.execPath, [cli, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, PATH: '' } }), code: 0 };
   } catch (e) {
     return { out: `${e.stdout}`, code: e.status };
   }

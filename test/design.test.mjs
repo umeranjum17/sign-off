@@ -12,9 +12,15 @@ const scratch = mkdtempSync(join(tmpdir(), 'sign-off-design-'));
 const repo = join(scratch, 'repo');
 const so = join(repo, '.sign-off');
 const board = join(so, 'decisions.json');
+// A PATH holding only node and the agents a test puts there, and an empty HOME, so no installed agent or skill on this host counts.
+const bin = join(scratch, 'bin');
+mkdirSync(bin);
+mkdirSync(join(scratch, 'home'));
+symlinkSync(process.execPath, join(bin, 'node'));
+const env = { ...process.env, PATH: bin, HOME: join(scratch, 'home') };
 const run = (...args) => {
   try {
-    return { out: execFileSync('node', [cli, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }), code: 0 };
+    return { out: execFileSync(process.execPath, [cli, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env }), code: 0 };
   } catch (e) {
     return { out: `${e.stdout}`, code: e.status };
   }
@@ -33,6 +39,29 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   writeFileSync(join(so, 'config.yaml'), 'board: decisions.json\nport: 0\n');
   assert.match(run('doctor', repo).out, /board,0 items/);
   assert.equal(run('doctor', join(scratch, 'missing')).code, 1);
+  // Agents: auto finds an agent only by its command on PATH; doctor names the install command for a missing skill.
+  assert.match(run('doctor', repo).out, /auto: no agent found on PATH/);
+  assert.equal(run('init', repo, '--agent', 'nope').code, 2);
+  writeFileSync(join(bin, 'codex'), '#!/bin/sh\n');
+  chmodSync(join(bin, 'codex'), 0o755);
+  const missing = run('doctor', repo);
+  assert.equal(missing.code, 1);
+  assert.match(missing.out, /codex skill: not installed\. Run `npx -y skills add umeranjum17\/sign-off --skill sign-off-axi -y -a codex`/);
+  mkdirSync(join(repo, '.agents', 'skills', 'sign-off-axi'), { recursive: true });
+  writeFileSync(join(repo, '.agents', 'skills', 'sign-off-axi', 'SKILL.md'), '---\nname: sign-off-axi\n---\n');
+  assert.match(run('doctor', repo).out, /codex skill,installed/);
+  assert.match(run('init', repo).out, /codex,already installed/);
+  // A config from before agent: existed: --agent is recorded there, so doctor checks the chosen agent, not PATH.
+  writeFileSync(join(so, 'config.yaml'), 'board: decisions.json\nport: 0\n');
+  assert.match(run('init', repo, '--agent', 'codex').out, /codex,already installed/);
+  assert.equal(readFileSync(join(so, 'config.yaml'), 'utf8'), 'board: decisions.json\nport: 0\nagent: codex\n');
+  writeFileSync(join(so, 'config.yaml'), 'board: decisions.json\nagent: codex, claude-code\nport: 0\n');
+  assert.match(run('doctor', repo).out, /claude-code skill: not installed\. Run `npx -y skills add .* -a claude-code`/);
+  // A blank agent: line is auto; it never reads the next line as the value.
+  writeFileSync(join(so, 'config.yaml'), 'board: decisions.json\nagent:\nport: 0\n');
+  assert.match(run('doctor', repo).out, /codex skill,installed/);
+  rmSync(join(bin, 'codex'));
+  writeFileSync(join(so, 'config.yaml'), 'board: decisions.json\nport: 0\n');
   mkdirSync(join(so, 'mocks'), { recursive: true });
   writeFileSync(join(so, 'mocks', 'a.html'), '<h1>Mock A</h1>');
   writeFileSync(join(so, 'mocks', 'b.html'), '<h1>Mock B</h1>');
@@ -224,7 +253,7 @@ test('doctor prints a fix a shell can run for a path with a space, and fails wit
   assert.equal(broken.code, 1);
   assert.match(broken.out, /^code: NOT_FOUND$/m);
   const fix = /Run `sign-off-axi (init [^`]+)`/.exec(broken.out)[1];
-  execFileSync('sh', ['-c', `node ${cli2} ${fix}`]);
+  execFileSync('/bin/sh', ['-c', `node ${cli2} ${fix}`], { env });
   writeFileSync(join(dir, '.sign-off', 'config.yaml'), 'board: decisions.json\nport: 0\n');
   assert.equal(run('doctor', dir).code, 0);
 });
@@ -262,7 +291,7 @@ test('doctor reports a port whose server names a non-text file as in use', async
   await new Promise((ok) => odd.once('listening', ok));
   const { port } = odd.address();
   writeFileSync(join(sod, 'config.yaml'), `board: decisions.json\nport: ${port}\n`);
-  const out = await new Promise((ok) => execFile('node', [cli, 'doctor', dir], { encoding: 'utf8' }, (err, stdout) => ok({ code: err?.code ?? 0, out: stdout || err?.stdout || '' })));
+  const out = await new Promise((ok) => execFile('node', [cli, 'doctor', dir], { encoding: 'utf8', env }, (err, stdout) => ok({ code: err?.code ?? 0, out: stdout || err?.stdout || '' })));
   odd.close();
   assert.equal(out.code, 1);
   assert.match(out.out, new RegExp(`port: ${port} is in use \\(EADDRINUSE\\)`));
