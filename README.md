@@ -20,7 +20,7 @@
 
 Agents stop and ask: ship this, keep that, turn this on? Those questions scatter across terminals and chats, and an answer typed in the wrong place gets lost.
 
-sign-off puts them on one calm list. The agent writes a small JSON file, you inspect the linked done-done run evidence, click **Yes** or **No**, and the answer is saved next to the file for the agent to read. It runs only on `127.0.0.1`: no account, no hosting, no runtime dependencies.
+sign-off puts them on one calm list. The agent writes a small JSON file, you inspect the linked done-done run evidence, click **Yes** or **No**, and the answer is saved next to the file for the agent to read. It runs only on `127.0.0.1`: no account, no hosting.
 
 Your answer survives reloads and restarts; you can change it with one more click. Recommendations and silent defaults are shown, never applied for you.
 
@@ -38,18 +38,39 @@ node dist/cli.js serve /tmp/decisions.json       # prints http://127.0.0.1:4410/
 # Optional: add --evidence-root /path/to/project-store to read proof records/media (the root containing .done-done/)
 
 # 3. Click an answer, then read it back the way an agent would
-node dist/cli.js answers /tmp/decisions.json     # {"weekly-digest":{"answer":"yes",...}}
+node dist/cli.js answers /tmp/decisions.json     # answers[1]{key,answer,at}: weekly-digest,yes,...
 ```
 
 ## Commands
 
+The CLI is `sign-off-axi`, an [AXI](https://axi.md): agents drive it from a shell with no setup. It prints compact [TOON](https://toonformat.dev) on stdout with next-step hints, and every command takes `--help`.
+
 ```
-sign-off serve <decisions.json> [--port 4410] [--evidence-root <dir>]   show the page on 127.0.0.1 (--port 0 picks a free port)
-sign-off answers <decisions.json>               print the latest answer per question as JSON
-sign-off help
+sign-off-axi                       list the decisions waiting on the user (same as list)
+sign-off-axi raise --title "<question>" [--key <key>] [--about <text>] [--detail <text>]
+                   [--recommend yes|no] [--default yes|no] [--close done|release]
+sign-off-axi raise --from <decisions.json>      add every decision in a decisions file
+sign-off-axi open  [--port 4410] [--evidence-root <dir>]   start the board in the background; prints its URL and pid
+sign-off-axi serve [--port 4410] [--evidence-root <dir>]   run the board in the foreground (--port 0 picks a free port)
+sign-off-axi answers [--key <key>]              the latest answer per decision, and how many still wait
 ```
 
-Exit codes: `0` ok, `2` usage or input error (the message names the item, key and field).
+- The board is `~/.sign-off/decisions.json` unless you name a file right after the command (`sign-off-axi answers ./decisions.json`). Answers are saved next to it.
+- `list` and `answers` take `--full` for every field and `--json` for JSON (`answers --json` prints `{"<key>":{"answer","label","close","at"}}`).
+- Raising a question that is already on the board is a no-op that reports its status, so an agent can re-run it safely. `--key` defaults to a slug of the title.
+- `open` is a no-op when the same board is already open on that port. `--evidence-root` is the folder holding `.done-done/`, for decisions that link run evidence.
+
+```
+$ sign-off-axi raise --title "Keep the weekly digest?" --recommend yes
+board: ~/.sign-off/decisions.json
+raised[1]{key,status,title}:
+  keep-the-weekly-digest,raised,Keep the weekly digest?
+help[2]:
+  Run `sign-off-axi open` so the user can answer at http://127.0.0.1:4410/
+  Run `sign-off-axi answers --key keep-the-weekly-digest` to read the answer
+```
+
+Exit codes: `0` ok, including no-ops; `1` the request cannot be done (a key that already holds a different question, a busy port); `2` usage or input error (the message names the item, key and field). Errors print on stdout as `error:`, `code:` and `help:` lines.
 
 Write your own questions using the [file-format reference](docs/file-formats.md).
 
@@ -71,7 +92,8 @@ Real demo questions, with one Yes already saved. Desktop shots are cropped to th
 ## Development
 
 ```sh
-npm test    # builds, then runs the integration journey against the real CLI and server
+npm test    # builds, then runs the integration journeys against the real CLI and server
+npm pack    # builds the publishable sign-off-axi tarball
 ```
 
 Browser proof lives in [`.agents/skills/verify-sign-off`](.agents/skills/verify-sign-off/SKILL.md).

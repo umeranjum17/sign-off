@@ -1,14 +1,19 @@
 {
-  "name": "sign-off",
+  "name": "sign-off-axi",
   "version": "0.1.0",
-  "description": "One local review board for quick yes/no decisions. Works with Firstmate or alone.",
+  "description": "One local review board where you answer your agents' yes/no questions. An AXI CLI agents run with no setup.",
   "type": "module",
-  "bin": { "sign-off": "dist/cli.js" },
+  "bin": { "sign-off-axi": "dist/cli.js" },
   "files": ["dist", "web"],
   "engines": { "node": ">=22.5" },
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/umeranjum17/sign-off.git" },
+  "keywords": ["axi", "agent", "cli", "toon", "decisions", "review"],
   "scripts": {
     "build": "tsc",
+    "prepack": "tsc",
     "test": "tsc && node --test"
   },
+  "dependencies": { "@toon-format/toon": "2.3.1", "axi-sdk-js": "0.1.13" },
   "devDependencies": { "@types/node": "^26.6.5", "typescript": "^7.0.2" }
 }

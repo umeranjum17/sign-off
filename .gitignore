@@ -1,3 +1,5 @@
 node_modules/
 dist/
 *.answers.jsonl
+*.board.log
+*.tgz
