@@ -178,9 +178,10 @@
 
   function save(d, o, buttons, err) {
     buttons.forEach((b) => (b.disabled = true));
-    const typed = (drafts.get(d.key) ?? '').trim(), saved = (state.answers[d.key]?.note ?? '').trim();
+    const typed = (drafts.get(d.key) ?? '').trim();
     const note = drafts.get(d.key) ?? state.answers[d.key]?.note ?? '';
-    const comment = typed && typed !== saved ? typed : '';
+    const posted = (state.messages ?? []).some((m) => m.kind === 'comment' && m.key === d.key && m.text === typed);
+    const comment = typed && !posted ? typed : '';
     const drop = () => { drafts.delete(d.key); keep(); };
     call('/api/answers', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
