@@ -9,7 +9,7 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { type Decision, InputError, answersPath, appendAnswer, loadDecisions, readAnswers } from './store.js';
+import { type Decision, InputError, NOTE_MAX, answersPath, appendAnswer, loadDecisions, readAnswers } from './store.js';
 
 const BOARD = join(homedir(), '.sign-off', 'decisions.json');
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
@@ -34,20 +34,23 @@ examples:
   sign-off-axi
   sign-off-axi list ./decisions.json --full
 `,
-  raise: `usage: sign-off-axi raise [board.json] --title "<question>" [--key <key>] [--about <text>] [--detail <text>] [--recommend yes|no] [--default yes|no] [--close done|release]
+  raise: `usage: sign-off-axi raise [board.json] --title "<question>" [--key <key>] [--about <text>] [--detail <text>] [--option <value>=<label>]... [--recommend <value>] [--default <value>] [--close done|release]
        sign-off-axi raise [board.json] --from <decisions.json>
-Adds yes/no questions to the board. --key defaults to a slug of the title. --default is what happens if the user stays silent; it is shown, never applied.
+Adds questions to the board: yes/no, or 2 to 6 choices with one --option each. --key defaults to a slug of the title.
+--recommend and --default name a value (yes or no without --option). --default is what happens if the user stays silent; it is shown, never applied.
 --from adds every decision in a decisions file: ${FORMAT}
 Raising the same question again is a no-op that reports its status; a different question under a used key is refused.
 examples:
   sign-off-axi raise --title "Keep the weekly digest?" --about "Open rate held steady." --recommend yes
+  sign-off-axi raise --title "When should it ship?" --option today=Today --option friday=Friday --option next-week="Next week" --recommend friday
   sign-off-axi raise --from ./decisions.json
 `,
   answers: `usage: sign-off-axi answers [board.json] [--key <key>] [--full] [--json]
 Prints the latest saved answer per decision and counts the ones still waiting.
   --key   only that decision
   --full  adds the button label, close and title
-  --json  {"<key>":{"answer","label","close","at"}} for the answered decisions
+  --json  {"<key>":{"answer","label","close","at","note"?}} for the answered decisions; note only when the user wrote one
+A note column appears when any shown answer has a note.
 examples:
   sign-off-axi answers --key keep-the-weekly-digest
   sign-off-axi answers ./decisions.json --json
@@ -97,10 +100,10 @@ const fail = (message: string, code: string, ...help: string[]) => new AxiError(
 const toon = (data: object, help: string[] = []) => [encode(data), ...(help.length ? [`help[${help.length}]:`, ...help.map((h) => `  ${h}`)] : [])].join('\n');
 class EvidenceError extends Error {}
 
-type Flags = Record<string, { type: 'string' | 'boolean'; default?: string }>;
+type Flags = Record<string, { type: 'string' | 'boolean'; default?: string; multiple?: boolean }>;
 const TIERS: Flags = { full: { type: 'boolean' }, json: { type: 'boolean' } };
 const BOARD_FLAGS: Flags = { port: { type: 'string', default: '4410' }, 'evidence-root': { type: 'string' } };
-const RAISE_FIELDS = ['title', 'key', 'about', 'detail', 'recommend', 'default', 'close'];
+const RAISE_FIELDS = ['title', 'key', 'about', 'detail', 'option', 'recommend', 'default', 'close'];
 
 /** Parses one command's flags strictly; `on` carries a given board file into the next-step hints. */
 function parse(cmd: string, args: string[], flags: Flags) {
@@ -167,10 +170,11 @@ function list(args: string[]) {
 /** The answered rows in the answers shape: TOON, --full adds label, close and title, --json the bare map. */
 function printAnswers(file: string, rows: ReturnType<typeof board>, waiting: number, values: Record<string, any>, help: string[]) {
   const done = rows.flatMap((d) => (d.answer ? [{ ...d.answer, title: d.title }] : []));
-  if (values.json) return JSON.stringify(Object.fromEntries(done.map(({ key, answer, label, close, at }) => [key, { answer, label, close, at }])));
+  if (values.json) return JSON.stringify(Object.fromEntries(done.map(({ key, answer, label, close, at, note }) => [key, { answer, label, close, at, note }])));
+  const notes = done.some((a) => a.note);
   return toon({
     board: tilde(file),
-    answers: done.length ? done.map(({ key, answer, at, label, close, title }) => (values.full ? { key, answer, at, label, close, title } : { key, answer, at })) : '0 saved yet',
+    answers: done.length ? done.map(({ key, answer, at, label, close, title, note = '' }) => ({ key, answer, at, ...(values.full && { label, close, title }), ...(notes && { note }) })) : '0 saved yet',
     waiting,
   }, help);
 }
@@ -232,7 +236,7 @@ async function locked<T>(lock: string, fn: () => T | Promise<T>, busy = 'another
 }
 
 function raise(args: string[]) {
-  const { file, values, on } = parse('raise', args, { from: { type: 'string' }, ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const }])) });
+  const { file, values, on } = parse('raise', args, { from: { type: 'string' }, ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: f === 'option' }])) });
   const given = RAISE_FIELDS.filter((f) => values[f] !== undefined);
   if (values.from !== undefined && given.length) throw fail(`--from cannot be combined with --${given[0]}`, 'VALIDATION_ERROR', 'Put every field in the --from file, or raise with flags only');
   if (values.from === undefined && values.title === undefined) throw fail('--title is required (or --from <decisions.json>)', 'VALIDATION_ERROR', 'sign-off-axi raise --title "<question>" [--recommend yes|no]');
@@ -243,7 +247,12 @@ function raise(args: string[]) {
   try {
     if (scratch) {
       const { title, key = slug(title), about, detail, recommend: recommend_value, default: default_if_silent, close } = values;
-      writeFileSync(source, JSON.stringify({ schema: 1, decisions: [{ key, title, about, detail, recommend_value, default_if_silent, close }] }));
+      const options = values.option?.map((o: string) => {
+        const at = o.indexOf('=');
+        if (at < 1) throw fail(`--option ${o} must be <value>=<label>`, 'VALIDATION_ERROR', 'sign-off-axi raise --title "<question>" --option friday=Friday --option next-week="Next week"');
+        return { value: o.slice(0, at), label: o.slice(at + 1) };
+      });
+      writeFileSync(source, JSON.stringify({ schema: 1, decisions: [{ key, title, about, detail, options, recommend_value, default_if_silent, close }] }));
     }
     incoming = loadDecisions(source);
     raw = JSON.parse(readFileSync(source, 'utf8')).decisions;
@@ -428,12 +437,13 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   if (!req.headers['content-type']?.startsWith('application/json')) return [415, { error: 'Send JSON' }];
   let body = '';
   for await (const chunk of req) body += chunk;
-  const { key, answer } = JSON.parse(body) ?? {};
+  const { key, answer, note = '' } = JSON.parse(body) ?? {};
+  if (typeof note !== 'string' || [...note.trim()].length > NOTE_MAX) return [400, { error: `The note must be text of ${NOTE_MAX} characters or fewer` }];
   const d = loadDecisions(file).find((x) => x.key === key);
   if (!d) return [404, { error: 'This question is no longer in the file' }];
   const option = d.options.find((o) => o.value === answer);
-  if (!option) return [400, { error: 'The answer must be yes or no' }];
-  appendAnswer(file, d, option);
+  if (!option) return [400, { error: `The answer must be one of: ${d.options.map((o) => o.label).join(', ')}` }];
+  appendAnswer(file, d, option, note.trim());
   return [200, state()];
 }
 

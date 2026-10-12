@@ -29,8 +29,8 @@ decisions.decisions[0].evidence = { run_id: runId, commit, outcome: 'Umer can se
 writeFileSync(file, JSON.stringify(decisions));
 const procs = [];
 after(() => procs.forEach((p) => p.kill()));
-async function serve() {
-  const proc = spawn('node', [cli, 'serve', file, '--port', '0', '--evidence-root', root], { cwd: tmpdir() });
+async function serve(f = file) {
+  const proc = spawn('node', [cli, 'serve', f, '--port', '0', '--evidence-root', root], { cwd: tmpdir() });
   procs.push(proc);
   return { proc, url: await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0]))) };
 }
@@ -149,4 +149,81 @@ test('agent journey: raise, open, answer, read back in TOON and JSON', async () 
   assert.match(run('status').out, /status: not running/);
   assert.match(run('stop').out, /not running \(no-op\)/);
   assert.match(run('raise', '--from', 'missing.json').out, new RegExp(`cannot read ${join(process.cwd(), 'missing.json')}: ENOENT`));
+});
+
+test('old files and answers read as before; a one-of-few answer with a note survives a restart', async () => {
+  const old = join(scratch, 'old.json');
+  copyFileSync(new URL('../fixtures/sample-decisions.json', import.meta.url), old);
+  const oldLines = ['{"key":"use-dark-default","answer":"yes","label":"Yes","close":"done","at":"2026-10-10T08:00:00Z"}',
+    '{"key":"short-question","answer":"yes","label":"Yes","close":"done","at":"2026-10-11T09:14:03Z"}',
+    '{"key":"use-dark-default","answer":"no","label":"No","close":"done","at":"2026-10-11T09:15:00Z"}'];
+  writeFileSync(old.replace('.json', '.answers.jsonl'), oldLines.join('\n') + '\n');
+  assert.equal(execFileSync('node', [cli, 'answers', old, '--json'], { encoding: 'utf8' }),
+    '{"short-question":{"answer":"yes","label":"Yes","close":"done","at":"2026-10-11T09:14:03Z"},'
+    + '"use-dark-default":{"answer":"no","label":"No","close":"done","at":"2026-10-11T09:15:00Z"}}\n');
+  let { proc, url } = await serve(old);
+  const oldBoard = await (await fetch(`${url}api/decisions`)).json();
+  assert.deepEqual(oldBoard.answers, { 'use-dark-default': JSON.parse(oldLines[2]), 'short-question': JSON.parse(oldLines[1]) });
+  assert.ok(oldBoard.decisions.every((d) => JSON.stringify(d.options) === '[{"value":"yes","label":"Yes"},{"value":"no","label":"No"}]'));
+  proc.kill();
+
+  const opts = join(scratch, 'options.json');
+  copyFileSync(new URL('../fixtures/options-decisions.json', import.meta.url), opts);
+  const lines = () => readFileSync(opts.replace('.json', '.answers.jsonl'), 'utf8').trim().split('\n');
+  ({ proc, url } = await serve(opts));
+  assert.equal((await post(url, { key: 'release-window', answer: 'yes' })).status, 400);
+  assert.equal((await post(url, { key: 'release-window', answer: 'friday', note: 'x'.repeat(501) })).status, 400);
+  assert.equal((await post(url, { key: 'release-window', answer: 'friday', note: 5 })).status, 400);
+  assert.equal((await (await post(url, { key: 'old-export', answer: 'keep', note: '😀'.repeat(500) })).json()).answers['old-export'].note, '😀'.repeat(500));
+  assert.equal((await post(url, { key: 'old-export', answer: 'keep', note: '😀'.repeat(501) })).status, 400);
+  const saved = await (await post(url, { key: 'release-window', answer: 'friday', note: '  Umer: after the stand-up  ' })).json();
+  assert.equal(saved.answers['release-window'].note, 'Umer: after the stand-up');
+  await post(url, { key: 'release-window', answer: 'friday', note: 'Umer: after the stand-up' });
+  assert.equal(lines().length, 2);
+  await post(url, { key: 'report-region', answer: 'token' });
+  assert.equal(JSON.parse(lines()[2]).note, undefined);
+  proc.kill();
+  ({ proc, url } = await serve(opts));
+  assert.equal((await (await fetch(`${url}api/decisions`)).json()).answers['release-window'].note, 'Umer: after the stand-up');
+  const printed = JSON.parse(execFileSync('node', [cli, 'answers', opts, '--json'], { encoding: 'utf8' }));
+  assert.deepEqual(Object.keys(printed['release-window']), ['answer', 'label', 'close', 'at', 'note']);
+  assert.deepEqual(Object.keys(printed['report-region']), ['answer', 'label', 'close', 'at']);
+  assert.equal(printed['report-region'].answer, 'token');
+
+  const good = JSON.parse(readFileSync(opts, 'utf8'));
+  const six = good.decisions[1].options;
+  for (const [field, change] of [['options', (d) => (d.options = six.slice(0, 1))], ['options', (d) => (d.options = [...six, { value: 'x', label: 'X' }])],
+    ['options', (d) => (d.options = [six[0], { ...six[1], value: 'emea' }])], ['options', (d) => (d.options = [six[0], { value: 'a b', label: 'A' }])],
+    ['options', (d) => (d.options = [six[0], { value: 'b', label: ' ' }])], ['recommend_value', (d) => (d.recommend_value = 'yes')],
+    ['default_if_silent', (d) => (d.default_if_silent = 'maybe')]]) {
+    const bad = structuredClone(good);
+    change(bad.decisions[1]);
+    writeFileSync(opts, JSON.stringify(bad));
+    assert.throws(() => execFileSync('node', [cli, 'answers', opts], { stdio: 'pipe' }),
+      (e) => e.status === 2 && `${e.stdout}`.includes(`decisions[1] (key \\"report-region\\"): ${field} `));
+  }
+  proc.kill();
+
+  // An agent raises a one-of-few question from the CLI and reads the note back.
+  const env = { ...process.env, HOME: mkdtempSync(join(tmpdir(), 'sign-off-home-')) };
+  const run = (...args) => {
+    try {
+      return { out: execFileSync('node', [cli, ...args], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }), code: 0 };
+    } catch (e) {
+      return { out: `${e.stdout}${e.stderr}`, code: e.status };
+    }
+  };
+  const ship = ['raise', '--title', 'When should it ship?', '--option', 'today=Today', '--option', 'next-week=Next week, after the review'];
+  assert.match(run(...ship, '--recommend', 'next-week').out, /when-should-it-ship,raised,/);
+  for (const bad of [['--option', 'today'], ['--option', '=Today'], ['--option', 'x y=Bad value'], ['--recommend', 'yes']]) {
+    assert.equal(run('raise', '--title', 'Bad?', '--option', 'a=A', ...bad).code, 2, bad.join(' '));
+  }
+  assert.equal(run('raise', '--title', 'One?', '--option', 'a=A').code, 2);
+  assert.equal(run('raise', '--from', opts, '--option', 'a=A').code, 2);
+  const opened = run('open', '--port', '0');
+  const boardUrl = /url: "(.+)"/.exec(opened.out)[1];
+  after(() => process.kill(Number(/pid: (\d+)/.exec(opened.out)[1])));
+  assert.equal((await post(boardUrl, { key: 'when-should-it-ship', answer: 'next-week', note: 'Umer: after the review, please.' })).status, 200);
+  assert.match(run('answers').out, /answers\[1\]\{key,answer,at,note\}:\n  when-should-it-ship,next-week,[^,]+,"Umer: after the review, please."/);
+  assert.equal(JSON.parse(run('answers', '--json').out)['when-should-it-ship'].note, 'Umer: after the review, please.');
 });

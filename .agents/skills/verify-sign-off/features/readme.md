@@ -4,13 +4,13 @@ The README images in `docs/media/` are shots of the real page serving `fixtures/
 
 ## Product media
 
-For a docs-only change, reuse the unchanged genuine shots; do not rerun product proof to recreate them. The `desktop-*-list.png` derivatives crop the original 2560×1520 desktop shots to `1680x1460+440+0`, removing only the empty side margins and bottom. Preserve the originals.
+For a docs-only change, reuse the unchanged genuine shots; do not rerun product proof to recreate them. The `desktop-*-list.png` derivatives crop the original 2560×1880 desktop shots to `1680x1840+440+0`, removing only the empty side margins and bottom. Preserve the originals.
 
 If the product page changes:
 
 1. Copy `fixtures/demo-decisions.json` to `$SCR/demo.json` and serve it (Launch in `SKILL.md`).
-2. Answer `weekly-digest` Yes in the page and poll `answers` until it is saved.
-3. Shoot desktop at `1440x900x1` and phone at `390x844x3,mobile,touch`, in both themes. Use viewport shots, not full-page. Keep private proof outside the repo; publish only clean synthetic demos and adjust the documented crop to the actual source dimensions.
+2. Open `Add a note` on `weekly-digest`, type `Keep it through the holidays, then check the open rate again.`, click Yes, and poll `answers` until it prints that note.
+3. Shoot desktop at `1280x940x2` (the whole list fits) and phone at `390x844x3,mobile,touch`, in both themes. Use viewport shots, not full-page. Keep private proof outside the repo; publish only clean synthetic demos and adjust the documented crop to the actual source dimensions.
 
 ## Rendered README
 

@@ -28,7 +28,7 @@
   .row h3 { font-size: 1.0625rem; font-weight: 600; line-height: 1.4; margin: 0; }
   .about, details p { color: var(--muted); margin: 0.25rem 0 0; max-width: 70ch; }
   .about { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-  .row:has(details[open]) .about { display: none; }
+  .row:has(details:not(.note)[open]) .about { display: none; }
   summary { cursor: pointer; color: var(--accent); font-size: 0.875rem; margin-top: 0.25rem; width: fit-content; }
   .meta { color: var(--muted); font-size: 0.8125rem; margin: 0.5rem 0 0; }
   .evidence { grid-column: 1 / -1; border: 1px solid var(--line); border-radius: 1rem; padding: 1rem; background: color-mix(in srgb, var(--accent) 5%, var(--bg)); }
@@ -53,12 +53,21 @@
   button.rec { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
   button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   button:disabled { opacity: 0.6; cursor: progress; }
-  button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .choices.many { display: flex; flex-wrap: wrap; }
+  .choices.many button { flex: 1 1 auto; max-width: 100%; padding: 0.5rem 1rem; }
+  .note label { display: block; color: var(--muted); font-size: 0.8125rem; margin-top: 0.5rem; }
+  textarea { display: block; width: 100%; max-width: 70ch; margin-top: 0.25rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border);
+    border-radius: 0.5rem; background: var(--bg); color: var(--text); font: inherit; resize: vertical; }
+  .saved-note { white-space: pre-line; }
+  button:focus-visible, summary:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .empty { margin: 0; padding: 1.5rem 1rem; color: var(--muted); text-align: center; }
   @media (min-width: 45rem) {
     .bar, main { padding: 0 2rem; }
     .row { grid-template-columns: 1fr auto; align-items: start; gap: 2rem; padding: 1.125rem 1.25rem; }
     .choices { grid-template-columns: repeat(2, 5.5rem); }
+    .row:has(.choices.many) { row-gap: 0.875rem; }
+    .choices.many { grid-column: 1 / -1; }
+    .choices.many button { flex: 0 1 auto; min-width: 5.5rem; }
   }
 </style>
 </head>
@@ -70,6 +79,7 @@
 <main><p class="banner" id="banner" role="alert" hidden></p><div id="board"></div></main>
 <script>
   let state = { decisions: [], answers: {} };
+  const drafts = new Map(); // Typed notes not yet sent, kept across re-renders.
   // Text goes in as text nodes, never as HTML, so a title from the file can't run code.
   const el = (tag, attrs = {}, ...kids) => {
     const e = document.createElement(tag);
@@ -88,9 +98,12 @@
 
   function save(d, o, buttons, err) {
     buttons.forEach((b) => (b.disabled = true));
+    const note = drafts.get(d.key) ?? state.answers[d.key]?.note ?? '';
+    drafts.delete(d.key);
     call('/api/answers', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value }),
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
     }).catch((e) => {
+      if (!drafts.has(d.key)) drafts.set(d.key, note);
       err.textContent = `Couldn't save: ${e.message}`;
       buttons.forEach((b) => (b.disabled = false));
     });
@@ -117,6 +130,13 @@
   function row(d) {
     const meta = [['Recommended', d.recommend_value], ['If no answer', d.default_if_silent]].filter(([, v]) => v);
     const err = el('div', { class: 'err', role: 'alert' });
+    const saved = Object.hasOwn(state.answers, d.key) ? state.answers[d.key] : undefined;
+    // Yes/No rows keep the two fixed buttons they always had; any other choice set wraps.
+    const many = d.options.map((o) => o.value).sort().join() !== 'no,yes';
+    const box = el('textarea', { id: `note-${d.key}`, rows: 2, maxlength: 500, dir: 'auto' });
+    box.value = drafts.get(d.key) ?? saved?.note ?? '';
+    box.oninput = () => drafts.set(d.key, box.value);
+    const noteText = saved?.note ? 'Edit note' : 'Add a note';
     const buttons = d.options.map((o) => el('button', {
       class: o.value === d.recommend_value ? 'rec' : '', 'aria-label': `${o.label}, ${d.title}`,
       'aria-pressed': o.value === state.answers[d.key]?.answer,
@@ -128,8 +148,11 @@
       d.detail || d.about?.length > 180 ? el('details', {}, el('summary', {}, 'Show more'),
         ...[d.about, d.detail].filter(Boolean).map((t) => el('p', { dir: 'auto' }, t))) : '',
       meta.length ? el('p', { class: 'meta' }, meta.map(([k, v]) => `${k}: ${d.options.find((o) => o.value === v).label}`).join(' · ')) : '',
+      saved?.note ? el('p', { class: 'meta saved-note', dir: 'auto' }, `Your note: ${saved.note}`) : '',
+      el('details', { class: 'note', ...(drafts.has(d.key) && { open: '' }) }, el('summary', { 'aria-label': `${noteText}, ${d.title}` }, noteText),
+        el('label', { for: box.id }, 'Optional note, sent with the answer you pick'), box),
       err,
-    ), el('div', { class: 'choices', role: 'group', 'aria-label': d.title }, ...buttons), evidenceCard(d));
+    ), el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': d.title }, ...buttons), evidenceCard(d));
   }
 
   function render() {
