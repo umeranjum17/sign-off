@@ -47,6 +47,7 @@ chrome-devtools-axi wait "<text that only appears in the expected state>"
 - Get a button ref from a fresh `snapshot --full`; buttons read like `button "Yes, <title>"`.
 - Wait for a saved answer by polling `node dist/cli.js answers $SCR/d.json --json` until it prints the expected value (for example `"short-question":{"answer":"yes"`), with a time limit. Never accept a fixed sleep, and never wait on the always-present "Answered" or "Waiting" labels.
 - Screenshots: `chrome-devtools-axi screenshot <evidence>/<name>.png --full-page`.
+- Mock and view frames are sandboxed, so a `--full-page` shot leaves any frame below the first screen blank (it is loaded; the capture does not paint it). For those rows, `eval` a `scrollIntoView()` on the frame and take a viewport shot.
 - Finish: `chrome-devtools-axi stop`, kill the server pid, delete `$SCR`.
 
 ### Android emulator (the phone bar)

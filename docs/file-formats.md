@@ -38,11 +38,12 @@
 - `view`: required on `diagram` and `interactive` items, the path of one file
   relative to the board file's folder (keep it under `mocks/<key>/`), served only
   from inside that folder. A diagram is an image (`.svg`, `.png`, `.jpg`,
-  `.jpeg`, `.webp`) shown at card width; tap it to open it full size. An
-  interactive item is one self-contained `.html` page (inline CSS and JS, images
-  as `data:` URLs) run in a sandboxed frame. Every mock and view file is served
-  under a Content-Security-Policy that blocks `fetch`, remote loads, forms and
-  top navigation, and gives the page no access to the dashboard. Both types
+  `.jpeg`, `.webp`, 5 MB or less) shown at card width; tap it to open it full
+  size. An interactive item is one self-contained `.html` page (inline CSS and
+  JS, images as `data:` URLs) run in a sandboxed frame. Every mock and view
+  file is served under a Content-Security-Policy that blocks `fetch`, remote
+  files, nested frames and forms, and gives the page no access to the dashboard
+  or its tab. A link in the page can still open a web page in its full-size tab. Both types
   answer like a decision: Yes/No by default, or their own `options`.
 
   ```json

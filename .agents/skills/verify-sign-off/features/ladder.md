@@ -13,6 +13,6 @@ Write two files under `.sign-off/mocks/<key>/`: a real SVG diagram (boxes, arrow
 | 5 | Phone dark, click `button "Needs work, <interactive title>"` with a note, poll `answers --json` | The answer and note are saved; the row moves to Answered with its button pressed |
 | 6 | `post --type diagram --view mocks/<key>/missing.svg`, `--view ../x.svg`, `--type interactive --view <the .svg>` | Exit 1 `NOT_FOUND`, then exit 2 twice, each naming the fix |
 
-A `--full-page` shot leaves a sandboxed frame below the first screen blank (the frame is loaded; the capture does not paint it). For that row, `eval` a `scrollIntoView()` on its `iframe` and take a viewport shot.
+A frame below the first screen needs a viewport shot after `scrollIntoView()` (see Drive in `SKILL.md`).
 
 The integration test (`npm test`, `test/design.test.mjs`) also covers the post validation, the served content types and the sandbox header.

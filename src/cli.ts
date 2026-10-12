@@ -103,12 +103,12 @@ examples:
        sign-off-axi post [board.json] --type evidence --title "<what this shows>" --about "<short note>" --media <file>... [--link <commit or URL>] [--detail <text>]
 Posts an item for the user. --type decision (the default) is a yes/no or pick-one question, exactly like raise.
 --type design is a pick between up to 6 options shown side by side, each with an optional board-relative mock file
-(.html, .png, .jpg, .jpeg, .webp), a --tradeoff line and a --recommend badge.
+(.html, .svg, .png, .jpg, .jpeg, .webp), a --tradeoff line and a --recommend badge.
 One .html page can hold every variant: --mock a=mocks/<key>/index.html?variant=a and so on; the page reads ?variant= to show one.
 After the user picks, answers --key <key> --json holds the pick and note; "rounds" holds an ask for another round.
 --type diagram and --type interactive are a decision shown with a picture: --view names one board-relative file,
-an image (.svg, .png, .jpg, .jpeg, .webp) shown at card width for a diagram, or one self-contained .html page for interactive.
-The page runs in a sandboxed frame: no network, no access to the dashboard, no top navigation. Answers work as for a decision.
+an image (.svg, .png, .jpg, .jpeg, .webp, 5 MB or less) shown at card width for a diagram, or one self-contained .html page for interactive.
+The page runs in a sandboxed frame: no fetch, no remote files, no access to the dashboard or its tab. Answers work as for a decision.
 --type evidence posts the next numbered update (key update-<number>): 1 to ${MEDIA_MAX} screenshots or recordings (.png, .jpg, .jpeg, .webp, .mp4, .webm, 50 MB each), copied into evidence/<number>/ next to the board, with a short note and an optional commit or PR link.
 The user gives a verdict, pass, fail or needs-work, with an optional note; read it with answers or wait --key update-<number>.
 examples:
@@ -314,8 +314,15 @@ function post(args: string[], cmd = 'post') {
   if (type === 'decision') return storeIncoming(file, on, buildIncoming(values));
   const root = resolve(dirname(file));
   if (view) {
-    if (!resolve(root, values.view).startsWith(root + sep)) throw fail(`--view ${values.view} escapes the board folder`, 'VALIDATION_ERROR', 'Keep the file next to the board file, under mocks/<key>/');
-    if (!statSync(resolve(root, values.view), { throwIfNoEntry: false })?.isFile()) throw fail(`--view ${values.view} is not a file in ${tilde(root)}`, 'NOT_FOUND', 'Paths are relative to the board file\'s folder');
+    // The same real-path check the board serves with, so a post that passes always renders.
+    const escapes = () => fail(`--view ${values.view} escapes the board folder`, 'VALIDATION_ERROR', 'Keep the file next to the board file, under mocks/<key>/');
+    if (!resolve(root, values.view).startsWith(root + sep)) throw escapes();
+    let actual;
+    try { actual = under(root, values.view); } catch (e: any) {
+      throw e.message === 'no matching mock file' ? fail(`--view ${values.view} is not a file in ${tilde(root)}`, 'NOT_FOUND', 'Paths are relative to the board file\'s folder') : escapes();
+    }
+    const size = statSync(actual);
+    if (!size.isFile() || size.size > MOCK_BYTES) throw fail(`--view ${values.view} must be a file of 5 MB or less`, 'VALIDATION_ERROR');
     return storeIncoming(file, on, buildIncoming(values, { type, view: values.view }));
   }
   const mocks = values.mock?.map((m: string) => {
@@ -600,8 +607,9 @@ const state = () => ({
 });
 const mediaTypes: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.mp4': 'video/mp4', '.webm': 'video/webm' };
 const mockTypes: Record<string, string> = { '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
-/** Every served file is its own sandboxed page: no fetch, no top navigation, no reach into the dashboard, even opened full size. */
-const FRAME_CSP = "default-src 'self' 'unsafe-inline' data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; sandbox allow-scripts";
+const MOCK_BYTES = 5_000_000;
+/** Every served file is its own sandboxed page, even opened full size: no fetch, no remote files, no frames, and no reach into the dashboard or its tab. */
+const FRAME_CSP = "default-src 'self' 'unsafe-inline' data: blob:; connect-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'; sandbox allow-scripts";
 /** A board-relative path resolved inside a root folder; anything else is unavailable. */
 function under(root: string, rel: string): string {
   let base: string, actual: string;
@@ -662,7 +670,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     if (!mock || !type) return [404, { error: 'Mock is unavailable' }];
     try {
       const actual = under(dirname(file), mockFile(mock));
-      if (statSync(actual).size > 5_000_000) return [404, { error: 'Mock is unavailable' }];
+      if (statSync(actual).size > MOCK_BYTES) return [404, { error: 'Mock is unavailable' }];
       return [200, { media: readFileSync(actual), type }];
     } catch { return [404, { error: 'Mock is unavailable' }]; }
   }

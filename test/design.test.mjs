@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -72,6 +72,10 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
     assert.equal(run('post', board, '--title', 'Other?', ...bad).code, 2, bad.join(' '));
   }
   assert.equal(run('post', board, '--type', 'diagram', '--title', 'Other?', '--view', 'mocks/flow/missing.svg').code, 1);
+  // A symlink out of the board folder is refused at post time, the same way the board refuses to serve it.
+  writeFileSync(join(scratch, 'outside.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>');
+  symlinkSync(join(scratch, 'outside.svg'), join(so, 'mocks', 'flow', 'link.svg'));
+  assert.equal(run('post', board, '--type', 'diagram', '--title', 'Other?', '--view', 'mocks/flow/link.svg').code, 2);
   const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: tmpdir() });
   procs.push(proc);
   const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
@@ -87,7 +91,7 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   assert.deepEqual(api.decisions.map((d) => d.type), ['design', 'report', 'decision', 'design', 'diagram', 'interactive']);
   assert.equal(api.decisions[4].view, 'mocks/flow/flow.svg');
   // Each view is served as its own sandboxed page that can fetch nothing, even opened full size.
-  for (const [key, type] of [['flow', 'image/svg+xml'], ['demo', 'text/html']]) {
+  for (const [key, type] of [['flow', 'image/svg+xml'], ['demo', 'text/html'], ['pick-the-sign-in-layout&value=a', 'text/html']]) {
     const res = await fetch(`${url}api/mock?key=${key}`);
     assert.equal(res.headers.get('content-type'), type);
     assert.match(res.headers.get('content-security-policy'), /connect-src 'none'.*sandbox allow-scripts/);
