@@ -231,8 +231,10 @@
   function mockCards(d, buttons) {
     return el('div', { class: 'mocks', role: 'group', 'aria-label': d.title }, ...d.options.map((o, i) => {
       const m = d.mocks?.find((x) => x.value === o.value);
-      const url = m && `/api/mock?key=${encodeURIComponent(d.key)}&value=${encodeURIComponent(m.value)}`;
-      const view = m && (/\.html?$/i.test(m.path) ? el('iframe', { src: url, title: `Mock ${o.label}`, tabindex: '-1', 'aria-hidden': 'true', loading: 'lazy' })
+      // A `page.html?variant=b` mock keeps its variant in the frame's query, where the page reads it.
+      const [path, query] = m?.path.split('?') ?? [];
+      const url = m && `/api/mock?key=${encodeURIComponent(d.key)}&value=${encodeURIComponent(m.value)}${query ? `&${query}` : ''}`;
+      const view = m && (/\.html?$/i.test(path) ? el('iframe', { src: url, title: `Mock ${o.label}`, tabindex: '-1', 'aria-hidden': 'true', loading: 'lazy' })
         : el('img', { src: url, alt: `Mock: ${o.label}` }));
       return el('figure', { class: 'mock' },
         m ? el('a', { class: 'shot', href: url, target: '_blank', rel: 'noopener', 'aria-label': `Open mock ${o.label} full size` }, view) : '',

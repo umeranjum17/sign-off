@@ -38,7 +38,9 @@
   next to the mocks.
 - `mocks`: optional on design items, up to 6 entries of an option `value` and a
   `path` to a mock file, relative to the board file's folder. Each value must
-  name one of the item's own options. Served only from inside that folder.
+  name one of the item's own options. Served only from inside that folder. An
+  `.html` path may end in `?variant=<name>` (1-64 of `A-Z a-z 0-9 . _ -`): the
+  page is loaded with that query, so one page can show each variant.
 - `options`: optional, 2 to 6 choices. Each has a `value` (1-128 of `A-Z a-z 0-9 . _ -`, unique within the question) and a non-empty `label` shown on its button. Leave it out for **Yes** (`yes`) and **No** (`no`); files written before options existed read exactly as before.
 - `recommend_value`, `default_if_silent`: optional, the `value` of one of the question's own options (`yes` or `no` when `options` is left out). Shown, never applied.
 - `close`: optional, `done` (default) or `release`; copied into the answer.

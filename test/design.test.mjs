@@ -49,6 +49,17 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   assert.match(run('raise', board, '--from', join(scratch, 'report.json')).out, /weekly-report,raised,/);
   writeFileSync(join(scratch, 'bad-type.json'), JSON.stringify({ schema: 1, decisions: [{ key: 'x', type: 'Not A Type', title: 'X?' }] }));
   assert.equal(run('raise', board, '--from', join(scratch, 'bad-type.json')).code, 2);
+  // raise is the alias for post --type decision: the same question posted either way is one item.
+  assert.match(run('post', board, '--type', 'decision', '--title', 'Keep the digest?', '--recommend', 'yes').out, /keep-the-digest,raised,/);
+  assert.match(run('raise', board, '--title', 'Keep the digest?', '--recommend', 'yes').out, /keep-the-digest,already waiting,/);
+  assert.equal(run('raise', board, '--title', 'Other?', '--type', 'design').code, 2);
+  // One page holds every variant and reads ?variant= to show one.
+  mkdirSync(join(so, 'mocks', 'nav'));
+  writeFileSync(join(so, 'mocks', 'nav', 'index.html'), '<p>variant page</p>');
+  const nav = ['--type', 'design', '--key', 'nav', '--title', 'Pick the nav', '--option', 'a=A: tabs', '--option', 'b=B: drawer', '--option', 'c=C: rail'];
+  assert.equal(run('post', board, ...nav, '--mock', 'c=mocks/c.png?variant=c').code, 2);
+  assert.equal(run('post', board, ...nav, '--mock', 'a=mocks/nav/index.html?other=a').code, 2);
+  assert.match(run('post', board, ...nav, ...['a', 'b', 'c'].flatMap((v) => ['--mock', `${v}=mocks/nav/index.html?variant=${v}`]), '--tradeoff', 'A is flat; B hides; C is dense.', '--recommend', 'a').out, /nav,raised,/);
   const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: tmpdir() });
   procs.push(proc);
   const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
@@ -61,10 +72,11 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   assert.equal(api.decisions[0].title, 'Pick the sign-in layout');
   assert.equal(api.decisions[0].tradeoff, 'B scans fastest; A is simplest.');
   assert.equal(api.decisions[0].mocks.length, 3);
-  assert.deepEqual(api.decisions.map((d) => d.type), ['design', 'report']);
+  assert.deepEqual(api.decisions.map((d) => d.type), ['design', 'report', 'decision', 'design']);
   assert.deepEqual(api.rounds, []);
   assert.equal(await (await fetch(`${url}api/mock?key=pick-the-sign-in-layout&value=a`)).text(), '<h1>Mock A</h1>');
   assert.equal((await fetch(`${url}api/mock?key=pick-the-sign-in-layout&value=z`)).status, 404);
+  assert.equal(await (await fetch(`${url}api/mock?key=nav&value=b&variant=b`)).text(), '<p>variant page</p>');
   assert.equal((await post(url, 'api/rounds', { key: 'pick-the-sign-in-layout', note: '' })).status, 400);
   assert.equal((await post(url, 'api/rounds', { key: 'gone', note: 'hi' })).status, 404);
   const waiting = spawn('node', [cli, 'wait', board, '--key', 'pick-the-sign-in-layout', '--timeout', '20']);

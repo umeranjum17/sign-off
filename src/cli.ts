@@ -22,6 +22,7 @@ examples:
   sign-off-axi
   sign-off-axi raise --title "Ship the new sign-in screen this week?" --recommend yes
   sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media shot.png
+  sign-off-axi post .sign-off/decisions.json --type design --title "Pick the sign-in layout" --option a=A --option b=B --mock a=mocks/a.html --mock b=mocks/b.html --recommend b
   sign-off-axi init
   sign-off-axi doctor
   sign-off-axi open
@@ -40,6 +41,7 @@ examples:
   raise: `usage: sign-off-axi raise [board.json] --title "<question>" [--key <key>] [--about <text>] [--detail <text>] [--option <value>=<label>]... [--recommend <value>] [--default <value>] [--close done|release]
        sign-off-axi raise [board.json] --from <decisions.json>
 Adds questions to the board: yes/no, or 2 to 6 choices with one --option each. --key defaults to a slug of the title.
+raise is the alias for post --type decision: same flags, same output.
 --recommend and --default name a value (yes or no without --option). --default is what happens if the user stays silent; it is shown, never applied.
 --from adds every decision in a decisions file: ${FORMAT}
 Raising the same question again is a no-op that reports its status; a different question under a used key is refused.
@@ -96,13 +98,19 @@ Runs the board in the foreground until Ctrl-C; --port 0 picks a free port. Use o
 examples:
   sign-off-axi serve --port 0
 `,
-  post: `usage: sign-off-axi post [board.json] --type design --title "<question>" [--about <text>] [--option <value>=<label>]... [--mock <value>=<path>]... [--tradeoff <text>] [--recommend <value>] [--default <value>] [--close done|release]
+  post: `usage: sign-off-axi post [board.json] [--type decision|design] --title "<question>" [--key <key>] [--about <text>] [--option <value>=<label>]... [--mock <value>=<path>]... [--tradeoff <text>] [--recommend <value>] [--default <value>] [--close done|release]
        sign-off-axi post [board.json] --type evidence --title "<what this shows>" --about "<short note>" --media <file>... [--link <commit or URL>] [--detail <text>]
-Posts a design item: up to 6 options shown side by side, each with an optional board-relative mock file (.html, .png, .jpg, .jpeg, .webp). Without --type it behaves like raise.
+Posts an item for the user. --type decision (the default) is a yes/no or pick-one question, exactly like raise.
+--type design is a pick between up to 6 options shown side by side, each with an optional board-relative mock file
+(.html, .png, .jpg, .jpeg, .webp), a --tradeoff line and a --recommend badge.
+One .html page can hold every variant: --mock a=mocks/<key>/index.html?variant=a and so on; the page reads ?variant= to show one.
+After the user picks, answers --key <key> --json holds the pick and note; "rounds" holds an ask for another round.
 --type evidence posts the next numbered update (key update-<number>): 1 to ${MEDIA_MAX} screenshots or recordings (.png, .jpg, .jpeg, .webp, .mp4, .webm, 50 MB each), copied into evidence/<number>/ next to the board, with a short note and an optional commit or PR link.
 The user gives a verdict, pass, fail or needs-work, with an optional note; read it with answers or wait --key update-<number>.
 examples:
   sign-off-axi post --type design --title "Pick the sign-in layout" --option a="A: single column" --option b="B: split screen" --mock a=mocks/a.html --mock b=mocks/b.html --tradeoff "B scans fastest; A is simplest." --recommend b
+  sign-off-axi post .sign-off/decisions.json --type design --key sign-in --title "Pick the sign-in layout" --option a=A --option b=B --option c=C --mock a=mocks/sign-in/index.html?variant=a --mock b=mocks/sign-in/index.html?variant=b --mock c=mocks/sign-in/index.html?variant=c --tradeoff "..." --recommend b
+  sign-off-axi post --type decision --title "Keep the weekly digest?" --recommend yes
   sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media phone.png --media flow.mp4 --link https://github.com/acme/app/pull/12
 `,
   init: `usage: sign-off-axi init [dir]
@@ -277,36 +285,36 @@ async function locked<T>(lock: string, fn: () => T | Promise<T>, busy = 'another
   try { return await fn(); } finally { rmSync(lock, { force: true }); }
 }
 
-function raise(args: string[]) {
-  const { file, values, on } = parse('raise', args, { from: { type: 'string' }, ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: f === 'option' }])) });
-  const given = RAISE_FIELDS.filter((f) => values[f] !== undefined);
-  if (values.from !== undefined && given.length) throw fail(`--from cannot be combined with --${given[0]}`, 'VALIDATION_ERROR', 'Put every field in the --from file, or raise with flags only');
-  if (values.from === undefined && values.title === undefined) throw fail('--title is required (or --from <decisions.json>)', 'VALIDATION_ERROR', 'sign-off-axi raise --title "<question>" [--recommend <value>]');
-  return storeIncoming(file, on, buildIncoming(values));
-}
-
 const MOCK_TYPES = ['.html', '.png', '.jpg', '.jpeg', '.webp'];
-function post(args: string[]) {
-  const { file, values, on } = parse('post', args, { from: { type: 'string' }, type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
-    media: { type: 'string', multiple: true }, link: { type: 'string' },
+/** A mock path without its optional `?variant=<name>` suffix, which picks one variant of a single .html page. */
+const mockFile = (path: string) => path.split('?')[0];
+/** Posts an item. `raise` is the alias for `post --type decision`: same flags as before, same output. */
+function post(args: string[], cmd = 'post') {
+  const typed: Flags = cmd === 'post' ? { type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
+    media: { type: 'string', multiple: true }, link: { type: 'string' } } : {};
+  const { file, values, on } = parse(cmd, args, { from: { type: 'string' }, ...typed,
     ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: f === 'option' }])) });
   const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'link'].filter((f) => values[f] !== undefined);
-  if (values.from !== undefined && given.length) throw fail(`--from cannot be combined with --${given[0]}`, 'VALIDATION_ERROR', 'Put every field in the --from file, or post with flags only');
-  if (values.from === undefined && values.title === undefined) throw fail('--title is required (or --from <decisions.json>)', 'VALIDATION_ERROR', 'sign-off-axi post --type design --title "<question>" --option a=A --option b=B');
+  if (values.from !== undefined && given.length) throw fail(`--from cannot be combined with --${given[0]}`, 'VALIDATION_ERROR', `Put every field in the --from file, or ${cmd} with flags only`);
   const type = values.type ?? 'decision';
+  if (values.from === undefined && values.title === undefined) {
+    throw fail('--title is required (or --from <decisions.json>)', 'VALIDATION_ERROR', type === 'design' ? 'sign-off-axi post --type design --title "<question>" --option a=A --option b=B'
+      : type === 'evidence' ? 'sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media <file>' : `sign-off-axi ${cmd} --title "<question>" [--recommend <value>]`);
+  }
   if (!['decision', 'design', 'evidence'].includes(type)) throw fail(`--type must be decision, design or evidence`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (type === 'evidence') return postEvidence(file, on, values);
   if (values.media !== undefined || values.link !== undefined) throw fail('--media and --link need --type evidence', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
-  if (type === 'decision' && (values.tradeoff !== undefined || values.mock !== undefined)) {
-    throw fail('--tradeoff and --mock need --type design', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
+  if (type === 'decision') {
+    if (values.tradeoff !== undefined || values.mock !== undefined) throw fail('--tradeoff and --mock need --type design', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
+    return storeIncoming(file, on, buildIncoming(values));
   }
   const root = resolve(dirname(file));
   const mocks = values.mock?.map((m: string) => {
     const at = m.indexOf('=');
     if (at < 1) throw fail(`--mock ${m} must be <value>=<path>`, 'VALIDATION_ERROR', 'sign-off-axi post --type design --title "<question>" --option a=A --mock a=mocks/a.html');
-    const path = m.slice(at + 1);
-    if (!MOCK_TYPES.includes(extname(path).toLowerCase())) throw fail(`--mock ${path} must end in ${MOCK_TYPES.join(', ')}`, 'VALIDATION_ERROR');
-    if (!resolve(root, path).startsWith(root + sep)) throw fail(`--mock ${path} escapes the board folder`, 'VALIDATION_ERROR', 'Keep mock files next to the board file');
+    const path = m.slice(at + 1), name = mockFile(path);
+    if (!MOCK_TYPES.includes(extname(name).toLowerCase())) throw fail(`--mock ${path} must end in ${MOCK_TYPES.join(', ')}`, 'VALIDATION_ERROR');
+    if (!resolve(root, name).startsWith(root + sep)) throw fail(`--mock ${path} escapes the board folder`, 'VALIDATION_ERROR', 'Keep mock files next to the board file');
     return { value: m.slice(0, at), path };
   });
   return storeIncoming(file, on, buildIncoming(values, { type, tradeoff: values.tradeoff, mocks }));
@@ -637,10 +645,10 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   if (req.method === 'GET' && req.url?.startsWith('/api/mock?')) {
     const q = new URL(req.url, 'http://localhost').searchParams;
     const mock = loadDecisions(file).find((d) => d.key === q.get('key'))?.mocks?.find((m) => m.value === q.get('value'));
-    const type = mock && mockTypes[extname(mock.path).toLowerCase()];
+    const type = mock && mockTypes[extname(mockFile(mock.path)).toLowerCase()];
     if (!mock || !type) return [404, { error: 'Mock is unavailable' }];
     try {
-      const actual = under(dirname(file), mock.path);
+      const actual = under(dirname(file), mockFile(mock.path));
       if (statSync(actual).size > 5_000_000) return [404, { error: 'Mock is unavailable' }];
       return [200, { media: readFileSync(actual), type }];
     } catch { return [404, { error: 'Mock is unavailable' }]; }
@@ -731,7 +739,7 @@ await runAxiCli({
   topLevelHelp: TOP_HELP,
   getCommandHelp: (cmd) => HELP[cmd],
   home: axi('list', list),
-  commands: { list: axi('list', list), raise: axi('raise', raise), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), init: axi('init', init), doctor: axi('doctor', doctor), help: ([name, ...rest]) => {
+  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), init: axi('init', init), doctor: axi('doctor', doctor), help: ([name, ...rest]) => {
     if (rest.length || (name && !HELP[name])) throw fail(`unknown command or argument: ${[name, ...rest].join(' ')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi --help` to see the commands');
     return name ? HELP[name] : TOP_HELP;
   } },

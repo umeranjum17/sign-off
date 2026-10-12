@@ -69,8 +69,8 @@ export function loadDecisions(path: string): Decision[] {
     if (d.tradeoff !== undefined && (!isText(d.tradeoff) || !d.tradeoff.trim() || d.tradeoff.length > TRADEOFF_MAX)) throw bad('tradeoff', `must be text of ${TRADEOFF_MAX} characters or fewer`);
     if (d.mocks !== undefined) {
       if (!Array.isArray(d.mocks) || !d.mocks.length || d.mocks.length > 6
-        || !d.mocks.every((m: any) => isKey(m?.value) && isText(m?.path) && m.path.trim() && m.path.length <= 256)) {
-        throw bad('mocks', 'must list up to 6 items, each an option value and a board-relative mock path');
+        || !d.mocks.every((m: any) => isKey(m?.value) && isText(m?.path) && m.path.trim() && m.path.length <= 256 && /^[^?#]+(\.html\?variant=[A-Za-z0-9._-]{1,64})?$/i.test(m.path))) {
+        throw bad('mocks', 'must list up to 6 items, each an option value and a board-relative mock path (an .html page may end in ?variant=<name>)');
       }
       const targets = d.mocks.map((m: MockRef) => m.value);
       if (new Set(targets).size < targets.length) throw bad('mocks', 'option values must be unique');

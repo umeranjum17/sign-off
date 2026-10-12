@@ -1,6 +1,6 @@
 # Design item
 
-Covers `sign-off-axi init`, `sign-off-axi doctor`, `sign-off-axi post --type design`, the A/B/C mock cards, and Ask for another round. Follow Launch and Drive in `SKILL.md` first, with a board from `init` in the scratch folder and three mock files under `.sign-off/mocks/` (two `.html`, one image).
+Covers `sign-off-axi init`, `sign-off-axi doctor`, `sign-off-axi post --type design` (and `--type decision`, which `raise` is the alias of), the A/B/C mock cards, and Ask for another round. Follow Launch and Drive in `SKILL.md` first, with a board from `init` in the scratch folder and three mock files under `.sign-off/mocks/` (two `.html`, one image).
 
 | # | Step | Pass when |
 |---|---|---|
@@ -11,3 +11,5 @@ Covers `sign-off-axi init`, `sign-off-axi doctor`, `sign-off-axi post --type des
 | 5 | Phone dark, click the recommended mock's `Pick` button, poll `answers --json` for the pick and the note | The saved pick and note appear within the time limit; `answers-after-pick.json` saved |
 | 6 | Reload, shot | The picked button has `[aria-pressed=true]` under Answered with the note and round note intact |
 | 7 | `answers --json` saved as `answers-final.json` | The key holds `answer`, `label`, `close`, `at`, `note`, and a `rounds` list with the round note |
+| 8 | One page for all variants: write `mocks/<key>/index.html` that prints `location.search`'s `variant`, post with `--mock a=mocks/<key>/index.html?variant=a` (b, c alike), reload, shot | Each card's frame shows its own variant letter |
+| 9 | `raise` against `post --type decision`: run the same raise cases with `dist/cli.js` from main and from the branch in fresh HOMEs and `diff` the output and board files | No difference |

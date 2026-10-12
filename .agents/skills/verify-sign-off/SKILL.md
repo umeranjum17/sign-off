@@ -76,9 +76,9 @@ Look at every shot before you report: nothing overlaps, no text is cut, no raw p
 |---|---|
 | Dashboard: one list for every item type, newest first, pick on the mock card, plain card for new types | [features/dashboard.md](features/dashboard.md) |
 | Decisions page: list, one-click answer, durable answers | [features/decisions.md](features/decisions.md) |
-| Design item: init/doctor, A/B/C mock cards, another-round asks | [features/design.md](features/design.md) |
+| Design item: init/doctor, A/B/C mock cards, `?variant=` pages, another-round asks, `raise` as `post --type decision` | [features/design.md](features/design.md) |
 | Evidence updates: numbered posts with media, hash-checked serving, inline video, verdict | [features/evidence.md](features/evidence.md) |
 | One-of-few options and the answer note, old-format compatibility | [features/options-note.md](features/options-note.md) |
 | README media and rendered README | [features/readme.md](features/readme.md) |
 | `sign-off-axi` commands, TOON/`--full`/`--json`, packed tarball via `npx -y` | [features/axi.md](features/axi.md) |
-| Agent skill: `skills/sign-off-axi`, `npm run build:skill`, install with `npx skills add` | [features/skill.md](features/skill.md) |
+| Agent skill: `skills/sign-off-axi`, the A/B/C mock recipe, `npm run build:skill`, install with `npx skills add` | [features/skill.md](features/skill.md) |
