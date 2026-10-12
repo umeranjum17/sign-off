@@ -1,6 +1,8 @@
 ---
 name: verify-sign-off
-description: Prove sign-off works in a real browser before a PR or ready report. Use for any change to src/, web/ or the README media. Drives the real CLI and page with chrome-devtools-axi on phone and desktop, light and dark.
+description: Prove sign-off works in a real browser before a PR or ready report. Use for any change to src/, web/, skills/ or the README. Drives the real CLI and page with chrome-devtools-axi on phone and desktop, light and dark.
+metadata:
+  internal: true
 ---
 
 # verify-sign-off
@@ -56,3 +58,4 @@ Look at every shot before you report: nothing overlaps, no text is cut, no raw p
 | Decisions page: list, one-click answer, durable answers | [features/decisions.md](features/decisions.md) |
 | README media and rendered README | [features/readme.md](features/readme.md) |
 | `sign-off-axi` commands, TOON/`--full`/`--json`, packed tarball via `npx -y` | [features/axi.md](features/axi.md) |
+| Agent skill: `skills/sign-off-axi`, `npm run build:skill`, install with `npx skills add` | [features/skill.md](features/skill.md) |

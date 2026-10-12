@@ -26,7 +26,32 @@ Your answer survives reloads and restarts; you can change it with one more click
 
 ## Quick start
 
-sign-off is not on npm yet. Run it from this repository (Node 22.5 or newer):
+### Agent skill (recommended)
+
+Install the sign-off skill in the [Agent Skills](https://agentskills.io) format with [`npx skills`](https://github.com/vercel-labs/skills):
+
+```sh
+npx skills add umeranjum17/sign-off --skill sign-off-axi
+```
+
+That is the entire setup - no npm install needed.
+The skill teaches your agent to run sign-off through `npx -y sign-off-axi`, so the CLI comes along on demand.
+It stays a short stub and sends the agent to `npx -y sign-off-axi --help` for current instructions, so an installed copy cannot go stale against a newer CLI.
+Its frontmatter also includes Hermes Agent metadata, so Hermes-compatible harnesses can categorize and surface it as a first-class productivity skill.
+
+Then, in agents that expose skills as slash commands (Claude Code, for example), invoke it directly:
+
+```
+/sign-off-axi should we keep the weekly digest?
+```
+
+Or just ask in plain words - "ask me whether to keep the weekly digest and wait for my answer" - and the agent loads the skill on its own when it recognizes the task.
+
+By default the skill lands in the current project's skills directory (`.claude/skills/`, for example); add `-g` to install it for all projects (`~/.claude/skills/`).
+
+### Manual CLI
+
+The skill is the recommended path, but you can also run the board by hand from this repository (Node 22.5 or newer):
 
 ```sh
 # 1. Build
@@ -92,8 +117,9 @@ Real demo questions, with one Yes already saved. Desktop shots are cropped to th
 ## Development
 
 ```sh
-npm test    # builds, then runs the integration journeys against the real CLI and server
-npm pack    # builds the publishable sign-off-axi tarball
+npm test                      # builds, then runs the integration journeys against the real CLI and server
+npm run build:skill           # regenerates skills/sign-off-axi/SKILL.md from src/skill.ts (CI runs it with -- --check)
+npm pack                      # builds the publishable sign-off-axi tarball
 ```
 
 Browser proof lives in [`.agents/skills/verify-sign-off`](.agents/skills/verify-sign-off/SKILL.md).
