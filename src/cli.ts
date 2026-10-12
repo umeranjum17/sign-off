@@ -478,7 +478,13 @@ async function open(args: string[]) {
 }
 async function start(file: string, port: number, host: string, values: Record<string, any>, on: string) {
   const live = await running(file);
-  const already = (url = live!.url) => toon({ board: tilde(file), url, status: 'already open (no-op)' }, [linkHelp(file, url), `Run \`sign-off-axi stop${on}\` to close the board`]);
+  const answerLink = (url: string) => {
+    if (loopback(host)) return url;
+    const token = tokenOf(file);
+    if (!token) throw fail(`${tilde(tokenFile(file))} is gone, so the running board refuses every link`, 'CONFLICT', `Run \`sign-off-axi stop${on}\`, then open it again`);
+    return `${url}?token=${token}`;
+  };
+  const already = (url = live!.url) => toon({ board: tilde(file), url: answerLink(url), status: 'already open (no-op)' }, [`Tell the user to answer at ${answerLink(url)}`, `Run \`sign-off-axi stop${on}\` to close the board`]);
   if (live && !live.url.startsWith(`http://${urlHost(host)}:`)) {
     throw fail(`this board is already open at ${live.url}, not on ${host}`, 'CONFLICT', `Run \`sign-off-axi stop${on}\`, then open it again on the new address`);
   }
@@ -502,7 +508,7 @@ async function start(file: string, port: number, host: string, values: Record<st
     if (url) {
       writeFileSync(record(file), `${child.pid} ${new URL(url).port} ${host}\n`, { mode: 0o600 });
       // The token is shown here, never in the log, so a log shared for help does not carry it.
-      const link = loopback(host) ? url : `${url}?token=${tokenOf(file)}`;
+      const link = answerLink(url);
       return toon({ board: tilde(file), url: link, pid: child.pid, status: 'opened' },
         [`Tell the user to answer at ${link}`, `Run \`sign-off-axi wait${on}\` to block until they answer`, `Run \`sign-off-axi stop${on}\` to close the board`]);
     }
@@ -553,7 +559,7 @@ function tokenOf(file: string, make = false) {
   if (make && !/^[\w-]{32,}$/.test(token)) throw fail(`${tilde(tokenFile(file))} holds no usable access token`, 'VALIDATION_ERROR', 'Delete it and open the board again to make a new one');
   return token;
 }
-/** The token is printed once, by the open that starts the board; later hints point at its file instead. */
+/** Status and serve print the URL and point at the token file, never the token itself. */
 const linkHelp = (file: string, url: string) => (loopback(new URL(url).hostname.replace(/^\[|\]$/g, '')) ? `Tell the user to answer at ${url}`
   : `Tell the user to answer at ${url}?token=<the token in ${tilde(tokenFile(file))}>`);
 
@@ -716,16 +722,22 @@ async function exportBoard(args: string[]) {
   const { file: _, messages: _messages, ...frozen } = state(), files: Record<string, string> = {}, q = encodeURIComponent;
   let missing = 0;
   // The same URLs the page asks the server for, read through the same hash and path checks.
+  const inline = async (url: string, query?: string) => {
+    const [code, body] = await route({ method: 'GET', url } as IncomingMessage).catch((): [number, unknown] => [404, null]);
+    if (code !== 200) { missing++; return; }
+    const { media, type } = body as { media: Buffer; type: string };
+    // A data: URL keeps a one-page mock's query where the mock page reads it, but also appends it to the page text: a trailing comment hides it.
+    files[url] = query && type === 'text/html' ? `data:text/html;charset=utf-8,${q(media.toString())}%3C!--?${query}` : `data:${type};base64,${media.toString('base64')}`;
+  };
   for (const d of frozen.decisions) {
-    for (const url of [...(d.mocks ?? []).map((m) => `/api/mock?key=${q(d.key)}&value=${q(m.value)}${m.path.includes('?') ? `&${m.path.split('?')[1]}` : ''}`),
-      ...(d.view ? [`/api/mock?key=${q(d.key)}`] : []), ...(d.media ?? []).map((_, i) => `/api/media?key=${q(d.key)}&i=${i}`), ...(d.evidenceCard?.media ?? []).map((m) => m.url)]) {
-      const [code, body] = await route({ method: 'GET', url } as IncomingMessage).catch((): [number, unknown] => [404, null]);
-      if (code !== 200) { missing++; continue; }
-      const { media, type } = body as { media: Buffer; type: string };
-      // A data: URL keeps a ?variant= query where the mock page reads it, but also appends it to the page text: a trailing comment hides it.
-      const variant = /&(variant=[\w.-]+)$/.exec(url)?.[1];
-      files[url] = variant ? `data:text/html;charset=utf-8,${q(media.toString())}%3C!--?${variant}` : `data:${type};base64,${media.toString('base64')}`;
+    for (const m of d.mocks ?? []) {
+      const query = m.path.split('?')[1];
+      await inline(`/api/mock?key=${q(d.key)}&value=${q(m.value)}${query ? `&${query}` : ''}`, query);
     }
+    // A diagram or an interactive page is the item's own view, inlined the same way.
+    if (d.view) await inline(`/api/mock?key=${q(d.key)}`);
+    for (const i of (d.media ?? []).keys()) await inline(`/api/media?key=${q(d.key)}&i=${i}`);
+    for (const m of d.evidenceCard?.media ?? []) await inline(m.url);
   }
   const out = resolve(parsed.values.out ?? `${parsed.file.replace(/\.json$/, '')}.export.html`);
   const data = JSON.stringify({ ...frozen, files, exported: `${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC` }).replace(/</g, '\\u003c');

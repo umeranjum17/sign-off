@@ -212,6 +212,9 @@ test('private-network bind: token on every route, kept across a restart', { skip
   assert.match(run('stop', board).out, /status: stopped/);
   const reopened = run('open', board, '--port', String(port), '--bind', mine.address);
   assert.equal(new URL(/url: "(.+)"/.exec(reopened.out)[1]).searchParams.get('token'), token);
+  const repeat = run('open', board, '--port', String(port), '--bind', mine.address);
+  assert.match(repeat.out, /already open \(no-op\)/);
+  assert.equal(new URL(/url: "(.+)"/.exec(repeat.out)[1]).searchParams.get('token'), token);
   // Another address while it runs is refused, never a silent no-op on the old one.
   const moved = run('open', board, '--port', String(port), '--bind', '127.0.0.1');
   assert.deepEqual([moved.code, /code: CONFLICT/.test(moved.out)], [1, true]);
