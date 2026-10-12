@@ -105,12 +105,12 @@
   .mock figcaption button { flex: 1 0 100%; }
   /* Ladder rungs: a diagram at card width, an interactive page in a sandboxed frame; a white page so drawings read in dark mode. */
   .rung { grid-column: 1 / -1; display: grid; gap: 0.25rem; justify-items: start; }
-  .rung .frame { display: block; width: 100%; border: 1px solid var(--line); border-radius: 0.7rem; overflow: hidden; background: #fff; }
+  .rung .frame { display: block; width: 100%; border: 1px solid var(--line); border-radius: 0.625rem; overflow: hidden; background: #fff; }
   .rung img { display: block; width: 100%; height: auto; max-height: 80vh; object-fit: contain; }
-  .rung iframe { display: block; width: 100%; height: min(32rem, 75vh); border: 0; }
+  /* Short on a phone so a small page leaves no tall blank; Open full size shows the rest. */
+  .rung iframe { display: block; width: 100%; height: min(18rem, 50vh); border: 0; }
   .rung .gone { color: var(--danger); margin: 0; }
   .rung > .meta { color: var(--accent); margin: 0; }
-  .row:has(> .rung) { row-gap: 0.875rem; }
   .badge { padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; color: var(--accent); border: 1px dashed var(--accent); }
   .round { margin-top: 0.5rem; }
   textarea { display: block; width: 100%; max-width: 70ch; margin-top: 0.25rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border);
@@ -123,6 +123,10 @@
     .bar, main { padding: 0 2rem; }
     .row { grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 2rem; padding: 1.125rem 1.25rem; }
     .row.design { grid-template-columns: minmax(0, 1fr); gap: 0.875rem; }
+    .rung iframe { height: min(32rem, 75vh); }
+    /* A picture card stacks like a design card: the picture, then its buttons at their own width. */
+    .row:has(> .rung) { grid-template-columns: minmax(0, 1fr); gap: 0.875rem; }
+    .row:has(> .rung) .choices { justify-content: start; }
     .choices { grid-template-columns: repeat(2, minmax(5.5rem, auto)); }
     .row:has(.choices.many) { row-gap: 0.875rem; }
     .choices.many { grid-column: 1 / -1; }
@@ -185,11 +189,11 @@
       media.childElementCount ? media : el('p', { class: 'meta' }, 'No recorded image or recording.'));
   }
 
-  const NAMES = { decision: 'Decision', design: 'Design', evidence: 'Evidence' };
+  const NAMES = { decision: 'Decision', design: 'Design', evidence: 'Evidence', diagram: 'Diagram', interactive: 'Interactive' };
   // Any other type gets the plain card until it has its own renderer.
   const chip = (d) => el('span', { class: 'chip' }, NAMES[d.type] ?? d.type.replace(/-/g, ' '));
   const title = (d) => (d.type === 'evidence' ? `Update ${d.number} · ${d.title}` : d.title);
-  const FILTERS = { decision: 'Decisions', design: 'Designs', evidence: 'Evidence', other: 'Other' };
+  const FILTERS = { decision: 'Decisions', design: 'Designs', evidence: 'Evidence', diagram: 'Diagrams', interactive: 'Interactive pages', other: 'Other' };
   const kind = (d) => (Object.hasOwn(NAMES, d.type) ? d.type : 'other');
 
   function row(d) {
