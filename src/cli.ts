@@ -341,7 +341,7 @@ async function wait(args: string[]) {
       for (const [k, n] of counts) seenRounds.set(k, n);
       let found = [...new Map([...hit.filter((d) => d.answer), ...fresh].map((d) => [d.key, d] as const)).values()];
       if (found.length && filer !== undefined) {
-        // Taken under a lock, so two waits for one filer never both hand over the same answer.
+        // Taken under a lock, so two waits for one filer never both hand over the same answer (another-round asks are not deduped here).
         found = await locked(`${seenPath(file)}.lock`, () => {
           const now = seenBy(file), left = found.filter((d) => values.key !== undefined || fresh.includes(d) || !now(d.answer!));
           markSeen(file, left.flatMap((d) => (d.answer && !now(d.answer) ? [d.answer] : [])));
