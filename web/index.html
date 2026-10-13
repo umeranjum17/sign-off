@@ -8,47 +8,80 @@
   :root { color-scheme: light dark;
     --bg: #F6F3EE; --surface: #FFFFFF; --sunk: #EFEBE4; --line: #E6E0D6; --text: #1F1B16; --muted: #6A6157;
     --border: #B8AE9F; --accent: #C2410C; --on-accent: #FFFFFF; --danger: #B42318; --bezel: #1F1B16;
+    --c-waiting: #E8590C; --c-evidence: #0C8599; --c-reports: #5B5BD6; --c-answered: #2B8A3E;
     --shadow: 0 1px 2px rgb(60 40 20 / 0.06), 0 6px 18px rgb(60 40 20 / 0.06); }
   @media (prefers-color-scheme: dark) { :root {
     --bg: #15120F; --surface: #211D18; --sunk: #1B1814; --line: #342E26; --text: #F3EEE6; --muted: #A99F91;
     --border: #6E6458; --accent: #FB923C; --on-accent: #1A1009; --danger: #FF8A80; --bezel: #4A4238;
+    --c-waiting: #FF8A4C; --c-evidence: #3BC9DB; --c-reports: #9491FF; --c-answered: #51CF66;
     --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.25); } }
   * { box-sizing: border-box; }
   body { margin: 0 0 3rem; background: var(--bg); color: var(--text); overflow-wrap: anywhere; -webkit-font-smoothing: antialiased;
     font: 1rem/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  header { position: sticky; top: 0; z-index: 1; border-bottom: 1px solid var(--line);
-    background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); }
-  .bar, main { max-width: 55rem; margin: 0 auto; padding: 0 1rem; }
-  .bar { display: flex; align-items: center; gap: 0.625rem; min-height: 3.5rem; flex-wrap: wrap; }
-  .bar h1 { font-size: 1rem; font-weight: 600; margin: 0; flex: 1 0 auto; }
-  .count { color: var(--muted); font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+  /* The four areas each have a colour, used on icons, dots and marks. */
+  .i-waiting { --area: var(--c-waiting); } .i-evidence { --area: var(--c-evidence); } .i-reports { --area: var(--c-reports); } .i-answered { --area: var(--c-answered); }
+  main { max-width: 72rem; margin: 0 auto; padding: 0 1rem; }
+  .side { display: none; }
   .banner { margin: 1rem 0 0; padding: 0.75rem 1rem; border: 1px solid var(--danger); border-radius: 0.5rem; color: var(--danger); }
-  h2 { font-size: 0.75rem; font-weight: 700; color: var(--muted); margin: 2rem 0 0.625rem; letter-spacing: 0.06em; text-transform: uppercase; }
-  /* The glance: what waits, by type, oldest first; the chips filter the lists below and live in the URL hash. */
-  .glance { padding-top: 1.25rem; }
-  .big { margin: 0; font: 600 1.625rem/1.2 ui-serif, "Iowan Old Style", Georgia, serif; letter-spacing: -0.01em; }
-  .filters { display: flex; flex-wrap: wrap; gap: 0.375rem; margin-top: 0.875rem; }
-  .filters button { min-height: 2.5rem; padding: 0 0.625rem; border-radius: 999px; border-color: var(--line); font-size: 0.875rem; }
-  .filters .n { margin-left: 0.375rem; color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; }
-  .filters button[aria-pressed="true"] { background: var(--text); border-color: var(--text); color: var(--bg); }
-  .filters button[aria-pressed="true"] .n { color: inherit; }
-  .filters button[aria-pressed="true"]::before { content: none; }
-  .oldest { list-style: none; margin: 0.375rem 0 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 0.875rem; box-shadow: var(--shadow); }
-  .oldest .chip { min-width: 5.75rem; text-align: center; }
-  .oldest li + li { border-top: 1px solid var(--line); }
-  .oldest button { display: flex; align-items: flex-start; gap: 0.625rem; width: 100%; padding: 0.625rem 0.875rem; border: 0; border-radius: 0;
-    background: none; text-align: start; font-weight: 500; }
-  .glance > .meta { margin-top: 1rem; }
+  .top { padding: 1.25rem 0 1rem; }
+  .date { margin: 0; color: var(--muted); font-size: 0.9375rem; font-weight: 600; }
+  .top h1 { margin: 0; font-size: 2.125rem; line-height: 1.2; letter-spacing: -0.01em; outline: none; }
+  .back, .sec-head a, .more { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--accent); font-weight: 600; text-decoration: none; }
+  h2 { font-size: 1.375rem; line-height: 1.25; margin: 0 0 0.75rem; }
+  .icon { flex: none; display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 0.5rem; background: var(--area, var(--muted)); }
+  .icon svg { width: 1.125rem; height: 1.125rem; fill: none; stroke: var(--surface); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  /* Summary: a tile per area (each opens its screen), what needs you first, the day so far, then a short list per area. */
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .card, .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 1rem; box-shadow: var(--shadow); }
+  .card { padding: 1rem; }
+  .tile { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-content: start; gap: 0.25rem 0.5rem; padding: 0.75rem 0.875rem; color: var(--text); text-decoration: none; }
+  .tile::after { content: "›" / ""; position: absolute; top: 0.5rem; right: 0.875rem; color: var(--muted); font-size: 1.5rem; line-height: 1.2; }
+  .tile .name { grid-column: 2 / -1; align-self: center; padding-right: 1rem; font-size: 0.875rem; font-weight: 600; color: var(--muted); line-height: 1.3; }
+  .tile .detail { grid-column: 1 / -1; }
+  .tile .n { grid-column: 1 / 3; font-size: 2.125rem; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
+  .tile .detail { font-size: 0.8125rem; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .vis { align-self: center; display: flex; align-items: center; gap: 0.25rem; }
+  .vis img { width: 1.5rem; height: 2.25rem; object-fit: cover; object-position: top; border: 1px solid var(--line); border-radius: 0.25rem; }
+  .mark { width: 0.875rem; height: 0.875rem; border-radius: 50%; border: 2px solid var(--area); }
+  .i-answered .mark { background: var(--area); }
+  .i-reports .mark { width: 0.375rem; height: 1.25rem; border-radius: 2px; background: var(--area); }
+  .pair, .areas { display: grid; gap: 1rem; margin-top: 1rem; }
+  /* What needs you first: the oldest ask, its pictures side by side and its answers stacked at one width. */
+  .needs .row { padding: 0; border: 0; background: none; box-shadow: none; grid-template-columns: minmax(0, 1fr); }
+  .needs .row .choices { display: grid; grid-template-columns: minmax(0, 1fr); max-width: 28rem; }
+  .needs .rung { max-width: 28rem; }
+  .needs .media { flex-wrap: nowrap; }
+  .needs .media > * { flex: 1 1 0; min-width: 0; }
+  .needs .mocks { grid-auto-columns: minmax(0, 1fr); max-width: 16rem; margin: 0; }
+  .needs .shot { aspect-ratio: 3 / 4; }
+  .day { position: relative; height: 4.5rem; border-bottom: 1px solid var(--border); }
+  .col { position: absolute; bottom: 0.25rem; display: flex; flex-direction: column-reverse; align-items: center; gap: 0.1875rem; transform: translateX(-50%);
+    font-size: 0.8125rem; font-weight: 700; line-height: 1.2; }
+  .dot { width: 0.625rem; height: 0.625rem; border-radius: 50%; background: var(--c-answered); }
+  .hours { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
+  .events { list-style: none; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.25rem; font-size: 0.9375rem; }
+  .events time, .sec-head .meta { font-weight: 700; font-variant-numeric: tabular-nums; margin-right: 0.5rem; }
+  .sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+  .sec-head h2 { margin: 0; }
+  .rows { list-style: none; margin: 0; padding: 0 1rem; }
+  .rows li + li { border-top: 1px solid var(--line); }
+  .compact { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 0; color: var(--text); text-decoration: none; }
+  .compact > span:last-child { display: grid; min-width: 0; }
+  .compact strong { font-size: 1.0625rem; font-weight: 600; line-height: 1.3; }
+  .compact .meta { margin: 0.125rem 0 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .thumb, .compact .icon { width: 3.5rem; height: 3.5rem; border-radius: 0.625rem; }
+  .compact .icon { background: color-mix(in srgb, var(--area) 14%, var(--surface)); }
+  .compact .icon svg { stroke: var(--area); }
+  .thumb { flex: none; object-fit: cover; object-position: top; border: 1px solid var(--line); background: var(--sunk); }
   .list { display: grid; gap: 0.75rem; }
   /* A read-only board is for reading: its pages get most of the screen. */
-  .readonly { margin-top: 1.25rem; }
   .readonly .rung iframe { height: 80vh; }
   .row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.875rem; padding: 1rem; scroll-margin-top: 4.5rem;
     background: var(--surface); border: 1px solid var(--line); border-radius: 0.875rem; box-shadow: var(--shadow); }
   /* Waiting cards carry the accent stripe and the shadow; answered ones sit flat and quiet. */
-  .waiting .row { box-shadow: inset 3px 0 0 var(--accent), var(--shadow); }
-  .answered .row { background: transparent; box-shadow: none; }
-  .answered .row h3 { color: var(--muted); font-weight: 500; }
+  .in-waiting .row { box-shadow: inset 3px 0 0 var(--accent), var(--shadow); }
+  .in-answered .row { background: transparent; box-shadow: none; }
+  .in-answered .row h3 { color: var(--muted); font-weight: 500; }
   .row h3 { font-size: 1.125rem; font-weight: 650; line-height: 1.35; margin: 0; }
   .about, details p { margin: 0.375rem 0 0; max-width: 70ch; }
   details p { color: var(--muted); }
@@ -89,6 +122,7 @@
   .other summary { display: flex; align-items: center; min-height: 2.75rem; margin: 0; padding: 0 1rem; list-style: none;
     border: 1px solid var(--line); border-radius: 0.5rem; color: var(--muted); font-size: 0.9375rem; }
   .other summary::-webkit-details-marker { display: none; }
+  .other:not([open]) > :not(summary) { display: none; }
   .other summary::after { content: "▾" / ""; padding-left: 0.5rem; }
   .other[open] summary::after { content: "▴" / ""; }
   .actions .quick { border-radius: 999px; }
@@ -103,7 +137,8 @@
   button { min-height: 2.75rem; padding: 0 1.25rem; border-radius: 0.5rem; border: 1px solid var(--border); cursor: pointer;
     background: var(--surface); color: var(--text); font: inherit; font-weight: 500; }
   /* Recommended is a dashed accent outline and a tag; picked is filled with a check. They never look alike. */
-  button.rec { border: 1px dashed var(--accent); }
+  button.rec { border: 1.5px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+  .tag::before { content: "★ " / ""; }
   .tag { display: inline-block; white-space: nowrap; margin-left: 0.375rem; color: var(--accent); font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
   button[aria-pressed="true"] { background: var(--accent); border: 1px solid var(--accent); color: var(--on-accent); font-weight: 600; }
   button[aria-pressed="true"]::before { content: "✓" / ""; margin-right: 0.375rem; font-weight: 700; }
@@ -141,7 +176,8 @@
   .rung iframe { display: block; width: 100%; height: min(18rem, 50vh); border: 0; }
   .rung .gone { color: var(--danger); margin: 0; }
   .rung > .meta { color: var(--accent); margin: 0; }
-  .badge { padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; color: var(--accent); border: 1px dashed var(--accent); }
+  .badge { padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; color: var(--accent); border: 1.5px solid var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
   .round { margin-top: 0.5rem; }
   .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
   .ask { margin: 1rem 0 0; padding: 0.25rem 1rem 0.75rem; background: var(--surface); border: 1px solid var(--line); border-radius: 0.75rem; }
@@ -149,10 +185,10 @@
     border-radius: 0.5rem; background: var(--bg); color: var(--text); font: inherit; resize: vertical; }
   .saved-note { white-space: pre-line; }
   button:focus-visible, summary:focus-visible, textarea:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .oldest button:focus-visible, .shot:focus-visible { outline-offset: -2px; }
+  .shot:focus-visible { outline-offset: -2px; }
   .empty { margin: 0; padding: 1.5rem 1rem; color: var(--muted); text-align: center; border: 1px dashed var(--line); border-radius: 0.875rem; }
   @media (min-width: 45rem) {
-    .bar, main { padding: 0 2rem; }
+    main { padding: 0 2rem; }
     .row { grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 0.875rem 2rem; padding: 1.125rem 1.25rem; }
     .row.design { grid-template-columns: minmax(0, 1fr); gap: 0.875rem; }
     /* The frames share the card width down to 11rem each; only a list longer than that scrolls. */
@@ -166,13 +202,25 @@
     .choices.many { grid-column: 1 / -1; }
     .choices.many button { flex: 0 1 auto; min-width: 5.5rem; }
   }
+  /* A wide screen keeps the areas in a sidebar; the Summary puts its tiles in one row and its lists in two columns. */
+  @media (min-width: 60rem) {
+    body { display: grid; grid-template-columns: 19rem minmax(0, 1fr); }
+    .side { display: flex; flex-direction: column; gap: 0.25rem; position: sticky; top: 0; height: 100vh; padding: 1.5rem 1rem;
+      border-right: 1px solid var(--line); background: var(--sunk); }
+    .side a { display: flex; align-items: center; gap: 0.75rem; min-height: 2.75rem; padding: 0 0.625rem; border-radius: 0.625rem; color: var(--text); text-decoration: none; }
+    .side a[aria-current] { background: var(--surface); font-weight: 600; }
+    .side .n { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .brand { margin: 0 0 1rem 0.625rem; font-weight: 700; }
+    main { width: 100%; padding: 0 3rem; }
+    .back { display: none; }
+    .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .pair { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
+    .areas { grid-template-columns: 1fr 1fr; align-items: start; }
+  }
 </style>
 </head>
 <body>
-<header><div class="bar">
-  <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6" fill="var(--accent)"/><path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="var(--on-accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-  <h1>Dashboard</h1><span class="count" id="count" aria-live="polite"></span>
-</div></header>
+<nav class="side" id="nav" aria-label="Board areas"></nav>
 <main><p class="banner" id="banner" role="alert" hidden></p><div id="board"></div></main>
 <div id="toast" role="status" hidden><span id="toast-text"></span><button id="undo" hidden>Undo</button></div>
 <script>
@@ -290,8 +338,6 @@
   // Any other type gets the plain card until it has its own renderer.
   const chip = (d) => el('span', { class: 'chip' }, NAMES[d.type] ?? d.type.replace(/-/g, ' '));
   const title = (d) => (d.type === 'evidence' ? `Update ${d.number} · ${d.title}` : d.title);
-  const FILTERS = { decision: 'Decisions', design: 'Designs', evidence: 'Evidence', diagram: 'Diagrams', interactive: 'Interactive pages', explainer: 'Explainers', other: 'Other' };
-  const kind = (d) => (Object.hasOwn(NAMES, d.type) ? d.type : 'other');
 
   function row(d) {
     const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` });
@@ -451,57 +497,85 @@
     }));
   }
 
-  /** The top of the page: how much waits, one-tap type filters with waiting counts, and the oldest waiting items to jump to. */
-  function glance(all, filter, waiting) {
-    const open = all.filter((d) => !Object.hasOwn(state.answers, d.key));
-    const kinds = Object.keys(FILTERS).filter((k) => k === filter || all.some((d) => kind(d) === k));
-    const filterBtn = (k, label, n) => {
-      const b = el('button', { 'aria-pressed': k === filter, 'data-k': k, 'aria-label': `${label}, ${n} waiting` }, label, el('span', { class: 'n' }, String(n)));
-      b.onclick = () => { if (k !== filter) { refocus = k; location.hash = k && `type=${k}`; } };
-      return b;
-    };
-    const jump = (d) => {
-      const b = el('button', { 'aria-label': `Go to ${title(d)}` }, chip(d), el('span', { dir: 'auto' }, title(d)));
-      b.onclick = () => document.getElementById(`item-${d.key}`).scrollIntoView({ behavior: 'smooth' });
-      return el('li', {}, b);
-    };
-    // The board file appends new items at the end, so its order is oldest first.
-    const oldest = [...waiting].reverse(), SHOWN = 5;
-    return el('section', { class: 'glance', 'aria-label': 'At a glance' },
-      el('p', { class: 'big' }, open.length ? `${open.length} waiting on you` : 'Nothing is waiting on you'),
-      kinds.length > 1 || filter ? el('div', { class: 'filters', role: 'group', 'aria-label': 'Show one type' }, filterBtn('', 'All', open.length),
-        ...kinds.map((k) => filterBtn(k, FILTERS[k], open.filter((d) => kind(d) === k).length))) : '',
-      ...(oldest.length ? [el('p', { class: 'meta' }, 'Waiting longest'), el('ol', { class: 'oldest' }, ...oldest.slice(0, SHOWN).map(jump))] : []),
-      oldest.length > SHOWN ? el('p', { class: 'meta' }, `and ${oldest.length - SHOWN} more below`) : '');
+  const AREAS = { waiting: 'Waiting on you', evidence: 'Evidence', reports: 'Reports and explainers', answered: 'Answered' };
+  const EMPTY = { waiting: 'Nothing is waiting on you.', evidence: 'No evidence updates.', reports: 'No reports or explainers.', answered: 'Nothing answered yet.' };
+  const ICONS = { summary: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z', waiting: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2',
+    evidence: 'M4 5h16v14H4zM4 16l5-5 4 4 2-2 5 5M15 9h.01', reports: 'M7 3h7l4 4v14H7zM10 12h5M10 16h5', answered: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM8 12l3 3 5-6' };
+  // The drawings are fixed strings from this page, never text from the board file.
+  const icon = (a) => { const s = el('span', { class: `icon i-${a}`, 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[a]}"/></svg>`; return s; };
+  const isAnswered = (d) => Object.hasOwn(state.answers, d.key);
+  /** Each item lives in one area: answered items, then evidence updates, then what is only to read (explainers, pages with nothing to answer), then the open asks. */
+  const area = (d) => (isAnswered(d) ? 'answered' : d.type === 'evidence' ? 'evidence'
+    : state.readonly || d.type === 'explainer' || !(d.options.length || d.reply) ? 'reports' : 'waiting');
+  const hhmm = (at) => new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const pic = (d) => {
+    const i = d.media?.findIndex((m) => !/\.(mp4|webm)$/i.test(m.path)), m = d.mocks?.find((x) => !/\.html?$/i.test(x.path));
+    return i >= 0 ? `/api/media?key=${encodeURIComponent(d.key)}&i=${i}` : d.type === 'diagram' ? mockUrl(d.key, '', d.view) : m && mockUrl(d.key, m.value, m.path);
+  };
+  const thumb = (a, url) => { if (!url) return icon(a); const img = el('img', { class: 'thumb', src: src(url), alt: '' }); img.onerror = () => img.replaceWith(icon(a)); return img; };
+
+  function tile(a, items) {
+    const answeredToday = a === 'answered' && items.filter((d) => new Date(state.answers[d.key].at).toDateString() === new Date().toDateString()).length;
+    const detail = { waiting: items[0] && `Oldest: ${items[0].title}`, evidence: items[0] && `Newest: Update ${items[0].number}`,
+      reports: items[0] && `Newest: ${items[0].title}`, answered: `${answeredToday} today` }[a] ?? EMPTY[a];
+    const thumbs = a === 'evidence' ? items.map(pic).filter(Boolean).slice(0, 3).map((u) => el('img', { src: src(u), alt: '' })) : [];
+    const marks = thumbs.length ? thumbs : Array.from({ length: Math.min(items.length, 3) }, () => el('span', { class: 'mark' }));
+    return el('a', { class: `tile i-${a}`, href: `#${a}`, 'aria-label': `${AREAS[a]}, ${items.length}` }, icon(a), el('span', { class: 'name' }, AREAS[a]),
+      el('span', { class: 'n' }, String(items.length)), el('span', { class: 'vis', 'aria-hidden': 'true' }, ...marks), el('span', { class: 'detail', dir: 'auto' }, detail));
   }
 
-  let refocus = null; // The filter chip that was tapped, focused again after the page redraws.
+  /** The day so far: a mark per answer on a line of hours, and the list of them. Items carry no time of their own, so only answers show. */
+  function today() {
+    const day = new Date().toDateString(), done = state.decisions.filter(isAnswered).map((d) => ({ d, t: new Date(state.answers[d.key].at) }))
+      .filter((e) => e.t.toDateString() === day).sort((x, y) => x.t - y.t);
+    const head = (range) => el('div', { class: 'sec-head' }, el('h2', {}, 'Today'), range ? el('span', { class: 'meta' }, range) : '');
+    if (!done.length) return el('section', { class: 'card today' }, head(), el('p', { class: 'meta' }, 'Nothing answered today yet.'));
+    const h0 = done[0].t.getHours(), step = Math.ceil((done.at(-1).t.getHours() + 1 - h0) / 4), h1 = h0 + step * Math.ceil((done.at(-1).t.getHours() + 1 - h0) / step);
+    const x = (t) => ((t.getHours() + t.getMinutes() / 60 - h0) / (h1 - h0)) * 100, cols = new Map();
+    for (const e of done) { const k = Math.round(x(e.t) / 4) * 4; cols.set(k, [...(cols.get(k) ?? []), e]); }
+    const hours = Array.from({ length: (h1 - h0) / step + 1 }, (_, i) => `${(h0 + i * step) % 24}:00`), SHOWN = 8;
+    return el('section', { class: 'card today' }, head(`${done.length} answered, ${hours[0]} to ${hours.at(-1)}`),
+      el('div', { class: 'day', 'aria-hidden': 'true' }, ...[...cols].map(([k, es]) => el('span', { class: 'col', style: `left: ${k}%` },
+        ...es.slice(0, 6).map(() => el('span', { class: 'dot' })), es.length > 1 ? String(es.length) : ''))),
+      el('div', { class: 'hours', 'aria-hidden': 'true' }, ...hours.map((h) => el('span', {}, h))),
+      el('ol', { class: 'events' }, ...done.slice(-SHOWN).map((e) => el('li', { dir: 'auto' }, el('time', {}, hhmm(e.t)), `${title(e.d)} · ${state.answers[e.d.key].label}`))),
+      done.length > SHOWN ? el('p', { class: 'meta' }, `and ${done.length - SHOWN} earlier`) : '');
+  }
+
+  let jump = null; // The item a Summary row was tapped for, scrolled to on its area's screen.
+  /** A short list of an area on the Summary: a picture and the title; a tap opens the area at that item. */
+  function section(a, items) {
+    const SHOWN = 4, line = (d) => {
+      const saved = state.answers[d.key], link = el('a', { class: 'compact', href: `#${a}` }, thumb(a, pic(d)), el('span', {}, el('strong', { dir: 'auto' }, title(d)),
+        el('span', { class: 'meta', dir: 'auto' }, saved ? `${saved.answer === 'text' ? 'Your reply' : saved.label} · ${hhmm(saved.at)}` : d.about ?? NAMES[d.type] ?? d.type)));
+      link.onclick = () => (jump = d.key);
+      return el('li', {}, link);
+    };
+    return el('section', { class: `i-${a}` }, el('div', { class: 'sec-head' }, el('h2', {}, AREAS[a]),
+      items.length ? el('a', { href: `#${a}` }, items.length > SHOWN ? `See all ${items.length}` : 'Open') : ''),
+    items.length ? el('ul', { class: 'card rows' }, ...items.slice(0, SHOWN).map(line)) : el('p', { class: 'empty' }, EMPTY[a]));
+  }
+
   function render() {
-    // The board file appends new items at the end, so reversed is newest first.
-    const all = [...state.decisions].reverse();
-    const pick = /^#type=([a-z]+)$/.exec(location.hash)?.[1];
-    const filter = Object.hasOwn(FILTERS, pick ?? '') ? pick : '';
-    const items = all.filter((d) => !filter || kind(d) === filter);
-    const waiting = items.filter((d) => !Object.hasOwn(state.answers, d.key));
-    const answered = items.filter((d) => Object.hasOwn(state.answers, d.key));
-    const done = all.filter((d) => Object.hasOwn(state.answers, d.key)).length;
-    const list = (items, cls) => el('div', { class: `list ${cls}` }, ...items.map(row));
-    // A board another program feeds is one list; on an answers-only one, the items that ask something take answers.
-    if (state.readonly || state.answers_only) {
-      const asks = all.filter((d) => d.options.length || d.reply), left = asks.filter((d) => !Object.hasOwn(state.answers, d.key)).length;
-      document.getElementById('count').textContent = state.readonly ? `${all.length} ${all.length === 1 ? 'item' : 'items'} · read only`
-        : `${left} waiting · ${asks.length - left} answered${FROZEN ? ` · read-only copy, ${FROZEN.exported}` : ''}`;
-      document.getElementById('board').replaceChildren(all.length ? list(all, 'readonly') : el('p', { class: 'empty' }, 'Nothing to show yet.'));
-      return FROZEN && freeze();
-    }
-    document.getElementById('count').textContent = `${all.length - done} waiting · ${done} answered${FROZEN ? ` · read-only copy, ${FROZEN.exported}` : ''}`;
-    // The Ask box is for the live board; the frozen copy has no agent to read it.
-    document.getElementById('board').replaceChildren(glance(all, filter, waiting), ...(FROZEN ? [] : [ask()]),
-      el('h2', {}, 'Waiting'), waiting.length ? list(waiting, 'waiting')
-        : el('p', { class: 'empty' }, filter ? `No ${filter === 'other' ? 'other items' : FILTERS[filter].toLowerCase()} waiting on you.` : 'Nothing is waiting on you.'),
-      ...(answered.length ? [el('h2', {}, 'Answered'), list(answered, 'answered')] : []));
-    if (refocus !== null) document.querySelector(`.filters [data-k="${refocus}"]`)?.focus();
-    refocus = null;
+    const by = { waiting: [], evidence: [], reports: [], answered: [] };
+    // The board file appends new items at the end: asks are answered oldest first, the rest read newest first, answers by their time.
+    for (const d of [...state.decisions].reverse()) by[area(d)].push(d);
+    by.waiting.reverse();
+    by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
+    const at = /^#(waiting|evidence|reports|answered)$/.exec(location.hash)?.[1];
+    const link = (a, name, n) => el('a', { href: `#${a}`, ...(a === (at ?? '') && { 'aria-current': 'page' }) }, icon(a || 'summary'), name, n === undefined ? '' : el('span', { class: 'n' }, String(n)));
+    document.getElementById('nav').replaceChildren(el('p', { class: 'brand' }, 'sign-off'), link('', 'Summary'), ...Object.keys(AREAS).map((a) => link(a, AREAS[a], by[a].length)));
+    const ro = state.readonly ? 'Read only' : FROZEN ? `Read-only copy, ${FROZEN.exported}` : '';
+    const top = el('header', { class: 'top' }, at ? el('a', { class: 'back', href: '#' }, '‹ Summary')
+      : el('p', { class: 'date' }, new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })),
+    el('h1', { tabindex: '-1' }, at ? AREAS[at] : 'Summary'), ro ? el('p', { class: 'meta' }, ro) : '');
+    const first = by.waiting[0], more = by.waiting.length > 1 ? `Answer all ${by.waiting.length} on Waiting on you →` : 'Open Waiting on you →';
+    const needs = el('section', { class: 'card needs' }, el('h2', {}, 'Needs you first'),
+      ...(first ? [row(first), el('a', { class: 'more', href: '#waiting' }, more)] : [el('p', { class: 'meta' }, 'Nothing is waiting on you.')]));
+    document.getElementById('board').replaceChildren(top, ...(at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
+      : el('p', { class: 'empty' }, EMPTY[at])] : [el('div', { class: 'tiles' }, ...Object.keys(AREAS).map((a) => tile(a, by[a]))),
+      el('div', { class: 'pair' }, needs, today()), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()]),
+      el('div', { class: 'areas' }, ...Object.keys(AREAS).map((a) => section(a, by[a])))]));
     if (FROZEN) freeze();
   }
   function freeze() {
@@ -510,7 +584,14 @@
     // A browser will not open a data: link in a new tab; the inline preview is the copy.
     document.querySelectorAll('#board a[href^="data:"]').forEach((a) => a.removeAttribute('href'));
   }
-  addEventListener('hashchange', render);
+  // A new screen starts at its top, or at the item tapped on the Summary, with the focus on its title.
+  addEventListener('hashchange', () => {
+    render();
+    const item = jump && document.getElementById(`item-${jump}`);
+    jump = null;
+    item ? item.scrollIntoView() : scrollTo(0, 0);
+    document.querySelector('h1').focus({ preventScroll: true });
+  });
   // An interactive page may post its own height, `{ height: <px> }`, and its frame then fits it with no blank below.
   // Only a frame's own message sizes that frame, and never past 10000px.
   addEventListener('message', (e) => {

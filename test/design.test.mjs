@@ -133,7 +133,7 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   const html = await (await fetch(url)).text();
   assert.match(html, /<title>Dashboard/);
   assert.match(html, /mockCards/);
-  assert.match(html, /<h1>Dashboard<\/h1>/);
+  assert.match(html, /<nav class="side" id="nav" aria-label="Board areas">/);
   const api = await (await fetch(`${url}api/decisions`)).json();
   assert.equal(api.decisions[0].type, 'design');
   assert.equal(api.decisions[0].title, 'Pick the sign-in layout');
@@ -480,7 +480,8 @@ test('an interactive page that posts its height gets a frame that fits it, each 
   writeFileSync(file, JSON.stringify({ schema: 2, readonly: true, items: [...['short', 'huge', 'quiet'].map(item), look] }));
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
-  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  // A read-only board's pages and designs are only to read: they live on Reports and explainers.
+  const url = `${/url: "(\S+)"/.exec(await served(proc))[1]}#reports`;
   const dom = await new Promise((ok, no) => execFile(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${join(dir, 'profile')}`,
     '--window-size=800,4000', '--virtual-time-budget=10000', '--dump-dom', url], { env: { ...process.env, TMPDIR: dir }, maxBuffer: 1 << 24 }, (e, out) => (e ? no(e) : ok(out))));
   const frame = (key) => new RegExp(`<iframe[^>]*title="Interactive page: ${key}"[^>]*>`).exec(dom)?.[0];
@@ -503,7 +504,8 @@ test('each card has one place to type: Other answer holds the reply, Another rou
     { key: 'look', type: 'design', title: 'Pick the look', options: abc, recommend_value: 'b' }] }));
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
-  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  // Both open asks are cards on Waiting on you; the Summary shows only the oldest in full.
+  const url = `${/url: "(\S+)"/.exec(await served(proc))[1]}#waiting`;
   const dom = await new Promise((ok, no) => execFile(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${join(dir, 'profile')}`,
     '--window-size=800,4000', '--virtual-time-budget=10000', '--dump-dom', url], { env: { ...process.env, TMPDIR: dir }, maxBuffer: 1 << 24 }, (e, out) => (e ? no(e) : ok(out))));
   const rows = [...dom.matchAll(/<article class="row[^"]*" id="item-(\w+)">(.*?)<\/article>/gs)].map((m) => [m[1], m[2]]);

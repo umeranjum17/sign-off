@@ -36,7 +36,7 @@
   An `interactive` item on it gets most of the screen's height, unless its page
   posts its own height (below).
 - `"answers_only": true` instead makes an **answers-only board**, also fed by
-  another program: the same one list, checked every 20 seconds, but the items
+  another program: the same Summary and area screens, checked every 20 seconds, but the items
   that ask something take answers and replies. There is no Ask box, and
   **Other answer** has no Another round or comment button; the server refuses rounds, comments
   and prompts with 403. An answer or reply to an item the program dropped
