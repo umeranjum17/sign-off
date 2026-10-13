@@ -145,7 +145,8 @@
   mock file. If that file is overwritten in place, an old ref is checked against
   the new file and can match a different element with the same tag and words at
   the same path; to keep refs exact, post a revised mock under a new round or
-  key. Tag and words are only a safety check, so empty words for a field are
+  key. The words are the element's text nodes joined with one space, at most 80
+  characters. Tag and words are only a safety check, so empty words for a field are
   fine.
 - Every item that asks something has one place to type, folded behind
   **Other answer** after its buttons (a design's Picks too): a short text,
@@ -258,10 +259,25 @@ again until the filer takes it too.
 
 - `text`: 1 to 2000 characters, trimmed.
 
+**Comments on mock elements**, not sent yet (`decisions.annotations.jsonl`, mode 600, oldest first).
+Each names its item's `key`, the option's `mock`, the sha256 `hash` of that mock file when the comment was saved,
+and the element as `ref`, `tag` and `words` (see the pointing script above). A later line with the same `id` edits it,
+and a `deleted` line removes it. A save sends the `hash` the page showed; when the file has changed since, the server answers 409 and nothing is written. An edit sends the `id` of its comment; when that comment is no longer live, the server answers 404 and writes nothing. The board shows a comment only while its mock file still has that hash,
+and under the list it counts the comments on an earlier version of each mock as hidden.
+A read-only or answers-only board returns none of them from its state, so its page shows none:
+
+```json
+{"key":"sign-in-layout","mock":"a","hash":"1ca1060e…","ref":"#sign-in > button:nth-of-type(1)","tag":"button","words":"Sign in","text":"Make it green.","id":"b61d84c0f9b3","at":"2026-10-13T21:50:02Z"}
+{"id":"b61d84c0f9b3","deleted":true,"at":"2026-10-13T21:51:40Z"}
+```
+
+- `text`: 1 to 500 characters, trimmed; `ref`, `tag` and `words` 300 or fewer. One comment per element:
+  a second one on the same element of the same file edits the first.
+
 **Access token** (`decisions.token`, mode 600): made the first time the board is served beyond `127.0.0.1`
 and reused after that. The board reads it on every request, so deleting it shuts old links out at once.
 Deleting it, then `stop` and `open` again, makes a new one (`stop` and `open` alone reuse it). `open` prints
-it in the link; the server log never holds it. `init` git-ignores `*.messages.jsonl`, `*.token` and
+it in the link; the server log never holds it. `init` git-ignores `*.messages.jsonl`, `*.annotations.jsonl`, `*.token` and
 `*.export.html` with the other files sign-off writes.
 
 **Board isolation for tests.** The default board and the walk to a project board are in the README's

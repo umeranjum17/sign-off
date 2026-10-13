@@ -2,6 +2,7 @@ import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync, spawn, spawnSync } from 'node:child_process';
 import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { createServer as createHttpServer, get } from 'node:http';
 import { createServer } from 'node:net';
 import { networkInterfaces, tmpdir } from 'node:os';
@@ -239,6 +240,7 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   assert.equal(data.files['/mock/local/nav~b/index.html?variant=b'], `data:text/html;charset=utf-8,${encodeURIComponent('<p>variant page</p>')}%3C!--?variant=b`);
   assert.equal(data.answers['pick-the-sign-in-layout'].answer, 'b');
   assert.equal(data.messages, undefined, 'the export leaves out comments and prompts');
+  assert.equal(data.annotations, undefined, 'the export leaves out comments on mocks');
   // A diagram and an interactive page are inlined too, so the frozen copy shows them with no server.
   assert.equal(data.files['/mock/local/flow~/flow.svg'], `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>').toString('base64')}`);
   assert.ok(data.files['/mock/local/demo~/demo.html']);
@@ -626,9 +628,69 @@ test('a stored pointing reference finds its element on the mock page itself, aga
   await until(() => evaluate('!window.old'));
   await until(() => evaluate("typeof signOffFind === 'function'"));
   assert.equal(await evaluate(same), true);
+  assert.equal(await evaluate("signOffFind({ ref: '#app > section:nth-of-type(1)', tag: 'section', text: 'Back Sign in' }) === document.querySelector('section')"), true);
   await evaluate(`${button}.textContent = 'Log in'`);
   assert.equal(await evaluate(`signOffFind(${JSON.stringify(ref)})`), null);
   close();
+  proc.kill();
+});
+
+test('comments on mock elements: one per element, kept across a reload, edited and deleted, shown only on the file they were made on; an option with no mock says so', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'annotate'), file = join(dir, 'board.json'), mockA = join(dir, 'mocks', 'a.html');
+  mkdirSync(join(dir, 'mocks'), { recursive: true });
+  writeFileSync(mockA, '<style>body { margin: 0 }</style><main id="app"><button style="width: 100%; height: 3000px">Sign in</button></main>');
+  writeFileSync(join(dir, 'mocks', 'b.html'), '<h1>Split</h1>');
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key: 'look', type: 'design', title: 'Look', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }, { value: 'c', label: 'C' }],
+    recommend_value: 'a', mocks: [{ value: 'a', path: 'mocks/a.html' }, { value: 'b', path: 'mocks/b.html' }] }] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, click, close } = await browse(dir);
+  const frame = "document.querySelector('.mock iframe')", button = (name) => `[...document.querySelectorAll('.ann button')].find((b) => b.textContent === '${name}')`;
+  const middle = () => evaluate(`${frame}.scrollIntoView({ block: 'center' }), (({ left, top, width, height }) => [left + width / 2, top + height / 2])(${frame}.getBoundingClientRect())`);
+  const write = async (text) => {
+    await evaluate(`(${button('Comment on the mocks')}).getAttribute('aria-pressed') === 'false' && (${button('Comment on the mocks')}).click()`);
+    // A synthetic mouse stays aimed at the frame a redraw removed until it clicks elsewhere, so it clicks the page first.
+    // A tap before the frame's bridge loads reaches nothing, so the test taps until the editor opens.
+    await click([1, 1]);
+    await until(async () => (await click(await middle()), evaluate("!!document.getElementById('ann-text-look')")));
+    const before = await evaluate("document.getElementById('ann-text-look').value");
+    await evaluate(`(document.getElementById('ann-text-look').value = ${JSON.stringify(text)}, (${button('Save comment')}).click())`);
+    await until(() => evaluate(`state.annotations?.some((a) => a.text === ${JSON.stringify(text)})`));
+    return before;
+  };
+  const reload = async () => { await evaluate(`window.old = true, location.href = ${JSON.stringify(url)}`); await until(() => evaluate(`!window.old && !!${frame}`)); };
+  await reload();
+  assert.deepEqual(await evaluate("[...document.querySelectorAll('.shot.none')].map((n) => n.textContent)"), ['No mock for this option']);
+  assert.equal(await write('Make this button green, Umer'), '');
+  const [saved] = await evaluate('state.annotations');
+  assert.deepEqual({ ...saved, id: '', at: '' }, { id: '', at: '', key: 'look', mock: 'a', hash: createHash('sha256').update(readFileSync(mockA)).digest('hex'),
+    ref: '#app > button:nth-of-type(1)', tag: 'button', words: 'Sign in', text: 'Make this button green, Umer' });
+  await reload();
+  assert.match(await evaluate("document.querySelector('.ann li').textContent"), /A · button “Sign in”Make this button green, Umer/);
+  // The same element again opens its comment, and saving edits it: still one comment.
+  assert.equal(await write('Make it blue'), 'Make this button green, Umer');
+  assert.deepEqual((await evaluate('state.annotations')).map((a) => [a.id, a.text]), [[saved.id, 'Make it blue']]);
+  await evaluate(`(${button('Edit')}).click()`);
+  await until(() => evaluate("!!document.getElementById('ann-text-look')"));
+  await evaluate(`(${button('Delete')}).click()`);
+  await until(() => evaluate("state.annotations.length === 0 && !document.querySelector('.ann li') && !document.getElementById('ann-text-look')"));
+  // A comment made on one file shows only on that file: overwritten, the mock shows none, and a mock file gone shows the placeholder.
+  await write('Keep the words');
+  writeFileSync(mockA, '<button style="width: 100%; height: 3000px">Sign in</button>');
+  rmSync(join(dir, 'mocks', 'b.html'));
+  await reload();
+  assert.deepEqual(await evaluate("[state.annotations.length, document.querySelectorAll('.ann li').length, document.querySelectorAll('.shot.none').length]"), [1, 0, 2]);
+  assert.equal(await evaluate("document.querySelector('.ann > p.meta:last-of-type').textContent"), '1 comment on an earlier version of “A” is hidden');
+  close();
+  // The page asks nothing the server takes on trust: no text, an option with no page, and a read-only board are refused.
+  const post = (body) => fetch(`${url}api/annotations`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.status);
+  const current = createHash('sha256').update(readFileSync(mockA)).digest('hex');
+  const one = { key: 'look', mock: 'a', ref: '#app', tag: 'main', words: '', text: 'Hi', hash: current };
+  assert.deepEqual([await post({ ...one, text: ' ' }), await post({ ...one, mock: 'c' }), await post({ id: 'nope', deleted: true }), await post({ ...one, hash: 'an older file' }), await post({ ...one, id: saved.id })], [400, 404, 404, 409, 404]);
+  writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, 'utf8')), readonly: true }));
+  assert.equal(await post(one), 403);
+  assert.deepEqual((await fetch(`${url}api/decisions`).then((r) => r.json())).annotations, []);
   proc.kill();
 });
 

@@ -3,7 +3,13 @@
 // Whatever finds `ref` again must check `tag` and `text`, and show nothing when they differ. A revision that keeps the same tag and words at the same path can still match another element.
 // window.signOffFind({ ref, tag, text }) gives back the element that reference finds, or null, on the mock page itself too.
 (() => {
-  const words = (e) => (e === document.body || e === document.documentElement ? '' : e.textContent.trim().replace(/\s+/g, ' ').slice(0, 80));
+  // An element's words are its text nodes joined with a space, so a container's children don't run together.
+  const words = (e) => {
+    if (e === document.body || e === document.documentElement) return '';
+    const all = [], walk = document.createTreeWalker(e, NodeFilter.SHOW_TEXT);
+    while (walk.nextNode()) all.push(walk.currentNode.data);
+    return all.join(' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+  };
   const find = ({ ref: path, tag, text }) => {
     let e;
     try { e = document.querySelector(path); } catch { return null; }

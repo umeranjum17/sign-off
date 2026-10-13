@@ -10,7 +10,7 @@ import { basename, delimiter, dirname, extname, isAbsolute, join, relative, reso
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { type Answer, CHAPTERS_MAX, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, writeItems } from './store.js';
+import { type Answer, CHAPTERS_MAX, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, writeItems } from './store.js';
 
 import { ContractError, KINDS, checkMessage, parseMessage } from './contract.js';
 import { sweepVault } from './vault.js';
@@ -925,7 +925,7 @@ const skillInstalled = (dir: string, agent: string) => [join(dir, AGENTS[agent].
 const SKILL_ADD = ['-y', 'skills', 'add', 'umeranjum17/sign-off', '--skill', 'sign-off-axi', '-y', '-a'];
 const skillAdd = (agents: string[]) => `npx ${[...SKILL_ADD, ...agents].join(' ')}`;
 
-const GITIGNORE = 'mocks/\nevidence/\n*.answers.jsonl\n*.rounds.jsonl\n*.messages.jsonl\n*.seen.jsonl\n*.dismissed.jsonl\n*.board.pid\n*.board.log\n*.token\n*.export.html\n';
+const GITIGNORE = 'mocks/\nevidence/\n*.answers.jsonl\n*.rounds.jsonl\n*.messages.jsonl\n*.annotations.jsonl\n*.seen.jsonl\n*.dismissed.jsonl\n*.board.pid\n*.board.log\n*.token\n*.export.html\n';
 /** The board, port, bind and hosts in <so>/config.yaml (the `key: value` lines init writes). A bad line falls back on its own default
  * (decisions.json, 4410) and `problems` says what is wrong; a file that cannot be read throws. */
 function readSetup(so: string) {
@@ -1218,7 +1218,7 @@ async function exportBoard(args: string[]) {
   const parsed = parse('export', args, { out: { type: 'string' }, 'evidence-root': { type: 'string' } });
   ready(parsed.file, parsed.on, parsed.values['evidence-root']);
   [file, evidenceRoot] = [parsed.file, parsed.values['evidence-root'] ? resolve(parsed.values['evidence-root']) : ''];
-  const { file: _, messages: _messages, ...frozen } = state(), files: Record<string, string> = {}, q = encodeURIComponent;
+  const { file: _, messages: _messages, annotations: _annotations, ...frozen } = state(), files: Record<string, string> = {}, q = encodeURIComponent;
   let missing = 0;
   // The same URLs the page asks the server for, read through the same hash and path checks.
   const inline = async (url: string, query?: string) => {
@@ -1261,16 +1261,21 @@ const state = () => {
     file,
     mockBase: `/mock/${loopback(bind) ? 'local' : mockPass(tokenOf(file))}/`,
     // Who filed an item stays in the file: the page only learns that its filer took the answer.
-    decisions: loadDecisions(file).map(({ filer: _, ...d }) => ({ ...d, evidenceCard: d.evidence ? evidenceCard(d.evidence) : null })),
+    decisions: loadDecisions(file).map(({ filer: _, ...d }) => ({ ...d, evidenceCard: d.evidence ? evidenceCard(d.evidence) : null,
+      ...(d.mocks && { mocks: d.mocks.map((m) => ({ ...m, hash: mockHash(m.path) })) }) })),
     readonly: readOnly(),
     answers_only: answersOnly(),
     answers,
     seen: Object.values(answers).filter(taken).map((a) => a.key),
     rounds,
     messages: readMessages(file, warn),
+    annotations: readOnly() || answersOnly() ? [] : readAnnotations(file, warn),
     dismissed: readDismissed(file, answers, rounds, warn),
   };
 };
+/** A mock file's sha256 now, or null when it is gone: a comment shows only on the exact file it was made on.
+ * ponytail: hashes every mock on each state read; cache by mtime if boards carry many big mocks. */
+const mockHash = (path: string) => { try { return sha256(readFileSync(under(dirname(file), mockFile(path)))); } catch { return null; } };
 /** A board whose file says `"readonly": true` shows its items and takes no answers, rounds or comments: another program feeds it. */
 const readOnly = () => readItems(file).extra.readonly === true;
 /** A board whose file says `"answers_only": true` takes answers and replies but no rounds, comments or prompts: another program feeds it. */
@@ -1377,7 +1382,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   if (req.method === 'GET' && req.url === '/api/decisions') {
     return [200, state()];
   }
-  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/dismiss'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
+  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
   if (readOnly()) return [403, { error: 'This board is read-only' }];
   // Dismiss only hides an item on this page and sends nothing to the feeding program, so an answers-only board takes it too.
   if (!['/api/answers', '/api/dismiss'].includes(req.url!) && answersOnly()) return [403, { error: 'This board takes answers only' }];
@@ -1390,6 +1395,27 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     if (typeof text !== 'string' || !text.trim() || [...text.trim()].length > MESSAGE_MAX) return [400, { error: `Write the ${kind} first, ${MESSAGE_MAX} characters or fewer` }];
     if (kind === 'comment' && !loadDecisions(file).some((x) => x.key === key)) return [404, { error: 'This question is no longer in the file' }];
     appendMessage(file, kind, text.trim(), kind === 'comment' ? key : undefined);
+    return [200, state()];
+  }
+  if (req.url === '/api/annotations') {
+    const { id, deleted, key, mock, ref, tag, words, text, hash: shown } = JSON.parse(body) ?? {}, live = readAnnotations(file);
+    if (deleted === true) {
+      if (!live.some((a) => a.id === id)) return [404, { error: 'This comment is gone' }];
+      appendAnnotation(file, { id, deleted });
+      return [200, state()];
+    }
+    if (![ref, tag, words].every((v) => typeof v === 'string' && v.length <= 300) || !ref || !tag) return [400, { error: 'Point at an element of the mock first' }];
+    if (typeof text !== 'string' || !text.trim() || [...text.trim()].length > NOTE_MAX) return [400, { error: `Write the comment first, ${NOTE_MAX} characters or fewer` }];
+    const m = loadDecisions(file).find((x) => x.key === key)?.mocks?.find((x) => x.value === mock);
+    const hash = m && /\.html$/i.test(mockFile(m.path)) && mockHash(m.path);
+    if (!hash) return [404, { error: 'This mock is no longer on the board' }];
+    // The page saved against the file it showed; a file overwritten since then is not the one the comment is about.
+    if (shown !== hash) return [409, { error: 'The mock changed; reload the board' }];
+    // An edit names a comment that must still be live, so a deleted one is not written back.
+    if (id !== undefined && !live.some((a) => a.id === id)) return [404, { error: 'This comment is gone' }];
+    // One comment per element: another on the same element of the same file edits the first.
+    const same = live.find((a) => a.key === key && a.mock === mock && a.hash === hash && a.ref === ref);
+    appendAnnotation(file, { id: same?.id, key, mock, hash, ref, tag, words, text: text.trim() });
     return [200, state()];
   }
   if (req.url === '/api/dismiss') {
