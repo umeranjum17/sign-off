@@ -45,6 +45,7 @@
   the whole file the way the board reads it and refuses a bad item before
   anything is written; answers stay. A key that was answered may not come back
   with a different title, options or reply: post that question under a new key.
+- An optional `"vault_id"` (32 lowercase hex characters) beside `"schema"` is written the first time the board uses a vault item; it names the board's private vault records. Copy the board file and the copy shares them; delete and recreate it and it starts fresh.
 - A 0.1.0 file, `"schema": 1` with a `"decisions"` list, still reads: each entry is an item, a decision unless it says otherwise. The first write that changes it (a `raise` of a new key, or a `post`) rewrites it as `"schema": 2` (temp file, then rename) and first keeps the old file once beside it as `<board>.schema-1.bak`. Answer and round files are not touched.
 - `key`: 1-128 of `A-Z a-z 0-9 . _ -`, unique in the file. `title`: required.
 - `recommend_value`: the option the poster would pick; the board shows it first and marks it **Recommended**.
