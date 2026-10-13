@@ -221,7 +221,6 @@
     background: none; color: var(--muted); font-size: 1.5rem; line-height: 1.25; }
   .x:hover { background: var(--sunk); color: var(--text); }
   .head .st + .x { margin-left: 0; }
-  .report .row .x { display: none; }
   .rows li { display: flex; align-items: center; }
   .rows li .compact { flex: 1; min-width: 0; }
   .rows li .x { margin: 0; }
@@ -693,6 +692,7 @@
     const head = [el('div', { class: 'head' }, st ? '' : chip(d), el('h3', { dir: 'auto' }, title(d)), st || '', xBtn(d)), d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided];
     const full = open && !n ? row(d) : null;
     full?.removeAttribute('id');
+    full?.querySelector('.head .x')?.remove(); // the card head already has the ×
     const body = full ? [full, decided] : [n ? (open ? el('ol', { class: 'steps' }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), el('span', { dir: 'auto' }, t.title), marks(t))))
       : el('ol', { class: 'flow', style: `--n: ${n}`, 'aria-label': `${n} steps: ${d.steps.map((t) => t.title).join(', ')}` }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), marks(t)))))
       : d.type === 'interactive' ? el('div', { class: 'shot', 'aria-hidden': 'true' }, el('iframe', { src: url, sandbox: 'allow-scripts', tabindex: '-1', loading: 'lazy' }))
