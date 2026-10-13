@@ -1,4 +1,4 @@
-// Vault remains OFF. The server imports only startup expiry housekeeping, never payload access.
+// Vault remains OFF. The server imports only expiry housekeeping, never payload access.
 import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, parse, resolve } from 'node:path';
 import { homedir } from 'node:os';
@@ -163,7 +163,7 @@ export async function sweepVault(board: string) {
     const { dir } = custody(board, false);
     if (!dir) return true;
     return await lockedVault(dir, () => {
-      // ponytail: linear startup scan; periodic cleanup and durable wake events are still owed before activation.
+      // ponytail: linear global scan; batch records if custody size delays ordinary serving. Durable wake events remain owed.
       let clean = true;
       for (const name of readdirSync(dir).filter((n) => n.endsWith('.json'))) {
         try { const path = join(dir, name); expire(path, readRecord(path)); } catch { clean = false; }
