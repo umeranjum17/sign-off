@@ -3,10 +3,10 @@ import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readF
 import { dirname, isAbsolute, join, parse, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { createCipheriv, createHash, randomBytes } from 'node:crypto';
-import { isKey, readItems, writeItems } from './store.js';
+import { isKey } from './store.js';
 
 export type VaultMeta = { board: string; key: string; mode: 'give' | 'receive'; filer: string; expires: number; destination?: string };
-type Status = 'pending' | 'ready' | 'expired' | 'refused';
+type Status = 'pending' | 'ready' | 'refused';
 type Sealed = { nonce: string; tag: string; data: string };
 type Record = { schema: 1; meta: VaultMeta; status: Status; at: number; sealed?: Sealed };
 const errors = {
@@ -28,29 +28,16 @@ function boardFile(board: unknown) {
   if (typeof board !== 'string' || !isAbsolute(board)) bad('VALIDATION_ERROR');
   try { return realpathSync(board); } catch { bad('NOT_FOUND'); }
 }
-function vaultIdOf(extra: { vault_id?: unknown }) {
-  if (extra.vault_id === undefined) return undefined;
-  if (typeof extra.vault_id === 'string' && VAULT_ID.test(extra.vault_id)) return extra.vault_id;
-  bad('VALIDATION_ERROR');
-}
-async function acquire(lock: string) {
-  for (let tries = 0; ; tries++) {
-    try { writeFileSync(lock, `${process.pid}\n`, { flag: 'wx', mode: 0o600 }); return lock; }
-    catch (e: any) { if (e.code !== 'EEXIST' || tries === 49) bad('BUSY'); }
-    await new Promise((ok) => setTimeout(ok, 20));
+function boardId(file: string, create: boolean) {
+  const side = `${file}.vault`;
+  if (!lstatSync(side, { throwIfNoEntry: false })) {
+    if (!create) bad('NOT_FOUND');
+    writeFileSync(side, `${randomBytes(16).toString('hex')}\n`, { flag: 'wx', mode: 0o600 });
   }
-}
-async function vaultId(file: string, create: boolean) {
-  const found = vaultIdOf(readItems(file).extra);
-  if (found || !create) return found ?? bad('NOT_FOUND');
-  const lock = await acquire(`${file}.lock`);
-  try {
-    const { items, extra } = readItems(file), had = vaultIdOf(extra);
-    if (had) return had;
-    const id = randomBytes(16).toString('hex');
-    writeItems(file, items, { ...extra, vault_id: id });
-    return id;
-  } finally { rmSync(lock, { force: true }); }
+  privateFile(side);
+  const id = readFileSync(side, 'utf8').trim();
+  if (!VAULT_ID.test(id)) bad('VALIDATION_ERROR');
+  return id;
 }
 
 function metadata(m: VaultMeta): VaultMeta {
@@ -117,26 +104,26 @@ async function operate<T>(board: string, key: string, create: boolean, fn: (dir:
   if (!isKey(key)) bad('VALIDATION_ERROR');
   let lock: string | undefined;
   try {
-    const file = boardFile(board), parent = dirname(file), dir = root();
+    const file = boardFile(board), parent = dirname(file), dir = root(), candidate = join(dir, 'lock');
     if (dir === parent || dir.startsWith(parent + '/')) bad('VAULT_KEY_UNAVAILABLE');
     // ponytail: one global lock; split by board only if custody throughput requires it. Stale locks fail closed.
-    lock = await acquire(join(dir, 'lock'));
+    for (let tries = 0; ; tries++) {
+      try { const fd = openSync(candidate, 'wx', 0o600); closeSync(fd); lock = candidate; break; }
+      catch (e: any) { if (e.code !== 'EEXIST' || tries === 49) bad('BUSY'); }
+      await new Promise((ok) => setTimeout(ok, 20));
+    }
     // Keep interrupted ciphertext when its key vanished; never turn cleanup into silent key replacement.
     if (!lstatSync(join(dir, 'key'), { throwIfNoEntry: false }) && readdirSync(dir).some((n) => n.endsWith('.tmp'))) bad('VAULT_KEY_UNAVAILABLE');
     // No writer can still own these under the lock; only ciphertext ever enters a temp record.
     for (const n of readdirSync(dir).filter((n) => /^[a-f0-9]{64}\.json\.[a-f0-9]{16}\.tmp$/.test(n))) rmSync(join(dir, n));
     syncDir(dir);
-    const id = await vaultId(file, create), path = join(dir, `${digest(id, key)}.json`);
+    const id = boardId(file, create), path = join(dir, `${digest(id, key)}.json`);
     let record: Record | undefined;
     if (lstatSync(path, { throwIfNoEntry: false })) {
       privateFile(path);
       record = JSON.parse(readFileSync(path, 'utf8'));
       if (!record || record.schema !== 1 || record.meta.board !== id || record.meta.key !== key
-        || JSON.stringify(metadata(record.meta)) !== JSON.stringify(record.meta) || !['pending', 'ready', 'expired', 'refused'].includes(record.status)) bad('VALIDATION_ERROR');
-      if (['pending', 'ready'].includes(record.status) && record.meta.expires <= Date.now()) {
-        record = { schema: 1, meta: record.meta, status: 'expired', at: Date.now() };
-        persist(path, record);
-      }
+        || JSON.stringify(metadata(record.meta)) !== JSON.stringify(record.meta) || !['pending', 'ready', 'refused'].includes(record.status)) bad('VALIDATION_ERROR');
     }
     return fn(dir, path, record, id);
   } catch (e) { throw e instanceof VaultError ? e : new VaultError('BUSY'); }
@@ -145,7 +132,6 @@ async function operate<T>(board: string, key: string, create: boolean, fn: (dir:
 const summary = (r: Record) => ({ ...r.meta, status: r.status, at: r.at });
 const active = (r?: Record) => {
   if (!r) bad('NOT_FOUND');
-  if (r.status === 'expired') bad('EXPIRED');
   if (r.status === 'refused') bad('REFUSED');
   return r;
 };
