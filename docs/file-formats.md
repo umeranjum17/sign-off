@@ -141,11 +141,12 @@
   kept as `{ ref, tag, text }`: `ref` is a path to it, and anything that finds
   it again must check `tag` and `text` and show nothing when they differ. The
   mock page itself has `window.signOffFind({ ref, tag, text })`, which gives
-  back that element, or null when its tag or words differ. A ref belongs to the
-  exact mock file it was made on: a revised mock is a new round with new refs,
-  so a ref does not need to survive a revision. On that same file the path finds
-  the element, and tag and words are only a safety check, so empty words for a
-  field are fine.
+  back that element, or null when its tag or words differ. A ref is made on one
+  mock file. If that file is overwritten in place, an old ref is checked against
+  the new file and can match a different element with the same tag and words at
+  the same path; to keep refs exact, post a revised mock under a new round or
+  key. Tag and words are only a safety check, so empty words for a field are
+  fine.
 - Every item that asks something has one place to type, folded behind
   **Other answer** after its buttons (a design's Picks too): a short text,
   500 characters or fewer. **Send reply** saves it as the answer `text` with
