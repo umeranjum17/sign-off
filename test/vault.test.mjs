@@ -102,7 +102,8 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     const movedAgain = join(home, 'moved-again', 'board.json'), linkedBoard = join(home, 'linked-board.json');
     assert.equal((await run({ op: 'create', meta: { ...meta('moving'), board: movedAgain } })).code, 'VALIDATION_ERROR');
     symlinkSync(movedAgain, linkedBoard);
-    assert.equal((await run({ op: 'create', meta: { ...meta('moving'), board: linkedBoard } })).code, 'VALIDATION_ERROR');
+    assert.equal((await run({ op: 'create', meta: { ...meta('via-alias'), board: linkedBoard } })).status, 'pending');
+    assert.equal((await run({ op: 'inspect', board: movedAgain, key: 'via-alias' })).status, 'pending');
     rmSync(join(home, 'moved-again'), { recursive: true });
     mkdirSync(join(home, 'moved-again'), { mode: 0o700 });
     writeFileSync(movedAgain, JSON.stringify({ schema: 2, items: [] }));
@@ -116,6 +117,18 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     const fed = spawnSync(process.execPath, [cli, 'post', board, '--from', feed], { env, encoding: 'utf8' });
     outputs.push(fed.stdout, fed.stderr); assert.equal(fed.status, 2); assert.match(fed.stdout, /Vault is not enabled/);
     assert.equal(JSON.parse(readFileSync(board)).items[0].key, 'ordinary');
+    const raceDir = join(home, 'race'); mkdirSync(raceDir, { mode: 0o700 });
+    const runCli = (args) => new Promise((ok) => spawn(process.execPath, [cli, ...args], { env, stdio: 'ignore' }).once('exit', ok));
+    for (let i = 0; i < 5; i++) {
+      const raceBoard = join(raceDir, `board-${i}.json`), feed = join(raceDir, `feed-${i}.json`);
+      writeFileSync(raceBoard, JSON.stringify({ schema: 2, items: [] }));
+      writeFileSync(feed, JSON.stringify({ schema: 2, items: [{ key: `raced-${i}`, title: 'Raced' }] }));
+      await Promise.all([run({ op: 'create', meta: { ...meta(`vault-${i}`), board: raceBoard } }), runCli(['post', raceBoard, '--from', feed])]);
+      const raced = JSON.parse(readFileSync(raceBoard));
+      assert.deepEqual(raced.items.map((x) => x.key), [`raced-${i}`]);
+      assert.match(raced.vault_id, /^[a-f0-9]{32}$/);
+      assert.equal((await run({ op: 'inspect', board: raceBoard, key: `vault-${i}` })).status, 'pending');
+    }
     for (const text of [...outputs, ...files(home).map((p) => readFileSync(p).toString())]) {
       assert.equal(text.includes(secret) || text.includes(url), false);
     }

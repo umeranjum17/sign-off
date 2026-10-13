@@ -28,16 +28,29 @@ function boardFile(board: unknown) {
   if (typeof board !== 'string' || !isAbsolute(board)) bad('VALIDATION_ERROR');
   try { return realpathSync(board); } catch { bad('NOT_FOUND'); }
 }
-function vaultId(file: string, create: boolean) {
-  const { items, extra } = readItems(file);
-  if (extra.vault_id !== undefined) {
-    if (typeof extra.vault_id === 'string' && VAULT_ID.test(extra.vault_id)) return extra.vault_id;
-    bad('VALIDATION_ERROR');
+function vaultIdOf(extra: { vault_id?: unknown }) {
+  if (extra.vault_id === undefined) return undefined;
+  if (typeof extra.vault_id === 'string' && VAULT_ID.test(extra.vault_id)) return extra.vault_id;
+  bad('VALIDATION_ERROR');
+}
+async function acquire(lock: string) {
+  for (let tries = 0; ; tries++) {
+    try { writeFileSync(lock, `${process.pid}\n`, { flag: 'wx', mode: 0o600 }); return lock; }
+    catch (e: any) { if (e.code !== 'EEXIST' || tries === 49) bad('BUSY'); }
+    await new Promise((ok) => setTimeout(ok, 20));
   }
-  if (!create) bad('NOT_FOUND');
-  const id = randomBytes(16).toString('hex');
-  writeItems(file, items, { ...extra, vault_id: id });
-  return id;
+}
+async function vaultId(file: string, create: boolean) {
+  const found = vaultIdOf(readItems(file).extra);
+  if (found || !create) return found ?? bad('NOT_FOUND');
+  const lock = await acquire(`${file}.lock`);
+  try {
+    const { items, extra } = readItems(file), had = vaultIdOf(extra);
+    if (had) return had;
+    const id = randomBytes(16).toString('hex');
+    writeItems(file, items, { ...extra, vault_id: id });
+    return id;
+  } finally { rmSync(lock, { force: true }); }
 }
 
 function metadata(m: VaultMeta): VaultMeta {
@@ -104,20 +117,16 @@ async function operate<T>(board: string, key: string, create: boolean, fn: (dir:
   if (!isKey(key)) bad('VALIDATION_ERROR');
   let lock: string | undefined;
   try {
-    const file = boardFile(board), parent = dirname(file), dir = root(), candidate = join(dir, 'lock');
+    const file = boardFile(board), parent = dirname(file), dir = root();
     if (dir === parent || dir.startsWith(parent + '/')) bad('VAULT_KEY_UNAVAILABLE');
     // ponytail: one global lock; split by board only if custody throughput requires it. Stale locks fail closed.
-    for (let tries = 0; ; tries++) {
-      try { const fd = openSync(candidate, 'wx', 0o600); closeSync(fd); lock = candidate; break; }
-      catch (e: any) { if (e.code !== 'EEXIST' || tries === 49) bad('BUSY'); }
-      await new Promise((ok) => setTimeout(ok, 20));
-    }
+    lock = await acquire(join(dir, 'lock'));
     // Keep interrupted ciphertext when its key vanished; never turn cleanup into silent key replacement.
     if (!lstatSync(join(dir, 'key'), { throwIfNoEntry: false }) && readdirSync(dir).some((n) => n.endsWith('.tmp'))) bad('VAULT_KEY_UNAVAILABLE');
     // No writer can still own these under the lock; only ciphertext ever enters a temp record.
     for (const n of readdirSync(dir).filter((n) => /^[a-f0-9]{64}\.json\.[a-f0-9]{16}\.tmp$/.test(n))) rmSync(join(dir, n));
     syncDir(dir);
-    const id = vaultId(file, create), path = join(dir, `${digest(id, key)}.json`);
+    const id = await vaultId(file, create), path = join(dir, `${digest(id, key)}.json`);
     let record: Record | undefined;
     if (lstatSync(path, { throwIfNoEntry: false })) {
       privateFile(path);
@@ -142,9 +151,10 @@ const active = (r?: Record) => {
 };
 
 export async function createVault(input: VaultMeta, value?: Buffer) {
-  if (input?.expires <= Date.now() || input?.expires > Date.now() + 3_600_000 || (input?.mode === 'receive') !== (value !== undefined)) bad('VALIDATION_ERROR');
-  return operate(input?.board, input?.key, true, (dir, path, old, id) => {
-    const meta = metadata({ ...input, board: id });
+  const fixed = metadata({ ...input, board: '0'.repeat(32) });
+  if (fixed.expires <= Date.now() || fixed.expires > Date.now() + 3_600_000 || (fixed.mode === 'receive') !== (value !== undefined)) bad('VALIDATION_ERROR');
+  return operate(input.board, fixed.key, true, (dir, path, old, id) => {
+    const meta = { ...fixed, board: id };
     if (old) bad('VALIDATION_ERROR'); // Terminal keys are tombstones, never reusable.
     if (meta.expires <= Date.now()) bad('EXPIRED');
     if (!value) master(dir);
