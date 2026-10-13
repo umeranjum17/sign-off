@@ -1,0 +1,3 @@
+slice 1 code lines vs base becdbb8 (src + test, tests included): 300 (cap 300, OK)
+src/vault.ts 169, test/vault.test.mjs 131, src/store.ts 1
+docs/file-formats.md 1 line (not counted as code)
