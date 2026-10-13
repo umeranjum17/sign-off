@@ -504,11 +504,19 @@ test('each card has one place to type: Other answer holds the reply, Another rou
     { key: 'look', type: 'design', title: 'Pick the look', options: abc, recommend_value: 'b' }] }));
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
-  // Both open asks are cards on Waiting on you; the Summary shows only the oldest in full.
-  const url = `${/url: "(\S+)"/.exec(await served(proc))[1]}#waiting`;
-  const dom = await new Promise((ok, no) => execFile(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${join(dir, 'profile')}`,
-    '--window-size=800,4000', '--virtual-time-budget=10000', '--dump-dom', url], { env: { ...process.env, TMPDIR: dir }, maxBuffer: 1 << 24 }, (e, out) => (e ? no(e) : ok(out))));
-  const rows = [...dom.matchAll(/<article class="row[^"]*" id="item-(\w+)">(.*?)<\/article>/gs)].map((m) => [m[1], m[2]]);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const dump = (hash) => new Promise((ok, no) => execFile(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${join(dir, 'profile')}`,
+    '--window-size=800,4000', '--virtual-time-budget=10000', '--dump-dom', url + hash], { env: { ...process.env, TMPDIR: dir }, maxBuffer: 1 << 24 }, (e, out) => (e ? no(e) : ok(out))));
+  const cards = (dom) => [...dom.matchAll(/<article class="row[^"]*" id="item-(\w+)">(.*?)<\/article>/gs)].map((m) => [m[1], m[2]]);
+  // Waiting on you is Triage: the oldest ask alone, with the queue of both beside it and Skip to the next.
+  const waiting = await dump('#waiting');
+  assert.deepEqual(cards(waiting).map(([key]) => key), ['ship']);
+  assert.match(waiting, /1 of 2/);
+  assert.equal(waiting.match(/<ol class="queue"[^>]*>.*?<\/ol>/s)[0].match(/<button/g).length, 2);
+  assert.match(waiting, />Skip for now</);
+  // Answered, both cards show in full, each with its one box.
+  writeFileSync(file.replace(/\.json$/, '.answers.jsonl'), ['ship', 'look'].map((key) => JSON.stringify({ key, answer: 'a', label: 'A', close: 'done', at: new Date().toISOString() })).join('\n') + '\n');
+  const rows = cards(await dump('#answered'));
   assert.deepEqual(rows.map(([key]) => key).sort(), ['look', 'ship']);
   for (const [key, row] of rows) {
     assert.equal(row.match(/<textarea/g)?.length, 1, key);
@@ -655,7 +663,8 @@ test('an answers-only board fed through post --replace: a bad item is refused, y
   mkdirSync(join(dir, 'mocks', 'page'), { recursive: true });
   writeFileSync(join(dir, 'mocks', 'page', 'index.html'), '<p>Updates</p>');
   const write = (items) => (writeFileSync(feed, JSON.stringify({ schema: 2, answers_only: true, items })), run('post', file, '--from', feed, '--replace'));
-  const page = { key: 'page', type: 'interactive', title: 'Updates', view: 'mocks/page/index.html', options: [] };
+  // The feed's page of updates names its area, so the board counts and opens it under Evidence.
+  const page = { key: 'page', type: 'interactive', title: 'Updates', view: 'mocks/page/index.html', options: [], area: 'evidence' };
   const yesNo = { key: 'ask-1', type: 'ask', title: 'Ship it?', reply: true };
   const words = { key: 'ask-2', type: 'ask', title: 'Say ready when you are', options: [], reply: true };
   assert.match(write([page, yesNo, words]).out, /items: 3\nchanged: true/);
@@ -666,13 +675,15 @@ test('an answers-only board fed through post --replace: a bad item is refused, y
   assert.equal(bad.code, 2);
   assert.match(bad.out, /feed\.json: items\[1\] \(key \\"ask-2\\"\): options must be 2 to 6 items \(or empty/);
   assert.equal(write([{ ...yesNo, options: [{ value: 'text', label: 'T' }, { value: 'no', label: 'No' }] }]).code, 2);
+  assert.match(write([{ ...page, area: 'later' }]).out, /area must be waiting or evidence or reports or answered/);
   assert.equal(readFileSync(file, 'utf8'), before);
   assert.equal(run('post', file, '--replace').code, 2);
   assert.match(run('list', file).out, /waiting\[2\]/);
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
-  assert.equal((await (await fetch(`${url}api/decisions`)).json()).answers_only, true);
+  const shown = await (await fetch(`${url}api/decisions`)).json();
+  assert.deepEqual([shown.answers_only, shown.decisions.map((d) => d.area)], [true, ['evidence', undefined, undefined]]);
   for (const [path, body] of [['api/rounds', { key: 'ask-1', note: 'again' }], ['api/messages', { kind: 'prompt', text: 'hi' }], ['api/messages', { kind: 'comment', key: 'ask-1', text: 'hi' }]]) {
     const res = await post(url, path, body);
     assert.deepEqual([res.status, (await res.json()).error], [403, 'This board takes answers only'], path);
