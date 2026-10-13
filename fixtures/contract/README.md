@@ -1,6 +1,6 @@
 # Contract fixtures
 
-Shared test messages for the [communication contract](../../docs/contract.md). Once the validator ships, every tool that posts to sign-off runs them in its CI, so all tools agree on one shape per kind.
+Shared test messages for the [communication contract](../../docs/contract.md). Every tool that posts to sign-off runs them in its CI, so all tools agree on one shape per kind.
 
 ## Layout
 
