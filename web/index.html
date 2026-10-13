@@ -79,9 +79,9 @@
   .row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.875rem; padding: 1rem; scroll-margin-top: 4.5rem;
     background: var(--surface); border: 1px solid var(--line); border-radius: 0.875rem; box-shadow: var(--shadow); }
   /* Waiting cards carry the accent stripe and the shadow; answered ones sit flat and quiet. */
-  .waiting .row { box-shadow: inset 3px 0 0 var(--accent), var(--shadow); }
-  .answered .row { background: transparent; box-shadow: none; }
-  .answered .row h3 { color: var(--muted); font-weight: 500; }
+  .in-waiting .row { box-shadow: inset 3px 0 0 var(--accent), var(--shadow); }
+  .in-answered .row { background: transparent; box-shadow: none; }
+  .in-answered .row h3 { color: var(--muted); font-weight: 500; }
   .row h3 { font-size: 1.125rem; font-weight: 650; line-height: 1.35; margin: 0; }
   .about, details p { margin: 0.375rem 0 0; max-width: 70ch; }
   details p { color: var(--muted); }
@@ -204,7 +204,7 @@
   }
   /* A wide screen keeps the areas in a sidebar; the Summary puts its tiles in one row and its lists in two columns. */
   @media (min-width: 60rem) {
-    body { display: grid; grid-template-columns: 18rem minmax(0, 1fr); }
+    body { display: grid; grid-template-columns: 19rem minmax(0, 1fr); }
     .side { display: flex; flex-direction: column; gap: 0.25rem; position: sticky; top: 0; height: 100vh; padding: 1.5rem 1rem;
       border-right: 1px solid var(--line); background: var(--sunk); }
     .side a { display: flex; align-items: center; gap: 0.75rem; min-height: 2.75rem; padding: 0 0.625rem; border-radius: 0.625rem; color: var(--text); text-decoration: none; }
@@ -572,7 +572,7 @@
     const first = by.waiting[0], more = by.waiting.length > 1 ? `Answer all ${by.waiting.length} on Waiting on you →` : 'Open Waiting on you →';
     const needs = el('section', { class: 'card needs' }, el('h2', {}, 'Needs you first'),
       ...(first ? [row(first), el('a', { class: 'more', href: '#waiting' }, more)] : [el('p', { class: 'meta' }, 'Nothing is waiting on you.')]));
-    document.getElementById('board').replaceChildren(top, ...(at ? [by[at].length ? el('div', { class: `list ${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
+    document.getElementById('board').replaceChildren(top, ...(at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : el('p', { class: 'empty' }, EMPTY[at])] : [el('div', { class: 'tiles' }, ...Object.keys(AREAS).map((a) => tile(a, by[a]))),
       el('div', { class: 'pair' }, needs, today()), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()]),
       el('div', { class: 'areas' }, ...Object.keys(AREAS).map((a) => section(a, by[a])))]));
