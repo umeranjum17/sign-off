@@ -466,6 +466,32 @@ const hostStatus = (url, host) => new Promise((ok, no) => get(url, { agent: fals
 
 // A real browser draws the board for the frame tests: CI's runner has Chrome; elsewhere they skip when none is on the PATH.
 const chrome = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'].flatMap((b) => process.env.PATH.split(':').map((d) => join(d, b))).find(existsSync);
+// Chrome puts a socket in its TMPDIR and stops when that path passes 107 characters, which a deep test folder does,
+// so every Chrome here gets one short throwaway TMPDIR of its own, removed when the tests end.
+const chromeEnv = chrome && { ...process.env, TMPDIR: mkdtempSync('/tmp/so-') };
+after(() => chromeEnv && rmSync(chromeEnv.TMPDIR, { recursive: true, force: true }));
+// A busy host can take many seconds to start Chrome or draw a page, so a check waits on the page itself, up to 60 seconds.
+const until = async (check) => {
+  for (const end = Date.now() + 60000; Date.now() < end; await new Promise((r) => setTimeout(r, 100))) if (await check()) return;
+  assert.fail('the page did not reach the expected state');
+};
+/** A headless Chrome driven over its DevTools socket: evaluate(js) returns the value, or undefined while a page is still loading. */
+async function browse(dir) {
+  const profile = join(dir, 'profile'), active = join(profile, 'DevToolsActivePort');
+  mkdirSync(dir, { recursive: true });
+  const browser = spawn(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${profile}`, '--window-size=800,4000', '--remote-debugging-port=0', 'about:blank'],
+    { env: chromeEnv, stdio: 'ignore' });
+  procs.push(browser);
+  await until(() => existsSync(active) && readFileSync(active, 'utf8').includes('\n'));
+  const page = (await (await fetch(`http://127.0.0.1:${readFileSync(active, 'utf8').split('\n')[0]}/json`)).json()).find((t) => t.type === 'page');
+  const ws = new WebSocket(page.webSocketDebuggerUrl);
+  await new Promise((ok) => { ws.onopen = ok; });
+  const replies = new Map();
+  let seq = 0;
+  ws.onmessage = (m) => { const msg = JSON.parse(m.data); replies.get(msg.id)?.(msg.result?.result?.value); };
+  const evaluate = (expression) => new Promise((ok) => { const id = ++seq; replies.set(id, ok); ws.send(JSON.stringify({ id, method: 'Runtime.evaluate', params: { expression, returnByValue: true } })); });
+  return { evaluate, close: () => { ws.close(); browser.kill(); } };
+}
 
 test('an interactive page that posts its height gets a frame that fits it, each frame only its own and never past 10000px; a design shows the recommended phone frame first', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'fit'), file = join(dir, 'board.json'), pages = join(dir, 'mocks', 'page');
@@ -482,8 +508,14 @@ test('an interactive page that posts its height gets a frame that fits it, each 
   procs.push(proc);
   // A read-only board's pages and designs are only to read: they live on Reports and explainers.
   const url = `${/url: "(\S+)"/.exec(await served(proc))[1]}#reports`;
-  const dom = await new Promise((ok, no) => execFile(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${join(dir, 'profile')}`,
-    '--window-size=800,4000', '--virtual-time-budget=10000', '--dump-dom', url], { env: { ...process.env, TMPDIR: dir }, maxBuffer: 1 << 24 }, (e, out) => (e ? no(e) : ok(out))));
+  // Each page posts its height once it loads, and a frame loads only near the screen (the 10000px one can push the rest away),
+  // so scroll to each frame still unsized, as a reader would, and read the board once both pages that post have their frame sized.
+  const { evaluate, close } = await browse(dir);
+  await evaluate(`location.href = ${JSON.stringify(url)}`);
+  const sized = `[...document.querySelectorAll("iframe[title^='Interactive page']")].map((f) => f.style.height ? f.title : void f.scrollIntoView()).filter(Boolean).sort().join()`;
+  await until(async () => (await evaluate(sized)) === 'Interactive page: huge,Interactive page: short');
+  const dom = await evaluate('document.documentElement.outerHTML');
+  close();
   const frame = (key) => new RegExp(`<iframe[^>]*title="Interactive page: ${key}"[^>]*>`).exec(dom)?.[0];
   assert.match(frame('short'), /style="height: 240px;"/);
   assert.match(frame('huge'), /style="height: 10000px;"/);
@@ -507,7 +539,7 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const dump = (hash) => new Promise((ok, no) => execFile(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${join(dir, 'profile')}`,
-    '--window-size=800,4000', '--virtual-time-budget=10000', '--dump-dom', url + hash], { env: { ...process.env, TMPDIR: dir }, maxBuffer: 1 << 24 }, (e, out) => (e ? no(e) : ok(out))));
+    '--window-size=800,4000', '--virtual-time-budget=10000', '--dump-dom', url + hash], { env: chromeEnv, maxBuffer: 1 << 24 }, (e, out) => (e ? no(e) : ok(out))));
   const cards = (dom) => [...dom.matchAll(/<article class="row[^"]*" id="item-(\w+)">(.*?)<\/article>/gs)].map((m) => [m[1], m[2]]);
   // Waiting on you is Triage: the oldest ask alone, with the queue of both beside it and Skip to the next.
   const waiting = await dump('#waiting');
@@ -519,6 +551,18 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   const home = await dump('');
   assert.match(home, /<div class="foot"><button class="dis" aria-label="Dismiss, When should it ship\?">Dismiss<\/button><a class="more" href="#waiting">Answer all 2 in Triage →<\/a><\/div>/);
   assert.doesNotMatch(home.match(/<section class="card needs.*?<\/section>/s)[0], /class="x"/);
+  // An ask dismissed from Waiting on you sits under Dismissed (1) at the end of Needs you first and of Triage, with Restore.
+  const gone = file.replace(/\.json$/, '.dismissed.jsonl');
+  writeFileSync(gone, JSON.stringify({ key: 'ship', dismissed: true, at: new Date().toISOString() }) + '\n');
+  for (const hash of ['', '#waiting']) assert.match(await dump(hash), /<details class="other gone-asks"><summary>Dismissed \(1\)<\/summary><ul class="rows"><li><strong dir="auto">When should it ship\?<\/strong><button class="dis" aria-label="Restore, When should it ship\?">Restore<\/button><\/li><\/ul><\/details>/, hash);
+  // Restore puts it back in Triage (behind the ask in focus) through the same dismiss log, and the row goes once nothing is dismissed.
+  const { evaluate, close } = await browse(join(dir, 'live'));
+  await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+  await until(async () => (await evaluate('document.querySelector(".fhead")?.textContent')) === '1 of 1');
+  await evaluate('document.querySelector(".gone-asks .dis").click()');
+  await until(async () => (await evaluate('!document.querySelector(".gone-asks") && document.querySelector(".fhead").textContent')) === '2 of 2');
+  close();
+  assert.deepEqual(readFileSync(gone, 'utf8').trim().split('\n').map((l) => JSON.parse(l)).map(({ key, dismissed }) => [key, dismissed]), [['ship', true], ['ship', false]]);
   // Reports and explainers says what the page is under its title, draws a report's steps as numbered nodes, each with only the marks it lists, and the legend once.
   const reports = await dump('#reports');
   assert.match(reports, /<p class="lede">How the tools work, step by step\. Tap Open to see the whole flow\.<\/p>/);
@@ -553,14 +597,6 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   proc.kill();
 });
 
-const until = async (check) => {
-  for (let i = 0; i < 100; i++) {
-    if (await check()) return;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  assert.fail('the page did not reach the expected state');
-};
-
 test('Clear all done on 201 answered items: the page empties in chunks, says so, and Undo brings all 201 back', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'many-answered'), file = join(dir, 'board.json');
   mkdirSync(dir);
@@ -571,18 +607,7 @@ test('Clear all done on 201 answered items: the page empties in chunks, says so,
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
-  const profile = join(dir, 'profile');
-  const browser = spawn(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${profile}`, '--remote-debugging-port=0', 'about:blank'], { env: { ...process.env, TMPDIR: dir }, stdio: 'ignore' });
-  procs.push(browser);
-  await until(() => existsSync(join(profile, 'DevToolsActivePort')));
-  const [port] = readFileSync(join(profile, 'DevToolsActivePort'), 'utf8').trim().split('\n');
-  const page = (await (await fetch(`http://127.0.0.1:${port}/json`)).json()).find((t) => t.type === 'page');
-  const ws = new WebSocket(page.webSocketDebuggerUrl);
-  await new Promise((ok) => { ws.onopen = ok; });
-  const replies = new Map();
-  let seq = 0;
-  ws.onmessage = (m) => { const msg = JSON.parse(m.data); replies.get(msg.id)?.(msg.result); };
-  const evaluate = (expression) => new Promise((ok) => { const id = ++seq; replies.set(id, ok); ws.send(JSON.stringify({ id, method: 'Runtime.evaluate', params: { expression, returnByValue: true } })); }).then((r) => r.result.value);
+  const { evaluate, close } = await browse(dir);
   const rows = 'document.querySelectorAll("article.row").length';
   await evaluate(`location.href = ${JSON.stringify(`${url}#answered`)}`);
   await until(async () => (await evaluate(`${rows} === 201`)));
@@ -590,8 +615,7 @@ test('Clear all done on 201 answered items: the page empties in chunks, says so,
   await until(async () => (await evaluate(`${rows} === 0 && document.querySelector(".empty")?.textContent === "All done items cleared."`)));
   await evaluate('document.getElementById("undo").click()');
   await until(async () => (await evaluate(`${rows} === 201`)));
-  ws.close();
-  browser.kill();
+  close();
   proc.kill();
 });
 

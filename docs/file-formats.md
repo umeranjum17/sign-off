@@ -211,7 +211,7 @@ also copies each file into `evidence/<number>/` next to the board:
 
 **Dismissed items**, written by sign-off next to the questions (`decisions.dismissed.jsonl`, mode 600, one line
 per item per tap, the latest line per key wins). **Dismiss** (the × on an item) and **Clear all done** (on Answered) hide
-items from the page; **Undo** saves `"dismissed": false`. The agent is not told: an ask it waits on keeps waiting.
+items from the page; **Undo**, or **Restore** under **Dismissed (N)**, saves `"dismissed": false`. The agent is not told: an ask it waits on keeps waiting.
 A new answer or another round after the line brings the item back. Read-only boards refuse it; answers-only boards take it.
 `*.dismissed.jsonl` is git-ignored here like `*.answers.jsonl`.
 
