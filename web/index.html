@@ -133,6 +133,8 @@
   .thumb, .compact .icon { width: 3.5rem; height: 3.5rem; border-radius: 0.625rem; }
   .compact .icon { background: color-mix(in srgb, var(--area) 14%, var(--surface)); }
   .compact .icon svg { stroke: var(--area); }
+  /* An answered row with no picture leads with a small check badge, so the row stays short. */
+  .compact .icon.i-answered { width: 1.75rem; height: 1.75rem; border-radius: 0.5625rem; } .compact .icon.i-answered svg { width: 1rem; height: 1rem; }
   .thumb { flex: none; object-fit: cover; object-position: top; border: 1px solid var(--line); background: var(--sunk); }
   .list { display: grid; gap: 0.75rem; }
   /* A read-only board is for reading: its pages get most of the screen. */
