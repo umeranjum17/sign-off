@@ -450,7 +450,7 @@ function replace(file: string, on: string, from?: string, filer?: string) {
   return locked(`${file}.lock`, () => {
     // An item the feed sends without a time keeps the one it was first posted with, so a feeder that runs every few seconds never resets it.
     const first = new Map((existsSync(file) ? readItems(file).items : []).map((i) => [i?.key, i?.filed])), now = new Date().toISOString();
-    const feed = fed.items.map((i) => ({ ...(i?.filed === undefined && { filed: first.get(i?.key) ?? now }), ...i, ...(filer && { filer }) }));
+    const feed = fed.items.map((i) => ({ filed: first.get(i?.key) ?? now, ...i, ...(filer && { filer }) }));
     // An answer belongs to its question: an answered key may not come back asking something else.
     const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply]);
     for (const had of board(file)) {
