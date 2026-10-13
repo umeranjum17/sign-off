@@ -455,7 +455,7 @@
     return b;
   }
 
-  function row(d) {
+  function row(d, opts) {
     const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` });
     const saved = Object.hasOwn(state.answers, d.key) ? state.answers[d.key] : undefined;
     // A read-only board, or an item with nothing to answer, shows no answer, note or comment controls.
@@ -470,7 +470,7 @@
     const top = d.options.findIndex((o) => o.value === d.recommend_value), ranked = top > 0 ? [buttons[top], ...buttons.filter((_, i) => i !== top)] : buttons;
     // The agent that posted the item took this answer with wait --filer.
     const seen = saved && state.seen?.includes(d.key) ? el('span', { class: 'chip seen' }, 'Seen by agent') : '';
-    const head = el('div', { class: 'head' }, chip(d), el('div', {}, el('h3', { dir: 'auto' }, title(d)), seen), xBtn(d));
+    const head = el('div', { class: 'head' }, chip(d), el('div', {}, el('h3', { dir: 'auto' }, title(d)), seen), opts?.inReport ? '' : xBtn(d));
     const silent = d.default_if_silent && !ro ? `If no answer: ${d.options.find((o) => o.value === d.default_if_silent).label}` : '';
     if (design) {
       return el('article', { class: 'row design', id: `item-${d.key}` }, head,
@@ -690,9 +690,8 @@
     const fresh = d.filed && isToday(d.filed), st = d.filed && el('span', { class: `st ${fresh ? 'new' : 'ok'}` }, fresh ? 'New today' : 'Current');
     const decided = d.decided ? el('p', { class: 'decided', dir: 'auto' }, el('span', { class: 'lbl' }, 'What it decided'), d.decided) : '';
     const head = [el('div', { class: 'head' }, st ? '' : chip(d), el('h3', { dir: 'auto' }, title(d)), st || '', xBtn(d)), d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided];
-    const full = open && !n ? row(d) : null;
+    const full = open && !n ? row(d, { inReport: true }) : null;
     full?.removeAttribute('id');
-    full?.querySelector('.head .x')?.remove(); // the card head already has the ×
     const body = full ? [full, decided] : [n ? (open ? el('ol', { class: 'steps' }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), el('span', { dir: 'auto' }, t.title), marks(t))))
       : el('ol', { class: 'flow', style: `--n: ${n}`, 'aria-label': `${n} steps: ${d.steps.map((t) => t.title).join(', ')}` }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), marks(t)))))
       : d.type === 'interactive' ? el('div', { class: 'shot', 'aria-hidden': 'true' }, el('iframe', { src: url, sandbox: 'allow-scripts', tabindex: '-1', loading: 'lazy' }))
