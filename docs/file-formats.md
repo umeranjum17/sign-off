@@ -54,6 +54,11 @@
   `wait --filer` with the same id returns the answers to that filer's items. The page never shows it.
   `post --from <file> --replace --filer <id>` replaces only the items with that filer (and items with
   no filer the file names by key); every other item, the board's other top-level fields and the answers stay.
+- `area`: optional, the board area the item shows in: `waiting`, `evidence`, `reports` or `answered`
+  (Waiting on you, Evidence, Reports and explainers, Answered). Without it an `evidence` item is in Evidence;
+  an `explainer`, an item with nothing to answer, or any item on a read-only board is in Reports and
+  explainers; any other item is in Waiting on you. An answered item is always in Answered. A feed's
+  evidence page, an `interactive` item, can say `"area": "evidence"` to count and open under Evidence.
 - `type`: optional, `decision` (default), `design`, `evidence`, `diagram`,
   `interactive` or `explainer`. A design item
   is a pick between mock options shown side by side. An evidence item is a
