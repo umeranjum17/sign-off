@@ -515,6 +515,10 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   assert.match(waiting, /1 of 2/);
   assert.equal(waiting.match(/<ol class="queue"[^>]*>.*?<\/ol>/s)[0].match(/<button/g).length, 2);
   assert.match(waiting, />Skip for now</);
+  // Needs you first ends with Dismiss on the left and the way to Triage on the right; its card has no × of its own.
+  const home = await dump('');
+  assert.match(home, /<div class="foot"><button class="dis" aria-label="Dismiss, When should it ship\?">Dismiss<\/button><a class="more" href="#waiting">Answer all 2 in Triage →<\/a><\/div>/);
+  assert.doesNotMatch(home.match(/<section class="card needs.*?<\/section>/s)[0], /class="x"/);
   // Reports and explainers says what the page is under its title, draws a report's steps as numbered nodes, each with only the marks it lists, and the legend once.
   const reports = await dump('#reports');
   assert.match(reports, /<p class="lede">How the tools work, step by step\. Tap Open to see the whole flow\.<\/p>/);
@@ -525,18 +529,21 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   // Its group heads a section with the filed time; the card says New today and what it decided.
   assert.match(reports, /<div class="sec-h"><h2>How it works<\/h2><span class="meta">Filed \d\d:\d\d today<\/span>/);
   assert.match(reports, /How it ships<\/h3><span class="st new">New today<\/span>.*<span class="lbl">What it decided<\/span>Ships only when the check passes\./s);
-  // Answered, both cards show in full, each with its one box.
+  // Answered is Done today: a count under the title, Clear all done on the section head, and a short row per item with its answer and time on the right, beside its ×.
   writeFileSync(file.replace(/\.json$/, '.answers.jsonl'), ['ship', 'look'].map((key) => JSON.stringify({ key, answer: 'a', label: 'A', close: 'done', at: new Date().toISOString() })).join('\n') + '\n');
-  const rows = cards(await dump('#answered'));
+  const answered = await dump('#answered');
+  assert.match(answered, /<p class="lede">2 answered today\.<\/p><\/header><div class="sec-head"><h2>Done today<\/h2><button class="clear">Clear all done<\/button><\/div>/);
+  const lines = [...answered.matchAll(/<summary class="compact">.*?<strong[^>]*>(.*?)<\/strong>.*?<span class="ans"><b[^>]*>(\w+)<\/b><time>\d\d:\d\d<\/time><\/span><\/summary>.*?<\/details><button class="x" aria-label="Dismiss, [^"]+">×<\/button>/gs)];
+  assert.deepEqual(lines.map((m) => [m[1], m[2]]).sort(), [['Pick the look', 'A'], ['When should it ship?', 'A']]);
+  // Each row opens to its full card, with its one box.
+  const rows = cards(answered);
   assert.deepEqual(rows.map(([key]) => key).sort(), ['look', 'ship']);
   for (const [key, row] of rows) {
     assert.equal(row.match(/<textarea/g)?.length, 1, key);
     assert.match(row, /<details class="other"><summary[^>]*>Other answer<\/summary>.*<textarea.*>Send reply<.*>Another round<.*>Send as a comment</s, key);
     assert.doesNotMatch(row, /Note, comment or another round/, key);
-    assert.match(row, /<button class="x" aria-label="Dismiss, [^"]+">×<\/button>/, key);
   }
-  // Clear all done sits above Answered; a dismissed item leaves the page and its counts.
-  assert.match(await dump('#answered'), /<div class="tools"><button class="clear">Clear all done<\/button><\/div>/);
+  // A dismissed item leaves the page and its counts.
   writeFileSync(file.replace(/\.json$/, '.dismissed.jsonl'), JSON.stringify({ key: 'look', dismissed: true, at: new Date(Date.now() + 1000).toISOString() }) + '\n');
   const left = await dump('#answered');
   assert.deepEqual(cards(left).map(([key]) => key), ['ship']);
