@@ -183,7 +183,8 @@
 
   function save(d, o, buttons, err) {
     buttons.forEach((b) => (b.disabled = true));
-    const typed = (drafts.get(d.key) ?? '').trim();
+    // An answers-only board takes no comments: a typed note goes with the answer alone.
+    const typed = state.answers_only ? '' : (drafts.get(d.key) ?? '').trim();
     const note = drafts.get(d.key) ?? state.answers[d.key]?.note ?? '';
     const drop = clearIfSaved(d.key, drafts.get(d.key));
     call('/api/answers', {
@@ -237,8 +238,8 @@
   function row(d) {
     const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` });
     const saved = Object.hasOwn(state.answers, d.key) ? state.answers[d.key] : undefined;
-    // A read-only board shows each item with no answer, note or comment controls.
-    const design = d.type === 'design', ro = state.readonly;
+    // A read-only board, or an item with nothing to answer, shows no answer, note or comment controls.
+    const design = d.type === 'design', ro = state.readonly || !(d.options.length || d.reply);
     const buttons = d.options.map((o) => {
       const rec = o.value === d.recommend_value && !design;
       return el('button', { class: rec ? 'rec' : '', 'aria-label': `${o.label}, ${d.title}`, 'aria-pressed': o.value === saved?.answer, ...(rec && { 'aria-describedby': `rec-${d.key}` }) },
@@ -250,7 +251,7 @@
     if (design) {
       return el('article', { class: 'row design', id: `item-${d.key}` }, head,
         d.tradeoff ? el('p', { class: 'tradeoff', dir: 'auto' }, el('strong', {}, 'Trade-off '), d.tradeoff) : '',
-        mockCards(d, ro ? [] : buttons), silent ? el('p', { class: 'meta' }, silent) : '', ro ? '' : more(d, saved, err), err);
+        mockCards(d, ro ? [] : buttons), silent ? el('p', { class: 'meta' }, silent) : '', notes(d, ro, saved, err), err);
     }
     // Yes/No rows keep the two fixed buttons they always had; any other choice set wraps.
     const many = d.options.map((o) => o.value).sort().join() !== 'no,yes';
@@ -263,9 +264,9 @@
       d.link ? el('p', { class: 'meta' }, /^https?:/.test(d.link)
         ? el('a', { href: d.link, target: '_blank', rel: 'noopener' }, d.link) : `Commit ${d.link}`) : '',
       silent ? el('p', { class: 'meta' }, silent) : '',
-      ro ? '' : more(d, saved, err),
+      notes(d, ro, saved, err),
       err,
-    ), updateMedia(d), chapters(d), rung(d), ro ? '' : el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': d.title }, ...buttons), evidenceCard(d));
+    ), updateMedia(d), chapters(d), rung(d), ro || !buttons.length ? '' : el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': d.title }, ...buttons), evidenceCard(d));
   }
 
   /** The note and another-round controls, folded away until the person wants them. An evidence update takes a note only. */
@@ -298,6 +299,22 @@
       el('label', { for: box.id }, update ? 'Optional note, sent with your verdict, and also to the agent as a comment'
         : 'Optional note: sent with the answer you pick (and to the agent as a comment), or with the round you ask for'), box,
       el('div', { class: 'actions' }, update ? '' : roundBtn, FROZEN ? '' : commentBtn));
+  }
+
+  // A reply item gets its reply box; an answers-only board takes no notes, comments or rounds.
+  const notes = (d, ro, saved, err) => (ro ? '' : d.reply ? reply(d, saved, err) : state.answers_only ? '' : more(d, saved, err));
+
+  /** A short text reply: sent on its own, or with the answer picked. On a reply item it takes the place of the note panel. */
+  function reply(d, saved, err) {
+    const box = el('textarea', { id: `note-${d.key}`, rows: 2, maxlength: 500, dir: 'auto' });
+    box.value = drafts.get(d.key) ?? '';
+    box.oninput = () => { drafts.set(d.key, box.value); keep(); };
+    const btn = el('button', { 'aria-label': `Send reply, ${d.title}` }, 'Send reply');
+    btn.onclick = () => (box.value.trim() ? save(d, { value: 'text' }, [btn], err) : (shown(err).textContent = 'Write the reply first.'));
+    return el('div', { class: 'note' },
+      saved?.note ? el('p', { class: 'meta saved-note', dir: 'auto' }, `Your reply: ${saved.note}`) : '',
+      el('label', { for: box.id }, d.options.length ? 'Reply in a few words, sent on its own or with the answer you pick' : 'Reply in a few words'), box,
+      el('div', { class: 'actions' }, btn));
   }
 
   /** Free-text prompts for the agent, which it reads with sign-off-axi poll. */
@@ -412,9 +429,13 @@
     const answered = items.filter((d) => Object.hasOwn(state.answers, d.key));
     const done = all.filter((d) => Object.hasOwn(state.answers, d.key)).length;
     const list = (items, cls) => el('div', { class: `list ${cls}` }, ...items.map(row));
-    if (state.readonly) {
-      document.getElementById('count').textContent = `${all.length} ${all.length === 1 ? 'item' : 'items'} · read only`;
-      return document.getElementById('board').replaceChildren(all.length ? list(all, 'readonly') : el('p', { class: 'empty' }, 'Nothing to show yet.'));
+    // A board another program feeds is one list; on an answers-only one, the items that ask something take answers.
+    if (state.readonly || state.answers_only) {
+      const asks = all.filter((d) => d.options.length || d.reply), left = asks.filter((d) => !Object.hasOwn(state.answers, d.key)).length;
+      document.getElementById('count').textContent = state.readonly ? `${all.length} ${all.length === 1 ? 'item' : 'items'} · read only`
+        : `${left} waiting · ${asks.length - left} answered${FROZEN ? ` · read-only copy, ${FROZEN.exported}` : ''}`;
+      document.getElementById('board').replaceChildren(all.length ? list(all, 'readonly') : el('p', { class: 'empty' }, 'Nothing to show yet.'));
+      return FROZEN && freeze();
     }
     document.getElementById('count').textContent = `${all.length - done} waiting · ${done} answered${FROZEN ? ` · read-only copy, ${FROZEN.exported}` : ''}`;
     // The Ask box is for the live board; the frozen copy has no agent to read it.
@@ -424,12 +445,13 @@
       ...(answered.length ? [el('h2', {}, 'Answered'), list(answered, 'answered')] : []));
     if (refocus !== null) document.querySelector(`.filters [data-k="${refocus}"]`)?.focus();
     refocus = null;
-    if (FROZEN) {
-      // Answers stay as they are, but nothing in the copy can be sent.
-      document.querySelectorAll('#board .choices button, #board .mock button, #board .note button, #board .note textarea').forEach((e) => (e.disabled = true));
-      // A browser will not open a data: link in a new tab; the inline preview is the copy.
-      document.querySelectorAll('#board a[href^="data:"]').forEach((a) => a.removeAttribute('href'));
-    }
+    if (FROZEN) freeze();
+  }
+  function freeze() {
+    // Answers stay as they are, but nothing in the copy can be sent.
+    document.querySelectorAll('#board .choices button, #board .mock button, #board .note button, #board .note textarea').forEach((e) => (e.disabled = true));
+    // A browser will not open a data: link in a new tab; the inline preview is the copy.
+    document.querySelectorAll('#board a[href^="data:"]').forEach((a) => a.removeAttribute('href'));
   }
   addEventListener('hashchange', render);
   // An interactive page may post its own height, `{ height: <px> }`, and its frame then fits it with no blank below.
@@ -444,19 +466,25 @@
     banner.textContent = `Can't read the board file: ${e.message}`;
     banner.hidden = false;
   };
-  // Another program rewrites a read-only board's file, so the page checks it every 20 seconds and redraws only on a change.
+  // Another program rewrites a read-only or answers-only board's file, so the page checks it every 20 seconds and redraws only on a change.
   async function refresh() {
     try {
       const res = await fetch('/api/decisions'), body = await res.json().catch(() => ({ error: `The server replied ${res.status}` }));
       if (!res.ok) throw new Error(body.error);
       banner.hidden = true;
-      if (JSON.stringify(body) !== JSON.stringify(state)) (state = body), render();
+      if (JSON.stringify(body) === JSON.stringify(state)) return;
+      // A redraw keeps the reply box being typed in focused, with its caret where it was.
+      const typing = document.activeElement?.tagName === 'TEXTAREA' && document.activeElement, at = typing && typing.selectionStart;
+      state = body;
+      render();
+      const box = typing && document.getElementById(typing.id);
+      if (box) box.focus(), box.setSelectionRange(at, at);
     } catch (e) { failed(e); }
   }
   if (FROZEN) (state = FROZEN), render();
   else call('/api/decisions').then(() => {
     banner.hidden = true;
-    if (state.readonly) setInterval(refresh, 20_000);
+    if (state.readonly || state.answers_only) setInterval(refresh, 20_000);
   }, failed);
 </script>
 </body>

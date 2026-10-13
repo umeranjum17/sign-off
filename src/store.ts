@@ -10,7 +10,7 @@ export type EvidenceLink = { run_id: string; commit: string; outcome: string; re
 export type Decision = {
   key: string; title: string; about?: string; detail?: string; options: Option[];
   recommend_value?: string; default_if_silent?: string; close: string; evidence?: EvidenceLink;
-  type: string; tradeoff?: string; mocks?: MockRef[]; number?: number; media?: MediaRef[]; link?: string; view?: string; chapters?: Chapter[];
+  type: string; tradeoff?: string; mocks?: MockRef[]; number?: number; media?: MediaRef[]; link?: string; view?: string; chapters?: Chapter[]; reply?: boolean;
 };
 export type Answer = { key: string; answer: string; label: string; close: string; at: string; note?: string };
 export type Round = { key: string; note: string; at: string };
@@ -19,6 +19,8 @@ export type Round = { key: string; note: string; at: string };
 export class InputError extends Error {}
 
 const YES_NO: Option[] = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
+/** The answer a `reply: true` item saves for a short text reply; the text is its note. */
+export const REPLY: Option = { value: 'text', label: 'Reply' };
 const VERDICTS: Option[] = [{ value: 'pass', label: 'Pass' }, { value: 'fail', label: 'Fail' }, { value: 'needs-work', label: 'Needs work' }];
 export const MEDIA_MAX = 12;
 /** Item types whose files post copies into evidence/<number>/: how many, and which kinds. An explainer is one narrated video. */
@@ -28,7 +30,7 @@ const STORED: Record<string, [number, string, RegExp]> = {
 };
 export const CHAPTERS_MAX = 12;
 const isText = (v: unknown) => typeof v === 'string';
-const isKey = (v: unknown) => isText(v) && /^[A-Za-z0-9._-]{1,128}$/.test(v as string);
+export const isKey = (v: unknown) => isText(v) && /^[A-Za-z0-9._-]{1,128}$/.test(v as string);
 const ONE_OF: Record<string, unknown[]> = { close: ['done', 'release'] };
 export const NOTE_MAX = 500;
 const TRADEOFF_MAX = 1000;
@@ -51,8 +53,8 @@ export function readItems(path: string): { schema: 1 | 2; items: any[]; extra: R
   throw new InputError(`${basename(path)}: needs "schema": 2 with an "items" list, or a 0.1.0 board with "schema": 1 and a "decisions" list`);
 }
 
-/** Writes the board as schema 2 through a temp file and a rename, keeping its other top-level fields. A schema 1 board is first kept once as <board>.schema-1.bak. Callers hold the board lock. */
-export function writeItems(path: string, items: object[]): void {
+/** Writes the board as schema 2 through a temp file and a rename, keeping its other top-level fields unless `extra` replaces them. A schema 1 board is first kept once as <board>.schema-1.bak. Callers hold the board lock. */
+export function writeItems(path: string, items: object[], extra?: Record<string, unknown>): void {
   const tmp = `${path}.${process.pid}.tmp`, old = existsSync(path) ? readItems(path) : undefined;
   if (old?.schema === 1) {
     const bak = `${path}.schema-1.bak`, bakTmp = `${bak}.${process.pid}.tmp`;
@@ -60,12 +62,13 @@ export function writeItems(path: string, items: object[]): void {
     if (existsSync(bak)) rmSync(bakTmp, { force: true });
     else renameSync(bakTmp, bak);
   }
-  writeFileSync(tmp, `${JSON.stringify({ ...old?.extra, schema: 2, items }, null, 2)}\n`, { mode: 0o600 });
+  writeFileSync(tmp, `${JSON.stringify({ ...(extra ?? old?.extra), schema: 2, items }, null, 2)}\n`, { mode: 0o600 });
   renameSync(tmp, path);
 }
 
 export function loadDecisions(path: string): Decision[] {
-  const name = basename(path), { schema, items } = readItems(path), list = schema === 1 ? 'decisions' : 'items';
+  const name = basename(path), { schema, items, extra } = readItems(path), list = schema === 1 ? 'decisions' : 'items';
+  const fed = extra.readonly === true || extra.answers_only === true;
   const seen = new Map<string, number>();
   return items.map((d: any, i: number): Decision => {
     const bad = (field: string, rule: string) => new InputError(`${name}: ${list}[${i}] (key ${JSON.stringify(d?.key)}): ${field} ${rule}`);
@@ -100,12 +103,15 @@ export function loadDecisions(path: string): Decision[] {
     const views = Object.hasOwn(VIEWS, d.type ?? '') ? VIEWS[d.type] : undefined;
     if (views && !(isText(d.view) && d.view.length <= 256 && /^[^?#]+$/.test(d.view) && views[1].test(d.view))) throw bad('view', `must be a board-relative ${views[0]} file`);
     const options = d.options ?? (d.type === 'evidence' ? VERDICTS : YES_NO);
-    if (!Array.isArray(options) || options.length < 2 || options.length > 6
+    // An empty list is an item to look at only, unless it takes a reply: only a board another program feeds shows those.
+    if (!Array.isArray(options) || options.length === 1 || (!options.length && !fed) || options.length > 6
       || !options.every((o) => isKey(o?.value) && isText(o.label) && o.label.trim())) {
-      throw bad('options', 'must be 2 to 6 items, each a value of 1-128 of A-Z a-z 0-9 . _ - and a label');
+      throw bad('options', 'must be 2 to 6 items (or empty on a readonly or answers_only board), each a value of 1-128 of A-Z a-z 0-9 . _ - and a label');
     }
     const values = options.map((o: Option) => o.value);
     if (new Set(values).size < values.length) throw bad('options', 'values must be unique');
+    if (d.reply !== undefined && typeof d.reply !== 'boolean') throw bad('reply', 'must be true or false');
+    if (d.reply && values.includes(REPLY.value)) throw bad('options', `value ${REPLY.value} is the answer a reply saves`);
     for (const f of ['recommend_value', 'default_if_silent']) if (d[f] !== undefined && !values.includes(d[f])) throw bad(f, `must be one of ${values.join(', ')}`);
     if (d.tradeoff !== undefined && (!isText(d.tradeoff) || !d.tradeoff.trim() || d.tradeoff.length > TRADEOFF_MAX)) throw bad('tradeoff', `must be text of ${TRADEOFF_MAX} characters or fewer`);
     if (d.mocks !== undefined) {
@@ -121,7 +127,7 @@ export function loadDecisions(path: string): Decision[] {
       key: d.key, title: d.title, about: d.about, detail: d.detail, options: options.map((o: Option) => ({ value: o.value, label: o.label })),
       recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done', evidence: d.evidence,
       type: d.type ?? 'decision', tradeoff: d.tradeoff, link: d.link, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path })),
-      ...(views && { view: d.view }),
+      ...(views && { view: d.view }), ...(d.reply && { reply: true }),
       ...(stored && { media: d.media.map(({ path, sha256, bytes }: MediaRef) => ({ path, sha256, bytes })) }),
       ...(d.type === 'evidence' && { number: d.number }),
       ...(d.type === 'explainer' && d.chapters && { chapters: d.chapters.map(({ at, title }: Chapter) => ({ at, title })) }),

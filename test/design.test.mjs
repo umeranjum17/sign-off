@@ -610,3 +610,52 @@ test('a read-only board fed by another program: no answers, a link on any item, 
   assert.equal((await fetch(`${url}api/decisions`)).status, 422);
   proc.kill();
 });
+
+test('an answers-only board fed through post --replace: a bad item is refused, yes/no and text replies are saved, even for a dropped item', async () => {
+  const dir = join(scratch, 'fed-answers'), file = join(dir, 'board.json'), feed = join(dir, 'feed.json');
+  mkdirSync(join(dir, 'mocks', 'page'), { recursive: true });
+  writeFileSync(join(dir, 'mocks', 'page', 'index.html'), '<p>Updates</p>');
+  const write = (items) => (writeFileSync(feed, JSON.stringify({ schema: 2, answers_only: true, items })), run('post', file, '--from', feed, '--replace'));
+  const page = { key: 'page', type: 'interactive', title: 'Updates', view: 'mocks/page/index.html', options: [] };
+  const yesNo = { key: 'ask-1', type: 'ask', title: 'Ship it?', reply: true };
+  const words = { key: 'ask-2', type: 'ask', title: 'Say ready when you are', options: [], reply: true };
+  assert.match(write([page, yesNo, words]).out, /items: 3\nchanged: true/);
+  assert.match(write([page, yesNo, words]).out, /changed: false/);
+  // A malformed item from the feeder is refused at write time, and the board stays as it was.
+  const before = readFileSync(file, 'utf8');
+  const bad = write([page, { ...words, options: [{ value: 'only', label: 'Only' }] }]);
+  assert.equal(bad.code, 2);
+  assert.match(bad.out, /feed\.json: items\[1\] \(key \\"ask-2\\"\): options must be 2 to 6 items \(or empty/);
+  assert.equal(write([{ ...yesNo, options: [{ value: 'text', label: 'T' }, { value: 'no', label: 'No' }] }]).code, 2);
+  assert.equal(readFileSync(file, 'utf8'), before);
+  assert.equal(run('post', file, '--replace').code, 2);
+  assert.match(run('list', file).out, /waiting\[2\]/);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  assert.equal((await (await fetch(`${url}api/decisions`)).json()).answers_only, true);
+  for (const [path, body] of [['api/rounds', { key: 'ask-1', note: 'again' }], ['api/messages', { kind: 'prompt', text: 'hi' }], ['api/messages', { kind: 'comment', key: 'ask-1', text: 'hi' }]]) {
+    const res = await post(url, path, body);
+    assert.deepEqual([res.status, (await res.json()).error], [403, 'This board takes answers only'], path);
+  }
+  for (const [body, status] of [[{ key: 'page', answer: 'yes' }, 400], [{ key: 'ask-2', answer: 'yes' }, 400], [{ key: 'ask-2', answer: 'text' }, 400],
+    [{ key: 'ask-1', answer: 'yes', note: 'go' }, 200], [{ key: 'ask-2', answer: 'text', note: 'ready' }, 200]]) {
+    assert.equal((await post(url, 'api/answers', body)).status, status, JSON.stringify(body));
+  }
+  // The feeder drops ask-1 while the person replies to it: the reply is still saved.
+  assert.equal(write([page, words]).code, 0);
+  assert.equal((await post(url, 'api/answers', { key: 'ask-1', answer: 'text', note: 'too late?' })).status, 200);
+  assert.equal((await post(url, 'api/answers', { key: 'ask-9', answer: 'no such' })).status, 404);
+  const lines = readFileSync(join(dir, 'board.answers.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  assert.deepEqual(lines.map(({ key, answer, note }) => [key, answer, note]), [['ask-1', 'yes', 'go'], ['ask-2', 'text', 'ready'], ['ask-1', 'text', 'too late?']]);
+  assert.equal(statSync(join(dir, 'board.answers.jsonl')).mode & 0o777, 0o600);
+  assert.deepEqual(readdirSync(dir).filter((f) => /jsonl$/.test(f)), ['board.answers.jsonl']);
+  assert.match(run('list', file).out, /0 of 2 decisions/);
+  // An answered key may not come back asking something else; an item only shown needs a fed board.
+  const moved = write([page, { ...words, title: 'Say go when you are' }]);
+  assert.notEqual(moved.code, 0);
+  assert.match(moved.out, /key ask-2 was answered and now holds a different question/);
+  writeFileSync(feed, JSON.stringify({ schema: 2, items: [page] }));
+  assert.equal(run('post', join(dir, 'plain.json'), '--from', feed, '--replace').code, 2);
+  proc.kill();
+});

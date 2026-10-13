@@ -35,6 +35,16 @@
   the open page checks the file every 20 seconds and redraws when it changed.
   An `interactive` item on it gets most of the screen's height, unless its page
   posts its own height (below).
+- `"answers_only": true` instead makes an **answers-only board**, also fed by
+  another program: the same one list, checked every 20 seconds, but the items
+  that ask something take answers and replies. There is no Ask box, no note
+  panel and no another-round button, and the server refuses rounds, comments
+  and prompts with 403. An answer or reply to an item the program dropped
+  while the person answered it is still saved. A feeding program writes the
+  board with `sign-off-axi post <board> --from <file> --replace`, which checks
+  the whole file the way the board reads it and refuses a bad item before
+  anything is written; answers stay. A key that was answered may not come back
+  with a different title, options or reply: post that question under a new key.
 - A 0.1.0 file, `"schema": 1` with a `"decisions"` list, still reads: each entry is an item, a decision unless it says otherwise. The first write that changes it (a `raise` of a new key, or a `post`) rewrites it as `"schema": 2` (temp file, then rename) and first keeps the old file once beside it as `<board>.schema-1.bak`. Answer and round files are not touched.
 - `key`: 1-128 of `A-Z a-z 0-9 . _ -`, unique in the file. `title`: required.
 - `type`: optional, `decision` (default), `design`, `evidence`, `diagram`,
@@ -86,7 +96,12 @@
   `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.woff2`, `.mp4` and `.webm` files
   from inside that page's own folder only, never anything above it. `export`
   inlines the page itself, so those files show only on the running board.
-- `options`: optional, 2 to 6 choices. Each has a `value` (1-128 of `A-Z a-z 0-9 . _ -`, unique within the question) and a non-empty `label` shown on its button. Leave it out for **Yes** (`yes`) and **No** (`no`); files written before options existed read exactly as before.
+- `reply`: optional, `true` adds a short text reply (500 characters or fewer)
+  to the item, in place of its note panel: sent on its own, it is saved as the
+  answer `text` with the words as its `note`; typed before a button is
+  picked, it goes with that answer as its note. No option may use the value
+  `text` then. With `"options": []` the reply is the only answer.
+- `options`: optional, 2 to 6 choices, or `[]` on a read-only or answers-only board for an item that is only shown and waits on nothing (unless it has `reply`). Each has a `value` (1-128 of `A-Z a-z 0-9 . _ -`, unique within the question) and a non-empty `label` shown on its button. Leave it out for **Yes** (`yes`) and **No** (`no`); files written before options existed read exactly as before.
 - `recommend_value`, `default_if_silent`: optional, the `value` of one of the question's own options (`yes` or `no` when `options` is left out). Shown, never applied.
 - `close`: optional, `done` (default) or `release`; copied into the answer.
 - `link`: optional on any item, an `http(s)` link (shown as a link on its card) or a 7-40 character commit hash.

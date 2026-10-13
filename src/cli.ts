@@ -10,7 +10,7 @@ import { basename, delimiter, dirname, extname, join, resolve, sep } from 'node:
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { CHAPTERS_MAX, type Decision, InputError, MEDIA_MAX, NOTE_MAX, answersPath, appendAnswer, appendMessage, appendRound, loadDecisions, markDelivered, messagesPath, readAnswers, readItems, readMessages, readRounds, roundsPath, writeItems } from './store.js';
+import { CHAPTERS_MAX, type Decision, InputError, MEDIA_MAX, NOTE_MAX, REPLY, answersPath, appendAnswer, appendMessage, appendRound, isKey, loadDecisions, markDelivered, messagesPath, readAnswers, readItems, readMessages, readRounds, roundsPath, writeItems } from './store.js';
 
 const BOARD = join(homedir(), '.sign-off', 'decisions.json');
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
@@ -122,6 +122,7 @@ examples:
 `,
   post: `usage: sign-off-axi post [board.json] [--type decision|design|diagram|interactive] --title "<question>" [--key <key>] [--about <text>] [--option <value>=<label>]... [--mock <value>=<path>]... [--view <path>] [--tradeoff <text>] [--recommend <value>] [--default <value>] [--close done|release]
        sign-off-axi post [board.json] --type evidence --title "<what this shows>" --about "<short note>" --media <file>... [--link <commit or URL>] [--detail <text>]
+       sign-off-axi post [board.json] --from <board file> --replace
        sign-off-axi post [board.json] --type explainer --title "<question>" --media <video> [--about <summary>] [--chapter <m:ss>=<title>]... [--key <key>] [--option <value>=<label>]... [--recommend <value>]
 Posts an item for the user. --type decision (the default) is a yes/no or pick-one question, exactly like raise.
 --type design is a pick between up to 6 options shown side by side, each with an optional board-relative mock file
@@ -129,6 +130,8 @@ Posts an item for the user. --type decision (the default) is a yes/no or pick-on
 One .html page can hold every variant: --mock a=mocks/<key>/index.html?variant=a and so on; the page reads ?variant= to show one.
 An .html mock or view loads the css, scripts, images and fonts beside it by relative name, from its own folder only.
 After the user picks, answers --key <key> --json holds the pick and note; "rounds" holds an ask for another round.
+--from <file> --replace is for a program that feeds the board: the file, checked like any post, becomes the whole board (items and
+top-level fields such as "answers_only": true), written only when it changed; a bad item is refused and the board is left as it was. Answers stay.
 --type diagram and --type interactive are a decision shown with a picture: --view names one board-relative file,
 an image (.svg, .png, .jpg, .jpeg, .webp, 5 MB or less) shown at card width for a diagram, or one self-contained .html page for interactive.
 The page runs in a sandboxed frame: no fetch, no remote files, no access to the dashboard or its tab. Answers work as for a decision.
@@ -226,6 +229,8 @@ const axi = (cmd: string, run: (args: string[]) => string | Promise<string>) => 
   }
 };
 
+/** Still waiting on the user: not answered, and something to answer (an item with no options and no reply is only shown). */
+const waits = (d: Decision & { answer?: unknown }) => !d.answer && (d.options.length > 0 || !!d.reply);
 /** The board's decisions with their latest answer; a missing board file is an empty board. */
 function board(file: string, say = warn) {
   if (!existsSync(file)) return [];
@@ -241,7 +246,7 @@ function ready(file: string, on: string, root?: string) {
 
 function list(args: string[]) {
   const { file, values, on } = parse('list', args, TIERS);
-  const rows = board(file), waiting = rows.filter((d) => !d.answer), answered = rows.length - waiting.length;
+  const rows = board(file), waiting = rows.filter(waits), answered = rows.filter((d) => d.answer).length;
   if (values.json) return JSON.stringify({ board: file, decisions: rows });
   const help = [
     ...(waiting.length ? [`Run \`sign-off-axi open${on}\` to show the board to the user`] : []),
@@ -285,7 +290,7 @@ function answers(args: string[]) {
   const { file, values, on } = parse('answers', args, { ...TIERS, key: { type: 'string' } });
   const rows = board(file).filter((d) => values.key === undefined || d.key === values.key);
   if (values.key !== undefined && !rows.length) throw fail(`no decision with key ${values.key} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi list${on}\` to see the waiting keys`);
-  const waiting = rows.filter((d) => !d.answer).length, key = values.key === undefined ? '' : ` --key ${values.key}`;
+  const waiting = rows.filter(waits).length, key = values.key === undefined ? '' : ` --key ${values.key}`;
   return printAnswers(file, rows, waiting, values, waiting ? [`Run \`sign-off-axi open${on}\` so the user can answer the ${waiting} waiting`, `Run \`sign-off-axi wait${on}${key}\` to block until they answer`] : []);
 }
 
@@ -304,7 +309,7 @@ async function wait(args: string[]) {
   try {
     try { watcher = watch(dirname(file), (_, changed) => changed === name && wake()).on('error', () => {}); } catch {}
     for (let first = true; ; first = false) {
-      const rows = board(file, first ? warn : () => {}), waiting = rows.filter((d) => !d.answer).length;
+      const rows = board(file, first ? warn : () => {}), waiting = rows.filter(waits).length;
       const hit = rows.filter((d) => (values.key === undefined ? d.answer && !before.has(d.key) : d.key === values.key));
       const counts = new Map<string, number>();
       for (const r of readRounds(file, first ? warn : () => {})) counts.set(r.key, (counts.get(r.key) ?? 0) + 1);
@@ -354,12 +359,13 @@ async function locked<T>(lock: string, fn: () => T | Promise<T>, busy = 'another
 const mockFile = (path: string) => path.split('?')[0];
 /** Posts an item. `raise` is the alias for `post --type decision`: same flags as before, same output. */
 function post(args: string[], cmd = 'post') {
-  const typed: Flags = cmd === 'post' ? { type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
+  const typed: Flags = cmd === 'post' ? { replace: { type: 'boolean' }, type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
     media: { type: 'string', multiple: true }, link: { type: 'string' }, view: { type: 'string' }, chapter: { type: 'string', multiple: true } } : {};
   const { file, values, on } = parse(cmd, args, { from: { type: 'string' }, ...typed,
     ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: f === 'option' }])) });
   const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'link', 'view', 'chapter'].filter((f) => values[f] !== undefined);
   if (values.from !== undefined && given.length) throw fail(`--from cannot be combined with --${given[0]}`, 'VALIDATION_ERROR', `Put every field in the --from file, or ${cmd} with flags only`);
+  if (values.replace) return replace(file, on, values.from);
   const type = values.type ?? 'decision';
   if (values.from === undefined && values.title === undefined) {
     throw fail('--title is required (or --from <decisions.json>)', 'VALIDATION_ERROR', type === 'design' ? 'sign-off-axi post --type design --title "<question>" --option a=A --option b=B'
@@ -394,6 +400,29 @@ function post(args: string[], cmd = 'post') {
     return { value: m.slice(0, at), path };
   });
   return storeIncoming(file, on, buildIncoming(values, { type, tradeoff: values.tradeoff, mocks }));
+}
+
+/** For a program that feeds the board: the --from file, checked like any post, becomes the whole board, items and top-level fields. Answers stay. */
+function replace(file: string, on: string, from?: string) {
+  if (from === undefined) throw fail('--replace needs --from <board file>', 'VALIDATION_ERROR', 'sign-off-axi post board.json --from feed.json --replace');
+  const source = resolve(from), incoming = loadDecisions(source);
+  const { items, extra } = readItems(source);
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+  return locked(`${file}.lock`, () => {
+    // An answer belongs to its question: an answered key may not come back asking something else.
+    const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply]);
+    for (const had of board(file)) {
+      const d = incoming.find((x) => x.key === had.key);
+      if (had.answer && d && question(d) !== question(had)) {
+        throw fail(`key ${d.key} was answered and now holds a different question on ${tilde(file)}`, 'CONFLICT', 'Post the new question under a new key');
+      }
+    }
+    const old = existsSync(file) ? readItems(file) : undefined;
+    // Written only when it changed, so a feeder that runs every few seconds leaves the file alone.
+    const changed = JSON.stringify(old && { ...old.extra, schema: old.schema, items: old.items }) !== JSON.stringify({ ...extra, schema: 2, items });
+    if (changed) writeItems(file, items, extra);
+    return toon({ board: tilde(file), items: items.length, changed }, [`Run \`sign-off-axi answers${on}\` to read the answers`]);
+  });
 }
 
 const MEDIA_BYTES = 50_000_000;
@@ -969,12 +998,15 @@ const state = () => ({
   mockBase: `/mock/${loopback(bind) ? 'local' : mockPass(tokenOf(file))}/`,
   decisions: loadDecisions(file).map((d) => ({ ...d, evidenceCard: d.evidence ? evidenceCard(d.evidence) : null })),
   readonly: readOnly(),
+  answers_only: answersOnly(),
   answers: readAnswers(file, warn),
   rounds: readRounds(file, warn),
   messages: readMessages(file, warn),
 });
 /** A board whose file says `"readonly": true` shows its items and takes no answers, rounds or comments: another program feeds it. */
 const readOnly = () => readItems(file).extra.readonly === true;
+/** A board whose file says `"answers_only": true` takes answers and replies but no rounds, comments or prompts: another program feeds it. */
+const answersOnly = () => readItems(file).extra.answers_only === true;
 const mediaTypes: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.mp4': 'video/mp4', '.webm': 'video/webm' };
 const mockTypes: Record<string, string> = { '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
 /** What a mock's folder may serve beside it: pages, styles, scripts, images, fonts and clips; never the board, answers, token or config. */
@@ -1078,6 +1110,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   }
   if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
   if (readOnly()) return [403, { error: 'This board is read-only' }];
+  if (req.url !== '/api/answers' && answersOnly()) return [403, { error: 'This board takes answers only' }];
   if (!req.headers['content-type']?.startsWith('application/json')) return [415, { error: 'Send JSON' }];
   let body = '';
   for await (const chunk of req) body += chunk;
@@ -1100,9 +1133,15 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   const { key, answer, note = '' } = JSON.parse(body) ?? {};
   if (typeof note !== 'string' || [...note.trim()].length > NOTE_MAX) return [400, { error: `The note must be text of ${NOTE_MAX} characters or fewer` }];
   const d = loadDecisions(file).find((x) => x.key === key);
-  if (!d) return [404, { error: 'This question is no longer in the file' }];
-  const option = d.options.find((o) => o.value === answer);
-  if (!option) return [400, { error: `The answer must be one of: ${d.options.map((o) => o.label).join(', ')}` }];
+  if (answer === REPLY.value && !note.trim()) return [400, { error: 'Write the reply first' }];
+  if (!d) {
+    // The program feeding the board may drop an item while the person answers it: the answer is still saved.
+    if (!answersOnly() || !isKey(key) || !isKey(answer)) return [404, { error: 'This question is no longer in the file' }];
+    appendAnswer(file, { key, close: 'done' } as Decision, answer === REPLY.value ? REPLY : { value: answer, label: answer }, note.trim());
+    return [200, state()];
+  }
+  const option = d.reply && answer === REPLY.value ? REPLY : d.options.find((o) => o.value === answer);
+  if (!option) return [400, { error: `The answer must be one of: ${[...d.options, ...(d.reply ? [REPLY] : [])].map((o) => o.label).join(', ') || 'none, this item is only shown'}` }];
   appendAnswer(file, d, option, note.trim());
   return [200, state()];
 }
