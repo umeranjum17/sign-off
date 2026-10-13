@@ -155,7 +155,7 @@ To recover: read the `help` line, fix the message file, post it again. Never edi
 
 - `sign-off-axi validate <file.json>... [--kind <kind>]` checks message files without posting them. `--kind`, when given, must equal each file's `kind`. It prints `files[n]{file,kind,schema,ok,error,help}`.
 - Exit codes: 0 when all pass; 1 when any file cannot be read, which wins over a refusal; 2 when any is refused, or no file is named.
-- `sign-off-axi validate --expect-invalid <file.json>...` exits 0 only when every file is refused, and 1 when one cannot be read. Conformance uses it.
+- `sign-off-axi validate --expect-invalid <file.json>...` exits 0 only when every file is refused, and 1 when one cannot be read. Conformance uses it. Not built yet; see section 10.
 - `sign-off-axi schema <kind>` prints that kind's JSON Schema (draft 2020-12). With no kind it lists the kinds and their schema numbers. The schema is generated from the validator, so the package has no separate schema files. The printed JSON Schema leaves out cross-field rules (`recommend_value` among the options, unique values, `media` or `run`, `--kind` matching, media files).
 
 ## 10. Conformance
@@ -167,6 +167,8 @@ npm install --no-save sign-off-axi@<exact>
 npx sign-off-axi validate node_modules/sign-off-axi/fixtures/contract/*/valid-*.json
 npx sign-off-axi validate --expect-invalid node_modules/sign-off-axi/fixtures/contract/*/invalid-*.json
 ```
+
+`--expect-invalid` is not built yet (build-plan row 6), so until then the second command exits 2. Both must exit 0 once it is built: the first only when every valid file is accepted, the second only when every invalid file is refused.
 
 Each producer's own tests also write one real message per kind it sends, to a temp file, and run `validate` on it.
 

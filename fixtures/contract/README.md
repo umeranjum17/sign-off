@@ -17,15 +17,7 @@ fixtures/contract/<kind>.v<schema>/invalid-<field>-<rule>.json
 
 ## Running them
 
-The npm package ships this folder. Install the exact version your tool targets, then run the valid files (`--expect-invalid` for the invalid ones is not built yet; until then each invalid file run alone exits 2):
-
-```
-npm install --no-save sign-off-axi@<exact>
-npx sign-off-axi validate node_modules/sign-off-axi/fixtures/contract/*/valid-*.json
-npx sign-off-axi validate --expect-invalid node_modules/sign-off-axi/fixtures/contract/*/invalid-*.json
-```
-
-Both must exit 0. The first passes only when every valid file is accepted; the second only when every invalid file is refused.
+The commands each tool's CI runs are in [section 10 of the contract](../../docs/contract.md#10-conformance).
 
 ## Adding a fixture
 
