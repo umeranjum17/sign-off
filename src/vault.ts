@@ -5,16 +5,15 @@ import { homedir } from 'node:os';
 import { createCipheriv, createHash, randomBytes } from 'node:crypto';
 import { isKey } from './store.js';
 
-export type VaultMeta = { board: string; key: string; mode: 'give' | 'receive'; filer: string; expires: number; destination?: string };
+export type VaultMeta = { board: string; key: string; mode: 'give' | 'receive'; filer: string; destination?: string };
 type Status = 'pending' | 'ready' | 'refused';
 type Sealed = { nonce: string; tag: string; data: string };
 type Record = { schema: 1; meta: VaultMeta; status: Status; at: number; sealed?: Sealed };
 const errors = {
-  VALIDATION_ERROR: 'Vault input is invalid: check mode, expiry, provider and destination.',
+  VALIDATION_ERROR: 'Vault input is invalid: check mode, provider and destination.',
   VAULT_KEY_UNAVAILABLE: 'Vault key is unavailable; encrypted payload cannot be read.',
-  BUSY: 'Vault storage is busy or unavailable; retry before expiry.',
+  BUSY: 'Vault storage is busy or unavailable; retry later.',
   NOT_FOUND: 'Vault item was not found.',
-  EXPIRED: 'Vault item expired; request a fresh item.',
   REFUSED: 'User refused this vault item; no value was delivered.',
 };
 export class VaultError extends Error {
@@ -22,7 +21,7 @@ export class VaultError extends Error {
 }
 function bad(code: keyof typeof errors): never { throw new VaultError(code); }
 const digest = (board: string, key: string) => createHash('sha256').update(JSON.stringify([board, key])).digest('hex');
-const aad = (meta: VaultMeta) => Buffer.from(JSON.stringify([1, meta.board, meta.key, meta.mode, meta.expires, meta.destination ?? null, meta.filer]));
+const aad = (meta: VaultMeta) => Buffer.from(JSON.stringify([1, meta.board, meta.key, meta.mode, meta.destination ?? null, meta.filer]));
 const VAULT_ID = /^[a-f0-9]{32}$/;
 function boardFile(board: unknown) {
   if (typeof board !== 'string' || !isAbsolute(board)) bad('VALIDATION_ERROR');
@@ -32,7 +31,12 @@ function boardId(file: string, create: boolean) {
   const side = `${file}.vault`;
   if (!lstatSync(side, { throwIfNoEntry: false })) {
     if (!create) bad('NOT_FOUND');
-    writeFileSync(side, `${randomBytes(16).toString('hex')}\n`, { flag: 'wx', mode: 0o600 });
+    const tmp = `${side}.${randomBytes(8).toString('hex')}.tmp`, fd = openSync(tmp, 'wx', 0o600);
+    try {
+      try { writeFileSync(fd, `${randomBytes(16).toString('hex')}\n`); fsyncSync(fd); } finally { closeSync(fd); }
+      renameSync(tmp, side);
+      syncDir(dirname(side));
+    } finally { rmSync(tmp, { force: true }); }
   }
   privateFile(side);
   const id = readFileSync(side, 'utf8').trim();
@@ -42,8 +46,8 @@ function boardId(file: string, create: boolean) {
 
 function metadata(m: VaultMeta): VaultMeta {
   if (!m || typeof m.board !== 'string' || !VAULT_ID.test(m.board) || !isKey(m.key) || !isKey(m.filer) || !['give', 'receive'].includes(m.mode)
-    || !Number.isSafeInteger(m.expires) || (m.mode === 'give' ? typeof m.destination !== 'string' || !isAbsolute(m.destination) : m.destination !== undefined)) bad('VALIDATION_ERROR');
-  return { board: m.board, key: m.key, mode: m.mode, filer: m.filer, expires: m.expires,
+    || (m.mode === 'give' ? typeof m.destination !== 'string' || !isAbsolute(m.destination) : m.destination !== undefined)) bad('VALIDATION_ERROR');
+  return { board: m.board, key: m.key, mode: m.mode, filer: m.filer,
     ...(m.destination !== undefined && { destination: resolve(m.destination) }) };
 }
 function privateFile(path: string) {
@@ -73,8 +77,9 @@ function master(dir: string) {
   if (!lstatSync(path, { throwIfNoEntry: false })) {
     // Even an interrupted record write forbids replacing a missing key.
     if (readdirSync(dir).some((n) => n.endsWith('.json') || n.endsWith('.tmp'))) bad('VAULT_KEY_UNAVAILABLE');
-    const fd = openSync(path, 'wx', 0o600);
+    const tmp = join(dir, 'key.tmp'), fd = openSync(tmp, 'wx', 0o600);
     try { writeFileSync(fd, randomBytes(32)); fsyncSync(fd); } finally { closeSync(fd); }
+    renameSync(tmp, path);
     syncDir(dir);
   }
   privateFile(path);
@@ -112,6 +117,7 @@ async function operate<T>(board: string, key: string, create: boolean, fn: (dir:
       catch (e: any) { if (e.code !== 'EEXIST' || tries === 49) bad('BUSY'); }
       await new Promise((ok) => setTimeout(ok, 20));
     }
+    rmSync(join(dir, 'key.tmp'), { force: true });
     // Keep interrupted ciphertext when its key vanished; never turn cleanup into silent key replacement.
     if (!lstatSync(join(dir, 'key'), { throwIfNoEntry: false }) && readdirSync(dir).some((n) => n.endsWith('.tmp'))) bad('VAULT_KEY_UNAVAILABLE');
     // No writer can still own these under the lock; only ciphertext ever enters a temp record.
@@ -138,11 +144,10 @@ const active = (r?: Record) => {
 
 export async function createVault(input: VaultMeta, value?: Buffer) {
   const fixed = metadata({ ...input, board: '0'.repeat(32) });
-  if (fixed.expires <= Date.now() || fixed.expires > Date.now() + 3_600_000 || (fixed.mode === 'receive') !== (value !== undefined)) bad('VALIDATION_ERROR');
+  if ((fixed.mode === 'receive') !== (value !== undefined)) bad('VALIDATION_ERROR');
   return operate(input.board, fixed.key, true, (dir, path, old, id) => {
     const meta = { ...fixed, board: id };
     if (old) bad('VALIDATION_ERROR'); // Terminal keys are tombstones, never reusable.
-    if (meta.expires <= Date.now()) bad('EXPIRED');
     if (!value) master(dir);
     const record: Record = { schema: 1, meta, status: value ? 'ready' : 'pending', at: Date.now(), ...(value && { sealed: seal(dir, meta, value) }) };
     persist(path, record);
