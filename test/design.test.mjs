@@ -508,7 +508,9 @@ async function browse(dir, width = 800) {
   const evaluate = (expression) => call('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
   // A real mouse click at a point of the page, which reaches into a frame there as a person's would.
   const click = async ([x, y]) => { for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await call('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 }); };
-  return { evaluate, click, close: () => { ws.close(); browser.kill(); } };
+  // A real touch tap at a point of the page, as a phone's would.
+  const tap = async ([x, y]) => { await call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] }); await call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); };
+  return { evaluate, click, tap, close: () => { ws.close(); browser.kill(); } };
 }
 
 test('an interactive page that posts its height gets a frame that fits it, each frame only its own and never past 10000px; a design shows the recommended phone frame first', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
@@ -549,15 +551,15 @@ test('an interactive page that posts its height gets a frame that fits it, each 
 test('pointing at a design mock: the board turns it on for a frame, a tap comes back as a reference that finds the element again, and a message from another frame is ignored', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'point'), file = join(dir, 'board.json');
   mkdirSync(join(dir, 'mocks'), { recursive: true });
-  // The button fills the frame; its own focus and click handlers rename it, which must not happen while the person points.
+  // The button fills the frame; its own focus, touch and click handlers rename it, which must not happen while the person points.
   writeFileSync(join(dir, 'mocks', 'a.html'), '<style>body { margin: 0 }</style><main id="app"><section><button hidden>Back</button>'
-    + '<button style="width: 100%; height: 3000px" onfocus="this.textContent = \'Focused\'" onclick="this.textContent = \'Clicked\'">Sign in</button></section></main>');
+    + '<button style="width: 100%; height: 3000px" ontouchstart="this.textContent = \'Touched\'" onfocus="this.textContent = \'Focused\'" onclick="this.textContent = \'Clicked\'">Sign in</button></section></main>');
   writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key: 'look', type: 'design', title: 'Look', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }],
     recommend_value: 'a', mocks: [{ value: 'a', path: 'mocks/a.html' }] }] }));
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
-  const { evaluate, click, close } = await browse(dir);
+  const { evaluate, click, tap, close } = await browse(dir);
   const frame = "document.querySelector('.mock iframe')", pointed = "got.filter((m) => m['sign-off'] === 'pointed')";
   // The card snaps while it scrolls, so the test scrolls the frame into view and waits until it is what sits under the middle of it, then taps there.
   const middle = async () => {
@@ -593,6 +595,12 @@ test('pointing at a design mock: the board turns it on for a frame, a tap comes 
   await evaluate(`point(${frame}, true)`);
   await until(async () => (await click(await middle()), evaluate("pointed.has('look~a')")));
   assert.deepEqual(await evaluate("pointed.get('look~a')"), ref);
+  // A touch on a phone runs the mock's own touch handler no more than a click: the words stay as they were.
+  await evaluate("window.got = [], addEventListener('message', (e) => e.data?.['sign-off'] && got.push(e.data))");
+  await tap(await middle());
+  await click(await middle());
+  await until(() => evaluate(`${pointed}.length >= 1`));
+  assert.deepEqual(await evaluate(`${pointed}.at(-1)`), { 'sign-off': 'pointed', ...ref });
   close();
   proc.kill();
 });

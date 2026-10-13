@@ -141,7 +141,9 @@
   kept as `{ ref, tag, text }`: `ref` is a path to it, and anything that finds
   it again must check `tag` and `text` and show nothing when they differ. The
   mock page itself has `window.signOffFind({ ref, tag, text })`, which gives
-  back that element, or null when it is gone or its tag or words changed.
+  back that element, or null when its tag or words differ. A revision that
+  keeps the same tag and words at the same path can still match another
+  element: a known limit of the path reference.
 - Every item that asks something has one place to type, folded behind
   **Other answer** after its buttons (a design's Picks too): a short text,
   500 characters or fewer. **Send reply** saves it as the answer `text` with
