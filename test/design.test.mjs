@@ -174,6 +174,12 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   assert.equal((await post(url, 'api/rounds', { key: 'pick-the-sign-in-layout', note: 'Umer: show B with A header.' })).status, 200);
   assert.equal(await exited, 0);
   assert.match(waited, /show B with A header/);
+  // Other answer on a design: the typed words are the answer, saved as text, and wait and answers read them back.
+  assert.equal((await post(url, 'api/answers', { key: 'pick-the-sign-in-layout', answer: 'text', note: ' ' })).status, 400);
+  assert.equal((await post(url, 'api/answers', { key: 'pick-the-sign-in-layout', answer: 'text', note: 'Umer: A layout with the B colours.' })).status, 200);
+  const other = JSON.parse(run('wait', board, '--key', 'pick-the-sign-in-layout', '--json', '--timeout', '5').out)['pick-the-sign-in-layout'];
+  assert.deepEqual([other.answer, other.label, other.note], ['text', 'Reply', 'Umer: A layout with the B colours.']);
+  assert.match(run('answers', board, '--key', 'pick-the-sign-in-layout').out, /pick-the-sign-in-layout,text,.*Umer: A layout with the B colours\./);
   assert.equal((await post(url, 'api/answers', { key: 'pick-the-sign-in-layout', answer: 'b', note: 'Umer: B scans best.' })).status, 200);
   const read = JSON.parse(run('answers', board, '--json').out)['pick-the-sign-in-layout'];
   assert.deepEqual([read.answer, read.note], ['b', 'Umer: B scans best.']);

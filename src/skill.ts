@@ -62,7 +62,7 @@ When the user must choose how something looks or works, do this:
 4. Write a short trade-off in plain words (5 lines or fewer: what each variant does well and badly) and recommend one.
 5. Post it on the project board with \`npx -y sign-off-axi post .sign-off/decisions.json --type design --key <key>\`, one \`--option\` and one \`--mock\` per variant, \`--tradeoff\` and \`--recommend\` (see \`post --help\`). Mock paths are relative to \`.sign-off/\`: \`--mock a=mocks/<key>/a.html\`, or \`--mock a=mocks/<key>/index.html?variant=a\` for the one-page form. Then run \`npx -y sign-off-axi open .sign-off/decisions.json\` and give the user the URL.
 6. Wait with \`npx -y sign-off-axi wait .sign-off/decisions.json --key <key>\`.
-7. Read the answer with \`npx -y sign-off-axi answers .sign-off/decisions.json --key <key> --json\`. A pick holds \`answer\` and maybe a \`note\`. A \`rounds\` entry with no \`answer\`, or newer than the \`answer\`'s \`at\`, means the user wants another round: read its note, build 3 new variants and post them under a new key.
+7. Read the answer with \`npx -y sign-off-axi answers .sign-off/decisions.json --key <key> --json\`. A pick holds \`answer\` and maybe a \`note\`; \`"answer": "text"\` is the user's own answer (Other answer), in its \`note\`. A \`rounds\` entry with no \`answer\`, or newer than the \`answer\`'s \`at\`, means the user wants another round: read its note, build 3 new variants and post them under a new key.
 8. Build the winner into the real code, then delete \`.sign-off/mocks/<key>/\`.
 
 Build mocks with a cheap model, for example Go Muse, haiku or luna. A mock is throwaway work.

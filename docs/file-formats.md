@@ -109,6 +109,10 @@
   answer `text` with the words as its `note`; typed before a button is
   picked, it goes with that answer as its note. No option may use the value
   `text` then. With `"options": []` the reply is the only answer.
+  Every other item that lists options (a design's Picks too) also has an
+  **Other answer** after its buttons, above its note panel: the words are sent
+  in place of a pick and saved the same way, as the answer `text` with the
+  words as its `note`. An item with an option valued `text` has none.
 - `options`: optional, 2 to 6 choices, or `[]` on a read-only or answers-only board for an item that is only shown and waits on nothing (unless it has `reply`). Each has a `value` (1-128 of `A-Z a-z 0-9 . _ -`, unique within the question) and a non-empty `label` shown on its button. Leave it out for **Yes** (`yes`) and **No** (`no`); files written before options existed read exactly as before.
 - `recommend_value`, `default_if_silent`: optional, the `value` of one of the question's own options (`yes` or `no` when `options` is left out). Shown, never applied.
 - `close`: optional, `done` (default) or `release`; copied into the answer.
@@ -157,7 +161,8 @@ also copies each file into `evidence/<number>/` next to the board:
 {"key":"release-window","answer":"friday","label":"Friday","close":"done","at":"2026-10-12T04:50:32Z","note":"After the Friday stand-up."}
 ```
 
-- `answer` is the picked option's `value`, `label` its label at the time of the click.
+- `answer` is the picked option's `value`, `label` its label at the time of the click. An **Other answer** is saved as
+  `"answer":"text","label":"Reply"` with the typed words as its `note`.
 - An **Undo** (offered for a few seconds after each tap) is saved as one more line: the answer before the tap, or, when there
   was none, an empty `answer` and `label` (`{"key":"dark-default","answer":"","label":"","close":"done","at":"..."}`), which
   leaves the key unanswered, so the item waits again. An `on_answer:` command gets that line too.
