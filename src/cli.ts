@@ -30,8 +30,7 @@ const AGENTS: Record<string, { bin: string; dir: string; home: string }> = {
 const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
 commands[15]:
   (none)=list, raise, post, answers, wait, poll, open, status, stop, serve, export, init, doctor, validate, help
-board: the nearest .sign-off/ board from the working folder up to its repo root (the folder holding .git); with no .git above, up to HOME but never HOME's own .sign-off, and never one outside both; else ~/.sign-off/decisions.json, unless a board file is given; answers are saved next to it
-SIGN_OFF_HOME, when set, takes HOME's place for the default board and the walk's stop; a board file given always wins
+board: the nearest .sign-off/ board (the walk's bounds and SIGN_OFF_HOME: README, "Test runs never touch your board"), else ~/.sign-off/decisions.json; a board file given always wins
 flags: --full and --json on list, answers and wait, --json on status, --filer on post, raise and wait, --help on every command, -v/--version
 examples:
   sign-off-axi
@@ -291,17 +290,20 @@ function parse(cmd: string, args: string[], flags: Flags) {
 const signOffHome = () => resolve(process.env.SIGN_OFF_HOME || homedir());
 /** The account's own home folder from the system user database, which a changed HOME does not move; undefined when there is none. */
 const accountHome = () => { try { return userInfo().homedir || undefined; } catch { return undefined; } };
-/** The folder of the nearest .sign-off/config.yaml that init set up, from the working folder up to its repo root (the folder holding .git),
- * or up to HOME (or SIGN_OFF_HOME) but never its own .sign-off. With neither above, or on reaching the account's own home (which a changed
- * HOME does not move), none: a .sign-off/ outside both the repo root and HOME is never adopted. */
+/** The folder of the nearest .sign-off/config.yaml that init set up: the working folder's own, else one above it up to the repo root (the folder
+ * holding .git) or up to HOME (or SIGN_OFF_HOME), never HOME's own. With neither above the climb is not made, and the account's own home (which
+ * a changed HOME does not move) is never adopted. */
 function setupFolderHere() {
-  const [home, account] = [signOffHome(), accountHome()].map((h) => (h && existsSync(h) ? realpathSync(h) : undefined)), dirs: string[] = [];
-  for (let dir = process.cwd(); dir !== home; dir = dirname(dir)) {
-    if (dir === account || dirname(dir) === dir) return undefined;
-    dirs.push(dir);
-    if (existsSync(join(dir, '.git'))) break;
+  const [home, account] = [signOffHome(), accountHome()].map((h) => (h && existsSync(h) ? realpathSync(h) : undefined)), cwd = process.cwd(), chain: string[] = [];
+  if (cwd === account) return undefined;
+  let bounded = false;
+  for (let dir = cwd; dir !== account; dir = dirname(dir)) {
+    if (dir === home) { bounded = true; break; }
+    chain.push(dir);
+    if (existsSync(join(dir, '.git'))) { bounded = true; break; }
+    if (dirname(dir) === dir) break;
   }
-  return dirs.find((dir) => existsSync(join(dir, '.sign-off', 'config.yaml')));
+  return (bounded ? chain : [cwd]).find((dir) => existsSync(join(dir, '.sign-off', 'config.yaml')));
 }
 /** The board when none is given: the nearest project board, else ~/.sign-off/decisions.json under SIGN_OFF_HOME or HOME. */
 function boardHere() {
