@@ -264,3 +264,5 @@ Deleting it, then `stop` and `open` again, makes a new one (`stop` and `open` al
 it in the link; the server log never holds it. `init` git-ignores `*.messages.jsonl`, `*.token` and
 `*.export.html` with the other files sign-off writes.
 
+**Board isolation for tests.** The default board and the walk to a project board are in the README's
+[Test runs never touch your board](../README.md#test-runs-never-touch-your-board).

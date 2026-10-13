@@ -12,6 +12,7 @@ Proof comes from the real CLI, the real server and a real browser. A build or a 
 ## Isolation
 
 - Work only in a scratch folder: `SCR=~/.cache/fm-scratch/<task-id>`. Copy fixtures into it; never serve a tracked fixture, because answers land next to the file.
+- Isolate every `sign-off-axi` run under `$SCR` as the README's [Test runs never touch your board](../../../README.md#test-runs-never-touch-your-board) says.
 - Use your own browser session and profile inside the scratch folder:
   `export CHROME_DEVTOOLS_AXI_SESSION=<task-id> CHROME_DEVTOOLS_AXI_USER_DATA_DIR=$SCR/profile`
 - Evidence goes to a private folder outside the repo. Never commit proof media. Only the clean synthetic demo shots in `docs/media/` belong in git.
@@ -92,7 +93,7 @@ Look at every shot before you report: nothing overlaps, no text is cut, no raw p
 | Quick answers: buttons first with the recommended one first and marked, typing folded behind **Other answer** on every ask, the card's one place to type (a reply saved as the answer `text`, a note for a pick, the **Another round** chip, a comment; a design's Picks too), one tap then a 5 s **Undo** saved as an answer change, `raise`/`post` refusing listed options with no `--recommend` | [features/quick-answers.md](features/quick-answers.md) |
 | Answer events: `--filer` on post/raise, `wait --filer` returns only that filer's answers once, **Seen by agent** chip, `on_answer:` hook on stdin, `post --replace --filer` keeps other filers' items | [features/answer-events.md](features/answer-events.md) |
 | README media and rendered README | [features/readme.md](features/readme.md) |
-| `sign-off-axi` commands, TOON/`--full`/`--json`, packed tarball via `npx -y` | [features/axi.md](features/axi.md) |
+| `sign-off-axi` commands, TOON/`--full`/`--json`, packed tarball via `npx -y`, the board a bare command picks | [features/axi.md](features/axi.md) |
 | Contract: `validate` on message files, refusals with one fix line and exit 2, the shipped `fixtures/contract/` run from the package | [features/contract.md](features/contract.md) |
 | Coding agents: `init --agent auto|<name>`, config `agent:`, one doctor line per agent, the same journey on several agents | [features/agents.md](features/agents.md) |
 | Agent skill: `skills/sign-off-axi`, the A/B/C mock recipe, `npm run build:skill`, install with `npx skills add` | [features/skill.md](features/skill.md) |

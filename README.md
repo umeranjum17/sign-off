@@ -143,7 +143,7 @@ sign-off-axi poll [--timeout 600]               block until the user comments or
 sign-off-axi export [--out <file.html>]          write a frozen read-only copy of the board as one HTML file
 ```
 
-- The board is the one you name right after the command (`sign-off-axi answers ./decisions.json`). With none, it is the board of the nearest `.sign-off/` that `init` set up, looking from the working folder up to the repo root (the folder holding `.git`); with no `.git` above, the walk goes up to HOME but never uses HOME's own `.sign-off/`, and otherwise it is `~/.sign-off/decisions.json`. Answers are saved next to it.
+- The board is the one you name right after the command (`sign-off-axi answers ./decisions.json`). With none, it is the nearest `.sign-off/` board that `init` set up, found by the walk described in [Test runs never touch your board](#test-runs-never-touch-your-board); otherwise the default board there (`~/.sign-off/decisions.json`, or under `SIGN_OFF_HOME`). Answers are saved next to it.
 - Next-step commands in the output name paths under the working folder relative to it, and say `npx -y sign-off-axi` when sign-off-axi runs through `npx`.
 - `post --type design` asks for a pick between up to 6 mock options, each with an optional `--mock <value>=<path>` file (`.html`, `.svg`, `.png`, `.jpg`, `.jpeg`, `.webp`) shown as a tall phone frame above its button (the recommended one first; on a phone the frames swipe sideways, the next one peeking in, and a tap opens one full size), plus a `--tradeoff` line and a `--recommend` badge. Mock paths are relative to the board file's folder and never escape it. One `.html` page can hold every variant: `--mock a=mocks/<key>/index.html?variant=a` loads the page with `?variant=a`. An `.html` mock or view loads the css, scripts, images and fonts beside it by relative name (`style.css`, `img/dot.png`), from its own folder only, never anything above it. The board adds a small pointing script to each `.html` mock: once the board turns it on for that frame, a tap on a part of the mock is kept from the mock and named back to the board as a path to that element, its tag and its words; it passes only text and gives the mock no reach into the board. `post --type decision` (the default) is exactly `raise`, and `raise` stays as its alias.
 - `post --type evidence` posts the next numbered update (`update-1`, `update-2`, ...) with 1 to 12 screenshots or recordings (`.png`, `.jpg`, `.jpeg`, `.webp`, `.mp4`, `.webm`, up to 50 MB each), a short note and an optional commit or PR link. The files are copied into `evidence/<number>/` next to the board, so the board is the store: no hosted service. The page shows the updates newest first; each file is served only while its size and SHA-256 still match what was posted, and recordings play inline on a phone. The person gives a verdict, **Pass**, **Fail** or **Needs work**, with an optional note, read back with `answers` or `wait --key update-<number>`.
@@ -200,6 +200,17 @@ Real demo questions, with one Yes and its note already saved. Desktop shots are 
 npm test                      # builds, then runs the integration journeys against the real CLI and server
 npm run build:skill           # regenerates skills/sign-off-axi/SKILL.md from src/skill.ts (CI runs it with -- --check)
 npm pack                      # builds the publishable sign-off-axi tarball
+```
+
+### Test runs never touch your board
+
+With no board named, a bare command uses the nearest `.sign-off/` that `init` set up, looking from the working folder up to its repo root (the folder holding `.git`) or up to HOME, but never HOME's own `.sign-off/`. The working folder's own `.sign-off/` is always used. A folder above it is searched only when that climb reaches a repo root or HOME, so a `.sign-off/` above a folder with neither (outside HOME, no `.git`) is never used, and the account's own home is never used. Otherwise the default board is `~/.sign-off/decisions.json`, under `SIGN_OFF_HOME` when it is set (it takes HOME's place for the default board and for where the climb stops), else under HOME.
+
+A test or agent run that must not reach your own board sets HOME and every `XDG_*` folder to one fresh temporary folder, or sets `SIGN_OFF_HOME` to one. A board file named on the command line always wins, so name only a board inside the temporary folder, and spell it out in full: a `~` is expanded by the calling shell with its own HOME before `HOME=...` takes effect. Run the command from the temporary folder to keep project boards out too.
+
+```sh
+tmp=$(mktemp -d)
+(cd "$tmp" && SIGN_OFF_HOME="$tmp" sign-off-axi raise --title "Probe?")   # lands in $tmp/.sign-off/decisions.json
 ```
 
 Browser proof lives in [`.agents/skills/verify-sign-off`](.agents/skills/verify-sign-off/SKILL.md).

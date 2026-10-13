@@ -5,7 +5,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { accessSync, closeSync, constants, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, watch, writeFileSync, type Stats } from 'node:fs';
 import { lookup } from 'node:dns/promises';
-import { homedir, networkInterfaces, tmpdir } from 'node:os';
+import { homedir, networkInterfaces, tmpdir, userInfo } from 'node:os';
 import { basename, delimiter, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
@@ -30,7 +30,7 @@ const AGENTS: Record<string, { bin: string; dir: string; home: string }> = {
 const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
 commands[15]:
   (none)=list, raise, post, answers, wait, poll, open, status, stop, serve, export, init, doctor, validate, help
-board: the nearest .sign-off/ board from the working folder up to its repo root (the folder holding .git); with no .git above, up to HOME but never HOME's own .sign-off; else ~/.sign-off/decisions.json, unless a board file is given; answers are saved next to it
+board: the nearest .sign-off/ board (the walk's bounds and SIGN_OFF_HOME: README, "Test runs never touch your board"), else ~/.sign-off/decisions.json; a board file given always wins
 flags: --full and --json on list, answers and wait, --json on status, --filer on post, raise and wait, --help on every command, -v/--version
 examples:
   sign-off-axi
@@ -218,7 +218,7 @@ examples:
 Checks the repo setup init wrote: node version, config, board file, answer files, a lock a crashed command left behind, gitignore lines, folders, whether the dashboard port is free,
 that each hosts: name in the config leads to the bind address, that the on_answer: command can run (no shell, so | > && do nothing),
 and one line per coding agent in the config's agent: line (auto: each one on PATH) saying whether its skill is installed.
-With no dir, it checks the nearest setup from the working folder up to the repo root, found as a bare command finds its board.
+With no dir, it checks the nearest setup, found as a bare command finds its board (README: Test runs never touch your board).
 Each failure prints one help line naming its fix and exits 1; a clean setup exits 0.
 examples:
   sign-off-axi doctor
@@ -286,19 +286,30 @@ function parse(cmd: string, args: string[], flags: Flags) {
   const path = given === undefined ? boardHere() : resolve(given), real = existsSync(path) ? realpathSync(path) : path;
   return { file: real, named: path, values: parsed.values as Record<string, any>, on };
 }
-/** The folder of the nearest .sign-off/config.yaml that init set up, from the working folder up to the repo root (the folder holding .git), never HOME itself; with no HOME, the working folder only. */
+/** The root of the default store (~/.sign-off) and the walk's stop: SIGN_OFF_HOME when set, else HOME. */
+const signOffHome = () => resolve(process.env.SIGN_OFF_HOME || homedir());
+/** The account's own home folder from the system user database, which a changed HOME does not move; undefined when there is none. */
+const accountHome = () => { try { return userInfo().homedir || undefined; } catch { return undefined; } };
+/** The folder of the nearest .sign-off/config.yaml that init set up: the working folder's own, else one above it up to the repo root (the folder
+ * holding .git) or up to HOME (or SIGN_OFF_HOME), never HOME's own. With neither above the climb is not made, and the account's own home (which
+ * a changed HOME does not move) is never adopted. */
 function setupFolderHere() {
-  const home = existsSync(homedir()) ? realpathSync(homedir()) : undefined;
-  for (let dir = process.cwd(); dir !== home; dir = dirname(dir)) {
-    if (existsSync(join(dir, '.sign-off', 'config.yaml'))) return dir;
-    if (!home || existsSync(join(dir, '.git')) || dirname(dir) === dir) break;
+  const [home, account] = [signOffHome(), accountHome()].map((h) => (h && existsSync(h) ? realpathSync(h) : undefined)), cwd = process.cwd(), chain: string[] = [];
+  if (cwd === account) return undefined;
+  let bounded = false;
+  for (let dir = cwd; ; dir = dirname(dir)) {
+    if (dir === home) { bounded = true; break; }
+    if (dir === account) break;
+    chain.push(dir);
+    if (existsSync(join(dir, '.git'))) { bounded = true; break; }
+    if (dirname(dir) === dir) break;
   }
-  return undefined;
+  return (bounded ? chain : [cwd]).find((dir) => existsSync(join(dir, '.sign-off', 'config.yaml')));
 }
-/** The board when none is given: the nearest project board, else ~/.sign-off/decisions.json. */
+/** The board when none is given: the nearest project board, else ~/.sign-off/decisions.json under SIGN_OFF_HOME or HOME. */
 function boardHere() {
   const folder = setupFolderHere();
-  return folder ? setupOf(join(folder, '.sign-off', 'decisions.json'))!.board : join(homedir(), '.sign-off', 'decisions.json');
+  return folder ? setupOf(join(folder, '.sign-off', 'decisions.json'))!.board : join(signOffHome(), '.sign-off', 'decisions.json');
 }
 const portOf = (value: string) => {
   if (!/^\d{1,5}$/.test(value) || Number(value) > 65535) throw fail('--port must be a number from 0 to 65535', 'VALIDATION_ERROR');

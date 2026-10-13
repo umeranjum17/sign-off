@@ -1,4 +1,5 @@
-// Global setup for `node --test`: every test file runs with its own empty TMPDIR, and the run fails if any test leaves a file there.
+// Global setup for `node --test`: every test file runs with its own empty TMPDIR and no SIGN_OFF_HOME from the shell (it would move the
+// default board the tests read under their own HOME), and the run fails if any test leaves a file there.
 import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -7,6 +8,7 @@ let dir;
 export function globalSetup() {
   dir = mkdtempSync(join(tmpdir(), 'sign-off-tests-'));
   process.env.TMPDIR = dir;
+  delete process.env.SIGN_OFF_HOME;
 }
 export function globalTeardown() {
   // node-compile-cache is Node's own module cache, not a test's scratch.
