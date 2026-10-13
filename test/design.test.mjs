@@ -476,10 +476,10 @@ const until = async (check) => {
   assert.fail('the page did not reach the expected state');
 };
 /** A headless Chrome driven over its DevTools socket: evaluate(js) returns the value, or undefined while a page is still loading. */
-async function browse(dir) {
+async function browse(dir, width = 800) {
   const profile = join(dir, 'profile'), active = join(profile, 'DevToolsActivePort');
   mkdirSync(dir, { recursive: true });
-  const browser = spawn(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${profile}`, '--window-size=800,4000', '--remote-debugging-port=0', 'about:blank'],
+  const browser = spawn(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${profile}`, `--window-size=${width},4000`, '--remote-debugging-port=0', 'about:blank'],
     { env: chromeEnv, stdio: 'ignore' });
   procs.push(browser);
   await until(() => existsSync(active) && readFileSync(active, 'utf8').includes('\n'));
@@ -556,6 +556,8 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   const home = await dump('');
   assert.match(home, /<div class="foot"><button class="dis" aria-label="Dismiss, When should it ship\?">Dismiss<\/button><a class="more" href="#waiting">Answer all 2 in Triage →<\/a><\/div>/);
   assert.doesNotMatch(home.match(/<section class="card needs.*?<\/section>/s)[0], /class="x"/);
+  // Under its heading, when that ask was raised.
+  assert.match(home, /<h2>Needs you first<\/h2><p class="meta since">Waiting since 09:15<\/p>/);
   // Summary has the person's mark beside its title, and the Waiting on you tile one clock and the oldest ask's time (the design ask has none).
   assert.match(home, /<h1 tabindex="-1">Summary<\/h1><span class="icon i-you" aria-hidden="true">/);
   const vis = (dom, a) => dom.match(new RegExp(`<a class="tile i-${a}".*?<span class="vis" aria-hidden="true">(.*?)<\\/span><span class="detail"`, 's'))[1];
@@ -613,7 +615,7 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   proc.kill();
 });
 
-test('Clear all done on 201 answered items: the page empties in chunks, says so, and Undo brings all 201 back', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Clear all done on 201 answered items, set two across on a wide screen: the page empties in chunks, says so, and Undo brings all 201 back', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'many-answered'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l }));
@@ -623,10 +625,12 @@ test('Clear all done on 201 answered items: the page empties in chunks, says so,
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
-  const { evaluate, close } = await browse(dir);
+  const { evaluate, close } = await browse(dir, 1440);
   const rows = 'document.querySelectorAll("article.row").length';
   await evaluate(`location.href = ${JSON.stringify(`${url}#answered`)}`);
   await until(async () => (await evaluate(`${rows} === 201`)));
+  // On a wide screen the rows are cards two across: the first two share a line, side by side.
+  assert.ok(await evaluate('(([a, b]) => a.top === b.top && b.left > a.right)([...document.querySelectorAll(".rows.i-answered > li")].map((li) => li.getBoundingClientRect()))'));
   await evaluate('document.querySelector(".clear").click()');
   await until(async () => (await evaluate(`${rows} === 0 && document.querySelector(".empty")?.textContent === "All done items cleared."`)));
   await evaluate('document.getElementById("undo").click()');
