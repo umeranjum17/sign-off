@@ -466,6 +466,10 @@ const hostStatus = (url, host) => new Promise((ok, no) => get(url, { agent: fals
 
 // A real browser draws the board for the frame tests: CI's runner has Chrome; elsewhere they skip when none is on the PATH.
 const chrome = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'].flatMap((b) => process.env.PATH.split(':').map((d) => join(d, b))).find(existsSync);
+// Chrome puts a socket in its TMPDIR and stops when that path passes 107 characters, which a deep test folder does,
+// so every Chrome here gets one short throwaway TMPDIR of its own, removed when the tests end.
+const chromeEnv = chrome && { ...process.env, TMPDIR: mkdtempSync('/tmp/so-') };
+after(() => chromeEnv && rmSync(chromeEnv.TMPDIR, { recursive: true, force: true }));
 // A busy host can take many seconds to start Chrome or draw a page, so a check waits on the page itself, up to 60 seconds.
 const until = async (check) => {
   for (const end = Date.now() + 60000; Date.now() < end; await new Promise((r) => setTimeout(r, 100))) if (await check()) return;
@@ -476,7 +480,7 @@ async function browse(dir) {
   const profile = join(dir, 'profile'), active = join(profile, 'DevToolsActivePort');
   mkdirSync(dir, { recursive: true });
   const browser = spawn(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${profile}`, '--window-size=800,4000', '--remote-debugging-port=0', 'about:blank'],
-    { env: { ...process.env, TMPDIR: dir }, stdio: 'ignore' });
+    { env: chromeEnv, stdio: 'ignore' });
   procs.push(browser);
   await until(() => existsSync(active) && readFileSync(active, 'utf8').includes('\n'));
   const page = (await (await fetch(`http://127.0.0.1:${readFileSync(active, 'utf8').split('\n')[0]}/json`)).json()).find((t) => t.type === 'page');
@@ -535,7 +539,7 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const dump = (hash) => new Promise((ok, no) => execFile(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${join(dir, 'profile')}`,
-    '--window-size=800,4000', '--virtual-time-budget=10000', '--dump-dom', url + hash], { env: { ...process.env, TMPDIR: dir }, maxBuffer: 1 << 24 }, (e, out) => (e ? no(e) : ok(out))));
+    '--window-size=800,4000', '--virtual-time-budget=10000', '--dump-dom', url + hash], { env: chromeEnv, maxBuffer: 1 << 24 }, (e, out) => (e ? no(e) : ok(out))));
   const cards = (dom) => [...dom.matchAll(/<article class="row[^"]*" id="item-(\w+)">(.*?)<\/article>/gs)].map((m) => [m[1], m[2]]);
   // Waiting on you is Triage: the oldest ask alone, with the queue of both beside it and Skip to the next.
   const waiting = await dump('#waiting');
