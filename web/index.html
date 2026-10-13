@@ -251,7 +251,7 @@
     if (design) {
       return el('article', { class: 'row design', id: `item-${d.key}` }, head,
         d.tradeoff ? el('p', { class: 'tradeoff', dir: 'auto' }, el('strong', {}, 'Trade-off '), d.tradeoff) : '',
-        mockCards(d, ro ? [] : buttons), silent ? el('p', { class: 'meta' }, silent) : '', ro ? '' : more(d, saved, err), err);
+        mockCards(d, ro ? [] : buttons), silent ? el('p', { class: 'meta' }, silent) : '', notes(d, ro, saved, err), err);
     }
     // Yes/No rows keep the two fixed buttons they always had; any other choice set wraps.
     const many = d.options.map((o) => o.value).sort().join() !== 'no,yes';
@@ -264,7 +264,7 @@
       d.link ? el('p', { class: 'meta' }, /^https?:/.test(d.link)
         ? el('a', { href: d.link, target: '_blank', rel: 'noopener' }, d.link) : `Commit ${d.link}`) : '',
       silent ? el('p', { class: 'meta' }, silent) : '',
-      ro ? '' : d.reply ? reply(d, saved, err) : state.answers_only ? '' : more(d, saved, err),
+      notes(d, ro, saved, err),
       err,
     ), updateMedia(d), chapters(d), rung(d), ro || !buttons.length ? '' : el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': d.title }, ...buttons), evidenceCard(d));
   }
@@ -300,6 +300,9 @@
         : 'Optional note: sent with the answer you pick (and to the agent as a comment), or with the round you ask for'), box,
       el('div', { class: 'actions' }, update ? '' : roundBtn, FROZEN ? '' : commentBtn));
   }
+
+  // A reply item gets its reply box; an answers-only board takes no notes, comments or rounds.
+  const notes = (d, ro, saved, err) => (ro ? '' : d.reply ? reply(d, saved, err) : state.answers_only ? '' : more(d, saved, err));
 
   /** A short text reply: sent on its own, or with the answer picked. On a reply item it takes the place of the note panel. */
   function reply(d, saved, err) {
@@ -465,13 +468,17 @@
   };
   // Another program rewrites a read-only or answers-only board's file, so the page checks it every 20 seconds and redraws only on a change.
   async function refresh() {
-    // Never while the person is typing a reply: the next check redraws.
-    if (document.activeElement?.tagName === 'TEXTAREA') return;
     try {
       const res = await fetch('/api/decisions'), body = await res.json().catch(() => ({ error: `The server replied ${res.status}` }));
       if (!res.ok) throw new Error(body.error);
       banner.hidden = true;
-      if (JSON.stringify(body) !== JSON.stringify(state)) (state = body), render();
+      if (JSON.stringify(body) === JSON.stringify(state)) return;
+      // A redraw keeps the reply box being typed in focused, with its caret where it was.
+      const typing = document.activeElement?.tagName === 'TEXTAREA' && document.activeElement, at = typing && typing.selectionStart;
+      state = body;
+      render();
+      const box = typing && document.getElementById(typing.id);
+      if (box) box.focus(), box.setSelectionRange(at, at);
     } catch (e) { failed(e); }
   }
   if (FROZEN) (state = FROZEN), render();

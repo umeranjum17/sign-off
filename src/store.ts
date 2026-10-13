@@ -67,7 +67,8 @@ export function writeItems(path: string, items: object[], extra?: Record<string,
 }
 
 export function loadDecisions(path: string): Decision[] {
-  const name = basename(path), { schema, items } = readItems(path), list = schema === 1 ? 'decisions' : 'items';
+  const name = basename(path), { schema, items, extra } = readItems(path), list = schema === 1 ? 'decisions' : 'items';
+  const fed = extra.readonly === true || extra.answers_only === true;
   const seen = new Map<string, number>();
   return items.map((d: any, i: number): Decision => {
     const bad = (field: string, rule: string) => new InputError(`${name}: ${list}[${i}] (key ${JSON.stringify(d?.key)}): ${field} ${rule}`);
@@ -102,10 +103,10 @@ export function loadDecisions(path: string): Decision[] {
     const views = Object.hasOwn(VIEWS, d.type ?? '') ? VIEWS[d.type] : undefined;
     if (views && !(isText(d.view) && d.view.length <= 256 && /^[^?#]+$/.test(d.view) && views[1].test(d.view))) throw bad('view', `must be a board-relative ${views[0]} file`);
     const options = d.options ?? (d.type === 'evidence' ? VERDICTS : YES_NO);
-    // An empty list is an item to look at only, unless it takes a reply.
-    if (!Array.isArray(options) || options.length === 1 || options.length > 6
+    // An empty list is an item to look at only, unless it takes a reply: only a board another program feeds shows those.
+    if (!Array.isArray(options) || options.length === 1 || (!options.length && !fed) || options.length > 6
       || !options.every((o) => isKey(o?.value) && isText(o.label) && o.label.trim())) {
-      throw bad('options', 'must be empty or 2 to 6 items, each a value of 1-128 of A-Z a-z 0-9 . _ - and a label');
+      throw bad('options', 'must be 2 to 6 items (or empty on a readonly or answers_only board), each a value of 1-128 of A-Z a-z 0-9 . _ - and a label');
     }
     const values = options.map((o: Option) => o.value);
     if (new Set(values).size < values.length) throw bad('options', 'values must be unique');

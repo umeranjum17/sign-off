@@ -43,7 +43,8 @@
   while the person answered it is still saved. A feeding program writes the
   board with `sign-off-axi post <board> --from <file> --replace`, which checks
   the whole file the way the board reads it and refuses a bad item before
-  anything is written; answers stay.
+  anything is written; answers stay. A key that was answered may not come back
+  with a different title, options or reply: post that question under a new key.
 - A 0.1.0 file, `"schema": 1` with a `"decisions"` list, still reads: each entry is an item, a decision unless it says otherwise. The first write that changes it (a `raise` of a new key, or a `post`) rewrites it as `"schema": 2` (temp file, then rename) and first keeps the old file once beside it as `<board>.schema-1.bak`. Answer and round files are not touched.
 - `key`: 1-128 of `A-Z a-z 0-9 . _ -`, unique in the file. `title`: required.
 - `type`: optional, `decision` (default), `design`, `evidence`, `diagram`,
@@ -100,7 +101,7 @@
   answer `text` with the words as its `note`; typed before a button is
   picked, it goes with that answer as its note. No option may use the value
   `text` then. With `"options": []` the reply is the only answer.
-- `options`: optional, 2 to 6 choices, or `[]` for an item that is only shown and waits on nothing (unless it has `reply`). Each has a `value` (1-128 of `A-Z a-z 0-9 . _ -`, unique within the question) and a non-empty `label` shown on its button. Leave it out for **Yes** (`yes`) and **No** (`no`); files written before options existed read exactly as before.
+- `options`: optional, 2 to 6 choices, or `[]` on a read-only or answers-only board for an item that is only shown and waits on nothing (unless it has `reply`). Each has a `value` (1-128 of `A-Z a-z 0-9 . _ -`, unique within the question) and a non-empty `label` shown on its button. Leave it out for **Yes** (`yes`) and **No** (`no`); files written before options existed read exactly as before.
 - `recommend_value`, `default_if_silent`: optional, the `value` of one of the question's own options (`yes` or `no` when `options` is left out). Shown, never applied.
 - `close`: optional, `done` (default) or `release`; copied into the answer.
 - `link`: optional on any item, an `http(s)` link (shown as a link on its card) or a 7-40 character commit hash.

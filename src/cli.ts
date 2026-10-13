@@ -405,11 +405,18 @@ function post(args: string[], cmd = 'post') {
 /** For a program that feeds the board: the --from file, checked like any post, becomes the whole board, items and top-level fields. Answers stay. */
 function replace(file: string, on: string, from?: string) {
   if (from === undefined) throw fail('--replace needs --from <board file>', 'VALIDATION_ERROR', 'sign-off-axi post board.json --from feed.json --replace');
-  const source = resolve(from);
-  loadDecisions(source);
+  const source = resolve(from), incoming = loadDecisions(source);
   const { items, extra } = readItems(source);
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
+    // An answer belongs to its question: an answered key may not come back asking something else.
+    const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply]);
+    for (const had of board(file)) {
+      const d = incoming.find((x) => x.key === had.key);
+      if (had.answer && d && question(d) !== question(had)) {
+        throw fail(`key ${d.key} was answered and now holds a different question on ${tilde(file)}`, 'CONFLICT', 'Post the new question under a new key');
+      }
+    }
     const old = existsSync(file) ? readItems(file) : undefined;
     // Written only when it changed, so a feeder that runs every few seconds leaves the file alone.
     const changed = JSON.stringify(old && { ...old.extra, schema: old.schema, items: old.items }) !== JSON.stringify({ ...extra, schema: 2, items });

@@ -625,7 +625,7 @@ test('an answers-only board fed through post --replace: a bad item is refused, y
   const before = readFileSync(file, 'utf8');
   const bad = write([page, { ...words, options: [{ value: 'only', label: 'Only' }] }]);
   assert.equal(bad.code, 2);
-  assert.match(bad.out, /feed\.json: items\[1\] \(key \\"ask-2\\"\): options must be empty or 2 to 6 items/);
+  assert.match(bad.out, /feed\.json: items\[1\] \(key \\"ask-2\\"\): options must be 2 to 6 items \(or empty/);
   assert.equal(write([{ ...yesNo, options: [{ value: 'text', label: 'T' }, { value: 'no', label: 'No' }] }]).code, 2);
   assert.equal(readFileSync(file, 'utf8'), before);
   assert.equal(run('post', file, '--replace').code, 2);
@@ -651,5 +651,11 @@ test('an answers-only board fed through post --replace: a bad item is refused, y
   assert.equal(statSync(join(dir, 'board.answers.jsonl')).mode & 0o777, 0o600);
   assert.deepEqual(readdirSync(dir).filter((f) => /jsonl$/.test(f)), ['board.answers.jsonl']);
   assert.match(run('list', file).out, /0 of 2 decisions/);
+  // An answered key may not come back asking something else; an item only shown needs a fed board.
+  const moved = write([page, { ...words, title: 'Say go when you are' }]);
+  assert.notEqual(moved.code, 0);
+  assert.match(moved.out, /key ask-2 was answered and now holds a different question/);
+  writeFileSync(feed, JSON.stringify({ schema: 2, items: [page] }));
+  assert.equal(run('post', join(dir, 'plain.json'), '--from', feed, '--replace').code, 2);
   proc.kill();
 });
