@@ -427,10 +427,9 @@
   const title = (d) => (d.type === 'evidence' ? `Update ${d.number} · ${d.title}` : d.title);
 
   /** Dismiss hides items from this board (the agent is not told, so an ask keeps waiting); Undo puts them back. */
-  const post = (body) => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   // The server takes at most 200 keys a request; the requests run one after another so the last reply carries every change.
   const setDismissed = (keys, dismissed) => Array.from({ length: Math.ceil(keys.length / 200) }, (_, i) => keys.slice(i * 200, i * 200 + 200))
-    .reduce((sent, part) => sent.then(() => call('/api/dismiss', post({ keys: part, dismissed }))), Promise.resolve());
+    .reduce((sent, part) => sent.then(() => call('/api/dismiss', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keys: part, dismissed }) })), Promise.resolve());
   function dismiss(keys, text) {
     setDismissed(keys, true).then(() => {
       undoBtn.setAttribute('aria-label', `Undo, ${text}`);

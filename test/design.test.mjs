@@ -546,6 +546,48 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   proc.kill();
 });
 
+const until = async (check) => {
+  for (let i = 0; i < 100; i++) {
+    if (await check()) return;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  assert.fail('the page did not reach the expected state');
+};
+
+test('Clear all done on 201 answered items: the page empties in chunks, says so, and Undo brings all 201 back', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'many-answered'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  const abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l }));
+  const keys = Array.from({ length: 201 }, (_, i) => `q${i}`);
+  writeFileSync(file, JSON.stringify({ schema: 2, items: keys.map((key) => ({ key, title: `Question ${key}`, options: abc, recommend_value: 'b' })) }));
+  writeFileSync(file.replace(/\.json$/, '.answers.jsonl'), keys.map((key) => JSON.stringify({ key, answer: 'a', label: 'A', close: 'done', at: new Date().toISOString() })).join('\n') + '\n');
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const profile = join(dir, 'profile');
+  const browser = spawn(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${profile}`, '--remote-debugging-port=0', 'about:blank'], { env: { ...process.env, TMPDIR: dir }, stdio: 'ignore' });
+  procs.push(browser);
+  await until(() => existsSync(join(profile, 'DevToolsActivePort')));
+  const [port] = readFileSync(join(profile, 'DevToolsActivePort'), 'utf8').trim().split('\n');
+  const page = (await (await fetch(`http://127.0.0.1:${port}/json`)).json()).find((t) => t.type === 'page');
+  const ws = new WebSocket(page.webSocketDebuggerUrl);
+  await new Promise((ok) => { ws.onopen = ok; });
+  const replies = new Map();
+  let seq = 0;
+  ws.onmessage = (m) => { const msg = JSON.parse(m.data); replies.get(msg.id)?.(msg.result); };
+  const evaluate = (expression) => new Promise((ok) => { const id = ++seq; replies.set(id, ok); ws.send(JSON.stringify({ id, method: 'Runtime.evaluate', params: { expression, returnByValue: true } })); }).then((r) => r.result.value);
+  const rows = 'document.querySelectorAll("article.row").length';
+  await evaluate(`location.href = ${JSON.stringify(`${url}#answered`)}`);
+  await until(async () => (await evaluate(`${rows} === 201`)));
+  await evaluate('document.querySelector(".clear").click()');
+  await until(async () => (await evaluate(`${rows} === 0 && document.querySelector(".empty")?.textContent === "All done items cleared."`)));
+  await evaluate('document.getElementById("undo").click()');
+  await until(async () => (await evaluate(`${rows} === 201`)));
+  ws.close();
+  browser.kill();
+  proc.kill();
+});
+
 test('a lock left by a sign-off-axi that stopped mid-write: raise names it, doctor prints its fix, the fix clears it', () => {
   const dir = join(scratch, 'crashed'), sod = join(dir, '.sign-off'), lock = join(sod, 'decisions.json.lock');
   run('init', dir);
