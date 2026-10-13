@@ -951,7 +951,7 @@
   const pointing = new Map(), pointed = new Map();
   const mockFrame = (source) => [...document.querySelectorAll('.mock iframe')].find((f) => f.contentWindow === source);
   const aim = (frame) => {
-    const on = pointing.get(frame.dataset.mock) === true;
+    const on = talks() && pointing.get(frame.dataset.mock) === true;
     frame.style.pointerEvents = on ? 'auto' : '';
     frame.parentElement.classList.toggle('aiming', on);
     frame.contentWindow.postMessage({ 'sign-off': 'point', on }, '*');
