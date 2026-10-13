@@ -20,7 +20,7 @@ Board items stored before v1 have no `kind` or `schema`. They read exactly as to
 
 Every new post of a contract kind is checked against that kind's v1 rules from the change that adds that kind. `raise`, and `post --type decision`, which is the same thing, post an `ask`: they fill in `contract`, `kind` and `schema` themselves, then check the item. `post --type evidence` posts an `evidence` the same way. `raise` stamps `filed` itself where a kind needs it.
 
-Non-contract types stay outside this contract. `raise --title` and `post --type design|diagram|interactive|explainer` keep the board rules in [file-formats.md](file-formats.md). In a `--from` file, a new item of a contract kind with no `kind` is refused with the fix "add contract, kind and schema".
+Non-contract types stay outside this contract. `raise --title` and `post --type design|diagram|interactive|explainer` keep the board rules in [file-formats.md](file-formats.md). In a `--from` file, a new item of a contract kind with no `kind` is refused with a fix line to add `contract`, `kind` and `schema`.
 
 ## 3. How a message gets in
 
@@ -79,7 +79,7 @@ Something the person reads. It takes no answer. Shows in Reports and explainers.
 
 - Required: the common fields, `about`, `filed` (a real UTC date and time, exactly `YYYY-MM-DDTHH:MM:SSZ` with seconds 00-59, such as `2026-10-13T07:19:00Z`).
 - Optional: `group` (text, 1-40), `decided` (text, 1-200).
-- No `options` key, not even `[]`: it is refused with the fix "post an ask to get an answer". On the board it is stored with no options, shows under Reports and explainers on any board, and never waits.
+- No `options` key, not even `[]`: it is refused with the fix "post an ask to get an answer". On the board it is stored with no options, shows under Reports and explainers on any board, and never waits. A stored report that carries `options`, `reply`, `area` or `type` is refused when the board is read, the same way.
 
 ### evidence, schema 1
 
