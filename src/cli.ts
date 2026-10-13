@@ -218,7 +218,7 @@ examples:
 Checks the repo setup init wrote: node version, config, board file, answer files, a lock a crashed command left behind, gitignore lines, folders, whether the dashboard port is free,
 that each hosts: name in the config leads to the bind address, that the on_answer: command can run (no shell, so | > && do nothing),
 and one line per coding agent in the config's agent: line (auto: each one on PATH) saying whether its skill is installed.
-With no dir, it checks the nearest setup from the working folder up to the repo root, found as a bare command finds its board.
+With no dir, it checks the nearest setup, found as a bare command finds its board (README: Test runs never touch your board).
 Each failure prints one help line naming its fix and exits 1; a clean setup exits 0.
 examples:
   sign-off-axi doctor
