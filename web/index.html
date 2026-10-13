@@ -429,12 +429,15 @@
 
   /** Dismiss hides items from this board (the agent is not told, so an ask keeps waiting); Undo puts them back. */
   const post = (body) => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  // The server takes at most 200 keys a request; the requests run one after another so the last reply carries every change.
+  const setDismissed = (keys, dismissed) => Array.from({ length: Math.ceil(keys.length / 200) }, (_, i) => keys.slice(i * 200, i * 200 + 200))
+    .reduce((sent, part) => sent.then(() => call('/api/dismiss', post({ keys: part, dismissed }))), Promise.resolve());
   function dismiss(keys, text) {
-    call('/api/dismiss', post({ keys, dismissed: true })).then(() => {
+    setDismissed(keys, true).then(() => {
       undoBtn.setAttribute('aria-label', `Undo, ${text}`);
       say(text, 5000, () => {
         undoBtn.disabled = true;
-        call('/api/dismiss', post({ keys, dismissed: false })).then(() => say('Back on the board', 3000), (e) => say(`Couldn't undo: ${e.message}`, 8000));
+        setDismissed(keys, false).then(() => say('Back on the board', 3000), (e) => say(`Couldn't undo: ${e.message}`, 8000));
       });
       undoBtn.focus();
     }, (e) => say(`Couldn't dismiss: ${e.message}`, 8000));
@@ -641,8 +644,8 @@
   }
 
   /** The day so far: a mark per answer on a line of hours, and the list of them. Items carry no time of their own, so only answers show. */
-  function today() {
-    const day = new Date().toDateString(), done = state.decisions.filter(isAnswered).map((d) => ({ d, t: new Date(state.answers[d.key].at) }))
+  function today(answered) {
+    const day = new Date().toDateString(), done = answered.map((d) => ({ d, t: new Date(state.answers[d.key].at) }))
       .filter((e) => e.t.toDateString() === day).sort((x, y) => x.t - y.t);
     const head = (range) => el('div', { class: 'sec-head' }, el('h2', {}, 'Today'), range ? el('span', { class: 'meta' }, range) : '');
     if (!done.length) return el('section', { class: 'card today' }, head(), el('p', { class: 'meta' }, 'Nothing answered today yet.'));
@@ -770,7 +773,7 @@
       : at === 'reports' && !state.readonly && by.reports.length ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
         ...reportGroups(by.reports)] : at ? [at === 'answered' && clearAll(by.answered) ? el('div', { class: 'tools' }, clearAll(by.answered)) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [el('div', { class: 'tiles' }, ...Object.keys(AREAS).map((a) => tile(a, by[a]))),
-      el('div', { class: 'pair' }, needs, today()), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()]),
+      el('div', { class: 'pair' }, needs, today(by.answered)), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()]),
       el('div', { class: 'areas' }, ...Object.keys(AREAS).map((a) => section(a, by[a])))]));
     if (FROZEN) freeze();
   }
