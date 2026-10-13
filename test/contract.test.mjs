@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { decode } from '@toon-format/toon';
@@ -187,4 +187,18 @@ test('a report re-posted under its key reports already posted, and a feed with n
   const empty = cli2('raise', board, '--from', feed('empty.json'));
   assert.equal(empty.status, 0, empty.stdout);
   assert.doesNotMatch(empty.stdout, /so the user can read/);
+});
+
+test('a re-post of an answered ask beside a new report gets the read hint, never the answer hint', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const board = join(scratch, 'answered.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const feed = (name, ...items) => message(name, JSON.stringify({ schema: 2, items }));
+  assert.equal(cli2('raise', board, '--from', feed('ask.json', ask)).status, 0);
+  appendFileSync(join(scratch, 'answered.answers.jsonl'), `${JSON.stringify({ key: ask.key, answer: 'yes', label: 'Yes', close: 'done', at: '2026-10-13T08:00:00Z' })}\n`);
+  const mixed = cli2('raise', board, '--from', feed('mixed.json', ask, { ...report, key: 'mixed-report' }));
+  assert.equal(mixed.status, 0, mixed.stdout);
+  assert.match(mixed.stdout, /so the user can read them/);
+  assert.doesNotMatch(mixed.stdout, /so the user can answer/);
 });

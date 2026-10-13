@@ -684,9 +684,10 @@ function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: 
     });
     if (raised.some((r) => r.status === 'raised')) writeItems(file, items);
     const key = raised.length === 1 ? ` --key ${raised[0].key}` : '';
-    // Reports take no answer, so a post of only reports asks the user to read them, never to answer.
-    if (incoming.length && !incoming.some(waits)) return toon({ board: tilde(file), raised }, [`Run \`sign-off-axi open${on}\` so the user can read ${incoming.length > 1 ? 'them' : 'it'}`]);
-    const open = raised.some((r) => !r.status.startsWith('already answered')) ? [`Run \`sign-off-axi open${on}\` so the user can answer`] : [];
+    // Reports take no answer, so a post with nothing waiting asks the user to read it, never to answer.
+    const anyWaiting = incoming.some((d, i) => waits(d) && !raised[i].status.startsWith('already answered'));
+    if (incoming.length && !anyWaiting) return toon({ board: tilde(file), raised }, [`Run \`sign-off-axi open${on}\` so the user can read ${incoming.length > 1 ? 'them' : 'it'}`]);
+    const open = anyWaiting ? [`Run \`sign-off-axi open${on}\` so the user can answer`] : [];
     return toon({ board: tilde(file), raised }, [...open, ...(filer ? [waitFor(on, filer)] : []), `Run \`sign-off-axi answers${on}${key}\` to read ${key ? 'the answer' : 'the answers'}`]);
   });
 }
