@@ -1407,10 +1407,12 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     if (![ref, tag, words].every((v) => typeof v === 'string' && v.length <= 300) || !ref || !tag) return [400, { error: 'Point at an element of the mock first' }];
     if (typeof text !== 'string' || !text.trim() || [...text.trim()].length > NOTE_MAX) return [400, { error: `Write the comment first, ${NOTE_MAX} characters or fewer` }];
     const m = loadDecisions(file).find((x) => x.key === key)?.mocks?.find((x) => x.value === mock);
-    const hash = m && /\.html?$/i.test(mockFile(m.path)) && mockHash(m.path);
+    const hash = m && /\.html$/i.test(mockFile(m.path)) && mockHash(m.path);
     if (!hash) return [404, { error: 'This mock is no longer on the board' }];
     // The page saved against the file it showed; a file overwritten since then is not the one the comment is about.
     if (shown !== hash) return [409, { error: 'The mock changed; reload the board' }];
+    // An edit names a comment that must still be live, so a deleted one is not written back.
+    if (id !== undefined && !live.some((a) => a.id === id)) return [404, { error: 'This comment is gone' }];
     // One comment per element: another on the same element of the same file edits the first.
     const same = live.find((a) => a.key === key && a.mock === mock && a.hash === hash && a.ref === ref);
     appendAnnotation(file, { id: same?.id, key, mock, hash, ref, tag, words, text: text.trim() });

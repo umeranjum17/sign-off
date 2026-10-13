@@ -690,8 +690,8 @@
       });
     };
     // While Comment on the mocks is on, a tap on a mock names an element to comment on instead of opening the mock.
-    const pages = (d.mocks ?? []).filter((m) => m.hash !== null && /\.html?$/i.test(m.path.split('?')[0])), on = pages.some((m) => pointing.get(`${d.key}~${m.value}`));
-    if (!talks() || !pages.length) return el('div', { class: 'ann', 'data-ann': d.key });
+    const pages = (d.mocks ?? []).filter((m) => m.hash !== null && /\.html$/i.test(m.path.split('?')[0])), on = pages.some((m) => pointing.get(`${d.key}~${m.value}`));
+    if (!talks()) return el('div', { class: 'ann', 'data-ann': d.key });
     const toggle = el('button', { class: 'quick', 'aria-pressed': String(on), 'aria-label': `Comment on the mocks, ${d.title}` }, 'Comment on the mocks');
     toggle.onclick = () => {
       for (const m of pages) pointing.set(`${d.key}~${m.value}`, !on);
@@ -699,11 +699,11 @@
       redraw(d);
     };
     let form = '';
-    if (open) {
+    if (open && pages.length) {
       const box = el('textarea', { id: `ann-text-${d.key}`, rows: 2, maxlength: 500, dir: 'auto' }), save = el('button', {}, 'Save comment'), cancel = el('button', { class: 'quick' }, 'Cancel');
       box.value = open.text ?? mine.find((a) => a.mock === open.mock && a.ref === open.ref)?.text ?? '';
       box.oninput = () => (open.text = box.value);
-      save.onclick = () => post(save, { key: d.key, mock: open.mock, ref: open.ref, tag: open.tag, words: open.words, text: box.value, hash: open.hash }, () => editing.delete(d.key));
+      save.onclick = () => post(save, { id: open.id, key: d.key, mock: open.mock, ref: open.ref, tag: open.tag, words: open.words, text: box.value, hash: open.hash }, () => editing.delete(d.key));
       cancel.onclick = () => { editing.delete(d.key); redraw(d); };
       form = el('div', {}, el('label', { for: box.id }, `Comment on ${what(open)}`), box, el('div', { class: 'actions' }, save, cancel));
     }
@@ -713,7 +713,7 @@
       del.onclick = () => post(del, { id: a.id, deleted: true }, () => { if (editing.get(d.key)?.mock === a.mock && editing.get(d.key)?.ref === a.ref) editing.delete(d.key); });
       return el('li', {}, el('div', {}, el('p', { class: 'meta' }, what(a)), el('p', { class: 'saved-note', dir: 'auto' }, a.text)), el('span', { class: 'actions' }, edit, del));
     });
-    return el('div', { class: 'ann', 'data-ann': d.key }, el('div', { class: 'actions' }, toggle),
+    return el('div', { class: 'ann', 'data-ann': d.key }, pages.length ? el('div', { class: 'actions' }, toggle) : '',
       on ? el('p', { class: 'meta' }, 'Tap an element in a mock to comment on it. Turn this off to open a mock full size.') : '', form, rows.length ? el('p', { class: 'meta' }, 'Your comments on the mocks, not sent yet') : '', rows.length ? el('ul', {}, ...rows) : '',
       ...[...old].map(([m, n]) => el('p', { class: 'meta' }, `${n} comment${n > 1 ? 's' : ''} on an earlier version of “${name(m)}” ${n > 1 ? 'are' : 'is'} hidden`)), err);
   }
