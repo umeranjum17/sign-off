@@ -46,6 +46,9 @@
   anything is written; answers stay. A key that was answered may not come back
   with a different title, options or reply: post that question under a new key.
 - `.sign-off-vault-id` (0600, in the board's folder, written only by a vault item): holds the random id naming that folder's private vault records; no other command reads it, and vault custody is not enabled in this build.
+  Private custody metadata includes `expires`, an absolute integer Unix deadline in milliseconds, authenticated with the encrypted payload. Give defaults to 10 minutes; Receive requires an explicit deadline. New deadlines must be in the future and at most one hour away; the producer must supply an earlier provider deadline when applicable.
+  Under the private custody lock, accessing an elapsed pending/ready record writes an `expired` tombstone without ciphertext. Inspect reports that state; deposit/refuse return fixed `EXPIRED` errors, and no terminal key can be recreated. Existing records without a deadline fail validation, rather than gaining a new lifetime.
+  This remains an OFF, unwired module with **access-driven expiry only**, including access after restart. Startup/background expiry sweeps and event/wait wakeups without a browser are still required before activation. Deletion is logical, not guaranteed erasure from backups or storage journals.
 - A 0.1.0 file, `"schema": 1` with a `"decisions"` list, still reads: each entry is an item, a decision unless it says otherwise. The first write that changes it (a `raise` of a new key, or a `post`) rewrites it as `"schema": 2` (temp file, then rename) and first keeps the old file once beside it as `<board>.schema-1.bak`. Answer and round files are not touched.
 - `key`: 1-128 of `A-Z a-z 0-9 . _ -`, unique in the file. `title`: required.
 - `recommend_value`: the option the poster would pick; the board shows it first and marks it **Recommended**.

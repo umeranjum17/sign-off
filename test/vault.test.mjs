@@ -7,9 +7,11 @@ import { tmpdir } from 'node:os';
 import { createDecipheriv, randomBytes } from 'node:crypto';
 
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
-const worker = `import { createVault, depositVault, inspectVault, refuseVault } from ${JSON.stringify(new URL('../dist/vault.js', import.meta.url).href)};
+const worker = `import { writeFileSync } from 'node:fs';
+import { createVault, depositVault, inspectVault, refuseVault } from ${JSON.stringify(new URL('../dist/vault.js', import.meta.url).href)};
 let input=''; for await (const chunk of process.stdin) input+=chunk;
-const {op,meta,value,board,key}=JSON.parse(input);
+const {op,meta,value,board,key,started}=JSON.parse(input);
+if(started) writeFileSync(started,'started');
 try { const out=await ({create:()=>createVault(meta,value===undefined?undefined:Buffer.from(value)),deposit:()=>depositVault(board,key,Buffer.from(value)),inspect:()=>inspectVault(board,key),refuse:()=>refuseVault(board,key)})[op](); console.log(JSON.stringify(out)); }
 catch(e) { console.log(JSON.stringify({code:e.code,error:e.message})); process.exitCode=1; }`;
 
@@ -29,27 +31,29 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     });
     child.stdin.end(JSON.stringify(input));
   });
-  const meta = (key, mode = 'give') => ({ board, key, mode, filer: 'demo-agent',...(mode === 'give' && { destination: join(home, 'config', 'api-token') }) });
+  const meta = (key, mode = 'give') => ({ board, key, mode, filer: 'demo-agent', ...(mode === 'receive' && { expires: Date.now() + 3_600_000 }),...(mode === 'give' && { destination: join(home, 'config', 'api-token') }) });
   const inspect = (key) => run({ op: 'inspect', board, key });
   const files = (dir) => readdirSync(dir).flatMap((n) => { const p = join(dir, n); return statSync(p).isDirectory() ? files(p) : [p]; });
   try {
-    assert.equal((await run({ op: 'create', meta: meta('give') })).status, 'pending');
+    const before = Date.now(), initial = await run({ op: 'create', meta: meta('give') });
+    assert.equal(initial.status, 'pending');
+    assert.ok(initial.expires >= before + 600_000 && initial.expires <= Date.now() + 600_000);
     const dir = join(state, 'sign-off', 'vault'), keyPath = join(dir, 'key');
     assert.equal(statSync(dir).mode & 0o777, 0o700); assert.equal(statSync(keyPath).mode & 0o777, 0o600);
     const raced = await Promise.all([1, 2].map(() => run({ op: 'deposit', board, key: 'give', value: secret })));
     assert.deepEqual(raced.map((r) => r.exit).sort(), [0, 1]);
-    assert.equal(raced.find((r) => r.error).error, 'Vault input is invalid: check mode, provider and destination.');
+    assert.equal(raced.find((r) => r.error).error, 'Vault input is invalid: check mode, expiry, provider and destination.');
     assert.equal((await inspect('give')).status, 'ready');
     const recordPath = readdirSync(dir).filter((n) => n.endsWith('.json')).map((n) => join(dir, n))[0], record = JSON.parse(readFileSync(recordPath));
     // Trusted-owner control: the synthetic private key really decrypts; altered routing cannot authenticate.
     const decrypt = (m) => {
       const cipher = createDecipheriv('aes-256-gcm', readFileSync(keyPath), Buffer.from(record.sealed.nonce, 'base64'));
-      cipher.setAAD(Buffer.from(JSON.stringify([1, m.board, m.key, m.mode, m.destination ?? null, m.filer])));
+      cipher.setAAD(Buffer.from(JSON.stringify([1, m.board, m.key, m.mode, m.expires, m.destination ?? null, m.filer])));
       cipher.setAuthTag(Buffer.from(record.sealed.tag, 'base64'));
       return Buffer.concat([cipher.update(Buffer.from(record.sealed.data, 'base64')), cipher.final()]).toString();
     };
     assert.ok(decrypt(record.meta) === secret, 'Trusted-owner decryption must match without printing the payload.');
-    for (const [field, value] of [['board', '/other/board.json'], ['key', 'other'], ['mode', 'receive'], ['destination', '/other/token'], ['filer', 'other']]) assert.throws(() => decrypt({ ...record.meta, [field]: value }));
+    for (const [field, value] of [['board', '/other/board.json'], ['key', 'other'], ['mode', 'receive'], ['expires', record.meta.expires + 1], ['destination', '/other/token'], ['filer', 'other']]) assert.throws(() => decrypt({ ...record.meta, [field]: value }));
     assert.equal((await run({ op: 'refuse', board, key: 'give' })).status, 'refused');
     assert.equal(JSON.parse(readFileSync(recordPath)).sealed, undefined);
     assert.equal((await run({ op: 'deposit', board, key: 'give', value: secret })).error, 'User refused this vault item; no value was delivered.');
@@ -124,6 +128,53 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     writeFileSync(feed, JSON.stringify({ schema: 2, items: [{ key: 'raised', title: 'Raised' }] }));
     assert.equal(spawnSync(process.execPath, [cli, 'post', board, '--from', feed], { env, encoding: 'utf8' }).status, 0);
     assert.equal((await run({ op: 'create', meta: meta('sequence') })).code, 'VALIDATION_ERROR');
+    // Deadlines are private, validated before folder identity initialization, and never inferred for Receive.
+    const invalidDir = join(home, 'invalid-expiry'); mkdirSync(invalidDir, { mode: 0o700 });
+    const invalidBoard = join(invalidDir, 'board.json'); writeFileSync(invalidBoard, '{"schema":2,"items":[]}');
+    for (const expires of [null, 0, -1, 1.5, secret, Date.now() - 1, Date.now() + 7_200_000]) {
+      const r = await run({ op: 'create', meta: { ...meta('invalid-expiry'), board: invalidBoard, expires } });
+      assert.equal(r.code, 'VALIDATION_ERROR');
+      assert.equal(r.error, 'Vault input is invalid: check mode, expiry, provider and destination.');
+    }
+    const receive = meta('needs-expiry', 'receive'); delete receive.expires;
+    assert.equal((await run({ op: 'create', meta: { ...receive, board: invalidBoard }, value: url })).code, 'VALIDATION_ERROR');
+    assert.deepEqual(readdirSync(invalidDir), ['board.json']);
+    const recordFor = (key) => readdirSync(dir).filter((n) => n.endsWith('.json')).map((n) => join(dir, n)).find((p) => JSON.parse(readFileSync(p)).meta.key === key);
+    const waitFor = async (condition, deadline) => {
+      while (!condition()) { assert.ok(Date.now() < deadline, 'Expiry condition timed out.'); await new Promise((ok) => setTimeout(ok, 20)); }
+    };
+    // Real wall clock and real child processes: no browser or timer mock is involved.
+    for (const mode of ['give', 'receive']) {
+      const key = `expires-${mode}`, expires = Date.now() + 3_000;
+      const r = await run({ op: 'create', meta: { ...meta(key, mode), expires }, ...(mode === 'receive' && { value: url }) });
+      assert.equal(r.status, mode === 'give' ? 'pending' : 'ready'); assert.equal(r.expires, expires);
+      const path = recordFor(key);
+      await waitFor(() => Date.now() >= expires, expires + 5_000);
+      assert.equal(JSON.parse(readFileSync(path)).status, r.status); // access-driven, not a background sweep
+      assert.equal((await inspect(key)).status, 'expired');
+      const terminal = readFileSync(path); assert.equal(JSON.parse(terminal).sealed, undefined);
+      assert.equal((await inspect(key)).status, 'expired'); assert.deepEqual(readFileSync(path), terminal);
+      assert.equal((await run({ op: 'deposit', board, key, value: secret })).code, 'EXPIRED');
+      assert.equal((await run({ op: 'refuse', board, key })).error, 'Vault item expired; request a fresh item.');
+      assert.equal((await run({ op: 'create', meta: meta(key, mode), ...(mode === 'receive' && { value: url }) })).code, 'VALIDATION_ERROR');
+    }
+    const expires = Date.now() + 3_000, lock = join(dir, 'lock'), started = join(home, 'deposit-started');
+    assert.equal((await run({ op: 'create', meta: { ...meta('locked-expiry'), expires } })).status, 'pending');
+    await waitFor(() => Date.now() >= expires - 500, expires + 5_000);
+    writeFileSync(lock, '', { mode: 0o600 });
+    const waiting = run({ op: 'deposit', board, key: 'locked-expiry', value: secret, started });
+    try {
+      await waitFor(() => existsSync(started), expires + 5_000);
+      assert.ok(Date.now() < expires, 'Deposit child must start before expiry.');
+      await waitFor(() => Date.now() >= expires + 20, expires + 5_000);
+    } finally { rmSync(lock, { force: true }); }
+    assert.equal((await waiting).code, 'EXPIRED');
+    const expiredRecord = JSON.parse(readFileSync(recordFor('locked-expiry')));
+    assert.equal(expiredRecord.status, 'expired'); assert.equal(expiredRecord.sealed, undefined);
+    // Legacy records without a deadline fail closed rather than receiving a fresh lifetime.
+    const keptPath = recordFor('kept'), kept = readFileSync(keptPath), legacy = JSON.parse(kept);
+    delete legacy.meta.expires; writeFileSync(keptPath, JSON.stringify(legacy));
+    assert.equal((await inspect('kept')).code, 'VALIDATION_ERROR'); writeFileSync(keptPath, kept);
     for (const text of [...outputs, ...files(home).map((p) => readFileSync(p).toString())]) {
       assert.equal(text.includes(secret) || text.includes(url), false);
     }
