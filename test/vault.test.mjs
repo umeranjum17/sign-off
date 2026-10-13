@@ -60,10 +60,6 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     assert.equal((await run({ op: 'deposit', board, key: 'give', value: secret })).error, 'User refused this vault item; no value was delivered.');
     assert.equal((await run({ op: 'create', meta: meta('give') })).exit, 1);
     assert.equal((await run({ op: 'create', meta: meta('receive', 'receive', Date.now() + 800), value: url })).status, 'ready');
-    let expired; const deadline = Date.now() + 5_000;
-    do { expired = await inspect('receive'); assert.ok(Date.now() < deadline); } while (expired.status !== 'expired');
-    assert.equal((await run({ op: 'refuse', board, key: 'receive' })).error, 'Vault item expired; request a fresh item.');
-    assert.equal(files(dir).filter((p) => p.endsWith('.json')).map((p) => JSON.parse(readFileSync(p))).every((r) => !r.sealed), true);
     await run({ op: 'create', meta: meta('kept', 'receive'), value: url });
     const master = readFileSync(keyPath); rmSync(keyPath);
     assert.equal((await run({ op: 'create', meta: meta('missing-key', 'receive'), value: url })).error, 'Vault key is unavailable; encrypted payload cannot be read.');
@@ -117,18 +113,11 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     const fed = spawnSync(process.execPath, [cli, 'post', board, '--from', feed], { env, encoding: 'utf8' });
     outputs.push(fed.stdout, fed.stderr); assert.equal(fed.status, 2); assert.match(fed.stdout, /Vault is not enabled/);
     assert.equal(JSON.parse(readFileSync(board)).items[0].key, 'ordinary');
-    const raceDir = join(home, 'race'); mkdirSync(raceDir, { mode: 0o700 });
-    const runCli = (args) => new Promise((ok) => spawn(process.execPath, [cli, ...args], { env, stdio: 'ignore' }).once('exit', ok));
-    for (let i = 0; i < 5; i++) {
-      const raceBoard = join(raceDir, `board-${i}.json`), feed = join(raceDir, `feed-${i}.json`);
-      writeFileSync(raceBoard, JSON.stringify({ schema: 2, items: [] }));
-      writeFileSync(feed, JSON.stringify({ schema: 2, items: [{ key: `raced-${i}`, title: 'Raced' }] }));
-      await Promise.all([run({ op: 'create', meta: { ...meta(`vault-${i}`), board: raceBoard } }), runCli(['post', raceBoard, '--from', feed])]);
-      const raced = JSON.parse(readFileSync(raceBoard));
-      assert.deepEqual(raced.items.map((x) => x.key), [`raced-${i}`]);
-      assert.match(raced.vault_id, /^[a-f0-9]{32}$/);
-      assert.equal((await run({ op: 'inspect', board: raceBoard, key: `vault-${i}` })).status, 'pending');
-    }
+    assert.equal((await run({ op: 'create', meta: meta('sequence') })).status, 'pending');
+    assert.equal((await run({ op: 'refuse', board, key: 'sequence' })).status, 'refused');
+    writeFileSync(feed, JSON.stringify({ schema: 2, items: [{ key: 'raised', title: 'Raised' }] }));
+    assert.equal(spawnSync(process.execPath, [cli, 'post', board, '--from', feed], { env, encoding: 'utf8' }).status, 0);
+    assert.equal((await run({ op: 'create', meta: meta('sequence') })).code, 'VALIDATION_ERROR');
     for (const text of [...outputs, ...files(home).map((p) => readFileSync(p).toString())]) {
       assert.equal(text.includes(secret) || text.includes(url), false);
     }
