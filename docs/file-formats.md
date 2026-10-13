@@ -262,7 +262,7 @@ again until the filer takes it too.
 **Comments on mock elements**, not sent yet (`decisions.annotations.jsonl`, mode 600, oldest first).
 Each names its item's `key`, the option's `mock`, the sha256 `hash` of that mock file when the comment was saved,
 and the element as `ref`, `tag` and `words` (see the pointing script above). A later line with the same `id` edits it,
-and a `deleted` line removes it. The board shows a comment only while its mock file still has that hash,
+and a `deleted` line removes it. A save sends the `hash` the page showed; when the file has changed since, the server answers 409 and nothing is written. The board shows a comment only while its mock file still has that hash,
 and under the list it counts the comments on an earlier version of each mock as hidden:
 
 ```json

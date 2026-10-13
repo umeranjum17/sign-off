@@ -240,6 +240,7 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   assert.equal(data.files['/mock/local/nav~b/index.html?variant=b'], `data:text/html;charset=utf-8,${encodeURIComponent('<p>variant page</p>')}%3C!--?variant=b`);
   assert.equal(data.answers['pick-the-sign-in-layout'].answer, 'b');
   assert.equal(data.messages, undefined, 'the export leaves out comments and prompts');
+  assert.equal(data.annotations, undefined, 'the export leaves out comments on mocks');
   // A diagram and an interactive page are inlined too, so the frozen copy shows them with no server.
   assert.equal(data.files['/mock/local/flow~/flow.svg'], `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>').toString('base64')}`);
   assert.ok(data.files['/mock/local/demo~/demo.html']);
@@ -670,8 +671,10 @@ test('comments on mock elements: one per element, kept across a reload, edited a
   // The same element again opens its comment, and saving edits it: still one comment.
   assert.equal(await write('Make it blue'), 'Make this button green, Umer');
   assert.deepEqual((await evaluate('state.annotations')).map((a) => [a.id, a.text]), [[saved.id, 'Make it blue']]);
+  await evaluate(`(${button('Edit')}).click()`);
+  await until(() => evaluate("!!document.getElementById('ann-text-look')"));
   await evaluate(`(${button('Delete')}).click()`);
-  await until(() => evaluate("state.annotations.length === 0 && !document.querySelector('.ann li')"));
+  await until(() => evaluate("state.annotations.length === 0 && !document.querySelector('.ann li') && !document.getElementById('ann-text-look')"));
   // A comment made on one file shows only on that file: overwritten, the mock shows none, and a mock file gone shows the placeholder.
   await write('Keep the words');
   writeFileSync(mockA, '<button style="width: 100%; height: 3000px">Sign in</button>');
@@ -682,8 +685,9 @@ test('comments on mock elements: one per element, kept across a reload, edited a
   close();
   // The page asks nothing the server takes on trust: no text, an option with no page, and a read-only board are refused.
   const post = (body) => fetch(`${url}api/annotations`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.status);
-  const one = { key: 'look', mock: 'a', ref: '#app', tag: 'main', words: '', text: 'Hi' };
-  assert.deepEqual([await post({ ...one, text: ' ' }), await post({ ...one, mock: 'c' }), await post({ id: 'nope', deleted: true })], [400, 404, 404]);
+  const current = createHash('sha256').update(readFileSync(mockA)).digest('hex');
+  const one = { key: 'look', mock: 'a', ref: '#app', tag: 'main', words: '', text: 'Hi', hash: current };
+  assert.deepEqual([await post({ ...one, text: ' ' }), await post({ ...one, mock: 'c' }), await post({ id: 'nope', deleted: true }), await post({ ...one, hash: 'an older file' })], [400, 404, 404, 409]);
   writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, 'utf8')), readonly: true }));
   assert.equal(await post(one), 403);
   proc.kill();

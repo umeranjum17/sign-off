@@ -703,14 +703,14 @@
       const box = el('textarea', { id: `ann-text-${d.key}`, rows: 2, maxlength: 500, dir: 'auto' }), save = el('button', {}, 'Save comment'), cancel = el('button', { class: 'quick' }, 'Cancel');
       box.value = open.text ?? mine.find((a) => a.mock === open.mock && a.ref === open.ref)?.text ?? '';
       box.oninput = () => (open.text = box.value);
-      save.onclick = () => post(save, { key: d.key, mock: open.mock, ref: open.ref, tag: open.tag, words: open.words, text: box.value }, () => editing.delete(d.key));
+      save.onclick = () => post(save, { key: d.key, mock: open.mock, ref: open.ref, tag: open.tag, words: open.words, text: box.value, hash: hash.get(open.mock) }, () => editing.delete(d.key));
       cancel.onclick = () => { editing.delete(d.key); redraw(d); };
       form = el('div', {}, el('label', { for: box.id }, `Comment on ${what(open)}`), box, el('div', { class: 'actions' }, save, cancel));
     }
     const rows = mine.map((a) => {
       const edit = el('button', { class: 'quick', 'aria-label': `Edit comment, ${what(a)}` }, 'Edit'), del = el('button', { class: 'quick', 'aria-label': `Delete comment, ${what(a)}` }, 'Delete');
       edit.onclick = () => { editing.set(d.key, { ...a }); redraw(d); };
-      del.onclick = () => post(del, { id: a.id, deleted: true });
+      del.onclick = () => post(del, { id: a.id, deleted: true }, () => { if (editing.get(d.key)?.mock === a.mock && editing.get(d.key)?.ref === a.ref) editing.delete(d.key); });
       return el('li', {}, el('div', {}, el('p', { class: 'meta' }, what(a)), el('p', { class: 'saved-note', dir: 'auto' }, a.text)), el('span', { class: 'actions' }, edit, del));
     });
     return el('div', { class: 'ann', 'data-ann': d.key }, el('div', { class: 'actions' }, toggle),

@@ -1218,7 +1218,7 @@ async function exportBoard(args: string[]) {
   const parsed = parse('export', args, { out: { type: 'string' }, 'evidence-root': { type: 'string' } });
   ready(parsed.file, parsed.on, parsed.values['evidence-root']);
   [file, evidenceRoot] = [parsed.file, parsed.values['evidence-root'] ? resolve(parsed.values['evidence-root']) : ''];
-  const { file: _, messages: _messages, ...frozen } = state(), files: Record<string, string> = {}, q = encodeURIComponent;
+  const { file: _, messages: _messages, annotations: _annotations, ...frozen } = state(), files: Record<string, string> = {}, q = encodeURIComponent;
   let missing = 0;
   // The same URLs the page asks the server for, read through the same hash and path checks.
   const inline = async (url: string, query?: string) => {
@@ -1398,7 +1398,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     return [200, state()];
   }
   if (req.url === '/api/annotations') {
-    const { id, deleted, key, mock, ref, tag, words, text } = JSON.parse(body) ?? {}, live = readAnnotations(file);
+    const { id, deleted, key, mock, ref, tag, words, text, hash: shown } = JSON.parse(body) ?? {}, live = readAnnotations(file);
     if (deleted === true) {
       if (!live.some((a) => a.id === id)) return [404, { error: 'This comment is gone' }];
       appendAnnotation(file, { id, deleted });
@@ -1409,6 +1409,8 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     const m = loadDecisions(file).find((x) => x.key === key)?.mocks?.find((x) => x.value === mock);
     const hash = m && /\.html$/i.test(mockFile(m.path)) && mockHash(m.path);
     if (!hash) return [404, { error: 'This mock is no longer on the board' }];
+    // The page saved against the file it showed; a file overwritten since then is not the one the comment is about.
+    if (shown !== hash) return [409, { error: 'The mock changed; reload the board' }];
     // One comment per element: another on the same element of the same file edits the first.
     const same = live.find((a) => a.key === key && a.mock === mock && a.hash === hash && a.ref === ref);
     appendAnnotation(file, { id: same?.id, key, mock, hash, ref, tag, words, text: text.trim() });
