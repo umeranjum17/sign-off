@@ -209,6 +209,7 @@ also copies each file into `evidence/<number>/` next to the board:
 per item per tap, the latest line per key wins). **Dismiss** (the × on an item) and **Clear all done** (on Answered) hide
 items from the page; **Undo** saves `"dismissed": false`. The agent is not told: an ask it waits on keeps waiting.
 A new answer or another round after the line brings the item back. Read-only boards refuse it; answers-only boards take it.
+`*.dismissed.jsonl` is git-ignored here like `*.answers.jsonl`.
 
 ```json
 {"key":"keep-the-weekly-digest","dismissed":true,"at":"2026-10-12T15:41:10Z"}
