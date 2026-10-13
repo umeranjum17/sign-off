@@ -76,7 +76,7 @@ Look at every shot before you report: nothing overlaps, no text is cut, no raw p
 | Feature | Entry |
 |---|---|
 | Dashboard: every item type as a card on its area screen, pick on the mock card, plain card for new types | [features/dashboard.md](features/dashboard.md) |
-| Summary home: four area tiles with counts, Triage in Waiting on you, the `area` field, Needs you first (answer there, with Undo), Today, a short list per area, area screens with `‹ Summary` and the wide-screen sidebar, full trade-off, fitted evidence media, recommended vs picked | [features/summary.md](features/summary.md) |
+| Summary home: four area tiles with counts, Triage in Waiting on you, the `area` field, report cards with `steps` and Open/Close, Needs you first (answer there, with Undo), Today, a short list per area, area screens with `‹ Summary` and the wide-screen sidebar, full trade-off, fitted evidence media, recommended vs picked | [features/summary.md](features/summary.md) |
 | Decisions page: list, one-click answer, durable answers | [features/decisions.md](features/decisions.md) |
 | Design item: init/doctor, A/B/C mock cards, `?variant=` pages, another-round asks, `raise` as `post --type decision` | [features/design.md](features/design.md) |
 | Ladder rungs: diagram item inline at card width, interactive item in a sandboxed frame with no network | [features/ladder.md](features/ladder.md) |
