@@ -12,6 +12,8 @@ import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
 import { type Answer, CHAPTERS_MAX, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, writeItems } from './store.js';
 
+import { sweepVault } from './vault.js';
+
 const BOARD = join(homedir(), '.sign-off', 'decisions.json');
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
 /** Coding agents init installs the skill for: the `npx skills add -a` name, the command that shows it is installed,
@@ -988,6 +990,7 @@ async function serve(args: string[]) {
     const live = await running(parsed.file);
     if (live) throw fail(`this board is already open at ${live.url}`, 'CONFLICT', `Run \`sign-off-axi stop${parsed.on}\` first`);
     if (!loopback(bind)) tokenOf(parsed.file, true);
+    try { await sweepVault(); } catch { warn('Vault startup expiry unavailable; access checks remain enforced.'); }
     [file, evidenceRoot] = [parsed.file, parsed.values['evidence-root'] ? resolve(parsed.values['evidence-root']) : ''];
     await new Promise<void>((ok, no) => server.once('error', no).listen(port, bind, ok)).catch((e) => {
       throw fail(e.code === 'EADDRINUSE' ? `port ${port} is in use; pass --port` : e.code === 'EADDRNOTAVAIL' ? `${bind} is not an address of this machine; pass another --bind` : e.message, 'SERVE_FAILED');
