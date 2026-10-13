@@ -264,3 +264,7 @@ Deleting it, then `stop` and `open` again, makes a new one (`stop` and `open` al
 it in the link; the server log never holds it. `init` git-ignores `*.messages.jsonl`, `*.token` and
 `*.export.html` with the other files sign-off writes.
 
+**Board isolation for tests.** The default board is `~/.sign-off/decisions.json` under `SIGN_OFF_HOME` when it is set, else under HOME, and
+the walk to a project board never leaves the repo root or that home. A test isolates its board by pointing HOME and every `XDG_*` folder at
+one temporary folder, or `SIGN_OFF_HOME` at one. A board file named on the command line always wins, so a test names only boards inside
+its temporary folder, written out in full rather than with a `~` the calling shell expands.

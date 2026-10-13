@@ -1,6 +1,6 @@
 # AXI command surface and npm package
 
-Covers `sign-off-axi` with no command (list), `raise`, `answers`, `open`, `serve` and `--help`, the TOON, `--full` and `--json` tiers, and the packed tarball an agent runs with `npx -y`. Follow Isolation in `SKILL.md` first; this entry runs the packed tarball, not `dist/` from the repo.
+Covers `sign-off-axi` with no command (list), the board a bare command picks (the walk, `SIGN_OFF_HOME`), `raise`, `answers`, `open`, `serve` and `--help`, the TOON, `--full` and `--json` tiers, and the packed tarball an agent runs with `npx -y`. Follow Isolation in `SKILL.md` first; this entry runs the packed tarball, not `dist/` from the repo.
 
 ## Fresh shell
 
@@ -26,5 +26,7 @@ Run every step as `"${FRESH[@]}" bash -c 'cd "$SCR" && npx -y ./sign-off-axi-<ve
 | 8 | `tar tzf` the tarball; `kill <pid>` from step 4 | Only `package.json`, `LICENSE`, `README.md`, `dist/`, `web/` and `fixtures/contract/`; the board stops |
 | 9 | `init` in `$SCR/proj` (with a `.git` folder), then `raise --title "Umer: from deep?"` with no board from `proj/src/deep` | Every init hint says `npx -y sign-off-axi ... .sign-off/decisions.json`; the item is in `proj/.sign-off/decisions.json` and `~/.sign-off/` is not made |
 | 10 | In a fresh folder: `npx -y -p ./sign-off-axi-<version>.tgz sign-off-axi init --agent codex` | Exit 0, `codex,installed`, and `.agents/skills/sign-off-axi/SKILL.md` exists |
+| 11 | Make a stray board above a folder with no `.git`: `$SCR/other/.sign-off/` holding `config.yaml` (`board: decisions.json`) and `decisions.json` (`{"schema":2,"items":[]}`), then `raise --title "Umer: probe?"` with no board from `$SCR/other/work/proj` | The item is in `~/.sign-off/decisions.json` (the FRESH HOME) and `$SCR/other/.sign-off/decisions.json` still has no items: a board outside both the repo root and HOME is never used |
+| 12 | From the same folder, `SIGN_OFF_HOME="$SCR/so-home" ... raise --title "Umer: own home?"`, then the same with `$SCR/other/.sign-off/decisions.json` named | The first item is in `$SCR/so-home/.sign-off/decisions.json`; the named board takes the second |
 
 Extreme case `npm test` also covers: 20 agents raising at once keep all 20 decisions (the board takes a lock file while it writes).

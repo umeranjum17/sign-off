@@ -1060,10 +1060,11 @@ test('answer events: a filer takes only its own answers, once, the card shows it
   proc.kill();
 });
 
-test('no board named: the nearest .sign-off/ up to the repo root, else the home board; doctor checks on_answer; init and hints under npx', () => {
+test('no board named: the nearest .sign-off/ up to the repo root, else the home board, never one outside both; SIGN_OFF_HOME; doctor checks on_answer; init and hints under npx', () => {
   const at = (cwd, more, ...args) => spawnSync(process.execPath, [cli, ...args], { cwd, env: { ...env, ...more }, encoding: 'utf8' });
   const proj = join(scratch, 'walk'), deep = join(proj, 'src', 'deep'), inner = join(proj, 'inner'), items = (b) => JSON.parse(readFileSync(b, 'utf8')).items.map((i) => i.key);
   mkdirSync(deep, { recursive: true });
+  mkdirSync(join(proj, '.git'));
   mkdirSync(join(inner, '.git'), { recursive: true });
   // Hints name the board relative to the working folder, and through npx say npx -y sign-off-axi.
   assert.match(at(proj, {}, 'init').stdout, /Run `sign-off-axi post \.sign-off\/decisions\.json --type design/);
@@ -1075,6 +1076,21 @@ test('no board named: the nearest .sign-off/ up to the repo root, else the home 
   // A folder holding .git is the repo root: the walk stops there and falls back to the home board.
   assert.equal(at(inner, {}, 'raise', '--title', 'From the inner repo?').status, 0);
   assert.deepEqual(items(join(env.HOME, '.sign-off', 'decisions.json')), ['from-the-inner-repo']);
+  // A .sign-off/ above the working folder but outside both its repo root and HOME (another home's board, say, under an isolated HOME) is never adopted.
+  const other = join(scratch, 'other-home'), stray = join(other, 'work', 'proj');
+  mkdirSync(join(other, '.sign-off'), { recursive: true });
+  mkdirSync(stray, { recursive: true });
+  writeFileSync(join(other, '.sign-off', 'config.yaml'), 'board: decisions.json\nport: 0\n');
+  writeFileSync(join(other, '.sign-off', 'decisions.json'), '{"schema":2,"items":[]}\n');
+  assert.equal(at(stray, {}, 'raise', '--title', 'Probe from an isolated run?').status, 0);
+  assert.deepEqual(items(join(other, '.sign-off', 'decisions.json')), []);
+  assert.deepEqual(items(join(env.HOME, '.sign-off', 'decisions.json')), ['from-the-inner-repo', 'probe-from-an-isolated-run']);
+  // SIGN_OFF_HOME takes HOME's place for the default board; a board file given always wins.
+  const own = join(scratch, 'sign-off-home');
+  assert.equal(at(stray, { SIGN_OFF_HOME: own }, 'raise', '--title', 'Into SIGN_OFF_HOME?').status, 0);
+  assert.deepEqual(items(join(own, '.sign-off', 'decisions.json')), ['into-sign-off-home']);
+  assert.equal(at(stray, { SIGN_OFF_HOME: own }, 'raise', join(other, '.sign-off', 'decisions.json'), '--title', 'Named board?').status, 0);
+  assert.deepEqual(items(join(other, '.sign-off', 'decisions.json')), ['named-board']);
   // on_answer runs with no shell: doctor names a missing program, a shell operator and a file that will not run.
   const doctor = (hook) => (writeFileSync(join(proj, '.sign-off', 'config.yaml'), `board: decisions.json\nport: 0\non_answer: ${hook}\n`), at(proj, {}, 'doctor'));
   assert.match(doctor('nosuch-hook').stdout, /on_answer: nosuch-hook is not a program on PATH or an executable file\. Install nosuch-hook/);
