@@ -117,7 +117,8 @@ sign-off itself calls no model and inherits the calling agent's model routing.
 sign-off-axi                       list the decisions waiting on the user (same as list)
 sign-off-axi raise --title "<question>" [--key <key>] [--about <text>] [--detail <text>]
                     [--option <value>=<label>]... [--recommend <value>] [--default <value>] [--close done|release]
-sign-off-axi raise --from <decisions.json>      add every decision in a decisions file
+sign-off-axi raise --from <decisions.json>      add every decision in a decisions file (a new item of a contract kind carries `contract`, `kind` and `schema`: see docs/contract.md)
+sign-off-axi post --kind <kind> --from <message.json|->   post one contract message, from a file or stdin
 sign-off-axi post --type design --title "<question>" [--option <value>=<label>]... [--mock <value>=<path>]...
                     [--tradeoff <text>] [--recommend <value>]   ask for a pick between mocks, shown side by side
                                                 (--type decision is the same as raise; raise stays its alias)
@@ -130,7 +131,7 @@ sign-off-axi post --type explainer --title "<question>" --media <video> [--about
 sign-off-axi init [dir] [--agent auto|<name>]   write the repo setup under <dir>/.sign-off/ (config, board, mocks/ and evidence/ folders)
                                                 and install the skill for each chosen coding agent (auto: each one on PATH)
 sign-off-axi doctor [dir]                       check that setup and each agent's skill; every failure names its fix
-sign-off-axi validate <message.json>... [--kind <kind>]   check ask and report messages against the contract (docs/contract.md) without posting
+sign-off-axi validate <message.json>... [--kind <kind>] [--expect-invalid]   check ask and report messages against the contract (docs/contract.md) without posting
 sign-off-axi open  [--port 4410] [--bind <address>] [--evidence-root <dir>]   start the board in the background; prints its URL and pid
 sign-off-axi status                             is the board open started for this file running? its URL and pid
 sign-off-axi stop                               stop that board

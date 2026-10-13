@@ -53,8 +53,8 @@
 - A 0.1.0 file, `"schema": 1` with a `"decisions"` list, still reads: each entry is an item, a decision unless it says otherwise. The first write that changes it (a `raise` of a new key, or a `post`) rewrites it as `"schema": 2` (temp file, then rename) and first keeps the old file once beside it as `<board>.schema-1.bak`. Answer and round files are not touched.
 - `key`: 1-128 of `A-Z a-z 0-9 . _ -`, unique in the file. `title`: required, 160 characters or fewer for a new item; an item already on the board is not checked again, so an older longer title still loads.
 - `recommend_value`: the option the poster would pick; the board shows it first and marks it **Recommended**.
-  `raise`, `post` and `raise --from` refuse an item that lists `options` without one; a plain Yes/No may leave it out,
-  and a feed written with `post --from <file> --replace` is not held to it.
+  `raise` and `post` refuse an item that lists `options` without one; a plain Yes/No may leave it out.
+  In a `--from` file (a `--replace` feed too), a new item of a contract kind must be a contract message: see [contract.md](contract.md) section 2. An item already on the board is not checked again.
 - `filer`: optional, who filed the item (1-128 of `A-Z a-z 0-9 . _ -`), written by `post --filer`.
   `wait --filer` with the same id returns the answers to that filer's items. The page never shows it.
   `post --from <file> --replace --filer <id>` replaces only the items with that filer (and items with

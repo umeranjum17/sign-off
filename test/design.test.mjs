@@ -96,7 +96,7 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   assert.equal(run('post', board, '--type', 'design', '--title', 'Other?', '--option', 'a=A', '--option', 'b=B', '--mock', 'a=mocks/a.txt').code, 2);
   assert.equal(run('post', board, '--type', 'nope', '--title', 'Other?').code, 2);
   // A type with no renderer yet still loads, and lands on the page as a plain card.
-  writeFileSync(join(scratch, 'report.json'), JSON.stringify({ schema: 1, decisions: [{ key: 'weekly-report', type: 'report', title: 'Approve the weekly report?' }] }));
+  writeFileSync(join(scratch, 'report.json'), JSON.stringify({ schema: 1, decisions: [{ key: 'weekly-report', type: 'memo', title: 'Approve the weekly report?' }] }));
   assert.match(run('raise', board, '--from', join(scratch, 'report.json')).out, /weekly-report,raised,/);
   writeFileSync(join(scratch, 'bad-type.json'), JSON.stringify({ schema: 1, decisions: [{ key: 'x', type: 'Not A Type', title: 'X?' }] }));
   assert.equal(run('raise', board, '--from', join(scratch, 'bad-type.json')).code, 2);
@@ -152,7 +152,7 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   assert.equal(api.decisions[0].title, 'Pick the sign-in layout');
   assert.equal(api.decisions[0].tradeoff, 'B scans fastest; A is simplest.');
   assert.equal(api.decisions[0].mocks.length, 3);
-  assert.deepEqual(api.decisions.map((d) => d.type), ['design', 'report', 'decision', 'design', 'diagram', 'interactive', 'explainer']);
+  assert.deepEqual(api.decisions.map((d) => d.type), ['design', 'memo', 'decision', 'design', 'diagram', 'interactive', 'explainer']);
   assert.equal(api.decisions[4].view, 'mocks/flow/flow.svg');
   const tour = api.decisions[6];
   assert.deepEqual([tour.about, tour.chapters, tour.media.length], ['The new sign-in has 2 steps.', [{ at: 0, title: 'Start' }, { at: 65, title: 'Step 2' }], 1]);
@@ -917,6 +917,8 @@ test('an answers-only board fed through post --replace: a bad item is refused, y
   const page = { key: 'page', type: 'interactive', title: 'Updates', view: 'mocks/page/index.html', options: [], area: 'evidence' };
   const yesNo = { key: 'ask-1', type: 'ask', title: 'Ship it?', reply: true };
   const words = { key: 'ask-2', type: 'ask', title: 'Say ready when you are', options: [], reply: true };
+  // Items already on a board are not checked again: these kind-less asks were on it before contract v1, which refuses a new one.
+  writeFileSync(file, JSON.stringify({ schema: 2, answers_only: true, items: [page, yesNo, words] }));
   assert.match(write([page, yesNo, words]).out, /items: 3\nchanged: true/);
   // A feed with no times gets one per item on first sight, kept on every later run, so the file is left alone; a feed's own time is kept as sent.
   const times = () => JSON.parse(readFileSync(file, 'utf8')).items.map((i) => i.filed), stamped = times();

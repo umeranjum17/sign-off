@@ -74,12 +74,15 @@ examples:
   sign-off-axi raise --title "When should it ship?" --option today=Today --option friday=Friday --option next-week="Next week" --recommend friday
   sign-off-axi raise --from ./decisions.json
 `,
-  validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>]
+  validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>] [--expect-invalid]
 Checks message files against the communication contract without posting them: ${CONTRACT}
 A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask and report, schema 1 each.
+Post one with \`sign-off-axi post --kind <kind> --from <message.json>\`, or --from - to read stdin.
 A board file given to raise --from or post --from may hold such messages as items: each is checked the same way before it is stored, and a report shows under Reports with no answer.
+In such a file a new item of a contract kind (a decision, the default, an ask, evidence or a report) must carry contract, kind and schema.
 Each file gets a row with ok, or the error and one help line that names the fix. A field written twice, an unknown field or a broken limit refuses the file.
-  --kind  each file must be this kind, so the wrong file is refused
+  --kind            each file must be this kind, so the wrong file is refused
+  --expect-invalid  every file must be refused: exits 0 only then, 2 when any passes (the conformance check of invalid fixtures)
 Exits 0 when every file passes, 2 when any is refused or no file is named, and 1 when any file cannot be read.
 example message:
   {"contract":1,"kind":"ask","schema":1,"key":"ship-signin-2","title":"Ship the new sign-in screen this week?","options":[{"value":"yes","label":"Yes"},{"value":"no","label":"No"}],"recommend_value":"yes"}
@@ -87,6 +90,7 @@ examples:
   sign-off-axi validate ask.json
   sign-off-axi validate --kind ask messages/*.json
   sign-off-axi validate --kind report report.json
+  sign-off-axi validate --expect-invalid node_modules/sign-off-axi/fixtures/contract/*/invalid-*.json
 `,
   answers: `usage: sign-off-axi answers [board.json] [--key <key>] [--full] [--json]
 Prints the latest saved answer per decision and counts the ones still waiting.
@@ -149,8 +153,11 @@ examples:
   post: `usage: sign-off-axi post [board.json] [--type decision|design|diagram|interactive] --title "<question>" [--key <key>] [--about <text>] [--option <value>=<label>]... [--mock <value>=<path>]... [--view <path>] [--tradeoff <text>] [--recommend <value>] [--default <value>] [--close done|release] [--filer <id>]
        sign-off-axi post [board.json] --type evidence --title "<what this shows>" --about "<short note>" --media <file>... [--link <commit or URL>] [--detail <text>] [--filer <id>]
        sign-off-axi post [board.json] --from <board file> --replace [--filer <id>]
+       sign-off-axi post [board.json] --kind <kind> --from <message.json|-> [--filer <id>]
        sign-off-axi post [board.json] --type explainer --title "<question>" --media <video> [--about <summary>] [--chapter <m:ss>=<title>]... [--key <key>] [--option <value>=<label>]... [--recommend <value>]
 Posts an item for the user. --type decision (the default) is a yes/no or pick-one question, exactly like raise.
+--kind posts one contract message (${CONTRACT}), read from a file or from stdin with --from -: it must be that kind and pass every rule,
+else it is refused with one fix line and nothing is written. A key already on the board takes only the same message again; anything else exits 2.
 Listing --option needs --recommend <value>, on every type: the option you would pick, shown first and marked. --from --replace feeds are not held to it.
 --filer names who posts (your agent session or any id of 1-128 of A-Z a-z 0-9 . _ -), saved on the item; then \`wait --filer <id>\` gets the answer.
 SIGN_OFF_FILER sets it for every command; with neither, the Claude Code session id is saved when there is one.
@@ -174,6 +181,7 @@ examples:
   sign-off-axi post --type design --title "Pick the sign-in layout" --option a="A: single column" --option b="B: split screen" --mock a=mocks/a.html --mock b=mocks/b.html --tradeoff "B scans fastest; A is simplest." --recommend b
   sign-off-axi post .sign-off/decisions.json --type design --key sign-in --title "Pick the sign-in layout" --option a=A --option b=B --option c=C --mock a=mocks/sign-in/index.html?variant=a --mock b=mocks/sign-in/index.html?variant=b --mock c=mocks/sign-in/index.html?variant=c --tradeoff "..." --recommend b
   sign-off-axi post --type decision --title "Keep the weekly digest?" --recommend yes
+  sign-off-axi post --kind ask --from ask.json --filer agent-41
   sign-off-axi post .sign-off/decisions.json --type interactive --title "Does the sign-in flow feel right?" --view mocks/sign-in/demo.html --option yes=Yes --option no="Needs work" --recommend yes
   sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media phone.png --media flow.mp4 --link https://github.com/acme/app/pull/12
   sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "The new sign-in has 2 steps." --media explainer.mp4 --chapter 0:00=Start --chapter 0:12="Step 2"
@@ -241,12 +249,21 @@ function fits(title: unknown, key?: string) {
   const n = typeof title === 'string' ? [...title].length : 0;
   if (n > TITLE_MAX) throw fail(`${key ? `key ${key}: ` : ''}title is ${n} characters, over ${TITLE_MAX}`, 'VALIDATION_ERROR', `Shorten the title to ${TITLE_MAX} characters and put the rest in about`);
 }
-/** Items of a --from file that carry contract or kind are contract messages: each is checked against its kind's rules before anything is stored. */
-function contractItems(items: any[]) {
+/** Board types that are contract kinds: a decision (the default type) is an ask. */
+const CONTRACT_TYPES = ['decision', 'ask', 'evidence', 'report'];
+/** Items of a --from file that carry contract or kind are contract messages: each is checked against its kind's rules before anything is stored.
+ * A new item of a contract kind must carry them (contract section 2); one already on the board is not checked again. */
+function contractItems(items: any[], from: string, file: string) {
+  const had = new Set(existsSync(file) ? readItems(file).items.map((i) => i?.key) : []);
   items.forEach((m, i) => {
-    if (m?.contract === undefined && m?.kind === undefined) return;
+    if (had.has(m?.key)) return;
+    if (m?.contract === undefined && m?.kind === undefined) {
+      if (!CONTRACT_TYPES.includes(m?.type ?? 'decision')) return;
+      throw fail(`${from}: items[${i}]${isKey(m?.key) ? ` key ${m.key}` : ''}: kind is required on a new ${m?.type ?? 'decision'}`, 'VALIDATION_ERROR',
+        'Add "contract": 1, "kind" and "schema" to the item, such as "contract": 1, "kind": "ask", "schema": 1');
+    }
     try { checkMessage(m); } catch (e) {
-      throw e instanceof ContractError ? fail(`items[${i}]: ${e.message}`, 'VALIDATION_ERROR', e.help) : e;
+      throw e instanceof ContractError ? fail(`${from}: items[${i}]: ${e.message}`, 'VALIDATION_ERROR', e.help) : e;
     }
   });
 }
@@ -447,11 +464,16 @@ async function locked<T>(lock: string, fn: () => T | Promise<T>, busy = 'another
 const mockFile = (path: string) => path.split('?')[0];
 /** Posts an item. `raise` is the alias for `post --type decision`: same flags as before, same output. */
 function post(args: string[], cmd = 'post') {
-  const typed: Flags = cmd === 'post' ? { replace: { type: 'boolean' }, type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
+  const typed: Flags = cmd === 'post' ? { replace: { type: 'boolean' }, kind: { type: 'string' }, type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
     media: { type: 'string', multiple: true }, link: { type: 'string' }, view: { type: 'string' }, chapter: { type: 'string', multiple: true } } : {};
   const { file, values, on } = parse(cmd, args, { from: { type: 'string' }, filer: { type: 'string' }, ...typed,
     ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: f === 'option' }])) });
   const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'link', 'view', 'chapter'].filter((f) => values[f] !== undefined);
+  if (values.kind !== undefined) {
+    const odd = [...given, ...(values.replace ? ['replace'] : [])][0];
+    if (odd) throw fail(`--kind cannot be combined with --${odd}`, 'VALIDATION_ERROR', 'Put every field in the message file: sign-off-axi post --kind ask --from ask.json');
+    return postKind(file, on, values);
+  }
   if (values.from !== undefined && given.length) throw fail(`--from cannot be combined with --${given[0]}`, 'VALIDATION_ERROR', `Put every field in the --from file, or ${cmd} with flags only`);
   if (values.replace) return replace(file, on, values.from, filerOf(values));
   const filer = filerOf(values, true);
@@ -466,7 +488,7 @@ function post(args: string[], cmd = 'post') {
   if (type !== 'design' && (values.tradeoff !== undefined || values.mock !== undefined)) throw fail('--tradeoff and --mock need --type design', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   const view = type === 'diagram' || type === 'interactive';
   if (view !== (values.view !== undefined)) throw fail(view ? `--type ${type} needs --view <path>` : '--view needs --type diagram or interactive', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
-  if (type === 'decision') return storeIncoming(file, on, buildIncoming(values, {}, filer), filer);
+  if (type === 'decision') return storeIncoming(file, on, buildIncoming(values, {}, filer, file), filer);
   const root = resolve(dirname(file));
   if (view) {
     // The same real-path check the board serves with, so a post that passes always renders.
@@ -496,7 +518,7 @@ function post(args: string[], cmd = 'post') {
 function replace(file: string, on: string, from?: string, filer?: string) {
   if (from === undefined) throw fail('--replace needs --from <board file>', 'VALIDATION_ERROR', 'sign-off-axi post board.json --from feed.json --replace');
   const source = resolve(from), fed = readItems(source);
-  contractItems(fed.items);
+  contractItems(fed.items, from, file);
   const incoming = loadDecisions(source);
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
@@ -599,13 +621,39 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
   });
 }
 
+/** Posts one contract message (docs/contract.md), from a file or from stdin with --from -: checked against --kind, then stored like a raised item. */
+async function postKind(file: string, on: string, values: Record<string, any>) {
+  const { kind, from } = values, example = 'sign-off-axi post --kind ask --from ask.json';
+  if (!KINDS.includes(kind)) throw fail(`--kind must be one of ${KINDS.join(', ')}`, 'VALIDATION_ERROR', example);
+  if (from === undefined) throw fail('--kind needs --from <message.json>, or --from - to read stdin', 'VALIDATION_ERROR', example);
+  const name = from === '-' ? 'stdin' : from;
+  let bytes, m: any;
+  try { bytes = readFileSync(from === '-' ? 0 : from); } catch (e: any) { throw fail(`${name}: cannot read: ${e.code}`, 'NOT_FOUND', 'Check the path names a readable file'); }
+  try { m = parseMessage(bytes); checkMessage(m, kind); } catch (e) { throw e instanceof ContractError ? fail(`${name}: ${e.message}`, 'VALIDATION_ERROR', e.help) : e; }
+  if (m.filer !== undefined && values.filer !== undefined && m.filer !== values.filer) {
+    throw fail(`${name}: key ${m.key}: filer ${m.filer} is not --filer ${values.filer}`, 'VALIDATION_ERROR', 'Leave "filer" out of the message, or pass the same --filer');
+  }
+  const filer = m.filer ?? filerOf(values, true), scratch = mkdtempSync(join(tmpdir(), 'sign-off-')), source = join(scratch, basename(name));
+  try {
+    writeFileSync(source, JSON.stringify({ schema: 2, items: [{ ...m, ...(filer && { filer }) }] }));
+    return await storeIncoming(file, on, buildIncoming({ from: source }, {}, filer, file), filer, true);
+  } catch (e) {
+    if (!(e instanceof AxiError && e.code === 'CONFLICT')) throw e;
+    // A key conflict refuses a contract post like any other rule: exit 2 (contract section 4); raise keeps exit 1.
+    process.once('exit', () => { process.exitCode = 2; });
+    throw fail(`${name}: ${e.message}`, 'CONFLICT', 'Post it under a new key');
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
 /** Checks message files without posting them: one row per file, exit 2 when any is refused, 1 when any cannot be read. */
 function validate(args: string[]) {
   let parsed;
-  try { parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { kind: { type: 'string' } } }); } catch (e: any) {
+  try { parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { kind: { type: 'string' }, 'expect-invalid': { type: 'boolean' } } }); } catch (e: any) {
     throw fail(e.message, 'VALIDATION_ERROR', 'Run `sign-off-axi validate --help`');
   }
-  const { values: { kind: want }, positionals: names } = parsed;
+  const { values: { kind: want, 'expect-invalid': expect }, positionals: names } = parsed;
   if (!names.length) throw fail('name at least one message file', 'VALIDATION_ERROR', 'sign-off-axi validate ask.json');
   if (want !== undefined && !KINDS.includes(want)) throw fail(`--kind must be one of ${KINDS.join(', ')}`, 'VALIDATION_ERROR', 'sign-off-axi validate --kind ask ask.json');
   let unread = false;
@@ -623,8 +671,10 @@ function validate(args: string[]) {
       return { file, kind: typeof m?.kind === 'string' ? m.kind : '', schema: Number.isSafeInteger(m?.schema) ? m.schema : '', ok: false, error: e.message, help: e.help };
     }
   });
-  process.exitCode = unread ? 1 : files.some((f) => !f.ok) ? 2 : 0;
-  return toon({ files }, process.exitCode ? ['Fix each refused file as its help says, then run validate again'] : []);
+  // With --expect-invalid a file that passes is the miss: conformance holds invalid fixtures that must each be refused.
+  const missed = files.some((f) => (expect ? f.ok : !f.ok));
+  process.exitCode = unread ? 1 : missed ? 2 : 0;
+  return toon({ files }, !process.exitCode ? [] : expect && missed ? ['Each file with ok true was accepted: make it break the one rule its name gives'] : ['Fix each refused file as its help says, then run validate again']);
 }
 
 const optionsOf = (values: Record<string, any>) => values.option?.map((o: string) => {
@@ -640,11 +690,11 @@ function recommended(items: any[], flags: boolean) {
   if (d) throw fail(`items[${items.indexOf(d)}] (key ${d.key}) lists options but no recommend_value`, 'VALIDATION_ERROR', `Add "recommend_value": "<value>", the option you would pick: one of ${values}`);
 }
 /** Flags are validated by the same loader as a file: write them as a one-decision file first. */
-function buildIncoming(values: Record<string, any>, extra: object = {}, filer?: string): { incoming: Decision[]; raw: object[] } {
+function buildIncoming(values: Record<string, any>, extra: object = {}, filer?: string, file = ''): { incoming: Decision[]; raw: object[] } {
   if (values.from !== undefined) {
     // An item that names its own filer keeps it.
     const source = resolve(values.from), raw = readItems(source).items;
-    contractItems(raw);
+    contractItems(raw, values.from, file);
     const incoming = loadDecisions(source);
     recommended(raw, false);
     return { incoming: incoming.map((d) => ({ filer, ...d })), raw: raw.map((i) => ({ filer, ...i })) };
@@ -662,7 +712,10 @@ function buildIncoming(values: Record<string, any>, extra: object = {}, filer?: 
   }
 }
 
-function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: Decision[]; raw: object[] }, filer?: string) {
+/** JSON with object fields in key order, so the same message compares equal in any field order. */
+const canon = (v: unknown) => JSON.stringify(v, (_, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x));
+/** exact: a contract post, where a key takes only the same message again, filer and filed included (contract section 4). */
+function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: Decision[]; raw: any[] }, filer?: string, exact = false) {
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
     const current = board(file), items = existsSync(file) ? readItems(file).items : [], saved = readAnswers(file), now = new Date().toISOString();
@@ -672,8 +725,10 @@ function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: 
       if (!had && Object.hasOwn(saved, d.key)) throw fail(`key ${d.key} already has a saved answer on ${tilde(file)} from an item no longer there`, 'CONFLICT', 'Raise it under a new --key');
       // The same question from another filer, or at another time, is the same question: it keeps its first filer and time.
       const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, filer: undefined, filed: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
-      if (had && same(had) !== same(d)) {
-        throw fail(`key ${d.key} already holds a different question on ${tilde(file)}`, 'CONFLICT', 'Raise it under a new --key');
+      // A message that names no filed time matches the one the board stamped.
+      const differs = () => exact ? canon({ ...items.find((x) => x?.key === d.key), ...(raw[i].filed === undefined && { filed: undefined }) }) !== canon(raw[i]) : same(had!) !== same(d);
+      if (had && differs()) {
+        throw fail(`key ${d.key} already holds a different ${exact ? 'message' : 'question'} on ${tilde(file)}`, 'CONFLICT', 'Raise it under a new --key');
       }
       // Each new item records when it was raised, unless it names its own time.
       if (!had) {
