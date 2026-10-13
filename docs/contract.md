@@ -2,7 +2,7 @@
 
 sign-off owns this contract. Agents and tools use it to post asks, reports, evidence, gates and retro findings to the board, and to read the answers back. Every message has the same strict shape, so the person reading the board sees one kind of card per kind of message, whoever sent it.
 
-Status: v1 target, built in parts. Built: the `ask` kind and `validate` without `--expect-invalid` (section 9), with its fixtures in the npm package. Not built yet: the other kinds, posting a message (`raise` and `post` still take the board format in [file-formats.md](file-formats.md), which ignores unknown keys), answer events and `schema`.
+Status: v1 target, built in parts. Built: the `ask` and `report` kinds and `validate` without `--expect-invalid` (section 9), with their fixtures in the npm package; an item of a `raise --from` or `post --from` file that carries `contract` or `kind` is checked as a message before anything is stored, and a new item's title is held to 1-160. Not built yet: `evidence`, `gate` and `finding`, `post --kind` (`raise` and `post` otherwise still take the board format in [file-formats.md](file-formats.md), which ignores unknown keys), answer events and `schema`.
 
 ## 1. Versions
 
@@ -40,7 +40,7 @@ A message file holds one JSON object, in any layout. The validator reads it with
 
 ## 4. Field rules
 
-- Text is a JSON string with at least one character that is not whitespace. It is stored as given; its length counts the Unicode code points of the whole value. Control characters other than newline are refused.
+- Text is a JSON string with at least one character that is not whitespace. It is stored as given; its length counts the Unicode code points of the whole value. Control characters other than newline are refused, and so is an unpaired surrogate (half of a character, such as `"\ud800"`).
 - A whole number is a JSON number from 0 to 9007199254740991 with no fractional part (`4.0` reads as 4). `"4"` is refused.
 - `contract` is `1`. `schema` is a whole number (section 1).
 - A key-set id is 1-128 of `A-Z a-z 0-9 . _ -`, case-sensitive.
@@ -51,7 +51,7 @@ A message file holds one JSON object, in any layout. The validator reads it with
 | `key` | all, required (optional on `evidence`) | a key-set id, unique on the board |
 | `title` | all, required | text, 1-160 |
 | `filer` | all, optional | a key-set id: the agent session id or tool name |
-| `link` | all, optional | `http://` or `https://` followed by 1-500 characters with no whitespace, or a 7-40 character lowercase hex commit |
+| `link` | all, optional | `http://` or `https://` followed by 1-500 characters with no whitespace, control character (C0, DEL or C1) or unpaired surrogate, or a 7-40 character lowercase hex commit |
 | `about` | all, required (optional on `ask`) | text, 1-500 |
 | `detail` | `ask`, optional | text, 1-1000 |
 | `options` | `ask`, `gate`, `finding`, required | 2-6 objects of exactly `value` (a key-set id, unique in the message) and `label` (text, 1-80) |
@@ -79,7 +79,7 @@ Something the person reads. It takes no answer. Shows in Reports and explainers.
 
 - Required: the common fields, `about`, `filed` (a real UTC date and time, exactly `YYYY-MM-DDTHH:MM:SSZ` with seconds 00-59, such as `2026-10-13T07:19:00Z`).
 - Optional: `group` (text, 1-40), `decided` (text, 1-200).
-- No `options` key, not even `[]`.
+- No `options` key, not even `[]`: it is refused with the fix "post an ask to get an answer". On the board it is stored with no options, shows under Reports and explainers on any board, and never waits.
 
 ### evidence, schema 1
 
@@ -160,7 +160,7 @@ To recover: read the `help` line, fix the message file, post it again. Never edi
 
 ## 10. Conformance
 
-Shared fixtures live in [fixtures/contract/](../fixtures/contract/README.md) and ship in the npm package, one folder per kind and schema (`ask.v1/`): for each, at least 2 valid messages and 3 invalid ones (a missing field, a broken limit, an unknown field). Each tool's CI installs the version it pins and runs them:
+Shared fixtures live in [fixtures/contract/](../fixtures/contract/README.md) and ship in the npm package, one folder per kind and schema (`ask.v1/`, `report.v1/`): for each, at least 2 valid messages and 3 invalid ones (a missing field, a broken limit, an unknown field). Each tool's CI installs the version it pins and runs them:
 
 ```
 npm install --no-save sign-off-axi@<exact>

@@ -21,6 +21,7 @@ const message = (name, text) => {
 };
 const ask = { contract: 1, kind: 'ask', schema: 1, key: 'ship-signin-2', title: 'Ship the new sign-in screen this week?',
   options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }], recommend_value: 'yes' };
+const report = { contract: 1, kind: 'report', schema: 1, key: 'slice-5-live', title: 'Board slice 5 is live', about: 'Umer can see the new cards.', filed: '2026-10-13T07:19:00Z' };
 
 test('every shipped fixture: valid files pass, each invalid file is refused on the field its name gives', () => {
   for (const folder of readdirSync(fixtures).filter((f) => !f.endsWith('.md'))) {
@@ -45,7 +46,12 @@ test('refusals: strict at every level, in contract order, with one fix line each
     [{ ...ask, contract: undefined }, /contract is required/, /Add "contract": 1, "kind" and "schema"/],
     [{ ...ask, schema: 2 }, /schema 2 of ask is not in this sign-off-axi/, /Upgrade sign-off-axi/],
     [{ ...ask, schema: '1' }, /schema must be a whole number/, /Set "schema": 1/],
-    [{ ...ask, kind: 'report' }, /report is not checked by this sign-off-axi yet/, /Upgrade sign-off-axi/],
+    [{ ...ask, kind: 'gate' }, /gate is not checked by this sign-off-axi yet/, /Upgrade sign-off-axi/],
+    [{ ...report, filed: '2026-02-30T00:00:00Z' }, /filed "2026-02-30T00:00:00Z" is not a UTC time/, /exactly YYYY-MM-DDTHH:MM:SSZ/],
+    [{ ...report, filed: '2026-10-13T07:19:00.000Z' }, /filed .* is not a UTC time/, /exactly YYYY-MM-DDTHH:MM:SSZ/],
+    [{ ...report, group: 'g'.repeat(41) }, /group is 41 characters, over 40/, /Shorten "group"/],
+    [{ ...report, about: 'Umer \udc00' }, /about has an unpaired surrogate/, /Remove the broken character from "about"/],
+    [{ ...ask, link: 'https://example.com/\u007f' }, /link must be an http\(s\) link with no spaces or control characters/, /Set "link"/],
     [{ ...ask, about: null }, /about must be text/, /about/],
     [{ ...ask, title: 'Tab\tin title' }, /title has a control character/, /Remove tabs/],
     [{ ...ask, kind: 'nope' }, /kind must be one of/, /Set "kind"/],
@@ -94,4 +100,30 @@ test('exit codes: --kind must match, an unreadable file wins over a refusal, no 
   const none = spawnSync('node', [cli, 'validate'], { encoding: 'utf8' });
   assert.equal(none.status, 2);
   assert.match(none.stdout, /code: VALIDATION_ERROR/);
+});
+
+test('a report in a raise --from file: checked by its kind, stored with no options, never waiting; a new title over 160 is refused', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const board = join(scratch, 'reports.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const feed = (name, ...items) => message(name, JSON.stringify({ schema: 2, items }));
+  const posted = cli2('raise', board, '--from', feed('feed.json', { ...report, about: 'Umer can see the new cards \u{1F600}' }));
+  assert.equal(posted.status, 0, posted.stdout);
+  assert.match(posted.stdout, /so the user can read it/);
+  assert.doesNotMatch(posted.stdout, /answer/);
+  const [item] = JSON.parse(cli2('list', board, '--json').stdout).decisions;
+  assert.deepEqual([item.key, item.options, item.filed], ['slice-5-live', [], '2026-10-13T07:19:00Z']);
+  assert.match(cli2('list', board).stdout, /waiting: 0 of 1/);
+  for (const [bad, help] of [[{ ...report, key: 'r2', options: [] }, /or post an ask to get an answer/], [{ ...report, key: 'r3', filed: undefined }, /exactly YYYY-MM-DDTHH:MM:SSZ/]]) {
+    const refused = cli2('raise', board, '--from', feed('bad.json', bad));
+    assert.equal(refused.status, 2, refused.stdout);
+    assert.match(refused.stdout, help);
+  }
+  const long = cli2('raise', board, '--title', 'T'.repeat(161));
+  assert.equal(long.status, 2);
+  assert.match(long.stdout, /title is 161 characters, over 160/);
+  // An item already on the board is not checked again: a long title from before still loads.
+  writeFileSync(board, JSON.stringify({ schema: 2, items: [{ key: 'old', title: 'T'.repeat(200) }] }));
+  assert.equal(cli2('list', board).status, 0);
 });

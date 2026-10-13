@@ -74,6 +74,8 @@
   { "key": "how-sync", "type": "interactive", "title": "How it works: Notes sync", "view": "mocks/how-sync/index.html", "options": [],
     "steps": [{ "title": "You change a note" }, { "title": "The phone saves it", "marks": ["store"] }, { "title": "It goes to the server", "marks": ["gate"] }] }
   ```
+- `contract`, `kind`, `schema`: an item posted as a contract message keeps them ([contract.md](contract.md)).
+  An item with `"kind": "report"` has no `options` key: it is only read, on any board, and never waits.
 - `filed`: optional, when the item was filed, an ISO 8601 date-time such as `2026-10-13T07:19:00Z`.
   `raise` and `post` write the current time when the item or flags give none, and `post --replace`
   keeps the time an item already has, so a feeder that runs every few seconds does not reset it.

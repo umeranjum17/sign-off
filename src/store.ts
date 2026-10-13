@@ -122,9 +122,11 @@ export function loadDecisions(path: string): Decision[] {
     // A ladder rung: a diagram image, or an interactive page the board frames in a sandbox.
     const views = Object.hasOwn(VIEWS, d.type ?? '') ? VIEWS[d.type] : undefined;
     if (views && !(isText(d.view) && d.view.length <= 256 && /^[^?#]+$/.test(d.view) && views[1].test(d.view))) throw bad('view', `must be a board-relative ${views[0]} file`);
-    const options = d.options ?? (d.type === 'evidence' ? VERDICTS : YES_NO);
-    // An empty list is an item to look at only, unless it takes a reply: only a board another program feeds shows those.
-    if (!Array.isArray(options) || options.length === 1 || (!options.length && !fed) || options.length > 6
+    // A report (contract kind report) takes no answer: it has no options, on any board.
+    if (d.kind === 'report' && d.options !== undefined) throw bad('options', 'must be left out: a report takes no answer');
+    const options = d.options ?? (d.kind === 'report' ? [] : d.type === 'evidence' ? VERDICTS : YES_NO);
+    // An empty list is an item to look at only, unless it takes a reply: only a board another program feeds, or a report, shows those.
+    if (!Array.isArray(options) || options.length === 1 || (!options.length && !fed && d.kind !== 'report') || options.length > 6
       || !options.every((o) => isKey(o?.value) && isText(o.label) && o.label.trim())) {
       throw bad('options', 'must be 2 to 6 items (or empty on a readonly or answers_only board), each a value of 1-128 of A-Z a-z 0-9 . _ - and a label');
     }
