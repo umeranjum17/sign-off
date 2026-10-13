@@ -177,7 +177,7 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     assert.equal((await inspect('kept')).code, 'VALIDATION_ERROR'); writeFileSync(keptPath, kept);
     // Actual server startup, no browser or access-time inspect to trigger these transitions.
     const warning = 'sign-off-axi: Vault startup expiry unavailable; access checks remain enforced.\n';
-    const serve = async (release = async () => {}, served = board) => {
+    const serve = async (release = async () => {}, served = board, during = async () => {}) => {
       const child = spawn(process.execPath, [cli, 'serve', served, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
       let out = '', err = '', exited = false;
       child.stdout.on('data', (b) => out += b); child.stderr.on('data', (b) => err += b);
@@ -190,10 +190,16 @@ test('disabled vault custody across real processes: encryption, racing deposits,
         assert.equal((await fetch(origin, { signal: AbortSignal.timeout(5_000) })).status, 200);
         const response = await fetch(`${origin}api/decisions`, { signal: AbortSignal.timeout(5_000) });
         assert.equal(response.status, 200); assert.ok(Array.isArray((await response.json()).decisions));
+        await during({ origin, child, stderr: () => err });
         assert.ok(![out, err].some((s) => s.includes(secret) || s.includes(url)));
         return err;
       } finally {
-        if (!exited) { const closed = new Promise((ok) => child.once('exit', ok)); child.kill('SIGTERM'); await closed; }
+        if (!exited) {
+          child.kill('SIGTERM');
+          try { await waitFor(() => exited, Date.now() + 5_000); }
+          finally { if (!exited) child.kill('SIGKILL'); }
+          assert.equal(child.exitCode, 0, 'Owned server must exit cleanly.');
+        }
         outputs.push(out, err);
       }
     };
@@ -274,6 +280,88 @@ test('disabled vault custody across real processes: encryption, racing deposits,
       assert.deepEqual(readFileSync(copied), elapsedBytes);
       assert.equal((await run({ op: 'inspect', board: containedBoard, key: 'contained-expiring' })).code, 'VAULT_KEY_UNAVAILABLE');
     } finally { env.XDG_STATE_HOME = state; rmSync(containedFolder, { recursive: true, force: true }); }
+    // Both ordinary servers stay up: no browser, restart or vault access triggers this expiry.
+    const periodicWarning = 'sign-off-axi: Vault periodic expiry unavailable; access checks remain enforced.\n';
+    const periodicDeadline = Date.now() + 4_000, periodic = [];
+    for (const [key, mode] of [['periodic-pending', 'give'], ['periodic-ready', 'give'], ['periodic-receive', 'receive']]) {
+      await run({ op: 'create', meta: { ...meta(key, mode), expires: periodicDeadline }, ...(mode === 'receive' && { value: url }) });
+      if (key === 'periodic-ready') await run({ op: 'deposit', board, key, value: secret });
+      periodic.push(recordFor(key));
+    }
+    await run({ op: 'create', meta: { ...meta('periodic-other', 'receive'), board: second, expires: periodicDeadline }, value: url });
+    periodic.push(recordFor('periodic-other'));
+    assert.equal(await serve(undefined, board, async (first) => {
+      assert.equal(await serve(undefined, second, async (other) => {
+        assert.ok(Date.now() < periodicDeadline, 'Both servers must start before expiry.');
+        periodic.forEach((p) => assert.ok(['pending', 'ready'].includes(JSON.parse(readFileSync(p)).status)));
+        const held = Buffer.from('owned periodic lock'); writeFileSync(lock, held, { mode: 0o600 });
+        try {
+          await waitFor(() => first.stderr() === periodicWarning && other.stderr() === periodicWarning, Date.now() + 15_000);
+          assert.deepEqual(readFileSync(lock), held);
+          periodic.forEach((p) => assert.ok(['pending', 'ready'].includes(JSON.parse(readFileSync(p)).status)));
+          for (const { origin } of [first, other]) assert.equal((await fetch(`${origin}api/decisions`, { signal: AbortSignal.timeout(5_000) })).status, 200);
+          const failedFolder = join(home, 'failed-bind'); mkdirSync(failedFolder, { mode: 0o700 });
+          const failedBoard = join(failedFolder, 'board.json'); writeFileSync(failedBoard, '{"schema":2,"items":[]}');
+          const failed = spawnSync(process.execPath, [cli, 'serve', failedBoard, '--port', new URL(first.origin).port], { env, encoding: 'utf8', timeout: 5_000 });
+          outputs.push(failed.stdout, failed.stderr); assert.equal(failed.status, 1); assert.equal(failed.signal, null); assert.match(failed.stdout, /^code: SERVE_FAILED$/m);
+        } finally { rmSync(lock, { force: true }); }
+        await waitFor(() => periodic.every((p) => JSON.parse(readFileSync(p)).status === 'expired'), Date.now() + 15_000);
+        const bytes = periodic.map((p) => readFileSync(p));
+        periodic.forEach((p) => assert.equal(JSON.parse(readFileSync(p)).sealed, undefined));
+        const nextTicks = Date.now() + 6_000;
+        await waitFor(() => Date.now() >= nextTicks, nextTicks + 5_000);
+        periodic.forEach((p, i) => assert.deepEqual(readFileSync(p), bytes[i]));
+        for (const [p, bytes] of preserved) assert.deepEqual(readFileSync(p), bytes);
+        assert.equal(existsSync(lock), false);
+        assert.equal(first.stderr(), periodicWarning); assert.equal(other.stderr(), periodicWarning);
+      }), periodicWarning);
+    }), periodicWarning);
+    assert.equal((await run({ op: 'create', meta: meta('periodic-ready') })).code, 'VALIDATION_ERROR');
+    const periodicTerminal = periodic.map((p) => readFileSync(p)); assert.equal(await serve(), '');
+    periodic.forEach((p, i) => assert.deepEqual(readFileSync(p), periodicTerminal[i]));
+    // A server with initially absent custody keeps polling; later records and unsafe siblings need no restart.
+    const laterState = join(home, 'periodic-state'), laterFolder = join(home, 'periodic-board'), laterBoard = join(laterFolder, 'board.json');
+    mkdirSync(laterFolder, { mode: 0o700 }); writeFileSync(laterBoard, '{"schema":2,"items":[]}');
+    env.XDG_STATE_HOME = laterState;
+    try {
+      assert.equal(await serve(undefined, laterBoard, async ({ origin, stderr }) => {
+        const firstTick = Date.now() + 6_000;
+        await waitFor(() => Date.now() >= firstTick, firstTick + 5_000);
+        assert.equal(existsSync(laterState), false); assert.equal(existsSync(join(laterFolder, '.sign-off-vault-id')), false);
+        await run({ op: 'create', meta: { ...meta('later-record', 'receive'), board: laterBoard, expires: Date.now() + 2_000 }, value: url });
+        const laterVault = join(laterState, 'sign-off', 'vault');
+        const path = join(laterVault, readdirSync(laterVault).find((n) => n.endsWith('.json')));
+        assert.equal(JSON.parse(readFileSync(path)).status, 'ready');
+        const bad = join(laterVault, `${'0'.repeat(64)}.json`), stray = join(laterVault, 'stray.json'), linked = join(laterVault, `${'f'.repeat(64)}.json`);
+        writeFileSync(bad, secret + url, { mode: 0o600 }); writeFileSync(stray, '{}', { mode: 0o600 }); symlinkSync(bad, linked);
+        try {
+          await waitFor(() => JSON.parse(readFileSync(path)).status === 'expired' && stderr() === periodicWarning, Date.now() + 15_000);
+          assert.equal(JSON.parse(readFileSync(path)).sealed, undefined);
+          assert.ok(readFileSync(bad, 'utf8') === secret + url); assert.equal(readFileSync(stray, 'utf8'), '{}');
+          assert.equal((await fetch(origin, { signal: AbortSignal.timeout(5_000) })).status, 200);
+          chmodSync(laterVault, 0o755);
+          assert.equal((await run({ op: 'inspect', board: laterBoard, key: 'later-record' })).code, 'VAULT_KEY_UNAVAILABLE');
+          const anotherTick = Date.now() + 6_000;
+          await waitFor(() => Date.now() >= anotherTick, anotherTick + 5_000);
+          assert.equal((await fetch(origin, { signal: AbortSignal.timeout(5_000) })).status, 200);
+          assert.equal(stderr(), periodicWarning);
+        } finally { chmodSync(laterVault, 0o700); for (const p of [bad, stray, linked]) rmSync(p, { force: true }); }
+        await run({ op: 'create', meta: { ...meta('after-repair', 'receive'), board: laterBoard, expires: Date.now() + 2_000 }, value: url });
+        const repaired = readdirSync(laterVault).filter((n) => n.endsWith('.json')).map((n) => join(laterVault, n)).find((p) => JSON.parse(readFileSync(p)).meta.key === 'after-repair');
+        await waitFor(() => JSON.parse(readFileSync(repaired)).status === 'expired', Date.now() + 15_000);
+        assert.equal(JSON.parse(readFileSync(repaired)).sealed, undefined); assert.equal(stderr(), periodicWarning);
+      }), periodicWarning);
+    } finally { env.XDG_STATE_HOME = state; }
+    assert.equal(existsSync(join(laterState, 'sign-off', 'vault', 'lock')), false);
+    // Startup failure already warned: repeated periodic failures must not print another line.
+    chmodSync(dir, 0o755);
+    try {
+      assert.equal(await serve(undefined, board, async ({ stderr }) => {
+        const twoTicks = Date.now() + 11_000;
+        await waitFor(() => Date.now() >= twoTicks, twoTicks + 5_000);
+        assert.equal(stderr(), warning);
+      }), warning);
+    } finally { chmodSync(dir, 0o700); }
     for (const text of [...outputs, ...files(home).map((p) => readFileSync(p).toString())]) {
       assert.equal(text.includes(secret) || text.includes(url), false);
     }

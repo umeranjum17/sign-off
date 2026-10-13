@@ -985,12 +985,18 @@ async function serve(args: string[]) {
   ready(parsed.file, parsed.on, parsed.values['evidence-root']);
   bind = bindOf(parsed.named, parsed.values.bind);
   ({ hosts = [], onAnswer = [] } = setupOf(parsed.named) ?? {});
+  let warned = false;
+  const sweep = async (phase: 'startup' | 'periodic') => {
+    if (await sweepVault(parsed.file) || warned) return;
+    warned = true;
+    warn(`Vault ${phase} expiry unavailable; access checks remain enforced.`);
+  };
   // Checked and recorded under the board lock, so two serves started at once never both run with one record between them.
   const bound = await locked(`${parsed.file}.lock`, async () => {
     const live = await running(parsed.file);
     if (live) throw fail(`this board is already open at ${live.url}`, 'CONFLICT', `Run \`sign-off-axi stop${parsed.on}\` first`);
     if (!loopback(bind)) tokenOf(parsed.file, true);
-    if (!await sweepVault(parsed.file)) warn('Vault startup expiry unavailable; access checks remain enforced.');
+    await sweep('startup');
     [file, evidenceRoot] = [parsed.file, parsed.values['evidence-root'] ? resolve(parsed.values['evidence-root']) : ''];
     await new Promise<void>((ok, no) => server.once('error', no).listen(port, bind, ok)).catch((e) => {
       throw fail(e.code === 'EADDRINUSE' ? `port ${port} is in use; pass --port` : e.code === 'EADDRNOTAVAIL' ? `${bind} is not an address of this machine; pass another --bind` : e.message, 'SERVE_FAILED');
@@ -999,6 +1005,14 @@ async function serve(args: string[]) {
     writeFileSync(record(file), `${process.pid} ${bound} ${bind}\n`, { mode: 0o600 });
     return bound;
   }, 'another serve is still starting this board');
+  let closed = false, timer: NodeJS.Timeout;
+  const repeat = async () => {
+    if (closed) return;
+    await sweep('periodic');
+    if (!closed) timer = setTimeout(repeat, 5_000).unref();
+  };
+  server.once('close', () => { closed = true; clearTimeout(timer); });
+  timer = setTimeout(repeat, 5_000).unref();
   const url = `http://${urlHost(bind)}:${bound}/`;
   process.on('exit', () => { if (existsSync(record(file)) && readFileSync(record(file), 'utf8').split(' ')[0] === String(process.pid)) rmSync(record(file), { force: true }); });
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(0));
