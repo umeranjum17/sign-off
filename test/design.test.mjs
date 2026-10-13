@@ -661,22 +661,22 @@ test('an answers-only board fed through post --replace: a bad item is refused, y
   writeFileSync(feed, JSON.stringify({ schema: 2, items: [page] }));
   assert.equal(run('post', join(dir, 'plain.json'), '--from', feed, '--replace').code, 2);
   // Another agent's card on the same board: a feed with --filer replaces only its own items, never that card or the answers.
-  assert.match(run('raise', file, '--key', 'fm-test-1', '--title', 'Hold the release?').out, /fm-test-1,raised/);
+  assert.match(run('raise', file, '--key', 'agent-card-1', '--title', 'Hold the release?').out, /agent-card-1,raised/);
   const scoped = (items) => (writeFileSync(feed, JSON.stringify({ schema: 2, ...(items.length && { answers_only: true }), items })), run('post', file, '--from', feed, '--replace', '--filer', 'feeder'));
   const keys = () => JSON.parse(readFileSync(file, 'utf8')).items.map((i) => [i.key, i.filer ?? '']);
   assert.match(scoped([page, words]).out, /changed: true/);
-  assert.deepEqual(keys(), [['page', 'feeder'], ['ask-2', 'feeder'], ['fm-test-1', '']]);
+  assert.deepEqual(keys(), [['page', 'feeder'], ['ask-2', 'feeder'], ['agent-card-1', '']]);
   assert.equal(JSON.parse(readFileSync(file, 'utf8')).answers_only, true, 'the board keeps its answers_only');
   assert.match(scoped([page, words]).out, /changed: false/);
   assert.equal(scoped([page]).code, 0);
-  assert.deepEqual(keys(), [['page', 'feeder'], ['fm-test-1', '']]);
+  assert.deepEqual(keys(), [['page', 'feeder'], ['agent-card-1', '']]);
   assert.match(run('raise', file, '--key', 'theirs', '--title', 'Theirs?', '--filer', 'other').out, /theirs,raised/);
   const taken = scoped([page, { key: 'theirs', title: 'Theirs?' }]);
   assert.equal(taken.code, 1);
   assert.match(taken.out, /key theirs .* was posted by another filer/);
   // An empty feed removes the feeder's items alone.
   assert.equal(scoped([]).code, 0);
-  assert.deepEqual(keys(), [['fm-test-1', ''], ['theirs', 'other']]);
+  assert.deepEqual(keys(), [['agent-card-1', ''], ['theirs', 'other']]);
   assert.match(readFileSync(join(dir, 'board.answers.jsonl'), 'utf8'), /"note":"ready"/);
   // ask-2 is gone but its answer stays: a new question under that key would inherit it, so it is refused.
   const reused = run('raise', file, '--key', 'ask-2', '--title', 'Something else?');
