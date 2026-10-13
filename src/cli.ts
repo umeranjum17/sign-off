@@ -570,7 +570,7 @@ function validate(args: string[]) {
   let unread = false;
   const files = names.map((file) => {
     let raw, m: any;
-    try { raw = readFileSync(file, 'utf8'); } catch (e: any) {
+    try { raw = readFileSync(file); } catch (e: any) {
       unread = true;
       return { file, kind: '', schema: '', ok: false, error: `cannot read: ${e.code}`, help: 'Check the path names a readable file' };
     }

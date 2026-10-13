@@ -47,13 +47,17 @@ test('refusals: strict at every level, in contract order, with one fix line each
     [{ ...ask, schema: '1' }, /schema must be a whole number/, /Set "schema": 1/],
     [{ ...ask, kind: 'report' }, /report is not checked by this sign-off-axi yet/, /Upgrade sign-off-axi/],
     [{ ...ask, about: null }, /about must be text/, /about/],
-    [{ ...ask, title: 'Tab\tin title' }, /title must be text/, /title/],
+    [{ ...ask, title: 'Tab\tin title' }, /title has a control character/, /Remove tabs/],
+    [{ ...ask, kind: 'nope' }, /kind must be one of/, /Set "kind"/],
+    [{ ...ask, contract: 2, kind: undefined }, /contract must be 1, not 2/, /Upgrade sign-off-axi/],
+    [{ ...ask, link: `https://${'\u{1F600}'.repeat(500)}` }, null, null],
     [{ ...ask, options: [{ value: 'yes', label: 'Yes', note: 'x' }, ask.options[1]] }, /options\[0\]\.note is not a field/, /Remove "note"/],
     [{ ...ask, options: [ask.options[0], ask.options[0]] }, /options\[1\]\.value repeats yes/, /own value/],
     [{ ...ask, recommend_value: 'maybe' }, /"maybe" is not an option value/, /one of yes, no/],
   ];
   for (const [m, error, help] of cases) {
     const { status, out: { files: [row] } } = validate(message('m.json', JSON.stringify(m)));
+    if (!error) { assert.equal(status, 0, 'a 500-character link passes, counted in code points'); continue; }
     assert.equal(status, 2, JSON.stringify(m));
     assert.match(row.error, error);
     assert.match(row.help, help);
@@ -64,6 +68,8 @@ test('refusals: strict at every level, in contract order, with one fix line each
   const quoted = validate(message('quoted.json', JSON.stringify({ ...ask, about: 'Umer wrote "key": "title", twice' })));
   assert.equal(quoted.status, 0, quoted.raw);
   assert.equal(validate(message('bad.json', '{"contract":1,')).out.files[0].help, 'Write the message as one JSON object');
+  const latin1 = Buffer.from(JSON.stringify({ ...ask, title: 'Caf\u00e9?' }), 'latin1');
+  assert.equal(validate(message('latin1.json', latin1)).out.files[0].help, 'Save the message as UTF-8');
 });
 
 test('exit codes: --kind must match, an unreadable file wins over a refusal, no file is a usage error', () => {

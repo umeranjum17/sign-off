@@ -160,7 +160,7 @@ To recover: read the `help` line, fix the message file, post it again. Never edi
 
 ## 10. Conformance
 
-Shared fixtures live in [fixtures/contract/](../fixtures/contract/README.md) and will ship in the npm package once the first validator lands, one folder per kind and schema (`ask.v1/`): for each, at least 2 valid messages and 3 invalid ones (a missing field, a broken limit, an unknown field). Each tool's CI installs the version it pins and runs them:
+Shared fixtures live in [fixtures/contract/](../fixtures/contract/README.md) and ship in the npm package, one folder per kind and schema (`ask.v1/`): for each, at least 2 valid messages and 3 invalid ones (a missing field, a broken limit, an unknown field). Each tool's CI installs the version it pins and runs them:
 
 ```
 npm install --no-save sign-off-axi@<exact>
