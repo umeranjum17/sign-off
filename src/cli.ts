@@ -10,7 +10,7 @@ import { basename, delimiter, dirname, extname, join, resolve, sep } from 'node:
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { type Answer, CHAPTERS_MAX, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnswer, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnswers, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, writeItems } from './store.js';
+import { type Answer, CHAPTERS_MAX, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, writeItems } from './store.js';
 
 const BOARD = join(homedir(), '.sign-off', 'decisions.json');
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
@@ -1067,7 +1067,7 @@ async function exportBoard(args: string[]) {
 const page = readFileSync(new URL('../web/index.html', import.meta.url));
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 const state = () => {
-  const answers = readAnswers(file, warn), taken = seenBy(file);
+  const answers = readAnswers(file, warn), taken = seenBy(file), rounds = readRounds(file, warn);
   return {
     file,
     mockBase: `/mock/${loopback(bind) ? 'local' : mockPass(tokenOf(file))}/`,
@@ -1077,8 +1077,9 @@ const state = () => {
     answers_only: answersOnly(),
     answers,
     seen: Object.values(answers).filter(taken).map((a) => a.key),
-    rounds: readRounds(file, warn),
+    rounds,
     messages: readMessages(file, warn),
+    dismissed: readDismissed(file, answers, rounds, warn),
   };
 };
 /** A board whose file says `"readonly": true` shows its items and takes no answers, rounds or comments: another program feeds it. */
@@ -1186,9 +1187,10 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   if (req.method === 'GET' && req.url === '/api/decisions') {
     return [200, state()];
   }
-  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
+  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/dismiss'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
   if (readOnly()) return [403, { error: 'This board is read-only' }];
-  if (req.url !== '/api/answers' && answersOnly()) return [403, { error: 'This board takes answers only' }];
+  // Dismiss only hides an item on this page and sends nothing to the feeding program, so an answers-only board takes it too.
+  if (!['/api/answers', '/api/dismiss'].includes(req.url!) && answersOnly()) return [403, { error: 'This board takes answers only' }];
   if (!req.headers['content-type']?.startsWith('application/json')) return [415, { error: 'Send JSON' }];
   let body = '';
   for await (const chunk of req) body += chunk;
@@ -1198,6 +1200,14 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     if (typeof text !== 'string' || !text.trim() || [...text.trim()].length > MESSAGE_MAX) return [400, { error: `Write the ${kind} first, ${MESSAGE_MAX} characters or fewer` }];
     if (kind === 'comment' && !loadDecisions(file).some((x) => x.key === key)) return [404, { error: 'This question is no longer in the file' }];
     appendMessage(file, kind, text.trim(), kind === 'comment' ? key : undefined);
+    return [200, state()];
+  }
+  if (req.url === '/api/dismiss') {
+    const { keys, dismissed } = JSON.parse(body) ?? {};
+    if (!Array.isArray(keys) || !keys.length || keys.length > 200 || typeof dismissed !== 'boolean') return [400, { error: 'Send 1 to 200 keys and dismissed true or false' }];
+    const have = new Set(loadDecisions(file).map((x) => x.key));
+    if (!keys.every((k) => isKey(k) && have.has(k))) return [404, { error: 'This item is no longer in the file' }];
+    appendDismissed(file, [...new Set<string>(keys)], dismissed);
     return [200, state()];
   }
   if (req.url === '/api/rounds') {

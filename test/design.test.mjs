@@ -533,7 +533,16 @@ test('each card has one place to type: Other answer holds the reply, Another rou
     assert.equal(row.match(/<textarea/g)?.length, 1, key);
     assert.match(row, /<details class="other"><summary[^>]*>Other answer<\/summary>.*<textarea.*>Send reply<.*>Another round<.*>Send as a comment</s, key);
     assert.doesNotMatch(row, /Note, comment or another round/, key);
+    assert.match(row, /<button class="x" aria-label="Dismiss, [^"]+">×<\/button>/, key);
   }
+  // Clear all done sits above Answered; a dismissed item leaves the page and its counts.
+  assert.match(await dump('#answered'), /<div class="tools"><button class="clear">Clear all done<\/button><\/div>/);
+  writeFileSync(file.replace(/\.json$/, '.dismissed.jsonl'), JSON.stringify({ key: 'look', dismissed: true, at: new Date(Date.now() + 1000).toISOString() }) + '\n');
+  const left = await dump('#answered');
+  assert.deepEqual(cards(left).map(([key]) => key), ['ship']);
+  assert.match(left, /Answered<span class="n">1<\/span>/);
+  writeFileSync(file.replace(/\.json$/, '.dismissed.jsonl'), ['look', 'ship'].map((key) => JSON.stringify({ key, dismissed: true, at: new Date(Date.now() + 1000).toISOString() })).join('\n') + '\n');
+  assert.match(await dump('#answered'), /<p class="empty">All done items cleared\.<\/p>/);
   proc.kill();
 });
 
@@ -656,7 +665,7 @@ test('a read-only board fed by another program: no answers, a link on any item, 
   assert.equal(first.readonly, true);
   assert.equal(first.decisions[1].link, 'https://example.com/pr/1');
   assert.equal((await fetch(new URL(`${first.mockBase.slice(1)}page~/img/dot.png`, url))).status, 200);
-  for (const [path, body] of [['api/answers', { key: 'ask-1', answer: 'yes' }], ['api/rounds', { key: 'ask-1', note: 'again' }], ['api/messages', { kind: 'prompt', text: 'hi' }]]) {
+  for (const [path, body] of [['api/answers', { key: 'ask-1', answer: 'yes' }], ['api/rounds', { key: 'ask-1', note: 'again' }], ['api/messages', { kind: 'prompt', text: 'hi' }], ['api/dismiss', { keys: ['ask-1'], dismissed: true }]]) {
     const res = await post(url, path, body);
     assert.deepEqual([res.status, (await res.json()).error], [403, 'This board is read-only'], path);
   }
@@ -714,6 +723,18 @@ test('an answers-only board fed through post --replace: a bad item is refused, y
   assert.equal(statSync(join(dir, 'board.answers.jsonl')).mode & 0o777, 0o600);
   assert.deepEqual(readdirSync(dir).filter((f) => /jsonl$/.test(f)), ['board.answers.jsonl']);
   assert.match(run('list', file).out, /0 of 2 decisions/);
+  // Dismiss hides items on an answers-only board too, and tells the feeder nothing; Undo, or a new answer after it, brings an item back.
+  const hidden = async (body) => (await (await post(url, 'api/dismiss', body)).json()).dismissed;
+  for (const [body, status] of [[{ keys: [], dismissed: true }, 400], [{ keys: ['page'], dismissed: 'yes' }, 400], [{ keys: ['ask-9'], dismissed: true }, 404]]) {
+    assert.equal((await post(url, 'api/dismiss', body)).status, status, JSON.stringify(body));
+  }
+  assert.deepEqual(await hidden({ keys: ['page', 'ask-2', 'page'], dismissed: true }), ['page', 'ask-2']);
+  assert.deepEqual(await hidden({ keys: ['page'], dismissed: false }), ['ask-2']);
+  assert.equal(statSync(join(dir, 'board.dismissed.jsonl')).mode & 0o777, 0o600);
+  await new Promise((r) => setTimeout(r, 1100)); // Times are kept to the second.
+  assert.equal((await post(url, 'api/answers', { key: 'ask-2', answer: 'text', note: 'ready now' })).status, 200);
+  assert.deepEqual((await (await fetch(`${url}api/decisions`)).json()).dismissed, []);
+  assert.deepEqual(readFileSync(join(dir, 'board.answers.jsonl'), 'utf8').trim().split('\n').length, 4);
   // An answered key may not come back asking something else; an item only shown needs a fed board.
   const moved = write([page, { ...words, title: 'Say go when you are' }]);
   assert.notEqual(moved.code, 0);

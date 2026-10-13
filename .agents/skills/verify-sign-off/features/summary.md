@@ -29,3 +29,7 @@ Build an answers-only board (`post --from <file> --replace`) oldest first: an `i
 | 19 | Click `Open` on a report without steps | The full card shows inside it (its page in a frame) with no second border; `Close` folds it |
 | 20 | Post a feed with `"steps": [{ "title": "Read", "marks": ["magic"] }, { "title": "Count" }]` | `post` fails with `steps must list 2 to 12 steps` |
 | 21 | Phone, Needs you first and Triage on a yes/no or diagram ask | The answers read from the left with `★ Recommended` above the recommended answer's text; `Other answer` is a plain row with a chevron that turns when opened |
+| 22 | Phone at 390, `#reports` | The legend's four badges (AI model, Stores, Gate, Hard fail) sit on one row, text at its usual size |
+| 23 | Click `button "Dismiss, <ask title>"` (the × on an ask), then `Undo` within 5 s | The ask leaves the page and every count drops by one; the toast says `Dismissed · the agent still waits`; `Undo` brings it back (`Back on the board`); `wait` on that key is still waiting; `<board>.dismissed.jsonl` holds one line per tap, mode 600 |
+| 24 | `#answered`, click `Clear all done`, then `Undo` | Every answered item leaves, the toast says `N cleared`; `Undo` brings them all back. A new answer or another round on a dismissed item brings it back too |
+| 25 | A read-only board | No × and no `Clear all done`; `POST /api/dismiss` answers 403. An answers-only board takes it |

@@ -91,6 +91,8 @@
   .sec-h h2, .sec-h .meta { margin: 0; }
   .legend { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin: 0 0 0.75rem; padding: 0.625rem 1rem; color: var(--muted); font-size: 0.875rem; }
   .legend > span, .marks { display: inline-flex; align-items: center; gap: 0.375rem; }
+  /* At phone width the four marks fit on one row. */
+  @media (max-width: 30rem) { .legend { justify-content: space-between; gap: 0.25rem 0.5rem; padding: 0.625rem 0.75rem; } .legend > span { gap: 0.3125rem; } }
   .marks { flex-wrap: wrap; justify-content: center; gap: 0.25rem; }
   /* A mark is its shape; in the legend and the open steps list it sits in a small rounded badge. */
   .mk { display: inline-grid; place-items: center; }
@@ -214,6 +216,18 @@
   .note label { display: block; color: var(--muted); font-size: 0.8125rem; margin-top: 0.5rem; }
   .tradeoff { margin: 0; max-width: 70ch; }
   .head { display: flex; align-items: flex-start; gap: 0.5rem; }
+  /* Dismiss: a quiet round x at the end of an item's head or row. */
+  .x { flex: none; display: grid; place-items: center; width: 2.75rem; padding: 0; margin: -0.5rem 0 -0.5rem auto; border: 0; border-radius: 50%;
+    background: none; color: var(--muted); font-size: 1.5rem; line-height: 1.25; }
+  .x:hover { background: var(--sunk); color: var(--text); }
+  .head .st + .x { margin-left: 0; }
+  .report .row .x { display: none; }
+  .rows li { display: flex; align-items: center; }
+  .rows li .compact { flex: 1; min-width: 0; }
+  .rows li .x { margin: 0; }
+  .clear { min-height: 2.75rem; padding: 0; border: 0; background: none; color: var(--accent); font-weight: 600; }
+  .tools { display: flex; justify-content: flex-end; margin: -0.5rem 0 0.25rem; }
+  .sec-head .clear { margin-left: auto; }
   .chip { flex: none; margin-top: 0.2rem; padding: 0 0.5rem; border: 1px solid var(--line); border-radius: 999px; color: var(--muted);
     font-size: 0.6875rem; font-weight: 600; line-height: 1.25rem; letter-spacing: 0.04em; text-transform: uppercase; }
   .chip.seen { display: inline-block; margin-top: 0.375rem; color: var(--accent); border-color: currentColor; }
@@ -413,6 +427,32 @@
   const chip = (d) => el('span', { class: 'chip' }, NAMES[d.type] ?? d.type.replace(/-/g, ' '));
   const title = (d) => (d.type === 'evidence' ? `Update ${d.number} · ${d.title}` : d.title);
 
+  /** Dismiss hides items from this board (the agent is not told, so an ask keeps waiting); Undo puts them back. */
+  const post = (body) => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  function dismiss(keys, text) {
+    call('/api/dismiss', post({ keys, dismissed: true })).then(() => {
+      undoBtn.setAttribute('aria-label', `Undo, ${text}`);
+      say(text, 5000, () => {
+        undoBtn.disabled = true;
+        call('/api/dismiss', post({ keys, dismissed: false })).then(() => say('Back on the board', 3000), (e) => say(`Couldn't undo: ${e.message}`, 8000));
+      });
+      undoBtn.focus();
+    }, (e) => say(`Couldn't dismiss: ${e.message}`, 8000));
+  }
+  const canDismiss = () => !state.readonly && !FROZEN;
+  function xBtn(d) {
+    if (!canDismiss()) return '';
+    const b = el('button', { class: 'x', 'aria-label': `Dismiss, ${d.title}` }, '×');
+    b.onclick = () => dismiss([d.key], area(d) === 'waiting' ? 'Dismissed · the agent still waits' : `Dismissed: ${d.title}`);
+    return b;
+  }
+  function clearAll(done) {
+    if (!canDismiss() || !done.length) return '';
+    const b = el('button', { class: 'clear' }, 'Clear all done');
+    b.onclick = () => dismiss(done.map((d) => d.key), `${done.length} cleared`);
+    return b;
+  }
+
   function row(d) {
     const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` });
     const saved = Object.hasOwn(state.answers, d.key) ? state.answers[d.key] : undefined;
@@ -428,7 +468,7 @@
     const top = d.options.findIndex((o) => o.value === d.recommend_value), ranked = top > 0 ? [buttons[top], ...buttons.filter((_, i) => i !== top)] : buttons;
     // The agent that posted the item took this answer with wait --filer.
     const seen = saved && state.seen?.includes(d.key) ? el('span', { class: 'chip seen' }, 'Seen by agent') : '';
-    const head = el('div', { class: 'head' }, chip(d), el('div', {}, el('h3', { dir: 'auto' }, title(d)), seen));
+    const head = el('div', { class: 'head' }, chip(d), el('div', {}, el('h3', { dir: 'auto' }, title(d)), seen), xBtn(d));
     const silent = d.default_if_silent && !ro ? `If no answer: ${d.options.find((o) => o.value === d.default_if_silent).label}` : '';
     if (design) {
       return el('article', { class: 'row design', id: `item-${d.key}` }, head,
@@ -625,9 +665,9 @@
       const saved = state.answers[d.key], link = el('a', { class: 'compact', href: `#${a}` }, thumb(a, pic(d)), el('span', {}, el('strong', { dir: 'auto' }, title(d)),
         el('span', { class: 'meta', dir: 'auto' }, saved ? `${saved.answer === 'text' ? 'Your reply' : saved.label} · ${hhmm(saved.at)}` : d.about ?? NAMES[d.type] ?? d.type)));
       link.onclick = () => (jump = d.key);
-      return el('li', {}, link);
+      return el('li', {}, link, xBtn(d));
     };
-    return el('section', { class: `i-${a}` }, el('div', { class: 'sec-head' }, el('h2', {}, AREAS[a]),
+    return el('section', { class: `i-${a}` }, el('div', { class: 'sec-head' }, el('h2', {}, AREAS[a]), a === 'answered' ? clearAll(items) : '',
       items.length ? el('a', { href: `#${a}` }, items.length > SHOWN ? `See all ${items.length}` : 'Open') : ''),
     items.length ? el('ul', { class: 'card rows' }, ...items.slice(0, SHOWN).map(line)) : el('p', { class: 'empty' }, EMPTY[a]));
   }
@@ -647,7 +687,7 @@
     };
     const fresh = d.filed && isToday(d.filed), st = d.filed && el('span', { class: `st ${fresh ? 'new' : 'ok'}` }, fresh ? 'New today' : 'Current');
     const decided = d.decided ? el('p', { class: 'decided', dir: 'auto' }, el('span', { class: 'lbl' }, 'What it decided'), d.decided) : '';
-    const head = [el('div', { class: 'head' }, st ? '' : chip(d), el('h3', { dir: 'auto' }, title(d)), st || ''), d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided];
+    const head = [el('div', { class: 'head' }, st ? '' : chip(d), el('h3', { dir: 'auto' }, title(d)), st || '', xBtn(d)), d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided];
     const full = open && !n ? row(d) : null;
     full?.removeAttribute('id');
     const body = full ? [full, decided] : [n ? (open ? el('ol', { class: 'steps' }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), el('span', { dir: 'auto' }, t.title), marks(t))))
@@ -710,7 +750,8 @@
   function render() {
     const by = { waiting: [], evidence: [], reports: [], answered: [] };
     // The board file appends new items at the end: asks are answered oldest first, the rest read newest first, answers by their time.
-    for (const d of [...state.decisions].reverse()) by[area(d)].push(d);
+    const gone = new Set(state.dismissed ?? []);
+    for (const d of [...state.decisions].reverse()) if (!gone.has(d.key)) by[area(d)].push(d);
     by.waiting.reverse();
     by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
     const at = /^#(waiting|evidence|reports|answered)$/.exec(location.hash)?.[1];
@@ -727,8 +768,8 @@
       ...(first ? [row(first), el('a', { class: 'more', href: '#waiting' }, more)] : [el('p', { class: 'meta' }, 'Nothing is waiting on you.')]));
     document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [triage(by.waiting)]
       : at === 'reports' && !state.readonly && by.reports.length ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
-        ...reportGroups(by.reports)] : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
-      : el('p', { class: 'empty' }, EMPTY[at])] : [el('div', { class: 'tiles' }, ...Object.keys(AREAS).map((a) => tile(a, by[a]))),
+        ...reportGroups(by.reports)] : at ? [at === 'answered' && clearAll(by.answered) ? el('div', { class: 'tools' }, clearAll(by.answered)) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
+      : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [el('div', { class: 'tiles' }, ...Object.keys(AREAS).map((a) => tile(a, by[a]))),
       el('div', { class: 'pair' }, needs, today()), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()]),
       el('div', { class: 'areas' }, ...Object.keys(AREAS).map((a) => section(a, by[a])))]));
     if (FROZEN) freeze();

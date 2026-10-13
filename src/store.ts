@@ -220,6 +220,27 @@ export function appendRound(decisionsPath: string, key: string, note: string): v
   appendLine(roundsPath(decisionsPath), { key, note, at: now() } satisfies Round);
 }
 
+/** Items hidden from the board, one line per key and change; the agent is not told, and an ask it waits on keeps waiting. */
+export const dismissedPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.dismissed.jsonl';
+export function appendDismissed(decisionsPath: string, keys: string[], dismissed: boolean): void {
+  const at = now();
+  for (const key of keys) appendLine(dismissedPath(decisionsPath), { key, dismissed, at });
+}
+/** Keys hidden now: the last line for each dismissed it, and no answer or round came after it. A torn line is skipped and reported through warn. */
+export function readDismissed(decisionsPath: string, answers: Record<string, Answer>, rounds: Round[], warn: (msg: string) => void = () => {}): string[] {
+  const hidden = new Map<string, string>();
+  readRaw(dismissedPath(decisionsPath)).split('\n').forEach((line, n) => {
+    try {
+      const x = line && JSON.parse(line);
+      if (x?.dismissed === true && typeof x.key === 'string' && typeof x.at === 'string') hidden.set(x.key, x.at);
+      else if (x) hidden.delete(x.key);
+    } catch {
+      warn(`skipped unreadable line ${n + 1} in ${dismissedPath(decisionsPath)}`);
+    }
+  });
+  return [...hidden].filter(([key, at]) => !(answers[key]?.at > at) && !rounds.some((r) => r.key === key && r.at > at)).map(([key]) => key);
+}
+
 /** A comment on one item or a prompt queued for the agent; delivered is when poll handed it over. */
 export type Message = { id: string; kind: 'comment' | 'prompt'; key?: string; text: string; at: string; delivered?: string };
 export const messagesPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.messages.jsonl';
