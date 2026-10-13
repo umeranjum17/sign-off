@@ -703,7 +703,7 @@
       const box = el('textarea', { id: `ann-text-${d.key}`, rows: 2, maxlength: 500, dir: 'auto' }), save = el('button', {}, 'Save comment'), cancel = el('button', { class: 'quick' }, 'Cancel');
       box.value = open.text ?? mine.find((a) => a.mock === open.mock && a.ref === open.ref)?.text ?? '';
       box.oninput = () => (open.text = box.value);
-      save.onclick = () => post(save, { key: d.key, mock: open.mock, ref: open.ref, tag: open.tag, words: open.words, text: box.value, hash: hash.get(open.mock) }, () => editing.delete(d.key));
+      save.onclick = () => post(save, { key: d.key, mock: open.mock, ref: open.ref, tag: open.tag, words: open.words, text: box.value, hash: open.hash }, () => editing.delete(d.key));
       cancel.onclick = () => { editing.delete(d.key); redraw(d); };
       form = el('div', {}, el('label', { for: box.id }, `Comment on ${what(open)}`), box, el('div', { class: 'actions' }, save, cancel));
     }
@@ -969,7 +969,8 @@
     // The element named opens the comment editor on its card, with its saved comment when it has one.
     const dm = frame.dataset.mock, cut = dm.indexOf('~'), d = state.decisions.find((x) => x.key === dm.slice(0, cut));
     if (!d || !talks()) return;
-    editing.set(d.key, { mock: dm.slice(cut + 1), ref: msg.ref, tag: msg.tag, words: msg.text });
+    const mock = dm.slice(cut + 1);
+    editing.set(d.key, { mock, hash: d.mocks?.find((m) => m.value === mock)?.hash, ref: msg.ref, tag: msg.tag, words: msg.text });
     redraw(d);
     document.getElementById(`ann-text-${d.key}`)?.focus();
   });
