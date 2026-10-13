@@ -137,11 +137,15 @@ function expire(path: string, record: Record): Record {
   }
   return record;
 }
+function custody(board: string, create: boolean) {
+  const file = boardFile(board), parent = dirname(file), dir = root(create);
+  if (dir === parent || dir.startsWith(parent + '/')) bad('VAULT_KEY_UNAVAILABLE');
+  return { file, dir };
+}
 async function operate<T>(board: string, key: string, create: boolean, fn: (dir: string, path: string, record: Record | undefined, id: string) => T): Promise<T> {
   if (!isKey(key)) bad('VALIDATION_ERROR');
   try {
-    const file = boardFile(board), parent = dirname(file), dir = root();
-    if (dir === parent || dir.startsWith(parent + '/')) bad('VAULT_KEY_UNAVAILABLE');
+    const { file, dir } = custody(board, true);
     return await lockedVault(dir, () => {
       const id = boardId(file, create), path = join(dir, `${digest(id, key)}.json`);
       let record: Record | undefined;
@@ -154,18 +158,19 @@ async function operate<T>(board: string, key: string, create: boolean, fn: (dir:
     });
   } catch (e) { throw e instanceof VaultError ? e : new VaultError('BUSY'); }
 }
-export async function sweepVault() {
+export async function sweepVault(board: string) {
   try {
-    const dir = root(false);
-    if (!dir) return;
-    await lockedVault(dir, () => {
+    const { dir } = custody(board, false);
+    if (!dir) return true;
+    return await lockedVault(dir, () => {
       // ponytail: linear startup scan; periodic cleanup and durable wake events are still owed before activation.
-      for (const name of readdirSync(dir).filter((n) => /^[a-f0-9]{64}\.json$/.test(n))) {
-        const path = join(dir, name);
-        expire(path, readRecord(path));
+      let clean = true;
+      for (const name of readdirSync(dir).filter((n) => n.endsWith('.json'))) {
+        try { const path = join(dir, name); expire(path, readRecord(path)); } catch { clean = false; }
       }
+      return clean;
     });
-  } catch (e) { throw e instanceof VaultError ? e : new VaultError('BUSY'); }
+  } catch { return false; }
 }
 const summary = (r: Record) => ({ ...r.meta, status: r.status, at: r.at });
 const active = (r?: Record) => {

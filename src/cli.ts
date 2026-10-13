@@ -990,7 +990,7 @@ async function serve(args: string[]) {
     const live = await running(parsed.file);
     if (live) throw fail(`this board is already open at ${live.url}`, 'CONFLICT', `Run \`sign-off-axi stop${parsed.on}\` first`);
     if (!loopback(bind)) tokenOf(parsed.file, true);
-    try { await sweepVault(); } catch { warn('Vault startup expiry unavailable; access checks remain enforced.'); }
+    if (!await sweepVault(parsed.file)) warn('Vault startup expiry unavailable; access checks remain enforced.');
     [file, evidenceRoot] = [parsed.file, parsed.values['evidence-root'] ? resolve(parsed.values['evidence-root']) : ''];
     await new Promise<void>((ok, no) => server.once('error', no).listen(port, bind, ok)).catch((e) => {
       throw fail(e.code === 'EADDRINUSE' ? `port ${port} is in use; pass --port` : e.code === 'EADDRNOTAVAIL' ? `${bind} is not an address of this machine; pass another --bind` : e.message, 'SERVE_FAILED');

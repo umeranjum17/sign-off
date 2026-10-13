@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createDecipheriv, randomBytes } from 'node:crypto';
 
@@ -208,11 +208,19 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     await run({ op: 'create', meta: { ...meta('startup-other', 'receive'), board: second, expires: deadline }, value: url });
     due.push(recordFor('startup-other'));
     const preserved = ['kept', 'sequence', 'expires-give'].map(recordFor).map((p) => [p, readFileSync(p)]);
+    // Malformed, misnamed, wrong-binding, symlinked and stray records sit beside valid elapsed ones.
+    const malformed = [[join(dir, `${'b'.repeat(64)}.json`), '{"corrupt":'], [join(dir, 'stray.json'), '{"schema":1}'], [join(dir, `${'c'.repeat(64)}.json`), readFileSync(due[0])]];
+    for (const [path, bytes] of malformed) writeFileSync(path, bytes, { mode: 0o600 });
+    const symlinkTarget = join(home, 'symlink-target'), symlinkRecord = join(dir, `${'d'.repeat(64)}.json`);
+    writeFileSync(symlinkTarget, 'target', { mode: 0o600 }); symlinkSync(symlinkTarget, symlinkRecord);
     await waitFor(() => Date.now() >= deadline, deadline + 5_000);
     for (const path of due) assert.ok(['pending', 'ready'].includes(JSON.parse(readFileSync(path)).status));
-    assert.equal(await serve(), '');
+    assert.equal(await serve(), warning);
     for (const path of due) { const r = JSON.parse(readFileSync(path)); assert.equal(r.status, 'expired'); assert.equal(r.sealed, undefined); }
     for (const [path, bytes] of preserved) assert.deepEqual(readFileSync(path), bytes);
+    for (const [path, bytes] of malformed) assert.deepEqual(readFileSync(path), Buffer.from(bytes));
+    assert.equal(readFileSync(symlinkTarget, 'utf8'), 'target');
+    for (const path of [...malformed.map(([p]) => p), symlinkRecord, symlinkTarget]) rmSync(path);
     const terminal = due.map((p) => readFileSync(p)); assert.equal(await serve(), '');
     due.forEach((p, i) => assert.deepEqual(readFileSync(p), terminal[i]));
     assert.equal((await run({ op: 'create', meta: meta('startup-pending') })).code, 'VALIDATION_ERROR');
@@ -250,6 +258,22 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     writeFileSync(join(brokenState, 'sign-off', 'vault'), secret + url, { mode: 0o600 }); env.XDG_STATE_HOME = brokenState;
     try { assert.ok(await serve(undefined, normal) === warning); assert.ok(readFileSync(join(brokenState, 'sign-off', 'vault'), 'utf8') === secret + url); }
     finally { env.XDG_STATE_HOME = state; rmSync(brokenState, { recursive: true }); }
+    // Custody inside the board's own folder is never swept; the ordinary board and vault access still behave.
+    const containedFolder = join(home, 'contained'), containedBoard = join(containedFolder, 'board.json');
+    mkdirSync(containedFolder, { mode: 0o700 }); writeFileSync(containedBoard, '{"schema":2,"items":[]}');
+    const containedExpires = Date.now() + 3_000;
+    await run({ op: 'create', meta: { ...meta('contained-expiring', 'receive'), board: containedBoard, expires: containedExpires }, value: url });
+    await waitFor(() => Date.now() >= containedExpires, containedExpires + 5_000);
+    const elapsedBytes = readFileSync(recordFor('contained-expiring')), containedVault = join(containedFolder, 'sign-off', 'vault');
+    mkdirSync(containedVault, { recursive: true, mode: 0o700 });
+    const copied = join(containedVault, basename(recordFor('contained-expiring')));
+    writeFileSync(copied, elapsedBytes, { mode: 0o600 });
+    env.XDG_STATE_HOME = containedFolder;
+    try {
+      assert.equal(await serve(undefined, containedBoard), warning);
+      assert.deepEqual(readFileSync(copied), elapsedBytes);
+      assert.equal((await run({ op: 'inspect', board: containedBoard, key: 'contained-expiring' })).code, 'VAULT_KEY_UNAVAILABLE');
+    } finally { env.XDG_STATE_HOME = state; rmSync(containedFolder, { recursive: true, force: true }); }
     for (const text of [...outputs, ...files(home).map((p) => readFileSync(p).toString())]) {
       assert.equal(text.includes(secret) || text.includes(url), false);
     }
