@@ -453,7 +453,6 @@ function post(args: string[], cmd = 'post') {
     ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: f === 'option' }])) });
   const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'link', 'view', 'chapter'].filter((f) => values[f] !== undefined);
   if (values.from !== undefined && given.length) throw fail(`--from cannot be combined with --${given[0]}`, 'VALIDATION_ERROR', `Put every field in the --from file, or ${cmd} with flags only`);
-  fits(values.title);
   if (values.replace) return replace(file, on, values.from, filerOf(values));
   const filer = filerOf(values, true);
   const type = values.type ?? 'decision';
@@ -540,6 +539,7 @@ function replace(file: string, on: string, from?: string, filer?: string) {
 const MEDIA_BYTES = 50_000_000;
 /** Copies the media into evidence/<n>/ next to the board and adds the item, numbered under the board lock: update-<n>, or an explainer under its own key. */
 function postMedia(file: string, on: string, values: Record<string, any>, type: 'evidence' | 'explainer', filer?: string) {
+  fits(values.title);
   const explainer = type === 'explainer';
   const extra = (explainer ? ['mock', 'tradeoff', 'view', 'link'] : ['key', 'option', 'recommend', 'default', 'mock', 'tradeoff', 'view', 'chapter']).find((f) => values[f] !== undefined);
   if (extra) throw fail(`--${extra} does not apply to --type ${type}`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
@@ -685,7 +685,7 @@ function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: 
     if (raised.some((r) => r.status === 'raised')) writeItems(file, items);
     const key = raised.length === 1 ? ` --key ${raised[0].key}` : '';
     // Reports take no answer, so a post of only reports asks the user to read them, never to answer.
-    if (!incoming.some((d) => d.options.length || d.reply)) return toon({ board: tilde(file), raised }, [`Run \`sign-off-axi open${on}\` so the user can read ${incoming.length > 1 ? 'them' : 'it'}`]);
+    if (!incoming.some(waits)) return toon({ board: tilde(file), raised }, [`Run \`sign-off-axi open${on}\` so the user can read ${incoming.length > 1 ? 'them' : 'it'}`]);
     const open = raised.some((r) => !r.status.startsWith('already answered')) ? [`Run \`sign-off-axi open${on}\` so the user can answer`] : [];
     return toon({ board: tilde(file), raised }, [...open, ...(filer ? [waitFor(on, filer)] : []), `Run \`sign-off-axi answers${on}${key}\` to read ${key ? 'the answer' : 'the answers'}`]);
   });

@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { decode } from '@toon-format/toon';
@@ -126,4 +126,36 @@ test('a report in a raise --from file: checked by its kind, stored with no optio
   // An item already on the board is not checked again: a long title from before still loads.
   writeFileSync(board, JSON.stringify({ schema: 2, items: [{ key: 'old', title: 'T'.repeat(200) }] }));
   assert.equal(cli2('list', board).status, 0);
+});
+
+test('the 160 title limit applies to new items only: a re-post of an item already on the board reports it waiting', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const board = join(scratch, 'repost.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  assert.equal(cli2('raise', board, '--title', 'Ship the sign-in screen?', '--key', 'signin').status, 0);
+  const doc = JSON.parse(readFileSync(board, 'utf8'));
+  doc.items[0].title = 'T'.repeat(200);
+  writeFileSync(board, JSON.stringify(doc));
+  const again = cli2('raise', board, '--title', 'T'.repeat(200), '--key', 'signin');
+  assert.equal(again.status, 0, again.stdout);
+  assert.match(again.stdout, /already waiting/);
+  const evidence = join(scratch, 'evidence.json');
+  const long = cli2('post', evidence, '--type', 'evidence', '--title', 'T'.repeat(161), '--about', 'Shot');
+  assert.equal(long.status, 2, long.stdout);
+  assert.match(long.stdout, /title is 161 characters, over 160/);
+  assert.equal(existsSync(evidence), false, 'refused before anything is written');
+});
+
+test('a stored report with reply, area or type is refused: it can never wait, be answered, or leave Reports', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const board = join(scratch, 'stored-report.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  for (const extra of [{ reply: true }, { area: 'waiting' }, { type: 'design' }]) {
+    writeFileSync(board, JSON.stringify({ schema: 2, items: [{ ...report, ...extra }] }));
+    const listed = cli2('list', board);
+    assert.equal(listed.status, 2, JSON.stringify(extra));
+    assert.match(listed.stdout, /must be left out: a report takes no answer and shows only under Reports/);
+  }
 });
