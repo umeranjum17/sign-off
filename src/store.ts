@@ -6,6 +6,7 @@ export type Option = { value: string; label: string };
 export type MockRef = { value: string; path: string };
 export type MediaRef = { path: string; sha256: string; bytes: number };
 export type Chapter = { at: number; title: string };
+export type Step = { title: string; marks?: string[] };
 export type EvidenceLink = { run_id: string; commit: string; outcome: string; repro: string; proof: string; evidence: string };
 export type Decision = {
   key: string; title: string; about?: string; detail?: string; options: Option[];
@@ -15,6 +16,8 @@ export type Decision = {
   filer?: string;
   /** The board area it shows in while it waits for no answer, in place of the one its type gives it. */
   area?: string;
+  /** How it works, step by step: each step's title and the marks for what matters there. */
+  steps?: Step[];
 };
 export type Answer = { key: string; answer: string; label: string; close: string; at: string; note?: string };
 export type Round = { key: string; note: string; at: string };
@@ -36,6 +39,8 @@ export const CHAPTERS_MAX = 12;
 const isText = (v: unknown) => typeof v === 'string';
 export const isKey = (v: unknown) => isText(v) && /^[A-Za-z0-9._-]{1,128}$/.test(v as string);
 const ONE_OF: Record<string, unknown[]> = { close: ['done', 'release'], area: ['waiting', 'evidence', 'reports', 'answered'] };
+/** What a step uses or can stop on: an AI model, a store, a gate, a hard fail. */
+const MARKS = ['ai', 'store', 'gate', 'fail'];
 export const NOTE_MAX = 500;
 const TRADEOFF_MAX = 1000;
 const VIEWS: Record<string, [string, RegExp]> = { diagram: ['.svg, .png, .jpg, .jpeg or .webp', /\.(svg|png|jpe?g|webp)$/i], interactive: ['.html', /\.html$/i] };
@@ -101,6 +106,11 @@ export function loadDecisions(path: string): Decision[] {
       || !d.chapters.every((c: any, n: number) => Number.isInteger(c?.at) && c.at >= 0 && (!n || c.at > d.chapters[n - 1].at) && isText(c.title) && c.title.trim() && c.title.length <= 120))) {
       throw bad('chapters', `must list 1 to ${CHAPTERS_MAX} items, each a start in whole seconds after the one before and a title of 120 characters or fewer`);
     }
+    if (d.steps !== undefined && (!Array.isArray(d.steps) || d.steps.length < 2 || d.steps.length > 12
+      || !d.steps.every((t: any) => isText(t?.title) && t.title.trim() && t.title.length <= 80 && (t.marks === undefined
+        || (Array.isArray(t.marks) && t.marks.every((m: any) => MARKS.includes(m)) && new Set(t.marks).size === t.marks.length))))) {
+      throw bad('steps', `must list 2 to 12 steps, each a title of 80 characters or fewer and marks from ${MARKS.join(', ')}`);
+    }
     if (d.type === 'evidence' && !(Number.isInteger(d.number) && d.number >= 1)) throw bad('number', 'must be a whole number from 1');
     if (d.link !== undefined && !(isText(d.link) && /^(https?:\/\/\S{1,500}|[a-f0-9]{7,40})$/.test(d.link))) throw bad('link', 'must be an http(s) link or a commit hash');
     // A ladder rung: a diagram image, or an interactive page the board frames in a sandbox.
@@ -133,6 +143,7 @@ export function loadDecisions(path: string): Decision[] {
       recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done', evidence: d.evidence,
       type: d.type ?? 'decision', tradeoff: d.tradeoff, link: d.link, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path })),
       ...(views && { view: d.view }), ...(d.reply && { reply: true }), ...(d.filer && { filer: d.filer }), ...(d.area && { area: d.area }),
+      ...(d.steps && { steps: d.steps.map(({ title, marks }: Step) => ({ title, ...(marks?.length && { marks }) })) }),
       ...(stored && { media: d.media.map(({ path, sha256, bytes }: MediaRef) => ({ path, sha256, bytes })) }),
       ...(d.type === 'evidence' && { number: d.number }),
       ...(d.type === 'explainer' && d.chapters && { chapters: d.chapters.map(({ at, title }: Chapter) => ({ at, title })) }),
