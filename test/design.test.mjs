@@ -18,6 +18,9 @@ mkdirSync(bin);
 mkdirSync(join(scratch, 'home'));
 symlinkSync(process.execPath, join(bin, 'node'));
 const env = { ...process.env, PATH: bin, HOME: join(scratch, 'home') };
+// No filer leaks in from the agent running the tests.
+delete env.SIGN_OFF_FILER;
+delete env.CLAUDE_CODE_SESSION_ID;
 const run = (...args) => {
   try {
     return { out: execFileSync(process.execPath, [cli, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env }), code: 0 };
@@ -657,5 +660,79 @@ test('an answers-only board fed through post --replace: a bad item is refused, y
   assert.match(moved.out, /key ask-2 was answered and now holds a different question/);
   writeFileSync(feed, JSON.stringify({ schema: 2, items: [page] }));
   assert.equal(run('post', join(dir, 'plain.json'), '--from', feed, '--replace').code, 2);
+  // Another agent's card on the same board: a feed with --filer replaces only its own items, never that card or the answers.
+  assert.match(run('raise', file, '--key', 'fm-test-1', '--title', 'Hold the release?').out, /fm-test-1,raised/);
+  const scoped = (items) => (writeFileSync(feed, JSON.stringify({ schema: 2, ...(items.length && { answers_only: true }), items })), run('post', file, '--from', feed, '--replace', '--filer', 'feeder'));
+  const keys = () => JSON.parse(readFileSync(file, 'utf8')).items.map((i) => [i.key, i.filer ?? '']);
+  assert.match(scoped([page, words]).out, /changed: true/);
+  assert.deepEqual(keys(), [['page', 'feeder'], ['ask-2', 'feeder'], ['fm-test-1', '']]);
+  assert.equal(JSON.parse(readFileSync(file, 'utf8')).answers_only, true, 'the board keeps its answers_only');
+  assert.match(scoped([page, words]).out, /changed: false/);
+  assert.equal(scoped([page]).code, 0);
+  assert.deepEqual(keys(), [['page', 'feeder'], ['fm-test-1', '']]);
+  assert.match(run('raise', file, '--key', 'theirs', '--title', 'Theirs?', '--filer', 'other').out, /theirs,raised/);
+  const taken = scoped([page, { key: 'theirs', title: 'Theirs?' }]);
+  assert.equal(taken.code, 1);
+  assert.match(taken.out, /key theirs .* was posted by another filer/);
+  // An empty feed removes the feeder's items alone.
+  assert.equal(scoped([]).code, 0);
+  assert.deepEqual(keys(), [['fm-test-1', ''], ['theirs', 'other']]);
+  assert.match(readFileSync(join(dir, 'board.answers.jsonl'), 'utf8'), /"note":"ready"/);
+  proc.kill();
+});
+
+test('answer events: a filer takes only its own answers, once, the card shows it seen, and on_answer gets each answer on stdin', async () => {
+  const dir = join(scratch, 'events'), file = join(dir, 'board.json'), out = join(dir, 'hook.out');
+  mkdirSync(dir);
+  writeFileSync(join(dir, 'hook.mjs'), `import { appendFileSync, readFileSync } from 'node:fs';\nappendFileSync(${JSON.stringify(out)}, readFileSync(0, 'utf8'));\n`);
+  // The answer reaches the hook on stdin only: its arguments are the config's words, never the answer.
+  writeFileSync(join(dir, 'config.yaml'), 'board: board.json\non_answer: node hook.mjs --from-board\n');
+  const as = (extra, ...args) => {
+    try { return { out: execFileSync(process.execPath, [cli, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: { ...env, ...extra } }), code: 0 }; }
+    catch (e) { return { out: `${e.stdout}`, code: e.status }; }
+  };
+  assert.match(as({}, 'raise', file, '--key', 'a', '--title', 'Ship A?', '--filer', 'agent-a').out, /Run `sign-off-axi wait \S+ --filer agent-a`/);
+  as({ SIGN_OFF_FILER: 'agent-b' }, 'raise', file, '--key', 'b', '--title', 'Ship B?');
+  as({ CLAUDE_CODE_SESSION_ID: 'session-1' }, 'raise', file, '--key', 's', '--title', 'Ship S?');
+  as({}, 'raise', file, '--key', 'none', '--title', 'Ship it?');
+  assert.equal(as({}, 'raise', file, '--key', 'bad', '--title', 'Bad?', '--filer', 'not ok').code, 2);
+  assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')).items.map((i) => [i.key, i.filer ?? '']), [['a', 'agent-a'], ['b', 'agent-b'], ['s', 'session-1'], ['none', '']]);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const read = async () => (await fetch(`${url}api/decisions`)).json();
+  assert.ok((await read()).decisions.every((d) => !('filer' in d)), 'the page never learns who filed an item');
+  // An answer saved before the filer waits is still its event.
+  assert.equal((await post(url, 'api/answers', { key: 'a', answer: 'yes' })).status, 200);
+  assert.deepEqual((await read()).seen, []);
+  const took = as({}, 'wait', file, '--filer', 'agent-a', '--json', '--timeout', '5');
+  assert.deepEqual([took.code, Object.keys(JSON.parse(took.out))], [0, ['a']]);
+  assert.deepEqual((await read()).seen, ['a']);
+  assert.match(await (await fetch(url)).text(), /Seen by agent/);
+  // Taken once: nothing of agent-a is left.
+  assert.match(as({}, 'wait', file, '--filer', 'agent-a', '--timeout', '1').out, /nothing posted by agent-a is waiting/);
+  // agent-b's wait sleeps through answers to other filers' items and wakes on its own.
+  const waiting = spawn(process.execPath, [cli, 'wait', file, '--filer', 'agent-b', '--json', '--timeout', '20'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  let waited = '';
+  waiting.stdout.on('data', (b) => (waited += b));
+  const exited = new Promise((ok) => waiting.on('exit', ok));
+  await new Promise((ok) => setTimeout(ok, 700));
+  assert.equal((await post(url, 'api/answers', { key: 'a', answer: 'no', note: 'changed my mind' })).status, 200);
+  assert.equal((await post(url, 'api/answers', { key: 'none', answer: 'yes' })).status, 200);
+  await new Promise((ok) => setTimeout(ok, 700));
+  assert.equal(waiting.exitCode, null, 'no answer to agent-b yet');
+  assert.equal((await post(url, 'api/answers', { key: 'b', answer: 'yes' })).status, 200);
+  assert.equal(await exited, 0);
+  assert.deepEqual(Object.keys(JSON.parse(waited)), ['b']);
+  // A changed answer is new again; SIGN_OFF_FILER names the filer for wait too.
+  assert.deepEqual((await read()).seen, ['b']);
+  assert.deepEqual(JSON.parse(as({ SIGN_OFF_FILER: 'agent-a' }, 'wait', file, '--json', '--timeout', '5').out).a.note, 'changed my mind');
+  assert.deepEqual((await read()).seen.sort(), ['a', 'b']);
+  const hooked = () => readFileSync(out, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  for (let i = 0; i < 50 && (!existsSync(out) || hooked().length < 4); i++) await new Promise((ok) => setTimeout(ok, 100));
+  // Each hook runs on its own, so their lines may land in any order.
+  assert.deepEqual(hooked().map(({ key, answer, filer = '', title }) => [key, answer, filer, title].join()).sort(),
+    ['a,no,agent-a,Ship A?', 'a,yes,agent-a,Ship A?', 'b,yes,agent-b,Ship B?', 'none,yes,,Ship it?']);
+  assert.equal(statSync(join(dir, 'board.seen.jsonl')).mode & 0o777, 0o600);
   proc.kill();
 });

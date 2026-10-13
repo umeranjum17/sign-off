@@ -57,6 +57,17 @@ Its frontmatter also includes Hermes Agent metadata, so Hermes-compatible harnes
 
 Then ask in plain words - "ask me whether to keep the weekly digest and wait for my answer" - and the agent loads the skill on its own when it recognizes the task. Agents that expose skills as slash commands also take `/sign-off-axi should we keep the weekly digest?`.
 
+### Your answer reaches the agent that asked
+
+Every item records who filed it, and that agent gets your answer as an event, by itself:
+
+```sh
+npx -y sign-off-axi raise --title "Keep the weekly digest?" --filer my-agent   # or export SIGN_OFF_FILER=my-agent
+npx -y sign-off-axi wait --filer my-agent                                      # blocks until you answer, then prints it
+```
+
+`wait --filer` returns only answers to that filer's items, each once, including one given before it started waiting; the card then shows **Seen by agent**. With no `--filer` or `SIGN_OFF_FILER`, a post saves the Claude Code session id when there is one, and the post prints the exact `wait` command to run. An agent that cannot block can be woken instead: an `on_answer:` line in the `config.yaml` beside the board names a command the board runs for every answer (below).
+
 ### Repo setup
 
 In a project folder, `sign-off-axi init` writes `.sign-off/` (config with the
@@ -124,7 +135,8 @@ sign-off-axi status                             is the board open started for th
 sign-off-axi stop                               stop that board
 sign-off-axi serve [--port 4410] [--bind <address>] [--evidence-root <dir>]   run the board in the foreground (--port 0 picks a free port)
 sign-off-axi answers [--key <key>]              the latest answer per decision, and how many still wait
-sign-off-axi wait [--key <key>] [--timeout 600]  block until the user answers, then print it like answers
+sign-off-axi wait [--filer <id>] [--key <key>] [--timeout 600]  block until the user answers, then print it like answers
+                                                (--filer: only answers to that filer's items, each once)
 sign-off-axi poll [--timeout 600]               block until the user comments or queues a prompt, then print each new one once
 sign-off-axi export [--out <file.html>]          write a frozen read-only copy of the board as one HTML file
 ```
@@ -142,6 +154,9 @@ sign-off-axi export [--out <file.html>]          write a frozen read-only copy o
 - `list` and `answers` take `--full` for every field and `--json` for JSON (`answers --json` prints `{"<key>":{"answer","label","close","at"}}`, plus `"note"` when the user wrote one). `answers` adds a note column when any shown answer has a note.
 - Raising a question that is already on the board is a no-op that reports its status, so an agent can re-run it safely. `--key` defaults to a slug of the title.
 - `open` is a no-op when the same board is already open on the same address, and fails with `CONFLICT` when it runs on another one. `--evidence-root` is the folder holding `.done-done/`, for decisions that link run evidence.
+- `--filer <id>` on `post` and `raise` saves who filed the item (an agent session id or any 1-128 of `A-Z a-z 0-9 . _ -`; `SIGN_OFF_FILER` sets it for every command, and a post with neither saves `CLAUDE_CODE_SESSION_ID` when it is set). `wait --filer <id>` then returns only answers to that filer's items it has not taken yet, marks each taken (`decisions.seen.jsonl`) and the card shows **Seen by agent**; it fails with `NOT_FOUND` when none of that filer's items is answered or waiting. The page never shows the filer id.
+- `on_answer: <command> [args]` in the `config.yaml` beside the board runs that command for every saved answer, read when the board starts. It runs with no shell, in the board's folder, and gets the answer as one JSON line on stdin (`{"key","answer","label","close","at","note"?,"title"?,"filer"?}`); the answer is never put into its arguments, so a typed note cannot inject a command. A failure is logged and never blocks the answer.
+- `post --from <file> --replace --filer <id>` lets several programs feed one board: it replaces only that filer's items (and items with no filer that the file names by key), keeps every other item, the board's other top-level fields and all answers, and an empty items list removes that filer's items.
 - `wait` replaces a polling loop. With `--key` it returns at once if that decision is already answered, and waits for a key that is not raised yet; without it, it waits for the next answer to any decision still waiting and fails with `NOT_FOUND` when nothing is. It wakes on each save, gives up after `--timeout` seconds (600, ten minutes, by default) with code `TIMEOUT` and exit 1, and takes `--full` and `--json` like `answers`. Ctrl-C stops it without changing anything.
 - `open` records the board's pid, port and address next to the board file (`decisions.board.pid`). `status` and `stop` read it and only act on a pid that really serves that board, so no one has to guess a pid to kill. `open` on a board already served by `serve` records that server, so `stop` can close it too.
 
