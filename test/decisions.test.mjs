@@ -150,6 +150,10 @@ test('agent journey: raise, open, answer, read back in TOON and JSON', async () 
   assert.equal((await post(url, { key: 'keep-the-weekly-digest', answer: '' })).status, 200);
   assert.equal(lines().length, 2, 'nothing to undo adds no line');
   assert.equal((await post(url, { key: 'keep-the-weekly-digest', answer: 'no' })).status, 200);
+  // An option valued text is a plain pick, with no note needed; that item takes no Other answer.
+  assert.match(run('raise', '--title', 'Which tab first?', '--option', 'text=Text', '--option', 'code=Code', '--recommend', 'code').out, /which-tab-first,raised/);
+  assert.equal((await post(url, { key: 'which-tab-first', answer: 'text' })).status, 200);
+  assert.equal(JSON.parse(run('answers', '--key', 'which-tab-first', '--json').out)['which-tab-first'].label, 'Text');
   // Listing options needs a recommendation, from flags or a file; a plain yes/no may leave it out, and a feed written with --replace is not held to it.
   const unmarked = run('raise', '--title', 'When should it ship?', '--option', 'today=Today', '--option', 'friday=Friday');
   assert.equal(unmarked.code, 2);

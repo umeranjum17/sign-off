@@ -208,9 +208,9 @@
 
   function save(d, o, buttons, err, draft = d.key) {
     buttons.forEach((b) => (b.disabled = true));
-    // An answers-only board takes no comments, and an Other answer is the answer itself: the typed words go with the answer alone.
-    const typed = state.answers_only || o.value === 'text' ? '' : (drafts.get(draft) ?? '').trim();
-    const note = drafts.get(draft) ?? noteOf(d.key), before = answerOf(d.key);
+    // An answers-only board takes no comments, and an Other answer beside the buttons is the answer itself: its words go with the answer alone.
+    const typed = state.answers_only || (o.value === 'text' && !d.reply) ? '' : (drafts.get(draft) ?? '').trim();
+    const note = drafts.get(draft) ?? noteOf(d), before = answerOf(d.key);
     const drop = clearIfSaved(draft, drafts.get(draft));
     call('/api/answers', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
@@ -225,8 +225,9 @@
   const toast = document.getElementById('toast'), toastText = document.getElementById('toast-text'), undoBtn = document.getElementById('undo');
   let hide;
   const answerOf = (key) => (Object.hasOwn(state.answers, key) ? state.answers[key] : undefined);
-  // An Other answer's words are that answer, not a note to carry over to the next pick or round.
-  const noteOf = (key) => (answerOf(key)?.answer === 'text' ? '' : answerOf(key)?.note ?? '');
+  // The saved note, for the next pick or round. The words of an Other answer beside the buttons are that answer, not a note
+  // to carry over; a reply item's reply still goes with the answer picked after it.
+  const noteOf = (d) => (answerOf(d.key)?.answer === 'text' && !d.reply ? '' : answerOf(d.key)?.note ?? '');
   // The toast stays while the pointer is on it or the keyboard is on Undo.
   const later = (ms) => { clearTimeout(hide); hide = setTimeout(() => (toast.matches(':hover') || undoBtn.matches(':focus-visible') ? later(1500) : (toast.hidden = true)), ms); };
   const say = (text, ms, undo) => {
@@ -331,7 +332,7 @@
   /** The note and another-round controls, folded away until the person wants them. An evidence update takes a note only. */
   function more(d, saved, err) {
     const box = el('textarea', { id: `note-${d.key}`, rows: 2, maxlength: 500, dir: 'auto' });
-    box.value = drafts.get(d.key) ?? noteOf(d.key);
+    box.value = drafts.get(d.key) ?? noteOf(d);
     box.oninput = () => { drafts.set(d.key, box.value); keep(); };
     const asked = (state.rounds ?? []).filter((r) => r.key === d.key);
     const comments = (state.messages ?? []).filter((m) => m.kind === 'comment' && m.key === d.key);
@@ -340,7 +341,7 @@
     const roundBtn = el('button', { 'aria-label': `Ask for another round, ${d.title}` }, 'Ask for another round');
     roundBtn.onclick = () => {
       roundBtn.disabled = true;
-      const note = (drafts.get(d.key) ?? noteOf(d.key)).trim();
+      const note = (drafts.get(d.key) ?? noteOf(d)).trim();
       call('/api/rounds', {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, note }),
       }, clearIfSaved(d.key, drafts.get(d.key))).catch((e) => {
@@ -349,7 +350,7 @@
       });
     };
     const update = d.type === 'evidence', title = update ? 'Note or comment' : 'Note, comment or another round';
-    const status = [noteOf(d.key) && 'note saved', asked.length && `${asked.length} ${asked.length > 1 ? 'rounds' : 'round'} asked`,
+    const status = [noteOf(d) && 'note saved', asked.length && `${asked.length} ${asked.length > 1 ? 'rounds' : 'round'} asked`,
       comments.length && `${comments.length} ${comments.length > 1 ? 'comments' : 'comment'}`].filter(Boolean).join(' · ');
     return el('details', { class: 'note', ...(drafts.has(d.key) && { open: '' }) },
       el('summary', { 'aria-label': `${title}, ${d.title}` }, `${title}${status && ` · ${status}`}`),

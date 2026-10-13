@@ -1211,7 +1211,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   const { key, answer, note = '' } = JSON.parse(body) ?? {};
   if (typeof note !== 'string' || [...note.trim()].length > NOTE_MAX) return [400, { error: `The note must be text of ${NOTE_MAX} characters or fewer` }];
   const d = loadDecisions(file).find((x) => x.key === key);
-  if (answer === REPLY.value && !note.trim()) return [400, { error: 'Write the reply first' }];
+  if (answer === REPLY.value && !note.trim() && !d?.options.some((o) => o.value === answer)) return [400, { error: 'Write the reply first' }];
   // Undo with no answer to go back to saves an empty answer: the line is kept and the item waits again.
   if (answer === CLEARED.value) {
     if (!isKey(key) || (!d && !answersOnly())) return [404, { error: 'This question is no longer in the file' }];
