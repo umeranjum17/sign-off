@@ -122,6 +122,7 @@ examples:
 `,
   post: `usage: sign-off-axi post [board.json] [--type decision|design|diagram|interactive] --title "<question>" [--key <key>] [--about <text>] [--option <value>=<label>]... [--mock <value>=<path>]... [--view <path>] [--tradeoff <text>] [--recommend <value>] [--default <value>] [--close done|release]
        sign-off-axi post [board.json] --type evidence --title "<what this shows>" --about "<short note>" --media <file>... [--link <commit or URL>] [--detail <text>]
+       sign-off-axi post [board.json] --from <board file> --replace
        sign-off-axi post [board.json] --type explainer --title "<question>" --media <video> [--about <summary>] [--chapter <m:ss>=<title>]... [--key <key>] [--option <value>=<label>]... [--recommend <value>]
 Posts an item for the user. --type decision (the default) is a yes/no or pick-one question, exactly like raise.
 --type design is a pick between up to 6 options shown side by side, each with an optional board-relative mock file
@@ -129,6 +130,8 @@ Posts an item for the user. --type decision (the default) is a yes/no or pick-on
 One .html page can hold every variant: --mock a=mocks/<key>/index.html?variant=a and so on; the page reads ?variant= to show one.
 An .html mock or view loads the css, scripts, images and fonts beside it by relative name, from its own folder only.
 After the user picks, answers --key <key> --json holds the pick and note; "rounds" holds an ask for another round.
+--from <file> --replace is for a program that feeds the board: the file, checked like any post, becomes the whole board (items and
+top-level fields such as "answers_only": true), written only when it changed; a bad item is refused and the board is left as it was. Answers stay.
 --type diagram and --type interactive are a decision shown with a picture: --view names one board-relative file,
 an image (.svg, .png, .jpg, .jpeg, .webp, 5 MB or less) shown at card width for a diagram, or one self-contained .html page for interactive.
 The page runs in a sandboxed frame: no fetch, no remote files, no access to the dashboard or its tab. Answers work as for a decision.

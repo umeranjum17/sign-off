@@ -87,6 +87,7 @@ Look at every shot before you report: nothing overlaps, no text is cut, no raw p
 | Self-hosted reach: `--bind`/config bind with the access token, comments and queued prompts read by `poll`, restart, one-file `export` | [features/selfhost.md](features/selfhost.md) |
 | Stale locks named by doctor, one `serve` per board, mock sibling files, `hosts:` names, config beside a symlinked board, the tests' temp-folder guard | [features/followups.md](features/followups.md) |
 | Read-only board fed from files: `"readonly": true`, no answer controls, 403 on writes, `link` on any item, the page redrawing within 20 seconds of a rewrite, an interactive frame fitted to the height its page posts | [features/readonly.md](features/readonly.md) |
+| Answers-only board fed through `post --from <file> --replace`: a bad item refused at write time, `reply` items (yes/no plus a short text reply, or text alone), `"options": []` items only shown, 403 on rounds, comments and prompts, an answer to a dropped item still saved | [features/answers-only.md](features/answers-only.md) |
 | README media and rendered README | [features/readme.md](features/readme.md) |
 | `sign-off-axi` commands, TOON/`--full`/`--json`, packed tarball via `npx -y` | [features/axi.md](features/axi.md) |
 | Coding agents: `init --agent auto|<name>`, config `agent:`, one doctor line per agent, the same journey on several agents | [features/agents.md](features/agents.md) |
