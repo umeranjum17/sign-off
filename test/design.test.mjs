@@ -504,7 +504,7 @@ async function browse(dir, width = 800) {
   let seq = 0;
   ws.onmessage = (m) => { const msg = JSON.parse(m.data); replies.get(msg.id)?.(msg.result?.result?.value); };
   const call = (method, params) => new Promise((ok) => { const id = ++seq; replies.set(id, ok); ws.send(JSON.stringify({ id, method, params })); });
-  const evaluate = (expression) => call('Runtime.evaluate', { expression, returnByValue: true });
+  const evaluate = (expression) => call('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
   // A real mouse click at a point of the page, which reaches into a frame there as a person's would.
   const click = async ([x, y]) => { for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await call('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 }); };
   return { evaluate, click, close: () => { ws.close(); browser.kill(); } };
@@ -545,7 +545,7 @@ test('an interactive page that posts its height gets a frame that fits it, each 
   proc.kill();
 });
 
-test('pointing at a design mock: turned on by the board, a tap is kept from the mock and comes back as a reference that finds the element again', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('pointing at a design mock: the board turns it on for a frame, a tap comes back as a reference that finds the element again, and a message from another frame is ignored', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'point'), file = join(dir, 'board.json');
   mkdirSync(join(dir, 'mocks'), { recursive: true });
   // The button fills the frame; its own focus and click handlers rename it, which must not happen while the person points.
@@ -557,28 +557,41 @@ test('pointing at a design mock: turned on by the board, a tap is kept from the 
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const { evaluate, click, close } = await browse(dir);
-  // The test plays the board's side: it lets the frame take the tap, turns pointing on and keeps what the frame names.
-  const frame = "document.querySelector('.mock iframe')";
-  const point = async () => {
-    // Listen first, then load the frame again, so its ready message is not missed and no tap lands before the bridge is on.
-    await until(() => evaluate(`!!${frame} && (window.got = [], addEventListener('message', (e) => e.data?.['sign-off'] && got.push(e.data)), ${frame}.style.pointerEvents = 'auto', ${frame}.src = ${frame}.src)`));
-    await until(() => evaluate("got.some((m) => m['sign-off'] === 'ready')"));
-    const middle = await evaluate(`${frame}.contentWindow.postMessage({ 'sign-off': 'point', on: true }, '*'), (({ left, top, width, height }) => [left + width / 2, top + height / 2])(${frame}.getBoundingClientRect())`);
-    const pointed = "got.filter((m) => m['sign-off'] === 'pointed')";
-    for (const n of [1, 2]) await click(middle), await until(() => evaluate(`${pointed}.length === ${n}`));
-    return evaluate(pointed);
+  const frame = "document.querySelector('.mock iframe')", pointed = "got.filter((m) => m['sign-off'] === 'pointed')";
+  // The card snaps while it scrolls, so the test scrolls the frame into view and waits until it is what sits under the middle of it, then taps there.
+  const middle = async () => {
+    let at;
+    await until(async () => {
+      at = await evaluate(`${frame}.scrollIntoView({ block: 'center' }), (({ left, top, width, height }) => [left + width / 2, top + height / 2])(${frame}.getBoundingClientRect())`);
+      return at && evaluate(`new Promise((paint) => requestAnimationFrame(() => requestAnimationFrame(() => paint(document.elementFromPoint(${at}) === ${frame}))))`);
+    });
+    return at;
   };
+  const ref = { ref: '#app > section:nth-of-type(1) > button:nth-of-type(2)', tag: 'button', text: 'Sign in' };
   await evaluate(`location.href = ${JSON.stringify(url)}`);
-  const first = await point();
-  const named = { 'sign-off': 'pointed', ref: '#app > section:nth-of-type(1) > button:nth-of-type(2)', tag: 'button', text: 'Sign in' };
-  assert.deepEqual(first.slice(0, 2), [named, named]);
+  await until(() => evaluate(`!!${frame}`));
+  await evaluate("window.got = [], addEventListener('message', (e) => e.data?.['sign-off'] && got.push(e.data))");
+  // The board's own function turns pointing on for the frame; a tap that lands before the bridge loads is simply not kept, so the test taps until it is.
+  await evaluate(`point(${frame}, true)`);
+  // A tap before the bridge loads reaches nothing, so the test taps until one is kept, then taps once more.
+  await until(async () => (await click(await middle()), evaluate(`${pointed}.length >= 1`)));
+  const kept = (await evaluate(pointed)).length;
+  await click(await middle());
+  await until(() => evaluate(`${pointed}.length > ${kept}`));
+  // Each tap names the button as it was: the mock's own focus and click handlers did not run.
+  for (const m of await evaluate(pointed)) assert.deepEqual(m, { 'sign-off': 'pointed', ...ref });
+  assert.deepEqual(await evaluate("pointed.get('look~a')"), ref);
+  // A message from a frame that is not a mock never changes what the board kept.
+  await evaluate(`document.body.append(Object.assign(document.createElement('iframe'), { srcdoc: ${JSON.stringify("<script>parent.postMessage({ 'sign-off': 'pointed', ref: '#other', tag: 'p', text: 'Other' }, '*')</script>")} }))`);
+  await until(() => evaluate("got.some((m) => m.text === 'Other')"));
+  assert.deepEqual(await evaluate("pointed.get('look~a')"), ref);
   // A new load of the same mock names the same element the same way.
   await evaluate('window.old = true, location.reload()');
   await until(() => evaluate('!window.old'));
-  assert.deepEqual((await point())[0], named);
-  // Only design mock pages carry the bridge; the css beside them is served as it is.
-  const page = await (await fetch(new URL(`${(await (await fetch(`${url}api/decisions`)).json()).mockBase.slice(1)}look~a/a.html`, url))).text();
-  assert.match(page, /'sign-off': 'pointed'/);
+  await until(() => evaluate(`!!${frame}`));
+  await evaluate(`point(${frame}, true)`);
+  await until(async () => (await click(await middle()), evaluate("pointed.has('look~a')")));
+  assert.deepEqual(await evaluate("pointed.get('look~a')"), ref);
   close();
   proc.kill();
 });

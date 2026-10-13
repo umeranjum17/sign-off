@@ -650,7 +650,7 @@
       // A `page.html?variant=b` mock keeps its variant in the frame's query, where the page reads it.
       const [path, query] = m?.path.split('?') ?? [];
       const url = m && src(mockUrl(d.key, m.value, path) + (query ? `?${query}` : ''));
-      const view = m && (/\.html?$/i.test(path) ? el('iframe', { src: url, title: `Mock ${o.label}`, sandbox: 'allow-scripts', tabindex: '-1', 'aria-hidden': 'true', loading: 'lazy' })
+      const view = m && (/\.html?$/i.test(path) ? el('iframe', { src: url, title: `Mock ${o.label}`, sandbox: 'allow-scripts', tabindex: '-1', 'aria-hidden': 'true', loading: 'lazy', 'data-mock': `${d.key}~${m.value}` })
         : el('img', { src: url, alt: `Mock: ${o.label}` }));
       return el('figure', { class: 'mock' },
         el('figcaption', {}, el('span', { class: 'label', dir: 'auto' }, o.label), rec(i) ? el('span', { class: 'badge' }, 'Recommended') : ''),
@@ -886,6 +886,24 @@
   addEventListener('message', (e) => {
     const frame = [...document.querySelectorAll('.rung iframe')].find((f) => f.contentWindow === e.source), h = e.data?.height;
     if (frame && Number.isFinite(h) && h > 0) frame.style.height = `${Math.ceil(Math.min(h, 10_000))}px`;
+  });
+  // A design mock page may point (web/point.js): the board keeps the last element named per mock, and turns pointing on for one mock frame.
+  const pointing = new Map(), pointed = new Map();
+  const mockFrame = (source) => [...document.querySelectorAll('.mock iframe')].find((f) => f.contentWindow === source);
+  const aim = (frame) => {
+    const on = pointing.get(frame.dataset.mock) === true;
+    frame.style.pointerEvents = on ? 'auto' : '';
+    frame.contentWindow.postMessage({ 'sign-off': 'point', on }, '*');
+  };
+  function point(frame, on) {
+    pointing.set(frame.dataset.mock, on);
+    aim(frame);
+  }
+  addEventListener('message', (e) => {
+    const frame = mockFrame(e.source), msg = e.data;
+    if (!frame || !msg) return;
+    if (msg['sign-off'] === 'ready') aim(frame);
+    if (msg['sign-off'] === 'pointed' && ['ref', 'tag', 'text'].every((k) => typeof msg[k] === 'string')) pointed.set(frame.dataset.mock, { ref: msg.ref, tag: msg.tag, text: msg.text });
   });
 
   const banner = document.getElementById('banner');
