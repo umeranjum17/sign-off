@@ -28,15 +28,10 @@ function boardFile(board: unknown) {
   try { return realpathSync(board); } catch { bad('NOT_FOUND'); }
 }
 function boardId(file: string, create: boolean) {
-  const side = `${file}.vault`;
+  const side = join(dirname(file), '.sign-off-vault-id');
   if (!lstatSync(side, { throwIfNoEntry: false })) {
     if (!create) bad('NOT_FOUND');
-    const tmp = `${side}.${randomBytes(8).toString('hex')}.tmp`, fd = openSync(tmp, 'wx', 0o600);
-    try {
-      try { writeFileSync(fd, `${randomBytes(16).toString('hex')}\n`); fsyncSync(fd); } finally { closeSync(fd); }
-      renameSync(tmp, side);
-      syncDir(dirname(side));
-    } finally { rmSync(tmp, { force: true }); }
+    publish(side, `${randomBytes(16).toString('hex')}\n`);
   }
   privateFile(side);
   const id = readFileSync(side, 'utf8').trim();
@@ -77,26 +72,24 @@ function master(dir: string) {
   if (!lstatSync(path, { throwIfNoEntry: false })) {
     // Even an interrupted record write forbids replacing a missing key.
     if (readdirSync(dir).some((n) => n.endsWith('.json') || n.endsWith('.tmp'))) bad('VAULT_KEY_UNAVAILABLE');
-    const tmp = join(dir, 'key.tmp'), fd = openSync(tmp, 'wx', 0o600);
-    try { writeFileSync(fd, randomBytes(32)); fsyncSync(fd); } finally { closeSync(fd); }
-    renameSync(tmp, path);
-    syncDir(dir);
+    publish(path, randomBytes(32), join(dir, 'key.tmp'));
   }
   privateFile(path);
   const bytes = readFileSync(path);
   if (bytes.length !== 32) bad('VAULT_KEY_UNAVAILABLE');
   return bytes;
 }
-function persist(path: string, record: Record) {
-  const tmp = `${path}.${randomBytes(8).toString('hex')}.tmp`, fd = openSync(tmp, 'wx', 0o600);
+function publish(path: string, data: string | Buffer, tmp = `${path}.${randomBytes(8).toString('hex')}.tmp`) {
+  const fd = openSync(tmp, 'wx', 0o600);
   try {
-    try { writeFileSync(fd, JSON.stringify(record)); fsyncSync(fd); } finally { closeSync(fd); }
+    try { writeFileSync(fd, data); fsyncSync(fd); } finally { closeSync(fd); }
     renameSync(tmp, path);
-    syncDir(dirname(path));
   } finally { rmSync(tmp, { force: true }); }
+  try { syncDir(dirname(path)); } catch {}
 }
+const sized = (value: unknown): value is Buffer => Buffer.isBuffer(value) && value.length > 0 && value.length <= 16_384;
 function seal(dir: string, meta: VaultMeta, value: Buffer): Sealed {
-  if (!Buffer.isBuffer(value) || !value.length || value.length > 16_384) bad('VALIDATION_ERROR');
+  if (!sized(value)) bad('VALIDATION_ERROR');
   const key = master(dir), nonce = randomBytes(12);
   try {
     const cipher = createCipheriv('aes-256-gcm', key, nonce);
@@ -127,7 +120,7 @@ async function operate<T>(board: string, key: string, create: boolean, fn: (dir:
     let record: Record | undefined;
     if (lstatSync(path, { throwIfNoEntry: false })) {
       privateFile(path);
-      record = JSON.parse(readFileSync(path, 'utf8'));
+      try { record = JSON.parse(readFileSync(path, 'utf8')); } catch { bad('VALIDATION_ERROR'); }
       if (!record || record.schema !== 1 || record.meta.board !== id || record.meta.key !== key
         || JSON.stringify(metadata(record.meta)) !== JSON.stringify(record.meta) || !['pending', 'ready', 'refused'].includes(record.status)) bad('VALIDATION_ERROR');
     }
@@ -144,13 +137,13 @@ const active = (r?: Record) => {
 
 export async function createVault(input: VaultMeta, value?: Buffer) {
   const fixed = metadata({ ...input, board: '0'.repeat(32) });
-  if ((fixed.mode === 'receive') !== (value !== undefined)) bad('VALIDATION_ERROR');
+  if ((fixed.mode === 'receive') !== (value !== undefined) || (value !== undefined && !sized(value))) bad('VALIDATION_ERROR');
   return operate(input.board, fixed.key, true, (dir, path, old, id) => {
     const meta = { ...fixed, board: id };
     if (old) bad('VALIDATION_ERROR'); // Terminal keys are tombstones, never reusable.
     if (!value) master(dir);
     const record: Record = { schema: 1, meta, status: value ? 'ready' : 'pending', at: Date.now(), ...(value && { sealed: seal(dir, meta, value) }) };
-    persist(path, record);
+    publish(path, JSON.stringify(record));
     return summary(record);
   });
 }
@@ -162,14 +155,14 @@ export async function depositVault(board: string, key: string, value: Buffer) {
     const r = active(old);
     if (r.meta.mode !== 'give' || r.status !== 'pending') bad('VALIDATION_ERROR');
     const record: Record = { ...r, status: 'ready', at: Date.now(), sealed: seal(dir, r.meta, value) };
-    persist(path, record);
+    publish(path, JSON.stringify(record));
     return summary(record);
   });
 }
 export async function refuseVault(board: string, key: string) {
   return operate(board, key, false, (_, path, old) => {
     const r = active(old), record: Record = { schema: 1, meta: r.meta, status: 'refused', at: Date.now() };
-    persist(path, record);
+    publish(path, JSON.stringify(record));
     return summary(record);
   });
 }

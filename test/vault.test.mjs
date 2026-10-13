@@ -54,6 +54,11 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     assert.equal(JSON.parse(readFileSync(recordPath)).sealed, undefined);
     assert.equal((await run({ op: 'deposit', board, key: 'give', value: secret })).error, 'User refused this vault item; no value was delivered.');
     assert.equal((await run({ op: 'create', meta: meta('give') })).exit, 1);
+    const renamed = join(home, 'project', 'renamed.json');
+    renameSync(board, renamed);
+    assert.equal((await run({ op: 'inspect', board: renamed, key: 'give' })).status, 'refused');
+    assert.equal((await run({ op: 'create', meta: { ...meta('give'), board: renamed } })).code, 'VALIDATION_ERROR');
+    renameSync(renamed, board);
     assert.equal((await run({ op: 'create', meta: meta('receive', 'receive'), value: url })).status, 'ready');
     await run({ op: 'create', meta: meta('kept', 'receive'), value: url });
     const master = readFileSync(keyPath); rmSync(keyPath);
