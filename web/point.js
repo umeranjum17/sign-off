@@ -13,6 +13,7 @@
   if (parent === window) return;
   let on = false;
   const ref = (e) => {
+    if (e === document.documentElement) return 'html';
     const path = [];
     for (; e && e !== document.body && e !== document.documentElement; e = e.parentElement) {
       if (e.id && document.querySelectorAll(`#${CSS.escape(e.id)}`).length === 1) return [`#${CSS.escape(e.id)}`, ...path].join(' > ');
