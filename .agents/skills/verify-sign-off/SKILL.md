@@ -75,6 +75,7 @@ Look at every shot before you report: nothing overlaps, no text is cut, no raw p
 
 | Feature | Entry |
 |---|---|
+| Vault staged OFF: private encrypted custody, process isolation, fixed errors, expiry/refusal and public admission refusal; final activation requires the full Give/Receive proof | [features/vault.md](features/vault.md) |
 | Dashboard: every item type as a card on its area screen, pick on the mock card, plain card for new types | [features/dashboard.md](features/dashboard.md) |
 | Summary home: four area tiles with counts, Triage in Waiting on you, the `area` field, report cards with `steps` and Open/Close, Needs you first (answer there, with Undo), Today, a short list per area, area screens with `‹ Summary` and the wide-screen sidebar, full trade-off, fitted evidence media, recommended vs picked | [features/summary.md](features/summary.md) |
 | Decisions page: list, one-click answer, durable answers | [features/decisions.md](features/decisions.md) |

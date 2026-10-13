@@ -43,6 +43,10 @@ You do not need sign-off-axi installed globally - invoke it with \`npx -y sign-o
 If sign-off-axi output shows a follow-up command starting with \`sign-off-axi\`, run it as \`npx -y sign-off-axi ...\` instead.
 sign-off itself calls no model and inherits the calling agent's model routing.
 
+## Vault is not enabled
+
+Do not send secrets or approval URLs through ordinary questions, notes, comments or mocks. Vault items are reserved and refused until the complete handoff implementation is qualified; the internal custody module is not a supported user command.
+
 ## Get the answer back as an event
 
 The answer comes to you; nobody has to notice it for you.

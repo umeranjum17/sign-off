@@ -82,6 +82,7 @@ export function loadDecisions(path: string): Decision[] {
   const fed = extra.readonly === true || extra.answers_only === true;
   const seen = new Map<string, number>();
   return items.map((d: any, i: number): Decision => {
+    if (d?.type === 'vault') throw new InputError('Vault is not enabled in this build.');
     const bad = (field: string, rule: string) => new InputError(`${name}: ${list}[${i}] (key ${JSON.stringify(d?.key)}): ${field} ${rule}`);
     if (!isKey(d?.key)) throw bad('key', 'must be 1-128 of A-Z a-z 0-9 . _ -');
     if (seen.has(d.key)) throw bad('key', `repeats ${list}[${seen.get(d.key)}]`);
