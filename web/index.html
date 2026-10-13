@@ -181,6 +181,14 @@
     border: 1px solid var(--line); border-radius: .625rem; background: var(--sunk); }
   .unverified, .media .gone { color: var(--danger); margin: .5rem 0; }
   .update-media { grid-column: 1 / -1; }
+  /* An evidence update: number, day and New on one line; its captures above the evidence mark, title and note, or one portrait capture beside them. */
+  .update .head { align-items: center; } .update .head .meta { margin: 0; } .row.update .head .x { margin-left: auto; }
+  .upd { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.75rem 0.875rem; align-items: start; }
+  .upd.side > .media { grid-column: auto; width: 6.5rem; } .upd.side > .icon { display: none; }
+  .upd > .media:has(> :nth-child(2)) { display: grid; grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr)); max-width: 26rem; }
+  .upd > .icon { width: 2.75rem; height: 2.75rem; border-radius: 0.75rem; background: var(--sunk); }
+  .upd > .icon svg { width: 1.5rem; height: 1.5rem; stroke: var(--area); }
+  .upd strong { font-size: 1.0625rem; line-height: 1.3; } .upd .about { margin-top: 0.25rem; color: var(--muted); }
   /* An explainer's chapters: one tap jumps the video to that part and plays it. */
   .chapters { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0.375rem; margin: -0.25rem 0 0; padding: 0; list-style: none; }
   .chapters button { min-height: 2.5rem; padding: 0 0.75rem; border-radius: 999px; border-color: var(--line); font-size: 0.875rem; }
@@ -289,7 +297,7 @@
   @media (min-width: 45rem) {
     main { padding: 0 2rem; }
     .row { grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 0.875rem 2rem; padding: 1.125rem 1.25rem; }
-    .row.design { grid-template-columns: minmax(0, 1fr); gap: 0.875rem; }
+    .row.design, .row.update { grid-template-columns: minmax(0, 1fr); gap: 0.875rem; }
     /* The frames share the card width down to 11rem each; only a list longer than that scrolls. */
     .mocks { grid-auto-columns: minmax(11rem, calc(var(--tall) * 9 / 19.5)); }
     .rung iframe { height: min(32rem, 75vh); }
@@ -326,6 +334,7 @@
     .rows.i-answered { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; align-items: start; padding: 0; border: 0; background: none; box-shadow: none; }
     .rows.i-answered li { padding: 0 0.5rem 0 1rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); box-shadow: var(--shadow); }
     .rows.i-answered li:has(.done[open]) { grid-column: 1 / -1; }
+    .upd.side > .media { width: 8rem; }
     .keys { display: block; }
   }
 </style>
@@ -494,7 +503,11 @@
     const top = d.options.findIndex((o) => o.value === d.recommend_value), ranked = top > 0 ? [buttons[top], ...buttons.filter((_, i) => i !== top)] : buttons;
     // The agent that posted the item took this answer with wait --filer.
     const seen = saved && state.seen?.includes(d.key) ? el('span', { class: 'chip seen' }, 'Seen by agent') : '';
-    const head = el('div', { class: 'head' }, chip(d), el('div', {}, el('h3', { dir: 'auto' }, title(d)), seen), x ? xBtn(d) : '');
+    // An evidence update heads its card with its number, the day it was filed and New when that is today.
+    const update = d.type === 'evidence';
+    const head = update ? el('div', { class: 'head' }, el('h3', {}, `Update ${d.number}`), d.filed ? el('span', { class: 'meta' }, day(d.filed)) : '',
+      d.filed && isToday(d.filed) ? el('span', { class: 'st new' }, 'New') : '', seen, x ? xBtn(d) : '')
+      : el('div', { class: 'head' }, chip(d), el('div', {}, el('h3', { dir: 'auto' }, title(d)), seen), x ? xBtn(d) : '');
     const silent = d.default_if_silent && !ro ? `If no answer: ${d.options.find((o) => o.value === d.default_if_silent).label}` : '';
     if (design) {
       return el('article', { class: 'row design', id: `item-${d.key}` }, head,
@@ -503,17 +516,23 @@
     }
     // Yes/No rows keep the two fixed buttons they always had; any other choice set wraps.
     const many = d.options.map((o) => o.value).sort().join() !== 'no,yes';
-    const update = d.type === 'evidence';
-    return el('article', { class: 'row', id: `item-${d.key}` }, el('div', {},
-      head,
-      d.about ? el('p', { class: d.media ? 'about full' : 'about', dir: 'auto' }, d.about) : '',
+    const words = [d.about ? el('p', { class: d.media ? 'about full' : 'about', dir: 'auto' }, d.about) : '',
       d.detail || (!d.media && d.about?.length > 180) ? el('details', {}, el('summary', {}, 'Show more'),
         ...[d.about, d.detail].filter(Boolean).map((t) => el('p', { dir: 'auto' }, t))) : '',
       d.link ? el('p', { class: 'meta' }, /^https?:/.test(d.link)
         ? el('a', { href: d.link, target: '_blank', rel: 'noopener' }, d.link) : `Commit ${d.link}`) : '',
-      silent ? el('p', { class: 'meta' }, silent) : '',
-    ), updateMedia(d), chapters(d), rung(d), ro || !buttons.length ? '' : el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': d.title }, ...ranked),
-    ro ? '' : other(d, saved, err), err, evidenceCard(d));
+      silent ? el('p', { class: 'meta' }, silent) : ''];
+    return el('article', { class: update ? 'row update' : 'row', id: `item-${d.key}` }, ...(update ? [head, upd(d, words)] : [el('div', {}, head, ...words), updateMedia(d), chapters(d), rung(d)]),
+      ro || !buttons.length ? '' : el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': d.title }, ...ranked),
+      ro ? '' : other(d, saved, err), err, evidenceCard(d));
+  }
+
+  /** An update's captures above its title and note, beside the evidence mark; one portrait capture sits beside them instead, as on a phone screen. */
+  function upd(d, words) {
+    const media = updateMedia(d), box = el('div', { class: 'upd' }, media, icon('evidence'), el('div', {}, el('strong', { dir: 'auto' }, d.title), ...words));
+    const one = d.media?.length === 1 && media.querySelector('img');
+    if (one) one.onload = () => one.naturalHeight > one.naturalWidth && box.classList.add('side');
+    return box;
   }
 
   /** Boxes the person unfolded, kept open across redraws. */
@@ -650,7 +669,8 @@
     : state.readonly || d.type === 'explainer' || !(d.options.length || d.reply) ? 'reports' : 'waiting'));
   const hhmm = (at) => new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   const isToday = (at) => new Date(at).toDateString() === new Date().toDateString();
-  const when = (at) => (isToday(at) ? hhmm(at) : `${new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ${hhmm(at)}`);
+  const day = (at) => new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const when = (at) => (isToday(at) ? hhmm(at) : `${day(at)} ${hhmm(at)}`);
   const pic = (d) => {
     const i = d.media?.findIndex((m) => !/\.(mp4|webm)$/i.test(m.path)), m = d.mocks?.find((x) => !/\.html?$/i.test(x.path));
     return i >= 0 ? `/api/media?key=${encodeURIComponent(d.key)}&i=${i}` : d.type === 'diagram' ? mockUrl(d.key, '', d.view) : m && mockUrl(d.key, m.value, m.path);
@@ -693,7 +713,7 @@
     const s = state.answers[d.key];
     return [thumb(a, pic(d)), el('span', { class: 't' }, el('strong', { dir: 'auto' }, title(d)), s ? '' : el('span', { class: 'meta', dir: 'auto' }, d.about ?? NAMES[d.type] ?? d.type)),
       s ? el('span', { class: 'ans' }, el('b', { dir: 'auto' }, s.answer === 'text' ? 'Your reply' : s.label),
-        el('time', {}, isToday(s.at) ? hhmm(s.at) : new Date(s.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }))) : ''];
+        el('time', {}, isToday(s.at) ? hhmm(s.at) : day(s.at))) : ''];
   };
   let jump = null; // The item a Summary row was tapped for, scrolled to on its area's screen.
   /** A short list of an area on the Summary: a picture and the title; a tap opens the area at that item. */
@@ -752,7 +772,7 @@
     return groups.flatMap((g) => {
       const list = items.filter((d) => (d.group ?? '') === g), at = list.map((d) => d.filed).filter(Boolean).sort((a, b) => Date.parse(b) - Date.parse(a))[0];
       const name = g || (groups.length > 1 ? 'Other reports' : '');
-      return [name ? el('div', { class: 'sec-h' }, el('h2', {}, name), at ? el('span', { class: 'meta' }, `Filed ${isToday(at) ? `${hhmm(at)} today` : new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`) : '') : '',
+      return [name ? el('div', { class: 'sec-h' }, el('h2', {}, name), at ? el('span', { class: 'meta' }, `Filed ${isToday(at) ? `${hhmm(at)} today` : day(at)}`) : '') : '',
         el('div', { class: 'reports' }, ...list.map(report))];
     });
   }

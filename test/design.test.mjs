@@ -6,6 +6,7 @@ import { createServer as createHttpServer, get } from 'node:http';
 import { createServer } from 'node:net';
 import { networkInterfaces, tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { crc32, deflateSync } from 'node:zlib';
 
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
 const scratch = mkdtempSync(join(tmpdir(), 'sign-off-design-'));
@@ -30,6 +31,15 @@ const run = (...args) => {
 };
 const post = (url, path, body) => fetch(`${url}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=', 'base64');
+// A plain PNG of a given size, for a capture of a known shape.
+const sized = (w, h) => {
+  const chunk = (type, data) => { const n = Buffer.alloc(8), t = Buffer.concat([Buffer.from(type), data]); n.writeUInt32BE(data.length); n.writeUInt32BE(crc32(t), 4); return Buffer.concat([n.subarray(0, 4), t, n.subarray(4)]); };
+  const head = Buffer.alloc(13);
+  head.writeUInt32BE(w);
+  head.writeUInt32BE(h, 4);
+  head[8] = 8;
+  return Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), chunk('IHDR', head), chunk('IDAT', deflateSync(Buffer.alloc((w + 1) * h))), chunk('IEND', Buffer.alloc(0))]);
+};
 const procs = [];
 after(async () => {
   // A dying serve removes its own run record; removing the scratch folder under it leaves the folder behind.
@@ -635,6 +645,35 @@ test('Clear all done on 201 answered items, set two across on a wide screen: the
   await until(async () => (await evaluate(`${rows} === 0 && document.querySelector(".empty")?.textContent === "All done items cleared."`)));
   await evaluate('document.getElementById("undo").click()');
   await until(async () => (await evaluate(`${rows} === 201`)));
+  close();
+  proc.kill();
+});
+
+test('Evidence: each update is a card with its number, the day it was filed and New when that is today; one portrait capture sits beside its words, two go side by side', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'updates'), file = join(dir, '.sign-off', 'decisions.json');
+  mkdirSync(dir);
+  run('init', dir);
+  const shot = (name, w, h) => (writeFileSync(join(dir, name), sized(w, h)), join(dir, name));
+  const [tall, wide] = [shot('tall.png', 300, 600), shot('wide.png', 600, 300)];
+  const update = (...media) => run('post', file, '--type', 'evidence', '--title', 'Sign-in', '--about', 'Loads in 1 second.', ...media.flatMap((m) => ['--media', m])).code;
+  assert.deepEqual([update(tall), update(wide, tall), update(wide)], [0, 0, 0]);
+  // The first update was filed three days ago: it shows that day and no New.
+  const doc = JSON.parse(readFileSync(file, 'utf8')), old = new Date(Date.now() - 3 * 864e5);
+  doc.items[0].filed = old.toISOString();
+  writeFileSync(file, JSON.stringify(doc));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'));
+  await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
+  const cards = '[...document.querySelectorAll("article.update")].map((a) => [a.querySelector("h3").textContent, a.querySelector(".head .meta").textContent, !!a.querySelector(".st.new"), a.querySelector(".upd").className, a.querySelectorAll(".choices button").length])';
+  await until(async () => (await evaluate(`${cards}.length === 3 && document.querySelector(".upd.side")`)));
+  const day = (at) => at.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }), today = day(new Date());
+  assert.deepEqual(await evaluate(cards), [['Update 3', today, true, 'upd', 3], ['Update 2', today, true, 'upd', 3], ['Update 1', day(old), false, 'upd side', 3]]);
+  // The portrait capture is left of the words; the pair shares a line.
+  const box = (sel) => `document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect()`;
+  assert.ok(await evaluate(`${box('#item-update-1 .upd > .media')}.right <= ${box('#item-update-1 .upd > div:last-child')}.left`));
+  assert.ok(await evaluate('(([a, b]) => a.top === b.top && b.left > a.right)([...document.querySelectorAll("#item-update-2 .media img")].map((i) => i.getBoundingClientRect()))'));
   close();
   proc.kill();
 });
