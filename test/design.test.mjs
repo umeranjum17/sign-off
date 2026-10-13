@@ -495,6 +495,27 @@ test('an interactive page that posts its height gets a frame that fits it, each 
   proc.kill();
 });
 
+test('each card has one place to type: Other answer holds the reply, Another round and the comment, and no separate note link', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'one-box'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  const abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l }));
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key: 'ship', title: 'When should it ship?', options: abc, recommend_value: 'b' },
+    { key: 'look', type: 'design', title: 'Pick the look', options: abc, recommend_value: 'b' }] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const dom = await new Promise((ok, no) => execFile(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${join(dir, 'profile')}`,
+    '--window-size=800,4000', '--virtual-time-budget=10000', '--dump-dom', url], { env: { ...process.env, TMPDIR: dir }, maxBuffer: 1 << 24 }, (e, out) => (e ? no(e) : ok(out))));
+  const rows = [...dom.matchAll(/<article class="row[^"]*" id="item-(\w+)">(.*?)<\/article>/gs)].map((m) => [m[1], m[2]]);
+  assert.deepEqual(rows.map(([key]) => key).sort(), ['look', 'ship']);
+  for (const [key, row] of rows) {
+    assert.equal(row.match(/<textarea/g)?.length, 1, key);
+    assert.match(row, /<details class="other"><summary[^>]*>Other answer<\/summary>.*<textarea.*>Send reply<.*>Another round<.*>Send as a comment</s, key);
+    assert.doesNotMatch(row, /Note, comment or another round/, key);
+  }
+  proc.kill();
+});
+
 test('a lock left by a sign-off-axi that stopped mid-write: raise names it, doctor prints its fix, the fix clears it', () => {
   const dir = join(scratch, 'crashed'), sod = join(dir, '.sign-off'), lock = join(sod, 'decisions.json.lock');
   run('init', dir);

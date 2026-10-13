@@ -91,6 +91,7 @@
   .other summary::-webkit-details-marker { display: none; }
   .other summary::after { content: "▾" / ""; padding-left: 0.5rem; }
   .other[open] summary::after { content: "▴" / ""; }
+  .actions .quick { border-radius: 999px; }
   /* After a tap: what was saved, and an Undo for a few seconds. */
   #toast { position: fixed; z-index: 2; left: 1rem; right: 1rem; bottom: max(1rem, env(safe-area-inset-bottom)); max-width: 30rem; margin: 0 auto;
     display: flex; align-items: center; gap: 0.75rem; padding: 0.375rem 0.375rem 0.375rem 1rem; border-radius: 0.75rem;
@@ -206,12 +207,12 @@
 
   const clearIfSaved = (key, sent) => () => { if (drafts.get(key) === sent) drafts.delete(key); keep(); };
 
-  function save(d, o, buttons, err, draft = d.key) {
+  function save(d, o, buttons, err) {
     buttons.forEach((b) => (b.disabled = true));
-    // An answers-only board takes no comments, and an Other answer beside the buttons is the answer itself: its words go with the answer alone.
-    const typed = state.answers_only || (o.value === 'text' && !d.reply) ? '' : (drafts.get(draft) ?? '').trim();
-    const note = drafts.get(draft) ?? noteOf(d), before = answerOf(d.key);
-    const drop = clearIfSaved(draft, drafts.get(draft));
+    // An answers-only board takes no comments, and words sent as the answer are the answer itself (a reply item's also go as a comment).
+    const typed = state.answers_only || (o.value === 'text' && !d.reply) ? '' : (drafts.get(d.key) ?? '').trim();
+    const note = drafts.get(d.key) ?? noteOf(d), before = answerOf(d.key);
+    const drop = clearIfSaved(d.key, drafts.get(d.key));
     call('/api/answers', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
     }, typed ? undefined : drop).then(() => offerUndo(d, before)).then(() => typed && call('/api/messages', {
@@ -225,8 +226,8 @@
   const toast = document.getElementById('toast'), toastText = document.getElementById('toast-text'), undoBtn = document.getElementById('undo');
   let hide;
   const answerOf = (key) => (Object.hasOwn(state.answers, key) ? state.answers[key] : undefined);
-  // The saved note, for the next pick or round. The words of an Other answer beside the buttons are that answer, not a note
-  // to carry over; a reply item's reply still goes with the answer picked after it.
+  // The saved note, for the next pick or round. Words sent as the answer are that answer, not a note to carry over;
+  // a reply item's reply still goes with the answer picked after it.
   const noteOf = (d) => (answerOf(d.key)?.answer === 'text' && !d.reply ? '' : answerOf(d.key)?.note ?? '');
   // The toast stays while the pointer is on it or the keyboard is on Undo.
   const later = (ms) => { clearTimeout(hide); hide = setTimeout(() => (toast.matches(':hover') || undoBtn.matches(':focus-visible') ? later(1500) : (toast.hidden = true)), ms); };
@@ -312,7 +313,7 @@
     if (design) {
       return el('article', { class: 'row design', id: `item-${d.key}` }, head,
         d.tradeoff ? el('p', { class: 'tradeoff', dir: 'auto' }, el('strong', {}, 'Trade-off '), d.tradeoff) : '',
-        mockCards(d, ro ? [] : buttons), silent ? el('p', { class: 'meta' }, silent) : '', ...notes(d, ro, saved, err), err);
+        mockCards(d, ro ? [] : buttons), silent ? el('p', { class: 'meta' }, silent) : '', ro ? '' : other(d, saved, err), err);
     }
     // Yes/No rows keep the two fixed buttons they always had; any other choice set wraps.
     const many = d.options.map((o) => o.value).sort().join() !== 'no,yes';
@@ -326,19 +327,23 @@
         ? el('a', { href: d.link, target: '_blank', rel: 'noopener' }, d.link) : `Commit ${d.link}`) : '',
       silent ? el('p', { class: 'meta' }, silent) : '',
     ), updateMedia(d), chapters(d), rung(d), ro || !buttons.length ? '' : el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': d.title }, ...ranked),
-    ...notes(d, ro, saved, err), err, evidenceCard(d));
+    ro ? '' : other(d, saved, err), err, evidenceCard(d));
   }
 
-  /** The note and another-round controls, folded away until the person wants them. An evidence update takes a note only. */
-  function more(d, saved, err) {
+  /** Boxes the person unfolded, kept open across redraws. */
+  const unfolded = new Set();
+  /** The one place to type on a card, folded behind Other answer so the buttons come first and typing is the last resort.
+   * Sent on its own the words are the answer (`text`); typed before a button is picked they go with that answer as its note.
+   * On a normal board they can also ask for another round (not on an evidence update) or go as a comment. */
+  function other(d, saved, err) {
     const box = el('textarea', { id: `note-${d.key}`, rows: 2, maxlength: 500, dir: 'auto' });
-    box.value = drafts.get(d.key) ?? noteOf(d);
+    box.value = drafts.get(d.key) ?? (saved?.answer === 'text' ? '' : noteOf(d));
     box.oninput = () => { drafts.set(d.key, box.value); keep(); };
-    const asked = (state.rounds ?? []).filter((r) => r.key === d.key);
-    const comments = (state.messages ?? []).filter((m) => m.kind === 'comment' && m.key === d.key);
-    const commentBtn = el('button', { 'aria-label': `Send as a comment, ${d.title}` }, 'Send as a comment');
-    commentBtn.onclick = () => send(commentBtn, err, { kind: 'comment', key: d.key }, d.key, box.value.trim());
-    const roundBtn = el('button', { 'aria-label': `Ask for another round, ${d.title}` }, 'Ask for another round');
+    // An option valued text would be the same answer, so that item takes words only as a note.
+    const words = !d.options.some((o) => o.value === 'text'), talk = !state.answers_only, round = talk && d.type !== 'evidence';
+    const sendBtn = el('button', { 'aria-label': `Send reply, ${d.title}` }, 'Send reply');
+    sendBtn.onclick = () => (box.value.trim() ? save(d, { value: 'text' }, [sendBtn], err) : (shown(err).textContent = 'Write the reply first.'));
+    const roundBtn = el('button', { class: 'quick', 'aria-label': `Another round, ${d.title}` }, 'Another round');
     roundBtn.onclick = () => {
       roundBtn.disabled = true;
       const note = (drafts.get(d.key) ?? noteOf(d)).trim();
@@ -349,44 +354,24 @@
         roundBtn.disabled = false;
       });
     };
-    const update = d.type === 'evidence', title = update ? 'Note or comment' : 'Note, comment or another round';
-    const status = [noteOf(d) && 'note saved', asked.length && `${asked.length} ${asked.length > 1 ? 'rounds' : 'round'} asked`,
+    const commentBtn = el('button', { 'aria-label': `Send as a comment, ${d.title}` }, 'Send as a comment');
+    commentBtn.onclick = () => send(commentBtn, err, { kind: 'comment', key: d.key }, d.key, box.value.trim());
+    const asked = (state.rounds ?? []).filter((r) => r.key === d.key);
+    const comments = (state.messages ?? []).filter((m) => m.kind === 'comment' && m.key === d.key);
+    const status = [saved?.note && saved.answer !== 'text' && 'note saved', asked.length && `${asked.length} ${asked.length > 1 ? 'rounds' : 'round'} asked`,
       comments.length && `${comments.length} ${comments.length > 1 ? 'comments' : 'comment'}`].filter(Boolean).join(' · ');
-    return el('details', { class: 'note', ...(drafts.has(d.key) && { open: '' }) },
-      el('summary', { 'aria-label': `${title}, ${d.title}` }, `${title}${status && ` · ${status}`}`),
+    const label = d.options.length ? 'Other answer' : 'Write a reply';
+    const also = `with a button you pick${round ? ' or with Another round' : ''}`;
+    const hint = !d.options.length ? 'Reply in a few words' : words ? `Your own answer in a few words. It also goes, as a note, ${also}.` : `A note, sent ${also}.`;
+    const fold = el('details', { class: 'other', ...((unfolded.has(d.key) || drafts.get(d.key)) && { open: '' }) },
+      el('summary', { 'aria-label': `${label}, ${d.title}` }, `${label}${status && ` · ${status}`}`),
       asked.length ? el('p', { class: 'meta saved-note', dir: 'auto' }, `You asked for another round: ${asked[asked.length - 1].note}`) : '',
       ...comments.map((m) => el('p', { class: 'meta saved-note', dir: 'auto' }, `Your comment, ${m.delivered ? 'read by the agent' : 'not read yet'}: ${m.text}`)),
-      el('label', { for: box.id }, update ? 'Optional note, sent with your verdict, and also to the agent as a comment'
-        : 'Optional note: sent with the answer you pick (and to the agent as a comment), or with the round you ask for'), box,
-      el('div', { class: 'actions' }, update ? '' : roundBtn, FROZEN ? '' : commentBtn));
-  }
-
-  // Every item that asks something takes an Other answer: a reply item's in place of its note panel, any other one's above it
-  // (unless an option is named text). An answers-only board takes no notes, comments or rounds.
-  const notes = (d, ro, saved, err) => (ro ? [] : d.reply ? [reply(d, saved, err, d.key)]
-    : [d.options.some((o) => o.value === 'text') ? '' : reply(d, saved, err, `other ${d.key}`), state.answers_only ? '' : more(d, saved, err)]);
-
-  /** Reply boxes the person unfolded, kept open across redraws. */
-  const unfolded = new Set();
-  /** A short text reply, folded behind Other answer so the buttons come first and typing is the last resort. On a reply item it
-   * takes the place of the note panel and its words also go with an answer picked (draft is the item key); on any other item
-   * it is sent on its own, in place of a pick, and keeps its own draft. */
-  function reply(d, saved, err, draft) {
-    const box = el('textarea', { id: `other-${d.key}`, rows: 2, maxlength: 500, dir: 'auto' });
-    box.value = drafts.get(draft) ?? '';
-    box.oninput = () => { drafts.set(draft, box.value); keep(); };
-    const btn = el('button', { 'aria-label': `Send reply, ${d.title}` }, 'Send reply');
-    btn.onclick = () => (box.value.trim() ? save(d, { value: 'text' }, [btn], err, draft) : (shown(err).textContent = 'Write the reply first.'));
-    const label = d.options.length ? 'Other answer' : 'Write a reply';
-    const hint = !d.options.length ? 'Reply in a few words' : d.reply ? 'Reply in a few words, sent on its own or with the answer you pick'
-      : 'Reply in a few words, sent as your answer in place of a pick';
-    const fold = el('details', { class: 'other', ...((unfolded.has(d.key) || drafts.get(draft)) && { open: '' }) },
-      el('summary', { 'aria-label': `${label}, ${d.title}` }, label), el('label', { for: box.id }, hint), box,
-      el('div', { class: 'actions' }, btn));
+      el('label', { for: box.id }, hint), box,
+      el('div', { class: 'actions' }, words ? sendBtn : '', round ? roundBtn : '', talk && !FROZEN ? commentBtn : ''));
     fold.ontoggle = () => (fold.open ? unfolded.add(d.key) : unfolded.delete(d.key));
     fold.firstChild.onclick = () => setTimeout(() => fold.open && box.focus());
-    const words = d.reply || saved?.answer === 'text' ? saved?.note : '';
-    return el('div', { class: 'note' }, words ? el('p', { class: 'meta saved-note', dir: 'auto' }, `Your reply: ${words}`) : '', fold);
+    return el('div', { class: 'note' }, saved?.answer === 'text' ? el('p', { class: 'meta saved-note', dir: 'auto' }, `Your reply: ${saved.note}`) : '', fold);
   }
 
   /** Free-text prompts for the agent, which it reads with sign-off-axi poll. */
