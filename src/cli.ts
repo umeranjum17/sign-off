@@ -6,7 +6,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { accessSync, closeSync, constants, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, watch, writeFileSync, type Stats } from 'node:fs';
 import { lookup } from 'node:dns/promises';
 import { homedir, networkInterfaces, tmpdir } from 'node:os';
-import { basename, delimiter, dirname, extname, join, resolve, sep } from 'node:path';
+import { basename, delimiter, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
@@ -15,7 +15,6 @@ import { type Answer, CHAPTERS_MAX, CLEARED, type Decision, InputError, MEDIA_MA
 import { ContractError, KINDS, checkMessage, parseMessage } from './contract.js';
 import { sweepVault } from './vault.js';
 
-const BOARD = join(homedir(), '.sign-off', 'decisions.json');
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
 const CONTRACT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/contract.md';
 /** Coding agents init installs the skill for: the `npx skills add -a` name, the command that shows it is installed,
@@ -31,7 +30,7 @@ const AGENTS: Record<string, { bin: string; dir: string; home: string }> = {
 const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
 commands[15]:
   (none)=list, raise, post, answers, wait, poll, open, status, stop, serve, export, init, doctor, validate, help
-board: ~/.sign-off/decisions.json unless a board file is given; answers are saved next to it
+board: the nearest .sign-off/ board from the working folder up to its repo root (the folder holding .git), else ~/.sign-off/decisions.json, unless a board file is given; answers are saved next to it
 flags: --full and --json on list, answers and wait, --json on status, --filer on post, raise and wait, --help on every command, -v/--version
 examples:
   sign-off-axi
@@ -207,7 +206,7 @@ examples:
 `,
   doctor: `usage: sign-off-axi doctor [dir]
 Checks the repo setup init wrote: node version, config, board file, answer files, a lock a crashed command left behind, gitignore lines, folders, whether the dashboard port is free,
-that each hosts: name in the config leads to the bind address,
+that each hosts: name in the config leads to the bind address, that the on_answer: command can run (no shell, so | > && do nothing),
 and one line per coding agent in the config's agent: line (auto: each one on PATH) saying whether its skill is installed.
 Each failure prints one help line naming its fix and exits 1; a clean setup exits 0.
 examples:
@@ -216,14 +215,18 @@ examples:
 };
 const warn = (msg: string) => console.error(`sign-off-axi: ${msg}`);
 const tilde = (path: string) => (path.startsWith(homedir() + sep) ? `~${path.slice(homedir().length)}` : path);
-/** A path as a shell word for a printed command: quoted when it has anything but plain path characters, with a leading ~/ kept outside the quotes. */
+/** A path as a shell word for a printed command: relative when it is under the working folder, quoted when it has anything but plain path characters,
+ * with a leading ~/ kept outside the quotes. */
 const shellPath = (path: string) => {
-  const shown = tilde(path), home = shown.startsWith('~/') ? '~/' : '', rest = shown.slice(home.length);
+  const rel = relative(process.cwd(), path), shown = !rel ? '.' : rel.split(sep)[0] !== '..' && !isAbsolute(rel) ? rel : tilde(path);
+  const home = shown.startsWith('~/') ? '~/' : '', rest = shown.slice(home.length);
   return home + (/^[\w./~-]+$/.test(rest) ? rest : `'${rest.replaceAll("'", "'\\''")}'`);
 };
-const fail = (message: string, code: string, ...help: string[]) => new AxiError(message, code, help);
+/** Run through npx (npm exec), a next-step command says npx -y sign-off-axi, since a bare sign-off-axi may not be installed. */
+const hint = (line: string) => (process.env.npm_command === 'exec' ? line.replaceAll('`sign-off-axi', '`npx -y sign-off-axi') : line);
+const fail = (message: string, code: string, ...help: string[]) => new AxiError(message, code, help.map(hint));
 /** TOON data, then next-step hints one per line, the way the other AXIs print them. */
-const toon = (data: object, help: string[] = []) => [encode(data), ...(help.length ? [`help[${help.length}]:`, ...help.map((h) => `  ${h}`)] : [])].join('\n');
+const toon = (data: object, help: string[] = []) => [encode(data), ...(help.length ? [`help[${help.length}]:`, ...help.map((h) => `  ${hint(h)}`)] : [])].join('\n');
 class EvidenceError extends Error {}
 
 type Flags = Record<string, { type: 'string' | 'boolean'; default?: string; multiple?: boolean }>;
@@ -245,8 +248,17 @@ function parse(cmd: string, args: string[], flags: Flags) {
   if (extra !== undefined) throw fail(`unexpected argument ${extra}: \`${cmd}\` takes one board file`, 'VALIDATION_ERROR', `Run \`sign-off-axi ${cmd} --help\``);
   const on = given === undefined ? '' : ` ${/^[\w./~-]+$/.test(given) ? given : JSON.stringify(given)}`;
   // One spelling per board, so a symlinked path finds the same pid record and server; its config.yaml stays the one beside the name given.
-  const path = given === undefined ? BOARD : resolve(given), real = existsSync(path) ? realpathSync(path) : path;
+  const path = given === undefined ? boardHere() : resolve(given), real = existsSync(path) ? realpathSync(path) : path;
   return { file: real, named: path, values: parsed.values as Record<string, any>, on };
+}
+/** The board when none is given: the nearest .sign-off/ that init set up, from the working folder up to the repo root (the folder holding .git), else ~/.sign-off/decisions.json. */
+function boardHere() {
+  for (let dir = process.cwd(); dir !== homedir(); dir = dirname(dir)) {
+    const so = join(dir, '.sign-off');
+    if (existsSync(join(so, 'config.yaml'))) return setupOf(join(so, 'decisions.json'))!.board;
+    if (existsSync(join(dir, '.git')) || dirname(dir) === dir) break;
+  }
+  return join(homedir(), '.sign-off', 'decisions.json');
 }
 const portOf = (value: string) => {
   if (!/^\d{1,5}$/.test(value) || Number(value) > 65535) throw fail('--port must be a number from 0 to 65535', 'VALIDATION_ERROR');
@@ -793,12 +805,13 @@ const configAgent = (so: string) => {
   try { return /^[ \t]*agent[ \t]*:([^#\n]*)/m.exec(readFileSync(join(so, 'config.yaml'), 'utf8'))?.[1].replace(/\s+/g, '') || undefined; } catch { return undefined; }
 };
 /** Is this command on PATH? The only thing auto detection looks at: no config, credential or network read. */
-const onPath = (bin: string) => (process.env.PATH ?? '').split(delimiter).filter(Boolean).some((d) => {
+const executable = (path: string) => {
   try {
-    accessSync(join(d, bin), constants.X_OK);
-    return statSync(join(d, bin)).isFile();
+    accessSync(path, constants.X_OK);
+    return statSync(path).isFile();
   } catch { return false; }
-});
+};
+const onPath = (bin: string) => (process.env.PATH ?? '').split(delimiter).filter(Boolean).some((d) => executable(join(d, bin)));
 /** The agents an agent: value names; auto is every known agent whose command is on PATH. */
 function chosenAgents(value: string) {
   if (value === 'auto') return Object.keys(AGENTS).filter((a) => onPath(AGENTS[a].bin));
@@ -849,7 +862,7 @@ function init(args: string[]) {
   let board = join(so, 'decisions.json');
   try { board = readSetup(so).board; } catch {}
   const files: [string, string][] = [
-    [join(so, 'config.yaml'), `# sign-off repo setup. board: path under .sign-off/, port: dashboard port, agent: auto or the coding agents to install the skill for.\n# bind: 127.0.0.1 keeps the dashboard on this machine; a private address such as its VPN address lets a phone open it.\n# hosts: (optional) private DNS names that lead to that address, such as its mesh VPN name, commas between them.\nboard: decisions.json\nport: 4410\nbind: 127.0.0.1\nagent: ${agent}\n`],
+    [join(so, 'config.yaml'), `# sign-off repo setup. board: path under .sign-off/, port: dashboard port, agent: auto or the coding agents to install the skill for.\n# bind: 127.0.0.1 keeps the dashboard on this machine; a private address such as its VPN address lets a phone open it.\n# hosts: (optional) private DNS names that lead to that address, such as its mesh VPN name, commas between them.\n# on_answer: (optional) a command run for each answer, with the answer as one JSON line on its stdin; no shell, so | > && do nothing: on_answer: node hook.mjs\nboard: decisions.json\nport: 4410\nbind: 127.0.0.1\nagent: ${agent}\n`],
     [board, `{"schema": 2, "items": []}\n`],
     [join(so, '.gitignore'), GITIGNORE],
   ];
@@ -870,7 +883,10 @@ function init(args: string[]) {
   }
   const missing = agents.filter((a) => !skillInstalled(dir, a));
   if (missing.length) {
-    const r = spawnSync('npx', [...SKILL_ADD, ...missing], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    // Under npx -p <package>, npm_config_package names that package, and a nested npx would run it instead of skills.
+    const env = { ...process.env };
+    delete env.npm_config_package;
+    const r = spawnSync('npx', [...SKILL_ADD, ...missing], { cwd: dir, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
     const cause = r.error?.message ?? `${r.stderr}\n${r.stdout}`.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '').split('\n').map((l) => l.trim()).filter(Boolean).pop();
     if (r.status !== 0 || missing.some((a) => !skillInstalled(dir, a))) {
       throw fail(`.sign-off/ is set up, but installing the skill for ${missing.join(', ')} failed: ${cause ?? `exit ${r.status}`}`, 'INSTALL_FAILED', `Run \`${skillAdd(missing)}\` in ${shellPath(dir)}`);
@@ -936,6 +952,15 @@ async function doctor(args: string[]) {
         if (setup.hosts.length) {
           check('hosts', astray.length ? `${astray.join('; ')}, not the bind address ${setup.bind}` : `${setup.hosts.join(', ')} resolve${setup.hosts.length > 1 ? '' : 's'} to ${setup.bind}`,
             astray.length ? `Point each name at ${setup.bind} in your private network's DNS, or take it off the hosts: line of ${shellPath(config)}` : undefined);
+        }
+        // on_answer runs with no shell, in the board's folder: a shell operator is passed as an argument, and a relative path is found from there.
+        const [hook] = setup.onAnswer, op = setup.onAnswer.find((w) => /[|&;<>$`]/.test(w));
+        if (hook) {
+          const path = hook.includes('/') && resolve(dirname(existsSync(board) ? realpathSync(board) : board), hook), runs = path ? executable(path) : onPath(hook);
+          check('on_answer', op ? `${op} is a shell operator, and on_answer runs with no shell` : runs ? `runs ${hook} for each answer` : `${hook} is not a program on PATH or an executable file`,
+            op ? `Put the command in a script and name the script on the on_answer: line of ${shellPath(config)}`
+              : runs ? undefined : path ? `Run \`chmod +x ${shellPath(path)}\`, or fix the path on the on_answer: line of ${shellPath(config)}`
+              : `Install ${hook}, or name an executable file on the on_answer: line of ${shellPath(config)}`);
         }
       }
       const boardBad = unusable(board);

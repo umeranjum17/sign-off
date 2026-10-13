@@ -24,5 +24,7 @@ Run every step as `"${FRESH[@]}" bash -c 'cd "$SCR" && npx -y ./sign-off-axi-<ve
 | 6 | `answers`, `answers --json`, `answers --full` | TOON row `<key>,yes,<at>` with `waiting: 0`; JSON `{"<key>":{"answer":"yes",...}}`; `--full` adds label, close and title |
 | 7 | `list --stat`; `raise --title x --recommend maybe`; the step 3 title with no `--recommend` | Exit 2, 2 and 1, each with `error:`, `code:` and `help:` on stdout and no stack trace |
 | 8 | `tar tzf` the tarball; `kill <pid>` from step 4 | Only `package.json`, `LICENSE`, `README.md`, `dist/`, `web/` and `fixtures/contract/`; the board stops |
+| 9 | `init` in `$SCR/proj` (with a `.git` folder), then `raise --title "Umer: from deep?"` with no board from `proj/src/deep` | Every init hint says `npx -y sign-off-axi ... .sign-off/decisions.json`; the item is in `proj/.sign-off/decisions.json` and `~/.sign-off/` is not made |
+| 10 | In a fresh folder: `npx -y -p ./sign-off-axi-<version>.tgz sign-off-axi init --agent codex` | Exit 0, `codex,installed`, and `.agents/skills/sign-off-axi/SKILL.md` exists |
 
 Extreme case `npm test` also covers: 20 agents raising at once keep all 20 decisions (the board takes a lock file while it writes).

@@ -21,6 +21,9 @@ const env = { ...process.env, PATH: bin, HOME: join(scratch, 'home') };
 // No filer leaks in from the agent running the tests.
 delete env.SIGN_OFF_FILER;
 delete env.CLAUDE_CODE_SESSION_ID;
+// Hints read as npm ran the tests, never as npx would.
+delete env.npm_command;
+delete env.npm_config_package;
 const run = (...args) => {
   try {
     return { out: execFileSync(process.execPath, [cli, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env }), code: 0 };
@@ -919,4 +922,41 @@ test('answer events: a filer takes only its own answers, once, the card shows it
     ['a,no,agent-a,Ship A?', 'a,yes,agent-a,Ship A?', 'b,yes,agent-b,Ship B?', 'none,yes,,Ship it?']);
   assert.equal(statSync(join(dir, 'board.seen.jsonl')).mode & 0o777, 0o600);
   proc.kill();
+});
+
+test('no board named: the nearest .sign-off/ up to the repo root, else the home board; doctor checks on_answer; init and hints under npx', () => {
+  const at = (cwd, more, ...args) => spawnSync(process.execPath, [cli, ...args], { cwd, env: { ...env, ...more }, encoding: 'utf8' });
+  const proj = join(scratch, 'walk'), deep = join(proj, 'src', 'deep'), inner = join(proj, 'inner'), items = (b) => JSON.parse(readFileSync(b, 'utf8')).items.map((i) => i.key);
+  mkdirSync(deep, { recursive: true });
+  mkdirSync(join(inner, '.git'), { recursive: true });
+  // Hints name the board relative to the working folder, and through npx say npx -y sign-off-axi.
+  assert.match(at(proj, {}, 'init').stdout, /Run `sign-off-axi post \.sign-off\/decisions\.json --type design/);
+  const viaNpx = at(proj, { npm_command: 'exec' }, 'init').stdout;
+  assert.match(viaNpx, /Run `npx -y sign-off-axi post \.sign-off\/decisions\.json --type design/);
+  assert.doesNotMatch(viaNpx, /`sign-off-axi /);
+  assert.equal(at(deep, {}, 'raise', '--title', 'From deep?').status, 0);
+  assert.deepEqual(items(join(proj, '.sign-off', 'decisions.json')), ['from-deep']);
+  // A folder holding .git is the repo root: the walk stops there and falls back to the home board.
+  assert.equal(at(inner, {}, 'raise', '--title', 'From the inner repo?').status, 0);
+  assert.deepEqual(items(join(env.HOME, '.sign-off', 'decisions.json')), ['from-the-inner-repo']);
+  // on_answer runs with no shell: doctor names a missing program, a shell operator and a file that will not run.
+  const doctor = (hook) => (writeFileSync(join(proj, '.sign-off', 'config.yaml'), `board: decisions.json\nport: 0\non_answer: ${hook}\n`), at(proj, {}, 'doctor'));
+  assert.match(doctor('nosuch-hook').stdout, /on_answer: nosuch-hook is not a program on PATH or an executable file\. Install nosuch-hook/);
+  const op = doctor('node hook.mjs > answer.txt');
+  assert.equal(op.status, 1);
+  assert.match(op.stdout, /on_answer: > is a shell operator, and on_answer runs with no shell\. Put the command in a script/);
+  assert.equal(doctor('node hook.mjs').status, 0);
+  writeFileSync(join(proj, '.sign-off', 'save.sh'), '#!/bin/sh\n');
+  assert.match(doctor('./save.sh').stdout, /on_answer: \.\/save\.sh is not a program on PATH or an executable file\. Run `chmod \+x .*save\.sh`/);
+  chmodSync(join(proj, '.sign-off', 'save.sh'), 0o755);
+  assert.match(doctor('./save.sh').stdout, /on_answer,runs \.\/save\.sh for each answer/);
+  // Under npx -p <package>, the skill install must still run skills, not that package.
+  const npx = join(bin, 'npx'), fresh = join(scratch, 'npx-p');
+  writeFileSync(npx, "#!/usr/bin/env node\nconst fs = require('fs');\nif (process.env.npm_config_package) process.exit(127);\nfs.mkdirSync('.agents/skills/sign-off-axi', { recursive: true });\nfs.writeFileSync('.agents/skills/sign-off-axi/SKILL.md', '---\\nname: sign-off-axi\\n---\\n');\n");
+  chmodSync(npx, 0o755);
+  mkdirSync(fresh);
+  const installed = at(fresh, { npm_config_package: join(scratch, 'sign-off-axi.tgz') }, 'init', '--agent', 'codex');
+  rmSync(npx);
+  assert.equal(installed.status, 0, installed.stdout);
+  assert.match(installed.stdout, /codex,installed/);
 });
