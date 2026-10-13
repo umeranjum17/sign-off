@@ -206,6 +206,16 @@ also copies each file into `evidence/<number>/` next to the board:
 - Asking wakes a waiting agent the same way an answer does. `answers --json`
   adds a `rounds` list per answered key only when that key has asks.
 
+**Dismissed items**, written by sign-off next to the questions (`decisions.dismissed.jsonl`, mode 600, one line
+per item per tap, the latest line per key wins). **Dismiss** (the × on an item) and **Clear all done** (on Answered) hide
+items from the page; **Undo** saves `"dismissed": false`. The agent is not told: an ask it waits on keeps waiting.
+A new answer or another round after the line brings the item back. Read-only boards refuse it; answers-only boards take it.
+`*.dismissed.jsonl` is git-ignored here like `*.answers.jsonl`.
+
+```json
+{"key":"keep-the-weekly-digest","dismissed":true,"at":"2026-10-12T15:41:10Z"}
+```
+
 **Taken answers**, written by `wait --filer` next to the questions (`decisions.seen.jsonl`, mode 600):
 one line per answer the item's filer took, so the card shows **Seen by agent**. A changed answer is new
 again until the filer takes it too.
