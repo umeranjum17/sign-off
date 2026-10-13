@@ -69,6 +69,12 @@
   { "key": "how-sync", "type": "interactive", "title": "How it works: Notes sync", "view": "mocks/how-sync/index.html", "options": [],
     "steps": [{ "title": "You change a note" }, { "title": "The phone saves it", "marks": ["store"] }, { "title": "It goes to the server", "marks": ["gate"] }] }
   ```
+- `group`, `filed`, `decided`: optional, for Reports and explainers. `group` (40 characters or fewer)
+  puts items under one section head, such as `How it works`, in the order each group first shows;
+  items with no group come last, under `Other reports`. `filed` is an ISO 8601 date-time such as `2026-10-13T07:19:00Z`: the
+  section head shows the newest (`Filed 07:19 today`), and the card says `New today` when it was filed
+  today or `Current` before that. `decided` (200 characters or fewer) shows under the label
+  `What it decided`. An item without them keeps its kind chip and its about line.
 - `type`: optional, `decision` (default), `design`, `evidence`, `diagram`,
   `interactive` or `explainer`. A design item
   is a pick between mock options shown side by side. An evidence item is a

@@ -26,6 +26,7 @@
   .top { padding: 1rem 0 0.75rem; }
   .date { margin: 0; color: var(--muted); font-size: 0.9375rem; font-weight: 600; }
   .top h1 { margin: 0; font-size: 2.125rem; line-height: 1.2; letter-spacing: -0.01em; outline: none; }
+  .lede { margin: 0.375rem 0 0; color: var(--muted); }
   .back, .sec-head a, .more { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--accent); font-weight: 600; text-decoration: none; }
   h2 { font-size: 1.375rem; line-height: 1.25; margin: 0 0 0.75rem; }
   .icon { flex: none; display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 0.5rem; background: var(--area, var(--muted)); }
@@ -79,15 +80,26 @@
   /* Reports: a card per report, its steps as numbered nodes on a line with only the marks that matter under each; Open lists them in place. */
   .reports { display: grid; gap: 0.75rem; }
   .report { display: grid; gap: 0.75rem; scroll-margin-top: 4.5rem; }
-  .report .head h3, .report .about { margin: 0; }
+  .report .head h3, .report .about, .report .decided { margin: 0; }
+  .report .head .st { margin-left: auto; }
+  .st { display: inline-flex; flex: none; align-items: center; gap: 0.375rem; padding: 0.125rem 0.625rem; border-radius: 999px; background: var(--sunk);
+    font-size: 0.8125rem; font-weight: 650; white-space: nowrap; }
+  .st::before { content: ""; width: 0.4375rem; height: 0.4375rem; border-radius: 50%; background: currentColor; }
+  .st.ok { color: var(--c-answered); } .st.new { color: var(--c-reports); }
+  .decided .lbl { display: block; color: var(--muted); font-size: 0.8125rem; font-weight: 650; }
+  .sec-h { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; margin: 1.5rem 0 0.75rem; }
+  .sec-h h2, .sec-h .meta { margin: 0; }
   .legend { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin: 0 0 0.75rem; padding: 0.625rem 1rem; color: var(--muted); font-size: 0.875rem; }
   .legend > span, .marks { display: inline-flex; align-items: center; gap: 0.375rem; }
   .marks { flex-wrap: wrap; justify-content: center; gap: 0.25rem; }
-  .mk { display: inline-block; width: 0.5rem; height: 0.5rem; }
-  .mk-ai { border-radius: 50%; background: var(--c-reports); }
-  .mk-store { border-radius: 1px; background: var(--c-evidence); }
-  .mk-gate { background: var(--c-gate); transform: rotate(45deg) scale(0.85); }
-  .mk-fail { width: 0.75rem; height: 0.3125rem; border-radius: 2px; background: var(--danger); }
+  /* A mark is its shape; in the legend and the open steps list it sits in a small rounded badge. */
+  .mk { display: inline-grid; place-items: center; }
+  .mk::before { content: ""; width: 0.5rem; height: 0.5rem; background: var(--c); }
+  .mk-ai { --c: var(--c-reports); } .mk-ai::before { border-radius: 50%; }
+  .mk-store { --c: var(--c-evidence); } .mk-store::before { border-radius: 1px; }
+  .mk-gate { --c: var(--c-gate); } .mk-gate::before { transform: rotate(45deg) scale(0.85); }
+  .mk-fail { --c: var(--danger); } .mk-fail::before { width: 0.75rem; height: 0.3125rem; border-radius: 2px; }
+  .legend .mk, .steps .mk { width: 1.375rem; height: 1.375rem; border: 1px solid var(--border); border-radius: 0.4375rem; background: var(--sunk); }
   .flow, .steps { display: grid; margin: 0; padding: 0; list-style: none; }
   .flow { grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
   .flow li { position: relative; display: grid; justify-items: center; align-content: start; gap: 0.375rem; }
@@ -95,8 +107,9 @@
   .num { position: relative; z-index: 1; display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border: 2px solid var(--muted); border-radius: 50%;
     background: var(--surface); font-size: 0.8125rem; font-weight: 700; }
   .steps { gap: 0.75rem; }
-  .steps .mk { width: 0.75rem; height: 0.75rem; }
-  .steps .mk-fail { width: 1.125rem; height: 0.4375rem; }
+  .steps .mk { width: 1.75rem; height: 1.75rem; border-radius: 0.5rem; }
+  .steps .mk::before { width: 0.75rem; height: 0.75rem; }
+  .steps .mk-fail::before { width: 0.9375rem; height: 0.375rem; }
   .steps li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; font-weight: 600; }
   .report .row { padding: 0; border: 0; background: none; box-shadow: none; }
   .report .rung > .meta { display: none; }
@@ -569,6 +582,7 @@
   const area = (d) => (isAnswered(d) ? 'answered' : d.area ?? (d.type === 'evidence' ? 'evidence'
     : state.readonly || d.type === 'explainer' || !(d.options.length || d.reply) ? 'reports' : 'waiting'));
   const hhmm = (at) => new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const isToday = (at) => new Date(at).toDateString() === new Date().toDateString();
   const pic = (d) => {
     const i = d.media?.findIndex((m) => !/\.(mp4|webm)$/i.test(m.path)), m = d.mocks?.find((x) => !/\.html?$/i.test(x.path));
     return i >= 0 ? `/api/media?key=${encodeURIComponent(d.key)}&i=${i}` : d.type === 'diagram' ? mockUrl(d.key, '', d.view) : m && mockUrl(d.key, m.value, m.path);
@@ -631,15 +645,28 @@
       render();
       document.getElementById(`item-${d.key}`)?.querySelector('.foot button').focus();
     };
-    const head = [el('div', { class: 'head' }, chip(d), el('h3', { dir: 'auto' }, title(d))), d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : ''];
+    const fresh = d.filed && isToday(d.filed), st = d.filed && el('span', { class: `st ${fresh ? 'new' : 'ok'}` }, fresh ? 'New today' : 'Current');
+    const decided = d.decided ? el('p', { class: 'decided', dir: 'auto' }, el('span', { class: 'lbl' }, 'What it decided'), d.decided) : '';
+    const head = [el('div', { class: 'head' }, st ? '' : chip(d), el('h3', { dir: 'auto' }, title(d)), st || ''), d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided];
     const full = open && !n ? row(d) : null;
     full?.removeAttribute('id');
-    const body = full ? [full] : [n ? (open ? el('ol', { class: 'steps' }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), el('span', { dir: 'auto' }, t.title), marks(t))))
+    const body = full ? [full, decided] : [n ? (open ? el('ol', { class: 'steps' }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), el('span', { dir: 'auto' }, t.title), marks(t))))
       : el('ol', { class: 'flow', style: `--n: ${n}`, 'aria-label': `${n} steps: ${d.steps.map((t) => t.title).join(', ')}` }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), marks(t)))))
       : d.type === 'interactive' ? el('div', { class: 'shot', 'aria-hidden': 'true' }, el('iframe', { src: url, sandbox: 'allow-scripts', tabindex: '-1', loading: 'lazy' }))
         : look ? thumb('reports', look) : '', ...head];
     return el('article', { class: 'card report', id: `item-${d.key}` }, ...body, el('div', { class: 'foot' }, el('span', { class: 'meta' }, n ? `${n} steps` : ''),
       url ? el('a', { href: url, target: '_blank', rel: 'noopener', 'aria-label': `Open full page, ${d.title}` }, 'Open full page') : '', toggle));
+  }
+
+  /** Reports in sections, one per `group` in the order each first shows, each head with the newest filed time; items with no group come last, under Other reports when there are groups. */
+  function reportGroups(items) {
+    const groups = [...new Set(items.map((d) => d.group ?? ''))].sort((a, b) => (a === '') - (b === ''));
+    return groups.flatMap((g) => {
+      const list = items.filter((d) => (d.group ?? '') === g), at = list.map((d) => d.filed).filter(Boolean).sort((a, b) => Date.parse(b) - Date.parse(a))[0];
+      const name = g || (groups.length > 1 ? 'Other reports' : '');
+      return [name ? el('div', { class: 'sec-h' }, el('h2', {}, name), at ? el('span', { class: 'meta' }, `Filed ${isToday(at) ? `${hhmm(at)} today` : new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`) : '') : '',
+        el('div', { class: 'reports' }, ...list.map(report))];
+    });
   }
 
   /** Triage: the open asks one at a time, oldest first. Skip moves on without answering and is not stored; an answer moves on to the next ask. */
@@ -692,13 +719,15 @@
     const ro = state.readonly ? 'Read only' : FROZEN ? `Read-only copy, ${FROZEN.exported}` : '';
     const top = el('header', { class: 'top' }, at ? el('a', { class: 'back', href: '#' }, '‹ Summary')
       : el('p', { class: 'date' }, new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })),
-    el('h1', { tabindex: '-1' }, at ? AREAS[at] : 'Summary'), ro ? el('p', { class: 'meta' }, ro) : '');
+    el('h1', { tabindex: '-1' }, at ? AREAS[at] : 'Summary'), ro ? el('p', { class: 'meta' }, ro) : '',
+    at === 'reports' && !state.readonly && by.reports.length ? el('p', { class: 'lede' }, by.reports.some((d) => d.steps)
+      ? 'How the tools work, step by step. Tap Open to see the whole flow.' : 'What the agents filed for you to read. Tap Open to see more.') : '');
     const first = by.waiting[0], more = by.waiting.length > 1 ? `Answer all ${by.waiting.length} on Waiting on you →` : 'Open Waiting on you →';
     const needs = el('section', { class: 'card needs' }, el('h2', {}, 'Needs you first'),
       ...(first ? [row(first), el('a', { class: 'more', href: '#waiting' }, more)] : [el('p', { class: 'meta' }, 'Nothing is waiting on you.')]));
     document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [triage(by.waiting)]
       : at === 'reports' && !state.readonly && by.reports.length ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
-        el('div', { class: 'reports' }, ...by.reports.map(report))] : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
+        ...reportGroups(by.reports)] : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : el('p', { class: 'empty' }, EMPTY[at])] : [el('div', { class: 'tiles' }, ...Object.keys(AREAS).map((a) => tile(a, by[a]))),
       el('div', { class: 'pair' }, needs, today()), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()]),
       el('div', { class: 'areas' }, ...Object.keys(AREAS).map((a) => section(a, by[a])))]));
