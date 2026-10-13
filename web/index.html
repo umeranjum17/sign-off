@@ -666,7 +666,7 @@
       el('span', { class: 'n' }, String(items.length)), el('span', { class: 'vis', 'aria-hidden': 'true' }, ...marks), el('span', { class: 'detail', dir: 'auto' }, detail));
   }
 
-  /** The day so far: a mark per answer on a line of hours, and the list of them. Items carry no time of their own, so only answers show. */
+  /** The day so far: a mark per answer on a line of hours, and the list of them. Only answers have a place on it; an item's `filed` time is not shown here. */
   function today(answered) {
     const day = new Date().toDateString(), done = answered.map((d) => ({ d, t: new Date(state.answers[d.key].at) }))
       .filter((e) => e.t.toDateString() === day).sort((x, y) => x.t - y.t);

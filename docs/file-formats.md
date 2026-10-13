@@ -79,12 +79,12 @@
   keeps the time an item already has, so a feeder that runs every few seconds does not reset it.
   An open ask shows `Waiting since 07:19` in Triage, and the Waiting on you tile shows the oldest (`Oldest 07:19`);
   with no `filed` on any waiting ask the tile keeps its count.
-- `group`, `filed`, `decided`: on Reports and explainers. `group` (40 characters or fewer)
+- `group` and `decided`: on Reports and explainers. `group` (40 characters or fewer)
   puts items under one section head, such as `How it works`, in the order each group first shows;
-  items with no group come last, under `Other reports`. With `filed`, the
+  items with no group come last, under `Other reports`. With `filed` (above), the
   section head shows the newest (`Filed 07:19 today`), and the card says `New today` when it was filed
   today or `Current` before that. `decided` (200 characters or fewer) shows under the label
-  `What it decided`. An item without them keeps its kind chip and its about line.
+  `What it decided`. An item without these keeps its kind chip and its about line.
 - `type`: optional, `decision` (default), `design`, `evidence`, `diagram`,
   `interactive` or `explainer`. A design item
   is a pick between mock options shown side by side. An evidence item is a
