@@ -8,11 +8,11 @@ import { createDecipheriv, randomBytes } from 'node:crypto';
 
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
 const worker = `import { writeFileSync } from 'node:fs';
-import { createVault, depositVault, inspectVault, refuseVault } from ${JSON.stringify(new URL('../dist/vault.js', import.meta.url).href)};
+import { createVault, depositVault, inspectVault, refuseVault, readVaultExpiry, waitVaultExpiry } from ${JSON.stringify(new URL('../dist/vault.js', import.meta.url).href)};
 let input=''; for await (const chunk of process.stdin) input+=chunk;
-const {op,meta,value,board,key,started}=JSON.parse(input);
+const {op,meta,value,board,key,started,filer,timeoutMs}=JSON.parse(input);
 if(started) writeFileSync(started,'started');
-try { const out=await ({create:()=>createVault(meta,value===undefined?undefined:Buffer.from(value)),deposit:()=>depositVault(board,key,Buffer.from(value)),inspect:()=>inspectVault(board,key),refuse:()=>refuseVault(board,key)})[op](); console.log(JSON.stringify(out)); }
+try { const out=await ({create:()=>createVault(meta,value===undefined?undefined:Buffer.from(value)),deposit:()=>depositVault(board,key,Buffer.from(value)),inspect:()=>inspectVault(board,key),refuse:()=>refuseVault(board,key),expiry:async()=>({event:await readVaultExpiry(board,key,filer)}),waitExpiry:async()=>({event:await waitVaultExpiry(board,key,filer,timeoutMs)})})[op](); console.log(JSON.stringify(out)); }
 catch(e) { console.log(JSON.stringify({code:e.code,error:e.message})); process.exitCode=1; }`;
 
 test('disabled vault custody across real processes: encryption, racing deposits, refusal and missing-key fail closed', async () => {
@@ -362,6 +362,123 @@ test('disabled vault custody across real processes: encryption, racing deposits,
         assert.equal(stderr(), warning);
       }), warning);
     } finally { chmodSync(dir, 0o700); }
+    // Expiry observation is private, non-consuming and never drives access-time expiry.
+    const eventInput = (key, extra = {}) => ({ op: 'expiry', board, key, filer: 'demo-agent', ...extra });
+    const eventFor = async (key, extra = {}) => (await run(eventInput(key, extra))).event;
+    const legacyEventPath = recordFor('expires-give'), legacyEventBytes = readFileSync(legacyEventPath);
+    const legacyEvent = await eventFor('expires-give');
+    assert.deepEqual(Object.keys(legacyEvent).sort(), ['at', 'id', 'schema', 'status']);
+    assert.equal(legacyEvent.schema, 1); assert.equal(legacyEvent.status, 'expired');
+    assert.match(legacyEvent.id, /^[a-f0-9]{64}:expired$/); assert.equal(legacyEvent.at, JSON.parse(legacyEventBytes).at);
+    for (const key of ['expires-give', 'startup-pending', 'periodic-ready']) {
+      const path = recordFor(key), bytes = readFileSync(path), event = await eventFor(key);
+      assert.equal(event.at, JSON.parse(bytes).at);
+      assert.deepEqual((await run(eventInput(key, { op: 'waitExpiry', timeoutMs: 0 }))).event, event);
+      assert.deepEqual(await eventFor(key), event); assert.deepEqual(readFileSync(path), bytes);
+    }
+    for (const op of ['expiry', 'waitExpiry']) {
+      assert.equal((await run(eventInput('expires-give', { op, filer: 'other', timeoutMs: 0 }))).code, 'READER_MISMATCH');
+      assert.equal((await run(eventInput('sequence', { op, timeoutMs: 0 }))).code, 'REFUSED');
+    }
+    assert.equal(await eventFor('expires-give', { board: second }), undefined);
+    assert.equal((await run(eventInput('expires-give', { board: second, op: 'waitExpiry', timeoutMs: 0 }))).code, 'TIMEOUT');
+    assert.deepEqual(readFileSync(legacyEventPath), legacyEventBytes);
+    const probeFolder = join(home, 'event-board'), probeBoard = join(probeFolder, 'board.json'), probeState = join(home, 'event-state');
+    mkdirSync(probeFolder, { mode: 0o700 }); writeFileSync(probeBoard, '{"schema":2,"items":[]}');
+    assert.equal(await eventFor('missing-event', { board: probeBoard }), undefined);
+    assert.equal(existsSync(join(probeFolder, '.sign-off-vault-id')), false);
+    env.XDG_STATE_HOME = probeState;
+    try {
+      const absent = eventInput('late-event', { board: probeBoard });
+      assert.equal((await run(absent)).event, undefined);
+      for (const timeoutMs of [-1, 0.5, null, 3_600_001, secret]) assert.equal((await run({ ...absent, op: 'waitExpiry', timeoutMs })).code, 'VALIDATION_ERROR');
+      assert.equal((await run({ ...absent, filer: '' })).code, 'VALIDATION_ERROR');
+      const started = join(home, 'event-wait-started');
+      const waiting = run({ ...absent, op: 'waitExpiry', timeoutMs: 15_000, started });
+      assert.equal(await serve(undefined, probeBoard, async () => {
+        await waitFor(() => existsSync(started), Date.now() + 5_000);
+        assert.equal(existsSync(probeState), false); assert.equal(existsSync(join(probeFolder, '.sign-off-vault-id')), false);
+        await run({ op: 'create', meta: { ...meta('late-event', 'receive'), board: probeBoard, expires: Date.now() + 2_000 }, value: url });
+        const pdir = join(probeState, 'sign-off', 'vault'), path = join(pdir, readdirSync(pdir).find((n) => n.endsWith('.json')));
+        assert.equal(JSON.parse(readFileSync(path)).status, 'ready');
+        const result = await waiting; assert.equal(result.exit, 0); assert.equal(result.event.status, 'expired');
+        const committed = JSON.parse(readFileSync(path)); assert.equal(committed.sealed, undefined); assert.equal(result.event.at, committed.at);
+      }), '');
+    } finally { env.XDG_STATE_HOME = state; }
+    // Negative control: elapsed wall time without a producer does not manufacture a committed event.
+    const unsweptDeadline = Date.now() + 1_000;
+    await run({ op: 'create', meta: { ...meta('event-unswept'), expires: unsweptDeadline } });
+    await run({ op: 'create', meta: { ...meta('expires-give'), board: second, expires: unsweptDeadline } });
+    assert.equal(await eventFor('expires-give', { board: second }), undefined);
+    const unsweptPath = recordFor('event-unswept'), unsweptBytes = readFileSync(unsweptPath);
+    await waitFor(() => Date.now() >= unsweptDeadline, unsweptDeadline + 5_000);
+    assert.equal(await eventFor('event-unswept'), undefined);
+    assert.equal((await run(eventInput('event-unswept', { op: 'waitExpiry', timeoutMs: 150 }))).code, 'TIMEOUT');
+    assert.deepEqual(readFileSync(unsweptPath), unsweptBytes);
+    assert.equal(await serve(), ''); assert.equal((await eventFor('event-unswept')).status, 'expired');
+    assert.notEqual((await eventFor('expires-give', { board: second })).id, legacyEvent.id);
+    const observedDeadline = Date.now() + 5_000, observedKeys = ['event-pending', 'event-ready', 'event-receive'];
+    for (const key of observedKeys) {
+      const mode = key === 'event-receive' ? 'receive' : 'give';
+      await run({ op: 'create', meta: { ...meta(key, mode), expires: observedDeadline }, ...(mode === 'receive' && { value: url }) });
+      if (key === 'event-ready') await run({ op: 'deposit', board, key, value: secret });
+    }
+    const sidecars = [board, ...['answers', 'seen', 'rounds', 'messages'].map((s) => board.replace(/\.json$/, `.${s}.jsonl`))].map((p) => [p, existsSync(p) ? readFileSync(p) : undefined]);
+    assert.equal(await serve(undefined, board, async ({ origin }) => {
+      const starts = observedKeys.map((key) => join(home, `${key}-started`)), finished = [];
+      const waits = observedKeys.map((key, i) => run(eventInput(key, { op: 'waitExpiry', timeoutMs: 15_000, started: starts[i] })).then((r) => { finished.push(key); return r; }));
+      const duplicate = run(eventInput('event-ready', { op: 'waitExpiry', timeoutMs: 15_000 }));
+      await waitFor(() => starts.every(existsSync), Date.now() + 5_000);
+      assert.ok(Date.now() < observedDeadline, 'Observers start before expiry.'); assert.deepEqual(finished, []);
+      observedKeys.forEach((key) => assert.ok(['pending', 'ready'].includes(JSON.parse(readFileSync(recordFor(key))).status)));
+      const results = await Promise.all(waits), repeat = await duplicate;
+      results.forEach((r, i) => {
+        assert.equal(r.exit, 0); assert.equal(r.event.status, 'expired');
+        const record = JSON.parse(readFileSync(recordFor(observedKeys[i]))); assert.equal(record.sealed, undefined); assert.equal(r.event.at, record.at);
+      });
+      assert.deepEqual(repeat.event, results[1].event);
+      assert.equal((await fetch(`${origin}api/decisions`, { signal: AbortSignal.timeout(5_000) })).status, 200);
+      assert.equal((await fetch(`${origin}api/vault/event-ready`, { method: 'POST', body: secret, signal: AbortSignal.timeout(5_000) })).status, 404);
+    }), '');
+    for (const [p, bytes] of sidecars) { if (bytes) assert.deepEqual(readFileSync(p), bytes); else assert.equal(existsSync(p), false); }
+    const replay = await eventFor('event-ready'), replayBytes = readFileSync(recordFor('event-ready'));
+    assert.equal(await serve(), ''); assert.deepEqual(await eventFor('event-ready'), replay); assert.deepEqual(readFileSync(recordFor('event-ready')), replayBytes);
+    // Malformed transition data cannot claim ciphertext removal or leak arbitrary record properties.
+    const eventRecord = JSON.parse(legacyEventBytes);
+    for (const changed of [{ at: null }, { at: -1 }, { at: 1.5 }, { at: eventRecord.meta.expires - 1 }, { at: secret }, { sealed: null }, { sealed: record.sealed }, { meta: { ...eventRecord.meta, key: 'wrong' } }]) {
+      const bytes = Buffer.from(JSON.stringify({ ...eventRecord, ...changed })); writeFileSync(legacyEventPath, bytes);
+      try { assert.equal((await run(eventInput('expires-give'))).code, 'VALIDATION_ERROR'); assert.deepEqual(readFileSync(legacyEventPath), bytes); }
+      finally { writeFileSync(legacyEventPath, legacyEventBytes); }
+    }
+    writeFileSync(legacyEventPath, JSON.stringify({ ...eventRecord, extra: secret, url }));
+    try { assert.deepEqual(await eventFor('expires-give'), legacyEvent); } finally { writeFileSync(legacyEventPath, legacyEventBytes); }
+    chmodSync(legacyEventPath, 0o644);
+    try { assert.equal((await run(eventInput('expires-give'))).code, 'VAULT_KEY_UNAVAILABLE'); } finally { chmodSync(legacyEventPath, 0o600); }
+    const linkedEvent = join(home, 'linked-event'); writeFileSync(linkedEvent, legacyEventBytes, { mode: 0o600 });
+    rmSync(legacyEventPath); symlinkSync(linkedEvent, legacyEventPath);
+    try { assert.equal((await run(eventInput('expires-give'))).code, 'VAULT_KEY_UNAVAILABLE'); }
+    finally { rmSync(legacyEventPath); writeFileSync(legacyEventPath, legacyEventBytes, { mode: 0o600 }); rmSync(linkedEvent); }
+    chmodSync(dir, 0o755);
+    try { assert.equal((await run(eventInput('expires-give'))).code, 'VAULT_KEY_UNAVAILABLE'); } finally { chmodSync(dir, 0o700); }
+    const heldEventLock = Buffer.from('owned event lock'); writeFileSync(lock, heldEventLock, { mode: 0o600 });
+    try {
+      assert.equal(await serve(undefined, board, async ({ origin }) => {
+        assert.equal((await run(eventInput('expires-give'))).code, 'BUSY'); assert.deepEqual(readFileSync(lock), heldEventLock);
+        assert.equal((await fetch(`${origin}api/decisions`, { signal: AbortSignal.timeout(5_000) })).status, 200);
+      }), warning);
+    }
+    finally { rmSync(lock); }
+    assert.deepEqual(await eventFor('expires-give'), legacyEvent); assert.deepEqual(readFileSync(legacyEventPath), legacyEventBytes);
+    const cancelStarted = join(home, 'cancel-event-started'), cancelled = spawn(process.execPath, ['--input-type=module', '-e', worker], { env, stdio: ['pipe', 'pipe', 'pipe'] });
+    let cancelOut = '', cancelErr = ''; cancelled.stdout.on('data', (b) => cancelOut += b); cancelled.stderr.on('data', (b) => cancelErr += b);
+    const ended = new Promise((ok, no) => { cancelled.on('error', no); cancelled.on('exit', (code, signal) => ok({ code, signal })); });
+    try {
+      cancelled.stdin.end(JSON.stringify(eventInput('kept', { op: 'waitExpiry', timeoutMs: 3_600_000, started: cancelStarted })));
+      await waitFor(() => existsSync(cancelStarted), Date.now() + 5_000);
+      cancelled.kill('SIGTERM'); await waitFor(() => cancelled.signalCode !== null, Date.now() + 5_000);
+      assert.equal((await ended).signal, 'SIGTERM'); assert.equal(cancelOut, ''); assert.equal(cancelErr, ''); assert.equal(existsSync(lock), false);
+    } finally { if (cancelled.signalCode === null && cancelled.exitCode === null) cancelled.kill('SIGKILL'); outputs.push(cancelOut, cancelErr); }
+    assert.deepEqual(readFileSync(keptPath), kept);
     for (const text of [...outputs, ...files(home).map((p) => readFileSync(p).toString())]) {
       assert.equal(text.includes(secret) || text.includes(url), false);
     }

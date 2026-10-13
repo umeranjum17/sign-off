@@ -9,12 +9,15 @@ export type VaultMeta = { board: string; key: string; mode: 'give' | 'receive'; 
 type Status = 'pending' | 'ready' | 'refused' | 'expired';
 type Sealed = { nonce: string; tag: string; data: string };
 type Record = { schema: 1; meta: VaultMeta; status: Status; at: number; sealed?: Sealed };
+export type VaultExpiry = { schema: 1; id: string; status: 'expired'; at: number };
 const errors = {
   VALIDATION_ERROR: 'Vault input is invalid: check mode, expiry, provider and destination.',
   EXPIRED: 'Vault item expired; request a fresh item.',
   VAULT_KEY_UNAVAILABLE: 'Vault key is unavailable; encrypted payload cannot be read.',
   BUSY: 'Vault storage is busy or unavailable; retry later.',
   NOT_FOUND: 'Vault item was not found.',
+  TIMEOUT: 'Vault expiry wait timed out; retry status later.',
+  READER_MISMATCH: 'This item belongs to a different filer or destination.',
   REFUSED: 'User refused this vault item; no value was delivered.',
 };
 export class VaultError extends Error {
@@ -142,19 +145,19 @@ function custody(board: string, create: boolean) {
   if (dir === parent || dir.startsWith(parent + '/')) bad('VAULT_KEY_UNAVAILABLE');
   return { file, dir };
 }
+function boundRecord(file: string, dir: string, key: string, create: boolean) {
+  const id = boardId(file, create), path = join(dir, `${digest(id, key)}.json`);
+  const record = lstatSync(path, { throwIfNoEntry: false }) ? readRecord(path) : undefined;
+  if (record && (record.meta.board !== id || record.meta.key !== key)) bad('VALIDATION_ERROR');
+  return { id, path, record };
+}
 async function operate<T>(board: string, key: string, create: boolean, fn: (dir: string, path: string, record: Record | undefined, id: string) => T): Promise<T> {
   if (!isKey(key)) bad('VALIDATION_ERROR');
   try {
     const { file, dir } = custody(board, true);
     return await lockedVault(dir, () => {
-      const id = boardId(file, create), path = join(dir, `${digest(id, key)}.json`);
-      let record: Record | undefined;
-      if (lstatSync(path, { throwIfNoEntry: false })) {
-        record = readRecord(path);
-        if (record.meta.board !== id || record.meta.key !== key) bad('VALIDATION_ERROR');
-        record = expire(path, record);
-      }
-      return fn(dir, path, record, id);
+      const { id, path, record } = boundRecord(file, dir, key, create);
+      return fn(dir, path, record && expire(path, record), id);
     });
   } catch (e) { throw e instanceof VaultError ? e : new VaultError('BUSY'); }
 }
@@ -171,6 +174,36 @@ export async function sweepVault(board: string) {
       return clean;
     });
   } catch { return false; }
+}
+/** Private, replayable expiry observation; never a payload or public answer consumer. */
+export async function readVaultExpiry(board: string, key: string, filer: string): Promise<VaultExpiry | undefined> {
+  if (!isKey(key) || !isKey(filer)) bad('VALIDATION_ERROR');
+  try {
+    const { file, dir } = custody(board, false);
+    if (!dir) return;
+    return await lockedVault(dir, () => {
+      if (!lstatSync(join(dirname(file), '.sign-off-vault-id'), { throwIfNoEntry: false })) return;
+      const { id, record } = boundRecord(file, dir, key, false);
+      if (!record) return;
+      if (record.meta.filer !== filer) bad('READER_MISMATCH');
+      if (record.status === 'refused') bad('REFUSED');
+      if (record.status !== 'expired') return;
+      if (!Number.isSafeInteger(record.at) || record.at <= 0 || record.at < record.meta.expires || Object.hasOwn(record, 'sealed')) bad('VALIDATION_ERROR');
+      return { schema: 1, id: `${digest(id, key)}:expired`, status: 'expired', at: record.at };
+    });
+  } catch (e) { throw e instanceof VaultError ? e : new VaultError('BUSY'); }
+}
+export async function waitVaultExpiry(board: string, key: string, filer: string, timeoutMs: number): Promise<VaultExpiry> {
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 0 || timeoutMs > 3_600_000) bad('VALIDATION_ERROR');
+  const deadline = performance.now() + timeoutMs;
+  for (;;) {
+    const event = await readVaultExpiry(board, key, filer);
+    if (event) return event;
+    const left = deadline - performance.now();
+    if (left <= 0) bad('TIMEOUT');
+    // ponytail: 1s keyed polling under the existing global lock; batch readers if measured contention matters.
+    await new Promise((ok) => setTimeout(ok, Math.min(1_000, left)));
+  }
 }
 const summary = (r: Record) => ({ ...r.meta, status: r.status, at: r.at });
 const active = (r?: Record) => {
