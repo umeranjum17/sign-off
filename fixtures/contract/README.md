@@ -17,7 +17,7 @@ fixtures/contract/<kind>.v<schema>/invalid-<field>-<rule>.json
 
 ## Running them
 
-The npm package ships this folder. Install the exact version your tool targets, then run:
+The npm package will ship this folder once the first validator lands. Install the exact version your tool targets, then run:
 
 ```
 npm install --no-save sign-off-axi@<exact>

@@ -14,11 +14,11 @@ Status: v1 target. Nothing in this file is enforced yet. Each part lands with it
 - The board file keeps its own `"schema": 2`. A posted message is stored as a board item that keeps its `kind` and `schema`.
 - Producers pin an exact version in CI, for example `npx -y sign-off-axi@0.3.0`.
 
-## 2. Items with no kind
+## 2. Items already on a board
 
-Board items with no `kind` (every item written before v1, and every `raise` or `post --type` item) read exactly as today, under [file-formats.md](file-formats.md). They are not checked against the v1 rules, so existing boards and answers keep working. Their answers report as `ask` schema 1.
+Board items stored before v1 have no `kind` or `schema`. They read exactly as today, under [file-formats.md](file-formats.md), and are not checked again, so existing boards and answers keep working. Their answers report as `ask` schema 1.
 
-A `post <board.json> --from <feed.json> --replace` feed keeps the board rules for items with no `kind`. An item in it that carries `kind` is checked against that kind.
+Every new post of a contract kind, through `raise`, `post --type` and `post --from` (including `--replace` feeds) alike, is checked against that kind's v1 rules from the change that adds that kind. `raise` stamps `filed` itself where a kind needs it. A new item with no `kind` is refused with the fix "add contract, kind and schema".
 
 ## 3. How a message gets in
 
@@ -28,9 +28,9 @@ One validator, three ways in. No daemon, socket or HTTP API.
 2. A file drop: the producer writes one message file, then runs the same command on it. sign-off never watches for dropped messages.
 3. A `--replace` feed, as in section 2.
 
-`raise` and `post --type` refuse a file that carries `contract` or `kind`, with the fix "use post --kind".
+`raise` and `post --type` check a file that carries `contract` and `kind` the same way `post --kind` does.
 
-A message file holds one JSON object, in any layout. It is read with standard JSON parsing, so a repeated field keeps its last value. A message with no `kind` is refused. `null` is a wrong type for every field.
+A message file holds one JSON object, in any layout. It is read with standard JSON parsing. A repeated field refuses the message with one fix line naming the field, such as `Remove the second "recommend_value".` A message with no `kind` is refused (section 2). `null` is a wrong type for every field.
 
 | Producer | Kinds it sends |
 |---|---|
@@ -71,7 +71,7 @@ A question the person answers by picking an option. Shows in Waiting on you.
 
 - Fields: the common ones, `about`, `detail`, `options`, `recommend_value`, `default_if_silent`, `close`.
 - A yes/no ask lists `yes` (Yes) and `no` (No) as its options.
-- Design picks, diagrams, interactive pages and explainers are not v1 kinds. They stay on `post --type`.
+- Design picks, diagrams, interactive pages and explainers are not v1 kinds, so this contract does not post them.
 
 ### report, schema 1
 
@@ -156,11 +156,11 @@ To recover: read the `help` line, fix the message file, post it again. Never edi
 - `sign-off-axi validate <file.json>... [--kind <kind>]` checks message files without posting them. `--kind`, when given, must equal each file's `kind`. It prints `files[n]{file,kind,schema,ok,error,help}`.
 - Exit codes: 0 when all pass; 1 when any file cannot be read, which wins over a refusal; 2 when any is refused, or no file is named.
 - `sign-off-axi validate --expect-invalid <file.json>...` exits 0 only when every file is refused, and 1 when one cannot be read. Conformance uses it.
-- `sign-off-axi schema <kind>` prints that kind's JSON Schema (draft 2020-12). With no kind it lists the kinds and their schema numbers. The package ships the same files as `schemas/<kind>.v1.json`, and a test fails if they differ. The validator is the rule: the JSON Schema leaves out cross-field rules (`recommend_value` among the options, unique values, `media` or `run`, `--kind` matching, media files).
+- `sign-off-axi schema <kind>` prints that kind's JSON Schema (draft 2020-12). With no kind it lists the kinds and their schema numbers. The schema is generated from the validator, so the package has no separate schema files. The printed JSON Schema leaves out cross-field rules (`recommend_value` among the options, unique values, `media` or `run`, `--kind` matching, media files).
 
 ## 10. Conformance
 
-Shared fixtures live in [fixtures/contract/](../fixtures/contract/README.md) and ship in the npm package, one folder per kind and schema (`ask.v1/`): for each, at least 2 valid messages and 3 invalid ones (a missing field, a broken limit, an unknown field). Each tool's CI installs the version it pins and runs them:
+Shared fixtures live in [fixtures/contract/](../fixtures/contract/README.md) and will ship in the npm package once the first validator lands, one folder per kind and schema (`ask.v1/`): for each, at least 2 valid messages and 3 invalid ones (a missing field, a broken limit, an unknown field). Each tool's CI installs the version it pins and runs them:
 
 ```
 npm install --no-save sign-off-axi@<exact>
@@ -186,4 +186,4 @@ A skill works alone: it never needs a supervisor or another tool to post.
 ## 12. Open questions
 
 - Should the board show a finding's `proposal`? Retro reports keep change text out; the board is local to the person.
-- Should `ask` gain design, diagram and interactive shapes in schema 2, or stay on `post --type`?
+- Should `ask` gain design, diagram and interactive shapes in schema 2, or should they get kinds of their own?
