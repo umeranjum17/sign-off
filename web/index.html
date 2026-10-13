@@ -23,7 +23,10 @@
   main { max-width: 72rem; margin: 0 auto; padding: 0 1rem; }
   .side { display: none; }
   .banner { margin: 1rem 0 0; padding: 0.75rem 1rem; border: 1px solid var(--danger); border-radius: 0.5rem; color: var(--danger); }
-  .top { padding: 1rem 0 0.75rem; }
+  .top { position: relative; padding: 1rem 0 0.75rem; }
+  /* The person who answers: a round mark beside the Summary title. The board has no name to show, so it is a plain figure. */
+  .top > .i-you { position: absolute; top: 2.4rem; right: 0; width: 2.5rem; height: 2.5rem; border-radius: 50%; --area: var(--accent); }
+  .top > .i-you svg { width: 1.375rem; height: 1.375rem; }
   .date { margin: 0; color: var(--muted); font-size: 0.9375rem; font-weight: 600; }
   .top h1 { margin: 0; font-size: 2.125rem; line-height: 1.2; letter-spacing: -0.01em; outline: none; }
   .lede { margin: 0.375rem 0 0; color: var(--muted); }
@@ -44,7 +47,9 @@
   .vis { align-self: center; display: flex; align-items: center; gap: 0.25rem; }
   .vis img { width: 1.5rem; height: 2.25rem; object-fit: cover; object-position: top; border: 1px solid var(--line); border-radius: 0.25rem; }
   .mark { width: 0.875rem; height: 0.875rem; border-radius: 50%; border: 2px solid var(--area); }
-  .i-answered .mark { background: var(--area); }
+  /* Waiting shows one clock and Answered up to three checks, drawn in the area's colour. */
+  .vis .icon { width: auto; height: auto; background: none; } .vis .icon svg { width: 1.5rem; height: 1.5rem; stroke: var(--area); }
+  .i-waiting .vis .icon svg { width: 2.25rem; height: 2.25rem; }
   .i-reports .mark { width: 0.375rem; height: 1.25rem; border-radius: 2px; background: var(--area); }
   .pair, .areas { display: grid; gap: 1rem; margin-top: 1rem; }
   /* What needs you first and the ask in Triage: its pictures side by side and its answers stacked at one width. */
@@ -62,7 +67,10 @@
   .pbar { height: 4px; margin: 0.5rem 0 1rem; border-radius: 4px; background: var(--line); overflow: hidden; }
   .pbar i { display: block; height: 100%; background: var(--c-waiting); }
   .focus .row h3 { font-size: 1.75rem; line-height: 1.2; letter-spacing: -0.01em; }
-  .focus .choices button { min-height: 4rem; border-radius: 1rem; font-size: 1.125rem; font-weight: 600; }
+  .focus .choices button, .needs .choices .rec { min-height: 4rem; border-radius: 1rem; font-size: 1.125rem; font-weight: 600; }
+  /* On Summary the recommended answer is the large button, and the others are pills under it. */
+  .needs .choices button { font-weight: 600; } .needs .choices button:not(.rec) { justify-self: start; border-radius: 999px; }
+  .needs .choices button[aria-pressed="true"] { padding-right: 2.75rem; }
   .quiet { display: flex; gap: 0.25rem; margin-top: 0.5rem; }
   .quiet button { border: 0; background: none; color: var(--muted); font-weight: 600; }
   .upnext { display: grid; margin-top: 1rem; }
@@ -627,7 +635,8 @@
   const AREAS = { waiting: 'Waiting on you', evidence: 'Evidence', reports: 'Reports and explainers', answered: 'Answered' };
   const EMPTY = { waiting: 'Nothing is waiting on you.', evidence: 'No evidence updates.', reports: 'No reports or explainers.', answered: 'Nothing answered yet.' };
   const ICONS = { summary: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z', waiting: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2',
-    evidence: 'M4 5h16v14H4zM4 16l5-5 4 4 2-2 5 5M15 9h.01', reports: 'M7 3h7l4 4v14H7zM10 12h5M10 16h5', answered: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM8 12l3 3 5-6' };
+    evidence: 'M4 5h16v14H4zM4 16l5-5 4 4 2-2 5 5M15 9h.01', reports: 'M7 3h7l4 4v14H7zM10 12h5M10 16h5', answered: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM8 12l3 3 5-6',
+    you: 'M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4.5 20.5c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5' };
   // The drawings are fixed strings from this page, never text from the board file.
   const icon = (a) => { const s = el('span', { class: `icon i-${a}`, 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[a]}"/></svg>`; return s; };
   const isAnswered = (d) => Object.hasOwn(state.answers, d.key);
@@ -648,7 +657,8 @@
     const detail = { waiting: `${items.length} waiting`, evidence: items[0]?.number ? `Newest: Update ${items[0].number}` : `${items.length} to see`,
       reports: `${items.length} to read`, answered: `${answeredToday} today` }[a];
     const thumbs = a === 'evidence' ? items.map(pic).filter(Boolean).slice(0, 3).map((u) => el('img', { src: src(u), alt: '' })) : [];
-    const marks = thumbs.length ? thumbs : Array.from({ length: Math.min(items.length, 3) }, () => el('span', { class: 'mark' }));
+    const marks = thumbs.length ? thumbs : a === 'waiting' ? [items.length ? icon(a) : '']
+      : Array.from({ length: Math.min(items.length, 3) }, () => (a === 'answered' ? icon(a) : el('span', { class: 'mark' })));
     return el('a', { class: `tile i-${a}`, href: `#${a}`, 'aria-label': `${AREAS[a]}, ${items.length}` }, icon(a), el('span', { class: 'name' }, AREAS[a]),
       el('span', { class: 'n' }, String(items.length)), el('span', { class: 'vis', 'aria-hidden': 'true' }, ...marks), el('span', { class: 'detail', dir: 'auto' }, detail));
   }
@@ -759,9 +769,9 @@
       el('a', { class: 'more', href: '#' }, 'Back to Summary'), dismissed(hidden));
     let i = items.findIndex((d) => d.key === cur);
     if (i < 0) i = Math.min(curAt, items.length - 1);
-    const d = items[i], next = items[i + 1], n = items.length, card = row(d);
+    const d = items[i], next = items[i + 1], n = items.length, card = row(d, { x: false }), dis = xBtn(d, 'Dismiss');
     [cur, curAt] = [d.key, i];
-    const go = (key) => () => { cur = key; render(); scrollTo(0, 0); }, skip = n > 1 && el('button', {}, 'Skip for now'), rec = card.querySelector('.choices .rec');
+    const go = (key) => () => { cur = key; render(); scrollTo(0, 0); }, skip = n > 1 && el('button', { class: 'skip' }, 'Skip for now'), rec = card.querySelector('.choices .rec');
     if (skip) skip.onclick = go(items[(i + 1) % n].key);
     // On a phone a swipe right on the ask picks the recommended answer and a swipe left skips; a swipe in the picture row only scrolls it.
     let start;
@@ -779,14 +789,14 @@
     }));
     return el('div', { class: 'tri' }, queue, el('div', { class: 'focus' }, el('p', { class: 'fhead' }, `${i + 1} of ${n}`),
       el('div', { class: 'pbar', 'aria-hidden': 'true' }, el('i', { style: `width: ${((i + 1) / n) * 100}%` })), card,
-      skip ? el('div', { class: 'quiet' }, skip) : '', next ? el('div', { class: 'card upnext' }, el('p', { class: 'meta' }, 'Up next'), el('strong', { dir: 'auto' }, title(next))) : '',
+      skip || dis ? el('div', { class: 'quiet' }, skip || '', dis) : '', next ? el('div', { class: 'card upnext' }, el('p', { class: 'meta' }, 'Up next'), el('strong', { dir: 'auto' }, title(next))) : '',
       hint ? el('p', { class: 'meta hint' }, hint) : '', el('p', { class: 'meta keys' }, `Keys: ${keys}`), dismissed(hidden)));
   }
   // Triage keys at a desk: a number picks that answer (in the order shown), E skips, Z takes back the last tap.
   addEventListener('keydown', (e) => {
     if (location.hash !== '#waiting' || e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.('textarea, input')) return;
     const k = e.key.toLowerCase(), pick = /^[1-9]$/.test(k) && document.querySelectorAll('.focus .choices button')[k - 1];
-    const act = pick || (k === 'e' ? document.querySelector('.quiet button') : k === 'z' && !toast.hidden && !undoBtn.hidden ? undoBtn : null);
+    const act = pick || (k === 'e' ? document.querySelector('.quiet .skip') : k === 'z' && !toast.hidden && !undoBtn.hidden ? undoBtn : null);
     if (act && !act.disabled) e.preventDefault(), act.click();
   });
 
@@ -804,7 +814,7 @@
     const ro = state.readonly ? 'Read only' : FROZEN ? `Read-only copy, ${FROZEN.exported}` : '';
     const top = el('header', { class: 'top' }, at ? el('a', { class: 'back', href: '#' }, '‹ Summary')
       : el('p', { class: 'date' }, new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })),
-    el('h1', { tabindex: '-1' }, at ? AREAS[at] : 'Summary'), ro ? el('p', { class: 'meta' }, ro) : '',
+    el('h1', { tabindex: '-1' }, at ? AREAS[at] : 'Summary'), at ? '' : icon('you'), ro ? el('p', { class: 'meta' }, ro) : '',
     at === 'reports' && !state.readonly && by.reports.length ? el('p', { class: 'lede' }, by.reports.some((d) => d.steps)
       ? 'How the tools work, step by step. Tap Open to see the whole flow.' : 'What the agents filed for you to read. Tap Open to see more.')
       : at === 'answered' && by.answered.length ? el('p', { class: 'lede' }, `${by.answered.filter((d) => isToday(state.answers[d.key].at)).length} answered today.`) : '');
