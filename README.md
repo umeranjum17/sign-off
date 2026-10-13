@@ -189,6 +189,12 @@ Real demo questions, with one Yes and its note already saved. Desktop shots are 
   <img src="docs/media/phone-dark.png" width="300" alt="Decisions page on a phone in dark mode">
 </p>
 
+## Vault status
+
+Vault handoffs are **not enabled** in this build. `post --type vault` and vault items in feeds are refused; no vault card or secret-reading browser route exists. Never put a token or an approval URL in an ordinary answer, note, comment, mock or board file.
+
+The staged internal custody foundation stores encrypted payloads outside the board and git, under a private state directory. It is not yet a usable vault: destination/provider allowlists, crash-safe delivery, HTTPS sessions and the Give/Receive journeys still need qualification. See [the internal state format](docs/file-formats.md#internal-vault-custody-disabled) and [the staged verification gates](.agents/skills/verify-sign-off/features/vault.md). No release or live-service switch is part of this slice.
+
 ## Development
 
 ```sh

@@ -75,6 +75,7 @@ Look at every shot before you report: nothing overlaps, no text is cut, no raw p
 
 | Feature | Entry |
 |---|---|
+| Vault staged OFF: private encrypted custody, process isolation, fixed errors, expiry/refusal and public admission refusal; final activation requires the full Give/Receive proof | [features/vault.md](features/vault.md) |
 | Dashboard: one list for every item type, newest first, pick on the mock card, plain card for new types | [features/dashboard.md](features/dashboard.md) |
 | Glance summary and type filters in the URL hash, full trade-off, fitted evidence media, recommended vs picked | [features/glance.md](features/glance.md) |
 | Decisions page: list, one-click answer, durable answers | [features/decisions.md](features/decisions.md) |
