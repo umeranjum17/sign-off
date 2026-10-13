@@ -117,7 +117,7 @@ sign-off itself calls no model and inherits the calling agent's model routing.
 sign-off-axi                       list the decisions waiting on the user (same as list)
 sign-off-axi raise --title "<question>" [--key <key>] [--about <text>] [--detail <text>]
                     [--option <value>=<label>]... [--recommend <value>] [--default <value>] [--close done|release]
-sign-off-axi raise --from <decisions.json>      add every decision in a decisions file (a new decision, ask or report in it carries kind: docs/contract.md)
+sign-off-axi raise --from <decisions.json>      add every decision in a decisions file (a new item of a contract kind carries `contract`, `kind` and `schema`: see docs/contract.md)
 sign-off-axi post --kind <kind> --from <message.json|->   post one contract message, from a file or stdin
 sign-off-axi post --type design --title "<question>" [--option <value>=<label>]... [--mock <value>=<path>]...
                     [--tradeoff <text>] [--recommend <value>]   ask for a pick between mocks, shown side by side

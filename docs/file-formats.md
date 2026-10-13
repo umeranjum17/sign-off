@@ -54,8 +54,7 @@
 - `key`: 1-128 of `A-Z a-z 0-9 . _ -`, unique in the file. `title`: required, 160 characters or fewer for a new item; an item already on the board is not checked again, so an older longer title still loads.
 - `recommend_value`: the option the poster would pick; the board shows it first and marks it **Recommended**.
   `raise` and `post` refuse an item that lists `options` without one; a plain Yes/No may leave it out.
-  In a `--from` file (a `--replace` feed too), a new item with no `type`, or `type` `decision`, `ask`, `evidence` or `report`, must be a contract message
-  with `contract`, `kind` and `schema` ([contract.md](contract.md) section 2), and an ask there always names one. An item already on the board is not checked again.
+  In a `--from` file (a `--replace` feed too), a new item of a contract kind must be a contract message: see [contract.md](contract.md) section 2. An item already on the board is not checked again.
 - `filer`: optional, who filed the item (1-128 of `A-Z a-z 0-9 . _ -`), written by `post --filer`.
   `wait --filer` with the same id returns the answers to that filer's items. The page never shows it.
   `post --from <file> --replace --filer <id>` replaces only the items with that filer (and items with
