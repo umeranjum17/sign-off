@@ -652,7 +652,7 @@ test('Clear all done on 201 answered items, set two across on a wide screen: the
   proc.kill();
 });
 
-test('Evidence: each update is a card with its number, the day it was filed and New when that is today; one portrait capture sits beside its words, two go side by side', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Evidence: each update is a card with its number, the day it was filed and New when that is today; one portrait capture sits beside its words, two go side by side; at 1440 the page counts them under its title and sets them two across', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'updates'), file = join(dir, '.sign-off', 'decisions.json');
   mkdirSync(dir);
   run('init', dir);
@@ -667,16 +667,20 @@ test('Evidence: each update is a card with its number, the day it was filed and 
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
-  const { evaluate, close } = await browse(join(dir, 'b'));
+  const { evaluate, close } = await browse(join(dir, 'b'), 1440);
   await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
   const cards = '[...document.querySelectorAll("article.update")].map((a) => [a.querySelector("h3").textContent, a.querySelector(".head .meta").textContent, !!a.querySelector(".st.new"), a.querySelector(".upd").className, a.querySelectorAll(".choices button").length])';
-  await until(async () => (await evaluate(`${cards}.length === 3 && document.querySelector(".upd.side")`)));
+  await until(async () => (await evaluate(`${cards}.length === 3 && document.querySelector(".upd.portrait")`)));
   const day = (at) => at.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }), today = day(new Date());
-  assert.deepEqual(await evaluate(cards), [['Update 3', today, true, 'upd', 3], ['Update 2', today, true, 'upd', 3], ['Update 1', day(old), false, 'upd side', 3]]);
+  assert.deepEqual(await evaluate(cards), [['Update 3', today, true, 'upd', 3], ['Update 2', today, true, 'upd', 3], ['Update 1', day(old), false, 'upd portrait', 3]]);
   // The portrait capture is left of the words; the pair shares a line.
   const box = (sel) => `document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect()`;
   assert.ok(await evaluate(`${box('#item-update-1 .upd > .media')}.right <= ${box('#item-update-1 .upd > div:last-child')}.left`));
   assert.ok(await evaluate('(([a, b]) => a.top === b.top && b.left > a.right)([...document.querySelectorAll("#item-update-2 .media img")].map((i) => i.getBoundingClientRect()))'));
+  // Under the title: how many, how many filed today and when the newest came; then the Updates head and the cards two across.
+  const at = new Date(doc.items[2].filed).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  assert.deepEqual(await evaluate('[document.querySelector(".top .lede").textContent, document.querySelector(".sec-head h2").textContent]'), [`3 updates, 2 new. The page changed at ${at}.`, 'Updates']);
+  assert.ok(await evaluate('(([a, b, c]) => a.top === b.top && b.left > a.right && c.top > a.bottom)([3, 2, 1].map((n) => document.getElementById(`item-update-${n}`).getBoundingClientRect()))'));
   close();
   proc.kill();
 });
