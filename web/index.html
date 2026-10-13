@@ -202,7 +202,7 @@
     buttons.forEach((b) => (b.disabled = true));
     // An answers-only board takes no comments: a typed note goes with the answer alone.
     const typed = state.answers_only ? '' : (drafts.get(d.key) ?? '').trim();
-    const note = drafts.get(d.key) ?? state.answers[d.key]?.note ?? '', before = state.answers[d.key];
+    const note = drafts.get(d.key) ?? state.answers[d.key]?.note ?? '', before = answerOf(d.key);
     const drop = clearIfSaved(d.key, drafts.get(d.key));
     call('/api/answers', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
@@ -216,18 +216,20 @@
 
   const toast = document.getElementById('toast'), toastText = document.getElementById('toast-text'), undoBtn = document.getElementById('undo');
   let hide;
+  const answerOf = (key) => (Object.hasOwn(state.answers, key) ? state.answers[key] : undefined);
+  // The toast stays while the pointer is on it or the keyboard is on Undo.
+  const later = (ms) => { clearTimeout(hide); hide = setTimeout(() => (toast.matches(':hover') || undoBtn.matches(':focus-visible') ? later(1500) : (toast.hidden = true)), ms); };
   const say = (text, ms, undo) => {
     toastText.textContent = text;
     undoBtn.hidden = !undo;
     undoBtn.disabled = false;
     undoBtn.onclick = undo;
     toast.hidden = false;
-    clearTimeout(hide);
-    hide = setTimeout(() => (toast.hidden = true), ms);
+    later(ms);
   };
   /** After a tap, a few seconds to take it back. Undo saves the answer from before the tap (or none) the usual way, so it is recorded too. */
   function offerUndo(d, before) {
-    const now = state.answers[d.key];
+    const now = answerOf(d.key);
     if (!now) return;
     undoBtn.setAttribute('aria-label', `Undo, ${d.title}`);
     say(`Saved: ${now.answer === 'text' ? 'your reply' : now.label}`, 5000, () => {
@@ -237,6 +239,8 @@
         .then(() => say(before ? `Back to: ${before.answer === 'text' ? 'your reply' : before.label}` : 'Undone: not answered', 3000),
           (e) => say(`Couldn't undo: ${e.message}`, 8000));
     });
+    // The tap redrew its card and took the focus with it: put it on Undo so the keyboard can reach it in time.
+    if (document.activeElement === document.body || !document.activeElement) undoBtn.focus();
   }
 
   // A render while a request was out replaced the error line; write to the one on screen.

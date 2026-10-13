@@ -11,5 +11,6 @@ Write `$SCR/q/feed.json`: `{"schema": 2, "answers_only": true, "items": [<"type"
 | 3 | Click **Yes**; shot while the toast shows; click **Undo** within 5 s | The toast reads `Saved: Yes` with **Undo**, then `Undone: not answered`; the card waits again. `board.answers.jsonl` holds the `yes` line, then `{"answer":"","label":"",...}`; `answers --json` no longer lists the key |
 | 4 | Click **Yes**, wait for the toast to go, click **No**, click **Undo** | The toast reads `Back to: Yes`; the last line is a new `yes` line, so `answers` shows yes |
 | 5 | Click **Other answer** | It unfolds the text box with the caret in it; a 20 s redraw keeps it open |
+| 6 | Keyboard only: Tab to **Yes**, press Enter, wait 8 s, press Enter | After the first Enter, focus is on **Undo** with a visible ring and the toast stays past 5 s while it has focus; the second Enter reads `Undone: not answered`. After a mouse tap focus shows no ring and the toast goes after about 5 s |
 
 The integration test (`npm test`, `test/decisions.test.mjs`) also covers the empty-answer line, an Undo with nothing to undo adding no line, and the refusal from flags, `--from` and `post --type design`.
