@@ -92,5 +92,6 @@ Look at every shot before you report: nothing overlaps, no text is cut, no raw p
 | Answer events: `--filer` on post/raise, `wait --filer` returns only that filer's answers once, **Seen by agent** chip, `on_answer:` hook on stdin, `post --replace --filer` keeps other filers' items | [features/answer-events.md](features/answer-events.md) |
 | README media and rendered README | [features/readme.md](features/readme.md) |
 | `sign-off-axi` commands, TOON/`--full`/`--json`, packed tarball via `npx -y` | [features/axi.md](features/axi.md) |
+| Contract: `validate` on message files, refusals with one fix line and exit 2, the shipped `fixtures/contract/` run from the package | [features/contract.md](features/contract.md) |
 | Coding agents: `init --agent auto|<name>`, config `agent:`, one doctor line per agent, the same journey on several agents | [features/agents.md](features/agents.md) |
 | Agent skill: `skills/sign-off-axi`, the A/B/C mock recipe, `npm run build:skill`, install with `npx skills add` | [features/skill.md](features/skill.md) |

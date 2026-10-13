@@ -12,10 +12,12 @@ import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
 import { type Answer, CHAPTERS_MAX, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, writeItems } from './store.js';
 
+import { ContractError, KINDS, checkMessage, parseMessage } from './contract.js';
 import { sweepVault } from './vault.js';
 
 const BOARD = join(homedir(), '.sign-off', 'decisions.json');
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
+const CONTRACT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/contract.md';
 /** Coding agents init installs the skill for: the `npx skills add -a` name, the command that shows it is installed,
  * and where its skills live in a project and in the home folder. */
 const [claudeHome, configHome] = [process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'), process.env.XDG_CONFIG_HOME || join(homedir(), '.config')];
@@ -27,8 +29,8 @@ const AGENTS: Record<string, { bin: string; dir: string; home: string }> = {
   'gemini-cli': { bin: 'gemini', dir: '.agents/skills', home: join(homedir(), '.gemini', 'skills') },
 };
 const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
-commands[14]:
-  (none)=list, raise, post, answers, wait, poll, open, status, stop, serve, export, init, doctor, help
+commands[15]:
+  (none)=list, raise, post, answers, wait, poll, open, status, stop, serve, export, init, doctor, validate, help
 board: ~/.sign-off/decisions.json unless a board file is given; answers are saved next to it
 flags: --full and --json on list, answers and wait, --json on status, --filer on post, raise and wait, --help on every command, -v/--version
 examples:
@@ -40,6 +42,7 @@ examples:
   sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "The new sign-in has 2 steps." --media explainer.mp4 --chapter 0:00=Start
   sign-off-axi init
   sign-off-axi doctor
+  sign-off-axi validate ask.json
   sign-off-axi open
   sign-off-axi wait --key ship-the-new-sign-in-screen-this-week
   sign-off-axi wait --filer my-session-id
@@ -71,6 +74,18 @@ examples:
   sign-off-axi raise --title "Keep the weekly digest?" --about "Open rate held steady." --recommend yes
   sign-off-axi raise --title "When should it ship?" --option today=Today --option friday=Friday --option next-week="Next week" --recommend friday
   sign-off-axi raise --from ./decisions.json
+`,
+  validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>]
+Checks message files against the communication contract without posting them: ${CONTRACT}
+A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kind ask, schema 1.
+Each file gets a row with ok, or the error and one help line that names the fix. A field written twice, an unknown field or a broken limit refuses the file.
+  --kind  each file must be this kind, so the wrong file is refused
+Exits 0 when every file passes, 2 when any is refused or no file is named, and 1 when any file cannot be read.
+example message:
+  {"contract":1,"kind":"ask","schema":1,"key":"ship-signin-2","title":"Ship the new sign-in screen this week?","options":[{"value":"yes","label":"Yes"},{"value":"no","label":"No"}],"recommend_value":"yes"}
+examples:
+  sign-off-axi validate ask.json
+  sign-off-axi validate --kind ask messages/*.json
 `,
   answers: `usage: sign-off-axi answers [board.json] [--key <key>] [--full] [--json]
 Prints the latest saved answer per decision and counts the ones still waiting.
@@ -541,6 +556,34 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
     return toon({ board: tilde(file), posted: [{ key, number, media: media.length, title }] },
       [`Run \`sign-off-axi open${on}\` so the user can give a verdict`, waitFor(on, filer, key)]);
   });
+}
+
+/** Checks message files without posting them: one row per file, exit 2 when any is refused, 1 when any cannot be read. */
+function validate(args: string[]) {
+  let parsed;
+  try { parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { kind: { type: 'string' } } }); } catch (e: any) {
+    throw fail(e.message, 'VALIDATION_ERROR', 'Run `sign-off-axi validate --help`');
+  }
+  const { values: { kind: want }, positionals: names } = parsed;
+  if (!names.length) throw fail('name at least one message file', 'VALIDATION_ERROR', 'sign-off-axi validate ask.json');
+  if (want !== undefined && !KINDS.includes(want)) throw fail(`--kind must be one of ${KINDS.join(', ')}`, 'VALIDATION_ERROR', 'sign-off-axi validate --kind ask ask.json');
+  let unread = false;
+  const files = names.map((file) => {
+    let raw, m: any;
+    try { raw = readFileSync(file, 'utf8'); } catch (e: any) {
+      unread = true;
+      return { file, kind: '', schema: '', ok: false, error: `cannot read: ${e.code}`, help: 'Check the path names a readable file' };
+    }
+    try {
+      m = parseMessage(raw);
+      return { file, ...checkMessage(m, want), ok: true, error: '', help: '' };
+    } catch (e) {
+      if (!(e instanceof ContractError)) throw e;
+      return { file, kind: typeof m?.kind === 'string' ? m.kind : '', schema: Number.isSafeInteger(m?.schema) ? m.schema : '', ok: false, error: e.message, help: e.help };
+    }
+  });
+  process.exitCode = unread ? 1 : files.some((f) => !f.ok) ? 2 : 0;
+  return toon({ files }, process.exitCode ? ['Fix each refused file as its help says, then run validate again'] : []);
 }
 
 const optionsOf = (values: Record<string, any>) => values.option?.map((o: string) => {
@@ -1304,7 +1347,7 @@ await runAxiCli({
   topLevelHelp: TOP_HELP,
   getCommandHelp: (cmd) => HELP[cmd],
   home: axi('list', list),
-  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), doctor: axi('doctor', doctor), help: ([name, ...rest]) => {
+  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), doctor: axi('doctor', doctor), validate, help: ([name, ...rest]) => {
     if (rest.length || (name && !HELP[name])) throw fail(`unknown command or argument: ${[name, ...rest].join(' ')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi --help` to see the commands');
     return name ? HELP[name] : TOP_HELP;
   } },

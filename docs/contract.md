@@ -2,7 +2,7 @@
 
 sign-off owns this contract. Agents and tools use it to post asks, reports, evidence, gates and retro findings to the board, and to read the answers back. Every message has the same strict shape, so the person reading the board sees one kind of card per kind of message, whoever sent it.
 
-Status: v1 target. Nothing in this file is enforced yet. Each part lands with its own change, and this line will name what is built. Until then, `raise` and `post` take the board format in [file-formats.md](file-formats.md), which ignores unknown keys.
+Status: v1 target, built in parts. Built: the `ask` kind and `validate` without `--expect-invalid` (section 9), with its fixtures in the npm package. Not built yet: the other kinds, posting a message (`raise` and `post` still take the board format in [file-formats.md](file-formats.md), which ignores unknown keys), answer events and `schema`.
 
 ## 1. Versions
 
