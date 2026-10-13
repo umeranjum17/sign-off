@@ -30,7 +30,7 @@ const AGENTS: Record<string, { bin: string; dir: string; home: string }> = {
 const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
 commands[15]:
   (none)=list, raise, post, answers, wait, poll, open, status, stop, serve, export, init, doctor, validate, help
-board: the nearest .sign-off/ board from the working folder up to its repo root (the folder holding .git), else ~/.sign-off/decisions.json, unless a board file is given; answers are saved next to it
+board: the nearest .sign-off/ board from the working folder up to its repo root (the folder holding .git); with no .git above, up to HOME but never HOME's own .sign-off; else ~/.sign-off/decisions.json, unless a board file is given; answers are saved next to it
 flags: --full and --json on list, answers and wait, --json on status, --filer on post, raise and wait, --help on every command, -v/--version
 examples:
   sign-off-axi
@@ -253,7 +253,8 @@ function parse(cmd: string, args: string[], flags: Flags) {
 }
 /** The board when none is given: the nearest .sign-off/ that init set up, from the working folder up to the repo root (the folder holding .git), else ~/.sign-off/decisions.json. */
 function boardHere() {
-  for (let dir = process.cwd(); dir !== homedir(); dir = dirname(dir)) {
+  const home = realpathSync(homedir());
+  for (let dir = process.cwd(); dir !== home; dir = dirname(dir)) {
     const so = join(dir, '.sign-off');
     if (existsSync(join(so, 'config.yaml'))) return setupOf(join(so, 'decisions.json'))!.board;
     if (existsSync(join(dir, '.git')) || dirname(dir) === dir) break;

@@ -960,3 +960,15 @@ test('no board named: the nearest .sign-off/ up to the repo root, else the home 
   assert.equal(installed.status, 0, installed.stdout);
   assert.match(installed.stdout, /codex,installed/);
 });
+
+test('no board named under a symlinked HOME: the walk stops at the real HOME, never its own .sign-off, and the home board takes the item', () => {
+  const realHome = join(scratch, 'linked', 'real-home'), linkHome = join(scratch, 'linked', 'link-home'), proj = join(realHome, 'proj');
+  mkdirSync(join(realHome, '.sign-off'), { recursive: true });
+  mkdirSync(proj, { recursive: true });
+  writeFileSync(join(realHome, '.sign-off', 'config.yaml'), 'board: home-trap.json\nport: 0\n');
+  symlinkSync(realHome, linkHome);
+  const r = spawnSync(process.execPath, [cli, 'raise', '--title', 'From linked home'], { cwd: join(linkHome, 'proj'), env: { ...env, HOME: linkHome }, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stdout);
+  assert.deepEqual(JSON.parse(readFileSync(join(linkHome, '.sign-off', 'decisions.json'), 'utf8')).items.map((i) => i.key), ['from-linked-home']);
+  assert.equal(existsSync(join(realHome, '.sign-off', 'home-trap.json')), false);
+});
