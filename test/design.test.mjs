@@ -690,6 +690,7 @@ test('comments on mock elements: one per element, kept across a reload, edited a
   assert.deepEqual([await post({ ...one, text: ' ' }), await post({ ...one, mock: 'c' }), await post({ id: 'nope', deleted: true }), await post({ ...one, hash: 'an older file' }), await post({ ...one, id: saved.id })], [400, 404, 404, 409, 404]);
   writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, 'utf8')), readonly: true }));
   assert.equal(await post(one), 403);
+  assert.deepEqual((await fetch(`${url}api/decisions`).then((r) => r.json())).annotations, []);
   proc.kill();
 });
 

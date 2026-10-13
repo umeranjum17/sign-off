@@ -1269,7 +1269,7 @@ const state = () => {
     seen: Object.values(answers).filter(taken).map((a) => a.key),
     rounds,
     messages: readMessages(file, warn),
-    annotations: readAnnotations(file, warn),
+    annotations: readOnly() || answersOnly() ? [] : readAnnotations(file, warn),
     dismissed: readDismissed(file, answers, rounds, warn),
   };
 };

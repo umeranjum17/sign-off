@@ -373,7 +373,7 @@
   async function call(path, init, sent) {
     const res = await fetch(path, init);
     const body = await res.json().catch(() => ({ error: `The server replied ${res.status}` }));
-    if (!res.ok) throw new Error(body.error);
+    if (!res.ok) throw Object.assign(new Error(body.error), { status: res.status });
     state = body;
     if (!loaded) {
       loaded = true;
@@ -687,6 +687,7 @@
       call('/api/annotations', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, sent).catch((e) => {
         shown(err).textContent = `Couldn't save: ${e.message}`;
         btn.disabled = false;
+        if (e.status === 404) call('/api/decisions').catch(failed);
       });
     };
     // While Comment on the mocks is on, a tap on a mock names an element to comment on instead of opening the mock.
@@ -968,7 +969,7 @@
     pointed.set(frame.dataset.mock, { ref: msg.ref, tag: msg.tag, text: msg.text });
     // The element named opens the comment editor on its card, with its saved comment when it has one.
     const dm = frame.dataset.mock, cut = dm.indexOf('~'), d = state.decisions.find((x) => x.key === dm.slice(0, cut));
-    if (!d || !talks()) return;
+    if (!d || !talks() || pointing.get(dm) !== true) return;
     const mock = dm.slice(cut + 1);
     editing.set(d.key, { mock, hash: d.mocks?.find((m) => m.value === mock)?.hash, ref: msg.ref, tag: msg.tag, words: msg.text });
     redraw(d);
