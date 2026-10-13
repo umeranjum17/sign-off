@@ -47,6 +47,10 @@
   with a different title, options or reply: post that question under a new key.
 - A 0.1.0 file, `"schema": 1` with a `"decisions"` list, still reads: each entry is an item, a decision unless it says otherwise. The first write that changes it (a `raise` of a new key, or a `post`) rewrites it as `"schema": 2` (temp file, then rename) and first keeps the old file once beside it as `<board>.schema-1.bak`. Answer and round files are not touched.
 - `key`: 1-128 of `A-Z a-z 0-9 . _ -`, unique in the file. `title`: required.
+- `filer`: optional, who filed the item (1-128 of `A-Z a-z 0-9 . _ -`), written by `post --filer`.
+  `wait --filer` with the same id returns the answers to that filer's items. The page never shows it.
+  `post --from <file> --replace --filer <id>` replaces only the items with that filer (and items with
+  no filer the file names by key); every other item, the board's other top-level fields and the answers stay.
 - `type`: optional, `decision` (default), `design`, `evidence`, `diagram`,
   `interactive` or `explainer`. A design item
   is a pick between mock options shown side by side. An evidence item is a
@@ -164,6 +168,14 @@ also copies each file into `evidence/<number>/` next to the board:
 
 - Asking wakes a waiting agent the same way an answer does. `answers --json`
   adds a `rounds` list per answered key only when that key has asks.
+
+**Taken answers**, written by `wait --filer` next to the questions (`decisions.seen.jsonl`, mode 600):
+one line per answer the item's filer took, so the card shows **Seen by agent**. A changed answer is new
+again until the filer takes it too.
+
+```json
+{"key":"keep-the-weekly-digest","answer":"yes","at":"2026-10-12T15:40:03Z","seen":"2026-10-12T15:40:04Z"}
+```
 
 **Comments and queued prompts**, written by sign-off next to the questions
 (`decisions.messages.jsonl`, mode 600, oldest first). A comment names its item's `key`; a prompt has none.

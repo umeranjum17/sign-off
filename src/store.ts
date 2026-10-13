@@ -11,6 +11,8 @@ export type Decision = {
   key: string; title: string; about?: string; detail?: string; options: Option[];
   recommend_value?: string; default_if_silent?: string; close: string; evidence?: EvidenceLink;
   type: string; tradeoff?: string; mocks?: MockRef[]; number?: number; media?: MediaRef[]; link?: string; view?: string; chapters?: Chapter[]; reply?: boolean;
+  /** Who posted it: an agent session or caller id, so that caller's `wait --filer` gets the answer. */
+  filer?: string;
 };
 export type Answer = { key: string; answer: string; label: string; close: string; at: string; note?: string };
 export type Round = { key: string; note: string; at: string };
@@ -112,6 +114,7 @@ export function loadDecisions(path: string): Decision[] {
     if (new Set(values).size < values.length) throw bad('options', 'values must be unique');
     if (d.reply !== undefined && typeof d.reply !== 'boolean') throw bad('reply', 'must be true or false');
     if (d.reply && values.includes(REPLY.value)) throw bad('options', `value ${REPLY.value} is the answer a reply saves`);
+    if (d.filer !== undefined && !isKey(d.filer)) throw bad('filer', 'must be 1-128 of A-Z a-z 0-9 . _ -');
     for (const f of ['recommend_value', 'default_if_silent']) if (d[f] !== undefined && !values.includes(d[f])) throw bad(f, `must be one of ${values.join(', ')}`);
     if (d.tradeoff !== undefined && (!isText(d.tradeoff) || !d.tradeoff.trim() || d.tradeoff.length > TRADEOFF_MAX)) throw bad('tradeoff', `must be text of ${TRADEOFF_MAX} characters or fewer`);
     if (d.mocks !== undefined) {
@@ -127,7 +130,7 @@ export function loadDecisions(path: string): Decision[] {
       key: d.key, title: d.title, about: d.about, detail: d.detail, options: options.map((o: Option) => ({ value: o.value, label: o.label })),
       recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done', evidence: d.evidence,
       type: d.type ?? 'decision', tradeoff: d.tradeoff, link: d.link, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path })),
-      ...(views && { view: d.view }), ...(d.reply && { reply: true }),
+      ...(views && { view: d.view }), ...(d.reply && { reply: true }), ...(d.filer && { filer: d.filer }),
       ...(stored && { media: d.media.map(({ path, sha256, bytes }: MediaRef) => ({ path, sha256, bytes })) }),
       ...(d.type === 'evidence' && { number: d.number }),
       ...(d.type === 'explainer' && d.chapters && { chapters: d.chapters.map(({ at, title }: Chapter) => ({ at, title })) }),
@@ -152,12 +155,28 @@ export function readAnswers(decisionsPath: string, warn: (msg: string) => void =
   return Object.fromEntries(latest);
 }
 
-/** Appends one answer line unless it equals the current answer and note. Starts a new line after a torn fragment. */
-export function appendAnswer(decisionsPath: string, d: Decision, option: Option, note = ''): void {
+/** Appends one answer line unless it equals the current answer and note, and returns the saved answer. Starts a new line after a torn fragment. */
+export function appendAnswer(decisionsPath: string, d: Decision, option: Option, note = ''): Answer | undefined {
   const current = readAnswers(decisionsPath)[d.key];
   if (current?.answer === option.value && (current.note ?? '') === note) return;
-  appendLine(answersPath(decisionsPath), { key: d.key, answer: option.value, label: option.label, close: d.close, at: now(), ...(note && { note }) } satisfies Answer);
+  const answer: Answer = { key: d.key, answer: option.value, label: option.label, close: d.close, at: now(), ...(note && { note }) };
+  appendLine(answersPath(decisionsPath), answer);
+  return answer;
 }
+
+/** Answers the filer took with `wait --filer`, one line each: the board marks that answer "seen by agent". */
+export const seenPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.seen.jsonl';
+const taken = (a: Pick<Answer, 'key' | 'answer' | 'at' | 'note'>) => JSON.stringify([a.key, a.answer, a.at, a.note ?? '']);
+/** Is this answer, as saved now, one the filer already took? A changed answer is new again. */
+export function seenBy(decisionsPath: string): (a: Answer) => boolean {
+  const seen = new Set(readRaw(seenPath(decisionsPath)).split('\n').flatMap((line) => {
+    try { const s = line && JSON.parse(line); return s?.key ? [taken(s)] : []; } catch { return []; }
+  }));
+  return (a) => seen.has(taken(a));
+}
+export const markSeen = (decisionsPath: string, answers: Answer[]) => {
+  for (const { key, answer, at, note } of answers) appendLine(seenPath(decisionsPath), { key, answer, at, ...(note && { note }), seen: now() });
+};
 
 /** Another-round asks per key, oldest first. A torn line is skipped and reported through warn. */
 export function readRounds(decisionsPath: string, warn: (msg: string) => void = () => {}): Round[] {

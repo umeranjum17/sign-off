@@ -43,6 +43,15 @@ You do not need sign-off-axi installed globally - invoke it with \`npx -y sign-o
 If sign-off-axi output shows a follow-up command starting with \`sign-off-axi\`, run it as \`npx -y sign-off-axi ...\` instead.
 sign-off itself calls no model and inherits the calling agent's model routing.
 
+## Get the answer back as an event
+
+The answer comes to you; nobody has to notice it for you.
+
+1. Pick one filer id for yourself: your agent session id, or any short name (1-128 of \`A-Z a-z 0-9 . _ -\`).
+2. Post every item with \`--filer <id>\`, or export \`SIGN_OFF_FILER=<id>\` once for every command.
+3. Right after posting, run \`npx -y sign-off-axi wait --filer <id>\` (same board file as the post). It returns every answer to your items you have not taken yet, even one given before you started waiting, and the board then shows **Seen by agent** on that card. Run it again for the next one; \`TIMEOUT\` means keep waiting, \`NOT_FOUND\` means none of your items wait.
+4. If you cannot block, the board owner can set \`on_answer: <command>\` in the \`config.yaml\` beside the board: it runs for each answer with the answer as JSON on its stdin.
+
 ## Design decisions: show A/B/C mocks, not words
 
 When the user must choose how something looks or works, do this:

@@ -10,7 +10,7 @@ import { basename, delimiter, dirname, extname, join, resolve, sep } from 'node:
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { CHAPTERS_MAX, type Decision, InputError, MEDIA_MAX, NOTE_MAX, REPLY, answersPath, appendAnswer, appendMessage, appendRound, isKey, loadDecisions, markDelivered, messagesPath, readAnswers, readItems, readMessages, readRounds, roundsPath, writeItems } from './store.js';
+import { type Answer, CHAPTERS_MAX, type Decision, InputError, MEDIA_MAX, NOTE_MAX, REPLY, answersPath, appendAnswer, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnswers, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, writeItems } from './store.js';
 
 const BOARD = join(homedir(), '.sign-off', 'decisions.json');
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
@@ -28,7 +28,7 @@ const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
 commands[14]:
   (none)=list, raise, post, answers, wait, poll, open, status, stop, serve, export, init, doctor, help
 board: ~/.sign-off/decisions.json unless a board file is given; answers are saved next to it
-flags: --full and --json on list, answers and wait, --json on status, --help on every command, -v/--version
+flags: --full and --json on list, answers and wait, --json on status, --filer on post, raise and wait, --help on every command, -v/--version
 examples:
   sign-off-axi
   sign-off-axi raise --title "Ship the new sign-in screen this week?" --recommend yes
@@ -40,6 +40,7 @@ examples:
   sign-off-axi doctor
   sign-off-axi open
   sign-off-axi wait --key ship-the-new-sign-in-screen-this-week
+  sign-off-axi wait --filer my-session-id
   sign-off-axi poll
   sign-off-axi export --out board.html
   sign-off-axi stop
@@ -53,13 +54,15 @@ examples:
   sign-off-axi
   sign-off-axi list ./decisions.json --full
 `,
-  raise: `usage: sign-off-axi raise [board.json] --title "<question>" [--key <key>] [--about <text>] [--detail <text>] [--option <value>=<label>]... [--recommend <value>] [--default <value>] [--close done|release]
-       sign-off-axi raise [board.json] --from <decisions.json>
+  raise: `usage: sign-off-axi raise [board.json] --title "<question>" [--key <key>] [--about <text>] [--detail <text>] [--option <value>=<label>]... [--recommend <value>] [--default <value>] [--close done|release] [--filer <id>]
+       sign-off-axi raise [board.json] --from <decisions.json> [--filer <id>]
 Adds questions to the board: yes/no, or 2 to 6 choices with one --option each. --key defaults to a slug of the title.
 raise is the alias for post --type decision: same flags, same output.
 --recommend and --default name a value (yes or no without --option). --default is what happens if the user stays silent; it is shown, never applied.
 --from adds every decision in a decisions file: ${FORMAT}
 Raising the same question again is a no-op that reports its status; a different question under a used key is refused.
+--filer names who asks (your agent session or any id of 1-128 of A-Z a-z 0-9 . _ -), saved on the item so \`wait --filer\` with the same id gets the answer.
+SIGN_OFF_FILER sets it for every command; with neither, the Claude Code session id is saved when there is one.
 examples:
   sign-off-axi raise --title "Keep the weekly digest?" --about "Open rate held steady." --recommend yes
   sign-off-axi raise --title "When should it ship?" --option today=Today --option friday=Friday --option next-week="Next week" --recommend friday
@@ -75,8 +78,11 @@ examples:
   sign-off-axi answers --key keep-the-weekly-digest
   sign-off-axi answers ./decisions.json --json
 `,
-  wait: `usage: sign-off-axi wait [board.json] [--key <key>] [--timeout 600] [--full] [--json]
+  wait: `usage: sign-off-axi wait [board.json] [--filer <id>] [--key <key>] [--timeout 600] [--full] [--json]
 Blocks until the user answers, then prints the answer the way answers does. Use it instead of a polling loop.
+  --filer    only the items posted with this --filer (or SIGN_OFF_FILER): returns every answer to them this filer has not taken yet,
+             even one saved before wait started, and marks it taken, so the board shows "Seen by agent" on that card;
+             NOT_FOUND when none of them is answered or waiting. Without --filer or SIGN_OFF_FILER, wait takes no filer
   --key      wait for that decision; an answer saved before wait starts returns at once
              and a key not raised yet is waited for too
              without --key, wait for the next answer to any decision still waiting; NOT_FOUND when nothing is
@@ -120,11 +126,13 @@ Runs the board in the foreground until Ctrl-C; --port 0 picks a free port, and i
 examples:
   sign-off-axi serve --port 0
 `,
-  post: `usage: sign-off-axi post [board.json] [--type decision|design|diagram|interactive] --title "<question>" [--key <key>] [--about <text>] [--option <value>=<label>]... [--mock <value>=<path>]... [--view <path>] [--tradeoff <text>] [--recommend <value>] [--default <value>] [--close done|release]
-       sign-off-axi post [board.json] --type evidence --title "<what this shows>" --about "<short note>" --media <file>... [--link <commit or URL>] [--detail <text>]
-       sign-off-axi post [board.json] --from <board file> --replace
+  post: `usage: sign-off-axi post [board.json] [--type decision|design|diagram|interactive] --title "<question>" [--key <key>] [--about <text>] [--option <value>=<label>]... [--mock <value>=<path>]... [--view <path>] [--tradeoff <text>] [--recommend <value>] [--default <value>] [--close done|release] [--filer <id>]
+       sign-off-axi post [board.json] --type evidence --title "<what this shows>" --about "<short note>" --media <file>... [--link <commit or URL>] [--detail <text>] [--filer <id>]
+       sign-off-axi post [board.json] --from <board file> --replace [--filer <id>]
        sign-off-axi post [board.json] --type explainer --title "<question>" --media <video> [--about <summary>] [--chapter <m:ss>=<title>]... [--key <key>] [--option <value>=<label>]... [--recommend <value>]
 Posts an item for the user. --type decision (the default) is a yes/no or pick-one question, exactly like raise.
+--filer names who posts (your agent session or any id of 1-128 of A-Z a-z 0-9 . _ -), saved on the item; then \`wait --filer <id>\` gets the answer.
+SIGN_OFF_FILER sets it for every command; with neither, the Claude Code session id is saved when there is one.
 --type design is a pick between up to 6 options shown side by side, each with an optional board-relative mock file
 (.html, .svg, .png, .jpg, .jpeg, .webp), a --tradeoff line and a --recommend badge.
 One .html page can hold every variant: --mock a=mocks/<key>/index.html?variant=a and so on; the page reads ?variant= to show one.
@@ -132,6 +140,8 @@ An .html mock or view loads the css, scripts, images and fonts beside it by rela
 After the user picks, answers --key <key> --json holds the pick and note; "rounds" holds an ask for another round.
 --from <file> --replace is for a program that feeds the board: the file, checked like any post, becomes the whole board (items and
 top-level fields such as "answers_only": true), written only when it changed; a bad item is refused and the board is left as it was. Answers stay.
+With --filer (or SIGN_OFF_FILER) the file replaces only that filer's items, and items with no filer it names by key: every other item and the board's other top-level fields stay.
+An empty items list removes that filer's items.
 --type diagram and --type interactive are a decision shown with a picture: --view names one board-relative file,
 an image (.svg, .png, .jpg, .jpeg, .webp, 5 MB or less) shown at card width for a diagram, or one self-contained .html page for interactive.
 The page runs in a sandboxed frame: no fetch, no remote files, no access to the dashboard or its tab. Answers work as for a decision.
@@ -229,6 +239,16 @@ const axi = (cmd: string, run: (args: string[]) => string | Promise<string>) => 
   }
 };
 
+/** Who posts or waits: --filer, else SIGN_OFF_FILER; a single post with neither saves the Claude Code session id when there is one. */
+function filerOf(values: Record<string, any>, session = false): string | undefined {
+  const filer = values.filer ?? (process.env.SIGN_OFF_FILER || undefined);
+  if (filer !== undefined && !isKey(filer)) throw fail(`--filer ${filer} must be 1-128 of A-Z a-z 0-9 . _ -`, 'VALIDATION_ERROR', 'Pass your agent session id, or any short name for yourself');
+  const own = session ? process.env.CLAUDE_CODE_SESSION_ID : undefined;
+  return filer ?? (isKey(own) ? own : undefined);
+}
+const waitFor = (on: string, filer?: string, key?: string) => (filer ? `Run \`sign-off-axi wait${on} --filer ${filer}\` to block until the user answers`
+  : `Run \`sign-off-axi wait${on}${key ? ` --key ${key}` : ''}\` to block until the user answers`);
+
 /** Still waiting on the user: not answered, and something to answer (an item with no options and no reply is only shown). */
 const waits = (d: Decision & { answer?: unknown }) => !d.answer && (d.options.length > 0 || !!d.reply);
 /** The board's decisions with their latest answer; a missing board file is an empty board. */
@@ -295,10 +315,13 @@ function answers(args: string[]) {
 }
 
 async function wait(args: string[]) {
-  const { file, values, on } = parse('wait', args, { ...TIERS, key: { type: 'string' }, timeout: { type: 'string', default: '600' } });
+  const { file, values, on: onBoard } = parse('wait', args, { ...TIERS, filer: { type: 'string' }, key: { type: 'string' }, timeout: { type: 'string', default: '600' } });
   if (!/^\d{1,7}$/.test(values.timeout)) throw fail('--timeout must be whole seconds, 0 or more', 'VALIDATION_ERROR', `Run \`sign-off-axi wait --help\``);
-  if (values.key === undefined) ready(file, on);
+  const filer = filerOf(values), on = onBoard + (filer ? ` --filer ${filer}` : '');
+  if (values.key === undefined) ready(file, onBoard);
   const seconds = Number(values.timeout), deadline = Date.now() + seconds * 1000, key = values.key === undefined ? '' : ` --key ${values.key}`;
+  // With a filer, only its own items count, and an answer it has not taken yet is new however old it is.
+  const mine = (rows: ReturnType<typeof board>) => (filer === undefined ? rows : rows.filter((d) => d.filer === filer));
   const before = new Set(board(file).flatMap((d) => (d.answer ? [d.key] : [])));
   // Rounds seen before waiting starts stay quiet; only a newly asked round wakes the loop.
   const seenRounds = new Map<string, number>();
@@ -309,24 +332,34 @@ async function wait(args: string[]) {
   try {
     try { watcher = watch(dirname(file), (_, changed) => changed === name && wake()).on('error', () => {}); } catch {}
     for (let first = true; ; first = false) {
-      const rows = board(file, first ? warn : () => {}), waiting = rows.filter(waits).length;
-      const hit = rows.filter((d) => (values.key === undefined ? d.answer && !before.has(d.key) : d.key === values.key));
+      const rows = mine(board(file, first ? warn : () => {})), waiting = rows.filter(waits).length, taken = filer === undefined ? undefined : seenBy(file);
+      const hit = rows.filter((d) => (values.key !== undefined ? d.key === values.key : d.answer && (taken ? !taken(d.answer) : !before.has(d.key))));
       const counts = new Map<string, number>();
       for (const r of readRounds(file, first ? warn : () => {})) counts.set(r.key, (counts.get(r.key) ?? 0) + 1);
       const fresh = rows.filter((d) => (counts.get(d.key) ?? 0) > (seenRounds.get(d.key) ?? 0)
         && (values.key === undefined || d.key === values.key));
       for (const [k, n] of counts) seenRounds.set(k, n);
-      const found = [...new Map([...hit.filter((d) => d.answer), ...fresh].map((d) => [d.key, d] as const)).values()];
+      let found = [...new Map([...hit.filter((d) => d.answer), ...fresh].map((d) => [d.key, d] as const)).values()];
+      if (found.length && filer !== undefined) {
+        // Taken under a lock, so two waits for one filer never both hand over the same answer (another-round asks are not deduped here).
+        found = await locked(`${seenPath(file)}.lock`, () => {
+          const now = seenBy(file), left = found.filter((d) => values.key !== undefined || fresh.includes(d) || !now(d.answer!));
+          markSeen(file, left.flatMap((d) => (d.answer && !now(d.answer) ? [d.answer] : [])));
+          return left;
+        }, 'another wait is still taking answers');
+      }
       if (found.length) {
         return printAnswers(file, found, waiting, values,
-          [waiting ? `Run \`sign-off-axi wait${on}\` for the next of the ${waiting} waiting` : `Run \`sign-off-axi stop${on}\` to close the board`]);
+          [waiting ? `Run \`sign-off-axi wait${on}\` for the next of the ${waiting} waiting` : `Run \`sign-off-axi stop${onBoard}\` to close the board`]);
       }
-      if (values.key === undefined && !waiting) throw fail(`nothing is waiting on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi answers${on}\` to read the saved answers`, `Run \`sign-off-axi raise${on} --title "<question>"\` to ask a new one`);
+      if (values.key === undefined && !waiting) {
+        throw fail(`nothing${filer ? ` posted by ${filer}` : ''} is waiting on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi answers${onBoard}\` to read the saved answers`, `Run \`sign-off-axi raise${on} --title "<question>"\` to ask a new one`);
+      }
       const left = deadline - Date.now();
       if (left <= 0) {
-        if (key && !hit.length) throw fail(`no decision with key ${values.key} was raised on ${tilde(file)} within ${seconds}s`, 'TIMEOUT', `Run \`sign-off-axi list${on}\` to see the waiting keys`);
+        if (key && !hit.length) throw fail(`no decision with key ${values.key}${filer ? ` posted by ${filer}` : ''} was raised on ${tilde(file)} within ${seconds}s`, 'TIMEOUT', `Run \`sign-off-axi list${onBoard}\` to see the waiting keys`);
         throw fail(`no answer${key ? ` for ${values.key}` : ''} within ${seconds}s`, 'TIMEOUT', `Run \`sign-off-axi wait${on}${key} --timeout ${seconds}\` to keep waiting`,
-          ...(await running(file).catch(() => true) ? [] : [`Run \`sign-off-axi open${on}\` so the user can answer: the board is not open`]));
+          ...(await running(file).catch(() => true) ? [] : [`Run \`sign-off-axi open${onBoard}\` so the user can answer: the board is not open`]));
       }
       await new Promise<void>((ok) => {
         const timer = setTimeout(ok, Math.min(1000, left));
@@ -361,23 +394,24 @@ const mockFile = (path: string) => path.split('?')[0];
 function post(args: string[], cmd = 'post') {
   const typed: Flags = cmd === 'post' ? { replace: { type: 'boolean' }, type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
     media: { type: 'string', multiple: true }, link: { type: 'string' }, view: { type: 'string' }, chapter: { type: 'string', multiple: true } } : {};
-  const { file, values, on } = parse(cmd, args, { from: { type: 'string' }, ...typed,
+  const { file, values, on } = parse(cmd, args, { from: { type: 'string' }, filer: { type: 'string' }, ...typed,
     ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: f === 'option' }])) });
   const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'link', 'view', 'chapter'].filter((f) => values[f] !== undefined);
   if (values.from !== undefined && given.length) throw fail(`--from cannot be combined with --${given[0]}`, 'VALIDATION_ERROR', `Put every field in the --from file, or ${cmd} with flags only`);
-  if (values.replace) return replace(file, on, values.from);
+  if (values.replace) return replace(file, on, values.from, filerOf(values));
+  const filer = filerOf(values, true);
   const type = values.type ?? 'decision';
   if (values.from === undefined && values.title === undefined) {
     throw fail('--title is required (or --from <decisions.json>)', 'VALIDATION_ERROR', type === 'design' ? 'sign-off-axi post --type design --title "<question>" --option a=A --option b=B'
       : type === 'evidence' ? 'sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media <file>' : `sign-off-axi ${cmd} --title "<question>" [--recommend <value>]`);
   }
   if (!['decision', 'design', 'evidence', 'diagram', 'interactive', 'explainer'].includes(type)) throw fail(`--type must be decision, design, evidence, diagram, interactive or explainer`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
-  if (type === 'evidence' || type === 'explainer') return postMedia(file, on, values, type);
+  if (type === 'evidence' || type === 'explainer') return postMedia(file, on, values, type, filer);
   if (values.media !== undefined || values.link !== undefined || values.chapter !== undefined) throw fail('--media, --link and --chapter need --type evidence or explainer', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (type !== 'design' && (values.tradeoff !== undefined || values.mock !== undefined)) throw fail('--tradeoff and --mock need --type design', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   const view = type === 'diagram' || type === 'interactive';
   if (view !== (values.view !== undefined)) throw fail(view ? `--type ${type} needs --view <path>` : '--view needs --type diagram or interactive', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
-  if (type === 'decision') return storeIncoming(file, on, buildIncoming(values));
+  if (type === 'decision') return storeIncoming(file, on, buildIncoming(values, {}, filer), filer);
   const root = resolve(dirname(file));
   if (view) {
     // The same real-path check the board serves with, so a post that passes always renders.
@@ -389,7 +423,7 @@ function post(args: string[], cmd = 'post') {
     }
     const size = statSync(actual);
     if (!size.isFile() || size.size > MOCK_BYTES) throw fail(`--view ${values.view} must be a file of 5 MB or less`, 'VALIDATION_ERROR');
-    return storeIncoming(file, on, buildIncoming(values, { type, view: values.view }));
+    return storeIncoming(file, on, buildIncoming(values, { type, view: values.view }, filer), filer);
   }
   const mocks = values.mock?.map((m: string) => {
     const at = m.indexOf('=');
@@ -399,25 +433,42 @@ function post(args: string[], cmd = 'post') {
     if (!resolve(root, name).startsWith(root + sep)) throw fail(`--mock ${path} escapes the board folder`, 'VALIDATION_ERROR', 'Keep mock files next to the board file');
     return { value: m.slice(0, at), path };
   });
-  return storeIncoming(file, on, buildIncoming(values, { type, tradeoff: values.tradeoff, mocks }));
+  return storeIncoming(file, on, buildIncoming(values, { type, tradeoff: values.tradeoff, mocks }, filer), filer);
 }
 
-/** For a program that feeds the board: the --from file, checked like any post, becomes the whole board, items and top-level fields. Answers stay. */
-function replace(file: string, on: string, from?: string) {
+/** For a program that feeds the board: the --from file, checked like any post, becomes the whole board, items and top-level fields. Answers stay.
+ * With a filer it replaces only that filer's items (and items with no filer it names by key); every other item and top-level field stays. */
+function replace(file: string, on: string, from?: string, filer?: string) {
   if (from === undefined) throw fail('--replace needs --from <board file>', 'VALIDATION_ERROR', 'sign-off-axi post board.json --from feed.json --replace');
-  const source = resolve(from), incoming = loadDecisions(source);
-  const { items, extra } = readItems(source);
+  const source = resolve(from), incoming = loadDecisions(source), fed = readItems(source);
+  const feed = filer ? fed.items.map((i) => ({ ...i, filer })) : fed.items;
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
     // An answer belongs to its question: an answered key may not come back asking something else.
     const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply]);
     for (const had of board(file)) {
       const d = incoming.find((x) => x.key === had.key);
+      if (filer && d && had.filer && had.filer !== filer) throw fail(`key ${d.key} on ${tilde(file)} was posted by another filer`, 'CONFLICT', 'Feed it under a new key');
       if (had.answer && d && question(d) !== question(had)) {
         throw fail(`key ${d.key} was answered and now holds a different question on ${tilde(file)}`, 'CONFLICT', 'Post the new question under a new key');
       }
     }
     const old = existsSync(file) ? readItems(file) : undefined;
+    let items = feed, extra = fed.extra;
+    if (filer) {
+      // The feed's items first: the board shows the file's last item first, so the other filers' items keep showing on top.
+      const named = new Set(feed.map((i) => i.key));
+      items = [...feed, ...(old?.items ?? []).filter((i) => i?.filer !== filer && !named.has(i?.key))];
+      extra = { ...old?.extra, ...fed.extra };
+      // The merged board is checked before it is written, so a feed that breaks another filer's items leaves the board as it was.
+      const check = `${file}.${process.pid}.check`;
+      writeFileSync(check, JSON.stringify({ ...extra, schema: 2, items }), { mode: 0o600 });
+      try { loadDecisions(check); } catch (e) {
+        throw e instanceof InputError ? new InputError(e.message.replace(basename(check), basename(file))) : e;
+      } finally {
+        rmSync(check, { force: true });
+      }
+    }
     // Written only when it changed, so a feeder that runs every few seconds leaves the file alone.
     const changed = JSON.stringify(old && { ...old.extra, schema: old.schema, items: old.items }) !== JSON.stringify({ ...extra, schema: 2, items });
     if (changed) writeItems(file, items, extra);
@@ -427,7 +478,7 @@ function replace(file: string, on: string, from?: string) {
 
 const MEDIA_BYTES = 50_000_000;
 /** Copies the media into evidence/<n>/ next to the board and adds the item, numbered under the board lock: update-<n>, or an explainer under its own key. */
-function postMedia(file: string, on: string, values: Record<string, any>, type: 'evidence' | 'explainer') {
+function postMedia(file: string, on: string, values: Record<string, any>, type: 'evidence' | 'explainer', filer?: string) {
   const explainer = type === 'explainer';
   const extra = (explainer ? ['mock', 'tradeoff', 'view', 'link'] : ['key', 'option', 'recommend', 'default', 'mock', 'tradeoff', 'view', 'chapter']).find((f) => values[f] !== undefined);
   if (extra) throw fail(`--${extra} does not apply to --type ${type}`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
@@ -468,8 +519,8 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
       return { path, sha256: sha256(bytes), bytes: bytes.length };
     });
     const { title, about, detail, close, link, recommend: recommend_value, default: default_if_silent } = values;
-    items.push(explainer ? { key, type, title, about, detail, options, recommend_value, default_if_silent, close, chapters, media }
-      : { key, type, number, title, about, detail, close, link, media });
+    items.push(explainer ? { key, type, title, about, detail, options, recommend_value, default_if_silent, close, chapters, media, filer }
+      : { key, type, number, title, about, detail, close, link, media, filer });
     // The whole board is checked before it is written, so a bad post leaves the board and evidence/ as they were.
     const check = `${file}.${process.pid}.check`;
     writeFileSync(check, JSON.stringify({ schema: 2, items }), { mode: 0o600 });
@@ -480,9 +531,9 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
       rmSync(check, { force: true });
     }
     writeItems(file, items);
-    if (explainer) return toon({ board: tilde(file), raised: [{ key, status: 'raised', title }] }, [`Run \`sign-off-axi open${on}\` so the user can watch and answer`, `Run \`sign-off-axi wait${on} --key ${key}\` to block until they do`]);
+    if (explainer) return toon({ board: tilde(file), raised: [{ key, status: 'raised', title }] }, [`Run \`sign-off-axi open${on}\` so the user can watch and answer`, waitFor(on, filer, key)]);
     return toon({ board: tilde(file), posted: [{ key, number, media: media.length, title }] },
-      [`Run \`sign-off-axi open${on}\` so the user can give a verdict`, `Run \`sign-off-axi wait${on} --key ${key}\` to block until they do`]);
+      [`Run \`sign-off-axi open${on}\` so the user can give a verdict`, waitFor(on, filer, key)]);
   });
 }
 
@@ -492,29 +543,33 @@ const optionsOf = (values: Record<string, any>) => values.option?.map((o: string
   return { value: o.slice(0, at), label: o.slice(at + 1) };
 });
 /** Flags are validated by the same loader as a file: write them as a one-decision file first. */
-function buildIncoming(values: Record<string, any>, extra: object = {}): { incoming: Decision[]; raw: object[] } {
+function buildIncoming(values: Record<string, any>, extra: object = {}, filer?: string): { incoming: Decision[]; raw: object[] } {
   if (values.from !== undefined) {
+    // An item that names its own filer keeps it.
     const source = resolve(values.from);
-    return { incoming: loadDecisions(source), raw: readItems(source).items };
+    return { incoming: loadDecisions(source).map((d) => ({ filer, ...d })), raw: readItems(source).items.map((i) => ({ filer, ...i })) };
   }
   const scratch = mkdtempSync(join(tmpdir(), 'sign-off-'));
   const source = join(scratch, 'flags');
   try {
     const { title, key = slug(title), about, detail, recommend: recommend_value, default: default_if_silent, close } = values;
-    writeFileSync(source, JSON.stringify({ schema: 2, items: [{ key, title, about, detail, options: optionsOf(values), recommend_value, default_if_silent, close, ...extra }] }));
+    writeFileSync(source, JSON.stringify({ schema: 2, items: [{ key, title, about, detail, options: optionsOf(values), recommend_value, default_if_silent, close, ...extra, filer }] }));
     return { incoming: loadDecisions(source), raw: readItems(source).items };
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
 }
 
-function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: Decision[]; raw: object[] }) {
+function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: Decision[]; raw: object[] }, filer?: string) {
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
-    const current = board(file), items = existsSync(file) ? readItems(file).items : [];
+    const current = board(file), items = existsSync(file) ? readItems(file).items : [], saved = readAnswers(file);
     const raised = incoming.map((d, i) => {
       const had = current.find((c) => c.key === d.key);
-      const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
+      // An answer outlives its item: a new question under that key would inherit it.
+      if (!had && Object.hasOwn(saved, d.key)) throw fail(`key ${d.key} already has a saved answer on ${tilde(file)} from an item no longer there`, 'CONFLICT', 'Raise it under a new --key');
+      // The same question from another filer is the same question: it keeps its first filer.
+      const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, filer: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
       if (had && same(had) !== same(d)) {
         throw fail(`key ${d.key} already holds a different question on ${tilde(file)}`, 'CONFLICT', 'Raise it under a new --key');
       }
@@ -524,7 +579,7 @@ function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: 
     if (raised.some((r) => r.status === 'raised')) writeItems(file, items);
     const key = raised.length === 1 ? ` --key ${raised[0].key}` : '';
     const open = raised.some((r) => !r.status.startsWith('already answered')) ? [`Run \`sign-off-axi open${on}\` so the user can answer`] : [];
-    return toon({ board: tilde(file), raised }, [...open, `Run \`sign-off-axi answers${on}${key}\` to read ${key ? 'the answer' : 'the answers'}`]);
+    return toon({ board: tilde(file), raised }, [...open, ...(filer ? [waitFor(on, filer)] : []), `Run \`sign-off-axi answers${on}${key}\` to read ${key ? 'the answer' : 'the answers'}`]);
   });
 }
 
@@ -694,11 +749,12 @@ const skillInstalled = (dir: string, agent: string) => [join(dir, AGENTS[agent].
 const SKILL_ADD = ['-y', 'skills', 'add', 'umeranjum17/sign-off', '--skill', 'sign-off-axi', '-y', '-a'];
 const skillAdd = (agents: string[]) => `npx ${[...SKILL_ADD, ...agents].join(' ')}`;
 
-const GITIGNORE = 'mocks/\nevidence/\n*.answers.jsonl\n*.rounds.jsonl\n*.messages.jsonl\n*.board.pid\n*.board.log\n*.token\n*.export.html\n';
+const GITIGNORE = 'mocks/\nevidence/\n*.answers.jsonl\n*.rounds.jsonl\n*.messages.jsonl\n*.seen.jsonl\n*.board.pid\n*.board.log\n*.token\n*.export.html\n';
 /** The board, port, bind and hosts in <so>/config.yaml (the `key: value` lines init writes). A bad line falls back on its own default
  * (decisions.json, 4410) and `problems` says what is wrong; a file that cannot be read throws. */
 function readSetup(so: string) {
   const config: Record<string, string> = {}, problems: string[] = [], hosts: string[] = [];
+  let onAnswer: string[] = [];
   readFileSync(join(so, 'config.yaml'), 'utf8').split(/\r?\n/).forEach((l, n) => {
     const line = l.split('#')[0].trim(), kv = line.match(/^([A-Za-z]+)\s*:\s*(\S+)$/), key = line.match(/^(board|port|bind)(\s|:|$)/i);
     // hosts: private DNS names that reach the bind address (a mesh VPN name), let in besides it; commas or spaces between them.
@@ -708,6 +764,9 @@ function readSetup(so: string) {
       else problems.push(`hosts ${h} is not a DNS name`);
     }
     if (names) return;
+    // on_answer: a command and its arguments, split on spaces and run with no shell for each saved answer.
+    const hook = /^on_answer\s*:(.*)$/i.exec(line)?.[1];
+    if (hook !== undefined) return void (onAnswer = hook.split(/\s+/).filter(Boolean));
     if (kv && ['board', 'port', 'bind'].includes(kv[1].toLowerCase())) config[kv[1].toLowerCase()] = kv[2];
     else if (key) problems.push(`line ${n + 1} is not one "key: value"`);
   });
@@ -716,7 +775,7 @@ function readSetup(so: string) {
   if (!goodPort) problems.push(`port ${port} is not a number from 0 to 65535`);
   const bind = config.bind ?? '127.0.0.1';
   if (!privateBind(bind)) problems.push(`bind ${bind} is not 127.0.0.1 or a private address`);
-  return { board: join(so, goodBoard ? config.board : 'decisions.json'), port: goodPort ? Number(port) : 4410, bind, hosts, goodBoard, problems };
+  return { board: join(so, goodBoard ? config.board : 'decisions.json'), port: goodPort ? Number(port) : 4410, bind, hosts, onAnswer, goodBoard, problems };
 }
 /** --port, else the port in a config.yaml beside the board (init writes one), else 4410. */
 const boardPort = (named: string, given?: string) => portOf(given ?? String(setupOf(named)?.port ?? 4410));
@@ -904,12 +963,12 @@ async function doctor(args: string[]) {
     [`Run \`sign-off-axi open ${shellPath(board)}\` to show the board to the user`]);
 }
 
-let file = '', evidenceRoot = '', bind = '127.0.0.1', hosts: string[] = [];
+let file = '', evidenceRoot = '', bind = '127.0.0.1', hosts: string[] = [], onAnswer: string[] = [];
 async function serve(args: string[]) {
   const parsed = parse('serve', args, BOARD_FLAGS), port = boardPort(parsed.named, parsed.values.port);
   ready(parsed.file, parsed.on, parsed.values['evidence-root']);
   bind = bindOf(parsed.named, parsed.values.bind);
-  hosts = setupOf(parsed.named)?.hosts ?? [];
+  ({ hosts = [], onAnswer = [] } = setupOf(parsed.named) ?? {});
   // Checked and recorded under the board lock, so two serves started at once never both run with one record between them.
   const bound = await locked(`${parsed.file}.lock`, async () => {
     const live = await running(parsed.file);
@@ -993,16 +1052,21 @@ async function exportBoard(args: string[]) {
 
 const page = readFileSync(new URL('../web/index.html', import.meta.url));
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
-const state = () => ({
-  file,
-  mockBase: `/mock/${loopback(bind) ? 'local' : mockPass(tokenOf(file))}/`,
-  decisions: loadDecisions(file).map((d) => ({ ...d, evidenceCard: d.evidence ? evidenceCard(d.evidence) : null })),
-  readonly: readOnly(),
-  answers_only: answersOnly(),
-  answers: readAnswers(file, warn),
-  rounds: readRounds(file, warn),
-  messages: readMessages(file, warn),
-});
+const state = () => {
+  const answers = readAnswers(file, warn), taken = seenBy(file);
+  return {
+    file,
+    mockBase: `/mock/${loopback(bind) ? 'local' : mockPass(tokenOf(file))}/`,
+    // Who filed an item stays in the file: the page only learns that its filer took the answer.
+    decisions: loadDecisions(file).map(({ filer: _, ...d }) => ({ ...d, evidenceCard: d.evidence ? evidenceCard(d.evidence) : null })),
+    readonly: readOnly(),
+    answers_only: answersOnly(),
+    answers,
+    seen: Object.values(answers).filter(taken).map((a) => a.key),
+    rounds: readRounds(file, warn),
+    messages: readMessages(file, warn),
+  };
+};
 /** A board whose file says `"readonly": true` shows its items and takes no answers, rounds or comments: another program feeds it. */
 const readOnly = () => readItems(file).extra.readonly === true;
 /** A board whose file says `"answers_only": true` takes answers and replies but no rounds, comments or prompts: another program feeds it. */
@@ -1137,13 +1201,24 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   if (!d) {
     // The program feeding the board may drop an item while the person answers it: the answer is still saved.
     if (!answersOnly() || !isKey(key) || !isKey(answer)) return [404, { error: 'This question is no longer in the file' }];
-    appendAnswer(file, { key, close: 'done' } as Decision, answer === REPLY.value ? REPLY : { value: answer, label: answer }, note.trim());
+    answered(appendAnswer(file, { key, close: 'done' } as Decision, answer === REPLY.value ? REPLY : { value: answer, label: answer }, note.trim()));
     return [200, state()];
   }
   const option = d.reply && answer === REPLY.value ? REPLY : d.options.find((o) => o.value === answer);
   if (!option) return [400, { error: `The answer must be one of: ${[...d.options, ...(d.reply ? [REPLY] : [])].map((o) => o.label).join(', ') || 'none, this item is only shown'}` }];
-  appendAnswer(file, d, option, note.trim());
+  answered(appendAnswer(file, d, option, note.trim()), d);
   return [200, state()];
+}
+
+/** Runs the config's on_answer command for a saved answer, with no shell: the answer goes in as one JSON line on its stdin, never in its arguments. */
+function answered(a?: Answer, d?: Decision) {
+  if (!a || !onAnswer.length) return;
+  const [cmd, ...rest] = onAnswer;
+  const child = spawn(cmd, rest, { cwd: dirname(file), stdio: ['pipe', 'ignore', 'inherit'] });
+  child.on('error', (e) => warn(`on_answer ${cmd} did not run: ${e.message}`));
+  child.on('exit', (code, signal) => (code || signal) && warn(`on_answer ${cmd} exited with ${code ?? signal}`));
+  child.stdin.on('error', () => {});
+  child.stdin.end(`${JSON.stringify({ ...a, ...(d && { title: d.title }), ...(d?.filer && { filer: d.filer }) })}\n`);
 }
 
 const server = createServer(async (req, res) => {
