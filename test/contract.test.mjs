@@ -72,6 +72,16 @@ test('refusals: strict at every level, in contract order, with one fix line each
   assert.equal(validate(message('latin1.json', latin1)).out.files[0].help, 'Save the message as UTF-8');
 });
 
+test('a field name holding a newline is refused on one help line, shown escaped', () => {
+  const unknown = validate(message('newline-unknown.json', JSON.stringify({ ...ask, 'a\nb': 'x' })));
+  assert.equal(unknown.status, 2, unknown.raw);
+  assert.equal(unknown.out.files[0].help, 'Remove "a\\nb"; ask takes key, title, filer, link, about, detail, options, recommend_value, default_if_silent, close');
+  const repeated = validate(message('newline-twice.json', JSON.stringify(ask).slice(0, -1) + ',"a\\nb":1,"a\\nb":2}'));
+  assert.equal(repeated.status, 2, repeated.raw);
+  assert.equal(repeated.out.files[0].error, 'field "a\\nb" is written twice');
+  assert.equal(repeated.out.files[0].help, 'Remove the second "a\\nb".');
+});
+
 test('exit codes: --kind must match, an unreadable file wins over a refusal, no file is a usage error', () => {
   const good = message('ask.json', JSON.stringify(ask));
   const wrong = validate('--kind', 'gate', good);

@@ -28,7 +28,7 @@ export function parseMessage(bytes: Uint8Array): unknown {
       while (text[end] !== '"') end += text[end] === '\\' ? 2 : 1;
       const name: string = JSON.parse(text.slice(i, end + 1));
       if (top?.keys && top.name) {
-        if (top.keys.has(name)) throw new ContractError(`field "${name}" is written twice`, `Remove the second "${name}".`);
+        if (top.keys.has(name)) throw new ContractError(`field "${escaped(name)}" is written twice`, `Remove the second ${show(name)}.`);
         top.keys.add(name);
         top.name = false;
       }
@@ -43,6 +43,8 @@ export function parseMessage(bytes: Uint8Array): unknown {
 
 const whole = (v: unknown) => Number.isSafeInteger(v) && (v as number) >= 0;
 const show = (v: unknown) => JSON.stringify(v);
+/** A field name as it reads inside a sentence: escaped, so a newline or control character shows as \n or \u001b. */
+const escaped = (v: string) => show(v).slice(1, -1);
 
 /** Checks one message against its kind's rules and returns its kind and schema; the first broken rule throws, in the order docs/contract.md gives.
  * `want` is the kind the caller expects, so the wrong file is refused before its fields are read. */
@@ -70,7 +72,7 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
   if (!whole(m.schema)) throw bad('schema', `must be a whole number, not ${show(m.schema)}`, `Set "schema": ${SCHEMAS[m.kind]}`);
   if (m.schema !== SCHEMAS[m.kind]) throw bad('schema', `${m.schema} of ${m.kind} is not in this sign-off-axi`, `Upgrade sign-off-axi, or post ${m.kind} schema ${SCHEMAS[m.kind]}`);
   const extra = Object.keys(m).find((f) => !ASK.includes(f));
-  if (extra) throw bad(extra, `is not a field of ${m.kind} schema ${m.schema}`, `Remove "${extra}"; ${m.kind} takes ${ASK.slice(3).join(', ')}`);
+  if (extra) throw bad(escaped(extra), `is not a field of ${m.kind} schema ${m.schema}`, `Remove ${show(extra)}; ${m.kind} takes ${ASK.slice(3).join(', ')}`);
   if (!isKey(m.key)) throw bad('key', Object.hasOwn(m, 'key') ? `${show(m.key)} must be 1-128 of A-Z a-z 0-9 . _ -` : 'is required', 'Set "key" to a short id such as "ship-signin-2"');
   if (!Object.hasOwn(m, 'title')) throw bad('title', 'is required', 'Add "title": the question, in 160 characters or fewer');
   text('title', m.title, 160, 'the question, in 160 characters or fewer');
@@ -88,7 +90,7 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
     const field = `options[${n}]`;
     if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad(field, 'must be an object', 'Write each option as {"value":"<id>","label":"<text>"}');
     const odd = Object.keys(o).find((f) => f !== 'value' && f !== 'label');
-    if (odd) throw bad(`${field}.${odd}`, 'is not a field of an option', `Remove "${odd}"; an option has only value and label`);
+    if (odd) throw bad(`${field}.${escaped(odd)}`, 'is not a field of an option', `Remove ${show(odd)}; an option has only value and label`);
     if (!isKey(o.value)) throw bad(`${field}.value`, 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "value" to a short id such as "yes"');
     if (options.slice(0, n).some((p: any) => p.value === o.value)) throw bad(`${field}.value`, `repeats ${o.value}`, 'Give every option its own value');
     text(`${field}.label`, o.label, 80, 'the button text, in 80 characters or fewer');
