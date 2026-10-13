@@ -158,7 +158,7 @@ test('agent journey: raise, open, answer, read back in TOON and JSON', async () 
   assert.match(run('raise', '--title', 'Which tab first?', '--option', 'text=Text', '--option', 'code=Code', '--recommend', 'code').out, /which-tab-first,raised/);
   assert.equal((await post(url, { key: 'which-tab-first', answer: 'text' })).status, 200);
   assert.equal(JSON.parse(run('answers', '--key', 'which-tab-first', '--json').out)['which-tab-first'].label, 'Text');
-  // Listing options needs a recommendation, from flags or a file; a plain yes/no may leave it out, and a feed written with --replace is not held to it.
+  // Listing options needs a recommendation; a plain yes/no may leave it out. A new decision in a file must be a contract ask, which always names one.
   const unmarked = run('raise', '--title', 'When should it ship?', '--option', 'today=Today', '--option', 'friday=Friday');
   assert.equal(unmarked.code, 2);
   assert.match(unmarked.out, /--recommend is required when you list options[^]*Add --recommend <value>, the option you would pick: one of today, friday/);
@@ -166,8 +166,9 @@ test('agent journey: raise, open, answer, read back in TOON and JSON', async () 
   assert.equal(run('post', '--type', 'design', '--title', 'Pick one', '--option', 'a=A', '--option', 'b=B').code, 2);
   const listed = join(env.HOME, 'listed.json');
   writeFileSync(listed, JSON.stringify({ schema: 2, items: [{ key: 'pick', title: 'Pick?', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] }] }));
-  assert.match(run('raise', '--from', listed).out, /items\[0\] \(key pick\) lists options but no recommend_value[^]*Add \\"recommend_value/);
-  assert.match(run('post', join(env.HOME, 'fed.json'), '--from', listed, '--replace').out, /changed: true/);
+  for (const args of [['raise', '--from', listed], ['post', join(env.HOME, 'fed.json'), '--from', listed, '--replace']]) {
+    assert.match(run(...args).out, /listed\.json: items\[0\] key pick: kind is required on a new decision[^]*Add \\"contract\\": 1, \\"kind\\" and \\"schema\\"/);
+  }
   run('raise', '--title', 'Only toString?', '--key', 'toString');
   assert.match(run().out, /waiting\[1\]\{key,title\}:\n  toString,Only toString\?/);
   assert.match(run('help', 'raise').out, /raise \[board.json\] --title/);

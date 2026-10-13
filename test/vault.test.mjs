@@ -125,7 +125,7 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     assert.equal(JSON.parse(readFileSync(board)).items[0].key, 'ordinary');
     assert.equal((await run({ op: 'create', meta: meta('sequence') })).status, 'pending');
     assert.equal((await run({ op: 'refuse', board, key: 'sequence' })).status, 'refused');
-    writeFileSync(feed, JSON.stringify({ schema: 2, items: [{ key: 'raised', title: 'Raised' }] }));
+    writeFileSync(feed, JSON.stringify({ schema: 2, items: [{ contract: 1, kind: 'ask', schema: 1, key: 'raised', title: 'Raised', options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }], recommend_value: 'yes' }] }));
     assert.equal(spawnSync(process.execPath, [cli, 'post', board, '--from', feed], { env, encoding: 'utf8' }).status, 0);
     assert.equal((await run({ op: 'create', meta: meta('sequence') })).code, 'VALIDATION_ERROR');
     // Deadlines are private, validated before folder identity initialization, and never inferred for Receive.

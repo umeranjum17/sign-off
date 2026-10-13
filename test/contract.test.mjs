@@ -30,6 +30,11 @@ test('every shipped fixture: valid files pass, each invalid file is refused on t
     assert.ok(valid.length >= 2 && invalid.length >= 3, `${folder} has 2 valid and 3 invalid files`);
     const kind = folder.split('.')[0], ok = validate('--kind', kind, ...valid);
     assert.equal(ok.status, 0, ok.raw);
+    // The conformance pair: every valid file passes, and --expect-invalid passes only when every invalid file is refused.
+    assert.equal(validate('--expect-invalid', ...invalid).status, 0);
+    const missed = validate('--expect-invalid', ...invalid, valid[0]);
+    assert.equal(missed.status, 2);
+    assert.match(missed.raw, /make it break the one rule its name gives/);
     assert.ok(ok.out.files.every((f) => f.ok && f.kind === kind && `v${f.schema}` === folder.split('.')[1]));
     for (const file of invalid) {
       const { status, out: { files: [row] } } = validate(file);
@@ -201,4 +206,38 @@ test('a re-post of an answered ask beside a new report gets the read hint, never
   assert.equal(mixed.status, 0, mixed.stdout);
   assert.match(mixed.stdout, /so the user can read them/);
   assert.doesNotMatch(mixed.stdout, /so the user can answer/);
+});
+
+test('post --kind: one message from a file or stdin, checked against its kind, refused with the file named and one fix line', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const board = join(scratch, 'kind.json'), post = (input, ...args) => spawnSync('node', [cli, 'post', board, ...args], { encoding: 'utf8', env, input });
+  const file = message('ask.json', JSON.stringify(ask));
+  const posted = post('', '--kind', 'ask', '--from', file, '--filer', 'agent-41');
+  assert.equal(posted.status, 0, posted.stdout);
+  assert.match(posted.stdout, /ship-signin-2,raised,/);
+  const [item] = JSON.parse(readFileSync(board, 'utf8')).items;
+  assert.deepEqual([item.kind, item.schema, item.filer], ['ask', 1, 'agent-41']);
+  assert.match(post('', '--kind', 'ask', '--from', file).stdout, /ship-signin-2,already waiting,/);
+  // stdin, and every refusal: the file (or stdin) and the key in the error, one help line, exit 2, nothing written.
+  const read = post(JSON.stringify(report), '--kind', 'report', '--from', '-');
+  assert.equal(read.status, 0, read.stdout);
+  assert.match(read.stdout, /slice-5-live,raised,[^]*so the user can read it/);
+  const before = readFileSync(board, 'utf8');
+  for (const [input, args, error, help] of [
+    [JSON.stringify({ ...ask, recommend_value: undefined }), ['--kind', 'ask', '--from', '-'], /stdin: key ship-signin-2: recommend_value is required/, /Add \\"recommend_value\\"/],
+    ['', ['--kind', 'report', '--from', file], new RegExp(`${file}: key ship-signin-2: kind is ask, not --kind report`), /Pass --kind ask/],
+    [JSON.stringify({ ...ask, title: 'Ship it next week?' }), ['--kind', 'ask', '--from', '-'], /stdin: key ship-signin-2 already holds a different question/, /Post it under a new key/],
+    [JSON.stringify({ ...ask, key: 'k2', filer: 'agent-7' }), ['--kind', 'ask', '--from', '-', '--filer', 'agent-41'], /filer agent-7 is not --filer agent-41/, /Leave \\"filer\\" out/],
+    ['', ['--kind', 'ask', '--from', file, '--title', 'X'], /--kind cannot be combined with --title/, /Put every field in the message file/],
+  ]) {
+    const refused = post(input, ...args);
+    assert.equal(refused.status, 2, refused.stdout);
+    assert.match(refused.stdout, error);
+    assert.match(refused.stdout, help);
+    assert.match(refused.stdout, /help\[1\]/);
+  }
+  assert.equal(readFileSync(board, 'utf8'), before);
+  assert.equal(post('', '--kind', 'ask', '--from', join(scratch, 'missing.json')).status, 1);
 });

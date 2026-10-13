@@ -2,7 +2,7 @@
 
 sign-off owns this contract. Agents and tools use it to post asks, reports, evidence, gates and retro findings to the board, and to read the answers back. Every message has the same strict shape, so the person reading the board sees one kind of card per kind of message, whoever sent it.
 
-Status: v1 target, built in parts. Built: the `ask` and `report` kinds and `validate` without `--expect-invalid` (section 9), with their fixtures in the npm package; an item of a `raise --from` or `post --from` file that carries `contract` or `kind` is checked as a message before anything is stored, and a new item's title is held to 1-160. Not built yet: `evidence`, `gate` and `finding`, `post --kind` (`raise` and `post` otherwise still take the board format in [file-formats.md](file-formats.md), which ignores unknown keys), answer events and `schema`.
+Status: v1 target, built in parts. Built: the `ask` and `report` kinds; `validate`, with `--expect-invalid` (section 9), and their fixtures in the npm package; `post --kind`, from a file or stdin with `--from -`, where a key conflict exits 2; in a `raise --from` or `post --from` file, an item that carries `contract` or `kind` is checked as a message before anything is stored, a new item of a contract kind without `kind` is refused, and a new item's title is held to 1-160. Not built yet: `evidence`, `gate` and `finding`, answer events and `schema`. `raise --title` and `post --type decision` still post board-format items (they do not fill in `contract`, `kind` and `schema` yet), and their key conflicts still exit 1.
 
 ## 1. Versions
 
@@ -20,7 +20,7 @@ Board items stored before v1 have no `kind` or `schema`. They read exactly as to
 
 Every new post of a contract kind is checked against that kind's v1 rules from the change that adds that kind. `raise`, and `post --type decision`, which is the same thing, post an `ask`: they fill in `contract`, `kind` and `schema` themselves, then check the item. `post --type evidence` posts an `evidence` the same way. `raise` stamps `filed` itself where a kind needs it.
 
-Non-contract types stay outside this contract. `raise --title` and `post --type design|diagram|interactive|explainer` keep the board rules in [file-formats.md](file-formats.md). In a `--from` file, a new item of a contract kind with no `kind` is refused with a fix line to add `contract`, `kind` and `schema`.
+Non-contract types stay outside this contract. `raise --title` and `post --type design|diagram|interactive|explainer` keep the board rules in [file-formats.md](file-formats.md). In a `--from` file, a new item of a contract kind with no `kind` is refused with a fix line to add `contract`, `kind` and `schema`, in a `--replace` feed too. A contract kind there is an item with no `type`, or `type` `decision` or `ask` (both an `ask`), `evidence` or `report`. An item already on the board under that key is not new, so a feed keeps sending it as it is.
 
 ## 3. How a message gets in
 
@@ -155,7 +155,7 @@ To recover: read the `help` line, fix the message file, post it again. Never edi
 
 - `sign-off-axi validate <file.json>... [--kind <kind>]` checks message files without posting them. `--kind`, when given, must equal each file's `kind`. It prints `files[n]{file,kind,schema,ok,error,help}`.
 - Exit codes: 0 when all pass; 1 when any file cannot be read, which wins over a refusal; 2 when any is refused, or no file is named.
-- `sign-off-axi validate --expect-invalid <file.json>...` exits 0 only when every file is refused, and 1 when one cannot be read. Conformance uses it. Not built yet; see section 10.
+- `sign-off-axi validate --expect-invalid <file.json>...` exits 0 only when every file is refused, 2 when any passes, and 1 when one cannot be read. Conformance uses it (section 10).
 - `sign-off-axi schema <kind>` prints that kind's JSON Schema (draft 2020-12). With no kind it lists the kinds and their schema numbers. The schema is generated from the validator, so the package has no separate schema files. The printed JSON Schema leaves out cross-field rules (`recommend_value` among the options, unique values, `media` or `run`, `--kind` matching, media files).
 
 ## 10. Conformance
@@ -168,7 +168,7 @@ npx sign-off-axi validate node_modules/sign-off-axi/fixtures/contract/*/valid-*.
 npx sign-off-axi validate --expect-invalid node_modules/sign-off-axi/fixtures/contract/*/invalid-*.json
 ```
 
-`--expect-invalid` is not built yet (build-plan row 6), so until then the second command exits 2. Both must exit 0 once it is built: the first only when every valid file is accepted, the second only when every invalid file is refused.
+Both must exit 0: the first only when every valid file is accepted, the second only when every invalid file is refused.
 
 Each producer's own tests also write one real message per kind it sends, to a temp file, and run `validate` on it.
 
