@@ -267,6 +267,28 @@ export const appendMessage = (decisionsPath: string, kind: Message['kind'], text
   appendLine(messagesPath(decisionsPath), { id: randomBytes(6).toString('hex'), kind, ...(key && { key }), text, at: now() } satisfies Message);
 export const markDelivered = (decisionsPath: string, ids: string[]) => appendLine(messagesPath(decisionsPath), { delivered: ids, at: now() });
 
+/** A comment on one element of a design mock, not sent yet: `hash` is the mock file it was made on, `ref`, `tag` and `words` name the element. */
+export type Annotation = { id: string; key: string; mock: string; hash: string; ref: string; tag: string; words: string; text: string; at: string };
+export const annotationsPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.annotations.jsonl';
+/** Live comments, oldest first: an edit is a later line with the same id, and a `{"id", "deleted": true}` line removes one. A torn line is skipped and reported through warn. */
+export function readAnnotations(decisionsPath: string, warn: (msg: string) => void = () => {}): Annotation[] {
+  const all = new Map<string, Annotation>();
+  readRaw(annotationsPath(decisionsPath)).split('\n').forEach((line, n) => {
+    try {
+      const a = line && JSON.parse(line);
+      if (a?.deleted === true) all.delete(a.id);
+      else if (a && ['id', 'key', 'mock', 'hash', 'ref', 'tag', 'words', 'text'].every((k) => typeof a[k] === 'string')) all.set(a.id, a);
+      else if (a) warn(`skipped unreadable line ${n + 1} in ${annotationsPath(decisionsPath)}`);
+    } catch {
+      warn(`skipped unreadable line ${n + 1} in ${annotationsPath(decisionsPath)}`);
+    }
+  });
+  return [...all.values()];
+}
+/** Saves a comment (a new id unless it edits one) or, with only an id, deletes it. */
+export const appendAnnotation = (decisionsPath: string, a: Omit<Annotation, 'id' | 'at'> & { id?: string } | { id: string; deleted: true }) =>
+  appendLine(annotationsPath(decisionsPath), { ...a, id: a.id ?? randomBytes(6).toString('hex'), at: now() });
+
 const now = () => new Date().toISOString().slice(0, 19) + 'Z';
 /** Appends one JSON line, starting a new line after a torn fragment. */
 function appendLine(file: string, entry: object) {
