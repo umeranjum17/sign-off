@@ -1005,14 +1005,12 @@ async function serve(args: string[]) {
     writeFileSync(record(file), `${process.pid} ${bound} ${bind}\n`, { mode: 0o600 });
     return bound;
   }, 'another serve is still starting this board');
-  let closed = false, timer: NodeJS.Timeout;
   const repeat = async () => {
-    if (closed) return;
+    if (!server.listening) return;
     await sweep('periodic');
-    if (!closed) timer = setTimeout(repeat, 5_000).unref();
+    if (server.listening) setTimeout(repeat, 5_000).unref();
   };
-  server.once('close', () => { closed = true; clearTimeout(timer); });
-  timer = setTimeout(repeat, 5_000).unref();
+  setTimeout(repeat, 5_000).unref();
   const url = `http://${urlHost(bind)}:${bound}/`;
   process.on('exit', () => { if (existsSync(record(file)) && readFileSync(record(file), 'utf8').split(' ')[0] === String(process.pid)) rmSync(record(file), { force: true }); });
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(0));
