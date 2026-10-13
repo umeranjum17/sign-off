@@ -91,6 +91,8 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     assert.equal(existsSync(join(interruptedDir, 'key')), false);
     env.XDG_STATE_HOME = state;
     for (const value of ['', 'x'.repeat(16_385)]) assert.equal((await run({ op: 'create', meta: meta('bad', 'receive'), value })).exit, 1);
+    const aliasDir = join(home, 'alias'); symlinkSync(join(home, 'project'), aliasDir);
+    assert.equal((await run({ op: 'create', meta: { ...meta('give'), board: join(aliasDir, 'board.json') } })).code, 'VALIDATION_ERROR');
     writeFileSync(board, JSON.stringify({ schema: 2, items: [{ key: 'ordinary', title: 'Umer: continue?' }] }));
     for (const args of [['post', board, '--type', 'vault', '--title', 'Give'], ['post', board, '--from', '-']]) {
       const r = spawnSync(process.execPath, [cli, ...args], { env, encoding: 'utf8' }); outputs.push(r.stdout, r.stderr); assert.notEqual(r.status, 0);

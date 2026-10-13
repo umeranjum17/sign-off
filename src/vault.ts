@@ -1,6 +1,6 @@
 // Internal custody foundation only. No CLI/browser route imports this until all vault gates are proved.
-import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, isAbsolute, join, parse, resolve } from 'node:path';
+import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, parse, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { createCipheriv, createHash, randomBytes } from 'node:crypto';
 import { isKey } from './store.js';
@@ -23,11 +23,16 @@ export class VaultError extends Error {
 function bad(code: keyof typeof errors): never { throw new VaultError(code); }
 const digest = (board: string, key: string) => createHash('sha256').update(JSON.stringify([board, key])).digest('hex');
 const aad = (meta: VaultMeta) => Buffer.from(JSON.stringify([1, meta.board, meta.key, meta.mode, meta.expires, meta.destination ?? null, meta.filer]));
+function boardPath(board: string) {
+  const p = resolve(board);
+  try { return realpathSync(p); }
+  catch { try { return join(realpathSync(dirname(p)), basename(p)); } catch { bad('VALIDATION_ERROR'); } }
+}
 
 function metadata(m: VaultMeta): VaultMeta {
   if (!m || typeof m.board !== 'string' || !isAbsolute(m.board) || !isKey(m.key) || !isKey(m.filer) || !['give', 'receive'].includes(m.mode)
     || !Number.isSafeInteger(m.expires) || (m.mode === 'give' ? typeof m.destination !== 'string' || !isAbsolute(m.destination) : m.destination !== undefined)) bad('VALIDATION_ERROR');
-  return { board: resolve(m.board), key: m.key, mode: m.mode, filer: m.filer, expires: m.expires,
+  return { board: boardPath(m.board), key: m.key, mode: m.mode, filer: m.filer, expires: m.expires,
     ...(m.destination !== undefined && { destination: resolve(m.destination) }) };
 }
 function privateFile(path: string) {
@@ -88,8 +93,8 @@ async function operate<T>(board: string, key: string, fn: (dir: string, path: st
   if (typeof board !== 'string' || !isAbsolute(board) || !isKey(key)) bad('VALIDATION_ERROR');
   let lock: string | undefined;
   try {
-    const dir = root(), path = join(dir, `${digest(resolve(board), key)}.json`), candidate = join(dir, 'lock');
-    if (dir === dirname(resolve(board)) || dir.startsWith(dirname(resolve(board)) + '/')) bad('VAULT_KEY_UNAVAILABLE');
+    const canonical = boardPath(board), dir = root(), path = join(dir, `${digest(canonical, key)}.json`), candidate = join(dir, 'lock');
+    if (dir === dirname(canonical) || dir.startsWith(dirname(canonical) + '/')) bad('VAULT_KEY_UNAVAILABLE');
     // ponytail: one global lock; split by board only if custody throughput requires it. Stale locks fail closed.
     for (let tries = 0; ; tries++) {
       try { const fd = openSync(candidate, 'wx', 0o600); closeSync(fd); lock = candidate; break; }
@@ -105,7 +110,7 @@ async function operate<T>(board: string, key: string, fn: (dir: string, path: st
     if (lstatSync(path, { throwIfNoEntry: false })) {
       privateFile(path);
       record = JSON.parse(readFileSync(path, 'utf8'));
-      if (!record || record.schema !== 1 || record.meta.board !== resolve(board) || record.meta.key !== key
+      if (!record || record.schema !== 1 || record.meta.board !== canonical || record.meta.key !== key
         || JSON.stringify(metadata(record.meta)) !== JSON.stringify(record.meta) || !['pending', 'ready', 'expired', 'refused'].includes(record.status)) bad('VALIDATION_ERROR');
       if (['pending', 'ready'].includes(record.status) && record.meta.expires <= Date.now()) {
         record = { schema: 1, meta: record.meta, status: 'expired', at: Date.now() };
@@ -114,7 +119,7 @@ async function operate<T>(board: string, key: string, fn: (dir: string, path: st
     }
     return fn(dir, path, record);
   } catch (e) { throw e instanceof VaultError ? e : new VaultError('BUSY'); }
-  finally { if (lock) { try { rmSync(lock, { force: true }); } catch { bad('BUSY'); } } }
+  finally { if (lock) { try { rmSync(lock, { force: true }); } catch { /* a stale lock already fails closed */ } } }
 }
 const summary = (r: Record) => ({ ...r.meta, status: r.status, at: r.at });
 const active = (r?: Record) => {
@@ -130,7 +135,7 @@ export async function createVault(input: VaultMeta, value?: Buffer) {
   return operate(meta.board, meta.key, (dir, path, old) => {
     if (old) bad('VALIDATION_ERROR'); // Terminal keys are tombstones, never reusable.
     if (meta.expires <= Date.now()) bad('EXPIRED');
-    if (!value) master(dir).fill(0);
+    if (!value) master(dir);
     const record: Record = { schema: 1, meta, status: value ? 'ready' : 'pending', at: Date.now(), ...(value && { sealed: seal(dir, meta, value) }) };
     persist(path, record);
     return summary(record);
