@@ -546,11 +546,17 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   assert.deepEqual(cards(waiting).map(([key]) => key), ['ship']);
   assert.match(waiting, /1 of 2/);
   assert.equal(waiting.match(/<ol class="queue"[^>]*>.*?<\/ol>/s)[0].match(/<button/g).length, 2);
-  assert.match(waiting, />Skip for now</);
+  // Under the ask, Skip for now and Dismiss sit side by side; the ask has no × of its own.
+  assert.match(waiting, /<div class="quiet"><button class="skip">Skip for now<\/button><button class="dis" aria-label="Dismiss, When should it ship\?">Dismiss<\/button><\/div>/);
+  assert.doesNotMatch(waiting.match(/<div class="focus">.*?<\/article>/s)[0], /class="x"/);
   // Needs you first ends with Dismiss on the left and the way to Triage on the right; its card has no × of its own.
   const home = await dump('');
   assert.match(home, /<div class="foot"><button class="dis" aria-label="Dismiss, When should it ship\?">Dismiss<\/button><a class="more" href="#waiting">Answer all 2 in Triage →<\/a><\/div>/);
   assert.doesNotMatch(home.match(/<section class="card needs.*?<\/section>/s)[0], /class="x"/);
+  // Summary has the person's mark beside its title, and the Waiting on you tile one clock.
+  assert.match(home, /<h1 tabindex="-1">Summary<\/h1><span class="icon i-you" aria-hidden="true">/);
+  const vis = (dom, a) => dom.match(new RegExp(`<a class="tile i-${a}".*?<span class="vis" aria-hidden="true">(.*?)<\\/span><span class="detail"`, 's'))[1];
+  assert.deepEqual(vis(home, 'waiting').match(/class="icon i-\w+"/g), ['class="icon i-waiting"']);
   // An ask dismissed from Waiting on you sits under Dismissed (1) at the end of Needs you first and of Triage, with Restore.
   const gone = file.replace(/\.json$/, '.dismissed.jsonl');
   writeFileSync(gone, JSON.stringify({ key: 'ship', dismissed: true, at: new Date().toISOString() }) + '\n');
@@ -575,6 +581,9 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   assert.match(reports, /How it ships<\/h3><span class="st new">New today<\/span>.*<span class="lbl">What it decided<\/span>Ships only when the check passes\./s);
   // Answered is Done today: a count under the title, Clear all done on the section head, and a short row per item with its answer and time on the right, beside its ×.
   writeFileSync(file.replace(/\.json$/, '.answers.jsonl'), ['ship', 'look'].map((key) => JSON.stringify({ key, answer: 'a', label: 'A', close: 'done', at: new Date().toISOString() })).join('\n') + '\n');
+  // Once both are answered, the Answered tile has a check for each and Waiting on you no clock.
+  const after = await dump('');
+  assert.deepEqual([vis(after, 'answered').match(/class="icon i-\w+"/g), vis(after, 'waiting')], [['class="icon i-answered"', 'class="icon i-answered"'], '']);
   const answered = await dump('#answered');
   assert.match(answered, /<p class="lede">2 answered today\.<\/p><\/header><div class="sec-head"><h2>Done today<\/h2><button class="clear">Clear all done<\/button><\/div>/);
   const lines = [...answered.matchAll(/<summary class="compact">.*?<strong[^>]*>(.*?)<\/strong>.*?<span class="ans"><b[^>]*>(\w+)<\/b><time>\d\d:\d\d<\/time><\/span><\/summary>.*?<\/details><button class="x" aria-label="Dismiss, [^"]+">×<\/button>/gs)];
