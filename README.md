@@ -136,7 +136,7 @@ sign-off-axi stop                               stop that board
 sign-off-axi serve [--port 4410] [--bind <address>] [--evidence-root <dir>]   run the board in the foreground (--port 0 picks a free port)
 sign-off-axi answers [--key <key>]              the latest answer per decision, and how many still wait
 sign-off-axi wait [--filer <id>] [--key <key>] [--timeout 600]  block until the user answers, then print it like answers
-                                                (--filer: only answers to that filer's items, each once)
+                                                (--filer: only that filer's items; without --key each answer once)
 sign-off-axi poll [--timeout 600]               block until the user comments or queues a prompt, then print each new one once
 sign-off-axi export [--out <file.html>]          write a frozen read-only copy of the board as one HTML file
 ```

@@ -678,6 +678,10 @@ test('an answers-only board fed through post --replace: a bad item is refused, y
   assert.equal(scoped([]).code, 0);
   assert.deepEqual(keys(), [['fm-test-1', ''], ['theirs', 'other']]);
   assert.match(readFileSync(join(dir, 'board.answers.jsonl'), 'utf8'), /"note":"ready"/);
+  // ask-2 is gone but its answer stays: a new question under that key would inherit it, so it is refused.
+  const reused = run('raise', file, '--key', 'ask-2', '--title', 'Something else?');
+  assert.equal(reused.code, 1);
+  assert.match(reused.out, /key ask-2 already has a saved answer/);
   proc.kill();
 });
 

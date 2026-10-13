@@ -563,9 +563,11 @@ function buildIncoming(values: Record<string, any>, extra: object = {}, filer?: 
 function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: Decision[]; raw: object[] }, filer?: string) {
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
-    const current = board(file), items = existsSync(file) ? readItems(file).items : [];
+    const current = board(file), items = existsSync(file) ? readItems(file).items : [], saved = readAnswers(file);
     const raised = incoming.map((d, i) => {
       const had = current.find((c) => c.key === d.key);
+      // An answer outlives its item: a new question under that key would inherit it.
+      if (!had && Object.hasOwn(saved, d.key)) throw fail(`key ${d.key} already has a saved answer on ${tilde(file)} from an item no longer there`, 'CONFLICT', 'Raise it under a new --key');
       // The same question from another filer is the same question: it keeps its first filer.
       const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, filer: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
       if (had && same(had) !== same(d)) {
