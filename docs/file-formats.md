@@ -263,7 +263,8 @@ again until the filer takes it too.
 Each names its item's `key`, the option's `mock`, the sha256 `hash` of that mock file when the comment was saved,
 and the element as `ref`, `tag` and `words` (see the pointing script above). A later line with the same `id` edits it,
 and a `deleted` line removes it. A save sends the `hash` the page showed; when the file has changed since, the server answers 409 and nothing is written. An edit sends the `id` of its comment; when that comment is no longer live, the server answers 404 and writes nothing. The board shows a comment only while its mock file still has that hash,
-and under the list it counts the comments on an earlier version of each mock as hidden:
+and under the list it counts the comments on an earlier version of each mock as hidden.
+A read-only or answers-only board returns none of them from its state, so its page shows none:
 
 ```json
 {"key":"sign-in-layout","mock":"a","hash":"1ca1060e…","ref":"#sign-in > button:nth-of-type(1)","tag":"button","words":"Sign in","text":"Make it green.","id":"b61d84c0f9b3","at":"2026-10-13T21:50:02Z"}
