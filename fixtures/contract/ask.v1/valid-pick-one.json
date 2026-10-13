@@ -1,0 +1,16 @@
+{
+  "contract": 1,
+  "kind": "ask",
+  "schema": 1,
+  "key": "release-day",
+  "title": "When should the sign-in screen ship?",
+  "link": "https://example.com/pull/41",
+  "detail": "Umer asked for a date before the weekly demo.\nFriday leaves a day for fixes.",
+  "options": [
+    { "value": "today", "label": "Today" },
+    { "value": "friday", "label": "Friday" },
+    { "value": "next-week", "label": "Next week" }
+  ],
+  "recommend_value": "friday",
+  "close": "release"
+}

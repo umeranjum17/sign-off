@@ -23,6 +23,6 @@ Run every step as `"${FRESH[@]}" bash -c 'cd "$SCR" && npx -y ./sign-off-axi-<ve
 | 5 | Desktop light (`1440x900x1`): open the URL, wait for the title, shot; click `button "Yes, Umer: keep`, poll `answers --json`; reload in dark, shot | The answer saves within the time limit; Yes is pressed in both themes |
 | 6 | `answers`, `answers --json`, `answers --full` | TOON row `<key>,yes,<at>` with `waiting: 0`; JSON `{"<key>":{"answer":"yes",...}}`; `--full` adds label, close and title |
 | 7 | `list --stat`; `raise --title x --recommend maybe`; the step 3 title with no `--recommend` | Exit 2, 2 and 1, each with `error:`, `code:` and `help:` on stdout and no stack trace |
-| 8 | `tar tzf` the tarball; `kill <pid>` from step 4 | Only `package.json`, `LICENSE`, `README.md`, `dist/` and `web/`; the board stops |
+| 8 | `tar tzf` the tarball; `kill <pid>` from step 4 | Only `package.json`, `LICENSE`, `README.md`, `dist/`, `web/` and `fixtures/contract/`; the board stops |
 
 Extreme case `npm test` also covers: 20 agents raising at once keep all 20 decisions (the board takes a lock file while it writes).

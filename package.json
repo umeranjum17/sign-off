@@ -4,7 +4,7 @@
   "description": "One review board for evidence, quick yes/no decisions and retro changes.",
   "type": "module",
   "bin": { "sign-off-axi": "dist/cli.js" },
-  "files": ["dist", "!dist/skill.js", "web"],
+  "files": ["dist", "!dist/skill.js", "web", "fixtures/contract"],
   "engines": { "node": ">=22.5" },
   "license": "MIT",
   "repository": { "type": "git", "url": "git+https://github.com/umeranjum17/sign-off.git" },
