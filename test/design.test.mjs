@@ -461,7 +461,7 @@ const hostStatus = (url, host) => new Promise((ok, no) => get(url, { agent: fals
 // A real browser draws the board for the frame tests: CI's runner has Chrome; elsewhere they skip when none is on the PATH.
 const chrome = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'].flatMap((b) => process.env.PATH.split(':').map((d) => join(d, b))).find(existsSync);
 
-test('an interactive page that posts its height gets a frame that fits it, each frame only its own and never past 10000px', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('an interactive page that posts its height gets a frame that fits it, each frame only its own and never past 10000px; a design shows the recommended phone frame first', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'fit'), file = join(dir, 'board.json'), pages = join(dir, 'mocks', 'page');
   mkdirSync(pages, { recursive: true });
   const says = (h) => `<p>page</p><script>parent.postMessage({ height: ${h} }, '*')</script>`;
@@ -469,7 +469,9 @@ test('an interactive page that posts its height gets a frame that fits it, each 
   writeFileSync(join(pages, 'huge.html'), says(99999));
   writeFileSync(join(pages, 'quiet.html'), '<p>no height</p>');
   const item = (key) => ({ key, type: 'interactive', title: key, view: `mocks/page/${key}.html` });
-  writeFileSync(file, JSON.stringify({ schema: 2, readonly: true, items: ['short', 'huge', 'quiet'].map(item) }));
+  const look = { key: 'look', type: 'design', title: 'look', options: ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l })), recommend_value: 'b',
+    mocks: ['a', 'b', 'c'].map((value) => ({ value, path: 'mocks/page/quiet.html' })) };
+  writeFileSync(file, JSON.stringify({ schema: 2, readonly: true, items: [...['short', 'huge', 'quiet'].map(item), look] }));
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
@@ -479,6 +481,11 @@ test('an interactive page that posts its height gets a frame that fits it, each 
   assert.match(frame('short'), /style="height: 240px;"/);
   assert.match(frame('huge'), /style="height: 10000px;"/);
   assert.doesNotMatch(frame('quiet'), /style=/);
+  // Each option is a figure: its label (and the badge) above its frame; the recommended one first, the rest in their order.
+  const figures = [...dom.matchAll(/<figure class="mock">(.*?)<\/figure>/g)].map((m) => m[1]);
+  assert.deepEqual(figures.map((f) => /class="label"[^>]*>(\w)</.exec(f)[1]), ['B', 'A', 'C']);
+  assert.ok(figures.every((f) => f.indexOf('<figcaption') < f.indexOf('class="shot"')), figures[0]);
+  assert.match(figures[0], /Recommended/);
   proc.kill();
 });
 

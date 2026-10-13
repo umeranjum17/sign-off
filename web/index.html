@@ -116,16 +116,18 @@
   .chip { flex: none; margin-top: 0.2rem; padding: 0 0.5rem; border: 1px solid var(--line); border-radius: 999px; color: var(--muted);
     font-size: 0.6875rem; font-weight: 600; line-height: 1.25rem; letter-spacing: 0.04em; text-transform: uppercase; }
   .chip.seen { display: inline-block; margin-top: 0.375rem; color: var(--accent); border-color: currentColor; }
-  .mocks { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 0.75rem; }
-  .mock { display: flex; flex-direction: column; margin: 0; border: 1px solid var(--line); border-radius: 0.7rem; overflow: hidden; background: var(--bg); min-width: 0; }
-  .mock:has([aria-pressed="true"]) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-  /* A preview draws the mock at twice the card width at half size, cropped from the top, so every card is the same height. */
-  .shot { position: relative; display: block; overflow: hidden; height: 11rem; background: #fff; border-bottom: 1px solid var(--line); }
-  .shot iframe { position: absolute; inset: 0 auto auto 0; width: 200%; height: 200%; border: 0; transform: scale(0.5); transform-origin: 0 0; pointer-events: none; }
+  /* Each option is a tall phone frame, side by side; on a phone the row swipes, one frame at a time, and the next one peeks in. */
+  .mocks { --tall: min(68svh, 42rem); display: grid; grid-auto-flow: column; grid-auto-columns: min(85%, calc(var(--tall) * 9 / 19.5)); justify-content: start;
+    gap: 0.875rem; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; padding: 1px 1px 0.375rem; }
+  .mock { display: flex; flex-direction: column; gap: 0.5rem; margin: 0; min-width: 0; scroll-snap-align: start; }
+  .mock:has([aria-pressed="true"]) .shot { border-color: var(--accent); }
+  /* A frame draws the mock at about phone width (1.7 times the frame) at that fraction, cropped from the top. */
+  .shot { position: relative; display: block; overflow: hidden; aspect-ratio: 9 / 19.5; background: #fff;
+    border: 0.375rem solid #1F1B16; border-radius: 1.75rem; box-shadow: 0 0 0 1px var(--border); }
+  .shot iframe { position: absolute; inset: 0 auto auto 0; width: 170%; height: 170%; border: 0; transform: scale(calc(1 / 1.7)); transform-origin: 0 0; pointer-events: none; }
   .shot img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
-  .mock figcaption { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-top: auto; padding: 0.625rem 0.75rem 0.75rem; font-size: 0.875rem; }
+  .mock figcaption { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; min-height: 1.75rem; font-size: 0.875rem; }
   .mock figcaption .label { flex: 1 1 6rem; font-weight: 500; }
-  .mock figcaption button { flex: 1 0 100%; }
   /* Ladder rungs: a diagram at card width, an interactive page in a sandboxed frame; a white page so drawings read in dark mode. */
   .rung { grid-column: 1 / -1; display: grid; gap: 0.25rem; justify-items: start; }
   .rung .frame { display: block; width: 100%; border: 1px solid var(--line); border-radius: 0.625rem; overflow: hidden; background: #fff; }
@@ -148,6 +150,8 @@
     .bar, main { padding: 0 2rem; }
     .row { grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 0.875rem 2rem; padding: 1.125rem 1.25rem; }
     .row.design { grid-template-columns: minmax(0, 1fr); gap: 0.875rem; }
+    /* Wide enough for every frame side by side: they share the width, and only a long list scrolls. */
+    .mocks { grid-auto-columns: minmax(11rem, calc(var(--tall) * 9 / 19.5)); }
     .rung iframe { height: min(32rem, 75vh); }
     /* A picture card stacks like a design card: the picture, then its buttons at their own width. */
     .row:has(> .rung) { grid-template-columns: minmax(0, 1fr); gap: 0.875rem; }
@@ -434,19 +438,19 @@
     return el('div', { class: 'rung' }, body, el('a', { class: 'meta', ...open, 'aria-label': `Open the ${name} full size, ${d.title}` }, 'Open full size'));
   }
 
-  /** One card per option: the mock preview (tap opens it full size), its label, the Recommended badge and its Pick button. */
+  /** One phone frame per option, the recommended one first: its label and Recommended badge, the mock (tap opens it full size) and its Pick button. */
   function mockCards(d, buttons) {
-    return el('div', { class: 'mocks', role: 'group', 'aria-label': d.title }, ...d.options.map((o, i) => {
-      const m = d.mocks?.find((x) => x.value === o.value);
+    const rec = (i) => d.options[i].value === d.recommend_value, order = d.options.map((_, i) => i).sort((a, b) => rec(b) - rec(a));
+    return el('div', { class: 'mocks', role: 'group', 'aria-label': d.title }, ...order.map((i) => {
+      const o = d.options[i], m = d.mocks?.find((x) => x.value === o.value);
       // A `page.html?variant=b` mock keeps its variant in the frame's query, where the page reads it.
       const [path, query] = m?.path.split('?') ?? [];
       const url = m && src(mockUrl(d.key, m.value, path) + (query ? `?${query}` : ''));
       const view = m && (/\.html?$/i.test(path) ? el('iframe', { src: url, title: `Mock ${o.label}`, sandbox: 'allow-scripts', tabindex: '-1', 'aria-hidden': 'true', loading: 'lazy' })
         : el('img', { src: url, alt: `Mock: ${o.label}` }));
       return el('figure', { class: 'mock' },
-        m ? el('a', { class: 'shot', href: url, target: '_blank', rel: 'noopener', 'aria-label': `Open mock ${o.label} full size` }, view) : '',
-        el('figcaption', {}, el('span', { class: 'label', dir: 'auto' }, o.label),
-          o.value === d.recommend_value ? el('span', { class: 'badge' }, 'Recommended') : '', buttons[i] ?? ''));
+        el('figcaption', {}, el('span', { class: 'label', dir: 'auto' }, o.label), rec(i) ? el('span', { class: 'badge' }, 'Recommended') : ''),
+        m ? el('a', { class: 'shot', href: url, target: '_blank', rel: 'noopener', 'aria-label': `Open mock ${o.label} full size` }, view) : '', buttons[i] ?? '');
     }));
   }
 

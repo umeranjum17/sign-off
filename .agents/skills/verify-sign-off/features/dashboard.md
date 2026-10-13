@@ -1,14 +1,14 @@
 # Dashboard
 
-Covers the one list in `web/index.html`: every item type on one page, newest first with waiting items on top, a type chip on each row, design items led by their mock cards, and the plain card for a type that has no view yet. Follow Launch and Drive in `SKILL.md` first, with a board from `init` in the scratch folder.
+Covers the one list in `web/index.html`: every item type on one page, newest first with waiting items on top, a type chip on each row, design items led by their options as tall phone frames, and the plain card for a type that has no view yet. Follow Launch and Drive in `SKILL.md` first, with a board from `init` in the scratch folder.
 
 Build the board oldest first: `raise` a yes/no decision, `raise` a three-option decision, `raise --from` a file holding one `"type": "report"` item, `post --type design` with three options, mocks `a=mocks/a.html`, `b=mocks/b.html`, `c=mocks/c.png` (real layouts, not one heading), a long `--tradeoff` and `--recommend b`, then `post --type evidence` one update with a real screenshot as `--media`. Answer the three-option decision through `POST /api/answers`. `FIT` below is
-`[...document.querySelectorAll('body *')].every(e => e.closest('.shot') || e.getBoundingClientRect().right <= innerWidth + 0.5) && document.documentElement.scrollWidth <= innerWidth`.
+`[...document.querySelectorAll('body *')].every(e => e.closest('.mocks') || e.getBoundingClientRect().right <= innerWidth + 0.5) && document.documentElement.scrollWidth <= innerWidth`.
 
 | # | Step | Pass when |
 |---|---|---|
 | 1 | Phone (the emulator; when the host has no emulator room, `390x844x3,mobile,touch`) and desktop `1440x900x1`, light and dark, wait `4 waiting`, full-page shots | `FIT` is true; header reads `Dashboard`; Waiting lists Update 1, design, report, decision in that order (newest first), Answered holds the three-option decision; each row has its type chip; the evidence row shows its capture and verdict buttons; the report row is a plain card with its buttons, no error |
-| 2 | Same page, the design row | The three mock cards come right after the title and the trade-off text; each card has its own label, `Pick` button, and B the `Recommended` badge; previews are cropped to the same height with no blank band; the note, comment and round controls are one closed `Note, comment or another round` |
+| 2 | Same page, the design row | The three options come right after the title and the trade-off text as tall phone frames of the same size, B first: each has its label (and B the `Recommended` badge) above its frame and its own `Pick` button below. On the phone a frame is about two-thirds of the screen high and the next one peeks in at the right edge; at desktop all three sit side by side with no scrollbar; the note, comment and round controls are one closed `Note, comment or another round` |
 | 3 | Read the trade-off line | It shows the full text, wrapped inside the screen, with no ellipsis and nothing to open |
 | 4 | Click `link "Open mock A: … full size"`, then `pages` | A new tab holds `/mock/local/<key>~a/<file>`; close it and select the dashboard tab again |
 | 5 | Phone dark: start `wait --key <design key>`, open `Note, comment or another round, <title>`, fill the note box, click `Ask for another round, <title>` | `wait` exits 0 with the note in its `rounds`; the summary shows `1 round asked` |
