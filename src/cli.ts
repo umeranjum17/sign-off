@@ -10,7 +10,7 @@ import { basename, delimiter, dirname, extname, join, resolve, sep } from 'node:
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { type Answer, CHAPTERS_MAX, type Decision, InputError, MEDIA_MAX, NOTE_MAX, REPLY, answersPath, appendAnswer, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnswers, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, writeItems } from './store.js';
+import { type Answer, CHAPTERS_MAX, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnswer, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnswers, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, writeItems } from './store.js';
 
 const BOARD = join(homedir(), '.sign-off', 'decisions.json');
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
@@ -59,6 +59,8 @@ examples:
 Adds questions to the board: yes/no, or 2 to 6 choices with one --option each. --key defaults to a slug of the title.
 raise is the alias for post --type decision: same flags, same output.
 --recommend and --default name a value (yes or no without --option). --default is what happens if the user stays silent; it is shown, never applied.
+--recommend is required when you list --option (or "options" in a --from file): the board shows that option first and marks it.
+A plain yes/no may leave it out; then nothing is marked. The user answers with one tap and can undo it for a few seconds.
 --from adds every decision in a decisions file: ${FORMAT}
 Raising the same question again is a no-op that reports its status; a different question under a used key is refused.
 --filer names who asks (your agent session or any id of 1-128 of A-Z a-z 0-9 . _ -), saved on the item so \`wait --filer\` with the same id gets the answer.
@@ -131,6 +133,7 @@ examples:
        sign-off-axi post [board.json] --from <board file> --replace [--filer <id>]
        sign-off-axi post [board.json] --type explainer --title "<question>" --media <video> [--about <summary>] [--chapter <m:ss>=<title>]... [--key <key>] [--option <value>=<label>]... [--recommend <value>]
 Posts an item for the user. --type decision (the default) is a yes/no or pick-one question, exactly like raise.
+Listing --option needs --recommend <value>, on every type: the option you would pick, shown first and marked. --from --replace feeds are not held to it.
 --filer names who posts (your agent session or any id of 1-128 of A-Z a-z 0-9 . _ -), saved on the item; then \`wait --filer <id>\` gets the answer.
 SIGN_OFF_FILER sets it for every command; with neither, the Claude Code session id is saved when there is one.
 --type design is a pick between up to 6 options shown side by side, each with an optional board-relative mock file
@@ -153,7 +156,7 @@ examples:
   sign-off-axi post --type design --title "Pick the sign-in layout" --option a="A: single column" --option b="B: split screen" --mock a=mocks/a.html --mock b=mocks/b.html --tradeoff "B scans fastest; A is simplest." --recommend b
   sign-off-axi post .sign-off/decisions.json --type design --key sign-in --title "Pick the sign-in layout" --option a=A --option b=B --option c=C --mock a=mocks/sign-in/index.html?variant=a --mock b=mocks/sign-in/index.html?variant=b --mock c=mocks/sign-in/index.html?variant=c --tradeoff "..." --recommend b
   sign-off-axi post --type decision --title "Keep the weekly digest?" --recommend yes
-  sign-off-axi post .sign-off/decisions.json --type interactive --title "Does the sign-in flow feel right?" --view mocks/sign-in/demo.html --option yes=Yes --option no="Needs work"
+  sign-off-axi post .sign-off/decisions.json --type interactive --title "Does the sign-in flow feel right?" --view mocks/sign-in/demo.html --option yes=Yes --option no="Needs work" --recommend yes
   sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media phone.png --media flow.mp4 --link https://github.com/acme/app/pull/12
   sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "The new sign-in has 2 steps." --media explainer.mp4 --chapter 0:00=Start --chapter 0:12="Step 2"
 `,
@@ -402,7 +405,7 @@ function post(args: string[], cmd = 'post') {
   const filer = filerOf(values, true);
   const type = values.type ?? 'decision';
   if (values.from === undefined && values.title === undefined) {
-    throw fail('--title is required (or --from <decisions.json>)', 'VALIDATION_ERROR', type === 'design' ? 'sign-off-axi post --type design --title "<question>" --option a=A --option b=B'
+    throw fail('--title is required (or --from <decisions.json>)', 'VALIDATION_ERROR', type === 'design' ? 'sign-off-axi post --type design --title "<question>" --option a=A --option b=B --recommend a'
       : type === 'evidence' ? 'sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media <file>' : `sign-off-axi ${cmd} --title "<question>" [--recommend <value>]`);
   }
   if (!['decision', 'design', 'evidence', 'diagram', 'interactive', 'explainer'].includes(type)) throw fail(`--type must be decision, design, evidence, diagram, interactive or explainer`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
@@ -427,7 +430,7 @@ function post(args: string[], cmd = 'post') {
   }
   const mocks = values.mock?.map((m: string) => {
     const at = m.indexOf('=');
-    if (at < 1) throw fail(`--mock ${m} must be <value>=<path>`, 'VALIDATION_ERROR', 'sign-off-axi post --type design --title "<question>" --option a=A --mock a=mocks/a.html');
+    if (at < 1) throw fail(`--mock ${m} must be <value>=<path>`, 'VALIDATION_ERROR', 'sign-off-axi post --type design --title "<question>" --option a=A --option b=B --mock a=mocks/a.html --recommend a');
     const path = m.slice(at + 1), name = mockFile(path);
     if (!mockTypes[extname(name).toLowerCase()]) throw fail(`--mock ${path} must end in ${Object.keys(mockTypes).join(', ')}`, 'VALIDATION_ERROR');
     if (!resolve(root, name).startsWith(root + sep)) throw fail(`--mock ${path} escapes the board folder`, 'VALIDATION_ERROR', 'Keep mock files next to the board file');
@@ -488,6 +491,7 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
   if (explainer && values.media?.length !== 1) throw fail('--type explainer needs one --media video (.mp4 or .webm)', 'VALIDATION_ERROR', example);
   if (!values.media?.length || values.media.length > MEDIA_MAX) throw fail(`--type evidence needs 1 to ${MEDIA_MAX} --media files`, 'VALIDATION_ERROR', example);
   const kinds = explainer ? ['.mp4', '.webm'] : Object.keys(mediaTypes), options = optionsOf(values);
+  recommended([{ options, recommend_value: values.recommend }], true);
   const chapters = values.chapter?.map((c: string) => {
     const m = /^(\d{1,3}):([0-5]\d)=(.+)$/.exec(c);
     if (!m) throw fail(`--chapter ${c} must be <m:ss>=<title>`, 'VALIDATION_ERROR', 'sign-off-axi post --type explainer ... --chapter 0:00=Start --chapter 0:12="Step 2"');
@@ -539,22 +543,32 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
 
 const optionsOf = (values: Record<string, any>) => values.option?.map((o: string) => {
   const at = o.indexOf('=');
-  if (at < 1) throw fail(`--option ${o} must be <value>=<label>`, 'VALIDATION_ERROR', 'sign-off-axi raise --title "<question>" --option friday=Friday --option next-week="Next week"');
+  if (at < 1) throw fail(`--option ${o} must be <value>=<label>`, 'VALIDATION_ERROR', 'sign-off-axi raise --title "<question>" --option friday=Friday --option next-week="Next week" --recommend friday');
   return { value: o.slice(0, at), label: o.slice(at + 1) };
 });
+/** Whoever lists the choices names the one they would pick: the board puts it first and marks it. A plain yes/no may leave it out,
+ * and a program feeding a whole board with --replace is not held to it. */
+function recommended(items: any[], flags: boolean) {
+  const d = items.find((i) => i?.options?.length && i.recommend_value === undefined), values = d?.options.map((o: Option) => o.value).join(', ');
+  if (d && flags) throw fail('--recommend is required when you list options', 'VALIDATION_ERROR', `Add --recommend <value>, the option you would pick: one of ${values}`);
+  if (d) throw fail(`items[${items.indexOf(d)}] (key ${d.key}) lists options but no recommend_value`, 'VALIDATION_ERROR', `Add "recommend_value": "<value>", the option you would pick: one of ${values}`);
+}
 /** Flags are validated by the same loader as a file: write them as a one-decision file first. */
 function buildIncoming(values: Record<string, any>, extra: object = {}, filer?: string): { incoming: Decision[]; raw: object[] } {
   if (values.from !== undefined) {
     // An item that names its own filer keeps it.
-    const source = resolve(values.from);
-    return { incoming: loadDecisions(source).map((d) => ({ filer, ...d })), raw: readItems(source).items.map((i) => ({ filer, ...i })) };
+    const source = resolve(values.from), incoming = loadDecisions(source), raw = readItems(source).items;
+    recommended(raw, false);
+    return { incoming: incoming.map((d) => ({ filer, ...d })), raw: raw.map((i) => ({ filer, ...i })) };
   }
   const scratch = mkdtempSync(join(tmpdir(), 'sign-off-'));
   const source = join(scratch, 'flags');
   try {
     const { title, key = slug(title), about, detail, recommend: recommend_value, default: default_if_silent, close } = values;
     writeFileSync(source, JSON.stringify({ schema: 2, items: [{ key, title, about, detail, options: optionsOf(values), recommend_value, default_if_silent, close, ...extra, filer }] }));
-    return { incoming: loadDecisions(source), raw: readItems(source).items };
+    const incoming = loadDecisions(source), raw = readItems(source).items;
+    recommended(raw, true);
+    return { incoming, raw };
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
@@ -818,7 +832,7 @@ function init(args: string[]) {
     : `no agent found on PATH (${Object.values(AGENTS).map((a) => a.bin).join(', ')})`;
   return toon({ dir: tilde(dir), created: created.length ? created : 'nothing new (re-run is a no-op)', kept, board: shellPath(board), agent, skills }, [
     ...(agents.length ? [] : [`Run \`sign-off-axi init ${shellPath(dir)} --agent <name>\` to install the skill for one agent: ${Object.keys(AGENTS).join(', ')}`]),
-    `Run \`sign-off-axi post ${shellPath(board)} --type design --title "<question>" --option a=A --option b=B\` to ask for a pick`,
+    `Run \`sign-off-axi post ${shellPath(board)} --type design --title "<question>" --option a=A --option b=B --recommend a\` to ask for a pick`,
       `Run \`sign-off-axi doctor ${shellPath(dir)}\` to check the setup`, `Run \`sign-off-axi open ${shellPath(board)}\` to show the board to the user`]);
 }
 
@@ -1198,6 +1212,12 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   if (typeof note !== 'string' || [...note.trim()].length > NOTE_MAX) return [400, { error: `The note must be text of ${NOTE_MAX} characters or fewer` }];
   const d = loadDecisions(file).find((x) => x.key === key);
   if (answer === REPLY.value && !note.trim()) return [400, { error: 'Write the reply first' }];
+  // Undo with no answer to go back to saves an empty answer: the line is kept and the item waits again.
+  if (answer === CLEARED.value) {
+    if (!isKey(key) || (!d && !answersOnly())) return [404, { error: 'This question is no longer in the file' }];
+    answered(appendAnswer(file, d ?? ({ key, close: 'done' } as Decision), CLEARED), d);
+    return [200, state()];
+  }
   if (!d) {
     // The program feeding the board may drop an item while the person answers it: the answer is still saved.
     if (!answersOnly() || !isKey(key) || !isKey(answer)) return [404, { error: 'This question is no longer in the file' }];

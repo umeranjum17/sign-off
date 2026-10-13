@@ -53,7 +53,7 @@
   .about, details p { margin: 0.375rem 0 0; max-width: 70ch; }
   details p { color: var(--muted); }
   .about { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-  .row:has(details:not(.note)[open]) .about { display: none; }
+  .row:has(details:not(.note, .other)[open]) .about { display: none; }
   .about.full { display: block; }
   summary { cursor: pointer; color: var(--accent); font-size: 0.875rem; margin-top: 0.25rem; width: fit-content; }
   .meta { color: var(--muted); font-size: 0.8125rem; margin: 0.5rem 0 0; }
@@ -83,7 +83,22 @@
   .err:empty { display: none; }
   .err:not(:empty) { color: var(--danger); font-size: 0.875rem; margin-top: 0.5rem; }
   .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-  .choices button { padding: 0 0.75rem; }
+  /* The quick answers come first and are big enough for a thumb; typing is last, behind Other answer. */
+  .choices button { min-height: 3rem; padding: 0 0.75rem; }
+  .row > .note, .row > .err { grid-column: 1 / -1; }
+  .other summary { display: flex; align-items: center; min-height: 2.75rem; margin: 0; padding: 0 1rem; list-style: none;
+    border: 1px solid var(--line); border-radius: 0.5rem; color: var(--muted); font-size: 0.9375rem; }
+  .other summary::-webkit-details-marker { display: none; }
+  .other summary::after { content: "▾" / ""; padding-left: 0.5rem; }
+  .other[open] summary::after { content: "▴" / ""; }
+  /* After a tap: what was saved, and an Undo for a few seconds. */
+  #toast { position: fixed; z-index: 2; left: 1rem; right: 1rem; bottom: max(1rem, env(safe-area-inset-bottom)); max-width: 30rem; margin: 0 auto;
+    display: flex; align-items: center; gap: 0.75rem; padding: 0.375rem 0.375rem 0.375rem 1rem; border-radius: 0.75rem;
+    background: var(--text); color: var(--bg); box-shadow: var(--shadow); }
+  #toast[hidden] { display: none; }
+  #toast span { flex: 1; min-width: 0; }
+  #toast button { flex: none; background: transparent; color: inherit; border-color: currentColor; font-weight: 600; }
+  #toast button:focus-visible { outline-color: var(--bg); }
   button { min-height: 2.75rem; padding: 0 1.25rem; border-radius: 0.5rem; border: 1px solid var(--border); cursor: pointer;
     background: var(--surface); color: var(--text); font: inherit; font-weight: 500; }
   /* Recommended is a dashed accent outline and a tag; picked is filled with a check. They never look alike. */
@@ -131,7 +146,7 @@
   .empty { margin: 0; padding: 1.5rem 1rem; color: var(--muted); text-align: center; border: 1px dashed var(--line); border-radius: 0.875rem; }
   @media (min-width: 45rem) {
     .bar, main { padding: 0 2rem; }
-    .row { grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 2rem; padding: 1.125rem 1.25rem; }
+    .row { grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 0.875rem 2rem; padding: 1.125rem 1.25rem; }
     .row.design { grid-template-columns: minmax(0, 1fr); gap: 0.875rem; }
     .rung iframe { height: min(32rem, 75vh); }
     /* A picture card stacks like a design card: the picture, then its buttons at their own width. */
@@ -150,6 +165,7 @@
   <h1>Dashboard</h1><span class="count" id="count" aria-live="polite"></span>
 </div></header>
 <main><p class="banner" id="banner" role="alert" hidden></p><div id="board"></div></main>
+<div id="toast" role="status" hidden><span id="toast-text"></span><button id="undo" hidden>Undo</button></div>
 <script>
   let state = { decisions: [], answers: {} };
   // An exported copy carries its state and files inline and is read-only.
@@ -186,16 +202,45 @@
     buttons.forEach((b) => (b.disabled = true));
     // An answers-only board takes no comments: a typed note goes with the answer alone.
     const typed = state.answers_only ? '' : (drafts.get(d.key) ?? '').trim();
-    const note = drafts.get(d.key) ?? state.answers[d.key]?.note ?? '';
+    const note = drafts.get(d.key) ?? state.answers[d.key]?.note ?? '', before = answerOf(d.key);
     const drop = clearIfSaved(d.key, drafts.get(d.key));
     call('/api/answers', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
-    }, typed ? undefined : drop).then(() => typed && call('/api/messages', {
+    }, typed ? undefined : drop).then(() => offerUndo(d, before)).then(() => typed && call('/api/messages', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'comment', key: d.key, text: typed }),
     }, drop)).catch((e) => {
       shown(err).textContent = `Couldn't save: ${e.message}`;
       buttons.forEach((b) => (b.disabled = false));
     });
+  }
+
+  const toast = document.getElementById('toast'), toastText = document.getElementById('toast-text'), undoBtn = document.getElementById('undo');
+  let hide;
+  const answerOf = (key) => (Object.hasOwn(state.answers, key) ? state.answers[key] : undefined);
+  // The toast stays while the pointer is on it or the keyboard is on Undo.
+  const later = (ms) => { clearTimeout(hide); hide = setTimeout(() => (toast.matches(':hover') || undoBtn.matches(':focus-visible') ? later(1500) : (toast.hidden = true)), ms); };
+  const say = (text, ms, undo) => {
+    toastText.textContent = text;
+    undoBtn.hidden = !undo;
+    undoBtn.disabled = false;
+    undoBtn.onclick = undo;
+    toast.hidden = false;
+    later(ms);
+  };
+  /** After a tap, a few seconds to take it back. Undo saves the answer from before the tap (or none) the usual way, so it is recorded too. */
+  function offerUndo(d, before) {
+    const now = answerOf(d.key);
+    if (!now) return;
+    undoBtn.setAttribute('aria-label', `Undo, ${d.title}`);
+    say(`Saved: ${now.answer === 'text' ? 'your reply' : now.label}`, 5000, () => {
+      undoBtn.disabled = true;
+      call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ key: d.key, answer: before?.answer ?? '', note: before?.note ?? '' }) })
+        .then(() => say(before ? `Back to: ${before.answer === 'text' ? 'your reply' : before.label}` : 'Undone: not answered', 3000),
+          (e) => say(`Couldn't undo: ${e.message}`, 8000));
+    });
+    // The tap redrew its card and took the focus with it: put it on Undo so the keyboard can reach it in time.
+    if (document.activeElement === document.body || !document.activeElement) undoBtn.focus();
   }
 
   // A render while a request was out replaced the error line; write to the one on screen.
@@ -247,6 +292,8 @@
         design ? (o.value === saved?.answer ? 'Picked' : 'Pick') : o.label, rec ? el('span', { class: 'tag', id: `rec-${d.key}` }, 'Recommended') : '');
     });
     buttons.forEach((b, i) => (b.onclick = () => save(d, d.options[i], buttons, err)));
+    // The recommended answer is the first button.
+    const top = d.options.findIndex((o) => o.value === d.recommend_value), ranked = top > 0 ? [buttons[top], ...buttons.filter((_, i) => i !== top)] : buttons;
     // The agent that posted the item took this answer with wait --filer.
     const seen = saved && state.seen?.includes(d.key) ? el('span', { class: 'chip seen' }, 'Seen by agent') : '';
     const head = el('div', { class: 'head' }, chip(d), el('div', {}, el('h3', { dir: 'auto' }, title(d)), seen));
@@ -267,9 +314,8 @@
       d.link ? el('p', { class: 'meta' }, /^https?:/.test(d.link)
         ? el('a', { href: d.link, target: '_blank', rel: 'noopener' }, d.link) : `Commit ${d.link}`) : '',
       silent ? el('p', { class: 'meta' }, silent) : '',
-      notes(d, ro, saved, err),
-      err,
-    ), updateMedia(d), chapters(d), rung(d), ro || !buttons.length ? '' : el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': d.title }, ...buttons), evidenceCard(d));
+    ), updateMedia(d), chapters(d), rung(d), ro || !buttons.length ? '' : el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': d.title }, ...ranked),
+    notes(d, ro, saved, err), err, evidenceCard(d));
   }
 
   /** The note and another-round controls, folded away until the person wants them. An evidence update takes a note only. */
@@ -307,17 +353,24 @@
   // A reply item gets its reply box; an answers-only board takes no notes, comments or rounds.
   const notes = (d, ro, saved, err) => (ro ? '' : d.reply ? reply(d, saved, err) : state.answers_only ? '' : more(d, saved, err));
 
-  /** A short text reply: sent on its own, or with the answer picked. On a reply item it takes the place of the note panel. */
+  /** Reply boxes the person unfolded, kept open across redraws. */
+  const unfolded = new Set();
+  /** A short text reply: sent on its own, or with the answer picked. On a reply item it takes the place of the note panel,
+   * folded behind Other answer so the buttons come first and typing is the last resort. */
   function reply(d, saved, err) {
     const box = el('textarea', { id: `note-${d.key}`, rows: 2, maxlength: 500, dir: 'auto' });
     box.value = drafts.get(d.key) ?? '';
     box.oninput = () => { drafts.set(d.key, box.value); keep(); };
     const btn = el('button', { 'aria-label': `Send reply, ${d.title}` }, 'Send reply');
     btn.onclick = () => (box.value.trim() ? save(d, { value: 'text' }, [btn], err) : (shown(err).textContent = 'Write the reply first.'));
-    return el('div', { class: 'note' },
-      saved?.note ? el('p', { class: 'meta saved-note', dir: 'auto' }, `Your reply: ${saved.note}`) : '',
+    const label = d.options.length ? 'Other answer' : 'Write a reply';
+    const fold = el('details', { class: 'other', ...((unfolded.has(d.key) || drafts.get(d.key)) && { open: '' }) },
+      el('summary', { 'aria-label': `${label}, ${d.title}` }, label),
       el('label', { for: box.id }, d.options.length ? 'Reply in a few words, sent on its own or with the answer you pick' : 'Reply in a few words'), box,
       el('div', { class: 'actions' }, btn));
+    fold.ontoggle = () => (fold.open ? unfolded.add(d.key) : unfolded.delete(d.key));
+    fold.firstChild.onclick = () => setTimeout(() => fold.open && box.focus());
+    return el('div', { class: 'note' }, saved?.note ? el('p', { class: 'meta saved-note', dir: 'auto' }, `Your reply: ${saved.note}`) : '', fold);
   }
 
   /** Free-text prompts for the agent, which it reads with sign-off-axi poll. */

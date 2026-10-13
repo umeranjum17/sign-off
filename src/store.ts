@@ -141,13 +141,14 @@ export function loadDecisions(path: string): Decision[] {
 export const answersPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.answers.jsonl';
 export const roundsPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.rounds.jsonl';
 const readRaw = (file: string) => (existsSync(file) ? readFileSync(file, 'utf8') : '');
-/** Latest answer per key. A torn line (a crash mid-write) is skipped and reported through warn. */
+/** Latest answer per key; a line with an empty answer (an Undo with nothing to go back to) leaves the key unanswered. A torn line (a crash mid-write) is skipped and reported through warn. */
 export function readAnswers(decisionsPath: string, warn: (msg: string) => void = () => {}): Record<string, Answer> {
   const latest = new Map<string, Answer>();
   readRaw(answersPath(decisionsPath)).split('\n').forEach((line, n) => {
     try {
       const a = line && JSON.parse(line);
-      if (a) latest.set(a.key, a);
+      if (a?.answer === '') latest.delete(a.key);
+      else if (a) latest.set(a.key, a);
     } catch {
       warn(`skipped unreadable line ${n + 1} in ${answersPath(decisionsPath)}`);
     }
@@ -155,10 +156,12 @@ export function readAnswers(decisionsPath: string, warn: (msg: string) => void =
   return Object.fromEntries(latest);
 }
 
+/** The option an Undo saves when the item had no answer before: an empty answer, so the item waits again. */
+export const CLEARED: Option = { value: '', label: '' };
 /** Appends one answer line unless it equals the current answer and note, and returns the saved answer. Starts a new line after a torn fragment. */
 export function appendAnswer(decisionsPath: string, d: Decision, option: Option, note = ''): Answer | undefined {
   const current = readAnswers(decisionsPath)[d.key];
-  if (current?.answer === option.value && (current.note ?? '') === note) return;
+  if (option === CLEARED ? !current : current?.answer === option.value && (current.note ?? '') === note) return;
   const answer: Answer = { key: d.key, answer: option.value, label: option.label, close: d.close, at: now(), ...(note && { note }) };
   appendLine(answersPath(decisionsPath), answer);
   return answer;

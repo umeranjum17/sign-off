@@ -80,7 +80,7 @@ Use the simplest view that explains the item: plain text, then a diagram, then a
   4. Join each still with its speech, then join the parts: \`ffmpeg -loop 1 -i 1.png -i 1.wav -c:v libx264 -tune stillimage -pix_fmt yuv420p -c:a aac -shortest 1.mp4\`, then \`ffmpeg -f concat -i parts.txt -c copy -movflags +faststart explainer.mp4\` (\`parts.txt\` lists \`file '1.mp4'\` and so on).
   5. Post it with \`--type explainer --media explainer.mp4 --about "<one-line summary>"\` and one \`--chapter <m:ss>=<title>\` per part (\`ffprobe -show_entries format=duration\` gives each part's length). The video plays on the card; the chapters jump to each part.
 
-All of these answer like a decision (Yes/No, or your own \`--option\`s); wait and read the answer the same way.
+All of these answer like a decision (Yes/No, or your own \`--option\`s with \`--recommend\`, the one you would pick); wait and read the answer the same way.
 
 ## Request
 

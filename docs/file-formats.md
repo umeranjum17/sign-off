@@ -47,6 +47,9 @@
   with a different title, options or reply: post that question under a new key.
 - A 0.1.0 file, `"schema": 1` with a `"decisions"` list, still reads: each entry is an item, a decision unless it says otherwise. The first write that changes it (a `raise` of a new key, or a `post`) rewrites it as `"schema": 2` (temp file, then rename) and first keeps the old file once beside it as `<board>.schema-1.bak`. Answer and round files are not touched.
 - `key`: 1-128 of `A-Z a-z 0-9 . _ -`, unique in the file. `title`: required.
+- `recommend_value`: the option the poster would pick; the board shows it first and marks it **Recommended**.
+  `raise`, `post` and `raise --from` refuse an item that lists `options` without one; a plain Yes/No may leave it out,
+  and a feed written with `post --from <file> --replace` is not held to it.
 - `filer`: optional, who filed the item (1-128 of `A-Z a-z 0-9 . _ -`), written by `post --filer`.
   `wait --filer` with the same id returns the answers to that filer's items. The page never shows it.
   `post --from <file> --replace --filer <id>` replaces only the items with that filer (and items with
@@ -101,7 +104,8 @@
   from inside that page's own folder only, never anything above it. `export`
   inlines the page itself, so those files show only on the running board.
 - `reply`: optional, `true` adds a short text reply (500 characters or fewer)
-  to the item, in place of its note panel: sent on its own, it is saved as the
+  to the item, in place of its note panel, folded behind an **Other answer**
+  button after the option buttons: sent on its own, it is saved as the
   answer `text` with the words as its `note`; typed before a button is
   picked, it goes with that answer as its note. No option may use the value
   `text` then. With `"options": []` the reply is the only answer.
@@ -154,6 +158,9 @@ also copies each file into `evidence/<number>/` next to the board:
 ```
 
 - `answer` is the picked option's `value`, `label` its label at the time of the click.
+- An **Undo** (offered for a few seconds after each tap) is saved as one more line: the answer before the tap, or, when there
+  was none, an empty `answer` and `label` (`{"key":"dark-default","answer":"","label":"","close":"done","at":"..."}`), which
+  leaves the key unanswered, so the item waits again. An `on_answer:` command gets that line too.
 - `note`: present only when the person typed one. Optional free text, trimmed, up to 500 characters, sent with the click. Picking the same answer again with a changed note adds a new line; clearing the note and clicking again removes it. Lines without `note` (all lines written before notes existed) read as before.
 - `sign-off-axi answers --json` prints the same fields per key, without `key`, and adds `note` only when the latest line has one.
 
