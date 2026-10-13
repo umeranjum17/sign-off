@@ -50,10 +50,14 @@ sign-off is the board where agents and projects post asks, reports, evidence, mo
 
 Answers reach the filing agent as durable records. The record survives reloads and restarts.
 
-sign-off owns the written communication contract. The contract covers the file and CLI shape, the schema, and answer delivery. The contract draft lives separately from this file. This file names it but does not define its fields.
+sign-off owns the written communication contract. The contract covers the file and CLI shape, the schema, and answer delivery. The contract lives in [docs/contract.md](docs/contract.md). This file names it but does not define its fields.
 
 ## Works with
 
 Integrations live in this section. They stay out of the description and the intro.
 
 Kun's tools set the patterns this family follows: firstmate, no-mistakes, quota-axi, and lavish-axi. The shared patterns are the AXI CLI shape, TOON output, next-command help lines, skill install, and npm distribution.
+
+sign-off owns one communication contract for asks, reports, evidence, gates and retro findings. In its v1 every message is strict and versioned, and a message that does not match is refused with one fix line, never shown half-broken. It is being built: the status line in [docs/contract.md](docs/contract.md) says what works today.
+
+Conformance will run on shared fixtures from the sign-off package. Each tool runs them in its CI with `sign-off-axi validate`, pinned to an exact version.
