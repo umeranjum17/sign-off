@@ -30,7 +30,7 @@ const AGENTS: Record<string, { bin: string; dir: string; home: string }> = {
 const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
 commands[15]:
   (none)=list, raise, post, answers, wait, poll, open, status, stop, serve, export, init, doctor, validate, help
-board: the nearest .sign-off/ board from the working folder up to its repo root (the folder holding .git); with no .git above, up to HOME but never HOME's own .sign-off, and with neither above, the working folder only; else ~/.sign-off/decisions.json, unless a board file is given; answers are saved next to it
+board: the nearest .sign-off/ board from the working folder up to its repo root (the folder holding .git); with no .git above, up to HOME but never HOME's own .sign-off, and never one outside both; else ~/.sign-off/decisions.json, unless a board file is given; answers are saved next to it
 SIGN_OFF_HOME, when set, takes HOME's place for the default board and the walk's stop; a board file given always wins
 flags: --full and --json on list, answers and wait, --json on status, --filer on post, raise and wait, --help on every command, -v/--version
 examples:
@@ -292,15 +292,14 @@ const signOffHome = () => resolve(process.env.SIGN_OFF_HOME || homedir());
 /** The account's own home folder from the system user database, which a changed HOME does not move; undefined when there is none. */
 const accountHome = () => { try { return userInfo().homedir || undefined; } catch { return undefined; } };
 /** The folder of the nearest .sign-off/config.yaml that init set up, from the working folder up to its repo root (the folder holding .git),
- * or up to HOME (or SIGN_OFF_HOME) but never its own .sign-off. With neither above, the working folder only, and never the account's own home
- * (which a changed HOME does not move): a .sign-off/ outside both the repo root and HOME is never adopted. */
+ * or up to HOME (or SIGN_OFF_HOME) but never its own .sign-off. With neither above, or on reaching the account's own home (which a changed
+ * HOME does not move), none: a .sign-off/ outside both the repo root and HOME is never adopted. */
 function setupFolderHere() {
   const [home, account] = [signOffHome(), accountHome()].map((h) => (h && existsSync(h) ? realpathSync(h) : undefined)), dirs: string[] = [];
   for (let dir = process.cwd(); dir !== home; dir = dirname(dir)) {
-    if (dir === account) { dirs.splice(1); break; }
+    if (dir === account || dirname(dir) === dir) return undefined;
     dirs.push(dir);
     if (existsSync(join(dir, '.git'))) break;
-    if (dirname(dir) === dir) { dirs.splice(1); break; }
   }
   return dirs.find((dir) => existsSync(join(dir, '.sign-off', 'config.yaml')));
 }

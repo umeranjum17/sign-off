@@ -1076,15 +1076,16 @@ test('no board named: the nearest .sign-off/ up to the repo root, else the home 
   // A folder holding .git is the repo root: the walk stops there and falls back to the home board.
   assert.equal(at(inner, {}, 'raise', '--title', 'From the inner repo?').status, 0);
   assert.deepEqual(items(join(env.HOME, '.sign-off', 'decisions.json')), ['from-the-inner-repo']);
-  // A .sign-off/ above the working folder but outside both its repo root and HOME (another home's board, say, under an isolated HOME) is never adopted.
+  // A .sign-off/ outside both the repo root and HOME (another home's board, say, under an isolated HOME) is never adopted, above or in the working folder.
   const other = join(scratch, 'other-home'), stray = join(other, 'work', 'proj');
   mkdirSync(join(other, '.sign-off'), { recursive: true });
   mkdirSync(stray, { recursive: true });
   writeFileSync(join(other, '.sign-off', 'config.yaml'), 'board: decisions.json\nport: 0\n');
   writeFileSync(join(other, '.sign-off', 'decisions.json'), '{"schema":2,"items":[]}\n');
   assert.equal(at(stray, {}, 'raise', '--title', 'Probe from an isolated run?').status, 0);
+  assert.equal(at(other, {}, 'raise', '--title', 'Probe from its own folder?').status, 0);
   assert.deepEqual(items(join(other, '.sign-off', 'decisions.json')), []);
-  assert.deepEqual(items(join(env.HOME, '.sign-off', 'decisions.json')), ['from-the-inner-repo', 'probe-from-an-isolated-run']);
+  assert.deepEqual(items(join(env.HOME, '.sign-off', 'decisions.json')), ['from-the-inner-repo', 'probe-from-an-isolated-run', 'probe-from-its-own-folder']);
   // SIGN_OFF_HOME takes HOME's place for the default board; a board file given always wins.
   const own = join(scratch, 'sign-off-home');
   assert.equal(at(stray, { SIGN_OFF_HOME: own }, 'raise', '--title', 'Into SIGN_OFF_HOME?').status, 0);
