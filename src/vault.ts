@@ -5,12 +5,13 @@ import { homedir } from 'node:os';
 import { createCipheriv, createHash, randomBytes } from 'node:crypto';
 import { isKey } from './store.js';
 
-export type VaultMeta = { board: string; key: string; mode: 'give' | 'receive'; filer: string; destination?: string };
-type Status = 'pending' | 'ready' | 'refused';
+export type VaultMeta = { board: string; key: string; mode: 'give' | 'receive'; filer: string; expires: number; destination?: string };
+type Status = 'pending' | 'ready' | 'refused' | 'expired';
 type Sealed = { nonce: string; tag: string; data: string };
 type Record = { schema: 1; meta: VaultMeta; status: Status; at: number; sealed?: Sealed };
 const errors = {
-  VALIDATION_ERROR: 'Vault input is invalid: check mode, provider and destination.',
+  VALIDATION_ERROR: 'Vault input is invalid: check mode, expiry, provider and destination.',
+  EXPIRED: 'Vault item expired; request a fresh item.',
   VAULT_KEY_UNAVAILABLE: 'Vault key is unavailable; encrypted payload cannot be read.',
   BUSY: 'Vault storage is busy or unavailable; retry later.',
   NOT_FOUND: 'Vault item was not found.',
@@ -21,7 +22,7 @@ export class VaultError extends Error {
 }
 function bad(code: keyof typeof errors): never { throw new VaultError(code); }
 const digest = (board: string, key: string) => createHash('sha256').update(JSON.stringify([board, key])).digest('hex');
-const aad = (meta: VaultMeta) => Buffer.from(JSON.stringify([1, meta.board, meta.key, meta.mode, meta.destination ?? null, meta.filer]));
+const aad = (meta: VaultMeta) => Buffer.from(JSON.stringify([1, meta.board, meta.key, meta.mode, meta.expires, meta.destination ?? null, meta.filer]));
 const VAULT_ID = /^[a-f0-9]{32}$/;
 function boardFile(board: unknown) {
   if (typeof board !== 'string' || !isAbsolute(board)) bad('VALIDATION_ERROR');
@@ -41,8 +42,9 @@ function boardId(file: string, create: boolean) {
 
 function metadata(m: VaultMeta): VaultMeta {
   if (!m || typeof m.board !== 'string' || !VAULT_ID.test(m.board) || !isKey(m.key) || !isKey(m.filer) || !['give', 'receive'].includes(m.mode)
+    || !Number.isSafeInteger(m.expires) || m.expires <= 0
     || (m.mode === 'give' ? typeof m.destination !== 'string' || !isAbsolute(m.destination) : m.destination !== undefined)) bad('VALIDATION_ERROR');
-  return { board: m.board, key: m.key, mode: m.mode, filer: m.filer,
+  return { board: m.board, key: m.key, mode: m.mode, filer: m.filer, expires: m.expires,
     ...(m.destination !== undefined && { destination: resolve(m.destination) }) };
 }
 function privateFile(path: string) {
@@ -122,7 +124,12 @@ async function operate<T>(board: string, key: string, create: boolean, fn: (dir:
       privateFile(path);
       try { record = JSON.parse(readFileSync(path, 'utf8')); } catch { bad('VALIDATION_ERROR'); }
       if (!record || record.schema !== 1 || record.meta.board !== id || record.meta.key !== key
-        || JSON.stringify(metadata(record.meta)) !== JSON.stringify(record.meta) || !['pending', 'ready', 'refused'].includes(record.status)) bad('VALIDATION_ERROR');
+        || JSON.stringify(metadata(record.meta)) !== JSON.stringify(record.meta) || !['pending', 'ready', 'refused', 'expired'].includes(record.status)) bad('VALIDATION_ERROR');
+      // ponytail: expire on access; startup/background sweeps and wake events are required before activation.
+      if (['pending', 'ready'].includes(record.status) && record.meta.expires <= Date.now()) {
+        record = { schema: 1, meta: record.meta, status: 'expired', at: Date.now() };
+        publish(path, JSON.stringify(record));
+      }
     }
     return fn(dir, path, record, id);
   } catch (e) { throw e instanceof VaultError ? e : new VaultError('BUSY'); }
@@ -132,15 +139,19 @@ const summary = (r: Record) => ({ ...r.meta, status: r.status, at: r.at });
 const active = (r?: Record) => {
   if (!r) bad('NOT_FOUND');
   if (r.status === 'refused') bad('REFUSED');
+  if (r.status === 'expired') bad('EXPIRED');
   return r;
 };
 
-export async function createVault(input: VaultMeta, value?: Buffer) {
-  const fixed = metadata({ ...input, board: '0'.repeat(32) });
+export async function createVault(input: Omit<VaultMeta, 'expires'> & { expires?: number }, value?: Buffer) {
+  const now = Date.now();
+  const fixed = metadata({ ...input, board: '0'.repeat(32), expires: input.expires === undefined ? (input.mode === 'give' ? now + 600_000 : NaN) : input.expires });
+  if (fixed.expires <= now || fixed.expires > now + 3_600_000) bad('VALIDATION_ERROR');
   if ((fixed.mode === 'receive') !== (value !== undefined) || (value !== undefined && !sized(value))) bad('VALIDATION_ERROR');
   return operate(input.board, fixed.key, true, (dir, path, old, id) => {
     const meta = { ...fixed, board: id };
     if (old) bad('VALIDATION_ERROR'); // Terminal keys are tombstones, never reusable.
+    if (meta.expires <= Date.now()) bad('EXPIRED');
     if (!value) master(dir);
     const record: Record = { schema: 1, meta, status: value ? 'ready' : 'pending', at: Date.now(), ...(value && { sealed: seal(dir, meta, value) }) };
     publish(path, JSON.stringify(record));
