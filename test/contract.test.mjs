@@ -159,3 +159,32 @@ test('a stored report with reply, area or type is refused: it can never wait, be
     assert.match(listed.stdout, /must be left out: a report takes no answer and shows only under Reports/);
   }
 });
+
+test('a report counts its group and decision in characters, not UTF-16 units: 21 emoji fit a 40 limit', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const board = join(scratch, 'emoji.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const feed = (name, ...items) => message(name, JSON.stringify({ schema: 2, items }));
+  const emoji = { ...report, key: 'emoji', group: '\u{1F600}'.repeat(21), decided: '\u{1F600}'.repeat(100), link: `https://${'\u{1F600}'.repeat(300)}` };
+  const posted = cli2('raise', board, '--from', feed('emoji.json', emoji));
+  assert.equal(posted.status, 0, posted.stdout);
+  const [item] = JSON.parse(cli2('list', board, '--json').stdout).decisions;
+  assert.equal(item.group, '\u{1F600}'.repeat(21));
+});
+
+test('a report re-posted under its key reports already posted, and a feed with no items says nothing about reading the board', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const board = join(scratch, 'repost-report.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const feed = (name, ...items) => message(name, JSON.stringify({ schema: 2, items }));
+  assert.equal(cli2('raise', board, '--from', feed('one.json', report)).status, 0);
+  const again = cli2('raise', board, '--from', feed('two.json', report));
+  assert.equal(again.status, 0, again.stdout);
+  assert.match(again.stdout, /already posted/);
+  assert.doesNotMatch(again.stdout, /already waiting/);
+  const empty = cli2('raise', board, '--from', feed('empty.json'));
+  assert.equal(empty.status, 0, empty.stdout);
+  assert.doesNotMatch(empty.stdout, /so the user can read/);
+});

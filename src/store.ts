@@ -114,11 +114,11 @@ export function loadDecisions(path: string): Decision[] {
         || (Array.isArray(t.marks) && t.marks.every((m: any) => MARKS.includes(m)) && new Set(t.marks).size === t.marks.length))))) {
       throw bad('steps', `must list 2 to 12 steps, each a title of 80 characters or fewer and marks from ${MARKS.join(', ')}`);
     }
-    if (d.group !== undefined && !(isText(d.group) && d.group.trim() && d.group.length <= 40)) throw bad('group', 'must be text of 40 characters or fewer');
+    if (d.group !== undefined && !(isText(d.group) && d.group.trim() && [...d.group].length <= 40)) throw bad('group', 'must be text of 40 characters or fewer');
     if (d.filed !== undefined && !(isText(d.filed) && /^\d{4}-\d{2}-\d{2}T/.test(d.filed) && !Number.isNaN(Date.parse(d.filed)))) throw bad('filed', 'must be an ISO 8601 date-time such as 2026-10-13T07:19:00Z');
-    if (d.decided !== undefined && !(isText(d.decided) && d.decided.trim() && d.decided.length <= 200)) throw bad('decided', 'must be text of 200 characters or fewer');
+    if (d.decided !== undefined && !(isText(d.decided) && d.decided.trim() && [...d.decided].length <= 200)) throw bad('decided', 'must be text of 200 characters or fewer');
     if (d.type === 'evidence' && !(Number.isInteger(d.number) && d.number >= 1)) throw bad('number', 'must be a whole number from 1');
-    if (d.link !== undefined && !(isText(d.link) && /^(https?:\/\/\S{1,500}|[a-f0-9]{7,40})$/.test(d.link))) throw bad('link', 'must be an http(s) link or a commit hash');
+    if (d.link !== undefined && !(isText(d.link) && /^(https?:\/\/\S{1,500}|[a-f0-9]{7,40})$/u.test(d.link))) throw bad('link', 'must be an http(s) link or a commit hash');
     // A ladder rung: a diagram image, or an interactive page the board frames in a sandbox.
     const views = Object.hasOwn(VIEWS, d.type ?? '') ? VIEWS[d.type] : undefined;
     if (views && !(isText(d.view) && d.view.length <= 256 && /^[^?#]+$/.test(d.view) && views[1].test(d.view))) throw bad('view', `must be a board-relative ${views[0]} file`);
