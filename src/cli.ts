@@ -297,8 +297,9 @@ function setupFolderHere() {
   const [home, account] = [signOffHome(), accountHome()].map((h) => (h && existsSync(h) ? realpathSync(h) : undefined)), cwd = process.cwd(), chain: string[] = [];
   if (cwd === account) return undefined;
   let bounded = false;
-  for (let dir = cwd; dir !== account; dir = dirname(dir)) {
+  for (let dir = cwd; ; dir = dirname(dir)) {
     if (dir === home) { bounded = true; break; }
+    if (dir === account) break;
     chain.push(dir);
     if (existsSync(join(dir, '.git'))) { bounded = true; break; }
     if (dirname(dir) === dir) break;

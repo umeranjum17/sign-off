@@ -1092,6 +1092,14 @@ test('no board named: the nearest .sign-off/ up to the repo root, else the home 
   assert.deepEqual(items(join(own, '.sign-off', 'decisions.json')), ['into-sign-off-home']);
   assert.equal(at(stray, { SIGN_OFF_HOME: own }, 'raise', join(other, '.sign-off', 'decisions.json'), '--title', 'Named board?').status, 0);
   assert.deepEqual(items(join(other, '.sign-off', 'decisions.json')), ['probe-from-its-own-folder', 'named-board']);
+  // A board above a folder with no .git but inside HOME is adopted. (HOME equal to the account home cannot be exercised here without touching the real home.)
+  const inHome = join(env.HOME, 'projects'), foo = join(inHome, 'foo');
+  mkdirSync(join(inHome, '.sign-off'), { recursive: true });
+  mkdirSync(foo, { recursive: true });
+  writeFileSync(join(inHome, '.sign-off', 'config.yaml'), 'board: decisions.json\nport: 0\n');
+  writeFileSync(join(inHome, '.sign-off', 'decisions.json'), '{"schema":2,"items":[]}\n');
+  assert.equal(at(foo, {}, 'raise', '--title', 'Ancestor board in home?').status, 0);
+  assert.deepEqual(items(join(inHome, '.sign-off', 'decisions.json')), ['ancestor-board-in-home']);
   // on_answer runs with no shell: doctor names a missing program, a shell operator and a file that will not run.
   const doctor = (hook) => (writeFileSync(join(proj, '.sign-off', 'config.yaml'), `board: decisions.json\nport: 0\non_answer: ${hook}\n`), at(proj, {}, 'doctor'));
   assert.match(doctor('nosuch-hook').stdout, /on_answer: nosuch-hook is not a program on PATH or an executable file\. Install nosuch-hook/);

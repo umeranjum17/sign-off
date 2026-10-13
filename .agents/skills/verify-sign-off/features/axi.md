@@ -1,6 +1,6 @@
 # AXI command surface and npm package
 
-Covers `sign-off-axi` with no command (list), the board a bare command picks (the walk, `SIGN_OFF_HOME`), `raise`, `answers`, `open`, `serve` and `--help`, the TOON, `--full` and `--json` tiers, and the packed tarball an agent runs with `npx -y`. Follow Isolation in `SKILL.md` first; this entry runs the packed tarball, not `dist/` from the repo.
+Covers `sign-off-axi` with no command (list), `raise`, `answers`, `open`, `serve` and `--help`, the TOON, `--full` and `--json` tiers, and the packed tarball an agent runs with `npx -y`. Follow Isolation in `SKILL.md` first; this entry runs the packed tarball, not `dist/` from the repo.
 
 ## Fresh shell
 

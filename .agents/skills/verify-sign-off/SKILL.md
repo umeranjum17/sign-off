@@ -12,7 +12,7 @@ Proof comes from the real CLI, the real server and a real browser. A build or a 
 ## Isolation
 
 - Work only in a scratch folder: `SCR=~/.cache/fm-scratch/<task-id>`. Copy fixtures into it; never serve a tracked fixture, because answers land next to the file.
-- Isolate every `sign-off-axi` run as the README's [Test runs never touch your board](../../../README.md#test-runs-never-touch-your-board) says, at `$SCR/home`, and name only boards under `$SCR`, written out in full.
+- Isolate every `sign-off-axi` run under `$SCR` as the README's [Test runs never touch your board](../../../README.md#test-runs-never-touch-your-board) says.
 - Use your own browser session and profile inside the scratch folder:
   `export CHROME_DEVTOOLS_AXI_SESSION=<task-id> CHROME_DEVTOOLS_AXI_USER_DATA_DIR=$SCR/profile`
 - Evidence goes to a private folder outside the repo. Never commit proof media. Only the clean synthetic demo shots in `docs/media/` belong in git.
