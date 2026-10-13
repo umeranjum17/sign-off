@@ -18,6 +18,8 @@ export type Decision = {
   area?: string;
   /** How it works, step by step: each step's title and the marks for what matters there. */
   steps?: Step[];
+  /** Reports: the section it is grouped under, when it was filed (ISO date-time), and what it decided. */
+  group?: string; filed?: string; decided?: string;
 };
 export type Answer = { key: string; answer: string; label: string; close: string; at: string; note?: string };
 export type Round = { key: string; note: string; at: string };
@@ -111,6 +113,9 @@ export function loadDecisions(path: string): Decision[] {
         || (Array.isArray(t.marks) && t.marks.every((m: any) => MARKS.includes(m)) && new Set(t.marks).size === t.marks.length))))) {
       throw bad('steps', `must list 2 to 12 steps, each a title of 80 characters or fewer and marks from ${MARKS.join(', ')}`);
     }
+    if (d.group !== undefined && !(isText(d.group) && d.group.trim() && d.group.length <= 40)) throw bad('group', 'must be text of 40 characters or fewer');
+    if (d.filed !== undefined && !(isText(d.filed) && /^\d{4}-\d{2}-\d{2}T/.test(d.filed) && !Number.isNaN(Date.parse(d.filed)))) throw bad('filed', 'must be an ISO 8601 date-time such as 2026-10-13T07:19:00Z');
+    if (d.decided !== undefined && !(isText(d.decided) && d.decided.trim() && d.decided.length <= 200)) throw bad('decided', 'must be text of 200 characters or fewer');
     if (d.type === 'evidence' && !(Number.isInteger(d.number) && d.number >= 1)) throw bad('number', 'must be a whole number from 1');
     if (d.link !== undefined && !(isText(d.link) && /^(https?:\/\/\S{1,500}|[a-f0-9]{7,40})$/.test(d.link))) throw bad('link', 'must be an http(s) link or a commit hash');
     // A ladder rung: a diagram image, or an interactive page the board frames in a sandbox.
@@ -143,6 +148,7 @@ export function loadDecisions(path: string): Decision[] {
       recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done', evidence: d.evidence,
       type: d.type ?? 'decision', tradeoff: d.tradeoff, link: d.link, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path })),
       ...(views && { view: d.view }), ...(d.reply && { reply: true }), ...(d.filer && { filer: d.filer }), ...(d.area && { area: d.area }),
+      ...(d.group && { group: d.group }), ...(d.filed && { filed: d.filed }), ...(d.decided && { decided: d.decided }),
       ...(d.steps && { steps: d.steps.map(({ title, marks }: Step) => ({ title, ...(marks?.length && { marks }) })) }),
       ...(stored && { media: d.media.map(({ path, sha256, bytes }: MediaRef) => ({ path, sha256, bytes })) }),
       ...(d.type === 'evidence' && { number: d.number }),
