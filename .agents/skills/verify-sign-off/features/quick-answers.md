@@ -1,0 +1,15 @@
+# Quick answers: buttons first, Other answer last, one tap with Undo, recommend required
+
+Covers the rule that typing is the last resort: every answerable card shows its option buttons first, the recommended option first and marked **Recommended**; a reply item's text box is folded behind **Other answer** (**Write a reply** when it has no options) and never open by default; one tap saves at once and a toast offers **Undo** for 5 seconds; `raise`/`post` refuse listed options with no recommendation. Follow Launch and Drive in `SKILL.md` first. Work in a fresh scratch folder and delete it at the end.
+
+Write `$SCR/q/feed.json`: `{"schema": 2, "answers_only": true, "items": [<"type": "ask", "title": "Say yes or no: ...", "reply": true>, <"type": "ask", "reply": true, "options": [today=Today, friday=Friday, next-week="Next week"], "recommend_value": "friday">, <"type": "ask", "reply": true, "options": [done=Done, not-now="Not now"]>]}`, run `node dist/cli.js post $SCR/q/board.json --from $SCR/q/feed.json --replace` and serve it. `FIT` is the one in [dashboard.md](dashboard.md).
+
+| # | Step | Pass when |
+|---|---|---|
+| 1 | `node dist/cli.js raise $SCR/q/r.json --title "When?" --option a=A --option b=B` | Exit 2, `--recommend is required when you list options`, the help line names `--recommend <value>` and `a, b`; with `--recommend b` it is raised. A `raise --from` file listing options with no `recommend_value` is refused naming the item and key; `raise --title "Ship?"` (plain yes/no) is raised; the `--replace` feed above was accepted |
+| 2 | Phone `390x844x3,mobile,touch`, light and dark; shot | `FIT` is true; every card shows its buttons before **Other answer**; **Friday** is the first button with **Recommended**; the yes/no card marks nothing; no text box is visible. Measured: no button, summary or text box is clipped (`scrollWidth > clientWidth`), lower than 40 px, outside its card, or overlapping another |
+| 3 | Click **Yes**; shot while the toast shows; click **Undo** within 5 s | The toast reads `Saved: Yes` with **Undo**, then `Undone: not answered`; the card waits again. `board.answers.jsonl` holds the `yes` line, then `{"answer":"","label":"",...}`; `answers --json` no longer lists the key |
+| 4 | Click **Yes**, wait for the toast to go, click **No**, click **Undo** | The toast reads `Back to: Yes`; the last line is a new `yes` line, so `answers` shows yes |
+| 5 | Click **Other answer** | It unfolds the text box with the caret in it; a 20 s redraw keeps it open |
+
+The integration test (`npm test`, `test/decisions.test.mjs`) also covers the empty-answer line, an Undo with nothing to undo adding no line, and the refusal from flags, `--from` and `post --type design`.

@@ -141,6 +141,25 @@ test('agent journey: raise, open, answer, read back in TOON and JSON', async () 
   assert.match(run('answers').out, /answers\[1\]\{key,answer,at\}:\n  keep-the-weekly-digest,no,/);
   assert.equal(JSON.parse(run('answers', '--key', 'keep-the-weekly-digest', '--json').out)['keep-the-weekly-digest'].answer, 'no');
   assert.match(run('raise', '--title', 'Keep the weekly digest?', '--recommend', 'yes').out, /already answered no/);
+  // Undo on the page saves the answer from before the tap; with none before, an empty answer: the line stays and the question waits again.
+  const saved = join(env.HOME, '.sign-off', 'decisions.answers.jsonl'), lines = () => readFileSync(saved, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  assert.equal((await post(url, { key: 'keep-the-weekly-digest', answer: '' })).status, 200);
+  assert.deepEqual(lines().map((a) => a.answer), ['no', '']);
+  assert.equal(JSON.parse(run('answers', '--json').out)['keep-the-weekly-digest'], undefined);
+  assert.match(run().out, /waiting\[1\]\{key,title\}:\n  keep-the-weekly-digest,/);
+  assert.equal((await post(url, { key: 'keep-the-weekly-digest', answer: '' })).status, 200);
+  assert.equal(lines().length, 2, 'nothing to undo adds no line');
+  assert.equal((await post(url, { key: 'keep-the-weekly-digest', answer: 'no' })).status, 200);
+  // Listing options needs a recommendation, from flags or a file; a plain yes/no may leave it out, and a feed written with --replace is not held to it.
+  const unmarked = run('raise', '--title', 'When should it ship?', '--option', 'today=Today', '--option', 'friday=Friday');
+  assert.equal(unmarked.code, 2);
+  assert.match(unmarked.out, /--recommend is required when you list options[^]*Add --recommend <value>, the option you would pick: one of today, friday/);
+  assert.match(run('raise', join(env.HOME, 'picks.json'), '--title', 'When should it ship?', '--option', 'today=Today', '--option', 'friday=Friday', '--recommend', 'friday').out, /when-should-it-ship,raised/);
+  assert.equal(run('post', '--type', 'design', '--title', 'Pick one', '--option', 'a=A', '--option', 'b=B').code, 2);
+  const listed = join(env.HOME, 'listed.json');
+  writeFileSync(listed, JSON.stringify({ schema: 2, items: [{ key: 'pick', title: 'Pick?', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] }] }));
+  assert.match(run('raise', '--from', listed).out, /items\[0\] \(key pick\) lists options but no recommend_value[^]*Add \\"recommend_value/);
+  assert.match(run('post', join(env.HOME, 'fed.json'), '--from', listed, '--replace').out, /changed: true/);
   run('raise', '--title', 'Only toString?', '--key', 'toString');
   assert.match(run().out, /waiting\[1\]\{key,title\}:\n  toString,Only toString\?/);
   assert.match(run('help', 'raise').out, /raise \[board.json\] --title/);
