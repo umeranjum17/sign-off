@@ -18,19 +18,19 @@ Status: v1 target. Nothing in this file is enforced yet. Each part lands with it
 
 Board items stored before v1 have no `kind` or `schema`. They read exactly as today, under [file-formats.md](file-formats.md), and are not checked again, so existing boards and answers keep working. Their answers report as `ask` schema 1.
 
-Every new post of a contract kind, through `raise`, `post --type` and `post --from` (including `--replace` feeds) alike, is checked against that kind's v1 rules from the change that adds that kind. `raise` stamps `filed` itself where a kind needs it. A new item with no `kind` is refused with the fix "add contract, kind and schema".
+Every new post of a contract kind is checked against that kind's v1 rules from the change that adds that kind. `raise`, and `post --type decision`, which is the same thing, post an `ask`: they fill in `contract`, `kind` and `schema` themselves, then check the item. `post --type evidence` posts an `evidence` the same way. `raise` stamps `filed` itself where a kind needs it.
+
+Non-contract types stay outside this contract. `raise --title` and `post --type design|diagram|interactive|explainer` keep the board rules in [file-formats.md](file-formats.md). In a `--from` file, a new item of a contract kind with no `kind` is refused with the fix "add contract, kind and schema".
 
 ## 3. How a message gets in
 
-One validator, three ways in. No daemon, socket or HTTP API.
+One validator, one way in. No daemon, socket or HTTP API.
 
-1. `sign-off-axi post [board.json] --kind <kind> --from <file.json>`, or `--from -` to read stdin. `--kind` picks this path and must equal the message's `kind`, so the wrong file is never posted.
-2. A file drop: the producer writes one message file, then runs the same command on it. sign-off never watches for dropped messages.
-3. A `--replace` feed, as in section 2.
+`sign-off-axi post [board.json] --kind <kind> --from <file.json>`, or `--from -` to read stdin. `--kind` must equal the message's `kind`, so the wrong file is never posted. A `post --from --replace` feed checks each new contract-kind item the same way.
 
-`raise` and `post --type` check a file that carries `contract` and `kind` the same way `post --kind` does.
+`raise` and `post --type` check a new file that carries `contract` and `kind` the same way `post --kind` does, and refuse a file with no `kind` unless it names a non-contract type (section 2).
 
-A message file holds one JSON object, in any layout. It is read with standard JSON parsing. A repeated field refuses the message with one fix line naming the field, such as `Remove the second "recommend_value".` A message with no `kind` is refused (section 2). `null` is a wrong type for every field.
+A message file holds one JSON object, in any layout. The validator reads it with a parser that reports repeated fields. A repeated field refuses the message with one fix line naming the field, such as `Remove the second "recommend_value".` A message with no `kind` is refused (section 2). `null` is a wrong type for every field.
 
 | Producer | Kinds it sends |
 |---|---|
@@ -61,7 +61,7 @@ A message file holds one JSON object, in any layout. It is read with standard JS
 
 When `filer` is missing, `post` takes it from `--filer`, else `SIGN_OFF_FILER` (empty means unset), else the agent session id. A `filer` in the message that differs from `--filer` is refused. Only `post` checks this; `validate` checks `filer` only when the message has one.
 
-A key already on the board takes only the same message again (the same fields and values, in any order), which changes nothing. Anything else under that key is refused with code `CONFLICT` and exit 1: post it under a new key.
+A key already on the board takes only the same message again (the same fields and values, in any order), which changes nothing. Anything else under that key is refused with code `CONFLICT`, exit 2 and the help line "Post it under a new key". Today's CLI exits 1 on `CONFLICT`; this contract changes that, so every refusal exits 2.
 
 ## 5. One shape per kind
 
@@ -71,7 +71,7 @@ A question the person answers by picking an option. Shows in Waiting on you.
 
 - Fields: the common ones, `about`, `detail`, `options`, `recommend_value`, `default_if_silent`, `close`.
 - A yes/no ask lists `yes` (Yes) and `no` (No) as its options.
-- Design picks, diagrams, interactive pages and explainers are not v1 kinds, so this contract does not post them.
+- Design picks, diagrams, interactive pages and explainers are not v1 kinds. They post with `post --type` under the board rules in [file-formats.md](file-formats.md), outside this contract.
 
 ### report, schema 1
 
@@ -86,7 +86,7 @@ Something the person reads. It takes no answer. Shows in Reports and explainers.
 Proof the person gives a verdict on. Shows in Evidence. Its options are fixed and not in the message: `pass` (Pass), `fail` (Fail) and `needs-work` (Needs work).
 
 - Required: the common fields (`key` is optional), `about`, and at least one of `media` or `run`.
-- `media`: 1 to 12 relative file paths, with no `..`, resolved from the message file's folder (from the current folder for `--from -`), ending in `.png`, `.jpg`, `.jpeg`, `.webp`, `.mp4` or `.webm` (any case), each 50,000,000 bytes or fewer. `post` copies them into `evidence/<number>/` and records each `sha256` and `bytes`. A missing or oversized file refuses the message. `validate` checks the same and copies nothing.
+- `media`: 1 to 12 relative file paths, with no `..`, resolved from the message file's folder (from the current folder for `--from -`). Symlinks are followed: the real path must stay inside that folder, else the message is refused with a fix line naming the file. Each path ends in `.png`, `.jpg`, `.jpeg`, `.webp`, `.mp4` or `.webm` (any case), each 50,000,000 bytes or fewer. `post` copies them into `evidence/<number>/` and records each `sha256` and `bytes`. A missing or oversized file refuses the message. `validate` checks the same and copies nothing.
 - `run`: a done-done run, exactly `run_id` (a key-set id), `commit` (40 lowercase hex) and the four Checks lines `outcome`, `repro`, `proof` and `evidence` (text, 1-1000 each). The board stores it in the item's `evidence` field ([file-formats.md](file-formats.md)); `link` stays its own field.
 - Without `key`, `post` sets `update-<number>`, where `<number>` is the next free `evidence/<number>/` folder next to the board.
 
@@ -128,7 +128,7 @@ One per kind, each written on one line here. Demo data uses the name Umer.
   {"event":"round","contract":1,"kind":"ask","schema":1,"key":"ship-signin-2","title":"Ship the new sign-in screen this week?","note":"Show it on a phone first.","at":"2026-10-13T08:05:00Z","filer":"agent-41"}
   ```
 
-- An `answer` event has `event`, `contract`, `kind`, `schema`, `key`, `title`, `answer`, `label`, `close` and `at`. A `round` event has `event`, `contract`, `kind`, `schema`, `key`, `title`, `note` and `at`.
+- An `answer` event has `event`, `contract`, `kind`, `schema`, `key`, `title`, `answer`, `label`, `close` and `at`. A `round` event has `event`, `contract`, `kind`, `schema`, `key`, `title`, `note` and `at`, and `filer` when the item has one.
 - `note` is added to an answer only when the person typed one. `filer` is added only when the item has one. `close` is `done` on kinds that do not take it. An `evidence` answer's `label` is Pass, Fail or Needs work.
 - `wait --json` and `answers --json` keep their map keyed by item key, so existing readers keep working.
 - An `on_answer:` command in `config.yaml` keeps every field it gets today (`key`, `answer`, `label`, `close`, `at`, `note`, `title`, `filer`) and gains `event`, `contract`, `kind` and `schema`. An Undo back to no answer still reaches it, with `"answer": ""`; `wait` never returns one.
