@@ -1,9 +1,9 @@
 // Internal custody foundation only. No CLI/browser route imports this until all vault gates are proved.
-import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { basename, dirname, isAbsolute, join, parse, resolve } from 'node:path';
+import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, isAbsolute, join, parse, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { createCipheriv, createHash, randomBytes } from 'node:crypto';
-import { isKey } from './store.js';
+import { isKey, readItems, writeItems } from './store.js';
 
 export type VaultMeta = { board: string; key: string; mode: 'give' | 'receive'; filer: string; expires: number; destination?: string };
 type Status = 'pending' | 'ready' | 'expired' | 'refused';
@@ -23,17 +23,25 @@ export class VaultError extends Error {
 function bad(code: keyof typeof errors): never { throw new VaultError(code); }
 const digest = (board: string, key: string) => createHash('sha256').update(JSON.stringify([board, key])).digest('hex');
 const aad = (meta: VaultMeta) => Buffer.from(JSON.stringify([1, meta.board, meta.key, meta.mode, meta.expires, meta.destination ?? null, meta.filer]));
-function boardId(board: unknown) {
+const VAULT_ID = /^[a-f0-9]{32}$/;
+function boardFile(board: unknown) {
   if (typeof board !== 'string' || !isAbsolute(board)) bad('VALIDATION_ERROR');
-  const file = existsSync(board) ? realpathSync(board) : resolve(board);
-  try {
-    const parent = realpathSync(dirname(file)), s = statSync(parent);
-    return { id: `${s.dev}:${s.ino}/${basename(file)}`, parent };
-  } catch { bad('VALIDATION_ERROR'); }
+  try { return realpathSync(board); } catch { bad('NOT_FOUND'); }
+}
+function vaultId(file: string, create: boolean) {
+  const { items, extra } = readItems(file);
+  if (extra.vault_id !== undefined) {
+    if (typeof extra.vault_id === 'string' && VAULT_ID.test(extra.vault_id)) return extra.vault_id;
+    bad('VALIDATION_ERROR');
+  }
+  if (!create) bad('NOT_FOUND');
+  const id = randomBytes(16).toString('hex');
+  writeItems(file, items, { ...extra, vault_id: id });
+  return id;
 }
 
 function metadata(m: VaultMeta): VaultMeta {
-  if (!m || typeof m.board !== 'string' || !/^\d+:\d+\/[^/]+$/.test(m.board) || !isKey(m.key) || !isKey(m.filer) || !['give', 'receive'].includes(m.mode)
+  if (!m || typeof m.board !== 'string' || !VAULT_ID.test(m.board) || !isKey(m.key) || !isKey(m.filer) || !['give', 'receive'].includes(m.mode)
     || !Number.isSafeInteger(m.expires) || (m.mode === 'give' ? typeof m.destination !== 'string' || !isAbsolute(m.destination) : m.destination !== undefined)) bad('VALIDATION_ERROR');
   return { board: m.board, key: m.key, mode: m.mode, filer: m.filer, expires: m.expires,
     ...(m.destination !== undefined && { destination: resolve(m.destination) }) };
@@ -92,11 +100,11 @@ function seal(dir: string, meta: VaultMeta, value: Buffer): Sealed {
     return { nonce: nonce.toString('base64'), tag: cipher.getAuthTag().toString('base64'), data: data.toString('base64') };
   } finally { key.fill(0); }
 }
-async function operate<T>(board: string, key: string, fn: (dir: string, path: string, record?: Record) => T): Promise<T> {
-  if (typeof board !== 'string' || !isAbsolute(board) || !isKey(key)) bad('VALIDATION_ERROR');
+async function operate<T>(board: string, key: string, create: boolean, fn: (dir: string, path: string, record: Record | undefined, id: string) => T): Promise<T> {
+  if (!isKey(key)) bad('VALIDATION_ERROR');
   let lock: string | undefined;
   try {
-    const { id, parent } = boardId(board), dir = root(), path = join(dir, `${digest(id, key)}.json`), candidate = join(dir, 'lock');
+    const file = boardFile(board), parent = dirname(file), dir = root(), candidate = join(dir, 'lock');
     if (dir === parent || dir.startsWith(parent + '/')) bad('VAULT_KEY_UNAVAILABLE');
     // ponytail: one global lock; split by board only if custody throughput requires it. Stale locks fail closed.
     for (let tries = 0; ; tries++) {
@@ -109,6 +117,7 @@ async function operate<T>(board: string, key: string, fn: (dir: string, path: st
     // No writer can still own these under the lock; only ciphertext ever enters a temp record.
     for (const n of readdirSync(dir).filter((n) => /^[a-f0-9]{64}\.json\.[a-f0-9]{16}\.tmp$/.test(n))) rmSync(join(dir, n));
     syncDir(dir);
+    const id = vaultId(file, create), path = join(dir, `${digest(id, key)}.json`);
     let record: Record | undefined;
     if (lstatSync(path, { throwIfNoEntry: false })) {
       privateFile(path);
@@ -120,7 +129,7 @@ async function operate<T>(board: string, key: string, fn: (dir: string, path: st
         persist(path, record);
       }
     }
-    return fn(dir, path, record);
+    return fn(dir, path, record, id);
   } catch (e) { throw e instanceof VaultError ? e : new VaultError('BUSY'); }
   finally { if (lock) { try { rmSync(lock, { force: true }); } catch { /* a stale lock already fails closed */ } } }
 }
@@ -133,9 +142,9 @@ const active = (r?: Record) => {
 };
 
 export async function createVault(input: VaultMeta, value?: Buffer) {
-  const meta = metadata({ ...input, board: boardId(input?.board).id });
-  if (meta.expires <= Date.now() || meta.expires > Date.now() + 3_600_000 || (meta.mode === 'receive') !== (value !== undefined)) bad('VALIDATION_ERROR');
-  return operate(input.board, meta.key, (dir, path, old) => {
+  if (input?.expires <= Date.now() || input?.expires > Date.now() + 3_600_000 || (input?.mode === 'receive') !== (value !== undefined)) bad('VALIDATION_ERROR');
+  return operate(input?.board, input?.key, true, (dir, path, old, id) => {
+    const meta = metadata({ ...input, board: id });
     if (old) bad('VALIDATION_ERROR'); // Terminal keys are tombstones, never reusable.
     if (meta.expires <= Date.now()) bad('EXPIRED');
     if (!value) master(dir);
@@ -145,10 +154,10 @@ export async function createVault(input: VaultMeta, value?: Buffer) {
   });
 }
 export async function inspectVault(board: string, key: string) {
-  return operate(board, key, (_, __, r) => r ? summary(r) : bad('NOT_FOUND'));
+  return operate(board, key, false, (_, __, r) => r ? summary(r) : bad('NOT_FOUND'));
 }
 export async function depositVault(board: string, key: string, value: Buffer) {
-  return operate(board, key, (dir, path, old) => {
+  return operate(board, key, false, (dir, path, old) => {
     const r = active(old);
     if (r.meta.mode !== 'give' || r.status !== 'pending') bad('VALIDATION_ERROR');
     const record: Record = { ...r, status: 'ready', at: Date.now(), sealed: seal(dir, r.meta, value) };
@@ -157,7 +166,7 @@ export async function depositVault(board: string, key: string, value: Buffer) {
   });
 }
 export async function refuseVault(board: string, key: string) {
-  return operate(board, key, (_, path, old) => {
+  return operate(board, key, false, (_, path, old) => {
     const r = active(old), record: Record = { schema: 1, meta: r.meta, status: 'refused', at: Date.now() };
     persist(path, record);
     return summary(record);

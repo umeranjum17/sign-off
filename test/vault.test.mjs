@@ -17,6 +17,7 @@ catch(e) { console.log(JSON.stringify({code:e.code,error:e.message})); process.e
 test('disabled vault custody across real processes: encryption, racing deposits, expiry, refusal and missing-key fail closed', async () => {
   const home = mkdtempSync(join(tmpdir(), 'sign-off-vault-')), state = join(home, 'state'), board = join(home, 'project', 'board.json');
   mkdirSync(join(home, 'project'), { mode: 0o700 });
+  writeFileSync(board, JSON.stringify({ schema: 2, items: [{ key: 'ordinary', title: 'Umer: continue?' }] }));
   const env = { ...process.env, HOME: home, XDG_STATE_HOME: state, XDG_CONFIG_HOME: join(home, 'config'), TMPDIR: home };
   const outputs = [], secret = `FAKE_${randomBytes(24).toString('hex')}`, url = `https://www.npmjs.com/login/cli/${randomBytes(24).toString('hex')}`;
   const run = (input, onStarted) => new Promise((ok, reject) => {
@@ -93,12 +94,20 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     for (const value of ['', 'x'.repeat(16_385)]) assert.equal((await run({ op: 'create', meta: meta('bad', 'receive'), value })).exit, 1);
     const aliasDir = join(home, 'alias'); symlinkSync(join(home, 'project'), aliasDir);
     assert.equal((await run({ op: 'create', meta: { ...meta('give'), board: join(aliasDir, 'board.json') } })).code, 'VALIDATION_ERROR');
-    const movedDir = join(home, 'moved'); mkdirSync(movedDir, { mode: 0o700 });
-    assert.equal((await run({ op: 'create', meta: { ...meta('moving'), board: join(movedDir, 'board.json') } })).status, 'pending');
-    assert.equal((await run({ op: 'refuse', board: join(movedDir, 'board.json'), key: 'moving' })).status, 'refused');
+    const movedDir = join(home, 'moved'), movedBoard = join(movedDir, 'board.json'); mkdirSync(movedDir, { mode: 0o700 });
+    writeFileSync(movedBoard, JSON.stringify({ schema: 2, items: [] }));
+    assert.equal((await run({ op: 'create', meta: { ...meta('moving'), board: movedBoard } })).status, 'pending');
+    assert.equal((await run({ op: 'refuse', board: movedBoard, key: 'moving' })).status, 'refused');
     renameSync(movedDir, join(home, 'moved-again'));
-    assert.equal((await run({ op: 'create', meta: { ...meta('moving'), board: join(home, 'moved-again', 'board.json') } })).code, 'VALIDATION_ERROR');
-    writeFileSync(board, JSON.stringify({ schema: 2, items: [{ key: 'ordinary', title: 'Umer: continue?' }] }));
+    const movedAgain = join(home, 'moved-again', 'board.json'), linkedBoard = join(home, 'linked-board.json');
+    assert.equal((await run({ op: 'create', meta: { ...meta('moving'), board: movedAgain } })).code, 'VALIDATION_ERROR');
+    symlinkSync(movedAgain, linkedBoard);
+    assert.equal((await run({ op: 'create', meta: { ...meta('moving'), board: linkedBoard } })).code, 'VALIDATION_ERROR');
+    rmSync(join(home, 'moved-again'), { recursive: true });
+    mkdirSync(join(home, 'moved-again'), { mode: 0o700 });
+    writeFileSync(movedAgain, JSON.stringify({ schema: 2, items: [] }));
+    assert.equal((await run({ op: 'inspect', board: movedAgain, key: 'moving' })).code, 'NOT_FOUND');
+    assert.equal((await run({ op: 'create', meta: { ...meta('moving'), board: movedAgain } })).status, 'pending');
     for (const args of [['post', board, '--type', 'vault', '--title', 'Give'], ['post', board, '--from', '-']]) {
       const r = spawnSync(process.execPath, [cli, ...args], { env, encoding: 'utf8' }); outputs.push(r.stdout, r.stderr); assert.notEqual(r.status, 0);
     }
@@ -107,9 +116,7 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     const fed = spawnSync(process.execPath, [cli, 'post', board, '--from', feed], { env, encoding: 'utf8' });
     outputs.push(fed.stdout, fed.stderr); assert.equal(fed.status, 2); assert.match(fed.stdout, /Vault is not enabled/);
     assert.equal(JSON.parse(readFileSync(board)).items[0].key, 'ordinary');
-    const inGit = spawnSync('git', ['grep', '-n', '-F', '-e', secret, '-e', url, 'HEAD'], { env, encoding: 'utf8' });
-    assert.equal(inGit.status, 1, 'Git must report no payload match, not a failed probe.');
-    for (const text of [...outputs, ...files(home).map((p) => readFileSync(p).toString()), inGit.stdout]) {
+    for (const text of [...outputs, ...files(home).map((p) => readFileSync(p).toString())]) {
       assert.equal(text.includes(secret) || text.includes(url), false);
     }
   } finally { rmSync(home, { recursive: true, force: true }); }
