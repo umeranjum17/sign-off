@@ -1211,7 +1211,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   const { key, answer, note = '' } = JSON.parse(body) ?? {};
   if (typeof note !== 'string' || [...note.trim()].length > NOTE_MAX) return [400, { error: `The note must be text of ${NOTE_MAX} characters or fewer` }];
   const d = loadDecisions(file).find((x) => x.key === key);
-  if (answer === REPLY.value && !note.trim()) return [400, { error: 'Write the reply first' }];
+  if (answer === REPLY.value && !note.trim() && !d?.options.some((o) => o.value === answer)) return [400, { error: 'Write the reply first' }];
   // Undo with no answer to go back to saves an empty answer: the line is kept and the item waits again.
   if (answer === CLEARED.value) {
     if (!isKey(key) || (!d && !answersOnly())) return [404, { error: 'This question is no longer in the file' }];
@@ -1224,8 +1224,9 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     answered(appendAnswer(file, { key, close: 'done' } as Decision, answer === REPLY.value ? REPLY : { value: answer, label: answer }, note.trim()));
     return [200, state()];
   }
-  const option = d.reply && answer === REPLY.value ? REPLY : d.options.find((o) => o.value === answer);
-  if (!option) return [400, { error: `The answer must be one of: ${[...d.options, ...(d.reply ? [REPLY] : [])].map((o) => o.label).join(', ') || 'none, this item is only shown'}` }];
+  // Every item that asks something takes an Other answer: the words, saved as the answer `text`, unless an option is named text.
+  const other = d.reply || d.options.length ? [REPLY] : [], option = d.options.find((o) => o.value === answer) ?? other.find((o) => o.value === answer);
+  if (!option) return [400, { error: `The answer must be one of: ${[...d.options, ...other].map((o) => o.label).join(', ') || 'none, this item is only shown'}` }];
   answered(appendAnswer(file, d, option, note.trim()), d);
   return [200, state()];
 }

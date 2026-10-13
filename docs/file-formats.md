@@ -37,8 +37,8 @@
   posts its own height (below).
 - `"answers_only": true` instead makes an **answers-only board**, also fed by
   another program: the same one list, checked every 20 seconds, but the items
-  that ask something take answers and replies. There is no Ask box, no note
-  panel and no another-round button, and the server refuses rounds, comments
+  that ask something take answers and replies. There is no Ask box, and
+  **Other answer** has no Another round or comment button; the server refuses rounds, comments
   and prompts with 403. An answer or reply to an item the program dropped
   while the person answered it is still saved. A feeding program writes the
   board with `sign-off-axi post <board> --from <file> --replace`, which checks
@@ -103,12 +103,19 @@
   `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.woff2`, `.mp4` and `.webm` files
   from inside that page's own folder only, never anything above it. `export`
   inlines the page itself, so those files show only on the running board.
-- `reply`: optional, `true` adds a short text reply (500 characters or fewer)
-  to the item, in place of its note panel, folded behind an **Other answer**
-  button after the option buttons: sent on its own, it is saved as the
-  answer `text` with the words as its `note`; typed before a button is
-  picked, it goes with that answer as its note. No option may use the value
-  `text` then. With `"options": []` the reply is the only answer.
+- Every item that asks something has one place to type, folded behind
+  **Other answer** after its buttons (a design's Picks too): a short text,
+  500 characters or fewer. **Send reply** saves it as the answer `text` with
+  the words as its `note`; typed before a button is picked, it goes with that
+  answer as its note. On a normal board the same box also asks for
+  **Another round** (not on an evidence update) and sends a comment
+  (**Send as a comment**). An item with an option valued `text` takes the
+  words only as a note: it has no **Send reply**.
+- `reply`: optional, `true` lets an item take a text reply with
+  `"options": []`, where the reply is the only answer (**Write a reply**); on an
+  item with options, the reply also goes to the agent as a comment and stays
+  the note of an answer picked after it. No option may use the value `text`
+  then.
 - `options`: optional, 2 to 6 choices, or `[]` on a read-only or answers-only board for an item that is only shown and waits on nothing (unless it has `reply`). Each has a `value` (1-128 of `A-Z a-z 0-9 . _ -`, unique within the question) and a non-empty `label` shown on its button. Leave it out for **Yes** (`yes`) and **No** (`no`); files written before options existed read exactly as before.
 - `recommend_value`, `default_if_silent`: optional, the `value` of one of the question's own options (`yes` or `no` when `options` is left out). Shown, never applied.
 - `close`: optional, `done` (default) or `release`; copied into the answer.
@@ -157,7 +164,8 @@ also copies each file into `evidence/<number>/` next to the board:
 {"key":"release-window","answer":"friday","label":"Friday","close":"done","at":"2026-10-12T04:50:32Z","note":"After the Friday stand-up."}
 ```
 
-- `answer` is the picked option's `value`, `label` its label at the time of the click.
+- `answer` is the picked option's `value`, `label` its label at the time of the click. An **Other answer** is saved as
+  `"answer":"text","label":"Reply"` with the typed words as its `note`.
 - An **Undo** (offered for a few seconds after each tap) is saved as one more line: the answer before the tap, or, when there
   was none, an empty `answer` and `label` (`{"key":"dark-default","answer":"","label":"","close":"done","at":"..."}`), which
   leaves the key unanswered, so the item waits again. An `on_answer:` command gets that line too.
