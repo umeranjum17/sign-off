@@ -944,7 +944,7 @@ test('no board named: the nearest .sign-off/ up to the repo root, else the home 
   assert.match(doctor('nosuch-hook').stdout, /on_answer: nosuch-hook is not a program on PATH or an executable file\. Install nosuch-hook/);
   const op = doctor('node hook.mjs > answer.txt');
   assert.equal(op.status, 1);
-  assert.match(op.stdout, /on_answer: > is a shell operator, and on_answer runs with no shell\. Put the command in a script/);
+  assert.match(op.stdout, /on_answer: > is a shell operator, and on_answer runs with no shell, so it is passed to the program as an argument\. Put the command in a script/);
   assert.equal(doctor('node hook.mjs').status, 0);
   writeFileSync(join(proj, '.sign-off', 'save.sh'), '#!/bin/sh\n');
   assert.match(doctor('./save.sh').stdout, /on_answer: \.\/save\.sh is not a program on PATH or an executable file\. Run `chmod \+x .*save\.sh`/);
@@ -971,4 +971,16 @@ test('no board named under a symlinked HOME: the walk stops at the real HOME, ne
   assert.equal(r.status, 0, r.stdout);
   assert.deepEqual(JSON.parse(readFileSync(join(linkHome, '.sign-off', 'decisions.json'), 'utf8')).items.map((i) => i.key), ['from-linked-home']);
   assert.equal(existsSync(join(realHome, '.sign-off', 'home-trap.json')), false);
+});
+
+test('no board named: doctor checks the nearest setup from a subfolder, a missing HOME uses the working folder, and a folder named ~ is printed quoted', () => {
+  const at = (cwd, more, ...args) => spawnSync(process.execPath, [cli, ...args], { cwd, env: { ...env, ...more }, encoding: 'utf8' });
+  const proj = join(scratch, 'doctor-walk'), deep = join(proj, 'src', 'deep');
+  mkdirSync(join(proj, '.git'), { recursive: true });
+  mkdirSync(deep, { recursive: true });
+  assert.equal(at(proj, {}, 'init').status, 0);
+  assert.match(at(deep, {}, 'doctor').stdout, /config,"board decisions\.json/);
+  assert.equal(at(proj, { HOME: join(scratch, 'no-such-home') }, 'raise', '--title', 'Missing home?').status, 0);
+  assert.deepEqual(JSON.parse(readFileSync(join(proj, '.sign-off', 'decisions.json'), 'utf8')).items.map((i) => i.key), ['missing-home']);
+  assert.match(at(proj, {}, 'doctor', join('~', 'x')).stdout, /init '~\/x'/);
 });

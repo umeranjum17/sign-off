@@ -208,6 +208,7 @@ examples:
 Checks the repo setup init wrote: node version, config, board file, answer files, a lock a crashed command left behind, gitignore lines, folders, whether the dashboard port is free,
 that each hosts: name in the config leads to the bind address, that the on_answer: command can run (no shell, so | > && do nothing),
 and one line per coding agent in the config's agent: line (auto: each one on PATH) saying whether its skill is installed.
+With no dir, it checks the nearest setup from the working folder up to the repo root, found as a bare command finds its board.
 Each failure prints one help line naming its fix and exits 1; a clean setup exits 0.
 examples:
   sign-off-axi doctor
@@ -218,9 +219,9 @@ const tilde = (path: string) => (path.startsWith(homedir() + sep) ? `~${path.sli
 /** A path as a shell word for a printed command: relative when it is under the working folder, quoted when it has anything but plain path characters,
  * with a leading ~/ kept outside the quotes. */
 const shellPath = (path: string) => {
-  const rel = relative(process.cwd(), path), shown = !rel ? '.' : rel.split(sep)[0] !== '..' && !isAbsolute(rel) ? rel : tilde(path);
-  const home = shown.startsWith('~/') ? '~/' : '', rest = shown.slice(home.length);
-  return home + (/^[\w./~-]+$/.test(rest) ? rest : `'${rest.replaceAll("'", "'\\''")}'`);
+  const rel = relative(process.cwd(), path), under = rel.split(sep)[0] !== '..' && !isAbsolute(rel);
+  const shown = !rel ? '.' : under ? rel : tilde(path), home = !under && shown.startsWith('~/') ? '~/' : '', rest = shown.slice(home.length);
+  return home + (/^[\w./-]+$/.test(rest) ? rest : `'${rest.replaceAll("'", "'\\''")}'`);
 };
 /** Run through npx (npm exec), a next-step command says npx -y sign-off-axi, since a bare sign-off-axi may not be installed. */
 const hint = (line: string) => (process.env.npm_command === 'exec' ? line.replaceAll('`sign-off-axi', '`npx -y sign-off-axi') : line);
@@ -251,15 +252,19 @@ function parse(cmd: string, args: string[], flags: Flags) {
   const path = given === undefined ? boardHere() : resolve(given), real = existsSync(path) ? realpathSync(path) : path;
   return { file: real, named: path, values: parsed.values as Record<string, any>, on };
 }
-/** The board when none is given: the nearest .sign-off/ that init set up, from the working folder up to the repo root (the folder holding .git), else ~/.sign-off/decisions.json. */
-function boardHere() {
-  const home = realpathSync(homedir());
+/** The folder of the nearest .sign-off/config.yaml that init set up, from the working folder up to the repo root (the folder holding .git), never HOME itself; with no HOME, the working folder only. */
+function setupFolderHere() {
+  const home = existsSync(homedir()) ? realpathSync(homedir()) : undefined;
   for (let dir = process.cwd(); dir !== home; dir = dirname(dir)) {
-    const so = join(dir, '.sign-off');
-    if (existsSync(join(so, 'config.yaml'))) return setupOf(join(so, 'decisions.json'))!.board;
-    if (existsSync(join(dir, '.git')) || dirname(dir) === dir) break;
+    if (existsSync(join(dir, '.sign-off', 'config.yaml'))) return dir;
+    if (!home || existsSync(join(dir, '.git')) || dirname(dir) === dir) break;
   }
-  return join(homedir(), '.sign-off', 'decisions.json');
+  return undefined;
+}
+/** The board when none is given: the nearest project board, else ~/.sign-off/decisions.json. */
+function boardHere() {
+  const folder = setupFolderHere();
+  return folder ? setupOf(join(folder, '.sign-off', 'decisions.json'))!.board : join(homedir(), '.sign-off', 'decisions.json');
 }
 const portOf = (value: string) => {
   if (!/^\d{1,5}$/.test(value) || Number(value) > 65535) throw fail('--port must be a number from 0 to 65535', 'VALIDATION_ERROR');
@@ -798,7 +803,7 @@ function repoDir(cmd: string, args: string[], options: Flags = {}) {
   }
   const [dir, extra] = parsed.positionals;
   if (extra !== undefined) throw fail(`unexpected argument ${extra}: \`${cmd}\` takes one folder`, 'VALIDATION_ERROR', `Run \`sign-off-axi ${cmd} --help\``);
-  return { dir: resolve(dir ?? '.'), values: parsed.values as Record<string, any> };
+  return { dir: resolve(dir ?? '.'), given: dir !== undefined, values: parsed.values as Record<string, any> };
 }
 
 /** The value of the agent: line of <so>/config.yaml, spaces dropped; undefined when there is none or it is empty. */
@@ -902,7 +907,7 @@ function init(args: string[]) {
 }
 
 async function doctor(args: string[]) {
-  const { dir } = repoDir('doctor', args), so = join(dir, '.sign-off'), rerun = `sign-off-axi init ${shellPath(dir)}`;
+  const { dir: folder, given } = repoDir('doctor', args), dir = given ? folder : setupFolderHere() ?? folder, so = join(dir, '.sign-off'), rerun = `sign-off-axi init ${shellPath(dir)}`;
   const checks: { name: string; ok: string; fix?: string }[] = [];
   const check = (name: string, ok: string, fix?: string) => checks.push({ name, ok, fix });
   /** Stats a path; one it cannot follow (a link to nothing, a link loop) is 'link', and one it may not reach is 'denied', instead of an error. */
@@ -958,7 +963,7 @@ async function doctor(args: string[]) {
         const [hook] = setup.onAnswer, op = setup.onAnswer.find((w) => /[|&;<>$`]/.test(w));
         if (hook) {
           const path = hook.includes('/') && resolve(dirname(existsSync(board) ? realpathSync(board) : board), hook), runs = path ? executable(path) : onPath(hook);
-          check('on_answer', op ? `${op} is a shell operator, and on_answer runs with no shell` : runs ? `runs ${hook} for each answer` : `${hook} is not a program on PATH or an executable file`,
+          check('on_answer', op ? `${op} is a shell operator, and on_answer runs with no shell, so it is passed to the program as an argument` : runs ? `runs ${hook} for each answer` : `${hook} is not a program on PATH or an executable file`,
             op ? `Put the command in a script and name the script on the on_answer: line of ${shellPath(config)}`
               : runs ? undefined : path ? `Run \`chmod +x ${shellPath(path)}\`, or fix the path on the on_answer: line of ${shellPath(config)}`
               : `Install ${hook}, or name an executable file on the on_answer: line of ${shellPath(config)}`);

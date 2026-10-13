@@ -78,7 +78,7 @@ a lock a crashed command left behind, gitignore lines, folders, the dashboard
 port, the `hosts:` names and each agent's skill. Each
 failure prints one `help:` line with its fix, and doctor exits 1; a clean run
 exits 0. `open` and `serve` use the config's `port:` unless `--port` is given;
-for a symlinked board they read the `config.yaml` beside the link, as doctor does.
+for a symlinked board they read the `config.yaml` beside the link, as doctor does. With no folder, `doctor` checks the nearest setup the same way a bare command finds its board.
 Re-running `init` keeps files that are already there, adds the missing ones (so
 it repairs an `init` that was cut short) and skips agents that already have the
 skill. Mock files go under
