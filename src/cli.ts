@@ -1186,6 +1186,8 @@ async function exportBoard(args: string[]) {
 
 
 const page = readFileSync(new URL('../web/index.html', import.meta.url));
+/** Added to each design mock page so the person can point at a part of it; see web/point.js. */
+const pointer = Buffer.from(`<script>${readFileSync(new URL('../web/point.js', import.meta.url), 'utf8')}</script>`);
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 const state = () => {
   const answers = readAnswers(file, warn), taken = seenBy(file), rounds = readRounds(file, warn);
@@ -1279,7 +1281,8 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
       if (!mock || !type) return [404, { error: 'Mock is unavailable' }];
       const actual = under(dirname(under(dirname(file), mockFile(mock))), path);
       if (statSync(actual).size > MOCK_BYTES) return [404, { error: 'Mock is unavailable' }];
-      return [200, { media: readFileSync(actual), type }];
+      // A design mock page gets the pointing bridge when served; export inlines the page as written.
+      return [200, { media: readFileSync(actual), type, point: Boolean(value) && type === 'text/html' }];
     } catch { return [404, { error: 'Mock is unavailable' }]; }
   }
   if (req.method === 'GET' && req.url?.startsWith('/api/evidence?')) {
@@ -1399,7 +1402,7 @@ const server = createServer(async (req, res) => {
     body = { error: e.message };
   }
   if (body && typeof body === 'object' && 'media' in body) {
-    const { media, type } = body as { media: Buffer; type: string };
+    const { media: bytes, type, point } = body as { media: Buffer; type: string; point?: boolean }, media = point ? Buffer.concat([bytes, pointer]) : bytes;
     const headers = { 'content-type': type, 'x-content-type-options': 'nosniff', 'content-security-policy': FRAME_CSP, 'accept-ranges': 'bytes', 'content-length': media.length };
     // One byte range, so phone browsers can play and seek a recording.
     const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? '');

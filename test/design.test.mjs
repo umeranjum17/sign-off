@@ -174,9 +174,10 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   assert.equal(JSON.parse(run('answers', board, '--key', 'demo', '--json').out).demo.answer, 'needs-work');
   assert.deepEqual(api.rounds, []);
   assert.equal(api.mockBase, '/mock/local/');
-  assert.equal(await (await fetch(`${url}mock/local/pick-the-sign-in-layout~a/a.html`)).text(), '<h1>Mock A</h1>');
+  // The mock comes as written, with the pointing bridge after it.
+  assert.match(await (await fetch(`${url}mock/local/pick-the-sign-in-layout~a/a.html`)).text(), /^<h1>Mock A<\/h1><script>/);
   assert.equal((await fetch(`${url}mock/local/pick-the-sign-in-layout~z/a.html`)).status, 404);
-  assert.equal(await (await fetch(`${url}mock/local/nav~b/index.html?variant=b`)).text(), '<p>variant page</p>');
+  assert.match(await (await fetch(`${url}mock/local/nav~b/index.html?variant=b`)).text(), /^<p>variant page<\/p><script>/);
   assert.equal((await post(url, 'api/rounds', { key: 'pick-the-sign-in-layout', note: '' })).status, 400);
   assert.equal((await post(url, 'api/rounds', { key: 'gone', note: 'hi' })).status, 404);
   const waiting = spawn('node', [cli, 'wait', board, '--key', 'pick-the-sign-in-layout', '--timeout', '20']);
@@ -502,8 +503,14 @@ async function browse(dir, width = 800) {
   const replies = new Map();
   let seq = 0;
   ws.onmessage = (m) => { const msg = JSON.parse(m.data); replies.get(msg.id)?.(msg.result?.result?.value); };
-  const evaluate = (expression) => new Promise((ok) => { const id = ++seq; replies.set(id, ok); ws.send(JSON.stringify({ id, method: 'Runtime.evaluate', params: { expression, returnByValue: true } })); });
-  return { evaluate, close: () => { ws.close(); browser.kill(); } };
+  // A call the browser never answers (a page torn down mid-call) gives undefined after 10 s, so until() asks again instead of hanging.
+  const call = (method, params) => new Promise((ok) => { const id = ++seq; replies.set(id, ok); setTimeout(ok, 10000).unref(); ws.send(JSON.stringify({ id, method, params })); });
+  const evaluate = (expression) => call('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+  // A real mouse click at a point of the page, which reaches into a frame there as a person's would.
+  const click = async ([x, y]) => { for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await call('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 }); };
+  // A real touch tap at a point of the page, as a phone's would.
+  const tap = async ([x, y]) => { await call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] }); await call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); };
+  return { evaluate, click, tap, close: () => { ws.close(); browser.kill(); } };
 }
 
 test('an interactive page that posts its height gets a frame that fits it, each frame only its own and never past 10000px; a design shows the recommended phone frame first', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
@@ -538,6 +545,90 @@ test('an interactive page that posts its height gets a frame that fits it, each 
   assert.deepEqual(figures.map((f) => /class="label"[^>]*>(\w)</.exec(f)[1]), ['B', 'A', 'C']);
   assert.ok(figures.every((f) => f.indexOf('<figcaption') < f.indexOf('class="shot"')), figures[0]);
   assert.match(figures[0], /Recommended/);
+  proc.kill();
+});
+
+test('pointing at a design mock: the board turns it on for a frame, a tap comes back as a reference that finds the element again, and a message from another frame is ignored', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'point'), file = join(dir, 'board.json');
+  mkdirSync(join(dir, 'mocks'), { recursive: true });
+  // The button fills the frame; its own focus, touch and click handlers rename it, which must not happen while the person points.
+  writeFileSync(join(dir, 'mocks', 'a.html'), '<style>body { margin: 0 }</style><main id="app"><section><button hidden>Back</button>'
+    + '<button style="width: 100%; height: 3000px" ontouchstart="this.textContent = \'Touched\'" onfocus="this.textContent = \'Focused\'" onclick="this.textContent = \'Clicked\'">Sign in</button></section></main>');
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key: 'look', type: 'design', title: 'Look', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }],
+    recommend_value: 'a', mocks: [{ value: 'a', path: 'mocks/a.html' }] }] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, click, tap, close } = await browse(dir);
+  const frame = "document.querySelector('.mock iframe')", pointed = "got.filter((m) => m['sign-off'] === 'pointed')";
+  // The card snaps while it scrolls, so the test scrolls the frame into view and waits until it is what sits under the middle of it, then taps there.
+  const middle = async () => {
+    let at;
+    await until(async () => {
+      at = await evaluate(`${frame}.scrollIntoView({ block: 'center' }), (({ left, top, width, height }) => [left + width / 2, top + height / 2])(${frame}.getBoundingClientRect())`);
+      return at && evaluate(`new Promise((paint) => requestAnimationFrame(() => requestAnimationFrame(() => paint(document.elementFromPoint(${at}) === ${frame}))))`);
+    });
+    return at;
+  };
+  const ref = { ref: '#app > section:nth-of-type(1) > button:nth-of-type(2)', tag: 'button', text: 'Sign in' };
+  await evaluate(`location.href = ${JSON.stringify(url)}`);
+  await until(() => evaluate(`!!${frame}`));
+  await evaluate("window.got = [], addEventListener('message', (e) => e.data?.['sign-off'] && got.push(e.data))");
+  // The board's own function turns pointing on for the frame; a tap that lands before the bridge loads is simply not kept, so the test taps until it is.
+  await evaluate(`point(${frame}, true)`);
+  // A tap before the bridge loads reaches nothing, so the test taps until one is kept, then taps once more.
+  await until(async () => (await click(await middle()), evaluate(`${pointed}.length >= 1`)));
+  const kept = (await evaluate(pointed)).length;
+  await click(await middle());
+  await until(() => evaluate(`${pointed}.length > ${kept}`));
+  // Each tap names the button as it was: the mock's own focus and click handlers did not run.
+  for (const m of await evaluate(pointed)) assert.deepEqual(m, { 'sign-off': 'pointed', ...ref });
+  assert.deepEqual(await evaluate("pointed.get('look~a')"), ref);
+  // A message from a frame that is not a mock never changes what the board kept.
+  await evaluate(`document.body.append(Object.assign(document.createElement('iframe'), { srcdoc: ${JSON.stringify("<script>parent.postMessage({ 'sign-off': 'pointed', ref: '#other', tag: 'p', text: 'Other' }, '*')</script>")} }))`);
+  await until(() => evaluate("got.some((m) => m.text === 'Other')"));
+  assert.deepEqual(await evaluate("pointed.get('look~a')"), ref);
+  // A new load of the same mock names the same element the same way.
+  await evaluate('window.old = true, location.reload()');
+  await until(() => evaluate('!window.old'));
+  await until(() => evaluate(`!!${frame}`));
+  await evaluate(`point(${frame}, true)`);
+  await until(async () => (await click(await middle()), evaluate("pointed.has('look~a')")));
+  assert.deepEqual(await evaluate("pointed.get('look~a')"), ref);
+  // A touch on a phone runs the mock's own touch handler no more than a click: the words stay as they were.
+  await evaluate("window.got = [], addEventListener('message', (e) => e.data?.['sign-off'] && got.push(e.data))");
+  await tap(await middle());
+  await click(await middle());
+  await until(() => evaluate(`${pointed}.length >= 1`));
+  assert.deepEqual(await evaluate(`${pointed}.at(-1)`), { 'sign-off': 'pointed', ...ref });
+  close();
+  proc.kill();
+});
+
+test('a stored pointing reference finds its element on the mock page itself, again after a reload, and finds nothing once its words change', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'find'), file = join(dir, 'board.json');
+  mkdirSync(join(dir, 'mocks'), { recursive: true });
+  writeFileSync(join(dir, 'mocks', 'a.html'), '<main id="app"><section><button hidden>Back</button><button>Sign in</button></section></main>');
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key: 'look', type: 'design', title: 'Look', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }],
+    recommend_value: 'a', mocks: [{ value: 'a', path: 'mocks/a.html' }] }] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { mockBase } = await (await fetch(`${url}api/decisions`)).json();
+  const { evaluate, close } = await browse(dir);
+  const ref = { ref: '#app > section:nth-of-type(1) > button:nth-of-type(2)', tag: 'button', text: 'Sign in' };
+  const button = "document.querySelector('#app > section:nth-of-type(1) > button:nth-of-type(2)')";
+  const same = `signOffFind(${JSON.stringify(ref)}) === ${button}`;
+  await evaluate(`location.href = ${JSON.stringify(new URL(`${mockBase.slice(1)}look~a/a.html`, url).href)}`);
+  await until(() => evaluate("typeof signOffFind === 'function'"));
+  assert.equal(await evaluate(same), true);
+  await evaluate('window.old = true, location.reload()');
+  await until(() => evaluate('!window.old'));
+  await until(() => evaluate("typeof signOffFind === 'function'"));
+  assert.equal(await evaluate(same), true);
+  await evaluate(`${button}.textContent = 'Log in'`);
+  assert.equal(await evaluate(`signOffFind(${JSON.stringify(ref)})`), null);
+  close();
   proc.kill();
 });
 
