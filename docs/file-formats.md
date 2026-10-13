@@ -51,7 +51,7 @@
   Vault admission and payload access remain **OFF**. Before serving a board, startup housekeeping scans existing private records under the custody lock and expires elapsed pending/ready items without decrypting or exposing contents. Absent custody is a no-op, with no key, folder identity or storage initialization. Unsafe or malformed custody emits one fixed value-free warning and does not prevent an ordinary board from serving; each bad record (malformed, misnamed, wrong-binding, non-file, or stray `.json`) is left unchanged while other elapsed records still expire. Custody inside or equal to the board's folder is not swept. Vault operations still fail closed on access.
   While serving, the same private sweep repeats five seconds after each preceding sweep finishes, without browser or vault access. Sweeps do not overlap within a server, do not initialize absent custody, and stop scheduling when its listener closes. Unsafe/busy custody never disables later attempts or ordinary serving; at most one fixed value-free warning is emitted per server process across startup and periodic failures. Access still enforces the absolute deadline even if housekeeping is delayed. Durable expiry events/wait wakeups without a browser remain required before activation. Deletion is logical, not guaranteed erasure from backups or storage journals.
 - A 0.1.0 file, `"schema": 1` with a `"decisions"` list, still reads: each entry is an item, a decision unless it says otherwise. The first write that changes it (a `raise` of a new key, or a `post`) rewrites it as `"schema": 2` (temp file, then rename) and first keeps the old file once beside it as `<board>.schema-1.bak`. Answer and round files are not touched.
-- `key`: 1-128 of `A-Z a-z 0-9 . _ -`, unique in the file. `title`: required.
+- `key`: 1-128 of `A-Z a-z 0-9 . _ -`, unique in the file. `title`: required, 160 characters or fewer for a new item; an item already on the board is not checked again, so an older longer title still loads.
 - `recommend_value`: the option the poster would pick; the board shows it first and marks it **Recommended**.
   `raise`, `post` and `raise --from` refuse an item that lists `options` without one; a plain Yes/No may leave it out,
   and a feed written with `post --from <file> --replace` is not held to it.
@@ -74,6 +74,8 @@
   { "key": "how-sync", "type": "interactive", "title": "How it works: Notes sync", "view": "mocks/how-sync/index.html", "options": [],
     "steps": [{ "title": "You change a note" }, { "title": "The phone saves it", "marks": ["store"] }, { "title": "It goes to the server", "marks": ["gate"] }] }
   ```
+- `contract`, `kind`, `schema`: an item posted as a contract message keeps them ([contract.md](contract.md)).
+  An item with `"kind": "report"` is only read, on any board, and never waits; it takes no `options`, `reply`, `area` or `type` ([contract.md](contract.md) section 5).
 - `filed`: optional, when the item was filed, an ISO 8601 date-time such as `2026-10-13T07:19:00Z`.
   `raise` and `post` write the current time when the item or flags give none, and `post --replace`
   keeps the time an item already has, so a feeder that runs every few seconds does not reset it.

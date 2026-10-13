@@ -76,7 +76,8 @@ examples:
 `,
   validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>]
 Checks message files against the communication contract without posting them: ${CONTRACT}
-A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kind ask, schema 1.
+A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask and report, schema 1 each.
+A board file given to raise --from or post --from may hold such messages as items: each is checked the same way before it is stored, and a report shows under Reports with no answer.
 Each file gets a row with ok, or the error and one help line that names the fix. A field written twice, an unknown field or a broken limit refuses the file.
   --kind  each file must be this kind, so the wrong file is refused
 Exits 0 when every file passes, 2 when any is refused or no file is named, and 1 when any file cannot be read.
@@ -85,6 +86,7 @@ example message:
 examples:
   sign-off-axi validate ask.json
   sign-off-axi validate --kind ask messages/*.json
+  sign-off-axi validate --kind report report.json
 `,
   answers: `usage: sign-off-axi answers [board.json] [--key <key>] [--full] [--json]
 Prints the latest saved answer per decision and counts the ones still waiting.
@@ -233,6 +235,21 @@ class EvidenceError extends Error {}
 type Flags = Record<string, { type: 'string' | 'boolean'; default?: string; multiple?: boolean }>;
 const TIERS: Flags = { full: { type: 'boolean' }, json: { type: 'boolean' } };
 const BOARD_FLAGS: Flags = { port: { type: 'string' }, bind: { type: 'string' }, 'evidence-root': { type: 'string' } };
+const TITLE_MAX = 160;
+/** A new item's title fits on a card, the contract's title rule; items already on a board are not checked again. */
+function fits(title: unknown, key?: string) {
+  const n = typeof title === 'string' ? [...title].length : 0;
+  if (n > TITLE_MAX) throw fail(`${key ? `key ${key}: ` : ''}title is ${n} characters, over ${TITLE_MAX}`, 'VALIDATION_ERROR', `Shorten the title to ${TITLE_MAX} characters and put the rest in about`);
+}
+/** Items of a --from file that carry contract or kind are contract messages: each is checked against its kind's rules before anything is stored. */
+function contractItems(items: any[]) {
+  items.forEach((m, i) => {
+    if (m?.contract === undefined && m?.kind === undefined) return;
+    try { checkMessage(m); } catch (e) {
+      throw e instanceof ContractError ? fail(`items[${i}]: ${e.message}`, 'VALIDATION_ERROR', e.help) : e;
+    }
+  });
+}
 const RAISE_FIELDS = ['title', 'key', 'about', 'detail', 'option', 'recommend', 'default', 'close'];
 
 /** Parses one command's flags strictly; `on` carries a given board file into the next-step hints. */
@@ -478,12 +495,15 @@ function post(args: string[], cmd = 'post') {
  * With a filer it replaces only that filer's items (and items with no filer it names by key); every other item and top-level field stays. */
 function replace(file: string, on: string, from?: string, filer?: string) {
   if (from === undefined) throw fail('--replace needs --from <board file>', 'VALIDATION_ERROR', 'sign-off-axi post board.json --from feed.json --replace');
-  const source = resolve(from), incoming = loadDecisions(source), fed = readItems(source);
+  const source = resolve(from), fed = readItems(source);
+  contractItems(fed.items);
+  const incoming = loadDecisions(source);
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
     // An item the feed sends without a time keeps the one it was first posted with, so a feeder that runs every few seconds never resets it.
-    const first = new Map((existsSync(file) ? readItems(file).items : []).map((i) => [i?.key, i?.filed])), now = new Date().toISOString();
-    const feed = fed.items.map((i) => ({ filed: first.get(i?.key) ?? now, ...i, ...(filer && { filer }) }));
+    const first = new Map((existsSync(file) ? readItems(file).items : []).map((i) => [i?.key, i])), now = new Date().toISOString();
+    for (const i of fed.items) if (first.get(i?.key)?.title !== i?.title) fits(i?.title, i?.key);
+    const feed = fed.items.map((i) => ({ filed: first.get(i?.key)?.filed ?? now, ...i, ...(filer && { filer }) }));
     // An answer belongs to its question: an answered key may not come back asking something else.
     const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply]);
     for (const had of board(file)) {
@@ -519,6 +539,7 @@ function replace(file: string, on: string, from?: string, filer?: string) {
 const MEDIA_BYTES = 50_000_000;
 /** Copies the media into evidence/<n>/ next to the board and adds the item, numbered under the board lock: update-<n>, or an explainer under its own key. */
 function postMedia(file: string, on: string, values: Record<string, any>, type: 'evidence' | 'explainer', filer?: string) {
+  fits(values.title);
   const explainer = type === 'explainer';
   const extra = (explainer ? ['mock', 'tradeoff', 'view', 'link'] : ['key', 'option', 'recommend', 'default', 'mock', 'tradeoff', 'view', 'chapter']).find((f) => values[f] !== undefined);
   if (extra) throw fail(`--${extra} does not apply to --type ${type}`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
@@ -622,7 +643,9 @@ function recommended(items: any[], flags: boolean) {
 function buildIncoming(values: Record<string, any>, extra: object = {}, filer?: string): { incoming: Decision[]; raw: object[] } {
   if (values.from !== undefined) {
     // An item that names its own filer keeps it.
-    const source = resolve(values.from), incoming = loadDecisions(source), raw = readItems(source).items;
+    const source = resolve(values.from), raw = readItems(source).items;
+    contractItems(raw);
+    const incoming = loadDecisions(source);
     recommended(raw, false);
     return { incoming: incoming.map((d) => ({ filer, ...d })), raw: raw.map((i) => ({ filer, ...i })) };
   }
@@ -653,12 +676,18 @@ function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: 
         throw fail(`key ${d.key} already holds a different question on ${tilde(file)}`, 'CONFLICT', 'Raise it under a new --key');
       }
       // Each new item records when it was raised, unless it names its own time.
-      if (!had) items.push({ filed: now, ...raw[i] });
-      return { key: d.key, status: !had ? 'raised' : had.answer ? `already answered ${had.answer.answer}` : 'already waiting', title: d.title };
+      if (!had) {
+        fits(d.title, d.key);
+        items.push({ filed: now, ...raw[i] });
+      }
+      return { key: d.key, status: !had ? 'raised' : had.answer ? `already answered ${had.answer.answer}` : waits(had) ? 'already waiting' : 'already posted', title: d.title };
     });
     if (raised.some((r) => r.status === 'raised')) writeItems(file, items);
     const key = raised.length === 1 ? ` --key ${raised[0].key}` : '';
-    const open = raised.some((r) => !r.status.startsWith('already answered')) ? [`Run \`sign-off-axi open${on}\` so the user can answer`] : [];
+    // Reports take no answer, so a post with nothing waiting asks the user to read it, never to answer.
+    const anyWaiting = incoming.some((d, i) => waits(d) && !raised[i].status.startsWith('already answered'));
+    if (incoming.length && !anyWaiting) return toon({ board: tilde(file), raised }, [`Run \`sign-off-axi open${on}\` so the user can read ${incoming.length > 1 ? 'them' : 'it'}`]);
+    const open = anyWaiting ? [`Run \`sign-off-axi open${on}\` so the user can answer`] : [];
     return toon({ board: tilde(file), raised }, [...open, ...(filer ? [waitFor(on, filer)] : []), `Run \`sign-off-axi answers${on}${key}\` to read ${key ? 'the answer' : 'the answers'}`]);
   });
 }

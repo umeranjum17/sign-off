@@ -6,8 +6,9 @@ Covers `validate` and the shipped `fixtures/contract/` messages ([docs/contract.
 
 | # | Step | Pass when |
 |---|---|---|
-| 1 | In `$SCR/ci`: `npm init -y`, `npm install --no-save $SCR/sign-off-axi-<version>.tgz` | `node_modules/sign-off-axi/fixtures/contract/ask.v1/` holds 2+ `valid-*` and 3+ `invalid-*` files |
+| 1 | In `$SCR/ci`: `npm init -y`, `npm install --no-save $SCR/sign-off-axi-<version>.tgz` | `ask.v1/` and `report.v1/` under `node_modules/sign-off-axi/fixtures/contract/` each hold 2+ `valid-*` and 3+ `invalid-*` files |
 | 2 | `npx sign-off-axi validate node_modules/sign-off-axi/fixtures/contract/*/valid-*.json` | One `files` row per file with `ok` true; exit 0 |
 | 3 | `validate` each `invalid-*.json` alone | `ok` false, an error naming the field in the file name, one `help` line; exit 2 |
 | 4 | A message with `"recommend_value"` twice; one with `"schema": 2`; `validate --kind gate` on a valid ask | Exit 2 with `Remove the second "recommend_value".`, `Upgrade sign-off-axi`, and `is ask, not --kind gate` |
+| 4b | `raise board.json --from feed.json` where the feed's one item is the report fixture `valid-full.json`; `list board.json --json`; `list board.json`; then the same with `"options": []` added, and `raise board.json --title` of 161 characters | The first prints `so the user can read it` and no answer hint; the item has `options: []` and `waiting: 0 of 1`; the other two exit 2 with `post an ask to get an answer` and `title is 161 characters, over 160` |
 | 5 | `validate` a valid file plus a missing path; then `validate` with no file | Exit 1 with the missing row `cannot read: ENOENT`; then exit 2 with `error:`, `code: VALIDATION_ERROR` and `help:` |
