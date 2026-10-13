@@ -174,9 +174,10 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   assert.equal(JSON.parse(run('answers', board, '--key', 'demo', '--json').out).demo.answer, 'needs-work');
   assert.deepEqual(api.rounds, []);
   assert.equal(api.mockBase, '/mock/local/');
-  assert.equal(await (await fetch(`${url}mock/local/pick-the-sign-in-layout~a/a.html`)).text(), '<h1>Mock A</h1>');
+  // The mock comes as written, with the pointing bridge after it.
+  assert.match(await (await fetch(`${url}mock/local/pick-the-sign-in-layout~a/a.html`)).text(), /^<h1>Mock A<\/h1><script>/);
   assert.equal((await fetch(`${url}mock/local/pick-the-sign-in-layout~z/a.html`)).status, 404);
-  assert.equal(await (await fetch(`${url}mock/local/nav~b/index.html?variant=b`)).text(), '<p>variant page</p>');
+  assert.match(await (await fetch(`${url}mock/local/nav~b/index.html?variant=b`)).text(), /^<p>variant page<\/p><script>/);
   assert.equal((await post(url, 'api/rounds', { key: 'pick-the-sign-in-layout', note: '' })).status, 400);
   assert.equal((await post(url, 'api/rounds', { key: 'gone', note: 'hi' })).status, 404);
   const waiting = spawn('node', [cli, 'wait', board, '--key', 'pick-the-sign-in-layout', '--timeout', '20']);
@@ -502,8 +503,11 @@ async function browse(dir, width = 800) {
   const replies = new Map();
   let seq = 0;
   ws.onmessage = (m) => { const msg = JSON.parse(m.data); replies.get(msg.id)?.(msg.result?.result?.value); };
-  const evaluate = (expression) => new Promise((ok) => { const id = ++seq; replies.set(id, ok); ws.send(JSON.stringify({ id, method: 'Runtime.evaluate', params: { expression, returnByValue: true } })); });
-  return { evaluate, close: () => { ws.close(); browser.kill(); } };
+  const call = (method, params) => new Promise((ok) => { const id = ++seq; replies.set(id, ok); ws.send(JSON.stringify({ id, method, params })); });
+  const evaluate = (expression) => call('Runtime.evaluate', { expression, returnByValue: true });
+  // A real mouse click at a point of the page, which reaches into a frame there as a person's would.
+  const click = async ([x, y]) => { for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await call('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 }); };
+  return { evaluate, click, close: () => { ws.close(); browser.kill(); } };
 }
 
 test('an interactive page that posts its height gets a frame that fits it, each frame only its own and never past 10000px; a design shows the recommended phone frame first', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
@@ -538,6 +542,44 @@ test('an interactive page that posts its height gets a frame that fits it, each 
   assert.deepEqual(figures.map((f) => /class="label"[^>]*>(\w)</.exec(f)[1]), ['B', 'A', 'C']);
   assert.ok(figures.every((f) => f.indexOf('<figcaption') < f.indexOf('class="shot"')), figures[0]);
   assert.match(figures[0], /Recommended/);
+  proc.kill();
+});
+
+test('pointing at a design mock: turned on by the board, a tap is kept from the mock and comes back as a reference that finds the element again', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'point'), file = join(dir, 'board.json');
+  mkdirSync(join(dir, 'mocks'), { recursive: true });
+  // The button fills the frame; its own focus and click handlers rename it, which must not happen while the person points.
+  writeFileSync(join(dir, 'mocks', 'a.html'), '<style>body { margin: 0 }</style><main id="app"><section><button hidden>Back</button>'
+    + '<button style="width: 100%; height: 3000px" onfocus="this.textContent = \'Focused\'" onclick="this.textContent = \'Clicked\'">Sign in</button></section></main>');
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key: 'look', type: 'design', title: 'Look', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }],
+    recommend_value: 'a', mocks: [{ value: 'a', path: 'mocks/a.html' }] }] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, click, close } = await browse(dir);
+  // The test plays the board's side: it lets the frame take the tap, turns pointing on and keeps what the frame names.
+  const frame = "document.querySelector('.mock iframe')";
+  const point = async () => {
+    // Listen first, then load the frame again, so its ready message is not missed and no tap lands before the bridge is on.
+    await until(() => evaluate(`!!${frame} && (window.got = [], addEventListener('message', (e) => e.data?.['sign-off'] && got.push(e.data)), ${frame}.style.pointerEvents = 'auto', ${frame}.src = ${frame}.src)`));
+    await until(() => evaluate("got.some((m) => m['sign-off'] === 'ready')"));
+    const middle = await evaluate(`${frame}.contentWindow.postMessage({ 'sign-off': 'point', on: true }, '*'), (({ left, top, width, height }) => [left + width / 2, top + height / 2])(${frame}.getBoundingClientRect())`);
+    const pointed = "got.filter((m) => m['sign-off'] === 'pointed')";
+    for (const n of [1, 2]) await click(middle), await until(() => evaluate(`${pointed}.length === ${n}`));
+    return evaluate(pointed);
+  };
+  await evaluate(`location.href = ${JSON.stringify(url)}`);
+  const first = await point();
+  const named = { 'sign-off': 'pointed', ref: '#app > section:nth-of-type(1) > button:nth-of-type(2)', tag: 'button', text: 'Sign in' };
+  assert.deepEqual(first.slice(0, 2), [named, named]);
+  // A new load of the same mock names the same element the same way.
+  await evaluate('window.old = true, location.reload()');
+  await until(() => evaluate('!window.old'));
+  assert.deepEqual((await point())[0], named);
+  // Only design mock pages carry the bridge; the css beside them is served as it is.
+  const page = await (await fetch(new URL(`${(await (await fetch(`${url}api/decisions`)).json()).mockBase.slice(1)}look~a/a.html`, url))).text();
+  assert.match(page, /'sign-off': 'pointed'/);
+  close();
   proc.kill();
 });
 

@@ -79,6 +79,7 @@ Look at every shot before you report: nothing overlaps, no text is cut, no raw p
 | Summary home: four area tiles with counts, Triage in Waiting on you, the `area` field, report cards with `steps`, sections and Open/Close, Dismiss with Undo and Clear all done, Dismissed (N) with Restore, Answered as Done today rows, Needs you first (answer there, with Undo, its Dismiss and Triage footer), Today, a short list per area, area screens with `‹ Summary` and the wide-screen sidebar, full trade-off, fitted evidence media, recommended vs picked | [features/summary.md](features/summary.md) |
 | Decisions page: list, one-click answer, durable answers | [features/decisions.md](features/decisions.md) |
 | Design item: init/doctor, A/B/C mock cards, `?variant=` pages, another-round asks, `raise` as `post --type decision` | [features/design.md](features/design.md) |
+| Pointing at a mock: the bridge in each `.html` design mock, a tap named back as an element reference, numbered marks | [features/pointing.md](features/pointing.md) |
 | Ladder rungs: diagram item inline at card width, interactive item in a sandboxed frame with no network | [features/ladder.md](features/ladder.md) |
 | Explainer rung: a narrated stills video built with free local speech, played inline with chapter buttons, no network | [features/explainer.md](features/explainer.md) |
 | Evidence updates: numbered posts with media, hash-checked serving, inline video, verdict | [features/evidence.md](features/evidence.md) |

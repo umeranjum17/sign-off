@@ -136,6 +136,8 @@
   `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.woff2`, `.mp4` and `.webm` files
   from inside that page's own folder only, never anything above it. `export`
   inlines the page itself, so those files show only on the running board.
+  The board adds a small pointing script to each `.html` mock page it serves
+  (see the README); it passes only text to the board.
 - Every item that asks something has one place to type, folded behind
   **Other answer** after its buttons (a design's Picks too): a short text,
   500 characters or fewer. **Send reply** saves it as the answer `text` with
