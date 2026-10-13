@@ -135,6 +135,7 @@
   .compact .icon svg { stroke: var(--area); }
   /* An answered row with no picture leads with a small check badge, so the row stays short. */
   .compact .icon.i-answered { width: 1.75rem; height: 1.75rem; border-radius: 0.5625rem; } .compact .icon.i-answered svg { width: 1rem; height: 1rem; }
+  .done .thumb { width: 3rem; height: 3rem; border-radius: 0.75rem; }
   .thumb { flex: none; object-fit: cover; object-position: top; border: 1px solid var(--line); background: var(--sunk); }
   .list { display: grid; gap: 0.75rem; }
   /* A read-only board is for reading: its pages get most of the screen. */
@@ -233,6 +234,10 @@
   .done[open] + .x { align-self: start; margin-top: 1rem; }
   .needs .foot { justify-content: space-between; margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid var(--line); }
   .foot .dis { padding: 0 0.5rem; background: none; color: var(--muted); }
+  /* The asks dismissed from Waiting on you: one muted row that opens to a list, each with Restore. */
+  .gone-asks { margin-top: 0.5rem; } .gone-asks summary { color: var(--muted); }
+  .gone-asks .rows { padding: 0; } .gone-asks li { justify-content: space-between; gap: 0.75rem; min-height: 2.75rem; }
+  .gone-asks .dis { flex: none; padding: 0 0.5rem; border-color: transparent; background: none; color: var(--accent); font-weight: 600; }
   .sec-head .clear { margin-left: auto; }
   .chip { flex: none; margin-top: 0.2rem; padding: 0 0.5rem; border: 1px solid var(--line); border-radius: 999px; color: var(--muted);
     font-size: 0.6875rem; font-weight: 600; line-height: 1.25rem; letter-spacing: 0.04em; text-transform: uppercase; }
@@ -735,11 +740,23 @@
     });
   }
 
+  /** The asks dismissed from Waiting on you, folded under one row; Restore puts one back on the board. */
+  function dismissed(items) {
+    if (!canDismiss() || !items.length) return '';
+    const box = el('details', { class: 'other gone-asks', ...(opened.has('#dismissed') && { open: '' }) }, el('summary', {}, `Dismissed (${items.length})`),
+      el('ul', { class: 'rows' }, ...items.map((d) => {
+        const b = el('button', { class: 'dis', 'aria-label': `Restore, ${d.title}` }, 'Restore');
+        b.onclick = () => setDismissed([d.key], false).then(() => say('Back on the board', 3000), (e) => say(`Couldn't restore: ${e.message}`, 8000));
+        return el('li', {}, el('strong', { dir: 'auto' }, title(d)), b);
+      })));
+    box.ontoggle = () => (box.open ? opened.add('#dismissed') : opened.delete('#dismissed'));
+    return box;
+  }
   /** Triage: the open asks one at a time, oldest first. Skip moves on without answering and is not stored; an answer moves on to the next ask. */
   let cur = null, curAt = 0;
-  function triage(items) {
+  function triage(items, hidden) {
     if (!items.length) return el('section', { class: 'card caught' }, el('h2', {}, 'All caught up'), el('p', { class: 'meta' }, 'Nothing is waiting on you.'),
-      el('a', { class: 'more', href: '#' }, 'Back to Summary'));
+      el('a', { class: 'more', href: '#' }, 'Back to Summary'), dismissed(hidden));
     let i = items.findIndex((d) => d.key === cur);
     if (i < 0) i = Math.min(curAt, items.length - 1);
     const d = items[i], next = items[i + 1], n = items.length, card = row(d);
@@ -763,7 +780,7 @@
     return el('div', { class: 'tri' }, queue, el('div', { class: 'focus' }, el('p', { class: 'fhead' }, `${i + 1} of ${n}`),
       el('div', { class: 'pbar', 'aria-hidden': 'true' }, el('i', { style: `width: ${((i + 1) / n) * 100}%` })), card,
       skip ? el('div', { class: 'quiet' }, skip) : '', next ? el('div', { class: 'card upnext' }, el('p', { class: 'meta' }, 'Up next'), el('strong', { dir: 'auto' }, title(next))) : '',
-      hint ? el('p', { class: 'meta hint' }, hint) : '', el('p', { class: 'meta keys' }, `Keys: ${keys}`)));
+      hint ? el('p', { class: 'meta hint' }, hint) : '', el('p', { class: 'meta keys' }, `Keys: ${keys}`), dismissed(hidden)));
   }
   // Triage keys at a desk: a number picks that answer (in the order shown), E skips, Z takes back the last tap.
   addEventListener('keydown', (e) => {
@@ -779,6 +796,7 @@
     const gone = new Set(state.dismissed ?? []);
     for (const d of [...state.decisions].reverse()) if (!gone.has(d.key)) by[area(d)].push(d);
     by.waiting.reverse();
+    const hidden = state.decisions.filter((d) => gone.has(d.key) && area(d) === 'waiting');
     by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
     const at = /^#(waiting|evidence|reports|answered)$/.exec(location.hash)?.[1];
     const link = (a, name, n) => el('a', { href: `#${a}`, ...(a === (at ?? '') && { 'aria-current': 'page' }) }, icon(a || 'summary'), name, n === undefined ? '' : el('span', { class: 'n' }, String(n)));
@@ -792,8 +810,8 @@
       : at === 'answered' && by.answered.length ? el('p', { class: 'lede' }, `${by.answered.filter((d) => isToday(state.answers[d.key].at)).length} answered today.`) : '');
     const first = by.waiting[0], more = by.waiting.length > 1 ? `Answer all ${by.waiting.length} in Triage →` : 'Open in Triage →';
     const needs = el('section', { class: 'card needs' }, el('h2', {}, 'Needs you first'), ...(first ? [row(first, { x: false }),
-      el('div', { class: 'foot' }, xBtn(first, 'Dismiss'), el('a', { class: 'more', href: '#waiting' }, more))] : [el('p', { class: 'meta' }, 'Nothing is waiting on you.')]));
-    document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [triage(by.waiting)]
+      el('div', { class: 'foot' }, xBtn(first, 'Dismiss'), el('a', { class: 'more', href: '#waiting' }, more))] : [el('p', { class: 'meta' }, 'Nothing is waiting on you.')]), dismissed(hidden));
+    document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [triage(by.waiting, hidden)]
       : at === 'reports' && !state.readonly && by.reports.length ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
         ...reportGroups(by.reports)] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [el('div', { class: 'tiles' }, ...Object.keys(AREAS).map((a) => tile(a, by[a]))),
