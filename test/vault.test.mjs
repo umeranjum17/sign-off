@@ -9,20 +9,18 @@ import { createDecipheriv, randomBytes } from 'node:crypto';
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
 const worker = `import { createVault, depositVault, inspectVault, refuseVault } from ${JSON.stringify(new URL('../dist/vault.js', import.meta.url).href)};
 let input=''; for await (const chunk of process.stdin) input+=chunk;
-const {op,meta,value,board,key,duration}=JSON.parse(input);
-if(duration) meta.expires=Date.now()+duration; process.send?.('started');
+const {op,meta,value,board,key}=JSON.parse(input);
 try { const out=await ({create:()=>createVault(meta,value===undefined?undefined:Buffer.from(value)),deposit:()=>depositVault(board,key,Buffer.from(value)),inspect:()=>inspectVault(board,key),refuse:()=>refuseVault(board,key)})[op](); console.log(JSON.stringify(out)); }
 catch(e) { console.log(JSON.stringify({code:e.code,error:e.message})); process.exitCode=1; }`;
 
-test('disabled vault custody across real processes: encryption, racing deposits, expiry, refusal and missing-key fail closed', async () => {
+test('disabled vault custody across real processes: encryption, racing deposits, refusal and missing-key fail closed', async () => {
   const home = mkdtempSync(join(tmpdir(), 'sign-off-vault-')), state = join(home, 'state'), board = join(home, 'project', 'board.json');
   mkdirSync(join(home, 'project'), { mode: 0o700 });
   writeFileSync(board, JSON.stringify({ schema: 2, items: [{ key: 'ordinary', title: 'Umer: continue?' }] }));
   const env = { ...process.env, HOME: home, XDG_STATE_HOME: state, XDG_CONFIG_HOME: join(home, 'config'), TMPDIR: home };
   const outputs = [], secret = `FAKE_${randomBytes(24).toString('hex')}`, url = `https://www.npmjs.com/login/cli/${randomBytes(24).toString('hex')}`;
-  const run = (input, onStarted) => new Promise((ok, reject) => {
-    const child = spawn(process.execPath, ['--input-type=module', '-e', worker], { env, stdio: ['pipe', 'pipe', 'pipe', 'ipc'] });
-    child.once('message', () => onStarted?.());
+  const run = (input) => new Promise((ok, reject) => {
+    const child = spawn(process.execPath, ['--input-type=module', '-e', worker], { env, stdio: ['pipe', 'pipe', 'pipe'] });
     let out = '', err = ''; child.stdout.on('data', (b) => out += b); child.stderr.on('data', (b) => err += b);
     child.on('error', reject); child.on('exit', (code) => {
       outputs.push(out, err);
@@ -31,7 +29,7 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     });
     child.stdin.end(JSON.stringify(input));
   });
-  const meta = (key, mode = 'give', expires = Date.now() + 60_000) => ({ board, key, mode, filer: 'demo-agent', expires, ...(mode === 'give' && { destination: join(home, 'config', 'api-token') }) });
+  const meta = (key, mode = 'give') => ({ board, key, mode, filer: 'demo-agent',...(mode === 'give' && { destination: join(home, 'config', 'api-token') }) });
   const inspect = (key) => run({ op: 'inspect', board, key });
   const files = (dir) => readdirSync(dir).flatMap((n) => { const p = join(dir, n); return statSync(p).isDirectory() ? files(p) : [p]; });
   try {
@@ -40,26 +38,23 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     assert.equal(statSync(dir).mode & 0o777, 0o700); assert.equal(statSync(keyPath).mode & 0o777, 0o600);
     const raced = await Promise.all([1, 2].map(() => run({ op: 'deposit', board, key: 'give', value: secret })));
     assert.deepEqual(raced.map((r) => r.exit).sort(), [0, 1]);
-    assert.equal(raced.find((r) => r.error).error, 'Vault input is invalid: check mode, expiry, provider and destination.');
+    assert.equal(raced.find((r) => r.error).error, 'Vault input is invalid: check mode, provider and destination.');
     assert.equal((await inspect('give')).status, 'ready');
-    writeFileSync(join(dir, 'lock'), 'held', { mode: 0o600 });
-    const lockedExpiry = await run({ op: 'create', meta: meta('locked-expiry', 'receive'), duration: 150, value: url }, () => setTimeout(() => rmSync(join(dir, 'lock')), 250));
-    assert.equal(lockedExpiry.code, 'EXPIRED'); assert.equal((await inspect('locked-expiry')).code, 'NOT_FOUND');
     const recordPath = readdirSync(dir).filter((n) => n.endsWith('.json')).map((n) => join(dir, n))[0], record = JSON.parse(readFileSync(recordPath));
-    // Trusted-owner control: the synthetic private key really decrypts; altered routing/expiry cannot authenticate.
+    // Trusted-owner control: the synthetic private key really decrypts; altered routing cannot authenticate.
     const decrypt = (m) => {
       const cipher = createDecipheriv('aes-256-gcm', readFileSync(keyPath), Buffer.from(record.sealed.nonce, 'base64'));
-      cipher.setAAD(Buffer.from(JSON.stringify([1, m.board, m.key, m.mode, m.expires, m.destination ?? null, m.filer])));
+      cipher.setAAD(Buffer.from(JSON.stringify([1, m.board, m.key, m.mode, m.destination ?? null, m.filer])));
       cipher.setAuthTag(Buffer.from(record.sealed.tag, 'base64'));
       return Buffer.concat([cipher.update(Buffer.from(record.sealed.data, 'base64')), cipher.final()]).toString();
     };
     assert.ok(decrypt(record.meta) === secret, 'Trusted-owner decryption must match without printing the payload.');
-    for (const [field, value] of [['board', '/other/board.json'], ['key', 'other'], ['mode', 'receive'], ['expires', 0], ['destination', '/other/token'], ['filer', 'other']]) assert.throws(() => decrypt({ ...record.meta, [field]: value }));
+    for (const [field, value] of [['board', '/other/board.json'], ['key', 'other'], ['mode', 'receive'], ['destination', '/other/token'], ['filer', 'other']]) assert.throws(() => decrypt({ ...record.meta, [field]: value }));
     assert.equal((await run({ op: 'refuse', board, key: 'give' })).status, 'refused');
     assert.equal(JSON.parse(readFileSync(recordPath)).sealed, undefined);
     assert.equal((await run({ op: 'deposit', board, key: 'give', value: secret })).error, 'User refused this vault item; no value was delivered.');
     assert.equal((await run({ op: 'create', meta: meta('give') })).exit, 1);
-    assert.equal((await run({ op: 'create', meta: meta('receive', 'receive', Date.now() + 800), value: url })).status, 'ready');
+    assert.equal((await run({ op: 'create', meta: meta('receive', 'receive'), value: url })).status, 'ready');
     await run({ op: 'create', meta: meta('kept', 'receive'), value: url });
     const master = readFileSync(keyPath); rmSync(keyPath);
     assert.equal((await run({ op: 'create', meta: meta('missing-key', 'receive'), value: url })).error, 'Vault key is unavailable; encrypted payload cannot be read.');
@@ -73,7 +68,7 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     const interrupted = recordPath + '.0123456789abcdef.tmp'; writeFileSync(interrupted, JSON.stringify(record), { mode: 0o600 });
     assert.equal((await inspect('kept')).status, 'ready'); assert.equal(existsSync(interrupted), false);
     writeFileSync(join(dir, 'lock'), 'interrupted process', { mode: 0o600 });
-    assert.equal((await inspect('kept')).error, 'Vault storage is busy or unavailable; retry before expiry.'); rmSync(join(dir, 'lock'));
+    assert.equal((await inspect('kept')).error, 'Vault storage is busy or unavailable; retry later.'); rmSync(join(dir, 'lock'));
     const other = join(home, 'other'); mkdirSync(other); const linked = join(home, 'linked'); symlinkSync(other, linked);
     env.XDG_STATE_HOME = linked;
     assert.equal((await run({ op: 'create', meta: meta('symlink', 'receive'), value: secret })).exit, 1); assert.deepEqual(readdirSync(other), []);
@@ -86,6 +81,12 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     writeFileSync(join(interruptedDir, 'a'.repeat(64) + '.json.0123456789abcdef.tmp'), JSON.stringify(record), { mode: 0o600 });
     assert.equal((await run({ op: 'create', meta: meta('orphan-key', 'receive'), value: url })).code, 'VAULT_KEY_UNAVAILABLE');
     assert.equal(existsSync(join(interruptedDir, 'key')), false);
+    const freshState = join(home, 'fresh-state'), freshDir = join(freshState, 'sign-off', 'vault');
+    mkdirSync(join(freshState, 'sign-off'), { recursive: true, mode: 0o700 }); mkdirSync(freshDir, { mode: 0o700 });
+    writeFileSync(join(freshDir, 'key.tmp'), 'partial', { mode: 0o600 });
+    env.XDG_STATE_HOME = freshState;
+    assert.equal((await run({ op: 'create', meta: meta('fresh-key', 'receive'), value: url })).status, 'ready');
+    assert.equal(existsSync(join(freshDir, 'key.tmp')), false);
     env.XDG_STATE_HOME = state;
     for (const value of ['', 'x'.repeat(16_385)]) assert.equal((await run({ op: 'create', meta: meta('bad', 'receive'), value })).exit, 1);
     const aliasDir = join(home, 'alias'); symlinkSync(join(home, 'project'), aliasDir);

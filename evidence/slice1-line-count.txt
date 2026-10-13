@@ -1,5 +1,9 @@
-slice 1 changed lines (src + test + docs, tests included)
-1	1	docs/file-formats.md
-19	33	src/vault.ts
-5	16	test/vault.test.mjs
-added 25 deleted 50 total 75 (cap 300: OK)
+slice 1 changed lines vs base becdbb8 (tests included)
+1	0	docs/file-formats.md
+1	0	evidence/slice1-line-count.txt
+1	0	src/store.ts
+175	0	src/vault.ts
+126	0	test/vault.test.mjs
+code (src+test): 302 = vault.ts 175 + test 126 + store.ts 1
+docs 1, evidence 5; total 308
+cap 300 code lines: OVER by 2, PR blocked
