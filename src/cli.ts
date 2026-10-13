@@ -256,8 +256,9 @@ const CONTRACT_TYPES = ['decision', 'ask', 'evidence', 'report'];
 function contractItems(items: any[], from: string, file: string) {
   const had = new Set(existsSync(file) ? readItems(file).items.map((i) => i?.key) : []);
   items.forEach((m, i) => {
+    if (had.has(m?.key)) return;
     if (m?.contract === undefined && m?.kind === undefined) {
-      if (had.has(m?.key) || !CONTRACT_TYPES.includes(m?.type ?? 'decision')) return;
+      if (!CONTRACT_TYPES.includes(m?.type ?? 'decision')) return;
       throw fail(`${from}: items[${i}]${isKey(m?.key) ? ` key ${m.key}` : ''}: kind is required on a new ${m?.type ?? 'decision'}`, 'VALIDATION_ERROR',
         'Add "contract": 1, "kind" and "schema" to the item, such as "contract": 1, "kind": "ask", "schema": 1');
     }
@@ -635,7 +636,7 @@ async function postKind(file: string, on: string, values: Record<string, any>) {
   const filer = m.filer ?? filerOf(values, true), scratch = mkdtempSync(join(tmpdir(), 'sign-off-')), source = join(scratch, basename(name));
   try {
     writeFileSync(source, JSON.stringify({ schema: 2, items: [{ ...m, ...(filer && { filer }) }] }));
-    return await storeIncoming(file, on, buildIncoming({ from: source }, {}, filer, file), filer);
+    return await storeIncoming(file, on, buildIncoming({ from: source }, {}, filer, file), filer, true);
   } catch (e) {
     if (!(e instanceof AxiError && e.code === 'CONFLICT')) throw e;
     // A key conflict refuses a contract post like any other rule: exit 2 (contract section 4); raise keeps exit 1.
@@ -711,7 +712,10 @@ function buildIncoming(values: Record<string, any>, extra: object = {}, filer?: 
   }
 }
 
-function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: Decision[]; raw: object[] }, filer?: string) {
+/** JSON with object fields in key order, so the same message compares equal in any field order. */
+const canon = (v: unknown) => JSON.stringify(v, (_, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x));
+/** exact: a contract post, where a key takes only the same message again, filer and filed included (contract section 4). */
+function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: Decision[]; raw: any[] }, filer?: string, exact = false) {
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
     const current = board(file), items = existsSync(file) ? readItems(file).items : [], saved = readAnswers(file), now = new Date().toISOString();
@@ -721,8 +725,10 @@ function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: 
       if (!had && Object.hasOwn(saved, d.key)) throw fail(`key ${d.key} already has a saved answer on ${tilde(file)} from an item no longer there`, 'CONFLICT', 'Raise it under a new --key');
       // The same question from another filer, or at another time, is the same question: it keeps its first filer and time.
       const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, filer: undefined, filed: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
-      if (had && same(had) !== same(d)) {
-        throw fail(`key ${d.key} already holds a different question on ${tilde(file)}`, 'CONFLICT', 'Raise it under a new --key');
+      // A message that names no filed time matches the one the board stamped.
+      const differs = () => exact ? canon({ ...items.find((x) => x?.key === d.key), ...(raw[i].filed === undefined && { filed: undefined }) }) !== canon(raw[i]) : same(had!) !== same(d);
+      if (had && differs()) {
+        throw fail(`key ${d.key} already holds a different ${exact ? 'message' : 'question'} on ${tilde(file)}`, 'CONFLICT', 'Raise it under a new --key');
       }
       // Each new item records when it was raised, unless it names its own time.
       if (!had) {

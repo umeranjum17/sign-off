@@ -219,16 +219,21 @@ test('post --kind: one message from a file or stdin, checked against its kind, r
   assert.match(posted.stdout, /ship-signin-2,raised,/);
   const [item] = JSON.parse(readFileSync(board, 'utf8')).items;
   assert.deepEqual([item.kind, item.schema, item.filer], ['ask', 1, 'agent-41']);
-  assert.match(post('', '--kind', 'ask', '--from', file).stdout, /ship-signin-2,already waiting,/);
+  assert.match(post('', '--kind', 'ask', '--from', file, '--filer', 'agent-41').stdout, /ship-signin-2,already waiting,/);
   // stdin, and every refusal: the file (or stdin) and the key in the error, one help line, exit 2, nothing written.
   const read = post(JSON.stringify(report), '--kind', 'report', '--from', '-');
   assert.equal(read.status, 0, read.stdout);
   assert.match(read.stdout, /slice-5-live,raised,[^]*so the user can read it/);
+  spawnSync('node', [cli, 'raise', board, '--title', 'Plain?', '--key', 'plain'], { env });
   const before = readFileSync(board, 'utf8');
+  // A key takes only the same message again: another filer, another filed time, or a plain item under it is a conflict.
   for (const [input, args, error, help] of [
+    ['', ['--kind', 'ask', '--from', file, '--filer', 'agent-99'], /already holds a different message/, /Post it under a new key/],
+    [JSON.stringify({ ...report, filed: '2026-10-14T07:19:00Z' }), ['--kind', 'report', '--from', '-'], /key slice-5-live already holds a different message/, /Post it under a new key/],
+    [JSON.stringify({ ...ask, key: 'plain' }), ['--kind', 'ask', '--from', '-'], /key plain already holds a different message/, /Post it under a new key/],
     [JSON.stringify({ ...ask, recommend_value: undefined }), ['--kind', 'ask', '--from', '-'], /stdin: key ship-signin-2: recommend_value is required/, /Add \\"recommend_value\\"/],
     ['', ['--kind', 'report', '--from', file], new RegExp(`${file}: key ship-signin-2: kind is ask, not --kind report`), /Pass --kind ask/],
-    [JSON.stringify({ ...ask, title: 'Ship it next week?' }), ['--kind', 'ask', '--from', '-'], /stdin: key ship-signin-2 already holds a different question/, /Post it under a new key/],
+    [JSON.stringify({ ...ask, title: 'Ship it next week?' }), ['--kind', 'ask', '--from', '-'], /stdin: key ship-signin-2 already holds a different message/, /Post it under a new key/],
     [JSON.stringify({ ...ask, key: 'k2', filer: 'agent-7' }), ['--kind', 'ask', '--from', '-', '--filer', 'agent-41'], /filer agent-7 is not --filer agent-41/, /Leave \\"filer\\" out/],
     ['', ['--kind', 'ask', '--from', file, '--title', 'X'], /--kind cannot be combined with --title/, /Put every field in the message file/],
   ]) {
@@ -240,4 +245,9 @@ test('post --kind: one message from a file or stdin, checked against its kind, r
   }
   assert.equal(readFileSync(board, 'utf8'), before);
   assert.equal(post('', '--kind', 'ask', '--from', join(scratch, 'missing.json')).status, 1);
+  // An item already on the board is not checked again, even one the current rules would refuse.
+  const old = { ...ask, title: 'Old \u0007 title' };
+  writeFileSync(board, JSON.stringify({ schema: 2, items: [old] }));
+  const kept = spawnSync('node', [cli, 'post', board, '--from', message('kept.json', JSON.stringify({ schema: 2, items: [old] })), '--replace'], { encoding: 'utf8', env });
+  assert.equal(kept.status, 0, kept.stdout);
 });

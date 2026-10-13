@@ -2,7 +2,7 @@
 
 sign-off owns this contract. Agents and tools use it to post asks, reports, evidence, gates and retro findings to the board, and to read the answers back. Every message has the same strict shape, so the person reading the board sees one kind of card per kind of message, whoever sent it.
 
-Status: v1 target, built in parts. Built: the `ask` and `report` kinds; `validate`, with `--expect-invalid` (section 9), and their fixtures in the npm package; `post --kind`, from a file or stdin with `--from -`, where a key conflict exits 2; in a `raise --from` or `post --from` file, an item that carries `contract` or `kind` is checked as a message before anything is stored, a new item of a contract kind without `kind` is refused, and a new item's title is held to 1-160. Not built yet: `evidence`, `gate` and `finding`, answer events and `schema`. `raise --title` and `post --type decision` still post board-format items (they do not fill in `contract`, `kind` and `schema` yet), and their key conflicts still exit 1.
+Status: v1 target, built in parts. Built: the `ask` and `report` kinds; `validate`, with `--expect-invalid` (section 9), and their fixtures in the npm package; `post --kind`, from a file or stdin with `--from -`, where a key conflict exits 2; in a `raise --from` or `post --from` file, a new item that carries `contract` or `kind` is checked as a message before anything is stored, a new item of a contract kind without `kind` is refused, and a new item's title is held to 1-160. Not built yet: `evidence`, `gate` and `finding`, answer events and `schema`. `raise --title` and `post --type decision` still post board-format items (they do not fill in `contract`, `kind` and `schema` yet), and their key conflicts still exit 1.
 
 ## 1. Versions
 
@@ -18,7 +18,7 @@ Status: v1 target, built in parts. Built: the `ask` and `report` kinds; `validat
 
 Board items stored before v1 have no `kind` or `schema`. They read exactly as today, under [file-formats.md](file-formats.md), and are not checked again, so existing boards and answers keep working. Their answers report as `ask` schema 1.
 
-Every new post of a contract kind is checked against that kind's v1 rules from the change that adds that kind. `raise`, and `post --type decision`, which is the same thing, post an `ask`: they fill in `contract`, `kind` and `schema` themselves, then check the item. `post --type evidence` posts an `evidence` the same way. `raise` stamps `filed` itself where a kind needs it.
+Every new post of a contract kind is checked against that kind's v1 rules from the change that adds that kind. `post --kind` posts a message of any built kind. The target is for `raise --title` and `post --type decision`, which is the same thing, to post an `ask` with `contract`, `kind` and `schema` filled in, and for `post --type evidence` to post an `evidence` the same way; until then they post board-format items (see Status). `raise` stamps `filed` itself where a kind needs it.
 
 Non-contract types stay outside this contract. `raise --title` and `post --type design|diagram|interactive|explainer` keep the board rules in [file-formats.md](file-formats.md). In a `--from` file, a new item of a contract kind with no `kind` is refused with a fix line to add `contract`, `kind` and `schema`, in a `--replace` feed too. A contract kind there is an item with no `type`, or `type` `decision` or `ask` (both an `ask`), `evidence` or `report`. An item already on the board under that key is not new, so a feed keeps sending it as it is.
 
@@ -28,7 +28,7 @@ One validator, one way in. No daemon, socket or HTTP API.
 
 `sign-off-axi post [board.json] --kind <kind> --from <file.json>`, or `--from -` to read stdin. `--kind` must equal the message's `kind`, so the wrong file is never posted. A `post --from --replace` feed checks each new contract-kind item the same way.
 
-`raise` and `post --type` check a new file that carries `contract` and `kind` the same way `post --kind` does, and refuse a file with no `kind` unless it names a non-contract type (section 2).
+`raise --from` and `post --from` (no `--kind`) check each new item that carries `contract` and `kind` the same way `post --kind` does, and refuse a new item with no `kind` unless it names a non-contract type (section 2).
 
 A message file holds one JSON object, in any layout. The validator reads it with a parser that reports repeated fields. A repeated field refuses the message with one fix line naming the field, such as `Remove the second "recommend_value".` A message with no `kind` is refused (section 2). `null` is a wrong type for every field.
 
@@ -61,7 +61,7 @@ A message file holds one JSON object, in any layout. The validator reads it with
 
 When `filer` is missing, `post` takes it from `--filer`, else `SIGN_OFF_FILER` (empty means unset), else the agent session id. A `filer` in the message that differs from `--filer` is refused. Only `post` checks this; `validate` checks `filer` only when the message has one.
 
-A key already on the board takes only the same message again (the same fields and values, in any order), which changes nothing. Anything else under that key is refused with code `CONFLICT`, exit 2 and the help line "Post it under a new key". Today's CLI exits 1 on `CONFLICT`; this contract changes that, so every refusal exits 2.
+A key already on the board takes only the same message again (the same fields and values, in any order, with the same `filer`), which changes nothing. A message that names no `filed` matches the time the board stamped; a board-format item under that key is not the same message. Anything else under that key is refused with code `CONFLICT`, exit 2 and the help line "Post it under a new key". Today's CLI exits 1 on `CONFLICT`; this contract changes that, so every refusal exits 2.
 
 ## 5. One shape per kind
 
