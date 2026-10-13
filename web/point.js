@@ -14,7 +14,7 @@
     }
     return ['body', ...path].join(' > ');
   };
-  const words = (e) => (e.innerText || e.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+  const words = (e) => (e.getAttribute('aria-label') || e.getAttribute('alt') || e.getAttribute('placeholder') || e.innerText || e.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 80);
   addEventListener('message', (m) => {
     if (m.source === parent && m.data?.['sign-off'] === 'point') on = m.data.on === true;
   });

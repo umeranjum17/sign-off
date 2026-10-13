@@ -503,7 +503,8 @@ async function browse(dir, width = 800) {
   const replies = new Map();
   let seq = 0;
   ws.onmessage = (m) => { const msg = JSON.parse(m.data); replies.get(msg.id)?.(msg.result?.result?.value); };
-  const call = (method, params) => new Promise((ok) => { const id = ++seq; replies.set(id, ok); ws.send(JSON.stringify({ id, method, params })); });
+  // A call the browser never answers (a page torn down mid-call) gives undefined after 10 s, so until() asks again instead of hanging.
+  const call = (method, params) => new Promise((ok) => { const id = ++seq; replies.set(id, ok); setTimeout(ok, 10000).unref(); ws.send(JSON.stringify({ id, method, params })); });
   const evaluate = (expression) => call('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
   // A real mouse click at a point of the page, which reaches into a frame there as a person's would.
   const click = async ([x, y]) => { for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await call('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 }); };
