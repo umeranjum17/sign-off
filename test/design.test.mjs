@@ -501,7 +501,8 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   mkdirSync(dir);
   const abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l }));
   writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key: 'ship', title: 'When should it ship?', options: abc, recommend_value: 'b' },
-    { key: 'look', type: 'design', title: 'Pick the look', options: abc, recommend_value: 'b' }] }));
+    { key: 'look', type: 'design', title: 'Pick the look', options: abc, recommend_value: 'b' },
+    { key: 'how', title: 'How it ships', area: 'reports', steps: [{ title: 'Build', marks: ['store'] }, { title: 'Check' }, { title: 'Ship', marks: ['gate', 'fail'] }] }] }));
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
@@ -514,6 +515,12 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   assert.match(waiting, /1 of 2/);
   assert.equal(waiting.match(/<ol class="queue"[^>]*>.*?<\/ol>/s)[0].match(/<button/g).length, 2);
   assert.match(waiting, />Skip for now</);
+  // Reports and explainers draws a report's steps as numbered nodes, each with only the marks it lists, and the legend once.
+  const reports = await dump('#reports');
+  assert.equal(reports.match(/class="card legend"/g).length, 1);
+  const flow = reports.match(/<ol class="flow"[^>]*>(.*?)<\/ol>/s)[1];
+  assert.deepEqual([...flow.matchAll(/<li>(.*?)<\/li>/gs)].map((m) => [...m[1].matchAll(/mk mk-(\w+)/g)].map((x) => x[1])), [['store'], [], ['gate', 'fail']]);
+  assert.match(reports, /3 steps.*>Open</s);
   // Answered, both cards show in full, each with its one box.
   writeFileSync(file.replace(/\.json$/, '.answers.jsonl'), ['ship', 'look'].map((key) => JSON.stringify({ key, answer: 'a', label: 'A', close: 'done', at: new Date().toISOString() })).join('\n') + '\n');
   const rows = cards(await dump('#answered'));
@@ -676,6 +683,7 @@ test('an answers-only board fed through post --replace: a bad item is refused, y
   assert.match(bad.out, /feed\.json: items\[1\] \(key \\"ask-2\\"\): options must be 2 to 6 items \(or empty/);
   assert.equal(write([{ ...yesNo, options: [{ value: 'text', label: 'T' }, { value: 'no', label: 'No' }] }]).code, 2);
   assert.match(write([{ ...page, area: 'later' }]).out, /area must be waiting or evidence or reports or answered/);
+  assert.match(write([{ ...page, steps: [{ title: 'Read', marks: ['magic'] }, { title: 'Count' }] }]).out, /steps must list 2 to 12 steps/);
   assert.equal(readFileSync(file, 'utf8'), before);
   assert.equal(run('post', file, '--replace').code, 2);
   assert.match(run('list', file).out, /waiting\[2\]/);

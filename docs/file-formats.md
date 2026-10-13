@@ -59,6 +59,16 @@
   an `explainer`, an item with nothing to answer, or any item on a read-only board is in Reports and
   explainers; any other item is in Waiting on you. An answered item is always in Answered. A feed's
   evidence page, an `interactive` item, can say `"area": "evidence"` to count and open under Evidence.
+- `steps`: optional, how it works step by step: 2 to 12 entries of a `title` (80 characters or fewer)
+  and optional `marks`, each once, from `ai` (AI model), `store` (Stores), `gate` (Gate) and `fail`
+  (Hard fail). List only the mark that matters at that step; a step can have none. Reports and
+  explainers draws them as numbered steps on a line with the marks under each, and **Open** lists them;
+  an item without steps shows a picture of its page there.
+
+  ```json
+  { "key": "how-sync", "type": "interactive", "title": "How it works: Notes sync", "view": "mocks/how-sync/index.html", "options": [],
+    "steps": [{ "title": "You change a note" }, { "title": "The phone saves it", "marks": ["store"] }, { "title": "It goes to the server", "marks": ["gate"] }] }
+  ```
 - `type`: optional, `decision` (default), `design`, `evidence`, `diagram`,
   `interactive` or `explainer`. A design item
   is a pick between mock options shown side by side. An evidence item is a
