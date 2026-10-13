@@ -139,7 +139,9 @@
   The board adds a small pointing script to each `.html` mock page it serves
   (see the README); it passes only text to the board. A pointed element is
   kept as `{ ref, tag, text }`: `ref` is a path to it, and anything that finds
-  it again must check `tag` and `text` and show nothing when they differ.
+  it again must check `tag` and `text` and show nothing when they differ. The
+  mock page itself has `window.signOffFind({ ref, tag, text })`, which gives
+  back that element, or null when it is gone or its tag or words changed.
 - Every item that asks something has one place to type, folded behind
   **Other answer** after its buttons (a design's Picks too): a short text,
   500 characters or fewer. **Send reply** saves it as the answer `text` with

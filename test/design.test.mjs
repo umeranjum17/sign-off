@@ -597,6 +597,33 @@ test('pointing at a design mock: the board turns it on for a frame, a tap comes 
   proc.kill();
 });
 
+test('a stored pointing reference finds its element on the mock page itself, again after a reload, and finds nothing once its words change', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'find'), file = join(dir, 'board.json');
+  mkdirSync(join(dir, 'mocks'), { recursive: true });
+  writeFileSync(join(dir, 'mocks', 'a.html'), '<main id="app"><section><button hidden>Back</button><button>Sign in</button></section></main>');
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key: 'look', type: 'design', title: 'Look', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }],
+    recommend_value: 'a', mocks: [{ value: 'a', path: 'mocks/a.html' }] }] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { mockBase } = await (await fetch(`${url}api/decisions`)).json();
+  const { evaluate, close } = await browse(dir);
+  const ref = { ref: '#app > section:nth-of-type(1) > button:nth-of-type(2)', tag: 'button', text: 'Sign in' };
+  const button = "document.querySelector('#app > section:nth-of-type(1) > button:nth-of-type(2)')";
+  const same = `signOffFind(${JSON.stringify(ref)}) === ${button}`;
+  await evaluate(`location.href = ${JSON.stringify(new URL(`${mockBase.slice(1)}look~a/a.html`, url).href)}`);
+  await until(() => evaluate("typeof signOffFind === 'function'"));
+  assert.equal(await evaluate(same), true);
+  await evaluate('window.old = true, location.reload()');
+  await until(() => evaluate('!window.old'));
+  await until(() => evaluate("typeof signOffFind === 'function'"));
+  assert.equal(await evaluate(same), true);
+  await evaluate(`${button}.textContent = 'Log in'`);
+  assert.equal(await evaluate(`signOffFind(${JSON.stringify(ref)})`), null);
+  close();
+  proc.kill();
+});
+
 test('each card has one place to type: Other answer holds the reply, Another round and the comment, and no separate note link', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'one-box'), file = join(dir, 'board.json');
   mkdirSync(dir);
