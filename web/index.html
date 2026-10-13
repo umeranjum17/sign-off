@@ -66,6 +66,7 @@
   .fhead { margin: 0; color: var(--muted); font-size: 0.875rem; font-weight: 650; }
   .pbar { height: 4px; margin: 0.5rem 0 1rem; border-radius: 4px; background: var(--line); overflow: hidden; }
   .pbar i { display: block; height: 100%; background: var(--c-waiting); }
+  .focus .since { margin: -0.375rem 0 1rem; font-weight: 600; }
   .focus .row h3 { font-size: 1.75rem; line-height: 1.2; letter-spacing: -0.01em; }
   .focus .choices button, .needs .choices .rec { min-height: 4rem; border-radius: 1rem; font-size: 1.125rem; font-weight: 600; }
   /* On Summary the recommended answer is the large button, and the others are pills under it. */
@@ -645,6 +646,7 @@
     : state.readonly || d.type === 'explainer' || !(d.options.length || d.reply) ? 'reports' : 'waiting'));
   const hhmm = (at) => new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   const isToday = (at) => new Date(at).toDateString() === new Date().toDateString();
+  const when = (at) => (isToday(at) ? hhmm(at) : `${new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ${hhmm(at)}`);
   const pic = (d) => {
     const i = d.media?.findIndex((m) => !/\.(mp4|webm)$/i.test(m.path)), m = d.mocks?.find((x) => !/\.html?$/i.test(x.path));
     return i >= 0 ? `/api/media?key=${encodeURIComponent(d.key)}&i=${i}` : d.type === 'diagram' ? mockUrl(d.key, '', d.view) : m && mockUrl(d.key, m.value, m.path);
@@ -653,8 +655,9 @@
 
   function tile(a, items) {
     const answeredToday = a === 'answered' && items.filter((d) => new Date(state.answers[d.key].at).toDateString() === new Date().toDateString()).length;
-    // A short count line that never cuts off on a phone. Items carry no time, so Waiting shows no age.
-    const detail = { waiting: `${items.length} waiting`, evidence: items[0]?.number ? `Newest: Update ${items[0].number}` : `${items.length} to see`,
+    // A short count line that never cuts off on a phone. Waiting gives the oldest ask's time when its items carry one.
+    const oldest = items.map((d) => d.filed).filter(Boolean).sort((x, y) => Date.parse(x) - Date.parse(y))[0];
+    const detail = { waiting: oldest ? `Oldest ${when(oldest)}` : `${items.length} waiting`, evidence: items[0]?.number ? `Newest: Update ${items[0].number}` : `${items.length} to see`,
       reports: `${items.length} to read`, answered: `${answeredToday} today` }[a];
     const thumbs = a === 'evidence' ? items.map(pic).filter(Boolean).slice(0, 3).map((u) => el('img', { src: src(u), alt: '' })) : [];
     const marks = thumbs.length ? thumbs : a === 'waiting' ? [items.length ? icon(a) : '']
@@ -663,7 +666,7 @@
       el('span', { class: 'n' }, String(items.length)), el('span', { class: 'vis', 'aria-hidden': 'true' }, ...marks), el('span', { class: 'detail', dir: 'auto' }, detail));
   }
 
-  /** The day so far: a mark per answer on a line of hours, and the list of them. Items carry no time of their own, so only answers show. */
+  /** The day so far: a mark per answer on a line of hours, and the list of them. Only answers have a place on it; an item's `filed` time is not shown here. */
   function today(answered) {
     const day = new Date().toDateString(), done = answered.map((d) => ({ d, t: new Date(state.answers[d.key].at) }))
       .filter((e) => e.t.toDateString() === day).sort((x, y) => x.t - y.t);
@@ -788,7 +791,8 @@
       return el('li', {}, b);
     }));
     return el('div', { class: 'tri' }, queue, el('div', { class: 'focus' }, el('p', { class: 'fhead' }, `${i + 1} of ${n}`),
-      el('div', { class: 'pbar', 'aria-hidden': 'true' }, el('i', { style: `width: ${((i + 1) / n) * 100}%` })), card,
+      el('div', { class: 'pbar', 'aria-hidden': 'true' }, el('i', { style: `width: ${((i + 1) / n) * 100}%` })),
+      d.filed ? el('p', { class: 'meta since' }, `Waiting since ${when(d.filed)}`) : '', card,
       skip || dis ? el('div', { class: 'quiet' }, skip || '', dis) : '', next ? el('div', { class: 'card upnext' }, el('p', { class: 'meta' }, 'Up next'), el('strong', { dir: 'auto' }, title(next))) : '',
       hint ? el('p', { class: 'meta hint' }, hint) : '', el('p', { class: 'meta keys' }, `Keys: ${keys}`), dismissed(hidden)));
   }

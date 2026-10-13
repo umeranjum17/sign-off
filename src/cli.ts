@@ -446,9 +446,11 @@ function post(args: string[], cmd = 'post') {
 function replace(file: string, on: string, from?: string, filer?: string) {
   if (from === undefined) throw fail('--replace needs --from <board file>', 'VALIDATION_ERROR', 'sign-off-axi post board.json --from feed.json --replace');
   const source = resolve(from), incoming = loadDecisions(source), fed = readItems(source);
-  const feed = filer ? fed.items.map((i) => ({ ...i, filer })) : fed.items;
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
+    // An item the feed sends without a time keeps the one it was first posted with, so a feeder that runs every few seconds never resets it.
+    const first = new Map((existsSync(file) ? readItems(file).items : []).map((i) => [i?.key, i?.filed])), now = new Date().toISOString();
+    const feed = fed.items.map((i) => ({ filed: first.get(i?.key) ?? now, ...i, ...(filer && { filer }) }));
     // An answer belongs to its question: an answered key may not come back asking something else.
     const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply]);
     for (const had of board(file)) {
@@ -524,9 +526,9 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
       writeFileSync(join(dir, `${i + 1}${extname(src).toLowerCase()}`), bytes, { mode: 0o600 });
       return { path, sha256: sha256(bytes), bytes: bytes.length };
     });
-    const { title, about, detail, close, link, recommend: recommend_value, default: default_if_silent } = values;
-    items.push(explainer ? { key, type, title, about, detail, options, recommend_value, default_if_silent, close, chapters, media, filer }
-      : { key, type, number, title, about, detail, close, link, media, filer });
+    const { title, about, detail, close, link, recommend: recommend_value, default: default_if_silent } = values, filed = new Date().toISOString();
+    items.push(explainer ? { key, type, title, about, detail, options, recommend_value, default_if_silent, close, chapters, media, filer, filed }
+      : { key, type, number, title, about, detail, close, link, media, filer, filed });
     // The whole board is checked before it is written, so a bad post leaves the board and evidence/ as they were.
     const check = `${file}.${process.pid}.check`;
     writeFileSync(check, JSON.stringify({ schema: 2, items }), { mode: 0o600 });
@@ -579,17 +581,18 @@ function buildIncoming(values: Record<string, any>, extra: object = {}, filer?: 
 function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: Decision[]; raw: object[] }, filer?: string) {
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
-    const current = board(file), items = existsSync(file) ? readItems(file).items : [], saved = readAnswers(file);
+    const current = board(file), items = existsSync(file) ? readItems(file).items : [], saved = readAnswers(file), now = new Date().toISOString();
     const raised = incoming.map((d, i) => {
       const had = current.find((c) => c.key === d.key);
       // An answer outlives its item: a new question under that key would inherit it.
       if (!had && Object.hasOwn(saved, d.key)) throw fail(`key ${d.key} already has a saved answer on ${tilde(file)} from an item no longer there`, 'CONFLICT', 'Raise it under a new --key');
-      // The same question from another filer is the same question: it keeps its first filer.
-      const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, filer: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
+      // The same question from another filer, or at another time, is the same question: it keeps its first filer and time.
+      const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, filer: undefined, filed: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
       if (had && same(had) !== same(d)) {
         throw fail(`key ${d.key} already holds a different question on ${tilde(file)}`, 'CONFLICT', 'Raise it under a new --key');
       }
-      if (!had) items.push(raw[i]);
+      // Each new item records when it was raised, unless it names its own time.
+      if (!had) items.push({ filed: now, ...raw[i] });
       return { key: d.key, status: !had ? 'raised' : had.answer ? `already answered ${had.answer.answer}` : 'already waiting', title: d.title };
     });
     if (raised.some((r) => r.status === 'raised')) writeItems(file, items);

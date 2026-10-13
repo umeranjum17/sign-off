@@ -118,7 +118,11 @@ test('agent journey: raise, open, answer, read back in TOON and JSON', async () 
   assert.match(run().out, /waiting: 0 of 0 decisions/);
   const raised = run('raise', '--title', 'Keep the weekly digest?', '--recommend', 'yes');
   assert.match(raised.out, /keep-the-weekly-digest,raised,/);
+  // A raised item records when it was raised; raising the same question again keeps that time.
+  const filed = () => JSON.parse(readFileSync(join(env.HOME, '.sign-off', 'decisions.json'), 'utf8')).items[0].filed, first = filed();
+  assert.ok(Date.now() - Date.parse(first) < 60_000, first);
   assert.match(run('raise', '--title', 'Keep the weekly digest?', '--recommend', 'yes').out, /already waiting/);
+  assert.equal(filed(), first);
   assert.deepEqual([run('raise', '--title', 'Keep the weekly digest?').code, run('raise', '--title', 'x', '--recommend', 'maybe').code, run('list', '--stat').code], [1, 2, 2]);
   assert.match(run().out, /waiting\[1\]\{key,title\}:\n  keep-the-weekly-digest,Keep the weekly digest\?/);
   const opened = run('open', '--port', '0');

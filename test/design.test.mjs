@@ -532,7 +532,8 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   const dir = join(scratch, 'one-box'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l }));
-  writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key: 'ship', title: 'When should it ship?', options: abc, recommend_value: 'b' },
+  const nine = new Date(new Date().setHours(9, 15, 0, 0)).toISOString();
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key: 'ship', title: 'When should it ship?', options: abc, recommend_value: 'b', filed: nine },
     { key: 'look', type: 'design', title: 'Pick the look', options: abc, recommend_value: 'b' },
     { key: 'how', title: 'How it ships', area: 'reports', group: 'How it works', filed: new Date().toISOString(), decided: 'Ships only when the check passes.', steps: [{ title: 'Build', marks: ['store'] }, { title: 'Check' }, { title: 'Ship', marks: ['gate', 'fail'] }] }] }));
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
@@ -545,6 +546,8 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   const waiting = await dump('#waiting');
   assert.deepEqual(cards(waiting).map(([key]) => key), ['ship']);
   assert.match(waiting, /1 of 2/);
+  // Under the progress bar, when the ask in focus was raised.
+  assert.match(waiting, /<div class="pbar"[^>]*><i[^>]*><\/i><\/div><p class="meta since">Waiting since 09:15<\/p>/);
   assert.equal(waiting.match(/<ol class="queue"[^>]*>.*?<\/ol>/s)[0].match(/<button/g).length, 2);
   // Under the ask, Skip for now and Dismiss sit side by side; the ask has no × of its own.
   assert.match(waiting, /<div class="quiet"><button class="skip">Skip for now<\/button><button class="dis" aria-label="Dismiss, When should it ship\?">Dismiss<\/button><\/div>/);
@@ -553,14 +556,18 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   const home = await dump('');
   assert.match(home, /<div class="foot"><button class="dis" aria-label="Dismiss, When should it ship\?">Dismiss<\/button><a class="more" href="#waiting">Answer all 2 in Triage →<\/a><\/div>/);
   assert.doesNotMatch(home.match(/<section class="card needs.*?<\/section>/s)[0], /class="x"/);
-  // Summary has the person's mark beside its title, and the Waiting on you tile one clock.
+  // Summary has the person's mark beside its title, and the Waiting on you tile one clock and the oldest ask's time (the design ask has none).
   assert.match(home, /<h1 tabindex="-1">Summary<\/h1><span class="icon i-you" aria-hidden="true">/);
   const vis = (dom, a) => dom.match(new RegExp(`<a class="tile i-${a}".*?<span class="vis" aria-hidden="true">(.*?)<\\/span><span class="detail"`, 's'))[1];
   assert.deepEqual(vis(home, 'waiting').match(/class="icon i-\w+"/g), ['class="icon i-waiting"']);
+  assert.match(home, /<a class="tile i-waiting".*?<span class="detail" dir="auto">Oldest 09:15<\/span>/s);
   // An ask dismissed from Waiting on you sits under Dismissed (1) at the end of Needs you first and of Triage, with Restore.
   const gone = file.replace(/\.json$/, '.dismissed.jsonl');
   writeFileSync(gone, JSON.stringify({ key: 'ship', dismissed: true, at: new Date().toISOString() }) + '\n');
-  for (const hash of ['', '#waiting']) assert.match(await dump(hash), /<details class="other gone-asks"><summary>Dismissed \(1\)<\/summary><ul class="rows"><li><strong dir="auto">When should it ship\?<\/strong><button class="dis" aria-label="Restore, When should it ship\?">Restore<\/button><\/li><\/ul><\/details>/, hash);
+  const pages = {};
+  for (const hash of ['', '#waiting']) assert.match(pages[hash] = await dump(hash), /<details class="other gone-asks"><summary>Dismissed \(1\)<\/summary><ul class="rows"><li><strong dir="auto">When should it ship\?<\/strong><button class="dis" aria-label="Restore, When should it ship\?">Restore<\/button><\/li><\/ul><\/details>/, hash);
+  // Only the design ask waits now, and it has no time: the tile keeps its count.
+  assert.match(pages[''], /<a class="tile i-waiting".*?<span class="detail" dir="auto">1 waiting<\/span>/s);
   // Restore puts it back in Triage (behind the ask in focus) through the same dismiss log, and the row goes once nothing is dismissed.
   const { evaluate, close } = await browse(join(dir, 'live'));
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
@@ -770,7 +777,13 @@ test('an answers-only board fed through post --replace: a bad item is refused, y
   const yesNo = { key: 'ask-1', type: 'ask', title: 'Ship it?', reply: true };
   const words = { key: 'ask-2', type: 'ask', title: 'Say ready when you are', options: [], reply: true };
   assert.match(write([page, yesNo, words]).out, /items: 3\nchanged: true/);
+  // A feed with no times gets one per item on first sight, kept on every later run, so the file is left alone; a feed's own time is kept as sent.
+  const times = () => JSON.parse(readFileSync(file, 'utf8')).items.map((i) => i.filed), stamped = times();
+  assert.ok(stamped.every((t) => Date.now() - Date.parse(t) < 60_000), String(stamped));
   assert.match(write([page, yesNo, words]).out, /changed: false/);
+  assert.deepEqual(times(), stamped);
+  assert.match(write([page, yesNo, { ...words, filed: '2026-10-13T07:19:00Z' }]).out, /changed: true/);
+  assert.deepEqual(times(), [...stamped.slice(0, 2), '2026-10-13T07:19:00Z']);
   // A malformed item from the feeder is refused at write time, and the board stays as it was.
   const before = readFileSync(file, 'utf8');
   const bad = write([page, { ...words, options: [{ value: 'only', label: 'Only' }] }]);

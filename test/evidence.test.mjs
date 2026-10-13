@@ -45,6 +45,8 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
     '--link', 'https://github.com/acme/app/pull/12').out, /update-2,2,2/);
   assert.deepEqual(readdirSync(join(so, 'evidence', '2')).sort(), ['1.png', '2.webm']);
   assert.deepEqual(readFileSync(join(so, 'evidence', '2', '2.webm')), clip);
+  // Each post records when it was filed.
+  for (const item of JSON.parse(readFileSync(board, 'utf8')).items) assert.ok(Date.now() - Date.parse(item.filed) < 60_000, item.key);
   // A second board in the same folder shares evidence/: it takes the next free number and never writes into a used one.
   const other = join(so, 'other.json');
   assert.match(run('post', other, '--type', 'evidence', '--title', 'Other board', '--about', 'Note.', '--media', rec).out, /update-3,3,1/);

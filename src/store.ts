@@ -18,7 +18,7 @@ export type Decision = {
   area?: string;
   /** How it works, step by step: each step's title and the marks for what matters there. */
   steps?: Step[];
-  /** Reports: the section it is grouped under, when it was filed (ISO date-time), and what it decided. */
+  /** Reports: the section it is grouped under and what it decided. `filed` (ISO date-time) is when any item was filed. */
   group?: string; filed?: string; decided?: string;
 };
 export type Answer = { key: string; answer: string; label: string; close: string; at: string; note?: string };
