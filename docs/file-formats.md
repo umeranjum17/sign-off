@@ -60,7 +60,6 @@
   numbered update the person gives a verdict on (below). Any other lowercase
   word (1-32 of `a-z 0-9 -`, starting with a letter) also loads; the dashboard
   shows it as a plain card with its options until that type has its own view.
-  Exception: `vault` is reserved and refused while its staged implementation is disabled.
 - `view`: required on `diagram` and `interactive` items, the path of one file
   relative to the board file's folder (keep it under `mocks/<key>/`), served only
   from inside that folder. A diagram is an image (`.svg`, `.png`, `.jpg`,
@@ -204,20 +203,6 @@ again until the filer takes it too.
 ```
 
 - `text`: 1 to 2000 characters, trimmed.
-
-## Internal vault custody (disabled)
-
-These files are an internal staged format, **not a supported CLI or browser feature**. All public vault admission is refused. No payload goes into a board, answer, seen event, hook or export. Do not use ordinary question fields for secrets.
-
-On Unix, `$XDG_STATE_HOME/sign-off/vault/` (default `$HOME/.local/state/sign-off/vault/`) and its `sign-off` parent must be owned by the current UID with mode 0700. Symlinked path components, writable non-sticky ancestors, a git ancestor, or storage under the board folder are refused. Private files must be regular, single-link, owner-owned mode 0600. Unsupported private-file platforms fail closed.
-
-- `key`: a random 32-byte AES-256 master key, created exclusively and fsynced before any record. A missing key is never regenerated while a record or interrupted record exists. This protects ciphertext-only copies, **not** same-UID processes, root, or full-home backups containing the key. Keep state out of backups/sync and use full-disk encryption as appropriate.
-- `<id>.json`: `id` is SHA-256 of the canonical board path and immutable key (never a payload hash). Each schema 1 record has `meta` (board, key, mode, filer, absolute expiry in epoch milliseconds, and Give destination), `status`, `at`, and optionally `sealed`. Metadata is private routing information; destination validation/allowlisting has not been implemented in this slice.
-- `sealed`: base64 `nonce` (fresh random 12 bytes), `tag` (16 bytes), and AES-256-GCM ciphertext `data`. Authenticated data is the JSON array `[1, board, key, mode, expires, destination-or-null, filer]`. Plaintext is bounded to 16 KiB, held briefly in memory, and never written to a spool or temporary file. There is no decryption/delivery entry point yet.
-- `status`: Give begins `pending`; a single deposit makes it `ready`. Receive begins `ready` with an encrypted payload. Expiry on inspection/access or explicit refusal removes `sealed` and persists `expired` or `refused`. Terminal metadata remains as a tombstone so a key cannot resurrect. Metadata summaries never include the envelope. No background expiry scheduler or public answer-event bridge exists yet.
-- `lock`: an exclusive 0600 global lock. Stale locks fail closed with `BUSY`; automated lock recovery is not implemented. Do not remove a live writer's lock. Interrupted writes use `<id>.json.<random>.tmp`; only encrypted records enter those files. Under the lock, the next operation removes orphaned temporary records. Committed writes fsync the file, rename, then fsync the containing directory. Raw filesystem/crypto exceptions never leave the custody API.
-
-Future delivery journaling, destination/provider allowlists, transport/session controls and completion states need their own qualified slices before enabling vault. Logical ciphertext removal is not a forensic wipe; the destination will deliberately retain plaintext after the future Give delivery.
 
 **Access token** (`decisions.token`, mode 600): made the first time the board is served beyond `127.0.0.1`
 and reused after that. The board reads it on every request, so deleting it shuts old links out at once.
