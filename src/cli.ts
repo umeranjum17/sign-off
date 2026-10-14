@@ -119,7 +119,7 @@ Blocks until the user answers, then prints the answer the way answers does. Use 
   --timeout  seconds to wait, 600 (10 minutes) by default; then exits 1 with code TIMEOUT
   --full     adds the button label, close and title
   --json     {"<key>":{"answer","label","close","at","note"?}} for the new answers; note only when the user wrote one
-  --events   one JSON line per new answer and per another-round ask, in the order they were saved (${CONTRACT}#7-answers):
+  --events   needs --filer (or SIGN_OFF_FILER); one JSON line per new answer and per another-round ask, in the order they were saved (${CONTRACT}#7-answers):
              {"event":"answer","contract":1,"kind","schema","key","title","answer","label","close","at","note"?,"filer"?,"comments"?}
              {"event":"round","contract":1,"kind","schema","key","title","note","at","filer"?,"comments"?}; a board-format item reports as ask schema 1
 A note column appears when any shown answer has a note.
@@ -445,6 +445,7 @@ async function wait(args: string[]) {
   if (!/^\d{1,7}$/.test(values.timeout)) throw fail('--timeout must be whole seconds, 0 or more', 'VALIDATION_ERROR', `Run \`sign-off-axi wait --help\``);
   if (values.events && (values.json || values.full)) throw fail(`--events prints event lines, so it does not take --${values.json ? 'json' : 'full'}`, 'VALIDATION_ERROR', 'Run `sign-off-axi wait --filer <id> --events`');
   const filer = filerOf(values), on = onBoard + (filer ? ` --filer ${filer}` : '');
+  if (values.events && filer === undefined) throw fail(`--events prints a filer's answer events, so it needs --filer`, 'VALIDATION_ERROR', 'Run `sign-off-axi wait --filer <id> --events`');
   // Vault Give delivery: its own loop, before any board read, so no ordinary wait changes. Undocumented while the vault is OFF.
   if (values.into !== undefined) return waitInto(file, values, onBoard);
   if (values.key === undefined) ready(file, onBoard);

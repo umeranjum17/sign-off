@@ -441,7 +441,11 @@ test('wait --events: one line per answer and per another-round ask, with the ite
   save('rounds', { key: gate.key, note: 'Show it on a phone first.', at: '2026-10-13T08:05:00Z' });
   assert.equal(await exited, 0, out);
   assert.deepEqual(out.trim().split('\n').map((l) => JSON.parse(l)), [{ event: 'round', ...head, note: 'Show it on a phone first.', at: '2026-10-13T08:05:00Z', filer: 'done-done' }]);
-  const both = cli2('wait', board, '--events', '--json');
+  const both = cli2('wait', board, '--filer', 'done-done', '--events', '--json');
   assert.equal(both.status, 2, both.stdout);
   assert.match(both.stdout, /--events prints event lines, so it does not take --json/);
+  // --events prints a filer's events, so a wait without one is refused.
+  const noFiler = cli2('wait', board, '--events');
+  assert.equal(noFiler.status, 2, noFiler.stdout);
+  assert.match(noFiler.stdout, /needs --filer/);
 });
