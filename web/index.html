@@ -979,6 +979,12 @@
     pointing.set(frame.dataset.mock, on);
     aim(frame);
   }
+  // While pointing is on, a tap never opens the mock full size, even one that reaches the board instead of the frame:
+  // one on the frame's edge, one the browser sends there until it has drawn the frame taking taps, or one before a frame drawn anew is ready.
+  addEventListener('click', (e) => {
+    const frame = e.target.closest?.('.shot')?.querySelector('iframe[data-mock]');
+    if (frame && talks() && pointing.get(frame.dataset.mock) === true) e.preventDefault();
+  });
   addEventListener('message', (e) => {
     const frame = mockFrame(e.source), msg = e.data;
     if (!frame || !msg) return;

@@ -105,7 +105,17 @@ function seal(dir: string, meta: VaultMeta, value: Buffer): Sealed {
     return { nonce: nonce.toString('base64'), tag: cipher.getAuthTag().toString('base64'), data: data.toString('base64') };
   } finally { key.fill(0); }
 }
+// A stop signal with no listener ends the process at once, even inside the locked section, and the lock it leaves fails closed for good.
+// So a listener takes each stop signal the process has none for: it runs only between turns of the event loop, after a section has
+// removed its lock, and raises the signal again with no listener, so the process still ends by it. It stays on once added, since
+// Node drops a signal that came just before its listener was removed.
+const STOPS = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
+function raise(signal: NodeJS.Signals) {
+  for (const s of STOPS) process.off(s, raise);
+  if (!process.listenerCount(signal)) process.kill(process.pid, signal);
+}
 async function lockedVault<T>(dir: string, fn: () => T, attempts = 50): Promise<T> {
+  for (const s of STOPS) if (!process.listenerCount(s)) process.on(s, raise);
   let lock: string | undefined;
   try {
     const candidate = join(dir, 'lock');
