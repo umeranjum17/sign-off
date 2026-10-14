@@ -161,7 +161,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       ...(stored && d.media && { media: d.media.map(({ path, sha256, bytes }: MediaRef) => ({ path, sha256, bytes })) }),
       ...(d.type === 'evidence' && { number: d.number }),
       // A gate's run is part of its question: the same key with another run is a different question.
-      ...(d.kind === 'gate' && d.run && { run: d.run }),
+      ...(d.kind === 'gate' && d.run && { run: { run_id: d.run.run_id, commit: d.run.commit } }),
       ...(d.type === 'explainer' && d.chapters && { chapters: d.chapters.map(({ at, title }: Chapter) => ({ at, title })) }),
     };
   });

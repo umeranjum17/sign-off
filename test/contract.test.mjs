@@ -339,6 +339,11 @@ test('post --kind gate: a done-done run waits for approval like an ask, its run 
   assert.equal(other.status, 2, other.stdout);
   assert.match(other.stdout, /key dd-gate-a1b2c3d4 already holds a different message[^]*Post it under a new key/);
   assert.equal(readFileSync(board, 'utf8'), before);
+  const reordered = message('gate-reordered.json', JSON.stringify({ schema: 2, items: [{ ...gate, run: { commit: gate.run.commit, run_id: gate.run.run_id } }] }));
+  const same = cli2('', 'raise', board, '--from', reordered);
+  assert.equal(same.status, 0, same.stdout);
+  assert.match(same.stdout, /dd-gate-a1b2c3d4,already waiting,/);
+  assert.equal(readFileSync(board, 'utf8'), before);
   appendFileSync(join(scratch, 'gate.answers.jsonl'), `${JSON.stringify({ key: gate.key, answer: 'fix', label: 'Fix first', close: 'done', at: '2026-10-13T08:00:00Z' })}\n`);
   const waited = cli2('', 'wait', board, '--filer', 'done-done', '--json', '--timeout', '5');
   assert.equal(waited.status, 0, waited.stdout);
