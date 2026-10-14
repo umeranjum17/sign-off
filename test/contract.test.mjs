@@ -1,6 +1,6 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -412,4 +412,36 @@ test('post --kind finding: a retro proposal waits like an ask, a changed proposa
   assert.equal(again.status, 2, again.stdout);
   assert.match(again.stdout, /key lfm-missing-env already has a saved answer[^]*Post it under a new key/);
   assert.equal(readFileSync(board, 'utf8'), gone);
+});
+
+test('wait --events: one line per answer and per another-round ask, with the item kind and schema; a board-format item reports as ask', async () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const board = join(scratch, 'events.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  assert.equal(spawnSync('node', [cli, 'post', board, '--kind', 'gate', '--from', '-'], { encoding: 'utf8', env, input: JSON.stringify(gate) }).status, 0);
+  // A board-format item, even one with a type of its own, reports as ask schema 1.
+  assert.equal(cli2('post', board, '--type', 'design', '--key', 'plain', '--title', 'Plain?', '--option', 'a=A', '--option', 'b=B', '--recommend', 'a', '--filer', 'done-done').status, 0);
+  assert.equal(cli2('raise', board, '--key', 'later', '--title', 'Later?', '--filer', 'done-done').status, 0);
+  const save = (name, line) => appendFileSync(join(scratch, `events.${name}.jsonl`), `${JSON.stringify(line)}\n`);
+  save('answers', { key: gate.key, answer: 'fix', label: 'Fix first', close: 'done', at: '2026-10-13T08:01:00Z', note: 'Umer: the judge first.' });
+  save('answers', { key: 'plain', answer: 'a', label: 'A', close: 'done', at: '2026-10-13T08:00:00Z' });
+  const head = { contract: 1, kind: 'gate', schema: 1, key: gate.key, title: gate.title };
+  const took = cli2('wait', board, '--filer', 'done-done', '--events', '--timeout', '5');
+  assert.equal(took.status, 0, took.stdout);
+  assert.deepEqual(took.stdout.trim().split('\n').map((l) => JSON.parse(l)), [
+    { event: 'answer', contract: 1, kind: 'ask', schema: 1, key: 'plain', title: 'Plain?', answer: 'a', label: 'A', close: 'done', at: '2026-10-13T08:00:00Z', filer: 'done-done' },
+    { event: 'answer', ...head, answer: 'fix', label: 'Fix first', close: 'done', at: '2026-10-13T08:01:00Z', note: 'Umer: the judge first.', filer: 'done-done' }]);
+  // A round asked while the filer waits wakes it as a round line; the answers it took already stay taken.
+  const waiting = spawn('node', [cli, 'wait', board, '--filer', 'done-done', '--events', '--timeout', '10'], { env });
+  let out = '';
+  waiting.stdout.on('data', (b) => (out += b));
+  const exited = new Promise((ok) => waiting.on('exit', ok));
+  await new Promise((ok) => setTimeout(ok, 700));
+  save('rounds', { key: gate.key, note: 'Show it on a phone first.', at: '2026-10-13T08:05:00Z' });
+  assert.equal(await exited, 0, out);
+  assert.deepEqual(out.trim().split('\n').map((l) => JSON.parse(l)), [{ event: 'round', ...head, note: 'Show it on a phone first.', at: '2026-10-13T08:05:00Z', filer: 'done-done' }]);
+  const both = cli2('wait', board, '--events', '--json');
+  assert.equal(both.status, 2, both.stdout);
+  assert.match(both.stdout, /--events prints event lines, so it does not take --json/);
 });
