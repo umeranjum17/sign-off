@@ -183,8 +183,8 @@ After the user picks, answers --key <key> --json holds the pick and note; "round
 --from <file> --replace is for a program that feeds the board: the file, checked like any post, becomes the whole board (items and
 top-level fields such as "answers_only": true), written only when it changed; a bad item is refused and the board is left as it was. Answers stay.
 A contract message under a key already on the board is checked against its kind's rules again when it changed, so a changed item that no longer
-matches is refused and the board left as it was; an item whose message did not change is not checked again. An answered key the feed dropped
-cannot come back: post it under a new key.
+matches is refused and the board left as it was; an item whose message did not change is not checked again. An answered contract key the feed dropped
+cannot come back: post it under a new key (a design, diagram, interactive or explainer item that comes back keeps its answer).
 With --filer (or SIGN_OFF_FILER) the file replaces only that filer's items, and items with no filer it names by key: every other item and the board's other top-level fields stay.
 An empty items list removes that filer's items.
 --type diagram and --type interactive are a decision shown with a picture: --view names one board-relative file,
@@ -279,6 +279,7 @@ const asSent = ({ filed: _filed, ...rest }: any) => rest;
 function contractItems(items: any[], from: string, file: string, replace = false) {
   const on = new Map((existsSync(file) ? readItems(file).items : []).map((i) => [i?.key, i]));
   // An answer belongs to the item it was given for: in a --replace feed, a key whose answer outlived it may not come back.
+  // This is the early refusal; replace re-asserts it under the board lock, where the write reads the board it applies to.
   const saved = replace ? readAnswers(file) : undefined;
   items.forEach((m, i) => {
     // Evidence in message form (no type) never comes in a feed, even under a key on the board: its media must be copied and numbered.
@@ -295,9 +296,14 @@ function contractItems(items: any[], from: string, file: string, replace = false
     if (on.has(m?.key)) {
       // In a --replace feed the stored item is replaced, so a changed item is checked again as the message it carries and
       // one that no longer matches its kind is refused, never stored half-broken (contract section 2). The board's own
-      // `filed` stamp is not a field of that message, except on a report, which names one. An unchanged item, a
-      // board-format one and every item outside a --replace feed are not checked again.
-      const asMessage = (x: any) => (m?.kind === 'report' ? x : asSent(x));
+      // `filed` stamp is not a field of that message, except on a report, which names one; an evidence item's `type`,
+      // `number` and media copies read as the message's `media` paths, and its `evidence` run reads as `run`. An unchanged
+      // item, a board-format one and every item outside a --replace feed are not checked again.
+      const asMessage = (x: any) => {
+        if (m?.kind !== 'evidence') return m?.kind === 'report' ? x : asSent(x);
+        const { type: _type, number: _number, media, evidence: run, ...message } = asSent(x);
+        return { ...message, ...(media?.length && { media: media.map((r: any) => r.path) }), ...(run && { run }) };
+      };
       const same = canon(m) === canon(m?.filed === undefined ? asMessage(held) : held);
       if (!replace || same || (m?.contract === undefined && m?.kind === undefined)) return;
       check = asMessage(m);
