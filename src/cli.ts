@@ -511,7 +511,7 @@ function post(args: string[], cmd = 'post') {
     }
     const size = statSync(actual);
     if (!size.isFile() || size.size > MOCK_BYTES) throw fail(`--view ${values.view} must be a file of 5 MB or less`, 'VALIDATION_ERROR');
-    return storeIncoming(file, on, buildIncoming(values, { type, view: values.view }, filer), filer);
+    return storeIncoming(file, on, buildIncoming(values, { type, view: values.view }, filer, file), filer);
   }
   const mocks = values.mock?.map((m: string) => {
     const at = m.indexOf('=');
@@ -521,7 +521,7 @@ function post(args: string[], cmd = 'post') {
     if (!resolve(root, name).startsWith(root + sep)) throw fail(`--mock ${path} escapes the board folder`, 'VALIDATION_ERROR', 'Keep mock files next to the board file');
     return { value: m.slice(0, at), path };
   });
-  return storeIncoming(file, on, buildIncoming(values, { type, tradeoff: values.tradeoff, mocks }, filer), filer);
+  return storeIncoming(file, on, buildIncoming(values, { type, tradeoff: values.tradeoff, mocks }, filer, file), filer);
 }
 
 /** For a program that feeds the board: the --from file, checked like any post, becomes the whole board, items and top-level fields. Answers stay.
@@ -597,7 +597,7 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
   });
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
-    const items = existsSync(file) ? readItems(file).items : [];
+    const { items, extra } = existsSync(file) ? readItems(file) : { items: [] as any[], extra: {} };
     // Boards in one folder share evidence/, so a number is taken only by creating its folder; one in use is never written into.
     const current = board(file), store = join(dirname(file), 'evidence'), taken = current.map((d) => Number(/^update-(\d+)$/.exec(d.key)?.[1] ?? 0));
     const own = explainer && (values.key ?? slug(values.title));
@@ -618,7 +618,7 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
       : { key, type, number, title, about, detail, close, link, media, filer, filed });
     // The whole board is checked before it is written, so a bad post leaves the board and evidence/ as they were.
     const check = `${file}.${process.pid}.check`;
-    writeFileSync(check, JSON.stringify({ schema: 2, items }), { mode: 0o600 });
+    writeFileSync(check, JSON.stringify({ ...extra, schema: 2, items }), { mode: 0o600 });
     try { loadDecisions(check); } catch (e) {
       rmSync(dir, { recursive: true, force: true });
       throw e instanceof InputError ? new InputError(e.message.replace(basename(check), basename(file))) : e;
@@ -700,13 +700,14 @@ function recommended(items: any[], flags: boolean) {
   if (d && flags) throw fail('--recommend is required when you list options', 'VALIDATION_ERROR', `Add --recommend <value>, the option you would pick: one of ${values}`);
   if (d) throw fail(`items[${items.indexOf(d)}] (key ${d.key}) lists options but no recommend_value`, 'VALIDATION_ERROR', `Add "recommend_value": "<value>", the option you would pick: one of ${values}`);
 }
-/** Flags are validated by the same loader as a file: write them as a one-decision file first. */
-function buildIncoming(values: Record<string, any>, extra: object = {}, filer?: string, file = ''): { incoming: Decision[]; raw: object[] } {
+/** Flags are validated by the same loader as a file: write them as a one-decision file first. Items are checked against the board they go to, so its answers_only or readonly holds. */
+function buildIncoming(values: Record<string, any>, extra: object, filer: string | undefined, file: string): { incoming: Decision[]; raw: object[] } {
+  const board = existsSync(file) ? readItems(file).extra : {};
   if (values.from !== undefined) {
     // An item that names its own filer keeps it.
     const source = resolve(values.from), raw = readItems(source).items;
     contractItems(raw, values.from, file);
-    const incoming = loadDecisions(source);
+    const incoming = loadDecisions(source, board);
     recommended(raw, false);
     return { incoming: incoming.map((d) => ({ filer, ...d })), raw: raw.map((i) => ({ filer, ...i })) };
   }
@@ -715,7 +716,7 @@ function buildIncoming(values: Record<string, any>, extra: object = {}, filer?: 
   try {
     const { title, key = slug(title), about, detail, recommend: recommend_value, default: default_if_silent, close } = values;
     writeFileSync(source, JSON.stringify({ schema: 2, items: [{ key, title, about, detail, options: optionsOf(values), recommend_value, default_if_silent, close, ...extra, filer }] }));
-    const incoming = loadDecisions(source), raw = readItems(source).items;
+    const incoming = loadDecisions(source, board), raw = readItems(source).items;
     recommended(raw, true);
     return { incoming, raw };
   } finally {
