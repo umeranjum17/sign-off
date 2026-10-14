@@ -183,6 +183,49 @@ test('agent journey: raise, open, answer, read back in TOON and JSON', async () 
   assert.match(run('raise', '--from', 'missing.json').out, new RegExp(`cannot read ${join(process.cwd(), 'missing.json')}: ENOENT`));
 });
 
+test('three dismissed updates are not waiting on the CLI either: list and answers count 0 like the board, and an agent still waits on them', async () => {
+  const home = mkdtempSync(join(scratch, 'dismiss-'));
+  const env = { ...process.env, HOME: home };
+  const run = (...args) => {
+    try { return { out: execFileSync('node', [cli, ...args], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }), code: 0 }; }
+    catch (e) { return { out: e.stdout, code: e.status }; }
+  };
+  run('init', home);
+  const shot = join(home, 'shot.png'), board = join(home, '.sign-off', 'decisions.json');
+  writeFileSync(shot, png);
+  // Three evidence updates, update-1 to update-3, as on the captain's board.
+  for (const t of ['Sign-in flow', 'Weekly digest', 'Reports page']) assert.equal(run('post', '--type', 'evidence', '--title', t, '--about', 'Loads in 1 second.', '--media', shot).code, 0);
+  assert.match(run('list', board).out, /waiting\[3\]/);
+  // The board dismisses them through its own dismiss call and then shows none of them.
+  const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: home, env });
+  procs.push(proc);
+  const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+  const keys = ['update-1', 'update-2', 'update-3'];
+  const dismiss = (ks) => fetch(`${url}api/dismiss`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keys: ks, dismissed: true }) });
+  assert.equal((await dismiss(keys)).status, 200);
+  assert.deepEqual((await (await fetch(`${url}api/decisions`)).json()).dismissed, keys);
+  // An answered item cleared from Answered, as Clear all done does, drops out of the answered count too.
+  assert.equal(run('raise', board, '--title', 'Ship the new sign-in screen?', '--recommend', 'yes').code, 0);
+  assert.equal((await post(url, { key: 'ship-the-new-sign-in-screen', answer: 'yes' })).status, 200);
+  assert.match(run('list', board).out, /answered: 1/);
+  assert.equal((await dismiss(['ship-the-new-sign-in-screen'])).status, 200);
+  // The CLI agrees: nothing is waiting or answered in list, answers is not waiting, --full keeps a dismissed answer and --json says dismissed.
+  assert.match(run('list', board).out, /waiting: 0 of 4 decisions \(nothing is waiting on the user\)/);
+  assert.match(run('list', board).out, /answered: 0/);
+  assert.match(run('answers', board).out, /waiting: 0/);
+  assert.deepEqual([...run('list', board, '--full').out.matchAll(/(?:update-\d|ship-the-new-sign-in-screen),(\w+)/g)].map((m) => m[1]), ['dismissed', 'dismissed', 'dismissed', 'yes']);
+  assert.deepEqual(JSON.parse(run('list', board, '--json').out).decisions.map((d) => d.dismissed), [true, true, true, true]);
+  // A dismissed, unanswered ask is hidden from the board, not withdrawn: raising it again still reports it waiting.
+  assert.equal(run('raise', board, '--title', 'Keep the weekly digest email?', '--recommend', 'yes').code, 0);
+  assert.equal((await dismiss(['keep-the-weekly-digest-email'])).status, 200);
+  assert.match(run('raise', board, '--title', 'Keep the weekly digest email?', '--recommend', 'yes').out, /keep-the-weekly-digest-email,already waiting/);
+  proc.kill();
+  // The agent is not told: answers still returns a dismissed answer, and a wait on the dismissed updates runs to its timeout.
+  assert.match(run('answers', board, '--key', 'ship-the-new-sign-in-screen').out, /ship-the-new-sign-in-screen,yes/);
+  const waited = run('wait', board, '--timeout', '0');
+  assert.deepEqual([waited.code, /code: TIMEOUT/.test(waited.out)], [1, true]);
+});
+
 test('old files and answers read as before; a one-of-few answer with a note survives a restart', async () => {
   const old = join(scratch, 'old.json');
   copyFileSync(new URL('../fixtures/sample-decisions.json', import.meta.url), old);

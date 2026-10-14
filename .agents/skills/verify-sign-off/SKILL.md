@@ -71,7 +71,7 @@ A labeled real Chrome on an Android emulator, reaching the loopback server throu
 If the emulator cannot boot, report the concrete blocker. Viewport emulation does not meet the phone bar.
 
 Look at every shot before you report: nothing overlaps, no text is cut, no raw paths or ids, hostile titles show as literal text, the pressed answer is clear in both themes.
-On every page you shoot, `eval` `SQUASH` from [features/dashboard.md](features/dashboard.md). It must return `[]`; any text it names is squashed, and that fails the check at any width.
+On every page you shoot, `eval` `SQUASH` from [features/dashboard.md](features/dashboard.md). It must return `[]`; any text it names is squashed, wrapped onto two lines, or overlapping another text box, and that fails the check at any width.
 
 ## Feature map
 

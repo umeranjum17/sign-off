@@ -112,10 +112,10 @@ examples:
 Blocks until the user answers, then prints the answer the way answers does. Use it instead of a polling loop.
   --filer    only the items posted with this --filer (or SIGN_OFF_FILER): returns every answer to them this filer has not taken yet,
              even one saved before wait started, and marks it taken, so the board shows "Seen by agent" on that card;
-             NOT_FOUND when none of them is answered or waiting. Without --filer or SIGN_OFF_FILER, wait takes no filer
+             NOT_FOUND when none of them still needs an answer. Without --filer or SIGN_OFF_FILER, wait takes no filer
   --key      wait for that decision; an answer saved before wait starts returns at once
              and a key not raised yet is waited for too
-             without --key, wait for the next answer to any decision still waiting; NOT_FOUND when nothing is
+             without --key, wait for the next answer to any decision that still needs an answer; NOT_FOUND when nothing needs one
   --timeout  seconds to wait, 600 (10 minutes) by default; then exits 1 with code TIMEOUT
   --full     adds the button label, close and title
   --json     {"<key>":{"answer","label","close","at","note"?}} for the new answers; note only when the user wrote one
@@ -351,14 +351,16 @@ function filerOf(values: Record<string, any>, session = false): string | undefin
 const waitFor = (on: string, filer?: string, key?: string) => (filer ? `Run \`sign-off-axi wait${on} --filer ${filer}\` to block until the user answers`
   : `Run \`sign-off-axi wait${on}${key ? ` --key ${key}` : ''}\` to block until the user answers`);
 
-/** Still waiting on the user: not answered, and something to answer (an item with no options and no reply is only shown). */
-const waits = (d: Decision & { answer?: unknown }) => !d.answer && (d.options.length > 0 || !!d.reply);
-/** The board's decisions with their latest answer; a missing board file is an empty board. */
+/** Still waiting on the user: not answered, not dismissed, and something to answer (an item with no options and no reply is only shown). */
+const waits = (d: Decision & { answer?: unknown; dismissed?: boolean }) => !d.dismissed && !d.answer && (d.options.length > 0 || !!d.reply);
+/** The board's decisions with their latest answer; a missing board file is an empty board.
+ *  A dismissal hides an item from the board and is not waiting here either, checked against the same dismissed log the board reads. */
 function board(file: string, say = warn) {
   if (!existsSync(file)) return [];
   const decisions = loadDecisions(file), answers = readAnswers(file, say);
+  const hidden = new Set(readDismissed(file, answers, readRounds(file), say));
   for (const key of Object.keys(answers)) if (!decisions.some((d) => d.key === key)) say(`left out the answer for ${key}: that question is no longer in ${basename(file)}`);
-  return decisions.map((d) => ({ ...d, answer: Object.hasOwn(answers, d.key) ? answers[d.key] : undefined }));
+  return decisions.map((d) => ({ ...d, answer: Object.hasOwn(answers, d.key) ? answers[d.key] : undefined, dismissed: hidden.has(d.key) }));
 }
 function ready(file: string, on: string, root?: string) {
   if (!existsSync(file)) throw fail(`no board yet at ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi raise${on} --title "<question>"\` first`);
@@ -368,8 +370,8 @@ function ready(file: string, on: string, root?: string) {
 
 function list(args: string[]) {
   const { file, values, on } = parse('list', args, TIERS);
-  const rows = board(file), waiting = rows.filter(waits), answered = rows.filter((d) => d.answer).length;
-  if (values.json) return JSON.stringify({ board: file, decisions: rows });
+  const rows = board(file), waiting = rows.filter(waits), answered = rows.filter((d) => d.answer && !d.dismissed).length;
+  if (values.json) return JSON.stringify({ board: file, decisions: rows.map(({ dismissed, ...d }) => (dismissed ? { ...d, dismissed } : d)) });
   const help = [
     ...(waiting.length ? [`Run \`sign-off-axi open${on}\` to show the board to the user`] : []),
     ...(answered ? [`Run \`sign-off-axi answers${on}\` to read the ${answered} saved answers`] : []),
@@ -377,7 +379,7 @@ function list(args: string[]) {
   ];
   const where = tilde(file) + (existsSync(file) ? '' : ' (no file yet; raise creates it)');
   if (values.full) {
-    return toon({ board: where, decisions: rows.map((d) => ({ key: d.key, status: d.answer?.answer ?? 'waiting', title: d.title, about: d.about ?? '', detail: d.detail ?? '',
+    return toon({ board: where, decisions: rows.map((d) => ({ key: d.key, status: d.answer?.answer ?? (d.dismissed ? 'dismissed' : 'waiting'), title: d.title, about: d.about ?? '', detail: d.detail ?? '',
       recommend: d.recommend_value ?? '', default_if_silent: d.default_if_silent ?? '', close: d.close })) }, help);
   }
   return toon({
@@ -471,7 +473,8 @@ async function wait(args: string[]) {
         }
         if (event) return vaultExpired(file, [{ key: values.key, at: event.at, status: event.status }], values);
       }
-      if (values.key === undefined && !waiting && !live && !unknown) {
+      // A dismissed ask is hidden from the board, not withdrawn: it is not counted as waiting, but the agent still waits on it.
+      if (values.key === undefined && !rows.some((d) => waits({ ...d, dismissed: false })) && !live && !unknown) {
         throw fail(`nothing${filer ? ` posted by ${filer}` : ''} is waiting on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi answers${onBoard}\` to read the saved answers`, `Run \`sign-off-axi raise${on} --title "<question>"\` to ask a new one`);
       }
       const left = deadline - Date.now();
@@ -817,7 +820,7 @@ function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: 
       // An answer outlives its item: a new question under that key would inherit it.
       if (!had && Object.hasOwn(saved, d.key)) throw refuse(`already has a saved answer on ${tilde(file)} from an item no longer there`);
       // The same question from another filer, or at another time, is the same question: it keeps its first filer and time.
-      const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, filer: undefined, filed: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
+      const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, dismissed: undefined, filer: undefined, filed: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
       // A message that names no filed time matches the one the board stamped.
       const differs = () => exact ? canon({ ...items.find((x) => x?.key === d.key), ...(raw[i].filed === undefined && { filed: undefined }) }) !== canon(raw[i]) : same(had!) !== same(d);
       if (had && differs()) throw refuse(`already holds a different ${contract ? 'message' : 'question'} on ${tilde(file)}`);
@@ -826,7 +829,7 @@ function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: 
         fits(d.title, d.key);
         items.push({ filed: now, ...raw[i] });
       }
-      return { key: d.key, status: !had ? 'raised' : had.answer ? `already answered ${had.answer.answer}` : waits(had) ? 'already waiting' : 'already posted', title: d.title };
+      return { key: d.key, status: !had ? 'raised' : had.answer ? `already answered ${had.answer.answer}` : waits({ ...had, dismissed: false }) ? 'already waiting' : 'already posted', title: d.title };
     });
     if (raised.some((r) => r.status === 'raised')) writeItems(file, items);
     const key = raised.length === 1 ? ` --key ${raised[0].key}` : '';
