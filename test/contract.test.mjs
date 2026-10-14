@@ -288,6 +288,7 @@ test('post --kind evidence: media copied and hashed from the message folder, a r
   assert.match(ran.stdout, /update-2,2,0,Sign-in screen on a phone,posted/);
   const [, update] = items();
   assert.deepEqual([update.type, update.kind, update.media, update.evidence.commit, update.run], ['evidence', 'evidence', undefined, '0123456789abcdef0123456789abcdef01234567', undefined]);
+  assert.equal(spawnSync('node', [cli, 'raise', board, '--title', 'Plain?', '--key', 'plain'], { encoding: 'utf8', env }).status, 0);
   // Media that leads out of the folder, to a non-image or to an unreadable file, evidence in any feed, and a contract key conflict in a feed:
   // each exits 2 and writes nothing.
   const dir = mkdtempSync(join(scratch, 'msg-')), valid = JSON.parse(readFileSync(file, 'utf8')), before = readFileSync(board, 'utf8');
@@ -301,9 +302,10 @@ test('post --kind evidence: media copied and hashed from the message folder, a r
   for (const [args, error] of [
     [['--kind', 'evidence', '--from', msg('link.png')], /link\.png\.json: media\[0\] \\"link\.png\\" leads outside the message file's folder/],
     [['--kind', 'evidence', '--from', msg('note.png')], /links to a file that does not end in \.png/],
-    [['--kind', 'evidence', '--from', msg('locked.png')], /media\[0\] \\"locked\.png\\" cannot be read/],
+    ...(process.getuid?.() === 0 ? [] : [[['--kind', 'evidence', '--from', msg('locked.png')], /media\[0\] \\"locked\.png\\" cannot be read/]]),
     [['--from', feedOf({ ...valid, key: 'fed' })], /items\[0\] key fed: evidence is posted one at a time[^]*post --kind evidence --from/],
     [['--from', feedOf(valid), '--replace'], /key signin-phone-2: evidence is posted one at a time/],
+    [['--from', feedOf({ type: 'evidence', key: 'plain', title: 'Plain?' }), '--replace'], /key plain: evidence is posted one at a time/],
     [['--from', feedOf({ ...ask, key: 'signin-phone-2' })], /key signin-phone-2 already holds a different message[^]*Post it under a new key/],
   ]) {
     const refused = post('', ...args);

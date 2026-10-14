@@ -259,13 +259,15 @@ const CONTRACT_TYPES = ['decision', 'ask', 'evidence', 'report'];
 /** Items of a --from file that carry contract or kind are contract messages: each is checked against its kind's rules before anything is stored.
  * A new item of a contract kind must carry them (contract section 2); one already on the board is not checked again. */
 function contractItems(items: any[], from: string, file: string) {
-  const had = new Set(existsSync(file) ? readItems(file).items.map((i) => i?.key) : []);
+  const on = new Map((existsSync(file) ? readItems(file).items : []).map((i) => [i?.key, i]));
   items.forEach((m, i) => {
     // Evidence in message form (no type) never comes in a feed, even under a key on the board: its media must be copied and numbered.
-    if ((m?.kind === 'evidence' && m?.type === undefined) || (!had.has(m?.key) && (m?.kind ?? m?.type) === 'evidence')) {
+    // A stored board-format evidence item passes through a feed unchanged; any other evidence under a key is refused.
+    const kept = on.get(m?.key)?.type === 'evidence';
+    if ((m?.kind === 'evidence' && m?.type === undefined) || (!kept && (m?.kind ?? m?.type) === 'evidence')) {
       throw fail(`${from}: items[${i}]${isKey(m?.key) ? ` key ${m.key}` : ''}: evidence is posted one at a time, not in a --from file`, 'VALIDATION_ERROR', 'Post it with sign-off-axi post --kind evidence --from <message.json>');
     }
-    if (had.has(m?.key)) return;
+    if (on.has(m?.key)) return;
     if (m?.contract === undefined && m?.kind === undefined) {
       if (!CONTRACT_TYPES.includes(m?.type ?? 'decision')) return;
       throw fail(`${from}: items[${i}]${isKey(m?.key) ? ` key ${m.key}` : ''}: kind is required on a new ${m?.type ?? 'decision'}`, 'VALIDATION_ERROR',
