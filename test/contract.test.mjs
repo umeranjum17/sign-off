@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { decode } from '@toon-format/toon';
@@ -58,6 +58,9 @@ test('refusals: strict at every level, in contract order, with one fix line each
     [{ ...report, about: 'Umer \udc00' }, /about has an unpaired surrogate/, /Remove the broken character from "about"/],
     [{ ...ask, link: 'https://example.com/\u007f' }, /link must be an http\(s\) link with no spaces or control characters/, /Set "link"/],
     [{ ...ask, about: null }, /about must be text/, /about/],
+    [{ ...ask, '': 1 }, /"" is not a field of ask/, /Remove ""/],
+    [{ ...ask, options: [{ ...ask.options[0], '': 1 }, ask.options[1]] }, /options\[0\]\."" is not a field of an option/, /Remove ""/],
+    [{ ...JSON.parse(readFileSync(join(fixtures, 'evidence.v1', 'valid-run.json'))), run: { '': 1 } }, /run\."" is not a field of run/, /Remove ""/],
     [{ ...ask, title: 'Tab\tin title' }, /title has a control character/, /Remove tabs/],
     [{ ...ask, kind: 'nope' }, /kind must be one of/, /Set "kind"/],
     [{ ...ask, contract: 2, kind: undefined }, /contract must be 1, not 2/, /Upgrade sign-off-axi/],
@@ -270,16 +273,28 @@ test('post --kind evidence: media copied and hashed from the message folder, a r
   assert.match(ran.stdout, /update-2,2,0,Sign-in screen on a phone,posted/);
   const [, update] = items();
   assert.deepEqual([update.type, update.kind, update.media, update.evidence.commit, update.run], ['evidence', 'evidence', undefined, '0123456789abcdef0123456789abcdef01234567', undefined]);
-  // A symlink out of the message folder, and evidence in a feed, are refused and write nothing.
-  const dir = mkdtempSync(join(scratch, 'msg-'));
+  // Media that leads out of the folder, to a non-image or to an unreadable file, evidence in any feed, and a contract key conflict in a feed:
+  // each exits 2 and writes nothing.
+  const dir = mkdtempSync(join(scratch, 'msg-')), valid = JSON.parse(readFileSync(file, 'utf8')), before = readFileSync(board, 'utf8');
   symlinkSync(join(fixtures, 'evidence.v1', 'shot.png'), join(dir, 'link.png'));
-  const before = readFileSync(board, 'utf8');
-  writeFileSync(join(dir, 'e.json'), JSON.stringify({ contract: 1, kind: 'evidence', schema: 1, title: 'Linked', about: 'A link.', media: ['link.png'] }));
-  const escaped = post('', '--kind', 'evidence', '--from', join(dir, 'e.json'));
-  assert.equal(escaped.status, 2, escaped.stdout);
-  assert.match(escaped.stdout, /e\.json: media\[0\] \\"link\.png\\" leads outside the message file's folder/);
-  const fed = post('', '--from', message('ev-feed.json', JSON.stringify({ schema: 2, items: [{ ...JSON.parse(readFileSync(file, 'utf8')), key: 'fed' }] })));
-  assert.equal(fed.status, 2, fed.stdout);
-  assert.match(fed.stdout, /items\[0\] key fed: new evidence is posted one at a time[^]*post --kind evidence --from/);
+  writeFileSync(join(dir, 'notes.txt'), 'x');
+  symlinkSync('notes.txt', join(dir, 'note.png'));
+  writeFileSync(join(dir, 'locked.png'), 'x');
+  chmodSync(join(dir, 'locked.png'), 0);
+  const msg = (media) => (writeFileSync(join(dir, `${media}.json`), JSON.stringify({ contract: 1, kind: 'evidence', schema: 1, title: 'Linked', about: 'A link.', media: [media] })), join(dir, `${media}.json`));
+  const feedOf = (item) => message(`feed-${item.key}-${item.kind}.json`, JSON.stringify({ schema: 2, items: [item] }));
+  for (const [args, error] of [
+    [['--kind', 'evidence', '--from', msg('link.png')], /link\.png\.json: media\[0\] \\"link\.png\\" leads outside the message file's folder/],
+    [['--kind', 'evidence', '--from', msg('note.png')], /links to a file that does not end in \.png/],
+    [['--kind', 'evidence', '--from', msg('locked.png')], /media\[0\] \\"locked\.png\\" cannot be read/],
+    [['--from', feedOf({ ...valid, key: 'fed' })], /items\[0\] key fed: evidence is posted one at a time[^]*post --kind evidence --from/],
+    [['--from', feedOf(valid), '--replace'], /key signin-phone-2: evidence is posted one at a time/],
+    [['--from', feedOf({ ...ask, key: 'signin-phone-2' })], /key signin-phone-2 already holds a different message[^]*Post it under a new key/],
+  ]) {
+    const refused = post('', ...args);
+    assert.equal(refused.status, 2, refused.stdout);
+    assert.match(refused.stdout, error);
+  }
   assert.equal(readFileSync(board, 'utf8'), before);
+  assert.deepEqual(readdirSync(join(scratch, 'ev', 'evidence')).sort(), ['1', '2']);
 });

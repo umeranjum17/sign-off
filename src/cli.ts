@@ -261,10 +261,11 @@ const CONTRACT_TYPES = ['decision', 'ask', 'evidence', 'report'];
 function contractItems(items: any[], from: string, file: string) {
   const had = new Set(existsSync(file) ? readItems(file).items.map((i) => i?.key) : []);
   items.forEach((m, i) => {
-    if (had.has(m?.key)) return;
-    if ((m?.kind ?? m?.type) === 'evidence') {
-      throw fail(`${from}: items[${i}]${isKey(m?.key) ? ` key ${m.key}` : ''}: new evidence is posted one at a time, not in a --from file`, 'VALIDATION_ERROR', 'Post it with sign-off-axi post --kind evidence --from <message.json>');
+    // Evidence in message form (no type) never comes in a feed, even under a key on the board: its media must be copied and numbered.
+    if ((m?.kind === 'evidence' && m?.type === undefined) || (!had.has(m?.key) && (m?.kind ?? m?.type) === 'evidence')) {
+      throw fail(`${from}: items[${i}]${isKey(m?.key) ? ` key ${m.key}` : ''}: evidence is posted one at a time, not in a --from file`, 'VALIDATION_ERROR', 'Post it with sign-off-axi post --kind evidence --from <message.json>');
     }
+    if (had.has(m?.key)) return;
     if (m?.contract === undefined && m?.kind === undefined) {
       if (!CONTRACT_TYPES.includes(m?.type ?? 'decision')) return;
       throw fail(`${from}: items[${i}]${isKey(m?.key) ? ` key ${m.key}` : ''}: kind is required on a new ${m?.type ?? 'decision'}`, 'VALIDATION_ERROR',
@@ -624,11 +625,18 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
       try { mkdirSync(join(store, String(number)), { mode: 0o700 }); break; } catch (e: any) { if (e.code !== 'EEXIST') throw e; }
     }
     const key = own || `update-${number}`, dir = join(store, String(number));
-    const media = sources.map((src, i) => {
-      const bytes = readFileSync(src), path = `evidence/${number}/${i + 1}${extname(src).toLowerCase()}`;
-      writeFileSync(join(dir, `${i + 1}${extname(src).toLowerCase()}`), bytes, { mode: 0o600 });
-      return { path, sha256: sha256(bytes), bytes: bytes.length };
-    });
+    let media;
+    try {
+      media = sources.map((src, i) => {
+        const bytes = readFileSync(src), path = `evidence/${number}/${i + 1}${extname(src).toLowerCase()}`;
+        writeFileSync(join(dir, `${i + 1}${extname(src).toLowerCase()}`), bytes, { mode: 0o600 });
+        return { path, sha256: sha256(bytes), bytes: bytes.length };
+      });
+    } catch (e) {
+      // A file that cannot be read after all leaves no copies behind.
+      rmSync(dir, { recursive: true, force: true });
+      throw e;
+    }
     const { title, about, detail, close, link, recommend: recommend_value, default: default_if_silent } = values, filed = new Date().toISOString();
     const { run, media: _paths, ...fields } = message ?? {};
     items.push(explainer ? { key, type, title, about, detail, options, recommend_value, default_if_silent, close, chapters, media, filer, filed }
@@ -766,7 +774,10 @@ function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: 
       // A message that names no filed time matches the one the board stamped.
       const differs = () => exact ? canon({ ...items.find((x) => x?.key === d.key), ...(raw[i].filed === undefined && { filed: undefined }) }) !== canon(raw[i]) : same(had!) !== same(d);
       if (had && differs()) {
-        throw fail(`key ${d.key} already holds a different ${exact ? 'message' : 'question'} on ${tilde(file)}`, 'CONFLICT', 'Raise it under a new --key');
+        // A contract message refused for its key exits 2 like any other refusal (contract section 4); raise --title keeps exit 1.
+        const contract = exact || raw[i]?.contract !== undefined;
+        if (contract) process.once('exit', () => { process.exitCode = 2; });
+        throw fail(`key ${d.key} already holds a different ${contract ? 'message' : 'question'} on ${tilde(file)}`, 'CONFLICT', contract ? 'Post it under a new key' : 'Raise it under a new --key');
       }
       // Each new item records when it was raised, unless it names its own time.
       if (!had) {
