@@ -1,6 +1,6 @@
 # Vault (OFF): expiry, refusal and delivery events reach `wait --filer` once, a keyed wait replays them, and `wait --into` delivers a Give once
 
-Vault admission is OFF: `post --type vault` and vault feed items are refused, and no card or route shows vault items. What this covers is the private expiry and refusal path an ordinary filer wait reads, the keyed filer wait that replays one item, and the Give delivery into an approved folder that `wait --into` runs (not in `--help` while OFF). Records exist only through the built module (`dist/vault.js`), as `test/vault.test.mjs` creates them. Synthetic values only; never a real token, URL, `.npmrc` or board.
+Vault admission is OFF: `post --type vault` and vault feed items are refused, and no card or route shows vault items. What this covers is the private expiry, refusal and delivery events an ordinary filer wait reads, the keyed filer wait that replays one item, and the Give delivery into an approved folder that `wait --into` runs (not in `--help` while OFF). Records exist only through the built module (`dist/vault.js`), as `test/vault.test.mjs` creates them. Synthetic values only; never a real token, URL, `.npmrc` or board.
 
 Work in a fresh scratch folder with its own `HOME`, `XDG_STATE_HOME` and `XDG_CONFIG_HOME`; delete it at the end.
 
