@@ -1,4 +1,4 @@
-// Vault remains OFF. The server imports only expiry housekeeping, never payload access.
+// Vault remains OFF. The server and `wait` import only expiry functions, never payload access.
 import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, parse, resolve } from 'node:path';
 import { homedir } from 'node:os';
