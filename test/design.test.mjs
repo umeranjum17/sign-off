@@ -647,7 +647,8 @@ test('comments on mock elements: one per element, kept across a reload, edited a
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const { evaluate, click, close } = await browse(dir);
   const frame = "document.querySelector('.mock iframe')", button = (name) => `[...document.querySelectorAll('.ann button')].find((b) => b.textContent === '${name}')`;
-  const middle = () => evaluate(`${frame}.scrollIntoView({ block: 'center' }), (({ left, top, width, height }) => [left + width / 2, top + height / 2])(${frame}.getBoundingClientRect())`);
+  const nth = (i) => `document.querySelectorAll('.mock iframe')[${i}]`;
+  const middle = (i = 0) => evaluate(`${nth(i)}.scrollIntoView({ block: 'center' }), (({ left, top, width, height }) => [left + width / 2, top + height / 2])(${nth(i)}.getBoundingClientRect())`);
   const write = async (text) => {
     await evaluate(`(${button('Comment on the mocks')}).getAttribute('aria-pressed') === 'false' && (${button('Comment on the mocks')}).click()`);
     // A synthetic mouse stays aimed at the frame a redraw removed until it clicks elsewhere, so it clicks the page first.
@@ -671,6 +672,22 @@ test('comments on mock elements: one per element, kept across a reload, edited a
   // The same element again opens its comment, and saving edits it: still one comment.
   assert.equal(await write('Make it blue'), 'Make this button green, Umer');
   assert.deepEqual((await evaluate('state.annotations')).map((a) => [a.id, a.text]), [[saved.id, 'Make it blue']]);
+  // Words typed and not saved stay with their element: tapping another element and back brings them back.
+  const box = "document.getElementById('ann-text-look')", label = "document.querySelector('.ann label').textContent";
+  const aim = async (i, name) => { await click([1, 1]); await until(async () => (await click(await middle(i)), evaluate(`!!${box} && ${label}.startsWith(${JSON.stringify(name)})`))); };
+  const type = (text) => `${box}.value = ${JSON.stringify(text)}, ${box}.dispatchEvent(new Event('input'))`;
+  await aim(0, 'Comment on A');
+  await evaluate(type('Not saved yet'));
+  await aim(1, 'Comment on B');
+  assert.equal(await evaluate(`${box}.value`), '');
+  await aim(0, 'Comment on A');
+  assert.equal(await evaluate(`${box}.value`), 'Not saved yet');
+  // Save, and at once B's element is named, as its mock does on a tap: when the save lands, B's editor stays open with its words.
+  await evaluate(`(${button('Save comment')}).click(), dispatchEvent(new MessageEvent('message', { source: ${nth(1)}.contentWindow,
+    data: { 'sign-off': 'pointed', ref: 'body > h1:nth-of-type(1)', tag: 'h1', text: 'Split' } })), ${type('Typed while saving')}`);
+  await until(() => evaluate("state.annotations.some((a) => a.text === 'Not saved yet')"));
+  assert.deepEqual(await evaluate(`[${label}, ${box}.value]`), ['Comment on B · h1 “Split”', 'Typed while saving']);
+  await evaluate(`(${button('Cancel')}).click()`);
   await evaluate(`(${button('Edit')}).click()`);
   await until(() => evaluate("!!document.getElementById('ann-text-look')"));
   await evaluate(`(${button('Delete')}).click()`);
