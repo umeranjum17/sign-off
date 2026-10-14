@@ -2,10 +2,11 @@
 import { closeSync, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, parse, resolve } from 'node:path';
 import { homedir } from 'node:os';
+import { isIP } from 'node:net';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import { isKey } from './store.js';
 
-export type VaultMeta = { board: string; key: string; mode: 'give' | 'receive'; filer: string; expires: number; destination?: string };
+export type VaultMeta = { board: string; key: string; mode: 'give' | 'receive'; filer: string; expires: number; destination?: string; provider?: string };
 type Status = 'pending' | 'ready' | 'refused' | 'expired' | 'claimed' | 'delivered';
 type Sealed = { nonce: string; tag: string; data: string };
 type Record = { schema: 1; meta: VaultMeta; status: Status; at: number; sealed?: Sealed };
@@ -29,7 +30,7 @@ export class VaultError extends Error {
 }
 function bad(code: keyof typeof errors): never { throw new VaultError(code); }
 const digest = (board: string, key: string) => createHash('sha256').update(JSON.stringify([board, key])).digest('hex');
-const aad = (meta: VaultMeta) => Buffer.from(JSON.stringify([1, meta.board, meta.key, meta.mode, meta.expires, meta.destination ?? null, meta.filer]));
+const aad = (meta: VaultMeta) => Buffer.from(JSON.stringify([1, meta.board, meta.key, meta.mode, meta.expires, meta.destination ?? null, meta.filer, ...(meta.provider === undefined ? [] : [meta.provider])]));
 const VAULT_ID = /^[a-f0-9]{32}$/;
 function boardFile(board: unknown) {
   if (typeof board !== 'string' || !isAbsolute(board)) bad('VALIDATION_ERROR');
@@ -57,9 +58,9 @@ const plain = (p: string) => isAbsolute(p) && !p.split('/').some((s) => s === '.
 function metadata(m: VaultMeta): VaultMeta {
   if (!m || typeof m.board !== 'string' || !VAULT_ID.test(m.board) || !isKey(m.key) || !isKey(m.filer) || !['give', 'receive'].includes(m.mode)
     || !Number.isSafeInteger(m.expires) || m.expires <= 0
-    || (m.mode === 'give' ? typeof m.destination !== 'string' || !plain(m.destination) : m.destination !== undefined)) bad('VALIDATION_ERROR');
+    || (m.mode === 'give' ? typeof m.destination !== 'string' || !plain(m.destination) || m.provider !== undefined : m.destination !== undefined || !isKey(m.provider))) bad('VALIDATION_ERROR');
   return { board: m.board, key: m.key, mode: m.mode, filer: m.filer, expires: m.expires,
-    ...(m.destination !== undefined && { destination: resolve(m.destination) }) };
+    ...(m.destination !== undefined && { destination: resolve(m.destination) }), ...(m.provider !== undefined && { provider: m.provider }) };
 }
 function privateFile(path: string) {
   const s = lstatSync(path);
@@ -101,6 +102,33 @@ function approvedDirs(file: string, dir: string): string[] {
       || !gitFree(line) || within(home, line) || [vaultDir, boardDir].some((o) => within(o, line) || within(line, o))) bad('DESTINATION_DENIED');
     return line;
   });
+}
+// Owner-only list of approved Receive sites: `<provider> <https-origin>` per line, `#` comments. Any bad line denies all.
+// Host rules live here; a link must then match one listed origin exactly, which carries them over.
+function approvedProviders() {
+  const list = join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'sign-off', 'vault-providers'), sites = new Map<string, string>();
+  let text = '';
+  try { if (isAbsolute(list)) { privateFile(list); text = readFileSync(list, 'utf8'); } } catch { /* denied below */ }
+  if (!text) bad('VALIDATION_ERROR');
+  for (const line of text.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'))) {
+    const [name, origin, extra] = line.split(/\s+/);
+    let host = '';
+    try { const u = new URL(origin); if (u.protocol === 'https:' && u.origin === origin) host = u.hostname; } catch { /* denied below */ }
+    if (extra !== undefined || !isKey(name) || sites.has(name) || !host.includes('.') || host.endsWith('.') || isIP(host)) bad('VALIDATION_ERROR');
+    sites.set(name, origin);
+  }
+  return sites;
+}
+/** A Receive link: one https URL whose exact origin the owner listed for its provider. Fails only with VALIDATION_ERROR, never echoing it. */
+export function checkReceiveUrl(value: Buffer, provider: string) {
+  const origin = approvedProviders().get(provider);
+  let url: URL | undefined;
+  try {
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(value).replace(/\r?\n$/, '');
+    // The URL parser silently drops tabs and newlines and trims spaces, so any space or control is refused before it.
+    if (!/[\x00-\x20\x7f-\x9f]/.test(text) && Buffer.byteLength(text) <= 8192) url = new URL(text);
+  } catch { /* refused below */ }
+  if (!origin || !url || url.username || url.password || url.origin !== origin) bad('VALIDATION_ERROR');
 }
 function checkDestination(dest: string, file: string, dir: string) {
   if (!approvedDirs(file, dir).includes(dirname(dest))) bad('DESTINATION_DENIED');
@@ -330,6 +358,8 @@ export async function createVault(input: Omit<VaultMeta, 'expires'> & { expires?
   const fixed = metadata({ ...input, board: '0'.repeat(32), expires: input.expires === undefined ? (input.mode === 'give' ? now + 600_000 : NaN) : input.expires });
   if (fixed.expires <= now || fixed.expires > now + 3_600_000) bad('VALIDATION_ERROR');
   if ((fixed.mode === 'receive') !== (value !== undefined) || (value !== undefined && !sized(value))) bad('VALIDATION_ERROR');
+  // Before custody: a refused link leaves no folder, folder id, key or record.
+  if (fixed.mode === 'receive') checkReceiveUrl(value as Buffer, fixed.provider as string);
   return operate(input.board, fixed.key, true, (dir, path, old, id) => {
     const meta = { ...fixed, board: id };
     if (old) bad('VALIDATION_ERROR'); // Terminal keys are tombstones, never reusable.
@@ -380,12 +410,14 @@ export async function deliverVault(board: string, key: string, filer: string, in
     try {
       afterClaim?.();
       const value = unseal(secret, r.meta, r.sealed as Sealed);
-      const fd = openSync(dest, 'wx', 0o600);
       try {
-        const st = fstatSync(fd);
-        made = { dev: st.dev, ino: st.ino };
-        writeFileSync(fd, value); fsyncSync(fd);
-      } finally { closeSync(fd); value.fill(0); }
+        const fd = openSync(dest, 'wx', 0o600);
+        try {
+          const st = fstatSync(fd);
+          made = { dev: st.dev, ino: st.ino };
+          writeFileSync(fd, value); fsyncSync(fd);
+        } finally { closeSync(fd); }
+      } finally { value.fill(0); } // also when openSync or closeSync throws
       syncDir(dirname(dest));
       const done: Record = { schema: 1, meta: r.meta, status: 'delivered', at: Date.now() };
       publish(path, JSON.stringify(done));
