@@ -6,7 +6,7 @@ Covers `validate`, `post --kind` and the shipped `fixtures/contract/` messages (
 
 | # | Step | Pass when |
 |---|---|---|
-| 1 | In `$SCR/ci`: `npm init -y`, `npm install --no-save $SCR/sign-off-axi-<version>.tgz` | `ask.v1/`, `report.v1/`, `evidence.v1/` and `gate.v1/` under `node_modules/sign-off-axi/fixtures/contract/` each hold 2+ `valid-*` and 3+ `invalid-*` files |
+| 1 | In `$SCR/ci`: `npm init -y`, `npm install --no-save $SCR/sign-off-axi-<version>.tgz` | The folders under `node_modules/sign-off-axi/fixtures/contract/` are exactly the ones its `README.md` lists as shipped, no more and no fewer, and each holds 2+ `valid-*` and 3+ `invalid-*` files |
 | 2 | `npx sign-off-axi validate node_modules/sign-off-axi/fixtures/contract/*/valid-*.json` | One `files` row per file with `ok` true; exit 0 |
 | 3 | `validate` each `invalid-*.json` alone | `ok` false, an error naming the field in the file name, one `help` line; exit 2 |
 | 4 | A message with `"recommend_value"` twice; one with `"schema": 2`; `validate --kind finding` on a valid ask | Exit 2 with `Remove the second "recommend_value".`, `Upgrade sign-off-axi`, and `is ask, not --kind finding` |
@@ -21,3 +21,5 @@ Covers `validate`, `post --kind` and the shipped `fixtures/contract/` messages (
 | 12 | An evidence message whose `media` is a symlink to a file outside its folder; a `--from` feed holding an evidence message | Both exit 2 and write nothing: `media[0] ... leads outside the message file's folder`; `new evidence is posted one at a time`, help `post --kind evidence --from` |
 | 13 | `post gate.json --kind gate --from node_modules/sign-off-axi/fixtures/contract/gate.v1/valid-three-actions.json`, the same again, then the same message with another `run_id` from stdin | `dd-gate-a1b2c3d4,raised`, then `already waiting`, then exit 2 `already holds a different message`, help `Post it under a new key`; the board item keeps `kind` `gate` and its `run` |
 | 14 | `open gate.json`, Waiting on you at 390 wide; pick **Fix first**; then `wait gate.json --filer done-done --json` | The card shows the title, about and the buttons Approve, Skip the judge and Fix first, Fix first marked as recommended; `wait` prints `fix` for `dd-gate-a1b2c3d4` |
+| 15 | `post finding.json --kind finding --from node_modules/sign-off-axi/fixtures/contract/finding.v1/valid-apply.json`, the same again, then the same message with another `proposal` from stdin, then in a `raise finding.json --from` feed | `lfm-missing-env,raised` with a `wait --filer learn-from-mistakes` hint, then `already waiting`, then exit 2 `already holds a different message`, help `Post it under a new key`, twice; the board file is unchanged by the last two |
+| 16 | `open finding.json`, Waiting on you at 390 wide; pick **Apply**; then `wait finding.json --filer learn-from-mistakes --json` | The card shows the title, about and the buttons Apply and Skip, Apply marked as recommended; `wait` prints `apply` for `lfm-missing-env` |

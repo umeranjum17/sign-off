@@ -82,6 +82,7 @@
 - `contract`, `kind`, `schema`: an item posted as a contract message keeps them ([contract.md](contract.md)).
   An item with `"kind": "report"` is only read, on any board, and never waits; it takes no `options`, `reply`, `area` or `type` ([contract.md](contract.md) section 5).
   An item with `"kind": "gate"` waits like a decision and keeps the done-done `run` it holds (`run_id` and `commit`) as sent; its answer is the `done-done respond --action` to take.
+  An item with `"kind": "finding"` waits like a decision and keeps its `cause`, `incidents`, `days`, `evidence_ids`, `change_kind` and `proposal` as sent; its answer, `apply` or `skip`, says whether to make the proposed change.
 - `filed`: optional, when the item was filed, an ISO 8601 date-time such as `2026-10-13T07:19:00Z`.
   `raise` and `post` write the current time when the item or flags give none, and `post --replace`
   keeps the time an item already has, so a feeder that runs every few seconds does not reset it.
