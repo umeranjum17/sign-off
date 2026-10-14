@@ -808,18 +808,19 @@ function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: 
     const current = board(file), items = existsSync(file) ? readItems(file).items : [], saved = readAnswers(file), now = new Date().toISOString();
     const raised = incoming.map((d, i) => {
       const had = current.find((c) => c.key === d.key);
+      // A contract message refused for its key exits 2 like any other refusal (contract section 4); raise --title keeps exit 1.
+      const contract = exact || raw[i]?.contract !== undefined || raw[i]?.kind !== undefined;
+      const refuse = (why: string) => {
+        if (contract) process.once('exit', () => { process.exitCode = 2; });
+        return fail(`key ${d.key} ${why}`, 'CONFLICT', contract ? 'Post it under a new key' : 'Raise it under a new --key');
+      };
       // An answer outlives its item: a new question under that key would inherit it.
-      if (!had && Object.hasOwn(saved, d.key)) throw fail(`key ${d.key} already has a saved answer on ${tilde(file)} from an item no longer there`, 'CONFLICT', 'Raise it under a new --key');
+      if (!had && Object.hasOwn(saved, d.key)) throw refuse(`already has a saved answer on ${tilde(file)} from an item no longer there`);
       // The same question from another filer, or at another time, is the same question: it keeps its first filer and time.
       const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, filer: undefined, filed: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
       // A message that names no filed time matches the one the board stamped.
       const differs = () => exact ? canon({ ...items.find((x) => x?.key === d.key), ...(raw[i].filed === undefined && { filed: undefined }) }) !== canon(raw[i]) : same(had!) !== same(d);
-      if (had && differs()) {
-        // A contract message refused for its key exits 2 like any other refusal (contract section 4); raise --title keeps exit 1.
-        const contract = exact || raw[i]?.contract !== undefined || raw[i]?.kind !== undefined;
-        if (contract) process.once('exit', () => { process.exitCode = 2; });
-        throw fail(`key ${d.key} already holds a different ${contract ? 'message' : 'question'} on ${tilde(file)}`, 'CONFLICT', contract ? 'Post it under a new key' : 'Raise it under a new --key');
-      }
+      if (had && differs()) throw refuse(`already holds a different ${contract ? 'message' : 'question'} on ${tilde(file)}`);
       // Each new item records when it was raised, unless it names its own time.
       if (!had) {
         fits(d.title, d.key);

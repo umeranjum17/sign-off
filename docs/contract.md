@@ -54,7 +54,7 @@ A message file holds one JSON object, in any layout. The validator reads it with
 | `link` | all, optional | `http://` or `https://` followed by 1-500 characters with no whitespace, control character (C0, DEL or C1) or unpaired surrogate, or a 7-40 character lowercase hex commit |
 | `about` | all, required (optional on `ask`) | text, 1-500 |
 | `detail` | `ask`, optional | text, 1-1000 |
-| `options` | `ask`, `gate`, `finding`, required | 2-6 (2 or 3 on `gate`, section 5) objects of exactly `value` (a key-set id, unique in the message) and `label` (text, 1-80) |
+| `options` | `ask`, `gate`, `finding`, required | 2-6 (2 or 3 on `gate`, exactly 2 on `finding`, section 5) objects of exactly `value` (a key-set id, unique in the message) and `label` (text, 1-80) |
 | `recommend_value` | `ask`, `gate`, `finding`, required | one listed option `value` |
 | `default_if_silent` | `ask`, optional | one listed option `value`; shown, never applied |
 | `close` | `ask`, `gate`, optional | `done` (default) or `release`; copied into the answer |

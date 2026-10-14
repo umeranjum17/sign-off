@@ -6,7 +6,7 @@ Covers `validate`, `post --kind` and the shipped `fixtures/contract/` messages (
 
 | # | Step | Pass when |
 |---|---|---|
-| 1 | In `$SCR/ci`: `npm init -y`, `npm install --no-save $SCR/sign-off-axi-<version>.tgz` | Each folder that `node_modules/sign-off-axi/fixtures/contract/README.md` lists as shipped is there and holds 2+ `valid-*` and 3+ `invalid-*` files |
+| 1 | In `$SCR/ci`: `npm init -y`, `npm install --no-save $SCR/sign-off-axi-<version>.tgz` | The folders under `node_modules/sign-off-axi/fixtures/contract/` are exactly the ones its `README.md` lists as shipped, no more and no fewer, and each holds 2+ `valid-*` and 3+ `invalid-*` files |
 | 2 | `npx sign-off-axi validate node_modules/sign-off-axi/fixtures/contract/*/valid-*.json` | One `files` row per file with `ok` true; exit 0 |
 | 3 | `validate` each `invalid-*.json` alone | `ok` false, an error naming the field in the file name, one `help` line; exit 2 |
 | 4 | A message with `"recommend_value"` twice; one with `"schema": 2`; `validate --kind finding` on a valid ask | Exit 2 with `Remove the second "recommend_value".`, `Upgrade sign-off-axi`, and `is ask, not --kind finding` |

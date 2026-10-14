@@ -407,5 +407,9 @@ test('post --kind finding: a retro proposal waits like an ask, a changed proposa
   const gone = readFileSync(board, 'utf8'), back = cli2('', 'post', board, '--from', feed, '--replace');
   assert.equal(back.status, 1, back.stdout);
   assert.match(back.stdout, /key lfm-missing-env was answered[^]*Post it under a new key/);
+  // Outside --replace the saved answer refuses it too, as a contract refusal: exit 2.
+  const again = cli2('', 'raise', board, '--from', message('finding-again.json', JSON.stringify({ schema: 2, items: [finding] })));
+  assert.equal(again.status, 2, again.stdout);
+  assert.match(again.stdout, /key lfm-missing-env already has a saved answer[^]*Post it under a new key/);
   assert.equal(readFileSync(board, 'utf8'), gone);
 });
