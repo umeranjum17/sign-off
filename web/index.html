@@ -674,11 +674,11 @@
   const redraw = (d) => document.querySelectorAll('.ann').forEach((n) => n.dataset.ann === d.key && n.replaceWith(annotations(d)));
   function annotations(d) {
     const hash = new Map((d.mocks ?? []).map((m) => [m.value, m.hash])), open = editing.get(d.key);
-    // A comment shows only on the mock file it was made on; the others are counted per mock.
+    // An unsent comment shows only on the mock file it was made on; the others are counted per mock. A sent one is always listed.
     const mine = [], old = new Map(), name = (m) => d.options.find((o) => o.value === m)?.label ?? m;
     for (const a of state.annotations ?? []) {
       if (a.key !== d.key) continue;
-      if (hash.get(a.mock) === a.hash) mine.push(a);
+      if (a.sent || hash.get(a.mock) === a.hash) mine.push(a);
       else old.set(a.mock, (old.get(a.mock) ?? 0) + 1);
     }
     const what = (a) => `${name(a.mock)} · ${a.tag}${a.words ? ` “${a.words.length > 40 ? `${a.words.slice(0, 40)}…` : a.words}”` : ''}`;

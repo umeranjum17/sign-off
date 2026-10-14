@@ -693,6 +693,11 @@ test('comments on mock elements: one per element, kept across a reload, edited a
   await until(() => evaluate("!window.old && !!document.querySelector('details.done') && (document.querySelector('details.done').open = true)"));
   assert.deepEqual(await evaluate(`[[...document.querySelectorAll('.ann p.meta')].map((p) => p.textContent).includes('Sent to the agent'), !!(${button('Edit')})]`), [true, false]);
   assert.equal(await status('api/annotations', { id: sent.id, deleted: true }), 409);
+  // The mock changes after the pick: the sent comment stays listed, and is not counted as hidden.
+  writeFileSync(mockA, '<button style="width: 100%; height: 3000px">Changed</button>');
+  await evaluate("window.old = true, location.reload()");
+  await until(() => evaluate("!window.old && !!document.querySelector('details.done') && (document.querySelector('details.done').open = true)"));
+  assert.deepEqual(await evaluate(`[[...document.querySelectorAll('.ann p.meta')].some((p) => p.textContent === 'Sent to the agent'), [...document.querySelectorAll('.ann p.meta')].filter((p) => /hidden/.test(p.textContent)).map((p) => p.textContent)]`), [true, ['1 comment on an earlier version of “A” is hidden']]);
   // The same element again is a new draft, and Another round with no note carries only it.
   assert.equal(await write('Bigger still'), '');
   assert.equal(await status('api/rounds', { key: 'look', note: '' }), 200);

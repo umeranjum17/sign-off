@@ -277,7 +277,7 @@ A read-only or answers-only board returns none of them from its state, so its pa
   a second one on the same element of the same file edits the first.
 - The next answer or another-round ask on the card sends its comments shown on the current mock files (not the hidden ones) in that line's `comments`.
   A comment whose `id` is in an answer or ask line is sent: the state marks it `"sent": true`, an edit or delete of it answers 409 and writes nothing,
-  and a new comment on the same element is a new one, sent with the next answer. An Undo sends none and leaves sent comments sent.
+  and a new comment on the same element is a new one, sent with the next answer. An Undo sends none and leaves sent comments sent; after an Undo back to no answer, sent comments come with the next answer.
 
 **Access token** (`decisions.token`, mode 600): made the first time the board is served beyond `127.0.0.1`
 and reused after that. The board reads it on every request, so deleting it shuts old links out at once.
