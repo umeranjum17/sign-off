@@ -357,4 +357,12 @@ test('post --kind gate: a done-done run waits for approval like an ask, its run 
     assert.match(refused.stdout, error);
   }
   assert.equal(readFileSync(board, 'utf8'), before);
+  // A replace feed that drops the answered gate keeps its answer, so the same key under another run is refused and nothing is written.
+  const dropped = message('gate-dropped.json', JSON.stringify({ schema: 2, items: [] }));
+  assert.equal(cli2('', 'post', board, '--from', dropped, '--replace').status, 0);
+  const gone = readFileSync(board, 'utf8');
+  const back = cli2('', 'post', board, '--from', swapped, '--replace');
+  assert.equal(back.status, 1, back.stdout);
+  assert.match(back.stdout, /key dd-gate-a1b2c3d4 was answered[^]*Post it under a new key/);
+  assert.equal(readFileSync(board, 'utf8'), gone);
 });

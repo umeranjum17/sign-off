@@ -571,6 +571,11 @@ function replace(file: string, on: string, from?: string, filer?: string) {
     const feed = fed.items.map((i) => ({ filed: first.get(i?.key)?.filed ?? now, ...i, ...(filer && { filer }) }));
     // An answer belongs to its question: an answered key may not come back asking something else.
     const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply, d.run]);
+    // A gate's answer is the action for its run, so it outlives its item only under that key: a gate that comes back under another run is refused.
+    const saved = readAnswers(file);
+    for (const i of fed.items) if (i?.kind === 'gate' && !first.has(i?.key) && Object.hasOwn(saved, i?.key)) {
+      throw fail(`key ${i.key} was answered on ${tilde(file)} and is no longer there`, 'CONFLICT', 'Post it under a new key');
+    }
     for (const had of board(file)) {
       const d = incoming.find((x) => x.key === had.key);
       if (filer && d && had.filer && had.filer !== filer) throw fail(`key ${d.key} on ${tilde(file)} was posted by another filer`, 'CONFLICT', 'Feed it under a new key');

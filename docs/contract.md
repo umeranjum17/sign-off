@@ -98,7 +98,7 @@ A run held for the person's approval. Shows in Waiting on you.
 - `options`: 2 or 3, in any order, from `approve` (Approve), `skip` (Skip the judge) and `fix` (Fix first). Labels must match exactly. They are the actions of `done-done respond --action`.
 - Optional: `close`.
 - The board keeps `run` on the item as sent. The card is a question in Waiting on you with the gate's actions; its `about` and `link` say which run it holds.
-- `run` is part of the question: under the gate's key another run is a different message in a `--from` feed too, and an answered gate cannot take another run, not even in a `--replace` feed, since the answer belongs to the run it was given for.
+- `run` is part of the question: under the gate's key another run is a different message in a `--from` feed too, and an answered gate cannot take another run, not even in a `--replace` feed, since the answer belongs to the run it was given for. A `--replace` feed that drops an answered gate keeps its answer, so sending that key back refuses a gate under another run (exit 1, `Post it under a new key`).
 
 ### finding, schema 1
 
