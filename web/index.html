@@ -133,7 +133,7 @@
   .sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
   .sec-head h2 { margin: 0; } .sec-head:has(+ .in-evidence) { margin: 1rem 0 0.375rem; }
   .rows { list-style: none; margin: 0; padding: 0 1rem; }
-  .rows li + li { border-top: 1px solid var(--line); }
+  .rows > li + li { border-top: 1px solid var(--line); }
   .compact { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 0; color: var(--text); text-decoration: none; }
   .compact .t { display: grid; flex: 1; min-width: 0; }
   .ans { display: grid; justify-items: end; text-align: right; } .ans b { color: var(--c-answered); } .ans time { color: var(--muted); font-size: 0.875rem; }
@@ -238,7 +238,7 @@
     background: none; color: var(--muted); font-size: 1.5rem; line-height: 1.25; }
   .x:hover { background: var(--sunk); color: var(--text); }
   .head .st + .x { margin-left: 0; }
-  .rows li { display: flex; align-items: center; }
+  .rows > li { display: flex; align-items: center; }
   .rows li .compact { flex: 1; min-width: 0; }
   .rows li .x { margin: 0; }
   .clear { min-height: 2.75rem; padding: 0; border: 0; background: none; color: var(--accent); font-weight: 600; }
@@ -340,8 +340,8 @@
     .reports { grid-template-columns: 1fr 1fr; align-items: start; }
     /* Answered sets each row as its own card, two across; an opened row takes the whole width. */
     .rows.i-answered { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; align-items: start; padding: 0; border: 0; background: none; box-shadow: none; }
-    .rows.i-answered li { padding: 0 0.5rem 0 1rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); box-shadow: var(--shadow); }
-    .rows.i-answered li:has(.done[open]) { grid-column: 1 / -1; }
+    .rows.i-answered > li { padding: 0 0.5rem 0 1rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); box-shadow: var(--shadow); }
+    .rows.i-answered > li:has(.done[open]) { grid-column: 1 / -1; }
     .upd.portrait > .media { width: 8rem; }
     /* Evidence sets its updates two across; a page that is not an update keeps the whole width. */
     .list.in-evidence { grid-template-columns: 1fr 1fr; align-items: start; } .in-evidence > .row:not(.update) { grid-column: 1 / -1; }
