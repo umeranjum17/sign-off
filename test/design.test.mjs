@@ -508,10 +508,12 @@ async function browse(dir, width = 800) {
   // A call the browser never answers (a page torn down mid-call) gives undefined after 10 s, so until() asks again instead of hanging.
   const call = (method, params) => new Promise((ok) => { const id = ++seq; replies.set(id, ok); setTimeout(ok, 10000).unref(); ws.send(JSON.stringify({ id, method, params })); });
   const evaluate = (expression) => call('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+  // On a busy host, input sent right after a redraw can miss the sandboxed frame it aims at, so each input waits for the page to paint first.
+  const painted = () => call('Runtime.evaluate', { expression: 'new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)))', awaitPromise: true });
   // A real mouse click at a point of the page, which reaches into a frame there as a person's would.
-  const click = async ([x, y]) => { for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await call('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 }); };
+  const click = async ([x, y]) => { await painted(); for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await call('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 }); };
   // A real touch tap at a point of the page, as a phone's would.
-  const tap = async ([x, y]) => { await call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] }); await call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); };
+  const tap = async ([x, y]) => { await painted(); await call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] }); await call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); };
   return { evaluate, click, tap, close: () => { ws.close(); browser.kill(); } };
 }
 
