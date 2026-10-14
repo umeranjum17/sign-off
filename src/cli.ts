@@ -13,7 +13,7 @@ import { AxiError, runAxiCli } from 'axi-sdk-js';
 import { type Answer, CHAPTERS_MAX, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, checkMessage, mediaFiles, parseMessage } from './contract.js';
-import { errors, readVaultExpiry, sweepVault, takeVaultExpiries } from './vault.js';
+import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
 
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
 const CONTRACT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/contract.md';
@@ -417,9 +417,11 @@ function answers(args: string[]) {
 }
 
 async function wait(args: string[]) {
-  const { file, values, on: onBoard } = parse('wait', args, { ...TIERS, filer: { type: 'string' }, key: { type: 'string' }, timeout: { type: 'string', default: '600' } });
+  const { file, values, on: onBoard } = parse('wait', args, { ...TIERS, filer: { type: 'string' }, key: { type: 'string' }, timeout: { type: 'string', default: '600' }, into: { type: 'string' } });
   if (!/^\d{1,7}$/.test(values.timeout)) throw fail('--timeout must be whole seconds, 0 or more', 'VALIDATION_ERROR', `Run \`sign-off-axi wait --help\``);
   const filer = filerOf(values), on = onBoard + (filer ? ` --filer ${filer}` : '');
+  // Vault Give delivery: its own loop, before any board read, so no ordinary wait changes. Undocumented while the vault is OFF.
+  if (values.into !== undefined) return waitInto(file, values, onBoard);
   if (values.key === undefined) ready(file, onBoard);
   const seconds = Number(values.timeout), deadline = Date.now() + seconds * 1000, key = values.key === undefined ? '' : ` --key ${values.key}`;
   // With a filer, only its own items count, and an answer it has not taken yet is new however old it is.
@@ -460,7 +462,7 @@ async function wait(args: string[]) {
         const vault = await takeVaultExpiries(file, filer).catch(() => undefined);
         unknown = !vault;
         if ((!vault || !vault.clean) && !vaultWarned) { vaultWarned = true; warn('Vault expiry status unavailable; ordinary answers still arrive.'); }
-        if (vault?.events.length) return vaultExpired(file, vault.events, values);
+        if (vault?.events.length) return vaultEvent(file, vault.events, values);
         live = vault?.live ?? 0;
       }
       // A keyed filer wait reads its own item's expiry or refusal, unless one of its board rows already holds the key.
@@ -469,7 +471,7 @@ async function wait(args: string[]) {
         try { event = await readVaultExpiry(file, values.key, filer, true); } catch (e: any) {
           if (e?.code !== 'READER_MISMATCH' && !vaultWarned) { vaultWarned = true; warn('Vault expiry status unavailable; ordinary answers still arrive.'); }
         }
-        if (event) return vaultExpired(file, [{ key: values.key, at: event.at, status: event.status }], values);
+        if (event) return vaultEvent(file, [{ key: values.key, at: event.at, status: event.status }], values);
       }
       if (values.key === undefined && !waiting && !live && !unknown) {
         throw fail(`nothing${filer ? ` posted by ${filer}` : ''} is waiting on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi answers${onBoard}\` to read the saved answers`, `Run \`sign-off-axi raise${on} --title "<question>"\` to ask a new one`);
@@ -490,12 +492,43 @@ async function wait(args: string[]) {
   }
 }
 
-/** Exit 1 with metadata only: the fixed sentence, never a value, URL, path or filer. One poll takes one kind, so all events share a status. */
-function vaultExpired(file: string, events: { key: string; at: number; status: 'expired' | 'refused' }[], values: Record<string, any>) {
-  const status = events[0].status, error = status === 'refused' ? errors.REFUSED : errors.EXPIRED, at = (ms: number) => new Date(ms).toISOString().slice(0, 19) + 'Z';
-  process.exitCode = 1;
-  if (values.json) return JSON.stringify(Object.fromEntries(events.map((e) => [e.key, { answer: status, label: error, close: 'done', at: at(e.at) }])));
-  return toon({ board: tilde(file), [status]: events.map((e) => ({ key: e.key, at: at(e.at) })), error, code: status.toUpperCase() }, ['Ask for a fresh item under a new key']);
+/** Metadata only: a fixed sentence, never a value, URL, path or filer. Failures exit 1; a delivery exits 0 with a label.
+ * One poll takes one kind, so all events share a status. */
+const VAULT_EVENTS: Record<VaultExpiry['status'], { sentence: string; code?: string }> = {
+  expired: { sentence: errors.EXPIRED, code: 'EXPIRED' },
+  refused: { sentence: errors.REFUSED, code: 'REFUSED' },
+  'delivery-uncertain': { sentence: errors.DELIVERY_UNCERTAIN, code: 'DELIVERY_UNCERTAIN' },
+  delivered: { sentence: 'Saved to the approved destination file.' },
+};
+function vaultEvent(file: string, events: { key: string; at: number; status: VaultExpiry['status'] }[], values: Record<string, any>) {
+  const status = events[0].status, { sentence, code } = VAULT_EVENTS[status], at = (ms: number) => new Date(ms).toISOString().slice(0, 19) + 'Z';
+  if (code) process.exitCode = 1;
+  if (values.json) return JSON.stringify(Object.fromEntries(events.map((e) => [e.key, { answer: status, label: sentence, close: 'done', at: at(e.at) }])));
+  return toon({ board: tilde(file), [status]: events.map((e) => ({ key: e.key, at: at(e.at) })), ...(code ? { error: sentence, code } : { label: sentence }) },
+    code ? ['Ask for a fresh item under a new key'] : []);
+}
+// Only these leave the item deliverable later; every other vault code is final for this wait.
+const INTO_RETRY = ['BUSY', 'NOT_FOUND', 'VAULT_KEY_UNAVAILABLE'];
+const INTO_HELP: Record<string, string> = { DESTINATION_DENIED: 'Fix the destination folder locally, then run the same wait again', DESTINATION_EXISTS: 'Fix the destination folder locally, then run the same wait again',
+  READER_MISMATCH: 'Check --key, --filer and --into against the item', VALIDATION_ERROR: 'Check --key, --filer and --into against the item' };
+/** `wait --into`: delivers one Give once into its bound file, polling while it is pending. The destination is never printed. */
+async function waitInto(file: string, values: Record<string, any>, onBoard: string) {
+  const { key, filer, into } = values, seconds = Number(values.timeout), deadline = Date.now() + seconds * 1000;
+  // An explicit --filer: an inherited SIGN_OFF_FILER must not route a secret write.
+  if (key === undefined || filer === undefined) throw fail('wait --into needs --key and --filer', 'VALIDATION_ERROR', 'Pass the Give item\'s --key and your own --filer');
+  let warned = false;
+  for (;;) {
+    let done;
+    try { done = await deliverVault(file, key, filer, into); } catch (e) {
+      const code = e instanceof VaultError ? e.code : 'BUSY';
+      if (!INTO_RETRY.includes(code)) throw fail(errors[code], code, INTO_HELP[code] ?? 'Ask for a fresh item under a new key');
+      if (code !== 'NOT_FOUND' && !warned) { warned = true; warn('Vault delivery status unavailable; still waiting.'); }
+    }
+    if (done) return vaultEvent(file, [done], values);
+    const left = deadline - Date.now();
+    if (left <= 0) throw fail(`no vault item with key ${key} was ready to deliver within ${seconds}s`, 'TIMEOUT', `Run \`sign-off-axi wait${onBoard} --key ${key} --filer ${filer} --into <file> --timeout ${seconds}\` to keep waiting`);
+    await new Promise((ok) => setTimeout(ok, Math.min(1000, left)));
+  }
 }
 
 const slug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 64).replace(/^-+|-+$/g, '') || 'decision';
