@@ -907,11 +907,14 @@ test('a long answer at 390 px sits under its long title, which keeps most of the
 // 100 all of them in one column. The last board is a last-bucket one: one answer at 9:00 and ten at 9:58, so the ten sit at
 // `left: 100%`, where a wrapping count would reach the caption. The Answered count stays on one line at its full width while its
 // checks give way; each Today column carries its own count, the counts add up to the caption, and none reaches it or another label.
-test('Summary at 390 with 1, 10, 100 answers today and a last-bucket board: the Answered count stays whole and the Today counts add up without touching the caption', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+// The Today list under the chart shows the day's newest answers first, taking the rows in the same order as the Answered list.
+test('Summary at 390 with 1, 10, 100 answers today and a last-bucket board: the Answered count stays whole, the Today counts add up without touching the caption, and the Today list leads with the newest answer in the Answered order', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const today = (h, m) => { const d = new Date(); d.setHours(h, m, 0, 0); return d.toISOString(); };
   const cases = [{ n: 1, at: () => today(9, 30) }, { n: 10, at: (i) => (i === 0 ? today(8, 0) : today(9, 30)) }, { n: 100, at: () => today(9, 30) },
     { n: 11, at: (i) => (i === 0 ? today(9, 0) : today(9, 58)) }];
-  const seen = {}, want = {};
+  // A list row reads `<time><title> · <label>`; the Answered list's own `strong` holds the title alone.
+  const names = (sel) => `[...document.querySelectorAll('${sel}')].map((li) => li.textContent.replace(/^\\d\\d:\\d\\d/, '').split(' · ')[0])`;
+  const seen = {}, want = {}, order = {};
   for (const { n, at } of cases) {
     const dir = join(scratch, `fit-${n}`), file = join(dir, 'board.json');
     mkdirSync(dir, { recursive: true });
@@ -926,10 +929,19 @@ test('Summary at 390 with 1, 10, 100 answers today and a last-bucket board: the 
     await until(async () => (await evaluate(`document.querySelector('.tile.i-answered .n')?.textContent === '${n}' && !!document.querySelector('.day')`)));
     seen[n] = await evaluate(`[${SQUASH}, document.querySelector('.today .sec-head .meta').textContent, [...document.querySelectorAll('.col')].map((c) => c.textContent)]`);
     want[n] = [[], `${n} answered, ${n === 10 ? '8:00' : '9:00'} to 10:00`, n === 10 ? ['1', '9'] : n === 11 ? ['1', '10'] : [String(n)]];
+    // The same page's Answered screen lists every answer, newest first: the day's list must name the same rows in the same order.
+    const list = await evaluate(names('.today .events li'));
+    await evaluate(`location.hash = '#answered'`);
+    await until(async () => (await evaluate(`!!document.querySelector('#board ul.i-answered > li')`)));
+    order[n] = { list, all: await evaluate(names('#board ul.i-answered > li summary .t strong')) };
     close();
     proc.kill();
   }
   assert.deepEqual(seen, want);
+  for (const { n } of cases) {
+    assert.equal(order[n].all[0], `Question ${n - 1}?`, `${n}: the Answered list leads with the newest answer`);
+    assert.deepEqual(order[n].list, order[n].all.slice(0, 8), `${n}: Today shows the newest answers first, in the Answered list's order`);
+  }
 });
 
 test('Evidence: each update is a card with its number, the day it was filed and New when that is today; one portrait capture sits beside its words, two go side by side; at 1440 the page counts them under its title and sets them two across', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
