@@ -1,0 +1,1 @@
+{"contract":1,"kind":"gate","schema":1,"key":"dd-gate-c1","title":"Move the sign-in run on past its judge?","about":"The judge could not tell the screens apart.","options":[{"value":"approve","label":"Approve"},{"value":"fix","label":"Fix first"}],"recommend_value":"fix"}

@@ -76,8 +76,9 @@ examples:
 `,
   validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>] [--expect-invalid]
 Checks message files against the communication contract without posting them: ${CONTRACT}
-A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, report and evidence, schema 1 each.
+A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, report, evidence and gate, schema 1 each.
 An evidence message's media paths read from the message file's folder: each file must be there, inside it, and 50 MB or less.
+A gate names its done-done run (run_id and commit) and offers 2 or 3 of approve (Approve), skip (Skip the judge) and fix (Fix first).
 Post one with \`sign-off-axi post --kind <kind> --from <message.json>\`, or --from - to read stdin.
 A board file given to raise --from or post --from may hold such messages as items: each is checked the same way before it is stored, and a report shows under Reports with no answer.
 In such a file a new item of a contract kind (a decision, the default, an ask or a report) must carry contract, kind and schema; new evidence is posted with post --kind evidence, one at a time.
@@ -92,6 +93,7 @@ examples:
   sign-off-axi validate --kind ask messages/*.json
   sign-off-axi validate --kind report report.json
   sign-off-axi validate --kind evidence proof/evidence.json
+  sign-off-axi validate --kind gate gate.json
   sign-off-axi validate --expect-invalid node_modules/sign-off-axi/fixtures/contract/*/invalid-*.json
 `,
   answers: `usage: sign-off-axi answers [board.json] [--key <key>] [--full] [--json]
@@ -162,6 +164,7 @@ Posts an item for the user. --type decision (the default) is a yes/no or pick-on
 else it is refused with one fix line and nothing is written. A key already on the board takes only the same message again; anything else exits 2.
 --kind evidence copies its media, read from the message file's folder (the current folder for stdin), into evidence/<number>/ like --type evidence;
 a "run" is shown as the update's proof record. With no key it posts the next update-<number>.
+--kind gate holds a done-done run for the user: it waits like an ask; run done-done respond --action <the picked value>.
 Listing --option needs --recommend <value>, on every type: the option you would pick, shown first and marked. --from --replace feeds are not held to it.
 --filer names who posts (your agent session or any id of 1-128 of A-Z a-z 0-9 . _ -), saved on the item; then \`wait --filer <id>\` gets the answer.
 SIGN_OFF_FILER sets it for every command; with neither, the Claude Code session id is saved when there is one.
@@ -187,6 +190,7 @@ examples:
   sign-off-axi post --type decision --title "Keep the weekly digest?" --recommend yes
   sign-off-axi post --kind ask --from ask.json --filer agent-41
   sign-off-axi post --kind evidence --from proof/evidence.json --filer done-done
+  sign-off-axi post --kind gate --from gate.json --filer done-done
   sign-off-axi post .sign-off/decisions.json --type interactive --title "Does the sign-in flow feel right?" --view mocks/sign-in/demo.html --option yes=Yes --option no="Needs work" --recommend yes
   sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media phone.png --media flow.mp4 --link https://github.com/acme/app/pull/12
   sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "The new sign-in has 2 steps." --media explainer.mp4 --chapter 0:00=Start --chapter 0:12="Step 2"
@@ -566,7 +570,12 @@ function replace(file: string, on: string, from?: string, filer?: string) {
     for (const i of fed.items) if (first.get(i?.key)?.title !== i?.title) fits(i?.title, i?.key);
     const feed = fed.items.map((i) => ({ filed: first.get(i?.key)?.filed ?? now, ...i, ...(filer && { filer }) }));
     // An answer belongs to its question: an answered key may not come back asking something else.
-    const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply]);
+    const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply, d.run]);
+    // A gate's answer is the action for its run, so it outlives its item only under that key: a gate that comes back under another run is refused.
+    const saved = readAnswers(file);
+    for (const i of fed.items) if (i?.kind === 'gate' && !first.has(i?.key) && Object.hasOwn(saved, i?.key)) {
+      throw fail(`key ${i.key} was answered on ${tilde(file)} and is no longer there`, 'CONFLICT', 'Post it under a new key');
+    }
     for (const had of board(file)) {
       const d = incoming.find((x) => x.key === had.key);
       if (filer && d && had.filer && had.filer !== filer) throw fail(`key ${d.key} on ${tilde(file)} was posted by another filer`, 'CONFLICT', 'Feed it under a new key');

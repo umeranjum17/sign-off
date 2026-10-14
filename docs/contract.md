@@ -2,7 +2,7 @@
 
 sign-off owns this contract. Agents and tools use it to post asks, reports, evidence, gates and retro findings to the board, and to read the answers back. Every message has the same strict shape, so the person reading the board sees one kind of card per kind of message, whoever sent it.
 
-Status: v1 target, built in parts. Built: the `ask`, `report` and `evidence` kinds; `validate`, with `--expect-invalid` (section 9), and their fixtures in the npm package; `post --kind`, from a file or stdin with `--from -`, where a key conflict exits 2; in a `raise --from` or `post --from` file, a new item that carries `contract` or `kind` is checked as a message before anything is stored, a new item of a contract kind without `kind` is refused, and a new item's title is held to 1-160. New contract evidence is posted with `post --kind evidence`, never in a `--from` file; `post --type evidence` keeps the board format. Not built yet: `gate` and `finding`, answer events and `schema`. `raise --title` and `post --type decision` still post board-format items (they do not fill in `contract`, `kind` and `schema` yet), and their key conflicts still exit 1.
+Status: v1 target, built in parts. Built: the `ask`, `report`, `evidence` and `gate` kinds; `validate`, with `--expect-invalid` (section 9), and their fixtures in the npm package; `post --kind`, from a file or stdin with `--from -`, where a key conflict exits 2; in a `raise --from` or `post --from` file, a new item that carries `contract` or `kind` is checked as a message before anything is stored, a new item of a contract kind without `kind` is refused, and a new item's title is held to 1-160. New contract evidence is posted with `post --kind evidence`, never in a `--from` file; `post --type evidence` keeps the board format. Not built yet: `finding`, answer events and `schema`. `raise --title` and `post --type decision` still post board-format items (they do not fill in `contract`, `kind` and `schema` yet), and their key conflicts still exit 1.
 
 ## 1. Versions
 
@@ -26,7 +26,7 @@ Non-contract types stay outside this contract. `raise --title` and `post --type 
 
 One validator, one way in. No daemon, socket or HTTP API.
 
-`sign-off-axi post [board.json] --kind <kind> --from <file.json>`, or `--from -` to read stdin. `--kind` must equal the message's `kind`, so the wrong file is never posted. A `post --from --replace` feed checks each new contract-kind item the same way, except evidence (section 2). A --replace feed is a whole-board resync: it does not refuse a contract item whose key holds a different message, it replaces it.
+`sign-off-axi post [board.json] --kind <kind> --from <file.json>`, or `--from -` to read stdin. `--kind` must equal the message's `kind`, so the wrong file is never posted. A `post --from --replace` feed checks each new contract-kind item the same way, except evidence (section 2). A --replace feed is a whole-board resync: it does not refuse a contract item whose key holds a different message, it replaces it. The gate exception: an answered gate cannot take another run, and a dropped answered gate key cannot come back, in a `--replace` feed (section 5).
 
 `raise --from` and `post --from` (no `--kind`) check each new item that carries `contract` and `kind` the same way `post --kind` does, and refuse a new item with no `kind` unless it names a non-contract type (section 2).
 
@@ -54,7 +54,7 @@ A message file holds one JSON object, in any layout. The validator reads it with
 | `link` | all, optional | `http://` or `https://` followed by 1-500 characters with no whitespace, control character (C0, DEL or C1) or unpaired surrogate, or a 7-40 character lowercase hex commit |
 | `about` | all, required (optional on `ask`) | text, 1-500 |
 | `detail` | `ask`, optional | text, 1-1000 |
-| `options` | `ask`, `gate`, `finding`, required | 2-6 objects of exactly `value` (a key-set id, unique in the message) and `label` (text, 1-80) |
+| `options` | `ask`, `gate`, `finding`, required | 2-6 (2 or 3 on `gate`, section 5) objects of exactly `value` (a key-set id, unique in the message) and `label` (text, 1-80) |
 | `recommend_value` | `ask`, `gate`, `finding`, required | one listed option `value` |
 | `default_if_silent` | `ask`, optional | one listed option `value`; shown, never applied |
 | `close` | `ask`, `gate`, optional | `done` (default) or `release`; copied into the answer |
@@ -97,6 +97,8 @@ A run held for the person's approval. Shows in Waiting on you.
 - Required: the common fields, `about`, `run` (exactly `run_id` and `commit`, with the evidence rules), `options`, `recommend_value`.
 - `options`: 2 or 3, in any order, from `approve` (Approve), `skip` (Skip the judge) and `fix` (Fix first). Labels must match exactly. They are the actions of `done-done respond --action`.
 - Optional: `close`.
+- The board keeps `run` on the item as sent. The card is a question in Waiting on you with the gate's title, about and actions; it does not show the run id or commit yet.
+- `run` is part of the question: under the gate's key another run is a different message in a `--from` feed too, and an answered gate cannot take another run, not even in a `--replace` feed, since the answer belongs to the run it was given for. A dropped answered gate key cannot come back in a `--replace` feed; post it under a new key.
 
 ### finding, schema 1
 
@@ -160,7 +162,7 @@ To recover: read the `help` line, fix the message file, post it again. Never edi
 
 ## 10. Conformance
 
-Shared fixtures live in [fixtures/contract/](../fixtures/contract/README.md) and ship in the npm package, one folder per kind and schema (`ask.v1/`, `report.v1/`, `evidence.v1/`): for each, at least 2 valid messages and 3 invalid ones (a missing field, a broken limit, an unknown field). Each tool's CI installs the version it pins and runs them:
+Shared fixtures live in [fixtures/contract/](../fixtures/contract/README.md) and ship in the npm package, one folder per kind and schema (`ask.v1/`, `report.v1/`, `evidence.v1/`, `gate.v1/`): for each, at least 2 valid messages and 3 invalid ones (a missing field, a broken limit, an unknown field). Each tool's CI installs the version it pins and runs them:
 
 ```
 npm install --no-save sign-off-axi@<exact>

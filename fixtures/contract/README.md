@@ -9,7 +9,7 @@ fixtures/contract/<kind>.v<schema>/valid-<name>.json
 fixtures/contract/<kind>.v<schema>/invalid-<field>-<rule>.json
 ```
 
-- `<kind>` is `ask`, `report`, `evidence`, `gate` or `finding`, and `<schema>` its schema number, such as `ask.v1/`. A version ships a folder for every kind it validates. This version ships `ask.v1/`, `report.v1/` and `evidence.v1/`.
+- `<kind>` is `ask`, `report`, `evidence`, `gate` or `finding`, and `<schema>` its schema number, such as `ask.v1/`. A version ships a folder for every kind it validates. This version ships `ask.v1/`, `report.v1/`, `evidence.v1/` and `gate.v1/`.
 - Each file holds one message. An evidence fixture that names `media` ships those files next to it.
 - Each kind has at least 2 valid files and 3 invalid ones: one with a required field missing, one over a limit, and one with an unknown field.
 - An invalid file breaks exactly one rule. Its name gives the field and the rule, such as `invalid-title-too-long.json`, and sign-off's own tests check that the refusal names that field.
