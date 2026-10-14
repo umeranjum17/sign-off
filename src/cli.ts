@@ -829,7 +829,7 @@ function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: 
         fits(d.title, d.key);
         items.push({ filed: now, ...raw[i] });
       }
-      return { key: d.key, status: !had ? 'raised' : had.answer ? `already answered ${had.answer.answer}` : waits(had) ? 'already waiting' : 'already posted', title: d.title };
+      return { key: d.key, status: !had ? 'raised' : had.answer ? `already answered ${had.answer.answer}` : waits({ ...had, dismissed: false }) ? 'already waiting' : 'already posted', title: d.title };
     });
     if (raised.some((r) => r.status === 'raised')) writeItems(file, items);
     const key = raised.length === 1 ? ` --key ${raised[0].key}` : '';
