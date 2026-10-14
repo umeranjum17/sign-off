@@ -9,7 +9,7 @@ export type VaultMeta = { board: string; key: string; mode: 'give' | 'receive'; 
 type Status = 'pending' | 'ready' | 'refused' | 'expired';
 type Sealed = { nonce: string; tag: string; data: string };
 type Record = { schema: 1; meta: VaultMeta; status: Status; at: number; sealed?: Sealed };
-export type VaultExpiry = { schema: 1; id: string; status: 'expired'; at: number };
+export type VaultExpiry = { schema: 1; id: string; status: 'expired' | 'refused'; at: number };
 export const errors = {
   VALIDATION_ERROR: 'Vault input is invalid: check mode, expiry, provider and destination.',
   EXPIRED: 'Vault item expired; request a fresh item.',
@@ -134,9 +134,11 @@ function readRecord(path: string): Record {
     || path !== join(dirname(path), `${digest(record.meta.board, record.meta.key)}.json`)) bad('VALIDATION_ERROR');
   return record;
 }
+// A refusal is admitted only while the item is live (`operate` expires first), so only an expiry is bound to the deadline.
 function expiryEvent(id: string, record: Record): VaultExpiry {
-  if (!Number.isSafeInteger(record.at) || record.at <= 0 || record.at < record.meta.expires || record.at > 8.64e15 || Object.hasOwn(record, 'sealed')) bad('VALIDATION_ERROR');
-  return { schema: 1, id: `${digest(id, record.meta.key)}:expired`, status: 'expired', at: record.at };
+  const status = record.status as VaultExpiry['status'];
+  if (!Number.isSafeInteger(record.at) || record.at <= 0 || (status === 'expired' && record.at < record.meta.expires) || record.at > 8.64e15 || Object.hasOwn(record, 'sealed')) bad('VALIDATION_ERROR');
+  return { schema: 1, id: `${digest(id, record.meta.key)}:${status}`, status, at: record.at };
 }
 function expire(path: string, record: Record): Record {
   if (['pending', 'ready'].includes(record.status) && record.meta.expires <= Date.now()) {
@@ -196,11 +198,12 @@ export async function readVaultExpiry(board: string, key: string, filer: string)
     });
   } catch (e) { throw e instanceof VaultError ? e : new VaultError('BUSY'); }
 }
-/** For an ordinary filer wait: expires this filer's elapsed items in the board's folder, then takes each untaken expiry once.
- * A private `.expired.taken` marker per event dedupes filer waits; markers are durable before any event is returned. */
+/** For an ordinary filer wait: expires this filer's elapsed items in the board's folder, then takes each untaken expiry or refusal once.
+ * A private `.expired.taken` or `.refused.taken` marker per event dedupes filer waits; markers are durable before any event is returned.
+ * One kind per poll, expired first, so one output never mixes two codes; refusals come on the next poll. */
 export async function takeVaultExpiries(board: string, filer: string) {
   if (!isKey(filer)) bad('VALIDATION_ERROR');
-  const none = { events: [] as { key: string; at: number }[], live: 0, clean: true };
+  const none = { events: [] as { key: string; at: number; status: VaultExpiry['status'] }[], live: 0, clean: true };
   try {
     // Never used: silent, with no permission walk, lock or state creation.
     const file = boardFile(board);
@@ -216,13 +219,14 @@ export async function takeVaultExpiries(board: string, filer: string) {
           const path = join(dir, name), record = readRecord(path);
           if (record.meta.board !== id || record.meta.filer !== filer) continue;
           const r = expire(path, record);
-          if (r.status === 'expired') found.push({ path, key: r.meta.key, event: expiryEvent(id, r) });
-          else if (r.status !== 'refused') live++;
+          if (r.status === 'expired' || r.status === 'refused') found.push({ path, key: r.meta.key, event: expiryEvent(id, r) });
+          else live++;
         } catch { clean = false; }
       }
       try {
-        const fresh = found.filter(({ path, event }) => {
-          const marker = path.replace(/\.json$/, '.expired.taken');
+        const take = (kind: VaultExpiry['status']) => found.filter(({ path, event }) => {
+          if (event.status !== kind) return false;
+          const marker = path.replace(/\.json$/, `.${kind}.taken`);
           let fd;
           try { fd = openSync(marker, 'wx', 0o600); } catch (e: any) {
             if (e.code !== 'EEXIST') throw e;
@@ -233,8 +237,9 @@ export async function takeVaultExpiries(board: string, filer: string) {
           try { writeFileSync(fd, event.id); fsyncSync(fd); } finally { closeSync(fd); }
           return true;
         });
+        const expired = take('expired'), fresh = expired.length ? expired : take('refused');
         if (made.length) syncDir(dir);
-        return { events: fresh.map(({ key, event }) => ({ key, at: event.at })), live, clean };
+        return { events: fresh.map(({ key, event }) => ({ key, at: event.at, status: event.status })), live, clean };
       } catch (e) { for (const m of made) rmSync(m, { force: true }); throw e; }
     }, 1);
   } catch (e) { throw e instanceof VaultError ? e : new VaultError('BUSY'); }

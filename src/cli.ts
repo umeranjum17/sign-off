@@ -446,7 +446,7 @@ async function wait(args: string[]) {
         return printAnswers(file, found, waiting, values,
           [waiting ? `Run \`sign-off-axi wait${on}\` for the next of the ${waiting} waiting` : `Run \`sign-off-axi stop${onBoard}\` to close the board`]);
       }
-      // Private vault expiries reach a filer wait only once its ordinary answers are out; each is taken once.
+      // Private vault expiries and refusals reach a filer wait only once its ordinary answers are out; each is taken once.
       let live = 0, unknown = false;
       if (filer !== undefined && values.key === undefined) {
         const vault = await takeVaultExpiries(file, filer).catch(() => undefined);
@@ -474,12 +474,12 @@ async function wait(args: string[]) {
   }
 }
 
-/** Exit 1 with metadata only: the fixed sentence, never a value, URL, path or filer. */
-function vaultExpired(file: string, events: { key: string; at: number }[], values: Record<string, any>) {
-  const error = errors.EXPIRED, at = (ms: number) => new Date(ms).toISOString().slice(0, 19) + 'Z';
+/** Exit 1 with metadata only: the fixed sentence, never a value, URL, path or filer. One poll takes one kind, so all events share a status. */
+function vaultExpired(file: string, events: { key: string; at: number; status: 'expired' | 'refused' }[], values: Record<string, any>) {
+  const status = events[0].status, error = status === 'refused' ? errors.REFUSED : errors.EXPIRED, at = (ms: number) => new Date(ms).toISOString().slice(0, 19) + 'Z';
   process.exitCode = 1;
-  if (values.json) return JSON.stringify(Object.fromEntries(events.map((e) => [e.key, { answer: 'expired', label: error, close: 'done', at: at(e.at) }])));
-  return toon({ board: tilde(file), expired: events.map((e) => ({ key: e.key, at: at(e.at) })), error, code: 'EXPIRED' }, ['Ask for a fresh item under a new key']);
+  if (values.json) return JSON.stringify(Object.fromEntries(events.map((e) => [e.key, { answer: status, label: error, close: 'done', at: at(e.at) }])));
+  return toon({ board: tilde(file), [status]: events.map((e) => ({ key: e.key, at: at(e.at) })), error, code: status.toUpperCase() }, ['Ask for a fresh item under a new key']);
 }
 
 const slug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 64).replace(/^-+|-+$/g, '') || 'decision';
