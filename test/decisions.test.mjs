@@ -201,15 +201,23 @@ test('three dismissed updates are not waiting on the CLI either: list and answer
   procs.push(proc);
   const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
   const keys = ['update-1', 'update-2', 'update-3'];
-  assert.equal((await fetch(`${url}api/dismiss`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keys, dismissed: true }) })).status, 200);
+  const dismiss = (ks) => fetch(`${url}api/dismiss`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keys: ks, dismissed: true }) });
+  assert.equal((await dismiss(keys)).status, 200);
   assert.deepEqual((await (await fetch(`${url}api/decisions`)).json()).dismissed, keys);
+  // An answered item cleared from Answered, as Clear all done does, drops out of the answered count too.
+  assert.equal(run('raise', board, '--title', 'Ship the new sign-in screen?', '--recommend', 'yes').code, 0);
+  assert.equal((await post(url, { key: 'ship-the-new-sign-in-screen', answer: 'yes' })).status, 200);
+  assert.match(run('list', board).out, /answered: 1/);
+  assert.equal((await dismiss(['ship-the-new-sign-in-screen'])).status, 200);
   proc.kill();
-  // The CLI agrees: nothing is waiting in list or answers, --full and --json say dismissed.
-  assert.match(run('list', board).out, /waiting: 0 of 3 decisions \(nothing is waiting on the user\)/);
+  // The CLI agrees: nothing is waiting or answered in list, answers is not waiting, --full and --json say dismissed.
+  assert.match(run('list', board).out, /waiting: 0 of 4 decisions \(nothing is waiting on the user\)/);
+  assert.match(run('list', board).out, /answered: 0/);
   assert.match(run('answers', board).out, /waiting: 0/);
-  assert.deepEqual([...run('list', board, '--full').out.matchAll(/update-\d,(\w+)/g)].map((m) => m[1]), ['dismissed', 'dismissed', 'dismissed']);
-  assert.deepEqual(JSON.parse(run('list', board, '--json').out).decisions.map((d) => d.dismissed), [true, true, true]);
-  // The agent is not told: a wait on the dismissed updates runs to its timeout instead of finding nothing to wait on.
+  assert.deepEqual([...run('list', board, '--full').out.matchAll(/(?:update-\d|ship-the-new-sign-in-screen),(\w+)/g)].map((m) => m[1]), ['dismissed', 'dismissed', 'dismissed', 'dismissed']);
+  assert.deepEqual(JSON.parse(run('list', board, '--json').out).decisions.map((d) => d.dismissed), [true, true, true, true]);
+  // The agent is not told: answers still returns a dismissed answer, and a wait on the dismissed updates runs to its timeout.
+  assert.match(run('answers', board, '--key', 'ship-the-new-sign-in-screen').out, /ship-the-new-sign-in-screen,yes/);
   const waited = run('wait', board, '--timeout', '0');
   assert.deepEqual([waited.code, /code: TIMEOUT/.test(waited.out)], [1, true]);
 });
