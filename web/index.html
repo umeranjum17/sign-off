@@ -136,7 +136,8 @@
   .rows > li + li { border-top: 1px solid var(--line); }
   .compact { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 0; color: var(--text); text-decoration: none; }
   .compact .t { display: grid; flex: 1; min-width: 0; }
-  .ans { display: grid; justify-items: end; text-align: right; } .ans b { color: var(--c-answered); } .ans time { color: var(--muted); font-size: 0.875rem; }
+  /* The answer sits under the title, never beside it: a long answer beside the title squeezed it to a letter a line. */
+  .ans { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 0.5rem; margin-top: 0.125rem; } .ans b { color: var(--c-answered); } .ans time { color: var(--muted); font-size: 0.875rem; }
   .compact strong { font-size: 1.0625rem; font-weight: 600; line-height: 1.3; }
   .compact .meta { margin: 0.125rem 0 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .thumb, .compact .icon { width: 3.5rem; height: 3.5rem; border-radius: 0.625rem; }
@@ -776,12 +777,12 @@
       done.length > SHOWN ? el('p', { class: 'meta' }, `and ${done.length - SHOWN} earlier`) : '');
   }
 
-  /** A short row: a picture (or the area's mark) and the title; an answered item has its answer and time on the right. */
+  /** A short row: a picture (or the area's mark) and the title; an answered item has its answer and time under the title. */
   const compact = (d, a) => {
     const s = state.answers[d.key];
-    return [thumb(a, pic(d)), el('span', { class: 't' }, el('strong', { dir: 'auto' }, title(d)), s ? '' : el('span', { class: 'meta', dir: 'auto' }, d.about ?? NAMES[d.type] ?? d.type)),
-      s ? el('span', { class: 'ans' }, el('b', { dir: 'auto' }, s.answer === 'text' ? 'Your reply' : s.label),
-        el('time', {}, isToday(s.at) ? hhmm(s.at) : day(s.at))) : ''];
+    return [thumb(a, pic(d)), el('span', { class: 't' }, el('strong', { dir: 'auto' }, title(d)), s
+      ? el('span', { class: 'ans' }, el('b', { dir: 'auto' }, s.answer === 'text' ? 'Your reply' : s.label), el('time', {}, isToday(s.at) ? hhmm(s.at) : day(s.at)))
+      : el('span', { class: 'meta', dir: 'auto' }, d.about ?? NAMES[d.type] ?? d.type))];
   };
   let jump = null; // The item a Summary row was tapped for, scrolled to on its area's screen.
   /** A short list of an area on the Summary: a picture and the title; a tap opens the area at that item. */
