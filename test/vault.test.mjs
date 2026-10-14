@@ -20,6 +20,7 @@ test('disabled vault custody across real processes: encryption, racing deposits,
   mkdirSync(join(home, 'project'), { mode: 0o700 });
   writeFileSync(board, JSON.stringify({ schema: 2, items: [{ key: 'ordinary', title: 'Umer: continue?' }] }));
   const env = { ...process.env, HOME: home, XDG_STATE_HOME: state, XDG_CONFIG_HOME: join(home, 'config'), TMPDIR: home };
+  delete env.SIGN_OFF_FILER;
   const outputs = [], secret = `FAKE_${randomBytes(24).toString('hex')}`, url = `https://www.npmjs.com/login/cli/${randomBytes(24).toString('hex')}`;
   const run = (input) => new Promise((ok, reject) => {
     const child = spawn(process.execPath, ['--input-type=module', '-e', worker], { env, stdio: ['pipe', 'pipe', 'pipe'] });
@@ -503,6 +504,7 @@ test('disabled vault custody across real processes: encryption, racing deposits,
         unsafe();
         try {
           for (const b of [wb, ob]) { const r = await waitCli(b, 'filer-f', ['--timeout', '0']); assert.equal(r.code, 1); assert.match(r.out, /^code: NOT_FOUND$/m); assert.equal(r.err, ''); }
+          for (const b of [wb, ob]) { const k = await waitCli(b, 'filer-f', ['--key', 'never-raised', '--timeout', '0']); assert.match(k.out, /^code: TIMEOUT$/m); assert.equal(k.err, ''); }
         }
         finally { chmodSync(home, 0o700); rmSync(join(home, '.git'), { force: true, recursive: true }); }
       }
@@ -552,6 +554,25 @@ test('disabled vault custody across real processes: encryption, racing deposits,
       const e = await waitCli(wb, 'filer-e', ['--json']); assert.deepEqual(expiredKeys(e), ['e-refused']);
       assert.equal(e.json['e-refused'].answer, 'refused'); assert.equal(e.json['e-refused'].label, 'User refused this vault item; no value was delivered.');
       assert.match((await waitCli(wb, 'filer-e', ['--timeout', '0'])).out, /^code: NOT_FOUND$/m);
+      // Keyed public wait: its own item's expiry or refusal, replayed as metadata with exit 1; a keyed wait never marks anything taken.
+      const keyedDeadline = Date.now() + 1_500;
+      await create('k-late', 'receive', 'filer-k', keyedDeadline); await create('k-refused', 'receive', 'filer-k', Date.now() + 3_600_000); await run({ op: 'refuse', board: wb, key: 'k-refused' });
+      await waitFor(() => Date.now() >= keyedDeadline, keyedDeadline + 5_000);
+      const lateBytes = readFileSync(vaultOf('k-late'));
+      const other = await waitCli(wb, 'filer-g', ['--key', 'k-late', '--timeout', '1']); assert.match(other.out, /^code: TIMEOUT$/m); assert.equal(other.err, ''); assert.deepEqual(readFileSync(vaultOf('k-late')), lateBytes);
+      const nofiler = await waitCli(wb, undefined, ['--key', 'k-late', '--timeout', '1']); assert.match(nofiler.out, /^code: TIMEOUT$/m); assert.equal(nofiler.err, ''); assert.deepEqual(readFileSync(vaultOf('k-late')), lateBytes);
+      const keyedLate = await waitCli(wb, 'filer-k', ['--key', 'k-late', '--json', '--timeout', '5']); assert.deepEqual(expiredKeys(keyedLate), ['k-late']);
+      assert.equal(JSON.parse(readFileSync(vaultOf('k-late'))).status, 'expired'); assert.equal(existsSync(vaultOf('k-late').replace(/\.json$/, '.expired.taken')), false);
+      assert.deepEqual(expiredKeys(await waitCli(wb, 'filer-k', ['--key', 'k-late', '--json', '--timeout', '1'])), ['k-late']);
+      assert.deepEqual(expiredKeys(await waitCli(wb, undefined, ['--key', 'k-late', '--json', '--timeout', '1'], { SIGN_OFF_FILER: 'filer-k' })), ['k-late']);
+      const keyedRefused = await waitCli(wb, 'filer-k', ['--key', 'k-refused', '--timeout', '5']);
+      assert.equal(keyedRefused.code, 1); assert.match(keyedRefused.out, /^refused\[1\]\{key,at\}:\n {2}k-refused,/m); assert.match(keyedRefused.out, /^code: REFUSED$/m); assert.equal(keyedRefused.err, '');
+      // A waiting board row of this filer holds the key: the wait keeps waiting for the answer, not the expiry.
+      writeFileSync(wb, JSON.stringify({ schema: 2, items: [{ key: 'k-late', title: 'Umer: continue?', filer: 'filer-k', options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }] }] }));
+      assert.match((await waitCli(wb, 'filer-k', ['--key', 'k-late', '--timeout', '1'])).out, /^code: TIMEOUT$/m);
+      // Custody held: the keyed wait reports unknown custody once and keeps waiting.
+      const keyedLock = join(waitState, 'sign-off', 'vault', 'lock'); writeFileSync(keyedLock, 'owned keyed lock', { mode: 0o600 });
+      try { const r = await waitCli(wb, 'filer-k', ['--key', 'k-refused', '--timeout', '1']); assert.match(r.out, /^code: TIMEOUT$/m); assert.equal(r.err, vaultWarning); } finally { rmSync(keyedLock); }
       // Ordinary answers come first and keep exit 0; the vault expiry follows on the next wait.
       const ask = (key, filer) => ({ key, title: 'Umer: continue?', filer, options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }] });
       const answer = (key) => writeFileSync(wb.replace(/\.json$/, '.answers.jsonl'), `${JSON.stringify({ key, answer: 'yes', label: 'Yes', close: 'done', at: '2026-10-14T00:00:00Z' })}\n`, { flag: 'a' });
@@ -592,7 +613,7 @@ test('disabled vault custody across real processes: encryption, racing deposits,
       for (const [p, bytes] of markers) assert.deepEqual(readFileSync(p), bytes);
       assert.deepEqual((await run({ op: 'expiry', board: wb, key: 'f-ready', filer: 'filer-f' })).event, keyed.event);
       for (const p of readdirSync(waitFolder).map((n) => join(waitFolder, n)).filter((p) => !p.endsWith('.sign-off-vault-id'))) {
-        assert.ok(!/f-pending|f-ready|f-receive|g-item|s-late|p-prio|m-good|r-a|q-refused|e-late|e-refused|filer-g|filer-s|filer-m|filer-r|filer-q|filer-e|api-token/.test(readFileSync(p, 'utf8')));
+        assert.ok(!/f-pending|f-ready|f-receive|g-item|s-late|p-prio|m-good|r-a|q-refused|e-late|e-refused|filer-g|filer-s|filer-m|filer-r|filer-q|filer-e|k-late|k-refused|filer-k|api-token/.test(readFileSync(p, 'utf8')));
       }
     } finally { env.XDG_STATE_HOME = state; }
     assert.deepEqual(readFileSync(keptPath), kept);
