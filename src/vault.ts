@@ -36,7 +36,10 @@ function boardFile(board: unknown) {
   try { return realpathSync(board); } catch { bad('NOT_FOUND'); }
 }
 // Never used: callers stay silent with no permission walk, lock or state creation.
-const unused = (file: string) => !lstatSync(join(stateHome(), 'sign-off', 'vault'), { throwIfNoEntry: false }) || !lstatSync(join(dirname(file), '.sign-off-vault-id'), { throwIfNoEntry: false });
+const unused = (file: string) => {
+  try { return !lstatSync(join(stateHome(), 'sign-off', 'vault'), { throwIfNoEntry: false }) || !lstatSync(join(dirname(file), '.sign-off-vault-id'), { throwIfNoEntry: false }); }
+  catch { return true; }
+};
 function boardId(file: string, create: boolean) {
   const side = join(dirname(file), '.sign-off-vault-id');
   if (!lstatSync(side, { throwIfNoEntry: false })) {

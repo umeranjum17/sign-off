@@ -745,6 +745,9 @@ test('disabled vault custody across real processes: encryption, racing deposits,
       assert.equal(r.code, 1, b); assert.match(r.out, /^code: TIMEOUT$/m); assert.equal(r.err, '');
     }
     assert.equal(existsSync(offState), false); assert.equal(existsSync(join(offFolder, '.sign-off-vault-id')), false);
+    const badState = join(home, 'off-bad'); mkdirSync(badState, { mode: 0o700 }); writeFileSync(join(badState, 'sign-off'), 'x', { mode: 0o600 });
+    const bad = await into('off-item', join(tokens, 'off-token'), ['--timeout', '0'], 'd-agent', { XDG_STATE_HOME: badState }, offBoard);
+    assert.equal(bad.code, 1); assert.match(bad.out, /^code: TIMEOUT$/m); assert.equal(bad.err, ''); assert.equal(readFileSync(join(badState, 'sign-off'), 'utf8'), 'x');
     assert.equal((await into(null, join(tokens, 'off-token'), ['--timeout', '0'], 'd-agent', {}, join(home, 'no-board', 'board.json'))).code, 2, 'usage is checked before any board read');
     const delivered = new Set([token, racedToken, intoToken, raceIntoToken]); // the only files allowed to hold the synthetic value
     for (const text of [...outputs, ...files(home).filter((p) => !delivered.has(p)).map((p) => readFileSync(p).toString())]) {
