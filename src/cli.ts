@@ -13,7 +13,7 @@ import { AxiError, runAxiCli } from 'axi-sdk-js';
 import { type Answer, CHAPTERS_MAX, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, writeItems } from './store.js';
 
 import { ContractError, KINDS, checkMessage, parseMessage } from './contract.js';
-import { sweepVault, takeVaultExpiries } from './vault.js';
+import { errors, sweepVault, takeVaultExpiries } from './vault.js';
 
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
 const CONTRACT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/contract.md';
@@ -465,7 +465,7 @@ async function wait(args: string[]) {
 
 /** Exit 1 with metadata only: the fixed sentence, never a value, URL, path or filer. */
 function vaultExpired(file: string, events: { key: string; at: number }[], values: Record<string, any>) {
-  const error = 'Vault item expired; request a fresh item.', at = (ms: number) => new Date(ms).toISOString().slice(0, 19) + 'Z';
+  const error = errors.EXPIRED, at = (ms: number) => new Date(ms).toISOString().slice(0, 19) + 'Z';
   process.exitCode = 1;
   if (values.json) return JSON.stringify(Object.fromEntries(events.map((e) => [e.key, { answer: 'expired', label: error, close: 'done', at: at(e.at) }])));
   return toon({ board: tilde(file), expired: events.map((e) => ({ key: e.key, at: at(e.at) })), error, code: 'EXPIRED' }, ['Ask for a fresh item under a new key']);

@@ -10,7 +10,7 @@ type Status = 'pending' | 'ready' | 'refused' | 'expired';
 type Sealed = { nonce: string; tag: string; data: string };
 type Record = { schema: 1; meta: VaultMeta; status: Status; at: number; sealed?: Sealed };
 export type VaultExpiry = { schema: 1; id: string; status: 'expired'; at: number };
-const errors = {
+export const errors = {
   VALIDATION_ERROR: 'Vault input is invalid: check mode, expiry, provider and destination.',
   EXPIRED: 'Vault item expired; request a fresh item.',
   VAULT_KEY_UNAVAILABLE: 'Vault key is unavailable; encrypted payload cannot be read.',
