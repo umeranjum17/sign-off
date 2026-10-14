@@ -781,14 +781,14 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   // Its group heads a section with the filed time; the card says New today and what it decided.
   assert.match(reports, /<div class="sec-h"><h2>How it works<\/h2><span class="meta">Filed \d\d:\d\d today<\/span>/);
   assert.match(reports, /How it ships<\/h3><span class="st new">New today<\/span>.*<span class="lbl">What it decided<\/span>Ships only when the check passes\./s);
-  // Answered is Done today: a count under the title, Clear all done on the section head, and a short row per item with its answer and time on the right, beside its ×.
+  // Answered is Done today: a count under the title, Clear all done on the section head, and a short row per item with its answer and time under the title, beside its ×.
   writeFileSync(file.replace(/\.json$/, '.answers.jsonl'), ['ship', 'look'].map((key) => JSON.stringify({ key, answer: 'a', label: 'A', close: 'done', at: new Date().toISOString() })).join('\n') + '\n');
   // Once both are answered, the Answered tile has a check for each and Waiting on you no clock.
   const after = await dump('');
   assert.deepEqual([vis(after, 'answered').match(/class="icon i-\w+"/g), vis(after, 'waiting')], [['class="icon i-answered"', 'class="icon i-answered"'], '']);
   const answered = await dump('#answered');
   assert.match(answered, /<p class="lede">2 answered today\.<\/p><\/header><div class="sec-head"><h2>Done today<\/h2><button class="clear">Clear all done<\/button><\/div>/);
-  const lines = [...answered.matchAll(/<summary class="compact">.*?<strong[^>]*>(.*?)<\/strong>.*?<span class="ans"><b[^>]*>(\w+)<\/b><time>\d\d:\d\d<\/time><\/span><\/summary>.*?<\/details><button class="x" aria-label="Dismiss, [^"]+">×<\/button>/gs)];
+  const lines = [...answered.matchAll(/<summary class="compact">.*?<strong[^>]*>(.*?)<\/strong>.*?<span class="ans"><b[^>]*>(\w+)<\/b><time>\d\d:\d\d<\/time><\/span><\/span><\/summary>.*?<\/details><button class="x" aria-label="Dismiss, [^"]+">×<\/button>/gs)];
   assert.deepEqual(lines.map((m) => [m[1], m[2]]).sort(), [['Pick the look', 'A'], ['When should it ship?', 'A']]);
   // Each row opens to its full card, with its one box.
   const rows = cards(answered);
@@ -828,6 +828,35 @@ test('Clear all done on 201 answered items, set two across on a wide screen: the
   await until(async () => (await evaluate(`${rows} === 0 && document.querySelector(".empty")?.textContent === "All done items cleared."`)));
   await evaluate('document.getElementById("undo").click()');
   await until(async () => (await evaluate(`${rows} === 201`)));
+  close();
+  proc.kill();
+});
+
+// SQUASH from the verify skill: no visible element holding more than 8 characters of its own text is narrower than 8 characters of its font.
+const SQUASH = `[...document.querySelectorAll('body *')].filter((e) => { const t = [...e.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('').trim();
+  return t.length > 8 && e.checkVisibility({ visibilityProperty: true }) && e.getBoundingClientRect().width < 8 * parseFloat(getComputedStyle(e).fontSize) * 0.5; }).map((e) => e.textContent.trim().slice(0, 40))`;
+
+test('a long answer at 390 px sits under its long title, which keeps most of the row and wraps by words, on Answered and the Summary', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'squash'), file = join(dir, 'board.json'), long = 'A (recommended): you sign in to npm once (1 tap); no key stored anywhere';
+  mkdirSync(dir);
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key: 'npm', title: 'npm auto-publish on merge: how do GitHub builds get publish rights?', options: [{ value: 'a', label: long }, { value: 'b', label: 'B' }] }] }));
+  writeFileSync(file.replace(/\.json$/, '.answers.jsonl'), JSON.stringify({ key: 'npm', answer: 'a', label: long, at: new Date().toISOString() }) + '\n');
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  // Per row: the title's share of the row's width, and its narrowest line in ems (a lone letter is about half an em).
+  const rows = `[...document.querySelectorAll('.compact')].filter((c) => c.querySelector('.ans')).map((c) => { const s = c.querySelector('strong'), r = document.createRange();
+    r.selectNodeContents(s);
+    return [s.getBoundingClientRect().width / c.getBoundingClientRect().width, Math.min(...[...r.getClientRects()].map((l) => l.width)) / parseFloat(getComputedStyle(s).fontSize)]; })`;
+  for (const [hash, h1] of [['', 'Summary'], ['#answered', 'Answered']]) {
+    await evaluate(`location.href = ${JSON.stringify(url + hash)}`);
+    await until(async () => (await evaluate(`document.querySelector('h1')?.textContent === '${h1}' && !!document.querySelector('.compact .ans')`)));
+    assert.deepEqual(await evaluate(SQUASH), [], h1);
+    const [[share, line], ...more] = await evaluate(rows);
+    assert.equal(more.length, 0, h1);
+    assert.ok(share > 0.75 && line > 1, `${h1}: the title takes ${Math.round(share * 100)}% of the row, its narrowest line ${line.toFixed(1)} em`);
+  }
   close();
   proc.kill();
 });
