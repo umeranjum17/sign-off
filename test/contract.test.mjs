@@ -21,6 +21,7 @@ const message = (name, text) => {
 };
 const ask = { contract: 1, kind: 'ask', schema: 1, key: 'ship-signin-2', title: 'Ship the new sign-in screen this week?',
   options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }], recommend_value: 'yes' };
+const gate = JSON.parse(readFileSync(join(fixtures, 'gate.v1', 'valid-three-actions.json')));
 const report = { contract: 1, kind: 'report', schema: 1, key: 'slice-5-live', title: 'Board slice 5 is live', about: 'Umer can see the new cards.', filed: '2026-10-13T07:19:00Z' };
 
 test('every shipped fixture: valid files pass, each invalid file is refused on the field its name gives', () => {
@@ -51,7 +52,12 @@ test('refusals: strict at every level, in contract order, with one fix line each
     [{ ...ask, contract: undefined }, /contract is required/, /Add "contract": 1, "kind" and "schema"/],
     [{ ...ask, schema: 2 }, /schema 2 of ask is not in this sign-off-axi/, /Upgrade sign-off-axi/],
     [{ ...ask, schema: '1' }, /schema must be a whole number/, /Set "schema": 1/],
-    [{ ...ask, kind: 'gate' }, /gate is not checked by this sign-off-axi yet/, /Upgrade sign-off-axi/],
+    [{ ...ask, kind: 'finding' }, /finding is not checked by this sign-off-axi yet/, /Upgrade sign-off-axi/],
+    [{ ...gate, options: gate.options.slice(0, 1) }, /options must list 2 or 3 options/, /2 or 3 of \{"value":"approve","label":"Approve"\}/],
+    [{ ...gate, options: [gate.options[0], { value: 'yes', label: 'Yes' }] }, /options \{"value":"yes","label":"Yes"\} is not a gate action/, /Skip the judge/],
+    [{ ...gate, run: { ...gate.run, commit: 'abc1234' } }, /run\.commit must be a full 40-character/, /git rev-parse HEAD/],
+    [{ ...gate, run: 'r1' }, /run must be an object/, /"run_id", "commit"\}/],
+    [{ ...gate, about: undefined }, /about is required/, /why the run is held/],
     [{ ...report, filed: '2026-02-30T00:00:00Z' }, /filed "2026-02-30T00:00:00Z" is not a UTC time/, /exactly YYYY-MM-DDTHH:MM:SSZ/],
     [{ ...report, filed: '2026-10-13T07:19:00.000Z' }, /filed .* is not a UTC time/, /exactly YYYY-MM-DDTHH:MM:SSZ/],
     [{ ...report, group: 'g'.repeat(41) }, /group is 41 characters, over 40/, /Shorten "group"/],
@@ -98,9 +104,9 @@ test('a field name holding a newline is refused on one help line, shown escaped'
 
 test('exit codes: --kind must match, an unreadable file wins over a refusal, no file is a usage error', () => {
   const good = message('ask.json', JSON.stringify(ask));
-  const wrong = validate('--kind', 'gate', good);
+  const wrong = validate('--kind', 'finding', good);
   assert.equal(wrong.status, 2);
-  assert.match(wrong.out.files[0].error, /is ask, not --kind gate/);
+  assert.match(wrong.out.files[0].error, /is ask, not --kind finding/);
   const mixed = validate(good, message('refused.json', '{}'), join(scratch, 'missing.json'));
   assert.equal(mixed.status, 1);
   assert.deepEqual(mixed.out.files.map((f) => f.ok), [true, false, false]);
@@ -314,4 +320,27 @@ test('post --kind evidence: media copied and hashed from the message folder, a r
   }
   assert.equal(readFileSync(board, 'utf8'), before);
   assert.deepEqual(readdirSync(join(scratch, 'ev', 'evidence')).sort(), ['1', '2']);
+});
+
+test('post --kind gate: a done-done run waits for approval like an ask, its run kept, and its answer is the action to take', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const board = join(scratch, 'gate.json'), cli2 = (input, ...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env, input });
+  const posted = cli2(JSON.stringify(gate), 'post', board, '--kind', 'gate', '--from', '-');
+  assert.equal(posted.status, 0, posted.stdout);
+  assert.match(posted.stdout, /dd-gate-a1b2c3d4,raised,[^]*wait .*--filer done-done/);
+  assert.match(cli2(JSON.stringify(gate), 'post', board, '--kind', 'gate', '--from', '-').stdout, /dd-gate-a1b2c3d4,already waiting,/);
+  const [item] = JSON.parse(readFileSync(board, 'utf8')).items;
+  assert.deepEqual([item.kind, item.run, item.options.map((o) => o.value)], ['gate', gate.run, ['approve', 'skip', 'fix']]);
+  // The same key with another run is a different message: exit 2, nothing written.
+  const before = readFileSync(board, 'utf8');
+  const other = cli2(JSON.stringify({ ...gate, run: { ...gate.run, run_id: 'other-run' } }), 'post', board, '--kind', 'gate', '--from', '-');
+  assert.equal(other.status, 2, other.stdout);
+  assert.match(other.stdout, /key dd-gate-a1b2c3d4 already holds a different message[^]*Post it under a new key/);
+  assert.equal(readFileSync(board, 'utf8'), before);
+  appendFileSync(join(scratch, 'gate.answers.jsonl'), `${JSON.stringify({ key: gate.key, answer: 'fix', label: 'Fix first', close: 'done', at: '2026-10-13T08:00:00Z' })}\n`);
+  const waited = cli2('', 'wait', board, '--filer', 'done-done', '--json', '--timeout', '5');
+  assert.equal(waited.status, 0, waited.stdout);
+  assert.equal(JSON.parse(waited.stdout)[gate.key].answer, 'fix');
 });

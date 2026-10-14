@@ -9,15 +9,18 @@ export class ContractError extends Error {
 }
 export const KINDS = ['ask', 'report', 'evidence', 'gate', 'finding'];
 /** The kinds this build checks, with the schema number of each. */
-export const SCHEMAS: Record<string, number> = { ask: 1, report: 1, evidence: 1 };
+export const SCHEMAS: Record<string, number> = { ask: 1, report: 1, evidence: 1, gate: 1 };
 const COMMON = ['contract', 'kind', 'schema', 'key', 'title', 'filer', 'link', 'about'];
 const FIELDS: Record<string, string[]> = {
   ask: [...COMMON, 'detail', 'options', 'recommend_value', 'default_if_silent', 'close'],
   report: [...COMMON, 'filed', 'group', 'decided'],
   evidence: [...COMMON, 'media', 'run'],
+  gate: [...COMMON, 'run', 'options', 'recommend_value', 'close'],
 };
 /** A done-done run: its id, full commit and the four Checks lines. */
 const RUN = ['run_id', 'commit', 'outcome', 'repro', 'proof', 'evidence'];
+/** A gate's options: the actions of done-done respond --action, each with its one label. */
+const GATE: Record<string, string> = { approve: 'Approve', skip: 'Skip the judge', fix: 'Fix first' };
 export const MEDIA_BYTES = 50_000_000;
 
 /** Parses one message; a field written twice in any object refuses it, since plain JSON.parse keeps the last one quietly. */
@@ -73,6 +76,18 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
     if (/\p{Cs}/u.test(v)) throw bad(field, 'has an unpaired surrogate (half of a character)', `Remove the broken character from "${name}", or write it whole`);
     if ([...v].length > max) throw bad(field, `is ${[...v].length} characters, over ${max}`, `Shorten "${name}" to ${max} characters`);
   };
+  /** A done-done run block with exactly these fields: an id, a full commit, and on evidence the four Checks lines. */
+  const checkRun = (fields: string[]) => {
+    const r = m.run;
+    if (!r || typeof r !== 'object' || Array.isArray(r)) throw bad('run', 'must be an object', `Set "run" to {${fields.map(show).join(', ')}}`);
+    const odd = Object.keys(r).find((f) => !fields.includes(f));
+    if (odd !== undefined) throw bad(`run.${escaped(odd) || '""'}`, 'is not a field of run', `Remove ${show(odd)}; run has only ${fields.join(', ')}`);
+    const missing = fields.find((f) => !Object.hasOwn(r, f));
+    if (missing) throw bad(`run.${missing}`, 'is required', `Add "${missing}" to "run"`);
+    if (!isKey(r.run_id)) throw bad('run.run_id', 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "run_id" to the done-done run id');
+    if (!(typeof r.commit === 'string' && /^[a-f0-9]{40}$/.test(r.commit))) throw bad('run.commit', 'must be a full 40-character lowercase commit', 'Set "commit" to the full hash, such as the output of git rev-parse HEAD');
+    for (const f of fields.slice(2)) text(`run.${f}`, r[f], 1000, `the run's ${f} Checks line, in 1000 characters or fewer`);
+  };
   need('contract');
   if (m.contract !== 1) throw bad('contract', `must be 1, not ${show(m.contract)}`, whole(m.contract) ? 'Upgrade sign-off-axi: this one knows contract 1' : 'Set "contract": 1');
   need('kind');
@@ -94,7 +109,7 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
       'Set "link" to a URL such as "https://example.com/pr/4" or a commit hash, or leave it out');
   }
   if (m.kind !== 'ask') {
-    const what = m.kind === 'report' ? 'what happened' : 'what this shows';
+    const what = ({ report: 'what happened', gate: 'why the run is held' } as Record<string, string>)[m.kind] ?? 'what this shows';
     if (!Object.hasOwn(m, 'about')) throw bad('about', 'is required', `Add "about": ${what}, in 500 characters or fewer`);
     text('about', m.about, 500, `${what}, in 500 characters or fewer`);
   }
@@ -108,17 +123,7 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
         if (!/\.(png|jpe?g|webp|mp4|webm)$/i.test(p as string)) throw bad(`media[${n}]`, `${show(p)} must end in .png, .jpg, .jpeg, .webp, .mp4 or .webm`, 'Post a screenshot or recording in one of those formats');
       });
     }
-    if (Object.hasOwn(m, 'run')) {
-      const r = m.run;
-      if (!r || typeof r !== 'object' || Array.isArray(r)) throw bad('run', 'must be an object', `Set "run" to {${RUN.map(show).join(', ')}}`);
-      const odd = Object.keys(r).find((f) => !RUN.includes(f));
-      if (odd !== undefined) throw bad(`run.${escaped(odd) || '""'}`, 'is not a field of run', `Remove ${show(odd)}; run has only ${RUN.join(', ')}`);
-      const missing = RUN.find((f) => !Object.hasOwn(r, f));
-      if (missing) throw bad(`run.${missing}`, 'is required', `Add "${missing}" to "run"`);
-      if (!isKey(r.run_id)) throw bad('run.run_id', 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "run_id" to the done-done run id');
-      if (!(typeof r.commit === 'string' && /^[a-f0-9]{40}$/.test(r.commit))) throw bad('run.commit', 'must be a full 40-character lowercase commit', 'Set "commit" to the full hash, such as the output of git rev-parse HEAD');
-      for (const f of RUN.slice(2)) text(`run.${f}`, r[f], 1000, `the run's ${f} Checks line, in 1000 characters or fewer`);
-    }
+    if (Object.hasOwn(m, 'run')) checkRun(RUN);
     return { kind: m.kind, schema: m.schema };
   }
   if (m.kind === 'report') {
@@ -131,12 +136,16 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
     if (Object.hasOwn(m, 'decided')) text('decided', m.decided, 200, 'what was decided, in 200 characters or fewer, or leave it out');
     return { kind: m.kind, schema: m.schema };
   }
+  if (m.kind === 'gate') {
+    if (!Object.hasOwn(m, 'run')) throw bad('run', 'is required', 'Add "run": {"run_id": "<done-done run id>", "commit": "<full commit>"}, the run held for approval');
+    checkRun(RUN.slice(0, 2));
+  }
   if (Object.hasOwn(m, 'about')) text('about', m.about, 500, 'a short note, or leave it out');
   if (Object.hasOwn(m, 'detail')) text('detail', m.detail, 1000, 'the longer note, or leave it out');
-  const options = m.options;
-  if (!Array.isArray(options) || options.length < 2 || options.length > 6) {
-    throw bad('options', Object.hasOwn(m, 'options') ? 'must list 2 to 6 options' : 'is required', 'Set "options" to 2-6 objects such as {"value":"yes","label":"Yes"}');
-  }
+  // A gate offers 2 or 3 of done-done's actions, in any order, each with its own label.
+  const options = m.options, max = m.kind === 'gate' ? 3 : 6, gate = Object.entries(GATE).map(([value, label]) => show({ value, label })).join(', ');
+  const listed = m.kind === 'gate' ? `Set "options" to 2 or 3 of ${gate}` : 'Set "options" to 2-6 objects such as {"value":"yes","label":"Yes"}';
+  if (!Array.isArray(options) || options.length < 2 || options.length > max) throw bad('options', Object.hasOwn(m, 'options') ? `must list ${max === 3 ? '2 or 3' : '2 to 6'} options` : 'is required', listed);
   options.forEach((o: any, n: number) => {
     const field = `options[${n}]`;
     if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad(field, 'must be an object', 'Write each option as {"value":"<id>","label":"<text>"}');
@@ -146,6 +155,8 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
     if (options.slice(0, n).some((p: any) => p.value === o.value)) throw bad(`${field}.value`, `repeats ${o.value}`, 'Give every option its own value');
     text(`${field}.label`, o.label, 80, 'the button text, in 80 characters or fewer');
   });
+  const odd = m.kind === 'gate' && options.find((o: any) => !Object.hasOwn(GATE, o.value) || GATE[o.value] !== o.label);
+  if (odd) throw bad('options', `${show(odd)} is not a gate action: ${Object.keys(GATE).join(', ')}, each with its label`, listed);
   const values = options.map((o: any) => o.value), pick = `the option you would pick: one of ${values.join(', ')}`;
   if (!Object.hasOwn(m, 'recommend_value')) throw bad('recommend_value', 'is required', `Add "recommend_value": ${show(values[0])}, ${pick}`);
   if (!values.includes(m.recommend_value)) throw bad('recommend_value', `${show(m.recommend_value)} is not an option value`, `Set "recommend_value" to ${pick}`);
