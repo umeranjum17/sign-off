@@ -112,10 +112,10 @@ examples:
 Blocks until the user answers, then prints the answer the way answers does. Use it instead of a polling loop.
   --filer    only the items posted with this --filer (or SIGN_OFF_FILER): returns every answer to them this filer has not taken yet,
              even one saved before wait started, and marks it taken, so the board shows "Seen by agent" on that card;
-             NOT_FOUND when none of them is answered or waiting. Without --filer or SIGN_OFF_FILER, wait takes no filer
+             NOT_FOUND when none of them is unanswered. Without --filer or SIGN_OFF_FILER, wait takes no filer
   --key      wait for that decision; an answer saved before wait starts returns at once
              and a key not raised yet is waited for too
-             without --key, wait for the next answer to any decision still waiting; NOT_FOUND when nothing is
+             without --key, wait for the next answer to any decision still unanswered; NOT_FOUND when nothing is
   --timeout  seconds to wait, 600 (10 minutes) by default; then exits 1 with code TIMEOUT
   --full     adds the button label, close and title
   --json     {"<key>":{"answer","label","close","at","note"?}} for the new answers; note only when the user wrote one

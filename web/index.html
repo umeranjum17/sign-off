@@ -128,7 +128,7 @@
   /* Tall enough for the tallest column, six dots under its count, so no count reaches the caption above. */
   .day { position: relative; height: 6.5rem; border-bottom: 1px solid var(--border); }
   .col { position: absolute; bottom: 0.25rem; display: flex; flex-direction: column-reverse; align-items: center; gap: 0.1875rem; transform: translateX(-50%);
-    font-size: 0.8125rem; font-weight: 700; line-height: 1.2; }
+    font-size: 0.8125rem; font-weight: 700; line-height: 1.2; overflow-wrap: normal; }
   .dot { width: 0.625rem; height: 0.625rem; border-radius: 50%; background: var(--c-answered); }
   .hours { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
   .events { list-style: none; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.25rem; font-size: 0.9375rem; }

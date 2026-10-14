@@ -904,17 +904,20 @@ test('a long answer at 390 px sits under its long title, which keeps most of the
 });
 
 // The Summary at 390 with 1, 10 and 100 answers today, as on the captain's phone: one answer at 8:00 and the rest at 9:30, and at
-// 100 all of them in one column. The Answered count stays on one line at its full width while its checks give way; each Today
-// column carries its own count, the counts add up to the caption, and none reaches the caption or another label.
-test('Summary at 390 with 1, 10 and 100 answers today: the Answered count stays whole and the Today counts add up without touching the caption', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+// 100 all of them in one column. The last board is a last-bucket one: one answer at 9:00 and ten at 9:58, so the ten sit at
+// `left: 100%`, where a wrapping count would reach the caption. The Answered count stays on one line at its full width while its
+// checks give way; each Today column carries its own count, the counts add up to the caption, and none reaches it or another label.
+test('Summary at 390 with 1, 10, 100 answers today and a last-bucket board: the Answered count stays whole and the Today counts add up without touching the caption', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const today = (h, m) => { const d = new Date(); d.setHours(h, m, 0, 0); return d.toISOString(); };
+  const cases = [{ n: 1, at: () => today(9, 30) }, { n: 10, at: (i) => (i === 0 ? today(8, 0) : today(9, 30)) }, { n: 100, at: () => today(9, 30) },
+    { n: 11, at: (i) => (i === 0 ? today(9, 0) : today(9, 58)) }];
   const seen = {}, want = {};
-  for (const n of [1, 10, 100]) {
+  for (const { n, at } of cases) {
     const dir = join(scratch, `fit-${n}`), file = join(dir, 'board.json');
     mkdirSync(dir, { recursive: true });
     const rows = Array.from({ length: n }, (_, i) => ({ key: `q${i}`, title: `Question ${i}?`, options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }] }));
     writeFileSync(file, JSON.stringify({ schema: 2, items: rows }));
-    writeFileSync(file.replace(/\.json$/, '.answers.jsonl'), rows.map((d, i) => JSON.stringify({ key: d.key, answer: 'yes', label: 'Yes', close: 'done', at: n === 10 && i === 0 ? today(8, 0) : today(9, 30) })).join('\n') + '\n');
+    writeFileSync(file.replace(/\.json$/, '.answers.jsonl'), rows.map((d, i) => JSON.stringify({ key: d.key, answer: 'yes', label: 'Yes', close: 'done', at: at(i) })).join('\n') + '\n');
     const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
     procs.push(proc);
     const url = /url: "(\S+)"/.exec(await served(proc))[1];
@@ -922,7 +925,7 @@ test('Summary at 390 with 1, 10 and 100 answers today: the Answered count stays 
     await evaluate(`location.href = ${JSON.stringify(url)}`);
     await until(async () => (await evaluate(`document.querySelector('.tile.i-answered .n')?.textContent === '${n}' && !!document.querySelector('.day')`)));
     seen[n] = await evaluate(`[${SQUASH}, document.querySelector('.today .sec-head .meta').textContent, [...document.querySelectorAll('.col')].map((c) => c.textContent)]`);
-    want[n] = [[], `${n} answered, ${n === 10 ? '8:00 to 10:00' : '9:00 to 10:00'}`, n === 10 ? ['1', '9'] : [String(n)]];
+    want[n] = [[], `${n} answered, ${n === 10 ? '8:00' : '9:00'} to 10:00`, n === 10 ? ['1', '9'] : n === 11 ? ['1', '10'] : [String(n)]];
     close();
     proc.kill();
   }
