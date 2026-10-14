@@ -162,7 +162,7 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     const linkedList = join(home, 'linked-providers'), linkPath = new URL(url).pathname;
     for (const [label, list, mode = 0o600] of [['no file'], ['mode 0644', 'npm https://www.npmjs.com\n', 0o644], ['symlinked list'], ['comments only', '# npm https://www.npmjs.com\n'],
       ...['https://www.npmjs.cöm', 'http://www.npmjs.com', 'https://127.0.0.1', 'https://[::1]', 'https://localhost', 'https://www.npmjs.com.', 'https://u@www.npmjs.com', 'https://www.npmjs.com/login',
-        'https://www.npmjs.com:443', 'https://WWW.npmjs.com', 'https://www.npmjs.com extra', 'https://www.npmjs.com\nnpm https://www.npmjs.com', 'https://www.npmjs.com\nbad line'].map((l) => [l, `npm ${l}\n`])]) {
+        'https://www.npmjs.com:443', 'https://WWW.npmjs.com', 'https://www.npmjs.com:8443', 'https://www.npmjs.com extra', 'https://www.npmjs.com\nnpm https://www.npmjs.com', 'https://www.npmjs.com\nbad line'].map((l) => [l, `npm ${l}\n`])]) {
       rmSync(providers, { force: true });
       if (label === 'symlinked list') { writeFileSync(linkedList, 'npm https://www.npmjs.com\n', { mode: 0o600 }); symlinkSync(linkedList, providers); }
       else if (list) writeFileSync(providers, list, { mode });

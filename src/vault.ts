@@ -113,7 +113,7 @@ function approvedProviders() {
   for (const line of text.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'))) {
     const [name, origin, extra] = line.split(/\s+/);
     let host = '';
-    try { const u = new URL(origin); if (u.protocol === 'https:' && u.origin === origin) host = u.hostname; } catch { /* denied below */ }
+    try { const u = new URL(origin); if (u.protocol === 'https:' && u.origin === origin && !u.port) host = u.hostname; } catch { /* denied below */ }
     if (extra !== undefined || !isKey(name) || sites.has(name) || !host.includes('.') || host.endsWith('.') || isIP(host)) bad('VALIDATION_ERROR');
     sites.set(name, origin);
   }
