@@ -508,7 +508,7 @@ test('disabled vault custody across real processes: encryption, racing deposits,
         }
         finally { chmodSync(home, 0o700); rmSync(join(home, '.git'), { force: true, recursive: true }); }
       }
-      assert.equal(existsSync(waitState), false);
+      assert.equal(existsSync(waitState), false); assert.equal(existsSync(join(waitFolder, '.sign-off-vault-id')), false);
       await create('elsewhere', 'receive', 'filer-f', Date.now() + 3_600_000, ob);
       const quiet = await waitCli(wb, 'filer-f', ['--timeout', '0']); assert.match(quiet.out, /^code: NOT_FOUND$/m); assert.equal(quiet.err, ''); assert.equal(existsSync(join(waitFolder, '.sign-off-vault-id')), false);
       const deadline = Date.now() + 5_000;
@@ -572,7 +572,7 @@ test('disabled vault custody across real processes: encryption, racing deposits,
       assert.match((await waitCli(wb, 'filer-k', ['--key', 'k-late', '--timeout', '1'])).out, /^code: TIMEOUT$/m);
       // Custody held: the keyed wait reports unknown custody once and keeps waiting.
       const keyedLock = join(waitState, 'sign-off', 'vault', 'lock'); writeFileSync(keyedLock, 'owned keyed lock', { mode: 0o600 });
-      try { const r = await waitCli(wb, 'filer-k', ['--key', 'k-refused', '--timeout', '1']); assert.match(r.out, /^code: TIMEOUT$/m); assert.equal(r.err, vaultWarning); } finally { rmSync(keyedLock); }
+      try { const r = await waitCli(wb, 'filer-k', ['--key', 'k-refused', '--timeout', '1']); assert.match(r.out, /^code: TIMEOUT$/m); assert.equal(r.err, vaultWarning); assert.equal(readFileSync(keyedLock, 'utf8'), 'owned keyed lock'); } finally { rmSync(keyedLock); }
       // Ordinary answers come first and keep exit 0; the vault expiry follows on the next wait.
       const ask = (key, filer) => ({ key, title: 'Umer: continue?', filer, options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }] });
       const answer = (key) => writeFileSync(wb.replace(/\.json$/, '.answers.jsonl'), `${JSON.stringify({ key, answer: 'yes', label: 'Yes', close: 'done', at: '2026-10-14T00:00:00Z' })}\n`, { flag: 'a' });
