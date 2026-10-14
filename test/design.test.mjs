@@ -1063,6 +1063,15 @@ test('an answers-only board fed through post --replace: a bad item is refused, y
   const reused = run('raise', file, '--key', 'ask-2', '--title', 'Something else?');
   assert.equal(reused.code, 1);
   assert.match(reused.out, /key ask-2 already has a saved answer/);
+  // A single-item post is checked against the board it goes to: on this answers-only board an evidence update and an item only shown both post.
+  assert.equal(scoped([page]).code, 0);
+  const shot = join(dir, 'shot.png');
+  writeFileSync(shot, png);
+  assert.match(run('post', file, '--type', 'evidence', '--title', 'Sign-in screen', '--about', 'The screen loads.', '--media', shot).out, /update-1,1,1/);
+  writeFileSync(feed, JSON.stringify({ schema: 2, items: [{ ...page, key: 'look', title: 'Look' }] }));
+  assert.match(run('post', file, '--from', feed).out, /look,raised/);
+  const posted = JSON.parse(readFileSync(file, 'utf8'));
+  assert.deepEqual([posted.answers_only, posted.items.find((i) => i.key === 'page').options], [true, []]);
   proc.kill();
 });
 

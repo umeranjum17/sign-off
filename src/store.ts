@@ -77,8 +77,9 @@ export function writeItems(path: string, items: object[], extra?: Record<string,
   renameSync(tmp, path);
 }
 
-export function loadDecisions(path: string): Decision[] {
-  const name = basename(path), { schema, items, extra } = readItems(path), list = schema === 1 ? 'decisions' : 'items';
+/** `board`: the top-level fields of the board the items are posted to, which decide in place of the file's own. */
+export function loadDecisions(path: string, board?: Record<string, unknown>): Decision[] {
+  const name = basename(path), { schema, items, extra: own } = readItems(path), list = schema === 1 ? 'decisions' : 'items', extra = board ?? own;
   const fed = extra.readonly === true || extra.answers_only === true;
   const seen = new Map<string, number>();
   return items.map((d: any, i: number): Decision => {
