@@ -124,7 +124,7 @@ One per kind, each written on one line here. Demo data uses the name Umer.
 
 ## 7. Answers
 
-- `wait --filer <id>` without `--key` returns the answers to that filer's items it has not taken yet. Each answer is taken once; a changed answer is new again. Another-round asks wake it too: the person taps **Another round** on an answered item and types a note.
+- `wait --filer <id>` without `--key` returns the answers to that filer's items it has not taken yet. With `--key`, it returns that key's answer even if it was taken before. Either way it marks each answer it returns as taken, so a later `wait --filer <id>` without `--key` does not return it again. Each answer is taken once; a changed answer is new again. Another-round asks wake it too: the person taps **Another round** on an answered item and types a note.
 - `wait --filer <id> --events` prints one event line per answer and per another-round ask:
 
   ```json
