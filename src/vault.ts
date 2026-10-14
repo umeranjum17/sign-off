@@ -192,20 +192,25 @@ export async function sweepVault(board: string) {
     });
   } catch { return false; }
 }
-/** Private, replayable expiry observation; never a payload or public answer consumer. */
-export async function readVaultExpiry(board: string, key: string, filer: string): Promise<VaultExpiry | undefined> {
+/** Replayable expiry observation; never a payload consumer. The public keyed wait (`publicWait`) also expires its own item on access,
+ * gets a refusal as an event and tries the lock once; the private observer neither produces nor reports refusals as events. */
+export async function readVaultExpiry(board: string, key: string, filer: string, publicWait = false): Promise<VaultExpiry | undefined> {
   if (!isKey(key) || !isKey(filer)) bad('VALIDATION_ERROR');
   try {
-    const { file, dir } = custody(board, false);
+    // Never used: silent before any custody or permission walk.
+    const file = boardFile(board);
+    if (!lstatSync(join(stateHome(), 'sign-off', 'vault'), { throwIfNoEntry: false }) || !lstatSync(join(dirname(file), '.sign-off-vault-id'), { throwIfNoEntry: false })) return;
+    const { dir } = custody(board, false);
     if (!dir) return;
     return await lockedVault(dir, () => {
       if (!lstatSync(join(dirname(file), '.sign-off-vault-id'), { throwIfNoEntry: false })) return;
-      const { id, record } = boundRecord(file, dir, key, false);
+      const { id, path, record } = boundRecord(file, dir, key, false);
       if (!record) return;
       if (record.meta.filer !== filer) bad('READER_MISMATCH');
-      if (record.status === 'refused') bad('REFUSED');
-      return record.status === 'expired' ? expiryEvent(id, record) : undefined;
-    });
+      if (record.status === 'refused' && !publicWait) bad('REFUSED');
+      const current = publicWait ? expire(path, record) : record;
+      return current.status === 'expired' || current.status === 'refused' ? expiryEvent(id, current) : undefined;
+    }, publicWait ? 1 : 50);
   } catch (e) { throw e instanceof VaultError ? e : new VaultError('BUSY'); }
 }
 /** For an ordinary filer wait: expires this filer's elapsed items in the board's folder, then takes each untaken expiry or refusal once.

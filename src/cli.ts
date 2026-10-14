@@ -13,7 +13,7 @@ import { AxiError, runAxiCli } from 'axi-sdk-js';
 import { type Answer, CHAPTERS_MAX, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, checkMessage, mediaFiles, parseMessage } from './contract.js';
-import { errors, sweepVault, takeVaultExpiries } from './vault.js';
+import { errors, readVaultExpiry, sweepVault, takeVaultExpiries } from './vault.js';
 
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
 const CONTRACT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/contract.md';
@@ -458,6 +458,14 @@ async function wait(args: string[]) {
         if ((!vault || !vault.clean) && !vaultWarned) { vaultWarned = true; warn('Vault expiry status unavailable; ordinary answers still arrive.'); }
         if (vault?.events.length) return vaultExpired(file, vault.events, values);
         live = vault?.live ?? 0;
+      }
+      // A keyed filer wait reads its own item's expiry or refusal, unless one of its board rows already holds the key.
+      if (filer !== undefined && values.key !== undefined && isKey(values.key) && !rows.some((d) => d.key === values.key)) {
+        let event;
+        try { event = await readVaultExpiry(file, values.key, filer, true); } catch (e: any) {
+          if (e?.code !== 'READER_MISMATCH' && !vaultWarned) { vaultWarned = true; warn('Vault expiry status unavailable; ordinary answers still arrive.'); }
+        }
+        if (event) return vaultExpired(file, [{ key: values.key, at: event.at, status: event.status }], values);
       }
       if (values.key === undefined && !waiting && !live && !unknown) {
         throw fail(`nothing${filer ? ` posted by ${filer}` : ''} is waiting on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi answers${onBoard}\` to read the saved answers`, `Run \`sign-off-axi raise${on} --title "<question>"\` to ask a new one`);
