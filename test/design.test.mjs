@@ -833,8 +833,8 @@ test('Clear all done on 201 answered items, set two across on a wide screen: the
 });
 
 // SQUASH from the verify skill: no visible element holding more than 8 characters of its own text is narrower than 8 characters of its font.
-const SQUASH = `[...document.querySelectorAll('body *')].filter((e) => { const t = [...e.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('').trim(), w = e.getBoundingClientRect().width;
-  return t.length > 8 && w > 0 && w < 8 * parseFloat(getComputedStyle(e).fontSize) * 0.5; }).map((e) => e.textContent.trim().slice(0, 40))`;
+const SQUASH = `[...document.querySelectorAll('body *')].filter((e) => { const t = [...e.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('').trim();
+  return t.length > 8 && e.checkVisibility({ visibilityProperty: true }) && e.getBoundingClientRect().width < 8 * parseFloat(getComputedStyle(e).fontSize) * 0.5; }).map((e) => e.textContent.trim().slice(0, 40))`;
 
 test('a long answer at 390 px sits under its long title, which keeps most of the row and wraps by words, on Answered and the Summary', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'squash'), file = join(dir, 'board.json'), long = 'A (recommended): you sign in to npm once (1 tap); no key stored anywhere';
@@ -852,10 +852,10 @@ test('a long answer at 390 px sits under its long title, which keeps most of the
   for (const [hash, h1] of [['', 'Summary'], ['#answered', 'Answered']]) {
     await evaluate(`location.href = ${JSON.stringify(url + hash)}`);
     await until(async () => (await evaluate(`document.querySelector('h1')?.textContent === '${h1}' && !!document.querySelector('.compact .ans')`)));
+    assert.deepEqual(await evaluate(SQUASH), [], h1);
     const [[share, line], ...more] = await evaluate(rows);
     assert.equal(more.length, 0, h1);
     assert.ok(share > 0.75 && line > 1, `${h1}: the title takes ${Math.round(share * 100)}% of the row, its narrowest line ${line.toFixed(1)} em`);
-    assert.deepEqual(await evaluate(SQUASH), [], h1);
   }
   close();
   proc.kill();
