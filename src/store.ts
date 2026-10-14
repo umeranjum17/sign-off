@@ -168,17 +168,20 @@ export const roundsPath = (decisionsPath: string) => decisionsPath.replace(/\.js
 const readRaw = (file: string) => (existsSync(file) ? readFileSync(file, 'utf8') : '');
 /** Latest answer per key; a line with an empty answer (an Undo with nothing to go back to) leaves the key unanswered. A torn line (a crash mid-write) is skipped and reported through warn. */
 export function readAnswers(decisionsPath: string, warn: (msg: string) => void = () => {}): Record<string, Answer> {
-  const latest = new Map<string, Answer>();
+  const latest = new Map<string, Answer>(), sent = new Map<string, Sent[]>();
   readRaw(answersPath(decisionsPath)).split('\n').forEach((line, n) => {
     try {
       const a = line && JSON.parse(line);
       if (a?.answer === '') latest.delete(a.key);
-      else if (a) latest.set(a.key, a);
+      else if (a) {
+        latest.set(a.key, a);
+        if (a.comments) sent.set(a.key, [...(sent.get(a.key) ?? []), ...a.comments]);
+      }
     } catch {
       warn(`skipped unreadable line ${n + 1} in ${answersPath(decisionsPath)}`);
     }
   });
-  return Object.fromEntries(latest);
+  return Object.fromEntries([...latest].map(([key, a]) => [key, sent.has(key) ? { ...a, comments: sent.get(key) } : a]));
 }
 
 /** The option an Undo saves when the item had no answer before: an empty answer, so the item waits again. */

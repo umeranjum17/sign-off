@@ -393,7 +393,7 @@
     const drop = clearIfSaved(d.key, drafts.get(d.key));
     call('/api/answers', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
-    }, typed ? undefined : drop).then(() => offerUndo(d, before)).then(() => typed && call('/api/messages', {
+    }, () => { editing.delete(d.key); if (!typed) drop(); }).then(() => offerUndo(d, before)).then(() => typed && call('/api/messages', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'comment', key: d.key, text: typed }),
     }, drop)).catch((e) => {
       shown(err).textContent = `Couldn't save: ${e.message}`;
@@ -562,9 +562,10 @@
     roundBtn.onclick = () => {
       roundBtn.disabled = true;
       const note = (drafts.get(d.key) ?? noteOf(d)).trim();
+      const drop = clearIfSaved(d.key, drafts.get(d.key));
       call('/api/rounds', {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, note }),
-      }, clearIfSaved(d.key, drafts.get(d.key))).catch((e) => {
+      }, () => { editing.delete(d.key); drop(); }).catch((e) => {
         shown(err).textContent = `Couldn't ask: ${e.message}`;
         roundBtn.disabled = false;
       });
@@ -719,7 +720,7 @@
     });
     return el('div', { class: 'ann', 'data-ann': d.key }, pages.length ? el('div', { class: 'actions' }, toggle) : '',
       on ? el('p', { class: 'meta' }, 'Tap an element in a mock to comment on it. Turn this off to open a mock full size.') : '', form, ...(rows.length ? [el('p', { class: 'meta' }, 'Your comments on the mocks, not sent yet'), el('ul', {}, ...rows), el('p', { class: 'meta' }, 'They go with your pick, your Other answer or Another round.')] : []),
-      ...(sent.length ? [el('p', { class: 'meta' }, 'Sent with your answer'), el('ul', {}, ...sent)] : []),
+      ...(sent.length ? [el('p', { class: 'meta' }, 'Sent to the agent'), el('ul', {}, ...sent)] : []),
       ...[...old].map(([m, n]) => el('p', { class: 'meta' }, `${n} comment${n > 1 ? 's' : ''} on an earlier version of “${name(m)}” ${n > 1 ? 'are' : 'is'} hidden`)), err);
   }
 

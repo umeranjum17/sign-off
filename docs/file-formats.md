@@ -216,7 +216,7 @@ also copies each file into `evidence/<number>/` next to the board:
   leaves the key unanswered, so the item waits again. An `on_answer:` command gets that line too.
 - `note`: present only when the person typed one. Optional free text, trimmed, up to 500 characters, sent with the click. Picking the same answer again with a changed note adds a new line; clearing the note and clicking again removes it. Lines without `note` (all lines written before notes existed) read as before.
 - `comments`: present only when the answer carried comments on mock elements (below): each as `id`, `mock`, `hash`, `ref`, `tag`, `words` and `text`, as it was sent.
-- `sign-off-axi answers --json` prints the same fields per key, without `key`, and adds `note` and `comments` only when the latest line has them. The default output lists every sent comment in one `comments` table with its `key`.
+- `sign-off-axi answers --json` prints the same fields per key, without `key`, and adds `note` only when the latest line has one; `comments` holds every comment sent with any answer line for the key, so a later pick or Undo does not hide them. The default output lists every sent comment in one `comments` table with its `key`.
 
 `*.answers.jsonl` is git-ignored here so an answer is never committed by accident.
 

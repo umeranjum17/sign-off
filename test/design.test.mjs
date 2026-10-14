@@ -691,7 +691,7 @@ test('comments on mock elements: one per element, kept across a reload, edited a
   // Sent, it is the agent's: listed without Edit or Delete, and the server refuses to change it. The picked card is under Answered.
   await evaluate("window.old = true, location.hash = 'answered', location.reload()");
   await until(() => evaluate("!window.old && !!document.querySelector('details.done') && (document.querySelector('details.done').open = true)"));
-  assert.deepEqual(await evaluate(`[[...document.querySelectorAll('.ann p.meta')].map((p) => p.textContent).includes('Sent with your answer'), !!(${button('Edit')})]`), [true, false]);
+  assert.deepEqual(await evaluate(`[[...document.querySelectorAll('.ann p.meta')].map((p) => p.textContent).includes('Sent to the agent'), !!(${button('Edit')})]`), [true, false]);
   assert.equal(await status('api/annotations', { id: sent.id, deleted: true }), 409);
   // The same element again is a new draft, and Another round with no note carries only it.
   assert.equal(await write('Bigger still'), '');
@@ -699,6 +699,10 @@ test('comments on mock elements: one per element, kept across a reload, edited a
   assert.deepEqual(JSON.parse(run('answers', file, '--json').out).look.rounds[0].comments.map((c) => c.text), ['Bigger still']);
   assert.match(run('answers', file).out, /comments\[2\]\{key,mock,ref,tag,words,text\}:\n\s+look,a,"body > button:nth-of-type\(1\)",button,Sign in,Make the words bigger\n\s+look,a,.*Bigger still/);
   close();
+  // A later pick supersedes the answer, but the comments it carried still reach the agent.
+  assert.equal(await status('api/answers', { key: 'look', answer: 'b' }), 200);
+  const later = JSON.parse(run('answers', file, '--key', 'look', '--json').out).look;
+  assert.deepEqual([later.answer, later.comments.map((c) => c.text)], ['b', ['Make the words bigger']]);
   // The page asks nothing the server takes on trust: no text, an option with no page, and a read-only board are refused.
   const post = (body) => fetch(`${url}api/annotations`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.status);
   const current = createHash('sha256').update(readFileSync(mockA)).digest('hex');
