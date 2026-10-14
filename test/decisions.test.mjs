@@ -209,11 +209,11 @@ test('three dismissed updates are not waiting on the CLI either: list and answer
   assert.equal((await post(url, { key: 'ship-the-new-sign-in-screen', answer: 'yes' })).status, 200);
   assert.match(run('list', board).out, /answered: 1/);
   assert.equal((await dismiss(['ship-the-new-sign-in-screen'])).status, 200);
-  // The CLI agrees: nothing is waiting or answered in list, answers is not waiting, --full and --json say dismissed.
+  // The CLI agrees: nothing is waiting or answered in list, answers is not waiting, --full keeps a dismissed answer and --json says dismissed.
   assert.match(run('list', board).out, /waiting: 0 of 4 decisions \(nothing is waiting on the user\)/);
   assert.match(run('list', board).out, /answered: 0/);
   assert.match(run('answers', board).out, /waiting: 0/);
-  assert.deepEqual([...run('list', board, '--full').out.matchAll(/(?:update-\d|ship-the-new-sign-in-screen),(\w+)/g)].map((m) => m[1]), ['dismissed', 'dismissed', 'dismissed', 'dismissed']);
+  assert.deepEqual([...run('list', board, '--full').out.matchAll(/(?:update-\d|ship-the-new-sign-in-screen),(\w+)/g)].map((m) => m[1]), ['dismissed', 'dismissed', 'dismissed', 'yes']);
   assert.deepEqual(JSON.parse(run('list', board, '--json').out).decisions.map((d) => d.dismissed), [true, true, true, true]);
   // A dismissed, unanswered ask is hidden from the board, not withdrawn: raising it again still reports it waiting.
   assert.equal(run('raise', board, '--title', 'Keep the weekly digest email?', '--recommend', 'yes').code, 0);
