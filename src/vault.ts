@@ -38,7 +38,7 @@ function boardFile(board: unknown) {
 // Never used: callers stay silent with no permission walk, lock or state creation.
 const unused = (file: string) => {
   try { return !lstatSync(join(stateHome(), 'sign-off', 'vault'), { throwIfNoEntry: false }) || !lstatSync(join(dirname(file), '.sign-off-vault-id'), { throwIfNoEntry: false }); }
-  catch { return true; }
+  catch (e: any) { if (e?.code === 'ENOENT' || e?.code === 'ENOTDIR') return true; throw e; }
 };
 function boardId(file: string, create: boolean) {
   const side = join(dirname(file), '.sign-off-vault-id');
@@ -365,7 +365,7 @@ export async function refuseVault(board: string, key: string) {
  * decrypts again. */
 export async function deliverVault(board: string, key: string, filer: string, into: string, afterClaim?: () => void) {
   if (!isKey(key) || !isKey(filer) || typeof into !== 'string' || !plain(into)) bad('VALIDATION_ERROR');
-  if (unused(boardFile(board))) return undefined;
+  try { if (unused(boardFile(board))) return undefined; } catch (e) { throw e instanceof VaultError ? e : new VaultError('BUSY'); }
   return operate(board, key, false, (dir, path, old) => {
     if (old && old.meta.filer !== filer) bad('READER_MISMATCH');
     const r = active(old);
