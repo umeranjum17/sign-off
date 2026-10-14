@@ -7,20 +7,24 @@ import { isKey, MEDIA_MAX } from './store.js';
 export class ContractError extends Error {
   constructor(message: string, readonly help: string) { super(message); }
 }
-export const KINDS = ['ask', 'report', 'evidence', 'gate', 'finding'];
-/** The kinds this build checks, with the schema number of each. */
-export const SCHEMAS: Record<string, number> = { ask: 1, report: 1, evidence: 1, gate: 1 };
+/** The kinds, with the schema number of each. */
+export const SCHEMAS: Record<string, number> = { ask: 1, report: 1, evidence: 1, gate: 1, finding: 1 };
+export const KINDS = Object.keys(SCHEMAS);
 const COMMON = ['contract', 'kind', 'schema', 'key', 'title', 'filer', 'link', 'about'];
 const FIELDS: Record<string, string[]> = {
   ask: [...COMMON, 'detail', 'options', 'recommend_value', 'default_if_silent', 'close'],
   report: [...COMMON, 'filed', 'group', 'decided'],
   evidence: [...COMMON, 'media', 'run'],
   gate: [...COMMON, 'run', 'options', 'recommend_value', 'close'],
+  finding: [...COMMON, 'cause', 'incidents', 'days', 'evidence_ids', 'change_kind', 'proposal', 'options', 'recommend_value'],
 };
 /** A done-done run: its id, full commit and the four Checks lines. */
 const RUN = ['run_id', 'commit', 'outcome', 'repro', 'proof', 'evidence'];
-/** A gate's options: the actions of done-done respond --action, each with its one label. */
-const GATE: Record<string, string> = { approve: 'Approve', skip: 'Skip the judge', fix: 'Fix first' };
+/** The fixed options of a kind, each with its one label: a gate's are the actions of done-done respond --action. */
+const ACTIONS: Record<string, Record<string, string>> = {
+  gate: { approve: 'Approve', skip: 'Skip the judge', fix: 'Fix first' },
+  finding: { apply: 'Apply', skip: 'Skip' },
+};
 export const MEDIA_BYTES = 50_000_000;
 
 /** Parses one message; a field written twice in any object refuses it, since plain JSON.parse keeps the last one quietly. */
@@ -93,7 +97,6 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
   need('kind');
   if (!KINDS.includes(m.kind)) throw bad('kind', `must be one of ${KINDS.join(', ')}, not ${show(m.kind)}`, `Set "kind" to one of ${KINDS.join(', ')}`);
   if (want !== undefined && m.kind !== want) throw bad('kind', `is ${m.kind}, not --kind ${want}`, `Pass --kind ${m.kind}, or name the ${want} message file`);
-  if (!SCHEMAS[m.kind]) throw bad('kind', `${m.kind} is not checked by this sign-off-axi yet`, `Upgrade sign-off-axi to a version that checks ${m.kind}`);
   need('schema');
   if (!whole(m.schema)) throw bad('schema', `must be a whole number, not ${show(m.schema)}`, `Set "schema": ${SCHEMAS[m.kind]}`);
   if (m.schema !== SCHEMAS[m.kind]) throw bad('schema', `${m.schema} of ${m.kind} is not in this sign-off-axi`, `Upgrade sign-off-axi, or post ${m.kind} schema ${SCHEMAS[m.kind]}`);
@@ -109,7 +112,7 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
       'Set "link" to a URL such as "https://example.com/pr/4" or a commit hash, or leave it out');
   }
   if (m.kind !== 'ask') {
-    const what = ({ report: 'what happened', gate: 'why the run is held' } as Record<string, string>)[m.kind] ?? 'what this shows';
+    const what = ({ report: 'what happened', gate: 'why the run is held', finding: 'the counts, with no record text' } as Record<string, string>)[m.kind] ?? 'what this shows';
     if (!Object.hasOwn(m, 'about')) throw bad('about', 'is required', `Add "about": ${what}, in 500 characters or fewer`);
     text('about', m.about, 500, `${what}, in 500 characters or fewer`);
   }
@@ -138,10 +141,11 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
   }
   if (Object.hasOwn(m, 'about')) text('about', m.about, 500, 'a short note, or leave it out');
   if (Object.hasOwn(m, 'detail')) text('detail', m.detail, 1000, 'the longer note, or leave it out');
-  // A gate offers 2 or 3 of done-done's actions, in any order, each with its own label.
-  const options = m.options, max = m.kind === 'gate' ? 3 : 6, gate = Object.entries(GATE).map(([value, label]) => show({ value, label })).join(', ');
-  const listed = m.kind === 'gate' ? `Set "options" to 2 or 3 of ${gate}` : 'Set "options" to 2-6 objects such as {"value":"yes","label":"Yes"}';
-  if (!Array.isArray(options) || options.length < 2 || options.length > max) throw bad('options', Object.hasOwn(m, 'options') ? `must list ${max === 3 ? '2 or 3' : '2 to 6'} options` : 'is required', listed);
+  // A gate offers 2 or 3 of done-done's actions and a finding both of apply and skip, in any order, each with its own label.
+  const options = m.options, actions = ACTIONS[m.kind], max = actions ? Object.keys(actions).length : 6;
+  const named = actions && Object.entries(actions).map(([value, label]) => show({ value, label })).join(', ');
+  const listed = !actions ? 'Set "options" to 2-6 objects such as {"value":"yes","label":"Yes"}' : max === 3 ? `Set "options" to 2 or 3 of ${named}` : `Set "options" to ${named}`;
+  if (!Array.isArray(options) || options.length < 2 || options.length > max) throw bad('options', Object.hasOwn(m, 'options') ? `must list ${({ 2: '2', 3: '2 or 3' } as Record<number, string>)[max] ?? '2 to 6'} options` : 'is required', listed);
   options.forEach((o: any, n: number) => {
     const field = `options[${n}]`;
     if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad(field, 'must be an object', 'Write each option as {"value":"<id>","label":"<text>"}');
@@ -151,8 +155,8 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
     if (options.slice(0, n).some((p: any) => p.value === o.value)) throw bad(`${field}.value`, `repeats ${o.value}`, 'Give every option its own value');
     text(`${field}.label`, o.label, 80, 'the button text, in 80 characters or fewer');
   });
-  const odd = m.kind === 'gate' && options.find((o: any) => !Object.hasOwn(GATE, o.value) || GATE[o.value] !== o.label);
-  if (odd) throw bad('options', `${show(odd)} is not a gate action: ${Object.keys(GATE).join(', ')}, each with its label`, listed);
+  const odd = actions && options.find((o: any) => !Object.hasOwn(actions, o.value) || actions[o.value] !== o.label);
+  if (odd) throw bad('options', `${show(odd)} is not a ${m.kind} action: ${Object.keys(actions).join(', ')}, each with its label`, listed);
   const values = options.map((o: any) => o.value), pick = `the option you would pick: one of ${values.join(', ')}`;
   if (!Object.hasOwn(m, 'recommend_value')) throw bad('recommend_value', 'is required', `Add "recommend_value": ${show(values[0])}, ${pick}`);
   if (!values.includes(m.recommend_value)) throw bad('recommend_value', `${show(m.recommend_value)} is not an option value`, `Set "recommend_value" to ${pick}`);
@@ -164,6 +168,23 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
   if (m.kind === 'gate') {
     if (!Object.hasOwn(m, 'run')) throw bad('run', 'is required', 'Add "run": {"run_id": "<done-done run id>", "commit": "<full commit>"}, the run held for approval');
     checkRun(RUN.slice(0, 2));
+  }
+  // A finding names its records by id only; the validator cannot see record text, so keeping it out is the producer's job.
+  if (m.kind === 'finding') {
+    const must = (f: string, ok: (v: any) => boolean, rule: string, help: string) => {
+      if (!Object.hasOwn(m, f)) throw bad(f, 'is required', help);
+      if (!ok(m[f])) throw bad(f, rule, help);
+    };
+    must('cause', (v) => typeof v === 'string' && /^[a-z0-9-]{1,64}$/.test(v), 'must be 1-64 of a-z 0-9 -', 'Set "cause" to the repeated cause, such as "missing-env"');
+    for (const f of ['incidents', 'days']) must(f, whole, 'must be a whole number, 0 or more', `Set "${f}" to a count, such as 4`);
+    must('evidence_ids', (v) => Array.isArray(v) && v.length <= 50, 'must list 0 to 50 record ids', 'Set "evidence_ids" to the ids of the records, such as ["rec-7f3a"], never their text');
+    m.evidence_ids.forEach((id: unknown, n: number) => {
+      if (!isKey(id)) throw bad(`evidence_ids[${n}]`, 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Name each record by its id, never its text');
+      if (m.evidence_ids.indexOf(id) < n) throw bad(`evidence_ids[${n}]`, `repeats ${id}`, 'List each record id once');
+    });
+    must('change_kind', (v) => ['doc', 'rule', 'code'].includes(v), 'must be doc, rule or code', 'Set "change_kind" to "doc", "rule" or "code"');
+    if (!Object.hasOwn(m, 'proposal')) throw bad('proposal', 'is required', 'Add "proposal": the change, in 500 characters or fewer');
+    text('proposal', m.proposal, 500, 'the change, in 500 characters or fewer');
   }
   return { kind: m.kind, schema: m.schema };
 }

@@ -22,6 +22,7 @@ const message = (name, text) => {
 const ask = { contract: 1, kind: 'ask', schema: 1, key: 'ship-signin-2', title: 'Ship the new sign-in screen this week?',
   options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }], recommend_value: 'yes' };
 const gate = JSON.parse(readFileSync(join(fixtures, 'gate.v1', 'valid-three-actions.json')));
+const finding = JSON.parse(readFileSync(join(fixtures, 'finding.v1', 'valid-apply.json')));
 const report = { contract: 1, kind: 'report', schema: 1, key: 'slice-5-live', title: 'Board slice 5 is live', about: 'Umer can see the new cards.', filed: '2026-10-13T07:19:00Z' };
 
 test('every shipped fixture: valid files pass, each invalid file is refused on the field its name gives', () => {
@@ -52,7 +53,14 @@ test('refusals: strict at every level, in contract order, with one fix line each
     [{ ...ask, contract: undefined }, /contract is required/, /Add "contract": 1, "kind" and "schema"/],
     [{ ...ask, schema: 2 }, /schema 2 of ask is not in this sign-off-axi/, /Upgrade sign-off-axi/],
     [{ ...ask, schema: '1' }, /schema must be a whole number/, /Set "schema": 1/],
-    [{ ...ask, kind: 'finding' }, /finding is not checked by this sign-off-axi yet/, /Upgrade sign-off-axi/],
+    [{ ...finding, options: [...finding.options, { value: 'later', label: 'Later' }] }, /options must list 2 options/, /\{"value":"apply","label":"Apply"\}, \{"value":"skip"/],
+    [{ ...finding, incidents: '4' }, /incidents must be a whole number, 0 or more/, /Set "incidents" to a count/],
+    [{ ...finding, days: 1.5 }, /days must be a whole number/, /Set "days"/],
+    [{ ...finding, cause: 'Missing-Env' }, /cause must be 1-64 of a-z 0-9 -/, /missing-env/],
+    [{ ...finding, evidence_ids: Array.from({ length: 51 }, (_, n) => `rec-${n}`) }, /evidence_ids must list 0 to 50 record ids/, /never their text/],
+    [{ ...finding, evidence_ids: ['CI failed: API_TOKEN is not set'] }, /evidence_ids\[0\] must be 1-128/, /never its text/],
+    [{ ...finding, about: undefined }, /about is required/, /the counts, with no record text/],
+    [{ ...finding, close: 'done' }, /close is not a field of finding/, /Remove "close"/],
     [{ ...gate, run: undefined, options: gate.options.slice(0, 1) }, /options must list 2 or 3 options/, /2 or 3 of \{"value":"approve","label":"Approve"\}/],
     [{ ...gate, options: [gate.options[0], { value: 'yes', label: 'Yes' }] }, /options \{"value":"yes","label":"Yes"\} is not a gate action/, /Skip the judge/],
     [{ ...gate, run: { ...gate.run, commit: 'abc1234' } }, /run\.commit must be a full 40-character/, /git rev-parse HEAD/],
@@ -364,5 +372,40 @@ test('post --kind gate: a done-done run waits for approval like an ask, its run 
   const back = cli2('', 'post', board, '--from', swapped, '--replace');
   assert.equal(back.status, 1, back.stdout);
   assert.match(back.stdout, /key dd-gate-a1b2c3d4 was answered[^]*Post it under a new key/);
+  assert.equal(readFileSync(board, 'utf8'), gone);
+});
+
+test('post --kind finding: a retro proposal waits like an ask, a changed proposal is another message, and its answer is apply or skip', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const board = join(scratch, 'finding.json'), cli2 = (input, ...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env, input });
+  const posted = cli2(JSON.stringify(finding), 'post', board, '--kind', 'finding', '--from', '-');
+  assert.equal(posted.status, 0, posted.stdout);
+  assert.match(posted.stdout, /lfm-missing-env,raised,[^]*wait .*--filer learn-from-mistakes/);
+  assert.match(cli2(JSON.stringify(finding), 'post', board, '--kind', 'finding', '--from', '-').stdout, /lfm-missing-env,already waiting,/);
+  const before = readFileSync(board, 'utf8'), [item] = JSON.parse(before).items;
+  assert.deepEqual([item.kind, item.proposal, item.evidence_ids], ['finding', finding.proposal, finding.evidence_ids]);
+  // Another proposal or count under the key is another message, from a post or a feed: exit 2, nothing written.
+  const changed = { ...finding, proposal: 'Fail fast when the env var is missing.' };
+  const feed = message('finding-feed.json', JSON.stringify({ schema: 2, items: [changed] }));
+  for (const args of [['post', board, '--kind', 'finding', '--from', '-'], ['raise', board, '--from', feed], ['post', board, '--from', message('finding-count.json', JSON.stringify({ schema: 2, items: [{ ...finding, incidents: 5 }] }))]]) {
+    const refused = cli2(JSON.stringify(changed), ...args);
+    assert.equal(refused.status, 2, refused.stdout);
+    assert.match(refused.stdout, /key lfm-missing-env already holds a different message[^]*Post it under a new key/);
+  }
+  assert.equal(readFileSync(board, 'utf8'), before);
+  appendFileSync(join(scratch, 'finding.answers.jsonl'), `${JSON.stringify({ key: finding.key, answer: 'apply', label: 'Apply', close: 'done', at: '2026-10-13T08:00:00Z' })}\n`);
+  const waited = cli2('', 'wait', board, '--filer', 'learn-from-mistakes', '--json', '--timeout', '5');
+  assert.equal(waited.status, 0, waited.stdout);
+  assert.equal(JSON.parse(waited.stdout)[finding.key].answer, 'apply');
+  // An answered finding keeps the proposal it was answered for, in a --replace feed too, and once dropped it cannot come back.
+  const swap = cli2('', 'post', board, '--from', feed, '--replace');
+  assert.equal(swap.status, 1, swap.stdout);
+  assert.match(swap.stdout, /was answered and now holds a different question/);
+  assert.equal(cli2('', 'post', board, '--from', message('finding-dropped.json', JSON.stringify({ schema: 2, items: [] })), '--replace').status, 0);
+  const gone = readFileSync(board, 'utf8'), back = cli2('', 'post', board, '--from', feed, '--replace');
+  assert.equal(back.status, 1, back.stdout);
+  assert.match(back.stdout, /key lfm-missing-env was answered[^]*Post it under a new key/);
   assert.equal(readFileSync(board, 'utf8'), gone);
 });
