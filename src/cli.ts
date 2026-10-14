@@ -10,7 +10,7 @@ import { basename, delimiter, dirname, extname, isAbsolute, join, relative, reso
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { type Answer, CHAPTERS_MAX, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, writeItems } from './store.js';
+import { type Answer, CHAPTERS_MAX, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, checkMessage, mediaFiles, parseMessage } from './contract.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
@@ -31,7 +31,7 @@ const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
 commands[15]:
   (none)=list, raise, post, answers, wait, poll, open, status, stop, serve, export, init, doctor, validate, help
 board: the nearest .sign-off/ board (the walk's bounds and SIGN_OFF_HOME: README, "Test runs never touch your board"), else ~/.sign-off/decisions.json; a board file given always wins
-flags: --full and --json on list, answers and wait, --json on status, --filer on post, raise and wait, --help on every command, -v/--version
+flags: --full and --json on list, answers and wait, --events on wait, --json on status, --filer on post, raise and wait, --help on every command, -v/--version
 examples:
   sign-off-axi
   sign-off-axi raise --title "Ship the new sign-in screen this week?" --recommend yes
@@ -108,7 +108,7 @@ examples:
   sign-off-axi answers --key keep-the-weekly-digest
   sign-off-axi answers ./decisions.json --json
 `,
-  wait: `usage: sign-off-axi wait [board.json] [--filer <id>] [--key <key>] [--timeout 600] [--full] [--json]
+  wait: `usage: sign-off-axi wait [board.json] [--filer <id>] [--key <key>] [--timeout 600] [--full] [--json | --events]
 Blocks until the user answers, then prints the answer the way answers does. Use it instead of a polling loop.
   --filer    only the items posted with this --filer (or SIGN_OFF_FILER): returns every answer to them this filer has not taken yet,
              even one saved before wait started, and marks it taken, so the board shows "Seen by agent" on that card;
@@ -119,11 +119,15 @@ Blocks until the user answers, then prints the answer the way answers does. Use 
   --timeout  seconds to wait, 600 (10 minutes) by default; then exits 1 with code TIMEOUT
   --full     adds the button label, close and title
   --json     {"<key>":{"answer","label","close","at","note"?}} for the new answers; note only when the user wrote one
+  --events   needs --filer (or SIGN_OFF_FILER); one JSON line per new answer and per another-round ask, in the order they were saved (${CONTRACT}#7-answers):
+             {"event":"answer","contract":1,"kind","schema","key","title","answer","label","close","at","note"?,"filer"?,"comments"?}
+             {"event":"round","contract":1,"kind","schema","key","title","note","at","filer"?,"comments"?}; a board-format item reports as ask schema 1
 A note column appears when any shown answer has a note.
 Ctrl-C stops waiting; nothing is changed.
 examples:
   sign-off-axi wait --key keep-the-weekly-digest
   sign-off-axi wait ./decisions.json --timeout 60 --json
+  sign-off-axi wait --filer agent-41 --events
 `,
   open: `usage: sign-off-axi open [board.json] [--port 4410] [--bind <address>] [--evidence-root <dir>]
 Starts the board in the background on 127.0.0.1 and prints its URL and pid; a no-op when this board is already open.
@@ -418,10 +422,30 @@ function answers(args: string[]) {
   return printAnswers(file, rows, waiting, values, waiting ? [`Run \`sign-off-axi open${on}\` so the user can answer the ${waiting} waiting`, `Run \`sign-off-axi wait${on}${key}\` to block until they answer`] : []);
 }
 
+/** The contract fields an answer or round reports with: the item's kind and schema, or ask schema 1 for a board-format or dropped item (contract section 2). */
+function kindOf(file: string) {
+  const items = new Map((existsSync(file) ? readItems(file).items : []).map((i) => [i?.key, i]));
+  return (key: string) => {
+    const i = items.get(key), contract = typeof i?.kind === 'string';
+    return { contract: 1, kind: contract ? i.kind : 'ask', schema: contract ? i.schema : 1 };
+  };
+}
+/** One JSON line per answer and per round (contract section 7), oldest first. */
+function eventLines(file: string, rows: Decision[], answers: Answer[], rounds: Round[]) {
+  const kind = kindOf(file), item = new Map(rows.map((d) => [d.key, d]));
+  const head = (event: string, key: string) => ({ event, ...kind(key), key, title: item.get(key)?.title });
+  const tail = (key: string, comments?: Sent[]) => ({ ...(item.get(key)?.filer && { filer: item.get(key)!.filer }), ...(comments?.length && { comments }) });
+  return [...answers.map(({ key, answer, label, close, at, note, comments }) => ({ at, line: { ...head('answer', key), answer, label, close, at, ...(note && { note }), ...tail(key, comments) } })),
+    ...rounds.map(({ key, note, at, comments }) => ({ at, line: { ...head('round', key), note, at, ...tail(key, comments) } }))]
+    .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0)).map(({ line }) => JSON.stringify(line)).join('\n');
+}
+
 async function wait(args: string[]) {
-  const { file, values, on: onBoard } = parse('wait', args, { ...TIERS, filer: { type: 'string' }, key: { type: 'string' }, timeout: { type: 'string', default: '600' }, into: { type: 'string' } });
+  const { file, values, on: onBoard } = parse('wait', args, { ...TIERS, events: { type: 'boolean' }, filer: { type: 'string' }, key: { type: 'string' }, timeout: { type: 'string', default: '600' }, into: { type: 'string' } });
   if (!/^\d{1,7}$/.test(values.timeout)) throw fail('--timeout must be whole seconds, 0 or more', 'VALIDATION_ERROR', `Run \`sign-off-axi wait --help\``);
+  if (values.events && (values.json || values.full)) throw fail(`--events prints event lines, so it does not take --${values.json ? 'json' : 'full'}`, 'VALIDATION_ERROR', 'Run `sign-off-axi wait --filer <id> --events`');
   const filer = filerOf(values), on = onBoard + (filer ? ` --filer ${filer}` : '');
+  if (values.events && filer === undefined) throw fail(`--events prints a filer's answer events, so it needs --filer`, 'VALIDATION_ERROR', 'Run `sign-off-axi wait --filer <id> --events`');
   // Vault Give delivery: its own loop, before any board read, so no ordinary wait changes. Undocumented while the vault is OFF.
   if (values.into !== undefined) return waitInto(file, values, onBoard);
   if (values.key === undefined) ready(file, onBoard);
@@ -440,20 +464,28 @@ async function wait(args: string[]) {
     for (let first = true; ; first = false) {
       const rows = mine(board(file, first ? warn : () => {})), waiting = rows.filter(waits).length, taken = filer === undefined ? undefined : seenBy(file);
       const hit = rows.filter((d) => (values.key !== undefined ? d.key === values.key : d.answer && (taken ? !taken(d.answer) : !before.has(d.key))));
-      const counts = new Map<string, number>();
-      for (const r of readRounds(file, first ? warn : () => {})) counts.set(r.key, (counts.get(r.key) ?? 0) + 1);
+      const counts = new Map<string, number>(), asked: Round[] = [];
+      for (const r of readRounds(file, first ? warn : () => {})) {
+        counts.set(r.key, (counts.get(r.key) ?? 0) + 1);
+        if (counts.get(r.key)! > (seenRounds.get(r.key) ?? 0)) asked.push(r);
+      }
       const fresh = rows.filter((d) => (counts.get(d.key) ?? 0) > (seenRounds.get(d.key) ?? 0)
         && (values.key === undefined || d.key === values.key));
       for (const [k, n] of counts) seenRounds.set(k, n);
       let found = [...new Map([...hit.filter((d) => d.answer), ...fresh].map((d) => [d.key, d] as const)).values()];
+      // The answers this wait hands over: a filer wait without --key gives only the ones it has not taken yet.
+      let given = hit.flatMap((d) => (d.answer ? [d.answer] : []));
       if (found.length && filer !== undefined) {
         // Taken under a lock, so two waits for one filer never both hand over the same answer (another-round asks are not deduped here).
         found = await locked(`${seenPath(file)}.lock`, () => {
           const now = seenBy(file), left = found.filter((d) => values.key !== undefined || fresh.includes(d) || !now(d.answer!));
-          markSeen(file, left.flatMap((d) => (d.answer && !now(d.answer) ? [d.answer] : [])));
+          const taking = left.flatMap((d) => (d.answer && !now(d.answer) ? [d.answer] : []));
+          markSeen(file, taking);
+          if (values.key === undefined) given = taking;
           return left;
         }, 'another wait is still taking answers');
       }
+      if (found.length && values.events) return eventLines(file, found, given, asked.filter((r) => fresh.some((d) => d.key === r.key)));
       if (found.length) {
         return printAnswers(file, found, waiting, values,
           [waiting ? `Run \`sign-off-axi wait${on}\` for the next of the ${waiting} waiting` : `Run \`sign-off-axi stop${onBoard}\` to close the board`]);
@@ -1594,7 +1626,7 @@ function answered(a?: Answer, d?: Decision) {
   child.on('error', (e) => warn(`on_answer ${cmd} did not run: ${e.message}`));
   child.on('exit', (code, signal) => (code || signal) && warn(`on_answer ${cmd} exited with ${code ?? signal}`));
   child.stdin.on('error', () => {});
-  child.stdin.end(`${JSON.stringify({ ...a, ...(d && { title: d.title }), ...(d?.filer && { filer: d.filer }) })}\n`);
+  child.stdin.end(`${JSON.stringify({ event: 'answer', ...kindOf(file)(a.key), ...a, ...(d && { title: d.title }), ...(d?.filer && { filer: d.filer }) })}\n`);
 }
 
 const server = createServer(async (req, res) => {

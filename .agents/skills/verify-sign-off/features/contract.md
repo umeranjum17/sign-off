@@ -1,6 +1,6 @@
 # Contract validator
 
-Covers `validate`, `post --kind` and the shipped `fixtures/contract/` messages ([docs/contract.md](../../../../docs/contract.md)). Follow Isolation in `SKILL.md` and the Fresh shell in [axi.md](axi.md) first; this entry runs the packed tarball the way another tool's CI does.
+Covers `validate`, `post --kind`, the shipped `fixtures/contract/` messages, and `wait --events` with the contract fields on `on_answer` ([docs/contract.md](../../../../docs/contract.md)). Follow Isolation in `SKILL.md` and the Fresh shell in [axi.md](axi.md) first; this entry runs the packed tarball the way another tool's CI does.
 
 ## Steps
 
@@ -23,3 +23,5 @@ Covers `validate`, `post --kind` and the shipped `fixtures/contract/` messages (
 | 14 | `open gate.json`, Waiting on you at 390 wide; pick **Fix first**; then `wait gate.json --filer done-done --json` | The card shows the title, about and the buttons Approve, Skip the judge and Fix first, Fix first marked as recommended; `wait` prints `fix` for `dd-gate-a1b2c3d4` |
 | 15 | `post finding.json --kind finding --from node_modules/sign-off-axi/fixtures/contract/finding.v1/valid-apply.json`, the same again, then the same message with another `proposal` from stdin, then in a `raise finding.json --from` feed | `lfm-missing-env,raised` with a `wait --filer learn-from-mistakes` hint, then `already waiting`, then exit 2 `already holds a different message`, help `Post it under a new key`, twice; the board file is unchanged by the last two |
 | 16 | `open finding.json`, Waiting on you at 390 wide; pick **Apply**; then `wait finding.json --filer learn-from-mistakes --json` | The card shows the title, about and the buttons Apply and Skip, Apply marked as recommended; `wait` prints `apply` for `lfm-missing-env` |
+| 17 | On a board with the gate fixture (filer `done-done`), a `raise --filer done-done` item and one more waiting item: answer both on the page, then `wait --filer done-done --events`; then start the same wait, tap **Another round** with a note on the gate, and let it return; then `wait --filer done-done --events --json` | One JSON line per answer, oldest first: the raise item with `kind` `ask`, `schema` 1, and the gate with `kind` `gate`, each with `event` `answer`, `contract` 1, `title`, `label`, `close`, `at` and `filer`; then one line with `event` `round` and the note; the last exits 2 `does not take --json` |
+| 18 | `on_answer: <a script that appends stdin to a file>` in the board's `config.yaml`, `open`, answer the gate on the page | The file gets one JSON line with `event` `answer`, `contract` 1, `kind` `gate`, `schema` 1, the answer fields, `title` and `filer` |

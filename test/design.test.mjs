@@ -1266,6 +1266,8 @@ test('answer events: a filer takes only its own answers, once, the card shows it
   // Each hook runs on its own, so their lines may land in any order.
   assert.deepEqual(hooked().map(({ key, answer, filer = '', title }) => [key, answer, filer, title].join()).sort(),
     ['a,no,agent-a,Ship A?', 'a,yes,agent-a,Ship A?', 'b,yes,agent-b,Ship B?', 'none,yes,,Ship it?']);
+  // Each line is an answer event: a board-format item reports as ask schema 1.
+  assert.ok(hooked().every((h) => h.event === 'answer' && h.contract === 1 && h.kind === 'ask' && h.schema === 1), JSON.stringify(hooked()));
   assert.equal(statSync(join(dir, 'board.seen.jsonl')).mode & 0o777, 0o600);
   proc.kill();
 });
