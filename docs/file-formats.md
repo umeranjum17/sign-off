@@ -200,6 +200,8 @@ also copies each file into `evidence/<number>/` next to the board:
 - `number`: whole number from 1. `post` takes the next number whose `evidence/<number>/` folder and `update-<number>` key are both free (boards in one folder share `evidence/`) and sets `key` to `update-<number>`.
 - `about`: the short note. `link`: optional, as on any item.
 - `media`: 1 to 12 files, each under `evidence/<number>/` and ending in `.png`, `.jpg`, `.jpeg`, `.webp`, `.mp4` or `.webm`, with the `sha256` and `bytes` recorded at post time. The board serves a file only while both still match.
+  An update that has an `evidence` run link may leave `media` out.
+- `post --kind evidence` ([contract.md](contract.md) section 5) writes the same item: it keeps `contract`, `kind` and `schema`, takes `key` from the message or `update-<number>`, and stores the message's `run` as `evidence`.
 - `options` defaults to **Pass** (`pass`), **Fail** (`fail`) and **Needs work** (`needs-work`); the verdict and its note are saved as an answer.
 
 **Answers**, written by sign-off next to the questions (`decisions.answers.jsonl`, mode 600, one line per click, the latest line per key wins):

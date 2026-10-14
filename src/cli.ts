@@ -12,7 +12,7 @@ import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
 import { type Answer, CHAPTERS_MAX, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, writeItems } from './store.js';
 
-import { ContractError, KINDS, checkMessage, parseMessage } from './contract.js';
+import { ContractError, KINDS, MEDIA_BYTES, checkMessage, mediaFiles, parseMessage } from './contract.js';
 import { sweepVault } from './vault.js';
 
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
@@ -76,10 +76,11 @@ examples:
 `,
   validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>] [--expect-invalid]
 Checks message files against the communication contract without posting them: ${CONTRACT}
-A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask and report, schema 1 each.
+A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, report and evidence, schema 1 each.
+An evidence message's media paths read from the message file's folder: each file must be there, inside it, and 50 MB or less.
 Post one with \`sign-off-axi post --kind <kind> --from <message.json>\`, or --from - to read stdin.
 A board file given to raise --from or post --from may hold such messages as items: each is checked the same way before it is stored, and a report shows under Reports with no answer.
-In such a file a new item of a contract kind (a decision, the default, an ask, evidence or a report) must carry contract, kind and schema.
+In such a file a new item of a contract kind (a decision, the default, an ask or a report) must carry contract, kind and schema; new evidence is posted with post --kind evidence, one at a time.
 Each file gets a row with ok, or the error and one help line that names the fix. A field written twice, an unknown field or a broken limit refuses the file.
   --kind            each file must be this kind, so the wrong file is refused
   --expect-invalid  every file must be refused: exits 0 only then, 2 when any passes (the conformance check of invalid fixtures)
@@ -90,6 +91,7 @@ examples:
   sign-off-axi validate ask.json
   sign-off-axi validate --kind ask messages/*.json
   sign-off-axi validate --kind report report.json
+  sign-off-axi validate --kind evidence proof/evidence.json
   sign-off-axi validate --expect-invalid node_modules/sign-off-axi/fixtures/contract/*/invalid-*.json
 `,
   answers: `usage: sign-off-axi answers [board.json] [--key <key>] [--full] [--json]
@@ -158,6 +160,8 @@ examples:
 Posts an item for the user. --type decision (the default) is a yes/no or pick-one question, exactly like raise.
 --kind posts one contract message (${CONTRACT}), read from a file or from stdin with --from -: it must be that kind and pass every rule,
 else it is refused with one fix line and nothing is written. A key already on the board takes only the same message again; anything else exits 2.
+--kind evidence copies its media, read from the message file's folder (the current folder for stdin), into evidence/<number>/ like --type evidence;
+a "run" is shown as the update's proof record. With no key it posts the next update-<number>.
 Listing --option needs --recommend <value>, on every type: the option you would pick, shown first and marked. --from --replace feeds are not held to it.
 --filer names who posts (your agent session or any id of 1-128 of A-Z a-z 0-9 . _ -), saved on the item; then \`wait --filer <id>\` gets the answer.
 SIGN_OFF_FILER sets it for every command; with neither, the Claude Code session id is saved when there is one.
@@ -182,6 +186,7 @@ examples:
   sign-off-axi post .sign-off/decisions.json --type design --key sign-in --title "Pick the sign-in layout" --option a=A --option b=B --option c=C --mock a=mocks/sign-in/index.html?variant=a --mock b=mocks/sign-in/index.html?variant=b --mock c=mocks/sign-in/index.html?variant=c --tradeoff "..." --recommend b
   sign-off-axi post --type decision --title "Keep the weekly digest?" --recommend yes
   sign-off-axi post --kind ask --from ask.json --filer agent-41
+  sign-off-axi post --kind evidence --from proof/evidence.json --filer done-done
   sign-off-axi post .sign-off/decisions.json --type interactive --title "Does the sign-in flow feel right?" --view mocks/sign-in/demo.html --option yes=Yes --option no="Needs work" --recommend yes
   sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media phone.png --media flow.mp4 --link https://github.com/acme/app/pull/12
   sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "The new sign-in has 2 steps." --media explainer.mp4 --chapter 0:00=Start --chapter 0:12="Step 2"
@@ -257,6 +262,9 @@ function contractItems(items: any[], from: string, file: string) {
   const had = new Set(existsSync(file) ? readItems(file).items.map((i) => i?.key) : []);
   items.forEach((m, i) => {
     if (had.has(m?.key)) return;
+    if ((m?.kind ?? m?.type) === 'evidence') {
+      throw fail(`${from}: items[${i}]${isKey(m?.key) ? ` key ${m.key}` : ''}: new evidence is posted one at a time, not in a --from file`, 'VALIDATION_ERROR', 'Post it with sign-off-axi post --kind evidence --from <message.json>');
+    }
     if (m?.contract === undefined && m?.kind === undefined) {
       if (!CONTRACT_TYPES.includes(m?.type ?? 'decision')) return;
       throw fail(`${from}: items[${i}]${isKey(m?.key) ? ` key ${m.key}` : ''}: kind is required on a new ${m?.type ?? 'decision'}`, 'VALIDATION_ERROR',
@@ -569,9 +577,9 @@ function replace(file: string, on: string, from?: string, filer?: string) {
   });
 }
 
-const MEDIA_BYTES = 50_000_000;
-/** Copies the media into evidence/<n>/ next to the board and adds the item, numbered under the board lock: update-<n>, or an explainer under its own key. */
-function postMedia(file: string, on: string, values: Record<string, any>, type: 'evidence' | 'explainer', filer?: string) {
+/** Copies the media into evidence/<n>/ next to the board and adds the item, numbered under the board lock: update-<n>, or an explainer under its own key.
+ * `message` is a checked contract evidence message (post --kind evidence): its key, if any, takes only the same message again, and its run is stored as `evidence`. */
+function postMedia(file: string, on: string, values: Record<string, any>, type: 'evidence' | 'explainer', filer?: string, message?: any) {
   fits(values.title);
   const explainer = type === 'explainer';
   const extra = (explainer ? ['mock', 'tradeoff', 'view', 'link'] : ['key', 'option', 'recommend', 'default', 'mock', 'tradeoff', 'view', 'chapter']).find((f) => values[f] !== undefined);
@@ -580,7 +588,7 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
     : 'sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media shot.png';
   if (!explainer && !values.about?.trim()) throw fail('--about is required for --type evidence: the short note', 'VALIDATION_ERROR', example);
   if (explainer && values.media?.length !== 1) throw fail('--type explainer needs one --media video (.mp4 or .webm)', 'VALIDATION_ERROR', example);
-  if (!values.media?.length || values.media.length > MEDIA_MAX) throw fail(`--type evidence needs 1 to ${MEDIA_MAX} --media files`, 'VALIDATION_ERROR', example);
+  if ((!message && !values.media?.length) || values.media.length > MEDIA_MAX) throw fail(`--type evidence needs 1 to ${MEDIA_MAX} --media files`, 'VALIDATION_ERROR', example);
   const kinds = explainer ? ['.mp4', '.webm'] : Object.keys(mediaTypes), options = optionsOf(values);
   recommended([{ options, recommend_value: values.recommend }], true);
   const chapters = values.chapter?.map((c: string) => {
@@ -600,7 +608,15 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
     const items = existsSync(file) ? readItems(file).items : [];
     // Boards in one folder share evidence/, so a number is taken only by creating its folder; one in use is never written into.
     const current = board(file), store = join(dirname(file), 'evidence'), taken = current.map((d) => Number(/^update-(\d+)$/.exec(d.key)?.[1] ?? 0));
-    const own = explainer && (values.key ?? slug(values.title));
+    const own = message ? message.key : explainer && (values.key ?? slug(values.title)), had = message && own && items.find((x) => x?.key === own);
+    if (had) {
+      // The stored item, read back as the message it came from: its run, and each media file by hash.
+      const asMessage = ({ type: _t, number: _n, filed: _f, evidence: run, media: kept, ...rest }: any) => canon({ ...rest, run, media: kept?.map((x: any) => x.sha256) });
+      if (asMessage(had) !== canon({ ...message, media: sources.length ? sources.map((src) => sha256(readFileSync(src))) : undefined })) {
+        throw fail(`key ${own} already holds a different message on ${tilde(file)}`, 'CONFLICT', 'Post it under a new key');
+      }
+      return toon({ board: tilde(file), posted: [{ key: own, number: had.number, media: sources.length, title: had.title, status: 'already posted' }] }, [`Run \`sign-off-axi open${on}\` so the user can give a verdict`]);
+    }
     if (own && current.some((d) => d.key === own)) throw fail(`key ${own} is already used on ${tilde(file)}`, 'CONFLICT', 'Post it under a new --key');
     mkdirSync(store, { recursive: true, mode: 0o700 });
     let number = Math.max(0, ...taken, ...readdirSync(store).map(Number).filter(Number.isInteger)) + 1;
@@ -614,7 +630,9 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
       return { path, sha256: sha256(bytes), bytes: bytes.length };
     });
     const { title, about, detail, close, link, recommend: recommend_value, default: default_if_silent } = values, filed = new Date().toISOString();
+    const { run, media: _paths, ...fields } = message ?? {};
     items.push(explainer ? { key, type, title, about, detail, options, recommend_value, default_if_silent, close, chapters, media, filer, filed }
+      : message ? { ...fields, key, type, number, ...(media.length ? { media } : {}), ...(run && { evidence: run }), filed }
       : { key, type, number, title, about, detail, close, link, media, filer, filed });
     // The whole board is checked before it is written, so a bad post leaves the board and evidence/ as they were.
     const check = `${file}.${process.pid}.check`;
@@ -627,7 +645,7 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
     }
     writeItems(file, items);
     if (explainer) return toon({ board: tilde(file), raised: [{ key, status: 'raised', title }] }, [`Run \`sign-off-axi open${on}\` so the user can watch and answer`, waitFor(on, filer, key)]);
-    return toon({ board: tilde(file), posted: [{ key, number, media: media.length, title }] },
+    return toon({ board: tilde(file), posted: [{ key, number, media: media.length, title, ...(message && { status: 'posted' }) }] },
       [`Run \`sign-off-axi open${on}\` so the user can give a verdict`, waitFor(on, filer, key)]);
   });
 }
@@ -640,12 +658,19 @@ async function postKind(file: string, on: string, values: Record<string, any>) {
   const name = from === '-' ? 'stdin' : from;
   let bytes, m: any;
   try { bytes = readFileSync(from === '-' ? 0 : from); } catch (e: any) { throw fail(`${name}: cannot read: ${e.code}`, 'NOT_FOUND', 'Check the path names a readable file'); }
-  try { m = parseMessage(bytes); checkMessage(m, kind); } catch (e) { throw e instanceof ContractError ? fail(`${name}: ${e.message}`, 'VALIDATION_ERROR', e.help) : e; }
+  let sources: string[] = [];
+  try {
+    m = parseMessage(bytes);
+    checkMessage(m, kind);
+    // Media paths read from the message file's folder, or from the current folder for stdin.
+    if (m.kind === 'evidence') sources = mediaFiles(m, from === '-' ? process.cwd() : dirname(resolve(from)));
+  } catch (e) { throw e instanceof ContractError ? fail(`${name}: ${e.message}`, 'VALIDATION_ERROR', e.help) : e; }
   if (m.filer !== undefined && values.filer !== undefined && m.filer !== values.filer) {
     throw fail(`${name}: key ${m.key}: filer ${m.filer} is not --filer ${values.filer}`, 'VALIDATION_ERROR', 'Leave "filer" out of the message, or pass the same --filer');
   }
   const filer = m.filer ?? filerOf(values, true), scratch = mkdtempSync(join(tmpdir(), 'sign-off-')), source = join(scratch, basename(name));
   try {
+    if (m.kind === 'evidence') return await postMedia(file, on, { title: m.title, about: m.about, media: sources }, 'evidence', filer, { ...m, ...(filer && { filer }) });
     writeFileSync(source, JSON.stringify({ schema: 2, items: [{ ...m, ...(filer && { filer }) }] }));
     return await storeIncoming(file, on, buildIncoming({ from: source }, {}, filer, file), filer, true);
   } catch (e) {
@@ -676,7 +701,9 @@ function validate(args: string[]) {
     }
     try {
       m = parseMessage(raw);
-      return { file, ...checkMessage(m, want), ok: true, error: '', help: '' };
+      const kind = checkMessage(m, want);
+      if (m.kind === 'evidence') mediaFiles(m, dirname(resolve(file)));
+      return { file, ...kind, ok: true, error: '', help: '' };
     } catch (e) {
       if (!(e instanceof ContractError)) throw e;
       return { file, kind: typeof m?.kind === 'string' ? m.kind : '', schema: Number.isSafeInteger(m?.schema) ? m.schema : '', ok: false, error: e.message, help: e.help };

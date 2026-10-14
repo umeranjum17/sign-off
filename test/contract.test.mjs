@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { decode } from '@toon-format/toon';
@@ -250,4 +250,36 @@ test('post --kind: one message from a file or stdin, checked against its kind, r
   writeFileSync(board, JSON.stringify({ schema: 2, items: [old] }));
   const kept = spawnSync('node', [cli, 'post', board, '--from', message('kept.json', JSON.stringify({ schema: 2, items: [old] })), '--replace'], { encoding: 'utf8', env });
   assert.equal(kept.status, 0, kept.stdout);
+});
+
+test('post --kind evidence: media copied and hashed from the message folder, a run kept as the update\'s evidence, never in a --from file', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const board = join(scratch, 'ev', 'board.json'), post = (input, ...args) => spawnSync('node', [cli, 'post', board, ...args], { encoding: 'utf8', env, input });
+  const file = join(fixtures, 'evidence.v1', 'valid-media.json'), items = () => JSON.parse(readFileSync(board, 'utf8')).items;
+  assert.match(post('', '--kind', 'evidence', '--from', file, '--filer', 'agent-41').stdout, /signin-phone-2,1,1,"Sign-in screen, second pass",posted/);
+  assert.deepEqual(readFileSync(join(scratch, 'ev', 'evidence', '1', '1.png')), readFileSync(join(fixtures, 'evidence.v1', 'shot.png')));
+  assert.equal(items()[0].media[0].bytes, 69);
+  assert.match(post('', '--kind', 'evidence', '--from', file, '--filer', 'agent-41').stdout, /signin-phone-2,1,1,[^\n]*already posted/);
+  const other = post('', '--kind', 'evidence', '--from', file, '--filer', 'agent-9');
+  assert.equal(other.status, 2, other.stdout);
+  assert.match(other.stdout, /key signin-phone-2 already holds a different message[^]*Post it under a new key/);
+  // No key: the next update number; a run with no media is stored as the update's evidence field.
+  const ran = post(readFileSync(join(fixtures, 'evidence.v1', 'valid-run.json')), '--kind', 'evidence', '--from', '-');
+  assert.match(ran.stdout, /update-2,2,0,Sign-in screen on a phone,posted/);
+  const [, update] = items();
+  assert.deepEqual([update.type, update.kind, update.media, update.evidence.commit, update.run], ['evidence', 'evidence', undefined, '0123456789abcdef0123456789abcdef01234567', undefined]);
+  // A symlink out of the message folder, and evidence in a feed, are refused and write nothing.
+  const dir = mkdtempSync(join(scratch, 'msg-'));
+  symlinkSync(join(fixtures, 'evidence.v1', 'shot.png'), join(dir, 'link.png'));
+  const before = readFileSync(board, 'utf8');
+  writeFileSync(join(dir, 'e.json'), JSON.stringify({ contract: 1, kind: 'evidence', schema: 1, title: 'Linked', about: 'A link.', media: ['link.png'] }));
+  const escaped = post('', '--kind', 'evidence', '--from', join(dir, 'e.json'));
+  assert.equal(escaped.status, 2, escaped.stdout);
+  assert.match(escaped.stdout, /e\.json: media\[0\] \\"link\.png\\" leads outside the message file's folder/);
+  const fed = post('', '--from', message('ev-feed.json', JSON.stringify({ schema: 2, items: [{ ...JSON.parse(readFileSync(file, 'utf8')), key: 'fed' }] })));
+  assert.equal(fed.status, 2, fed.stdout);
+  assert.match(fed.stdout, /items\[0\] key fed: new evidence is posted one at a time[^]*post --kind evidence --from/);
+  assert.equal(readFileSync(board, 'utf8'), before);
 });
