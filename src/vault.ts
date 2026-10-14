@@ -54,8 +54,9 @@ function privateFile(path: string) {
   const s = lstatSync(path);
   if (!s.isFile() || s.nlink !== 1 || s.uid !== process.getuid?.() || (s.mode & 0o777) !== 0o600 || s.size > 32_768) bad('VAULT_KEY_UNAVAILABLE');
 }
+const stateHome = () => process.env.XDG_STATE_HOME || join(homedir(), '.local', 'state');
 function root(create = true) {
-  const state = process.env.XDG_STATE_HOME || join(homedir(), '.local', 'state');
+  const state = stateHome();
   if (!isAbsolute(state) || !process.getuid) bad('VAULT_KEY_UNAVAILABLE');
   const owner = join(state, 'sign-off'), vault = join(owner, 'vault');
   let path = parse(vault).root;
@@ -104,14 +105,14 @@ function seal(dir: string, meta: VaultMeta, value: Buffer): Sealed {
     return { nonce: nonce.toString('base64'), tag: cipher.getAuthTag().toString('base64'), data: data.toString('base64') };
   } finally { key.fill(0); }
 }
-async function lockedVault<T>(dir: string, fn: () => T): Promise<T> {
+async function lockedVault<T>(dir: string, fn: () => T, attempts = 50): Promise<T> {
   let lock: string | undefined;
   try {
     const candidate = join(dir, 'lock');
     // ponytail: one global lock; split by board only if custody throughput requires it. Stale locks fail closed.
-    for (let tries = 0; ; tries++) {
+    for (let tries = 1; ; tries++) {
       try { const fd = openSync(candidate, 'wx', 0o600); closeSync(fd); lock = candidate; break; }
-      catch (e: any) { if (e.code !== 'EEXIST' || tries === 49) bad('BUSY'); }
+      catch (e: any) { if (e.code !== 'EEXIST' || tries === attempts) bad('BUSY'); }
       await new Promise((ok) => setTimeout(ok, 20));
     }
     rmSync(join(dir, 'key.tmp'), { force: true });
@@ -132,6 +133,10 @@ function readRecord(path: string): Record {
     || JSON.stringify(metadata(record.meta)) !== JSON.stringify(record.meta) || !['pending', 'ready', 'refused', 'expired'].includes(record.status)
     || path !== join(dirname(path), `${digest(record.meta.board, record.meta.key)}.json`)) bad('VALIDATION_ERROR');
   return record;
+}
+function expiryEvent(id: string, record: Record): VaultExpiry {
+  if (!Number.isSafeInteger(record.at) || record.at <= 0 || record.at < record.meta.expires || record.at > 8.64e15 || Object.hasOwn(record, 'sealed')) bad('VALIDATION_ERROR');
+  return { schema: 1, id: `${digest(id, record.meta.key)}:expired`, status: 'expired', at: record.at };
 }
 function expire(path: string, record: Record): Record {
   if (['pending', 'ready'].includes(record.status) && record.meta.expires <= Date.now()) {
@@ -187,10 +192,51 @@ export async function readVaultExpiry(board: string, key: string, filer: string)
       if (!record) return;
       if (record.meta.filer !== filer) bad('READER_MISMATCH');
       if (record.status === 'refused') bad('REFUSED');
-      if (record.status !== 'expired') return;
-      if (!Number.isSafeInteger(record.at) || record.at <= 0 || record.at < record.meta.expires || Object.hasOwn(record, 'sealed')) bad('VALIDATION_ERROR');
-      return { schema: 1, id: `${digest(id, key)}:expired`, status: 'expired', at: record.at };
+      return record.status === 'expired' ? expiryEvent(id, record) : undefined;
     });
+  } catch (e) { throw e instanceof VaultError ? e : new VaultError('BUSY'); }
+}
+/** For an ordinary filer wait: expires this filer's elapsed items in the board's folder, then takes each untaken expiry once.
+ * A private `.expired.taken` marker per event dedupes filer waits; markers are durable before any event is returned. */
+export async function takeVaultExpiries(board: string, filer: string) {
+  if (!isKey(filer)) bad('VALIDATION_ERROR');
+  const none = { events: [] as { key: string; at: number }[], live: 0, clean: true };
+  try {
+    // Never used: silent, with no permission walk, lock or state creation.
+    const file = boardFile(board);
+    if (!lstatSync(join(stateHome(), 'sign-off', 'vault'), { throwIfNoEntry: false }) || !lstatSync(join(dirname(file), '.sign-off-vault-id'), { throwIfNoEntry: false })) return none;
+    const { dir } = custody(board, false);
+    if (!dir) return none;
+    // One try: an ordinary wait never queues behind custody; BUSY means unknown this poll.
+    return await lockedVault(dir, () => {
+      const id = boardId(file, false), found: { path: string; key: string; event: VaultExpiry }[] = [], made: string[] = [];
+      let live = 0, clean = true;
+      for (const name of readdirSync(dir).filter((n) => n.endsWith('.json')).sort()) {
+        try {
+          const path = join(dir, name), record = readRecord(path);
+          if (record.meta.board !== id || record.meta.filer !== filer) continue;
+          const r = expire(path, record);
+          if (r.status === 'expired') found.push({ path, key: r.meta.key, event: expiryEvent(id, r) });
+          else if (r.status !== 'refused') live++;
+        } catch { clean = false; }
+      }
+      try {
+        const fresh = found.filter(({ path, event }) => {
+          const marker = path.replace(/\.json$/, '.expired.taken');
+          let fd;
+          try { fd = openSync(marker, 'wx', 0o600); } catch (e: any) {
+            if (e.code !== 'EEXIST') throw e;
+            privateFile(marker);
+            return false;
+          }
+          made.push(marker);
+          try { writeFileSync(fd, event.id); fsyncSync(fd); } finally { closeSync(fd); }
+          return true;
+        });
+        if (made.length) syncDir(dir);
+        return { events: fresh.map(({ key, event }) => ({ key, at: event.at })), live, clean };
+      } catch (e) { for (const m of made) rmSync(m, { force: true }); throw e; }
+    }, 1);
   } catch (e) { throw e instanceof VaultError ? e : new VaultError('BUSY'); }
 }
 export async function waitVaultExpiry(board: string, key: string, filer: string, timeoutMs: number): Promise<VaultExpiry> {

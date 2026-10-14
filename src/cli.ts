@@ -13,7 +13,7 @@ import { AxiError, runAxiCli } from 'axi-sdk-js';
 import { type Answer, CHAPTERS_MAX, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, writeItems } from './store.js';
 
 import { ContractError, KINDS, checkMessage, parseMessage } from './contract.js';
-import { sweepVault } from './vault.js';
+import { sweepVault, takeVaultExpiries } from './vault.js';
 
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
 const CONTRACT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/contract.md';
@@ -410,7 +410,7 @@ async function wait(args: string[]) {
   const seenRounds = new Map<string, number>();
   for (const r of readRounds(file)) seenRounds.set(r.key, (seenRounds.get(r.key) ?? 0) + 1);
   // A save wakes the loop at once; the 1 second timer is the fallback where file events are unavailable.
-  let wake = () => {}, watcher;
+  let wake = () => {}, watcher, vaultWarned = false;
   const name = basename(answersPath(file));
   try {
     try { watcher = watch(dirname(file), (_, changed) => changed === name && wake()).on('error', () => {}); } catch {}
@@ -435,7 +435,16 @@ async function wait(args: string[]) {
         return printAnswers(file, found, waiting, values,
           [waiting ? `Run \`sign-off-axi wait${on}\` for the next of the ${waiting} waiting` : `Run \`sign-off-axi stop${onBoard}\` to close the board`]);
       }
-      if (values.key === undefined && !waiting) {
+      // Private vault expiries reach a filer wait only once its ordinary answers are out; each is taken once.
+      let live = 0, unknown = false;
+      if (filer !== undefined && values.key === undefined) {
+        const vault = await takeVaultExpiries(file, filer).catch(() => undefined);
+        unknown = !vault;
+        if ((!vault || !vault.clean) && !vaultWarned) { vaultWarned = true; warn('Vault expiry status unavailable; ordinary answers still arrive.'); }
+        if (vault?.events.length) return vaultExpired(file, vault.events, values);
+        live = vault?.live ?? 0;
+      }
+      if (values.key === undefined && !waiting && !live && !unknown) {
         throw fail(`nothing${filer ? ` posted by ${filer}` : ''} is waiting on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi answers${onBoard}\` to read the saved answers`, `Run \`sign-off-axi raise${on} --title "<question>"\` to ask a new one`);
       }
       const left = deadline - Date.now();
@@ -452,6 +461,14 @@ async function wait(args: string[]) {
   } finally {
     watcher?.close();
   }
+}
+
+/** Exit 1 with metadata only: the fixed sentence, never a value, URL, path or filer. */
+function vaultExpired(file: string, events: { key: string; at: number }[], values: Record<string, any>) {
+  const error = 'Vault item expired; request a fresh item.', at = (ms: number) => new Date(ms).toISOString().slice(0, 19) + 'Z';
+  process.exitCode = 1;
+  if (values.json) return JSON.stringify(Object.fromEntries(events.map((e) => [e.key, { answer: 'expired', label: error, close: 'done', at: at(e.at) }])));
+  return toon({ board: tilde(file), expired: events.map((e) => ({ key: e.key, at: at(e.at) })), error, code: 'EXPIRED' }, ['Ask for a fresh item under a new key']);
 }
 
 const slug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 64).replace(/^-+|-+$/g, '') || 'decision';

@@ -475,9 +475,113 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     try {
       cancelled.stdin.end(JSON.stringify(eventInput('kept', { op: 'waitExpiry', timeoutMs: 3_600_000, started: cancelStarted })));
       await waitFor(() => existsSync(cancelStarted), Date.now() + 5_000);
+      // Cancel during the poll's sleep: a kill inside the brief locked read would leave the documented stale lock.
+      await new Promise((ok) => setTimeout(ok, 300));
       cancelled.kill('SIGTERM'); await waitFor(() => cancelled.signalCode !== null, Date.now() + 5_000);
       assert.equal((await ended).signal, 'SIGTERM'); assert.equal(cancelOut, ''); assert.equal(cancelErr, ''); assert.equal(existsSync(lock), false);
     } finally { if (cancelled.signalCode === null && cancelled.exitCode === null) cancelled.kill('SIGKILL'); outputs.push(cancelOut, cancelErr); }
+    // Public filer wait: committed expiries of the filer's own items arrive once per event id, as metadata with exit 1.
+    const waitState = join(home, 'wait-state'), waitFolder = join(home, 'wait-board'), wb = join(waitFolder, 'board.json');
+    const otherFolder = join(home, 'wait-other'), ob = join(otherFolder, 'board.json'), vaultWarning = 'sign-off-axi: Vault expiry status unavailable; ordinary answers still arrive.\n';
+    for (const [f, b] of [[waitFolder, wb], [otherFolder, ob]]) { mkdirSync(f, { mode: 0o700 }); writeFileSync(b, '{"schema":2,"items":[]}'); }
+    const waitCli = (served, filer, extra = [], more = {}) => {
+      const child = spawn(process.execPath, [cli, 'wait', served, ...(filer ? ['--filer', filer] : []), ...extra], { env: { ...env, ...more }, stdio: ['ignore', 'pipe', 'pipe'] });
+      let out = '', err = ''; child.stdout.on('data', (b) => out += b); child.stderr.on('data', (b) => err += b);
+      const done = new Promise((ok, no) => { child.on('error', no); child.on('exit', (code) => { outputs.push(out, err); ok({ code, out, err, json: out.startsWith('{') ? JSON.parse(out) : undefined }); }); });
+      return Object.assign(done, { child });
+    };
+    const expiredKeys = (r) => { assert.equal(r.code, 1); assert.ok(r.json, 'EXPIRED prints JSON metadata.'); for (const v of Object.values(r.json)) assert.deepEqual(Object.keys(v), ['answer', 'label', 'close', 'at']); return Object.keys(r.json).sort(); };
+    const vaultOf = (key) => readdirSync(join(waitState, 'sign-off', 'vault')).filter((n) => n.endsWith('.json')).map((n) => join(waitState, 'sign-off', 'vault', n)).find((p) => JSON.parse(readFileSync(p)).meta.key === key);
+    const wmeta = (key, mode, filer, expires, b = wb) => ({ ...meta(key, mode), board: b, filer, expires });
+    const create = (key, mode, filer, expires, b) => run({ op: 'create', meta: wmeta(key, mode, filer, expires, b), ...(mode === 'receive' && { value: url }) });
+    env.XDG_STATE_HOME = join(home, 'wait-gone-state');
+    await create('identity-only', 'receive', 'filer-f', Date.now() + 3_600_000, ob);
+    env.XDG_STATE_HOME = waitState;
+    try {
+      // Never used: no warning, state or identity, even where a permission walk would refuse HOME.
+      for (const unsafe of [() => chmodSync(home, 0o775), () => mkdirSync(join(home, '.git'))]) {
+        unsafe();
+        try {
+          for (const b of [wb, ob]) { const r = await waitCli(b, 'filer-f', ['--timeout', '0']); assert.equal(r.code, 1); assert.match(r.out, /^code: NOT_FOUND$/m); assert.equal(r.err, ''); }
+        }
+        finally { chmodSync(home, 0o700); rmSync(join(home, '.git'), { force: true, recursive: true }); }
+      }
+      assert.equal(existsSync(waitState), false);
+      await create('elsewhere', 'receive', 'filer-f', Date.now() + 3_600_000, ob);
+      const quiet = await waitCli(wb, 'filer-f', ['--timeout', '0']); assert.match(quiet.out, /^code: NOT_FOUND$/m); assert.equal(quiet.err, ''); assert.equal(existsSync(join(waitFolder, '.sign-off-vault-id')), false);
+      const deadline = Date.now() + 5_000;
+      for (const [key, mode, filer] of [['f-pending', 'give', 'filer-f'], ['f-ready', 'give', 'filer-f'], ['f-receive', 'receive', 'filer-f'], ['g-item', 'receive', 'filer-g']]) await create(key, mode, filer, deadline);
+      await run({ op: 'deposit', board: wb, key: 'f-ready', value: secret });
+      await create('f-other', 'receive', 'filer-f', deadline, ob);
+      assert.equal(await serve(undefined, wb, async () => {
+        const waits = [1, 2].map(() => waitCli(wb, 'filer-f', ['--timeout', '20', '--json']));
+        await waitFor(() => Date.now() >= deadline - 1_500, deadline);
+        assert.ok(waits.every((w) => w.child.exitCode === null), 'Live private items keep a filer wait waiting.');
+        const results = await Promise.all(waits), got = results.filter((r) => r.json).flatMap(expiredKeys).sort();
+        assert.deepEqual(got, ['f-pending', 'f-ready', 'f-receive']);
+        results.filter((r) => !r.json).forEach((r) => assert.match(r.out, /^code: NOT_FOUND$/m));
+        const g = await waitCli(wb, 'filer-g', ['--timeout', '5']);
+        assert.equal(g.code, 1); assert.match(g.out, /^expired\[1\]\{key,at\}:\n {2}g-item,/m); assert.match(g.out, /^error: Vault item expired; request a fresh item\.$/m); assert.match(g.out, /^code: EXPIRED$/m);
+        assert.ok(!g.out.includes('filer-g') && !g.out.includes(waitState));
+      }), '');
+      const again = await waitCli(wb, 'filer-f', ['--timeout', '2']); assert.match(again.out, /^code: NOT_FOUND$/m); assert.ok(!again.out.includes('expired'));
+      assert.deepEqual(expiredKeys(await waitCli(ob, 'filer-f', ['--json'])), ['f-other']);
+      const readyPath = vaultOf('f-ready'), readyBytes = readFileSync(readyPath), marker = readyPath.replace(/\.json$/, '.expired.taken');
+      const keyed = await run({ op: 'expiry', board: wb, key: 'f-ready', filer: 'filer-f' });
+      assert.equal(readFileSync(marker, 'utf8'), keyed.event.id); assert.equal(statSync(marker).mode & 0o777, 0o600); assert.deepEqual(readFileSync(readyPath), readyBytes);
+      // No server: the wait expires its own filer's elapsed items; other filers' records stay as they are.
+      const late = Date.now() + 1_500;
+      for (const [key, mode, filer] of [['s-late', 'give', 'filer-s'], ['g-late', 'give', 'filer-g'], ['p-prio', 'receive', 'filer-p'], ['m-good', 'receive', 'filer-m'], ['m-corrupt', 'receive', 'filer-m'], ['r-a', 'receive', 'filer-r'], ['r-b', 'receive', 'filer-r'], ['f-held', 'give', 'filer-f']]) {
+        await create(key, mode, filer, key === 'f-held' ? Date.now() + 3_600_000 : late);
+      }
+      await waitFor(() => Date.now() >= late, late + 5_000);
+      const untouched = ['g-late', 'm-good'].map(vaultOf).map((p) => [p, readFileSync(p)]);
+      assert.deepEqual(expiredKeys(await waitCli(wb, undefined, ['--json'], { SIGN_OFF_FILER: 'filer-s' })), ['s-late']);
+      const lateRecord = JSON.parse(readFileSync(vaultOf('s-late'))); assert.equal(lateRecord.status, 'expired'); assert.equal(lateRecord.sealed, undefined);
+      for (const [p, bytes] of untouched) assert.deepEqual(readFileSync(p), bytes);
+      // Ordinary answers come first and keep exit 0; the vault expiry follows on the next wait.
+      const ask = (key, filer) => ({ key, title: 'Umer: continue?', filer, options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }] });
+      const answer = (key) => writeFileSync(wb.replace(/\.json$/, '.answers.jsonl'), `${JSON.stringify({ key, answer: 'yes', label: 'Yes', close: 'done', at: '2026-10-14T00:00:00Z' })}\n`, { flag: 'a' });
+      writeFileSync(wb, JSON.stringify({ schema: 2, items: [ask('ordinary-p', 'filer-p')] })); answer('ordinary-p');
+      const first = await waitCli(wb, 'filer-p', ['--json']); assert.equal(first.code, 0); assert.deepEqual(Object.keys(first.json), ['ordinary-p']);
+      assert.deepEqual(expiredKeys(await waitCli(wb, 'filer-p', ['--json'])), ['p-prio']);
+      // Unreadable siblings and a corrupt filer expiry are skipped with one warning; valid events still arrive.
+      const corruptPath = vaultOf('m-corrupt'), corrupt = Buffer.from(JSON.stringify({ ...JSON.parse(readFileSync(corruptPath)), sealed: undefined, status: 'expired', at: late - 1 }));
+      const sibling = join(waitState, 'sign-off', 'vault', `${'e'.repeat(64)}.json`);
+      writeFileSync(corruptPath, corrupt); writeFileSync(sibling, '{"corrupt":', { mode: 0o600 });
+      try {
+        const m = await waitCli(wb, 'filer-m', ['--json']); assert.deepEqual(expiredKeys(m), ['m-good']); assert.equal(m.err, vaultWarning);
+        assert.deepEqual(readFileSync(corruptPath), corrupt); assert.equal(existsSync(corruptPath.replace(/\.json$/, '.expired.taken')), false);
+      } finally { rmSync(sibling); rmSync(corruptPath); }
+      // A take is all or nothing: an unsafe second marker rolls back the first, and a retry delivers both.
+      const [ra, rb] = ['r-a', 'r-b'].map(vaultOf).sort().map((p) => p.replace(/\.json$/, '.expired.taken'));
+      mkdirSync(rb);
+      try { const r = await waitCli(wb, 'filer-r', ['--timeout', '1']); assert.match(r.out, /^code: TIMEOUT$/m); assert.equal(r.err, vaultWarning); assert.equal(existsSync(ra), false); }
+      finally { rmSync(rb, { recursive: true }); }
+      assert.deepEqual(expiredKeys(await waitCli(wb, 'filer-r', ['--json'])), ['r-a', 'r-b']);
+      // Unknown custody never reads as nothing waiting, and never delays an ordinary answer.
+      const vaultLock = join(waitState, 'sign-off', 'vault', 'lock'), held = Buffer.from('owned wait lock'); writeFileSync(vaultLock, held, { mode: 0o600 });
+      try {
+        const busy = await waitCli(wb, 'filer-f', ['--timeout', '2']); assert.match(busy.out, /^code: TIMEOUT$/m); assert.equal(busy.err, vaultWarning);
+        writeFileSync(wb, JSON.stringify({ schema: 2, items: [ask('ordinary-p', 'filer-p'), ask('ordinary-f', 'filer-f')] }));
+        const pending = waitCli(wb, 'filer-f', ['--timeout', '10', '--json']);
+        await new Promise((ok) => setTimeout(ok, 1_500)); const saved = Date.now(); answer('ordinary-f');
+        const r = await pending; assert.equal(r.code, 0); assert.deepEqual(Object.keys(r.json), ['ordinary-f']); assert.ok(Date.now() - saved < 2_500, 'Ordinary answers do not queue behind custody.');
+        assert.deepEqual(readFileSync(vaultLock), held);
+      } finally { rmSync(vaultLock); }
+      const live = await waitCli(wb, 'filer-f', ['--timeout', '1']); assert.match(live.out, /^code: TIMEOUT$/m); assert.equal(live.err, '');
+      chmodSync(join(waitState, 'sign-off', 'vault'), 0o755);
+      try { const r = await waitCli(wb, 'filer-f', ['--timeout', '1']); assert.match(r.out, /^code: TIMEOUT$/m); assert.equal(r.err, vaultWarning); }
+      finally { chmodSync(join(waitState, 'sign-off', 'vault'), 0o700); }
+      // Sweeps and lock cleanup leave markers alone; the board folder never learns vault routing.
+      const markers = readdirSync(join(waitState, 'sign-off', 'vault')).filter((n) => n.endsWith('.taken')).map((n) => join(waitState, 'sign-off', 'vault', n)).map((p) => [p, readFileSync(p)]);
+      assert.equal(markers.length, 10); assert.equal(await serve(undefined, wb), '');
+      for (const [p, bytes] of markers) assert.deepEqual(readFileSync(p), bytes);
+      assert.deepEqual((await run({ op: 'expiry', board: wb, key: 'f-ready', filer: 'filer-f' })).event, keyed.event);
+      for (const p of readdirSync(waitFolder).map((n) => join(waitFolder, n)).filter((p) => !p.endsWith('.sign-off-vault-id'))) {
+        assert.ok(!/f-pending|f-ready|f-receive|g-item|s-late|p-prio|m-good|r-a|filer-g|filer-s|filer-m|filer-r|api-token/.test(readFileSync(p, 'utf8')));
+      }
+    } finally { env.XDG_STATE_HOME = state; }
     assert.deepEqual(readFileSync(keptPath), kept);
     for (const text of [...outputs, ...files(home).map((p) => readFileSync(p).toString())]) {
       assert.equal(text.includes(secret) || text.includes(url), false);
