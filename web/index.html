@@ -777,8 +777,9 @@
   /** The day so far: a mark per answer on a line of hours, and the list of them. Only answers have a place on it; an item's `filed` time is not shown here.
    *  Each column carries its own count, so the columns add up to the day's total in the caption; columns sit at least a tenth of the line apart, so two counts never touch. */
   function today(answered) {
-    const day = new Date().toDateString(), done = answered.map((d) => ({ d, t: new Date(state.answers[d.key].at) }))
-      .filter((e) => e.t.toDateString() === day).sort((x, y) => x.t - y.t);
+    // `answered` arrives newest first with ties in the Answered list's order, so the list keeps that order as given; the chart sorts a copy by time.
+    const day = new Date().toDateString(), fresh = answered.map((d) => ({ d, t: new Date(state.answers[d.key].at) }))
+      .filter((e) => e.t.toDateString() === day), done = [...fresh].sort((x, y) => x.t - y.t);
     const head = (range) => el('div', { class: 'sec-head' }, el('h2', {}, 'Today'), range ? el('span', { class: 'meta' }, range) : '');
     if (!done.length) return el('section', { class: 'card today' }, head(), el('p', { class: 'meta' }, 'Nothing answered today yet.'));
     const h0 = done[0].t.getHours(), step = Math.ceil((done.at(-1).t.getHours() + 1 - h0) / 4), h1 = h0 + step * Math.ceil((done.at(-1).t.getHours() + 1 - h0) / step);
@@ -789,7 +790,7 @@
       el('div', { class: 'day', 'aria-hidden': 'true' }, ...[...cols].map(([k, es]) => el('span', { class: 'col', style: `left: ${k}%` },
         ...es.slice(0, 6).map(() => el('span', { class: 'dot' })), String(es.length)))),
       el('div', { class: 'hours', 'aria-hidden': 'true' }, ...hours.map((h) => el('span', {}, h))),
-      el('ol', { class: 'events' }, ...done.slice(-SHOWN).map((e) => el('li', { dir: 'auto' }, el('time', {}, hhmm(e.t)), `${title(e.d)} · ${state.answers[e.d.key].label}`))),
+      el('ol', { class: 'events' }, ...fresh.slice(0, SHOWN).map((e) => el('li', { dir: 'auto' }, el('time', {}, hhmm(e.t)), `${title(e.d)} · ${state.answers[e.d.key].label}`))),
       done.length > SHOWN ? el('p', { class: 'meta' }, `and ${done.length - SHOWN} earlier`) : '');
   }
 
