@@ -183,6 +183,37 @@ test('agent journey: raise, open, answer, read back in TOON and JSON', async () 
   assert.match(run('raise', '--from', 'missing.json').out, new RegExp(`cannot read ${join(process.cwd(), 'missing.json')}: ENOENT`));
 });
 
+test('three dismissed updates are not waiting on the CLI either: list and answers count 0 like the board, and an agent still waits on them', async () => {
+  const home = mkdtempSync(join(scratch, 'dismiss-'));
+  const env = { ...process.env, HOME: home };
+  const run = (...args) => {
+    try { return { out: execFileSync('node', [cli, ...args], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }), code: 0 }; }
+    catch (e) { return { out: e.stdout, code: e.status }; }
+  };
+  run('init', home);
+  const shot = join(home, 'shot.png'), board = join(home, '.sign-off', 'decisions.json');
+  writeFileSync(shot, png);
+  // Three evidence updates, update-1 to update-3, as on the captain's board.
+  for (const t of ['Sign-in flow', 'Weekly digest', 'Reports page']) assert.equal(run('post', '--type', 'evidence', '--title', t, '--about', 'Loads in 1 second.', '--media', shot).code, 0);
+  assert.match(run('list', board).out, /waiting\[3\]/);
+  // The board dismisses them through its own dismiss call and then shows none of them.
+  const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: home, env });
+  procs.push(proc);
+  const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+  const keys = ['update-1', 'update-2', 'update-3'];
+  assert.equal((await fetch(`${url}api/dismiss`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keys, dismissed: true }) })).status, 200);
+  assert.deepEqual((await (await fetch(`${url}api/decisions`)).json()).dismissed, keys);
+  proc.kill();
+  // The CLI agrees: nothing is waiting in list or answers, --full and --json say dismissed.
+  assert.match(run('list', board).out, /waiting: 0 of 3 decisions \(nothing is waiting on the user\)/);
+  assert.match(run('answers', board).out, /waiting: 0/);
+  assert.deepEqual([...run('list', board, '--full').out.matchAll(/update-\d,(\w+)/g)].map((m) => m[1]), ['dismissed', 'dismissed', 'dismissed']);
+  assert.deepEqual(JSON.parse(run('list', board, '--json').out).decisions.map((d) => d.dismissed), [true, true, true]);
+  // The agent is not told: a wait on the dismissed updates runs to its timeout instead of finding nothing to wait on.
+  const waited = run('wait', board, '--timeout', '0');
+  assert.deepEqual([waited.code, /code: TIMEOUT/.test(waited.out)], [1, true]);
+});
+
 test('old files and answers read as before; a one-of-few answer with a note survives a restart', async () => {
   const old = join(scratch, 'old.json');
   copyFileSync(new URL('../fixtures/sample-decisions.json', import.meta.url), old);

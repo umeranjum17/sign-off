@@ -513,6 +513,8 @@ async function browse(dir, width = 800) {
   const evaluate = (expression) => call('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
   // On a busy host, input sent right after a redraw can miss the sandboxed frame it aims at, so each input waits for the page to paint first.
   const painted = () => call('Runtime.evaluate', { expression: 'new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)))', awaitPromise: true });
+  // Headless Chrome keeps a window at least 500 px wide, so the page is set to the asked width as a phone would be.
+  await call('Emulation.setDeviceMetricsOverride', { width, height: 4000, deviceScaleFactor: 1, mobile: false });
   // A real mouse click at a point of the page, which reaches into a frame there as a person's would.
   const click = async ([x, y]) => { await painted(); for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await call('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 }); };
   // A real touch tap at a point of the page, as a phone's would.
@@ -856,9 +858,25 @@ test('Clear all done on 201 answered items, set two across on a wide screen: the
   proc.kill();
 });
 
-// SQUASH from the verify skill: no visible element holding more than 8 characters of its own text is narrower than 8 characters of its font.
-const SQUASH = `[...document.querySelectorAll('body *')].filter((e) => { const t = [...e.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('').trim();
-  return t.length > 8 && e.checkVisibility({ visibilityProperty: true }) && e.getBoundingClientRect().width < 8 * parseFloat(getComputedStyle(e).fontSize) * 0.5; }).map((e) => e.textContent.trim().slice(0, 40))`;
+// SQUASH from the verify skill lists squashed text at any width: a visible element holding more than 8 characters of its own
+// text in a column narrower than 8 characters of its font, a number or short label (6 characters or fewer) on more than one
+// line or running out of its own box, and two visible runs of text that overlap.
+const SQUASH = `(() => {
+  const out = [], runs = [];
+  for (const e of document.querySelectorAll('body *')) {
+    const nodes = [...e.childNodes].filter((n) => n.nodeType === 3 && n.textContent.trim()), t = nodes.map((n) => n.textContent).join('').trim();
+    if (!t || !e.checkVisibility({ visibilityProperty: true })) continue;
+    const box = e.getBoundingClientRect(), rects = nodes.flatMap((n) => { const r = document.createRange(); r.selectNodeContents(n); return [...r.getClientRects()]; }).filter((r) => r.width && r.height);
+    if (t.length > 8 && box.width < 8 * parseFloat(getComputedStyle(e).fontSize) * 0.5) out.push('squash:' + t.slice(0, 40));
+    if (t.length <= 6 && (new Set(rects.map((r) => Math.round(r.top))).size > 1 || rects.some((r) => r.left < box.left - 1 || r.right > box.right + 1))) out.push('wrap:' + t);
+    for (const r of rects) runs.push([e, t, r]);
+  }
+  for (let i = 0; i < runs.length; i++) for (let j = i + 1; j < runs.length; j++) {
+    const [ea, ta, a] = runs[i], [eb, tb, b] = runs[j];
+    if (ea !== eb && a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1) out.push('overlap:' + ta.slice(0, 15) + '/' + tb.slice(0, 15));
+  }
+  return [...new Set(out)];
+})()`;
 
 test('a long answer at 390 px sits under its long title, which keeps most of the row and wraps by words, on Answered and the Summary', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'squash'), file = join(dir, 'board.json'), long = 'A (recommended): you sign in to npm once (1 tap); no key stored anywhere';
@@ -883,6 +901,32 @@ test('a long answer at 390 px sits under its long title, which keeps most of the
   }
   close();
   proc.kill();
+});
+
+// The Summary at 390 with 1, 10 and 100 answers today, as on the captain's phone: one answer at 8:00 and the rest at 9:30, and at
+// 100 all of them in one column. The Answered count stays on one line at its full width while its checks give way; each Today
+// column carries its own count, the counts add up to the caption, and none reaches the caption or another label.
+test('Summary at 390 with 1, 10 and 100 answers today: the Answered count stays whole and the Today counts add up without touching the caption', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const today = (h, m) => { const d = new Date(); d.setHours(h, m, 0, 0); return d.toISOString(); };
+  const seen = {}, want = {};
+  for (const n of [1, 10, 100]) {
+    const dir = join(scratch, `fit-${n}`), file = join(dir, 'board.json');
+    mkdirSync(dir, { recursive: true });
+    const rows = Array.from({ length: n }, (_, i) => ({ key: `q${i}`, title: `Question ${i}?`, options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }] }));
+    writeFileSync(file, JSON.stringify({ schema: 2, items: rows }));
+    writeFileSync(file.replace(/\.json$/, '.answers.jsonl'), rows.map((d, i) => JSON.stringify({ key: d.key, answer: 'yes', label: 'Yes', close: 'done', at: n === 10 && i === 0 ? today(8, 0) : today(9, 30) })).join('\n') + '\n');
+    const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+    procs.push(proc);
+    const url = /url: "(\S+)"/.exec(await served(proc))[1];
+    const { evaluate, close } = await browse(join(dir, 'b'), 390);
+    await evaluate(`location.href = ${JSON.stringify(url)}`);
+    await until(async () => (await evaluate(`document.querySelector('.tile.i-answered .n')?.textContent === '${n}' && !!document.querySelector('.day')`)));
+    seen[n] = await evaluate(`[${SQUASH}, document.querySelector('.today .sec-head .meta').textContent, [...document.querySelectorAll('.col')].map((c) => c.textContent)]`);
+    want[n] = [[], `${n} answered, ${n === 10 ? '8:00 to 10:00' : '9:00 to 10:00'}`, n === 10 ? ['1', '9'] : [String(n)]];
+    close();
+    proc.kill();
+  }
+  assert.deepEqual(seen, want);
 });
 
 test('Evidence: each update is a card with its number, the day it was filed and New when that is today; one portrait capture sits beside its words, two go side by side; at 1440 the page counts them under its title and sets them two across', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
