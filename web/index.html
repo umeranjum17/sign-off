@@ -133,7 +133,7 @@
   .sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
   .sec-head h2 { margin: 0; } .sec-head:has(+ .in-evidence) { margin: 1rem 0 0.375rem; }
   .rows { list-style: none; margin: 0; padding: 0 1rem; }
-  .rows li + li { border-top: 1px solid var(--line); }
+  .rows > li + li { border-top: 1px solid var(--line); }
   .compact { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 0; color: var(--text); text-decoration: none; }
   .compact .t { display: grid; flex: 1; min-width: 0; }
   .ans { display: grid; justify-items: end; text-align: right; } .ans b { color: var(--c-answered); } .ans time { color: var(--muted); font-size: 0.875rem; }
@@ -238,7 +238,7 @@
     background: none; color: var(--muted); font-size: 1.5rem; line-height: 1.25; }
   .x:hover { background: var(--sunk); color: var(--text); }
   .head .st + .x { margin-left: 0; }
-  .rows li { display: flex; align-items: center; }
+  .rows > li { display: flex; align-items: center; }
   .rows li .compact { flex: 1; min-width: 0; }
   .rows li .x { margin: 0; }
   .clear { min-height: 2.75rem; padding: 0; border: 0; background: none; color: var(--accent); font-weight: 600; }
@@ -340,8 +340,8 @@
     .reports { grid-template-columns: 1fr 1fr; align-items: start; }
     /* Answered sets each row as its own card, two across; an opened row takes the whole width. */
     .rows.i-answered { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; align-items: start; padding: 0; border: 0; background: none; box-shadow: none; }
-    .rows.i-answered li { padding: 0 0.5rem 0 1rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); box-shadow: var(--shadow); }
-    .rows.i-answered li:has(.done[open]) { grid-column: 1 / -1; }
+    .rows.i-answered > li { padding: 0 0.5rem 0 1rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); box-shadow: var(--shadow); }
+    .rows.i-answered > li:has(.done[open]) { grid-column: 1 / -1; }
     .upd.portrait > .media { width: 8rem; }
     /* Evidence sets its updates two across; a page that is not an update keeps the whole width. */
     .list.in-evidence { grid-template-columns: 1fr 1fr; align-items: start; } .in-evidence > .row:not(.update) { grid-column: 1 / -1; }
@@ -393,7 +393,7 @@
     const drop = clearIfSaved(d.key, drafts.get(d.key));
     call('/api/answers', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
-    }, typed ? undefined : drop).then(() => offerUndo(d, before)).then(() => typed && call('/api/messages', {
+    }, () => { editing.delete(d.key); if (!typed) drop(); }).then(() => offerUndo(d, before)).then(() => typed && call('/api/messages', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'comment', key: d.key, text: typed }),
     }, drop)).catch((e) => {
       shown(err).textContent = `Couldn't save: ${e.message}`;
@@ -562,9 +562,10 @@
     roundBtn.onclick = () => {
       roundBtn.disabled = true;
       const note = (drafts.get(d.key) ?? noteOf(d)).trim();
+      const drop = clearIfSaved(d.key, drafts.get(d.key));
       call('/api/rounds', {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, note }),
-      }, clearIfSaved(d.key, drafts.get(d.key))).catch((e) => {
+      }, () => { editing.delete(d.key); drop(); }).catch((e) => {
         shown(err).textContent = `Couldn't ask: ${e.message}`;
         roundBtn.disabled = false;
       });
@@ -580,7 +581,7 @@
     const hint = !d.options.length ? 'Reply in a few words' : words ? `Your own answer in a few words. It also goes, as a note, ${also}.` : `A note, sent ${also}.`;
     const fold = el('details', { class: 'other', ...((unfolded.has(d.key) || drafts.get(d.key)) && { open: '' }) },
       el('summary', { 'aria-label': `${label}, ${d.title}` }, `${label}${status && ` · ${status}`}`),
-      asked.length ? el('p', { class: 'meta saved-note', dir: 'auto' }, `You asked for another round: ${asked[asked.length - 1].note}`) : '',
+      asked.length ? el('p', { class: 'meta saved-note', dir: 'auto' }, `You asked for another round: ${asked[asked.length - 1].note || 'with your comments on the mocks'}`) : '',
       ...comments.map((m) => el('p', { class: 'meta saved-note', dir: 'auto' }, `Your comment, ${m.delivered ? 'read by the agent' : 'not read yet'}: ${m.text}`)),
       el('label', { for: box.id }, hint), box,
       el('div', { class: 'actions' }, words ? sendBtn : '', round ? roundBtn : '', talk && !FROZEN ? commentBtn : ''));
@@ -668,16 +669,16 @@
     }));
   }
 
-  /** Comments on mock elements, not sent yet: the open editor per item, then the list, each comment shown only on the mock file it was made on. */
+  /** Comments on mock elements: the open editor per item, then the unsent list, then the sent ones. An unsent comment shows only on the mock file it was made on. */
   const editing = new Map(), talks = () => !state.readonly && !state.answers_only && !FROZEN;
   const redraw = (d) => document.querySelectorAll('.ann').forEach((n) => n.dataset.ann === d.key && n.replaceWith(annotations(d)));
   function annotations(d) {
     const hash = new Map((d.mocks ?? []).map((m) => [m.value, m.hash])), open = editing.get(d.key);
-    // A comment shows only on the mock file it was made on; the others are counted per mock.
+    // An unsent comment shows only on the mock file it was made on; the others are counted per mock. A sent one is always listed.
     const mine = [], old = new Map(), name = (m) => d.options.find((o) => o.value === m)?.label ?? m;
     for (const a of state.annotations ?? []) {
       if (a.key !== d.key) continue;
-      if (hash.get(a.mock) === a.hash) mine.push(a);
+      if (a.sent || hash.get(a.mock) === a.hash) mine.push(a);
       else old.set(a.mock, (old.get(a.mock) ?? 0) + 1);
     }
     const what = (a) => `${name(a.mock)} · ${a.tag}${a.words ? ` “${a.words.length > 40 ? `${a.words.slice(0, 40)}…` : a.words}”` : ''}`;
@@ -702,20 +703,24 @@
     let form = '';
     if (open && pages.length) {
       const box = el('textarea', { id: `ann-text-${d.key}`, rows: 2, maxlength: 500, dir: 'auto' }), save = el('button', {}, 'Save comment'), cancel = el('button', { class: 'quick' }, 'Cancel');
-      box.value = open.text ?? mine.find((a) => a.mock === open.mock && a.ref === open.ref)?.text ?? '';
+      box.value = open.text ?? mine.find((a) => !a.sent && a.mock === open.mock && a.ref === open.ref)?.text ?? '';
       box.oninput = () => (open.text = box.value);
       save.onclick = () => post(save, { id: open.id, key: d.key, mock: open.mock, ref: open.ref, tag: open.tag, words: open.words, text: box.value, hash: open.hash }, () => editing.delete(d.key));
       cancel.onclick = () => { editing.delete(d.key); redraw(d); };
       form = el('div', {}, el('label', { for: box.id }, `Comment on ${what(open)}`), box, el('div', { class: 'actions' }, save, cancel));
     }
-    const rows = mine.map((a) => {
+    const row = (a, ...buttons) => el('li', {}, el('div', {}, el('p', { class: 'meta' }, what(a)), el('p', { class: 'saved-note', dir: 'auto' }, a.text)), ...buttons);
+    // A comment goes with the card's next answer or round; once sent it is the agent's and stays as it was.
+    const sent = mine.filter((a) => a.sent).map((a) => row(a));
+    const rows = mine.filter((a) => !a.sent).map((a) => {
       const edit = el('button', { class: 'quick', 'aria-label': `Edit comment, ${what(a)}` }, 'Edit'), del = el('button', { class: 'quick', 'aria-label': `Delete comment, ${what(a)}` }, 'Delete');
       edit.onclick = () => { editing.set(d.key, { ...a }); redraw(d); };
       del.onclick = () => post(del, { id: a.id, deleted: true }, () => { if (editing.get(d.key)?.mock === a.mock && editing.get(d.key)?.ref === a.ref) editing.delete(d.key); });
-      return el('li', {}, el('div', {}, el('p', { class: 'meta' }, what(a)), el('p', { class: 'saved-note', dir: 'auto' }, a.text)), el('span', { class: 'actions' }, edit, del));
+      return row(a, el('span', { class: 'actions' }, edit, del));
     });
     return el('div', { class: 'ann', 'data-ann': d.key }, pages.length ? el('div', { class: 'actions' }, toggle) : '',
-      on ? el('p', { class: 'meta' }, 'Tap an element in a mock to comment on it. Turn this off to open a mock full size.') : '', form, rows.length ? el('p', { class: 'meta' }, 'Your comments on the mocks, not sent yet') : '', rows.length ? el('ul', {}, ...rows) : '',
+      on ? el('p', { class: 'meta' }, 'Tap an element in a mock to comment on it. Turn this off to open a mock full size.') : '', form, ...(rows.length ? [el('p', { class: 'meta' }, 'Your comments on the mocks, not sent yet'), el('ul', {}, ...rows), el('p', { class: 'meta' }, 'They go with your pick, your Other answer or Another round.')] : []),
+      ...(sent.length ? [el('p', { class: 'meta' }, 'Sent to the agent'), el('ul', {}, ...sent)] : []),
       ...[...old].map(([m, n]) => el('p', { class: 'meta' }, `${n} comment${n > 1 ? 's' : ''} on an earlier version of “${name(m)}” ${n > 1 ? 'are' : 'is'} hidden`)), err);
   }
 

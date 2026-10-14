@@ -21,8 +21,10 @@ export type Decision = {
   /** Reports: the section it is grouped under and what it decided. `filed` (ISO date-time) is when any item was filed. */
   group?: string; filed?: string; decided?: string;
 };
-export type Answer = { key: string; answer: string; label: string; close: string; at: string; note?: string };
-export type Round = { key: string; note: string; at: string };
+export type Answer = { key: string; answer: string; label: string; close: string; at: string; note?: string; comments?: Sent[] };
+export type Round = { key: string; note: string; at: string; comments?: Sent[] };
+/** A comment on a mock element as it went to the agent with an answer or a round. */
+export type Sent = Pick<Annotation, 'id' | 'mock' | 'hash' | 'ref' | 'tag' | 'words' | 'text'>;
 
 /** A problem with the decisions file; the CLI exits 2 and the server answers 422/409 with this message. */
 export class InputError extends Error {}
@@ -92,14 +94,15 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     for (const f of ['about', 'detail']) if (d[f] !== undefined && !isText(d[f])) throw bad(f, 'must be text');
     if (d.evidence !== undefined && (!d.evidence || !/^[A-Za-z0-9._-]{1,128}$/.test(d.evidence.run_id ?? '')
       || !/^[a-f0-9]{40}$/.test(d.evidence.commit ?? '')
-      || ['outcome', 'repro', 'proof', 'evidence'].some((f) => !isText(d.evidence[f]) || !d.evidence[f].trim() || d.evidence[f].length > 1000))) {
+      || ['outcome', 'repro', 'proof', 'evidence'].some((f) => !isText(d.evidence[f]) || !d.evidence[f].trim() || [...d.evidence[f]].length > 1000))) {
       throw bad('evidence', 'must name a done-done run, full commit, and four Checks lines');
     }
     // Any lowercase type word loads; the page shows a plain card for a type it has no renderer for.
     if (d.type !== undefined && !(isText(d.type) && /^[a-z][a-z0-9-]{0,31}$/.test(d.type))) throw bad('type', 'must be a lowercase word such as decision or design');
     for (const [f, allowed] of Object.entries(ONE_OF)) if (d[f] !== undefined && !allowed.includes(d[f])) throw bad(f, `must be ${allowed.join(' or ')}`);
     const stored = Object.hasOwn(STORED, d.type ?? '') ? STORED[d.type] : undefined;
-    if (stored) {
+    // An evidence update that links a done-done run may have no files of its own (contract evidence with run only).
+    if (stored && !(d.type === 'evidence' && d.media === undefined && d.evidence)) {
       const [max, kinds, ext] = stored;
       if (!Array.isArray(d.media) || !d.media.length || d.media.length > max || !d.media.every((m: any) => isText(m?.path)
         && /^evidence\/\d+\/\w[\w-]*\.\w+$/.test(m.path) && ext.test(m.path) && /^[a-f0-9]{64}$/.test(m.sha256 ?? '') && Number.isInteger(m.bytes) && m.bytes >= 0)) {
@@ -155,7 +158,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       ...(views && { view: d.view }), ...(d.reply && { reply: true }), ...(d.filer && { filer: d.filer }), ...(d.area && { area: d.area }),
       ...(d.group && { group: d.group }), ...(d.filed && { filed: d.filed }), ...(d.decided && { decided: d.decided }),
       ...(d.steps && { steps: d.steps.map(({ title, marks }: Step) => ({ title, ...(marks?.length && { marks }) })) }),
-      ...(stored && { media: d.media.map(({ path, sha256, bytes }: MediaRef) => ({ path, sha256, bytes })) }),
+      ...(stored && d.media && { media: d.media.map(({ path, sha256, bytes }: MediaRef) => ({ path, sha256, bytes })) }),
       ...(d.type === 'evidence' && { number: d.number }),
       ...(d.type === 'explainer' && d.chapters && { chapters: d.chapters.map(({ at, title }: Chapter) => ({ at, title })) }),
     };
@@ -167,26 +170,29 @@ export const roundsPath = (decisionsPath: string) => decisionsPath.replace(/\.js
 const readRaw = (file: string) => (existsSync(file) ? readFileSync(file, 'utf8') : '');
 /** Latest answer per key; a line with an empty answer (an Undo with nothing to go back to) leaves the key unanswered. A torn line (a crash mid-write) is skipped and reported through warn. */
 export function readAnswers(decisionsPath: string, warn: (msg: string) => void = () => {}): Record<string, Answer> {
-  const latest = new Map<string, Answer>();
+  const latest = new Map<string, Answer>(), sent = new Map<string, Sent[]>();
   readRaw(answersPath(decisionsPath)).split('\n').forEach((line, n) => {
     try {
       const a = line && JSON.parse(line);
       if (a?.answer === '') latest.delete(a.key);
-      else if (a) latest.set(a.key, a);
+      else if (a) {
+        latest.set(a.key, a);
+        if (a.comments) sent.set(a.key, [...(sent.get(a.key) ?? []), ...a.comments]);
+      }
     } catch {
       warn(`skipped unreadable line ${n + 1} in ${answersPath(decisionsPath)}`);
     }
   });
-  return Object.fromEntries(latest);
+  return Object.fromEntries([...latest].map(([key, a]) => [key, sent.has(key) ? { ...a, comments: sent.get(key) } : a]));
 }
 
 /** The option an Undo saves when the item had no answer before: an empty answer, so the item waits again. */
 export const CLEARED: Option = { value: '', label: '' };
 /** Appends one answer line unless it equals the current answer and note, and returns the saved answer. Starts a new line after a torn fragment. */
-export function appendAnswer(decisionsPath: string, d: Decision, option: Option, note = ''): Answer | undefined {
+export function appendAnswer(decisionsPath: string, d: Decision, option: Option, note = '', comments: Sent[] = []): Answer | undefined {
   const current = readAnswers(decisionsPath)[d.key];
-  if (option === CLEARED ? !current : current?.answer === option.value && (current.note ?? '') === note) return;
-  const answer: Answer = { key: d.key, answer: option.value, label: option.label, close: d.close, at: now(), ...(note && { note }) };
+  if (option === CLEARED ? !current : current?.answer === option.value && (current.note ?? '') === note && !comments.length) return;
+  const answer: Answer = { key: d.key, answer: option.value, label: option.label, close: d.close, at: now(), ...(note && { note }), ...(comments.length && { comments }) };
   appendLine(answersPath(decisionsPath), answer);
   return answer;
 }
@@ -220,10 +226,14 @@ export function readRounds(decisionsPath: string, warn: (msg: string) => void = 
   return rounds;
 }
 
-/** Asks the agent for another round on a question, carrying the person's note. */
-export function appendRound(decisionsPath: string, key: string, note: string): void {
-  appendLine(roundsPath(decisionsPath), { key, note, at: now() } satisfies Round);
+/** Asks the agent for another round on a question, carrying the person's note and the comments on its mocks. */
+export function appendRound(decisionsPath: string, key: string, note: string, comments: Sent[] = []): void {
+  appendLine(roundsPath(decisionsPath), { key, note, at: now(), ...(comments.length && { comments }) } satisfies Round);
 }
+/** Ids of the comments that went with an answer or a round: sent, so locked. */
+export const sentIds = (decisionsPath: string) => new Set([answersPath, roundsPath].flatMap((path) => readRaw(path(decisionsPath)).split('\n').flatMap((line) => {
+  try { const c = line && JSON.parse(line)?.comments; return Array.isArray(c) ? c.map((x) => x?.id) : []; } catch { return []; }
+})));
 
 /** Items hidden from the board, one line per key and change; the agent is not told, and an ask it waits on keeps waiting. */
 export const dismissedPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.dismissed.jsonl';
@@ -268,7 +278,7 @@ export const appendMessage = (decisionsPath: string, kind: Message['kind'], text
   appendLine(messagesPath(decisionsPath), { id: randomBytes(6).toString('hex'), kind, ...(key && { key }), text, at: now() } satisfies Message);
 export const markDelivered = (decisionsPath: string, ids: string[]) => appendLine(messagesPath(decisionsPath), { delivered: ids, at: now() });
 
-/** A comment on one element of a design mock, not sent yet: `hash` is the mock file it was made on, `ref`, `tag` and `words` name the element. */
+/** A comment on one element of a design mock: `hash` is the mock file it was made on, `ref`, `tag` and `words` name the element. Once an answer or round carries it, it is locked. */
 export type Annotation = { id: string; key: string; mock: string; hash: string; ref: string; tag: string; words: string; text: string; at: string };
 export const annotationsPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.annotations.jsonl';
 /** Live comments, oldest first: an edit is a later line with the same id, and a `{"id", "deleted": true}` line removes one. A torn line is skipped and reported through warn. */

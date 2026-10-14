@@ -6,7 +6,7 @@ Covers `validate`, `post --kind` and the shipped `fixtures/contract/` messages (
 
 | # | Step | Pass when |
 |---|---|---|
-| 1 | In `$SCR/ci`: `npm init -y`, `npm install --no-save $SCR/sign-off-axi-<version>.tgz` | `ask.v1/` and `report.v1/` under `node_modules/sign-off-axi/fixtures/contract/` each hold 2+ `valid-*` and 3+ `invalid-*` files |
+| 1 | In `$SCR/ci`: `npm init -y`, `npm install --no-save $SCR/sign-off-axi-<version>.tgz` | `ask.v1/`, `report.v1/` and `evidence.v1/` under `node_modules/sign-off-axi/fixtures/contract/` each hold 2+ `valid-*` and 3+ `invalid-*` files |
 | 2 | `npx sign-off-axi validate node_modules/sign-off-axi/fixtures/contract/*/valid-*.json` | One `files` row per file with `ok` true; exit 0 |
 | 3 | `validate` each `invalid-*.json` alone | `ok` false, an error naming the field in the file name, one `help` line; exit 2 |
 | 4 | A message with `"recommend_value"` twice; one with `"schema": 2`; `validate --kind gate` on a valid ask | Exit 2 with `Remove the second "recommend_value".`, `Upgrade sign-off-axi`, and `is ask, not --kind gate` |
@@ -16,3 +16,6 @@ Covers `validate`, `post --kind` and the shipped `fixtures/contract/` messages (
 | 7 | `post board.json --kind ask --from <valid ask> --filer agent-41`, the same again, then `cat` the report fixture into `post board.json --kind report --from -` | `raised`, then `already waiting`; the board item keeps `kind` and `filer`; the report prints `so the user can read it` |
 | 8 | `post --kind` refusals: stdin with no `recommend_value`; a valid ask with `--kind report`; a new title under the same key; the same ask again with `--filer agent-99`; `"filer"` other than `--filer`; `--title` beside `--kind` | Each exits 2 with one `help` line, the error starts with `stdin:` or the file name, and the board file is unchanged; each key conflict says `Post it under a new key` |
 | 9 | `raise board.json --from feed.json` whose one item is `{"key":"pick","title":"Pick?"}` (no `kind`); the same feed with `post --replace` | Both exit 2: `feed.json: items[0] key pick: kind is required on a new decision`, help `Add "contract": 1, "kind" and "schema"` |
+| 10 | `post board.json --kind evidence --from node_modules/sign-off-axi/fixtures/contract/evidence.v1/valid-media.json --filer agent-41`, the same again, the same with `--filer agent-9`; then `cat` `valid-run.json` into `post board.json --kind evidence --from -` | `signin-phone-2,1,1,...,posted`, then `already posted`, then exit 2 `already holds a different message`; `evidence/1/1.png` equals the fixture's `shot.png`; the stdin one is `update-2` with no media and the run stored as `evidence` |
+| 11 | `open board.json`, then the Evidence area at 390 wide | Both updates show; `update-2` shows its Proof record with the four Checks lines (UNVERIFIED without `--evidence-root`) |
+| 12 | An evidence message whose `media` is a symlink to a file outside its folder; a `--from` feed holding an evidence message | Both exit 2 and write nothing: `media[0] ... leads outside the message file's folder`; `new evidence is posted one at a time`, help `post --kind evidence --from` |

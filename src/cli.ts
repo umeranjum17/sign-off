@@ -10,9 +10,9 @@ import { basename, delimiter, dirname, extname, isAbsolute, join, relative, reso
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { type Answer, CHAPTERS_MAX, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, writeItems } from './store.js';
+import { type Answer, CHAPTERS_MAX, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, writeItems } from './store.js';
 
-import { ContractError, KINDS, checkMessage, parseMessage } from './contract.js';
+import { ContractError, KINDS, MEDIA_BYTES, checkMessage, mediaFiles, parseMessage } from './contract.js';
 import { errors, sweepVault, takeVaultExpiries } from './vault.js';
 
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
@@ -76,10 +76,11 @@ examples:
 `,
   validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>] [--expect-invalid]
 Checks message files against the communication contract without posting them: ${CONTRACT}
-A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask and report, schema 1 each.
+A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, report and evidence, schema 1 each.
+An evidence message's media paths read from the message file's folder: each file must be there, inside it, and 50 MB or less.
 Post one with \`sign-off-axi post --kind <kind> --from <message.json>\`, or --from - to read stdin.
 A board file given to raise --from or post --from may hold such messages as items: each is checked the same way before it is stored, and a report shows under Reports with no answer.
-In such a file a new item of a contract kind (a decision, the default, an ask, evidence or a report) must carry contract, kind and schema.
+In such a file a new item of a contract kind (a decision, the default, an ask or a report) must carry contract, kind and schema; new evidence is posted with post --kind evidence, one at a time.
 Each file gets a row with ok, or the error and one help line that names the fix. A field written twice, an unknown field or a broken limit refuses the file.
   --kind            each file must be this kind, so the wrong file is refused
   --expect-invalid  every file must be refused: exits 0 only then, 2 when any passes (the conformance check of invalid fixtures)
@@ -90,6 +91,7 @@ examples:
   sign-off-axi validate ask.json
   sign-off-axi validate --kind ask messages/*.json
   sign-off-axi validate --kind report report.json
+  sign-off-axi validate --kind evidence proof/evidence.json
   sign-off-axi validate --expect-invalid node_modules/sign-off-axi/fixtures/contract/*/invalid-*.json
 `,
   answers: `usage: sign-off-axi answers [board.json] [--key <key>] [--full] [--json]
@@ -158,6 +160,8 @@ examples:
 Posts an item for the user. --type decision (the default) is a yes/no or pick-one question, exactly like raise.
 --kind posts one contract message (${CONTRACT}), read from a file or from stdin with --from -: it must be that kind and pass every rule,
 else it is refused with one fix line and nothing is written. A key already on the board takes only the same message again; anything else exits 2.
+--kind evidence copies its media, read from the message file's folder (the current folder for stdin), into evidence/<number>/ like --type evidence;
+a "run" is shown as the update's proof record. With no key it posts the next update-<number>.
 Listing --option needs --recommend <value>, on every type: the option you would pick, shown first and marked. --from --replace feeds are not held to it.
 --filer names who posts (your agent session or any id of 1-128 of A-Z a-z 0-9 . _ -), saved on the item; then \`wait --filer <id>\` gets the answer.
 SIGN_OFF_FILER sets it for every command; with neither, the Claude Code session id is saved when there is one.
@@ -182,6 +186,7 @@ examples:
   sign-off-axi post .sign-off/decisions.json --type design --key sign-in --title "Pick the sign-in layout" --option a=A --option b=B --option c=C --mock a=mocks/sign-in/index.html?variant=a --mock b=mocks/sign-in/index.html?variant=b --mock c=mocks/sign-in/index.html?variant=c --tradeoff "..." --recommend b
   sign-off-axi post --type decision --title "Keep the weekly digest?" --recommend yes
   sign-off-axi post --kind ask --from ask.json --filer agent-41
+  sign-off-axi post --kind evidence --from proof/evidence.json --filer done-done
   sign-off-axi post .sign-off/decisions.json --type interactive --title "Does the sign-in flow feel right?" --view mocks/sign-in/demo.html --option yes=Yes --option no="Needs work" --recommend yes
   sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media phone.png --media flow.mp4 --link https://github.com/acme/app/pull/12
   sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "The new sign-in has 2 steps." --media explainer.mp4 --chapter 0:00=Start --chapter 0:12="Step 2"
@@ -254,9 +259,15 @@ const CONTRACT_TYPES = ['decision', 'ask', 'evidence', 'report'];
 /** Items of a --from file that carry contract or kind are contract messages: each is checked against its kind's rules before anything is stored.
  * A new item of a contract kind must carry them (contract section 2); one already on the board is not checked again. */
 function contractItems(items: any[], from: string, file: string) {
-  const had = new Set(existsSync(file) ? readItems(file).items.map((i) => i?.key) : []);
+  const on = new Map((existsSync(file) ? readItems(file).items : []).map((i) => [i?.key, i]));
   items.forEach((m, i) => {
-    if (had.has(m?.key)) return;
+    // Evidence in message form (no type) never comes in a feed, even under a key on the board: its media must be copied and numbered.
+    // A stored board-format evidence item passes through a feed unchanged; any other evidence under a key is refused.
+    const kept = on.get(m?.key)?.type === 'evidence';
+    if ((m?.kind === 'evidence' && m?.type === undefined) || (!kept && (m?.kind ?? m?.type) === 'evidence')) {
+      throw fail(`${from}: items[${i}]${isKey(m?.key) ? ` key ${m.key}` : ''}: evidence is posted one at a time, not in a --from file`, 'VALIDATION_ERROR', 'Post it with sign-off-axi post --kind evidence --from <message.json>');
+    }
+    if (on.has(m?.key)) return;
     if (m?.contract === undefined && m?.kind === undefined) {
       if (!CONTRACT_TYPES.includes(m?.type ?? 'decision')) return;
       throw fail(`${from}: items[${i}]${isKey(m?.key) ? ` key ${m.key}` : ''}: kind is required on a new ${m?.type ?? 'decision'}`, 'VALIDATION_ERROR',
@@ -373,18 +384,18 @@ function printAnswers(file: string, rows: ReturnType<typeof board>, waiting: num
   const done = rows.flatMap((d) => (d.answer ? [{ ...d.answer, title: d.title }] : []));
   const rounds = readRounds(file).filter((r) => rows.some((d) => d.key === r.key));
   if (values.json) {
-    const out: Record<string, any> = Object.fromEntries(done.map(({ key, answer, label, close, at, note }) => {
-      const asked = rounds.filter((r) => r.key === key).map(({ note, at }) => ({ note, at }));
-      return [key, { answer, label, close, at, note, ...(asked.length && { rounds: asked }) }];
-    }));
-    for (const r of rounds) if (!out[r.key]) out[r.key] = { rounds: rounds.filter((q) => q.key === r.key).map(({ note, at }) => ({ note, at })) };
+    const asked = (key: string) => rounds.filter((r) => r.key === key).map(({ note, at, comments }) => ({ note, at, comments }));
+    const out: Record<string, any> = Object.fromEntries(done.map(({ key, answer, label, close, at, note, comments }) => [key, { answer, label, close, at, note, comments, ...(asked(key).length && { rounds: asked(key) }) }]));
+    for (const r of rounds) if (!out[r.key]) out[r.key] = { rounds: asked(r.key) };
     return JSON.stringify(out);
   }
-  const notes = done.some((a) => a.note);
+  const notes = done.some((a) => a.note), sent = [...done, ...rounds].flatMap(({ key, comments = [] }) => comments.map(({ mock, ref, tag, words, text }) => ({ key, mock, ref, tag, words, text })));
   return toon({
     board: tilde(file),
     answers: done.length ? done.map(({ key, answer, at, label, close, title, note = '' }) => ({ key, answer, at, ...(values.full && { label, close, title }), ...(notes && { note }) })) : '0 saved yet',
     ...(rounds.length && { rounds: rounds.map(({ key, note, at }) => ({ key, note, at })) }),
+    // Comments on mock elements that went with an answer or a round, each with the element it points at.
+    ...(sent.length && { comments: sent }),
     waiting,
   }, help);
 }
@@ -586,9 +597,9 @@ function replace(file: string, on: string, from?: string, filer?: string) {
   });
 }
 
-const MEDIA_BYTES = 50_000_000;
-/** Copies the media into evidence/<n>/ next to the board and adds the item, numbered under the board lock: update-<n>, or an explainer under its own key. */
-function postMedia(file: string, on: string, values: Record<string, any>, type: 'evidence' | 'explainer', filer?: string) {
+/** Copies the media into evidence/<n>/ next to the board and adds the item, numbered under the board lock: update-<n>, or an explainer under its own key.
+ * `message` is a checked contract evidence message (post --kind evidence): its key, if any, takes only the same message again, and its run is stored as `evidence`. */
+function postMedia(file: string, on: string, values: Record<string, any>, type: 'evidence' | 'explainer', filer?: string, message?: any) {
   fits(values.title);
   const explainer = type === 'explainer';
   const extra = (explainer ? ['mock', 'tradeoff', 'view', 'link'] : ['key', 'option', 'recommend', 'default', 'mock', 'tradeoff', 'view', 'chapter']).find((f) => values[f] !== undefined);
@@ -597,7 +608,7 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
     : 'sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media shot.png';
   if (!explainer && !values.about?.trim()) throw fail('--about is required for --type evidence: the short note', 'VALIDATION_ERROR', example);
   if (explainer && values.media?.length !== 1) throw fail('--type explainer needs one --media video (.mp4 or .webm)', 'VALIDATION_ERROR', example);
-  if (!values.media?.length || values.media.length > MEDIA_MAX) throw fail(`--type evidence needs 1 to ${MEDIA_MAX} --media files`, 'VALIDATION_ERROR', example);
+  if ((!message && !values.media?.length) || values.media.length > MEDIA_MAX) throw fail(`--type evidence needs 1 to ${MEDIA_MAX} --media files`, 'VALIDATION_ERROR', example);
   const kinds = explainer ? ['.mp4', '.webm'] : Object.keys(mediaTypes), options = optionsOf(values);
   recommended([{ options, recommend_value: values.recommend }], true);
   const chapters = values.chapter?.map((c: string) => {
@@ -617,7 +628,15 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
     const { items, extra } = existsSync(file) ? readItems(file) : { items: [] as any[], extra: {} };
     // Boards in one folder share evidence/, so a number is taken only by creating its folder; one in use is never written into.
     const current = board(file), store = join(dirname(file), 'evidence'), taken = current.map((d) => Number(/^update-(\d+)$/.exec(d.key)?.[1] ?? 0));
-    const own = explainer && (values.key ?? slug(values.title));
+    const own = message ? message.key : explainer && (values.key ?? slug(values.title)), had = message && own && items.find((x) => x?.key === own);
+    if (had) {
+      // The stored item, read back as the message it came from: its run, and each media file by hash.
+      const asMessage = ({ type: _t, number: _n, filed: _f, evidence: run, media: kept, ...rest }: any) => canon({ ...rest, run, media: kept?.map((x: any) => x.sha256) });
+      if (asMessage(had) !== canon({ ...message, media: sources.length ? sources.map((src) => sha256(readFileSync(src))) : undefined })) {
+        throw fail(`key ${own} already holds a different message on ${tilde(file)}`, 'CONFLICT', 'Post it under a new key');
+      }
+      return toon({ board: tilde(file), posted: [{ key: own, number: had.number, media: sources.length, title: had.title, status: 'already posted' }] }, [`Run \`sign-off-axi open${on}\` so the user can give a verdict`]);
+    }
     if (own && current.some((d) => d.key === own)) throw fail(`key ${own} is already used on ${tilde(file)}`, 'CONFLICT', 'Post it under a new --key');
     mkdirSync(store, { recursive: true, mode: 0o700 });
     let number = Math.max(0, ...taken, ...readdirSync(store).map(Number).filter(Number.isInteger)) + 1;
@@ -625,13 +644,22 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
       try { mkdirSync(join(store, String(number)), { mode: 0o700 }); break; } catch (e: any) { if (e.code !== 'EEXIST') throw e; }
     }
     const key = own || `update-${number}`, dir = join(store, String(number));
-    const media = sources.map((src, i) => {
-      const bytes = readFileSync(src), path = `evidence/${number}/${i + 1}${extname(src).toLowerCase()}`;
-      writeFileSync(join(dir, `${i + 1}${extname(src).toLowerCase()}`), bytes, { mode: 0o600 });
-      return { path, sha256: sha256(bytes), bytes: bytes.length };
-    });
+    let media;
+    try {
+      media = sources.map((src, i) => {
+        const bytes = readFileSync(src), path = `evidence/${number}/${i + 1}${extname(src).toLowerCase()}`;
+        writeFileSync(join(dir, `${i + 1}${extname(src).toLowerCase()}`), bytes, { mode: 0o600 });
+        return { path, sha256: sha256(bytes), bytes: bytes.length };
+      });
+    } catch (e) {
+      // A file that cannot be read after all leaves no copies behind.
+      rmSync(dir, { recursive: true, force: true });
+      throw e;
+    }
     const { title, about, detail, close, link, recommend: recommend_value, default: default_if_silent } = values, filed = new Date().toISOString();
+    const { run, media: _paths, ...fields } = message ?? {};
     items.push(explainer ? { key, type, title, about, detail, options, recommend_value, default_if_silent, close, chapters, media, filer, filed }
+      : message ? { ...fields, key, type, number, ...(media.length ? { media } : {}), ...(run && { evidence: run }), filed }
       : { key, type, number, title, about, detail, close, link, media, filer, filed });
     // The whole board is checked before it is written, so a bad post leaves the board and evidence/ as they were.
     const check = `${file}.${process.pid}.check`;
@@ -644,7 +672,7 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
     }
     writeItems(file, items);
     if (explainer) return toon({ board: tilde(file), raised: [{ key, status: 'raised', title }] }, [`Run \`sign-off-axi open${on}\` so the user can watch and answer`, waitFor(on, filer, key)]);
-    return toon({ board: tilde(file), posted: [{ key, number, media: media.length, title }] },
+    return toon({ board: tilde(file), posted: [{ key, number, media: media.length, title, ...(message && { status: 'posted' }) }] },
       [`Run \`sign-off-axi open${on}\` so the user can give a verdict`, waitFor(on, filer, key)]);
   });
 }
@@ -657,12 +685,19 @@ async function postKind(file: string, on: string, values: Record<string, any>) {
   const name = from === '-' ? 'stdin' : from;
   let bytes, m: any;
   try { bytes = readFileSync(from === '-' ? 0 : from); } catch (e: any) { throw fail(`${name}: cannot read: ${e.code}`, 'NOT_FOUND', 'Check the path names a readable file'); }
-  try { m = parseMessage(bytes); checkMessage(m, kind); } catch (e) { throw e instanceof ContractError ? fail(`${name}: ${e.message}`, 'VALIDATION_ERROR', e.help) : e; }
+  let sources: string[] = [];
+  try {
+    m = parseMessage(bytes);
+    checkMessage(m, kind);
+    // Media paths read from the message file's folder, or from the current folder for stdin.
+    if (m.kind === 'evidence') sources = mediaFiles(m, from === '-' ? process.cwd() : dirname(resolve(from)));
+  } catch (e) { throw e instanceof ContractError ? fail(`${name}: ${e.message}`, 'VALIDATION_ERROR', e.help) : e; }
   if (m.filer !== undefined && values.filer !== undefined && m.filer !== values.filer) {
     throw fail(`${name}: key ${m.key}: filer ${m.filer} is not --filer ${values.filer}`, 'VALIDATION_ERROR', 'Leave "filer" out of the message, or pass the same --filer');
   }
   const filer = m.filer ?? filerOf(values, true), scratch = mkdtempSync(join(tmpdir(), 'sign-off-')), source = join(scratch, basename(name));
   try {
+    if (m.kind === 'evidence') return await postMedia(file, on, { title: m.title, about: m.about, media: sources }, 'evidence', filer, { ...m, ...(filer && { filer }) });
     writeFileSync(source, JSON.stringify({ schema: 2, items: [{ ...m, ...(filer && { filer }) }] }));
     return await storeIncoming(file, on, buildIncoming({ from: source }, {}, filer, file), filer, true);
   } catch (e) {
@@ -693,7 +728,9 @@ function validate(args: string[]) {
     }
     try {
       m = parseMessage(raw);
-      return { file, ...checkMessage(m, want), ok: true, error: '', help: '' };
+      const kind = checkMessage(m, want);
+      if (m.kind === 'evidence') mediaFiles(m, dirname(resolve(file)));
+      return { file, ...kind, ok: true, error: '', help: '' };
     } catch (e) {
       if (!(e instanceof ContractError)) throw e;
       return { file, kind: typeof m?.kind === 'string' ? m.kind : '', schema: Number.isSafeInteger(m?.schema) ? m.schema : '', ok: false, error: e.message, help: e.help };
@@ -757,7 +794,10 @@ function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: 
       // A message that names no filed time matches the one the board stamped.
       const differs = () => exact ? canon({ ...items.find((x) => x?.key === d.key), ...(raw[i].filed === undefined && { filed: undefined }) }) !== canon(raw[i]) : same(had!) !== same(d);
       if (had && differs()) {
-        throw fail(`key ${d.key} already holds a different ${exact ? 'message' : 'question'} on ${tilde(file)}`, 'CONFLICT', 'Raise it under a new --key');
+        // A contract message refused for its key exits 2 like any other refusal (contract section 4); raise --title keeps exit 1.
+        const contract = exact || raw[i]?.contract !== undefined || raw[i]?.kind !== undefined;
+        if (contract) process.once('exit', () => { process.exitCode = 2; });
+        throw fail(`key ${d.key} already holds a different ${contract ? 'message' : 'question'} on ${tilde(file)}`, 'CONFLICT', contract ? 'Post it under a new key' : 'Raise it under a new --key');
       }
       // Each new item records when it was raised, unless it names its own time.
       if (!had) {
@@ -1274,7 +1314,9 @@ const page = readFileSync(new URL('../web/index.html', import.meta.url));
 const pointer = Buffer.from(`<script>${readFileSync(new URL('../web/point.js', import.meta.url), 'utf8')}</script>`);
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 const state = () => {
-  const answers = readAnswers(file, warn), taken = seenBy(file), rounds = readRounds(file, warn);
+  // The page marks sent comments in annotations, so answers and rounds go without theirs: a read-only board or an export carries none.
+  const answers = Object.fromEntries(Object.entries(readAnswers(file, warn)).map(([k, { comments: _, ...a }]) => [k, a])), taken = seenBy(file);
+  const rounds = readRounds(file, warn).map(({ comments: _, ...r }) => r);
   return {
     file,
     mockBase: `/mock/${loopback(bind) ? 'local' : mockPass(tokenOf(file))}/`,
@@ -1287,13 +1329,19 @@ const state = () => {
     seen: Object.values(answers).filter(taken).map((a) => a.key),
     rounds,
     messages: readMessages(file, warn),
-    annotations: readOnly() || answersOnly() ? [] : readAnnotations(file, warn),
+    annotations: readOnly() || answersOnly() ? [] : ((sent) => readAnnotations(file, warn).map((a) => (sent.has(a.id) ? { ...a, sent: true } : a)))(sentIds(file)),
     dismissed: readDismissed(file, answers, rounds, warn),
   };
 };
 /** A mock file's sha256 now, or null when it is gone: a comment shows only on the exact file it was made on.
  * ponytail: hashes every mock on each state read; cache by mtime if boards carry many big mocks. */
 const mockHash = (path: string) => { try { return sha256(readFileSync(under(dirname(file), mockFile(path)))); } catch { return null; } };
+/** The comments that go with a card's next answer or round: not sent yet, and made on the mock file the card shows now. */
+const unsent = (d: Decision): Sent[] => {
+  const sent = sentIds(file), now = new Map((d.mocks ?? []).map((m) => [m.value, mockHash(m.path)]));
+  return answersOnly() ? [] : readAnnotations(file).filter((a) => a.key === d.key && !sent.has(a.id) && now.get(a.mock) === a.hash)
+    .map(({ id, mock, hash, ref, tag, words, text }) => ({ id, mock, hash, ref, tag, words, text }));
+};
 /** A board whose file says `"readonly": true` shows its items and takes no answers, rounds or comments: another program feeds it. */
 const readOnly = () => readItems(file).extra.readonly === true;
 /** A board whose file says `"answers_only": true` takes answers and replies but no rounds, comments or prompts: another program feeds it. */
@@ -1416,7 +1464,9 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     return [200, state()];
   }
   if (req.url === '/api/annotations') {
-    const { id, deleted, key, mock, ref, tag, words, text, hash: shown } = JSON.parse(body) ?? {}, live = readAnnotations(file);
+    const { id, deleted, key, mock, ref, tag, words, text, hash: shown } = JSON.parse(body) ?? {}, live = readAnnotations(file), sent = sentIds(file);
+    // A comment that went with an answer or a round is the agent's now: it stays as it was sent.
+    if (id !== undefined && sent.has(id)) return [409, { error: 'This comment was sent' }];
     if (deleted === true) {
       if (!live.some((a) => a.id === id)) return [404, { error: 'This comment is gone' }];
       appendAnnotation(file, { id, deleted });
@@ -1432,7 +1482,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     // An edit names a comment that must still be live, so a deleted one is not written back.
     if (id !== undefined && !live.some((a) => a.id === id)) return [404, { error: 'This comment is gone' }];
     // One comment per element: another on the same element of the same file edits the first.
-    const same = live.find((a) => a.key === key && a.mock === mock && a.hash === hash && a.ref === ref);
+    const same = live.find((a) => a.key === key && a.mock === mock && a.hash === hash && a.ref === ref && !sent.has(a.id));
     appendAnnotation(file, { id: same?.id, key, mock, hash, ref, tag, words, text: text.trim() });
     return [200, state()];
   }
@@ -1447,9 +1497,12 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   if (req.url === '/api/rounds') {
     const { key, note = '' } = JSON.parse(body) ?? {};
     if (typeof note !== 'string' || [...note.trim()].length > NOTE_MAX) return [400, { error: `The note must be text of ${NOTE_MAX} characters or fewer` }];
-    if (!note.trim()) return [400, { error: 'Write a note first: another round needs your comment' }];
-    if (!loadDecisions(file).some((x) => x.key === key)) return [404, { error: 'This question is no longer in the file' }];
-    appendRound(file, key, note.trim());
+    const d = loadDecisions(file).find((x) => x.key === key);
+    if (!d) return [404, { error: 'This question is no longer in the file' }];
+    // Comments on the mocks are enough for a round; with none, the round needs a note.
+    const comments = unsent(d);
+    if (!note.trim() && !comments.length) return [400, { error: 'Write a note first: another round needs your comment' }];
+    appendRound(file, key, note.trim(), comments);
     return [200, state()];
   }
   const { key, answer, note = '' } = JSON.parse(body) ?? {};
@@ -1471,7 +1524,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   // Every item that asks something takes an Other answer: the words, saved as the answer `text`, unless an option is named text.
   const other = d.reply || d.options.length ? [REPLY] : [], option = d.options.find((o) => o.value === answer) ?? other.find((o) => o.value === answer);
   if (!option) return [400, { error: `The answer must be one of: ${[...d.options, ...other].map((o) => o.label).join(', ') || 'none, this item is only shown'}` }];
-  answered(appendAnswer(file, d, option, note.trim()), d);
+  answered(appendAnswer(file, d, option, note.trim(), unsent(d)), d);
   return [200, state()];
 }
 

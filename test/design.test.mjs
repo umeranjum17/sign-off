@@ -682,7 +682,32 @@ test('comments on mock elements: one per element, kept across a reload, edited a
   await reload();
   assert.deepEqual(await evaluate("[state.annotations.length, document.querySelectorAll('.ann li').length, document.querySelectorAll('.shot.none').length]"), [1, 0, 2]);
   assert.equal(await evaluate("document.querySelector('.ann > p.meta:last-of-type').textContent"), '1 comment on an earlier version of “A” is hidden');
+  // The pick takes the comments on the file shown now, each with its element, to the agent; the hidden one stays behind.
+  const status = (path, body) => fetch(`${url}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.status);
+  await write('Make the words bigger');
+  assert.equal(await status('api/answers', { key: 'look', answer: 'a' }), 200);
+  const [sent] = JSON.parse(run('wait', file, '--key', 'look', '--json', '--timeout', '5').out).look.comments;
+  assert.deepEqual({ ...sent, id: '' }, { id: '', mock: 'a', hash: createHash('sha256').update(readFileSync(mockA)).digest('hex'), ref: 'body > button:nth-of-type(1)', tag: 'button', words: 'Sign in', text: 'Make the words bigger' });
+  // Sent, it is the agent's: listed without Edit or Delete, and the server refuses to change it. The picked card is under Answered.
+  await evaluate("window.old = true, location.hash = 'answered', location.reload()");
+  await until(() => evaluate("!window.old && !!document.querySelector('details.done') && (document.querySelector('details.done').open = true)"));
+  assert.deepEqual(await evaluate(`[[...document.querySelectorAll('.ann p.meta')].map((p) => p.textContent).includes('Sent to the agent'), !!(${button('Edit')})]`), [true, false]);
+  assert.equal(await status('api/annotations', { id: sent.id, deleted: true }), 409);
+  // The mock changes after the pick: the sent comment stays listed, and is not counted as hidden.
+  writeFileSync(mockA, '<button style="width: 100%; height: 3000px">Changed</button>');
+  await evaluate("window.old = true, location.reload()");
+  await until(() => evaluate("!window.old && !!document.querySelector('details.done') && (document.querySelector('details.done').open = true)"));
+  assert.deepEqual(await evaluate(`[[...document.querySelectorAll('.ann p.meta')].some((p) => p.textContent === 'Sent to the agent'), [...document.querySelectorAll('.ann p.meta')].filter((p) => /hidden/.test(p.textContent)).map((p) => p.textContent)]`), [true, ['1 comment on an earlier version of “A” is hidden']]);
+  // The same element again is a new draft, and Another round with no note carries only it.
+  assert.equal(await write('Bigger still'), '');
+  assert.equal(await status('api/rounds', { key: 'look', note: '' }), 200);
+  assert.deepEqual(JSON.parse(run('answers', file, '--json').out).look.rounds[0].comments.map((c) => c.text), ['Bigger still']);
+  assert.match(run('answers', file).out, /comments\[2\]\{key,mock,ref,tag,words,text\}:\n\s+look,a,"body > button:nth-of-type\(1\)",button,Sign in,Make the words bigger\n\s+look,a,.*Bigger still/);
   close();
+  // A later pick supersedes the answer, but the comments it carried still reach the agent.
+  assert.equal(await status('api/answers', { key: 'look', answer: 'b' }), 200);
+  const later = JSON.parse(run('answers', file, '--key', 'look', '--json').out).look;
+  assert.deepEqual([later.answer, later.comments.map((c) => c.text)], ['b', ['Make the words bigger']]);
   // The page asks nothing the server takes on trust: no text, an option with no page, and a read-only board are refused.
   const post = (body) => fetch(`${url}api/annotations`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.status);
   const current = createHash('sha256').update(readFileSync(mockA)).digest('hex');
@@ -690,7 +715,9 @@ test('comments on mock elements: one per element, kept across a reload, edited a
   assert.deepEqual([await post({ ...one, text: ' ' }), await post({ ...one, mock: 'c' }), await post({ id: 'nope', deleted: true }), await post({ ...one, hash: 'an older file' }), await post({ ...one, id: saved.id })], [400, 404, 404, 409, 404]);
   writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, 'utf8')), readonly: true }));
   assert.equal(await post(one), 403);
-  assert.deepEqual((await fetch(`${url}api/decisions`).then((r) => r.json())).annotations, []);
+  // Nor do the sent answers and rounds carry their comments to it.
+  const ro = await fetch(`${url}api/decisions`).then((r) => r.json());
+  assert.deepEqual([ro.annotations, ro.answers.look.comments, ro.rounds[0].comments], [[], undefined, undefined]);
   proc.kill();
 });
 

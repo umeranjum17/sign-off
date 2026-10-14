@@ -2,7 +2,7 @@
 
 sign-off owns this contract. Agents and tools use it to post asks, reports, evidence, gates and retro findings to the board, and to read the answers back. Every message has the same strict shape, so the person reading the board sees one kind of card per kind of message, whoever sent it.
 
-Status: v1 target, built in parts. Built: the `ask` and `report` kinds; `validate`, with `--expect-invalid` (section 9), and their fixtures in the npm package; `post --kind`, from a file or stdin with `--from -`, where a key conflict exits 2; in a `raise --from` or `post --from` file, a new item that carries `contract` or `kind` is checked as a message before anything is stored, a new item of a contract kind without `kind` is refused, and a new item's title is held to 1-160. Not built yet: `evidence`, `gate` and `finding`, answer events and `schema`. `raise --title` and `post --type decision` still post board-format items (they do not fill in `contract`, `kind` and `schema` yet), and their key conflicts still exit 1.
+Status: v1 target, built in parts. Built: the `ask`, `report` and `evidence` kinds; `validate`, with `--expect-invalid` (section 9), and their fixtures in the npm package; `post --kind`, from a file or stdin with `--from -`, where a key conflict exits 2; in a `raise --from` or `post --from` file, a new item that carries `contract` or `kind` is checked as a message before anything is stored, a new item of a contract kind without `kind` is refused, and a new item's title is held to 1-160. New contract evidence is posted with `post --kind evidence`, never in a `--from` file; `post --type evidence` keeps the board format. Not built yet: `gate` and `finding`, answer events and `schema`. `raise --title` and `post --type decision` still post board-format items (they do not fill in `contract`, `kind` and `schema` yet), and their key conflicts still exit 1.
 
 ## 1. Versions
 
@@ -20,13 +20,13 @@ Board items stored before v1 have no `kind` or `schema`. They read exactly as to
 
 Every new post of a contract kind is checked against that kind's v1 rules from the change that adds that kind. `post --kind` posts a message of any built kind. The target is for `raise --title` and `post --type decision`, which is the same thing, to post an `ask` with `contract`, `kind` and `schema` filled in, and for `post --type evidence` to post an `evidence` the same way; until then they post board-format items (see Status). `raise` stamps `filed` itself where a kind needs it.
 
-Non-contract types stay outside this contract. `raise --title` and `post --type design|diagram|interactive|explainer` keep the board rules in [file-formats.md](file-formats.md). In a `--from` file, a new item of a contract kind with no `kind` is refused with a fix line to add `contract`, `kind` and `schema`, in a `--replace` feed too. A contract kind there is an item with no `type`, or `type` `decision` or `ask` (both an `ask`), `evidence` or `report`. An item already on the board under that key is not new, so a feed keeps sending it as it is.
+Non-contract types stay outside this contract. `raise --title` and `post --type design|diagram|interactive|explainer` keep the board rules in [file-formats.md](file-formats.md). In a `--from` file, a new item of a contract kind with no `kind` is refused with a fix line to add `contract`, `kind` and `schema`, in a `--replace` feed too. New evidence, with or without `kind`, is refused there with a fix line to post it with `post --kind evidence`: its media files are copied and numbered one message at a time. A contract kind there is an item with no `type`, or `type` `decision` or `ask` (both an `ask`), `evidence` or `report`. An item already on the board under that key is not new, so a feed keeps sending it as it is.
 
 ## 3. How a message gets in
 
 One validator, one way in. No daemon, socket or HTTP API.
 
-`sign-off-axi post [board.json] --kind <kind> --from <file.json>`, or `--from -` to read stdin. `--kind` must equal the message's `kind`, so the wrong file is never posted. A `post --from --replace` feed checks each new contract-kind item the same way.
+`sign-off-axi post [board.json] --kind <kind> --from <file.json>`, or `--from -` to read stdin. `--kind` must equal the message's `kind`, so the wrong file is never posted. A `post --from --replace` feed checks each new contract-kind item the same way, except evidence (section 2). A --replace feed is a whole-board resync: it does not refuse a contract item whose key holds a different message, it replaces it.
 
 `raise --from` and `post --from` (no `--kind`) check each new item that carries `contract` and `kind` the same way `post --kind` does, and refuse a new item with no `kind` unless it names a non-contract type (section 2).
 
@@ -88,7 +88,7 @@ Proof the person gives a verdict on. Shows in Evidence. Its options are fixed an
 - Required: the common fields (`key` is optional), `about`, and at least one of `media` or `run`.
 - `media`: 1 to 12 relative file paths, with no `..`, resolved from the message file's folder (from the current folder for `--from -`). Symlinks are followed: the real path must stay inside that folder, else the message is refused with a fix line naming the file. Each path ends in `.png`, `.jpg`, `.jpeg`, `.webp`, `.mp4` or `.webm` (any case), each 50,000,000 bytes or fewer. `post` copies them into `evidence/<number>/` and records each `sha256` and `bytes`. A missing or oversized file refuses the message. `validate` checks the same and copies nothing.
 - `run`: a done-done run, exactly `run_id` (a key-set id), `commit` (40 lowercase hex) and the four Checks lines `outcome`, `repro`, `proof` and `evidence` (text, 1-1000 each). The board stores it in the item's `evidence` field ([file-formats.md](file-formats.md)); `link` stays its own field.
-- Without `key`, `post` sets `update-<number>`, where `<number>` is the next free `evidence/<number>/` folder next to the board.
+- Without `key`, `post` sets `update-<number>`, where `<number>` is the next free `evidence/<number>/` folder next to the board. A key already on the board takes the same message again only when its media also match by file hash (section 4).
 
 ### gate, schema 1
 
@@ -131,7 +131,7 @@ One per kind, each written on one line here. Demo data uses the name Umer.
 - An `answer` event has `event`, `contract`, `kind`, `schema`, `key`, `title`, `answer`, `label`, `close` and `at`. A `round` event has `event`, `contract`, `kind`, `schema`, `key`, `title`, `note` and `at`, and `filer` when the item has one.
 - `note` is added to an answer only when the person typed one. `filer` is added only when the item has one. `close` is `done` on kinds that do not take it. An `evidence` answer's `label` is Pass, Fail or Needs work.
 - `wait --json` and `answers --json` keep their map keyed by item key, so existing readers keep working.
-- An `on_answer:` command in `config.yaml` keeps every field it gets today (`key`, `answer`, `label`, `close`, `at`, `note`, `title`, `filer`) and gains `event`, `contract`, `kind` and `schema`. An Undo back to no answer still reaches it, with `"answer": ""`; `wait` never returns one.
+- An `on_answer:` command in `config.yaml` keeps every field it gets today (`key`, `answer`, `label`, `close`, `at`, `note`, `title`, `filer`) and gains `event`, `contract`, `kind` and `schema`. An answer line that carried comments on mock elements also has `comments`, each with `id`, `mock`, `hash`, `ref`, `tag`, `words` and `text`. An Undo back to no answer still reaches it, with `"answer": ""`; `wait` never returns one.
 - What each answer means: `ask`, act on the picked value. `evidence`, the verdict goes back to the producer. `gate`, run `done-done respond --action <value>`. `finding`, `apply` means apply the change and `skip` means leave it. A `report` has no answer.
 
 ## 8. Refusals
@@ -160,7 +160,7 @@ To recover: read the `help` line, fix the message file, post it again. Never edi
 
 ## 10. Conformance
 
-Shared fixtures live in [fixtures/contract/](../fixtures/contract/README.md) and ship in the npm package, one folder per kind and schema (`ask.v1/`, `report.v1/`): for each, at least 2 valid messages and 3 invalid ones (a missing field, a broken limit, an unknown field). Each tool's CI installs the version it pins and runs them:
+Shared fixtures live in [fixtures/contract/](../fixtures/contract/README.md) and ship in the npm package, one folder per kind and schema (`ask.v1/`, `report.v1/`, `evidence.v1/`): for each, at least 2 valid messages and 3 invalid ones (a missing field, a broken limit, an unknown field). Each tool's CI installs the version it pins and runs them:
 
 ```
 npm install --no-save sign-off-axi@<exact>

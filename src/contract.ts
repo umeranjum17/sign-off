@@ -1,5 +1,7 @@
 // The v1 communication contract (docs/contract.md): one strict, versioned shape per kind of message.
-import { isKey } from './store.js';
+import { accessSync, constants, realpathSync, statSync } from 'node:fs';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { isKey, MEDIA_MAX } from './store.js';
 
 /** A message that does not match: what is wrong, and the one line that says how to fix it. */
 export class ContractError extends Error {
@@ -7,12 +9,16 @@ export class ContractError extends Error {
 }
 export const KINDS = ['ask', 'report', 'evidence', 'gate', 'finding'];
 /** The kinds this build checks, with the schema number of each. */
-export const SCHEMAS: Record<string, number> = { ask: 1, report: 1 };
+export const SCHEMAS: Record<string, number> = { ask: 1, report: 1, evidence: 1 };
 const COMMON = ['contract', 'kind', 'schema', 'key', 'title', 'filer', 'link', 'about'];
 const FIELDS: Record<string, string[]> = {
   ask: [...COMMON, 'detail', 'options', 'recommend_value', 'default_if_silent', 'close'],
   report: [...COMMON, 'filed', 'group', 'decided'],
+  evidence: [...COMMON, 'media', 'run'],
 };
+/** A done-done run: its id, full commit and the four Checks lines. */
+const RUN = ['run_id', 'commit', 'outcome', 'repro', 'proof', 'evidence'];
+export const MEDIA_BYTES = 50_000_000;
 
 /** Parses one message; a field written twice in any object refuses it, since plain JSON.parse keeps the last one quietly. */
 export function parseMessage(bytes: Uint8Array): unknown {
@@ -78,8 +84,8 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
   if (m.schema !== SCHEMAS[m.kind]) throw bad('schema', `${m.schema} of ${m.kind} is not in this sign-off-axi`, `Upgrade sign-off-axi, or post ${m.kind} schema ${SCHEMAS[m.kind]}`);
   const fields = FIELDS[m.kind], extra = Object.keys(m).find((f) => !fields.includes(f));
   if (extra === 'options' && m.kind === 'report') throw bad('options', 'is not a field of report: a report takes no answer', 'Remove "options", or post an ask to get an answer');
-  if (extra) throw bad(escaped(extra), `is not a field of ${m.kind} schema ${m.schema}`, `Remove ${show(extra)}; ${m.kind} takes ${fields.slice(3).join(', ')}`);
-  if (!isKey(m.key)) throw bad('key', Object.hasOwn(m, 'key') ? `${show(m.key)} must be 1-128 of A-Z a-z 0-9 . _ -` : 'is required', 'Set "key" to a short id such as "ship-signin-2"');
+  if (extra !== undefined) throw bad(escaped(extra) || '""', `is not a field of ${m.kind} schema ${m.schema}`, `Remove ${show(extra)}; ${m.kind} takes ${fields.slice(3).join(', ')}`);
+  if (!(m.kind === 'evidence' && !Object.hasOwn(m, 'key')) && !isKey(m.key)) throw bad('key', Object.hasOwn(m, 'key') ? `${show(m.key)} must be 1-128 of A-Z a-z 0-9 . _ -` : 'is required', 'Set "key" to a short id such as "ship-signin-2"');
   if (!Object.hasOwn(m, 'title')) throw bad('title', 'is required', 'Add "title": the question, in 160 characters or fewer');
   text('title', m.title, 160, 'the question, in 160 characters or fewer');
   if (Object.hasOwn(m, 'filer') && !isKey(m.filer)) throw bad('filer', 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "filer" to your agent session id or tool name, or leave it out');
@@ -87,9 +93,35 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
     throw bad('link', 'must be an http(s) link with no spaces or control characters, or a 7-40 character commit hash',
       'Set "link" to a URL such as "https://example.com/pr/4" or a commit hash, or leave it out');
   }
+  if (m.kind !== 'ask') {
+    const what = m.kind === 'report' ? 'what happened' : 'what this shows';
+    if (!Object.hasOwn(m, 'about')) throw bad('about', 'is required', `Add "about": ${what}, in 500 characters or fewer`);
+    text('about', m.about, 500, `${what}, in 500 characters or fewer`);
+  }
+  if (m.kind === 'evidence') {
+    if (!Object.hasOwn(m, 'media') && !Object.hasOwn(m, 'run')) throw bad('media', 'or run is required', 'Add "media": ["shot.png"], files next to the message, or "run": the done-done run it proves');
+    if (Object.hasOwn(m, 'media')) {
+      if (!Array.isArray(m.media) || !m.media.length || m.media.length > MEDIA_MAX) throw bad('media', `must list 1 to ${MEDIA_MAX} files`, 'Set "media" to file paths next to the message, such as ["shot.png"]');
+      m.media.forEach((p: unknown, n: number) => {
+        text(`media[${n}]`, p, 1000, 'a file path from the message file\'s folder, such as "shot.png"');
+        if (/^([\\/]|[A-Za-z]:)/.test(p as string) || (p as string).split(/[\\/]/).includes('..')) throw bad(`media[${n}]`, `${show(p)} must be a relative path with no ..`, 'Give the path from the message file\'s folder, such as "evidence-out/after.png"');
+        if (!/\.(png|jpe?g|webp|mp4|webm)$/i.test(p as string)) throw bad(`media[${n}]`, `${show(p)} must end in .png, .jpg, .jpeg, .webp, .mp4 or .webm`, 'Post a screenshot or recording in one of those formats');
+      });
+    }
+    if (Object.hasOwn(m, 'run')) {
+      const r = m.run;
+      if (!r || typeof r !== 'object' || Array.isArray(r)) throw bad('run', 'must be an object', `Set "run" to {${RUN.map(show).join(', ')}}`);
+      const odd = Object.keys(r).find((f) => !RUN.includes(f));
+      if (odd !== undefined) throw bad(`run.${escaped(odd) || '""'}`, 'is not a field of run', `Remove ${show(odd)}; run has only ${RUN.join(', ')}`);
+      const missing = RUN.find((f) => !Object.hasOwn(r, f));
+      if (missing) throw bad(`run.${missing}`, 'is required', `Add "${missing}" to "run"`);
+      if (!isKey(r.run_id)) throw bad('run.run_id', 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "run_id" to the done-done run id');
+      if (!(typeof r.commit === 'string' && /^[a-f0-9]{40}$/.test(r.commit))) throw bad('run.commit', 'must be a full 40-character lowercase commit', 'Set "commit" to the full hash, such as the output of git rev-parse HEAD');
+      for (const f of RUN.slice(2)) text(`run.${f}`, r[f], 1000, `the run's ${f} Checks line, in 1000 characters or fewer`);
+    }
+    return { kind: m.kind, schema: m.schema };
+  }
   if (m.kind === 'report') {
-    if (!Object.hasOwn(m, 'about')) throw bad('about', 'is required', 'Add "about": what happened, in 500 characters or fewer');
-    text('about', m.about, 500, 'what happened, in 500 characters or fewer');
     // An exact UTC second that exists on the calendar: Date.parse would roll 2026-02-30 over to March.
     const at = typeof m.filed === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(m.filed) ? new Date(m.filed) : undefined;
     if (!at || Number.isNaN(at.getTime()) || at.toISOString().replace('.000', '') !== m.filed) {
@@ -109,7 +141,7 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
     const field = `options[${n}]`;
     if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad(field, 'must be an object', 'Write each option as {"value":"<id>","label":"<text>"}');
     const odd = Object.keys(o).find((f) => f !== 'value' && f !== 'label');
-    if (odd) throw bad(`${field}.${escaped(odd)}`, 'is not a field of an option', `Remove ${show(odd)}; an option has only value and label`);
+    if (odd !== undefined) throw bad(`${field}.${escaped(odd) || '""'}`, 'is not a field of an option', `Remove ${show(odd)}; an option has only value and label`);
     if (!isKey(o.value)) throw bad(`${field}.value`, 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "value" to a short id such as "yes"');
     if (options.slice(0, n).some((p: any) => p.value === o.value)) throw bad(`${field}.value`, `repeats ${o.value}`, 'Give every option its own value');
     text(`${field}.label`, o.label, 80, 'the button text, in 80 characters or fewer');
@@ -122,4 +154,23 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
   }
   if (Object.hasOwn(m, 'close') && m.close !== 'done' && m.close !== 'release') throw bad('close', 'must be done or release', 'Set "close" to "done" or "release", or leave it out');
   return { kind: m.kind, schema: m.schema };
+}
+
+/** An evidence message's media files, from `base`, the message file's folder: each a file of 50,000,000 bytes or fewer whose real path,
+ * symlinks followed, stays inside that folder. Returns the real paths; validate checks them and copies nothing. */
+export function mediaFiles(m: any, base: string): string[] {
+  const root = realpathSync(base), at = isKey(m.key) ? `key ${m.key}: ` : '';
+  return (m.media ?? []).map((p: string, n: number) => {
+    const bad = (rule: string, help: string) => new ContractError(`${at}media[${n}] ${show(p)} ${rule}`, help);
+    let real;
+    try { real = realpathSync(resolve(root, p)); } catch { throw bad('is not there', `Put ${p} in the message file's folder, or fix the path`); }
+    const rel = relative(root, real);
+    if (!rel || rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel)) throw bad('leads outside the message file\'s folder', 'Copy the file into the message file\'s folder instead of linking to it');
+    const info = statSync(real);
+    if (!info.isFile()) throw bad('is not a file', 'Name a screenshot or recording file');
+    if (!/\.(png|jpe?g|webp|mp4|webm)$/i.test(real)) throw bad('links to a file that does not end in .png, .jpg, .jpeg, .webp, .mp4 or .webm', 'Name the screenshot or recording itself');
+    try { accessSync(real, constants.R_OK); } catch { throw bad('cannot be read', 'Make the file readable, then post again'); }
+    if (info.size > MEDIA_BYTES) throw bad(`is over ${MEDIA_BYTES} bytes`, 'Trim or compress the recording');
+    return real;
+  });
 }
