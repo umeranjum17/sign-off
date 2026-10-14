@@ -98,3 +98,4 @@ Look at every shot before you report: nothing overlaps, no text is cut, no raw p
 | Contract: `validate` on message files, refusals with one fix line and exit 2, the shipped `fixtures/contract/` run from the package | [features/contract.md](features/contract.md) |
 | Coding agents: `init --agent auto|<name>`, config `agent:`, one doctor line per agent, the same journey on several agents | [features/agents.md](features/agents.md) |
 | Agent skill: `skills/sign-off-axi`, the A/B/C mock recipe, `npm run build:skill`, install with `npx skills add` | [features/skill.md](features/skill.md) |
+| Release: `release.yml` publishes a new package.json version to npm on merge, skips one already on npm | [features/release.md](features/release.md) |
