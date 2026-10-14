@@ -10,7 +10,7 @@ export type Step = { title: string; marks?: string[] };
 export type EvidenceLink = { run_id: string; commit: string; outcome: string; repro: string; proof: string; evidence: string };
 export type Decision = {
   key: string; title: string; about?: string; detail?: string; options: Option[];
-  recommend_value?: string; default_if_silent?: string; close: string; evidence?: EvidenceLink;
+  recommend_value?: string; default_if_silent?: string; close: string; evidence?: EvidenceLink; run?: { run_id: string; commit: string };
   type: string; tradeoff?: string; mocks?: MockRef[]; number?: number; media?: MediaRef[]; link?: string; view?: string; chapters?: Chapter[]; reply?: boolean;
   /** Who posted it: an agent session or caller id, so that caller's `wait --filer` gets the answer. */
   filer?: string;
@@ -160,6 +160,8 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       ...(d.steps && { steps: d.steps.map(({ title, marks }: Step) => ({ title, ...(marks?.length && { marks }) })) }),
       ...(stored && d.media && { media: d.media.map(({ path, sha256, bytes }: MediaRef) => ({ path, sha256, bytes })) }),
       ...(d.type === 'evidence' && { number: d.number }),
+      // A gate's run is part of its question: the same key with another run is a different question.
+      ...(d.kind === 'gate' && d.run && { run: d.run }),
       ...(d.type === 'explainer' && d.chapters && { chapters: d.chapters.map(({ at, title }: Chapter) => ({ at, title })) }),
     };
   });

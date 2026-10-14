@@ -53,7 +53,7 @@ test('refusals: strict at every level, in contract order, with one fix line each
     [{ ...ask, schema: 2 }, /schema 2 of ask is not in this sign-off-axi/, /Upgrade sign-off-axi/],
     [{ ...ask, schema: '1' }, /schema must be a whole number/, /Set "schema": 1/],
     [{ ...ask, kind: 'finding' }, /finding is not checked by this sign-off-axi yet/, /Upgrade sign-off-axi/],
-    [{ ...gate, options: gate.options.slice(0, 1) }, /options must list 2 or 3 options/, /2 or 3 of \{"value":"approve","label":"Approve"\}/],
+    [{ ...gate, run: undefined, options: gate.options.slice(0, 1) }, /options must list 2 or 3 options/, /2 or 3 of \{"value":"approve","label":"Approve"\}/],
     [{ ...gate, options: [gate.options[0], { value: 'yes', label: 'Yes' }] }, /options \{"value":"yes","label":"Yes"\} is not a gate action/, /Skip the judge/],
     [{ ...gate, run: { ...gate.run, commit: 'abc1234' } }, /run\.commit must be a full 40-character/, /git rev-parse HEAD/],
     [{ ...gate, run: 'r1' }, /run must be an object/, /"run_id", "commit"\}/],
@@ -343,4 +343,13 @@ test('post --kind gate: a done-done run waits for approval like an ask, its run 
   const waited = cli2('', 'wait', board, '--filer', 'done-done', '--json', '--timeout', '5');
   assert.equal(waited.status, 0, waited.stdout);
   assert.equal(JSON.parse(waited.stdout)[gate.key].answer, 'fix');
+  // Another run under the key is another question in a feed too, and an answered gate keeps the run it was answered for.
+  const swapped = message('gate-feed.json', JSON.stringify({ schema: 2, items: [{ ...gate, run: { ...gate.run, run_id: 'other-run' } }] }));
+  for (const [args, status, error] of [[['raise', board, '--from', swapped], 2, /already holds a different message[^]*Post it under a new key/],
+    [['post', board, '--from', swapped, '--replace'], 1, /was answered and now holds a different question[^]*Post the new question under a new key/]]) {
+    const refused = cli2('', ...args);
+    assert.equal(refused.status, status, refused.stdout);
+    assert.match(refused.stdout, error);
+  }
+  assert.equal(readFileSync(board, 'utf8'), before);
 });

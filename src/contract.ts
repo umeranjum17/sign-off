@@ -136,10 +136,6 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
     if (Object.hasOwn(m, 'decided')) text('decided', m.decided, 200, 'what was decided, in 200 characters or fewer, or leave it out');
     return { kind: m.kind, schema: m.schema };
   }
-  if (m.kind === 'gate') {
-    if (!Object.hasOwn(m, 'run')) throw bad('run', 'is required', 'Add "run": {"run_id": "<done-done run id>", "commit": "<full commit>"}, the run held for approval');
-    checkRun(RUN.slice(0, 2));
-  }
   if (Object.hasOwn(m, 'about')) text('about', m.about, 500, 'a short note, or leave it out');
   if (Object.hasOwn(m, 'detail')) text('detail', m.detail, 1000, 'the longer note, or leave it out');
   // A gate offers 2 or 3 of done-done's actions, in any order, each with its own label.
@@ -164,6 +160,11 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
     throw bad('default_if_silent', `${show(m.default_if_silent)} is not an option value`, `Set "default_if_silent" to one of ${values.join(', ')}, or leave it out`);
   }
   if (Object.hasOwn(m, 'close') && m.close !== 'done' && m.close !== 'release') throw bad('close', 'must be done or release', 'Set "close" to "done" or "release", or leave it out');
+  // A gate's run is its own rule (section 5), so it comes after the field rules of section 4.
+  if (m.kind === 'gate') {
+    if (!Object.hasOwn(m, 'run')) throw bad('run', 'is required', 'Add "run": {"run_id": "<done-done run id>", "commit": "<full commit>"}, the run held for approval');
+    checkRun(RUN.slice(0, 2));
+  }
   return { kind: m.kind, schema: m.schema };
 }
 

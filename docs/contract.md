@@ -54,7 +54,7 @@ A message file holds one JSON object, in any layout. The validator reads it with
 | `link` | all, optional | `http://` or `https://` followed by 1-500 characters with no whitespace, control character (C0, DEL or C1) or unpaired surrogate, or a 7-40 character lowercase hex commit |
 | `about` | all, required (optional on `ask`) | text, 1-500 |
 | `detail` | `ask`, optional | text, 1-1000 |
-| `options` | `ask`, `gate`, `finding`, required | 2-6 objects of exactly `value` (a key-set id, unique in the message) and `label` (text, 1-80) |
+| `options` | `ask`, `gate`, `finding`, required | 2-6 (2 or 3 on `gate`, section 5) objects of exactly `value` (a key-set id, unique in the message) and `label` (text, 1-80) |
 | `recommend_value` | `ask`, `gate`, `finding`, required | one listed option `value` |
 | `default_if_silent` | `ask`, optional | one listed option `value`; shown, never applied |
 | `close` | `ask`, `gate`, optional | `done` (default) or `release`; copied into the answer |
@@ -98,6 +98,7 @@ A run held for the person's approval. Shows in Waiting on you.
 - `options`: 2 or 3, in any order, from `approve` (Approve), `skip` (Skip the judge) and `fix` (Fix first). Labels must match exactly. They are the actions of `done-done respond --action`.
 - Optional: `close`.
 - The board keeps `run` on the item as sent. The card is a question in Waiting on you with the gate's actions; its `about` and `link` say which run it holds.
+- `run` is part of the question: under the gate's key another run is a different message in a `--from` feed too, and an answered gate cannot take another run, not even in a `--replace` feed, since the answer belongs to the run it was given for.
 
 ### finding, schema 1
 
