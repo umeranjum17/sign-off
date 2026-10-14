@@ -8,11 +8,11 @@ import { createDecipheriv, randomBytes } from 'node:crypto';
 
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
 const worker = `import { writeFileSync } from 'node:fs';
-import { createVault, depositVault, inspectVault, refuseVault, readVaultExpiry, waitVaultExpiry } from ${JSON.stringify(new URL('../dist/vault.js', import.meta.url).href)};
+import { createVault, depositVault, inspectVault, refuseVault, readVaultExpiry, waitVaultExpiry, deliverVault } from ${JSON.stringify(new URL('../dist/vault.js', import.meta.url).href)};
 let input=''; for await (const chunk of process.stdin) input+=chunk;
-const {op,meta,value,board,key,started,filer,timeoutMs}=JSON.parse(input);
+const {op,meta,value,board,key,started,filer,timeoutMs,into,fail}=JSON.parse(input);
 if(started) writeFileSync(started,'started');
-try { const out=await ({create:()=>createVault(meta,value===undefined?undefined:Buffer.from(value)),deposit:()=>depositVault(board,key,Buffer.from(value)),inspect:()=>inspectVault(board,key),refuse:()=>refuseVault(board,key),expiry:async()=>({event:await readVaultExpiry(board,key,filer)}),waitExpiry:async()=>({event:await waitVaultExpiry(board,key,filer,timeoutMs)})})[op](); console.log(JSON.stringify(out)); }
+try { const out=await ({create:()=>createVault(meta,value===undefined?undefined:Buffer.from(value)),deposit:()=>depositVault(board,key,Buffer.from(value)),inspect:()=>inspectVault(board,key),refuse:()=>refuseVault(board,key),expiry:async()=>({event:await readVaultExpiry(board,key,filer)}),waitExpiry:async()=>({event:await waitVaultExpiry(board,key,filer,timeoutMs)}),deliver:()=>deliverVault(board,key,filer,into,fail==='kill'?()=>process.kill(process.pid,'SIGKILL'):fail==='plant'?()=>writeFileSync(into,'planted',{mode:0o600}):fail?()=>{throw new Error('synthetic');}:undefined)})[op](); console.log(JSON.stringify(out ?? {status:'pending'})); }
 catch(e) { console.log(JSON.stringify({code:e.code,error:e.message})); process.exitCode=1; }`;
 
 test('disabled vault custody across real processes: encryption, racing deposits, refusal and missing-key fail closed', async () => {
@@ -35,6 +35,8 @@ test('disabled vault custody across real processes: encryption, racing deposits,
   const meta = (key, mode = 'give') => ({ board, key, mode, filer: 'demo-agent', ...(mode === 'receive' && { expires: Date.now() + 3_600_000 }),...(mode === 'give' && { destination: join(home, 'config', 'api-token') }) });
   const inspect = (key) => run({ op: 'inspect', board, key });
   const files = (dir) => readdirSync(dir).flatMap((n) => { const p = join(dir, n); return statSync(p).isDirectory() ? files(p) : [p]; });
+  mkdirSync(join(home, 'config'), { mode: 0o700 }); mkdirSync(join(home, 'config', 'sign-off'), { mode: 0o700 });
+  writeFileSync(join(home, 'config', 'sign-off', 'vault-destinations'), `${join(home, 'config')}\n`, { mode: 0o600 });
   try {
     const before = Date.now(), initial = await run({ op: 'create', meta: meta('give') });
     assert.equal(initial.status, 'pending');
@@ -617,7 +619,84 @@ test('disabled vault custody across real processes: encryption, racing deposits,
       }
     } finally { env.XDG_STATE_HOME = state; }
     assert.deepEqual(readFileSync(keptPath), kept);
-    for (const text of [...outputs, ...files(home).map((p) => readFileSync(p).toString())]) {
+    // Give delivery: the destination sits directly under an approved private root; one claim, one decryption, fail closed after it.
+    const tokens = join(home, 'config'), list = join(tokens, 'sign-off', 'vault-destinations'), token = join(tokens, 'delivered-token'), racedToken = join(tokens, 'raced-token');
+    const setList = (text, mode = 0o600) => { rmSync(list, { force: true }); writeFileSync(list, text, { mode }); };
+    const reset = () => { rmSync(list, { force: true }); chmodSync(tokens, 0o700); setList(`${tokens}\n`); };
+    const linkDir = join(home, 'link-dir'), gitRepo = join(home, 'token-repo');
+    symlinkSync(tokens, linkDir); mkdirSync(gitRepo, { mode: 0o700 }); mkdirSync(join(gitRepo, '.git'));
+    const deliver = (key, into, extra = {}) => run({ op: 'deliver', board, key, filer: 'd-agent', into, ...extra });
+    const give = (key, destination, filer = 'd-agent') => run({ op: 'create', meta: { ...meta(key), filer, destination } });
+    const cases = [
+      ['no list', () => rmSync(list, { force: true }), join(tokens, 'a-token')],
+      ['list mode 0644', () => setList(`${tokens}\n`, 0o644), join(tokens, 'b-token')],
+      ['list symlink', () => { rmSync(list, { force: true }); symlinkSync(join(tokens, 'elsewhere'), list); }, join(tokens, 'c-token')],
+      ['root via symlinked ancestor', () => { mkdirSync(join(tokens, 'sub'), { mode: 0o700 }); setList(`${join(linkDir, 'sub')}\n`); }, join(linkDir, 'sub', 'd-token')],
+      ['root has .git', () => setList(`${gitRepo}\n`), join(gitRepo, 'e-token')],
+      ['root is HOME', () => setList(`${home}\n`), join(home, 'f-token')],
+      ['relative root', () => setList('config\n'), join(tokens, 'g-token')],
+      ['parent 0755', () => chmodSync(tokens, 0o755), join(tokens, 'h-token')],
+      ['parent missing', () => setList(`${join(home, 'missing')}\n`), join(home, 'missing', 'i-token')],
+      ['outside root', () => setList(`${tokens}\n`), join(home, 'outside', 'j-token')],
+      ['board folder as root', () => setList(`${join(home, 'project')}\n`), join(home, 'project', 'k-token')],
+      ['symlinked parent', () => setList(`${tokens}\n`), join(linkDir, 'l-token')],
+      ['target present', () => writeFileSync(join(tokens, 'present-token'), 'x', { mode: 0o600 }), join(tokens, 'present-token'), 'DESTINATION_EXISTS'],
+      ['dangling target', () => symlinkSync(join(home, 'nowhere'), join(tokens, 'dangling-token')), join(tokens, 'dangling-token'), 'DESTINATION_EXISTS'],
+      ['dot segment', () => {}, `${tokens}/../config/m-token`, 'VALIDATION_ERROR'],
+    ];
+    for (const [i, [name, setup, dest, code = 'DESTINATION_DENIED']] of cases.entries()) {
+      reset(); setup();
+      const before = readdirSync(dir).join(), r = await run({ op: 'create', meta: { ...meta(`deny-${i}`), destination: dest } });
+      assert.equal(r.code, code, name); assert.equal(readdirSync(dir).join(), before, name);
+    }
+    reset(); rmSync(join(tokens, 'dangling-token')); rmSync(linkDir); // the scan below follows symlinks
+    const pending = 'pending-deliver', happy = 'happy';
+    assert.equal((await give(pending, join(tokens, 'pending-token'), 'p-agent')).status, 'pending');
+    assert.equal((await deliver(pending, join(tokens, 'pending-token'), { filer: 'p-agent' })).status, 'pending'); assert.equal(existsSync(join(tokens, 'pending-token')), false);
+    assert.equal((await give(happy, token)).status, 'pending');
+    assert.equal((await run({ op: 'deposit', board, key: happy, value: secret })).status, 'ready');
+    const hp = recordFor(happy), held = readFileSync(hp);
+    assert.equal((await deliver(happy, join(tokens, 'other-token'))).code, 'READER_MISMATCH');
+    assert.equal((await deliver(happy, token, { filer: 'someone-else' })).code, 'READER_MISMATCH');
+    setList('# nothing approved now\n'); assert.equal((await deliver(happy, token)).code, 'DESTINATION_DENIED'); reset(); // re-read under the lock
+    assert.deepEqual(readFileSync(hp), held);
+    assert.equal((await deliver(happy, token)).status, 'delivered');
+    assert.equal(readFileSync(token, 'utf8'), secret); assert.equal(statSync(token).mode & 0o777, 0o600); assert.equal(statSync(token).nlink, 1);
+    assert.equal(JSON.parse(readFileSync(hp)).status, 'delivered'); assert.equal(JSON.parse(readFileSync(hp)).sealed, undefined);
+    assert.equal((await deliver(happy, token)).code, 'ALREADY_READ'); assert.equal(readFileSync(token, 'utf8'), secret);
+    // After-claim failure: no file, claimed (terminal), never decrypted again.
+    const thrown = 'after-throw', throwToken = join(tokens, 'throw-token');
+    await give(thrown, throwToken); await run({ op: 'deposit', board, key: thrown, value: secret });
+    assert.equal((await deliver(thrown, throwToken, { fail: 'throw' })).code, 'DELIVERY_UNCERTAIN');
+    assert.equal(existsSync(throwToken), false); assert.equal(JSON.parse(readFileSync(recordFor(thrown))).status, 'claimed'); assert.equal(JSON.parse(readFileSync(recordFor(thrown))).sealed, undefined);
+    assert.equal((await deliver(thrown, throwToken)).code, 'DELIVERY_UNCERTAIN');
+    // A file appearing after the check is never overwritten or removed.
+    const planted = 'plant', plantToken = join(tokens, 'plant-token');
+    await give(planted, plantToken); await run({ op: 'deposit', board, key: planted, value: secret });
+    assert.equal((await deliver(planted, plantToken, { fail: 'plant' })).code, 'DELIVERY_UNCERTAIN'); assert.equal(readFileSync(plantToken, 'utf8'), 'planted');
+    // Real AEAD failure: one ciphertext byte altered on disk fails after the claim, with no file.
+    const tampered = 'tamper', tamperToken = join(tokens, 'tamper-token');
+    await give(tampered, tamperToken); await run({ op: 'deposit', board, key: tampered, value: secret });
+    const tp = recordFor(tampered), rec = JSON.parse(readFileSync(tp)); rec.sealed.data = (rec.sealed.data[0] === 'A' ? 'B' : 'A') + rec.sealed.data.slice(1); writeFileSync(tp, JSON.stringify(rec));
+    assert.equal((await deliver(tampered, tamperToken)).code, 'DELIVERY_UNCERTAIN'); assert.equal(existsSync(tamperToken), false); assert.equal(JSON.parse(readFileSync(tp)).status, 'claimed');
+    // SIGKILL between claim and write: the lock it leaves fails closed until removed by hand; the item stays uncertain.
+    const killed = 'kill-claim', killToken = join(tokens, 'kill-token');
+    await give(killed, killToken); await run({ op: 'deposit', board, key: killed, value: secret });
+    const killedRun = spawnSync(process.execPath, ['--input-type=module', '-e', worker], { env, input: JSON.stringify({ op: 'deliver', board, key: killed, filer: 'd-agent', into: killToken, fail: 'kill' }), encoding: 'utf8' });
+    assert.equal(killedRun.signal, 'SIGKILL'); assert.equal(existsSync(killToken), false); assert.equal(JSON.parse(readFileSync(recordFor(killed))).status, 'claimed');
+    rmSync(join(dir, 'lock'), { force: true });
+    assert.equal((await deliver(killed, killToken)).code, 'DELIVERY_UNCERTAIN');
+    // Racing deliveries: exactly one wins; the loser gets ALREADY_READ or BUSY, never a second decryption.
+    const racing = 'racing';
+    await give(racing, racedToken); await run({ op: 'deposit', board, key: racing, value: secret });
+    const both = await Promise.all([deliver(racing, racedToken), deliver(racing, racedToken)]);
+    assert.equal(both.filter((r) => r.status === 'delivered').length, 1);
+    assert.ok(both.filter((r) => r.status !== 'delivered').every((r) => r.code === 'ALREADY_READ' || r.code === 'BUSY'));
+    assert.equal(readFileSync(racedToken, 'utf8'), secret);
+    // Delivered and claimed items are not live: this filer's wait finds nothing waiting.
+    assert.match(spawnSync(process.execPath, [cli, 'wait', board, '--filer', 'd-agent', '--timeout', '0'], { env, encoding: 'utf8' }).stdout, /^code: NOT_FOUND$/m);
+    const delivered = new Set([token, racedToken]); // the only files allowed to hold the synthetic value
+    for (const text of [...outputs, ...files(home).filter((p) => !delivered.has(p)).map((p) => readFileSync(p).toString())]) {
       assert.equal(text.includes(secret) || text.includes(url), false);
     }
   } finally { rmSync(home, { recursive: true, force: true }); }

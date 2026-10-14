@@ -1,12 +1,12 @@
 // Vault remains OFF. The server and `wait` import only expiry functions, never payload access.
-import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, parse, resolve } from 'node:path';
 import { homedir } from 'node:os';
-import { createCipheriv, createHash, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import { isKey } from './store.js';
 
 export type VaultMeta = { board: string; key: string; mode: 'give' | 'receive'; filer: string; expires: number; destination?: string };
-type Status = 'pending' | 'ready' | 'refused' | 'expired';
+type Status = 'pending' | 'ready' | 'refused' | 'expired' | 'claimed' | 'delivered';
 type Sealed = { nonce: string; tag: string; data: string };
 type Record = { schema: 1; meta: VaultMeta; status: Status; at: number; sealed?: Sealed };
 export type VaultExpiry = { schema: 1; id: string; status: 'expired' | 'refused'; at: number };
@@ -19,6 +19,10 @@ export const errors = {
   TIMEOUT: 'Vault expiry wait timed out; retry status later.',
   READER_MISMATCH: 'This item belongs to a different filer or destination.',
   REFUSED: 'User refused this vault item; no value was delivered.',
+  DESTINATION_DENIED: 'Destination is outside an approved private config root or has unsafe permissions.',
+  DESTINATION_EXISTS: 'Destination exists; nothing was overwritten.',
+  ALREADY_READ: 'Vault item was already delivered; value is unavailable.',
+  DELIVERY_UNCERTAIN: 'Delivery interrupted; do not retry this item. Check destination locally, then request a fresh item if needed.',
 };
 export class VaultError extends Error {
   constructor(readonly code: keyof typeof errors) { super(errors[code]); }
@@ -43,10 +47,12 @@ function boardId(file: string, create: boolean) {
   return id;
 }
 
+// Absolute and free of raw '.' or '..' segments, which resolve() would otherwise hide.
+const plain = (p: string) => isAbsolute(p) && !p.split('/').some((s) => s === '.' || s === '..');
 function metadata(m: VaultMeta): VaultMeta {
   if (!m || typeof m.board !== 'string' || !VAULT_ID.test(m.board) || !isKey(m.key) || !isKey(m.filer) || !['give', 'receive'].includes(m.mode)
     || !Number.isSafeInteger(m.expires) || m.expires <= 0
-    || (m.mode === 'give' ? typeof m.destination !== 'string' || !isAbsolute(m.destination) : m.destination !== undefined)) bad('VALIDATION_ERROR');
+    || (m.mode === 'give' ? typeof m.destination !== 'string' || !plain(m.destination) : m.destination !== undefined)) bad('VALIDATION_ERROR');
   return { board: m.board, key: m.key, mode: m.mode, filer: m.filer, expires: m.expires,
     ...(m.destination !== undefined && { destination: resolve(m.destination) }) };
 }
@@ -69,6 +75,31 @@ function root(create = true) {
     if (!s.isDirectory() || (s.mode & 0o022) && !(s.mode & 0o1000) || (path === owner || path === vault) && (s.uid !== process.getuid?.() || (s.mode & 0o777) !== 0o700)) bad('VAULT_KEY_UNAVAILABLE');
   }
   return vault;
+}
+const within = (child: string, parent: string) => child === parent || child.startsWith(parent.replace(/\/$/, '') + '/');
+function gitFree(path: string) {
+  let p = parse(path).root;
+  for (const part of path.slice(p.length).split('/')) { p = join(p, part); if (existsSync(join(p, '.git'))) return false; }
+  return true;
+}
+// Owner-only list of approved destination directories: one canonical absolute path per line, `#` comments. Any bad line denies all.
+// ponytail: exact-directory approvals, so a destination must be a direct child; ancestors get only the .git walk.
+function approvedDirs(file: string, dir: string): string[] {
+  const list = join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'sign-off', 'vault-destinations');
+  if (!isAbsolute(list)) bad('DESTINATION_DENIED');
+  let text: string;
+  try { privateFile(list); text = readFileSync(list, 'utf8'); } catch { bad('DESTINATION_DENIED'); }
+  const vaultDir = realpathSync(dir), home = realpathSync(homedir()), boardDir = dirname(file);
+  return text.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#')).map((line) => {
+    const s = lstatSync(line, { throwIfNoEntry: false });
+    if (!plain(line) || !s?.isDirectory() || realpathSync(line) !== line || s.uid !== process.getuid?.() || (s.mode & 0o777) !== 0o700
+      || !gitFree(line) || within(home, line) || [vaultDir, boardDir].some((o) => within(o, line) || within(line, o))) bad('DESTINATION_DENIED');
+    return line;
+  });
+}
+function checkDestination(dest: string, file: string, dir: string) {
+  if (!approvedDirs(file, dir).includes(dirname(dest))) bad('DESTINATION_DENIED');
+  if (lstatSync(dest, { throwIfNoEntry: false })) bad('DESTINATION_EXISTS'); // any entry, including a dangling symlink
 }
 function syncDir(path: string) {
   const fd = openSync(path, 'r');
@@ -105,6 +136,11 @@ function seal(dir: string, meta: VaultMeta, value: Buffer): Sealed {
     return { nonce: nonce.toString('base64'), tag: cipher.getAuthTag().toString('base64'), data: data.toString('base64') };
   } finally { key.fill(0); }
 }
+function unseal(key: Buffer, meta: VaultMeta, s: Sealed) {
+  const d = createDecipheriv('aes-256-gcm', key, Buffer.from(s.nonce, 'base64'));
+  d.setAAD(aad(meta)); d.setAuthTag(Buffer.from(s.tag, 'base64'));
+  return Buffer.concat([d.update(Buffer.from(s.data, 'base64')), d.final()]);
+}
 // A stop signal with no listener ends the process at once, even inside the locked section, and the lock it leaves fails closed for good.
 // So a listener takes each stop signal the process has none for: it runs only between turns of the event loop, after a section has
 // removed its lock, and raises the signal again with no listener, so the process still ends by it. It stays on once added, since
@@ -140,7 +176,7 @@ function readRecord(path: string): Record {
   let record: Record;
   try { record = JSON.parse(readFileSync(path, 'utf8')); } catch { bad('VALIDATION_ERROR'); }
   if (!record || record.schema !== 1 || !VAULT_ID.test(record.meta.board)
-    || JSON.stringify(metadata(record.meta)) !== JSON.stringify(record.meta) || !['pending', 'ready', 'refused', 'expired'].includes(record.status)
+    || JSON.stringify(metadata(record.meta)) !== JSON.stringify(record.meta) || !['pending', 'ready', 'refused', 'expired', 'claimed', 'delivered'].includes(record.status)
     || path !== join(dirname(path), `${digest(record.meta.board, record.meta.key)}.json`)) bad('VALIDATION_ERROR');
   return record;
 }
@@ -235,7 +271,7 @@ export async function takeVaultExpiries(board: string, filer: string) {
           if (record.meta.board !== id || record.meta.filer !== filer) continue;
           const r = expire(path, record);
           if (r.status === 'expired' || r.status === 'refused') found.push({ path, key: r.meta.key, event: expiryEvent(id, r) });
-          else live++;
+          else if (r.status === 'pending' || r.status === 'ready') live++;
         } catch { clean = false; }
       }
       try {
@@ -276,6 +312,8 @@ const active = (r?: Record) => {
   if (!r) bad('NOT_FOUND');
   if (r.status === 'refused') bad('REFUSED');
   if (r.status === 'expired') bad('EXPIRED');
+  if (r.status === 'delivered') bad('ALREADY_READ');
+  if (r.status === 'claimed') bad('DELIVERY_UNCERTAIN');
   return r;
 };
 
@@ -288,6 +326,7 @@ export async function createVault(input: Omit<VaultMeta, 'expires'> & { expires?
     const meta = { ...fixed, board: id };
     if (old) bad('VALIDATION_ERROR'); // Terminal keys are tombstones, never reusable.
     if (meta.expires <= Date.now()) bad('EXPIRED');
+    if (meta.destination !== undefined) checkDestination(meta.destination, boardFile(input.board), dir);
     if (!value) master(dir);
     const record: Record = { schema: 1, meta, status: value ? 'ready' : 'pending', at: Date.now(), ...(value && { sealed: seal(dir, meta, value) }) };
     publish(path, JSON.stringify(record));
@@ -311,5 +350,40 @@ export async function refuseVault(board: string, key: string) {
     const r = active(old), record: Record = { schema: 1, meta: r.meta, status: 'refused', at: Date.now() };
     publish(path, JSON.stringify(record));
     return summary(record);
+  });
+}
+/** Give delivery for the bound filer and destination. Pending returns undefined so the caller keeps waiting. Any failure after the
+ * claim leaves the record `claimed`, which is terminal (DELIVERY_UNCERTAIN) and never decrypts again. */
+export async function deliverVault(board: string, key: string, filer: string, into: string, afterClaim?: () => void) {
+  if (!isKey(filer) || typeof into !== 'string' || !plain(into)) bad('VALIDATION_ERROR');
+  return operate(board, key, false, (dir, path, old) => {
+    if (old && old.meta.filer !== filer) bad('READER_MISMATCH');
+    const r = active(old);
+    if (r.meta.mode !== 'give' || resolve(into) !== r.meta.destination) bad(r.meta.mode === 'give' ? 'READER_MISMATCH' : 'VALIDATION_ERROR');
+    if (r.status === 'pending') return undefined;
+    const dest = r.meta.destination as string;
+    checkDestination(dest, boardFile(board), dir); // pre-claim: the payload stays ready on any denial
+    const secret = master(dir);
+    // Commit point: the ciphertext leaves disk here, so no later process can decrypt it.
+    publish(path, JSON.stringify({ schema: 1, meta: r.meta, status: 'claimed', at: Date.now() }));
+    let made: { dev: number; ino: number } | undefined;
+    try {
+      afterClaim?.();
+      const value = unseal(secret, r.meta, r.sealed as Sealed);
+      const fd = openSync(dest, 'wx', 0o600);
+      try {
+        const st = fstatSync(fd);
+        made = { dev: st.dev, ino: st.ino };
+        writeFileSync(fd, value); fsyncSync(fd);
+      } finally { closeSync(fd); value.fill(0); }
+      syncDir(dirname(dest));
+      const done: Record = { schema: 1, meta: r.meta, status: 'delivered', at: Date.now() };
+      publish(path, JSON.stringify(done));
+      return { key: r.meta.key, at: done.at, status: 'delivered' as const };
+    } catch {
+      // Remove only a file this call created; a lost wx race is someone else's file and stays.
+      try { const s = lstatSync(dest); if (made && s.dev === made.dev && s.ino === made.ino) rmSync(dest); } catch { /* best effort */ }
+      bad('DELIVERY_UNCERTAIN');
+    } finally { secret.fill(0); }
   });
 }
