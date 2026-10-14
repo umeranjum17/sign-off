@@ -1,6 +1,6 @@
 // The v1 communication contract (docs/contract.md): one strict, versioned shape per kind of message.
 import { accessSync, constants, realpathSync, statSync } from 'node:fs';
-import { isAbsolute, relative, resolve } from 'node:path';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { isKey, MEDIA_MAX } from './store.js';
 
 /** A message that does not match: what is wrong, and the one line that says how to fix it. */
@@ -165,7 +165,7 @@ export function mediaFiles(m: any, base: string): string[] {
     let real;
     try { real = realpathSync(resolve(root, p)); } catch { throw bad('is not there', `Put ${p} in the message file's folder, or fix the path`); }
     const rel = relative(root, real);
-    if (!rel || rel.startsWith('..') || isAbsolute(rel)) throw bad('leads outside the message file\'s folder', 'Copy the file into the message file\'s folder instead of linking to it');
+    if (!rel || rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel)) throw bad('leads outside the message file\'s folder', 'Copy the file into the message file\'s folder instead of linking to it');
     const info = statSync(real);
     if (!info.isFile()) throw bad('is not a file', 'Name a screenshot or recording file');
     if (!/\.(png|jpe?g|webp|mp4|webm)$/i.test(real)) throw bad('links to a file that does not end in .png, .jpg, .jpeg, .webp, .mp4 or .webm', 'Name the screenshot or recording itself');

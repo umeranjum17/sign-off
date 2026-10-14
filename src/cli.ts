@@ -775,7 +775,7 @@ function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: 
       const differs = () => exact ? canon({ ...items.find((x) => x?.key === d.key), ...(raw[i].filed === undefined && { filed: undefined }) }) !== canon(raw[i]) : same(had!) !== same(d);
       if (had && differs()) {
         // A contract message refused for its key exits 2 like any other refusal (contract section 4); raise --title keeps exit 1.
-        const contract = exact || raw[i]?.contract !== undefined;
+        const contract = exact || raw[i]?.contract !== undefined || raw[i]?.kind !== undefined;
         if (contract) process.once('exit', () => { process.exitCode = 2; });
         throw fail(`key ${d.key} already holds a different ${contract ? 'message' : 'question'} on ${tilde(file)}`, 'CONFLICT', contract ? 'Post it under a new key' : 'Raise it under a new --key');
       }

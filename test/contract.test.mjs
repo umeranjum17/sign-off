@@ -255,6 +255,21 @@ test('post --kind: one message from a file or stdin, checked against its kind, r
   assert.equal(kept.status, 0, kept.stdout);
 });
 
+test('a feed item that carries kind but no contract, under a key that holds a different message, exits 2 with the new-key fix', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const board = join(scratch, 'kind-only.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  assert.equal(cli2('raise', board, '--title', 'Plain?', '--key', 'pick').status, 0);
+  const kindOnly = { kind: 'ask', schema: 1, key: 'pick', title: ask.title, options: ask.options, recommend_value: ask.recommend_value };
+  const feed = message('kind-only-feed.json', JSON.stringify({ schema: 2, items: [kindOnly] }));
+  for (const verb of ['raise', 'post']) {
+    const refused = cli2(verb, board, '--from', feed);
+    assert.equal(refused.status, 2, refused.stdout);
+    assert.match(refused.stdout, /key pick already holds a different message[^]*Post it under a new key/);
+  }
+});
+
 test('post --kind evidence: media copied and hashed from the message folder, a run kept as the update\'s evidence, never in a --from file', () => {
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;
