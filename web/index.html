@@ -580,7 +580,7 @@
     const hint = !d.options.length ? 'Reply in a few words' : words ? `Your own answer in a few words. It also goes, as a note, ${also}.` : `A note, sent ${also}.`;
     const fold = el('details', { class: 'other', ...((unfolded.has(d.key) || drafts.get(d.key)) && { open: '' }) },
       el('summary', { 'aria-label': `${label}, ${d.title}` }, `${label}${status && ` · ${status}`}`),
-      asked.length ? el('p', { class: 'meta saved-note', dir: 'auto' }, `You asked for another round: ${asked[asked.length - 1].note}`) : '',
+      asked.length ? el('p', { class: 'meta saved-note', dir: 'auto' }, `You asked for another round: ${asked[asked.length - 1].note || 'with your comments on the mocks'}`) : '',
       ...comments.map((m) => el('p', { class: 'meta saved-note', dir: 'auto' }, `Your comment, ${m.delivered ? 'read by the agent' : 'not read yet'}: ${m.text}`)),
       el('label', { for: box.id }, hint), box,
       el('div', { class: 'actions' }, words ? sendBtn : '', round ? roundBtn : '', talk && !FROZEN ? commentBtn : ''));
@@ -702,20 +702,24 @@
     let form = '';
     if (open && pages.length) {
       const box = el('textarea', { id: `ann-text-${d.key}`, rows: 2, maxlength: 500, dir: 'auto' }), save = el('button', {}, 'Save comment'), cancel = el('button', { class: 'quick' }, 'Cancel');
-      box.value = open.text ?? mine.find((a) => a.mock === open.mock && a.ref === open.ref)?.text ?? '';
+      box.value = open.text ?? mine.find((a) => !a.sent && a.mock === open.mock && a.ref === open.ref)?.text ?? '';
       box.oninput = () => (open.text = box.value);
       save.onclick = () => post(save, { id: open.id, key: d.key, mock: open.mock, ref: open.ref, tag: open.tag, words: open.words, text: box.value, hash: open.hash }, () => editing.delete(d.key));
       cancel.onclick = () => { editing.delete(d.key); redraw(d); };
       form = el('div', {}, el('label', { for: box.id }, `Comment on ${what(open)}`), box, el('div', { class: 'actions' }, save, cancel));
     }
-    const rows = mine.map((a) => {
+    const row = (a, ...buttons) => el('li', {}, el('div', {}, el('p', { class: 'meta' }, what(a)), el('p', { class: 'saved-note', dir: 'auto' }, a.text)), ...buttons);
+    // A comment goes with the card's next answer or round; once sent it is the agent's and stays as it was.
+    const sent = mine.filter((a) => a.sent).map((a) => row(a));
+    const rows = mine.filter((a) => !a.sent).map((a) => {
       const edit = el('button', { class: 'quick', 'aria-label': `Edit comment, ${what(a)}` }, 'Edit'), del = el('button', { class: 'quick', 'aria-label': `Delete comment, ${what(a)}` }, 'Delete');
       edit.onclick = () => { editing.set(d.key, { ...a }); redraw(d); };
       del.onclick = () => post(del, { id: a.id, deleted: true }, () => { if (editing.get(d.key)?.mock === a.mock && editing.get(d.key)?.ref === a.ref) editing.delete(d.key); });
-      return el('li', {}, el('div', {}, el('p', { class: 'meta' }, what(a)), el('p', { class: 'saved-note', dir: 'auto' }, a.text)), el('span', { class: 'actions' }, edit, del));
+      return row(a, el('span', { class: 'actions' }, edit, del));
     });
     return el('div', { class: 'ann', 'data-ann': d.key }, pages.length ? el('div', { class: 'actions' }, toggle) : '',
-      on ? el('p', { class: 'meta' }, 'Tap an element in a mock to comment on it. Turn this off to open a mock full size.') : '', form, rows.length ? el('p', { class: 'meta' }, 'Your comments on the mocks, not sent yet') : '', rows.length ? el('ul', {}, ...rows) : '',
+      on ? el('p', { class: 'meta' }, 'Tap an element in a mock to comment on it. Turn this off to open a mock full size.') : '', form, ...(rows.length ? [el('p', { class: 'meta' }, 'Your comments on the mocks, not sent yet'), el('ul', {}, ...rows), el('p', { class: 'meta' }, 'They go with your pick, your Other answer or Another round.')] : []),
+      ...(sent.length ? [el('p', { class: 'meta' }, 'Sent with your answer'), el('ul', {}, ...sent)] : []),
       ...[...old].map(([m, n]) => el('p', { class: 'meta' }, `${n} comment${n > 1 ? 's' : ''} on an earlier version of “${name(m)}” ${n > 1 ? 'are' : 'is'} hidden`)), err);
   }
 

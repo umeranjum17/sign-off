@@ -10,7 +10,7 @@ import { basename, delimiter, dirname, extname, isAbsolute, join, relative, reso
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { type Answer, CHAPTERS_MAX, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, writeItems } from './store.js';
+import { type Answer, CHAPTERS_MAX, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, writeItems } from './store.js';
 
 import { ContractError, KINDS, checkMessage, parseMessage } from './contract.js';
 import { sweepVault } from './vault.js';
@@ -373,18 +373,18 @@ function printAnswers(file: string, rows: ReturnType<typeof board>, waiting: num
   const done = rows.flatMap((d) => (d.answer ? [{ ...d.answer, title: d.title }] : []));
   const rounds = readRounds(file).filter((r) => rows.some((d) => d.key === r.key));
   if (values.json) {
-    const out: Record<string, any> = Object.fromEntries(done.map(({ key, answer, label, close, at, note }) => {
-      const asked = rounds.filter((r) => r.key === key).map(({ note, at }) => ({ note, at }));
-      return [key, { answer, label, close, at, note, ...(asked.length && { rounds: asked }) }];
-    }));
-    for (const r of rounds) if (!out[r.key]) out[r.key] = { rounds: rounds.filter((q) => q.key === r.key).map(({ note, at }) => ({ note, at })) };
+    const asked = (key: string) => rounds.filter((r) => r.key === key).map(({ note, at, comments }) => ({ note, at, comments }));
+    const out: Record<string, any> = Object.fromEntries(done.map(({ key, answer, label, close, at, note, comments }) => [key, { answer, label, close, at, note, comments, ...(asked(key).length && { rounds: asked(key) }) }]));
+    for (const r of rounds) if (!out[r.key]) out[r.key] = { rounds: asked(r.key) };
     return JSON.stringify(out);
   }
-  const notes = done.some((a) => a.note);
+  const notes = done.some((a) => a.note), sent = [...done, ...rounds].flatMap(({ key, comments = [] }) => comments.map(({ mock, ref, tag, words, text }) => ({ key, mock, ref, tag, words, text })));
   return toon({
     board: tilde(file),
     answers: done.length ? done.map(({ key, answer, at, label, close, title, note = '' }) => ({ key, answer, at, ...(values.full && { label, close, title }), ...(notes && { note }) })) : '0 saved yet',
     ...(rounds.length && { rounds: rounds.map(({ key, note, at }) => ({ key, note, at })) }),
+    // Comments on mock elements that went with an answer or a round, each with the element it points at.
+    ...(sent.length && { comments: sent }),
     waiting,
   }, help);
 }
@@ -1256,7 +1256,9 @@ const page = readFileSync(new URL('../web/index.html', import.meta.url));
 const pointer = Buffer.from(`<script>${readFileSync(new URL('../web/point.js', import.meta.url), 'utf8')}</script>`);
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 const state = () => {
-  const answers = readAnswers(file, warn), taken = seenBy(file), rounds = readRounds(file, warn);
+  // The page marks sent comments in annotations, so answers and rounds go without theirs: a read-only board or an export carries none.
+  const answers = Object.fromEntries(Object.entries(readAnswers(file, warn)).map(([k, { comments: _, ...a }]) => [k, a])), taken = seenBy(file);
+  const rounds = readRounds(file, warn).map(({ comments: _, ...r }) => r);
   return {
     file,
     mockBase: `/mock/${loopback(bind) ? 'local' : mockPass(tokenOf(file))}/`,
@@ -1269,13 +1271,19 @@ const state = () => {
     seen: Object.values(answers).filter(taken).map((a) => a.key),
     rounds,
     messages: readMessages(file, warn),
-    annotations: readOnly() || answersOnly() ? [] : readAnnotations(file, warn),
+    annotations: readOnly() || answersOnly() ? [] : ((sent) => readAnnotations(file, warn).map((a) => (sent.has(a.id) ? { ...a, sent: true } : a)))(sentIds(file)),
     dismissed: readDismissed(file, answers, rounds, warn),
   };
 };
 /** A mock file's sha256 now, or null when it is gone: a comment shows only on the exact file it was made on.
  * ponytail: hashes every mock on each state read; cache by mtime if boards carry many big mocks. */
 const mockHash = (path: string) => { try { return sha256(readFileSync(under(dirname(file), mockFile(path)))); } catch { return null; } };
+/** The comments that go with a card's next answer or round: not sent yet, and made on the mock file the card shows now. */
+const unsent = (d: Decision): Sent[] => {
+  const sent = sentIds(file), now = new Map((d.mocks ?? []).map((m) => [m.value, mockHash(m.path)]));
+  return answersOnly() ? [] : readAnnotations(file).filter((a) => a.key === d.key && !sent.has(a.id) && now.get(a.mock) === a.hash)
+    .map(({ id, mock, hash, ref, tag, words, text }) => ({ id, mock, hash, ref, tag, words, text }));
+};
 /** A board whose file says `"readonly": true` shows its items and takes no answers, rounds or comments: another program feeds it. */
 const readOnly = () => readItems(file).extra.readonly === true;
 /** A board whose file says `"answers_only": true` takes answers and replies but no rounds, comments or prompts: another program feeds it. */
@@ -1398,7 +1406,9 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     return [200, state()];
   }
   if (req.url === '/api/annotations') {
-    const { id, deleted, key, mock, ref, tag, words, text, hash: shown } = JSON.parse(body) ?? {}, live = readAnnotations(file);
+    const { id, deleted, key, mock, ref, tag, words, text, hash: shown } = JSON.parse(body) ?? {}, live = readAnnotations(file), sent = sentIds(file);
+    // A comment that went with an answer or a round is the agent's now: it stays as it was sent.
+    if (id !== undefined && sent.has(id)) return [409, { error: 'This comment was sent' }];
     if (deleted === true) {
       if (!live.some((a) => a.id === id)) return [404, { error: 'This comment is gone' }];
       appendAnnotation(file, { id, deleted });
@@ -1414,7 +1424,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     // An edit names a comment that must still be live, so a deleted one is not written back.
     if (id !== undefined && !live.some((a) => a.id === id)) return [404, { error: 'This comment is gone' }];
     // One comment per element: another on the same element of the same file edits the first.
-    const same = live.find((a) => a.key === key && a.mock === mock && a.hash === hash && a.ref === ref);
+    const same = live.find((a) => a.key === key && a.mock === mock && a.hash === hash && a.ref === ref && !sent.has(a.id));
     appendAnnotation(file, { id: same?.id, key, mock, hash, ref, tag, words, text: text.trim() });
     return [200, state()];
   }
@@ -1429,9 +1439,12 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   if (req.url === '/api/rounds') {
     const { key, note = '' } = JSON.parse(body) ?? {};
     if (typeof note !== 'string' || [...note.trim()].length > NOTE_MAX) return [400, { error: `The note must be text of ${NOTE_MAX} characters or fewer` }];
-    if (!note.trim()) return [400, { error: 'Write a note first: another round needs your comment' }];
-    if (!loadDecisions(file).some((x) => x.key === key)) return [404, { error: 'This question is no longer in the file' }];
-    appendRound(file, key, note.trim());
+    const d = loadDecisions(file).find((x) => x.key === key);
+    if (!d) return [404, { error: 'This question is no longer in the file' }];
+    // Comments on the mocks are enough for a round; with none, the round needs a note.
+    const comments = unsent(d);
+    if (!note.trim() && !comments.length) return [400, { error: 'Write a note first: another round needs your comment' }];
+    appendRound(file, key, note.trim(), comments);
     return [200, state()];
   }
   const { key, answer, note = '' } = JSON.parse(body) ?? {};
@@ -1453,7 +1466,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   // Every item that asks something takes an Other answer: the words, saved as the answer `text`, unless an option is named text.
   const other = d.reply || d.options.length ? [REPLY] : [], option = d.options.find((o) => o.value === answer) ?? other.find((o) => o.value === answer);
   if (!option) return [400, { error: `The answer must be one of: ${[...d.options, ...other].map((o) => o.label).join(', ') || 'none, this item is only shown'}` }];
-  answered(appendAnswer(file, d, option, note.trim()), d);
+  answered(appendAnswer(file, d, option, note.trim(), unsent(d)), d);
   return [200, state()];
 }
 

@@ -215,7 +215,8 @@ also copies each file into `evidence/<number>/` next to the board:
   was none, an empty `answer` and `label` (`{"key":"dark-default","answer":"","label":"","close":"done","at":"..."}`), which
   leaves the key unanswered, so the item waits again. An `on_answer:` command gets that line too.
 - `note`: present only when the person typed one. Optional free text, trimmed, up to 500 characters, sent with the click. Picking the same answer again with a changed note adds a new line; clearing the note and clicking again removes it. Lines without `note` (all lines written before notes existed) read as before.
-- `sign-off-axi answers --json` prints the same fields per key, without `key`, and adds `note` only when the latest line has one.
+- `comments`: present only when the answer carried comments on mock elements (below): each as `id`, `mock`, `hash`, `ref`, `tag`, `words` and `text`, as it was sent.
+- `sign-off-axi answers --json` prints the same fields per key, without `key`, and adds `note` and `comments` only when the latest line has them. The default output lists every sent comment in one `comments` table with its `key`.
 
 `*.answers.jsonl` is git-ignored here so an answer is never committed by accident.
 
@@ -228,6 +229,7 @@ also copies each file into `evidence/<number>/` next to the board:
 
 - Asking wakes a waiting agent the same way an answer does. `answers --json`
   adds a `rounds` list per answered key only when that key has asks.
+- An ask carries the card's comments on mock elements not sent yet in `comments`, as an answer does; with any, its `note` may be empty.
 
 **Dismissed items**, written by sign-off next to the questions (`decisions.dismissed.jsonl`, mode 600, one line
 per item per tap, the latest line per key wins). **Dismiss** (the × or the Dismiss button on an item) and **Clear all done** (on Answered) hide
@@ -259,7 +261,7 @@ again until the filer takes it too.
 
 - `text`: 1 to 2000 characters, trimmed.
 
-**Comments on mock elements**, not sent yet (`decisions.annotations.jsonl`, mode 600, oldest first).
+**Comments on mock elements** (`decisions.annotations.jsonl`, mode 600, oldest first).
 Each names its item's `key`, the option's `mock`, the sha256 `hash` of that mock file when the comment was saved,
 and the element as `ref`, `tag` and `words` (see the pointing script above). A later line with the same `id` edits it,
 and a `deleted` line removes it. A save sends the `hash` the page showed; when the file has changed since, the server answers 409 and nothing is written. An edit sends the `id` of its comment; when that comment is no longer live, the server answers 404 and writes nothing. The board shows a comment only while its mock file still has that hash,
@@ -273,6 +275,9 @@ A read-only or answers-only board returns none of them from its state, so its pa
 
 - `text`: 1 to 500 characters, trimmed; `ref`, `tag` and `words` 300 or fewer. One comment per element:
   a second one on the same element of the same file edits the first.
+- The next answer or another-round ask on the card sends its comments shown on the current mock files (not the hidden ones) in that line's `comments`.
+  A comment whose `id` is in an answer or ask line is sent: the state marks it `"sent": true`, an edit or delete of it answers 409 and writes nothing,
+  and a new comment on the same element is a new one, sent with the next answer. An Undo sends none and leaves sent comments sent.
 
 **Access token** (`decisions.token`, mode 600): made the first time the board is served beyond `127.0.0.1`
 and reused after that. The board reads it on every request, so deleting it shuts old links out at once.

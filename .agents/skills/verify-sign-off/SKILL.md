@@ -81,7 +81,7 @@ Look at every shot before you report: nothing overlaps, no text is cut, no raw p
 | Decisions page: list, one-click answer, durable answers | [features/decisions.md](features/decisions.md) |
 | Design item: init/doctor, A/B/C mock cards, `?variant=` pages, another-round asks, `raise` as `post --type decision` | [features/design.md](features/design.md) |
 | Pointing at a mock: the bridge in each `.html` design mock, a tap named back as an element reference, turned on by the board | [features/pointing.md](features/pointing.md) |
-| Comments on mock elements: Comment on the mocks, the editor and list with Edit and Delete, kept per mock file hash, and the No mock placeholder | [features/annotation.md](features/annotation.md) |
+| Comments on mock elements: Comment on the mocks, the editor and list with Edit and Delete, kept per mock file hash, the No mock placeholder, and comments sent to the agent with an answer or Another round, then locked | [features/annotation.md](features/annotation.md) |
 | Ladder rungs: diagram item inline at card width, interactive item in a sandboxed frame with no network | [features/ladder.md](features/ladder.md) |
 | Explainer rung: a narrated stills video built with free local speech, played inline with chapter buttons, no network | [features/explainer.md](features/explainer.md) |
 | Evidence updates: numbered posts with media, hash-checked serving, inline video, verdict | [features/evidence.md](features/evidence.md) |
