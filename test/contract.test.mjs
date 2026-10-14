@@ -284,6 +284,61 @@ test('a feed item that carries kind but no contract, under a key that holds a di
   }
 });
 
+test('post --replace: a changed item is checked against its kind again, an unchanged one is not, and the board is left as it was', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const board = join(scratch, 'replace-check.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  assert.equal(cli2('post', board, '--kind', 'ask', '--from', message('replace-ask.json', JSON.stringify(ask)), '--filer', 'agent-41').status, 0);
+  const feed = (name, item) => message(`replace-${name}.json`, JSON.stringify({ schema: 2, items: [item] }));
+  const boardText = () => readFileSync(board, 'utf8'), before = boardText();
+  // A changed item that no longer matches its kind is refused before anything is written, naming the file, the item index and the key.
+  const broken = cli2('post', board, '--from', feed('broken', { ...ask, media: ['shot.png'] }), '--replace');
+  assert.equal(broken.status, 2, broken.stdout);
+  assert.match(broken.stdout, /replace-broken\.json: items\[0\]: key ship-signin-2: media is not a field of ask schema 1/);
+  assert.match(broken.stdout, /Remove \\"media\\"/);
+  assert.equal(boardText(), before);
+  // A changed item that matches its kind is still replaced, and a resync of the board it wrote is left alone.
+  const changed = cli2('post', board, '--from', feed('changed', { ...ask, title: 'Ship it Friday?' }), '--replace');
+  assert.equal(changed.status, 0, changed.stdout);
+  assert.equal(JSON.parse(boardText()).items[0].title, 'Ship it Friday?');
+  const resync = cli2('post', board, '--from', feed('resync', JSON.parse(boardText()).items[0]), '--replace');
+  assert.equal(resync.status, 0, resync.stdout);
+  assert.match(resync.stdout, /changed: false/);
+  // A whole-board item carries the board's own `filed` stamp, which is not part of the ask's message: changing it still replaces.
+  const stamped = cli2('post', board, '--from', feed('stamped', { ...JSON.parse(boardText()).items[0], title: 'Ship it Monday?' }), '--replace');
+  assert.equal(stamped.status, 0, stamped.stdout);
+  assert.equal(JSON.parse(boardText()).items[0].title, 'Ship it Monday?');
+  // An unchanged item is not checked again, even one the current rules would refuse.
+  const old = { ...ask, title: 'Old title' };
+  writeFileSync(board, JSON.stringify({ schema: 2, items: [old] }));
+  const kept = cli2('post', board, '--from', feed('kept', old), '--replace');
+  assert.equal(kept.status, 0, kept.stdout);
+  assert.equal(JSON.parse(boardText()).items[0].title, 'Old title');
+});
+
+test('post --replace: an answer does not re-attach to a key the feed dropped and re-added, for every contract kind', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const board = join(scratch, 'replace-orphan.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const report2 = { ...report, key: 'slice-note' };
+  assert.equal(cli2('post', board, '--kind', 'ask', '--from', message('orphan-ask.json', JSON.stringify(ask))).status, 0);
+  assert.equal(cli2('post', board, '--kind', 'report', '--from', message('orphan-report.json', JSON.stringify(report2))).status, 0);
+  // Both keys are answered, then the feed drops them; a re-added one cannot bring the saved answer back.
+  appendFileSync(join(scratch, 'replace-orphan.answers.jsonl'), [ask, report2].map(({ key }) => `${JSON.stringify({ key, answer: 'yes', label: 'Yes', close: 'done', at: '2026-10-13T08:00:00Z' })}\n`).join(''));
+  const stored = JSON.parse(readFileSync(board, 'utf8')).items;
+  assert.equal(cli2('post', board, '--from', message('orphan-dropped.json', JSON.stringify({ schema: 2, items: [] })), '--replace').status, 0);
+  const gone = readFileSync(board, 'utf8');
+  // The whole-board item a resync would send (with its `filed` stamp), and the bare message, are both refused the same way.
+  for (const [kind, item] of [['ask', stored[0]], ['report', report2]]) {
+    const back = cli2('post', board, '--from', message(`orphan-back-${kind}.json`, JSON.stringify({ schema: 2, items: [item] })), '--replace');
+    assert.equal(back.status, 1, back.stdout);
+    assert.match(back.stdout, new RegExp(`key ${item.key} was answered[^]*Post it under a new key`));
+    assert.equal(readFileSync(board, 'utf8'), gone);
+  }
+});
+
 test('post --kind evidence: media copied and hashed from the message folder, a run kept as the update\'s evidence, never in a --from file', () => {
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;

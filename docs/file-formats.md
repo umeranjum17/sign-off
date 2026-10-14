@@ -44,7 +44,8 @@
   board with `sign-off-axi post <board> --from <file> --replace`, which checks
   the whole file the way the board reads it and refuses a bad item before
   anything is written; answers stay. A key that was answered may not come back
-  with a different title, options or reply: post that question under a new key.
+  with a different title, options or reply, and a key the program dropped after it was answered may not
+  come back at all: post that question under a new key.
 - `.sign-off-vault-id` (0600, in the board's folder, written only by a vault item): holds the random id naming that folder's private vault records. Besides vault items, only the waits read it, by identity only, and vault custody is not enabled in this build.
   Private custody metadata includes `expires`, an absolute integer Unix deadline in milliseconds, authenticated with the encrypted payload. Give defaults to 10 minutes; Receive requires an explicit deadline. New deadlines must be in the future and at most one hour away; the producer must supply an earlier provider deadline when applicable.
   Under the private custody lock, accessing an elapsed pending/ready record writes an `expired` tombstone without ciphertext. Inspect reports that state; deposit/refuse return fixed `EXPIRED` errors, and no terminal key can be recreated. Existing records without a deadline fail validation, rather than gaining a new lifetime.
@@ -62,7 +63,7 @@
 - `key`: 1-128 of `A-Z a-z 0-9 . _ -`, unique in the file. `title`: required, 160 characters or fewer for a new item; an item already on the board is not checked again, so an older longer title still loads.
 - `recommend_value`: the option the poster would pick; the board shows it first and marks it **Recommended**.
   `raise` and `post` refuse an item that lists `options` without one; a plain Yes/No may leave it out.
-  In a `--from` file (a `--replace` feed too), a new item of a contract kind must be a contract message: see [contract.md](contract.md) section 2. An item already on the board is not checked again.
+  In a `--from` file (a `--replace` feed too), a new item of a contract kind must be a contract message: see [contract.md](contract.md) section 2. An item already on the board is not checked again, except in a `--replace` feed, which replaces the stored item: a contract message that changed is checked against its kind's rules again, so one that no longer matches is refused and the board is left as it was.
 - `filer`: optional, who filed the item (1-128 of `A-Z a-z 0-9 . _ -`), written by `post --filer`.
   `wait --filer` with the same id returns the answers to that filer's items. The page never shows it.
   `post --from <file> --replace --filer <id>` replaces only the items with that filer (and items with
