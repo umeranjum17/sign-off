@@ -1,4 +1,4 @@
-// Vault remains OFF. The server and `wait` import only expiry functions, never payload access.
+// Vault remains OFF. The server imports only expiry functions; `wait --into` reaches payload only through deliverVault.
 import { closeSync, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, parse, resolve } from 'node:path';
 import { homedir } from 'node:os';
@@ -9,7 +9,7 @@ export type VaultMeta = { board: string; key: string; mode: 'give' | 'receive'; 
 type Status = 'pending' | 'ready' | 'refused' | 'expired' | 'claimed' | 'delivered';
 type Sealed = { nonce: string; tag: string; data: string };
 type Record = { schema: 1; meta: VaultMeta; status: Status; at: number; sealed?: Sealed };
-export type VaultExpiry = { schema: 1; id: string; status: 'expired' | 'refused'; at: number };
+export type VaultExpiry = { schema: 1; id: string; status: 'expired' | 'refused' | 'delivery-uncertain' | 'delivered'; at: number };
 export const errors = {
   VALIDATION_ERROR: 'Vault input is invalid: check mode, expiry, provider and destination.',
   EXPIRED: 'Vault item expired; request a fresh item.',
@@ -35,6 +35,11 @@ function boardFile(board: unknown) {
   if (typeof board !== 'string' || !isAbsolute(board)) bad('VALIDATION_ERROR');
   try { return realpathSync(board); } catch { bad('NOT_FOUND'); }
 }
+// Never used: callers stay silent with no permission walk, lock or state creation.
+const unused = (file: string) => {
+  try { return !lstatSync(join(stateHome(), 'sign-off', 'vault'), { throwIfNoEntry: false }) || !lstatSync(join(dirname(file), '.sign-off-vault-id'), { throwIfNoEntry: false }); }
+  catch (e: any) { if (e?.code === 'ENOENT' || e?.code === 'ENOTDIR') return true; throw e; }
+};
 function boardId(file: string, create: boolean) {
   const side = join(dirname(file), '.sign-off-vault-id');
   if (!lstatSync(side, { throwIfNoEntry: false })) {
@@ -182,7 +187,7 @@ function readRecord(path: string): Record {
 }
 // A refusal is admitted only while the item is live (`operate` expires first), so only an expiry is bound to the deadline.
 function expiryEvent(id: string, record: Record): VaultExpiry {
-  const status = record.status as VaultExpiry['status'];
+  const status = (record.status === 'claimed' ? 'delivery-uncertain' : record.status) as VaultExpiry['status'];
   if (!Number.isSafeInteger(record.at) || record.at <= 0 || (status === 'expired' && record.at < record.meta.expires) || record.at > 8.64e15 || Object.hasOwn(record, 'sealed')) bad('VALIDATION_ERROR');
   return { schema: 1, id: `${digest(id, record.meta.key)}:${status}`, status, at: record.at };
 }
@@ -229,13 +234,13 @@ export async function sweepVault(board: string) {
   } catch { return false; }
 }
 /** Replayable expiry observation; never a payload consumer. The public keyed wait (`publicWait`) also expires its own item on access,
- * gets a refusal as an event and tries the lock once; the private observer neither produces nor reports refusals as events. */
+ * gets a refusal, delivery or uncertain delivery as an event and tries the lock once; the private observer reports only expiry. */
 export async function readVaultExpiry(board: string, key: string, filer: string, publicWait = false): Promise<VaultExpiry | undefined> {
   if (!isKey(key) || !isKey(filer)) bad('VALIDATION_ERROR');
   try {
     // Never used: silent before any custody or permission walk.
     const file = boardFile(board);
-    if (!lstatSync(join(stateHome(), 'sign-off', 'vault'), { throwIfNoEntry: false }) || !lstatSync(join(dirname(file), '.sign-off-vault-id'), { throwIfNoEntry: false })) return;
+    if (unused(file)) return;
     const { dir } = custody(board, false);
     if (!dir) return;
     return await lockedVault(dir, () => {
@@ -245,20 +250,22 @@ export async function readVaultExpiry(board: string, key: string, filer: string,
       if (record.meta.filer !== filer) bad('READER_MISMATCH');
       if (record.status === 'refused' && !publicWait) bad('REFUSED');
       const current = publicWait ? expire(path, record) : record;
-      return current.status === 'expired' || current.status === 'refused' ? expiryEvent(id, current) : undefined;
+      const terminal = publicWait ? ['expired', 'refused', 'claimed', 'delivered'] : ['expired', 'refused'];
+      return terminal.includes(current.status) ? expiryEvent(id, current) : undefined;
     }, publicWait ? 1 : 50);
   } catch (e) { throw e instanceof VaultError ? e : new VaultError('BUSY'); }
 }
-/** For an ordinary filer wait: expires this filer's elapsed items in the board's folder, then takes each untaken expiry or refusal once.
- * A private `.expired.taken` or `.refused.taken` marker per event dedupes filer waits; markers are durable before any event is returned.
- * One kind per poll, expired first, so one output never mixes two codes; refusals come on the next poll. */
+/** For an ordinary filer wait: expires this filer's elapsed items in the board's folder, then takes each untaken terminal event once.
+ * A private `.<kind>.taken` marker per event dedupes filer waits; markers are durable before any event is returned.
+ * One kind per poll (expired, refused, delivery-uncertain, delivered), so one output never mixes two codes and a failure is never
+ * hidden behind a delivery's exit 0. */
 export async function takeVaultExpiries(board: string, filer: string) {
   if (!isKey(filer)) bad('VALIDATION_ERROR');
   const none = { events: [] as { key: string; at: number; status: VaultExpiry['status'] }[], live: 0, clean: true };
   try {
     // Never used: silent, with no permission walk, lock or state creation.
     const file = boardFile(board);
-    if (!lstatSync(join(stateHome(), 'sign-off', 'vault'), { throwIfNoEntry: false }) || !lstatSync(join(dirname(file), '.sign-off-vault-id'), { throwIfNoEntry: false })) return none;
+    if (unused(file)) return none;
     const { dir } = custody(board, false);
     if (!dir) return none;
     // One try: an ordinary wait never queues behind custody; BUSY means unknown this poll.
@@ -270,8 +277,8 @@ export async function takeVaultExpiries(board: string, filer: string) {
           const path = join(dir, name), record = readRecord(path);
           if (record.meta.board !== id || record.meta.filer !== filer) continue;
           const r = expire(path, record);
-          if (r.status === 'expired' || r.status === 'refused') found.push({ path, key: r.meta.key, event: expiryEvent(id, r) });
-          else if (r.status === 'pending' || r.status === 'ready') live++;
+          if (r.status === 'pending' || r.status === 'ready') live++;
+          else found.push({ path, key: r.meta.key, event: expiryEvent(id, r) });
         } catch { clean = false; }
       }
       try {
@@ -288,7 +295,8 @@ export async function takeVaultExpiries(board: string, filer: string) {
           try { writeFileSync(fd, event.id); fsyncSync(fd); } finally { closeSync(fd); }
           return true;
         });
-        const expired = take('expired'), fresh = expired.length ? expired : take('refused');
+        let fresh: typeof found = [];
+        for (const kind of ['expired', 'refused', 'delivery-uncertain', 'delivered'] as const) if (!fresh.length) fresh = take(kind);
         if (made.length) syncDir(dir);
         return { events: fresh.map(({ key, event }) => ({ key, at: event.at, status: event.status })), live, clean };
       } catch (e) { for (const m of made) rmSync(m, { force: true }); throw e; }
@@ -352,10 +360,12 @@ export async function refuseVault(board: string, key: string) {
     return summary(record);
   });
 }
-/** Give delivery for the bound filer and destination. Pending returns undefined so the caller keeps waiting. Any failure after the
- * claim leaves the record `claimed`, which is terminal (DELIVERY_UNCERTAIN) and never decrypts again. */
+/** Give delivery for the bound filer and destination. Pending, or a never-used vault (nothing is created), returns undefined so the
+ * caller keeps waiting. Any failure after the claim leaves the record `claimed`, which is terminal (DELIVERY_UNCERTAIN) and never
+ * decrypts again. */
 export async function deliverVault(board: string, key: string, filer: string, into: string, afterClaim?: () => void) {
-  if (!isKey(filer) || typeof into !== 'string' || !plain(into)) bad('VALIDATION_ERROR');
+  if (!isKey(key) || !isKey(filer) || typeof into !== 'string' || !plain(into)) bad('VALIDATION_ERROR');
+  try { if (unused(boardFile(board))) return undefined; } catch (e) { throw e instanceof VaultError ? e : new VaultError('BUSY'); }
   return operate(board, key, false, (dir, path, old) => {
     if (old && old.meta.filer !== filer) bad('READER_MISMATCH');
     const r = active(old);

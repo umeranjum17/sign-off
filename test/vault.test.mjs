@@ -693,9 +693,67 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     assert.equal(both.filter((r) => r.status === 'delivered').length, 1);
     assert.ok(both.filter((r) => r.status !== 'delivered').every((r) => r.code === 'ALREADY_READ' || r.code === 'BUSY'));
     assert.equal(readFileSync(racedToken, 'utf8'), secret);
-    // Delivered and claimed items are not live: this filer's wait finds nothing waiting.
-    assert.match(spawnSync(process.execPath, [cli, 'wait', board, '--filer', 'd-agent', '--timeout', '0'], { env, encoding: 'utf8' }).stdout, /^code: NOT_FOUND$/m);
-    const delivered = new Set([token, racedToken]); // the only files allowed to hold the synthetic value
+    // Delivery events reach this filer's wait once each, one kind per poll, uncertain before delivered; then nothing is live.
+    const fw = (extra) => waitCli(board, 'd-agent', ['--timeout', '0', ...extra]), saved = 'Saved to the approved destination file.';
+    const uncertain = await fw([]); assert.equal(uncertain.code, 1); assert.match(uncertain.out, /^"delivery-uncertain"\[4\]\{key,at\}:$/m);
+    assert.match(uncertain.out, /^code: DELIVERY_UNCERTAIN$/m); for (const k of [thrown, planted, tampered, killed]) assert.ok(uncertain.out.includes(`  ${k},`), k);
+    const done = await fw(['--json']); assert.equal(done.code, 0); assert.deepEqual(Object.keys(done.json).sort(), [happy, racing]);
+    for (const v of Object.values(done.json)) assert.deepEqual([Object.keys(v), v.answer, v.label, v.close], [['answer', 'label', 'close', 'at'], 'delivered', saved, 'done']);
+    assert.match((await fw([])).out, /^code: NOT_FOUND$/m);
+    const taken = (kind) => readdirSync(dir).filter((n) => n.endsWith(`.${kind}.taken`)).map((n) => readFileSync(join(dir, n), 'utf8'));
+    assert.deepEqual([taken('delivery-uncertain').length, taken('delivered').length], [4, 2]);
+    for (const id of [...taken('delivery-uncertain'), ...taken('delivered')]) assert.match(id, /^[a-f0-9]{64}:(delivery-uncertain|delivered)$/);
+    // Keyed waits replay their own delivery event and write no marker; the private observer stays silent on both.
+    const markerCount = readdirSync(dir).filter((n) => n.endsWith('.taken')).length;
+    for (let i = 0; i < 2; i++) {
+      const k = await fw(['--key', happy, '--json']); assert.equal(k.code, 0); assert.equal(k.json[happy].answer, 'delivered');
+      const u = await fw(['--key', tampered]); assert.equal(u.code, 1); assert.match(u.out, /^code: DELIVERY_UNCERTAIN$/m);
+    }
+    assert.equal(readdirSync(dir).filter((n) => n.endsWith('.taken')).length, markerCount);
+    for (const key of [happy, tampered]) assert.equal((await run({ op: 'expiry', board, key, filer: 'd-agent' })).event, undefined);
+    // wait --into: polls while pending, delivers once, maps every final code, never prints the destination.
+    const into = (key, file, extra = [], filer = 'd-agent', more = {}, served = board) => waitCli(served, filer, [...(key ? ['--key', key] : []), '--into', file, ...extra], more).then((r) => {
+      assert.ok(![r.out, r.err].some((t) => t.includes(file) || t.includes(file.replace(home, '~'))), 'wait --into never prints the destination'); return r;
+    });
+    const intoToken = join(tokens, 'into-token'), spareToken = join(tokens, 'spare-token'), raceIntoToken = join(tokens, 'race-into-token');
+    await give('into-a', intoToken); await give('into-b', spareToken); await run({ op: 'deposit', board, key: 'into-b', value: secret });
+    await run({ op: 'create', meta: { ...meta('into-recv', 'receive'), filer: 'd-agent' }, value: url });
+    // An inherited SIGN_OFF_FILER never routes a write; a missing key, a relative path or a Receive item is a usage error.
+    for (const [key, file, filer] of [['into-a', intoToken, null], [null, intoToken, 'd-agent'], ['into-a', 'rel-token', 'd-agent'], ['into-recv', intoToken, 'd-agent']]) {
+      const r = await into(key, file, ['--timeout', '0'], filer, { SIGN_OFF_FILER: 'd-agent' }); assert.equal(r.code, 2, `${key} ${file}`); assert.match(r.out, /^code: VALIDATION_ERROR$/m);
+    }
+    const polling = waitCli(board, 'd-agent', ['--key', 'into-a', '--into', intoToken, '--timeout', '10', '--json']);
+    await new Promise((ok) => setTimeout(ok, 1_500)); assert.equal(polling.child.exitCode, null); assert.equal(existsSync(intoToken), false);
+    await run({ op: 'deposit', board, key: 'into-a', value: secret });
+    const got = await polling; assert.equal(got.code, 0); assert.equal(got.err, ''); assert.ok(!got.out.includes(intoToken));
+    assert.deepEqual(got.json, { 'into-a': { answer: 'delivered', label: saved, close: 'done', at: got.json['into-a'].at } });
+    assert.equal(readFileSync(intoToken, 'utf8'), secret); assert.equal(statSync(intoToken).mode & 0o777, 0o600); assert.equal(statSync(intoToken).nlink, 1);
+    assert.equal(JSON.parse(readFileSync(recordFor('into-a'))).status, 'delivered'); assert.equal(JSON.parse(readFileSync(recordFor('into-a'))).sealed, undefined);
+    const final = async (key, file, code, filer) => { const r = await into(key, file, ['--timeout', '0'], filer); assert.equal(r.code, 1, code); assert.match(r.out, new RegExp(`^code: ${code}$`, 'm')); };
+    await final('into-a', intoToken, 'ALREADY_READ'); await final('into-b', intoToken, 'READER_MISMATCH'); await final('into-b', spareToken, 'READER_MISMATCH', 'someone-else');
+    setList('# nothing approved now\n'); await final('into-b', spareToken, 'DESTINATION_DENIED'); reset();
+    writeFileSync(spareToken, 'x', { mode: 0o600 }); await final('into-b', spareToken, 'DESTINATION_EXISTS'); rmSync(spareToken);
+    await final(tampered, tamperToken, 'DELIVERY_UNCERTAIN');
+    await give('into-race', raceIntoToken); await run({ op: 'deposit', board, key: 'into-race', value: secret });
+    const intoRace = await Promise.all([0, 1].map(() => into('into-race', raceIntoToken, ['--timeout', '5'])));
+    assert.deepEqual(intoRace.map((r) => r.code).sort(), [0, 1]); assert.match(intoRace.find((r) => r.code === 1).out, /^code: ALREADY_READ$/m);
+    // Never used (the vault is OFF): --into stays silent until TIMEOUT and creates no state or folder id, before any board read.
+    const offFolder = join(home, 'off'), offBoard = join(offFolder, 'board.json'), offState = join(home, 'off-state');
+    mkdirSync(offFolder, { mode: 0o700 }); writeFileSync(offBoard, '{"schema":2,"items":[]}');
+    for (const b of [offBoard, join(home, 'no-board', 'board.json')]) {
+      const r = await into('off-item', join(tokens, 'off-token'), ['--timeout', '0'], 'd-agent', { XDG_STATE_HOME: offState }, b);
+      assert.equal(r.code, 1, b); assert.match(r.out, /^code: TIMEOUT$/m); assert.equal(r.err, '');
+    }
+    assert.equal(existsSync(offState), false); assert.equal(existsSync(join(offFolder, '.sign-off-vault-id')), false);
+    const badState = join(home, 'off-bad'); mkdirSync(badState, { mode: 0o700 }); writeFileSync(join(badState, 'sign-off'), 'x', { mode: 0o600 });
+    const bad = await into('off-item', join(tokens, 'off-token'), ['--timeout', '0'], 'd-agent', { XDG_STATE_HOME: badState }, offBoard);
+    assert.equal(bad.code, 1); assert.match(bad.out, /^code: TIMEOUT$/m); assert.equal(bad.err, ''); assert.equal(readFileSync(join(badState, 'sign-off'), 'utf8'), 'x');
+    const denied = join(home, 'off-denied'); mkdirSync(join(denied, 'sign-off'), { recursive: true, mode: 0o700 }); chmodSync(join(denied, 'sign-off'), 0o000);
+    const busy = await into('off-item', join(tokens, 'off-token'), ['--timeout', '0'], 'd-agent', { XDG_STATE_HOME: denied }, offBoard);
+    chmodSync(join(denied, 'sign-off'), 0o700);
+    assert.equal(busy.code, 1); assert.match(busy.out, /^code: TIMEOUT$/m); assert.match(busy.err, /Vault delivery status unavailable; still waiting\./);
+    assert.equal((await into(null, join(tokens, 'off-token'), ['--timeout', '0'], 'd-agent', {}, join(home, 'no-board', 'board.json'))).code, 2, 'usage is checked before any board read');
+    const delivered = new Set([token, racedToken, intoToken, raceIntoToken]); // the only files allowed to hold the synthetic value
     for (const text of [...outputs, ...files(home).filter((p) => !delivered.has(p)).map((p) => readFileSync(p).toString())]) {
       assert.equal(text.includes(secret) || text.includes(url), false);
     }
