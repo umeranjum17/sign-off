@@ -1,6 +1,6 @@
 # Contract validator
 
-Covers `validate`, `post --kind` and the shipped `fixtures/contract/` messages ([docs/contract.md](../../../../docs/contract.md)). Follow Isolation in `SKILL.md` and the Fresh shell in [axi.md](axi.md) first; this entry runs the packed tarball the way another tool's CI does.
+Covers `validate`, `post --kind`, the shipped `fixtures/contract/` messages, and `wait --events` with the contract fields on `on_answer` ([docs/contract.md](../../../../docs/contract.md)). Follow Isolation in `SKILL.md` and the Fresh shell in [axi.md](axi.md) first; this entry runs the packed tarball the way another tool's CI does.
 
 ## Steps
 

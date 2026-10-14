@@ -97,7 +97,7 @@ On every page you shoot, `eval` `SQUASH` from [features/dashboard.md](features/d
 | Vault (OFF): a private expiry, refusal or delivery event reaches `wait --filer` once as metadata (`EXPIRED`, `REFUSED`, `DELIVERY_UNCERTAIN`, or `delivered` with exit 0), ordinary answers first, `wait --key --filer` replays its own item's, silent when the vault was never used; `wait --into` delivers a Give once into an owner-approved folder | [features/vault.md](features/vault.md) |
 | README media and rendered README | [features/readme.md](features/readme.md) |
 | `sign-off-axi` commands, TOON/`--full`/`--json`, packed tarball via `npx -y`, the board a bare command picks | [features/axi.md](features/axi.md) |
-| Contract: `validate` on message files, refusals with one fix line and exit 2, the shipped `fixtures/contract/` run from the package | [features/contract.md](features/contract.md) |
+| Contract: `validate` on message files, refusals with one fix line and exit 2, the shipped `fixtures/contract/` run from the package, `wait --events` and the `on_answer` contract fields | [features/contract.md](features/contract.md) |
 | Coding agents: `init --agent auto|<name>`, config `agent:`, one doctor line per agent, the same journey on several agents | [features/agents.md](features/agents.md) |
 | Agent skill: `skills/sign-off-axi`, the A/B/C mock recipe, `npm run build:skill`, install with `npx skills add` | [features/skill.md](features/skill.md) |
 | Release: `release.yml` publishes a new package.json version to npm on merge, skips one already on npm | [features/release.md](features/release.md) |
