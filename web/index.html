@@ -669,7 +669,7 @@
     }));
   }
 
-  /** Comments on mock elements, not sent yet: the open editor per item, then the list, each comment shown only on the mock file it was made on. */
+  /** Comments on mock elements: the open editor per item, then the unsent list, then the sent ones. An unsent comment shows only on the mock file it was made on. */
   const editing = new Map(), talks = () => !state.readonly && !state.answers_only && !FROZEN;
   const redraw = (d) => document.querySelectorAll('.ann').forEach((n) => n.dataset.ann === d.key && n.replaceWith(annotations(d)));
   function annotations(d) {
