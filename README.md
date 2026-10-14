@@ -202,6 +202,8 @@ npm run build:skill           # regenerates skills/sign-off-axi/SKILL.md from sr
 npm pack                      # builds the publishable sign-off-axi tarball
 ```
 
+A release is a merged version-bump PR: CI publishes the new version to npm.
+
 ### Test runs never touch your board
 
 With no board named, a bare command uses the nearest `.sign-off/` that `init` set up, looking from the working folder up to its repo root (the folder holding `.git`) or up to HOME, but never HOME's own `.sign-off/`. The working folder's own `.sign-off/` is always used. A folder above it is searched only when that climb reaches a repo root or HOME, so a `.sign-off/` above a folder with neither (outside HOME, no `.git`) is never used, and the account's own home is never used. Otherwise the default board is `~/.sign-off/decisions.json`, under `SIGN_OFF_HOME` when it is set (it takes HOME's place for the default board and for where the climb stops), else under HOME.
