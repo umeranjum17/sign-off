@@ -394,7 +394,7 @@
     const drop = clearIfSaved(d.key, drafts.get(d.key));
     call('/api/answers', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
-    }, () => { editing.delete(d.key); if (!typed) drop(); }).then(() => offerUndo(d, before)).then(() => typed && call('/api/messages', {
+    }, () => { forget(d.key); if (!typed) drop(); }).then(() => offerUndo(d, before)).then(() => typed && call('/api/messages', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'comment', key: d.key, text: typed }),
     }, drop)).catch((e) => {
       shown(err).textContent = `Couldn't save: ${e.message}`;
@@ -566,7 +566,7 @@
       const drop = clearIfSaved(d.key, drafts.get(d.key));
       call('/api/rounds', {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, note }),
-      }, () => { editing.delete(d.key); drop(); }).catch((e) => {
+      }, () => { forget(d.key); drop(); }).catch((e) => {
         shown(err).textContent = `Couldn't ask: ${e.message}`;
         roundBtn.disabled = false;
       });
@@ -672,6 +672,10 @@
 
   /** Comments on mock elements: the open editor per item, then the unsent list, then the sent ones. An unsent comment shows only on the mock file it was made on. */
   const editing = new Map(), talks = () => !state.readonly && !state.answers_only && !FROZEN;
+  // Words typed for an element and not saved yet, kept in page memory (not across a reload) so tapping another element or another Edit loses nothing.
+  const unsaved = new Map(), spot = (key, a) => `${key}~${a.mock}~${a.ref}`;
+  // Sent with an answer or round: the card's editor closes and its unsaved words go.
+  const forget = (key) => { editing.delete(key); for (const k of unsaved.keys()) if (k.startsWith(`${key}~`)) unsaved.delete(k); };
   const redraw = (d) => document.querySelectorAll('.ann').forEach((n) => n.dataset.ann === d.key && n.replaceWith(annotations(d)));
   function annotations(d) {
     const hash = new Map((d.mocks ?? []).map((m) => [m.value, m.hash])), open = editing.get(d.key);
@@ -704,10 +708,18 @@
     let form = '';
     if (open && pages.length) {
       const box = el('textarea', { id: `ann-text-${d.key}`, rows: 2, maxlength: 500, dir: 'auto' }), save = el('button', {}, 'Save comment'), cancel = el('button', { class: 'quick' }, 'Cancel');
-      box.value = open.text ?? mine.find((a) => !a.sent && a.mock === open.mock && a.ref === open.ref)?.text ?? '';
-      box.oninput = () => (open.text = box.value);
-      save.onclick = () => post(save, { id: open.id, key: d.key, mock: open.mock, ref: open.ref, tag: open.tag, words: open.words, text: box.value, hash: open.hash }, () => editing.delete(d.key));
-      cancel.onclick = () => { editing.delete(d.key); redraw(d); };
+      const at = spot(d.key, open);
+      box.value = unsaved.get(at) ?? mine.find((a) => !a.sent && a.mock === open.mock && a.ref === open.ref)?.text ?? '';
+      box.oninput = () => unsaved.set(at, box.value);
+      // Saved, only this editor closes: one opened while the save was on its way stays open with its words.
+      save.onclick = () => {
+        const text = box.value;
+        post(save, { id: open.id, key: d.key, mock: open.mock, ref: open.ref, tag: open.tag, words: open.words, text, hash: open.hash }, () => {
+          if (unsaved.get(at) === text) unsaved.delete(at);
+          if (editing.get(d.key) === open) editing.delete(d.key);
+        });
+      };
+      cancel.onclick = () => { unsaved.delete(at); editing.delete(d.key); redraw(d); };
       form = el('div', {}, el('label', { for: box.id }, `Comment on ${what(open)}`), box, el('div', { class: 'actions' }, save, cancel));
     }
     const row = (a, ...buttons) => el('li', {}, el('div', {}, el('p', { class: 'meta' }, what(a)), el('p', { class: 'saved-note', dir: 'auto' }, a.text)), ...buttons);
@@ -716,7 +728,7 @@
     const rows = mine.filter((a) => !a.sent).map((a) => {
       const edit = el('button', { class: 'quick', 'aria-label': `Edit comment, ${what(a)}` }, 'Edit'), del = el('button', { class: 'quick', 'aria-label': `Delete comment, ${what(a)}` }, 'Delete');
       edit.onclick = () => { editing.set(d.key, { ...a }); redraw(d); };
-      del.onclick = () => post(del, { id: a.id, deleted: true }, () => { if (editing.get(d.key)?.mock === a.mock && editing.get(d.key)?.ref === a.ref) editing.delete(d.key); });
+      del.onclick = () => post(del, { id: a.id, deleted: true }, () => { unsaved.delete(spot(d.key, a)); if (editing.get(d.key)?.mock === a.mock && editing.get(d.key)?.ref === a.ref) editing.delete(d.key); });
       return row(a, el('span', { class: 'actions' }, edit, del));
     });
     return el('div', { class: 'ann', 'data-ann': d.key }, pages.length ? el('div', { class: 'actions' }, toggle) : '',
