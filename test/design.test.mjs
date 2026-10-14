@@ -181,11 +181,14 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   assert.match(await (await fetch(`${url}mock/local/nav~b/index.html?variant=b`)).text(), /^<p>variant page<\/p><script>/);
   assert.equal((await post(url, 'api/rounds', { key: 'pick-the-sign-in-layout', note: '' })).status, 400);
   assert.equal((await post(url, 'api/rounds', { key: 'gone', note: 'hi' })).status, 404);
-  const waiting = spawn('node', [cli, 'wait', board, '--key', 'pick-the-sign-in-layout', '--timeout', '20']);
+  // wait takes the rounds already asked as seen, then watches the board folder, so the round is asked once it watches, as while it waits.
+  const watching = "import fs from 'node:fs'; import { syncBuiltinESMExports } from 'node:module'; const { watch } = fs;"
+    + " fs.watch = (...a) => { try { return watch(...a); } finally { process.stderr.write('watching'); } }; syncBuiltinESMExports();";
+  const waiting = spawn('node', ['--import', `data:text/javascript,${encodeURIComponent(watching)}`, cli, 'wait', board, '--key', 'pick-the-sign-in-layout', '--timeout', '20']);
   let waited = '';
   waiting.stdout.on('data', (b) => (waited += b));
   const exited = new Promise((ok) => waiting.on('exit', ok));
-  await new Promise((ok) => setTimeout(ok, 500));
+  await new Promise((ok) => { waiting.stderr.on('data', (b) => /watching/.test(b) && ok()); waiting.once('exit', ok); });
   assert.equal((await post(url, 'api/rounds', { key: 'pick-the-sign-in-layout', note: 'Umer: show B with A header.' })).status, 200);
   assert.equal(await exited, 0);
   assert.match(waited, /show B with A header/);
@@ -666,6 +669,8 @@ test('comments on mock elements: one per element, kept across a reload, edited a
   await reload();
   assert.deepEqual(await evaluate("[...document.querySelectorAll('.shot.none')].map((n) => n.textContent)"), ['No mock for this option']);
   assert.equal(await write('Make this button green, Umer'), '');
+  // While commenting, a tap that reaches the board instead of the frame, as one on its edge does, never opens the mock full size.
+  assert.equal(await evaluate(`${nth(0)}.parentElement.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))`), false);
   const [saved] = await evaluate('state.annotations');
   assert.deepEqual({ ...saved, id: '', at: '' }, { id: '', at: '', key: 'look', mock: 'a', hash: createHash('sha256').update(readFileSync(mockA)).digest('hex'),
     ref: '#app > button:nth-of-type(1)', tag: 'button', words: 'Sign in', text: 'Make this button green, Umer' });
