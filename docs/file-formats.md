@@ -187,7 +187,7 @@
   "commit": "0123456789abcdef0123456789abcdef01234567",
   "outcome": "Umer can see the updated sign-in screen.",
   "repro": "repro: n/a: no bug",
-  "proof": "verify-sign-off: real browser journey",
+  "proof": "done-done: real browser journey",
   "evidence": "after.png, walkthrough.mp4"
 }
 ```
