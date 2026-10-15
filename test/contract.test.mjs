@@ -284,6 +284,120 @@ test('a feed item that carries kind but no contract, under a key that holds a di
   }
 });
 
+test('post --replace: a changed item is checked against its kind again, an unchanged one is not, and the board is left as it was', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const board = join(scratch, 'replace-check.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  assert.equal(cli2('post', board, '--kind', 'ask', '--from', message('replace-ask.json', JSON.stringify(ask)), '--filer', 'agent-41').status, 0);
+  const feed = (name, item) => message(`replace-${name}.json`, JSON.stringify({ schema: 2, items: [item] }));
+  const boardText = () => readFileSync(board, 'utf8'), before = boardText();
+  // A changed item that no longer matches its kind is refused before anything is written, naming the file, the item index and the key.
+  const broken = cli2('post', board, '--from', feed('broken', { ...ask, media: ['shot.png'] }), '--replace');
+  assert.equal(broken.status, 2, broken.stdout);
+  assert.match(broken.stdout, /replace-broken\.json: items\[0\]: key ship-signin-2: media is not a field of ask schema 1/);
+  assert.match(broken.stdout, /Remove \\"media\\"/);
+  assert.equal(boardText(), before);
+  // A changed item that matches its kind is still replaced, and a resync of the board it wrote is left alone.
+  const changed = cli2('post', board, '--from', feed('changed', { ...ask, title: 'Ship it Friday?' }), '--replace');
+  assert.equal(changed.status, 0, changed.stdout);
+  assert.equal(JSON.parse(boardText()).items[0].title, 'Ship it Friday?');
+  const resync = cli2('post', board, '--from', feed('resync', JSON.parse(boardText()).items[0]), '--replace');
+  assert.equal(resync.status, 0, resync.stdout);
+  assert.match(resync.stdout, /changed: false/);
+  // A whole-board item carries the board's own `filed` stamp, which is not part of the ask's message: changing it still replaces.
+  const stamped = cli2('post', board, '--from', feed('stamped', { ...JSON.parse(boardText()).items[0], title: 'Ship it Monday?' }), '--replace');
+  assert.equal(stamped.status, 0, stamped.stdout);
+  assert.equal(JSON.parse(boardText()).items[0].title, 'Ship it Monday?');
+  // An unchanged item is not checked again, even one the current rules would refuse.
+  const old = { ...ask, title: 'Old title' };
+  writeFileSync(board, JSON.stringify({ schema: 2, items: [old] }));
+  const kept = cli2('post', board, '--from', feed('kept', old), '--replace');
+  assert.equal(kept.status, 0, kept.stdout);
+  assert.equal(JSON.parse(boardText()).items[0].title, 'Old title');
+});
+
+test('post --replace: an answer does not re-attach to a key the feed dropped and re-added, for every contract kind', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const board = join(scratch, 'replace-orphan.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const report2 = { ...report, key: 'slice-note' };
+  assert.equal(cli2('post', board, '--kind', 'ask', '--from', message('orphan-ask.json', JSON.stringify(ask))).status, 0);
+  assert.equal(cli2('post', board, '--kind', 'report', '--from', message('orphan-report.json', JSON.stringify(report2))).status, 0);
+  // Both keys are answered, then the feed drops them; a re-added one cannot bring the saved answer back.
+  appendFileSync(join(scratch, 'replace-orphan.answers.jsonl'), [ask, report2].map(({ key }) => `${JSON.stringify({ key, answer: 'yes', label: 'Yes', close: 'done', at: '2026-10-13T08:00:00Z' })}\n`).join(''));
+  const stored = JSON.parse(readFileSync(board, 'utf8')).items;
+  assert.equal(cli2('post', board, '--from', message('orphan-dropped.json', JSON.stringify({ schema: 2, items: [] })), '--replace').status, 0);
+  const gone = readFileSync(board, 'utf8');
+  // The whole-board item a resync would send (with its `filed` stamp), and the bare message, are both refused the same way.
+  for (const [kind, item] of [['ask', stored[0]], ['report', report2]]) {
+    const back = cli2('post', board, '--from', message(`orphan-back-${kind}.json`, JSON.stringify({ schema: 2, items: [item] })), '--replace');
+    assert.equal(back.status, 1, back.stdout);
+    assert.match(back.stdout, new RegExp(`key ${item.key} was answered[^]*Post it under a new key`));
+    assert.equal(readFileSync(board, 'utf8'), gone);
+  }
+});
+
+test('post --kind evidence: a key the feed dropped after it was answered cannot be posted again, so no stale verdict re-attaches', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const dir = mkdtempSync(join(scratch, 'orphan-evidence-')), board = join(dir, 'board.json');
+  const cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const shot = readFileSync(join(fixtures, 'evidence.v1', 'shot.png'));
+  writeFileSync(join(dir, 'one.png'), shot);
+  writeFileSync(join(dir, 'two.png'), Buffer.concat([shot, Buffer.from('\n')]));
+  const evidence = (name, media) => {
+    const path = join(dir, name);
+    writeFileSync(path, JSON.stringify({ contract: 1, kind: 'evidence', schema: 1, key: 'signin-phone-2', title: 'Sign-in screen, second pass', about: 'Umer checks the new layout.', media: [media] }));
+    return path;
+  };
+  const first = cli2('post', board, '--kind', 'evidence', '--from', evidence('first.json', 'one.png'));
+  assert.equal(first.status, 0, first.stdout);
+  const [item] = JSON.parse(readFileSync(board, 'utf8')).items;
+  assert.deepEqual([item.key, item.media.length], ['signin-phone-2', 1]);
+  appendFileSync(join(dir, 'board.answers.jsonl'), `${JSON.stringify({ key: 'signin-phone-2', answer: 'fail', label: 'Fail', close: 'done', at: '2026-10-13T08:00:00Z' })}\n`);
+  assert.equal(cli2('post', board, '--from', message('orphan-evidence-dropped.json', JSON.stringify({ schema: 2, items: [] })), '--replace').status, 0);
+  const gone = readFileSync(board, 'utf8');
+  // The same key with different media cannot come back through the evidence path the --replace refusal points at.
+  const back = cli2('post', board, '--kind', 'evidence', '--from', evidence('second.json', 'two.png'));
+  assert.equal(back.status, 2, back.stdout);
+  assert.match(back.stdout, /key signin-phone-2 was answered[^]*Post it under a new key/);
+  assert.equal(readFileSync(board, 'utf8'), gone);
+});
+
+test('post --replace: a board-shaped evidence item with malformed media is refused with a fix line, never a crash', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const dir = mkdtempSync(join(scratch, 'media-shape-')), board = join(dir, 'board.json');
+  const cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const write = (name, body) => {
+    const path = join(dir, name);
+    writeFileSync(path, JSON.stringify(body));
+    return path;
+  };
+  writeFileSync(join(dir, 'shot.png'), readFileSync(join(fixtures, 'evidence.v1', 'shot.png')));
+  const stored = () => JSON.parse(readFileSync(board, 'utf8')).items[0];
+  assert.equal(cli2('post', board, '--kind', 'evidence', '--from', write('first.json', { contract: 1, kind: 'evidence', schema: 1, key: 'signin-phone-2', title: 'Sign-in screen, second pass', about: 'Umer checks the new layout.', media: ['shot.png'] })).status, 0);
+  const before = readFileSync(board, 'utf8');
+  for (const [media, error] of [['nope', /media must list 1 to 12 files/], [[null], /media\[0\] must be text/], [{ length: 3 }, /media must list 1 to 12 files/]]) {
+    const refused = cli2('post', board, '--from', write('feed.json', { schema: 2, items: [{ ...stored(), media }] }), '--replace');
+    assert.equal(refused.status, 2, refused.stdout + refused.stderr);
+    assert.doesNotMatch(refused.stdout + refused.stderr, /TypeError|is not a function/);
+    assert.match(refused.stdout, error);
+    assert.equal(readFileSync(board, 'utf8'), before);
+  }
+  // The stored item is read back as a message too: a board whose own evidence media is malformed is refused, not crashed on.
+  const doc = JSON.parse(before);
+  doc.items[0].media = 'nope';
+  writeFileSync(board, JSON.stringify(doc));
+  const bare = cli2('post', board, '--from', write('bare.json', { schema: 2, items: [{ contract: 1, kind: 'evidence', schema: 1, type: 'evidence', key: 'signin-phone-2', title: 'T', about: 'A' }] }), '--replace');
+  assert.equal(bare.status, 2, bare.stdout + bare.stderr);
+  assert.doesNotMatch(bare.stdout + bare.stderr, /TypeError|is not a function/);
+});
+
 test('post --kind evidence: media copied and hashed from the message folder, a run kept as the update\'s evidence, never in a --from file', () => {
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;
