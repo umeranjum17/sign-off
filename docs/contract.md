@@ -26,7 +26,7 @@ Non-contract types stay outside this contract. `raise --title` and `post --type 
 
 One validator, one way in. No daemon, socket or HTTP API.
 
-`sign-off-axi post [board.json] --kind <kind> --from <file.json>`, or `--from -` to read stdin. `--kind` must equal the message's `kind`, so the wrong file is never posted. A `post --from --replace` feed checks each new contract-kind item the same way, except evidence (section 2). A --replace feed is a whole-board resync: it does not refuse a contract item whose key holds a different message, it replaces it, re-checking a changed contract message against its kind's rules (section 2). Two rules hold for every contract kind in a `--replace` feed: an answered item keeps its question — a gate cannot take another run, nor a finding another proposal, nor evidence other media or another run — and once an item's key has left the board, an answer recorded for it does not re-attach: the re-added item is refused, and is posted under a new key (section 5).
+`sign-off-axi post [board.json] --kind <kind> --from <file.json>`, or `--from -` to read stdin. `--kind` must equal the message's `kind`, so the wrong file is never posted. A `post --from --replace` feed checks each new contract-kind item the same way, except evidence (section 2). A --replace feed is a whole-board resync: it does not refuse a contract item whose key holds a different message, it replaces it, re-checking a changed contract message against its kind's rules (section 2). An answer stays with the question it was given for: in a `--replace` feed an answered item whose title, options, reply, run (for a gate), finding (for a finding), or media or run (for evidence) changed is refused. Known limit: ask `about`/`detail` changes are not part of that comparison. And once an item's key has left the board, an answer recorded for it does not re-attach for any contract kind — the re-added item is refused, and is posted under a new key (section 5).
 
 `raise --from` and `post --from` (no `--kind`) check each new item that carries `contract` and `kind` the same way `post --kind` does, and refuse a new item with no `kind` unless it names a non-contract type (section 2).
 
@@ -71,7 +71,7 @@ A question the person answers by picking an option. Shows in Waiting on you.
 
 - Fields: the common ones, `about`, `detail`, `options`, `recommend_value`, `default_if_silent`, `close`.
 - A yes/no ask lists `yes` (Yes) and `no` (No) as its options.
-- As for a gate's run, an answered ask keeps the question it was answered for: an answered ask cannot take another question, not even in a `--replace` feed. A dropped answered ask key cannot come back in a `--replace` feed; post it under a new key.
+- An answered ask keeps its title, options and reply: an answered ask cannot take another one, not even in a `--replace` feed. Known limit: `about`/`detail` changes are not part of that comparison. A dropped answered ask key cannot come back in a `--replace` feed; post it under a new key.
 - Design picks, diagrams, interactive pages and explainers are not v1 kinds. They post with `post --type` under the board rules in [file-formats.md](file-formats.md), outside this contract.
 
 ### report, schema 1
