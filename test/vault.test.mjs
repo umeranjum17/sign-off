@@ -10,9 +10,9 @@ const cli = new URL('../dist/cli.js', import.meta.url).pathname;
 const worker = `import { writeFileSync } from 'node:fs';
 import { createVault, depositVault, inspectVault, refuseVault, readVaultExpiry, waitVaultExpiry, deliverVault } from ${JSON.stringify(new URL('../dist/vault.js', import.meta.url).href)};
 let input=''; for await (const chunk of process.stdin) input+=chunk;
-const {op,meta,value,board,key,started,filer,timeoutMs,into,fail}=JSON.parse(input);
+const {op,meta,value,raw,board,key,started,filer,timeoutMs,into,fail}=JSON.parse(input);
 if(started) writeFileSync(started,'started');
-try { const out=await ({create:()=>createVault(meta,value===undefined?undefined:Buffer.from(value)),deposit:()=>depositVault(board,key,Buffer.from(value)),inspect:()=>inspectVault(board,key),refuse:()=>refuseVault(board,key),expiry:async()=>({event:await readVaultExpiry(board,key,filer)}),waitExpiry:async()=>({event:await waitVaultExpiry(board,key,filer,timeoutMs)}),deliver:()=>deliverVault(board,key,filer,into,fail==='kill'?()=>process.kill(process.pid,'SIGKILL'):fail==='plant'?()=>writeFileSync(into,'planted',{mode:0o600}):fail?()=>{throw new Error('synthetic');}:undefined)})[op](); console.log(JSON.stringify(out ?? {status:'pending'})); }
+try { const out=await ({create:()=>createVault(meta,value===undefined?undefined:Buffer.from(value,raw?'base64':'utf8')),deposit:()=>depositVault(board,key,Buffer.from(value)),inspect:()=>inspectVault(board,key),refuse:()=>refuseVault(board,key),expiry:async()=>({event:await readVaultExpiry(board,key,filer)}),waitExpiry:async()=>({event:await waitVaultExpiry(board,key,filer,timeoutMs)}),deliver:()=>deliverVault(board,key,filer,into,fail==='kill'?()=>process.kill(process.pid,'SIGKILL'):fail==='plant'?()=>writeFileSync(into,'planted',{mode:0o600}):fail?()=>{throw new Error('synthetic');}:undefined)})[op](); console.log(JSON.stringify(out ?? {status:'pending'})); }
 catch(e) { console.log(JSON.stringify({code:e.code,error:e.message})); process.exitCode=1; }`;
 
 test('disabled vault custody across real processes: encryption, racing deposits, refusal and missing-key fail closed', async () => {
@@ -32,11 +32,13 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     });
     child.stdin.end(JSON.stringify(input));
   });
-  const meta = (key, mode = 'give') => ({ board, key, mode, filer: 'demo-agent', ...(mode === 'receive' && { expires: Date.now() + 3_600_000 }),...(mode === 'give' && { destination: join(home, 'config', 'api-token') }) });
+  const meta = (key, mode = 'give') => ({ board, key, mode, filer: 'demo-agent', ...(mode === 'receive' && { expires: Date.now() + 3_600_000, provider: 'npm' }),...(mode === 'give' && { destination: join(home, 'config', 'api-token') }) });
   const inspect = (key) => run({ op: 'inspect', board, key });
   const files = (dir) => readdirSync(dir).flatMap((n) => { const p = join(dir, n); return statSync(p).isDirectory() ? files(p) : [p]; });
   mkdirSync(join(home, 'config'), { mode: 0o700 }); mkdirSync(join(home, 'config', 'sign-off'), { mode: 0o700 });
   writeFileSync(join(home, 'config', 'sign-off', 'vault-destinations'), `${join(home, 'config')}\n`, { mode: 0o600 });
+  const providers = join(home, 'config', 'sign-off', 'vault-providers');
+  writeFileSync(providers, 'npm https://www.npmjs.com\n', { mode: 0o600 });
   try {
     const before = Date.now(), initial = await run({ op: 'create', meta: meta('give') });
     assert.equal(initial.status, 'pending');
@@ -49,11 +51,11 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     assert.equal((await inspect('give')).status, 'ready');
     const recordPath = readdirSync(dir).filter((n) => n.endsWith('.json')).map((n) => join(dir, n))[0], record = JSON.parse(readFileSync(recordPath));
     // Trusted-owner control: the synthetic private key really decrypts; altered routing cannot authenticate.
-    const decrypt = (m) => {
-      const cipher = createDecipheriv('aes-256-gcm', readFileSync(keyPath), Buffer.from(record.sealed.nonce, 'base64'));
-      cipher.setAAD(Buffer.from(JSON.stringify([1, m.board, m.key, m.mode, m.expires, m.destination ?? null, m.filer])));
-      cipher.setAuthTag(Buffer.from(record.sealed.tag, 'base64'));
-      return Buffer.concat([cipher.update(Buffer.from(record.sealed.data, 'base64')), cipher.final()]).toString();
+    const decrypt = (m, rec = record) => {
+      const cipher = createDecipheriv('aes-256-gcm', readFileSync(keyPath), Buffer.from(rec.sealed.nonce, 'base64'));
+      cipher.setAAD(Buffer.from(JSON.stringify([1, m.board, m.key, m.mode, m.expires, m.destination ?? null, m.filer, ...(m.provider === undefined ? [] : [m.provider])])));
+      cipher.setAuthTag(Buffer.from(rec.sealed.tag, 'base64'));
+      return Buffer.concat([cipher.update(Buffer.from(rec.sealed.data, 'base64')), cipher.final()]).toString();
     };
     assert.ok(decrypt(record.meta) === secret, 'Trusted-owner decryption must match without printing the payload.');
     for (const [field, value] of [['board', '/other/board.json'], ['key', 'other'], ['mode', 'receive'], ['expires', record.meta.expires + 1], ['destination', '/other/token'], ['filer', 'other']]) assert.throws(() => decrypt({ ...record.meta, [field]: value }));
@@ -72,9 +74,9 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     assert.equal((await run({ op: 'create', meta: meta('missing-key', 'receive'), value: url })).error, 'Vault key is unavailable; encrypted payload cannot be read.');
     assert.equal(existsSync(keyPath), false); writeFileSync(keyPath, master, { mode: 0o600 });
     chmodSync(keyPath, 0o644);
-    assert.equal((await run({ op: 'create', meta: meta('unsafe-key', 'receive'), value: secret })).code, 'VAULT_KEY_UNAVAILABLE'); chmodSync(keyPath, 0o600);
+    assert.equal((await run({ op: 'create', meta: meta('unsafe-key', 'receive'), value: url })).code, 'VAULT_KEY_UNAVAILABLE'); chmodSync(keyPath, 0o600);
     const fakeKey = join(home, 'fake-key'); writeFileSync(fakeKey, master, { mode: 0o600 }); rmSync(keyPath); symlinkSync(fakeKey, keyPath);
-    assert.equal((await run({ op: 'create', meta: meta('linked-key', 'receive'), value: secret })).code, 'VAULT_KEY_UNAVAILABLE');
+    assert.equal((await run({ op: 'create', meta: meta('linked-key', 'receive'), value: url })).code, 'VAULT_KEY_UNAVAILABLE');
     rmSync(keyPath); writeFileSync(keyPath, master, { mode: 0o600 });
     chmodSync(dir, 0o755); assert.equal((await inspect('kept')).code, 'VAULT_KEY_UNAVAILABLE'); chmodSync(dir, 0o700);
     const interrupted = recordPath + '.0123456789abcdef.tmp'; writeFileSync(interrupted, JSON.stringify(record), { mode: 0o600 });
@@ -83,11 +85,11 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     assert.equal((await inspect('kept')).error, 'Vault storage is busy or unavailable; retry later.'); rmSync(join(dir, 'lock'));
     const other = join(home, 'other'); mkdirSync(other); const linked = join(home, 'linked'); symlinkSync(other, linked);
     env.XDG_STATE_HOME = linked;
-    assert.equal((await run({ op: 'create', meta: meta('symlink', 'receive'), value: secret })).exit, 1); assert.deepEqual(readdirSync(other), []);
+    assert.equal((await run({ op: 'create', meta: meta('symlink', 'receive'), value: url })).exit, 1); assert.deepEqual(readdirSync(other), []);
     env.XDG_STATE_HOME = join(home, 'project');
-    assert.equal((await run({ op: 'create', meta: meta('board-root', 'receive'), value: secret })).code, 'VAULT_KEY_UNAVAILABLE');
+    assert.equal((await run({ op: 'create', meta: meta('board-root', 'receive'), value: url })).code, 'VAULT_KEY_UNAVAILABLE');
     const gitRoot = join(home, 'git-root'); mkdirSync(gitRoot); mkdirSync(join(gitRoot, '.git')); env.XDG_STATE_HOME = gitRoot;
-    assert.equal((await run({ op: 'create', meta: meta('git-root', 'receive'), value: secret })).code, 'VAULT_KEY_UNAVAILABLE');
+    assert.equal((await run({ op: 'create', meta: meta('git-root', 'receive'), value: url })).code, 'VAULT_KEY_UNAVAILABLE');
     env.XDG_STATE_HOME = join(home, 'interrupted-state');
     const interruptedDir = join(env.XDG_STATE_HOME, 'sign-off', 'vault'); mkdirSync(interruptedDir, { recursive: true, mode: 0o700 });
     writeFileSync(join(interruptedDir, 'a'.repeat(64) + '.json.0123456789abcdef.tmp'), JSON.stringify(record), { mode: 0o600 });
@@ -146,6 +148,42 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     const waitFor = async (condition, deadline) => {
       while (!condition()) { assert.ok(Date.now() < deadline, 'Expiry condition timed out.'); await new Promise((ok) => setTimeout(ok, 20)); }
     };
+    // Receive links: an owner-only provider list, exact origin match, refused before any folder, id, key or record exists.
+    const linkFolder = join(home, 'link-board'); mkdirSync(linkFolder, { mode: 0o700 });
+    const linkBoard = join(linkFolder, 'board.json'); writeFileSync(linkBoard, '{"schema":2,"items":[]}');
+    const linkState = join(home, 'link-state'), invalid = 'Vault input is invalid: check mode, expiry, provider and destination.';
+    const refusedLink = async (label, input) => {
+      env.XDG_STATE_HOME = linkState;
+      const r = await run({ op: 'create', ...input, meta: { ...meta('link', 'receive'), ...input.meta, board: linkBoard } });
+      env.XDG_STATE_HOME = state;
+      assert.equal(r.code, 'VALIDATION_ERROR', label); assert.equal(r.error, invalid, label);
+      assert.equal(existsSync(linkState), false, label); assert.deepEqual(readdirSync(linkFolder), ['board.json'], label);
+    };
+    const linkedList = join(home, 'linked-providers'), linkPath = new URL(url).pathname;
+    for (const [label, list, mode = 0o600] of [['no file'], ['mode 0644', 'npm https://www.npmjs.com\n', 0o644], ['symlinked list'], ['comments only', '# npm https://www.npmjs.com\n'],
+      ...['https://www.npmjs.cöm', 'http://www.npmjs.com', 'https://127.0.0.1', 'https://[::1]', 'https://localhost', 'https://www.npmjs.com.', 'https://u@www.npmjs.com', 'https://www.npmjs.com/login',
+        'https://www.npmjs.com:443', 'https://WWW.npmjs.com', 'https://www.npmjs.com:8443', 'https://www.npmjs.com extra', 'https://www.npmjs.com\nnpm https://www.npmjs.com', 'https://www.npmjs.com\nbad line'].map((l) => [l, `npm ${l}\n`])]) {
+      rmSync(providers, { force: true });
+      if (label === 'symlinked list') { writeFileSync(linkedList, 'npm https://www.npmjs.com\n', { mode: 0o600 }); symlinkSync(linkedList, providers); }
+      else if (list) writeFileSync(providers, list, { mode });
+      // The link matches the bad line's own origin, so only the line rule refuses it.
+      const origin = list?.match(/^npm (\S+)/)?.[1];
+      await refusedLink(`list: ${label}`, { value: origin ? origin.replace(/\/$/, '') + linkPath : url });
+    }
+    rmSync(providers); rmSync(linkedList); writeFileSync(providers, '# owner list\npypi https://pypi.org\nnpm https://www.npmjs.com\n', { mode: 0o600 });
+    for (const value of ['', url.replace('https:', 'http:'), 'javascript:alert(1)', 'data:text/plain,x', 'file:///etc/passwd', `https://u:p@www.npmjs.com${linkPath}`, `https://u@www.npmjs.com${linkPath}`,
+      `https://www.npmjs.com.evil.example${linkPath}`, `https://www.npmjs.com.${linkPath}`, `https://www.npmjs.сom${linkPath}`, `https://127.0.0.1${linkPath}`, `https://0x7f.0.0.1${linkPath}`, `https://[::1]${linkPath}`,
+      `https://www.npmjs.com:444${linkPath}`, `${url}/${'a'.repeat(8192)}`, `https://www.np\tmjs.com${linkPath}`, `https://www.np\nmjs.com${linkPath}`, `${url}\0`, ` ${url}`, `${url} `, `${url}\n\n`, 'npm https://www.npmjs.com']) await refusedLink(JSON.stringify(value.slice(0, 40)), { value });
+    await refusedLink('invalid UTF-8', { raw: true, value: Buffer.concat([Buffer.from(url), Buffer.from([0xff])]).toString('base64') });
+    await refusedLink('unlisted provider', { value: url, meta: { provider: 'cargo' } });
+    await refusedLink('missing provider', { value: url, meta: { provider: undefined } });
+    await refusedLink('provider on Give', { meta: { mode: 'give', destination: join(home, 'config', 'api-token'), provider: 'npm' } });
+    for (const [n, value] of [`https://www.npmjs.com:443${linkPath}`, `${url}?next=%2F#done`, `${url}\n`, `${url}\r\n`].entries()) {
+      assert.equal((await run({ op: 'create', meta: meta(`link-${n}`, 'receive'), value })).status, 'ready');
+    }
+    const sealedLink = JSON.parse(readFileSync(recordFor('receive')));
+    assert.equal(sealedLink.meta.provider, 'npm'); assert.ok(decrypt(sealedLink.meta, sealedLink) === url, 'The provider is bound into the sealed Receive record.');
+    for (const provider of ['pypi', undefined]) assert.throws(() => decrypt({ ...sealedLink.meta, provider }, sealedLink));
     // Real wall clock and real child processes: no browser or timer mock is involved.
     for (const mode of ['give', 'receive']) {
       const key = `expires-${mode}`, expires = Date.now() + 3_000;
@@ -756,6 +794,7 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     const delivered = new Set([token, racedToken, intoToken, raceIntoToken]); // the only files allowed to hold the synthetic value
     for (const text of [...outputs, ...files(home).filter((p) => !delivered.has(p)).map((p) => readFileSync(p).toString())]) {
       assert.equal(text.includes(secret) || text.includes(url), false);
+      if (!text.startsWith('# owner list\n')) assert.equal(text.includes('npmjs'), false, 'The provider host stays in the owner list.');
     }
   } finally { rmSync(home, { recursive: true, force: true }); }
 });
