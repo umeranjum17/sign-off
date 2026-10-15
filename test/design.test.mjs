@@ -804,9 +804,9 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   const flow = reports.match(/<ol class="flow"[^>]*>(.*?)<\/ol>/s)[1];
   assert.deepEqual([...flow.matchAll(/<li>(.*?)<\/li>/gs)].map((m) => [...m[1].matchAll(/mk mk-(\w+)/g)].map((x) => x[1])), [['store'], [], ['gate', 'fail']]);
   assert.match(reports, /3 steps.*>Open</s);
-  // Its group heads a section with the filed time; the card says New today and what it decided.
+  // Its group heads a section with the filed time; the card says New today over its title, then what it decided.
   assert.match(reports, /<div class="sec-h"><h2>How it works<\/h2><span class="meta">Filed \d\d:\d\d today<\/span>/);
-  assert.match(reports, /How it ships<\/h3><span class="st new">New today<\/span>.*<span class="lbl">What it decided<\/span>Ships only when the check passes\./s);
+  assert.match(reports, /<span class="st new">New today<\/span><\/p><h3 dir="auto">How it ships<\/h3>.*<span class="lbl">What it decided<\/span>Ships only when the check passes\./s);
   // Answered is Done today: a count under the title, Clear all done on the section head, and a short row per item with its answer and time under the title, beside its ×.
   writeFileSync(file.replace(/\.json$/, '.answers.jsonl'), ['ship', 'look'].map((key) => JSON.stringify({ key, answer: 'a', label: 'A', close: 'done', at: new Date().toISOString() })).join('\n') + '\n');
   // Once both are answered, the Answered tile has a check for each and Waiting on you no clock.
@@ -944,7 +944,7 @@ test('Summary at 390 with 1, 10, 100 answers today and a last-bucket board: the 
   }
 });
 
-test('Evidence: each update is a card with its number, the day it was filed and New when that is today; one portrait capture sits beside its words, two go side by side; at 1440 the page counts them under its title and sets them two across', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Evidence: an update leads with its number and New or its day, then its result as a headline over the card width, its captures (two side by side) and Does this look right? over its verdicts; a done-done update heads with the run outcome, shows the run capture and check in plain words, and folds the commit and agent lines under Details; at 390 nothing squashes; at 1440 the page counts them and sets them two across', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'updates'), file = join(dir, '.sign-off', 'decisions.json');
   mkdirSync(dir);
   run('init', dir);
@@ -952,27 +952,48 @@ test('Evidence: each update is a card with its number, the day it was filed and 
   const [tall, wide] = [shot('tall.png', 300, 600), shot('wide.png', 600, 300)];
   const update = (...media) => run('post', file, '--type', 'evidence', '--title', 'Sign-in', '--about', 'Loads in 1 second.', ...media.flatMap((m) => ['--media', m])).code;
   assert.deepEqual([update(tall), update(wide, tall), update(wide)], [0, 0, 0]);
-  // The first update was filed three days ago: it shows that day and no New.
-  const doc = JSON.parse(readFileSync(file, 'utf8')), old = new Date(Date.now() - 3 * 864e5);
+  // The first update was filed three days ago: it shows that day and no New. The fourth links a done-done run as done-done files one:
+  // a title that only names the run, the plain outcome, and the capture its run record lists under --evidence-root.
+  const doc = JSON.parse(readFileSync(file, 'utf8')), old = new Date(Date.now() - 3 * 864e5), runId = '20261011T120000Z-a1b2c3d4', commit = 'c0ffee'.padEnd(40, '0');
+  const outcome = 'You can read every card on a phone.', bytes = readFileSync(wide);
   doc.items[0].filed = old.toISOString();
+  doc.items.push({ key: 'update-4', type: 'evidence', number: 4, title: 'sign-off board verify: pass', about: outcome,
+    evidence: { run_id: runId, commit, outcome, repro: 'repro: n/a: no bug', proof: 'done-done: real browser journey', evidence: 'wide.png' } });
   writeFileSync(file, JSON.stringify(doc));
-  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  mkdirSync(join(dir, '.done-done', 'runs'), { recursive: true });
+  writeFileSync(join(dir, '.done-done', 'runs', `${runId}.json`), JSON.stringify({ schema: 1, run_id: runId, commit, tree: 'a'.repeat(40), dirty: false, exit: 0,
+    files: [{ path: 'wide.png', sha256: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.length }] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0', '--evidence-root', dir], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
-  const { evaluate, close } = await browse(join(dir, 'b'), 1440);
+  let { evaluate, close } = await browse(join(dir, 'b'), 1440);
   await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
-  const cards = '[...document.querySelectorAll("article.update")].map((a) => [a.querySelector("h3").textContent, a.querySelector(".head .meta").textContent, !!a.querySelector(".st.new"), a.querySelector(".upd").className, a.querySelectorAll(".choices button").length])';
-  await until(async () => (await evaluate(`${cards}.length === 3 && document.querySelector(".upd.portrait")`)));
-  const day = (at) => at.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }), today = day(new Date());
-  assert.deepEqual(await evaluate(cards), [['Update 3', today, true, 'upd', 3], ['Update 2', today, true, 'upd', 3], ['Update 1', day(old), false, 'upd portrait', 3]]);
-  // The portrait capture is left of the words; the pair shares a line.
-  const box = (sel) => `document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect()`;
-  assert.ok(await evaluate(`${box('#item-update-1 .upd > .media')}.right <= ${box('#item-update-1 .upd > div:last-child')}.left`));
+  // Per card: the line over the headline, the headline, its pictures, the question over the verdicts and how many verdicts.
+  const cards = '[...document.querySelectorAll("article.update")].map((a) => [[...a.querySelector(".eyebrow").childNodes].map((n) => n.textContent), a.querySelector("h3").textContent, a.querySelectorAll(".proof img").length, a.querySelector(".ask-line").textContent, a.querySelectorAll(".choices button").length])';
+  await until(async () => (await evaluate(`${cards}.length === 4 && [...document.querySelectorAll(".proof img")].every((i) => i.complete && i.naturalWidth)`)));
+  const day = (at) => at.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }), ask = 'Does this look right?';
+  assert.deepEqual(await evaluate(cards), [[['Update 4', 'Check passed'], outcome, 1, ask, 3], [['Update 3', 'New'], 'Sign-in', 1, ask, 3],
+    [['Update 2', 'New'], 'Sign-in', 2, ask, 3], [['Update 1', day(old)], 'Sign-in', 1, ask, 3]]);
+  // The done-done update shows nothing an engineer wrote until Details opens: the run's title, its commit and the agent's lines.
+  const shown = (sel) => `[...document.querySelectorAll(${JSON.stringify(`${sel}, ${sel} *`)})].filter((e) => e.checkVisibility()).flatMap((e) => [...e.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent)).join(' ')`;
+  assert.doesNotMatch(await evaluate(shown('#item-update-4')), /verify|c0ffee|repro|done-done|wide\.png|RUN PASS/);
+  await evaluate('document.querySelector("#item-update-4 .tech summary").click()');
+  assert.match(await evaluate(shown('#item-update-4 .tech')), /sign-off board verify: pass/);
+  assert.match(await evaluate('document.querySelector("#item-update-4 .tech").textContent'), /Commit c0ffee0{34}.*repro: n\/a: no bug/s);
+  // Two captures share a line.
   assert.ok(await evaluate('(([a, b]) => a.top === b.top && b.left > a.right)([...document.querySelectorAll("#item-update-2 .media img")].map((i) => i.getBoundingClientRect()))'));
   // Under the title: how many, how many filed today and when the newest came; then the Updates head and the cards two across.
   const at = new Date(doc.items[2].filed).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  assert.deepEqual(await evaluate('[document.querySelector(".top .lede").textContent, document.querySelector(".sec-head h2").textContent]'), [`3 updates, 2 new. The page changed at ${at}.`, 'Updates']);
-  assert.ok(await evaluate('(([a, b, c]) => a.top === b.top && b.left > a.right && c.top > a.bottom)([3, 2, 1].map((n) => document.getElementById(`item-update-${n}`).getBoundingClientRect()))'));
+  assert.deepEqual(await evaluate('[document.querySelector(".top .lede").textContent, document.querySelector(".sec-head h2").textContent]'), [`4 updates, 2 new. The page changed at ${at}.`, 'Updates']);
+  assert.ok(await evaluate('(([a, b, c]) => a.top === b.top && b.left > a.right && c.top > a.bottom)([4, 3, 2].map((n) => document.getElementById(`item-update-${n}`).getBoundingClientRect()))'));
+  close();
+  // On a phone each headline keeps the card's width beside the corner x, nothing squashes, and the page never scrolls sideways.
+  ({ evaluate, close } = await browse(join(dir, 'p'), 390));
+  await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
+  await until(async () => (await evaluate('document.querySelectorAll("article.update").length === 4')));
+  assert.deepEqual(await evaluate(SQUASH), []);
+  assert.deepEqual(await evaluate('[...document.querySelectorAll("article.update")].filter((a) => a.querySelector("h3").getBoundingClientRect().width < 0.85 * a.getBoundingClientRect().width).map((a) => a.id)'), []);
+  assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'));
   close();
   proc.kill();
 });
