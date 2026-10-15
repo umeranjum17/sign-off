@@ -26,7 +26,7 @@ Non-contract types stay outside this contract. `raise --title` and `post --type 
 
 One validator, one way in. No daemon, socket or HTTP API.
 
-`sign-off-axi post [board.json] --kind <kind> --from <file.json>`, or `--from -` to read stdin. `--kind` must equal the message's `kind`, so the wrong file is never posted. A `post --from --replace` feed checks each new contract-kind item the same way, except evidence (section 2). A --replace feed is a whole-board resync: it does not refuse a contract item whose key holds a different message, it replaces it. The gate and finding exception: an answered gate cannot take another run, nor an answered finding another proposal, and a dropped answered gate or finding key cannot come back, in a `--replace` feed (section 5).
+`sign-off-axi post [board.json] --kind <kind> --from <file.json>`, or `--from -` to read stdin. `--kind` must equal the message's `kind`, so the wrong file is never posted. A `post --from --replace` feed checks each new contract-kind item the same way, except evidence (section 2). A --replace feed is a whole-board resync: it does not refuse a contract item whose key holds a different message, it replaces it. The gate, finding and evidence exception: an answered gate cannot take another run, nor an answered finding another proposal, nor answered evidence other media or another run, and a dropped answered gate or finding key cannot come back, in a `--replace` feed (section 5).
 
 `raise --from` and `post --from` (no `--kind`) check each new item that carries `contract` and `kind` the same way `post --kind` does, and refuse a new item with no `kind` unless it names a non-contract type (section 2).
 
@@ -88,7 +88,7 @@ Proof the person gives a verdict on. Shows in Evidence. Its options are fixed an
 - Required: the common fields (`key` is optional), `about`, and at least one of `media` or `run`.
 - `media`: 1 to 12 relative file paths, with no `..`, resolved from the message file's folder (from the current folder for `--from -`). Symlinks are followed: the real path must stay inside that folder, else the message is refused with a fix line naming the file. Each path ends in `.png`, `.jpg`, `.jpeg`, `.webp`, `.mp4` or `.webm` (any case), each 50,000,000 bytes or fewer. `post` copies them into `evidence/<number>/` and records each `sha256` and `bytes`. A missing or oversized file refuses the message. `validate` checks the same and copies nothing.
 - `run`: a done-done run, exactly `run_id` (a key-set id), `commit` (40 lowercase hex) and the four Checks lines `outcome`, `repro`, `proof` and `evidence` (text, 1-1000 each). The board stores it in the item's `evidence` field ([file-formats.md](file-formats.md)); `link` stays its own field.
-- Without `key`, `post` sets `update-<number>`, where `<number>` is the next free `evidence/<number>/` folder next to the board. A key already on the board takes the same message again only when its media also match by file hash (section 4).
+- Without `key`, `post` sets `update-<number>`, where `<number>` is the next free `evidence/<number>/` folder next to the board. A key already on the board takes the same message again only when its media also match by file hash (section 4). Its media and run are part of the question, as a gate's run is: under the key other media or another run is a different message in a `--from` feed too, and an answered evidence item cannot take other media or another run, not even in a `--replace` feed.
 
 ### gate, schema 1
 
