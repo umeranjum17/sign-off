@@ -536,7 +536,7 @@ test('post --kind evidence: an answered update keeps the media and run it was an
   const dir = mkdtempSync(join(scratch, 'evmsg-'));
   writeFileSync(join(dir, 'shot.png'), readFileSync(join(fixtures, 'evidence.v1', 'shot.png')));
   const run = { run_id: '20261011T120000Z-a1b2c3d4', commit: '0123456789abcdef0123456789abcdef01234567',
-    outcome: 'Umer can see the new screen.', repro: 'repro: n/a: no bug', proof: 'verify-sign-off: real browser journey', evidence: 'shot.png' };
+    outcome: 'Umer can see the new screen.', repro: 'repro: n/a: no bug', proof: 'done-done: real browser journey', evidence: 'shot.png' };
   writeFileSync(join(dir, 'k1.json'), JSON.stringify({ contract: 1, kind: 'evidence', schema: 1, key: 'k1', title: 'Sign-in screen', about: 'First pass.', media: ['shot.png'], run }));
   const posted = cli2('', 'post', board, '--kind', 'evidence', '--from', join(dir, 'k1.json'));
   assert.equal(posted.status, 0, posted.stdout);

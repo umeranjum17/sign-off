@@ -25,7 +25,7 @@ const originalRecord = readFileSync(recordPath);
 copyFileSync(new URL('../fixtures/sample-decisions.json', import.meta.url), file);
 const decisions = JSON.parse(readFileSync(file, 'utf8'));
 decisions.decisions[0].title = 'Umer: Ship the new sign-in screen this week?';
-decisions.decisions[0].evidence = { run_id: runId, commit, outcome: 'Umer can see the updated sign-in screen.', repro: 'repro: n/a: no bug', proof: 'verify-sign-off: real browser journey', evidence: 'after.png' };
+decisions.decisions[0].evidence = { run_id: runId, commit, outcome: 'Umer can see the updated sign-in screen.', repro: 'repro: n/a: no bug', proof: 'done-done: real browser journey', evidence: 'after.png' };
 writeFileSync(file, JSON.stringify(decisions));
 const procs = [];
 after(async () => {
