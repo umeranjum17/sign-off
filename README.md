@@ -215,4 +215,4 @@ tmp=$(mktemp -d)
 (cd "$tmp" && SIGN_OFF_HOME="$tmp" sign-off-axi raise --title "Probe?")   # lands in $tmp/.sign-off/decisions.json
 ```
 
-Browser proof lives in [`.agents/skills/verify-sign-off`](.agents/skills/verify-sign-off/SKILL.md).
+Proof lives in [`.done-done.yaml`](.done-done.yaml): the `install`, `test` and `skill` journeys re-run every check the CI gate enforces, and CI calls them through `done-done run`.

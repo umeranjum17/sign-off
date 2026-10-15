@@ -1,0 +1,14 @@
+# done-done project config. `done-done init` never overwrites this file.
+# The app name finds this repo's evidence and receipts from every checkout.
+app: "sign-off"
+# This repo's coding agent, over agent in ~/.done-done/config.yaml (model, effort and the other agent settings stay there).
+# agent: opencode
+# Every check the CI gate enforces, as a re-runnable journey. Each command
+# proves itself by writing its log under $DONE_DONE_EVIDENCE_ROOT and exiting 0.
+journeys:
+  install:
+    command: "npm ci > $DONE_DONE_EVIDENCE_ROOT/install.log 2>&1"
+  test:
+    command: "npm test > $DONE_DONE_EVIDENCE_ROOT/test.log 2>&1"
+  skill:
+    command: "npm run build:skill -- --check > $DONE_DONE_EVIDENCE_ROOT/skill.log 2>&1"

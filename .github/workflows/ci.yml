@@ -14,6 +14,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
-      - run: npm test
-      - run: npm run build:skill -- --check
+      - run: npm install -g done-done-axi@0.3.0
+      - run: done-done run install
+      - run: done-done run test
+      - run: done-done run skill
