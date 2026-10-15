@@ -71,7 +71,7 @@ test('answer journey: save, survive a torn line and a restart, read back', async
   assert.equal((await (await fetch(`${url}api/decisions`)).json()).decisions[0].evidenceCard.result, 'UNVERIFIED');
   rmSync(recordPath);
   const missing = (await (await fetch(`${url}api/decisions`)).json()).decisions[0].evidenceCard;
-  assert.deepEqual([missing.result, missing.reason], ['UNVERIFIED', 'run record is missing']);
+  assert.deepEqual([missing.result, missing.reason], ['UNVERIFIED', 'The proof for this run is missing.']);
   for (const bad of ['null', JSON.stringify({ ...makeRecord(), files: [null] })]) {
     writeFileSync(recordPath, bad);
     const card = (await (await fetch(`${url}api/decisions`)).json()).decisions[0].evidenceCard;

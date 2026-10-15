@@ -59,7 +59,7 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
   const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: tmpdir() });
   procs.push(proc);
   const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
-  assert.match(await (await fetch(url)).text(), /updateMedia/);
+  assert.match(await (await fetch(url)).text(), /function proof\(d\)/);
   const api = await (await fetch(`${url}api/decisions`)).json();
   assert.deepEqual(api.decisions.map((d) => [d.key, d.number, d.media.length]), [['update-1', 1, 1], ['update-2', 2, 2]]);
   assert.deepEqual(api.decisions[1].options.map((o) => o.value), ['pass', 'fail', 'needs-work']);

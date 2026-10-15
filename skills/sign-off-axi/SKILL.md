@@ -44,6 +44,16 @@ The answer comes to you; nobody has to notice it for you.
 3. Right after posting, run `npx -y sign-off-axi wait --filer <id>` (same board file as the post). It returns every answer to your items you have not taken yet, even one given before you started waiting, and the board then shows **Seen by agent** on that card. Run it again for the next one; `TIMEOUT` means keep waiting, `NOT_FOUND` means none of your items wait.
 4. If you cannot block, the board owner can set `on_answer: <command>` in the `config.yaml` beside the board: it runs for each answer with the answer as JSON on its stdin, with no shell (so `|` and `>` do nothing; name a script instead), and `npx -y sign-off-axi doctor` checks it can run.
 
+## Write each card for a 10-second read on a phone
+
+The user often reads the board on a phone. Each card must make sense in 10 seconds to a person who does not write code.
+
+- Title: the result or the question, in one short sentence: "You can now sign in with a passkey", "Ship the new sign-in this week?". Never a tool name, run id, version label, file path or error code.
+- `--about`: what changed for the user, in 1 or 2 short sentences. Write in ASD-STE100 Simplified Technical English: short sentences, active voice, common words.
+- Show the proof on the card: post a result to check as `--type evidence` with a screenshot or recording (`--media`); the user picks Pass, Fail or Needs work. When a picture explains more than words, add a diagram or an interactive page (see below).
+- Ask for one decision per card, and recommend the answer you would pick.
+- Put the pull request or page in `--link`. In a contract evidence message with a `run`, the `outcome` line heads the card: write it as the result the user can see.
+
 ## Design decisions: show A/B/C mocks, not words
 
 When the user must choose how something looks or works, do this:

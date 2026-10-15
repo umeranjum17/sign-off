@@ -8,12 +8,12 @@
   :root { color-scheme: light dark;
     --bg: #F6F3EE; --surface: #FFFFFF; --sunk: #EFEBE4; --line: #E6E0D6; --text: #1F1B16; --muted: #6A6157;
     --border: #B8AE9F; --accent: #C2410C; --on-accent: #FFFFFF; --danger: #B42318; --bezel: #1F1B16;
-    --c-waiting: #E8590C; --c-evidence: #0C8599; --c-reports: #5B5BD6; --c-answered: #2B8A3E; --c-gate: #E8A100;
+    --c-waiting: #E8590C; --c-evidence: #0C8599; --c-reports: #5B5BD6; --c-answered: #2B8A3E; --c-gate: #E8A100; --ok: #1E7034; --warn: #8A5A00;
     --shadow: 0 1px 2px rgb(60 40 20 / 0.06), 0 6px 18px rgb(60 40 20 / 0.06); }
   @media (prefers-color-scheme: dark) { :root {
     --bg: #15120F; --surface: #211D18; --sunk: #1B1814; --line: #342E26; --text: #F3EEE6; --muted: #A99F91;
     --border: #6E6458; --accent: #FB923C; --on-accent: #1A1009; --danger: #FF8A80; --bezel: #4A4238;
-    --c-waiting: #FF8A4C; --c-evidence: #3BC9DB; --c-reports: #9491FF; --c-answered: #51CF66; --c-gate: #FCC419;
+    --c-waiting: #FF8A4C; --c-evidence: #3BC9DB; --c-reports: #9491FF; --c-answered: #51CF66; --c-gate: #FCC419; --ok: #51CF66; --warn: #FCC419;
     --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.25); } }
   * { box-sizing: border-box; }
   body { margin: 0 0 3rem; background: var(--bg); color: var(--text); overflow-wrap: anywhere; -webkit-font-smoothing: antialiased;
@@ -84,12 +84,11 @@
   /* Reports: a card per report, its steps as numbered nodes on a line with only the marks that matter under each; Open lists them in place. */
   .reports { display: grid; gap: 0.75rem; }
   .report { display: grid; gap: 0.75rem; scroll-margin-top: 4.5rem; }
-  .report .head h3, .report .about, .report .decided { margin: 0; }
-  .report .head .st { margin-left: auto; }
+  .report .about, .report .decided { margin: 0; }
   .st { display: inline-flex; flex: none; align-items: center; gap: 0.375rem; padding: 0.125rem 0.625rem; border-radius: 999px; background: var(--sunk);
     font-size: 0.8125rem; font-weight: 650; white-space: nowrap; }
   .st::before { content: ""; width: 0.4375rem; height: 0.4375rem; border-radius: 50%; background: currentColor; }
-  .st.ok { color: var(--c-answered); } .st.new { color: var(--c-reports); }
+  .st.ok { color: var(--ok); } .st.new { color: var(--c-reports); } .st.bad { color: var(--danger); } .st.warn { color: var(--warn); }
   .decided .lbl { display: block; color: var(--muted); font-size: 0.8125rem; font-weight: 650; }
   .sec-h { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; margin: 1.5rem 0 0.75rem; }
   .sec-h h2, .sec-h .meta { margin: 0; }
@@ -159,40 +158,28 @@
   .in-waiting .row { box-shadow: inset 3px 0 0 var(--accent), var(--shadow); }
   .in-answered .row { background: transparent; box-shadow: none; }
   .in-answered .row h3 { color: var(--muted); font-weight: 500; }
-  .row h3 { font-size: 1.125rem; font-weight: 650; line-height: 1.35; margin: 0; }
+  .row h3, .report h3 { font-size: 1.1875rem; font-weight: 650; line-height: 1.3; letter-spacing: -0.005em; margin: 0; }
   .about, details p { margin: 0.375rem 0 0; max-width: 70ch; }
   details p { color: var(--muted); }
   .about { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-  .row:has(details:not(.note, .other)[open]) .about { display: none; }
+  .row:has(details:not(.note, .other, .tech)[open]) .about { display: none; }
   .about.full { display: block; }
   summary { cursor: pointer; color: var(--accent); font-size: 0.875rem; margin-top: 0.25rem; width: fit-content; }
   .meta { color: var(--muted); font-size: 0.8125rem; margin: 0.5rem 0 0; }
-  .evidence { grid-column: 1 / -1; border: 1px solid var(--line); border-radius: 1rem; padding: 1rem; background: color-mix(in srgb, var(--accent) 5%, var(--bg)); }
-  .evidence-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-  .evidence-head h4 { margin: 0; font-size: .9rem; letter-spacing: .02em; }
-  .verdict { border-radius: 999px; padding: .2rem .65rem; font-size: .75rem; font-weight: 700; background: var(--line); }
-  .verdict[data-result="RUN PASS"] { color: #147a4a; background: #dff5e9; }
-  .verdict[data-result="RUN FAIL"] { color: #a32020; background: #fde5e2; }
-  .verdict[data-result="INCONCLUSIVE"], .verdict[data-result="UNVERIFIED"] { color: #79510d; background: #fff1cc; }
-  .checks { display: grid; gap: .5rem; margin: .9rem 0; }
-  .check { margin: 0; color: var(--muted); font-size: .875rem; }
-  .check strong { color: var(--text); text-transform: capitalize; }
-  .commit { color: var(--muted); font: .75rem/1.5 ui-monospace, monospace; overflow-wrap: anywhere; margin: .5rem 0; }
-  /* Each capture keeps its own shape: the frame is the shot, bounded in height, never letterboxed. */
+  /* Every card reads top down in one order: a short status line, the result as its headline, what changed, the proof, then the one decision.
+     The headline keeps the card's whole width: the dismiss x floats at the corner, never in a row that squeezes the title. */
+  .lead > .x { float: right; margin: -0.625rem -0.625rem -0.75rem 0.5rem; }
+  .eyebrow { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.625rem; margin: 0 0 0.375rem; color: var(--muted); font-size: 0.8125rem; font-weight: 600; }
+  .ask-line { grid-column: 1 / -1; margin: 0 0 -0.375rem; font-weight: 650; }
+  .why { grid-column: 1 / -1; margin: 0; color: var(--warn); font-size: 0.875rem; font-weight: 600; }
+  .tech { grid-column: 1 / -1; font-size: 0.8125rem; } .tech summary { margin: 0; color: var(--muted); font-size: inherit; } .tech p { margin: 0.25rem 0 0; }
+  /* Each capture keeps its own shape: the frame is the shot, bounded in height, never letterboxed; two or more share the row. */
   .media { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .75rem; }
   .media a { display: block; max-width: 100%; color: var(--accent); cursor: zoom-in; }
-  .media img, .media video { display: block; width: auto; height: auto; max-width: 100%; max-height: min(28rem, 70vh);
+  .media img, .media video { display: block; width: auto; height: auto; max-width: 100%; max-height: min(24rem, 60vh);
     border: 1px solid var(--line); border-radius: .625rem; background: var(--sunk); }
-  .unverified, .media .gone { color: var(--danger); margin: .5rem 0; }
-  .update-media { grid-column: 1 / -1; }
-  /* An evidence update: number, day and New on one line; its captures above the evidence mark, title and note, or one portrait capture beside them. */
-  .update .head { align-items: center; } .update .head .meta { margin: 0; } .row.update .head .x { margin-left: auto; }
-  .upd { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.75rem 0.875rem; align-items: start; }
-  .upd.portrait > .media { grid-column: auto; width: 6.5rem; } .upd.portrait > .icon { display: none; }
-  .upd > .media:has(> :nth-child(2)) { display: grid; grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr)); max-width: 26rem; }
-  .upd > .icon { width: 2.75rem; height: 2.75rem; border-radius: 0.75rem; background: var(--sunk); }
-  .upd > .icon svg { width: 1.5rem; height: 1.5rem; stroke: var(--area); }
-  .upd strong { font-size: 1.0625rem; line-height: 1.3; } .upd .about { margin-top: 0.25rem; color: var(--muted); }
+  .media .gone { color: var(--danger); margin: 0; }
+  .proof { grid-column: 1 / -1; } .proof:has(> :nth-child(2)) { display: grid; grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr)); max-width: 26rem; }
   /* An explainer's chapters: one tap jumps the video to that part and plays it. */
   .chapters { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0.375rem; margin: -0.25rem 0 0; padding: 0; list-style: none; }
   .chapters button { min-height: 2.5rem; padding: 0 0.75rem; border-radius: 999px; border-color: var(--line); font-size: 0.875rem; }
@@ -236,12 +223,10 @@
   .choices.many button { flex: 1 1 auto; max-width: 100%; padding: 0.5rem 1rem; }
   .note label { display: block; color: var(--muted); font-size: 0.8125rem; margin-top: 0.5rem; }
   .tradeoff { margin: 0; max-width: 70ch; }
-  .head { display: flex; align-items: flex-start; gap: 0.5rem; }
-  /* Dismiss: a quiet round x at the end of an item's head or row. */
+  /* Dismiss: a quiet round x at the corner of a card or the end of a row. */
   .x { flex: none; display: grid; place-items: center; width: 2.75rem; padding: 0; margin: -0.5rem 0 -0.5rem auto; border: 0; border-radius: 50%;
     background: none; color: var(--muted); font-size: 1.5rem; line-height: 1.25; }
   .x:hover { background: var(--sunk); color: var(--text); }
-  .head .st + .x { margin-left: 0; }
   .rows > li { display: flex; align-items: center; }
   .rows li .compact { flex: 1; min-width: 0; }
   .rows li .x { margin: 0; }
@@ -251,7 +236,7 @@
   .done summary { width: auto; margin: 0; list-style: none; font-size: 1rem; cursor: pointer; }
   .done summary::-webkit-details-marker { display: none; }
   .done > .row { padding: 0 0 1rem; border: 0; background: none; box-shadow: none; }
-  .done > .row .head { display: none; }
+  .done > .row .eyebrow, .done > .row h3 { display: none; }
   .done[open] + .x { align-self: start; margin-top: 1rem; }
   .needs .foot { justify-content: space-between; margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid var(--line); }
   .foot .dis { padding: 0 0.5rem; background: none; color: var(--muted); }
@@ -260,9 +245,8 @@
   .gone-asks .rows { padding: 0; } .gone-asks li { justify-content: space-between; gap: 0.75rem; min-height: 2.75rem; }
   .gone-asks .dis { flex: none; padding: 0 0.5rem; border-color: transparent; background: none; color: var(--accent); font-weight: 600; }
   .sec-head .clear { margin-left: auto; }
-  .chip { flex: none; margin-top: 0.2rem; padding: 0 0.5rem; border: 1px solid var(--line); border-radius: 999px; color: var(--muted);
+  .chip { padding: 0 0.5rem; border: 1px solid currentColor; border-radius: 999px; color: var(--accent);
     font-size: 0.6875rem; font-weight: 600; line-height: 1.25rem; letter-spacing: 0.04em; text-transform: uppercase; }
-  .chip.seen { display: inline-block; margin-top: 0.375rem; color: var(--accent); border-color: currentColor; }
   /* Each option is a tall phone frame, side by side; on a phone the row swipes, one frame at a time, and the next one peeks in.
      Every option shares the label, frame and button rows, so a label that wraps never pushes one frame below the rest.
      The row keeps 0.25rem of room on each side for focus rings, given back by the margin. */
@@ -346,7 +330,6 @@
     .rows.i-answered { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; align-items: start; padding: 0; border: 0; background: none; box-shadow: none; }
     .rows.i-answered > li { padding: 0 0.5rem 0 1rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); box-shadow: var(--shadow); }
     .rows.i-answered > li:has(.done[open]) { grid-column: 1 / -1; }
-    .upd.portrait > .media { width: 8rem; }
     /* Evidence sets its updates two across; a page that is not an update keeps the whole width. */
     .list.in-evidence { grid-template-columns: 1fr 1fr; align-items: start; } .in-evidence > .row:not(.update) { grid-column: 1 / -1; }
     .keys { display: block; }
@@ -425,7 +408,7 @@
   function offerUndo(d, before) {
     const now = answerOf(d.key);
     if (!now) return;
-    undoBtn.setAttribute('aria-label', `Undo, ${d.title}`);
+    undoBtn.setAttribute('aria-label', `Undo, ${headline(d)}`);
     say(`Saved: ${now.answer === 'text' ? 'your reply' : now.label}`, 5000, () => {
       undoBtn.disabled = true;
       cur = d.key; // Triage shows the ask again.
@@ -451,28 +434,23 @@
     });
   }
 
-  function evidenceCard(d) {
-    const card = d.evidenceCard, link = d.evidence;
-    if (!link) return '';
-    const head = el('div', { class: 'evidence-head' }, el('h4', {}, 'Proof record'), el('span', { class: 'verdict', 'data-result': card?.result ?? 'UNVERIFIED' }, card?.result ?? 'UNVERIFIED'));
-    const checks = el('div', { class: 'checks' }, ...['outcome', 'repro', 'proof', 'evidence'].map((name) =>
-      el('p', { class: 'check' }, el('strong', {}, `${name}: `), document.createTextNode(link[name].replace(new RegExp(`^${name}:\\s*(?=\\S)`, 'i'), '')))));
-    const media = el('div', { class: 'media' }, ...(card?.media ?? []).map((item) => {
-      const node = item.type.startsWith('image/') ? el('img', { src: src(item.url), alt: `Evidence image: ${item.path}` })
-        : el('video', { src: src(item.url), controls: '', playsinline: '', preload: 'metadata', 'aria-label': `Evidence recording: ${item.path}` });
-      return item.type.startsWith('image/') ? el('a', { href: src(item.url), target: '_blank', rel: 'noopener', 'aria-label': `Open ${item.path}` }, node) : node;
-    }));
-    return el('section', { class: 'evidence', 'aria-label': 'Read-only proof evidence' }, head,
-      card?.commit ? el('p', { class: 'commit' }, `Commit · ${card.commit}`) : '',
-      el('p', { class: 'meta' }, 'Run result only · the lines below were not checked against this run.'),
-      card?.status === 'unverified' ? el('p', { class: 'unverified' }, `Evidence unavailable · ${card.reason}`) : '', checks,
-      media.childElementCount ? media : el('p', { class: 'meta' }, 'No recorded image or recording.'));
+  /** A linked run's result in plain words, for the line over the headline. */
+  const RESULT = { 'RUN PASS': ['ok', 'Check passed'], 'RUN FAIL': ['bad', 'Check failed'], INCONCLUSIVE: ['warn', 'Check did not finish'], UNVERIFIED: ['warn', 'Could not check'] };
+  /** What an engineer may want of a linked run or a commit, folded under Details so the card leads with the result. */
+  function tech(d) {
+    const run = d.evidence, commit = run?.commit ?? (/^[a-f0-9]{7,40}$/.test(d.link ?? '') ? d.link : '');
+    if (!commit) return '';
+    return el('details', { class: 'tech' }, el('summary', {}, 'Details'), headline(d) === d.title ? '' : el('p', { dir: 'auto' }, d.title), el('p', {}, `Commit ${commit}`),
+      ...(run ? [el('p', {}, 'The agent wrote the lines below; the board did not check them.'), ...['outcome', 'repro', 'proof', 'evidence'].map((name) =>
+        el('p', { dir: 'auto' }, el('strong', {}, `${name}: `), run[name].replace(new RegExp(`^${name}:\\s*(?=\\S)`, 'i'), '')))] : []));
   }
 
   const NAMES = { decision: 'Decision', design: 'Design', evidence: 'Evidence', diagram: 'Diagram', interactive: 'Interactive', explainer: 'Explainer' };
-  // Any other type gets the plain card until it has its own renderer.
-  const chip = (d) => el('span', { class: 'chip' }, NAMES[d.type] ?? d.type.replace(/-/g, ' '));
-  const title = (d) => (d.type === 'evidence' ? `Update ${d.number} · ${d.title}` : d.title);
+  // Any other type gets the plain card until it has its own renderer; a plain question needs no name.
+  const kind = (d) => (d.type === 'decision' ? '' : NAMES[d.type] ?? d.type.replace(/-/g, ' '));
+  // A done-done run's outcome line is the plain result a person can now see; the title it sends only names the run.
+  const headline = (d) => (d.type === 'evidence' && d.evidence?.outcome.length <= 160 ? d.evidence.outcome : d.title);
+  const title = (d) => (d.type === 'evidence' ? `Update ${d.number} · ${headline(d)}` : d.title);
 
   /** Dismiss hides items from this board (the agent is not told, so an ask keeps waiting); Undo puts them back. */
   // The server takes at most 200 keys a request; the requests run one after another so the last reply carries every change.
@@ -491,8 +469,8 @@
   const canDismiss = () => !state.readonly && !FROZEN;
   function xBtn(d, label) {
     if (!canDismiss()) return '';
-    const b = el('button', { class: label ? 'dis' : 'x', 'aria-label': `Dismiss, ${d.title}` }, label ?? '×');
-    b.onclick = () => dismiss([d.key], area(d) === 'waiting' ? 'Dismissed · the agent still waits' : `Dismissed: ${d.title}`);
+    const b = el('button', { class: label ? 'dis' : 'x', 'aria-label': `Dismiss, ${title(d)}` }, label ?? '×');
+    b.onclick = () => dismiss([d.key], area(d) === 'waiting' ? 'Dismissed · the agent still waits' : `Dismissed: ${title(d)}`);
     return b;
   }
   function clearAll(done) {
@@ -506,10 +484,10 @@
     const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` });
     const saved = Object.hasOwn(state.answers, d.key) ? state.answers[d.key] : undefined;
     // A read-only board, or an item with nothing to answer, shows no answer, note or comment controls.
-    const design = d.type === 'design', ro = state.readonly || !(d.options.length || d.reply);
+    const design = d.type === 'design', ro = state.readonly || !(d.options.length || d.reply), name = headline(d);
     const buttons = d.options.map((o) => {
       const rec = o.value === d.recommend_value && !design;
-      return el('button', { class: rec ? 'rec' : '', 'aria-label': `${o.label}, ${d.title}`, 'aria-pressed': o.value === saved?.answer, ...(rec && { 'aria-describedby': `rec-${d.key}` }) },
+      return el('button', { class: rec ? 'rec' : '', 'aria-label': `${o.label}, ${name}`, 'aria-pressed': o.value === saved?.answer, ...(rec && { 'aria-describedby': `rec-${d.key}` }) },
         design ? (o.value === saved?.answer ? 'Picked' : 'Pick') : o.label, rec ? el('span', { class: 'tag', id: `rec-${d.key}` }, 'Recommended') : '');
     });
     buttons.forEach((b, i) => (b.onclick = () => save(d, d.options[i], buttons, err)));
@@ -517,36 +495,31 @@
     const top = d.options.findIndex((o) => o.value === d.recommend_value), ranked = top > 0 ? [buttons[top], ...buttons.filter((_, i) => i !== top)] : buttons;
     // The agent that posted the item took this answer with wait --filer.
     const seen = saved && state.seen?.includes(d.key) ? el('span', { class: 'chip seen' }, 'Seen by agent') : '';
-    // An evidence update heads its card with its number, the day it was filed and New when that is today.
-    const update = d.type === 'evidence';
-    const head = update ? el('div', { class: 'head' }, el('h3', {}, `Update ${d.number}`), d.filed ? el('span', { class: 'meta' }, day(d.filed)) : '',
-      d.filed && isToday(d.filed) ? el('span', { class: 'st new' }, 'New') : '', seen, x ? xBtn(d) : '')
-      : el('div', { class: 'head' }, chip(d), el('div', {}, el('h3', { dir: 'auto' }, title(d)), seen), x ? xBtn(d) : '');
+    // Over the headline: what the card is (an update's number, and New or the day it was filed), a linked run's result in plain words, Seen by agent.
+    const update = d.type === 'evidence', card = d.evidenceCard, result = RESULT[card?.result];
+    const brow = [update ? `Update ${d.number}` : kind(d), result ? el('span', { class: `st ${result[0]}` }, result[1]) : '',
+      update && d.filed ? (isToday(d.filed) ? el('span', { class: 'st new' }, 'New') : day(d.filed)) : '', seen].filter(Boolean);
+    const lead = el('div', { class: 'lead' }, x ? xBtn(d) : '', brow.length ? el('p', { class: 'eyebrow' }, ...brow) : '', el('h3', { dir: 'auto' }, name));
     const silent = d.default_if_silent && !ro ? `If no answer: ${d.options.find((o) => o.value === d.default_if_silent).label}` : '';
     if (design) {
-      return el('article', { class: 'row design', id: `item-${d.key}` }, head,
+      return el('article', { class: 'row design', id: `item-${d.key}` }, lead,
         d.tradeoff ? el('p', { class: 'tradeoff', dir: 'auto' }, el('strong', {}, 'Trade-off '), d.tradeoff) : '',
         mockCards(d, ro ? [] : buttons), annotations(d), silent ? el('p', { class: 'meta' }, silent) : '', ro ? '' : other(d, saved, err), err);
     }
     // Yes/No rows keep the two fixed buttons they always had; any other choice set wraps.
     const many = d.options.map((o) => o.value).sort().join() !== 'no,yes';
-    const words = [d.about ? el('p', { class: d.media ? 'about full' : 'about', dir: 'auto' }, d.about) : '',
+    const words = [d.about && d.about !== name ? el('p', { class: d.media ? 'about full' : 'about', dir: 'auto' }, d.about) : '',
       d.detail || (!d.media && d.about?.length > 180) ? el('details', {}, el('summary', {}, 'Show more'),
         ...[d.about, d.detail].filter(Boolean).map((t) => el('p', { dir: 'auto' }, t))) : '',
-      d.link ? el('p', { class: 'meta' }, /^https?:/.test(d.link)
-        ? el('a', { href: d.link, target: '_blank', rel: 'noopener' }, d.link) : `Commit ${d.link}`) : '',
+      // A web link names the site it opens; a commit goes under Details.
+      /^https?:/.test(d.link ?? '') ? el('p', { class: 'meta' }, el('a', { href: d.link, target: '_blank', rel: 'noopener' }, `Open on ${d.link.split('/')[2]}`)) : '',
       silent ? el('p', { class: 'meta' }, silent) : ''];
-    return el('article', { class: update ? 'row update' : 'row', id: `item-${d.key}` }, ...(update ? [head, upd(d, words)] : [el('div', {}, head, ...words), updateMedia(d), chapters(d), rung(d)]),
-      ro || !buttons.length ? '' : el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': d.title }, ...ranked),
-      ro ? '' : other(d, saved, err), err, evidenceCard(d));
-  }
-
-  /** An update's captures above its title and note, beside the evidence mark; one portrait capture sits beside them instead, as on a phone screen. */
-  function upd(d, words) {
-    const media = updateMedia(d), box = el('div', { class: 'upd' }, media, icon('evidence'), el('div', {}, el('strong', { dir: 'auto' }, d.title), ...words));
-    const one = d.media?.length === 1 && media.querySelector('img');
-    if (one) one.onload = () => one.naturalHeight > one.naturalWidth && box.classList.add('portrait');
-    return box;
+    return el('article', { class: update ? 'row update' : 'row', id: `item-${d.key}` }, el('div', {}, lead, ...words), proof(d),
+      card?.status === 'unverified' ? el('p', { class: 'why' }, `${card.reason} Ask the agent to run the check again.`) : '', chapters(d), rung(d),
+      // An update states a result, so the one decision is asked in words above its buttons.
+      update && !ro && buttons.length ? el('p', { class: 'ask-line' }, 'Does this look right?') : '',
+      ro || !buttons.length ? '' : el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': name }, ...ranked),
+      ro ? '' : other(d, saved, err), err, tech(d));
   }
 
   /** Boxes the person unfolded, kept open across redraws. */
@@ -560,9 +533,9 @@
     box.oninput = () => { drafts.set(d.key, box.value); keep(); };
     // An option valued text would be the same answer, so that item takes words only as a note.
     const words = !d.options.some((o) => o.value === 'text'), talk = !state.answers_only, round = talk && d.type !== 'evidence';
-    const sendBtn = el('button', { 'aria-label': `Send reply, ${d.title}` }, 'Send reply');
+    const sendBtn = el('button', { 'aria-label': `Send reply, ${headline(d)}` }, 'Send reply');
     sendBtn.onclick = () => (box.value.trim() ? save(d, { value: 'text' }, [sendBtn], err) : (shown(err).textContent = 'Write the reply first.'));
-    const roundBtn = el('button', { class: 'quick', 'aria-label': `Another round, ${d.title}` }, 'Another round');
+    const roundBtn = el('button', { class: 'quick', 'aria-label': `Another round, ${headline(d)}` }, 'Another round');
     roundBtn.onclick = () => {
       roundBtn.disabled = true;
       const note = (drafts.get(d.key) ?? noteOf(d)).trim();
@@ -574,7 +547,7 @@
         roundBtn.disabled = false;
       });
     };
-    const commentBtn = el('button', { 'aria-label': `Send as a comment, ${d.title}` }, 'Send as a comment');
+    const commentBtn = el('button', { 'aria-label': `Send as a comment, ${headline(d)}` }, 'Send as a comment');
     commentBtn.onclick = () => send(commentBtn, err, { kind: 'comment', key: d.key }, d.key, box.value.trim());
     const asked = (state.rounds ?? []).filter((r) => r.key === d.key);
     const comments = (state.messages ?? []).filter((m) => m.kind === 'comment' && m.key === d.key);
@@ -584,7 +557,7 @@
     const also = `with a button you pick${round ? ' or with Another round' : ''}`;
     const hint = !d.options.length ? 'Reply in a few words' : words ? `Your own answer in a few words. It also goes, as a note, ${also}.` : `A note, sent ${also}.`;
     const fold = el('details', { class: 'other', ...((unfolded.has(d.key) || drafts.get(d.key)) && { open: '' }) },
-      el('summary', { 'aria-label': `${label}, ${d.title}` }, `${label}${status && ` · ${status}`}`),
+      el('summary', { 'aria-label': `${label}, ${headline(d)}` }, `${label}${status && ` · ${status}`}`),
       asked.length ? el('p', { class: 'meta saved-note', dir: 'auto' }, `You asked for another round: ${asked[asked.length - 1].note || 'with your comments on the mocks'}`) : '',
       ...comments.map((m) => el('p', { class: 'meta saved-note', dir: 'auto' }, `Your comment, ${m.delivered ? 'read by the agent' : 'not read yet'}: ${m.text}`)),
       el('label', { for: box.id }, hint), box,
@@ -608,13 +581,16 @@
       el('label', { for: box.id }, 'A prompt the agent reads the next time it checks in'), box, el('div', { class: 'actions' }, btn), err);
   }
 
-  // Each file is hash-checked by the server; one that changed or went missing says so instead of a broken frame.
-  function updateMedia(d) {
-    if (!d.media) return '';
-    return el('div', { class: 'media update-media' }, ...d.media.map((m, i) => {
-      const url = src(`/api/media?key=${encodeURIComponent(d.key)}&i=${i}`);
-      const name = d.type === 'evidence' ? `Update ${d.number}, capture ${i + 1} of ${d.media.length}` : `Explainer video, ${d.title}`;
-      const node = /\.(mp4|webm)$/i.test(m.path) ? el('video', { src: url, controls: '', playsinline: '', preload: 'metadata', 'aria-label': name })
+  /** The proof on the card itself: its own captures, or else the media of its linked run.
+   * Each file is hash-checked by the server; one that changed or went missing says so instead of a broken frame. */
+  function proof(d) {
+    const files = d.media?.map((m, i) => [`/api/media?key=${encodeURIComponent(d.key)}&i=${i}`, /\.(mp4|webm)$/i.test(m.path)])
+      ?? d.evidenceCard?.media.map((m) => [m.url, m.type.startsWith('video/')]) ?? [];
+    if (!files.length) return '';
+    return el('div', { class: 'media proof' }, ...files.map(([path, video], i) => {
+      const url = src(path);
+      const name = d.type === 'explainer' ? `Explainer video, ${d.title}` : `${d.type === 'evidence' ? `Update ${d.number}` : 'Proof'}, capture ${i + 1} of ${files.length}`;
+      const node = video ? el('video', { src: url, controls: '', playsinline: '', preload: 'metadata', 'aria-label': name })
         : el('a', { href: url, target: '_blank', rel: 'noopener', 'aria-label': `Open ${name}` }, el('img', { src: url, alt: name }));
       (node.tagName === 'A' ? node.firstChild : node).onerror = () => node.replaceWith(el('p', { class: 'gone' }, `${name} can't be shown: the file is missing, changed since it was posted, or in a format this browser can't play.`));
       return node;
@@ -757,7 +733,8 @@
   const when = (at) => (isToday(at) ? hhmm(at) : `${day(at)} ${hhmm(at)}`);
   const pic = (d) => {
     const i = d.media?.findIndex((m) => !/\.(mp4|webm)$/i.test(m.path)), m = d.mocks?.find((x) => !/\.html?$/i.test(x.path));
-    return i >= 0 ? `/api/media?key=${encodeURIComponent(d.key)}&i=${i}` : d.type === 'diagram' ? mockUrl(d.key, '', d.view) : m && mockUrl(d.key, m.value, m.path);
+    return i >= 0 ? `/api/media?key=${encodeURIComponent(d.key)}&i=${i}` : d.type === 'diagram' ? mockUrl(d.key, '', d.view)
+      : m ? mockUrl(d.key, m.value, m.path) : d.evidenceCard?.media.find((x) => x.type.startsWith('image/'))?.url;
   };
   const thumb = (a, url) => { if (!url) return icon(a); const img = el('img', { class: 'thumb', src: src(url), alt: '' }); img.onerror = () => img.replaceWith(icon(a)); return img; };
 
@@ -794,12 +771,14 @@
       done.length > SHOWN ? el('p', { class: 'meta' }, `and ${done.length - SHOWN} earlier`) : '');
   }
 
+  /** A short row's second line: what changed, unless the headline already says it. */
+  const sub = (d) => (d.about && d.about !== headline(d) ? d.about : NAMES[d.type] ?? d.type);
   /** A short row: a picture (or the area's mark) and the title; an answered item has its answer and time under the title. */
   const compact = (d, a) => {
     const s = state.answers[d.key];
     return [thumb(a, pic(d)), el('span', { class: 't' }, el('strong', { dir: 'auto' }, title(d)), s
       ? el('span', { class: 'ans' }, el('b', { dir: 'auto' }, s.answer === 'text' ? 'Your reply' : s.label), el('time', {}, isToday(s.at) ? hhmm(s.at) : day(s.at)))
-      : el('span', { class: 'meta', dir: 'auto' }, d.about ?? NAMES[d.type] ?? d.type))];
+      : el('span', { class: 'meta', dir: 'auto' }, sub(d)))];
   };
   let jump = null; // The item a Summary row was tapped for, scrolled to on its area's screen.
   /** A short list of an area on the Summary: a picture and the title; a tap opens the area at that item. */
@@ -836,7 +815,7 @@
   const MARKS = { ai: 'AI model', store: 'Stores', gate: 'Gate', fail: 'Hard fail' };
   const marks = (t) => el('span', { class: 'marks' }, ...(t.marks ?? []).map((m) => el('span', { class: `mk mk-${m}`, role: 'img', 'aria-label': MARKS[m] })));
   const opened = new Set(); // Reports and answered rows opened in place, kept open across redraws.
-  /** A report: its steps on a line (or a picture of its page when it lists none), its kind, title and what it says; Open shows the whole flow, or the full card, in place. */
+  /** A report: its kind and title, what it says, then its steps on a line (or a picture of its page when it lists none) and what it decided; Open shows the whole flow, or the full card, in place. */
   function report(d) {
     const open = opened.has(d.key), n = d.steps?.length, url = d.view && src(mockUrl(d.key, '', d.view)), look = pic(d);
     const toggle = el('button', { 'aria-expanded': open, 'aria-label': `${open ? 'Close' : 'Open'}, ${d.title}` }, open ? 'Close' : 'Open');
@@ -847,13 +826,15 @@
     };
     const fresh = d.filed && isToday(d.filed), st = d.filed && el('span', { class: `st ${fresh ? 'new' : 'ok'}` }, fresh ? 'New today' : 'Current');
     const decided = d.decided ? el('p', { class: 'decided', dir: 'auto' }, el('span', { class: 'lbl' }, 'What it decided'), d.decided) : '';
-    const head = [el('div', { class: 'head' }, st ? '' : chip(d), el('h3', { dir: 'auto' }, title(d)), st || '', xBtn(d)), d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided];
+    const brow = [kind(d), st].filter(Boolean);
+    const lead = [el('div', { class: 'lead' }, xBtn(d), brow.length ? el('p', { class: 'eyebrow' }, ...brow) : '', el('h3', { dir: 'auto' }, title(d))),
+      d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : ''];
     const full = open && !n ? row(d) : null;
     full?.removeAttribute('id');
-    const body = full ? [full, decided] : [n ? (open ? el('ol', { class: 'steps' }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), el('span', { dir: 'auto' }, t.title), marks(t))))
+    const body = full ? [full, decided] : [...lead, n ? (open ? el('ol', { class: 'steps' }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), el('span', { dir: 'auto' }, t.title), marks(t))))
       : el('ol', { class: 'flow', style: `--n: ${n}`, 'aria-label': `${n} steps: ${d.steps.map((t) => t.title).join(', ')}` }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), marks(t)))))
       : d.type === 'interactive' ? el('div', { class: 'shot', 'aria-hidden': 'true' }, el('iframe', { src: url, sandbox: 'allow-scripts', tabindex: '-1', loading: 'lazy' }))
-        : look ? thumb('reports', look) : '', ...head];
+        : look ? thumb('reports', look) : '', decided];
     return el('article', { class: 'card report', id: `item-${d.key}` }, ...body, el('div', { class: 'foot' }, el('span', { class: 'meta' }, n ? `${n} steps` : ''),
       url ? el('a', { href: url, target: '_blank', rel: 'noopener', 'aria-label': `Open full page, ${d.title}` }, 'Open full page') : '', toggle));
   }
@@ -902,7 +883,7 @@
     const hint = [rec && 'Swipe right for the recommended answer', skip && (rec ? 'left to skip' : 'Swipe left to skip')].filter(Boolean).join(', ');
     const keys = [d.options.length && d.type !== 'design' && `1 to ${Math.min(d.options.length, 9)} answer`, skip && 'E skip', 'Z undo'].filter(Boolean).join(' · ');
     const queue = el('ol', { class: 'queue', 'aria-label': `${n} ${n > 1 ? 'asks' : 'ask'}, one at a time` }, ...items.map((x) => {
-      const b = el('button', { ...(x === d && { 'aria-current': 'true' }) }, el('strong', { dir: 'auto' }, title(x)), el('span', { class: 'meta', dir: 'auto' }, x.about ?? NAMES[x.type] ?? x.type));
+      const b = el('button', { ...(x === d && { 'aria-current': 'true' }) }, el('strong', { dir: 'auto' }, title(x)), el('span', { class: 'meta', dir: 'auto' }, sub(x)));
       b.onclick = go(x.key);
       return el('li', {}, b);
     }));

@@ -169,7 +169,7 @@ Posts an item for the user. --type decision (the default) is a yes/no or pick-on
 --kind posts one contract message (${CONTRACT}), read from a file or from stdin with --from -: it must be that kind and pass every rule,
 else it is refused with one fix line and nothing is written. A key already on the board takes only the same message again; anything else exits 2.
 --kind evidence copies its media, read from the message file's folder (the current folder for stdin), into evidence/<number>/ like --type evidence;
-a "run" is shown as the update's proof record. With no key it posts the next update-<number>.
+a "run" is the update's proof: its outcome line heads the card, so write it as the result the user can see. With no key it posts the next update-<number>.
 --kind gate holds a done-done run for the user: it waits like an ask; run done-done respond --action <the picked value>.
 --kind finding asks the user to apply or skip a retro's proposed change: it waits like an ask.
 Listing --option needs --recommend <value>, on every type: the option you would pick, shown first and marked. --from --replace feeds are not held to it.
@@ -1479,42 +1479,42 @@ function under(root: string, rel: string): string {
   if (actual !== base && !actual.startsWith(base + sep)) throw new EvidenceError('mock path escapes the board folder');
   return actual;
 }
-function contained(path: string, missing = 'no matching evidence file'): string {
+function contained(path: string, missing = 'A picture or recording of the proof is missing.'): string {
   let root: string, actual: string;
   try {
     root = realpathSync(evidenceRoot);
     actual = realpathSync(resolve(root, path));
   } catch { throw new EvidenceError(missing); }
-  if (!actual.startsWith(root + sep)) throw new EvidenceError('evidence path escapes the selected root');
+  if (!actual.startsWith(root + sep)) throw new EvidenceError('A picture or recording is outside the proof folder.');
   return actual;
 }
+/** A linked run as the board checked it; the reason a check failed is a plain sentence for the card.
+ * With no --evidence-root the board cannot check a run at all, so the card shows no result rather than one that blames the run. */
 function evidenceCard(link: NonNullable<Decision['evidence']>) {
+  if (!evidenceRoot) return null;
   try {
-    if (!evidenceRoot) throw new EvidenceError('no evidence root was selected');
-    const recordPath = contained(`.done-done/runs/${link.run_id}.json`, 'run record is missing');
-    if (statSync(recordPath).size > 1_000_000) throw new EvidenceError('run record is too large');
+    const recordPath = contained(`.done-done/runs/${link.run_id}.json`, 'The proof for this run is missing.');
+    if (statSync(recordPath).size > 1_000_000) throw new EvidenceError('The proof for this run is too large to read.');
     const run = JSON.parse(readFileSync(recordPath, 'utf8'));
-    if (!run || typeof run !== 'object' || Array.isArray(run)) throw new EvidenceError('run record is malformed or its media is unavailable');
+    if (!run || typeof run !== 'object' || Array.isArray(run)) throw new EvidenceError('The proof for this run cannot be read.');
     if (run.schema !== 1 || run.run_id !== link.run_id || run.commit !== link.commit || !/^[a-f0-9]{40}$/.test(run.tree ?? '')
       || typeof run.dirty !== 'boolean' || !(run.exit === null || Number.isInteger(run.exit)) || !Array.isArray(run.files)
       || run.files.some((f: any) => !f || typeof f !== 'object' || typeof f.path !== 'string' || !/^[a-f0-9]{64}$/.test(f.sha256 ?? '') || !Number.isInteger(f.bytes) || f.bytes < 0)) {
-      throw new EvidenceError('run record is malformed or commit does not match');
+      throw new EvidenceError('The proof does not match this change.');
     }
     const media: { path: string; url: string; type: string }[] = run.files.flatMap((f: any) => {
       const type = mediaTypes[extname(f.path ?? '').toLowerCase()];
       if (!type) return [];
       const path = contained(f.path);
-      if (statSync(path).size > 20_000_000) throw new EvidenceError('media is unavailable or too large');
+      if (statSync(path).size > 20_000_000) throw new EvidenceError('A picture or recording of the proof is too large.');
       const bytes = readFileSync(path);
-      if (bytes.length !== f.bytes || sha256(bytes) !== f.sha256) throw new EvidenceError('evidence hash does not match the run record');
+      if (bytes.length !== f.bytes || sha256(bytes) !== f.sha256) throw new EvidenceError('A picture or recording changed after the run.');
       return [{ path: f.path, url: `/api/evidence?run=${encodeURIComponent(link.run_id)}&file=${encodeURIComponent(f.path)}`, type }];
     });
     const result = !Number.isInteger(run.exit) ? 'INCONCLUSIVE' : run.exit !== 0 || run.dirty || !run.files.length ? 'RUN FAIL' : 'RUN PASS';
     return { status: 'verified', result, commit: run.commit, media };
   } catch (e: any) {
-    const reason = e instanceof EvidenceError ? e.message
-      : e?.code ? 'no matching run record or media'
-      : 'run record is malformed or its media is unavailable';
+    const reason = e instanceof EvidenceError ? e.message : 'The proof for this run cannot be read.';
     return { status: 'unverified', result: 'UNVERIFIED', reason, commit: '', media: [] };
   }
 }
@@ -1541,7 +1541,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     const decision = loadDecisions(file).find((d) => d.evidence?.run_id === runId);
     if (!decision?.evidence || !path) return [404, { error: 'Evidence is unavailable' }];
     const card = evidenceCard(decision.evidence);
-    if (card.status !== 'verified' || !card.media.some((m) => m.path === path)) return [404, { error: 'Evidence is unavailable' }];
+    if (card?.status !== 'verified' || !card.media.some((m) => m.path === path)) return [404, { error: 'Evidence is unavailable' }];
     const actual = contained(path), type = mediaTypes[extname(path).toLowerCase()];
     return [200, { media: readFileSync(actual), type }];
   }
