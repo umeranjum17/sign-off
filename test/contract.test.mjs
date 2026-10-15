@@ -414,6 +414,44 @@ test('post --kind finding: a retro proposal waits like an ask, a changed proposa
   assert.equal(readFileSync(board, 'utf8'), gone);
 });
 
+test('post --kind evidence: an answered update keeps the media and run it was answered for, in a --replace feed too', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const board = join(scratch, 'evidence-replace.json'), cli2 = (input, ...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env, input });
+  const dir = mkdtempSync(join(scratch, 'evmsg-'));
+  writeFileSync(join(dir, 'shot.png'), readFileSync(join(fixtures, 'evidence.v1', 'shot.png')));
+  const run = { run_id: '20261011T120000Z-a1b2c3d4', commit: '0123456789abcdef0123456789abcdef01234567',
+    outcome: 'Umer can see the new screen.', repro: 'repro: n/a: no bug', proof: 'verify-sign-off: real browser journey', evidence: 'shot.png' };
+  writeFileSync(join(dir, 'k1.json'), JSON.stringify({ contract: 1, kind: 'evidence', schema: 1, key: 'k1', title: 'Sign-in screen', about: 'First pass.', media: ['shot.png'], run }));
+  const posted = cli2('', 'post', board, '--kind', 'evidence', '--from', join(dir, 'k1.json'));
+  assert.equal(posted.status, 0, posted.stdout);
+  assert.match(posted.stdout, /k1,1,1,Sign-in screen,posted/);
+  appendFileSync(join(scratch, 'evidence-replace.answers.jsonl'), `${JSON.stringify({ key: 'k1', answer: 'fail', label: 'Fail', close: 'done', at: '2026-10-13T08:00:00Z' })}\n`);
+  const before = readFileSync(board, 'utf8');
+  const feed = (name, change) => {
+    const [item] = JSON.parse(before).items;
+    return message(name, JSON.stringify({ schema: 2, items: [change(item)] }));
+  };
+  // Other media under the key is another question in a --replace feed too: exit 1, nothing written.
+  const swapped = feed('ev-media.json', (item) => ({ ...item, media: [{ ...item.media[0], sha256: '0'.repeat(64), bytes: item.media[0].bytes + 1 }] }));
+  const media = cli2('', 'post', board, '--from', swapped, '--replace');
+  assert.equal(media.status, 1, media.stdout);
+  assert.match(media.stdout, /was answered and now holds a different question[^]*Post the new question under a new key/);
+  assert.equal(readFileSync(board, 'utf8'), before);
+  // Another run under the key is refused the same way.
+  const rerun = feed('ev-run.json', (item) => ({ ...item, evidence: { ...item.evidence, run_id: '20261012T120000Z-d4c3b2a1' } }));
+  const reran = cli2('', 'post', board, '--from', rerun, '--replace');
+  assert.equal(reran.status, 1, reran.stdout);
+  assert.match(reran.stdout, /was answered and now holds a different question[^]*Post the new question under a new key/);
+  assert.equal(readFileSync(board, 'utf8'), before);
+  // The unchanged feed still resyncs, and asking about the key still returns the saved verdict.
+  assert.equal(cli2('', 'post', board, '--from', message('ev-same.json', before), '--replace').status, 0);
+  const asked = cli2('', 'answers', board, '--key', 'k1');
+  assert.equal(asked.status, 0, asked.stdout);
+  assert.match(asked.stdout, /k1,fail/);
+});
+
 test('wait --events: one line per answer and per another-round ask, with the item kind and schema; a board-format item reports as ask', async () => {
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;

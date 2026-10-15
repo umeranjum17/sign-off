@@ -650,7 +650,8 @@ function replace(file: string, on: string, from?: string, filer?: string) {
     for (const i of fed.items) if (first.get(i?.key)?.title !== i?.title) fits(i?.title, i?.key);
     const feed = fed.items.map((i) => ({ filed: first.get(i?.key)?.filed ?? now, ...i, ...(filer && { filer }) }));
     // An answer belongs to its question: an answered key may not come back asking something else.
-    const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply, d.run, d.finding]);
+    // Evidence is answered for the media and run it shows, so those are part of its question too, as a gate's run and a finding's proposal are.
+    const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply, d.run, d.finding, d.evidence, d.media]);
     // A gate's answer is the action for its run, and a finding's the verdict on its proposal, so a dropped answered one cannot come back.
     const saved = readAnswers(file);
     for (const i of fed.items) if ((i?.kind === 'gate' || i?.kind === 'finding') && !first.has(i?.key) && Object.hasOwn(saved, i?.key)) {
