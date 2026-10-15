@@ -367,6 +367,37 @@ test('post --kind evidence: a key the feed dropped after it was answered cannot 
   assert.equal(readFileSync(board, 'utf8'), gone);
 });
 
+test('post --replace: a board-shaped evidence item with malformed media is refused with a fix line, never a crash', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const dir = mkdtempSync(join(scratch, 'media-shape-')), board = join(dir, 'board.json');
+  const cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const write = (name, body) => {
+    const path = join(dir, name);
+    writeFileSync(path, JSON.stringify(body));
+    return path;
+  };
+  writeFileSync(join(dir, 'shot.png'), readFileSync(join(fixtures, 'evidence.v1', 'shot.png')));
+  const stored = () => JSON.parse(readFileSync(board, 'utf8')).items[0];
+  assert.equal(cli2('post', board, '--kind', 'evidence', '--from', write('first.json', { contract: 1, kind: 'evidence', schema: 1, key: 'signin-phone-2', title: 'Sign-in screen, second pass', about: 'Umer checks the new layout.', media: ['shot.png'] })).status, 0);
+  const before = readFileSync(board, 'utf8');
+  for (const [media, error] of [['nope', /media must list 1 to 12 files/], [[null], /media\[0\] must be text/], [{ length: 3 }, /media must list 1 to 12 files/]]) {
+    const refused = cli2('post', board, '--from', write('feed.json', { schema: 2, items: [{ ...stored(), media }] }), '--replace');
+    assert.equal(refused.status, 2, refused.stdout + refused.stderr);
+    assert.doesNotMatch(refused.stdout + refused.stderr, /TypeError|is not a function/);
+    assert.match(refused.stdout, error);
+    assert.equal(readFileSync(board, 'utf8'), before);
+  }
+  // The stored item is read back as a message too: a board whose own evidence media is malformed is refused, not crashed on.
+  const doc = JSON.parse(before);
+  doc.items[0].media = 'nope';
+  writeFileSync(board, JSON.stringify(doc));
+  const bare = cli2('post', board, '--from', write('bare.json', { schema: 2, items: [{ contract: 1, kind: 'evidence', schema: 1, type: 'evidence', key: 'signin-phone-2', title: 'T', about: 'A' }] }), '--replace');
+  assert.equal(bare.status, 2, bare.stdout + bare.stderr);
+  assert.doesNotMatch(bare.stdout + bare.stderr, /TypeError|is not a function/);
+});
+
 test('post --kind evidence: media copied and hashed from the message folder, a run kept as the update\'s evidence, never in a --from file', () => {
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;

@@ -295,7 +295,7 @@ function contractItems(items: any[], from: string, file: string, replace = false
     const asMessage = (x: any) => {
       if (m?.kind !== 'evidence') return m?.kind === 'report' ? x : asSent(x);
       const { type: _type, number: _number, media, evidence: run, ...message } = asSent(x);
-      return { ...message, ...(media?.length && { media: media.map((r: any) => r.path) }), ...(run && { run }) };
+      return { ...message, ...(media !== undefined && { media: Array.isArray(media) ? media.map((r: any) => r?.path) : media }), ...(run && { run }) };
     };
     if (on.has(m?.key)) {
       const same = canon(m) === canon(m?.filed === undefined ? asMessage(held) : held);
