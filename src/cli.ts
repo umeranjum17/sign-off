@@ -390,7 +390,11 @@ function board(file: string, say = warn) {
 }
 function ready(file: string, on: string, root?: string) {
   if (!existsSync(file)) throw fail(`no board yet at ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi raise${on} --title "<question>"\` first`);
-  if (root && !statSync(root, { throwIfNoEntry: false })?.isDirectory()) throw fail(`--evidence-root ${tilde(resolve(root))} is not a folder`, 'VALIDATION_ERROR', 'Pass the folder that holds .done-done/');
+  if (root) {
+    let dir = false;
+    try { dir = !!statSync(root, { throwIfNoEntry: false })?.isDirectory(); } catch (e: any) { throw fail(`--evidence-root ${tilde(resolve(root))} ${reasonOf(e.code)}`, 'VALIDATION_ERROR', 'Pass the folder that holds .done-done/'); }
+    if (!dir) throw fail(`--evidence-root ${tilde(resolve(root))} is not a folder`, 'VALIDATION_ERROR', 'Pass the folder that holds .done-done/');
+  }
   loadDecisions(file);
 }
 
@@ -643,7 +647,8 @@ function post(args: string[], cmd = 'post') {
     try { actual = under(root, values.view); } catch (e: any) {
       throw e.message === 'no matching mock file' ? fail(`--view ${values.view} is not a file in ${tilde(root)}`, 'NOT_FOUND', 'Paths are relative to the board file\'s folder') : escapes();
     }
-    const size = statSync(actual);
+    let size: Stats;
+    try { size = statSync(actual); } catch (e: any) { throw fail(`--view ${values.view} ${reasonOf(e.code)}`, 'VALIDATION_ERROR', 'Shrink the picture, or post an interactive page instead of a diagram'); }
     if (!size.isFile() || size.size > MOCK_BYTES) throw fail(`--view ${values.view} must be a file of 5 MB or less`, 'VALIDATION_ERROR', 'Shrink the picture, or post an interactive page instead of a diagram');
     return storeIncoming(file, on, buildIncoming(values, { type, view: values.view }, filer, file), filer);
   }
@@ -653,7 +658,8 @@ function post(args: string[], cmd = 'post') {
     const path = m.slice(at + 1), name = mockFile(path);
     if (!mockTypes[extname(name).toLowerCase()]) throw fail(`--mock ${path} must end in ${Object.keys(mockTypes).join(', ')}`, 'VALIDATION_ERROR', 'Name the mock file itself: .html, an image, or a screenshot of the variant');
     if (!resolve(root, name).startsWith(root + sep)) throw fail(`--mock ${path} escapes the board folder`, 'VALIDATION_ERROR', 'Keep mock files next to the board file');
-    const info = statSync(resolve(root, name), { throwIfNoEntry: false });
+    let info: Stats | undefined;
+    try { info = statSync(resolve(root, name), { throwIfNoEntry: false }); } catch (e: any) { throw fail(`--mock ${path} ${reasonOf(e.code)}`, 'VALIDATION_ERROR', 'Shrink the mock, or point --mock at the screenshot of the variant'); }
     // A mock that is not there posts on purpose (the card says so); one the board could never serve is refused here, as --view is.
     if (info && (!info.isFile() || info.size > MOCK_BYTES)) {
       throw fail(`--mock ${path} must be a file of 5 MB or less`, 'VALIDATION_ERROR', 'Shrink the mock, or point --mock at the screenshot of the variant');
@@ -734,7 +740,9 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
     return { at: Number(m[1]) * 60 + Number(m[2]), title: m[3] };
   });
   const sources: string[] = values.media.map((m: string) => {
-    const path = resolve(m), info = statSync(path, { throwIfNoEntry: false });
+    const path = resolve(m);
+    let info: Stats | undefined;
+    try { info = statSync(path, { throwIfNoEntry: false }); } catch (e: any) { throw fail(`--media ${m} ${reasonOf(e.code)}`, 'NOT_FOUND', 'Name a file that is there, such as the screenshot you just took'); }
     if (!kinds.includes(extname(path).toLowerCase())) throw fail(`--media ${m} must end in ${kinds.join(', ')}`, 'VALIDATION_ERROR', example);
     if (!info?.isFile()) throw fail(`--media ${m} ${info || existsSync(path) ? 'is not a file' : 'is not there'}`, 'NOT_FOUND', 'Name a file that is there, such as the screenshot you just took');
     if (info.size > MEDIA_BYTES) throw fail(`--media ${tilde(path)} is over 50 MB`, 'VALIDATION_ERROR', 'Trim or compress the recording');
