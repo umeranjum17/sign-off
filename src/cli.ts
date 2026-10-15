@@ -10,7 +10,7 @@ import { basename, delimiter, dirname, extname, isAbsolute, join, relative, reso
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { type Answer, CHAPTERS_MAX, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, writeItems } from './store.js';
+import { type Answer, CHAPTERS_MAX, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, checkMessage, mediaFiles, parseMessage } from './contract.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
@@ -176,7 +176,7 @@ Listing --option needs --recommend <value>, on every type: the option you would 
 --filer names who posts (your agent session or any id of 1-128 of A-Z a-z 0-9 . _ -), saved on the item; then \`wait --filer <id>\` gets the answer.
 SIGN_OFF_FILER sets it for every command; with neither, the Claude Code session id is saved when there is one.
 --type design is a pick between up to 6 options shown side by side, each with an optional board-relative mock file
-(.html, .svg, .png, .jpg, .jpeg, .webp), a --tradeoff line and a --recommend badge.
+(.html, .svg, .png, .jpg, .jpeg, .webp, 5 MB or less), a --tradeoff line and a --recommend badge.
 One .html page can hold every variant: --mock a=mocks/<key>/index.html?variant=a and so on; the page reads ?variant= to show one.
 An .html mock or view loads the css, scripts, images and fonts beside it by relative name, from its own folder only.
 After the user picks, answers --key <key> --json holds the pick and note; "rounds" holds an ask for another round.
@@ -357,7 +357,7 @@ function boardHere() {
   return folder ? setupOf(join(folder, '.sign-off', 'decisions.json'))!.board : join(signOffHome(), '.sign-off', 'decisions.json');
 }
 const portOf = (value: string) => {
-  if (!/^\d{1,5}$/.test(value) || Number(value) > 65535) throw fail('--port must be a number from 0 to 65535', 'VALIDATION_ERROR');
+  if (!/^\d{1,5}$/.test(value) || Number(value) > 65535) throw fail('--port must be a number from 0 to 65535', 'VALIDATION_ERROR', 'Pass a free port, such as 4410, or 0 to let the system pick one');
   return Number(value);
 };
 /** Maps a decisions-file problem to a structured usage error (exit 2). */
@@ -390,7 +390,11 @@ function board(file: string, say = warn) {
 }
 function ready(file: string, on: string, root?: string) {
   if (!existsSync(file)) throw fail(`no board yet at ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi raise${on} --title "<question>"\` first`);
-  if (root && !statSync(root, { throwIfNoEntry: false })?.isDirectory()) throw fail(`--evidence-root ${tilde(resolve(root))} is not a folder`, 'VALIDATION_ERROR', 'Pass the folder that holds .done-done/');
+  if (root) {
+    let dir = false;
+    try { dir = !!statSync(root, { throwIfNoEntry: false })?.isDirectory(); } catch (e: any) { throw fail(`--evidence-root ${tilde(resolve(root))} ${reasonOf(e.code)}`, 'VALIDATION_ERROR', 'Pass the folder that holds .done-done/'); }
+    if (!dir) throw fail(`--evidence-root ${tilde(resolve(root))} is not a folder`, 'VALIDATION_ERROR', 'Pass the folder that holds .done-done/');
+  }
   loadDecisions(file);
 }
 
@@ -643,16 +647,23 @@ function post(args: string[], cmd = 'post') {
     try { actual = under(root, values.view); } catch (e: any) {
       throw e.message === 'no matching mock file' ? fail(`--view ${values.view} is not a file in ${tilde(root)}`, 'NOT_FOUND', 'Paths are relative to the board file\'s folder') : escapes();
     }
-    const size = statSync(actual);
-    if (!size.isFile() || size.size > MOCK_BYTES) throw fail(`--view ${values.view} must be a file of 5 MB or less`, 'VALIDATION_ERROR');
+    let size: Stats;
+    try { size = statSync(actual); } catch (e: any) { throw fail(`--view ${values.view} ${reasonOf(e.code)}`, 'VALIDATION_ERROR', 'Shrink the picture, or post an interactive page instead of a diagram'); }
+    if (!size.isFile() || size.size > MOCK_BYTES) throw fail(`--view ${values.view} must be a file of 5 MB or less`, 'VALIDATION_ERROR', 'Shrink the picture, or post an interactive page instead of a diagram');
     return storeIncoming(file, on, buildIncoming(values, { type, view: values.view }, filer, file), filer);
   }
   const mocks = values.mock?.map((m: string) => {
     const at = m.indexOf('=');
     if (at < 1) throw fail(`--mock ${m} must be <value>=<path>`, 'VALIDATION_ERROR', 'sign-off-axi post --type design --title "<question>" --option a=A --option b=B --mock a=mocks/a.html --recommend a');
     const path = m.slice(at + 1), name = mockFile(path);
-    if (!mockTypes[extname(name).toLowerCase()]) throw fail(`--mock ${path} must end in ${Object.keys(mockTypes).join(', ')}`, 'VALIDATION_ERROR');
+    if (!mockTypes[extname(name).toLowerCase()]) throw fail(`--mock ${path} must end in ${Object.keys(mockTypes).join(', ')}`, 'VALIDATION_ERROR', 'Name the mock file itself: .html, an image, or a screenshot of the variant');
     if (!resolve(root, name).startsWith(root + sep)) throw fail(`--mock ${path} escapes the board folder`, 'VALIDATION_ERROR', 'Keep mock files next to the board file');
+    let info: Stats | undefined;
+    try { info = statSync(resolve(root, name), { throwIfNoEntry: false }); } catch (e: any) { throw fail(`--mock ${path} ${reasonOf(e.code)}`, 'VALIDATION_ERROR', 'Shrink the mock, or point --mock at the screenshot of the variant'); }
+    // A mock that is not there posts on purpose (the card says so); one the board could never serve is refused here, as --view is.
+    if (info && (!info.isFile() || info.size > MOCK_BYTES)) {
+      throw fail(`--mock ${path} must be a file of 5 MB or less`, 'VALIDATION_ERROR', 'Shrink the mock, or point --mock at the screenshot of the variant');
+    }
     return { value: m.slice(0, at), path };
   });
   return storeIncoming(file, on, buildIncoming(values, { type, tradeoff: values.tradeoff, mocks }, filer, file), filer);
@@ -729,9 +740,11 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
     return { at: Number(m[1]) * 60 + Number(m[2]), title: m[3] };
   });
   const sources: string[] = values.media.map((m: string) => {
-    const path = resolve(m), info = statSync(path, { throwIfNoEntry: false });
-    if (!kinds.includes(extname(path).toLowerCase())) throw fail(`--media ${m} must end in ${kinds.join(', ')}`, 'VALIDATION_ERROR');
-    if (!info?.isFile()) throw fail(`--media ${tilde(path)} is not a file`, 'NOT_FOUND');
+    const path = resolve(m);
+    let info: Stats | undefined;
+    try { info = statSync(path, { throwIfNoEntry: false }); } catch (e: any) { throw fail(`--media ${m} ${reasonOf(e.code)}`, 'NOT_FOUND', 'Name a file that is there, such as the screenshot you just took'); }
+    if (!kinds.includes(extname(path).toLowerCase())) throw fail(`--media ${m} must end in ${kinds.join(', ')}`, 'VALIDATION_ERROR', example);
+    if (!info?.isFile()) throw fail(`--media ${m} ${info || existsSync(path) ? 'is not a file' : 'is not there'}`, 'NOT_FOUND', 'Name a file that is there, such as the screenshot you just took');
     if (info.size > MEDIA_BYTES) throw fail(`--media ${tilde(path)} is over 50 MB`, 'VALIDATION_ERROR', 'Trim or compress the recording');
     return path;
   });
@@ -797,7 +810,7 @@ async function postKind(file: string, on: string, values: Record<string, any>) {
   if (from === undefined) throw fail('--kind needs --from <message.json>, or --from - to read stdin', 'VALIDATION_ERROR', example);
   const name = from === '-' ? 'stdin' : from;
   let bytes, m: any;
-  try { bytes = readFileSync(from === '-' ? 0 : from); } catch (e: any) { throw fail(`${name}: cannot read: ${e.code}`, 'NOT_FOUND', 'Check the path names a readable file'); }
+  try { bytes = readFileSync(from === '-' ? 0 : from); } catch (e: any) { throw fail(`${name} ${reasonOf(e.code)}`, 'NOT_FOUND', 'Check the path names a readable file'); }
   let sources: string[] = [];
   try {
     m = parseMessage(bytes);
@@ -837,7 +850,8 @@ function validate(args: string[]) {
     let raw, m: any;
     try { raw = readFileSync(file); } catch (e: any) {
       unread = true;
-      return { file, kind: '', schema: '', ok: false, error: `cannot read: ${e.code}`, help: 'Check the path names a readable file' };
+      // A file that is not there is refused like any other bad input, with the reason in words: the row's file column names it.
+      return { file, kind: '', schema: '', ok: false, error: reasonOf(e.code), help: 'Check the path names a readable file' };
     }
     try {
       m = parseMessage(raw);
@@ -1012,7 +1026,7 @@ function setupOf(named: string) {
   const config = join(dirname(named), 'config.yaml');
   if (!existsSync(config)) return undefined;
   try { return readSetup(dirname(named)); } catch (e: any) {
-    throw fail(`${basename(config)} cannot be read (${e.code}), so its port, bind and hosts lines are unknown`, 'VALIDATION_ERROR', `Make ${shellPath(config)} readable, or pass --port and --bind`);
+    throw fail(`${basename(config)} ${reasonOf(e.code)}, so its port, bind and hosts lines are unknown`, 'VALIDATION_ERROR', `Make ${shellPath(config)} readable, or pass --port and --bind`);
   }
 }
 /** --bind, else the bind line of config.yaml next to the board, else 127.0.0.1. */
@@ -1186,17 +1200,17 @@ async function doctor(args: string[]) {
     }
   };
   /** A permission problem is fixed by chmod on the setup folder holding the path; anything else in the way is moved aside. */
-  const unreadable = (path: string, code: string, then: string) => ['EACCES', 'EPERM'].includes(code) ? `Run \`chmod -R u+rwX ${shellPath(dirname(path))}\`` : `Move ${shellPath(path)} away, then ${then}`;
+  const fixFor = (path: string, code: string, then: string) => ['EACCES', 'EPERM'].includes(code) ? `Run \`chmod -R u+rwX ${shellPath(dirname(path))}\`` : `Move ${shellPath(path)} away, then ${then}`;
   /** Why a setup file cannot be used and its fix, or nothing when it is a readable file with content. */
   const writeError = (path: string): string | undefined => { try { accessSync(path, constants.W_OK); } catch (e: any) { return e.code; } };
   const unusable = (path: string): [string, string] | undefined => {
     const stat = look(path);
-    if (stat === 'denied') return [`${basename(path)} cannot be read (permission denied)`, unreadable(path, 'EACCES', `run \`${rerun}\``)];
+    if (stat === 'denied') return [`${basename(path)} cannot be read (permission denied)`, fixFor(path, 'EACCES', `run \`${rerun}\``)];
     if (stat === 'link') return [`${basename(path)} is a broken link`, `Delete the link ${shellPath(path)}, then run \`${rerun}\``];
     if (!stat) return [`${basename(path)} is missing`, `Run \`${rerun}\``];
     if (!stat.isFile()) return [`${basename(path)} is not a file`, `Move ${shellPath(path)} away, then run \`${rerun}\``];
     if (!stat.size) return [`${basename(path)} is empty (init was cut short)`, `Delete ${shellPath(path)}, then run \`${rerun}\``];
-    try { closeSync(openSync(path, 'r')); } catch (e: any) { return [`${basename(path)} cannot be read (${e.code})`, unreadable(path, e.code, `run \`${rerun}\``)]; }
+    try { closeSync(openSync(path, 'r')); } catch (e: any) { return [`${basename(path)} ${reasonOf(e.code)}`, fixFor(path, e.code, `run \`${rerun}\``)]; }
   };
   const [major, minor] = process.versions.node.split('.').map(Number);
   check('node', major > 22 || (major === 22 && minor >= 5) ? `ok (${process.versions.node})` : `too old (${process.versions.node})`,
@@ -1249,7 +1263,7 @@ async function doctor(args: string[]) {
       for (const [name, path, fields] of [['answers', answersPath(board), ['key', 'answer']], ['rounds', roundsPath(board), ['key', 'note', 'at']]] as const) {
         let text: string;
         try { text = readFileSync(path, 'utf8'); } catch (e: any) {
-          check(name, e.code === 'ENOENT' ? 'none yet' : `${basename(path)} cannot be read (${e.code})`, e.code === 'ENOENT' ? undefined : unreadable(path, e.code, 'the next save writes a new one'));
+          check(name, e.code === 'ENOENT' ? 'none yet' : `${basename(path)} ${reasonOf(e.code)}`, e.code === 'ENOENT' ? undefined : fixFor(path, e.code, 'the next save writes a new one'));
           continue;
         }
         const torn = text.split('\n').flatMap((line, n) => {
@@ -1343,7 +1357,7 @@ async function serve(args: string[]) {
     await sweep('startup');
     [file, evidenceRoot] = [parsed.file, parsed.values['evidence-root'] ? resolve(parsed.values['evidence-root']) : ''];
     await new Promise<void>((ok, no) => server.once('error', no).listen(port, bind, ok)).catch((e) => {
-      throw fail(e.code === 'EADDRINUSE' ? `port ${port} is in use; pass --port` : e.code === 'EADDRNOTAVAIL' ? `${bind} is not an address of this machine; pass another --bind` : e.message, 'SERVE_FAILED');
+      throw fail(e.code === 'EADDRINUSE' ? `port ${port} is in use; pass --port` : e.code === 'EADDRNOTAVAIL' ? `${bind} is not an address of this machine; pass another --bind` : e.message, 'SERVE_FAILED', 'Run `sign-off-axi --help` for the flags, then start it again');
     });
     const { port: bound } = server.address() as AddressInfo;
     writeFileSync(record(file), `${process.pid} ${bound} ${bind}\n`, { mode: 0o600 });
