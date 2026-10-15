@@ -339,6 +339,34 @@ test('post --replace: an answer does not re-attach to a key the feed dropped and
   }
 });
 
+test('post --kind evidence: a key the feed dropped after it was answered cannot be posted again, so no stale verdict re-attaches', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const dir = mkdtempSync(join(scratch, 'orphan-evidence-')), board = join(dir, 'board.json');
+  const cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const shot = readFileSync(join(fixtures, 'evidence.v1', 'shot.png'));
+  writeFileSync(join(dir, 'one.png'), shot);
+  writeFileSync(join(dir, 'two.png'), Buffer.concat([shot, Buffer.from('\n')]));
+  const evidence = (name, media) => {
+    const path = join(dir, name);
+    writeFileSync(path, JSON.stringify({ contract: 1, kind: 'evidence', schema: 1, key: 'signin-phone-2', title: 'Sign-in screen, second pass', about: 'Umer checks the new layout.', media: [media] }));
+    return path;
+  };
+  const first = cli2('post', board, '--kind', 'evidence', '--from', evidence('first.json', 'one.png'));
+  assert.equal(first.status, 0, first.stdout);
+  const [item] = JSON.parse(readFileSync(board, 'utf8')).items;
+  assert.deepEqual([item.key, item.media.length], ['signin-phone-2', 1]);
+  appendFileSync(join(dir, 'board.answers.jsonl'), `${JSON.stringify({ key: 'signin-phone-2', answer: 'fail', label: 'Fail', close: 'done', at: '2026-10-13T08:00:00Z' })}\n`);
+  assert.equal(cli2('post', board, '--from', message('orphan-evidence-dropped.json', JSON.stringify({ schema: 2, items: [] })), '--replace').status, 0);
+  const gone = readFileSync(board, 'utf8');
+  // The same key with different media cannot come back through the evidence path the --replace refusal points at.
+  const back = cli2('post', board, '--kind', 'evidence', '--from', evidence('second.json', 'two.png'));
+  assert.equal(back.status, 2, back.stdout);
+  assert.match(back.stdout, /key signin-phone-2 was answered[^]*Post it under a new key/);
+  assert.equal(readFileSync(board, 'utf8'), gone);
+});
+
 test('post --kind evidence: media copied and hashed from the message folder, a run kept as the update\'s evidence, never in a --from file', () => {
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;

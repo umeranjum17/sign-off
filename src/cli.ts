@@ -278,9 +278,6 @@ const asSent = ({ filed: _filed, ...rest }: any) => rest;
  * that changed is checked again; an unchanged item, a board-format one and every item outside a --replace feed are not checked again. */
 function contractItems(items: any[], from: string, file: string, replace = false) {
   const on = new Map((existsSync(file) ? readItems(file).items : []).map((i) => [i?.key, i]));
-  // An answer belongs to the item it was given for: in a --replace feed, a key whose answer outlived it may not come back.
-  // This is the early refusal; replace re-asserts it under the board lock, where the write reads the board it applies to.
-  const saved = replace ? readAnswers(file) : undefined;
   items.forEach((m, i) => {
     // Evidence in message form (no type) never comes in a feed, even under a key on the board: its media must be copied and numbered.
     // A stored board-format evidence item passes through a feed unchanged; any other evidence under a key is refused.
@@ -289,25 +286,22 @@ function contractItems(items: any[], from: string, file: string, replace = false
       throw fail(`${from}: items[${i}]${isKey(m?.key) ? ` key ${m.key}` : ''}: evidence is posted one at a time, not in a --from file`, 'VALIDATION_ERROR', 'Post it with sign-off-axi post --kind evidence --from <message.json>');
     }
     const held = on.get(m?.key);
-    if (replace && !on.has(m?.key) && m?.kind !== undefined && saved && Object.hasOwn(saved, m.key)) {
-      throw fail(`key ${m.key} was answered on ${tilde(file)} and is no longer there`, 'CONFLICT', 'Post it under a new key');
-    }
     let check = m;
+    // In a --replace feed the stored item is replaced, so a changed item is checked again as the message it carries and
+    // one that no longer matches its kind is refused, never stored half-broken (contract section 2). The board's own
+    // `filed` stamp is not a field of that message, except on a report, which names one; an evidence item's `type`,
+    // `number` and media copies read as the message's `media` paths, and its `evidence` run reads as `run`. An unchanged
+    // item, a board-format one and every item outside a --replace feed are not checked again.
+    const asMessage = (x: any) => {
+      if (m?.kind !== 'evidence') return m?.kind === 'report' ? x : asSent(x);
+      const { type: _type, number: _number, media, evidence: run, ...message } = asSent(x);
+      return { ...message, ...(media?.length && { media: media.map((r: any) => r.path) }), ...(run && { run }) };
+    };
     if (on.has(m?.key)) {
-      // In a --replace feed the stored item is replaced, so a changed item is checked again as the message it carries and
-      // one that no longer matches its kind is refused, never stored half-broken (contract section 2). The board's own
-      // `filed` stamp is not a field of that message, except on a report, which names one; an evidence item's `type`,
-      // `number` and media copies read as the message's `media` paths, and its `evidence` run reads as `run`. An unchanged
-      // item, a board-format one and every item outside a --replace feed are not checked again.
-      const asMessage = (x: any) => {
-        if (m?.kind !== 'evidence') return m?.kind === 'report' ? x : asSent(x);
-        const { type: _type, number: _number, media, evidence: run, ...message } = asSent(x);
-        return { ...message, ...(media?.length && { media: media.map((r: any) => r.path) }), ...(run && { run }) };
-      };
       const same = canon(m) === canon(m?.filed === undefined ? asMessage(held) : held);
       if (!replace || same || (m?.contract === undefined && m?.kind === undefined)) return;
       check = asMessage(m);
-    }
+    } else if (replace && m?.kind !== undefined) check = asMessage(m);
     if (m?.contract === undefined && m?.kind === undefined) {
       if (!CONTRACT_TYPES.includes(m?.type ?? 'decision')) return;
       throw fail(`${from}: items[${i}]${isKey(m?.key) ? ` key ${m.key}` : ''}: kind is required on a new ${m?.type ?? 'decision'}`, 'VALIDATION_ERROR',
@@ -755,6 +749,7 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
       }
       return toon({ board: tilde(file), posted: [{ key: own, number: had.number, media: sources.length, title: had.title, status: 'already posted' }] }, [`Run \`sign-off-axi open${on}\` so the user can give a verdict`]);
     }
+    if (message && own && Object.hasOwn(readAnswers(file), own)) throw fail(`key ${own} was answered on ${tilde(file)} and is no longer there`, 'CONFLICT', 'Post it under a new key');
     if (own && current.some((d) => d.key === own)) throw fail(`key ${own} is already used on ${tilde(file)}`, 'CONFLICT', 'Post it under a new --key');
     mkdirSync(store, { recursive: true, mode: 0o700 });
     let number = Math.max(0, ...taken, ...readdirSync(store).map(Number).filter(Number.isInteger)) + 1;
