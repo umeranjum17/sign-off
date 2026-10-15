@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { appendFileSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { get } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -180,7 +180,7 @@ test('agent journey: raise, open, answer, read back in TOON and JSON', async () 
   assert.match(run('stop').out, new RegExp(`status: stopped\npid: ${pid}\n`));
   assert.match(run('status').out, /status: not running/);
   assert.match(run('stop').out, /not running \(no-op\)/);
-  assert.match(run('raise', '--from', 'missing.json').out, new RegExp(`cannot read ${join(process.cwd(), 'missing.json')}: ENOENT`));
+  assert.match(run('raise', '--from', 'missing.json').out, new RegExp(`${join(process.cwd(), 'missing.json')} is not there`));
 });
 
 test('three dismissed updates are not waiting on the CLI either: list and answers count 0 like the board, and an agent still waits on them', async () => {
@@ -311,4 +311,107 @@ test('old files and answers read as before; a one-of-few answer with a note surv
   assert.equal((await post(boardUrl, { key: 'when-should-it-ship', answer: 'next-week', note: 'Umer: after the review, please.' })).status, 200);
   assert.match(run('answers').out, /answers\[1\]\{key,answer,at,note\}:\n  when-should-it-ship,next-week,[^,]+,"Umer: after the review, please."/);
   assert.equal(JSON.parse(run('answers', '--json').out)['when-should-it-ship'].note, 'Umer: after the review, please.');
+});
+
+// The conformance checklist of skills/sign-off-axi/SKILL.md and the README: every command and worked example, run exactly
+// as written on a clean install, plus each guard fed bad input. One item per command and per guard family.
+test('the skill and README command checklist runs as written on a fresh install', async () => {
+  const home = mkdtempSync(join(scratch, 'checklist-'));
+  // A clean install: fresh HOME, XDG_* and TMPDIR, and no coding agent on PATH (init then writes the setup and installs nothing).
+  const env = { ...process.env, HOME: home, XDG_CONFIG_HOME: join(home, '.config'), XDG_DATA_HOME: join(home, '.local', 'share'),
+    XDG_CACHE_HOME: join(home, '.cache'), XDG_STATE_HOME: join(home, '.local', 'state'), TMPDIR: join(home, 'tmp'), PATH: '' };
+  delete env.CLAUDE_CODE_SESSION_ID; delete env.SIGN_OFF_FILER; delete env.SIGN_OFF_HOME;
+  mkdirSync(env.TMPDIR, { recursive: true });
+  const app = join(home, 'app'), so = join(app, '.sign-off'), board = join(so, 'decisions.json');
+  mkdirSync(app);
+  const axi = (...args) => {
+    // PATH is empty so init finds no coding agent to install the skill for, so name the interpreter by its real path.
+    try { return { out: execFileSync(process.execPath, [cli, ...args], { cwd: app, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }), code: 0 }; }
+    catch (e) { return { out: `${e.stdout}`, code: e.status }; }
+  };
+  const ok = (result, what) => { assert.equal(result.code, 0, `${what}: ${result.out}`); return result.out; };
+  const wrote = (rel) => { const p = join(app, '.sign-off', rel); mkdirSync(join(p, '..'), { recursive: true }); writeFileSync(p, `<html><body>${rel}</body></html>`); };
+
+  // SKILL.md: the CLI is the source of truth, and every command takes --help.
+  for (const cmd of ['list', 'raise', 'post', 'answers', 'wait', 'poll', 'open', 'status', 'stop', 'serve', 'export', 'init', 'doctor', 'validate']) {
+    assert.match(ok(axi(cmd, '--help'), `${cmd} --help`), /^usage: sign-off-axi/, `${cmd} --help prints its usage`);
+  }
+  assert.match(ok(axi('--help'), '--help'), /sign-off-axi/);
+  assert.equal(axi('-v').out.trim(), JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version);
+  // README: init writes the repo setup; doctor checks it and exits 0 clean.
+  assert.match(ok(axi('init', app), 'init'), /\.sign-off\/config\.yaml/);
+  assert.match(ok(axi('doctor', '.'), 'doctor'), /checks\[\d+\]/);
+
+  // SKILL.md: 3 structural variants under mocks/<key>/, one --option and one --mock each, a --tradeoff and a --recommend.
+  for (const v of ['a', 'b', 'c']) wrote(`mocks/pick-layout/${v}.html`);
+  assert.match(ok(axi('post', '.sign-off/decisions.json', '--type', 'design', '--title', 'Pick the sign-in layout', '--key', 'pick-layout',
+    '--option', 'a=A: single column', '--option', 'b=B: split screen', '--option', 'c=C: cards',
+    '--mock', 'a=mocks/pick-layout/a.html', '--mock', 'b=mocks/pick-layout/b.html', '--mock', 'c=mocks/pick-layout/c.html',
+    '--tradeoff', 'B scans fastest; A is simplest.', '--recommend', 'b'), 'design post'), /pick-layout,raised/);
+  // SKILL.md: one index.html shows the variant ?variant= names.
+  wrote('mocks/one-page/index.html');
+  assert.match(ok(axi('post', '.sign-off/decisions.json', '--type', 'design', '--title', 'Pick one page layout', '--key', 'one-page',
+    '--option', 'a=A', '--option', 'b=B', '--option', 'c=C', '--mock', 'a=mocks/one-page/index.html?variant=a',
+    '--mock', 'b=mocks/one-page/index.html?variant=b', '--mock', 'c=mocks/one-page/index.html?variant=c', '--tradeoff', '...', '--recommend', 'b'), 'one-page design post'), /one-page,raised/);
+  // SKILL.md: a diagram is one SVG, an interactive page one self-contained .html, an explainer one narrated video with chapters.
+  wrote('mocks/pick-layout/flow.svg'); wrote('mocks/pick-layout/demo.html');
+  assert.match(ok(axi('post', '.sign-off/decisions.json', '--type', 'diagram', '--title', 'Is this the sign-in flow?', '--view', 'mocks/pick-layout/flow.svg'), 'diagram post'), /raised/);
+  assert.match(ok(axi('post', '.sign-off/decisions.json', '--type', 'interactive', '--title', 'Does the flow feel right?', '--view', 'mocks/pick-layout/demo.html',
+    '--option', 'yes=Yes', '--option', 'no=Needs work', '--recommend', 'yes'), 'interactive post'), /raised/);
+  writeFileSync(join(app, 'explainer.mp4'), 'stand-in video');
+  assert.match(ok(axi('post', '.sign-off/decisions.json', '--type', 'explainer', '--title', 'Is the new sign-in clear?', '--about', 'The new sign-in has 2 steps.',
+    '--media', 'explainer.mp4', '--chapter', '0:00=Start', '--chapter', '0:12=Step 2'), 'explainer post'), /raised/);
+  // README: post --type evidence with its media, then read the verdict back.
+  writeFileSync(join(app, 'shot.png'), png);
+  assert.match(ok(axi('post', '.sign-off/decisions.json', '--type', 'evidence', '--title', 'Sign-in screen on a phone', '--about', 'The new screen loads in 1 second.',
+    '--media', 'shot.png', '--link', 'https://github.com/acme/app/pull/12'), 'evidence post'), /update-\d+,\d+,1,Sign-in screen on a phone/);
+
+  // README: the agent gets its answer as an event: post with --filer, then wait --filer.
+  assert.match(ok(axi('raise', '.sign-off/decisions.json', '--title', 'Keep the weekly digest?', '--filer', 'my-agent'), 'raise --filer'), /keep-the-weekly-digest,raised/);
+  // SKILL.md: open the board and give the user its URL, then wait --key and read answers --json.
+  const opened = ok(axi('open', '.sign-off/decisions.json', '--port', '0'), 'open');
+  const url = /url: "(.+)"/.exec(opened)[1];
+  try {
+    assert.match(ok(axi('status', '.sign-off/decisions.json'), 'status'), /status: running/);
+    const answer = (key, value, note) => fetch(`${url}api/answers`, { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ key, answer: value, ...(note && { note }) }) });
+    assert.equal((await answer('pick-layout', 'b', 'Umer: B, please.')).status, 200);
+    assert.equal((await answer('keep-the-weekly-digest', 'yes')).status, 200);
+    assert.equal(JSON.parse(ok(axi('wait', '.sign-off/decisions.json', '--key', 'pick-layout', '--json'), 'wait --key'))['pick-layout'].answer, 'b');
+    // SKILL.md: wait gives up with TIMEOUT, exit 1, never a false success.
+    const timedOut = axi('wait', '.sign-off/decisions.json', '--key', 'one-page', '--timeout', '1');
+    assert.deepEqual([timedOut.code, /code: TIMEOUT/.test(timedOut.out)], [1, true], timedOut.out);
+    const filer = ok(axi('wait', '--filer', 'my-agent'), 'wait --filer');
+    assert.match(filer, /keep-the-weekly-digest,yes/);
+    assert.equal(JSON.parse(ok(axi('answers', '.sign-off/decisions.json', '--json'), 'answers --json'))['pick-layout'].answer, 'b');
+    assert.match(ok(axi('list', '.sign-off/decisions.json', '--full'), 'list --full'), /decisions\[\d+\]/);
+    assert.match(axi('poll', '.sign-off/decisions.json', '--timeout', '1').out, /code: TIMEOUT/);
+    // README: export writes one read-only HTML file; --out must end in .html.
+    ok(axi('export', '.sign-off/decisions.json', '--out', 'board.html'), 'export');
+    assert.ok(readFileSync(join(app, 'board.html'), 'utf8').includes('<!doctype html') || readFileSync(join(app, 'board.html'), 'utf8').includes('<html'));
+    assert.match(axi('export', '.sign-off/decisions.json', '--out', 'board.txt').out, /does not end in \.html/);
+  } finally {
+    ok(axi('stop', '.sign-off/decisions.json'), 'stop');
+    assert.match(axi('status', '.sign-off/decisions.json').out, /not running/);
+  }
+
+  // README/validate --help: a valid message passes, --kind must match, and --expect-invalid takes the shipped invalid fixtures.
+  const ask = join(app, 'ask.json');
+  writeFileSync(ask, JSON.stringify({ contract: 1, kind: 'ask', schema: 1, key: 'ship-signin-2', title: 'Ship the new sign-in screen this week?',
+    options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }], recommend_value: 'yes' }));
+  assert.match(ok(axi('validate', 'ask.json'), 'validate'), /ask,1,true/);
+  assert.match(axi('validate', '--kind', 'finding', 'ask.json').out, /is ask, not --kind finding/);
+  assert.match(ok(axi('validate', '--kind', 'evidence', join(new URL('../fixtures/contract/evidence.v1', import.meta.url).pathname, 'valid-media.json')), 'validate --kind evidence'), /evidence,1,true/);
+  // SKILL.md: doctor checks the on_answer hook can run, a relative script found from the board's folder.
+  const hook = join(so, 'hook.sh');
+  writeFileSync(hook, '#!/bin/sh\ncat >/dev/null\n');
+  chmodSync(hook, 0o700);
+  appendFileSync(join(so, 'config.yaml'), 'on_answer: ./hook.sh\n');
+  const checked = ok(axi('doctor', app), 'doctor with on_answer');
+  assert.match(checked, /on_answer/);
+  assert.match(checked, /runs \.\/hook\.sh for each answer/);
+  // A hook that is not there is a named failure with its fix, not a pass.
+  rmSync(hook);
+  const noHook = axi('doctor', app);
+  assert.deepEqual([noHook.code, /on_answer[^]*not a program on PATH or an executable file/.test(noHook.out), /chmod \+x/.test(noHook.out)], [1, true, true], noHook.out);
 });

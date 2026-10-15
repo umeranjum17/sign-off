@@ -30,6 +30,15 @@ export type Sent = Pick<Annotation, 'id' | 'mock' | 'hash' | 'ref' | 'tag' | 'wo
 /** A problem with the decisions file; the CLI exits 2 and the server answers 422/409 with this message. */
 export class InputError extends Error {}
 
+/** Why a file could not be read, in plain words, for the refusal every reader quotes: a missing file is not a failure, it is a refusal
+ * that names what is wrong and how to fix it. The reader's path is prefixed by the caller, the error code is never the whole reason. */
+export function unreadable(code?: string): string {
+  return code === 'ENOENT' || code === 'ENOTDIR' ? 'is not there'
+    : code === 'EISDIR' ? 'is a folder, not a file'
+    : code === 'EACCES' || code === 'EPERM' ? 'cannot be read (permission denied)'
+    : `cannot be read (${code ?? 'unknown error'})`;
+}
+
 const YES_NO: Option[] = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
 /** The answer a `reply: true` item saves for a short text reply; the text is its note. */
 export const REPLY: Option = { value: 'text', label: 'Reply' };
@@ -56,7 +65,7 @@ export function readItems(path: string): { schema: 1 | 2; items: any[]; extra: R
   try {
     doc = JSON.parse(readFileSync(path, 'utf8'));
   } catch (e: any) {
-    throw new InputError(e.code ? `cannot read ${resolve(path)}: ${e.code}` : `${basename(path)}: invalid JSON: ${e.message}`);
+    throw new InputError(e.code ? `${resolve(path)} ${unreadable(e.code)}` : `${basename(path)}: invalid JSON: ${e.message}`);
   }
   const extra = { ...doc };
   delete extra.schema;

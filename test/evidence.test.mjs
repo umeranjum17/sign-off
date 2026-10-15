@@ -35,7 +35,7 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
   assert.equal(evidence('--title', 'No media', '--about', 'Note.').code, 2);
   assert.equal(evidence('--title', 'No note', '--media', shot).code, 2);
   assert.equal(evidence('--title', 'Bad type', '--about', 'Note.', '--media', join(scratch, 'notes.txt')).code, 2);
-  assert.match(evidence('--title', 'Missing', '--about', 'Note.', '--media', join(scratch, 'gone.png')).out, /gone\.png is not a file/);
+  assert.match(evidence('--title', 'Missing', '--about', 'Note.', '--media', join(scratch, 'gone.png')).out, /gone\.png is not there/);
   assert.equal(evidence('--title', 'Bad link', '--about', 'Note.', '--media', shot, '--link', 'javascript:alert(1)').code, 2);
   assert.equal(evidence('--title', 'Options', '--about', 'Note.', '--media', shot, '--option', 'a=A', '--option', 'b=B').code, 2);
   assert.deepEqual(readdirSync(join(so, 'evidence')), []);

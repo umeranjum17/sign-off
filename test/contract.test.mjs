@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync, chmodSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { decode } from '@toon-format/toon';
@@ -118,7 +118,7 @@ test('exit codes: --kind must match, an unreadable file wins over a refusal, no 
   const mixed = validate(good, message('refused.json', '{}'), join(scratch, 'missing.json'));
   assert.equal(mixed.status, 1);
   assert.deepEqual(mixed.out.files.map((f) => f.ok), [true, false, false]);
-  assert.match(mixed.out.files[2].error, /cannot read: ENOENT/);
+  assert.match(mixed.out.files[2].error, /is not there/);
   const none = spawnSync('node', [cli, 'validate'], { encoding: 'utf8' });
   assert.equal(none.status, 2);
   assert.match(none.stdout, /code: VALIDATION_ERROR/);
@@ -600,4 +600,103 @@ test('wait --events: one line per answer and per another-round ask, with the ite
   const noFiler = cli2('wait', board, '--events');
   assert.equal(noFiler.status, 2, noFiler.stdout);
   assert.match(noFiler.stdout, /needs --filer/);
+});
+
+// Every guard fed bad input: each one refuses with a reason and one fix line, so a caller can tell a refusal from a crash, and real
+// evidence is never false-failed. A file that is not there is the case that used to come back as a bare `ENOENT` failure.
+test('every guard refuses bad input with a reason and one fix line, and never false-fails real evidence', () => {
+  const env = { ...process.env, HOME: join(scratch, 'guards-home') };
+  delete env.CLAUDE_CODE_SESSION_ID; delete env.SIGN_OFF_FILER;
+  const dir = mkdtempSync(join(scratch, 'guards-')), board = join(dir, '.sign-off', 'decisions.json');
+  const cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', cwd: dir, env, input: '' });
+  const at = (name) => join(dir, name);
+  assert.equal(cli2('init', dir).status, 0);
+  writeFileSync(at('shot.png'), readFileSync(join(fixtures, 'evidence.v1', 'shot.png')));
+  writeFileSync(at('ask.json'), JSON.stringify({ contract: 1, kind: 'ask', schema: 1, key: 'k', title: 'Ship it?',
+    options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }], recommend_value: 'yes' }));
+  writeFileSync(at('bad.json'), '{"schema":2,');
+  writeFileSync(at('not-utf8.json'), Buffer.from('{"contract":1,"kind":"ask","schema":1,"key":"k","title":"Caf\u00e9?"}', 'latin1'));
+  mkdirSync(join(dir, '.sign-off', 'mocks', 'k'), { recursive: true });
+  writeFileSync(join(dir, '.sign-off', 'mocks', 'k', 'a.html'), '<html>a</html>');
+  const absent = at('missing.json');
+
+  // [args, exit code, the reason it must give, the fix line it must give]
+  const cases = [
+    // Board files: absent, malformed, unreadable, unparsable.
+    [['list', at('missing-board.json')], 0, null, null],
+    [['wait', at('missing-board.json'), '--timeout', '1'], 1, /no board yet/, /raise/],
+    [['list', at('bad.json')], 2, /invalid JSON/, /file-format|help/],
+    [['raise', at('bad.json'), '--title', 'T?'], 2, /invalid JSON/, /file format/],
+    [['list', dir], 2, /is a folder, not a file/, /file format/],
+    // Flag and type guards.
+    [['raise', board, '--title', 'T?', '--port', '99999'], 2, /unknown flag --port for `raise`/, /valid flags/],
+    [['raise', board, '--title', 'T?', '--filer', 'bad id!'], 2, /--filer bad id! must be 1-128/, /session id/],
+    [['raise', board, '--title', 'T?', '--option', 'noequals', '--recommend', 'noequals'], 2, /--option noequals must be <value>=<label>/, /--recommend/],
+    [['raise', board, '--title', 'T?', '--option', 'a=A', '--option', 'b=B'], 2, /--recommend is required/, /one of a, b/],
+    [['raise', board, '--title', 'T?', 'extra'], 2, /unexpected argument extra/, /--help/],
+    [['frobnicate'], 2, /Unknown command: frobnicate/, /--help/],
+    [['wait', board, '--timeout', '1.5'], 2, /--timeout must be whole seconds/, /wait --help/],
+    [['wait', board, '--filer', 'x', '--json', '--events'], 2, /does not take --json/, /--events/],
+    [['wait', board, '--events'], 2, /needs --filer/, /--events/],
+    // post: the type, view, mock and media guards.
+    [['post', board, '--type', 'nope', '--title', 'T?'], 2, /--type must be decision, design, evidence, diagram, interactive or explainer/, /post --help/],
+    [['post', board, '--type', 'decision', '--title', 'T?', '--media', 'shot.png'], 2, /--media, --link and --chapter need --type evidence or explainer/, /post --help/],
+    [['post', board, '--type', 'diagram', '--title', 'T?'], 2, /--type diagram needs --view <path>/, /post --help/],
+    [['post', board, '--type', 'decision', '--title', 'T?', '--view', 'x.svg'], 2, /--view needs --type diagram or interactive/, /post --help/],
+    [['post', board, '--type', 'diagram', '--title', 'T?', '--view', '../escape.svg'], 2, /escapes the board folder/, /next to the board file/],
+    [['post', board, '--type', 'diagram', '--title', 'T?', '--view', 'mocks/k/gone.svg'], 1, /is not a file/, /relative to the board file's folder/],
+    [['post', board, '--type', 'design', '--title', 'T?', '--option', 'a=A', '--option', 'b=B', '--mock', 'a=mocks/k/a.txt', '--recommend', 'a'], 2, /--mock .* must end in/, /Name the mock file itself/],
+    [['post', board, '--type', 'design', '--title', 'T?', '--option', 'a=A', '--option', 'b=B', '--mock', 'a=../escape.html', '--recommend', 'a'], 2, /escapes the board folder/, /next to the board file/],
+    [['post', board, '--type', 'evidence', '--title', 'T?', '--about', 'x', '--media', 'gone.png'], 1, /gone\.png is not there/, /Name a file that is there/],
+    [['post', board, '--type', 'evidence', '--title', 'T?', '--about', 'x', '--media', 'notes.txt'], 2, /must end in \.png, \.jpg/, /media shot\.png/],
+    [['post', board, '--type', 'evidence', '--title', 'T?', '--about', 'x'], 2, /needs 1 to 12 --media files/, /--media shot\.png/],
+    [['post', board, '--type', 'explainer', '--title', 'T?', '--about', 'x', '--media', 'shot.png', '--media', 'shot.png'], 2, /needs one --media video/, /explainer\.mp4/],
+    [['post', board, '--type', 'explainer', '--title', 'T?', '--about', 'x', '--media', 'shot.png', '--chapter', 'bogus'], 2, /--chapter bogus must be <m:ss>=<title>/, /0:00=Start/],
+    [['post', board, '--replace'], 2, /--replace needs --from/, /--replace/],
+    [['post', board, '--kind', 'ask'], 2, /--kind needs --from/, /--from ask\.json/],
+    [['post', board, '--kind', 'nope', '--from', at('ask.json')], 2, /--kind must be one of/, /--kind ask/],
+    [['export', board, '--out', 'board.txt'], 2, /does not end in \.html/, /--out <file\.html>/],
+    [['init', dir, '--agent', 'nobody'], 2, /unknown agent nobody/, /one or more of claude-code/],
+    // open/serve: the port, bind and evidence-root guards.
+    [['open', board, '--port', '99999'], 2, /--port must be a number from 0 to 65535/, /Pass a free port/],
+    [['open', board, '--bind', '0.0.0.0'], 2, /never all interfaces or a public address/, /127\.0\.0\.1 or a private address/],
+    [['open', board, '--evidence-root', at('missing')], 2, /--evidence-root .* is not a folder/, /holds \.done-done\//],
+    // A message file that is not there, on every path that reads one: a refusal that says so, never a bare ENOENT failure.
+    [['validate', absent], 1, /is not there/, /Check the path names a readable file/],
+    [['validate', at('bad.json')], 2, /invalid JSON/, /Write the message as one JSON object/],
+    [['validate', at('not-utf8.json')], 2, /is not UTF-8 text/, /Save the message as UTF-8/],
+    [['post', board, '--kind', 'ask', '--from', absent], 1, /is not there/, /Check the path names a readable file/],
+    [['post', board, '--from', absent], 2, /is not there/, /file format/],
+    [['raise', board, '--from', absent], 2, /is not there/, /file format/],
+    [['post', board, '--replace', '--from', absent], 2, /is not there/, /file format/],
+    [['post', board, '--kind', 'ask', '--from', '-'], 2, /invalid JSON/, /one JSON object/],
+  ];
+  for (const [args, code, error, help] of cases) {
+    const run = cli2(...args), what = args.join(' ');
+    assert.equal(run.status, code, `${what} -> ${run.status}\n${run.stdout}`);
+    if (code === 0) continue;
+    assert.match(run.stdout, error, `reason: ${what}`);
+    assert.match(run.stdout, help, `fix: ${what}`);
+    // validate answers with a per-file row (`files[N]` plus its own error and help columns) instead of an error envelope.
+    if (args[0] === 'validate') {
+      assert.match(run.stdout, /^files\[\d+\]\{file,kind,schema,ok,error,help\}:$/m, `a row per file: ${what}`);
+      assert.match(run.stdout, /,false,/, `the row is refused, not skipped: ${what}`);
+      continue;
+    }
+    assert.match(run.stdout, /^error: /m, `names the failure: ${what}`);
+    assert.match(run.stdout, /^code: \w+/m, `carries a code: ${what}`);
+    assert.match(run.stdout, /^help\[/m, `prints a fix line: ${what}\n${run.stdout}`);
+    // The old failure shape: the whole reason was the system's code, with nothing a person could act on.
+    assert.doesNotMatch(run.stdout, /^error: "?[^"]*:\s*ENOENT"?$/m, `a missing file is a reason, not a bare ENOENT: ${what}`);
+  }
+  // A file that is not there refuses its own row and leaves the other files alone; a real message still passes.
+  const mixed = cli2('validate', at('ask.json'), absent);
+  assert.equal(mixed.status, 1, mixed.stdout);
+  assert.deepEqual(decode(mixed.stdout.split('\nhelp[')[0]).files.map((f) => f.ok), [true, false]);
+  assert.equal(cli2('validate', at('ask.json')).status, 0, 'a real ask still passes');
+  assert.equal(cli2('validate', at('shot.png')).status, 2, 'a picture is refused as a message, not read as a crash');
+  // Real evidence on the same board: post and read back never false-fail.
+  const posted = cli2('post', board, '--type', 'evidence', '--title', 'Sign-in screen', '--about', 'Umer signs in.', '--media', at('shot.png'));
+  assert.equal(posted.status, 0, posted.stdout);
+  assert.match(posted.stdout, /update-1,1,1/);
 });
