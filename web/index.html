@@ -567,8 +567,9 @@
   /** A sign-in whose link this host makes at each tap: Open starts it and sends a new tab to the new link, so its link never expires on the card. */
   function started(d, lead, saved, err) {
     const failed = d.run?.startsWith('failed: ') && d.run.slice(8);
-    const open = saved ? '' : el('button', { class: 'open-link', 'aria-label': `Open the ${d.title} sign-in` }, 'Open');
-    if (open) open.onclick = async () => {
+    const open = saved ? '' : FROZEN || state.readonly ? el('button', { class: 'open-link', disabled: '' }, 'Open')
+      : el('button', { class: 'open-link', 'aria-label': `Open the ${d.title} sign-in` }, 'Open');
+    if (open && !open.disabled) open.onclick = async () => {
       // The tab opens on the tap itself, so a browser does not block it; it goes to the link once this host has made one.
       const tab = window.open('', '_blank');
       if (tab) tab.opener = null;

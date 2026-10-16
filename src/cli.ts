@@ -444,7 +444,7 @@ function ready(file: string, on: string, root?: string) {
 function list(args: string[]) {
   const { file, values, on } = parse('list', args, TIERS);
   const rows = board(file), waiting = rows.filter(waits), answered = rows.filter((d) => d.answer && !d.dismissed).length;
-  if (values.json) return JSON.stringify({ board: file, decisions: rows.map(({ dismissed, ...d }) => (dismissed ? { ...d, dismissed } : d)) });
+  if (values.json) return JSON.stringify({ board: file, decisions: rows.map(({ dismissed, ...d }) => ({ ...d, ...(d.type === 'signin' && { link: undefined }), ...(dismissed && { dismissed }) })) });
   const help = [
     ...(waiting.length ? [`Run \`sign-off-axi open${on}\` to show the board to the user`] : []),
     ...(answered ? [`Run \`sign-off-axi answers${on}\` to read the ${answered} saved answers`] : []),
@@ -795,7 +795,7 @@ function replace(file: string, on: string, from?: string, filer?: string) {
     const feed = fed.items.map((i) => ({ filed: first.get(i?.key)?.filed ?? now, ...i, ...(filer && { filer }) }));
     // An answer belongs to its question: an answered key may not come back asking something else.
     // Evidence is answered for the media and run it shows, so those are part of its question too, as a gate's run and a finding's proposal are.
-    const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply, d.run, d.finding, d.evidence, d.media]);
+    const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply, d.run, d.finding, d.evidence, d.media, d.type === 'signin' ? [d.link, d.start] : '']);
     // A key whose answer outlived it may not come back: the board and the answers are read here, under the lock the feed writes with.
     const saved = readAnswers(file);
     for (const i of fed.items) if (i?.kind !== undefined && !first.has(i?.key) && Object.hasOwn(saved, i?.key)) {
