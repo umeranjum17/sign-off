@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" font-family="system-ui, sans-serif">
+  <rect width="640" height="360" fill="#ECECFD"/>
+  <rect x="40" y="110" width="220" height="140" rx="20" fill="#FFFFFF" stroke="#5B5BD6" stroke-width="4"/>
+  <text x="150" y="188" text-anchor="middle" font-size="26" font-weight="600" fill="#16161A">Password</text>
+  <path d="M280 180H346" stroke="#5B5BD6" stroke-width="6" fill="none"/>
+  <path d="M346 166L370 180L346 194z" fill="#5B5BD6"/>
+  <rect x="380" y="110" width="220" height="140" rx="20" fill="#5B5BD6"/>
+  <text x="490" y="188" text-anchor="middle" font-size="26" font-weight="600" fill="#FFFFFF">+ a code</text>
+</svg>

@@ -1,6 +1,6 @@
 // The v1 communication contract (docs/contract.md): one strict, versioned shape per kind of message.
-import { accessSync, constants, realpathSync, statSync } from 'node:fs';
-import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { accessSync, constants, readFileSync, realpathSync, statSync } from 'node:fs';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { isKey, MEDIA_MAX } from './store.js';
 
 /** A message that does not match: what is wrong, and the one line that says how to fix it. */
@@ -8,12 +8,12 @@ export class ContractError extends Error {
   constructor(message: string, readonly help: string) { super(message); }
 }
 /** The kinds, with the schema number of each. */
-export const SCHEMAS: Record<string, number> = { ask: 1, report: 1, evidence: 1, gate: 1, finding: 1 };
+export const SCHEMAS: Record<string, number> = { ask: 1, report: 2, evidence: 1, gate: 1, finding: 1 };
 export const KINDS = Object.keys(SCHEMAS);
 const COMMON = ['contract', 'kind', 'schema', 'key', 'title', 'filer', 'link', 'about'];
 const FIELDS: Record<string, string[]> = {
   ask: [...COMMON, 'detail', 'options', 'recommend_value', 'default_if_silent', 'close'],
-  report: [...COMMON, 'filed', 'group', 'decided'],
+  report: [...COMMON, 'filed', 'group', 'decided', 'view', 'preview'],
   evidence: [...COMMON, 'media', 'run'],
   gate: [...COMMON, 'run', 'options', 'recommend_value', 'close'],
   finding: [...COMMON, 'cause', 'incidents', 'days', 'evidence_ids', 'change_kind', 'proposal', 'options', 'recommend_value'],
@@ -26,6 +26,9 @@ const ACTIONS: Record<string, Record<string, string>> = {
   finding: { apply: 'Apply', skip: 'Skip' },
 };
 export const MEDIA_BYTES = 50_000_000;
+/** The command that makes a report's page, named in every refusal of a report without one. */
+export const REPORT_INIT = 'sign-off-axi report init <folder>';
+const PAGE_HELP = `Run \`${REPORT_INIT}\` to make the page, fill it, then post it with "view" and "preview"`;
 
 /** Parses one message; a field written twice in any object refuses it, since plain JSON.parse keeps the last one quietly. */
 export function parseMessage(bytes: Uint8Array): unknown {
@@ -99,6 +102,7 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
   if (want !== undefined && m.kind !== want) throw bad('kind', `is ${m.kind}, not --kind ${want}`, `Pass --kind ${m.kind}, or name the ${want} message file`);
   need('schema');
   if (!whole(m.schema)) throw bad('schema', `must be a whole number, not ${show(m.schema)}`, `Set "schema": ${SCHEMAS[m.kind]}`);
+  if (m.kind === 'report' && m.schema === 1) throw bad('schema', '1 of report is text only: a report must be a page to tap through, with "view" and "preview"', PAGE_HELP);
   if (m.schema !== SCHEMAS[m.kind]) throw bad('schema', `${m.schema} of ${m.kind} is not in this sign-off-axi`, `Upgrade sign-off-axi, or post ${m.kind} schema ${SCHEMAS[m.kind]}`);
   const fields = FIELDS[m.kind], extra = Object.keys(m).find((f) => !fields.includes(f));
   if (extra === 'options' && m.kind === 'report') throw bad('options', 'is not a field of report: a report takes no answer', 'Remove "options", or post an ask to get an answer');
@@ -137,6 +141,16 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
     }
     if (Object.hasOwn(m, 'group')) text('group', m.group, 40, 'the section it belongs to, in 40 characters or fewer, or leave it out');
     if (Object.hasOwn(m, 'decided')) text('decided', m.decided, 200, 'what was decided, in 200 characters or fewer, or leave it out');
+    // A report is a page to tap through and a picture of it for the card: text alone is a status note, not a report.
+    const page = (f: string, ends: RegExp, kinds: string, example: string) => {
+      if (!Object.hasOwn(m, f)) throw bad(f, `is required: a report is a page to tap through, not text`, PAGE_HELP);
+      text(f, m[f], 256, `${example}, a path from the board file's folder`);
+      if (/^([\\/]|[A-Za-z]:)/.test(m[f]) || m[f].split(/[\\/]/).includes('..') || /[?#\\]/.test(m[f])) throw bad(f, `${show(m[f])} must be a relative path with no .., ?, # or \\`, `Set "${f}" to ${example}, a path from the board file's folder`);
+      if (!ends.test(m[f])) throw bad(f, `${show(m[f])} must end in ${kinds}`, PAGE_HELP);
+    };
+    page('view', /\.html$/i, '.html', '"mocks/<key>/index.html"');
+    page('preview', /\.(svg|png|jpe?g|webp)$/i, '.svg, .png, .jpg, .jpeg or .webp', '"mocks/<key>/preview.svg"');
+    if (dirname(m.preview) !== dirname(m.view)) throw bad('preview', `${show(m.preview)} must sit in the folder of ${show(m.view)}`, `Put the picture beside the page, such as "${dirname(m.view)}/preview.svg"`);
     return { kind: m.kind, schema: m.schema };
   }
   if (Object.hasOwn(m, 'about')) text('about', m.about, 500, 'a short note, or leave it out');
@@ -206,4 +220,40 @@ export function mediaFiles(m: any, base: string): string[] {
     if (info.size > MEDIA_BYTES) throw bad(`is over ${MEDIA_BYTES} bytes`, 'Trim or compress the recording');
     return real;
   });
+}
+
+/** The longest a block of plain text on a report page may run: about five lines on a phone. */
+const BLOCK_CHARS = 240;
+/** A report's page and picture, from `base`, the board file's folder (or, for validate, the message file's): each a file of 5 MB or less
+ * whose real path stays inside that folder, and a page filled in the ladder shape the scaffold gives. The first broken rule throws. */
+export function reportPage(m: any, base: string): void {
+  const at = isKey(m.key) ? `key ${m.key}: ` : '';
+  // A board not made yet has no folder, so its page is not there either.
+  let root = resolve(base);
+  try { root = realpathSync(base); } catch {}
+  const bad = (rule: string, help = PAGE_HELP) => new ContractError(`${at}${rule}`, help);
+  const files = (['view', 'preview'] as const).map((f) => {
+    let real;
+    try { real = realpathSync(resolve(root, m[f])); } catch { throw bad(`${f} ${show(m[f])} is not there`, `Put the file at ${m[f]} from the board file's folder, or fix the path`); }
+    const rel = relative(root, real);
+    if (!rel || rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel)) throw bad(`${f} ${show(m[f])} leads outside the board file's folder`, 'Copy the page into the board file\'s folder, such as under mocks/<key>/');
+    const info = statSync(real);
+    if (!info.isFile() || info.size > 5_000_000) throw bad(`${f} ${show(m[f])} must be a file of 5 MB or less`, 'Shrink the page or its picture');
+    try { accessSync(real, constants.R_OK); } catch { throw bad(`${f} ${show(m[f])} cannot be read`, 'Make the file readable, then post again'); }
+    return /\.(html|svg)$/i.test(real) ? readFileSync(real, 'utf8') : '';
+  });
+  const [html, picture] = files, page = `view ${show(m.view)}`;
+  for (const [f, t] of [[page, html], [`preview ${show(m.preview)}`, picture]]) {
+    if (/FILL:/.test(t)) throw bad(`${f} still has FILL: lines from the scaffold`, 'Replace every FILL: line with your own words and pictures, then post again');
+  }
+  if (!/<meta[^>]+name=["']?viewport/i.test(html)) throw bad(`${page} has no viewport tag, so a phone shows it zoomed out`, 'Add <meta name="viewport" content="width=device-width, initial-scale=1">, or start again from report init');
+  if (!/prefers-color-scheme/i.test(html)) throw bad(`${page} has no dark mode`, 'Add a @media (prefers-color-scheme: dark) block, or start again from report init');
+  if (!/<(svg|img|canvas|video)\b/i.test(html)) throw bad(`${page} has no picture or diagram`, 'Draw the idea: add an <svg> or <img> under the answer and a diagram under it');
+  if (!/<(button|input|select)\b/i.test(html)) throw bad(`${page} has nothing to tap or slide, so it is text, not a report`, 'Add a demo the reader can tap through, such as the scaffold\'s steps with Back and Next');
+  if (!/<details\b/i.test(html)) throw bad(`${page} has no folded detail`, 'Fold the detail into <details><summary>Details</summary>...</details> at the end');
+  if (/<(script|img|iframe|link|video|audio|source)\b[^>]*\b(src|href)\s*=\s*["']?\s*(https?:)?\/\//i.test(html)) throw bad(`${page} loads something from the web, which the board blocks`, 'Put scripts, styles and pictures in the page or beside it');
+  // A block is one paragraph or list item; about five lines on a phone is the most a reader takes in at once.
+  const long = [...html.matchAll(/<(p|li|dd|blockquote)\b[^>]*>([\s\S]*?)<\/\1>/gi)].map((b) => b[2].replace(/<[^>]*>/g, '').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim())
+    .find((t) => [...t].length > BLOCK_CHARS);
+  if (long) throw bad(`${page} has a block of ${[...long].length} characters, over ${BLOCK_CHARS} (about five lines on a phone): "${[...long].slice(0, 40).join('')}..."`, 'Split it, cut it, or show it as a picture or step');
 }

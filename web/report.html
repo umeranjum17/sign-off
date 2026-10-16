@@ -1,0 +1,152 @@
+<!doctype html>
+<!-- A sign-off report page, made by sign-off-axi report init. Replace every marked line (the word FILL and a colon) with your own words and
+     pictures, top to bottom: the answer and its picture, the diagram, the steps to tap through, then the folded detail. Keep each block to
+     five short lines on a phone, plain words, no internal labels. Open it in a browser 390 px wide, light and dark, and look before posting. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FILL: the report title</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #F7F7F8; --surface: #FFFFFF; --line: #E2E2E6; --text: #16161A; --muted: #5C5C66;
+    --accent: #5B5BD6; --accent-soft: #ECECFD; --on-accent: #FFFFFF; --ok: #1E7034;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111114; --surface: #1C1C21; --line: #2E2E36; --text: #EDEDF0; --muted: #A4A4AE; --accent: #9491FF; --accent-soft: #26264A; --on-accent: #111114; --ok: #51CF66; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 34rem; margin: 0 auto; padding: 1rem 1rem 3rem; display: grid; gap: 1rem; }
+  section { background: var(--surface); border: 1px solid var(--line); border-radius: 1rem; padding: 1.25rem 1rem; display: grid; gap: 0.75rem; }
+  h1 { font-size: 1.625rem; line-height: 1.2; margin: 0; letter-spacing: -0.01em; }
+  h2 { font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0; }
+  p { margin: 0; }
+  .lead { font-size: 1.125rem; }
+  svg { width: 100%; height: auto; display: block; }
+  svg text { fill: var(--text); font: 600 15px system-ui, sans-serif; }
+  .box { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2; }
+  .arrow { stroke: var(--muted); stroke-width: 2.5; fill: none; marker-end: url(#tip); }
+  #tip path { fill: var(--muted); }
+  /* Try it: tap a step, or Back and Next; the line shows where you are. */
+  .track { list-style: none; margin: 0; padding: 0; display: flex; justify-content: space-between; position: relative; }
+  .track::before { content: ""; position: absolute; left: 1.5rem; right: 1.5rem; top: 50%; border-top: 2px solid var(--line); }
+  .track button { position: relative; width: 3rem; height: 3rem; border-radius: 50%; border: 2px solid var(--line); background: var(--surface); color: var(--muted); font: 700 1.0625rem system-ui, sans-serif; cursor: pointer; }
+  .track .done { border-color: var(--accent); color: var(--accent); }
+  .track .on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .stage { min-height: 7.5rem; border-radius: 0.75rem; background: var(--accent-soft); padding: 1rem; display: grid; gap: 0.375rem; align-content: start; }
+  .stage .count { font-size: 0.875rem; color: var(--muted); }
+  .stage h3 { margin: 0; font-size: 1.1875rem; }
+  .nav { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .nav button { min-height: 3rem; border-radius: 0.75rem; font: 650 1.0625rem system-ui, sans-serif; cursor: pointer; border: 2px solid var(--accent); }
+  .back { background: transparent; color: var(--accent); }
+  .next { background: var(--accent); color: var(--on-accent); }
+  button:disabled { opacity: 0.4; cursor: default; }
+  button:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+  summary { min-height: 3rem; display: flex; align-items: center; justify-content: space-between; font-weight: 650; cursor: pointer; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "Show"; color: var(--accent); font-size: 0.9375rem; }
+  details[open] summary::after { content: "Hide"; }
+  details ul { margin: 0.5rem 0 0; padding-left: 1.25rem; display: grid; gap: 0.5rem; }
+</style>
+</head>
+<body>
+<main>
+  <!-- 1. The answer, first: one sentence of what is true, then a picture of it. -->
+  <section aria-labelledby="answer">
+    <h2>The answer</h2>
+    <h1 id="answer">FILL: the answer in one plain sentence</h1>
+    <p class="lead">FILL: one or two short lines on why it matters to the reader.</p>
+    <svg viewBox="0 0 340 120" role="img" aria-label="FILL: what the picture shows">
+      <defs><marker id="tip" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z"/></marker></defs>
+      <rect class="box" x="4" y="24" width="130" height="72" rx="12"/>
+      <text x="69" y="66" text-anchor="middle">FILL: before</text>
+      <path class="arrow" d="M144 60H192"/>
+      <rect class="box" x="206" y="24" width="130" height="72" rx="12"/>
+      <text x="271" y="66" text-anchor="middle">FILL: after</text>
+    </svg>
+  </section>
+
+  <!-- 2. How it works: the parts and how they connect, drawn, not told. -->
+  <section aria-labelledby="how">
+    <h2 id="how">How it works</h2>
+    <svg viewBox="0 0 340 250" role="img" aria-label="FILL: what the diagram shows">
+      <rect class="box" x="70" y="6" width="200" height="56" rx="12"/>
+      <text x="170" y="40" text-anchor="middle">FILL: part one</text>
+      <path class="arrow" d="M170 64V92"/>
+      <rect class="box" x="70" y="97" width="200" height="56" rx="12"/>
+      <text x="170" y="131" text-anchor="middle">FILL: part two</text>
+      <path class="arrow" d="M170 155V183"/>
+      <rect class="box" x="70" y="188" width="200" height="56" rx="12"/>
+      <text x="170" y="222" text-anchor="middle">FILL: part three</text>
+    </svg>
+    <p>FILL: one line on how the parts fit.</p>
+  </section>
+
+  <!-- 3. Try it: the reader taps through it, one step at a time. Each step is a short title and one or two lines. -->
+  <section aria-labelledby="try">
+    <h2 id="try">Try it</h2>
+    <ol class="track" aria-label="Steps"></ol>
+    <div class="stage" aria-live="polite">
+      <span class="count"></span>
+      <h3></h3>
+      <p></p>
+    </div>
+    <div class="nav">
+      <button type="button" class="back">Back</button>
+      <button type="button" class="next">Next</button>
+    </div>
+  </section>
+
+  <!-- 4. Details, last and folded: what only some readers need. -->
+  <section aria-label="Details">
+    <details>
+      <summary>Details</summary>
+      <ul>
+        <li>FILL: a detail some readers want, in a line or two.</li>
+        <li>FILL: another, or delete this line.</li>
+      </ul>
+    </details>
+  </section>
+</main>
+<script>
+  // The steps to tap through, 2 to 6: each a short title and one or two plain lines.
+  const STEPS = [
+    { title: 'FILL: first step', text: 'FILL: what happens, in one line.' },
+    { title: 'FILL: second step', text: 'FILL: what happens, in one line.' },
+    { title: 'FILL: third step', text: 'FILL: what happens, in one line.' },
+  ];
+  const track = document.querySelector('.track'), stage = document.querySelector('.stage');
+  const back = document.querySelector('.back'), next = document.querySelector('.next');
+  let at = 0;
+  const dots = STEPS.map((s, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = i + 1;
+    b.setAttribute('aria-label', `Step ${i + 1}: ${s.title}`);
+    b.onclick = () => show(i);
+    const li = document.createElement('li');
+    li.append(b);
+    track.append(li);
+    return b;
+  });
+  function show(i) {
+    at = i;
+    dots.forEach((b, n) => { b.className = n === i ? 'on' : n < i ? 'done' : ''; b.setAttribute('aria-current', n === i ? 'step' : 'false'); });
+    stage.querySelector('.count').textContent = `Step ${i + 1} of ${STEPS.length}`;
+    stage.querySelector('h3').textContent = STEPS[i].title;
+    stage.querySelector('p').textContent = STEPS[i].text;
+    back.disabled = i === 0;
+    next.textContent = i === STEPS.length - 1 ? 'Start again' : 'Next';
+  }
+  back.onclick = () => show(Math.max(0, at - 1));
+  next.onclick = () => show(at === STEPS.length - 1 ? 0 : at + 1);
+  addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight') next.click();
+    if (e.key === 'ArrowLeft' && at > 0) back.click();
+  });
+  show(0);
+</script>
+</body>
+</html>

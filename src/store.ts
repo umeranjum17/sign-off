@@ -12,7 +12,7 @@ export type Decision = {
   key: string; title: string; about?: string; detail?: string; options: Option[];
   recommend_value?: string; default_if_silent?: string; close: string; evidence?: EvidenceLink; run?: { run_id: string; commit: string };
   finding?: { cause: string; incidents: number; days: number; evidence_ids: string[]; change_kind: string; proposal: string };
-  type: string; tradeoff?: string; mocks?: MockRef[]; number?: number; media?: MediaRef[]; link?: string; view?: string; chapters?: Chapter[]; reply?: boolean;
+  type: string; tradeoff?: string; mocks?: MockRef[]; number?: number; media?: MediaRef[]; link?: string; view?: string; preview?: string; chapters?: Chapter[]; reply?: boolean;
   /** Who posted it: an agent session or caller id, so that caller's `wait --filer` gets the answer. */
   filer?: string;
   /** The board area it shows in while it waits for no answer, in place of the one its type gives it. */
@@ -134,10 +134,13 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     if (d.type === 'evidence' && !(Number.isInteger(d.number) && d.number >= 1)) throw bad('number', 'must be a whole number from 1');
     if (d.link !== undefined && !(isText(d.link) && /^(https?:\/\/\S{1,500}|[a-f0-9]{7,40})$/u.test(d.link))) throw bad('link', 'must be an http(s) link or a commit hash');
     // A ladder rung: a diagram image, or an interactive page the board frames in a sandbox.
-    const views = Object.hasOwn(VIEWS, d.type ?? '') ? VIEWS[d.type] : undefined;
-    if (views && !(isText(d.view) && d.view.length <= 256 && /^[^?#]+$/.test(d.view) && views[1].test(d.view))) throw bad('view', `must be a board-relative ${views[0]} file`);
-    // A report (contract kind report) takes no answer: it has no options, on any board.
+    // A report is a page and its picture; one stored before reports had pages still loads, as a note with neither.
     const report = d.kind === 'report';
+    const views = report ? (d.view !== undefined || d.preview !== undefined ? VIEWS.interactive : undefined) : Object.hasOwn(VIEWS, d.type ?? '') ? VIEWS[d.type] : undefined;
+    const viewOk = (v: any, [, ends]: [string, RegExp]) => isText(v) && v.length <= 256 && /^[^?#]+$/.test(v) && ends.test(v);
+    if (views && !viewOk(d.view, views)) throw bad('view', `must be a board-relative ${views[0]} file`);
+    if (report && views && !viewOk(d.preview, VIEWS.diagram)) throw bad('preview', `must be a board-relative ${VIEWS.diagram[0]} file`);
+    // A report (contract kind report) takes no answer: it has no options, on any board.
     if (report) for (const f of ['options', 'reply', 'area', 'type']) if (d[f] !== undefined) throw bad(f, `must be left out: a report takes no answer${f === 'options' ? '' : ' and shows only under Reports'}`);
     const options = d.options ?? (report ? [] : d.type === 'evidence' ? VERDICTS : YES_NO);
     // An empty list is an item to look at only, unless it takes a reply: only a board another program feeds, or a report, shows those.
@@ -165,7 +168,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       key: d.key, title: d.title, about: d.about, detail: d.detail, options: options.map((o: Option) => ({ value: o.value, label: o.label })),
       recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done', evidence: d.evidence,
       type: d.type ?? 'decision', tradeoff: d.tradeoff, link: d.link, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path })),
-      ...(views && { view: d.view }), ...(d.reply && { reply: true }), ...(d.filer && { filer: d.filer }), ...(d.area && { area: d.area }),
+      ...(views && { view: d.view }), ...(report && views && { preview: d.preview }), ...(d.reply && { reply: true }), ...(d.filer && { filer: d.filer }), ...(d.area && { area: d.area }),
       ...(d.group && { group: d.group }), ...(d.filed && { filed: d.filed }), ...(d.decided && { decided: d.decided }),
       ...(d.steps && { steps: d.steps.map(({ title, marks }: Step) => ({ title, ...(marks?.length && { marks }) })) }),
       ...(stored && d.media && { media: d.media.map(({ path, sha256, bytes }: MediaRef) => ({ path, sha256, bytes })) }),

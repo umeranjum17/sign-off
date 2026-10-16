@@ -1,9 +1,0 @@
-{
-  "contract": 1,
-  "kind": "report",
-  "schema": 1,
-  "key": "nightly-checks-12-oct",
-  "title": "Nightly checks passed",
-  "about": "All 37 checks passed.\nUmer has nothing to do.",
-  "filed": "2026-10-12T23:59:59Z"
-}

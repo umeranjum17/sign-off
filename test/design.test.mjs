@@ -747,14 +747,19 @@ test('comments on mock elements: one per element, kept across a reload, edited a
   proc.kill();
 });
 
-test('each card has one place to type: Other answer holds the reply, Another round and the comment, and no separate note link', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('each card has one place to type: Other answer holds the reply, Another round and the comment, and no separate note link; a report opens full screen and back', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'one-box'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l }));
   const nine = new Date(new Date().setHours(9, 15, 0, 0)).toISOString();
+  // A report is the page report init writes, filled in; a text-only report stored before reports had pages is a note, never a report card.
+  assert.equal(run('report', 'init', join(dir, 'mocks', 'how')).code, 0);
+  for (const f of ['index.html', 'preview.svg']) writeFileSync(join(dir, 'mocks', 'how', f), readFileSync(join(dir, 'mocks', 'how', f), 'utf8').replace(/FILL: [^<"']*/g, 'Umer taps through it'));
   writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key: 'ship', title: 'When should it ship?', options: abc, recommend_value: 'b', filed: nine },
     { key: 'look', type: 'design', title: 'Pick the look', options: abc, recommend_value: 'b' },
-    { key: 'how', title: 'How it ships', area: 'reports', group: 'How it works', filed: new Date().toISOString(), decided: 'Ships only when the check passes.', steps: [{ title: 'Build', marks: ['store'] }, { title: 'Check' }, { title: 'Ship', marks: ['gate', 'fail'] }] }] }));
+    { contract: 1, kind: 'report', schema: 1, key: 'merged', title: 'Merged: the sign-in fix', about: 'Checks passed.', filed: nine },
+    { contract: 1, kind: 'report', schema: 2, key: 'how', title: 'How it ships', group: 'How it works', filed: new Date().toISOString(), decided: 'Ships only when the check passes.',
+      view: 'mocks/how/index.html', preview: 'mocks/how/preview.svg', steps: [{ title: 'Build', marks: ['store'] }, { title: 'Check' }, { title: 'Ship', marks: ['gate', 'fail'] }] }] }));
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
@@ -799,14 +804,42 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   assert.deepEqual(readFileSync(gone, 'utf8').trim().split('\n').map((l) => JSON.parse(l)).map(({ key, dismissed }) => [key, dismissed]), [['ship', true], ['ship', false]]);
   // Reports and explainers says what the page is under its title, draws a report's steps as numbered nodes, each with only the marks it lists, and the legend once.
   const reports = await dump('#reports');
-  assert.match(reports, /<p class="lede">How the tools work, step by step\. Tap Open to see the whole flow\.<\/p>/);
+  assert.match(reports, /<p class="lede">How the tools work, step by step\. Tap one to open it\.<\/p>/);
   assert.equal(reports.match(/class="card legend"/g).length, 1);
   const flow = reports.match(/<ol class="flow"[^>]*>(.*?)<\/ol>/s)[1];
   assert.deepEqual([...flow.matchAll(/<li>(.*?)<\/li>/gs)].map((m) => [...m[1].matchAll(/mk mk-(\w+)/g)].map((x) => x[1])), [['store'], [], ['gate', 'fail']]);
-  assert.match(reports, /3 steps.*>Open</s);
-  // Its group heads a section with the filed time; the card says New today over its title, then what it decided.
+  assert.match(reports, /3 steps.*>Open ›</s);
+  // Its group heads a section with the filed time; the card says New today over its title, a link that opens it, then what it decided.
   assert.match(reports, /<div class="sec-h"><h2>How it works<\/h2><span class="meta">Filed \d\d:\d\d today<\/span>/);
-  assert.match(reports, /<span class="st new">New today<\/span><\/p><h3 dir="auto">How it ships<\/h3>.*<span class="lbl">What it decided<\/span>Ships only when the check passes\./s);
+  assert.match(reports, /<span class="st new">New today<\/span><\/p><h3 dir="auto"><a href="#reports\/how">How it ships<\/a><\/h3>.*<span class="lbl">What it decided<\/span>Ships only when the check passes\./s);
+  // Only the report is a card and counted; the text-only one is folded under Notes, a short row with no page to open.
+  assert.deepEqual([...reports.matchAll(/<article class="card report[^"]*" id="item-(\w+)"/g)].map((m) => m[1]), ['how']);
+  assert.match(reports, /Reports and explainers<span class="n">1<\/span>/);
+  assert.match(reports, /<details class="other notes"><summary>Notes \(1\)<\/summary>.*<strong dir="auto">Merged: the sign-in fix<\/strong>/s);
+  // On a phone, a tap on the card opens the report over the whole board with the focus on its title; the board under it takes no taps.
+  // ‹ Reports goes back to the card with the focus on its link, and Escape closes it too.
+  {
+    const { evaluate, tap, close } = await browse(join(dir, 'reader'), 390);
+    await evaluate(`location.href = ${JSON.stringify(`${url}#reports`)}`);
+    await until(async () => (await evaluate('document.querySelector("#item-how .thumb, #item-how .flow") && innerWidth')) === 390);
+    const at = (sel) => evaluate(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`);
+    await tap(await at('#item-how .about, #item-how .decided'));
+    await until(async () => (await evaluate('location.hash')) === '#reports/how');
+    const open = await evaluate(`(() => { const f = reader.querySelector('iframe').getBoundingClientRect(); return { hidden: reader.hidden, title: document.activeElement.textContent,
+      inert: document.querySelector('main').inert, src: reader.querySelector('iframe').getAttribute('src'), sandbox: reader.querySelector('iframe').getAttribute('sandbox'),
+      frame: [f.x, f.width, Math.round(f.bottom) === innerHeight], back: reader.querySelector('a').textContent }; })()`);
+    assert.deepEqual(open, { hidden: false, title: 'How it ships', inert: true, src: '/mock/local/how~/index.html', sandbox: 'allow-scripts', frame: [0, 390, true], back: '‹ Reports' });
+    // The page itself is served: the filled scaffold, with its steps to tap.
+    assert.match(await (await fetch(new URL('/mock/local/how~/index.html', url))).text(), /<button type="button" class="next">Next<\/button>/);
+    await tap(await at('#reader .close'));
+    await until(async () => (await evaluate('location.hash + reader.hidden')) === '#reportstrue');
+    assert.deepEqual(await evaluate('[document.activeElement.getAttribute("href"), document.querySelector("main").inert, document.body.className]'), ['#reports/how', false, '']);
+    await evaluate('location.hash = "#reports/how"');
+    await until(async () => (await evaluate('reader.hidden')) === false);
+    await evaluate('dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))');
+    await until(async () => (await evaluate('location.hash + reader.hidden')) === '#reportstrue');
+    close();
+  }
   // Answered is Done today: a count under the title, Clear all done on the section head, and a short row per item with its answer and time under the title, beside its ×.
   writeFileSync(file.replace(/\.json$/, '.answers.jsonl'), ['ship', 'look'].map((key) => JSON.stringify({ key, answer: 'a', label: 'A', close: 'done', at: new Date().toISOString() })).join('\n') + '\n');
   // Once both are answered, the Answered tile has a check for each and Waiting on you no clock.
