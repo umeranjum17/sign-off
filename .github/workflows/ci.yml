@@ -10,11 +10,38 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # A PR that changes only root *.md files other than README.md skips the heavy steps; `test`
+      # still reports green, so the branch rule that requires it never waits. Tests scan README.md
+      # and docs/, so those run the full suite. A push to main always runs it.
+      - id: changes
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          files=$(git diff --name-only --no-renames "origin/$BASE...HEAD")
+          docs_only=true
+          [ -n "$files" ] || docs_only=false
+          while IFS= read -r f; do
+            case "$f" in
+              README.md | */*) docs_only=false ;;
+              *.md) ;;
+              *) docs_only=false ;;
+            esac
+          done <<< "$files"
+          echo "Changed files:"; echo "$files"; echo "docs_only=$docs_only"
+          echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@v4
+        if: steps.changes.outputs.docs_only != 'true'
         with:
           node-version: 24
           cache: npm
-      - run: npm install -g done-done-axi@0.3.0
-      - run: done-done run install
-      - run: done-done run test
-      - run: done-done run skill
+      - if: steps.changes.outputs.docs_only != 'true'
+        run: npm install -g done-done-axi@0.3.0
+      - if: steps.changes.outputs.docs_only != 'true'
+        run: done-done run install
+      - if: steps.changes.outputs.docs_only != 'true'
+        run: done-done run test
+      - if: steps.changes.outputs.docs_only != 'true'
+        run: done-done run skill
