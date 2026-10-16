@@ -825,9 +825,11 @@ test('each card has one place to type: Other answer holds the reply, Another rou
     const at = (sel) => evaluate(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`);
     await tap(await at('#item-how .about, #item-how .decided'));
     await until(async () => (await evaluate('location.hash')) === '#reports/how');
-    const open = await evaluate(`(() => { const f = reader.querySelector('iframe').getBoundingClientRect(); return { hidden: reader.hidden, title: document.activeElement.textContent,
+    // The hash lands before its handler draws the reader, so wait for the drawn reader itself, not just the hash.
+    let open;
+    await until(async () => (open = await evaluate(`(() => { const f = reader.querySelector('iframe').getBoundingClientRect(); return { hidden: reader.hidden, title: document.activeElement.textContent,
       inert: document.querySelector('main').inert, src: reader.querySelector('iframe').getAttribute('src'), sandbox: reader.querySelector('iframe').getAttribute('sandbox'),
-      frame: [f.x, f.width, Math.round(f.bottom) === innerHeight], back: reader.querySelector('a').textContent }; })()`);
+      frame: [f.x, f.width, Math.round(f.bottom) === innerHeight], back: reader.querySelector('a').textContent }; })()`))?.src === '/mock/local/how~/index.html');
     assert.deepEqual(open, { hidden: false, title: 'How it ships', inert: true, src: '/mock/local/how~/index.html', sandbox: 'allow-scripts', frame: [0, 390, true], back: '‹ Reports' });
     // The page itself is served: the filled scaffold, with its steps to tap.
     assert.match(await (await fetch(new URL('/mock/local/how~/index.html', url))).text(), /<button type="button" class="next">Next<\/button>/);
