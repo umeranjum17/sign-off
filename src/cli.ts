@@ -740,7 +740,7 @@ function postSignin(file: string, on: string, values: Record<string, any>, filer
   if (values.start !== undefined) {
     try { start = JSON.parse(values.start); } catch { start = undefined; }
     if (!Array.isArray(start)) throw fail('--start must be the command as a JSON list, such as \'["npm", "login", "--auth-type=web"]\'', 'VALIDATION_ERROR', SIGNIN_START_EXAMPLE);
-    if (values.expires !== undefined) throw fail('--expires does not apply with --start: each tap makes a new link', 'VALIDATION_ERROR', SIGNIN_START_EXAMPLE);
+    if (values.link !== undefined || values.expires !== undefined) throw fail(`--${values.link !== undefined ? 'link' : 'expires'} does not apply with --start: each tap makes a new link`, 'VALIDATION_ERROR', SIGNIN_START_EXAMPLE);
   }
   const expires = values.expires === undefined ? undefined : expiresAt(values.expires);
   const { incoming: [d], raw: [item] } = buildIncoming({ title: service, key }, { type: 'signin', link, unlocks, waits: who, ...(expires && { expires }), ...(start && { start }) }, filer, file);
@@ -1843,7 +1843,7 @@ function answered(a?: Answer, d?: Decision) {
 }
 
 /** Live sign-in runs by key, and why the last one failed: kept in memory only, so a captured link is gone once its run ends. */
-type SigninRun = { child: ChildProcess; url?: string; why?: string; link: Promise<string> };
+type SigninRun = { child: ChildProcess; argv: string[]; url?: string; why?: string; link: Promise<string> };
 const runs = new Map<string, SigninRun>(), failures = new Map<string, string>();
 const SIGNIN_WAIT = 20_000, SIGNIN_LIFE = 600_000;
 const signinState = (key: string) => (runs.get(key)?.url ? 'live' : runs.has(key) ? 'starting' : failures.has(key) ? `failed: ${failures.get(key)}` : 'none');
@@ -1854,11 +1854,15 @@ function stopRun(key: string, why: string) {
   run.why ??= why;
   try { process.kill(-run.child.pid!, 'SIGTERM'); } catch { run.child.kill('SIGTERM'); }
 }
-/** Stops each run whose card closed: done, gone from the board, or no longer a start-command sign-in. */
+/** Stops each run whose card closed: done, gone from the board, no longer a start-command sign-in, or swapped for another command. */
 function reap() {
   if (!runs.size) return;
   const items = new Map(board(file).map((d) => [d.key, d]));
-  for (const key of runs.keys()) if (!items.get(key)?.start || items.get(key)!.answer) stopRun(key, 'The card closed.');
+  for (const key of runs.keys()) {
+    const d = items.get(key), run = runs.get(key)!;
+    if (!d?.start || d.answer) stopRun(key, 'The card closed.');
+    else if (JSON.stringify(d.start) !== JSON.stringify(run.argv)) stopRun(key, 'A new sign-in was posted for this card.');
+  }
 }
 /** The live link for a tap on Open: a run still going gives its link again; else the start command runs with no shell in the board's folder,
  * and the first https link it prints on stdout (else on stderr) is the link. Its exit 0 closes the card as done. The link is never logged or stored. */
@@ -1868,7 +1872,7 @@ function signinLink(d: Decision): Promise<string> {
   failures.delete(d.key);
   const [cmd, ...rest] = d.start!, child = spawn(cmd, rest, { cwd: dirname(file), stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   let found!: (url: string) => void, lost!: (why: string) => void, aside: NodeJS.Timeout | undefined;
-  const run: SigninRun = { child, link: new Promise<string>((ok, no) => { found = ok; lost = (why) => no(new Error(why)); }) };
+  const run: SigninRun = { child, argv: [cmd, ...rest], link: new Promise<string>((ok, no) => { found = ok; lost = (why) => no(new Error(why)); }) };
   run.link.catch(() => {});
   runs.set(d.key, run);
   const take = (url: string) => { if (!run.url) found((run.url = url)); };
@@ -1901,7 +1905,7 @@ function signinLink(d: Decision): Promise<string> {
   child.on('exit', (code) => {
     if (code === 0) {
       const now = board(file).find((x) => x.key === d.key);
-      if (now?.start && !now.answer) answered(appendAnswer(file, now, SIGNED_IN), now);
+      if (now?.start && !now.answer && JSON.stringify(now.start) === JSON.stringify(run.argv)) answered(appendAnswer(file, now, SIGNED_IN), now);
       return end();
     }
     end(run.why ?? (code === null ? "It was stopped." : `It stopped with exit code ${code}.`));
