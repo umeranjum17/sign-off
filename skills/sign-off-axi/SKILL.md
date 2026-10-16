@@ -61,6 +61,7 @@ The user often reads the board on a phone. Each card must make sense in 10 secon
 - A report is a page to tap through, never a text card; text alone is refused. Run `npx -y sign-off-axi report init .sign-off/mocks/<key>`, fill every `FILL:` line, then post with the command it prints.
 - Build it for the reader:
   - Answer first: the first screen gives the answer in 1 to 3 short plain lines and one picture.
+  - Date it: name the date the facts were true (for example "As of 15 Oct"); never "today", "now" or "this week".
   - One idea per screen: the answer, then a diagram, then a demo to tap (steps, a slider, before and after, real data), then the detail.
   - Visual first: draw the idea; words only label the picture.
   - Progressive disclosure: the detail comes last, folded.

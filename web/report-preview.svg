@@ -15,4 +15,5 @@
   <path class="tip" d="M346 166L370 180L346 194z"/>
   <rect class="after" x="380" y="110" width="220" height="140" rx="20"/>
   <text class="on-after" x="490" y="188" text-anchor="middle" font-size="26" font-weight="600">FILL: after</text>
+  <text class="label" x="320" y="300" text-anchor="middle" font-size="22" font-weight="500">FILL: as of the date, e.g. As of 15 Oct</text>
 </svg>
