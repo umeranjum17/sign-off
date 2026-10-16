@@ -12,7 +12,7 @@ import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
 import { type Answer, CHAPTERS_MAX, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
-import { ContractError, KINDS, MEDIA_BYTES, checkMessage, mediaFiles, parseMessage } from './contract.js';
+import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
 
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
@@ -28,8 +28,8 @@ const AGENTS: Record<string, { bin: string; dir: string; home: string }> = {
   'gemini-cli': { bin: 'gemini', dir: '.agents/skills', home: join(homedir(), '.gemini', 'skills') },
 };
 const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
-commands[15]:
-  (none)=list, raise, post, answers, wait, poll, open, status, stop, serve, export, init, doctor, validate, help
+commands[16]:
+  (none)=list, raise, post, answers, wait, poll, open, status, stop, serve, export, init, report, doctor, validate, help
 board: the nearest .sign-off/ board (the walk's bounds and SIGN_OFF_HOME: README, "Test runs never touch your board"), else ~/.sign-off/decisions.json; a board file given always wins
 flags: --full and --json on list, answers and wait, --events on wait, --json on status, --filer on post, raise and wait, --help on every command, -v/--version
 examples:
@@ -39,6 +39,8 @@ examples:
   sign-off-axi post .sign-off/decisions.json --type design --title "Pick the sign-in layout" --option a=A --option b=B --mock a=mocks/a.html --mock b=mocks/b.html --recommend b
   sign-off-axi post .sign-off/decisions.json --type diagram --title "Is this the sign-in flow?" --view mocks/sign-in/flow.svg
   sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "The new sign-in has 2 steps." --media explainer.mp4 --chapter 0:00=Start
+  sign-off-axi report init .sign-off/mocks/sign-in-flow
+  sign-off-axi post .sign-off/decisions.json --type report --title "Sign-in now takes 2 steps" --about "Why the code step moved first." --view mocks/sign-in-flow/index.html --preview mocks/sign-in-flow/preview.svg
   sign-off-axi init
   sign-off-axi doctor
   sign-off-axi validate ask.json
@@ -76,8 +78,9 @@ examples:
 `,
   validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>] [--expect-invalid]
 Checks message files against the communication contract without posting them: ${CONTRACT}
-A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, report, evidence, gate and finding, schema 1 each.
+A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate and finding at schema 1, and report at schema 2.
 An evidence message's media paths read from the message file's folder: each file must be there, inside it, and 50 MB or less.
+A report is a page to tap through: its "view" (.html) and "preview" (its picture, beside it) read from the message file's folder, filled with no FILL: lines left (see report init).
 A gate names its done-done run (run_id and commit) and offers 2 or 3 of approve (Approve), skip (Skip the judge) and fix (Fix first).
 A finding gives a repeated cause, its counts, record ids (never record text) and a proposed change, and offers apply (Apply) and skip (Skip).
 Post one with \`sign-off-axi post --kind <kind> --from <message.json>\`, or --from - to read stdin.
@@ -165,6 +168,7 @@ examples:
        sign-off-axi post [board.json] --from <board file> --replace [--filer <id>]
        sign-off-axi post [board.json] --kind <kind> --from <message.json|-> [--filer <id>]
        sign-off-axi post [board.json] --type explainer --title "<question>" --media <video> [--about <summary>] [--chapter <m:ss>=<title>]... [--key <key>] [--option <value>=<label>]... [--recommend <value>]
+       sign-off-axi post [board.json] --type report --title "<the answer>" --about "<why it matters>" --view <page.html> --preview <picture> [--key <key>] [--link <commit or URL>] [--filer <id>]
 Posts an item for the user. --type decision (the default) is a yes/no or pick-one question, exactly like raise.
 --kind posts one contract message (${CONTRACT}), read from a file or from stdin with --from -: it must be that kind and pass every rule,
 else it is refused with one fix line and nothing is written. A key already on the board takes only the same message again; anything else exits 2.
@@ -194,6 +198,10 @@ The page runs in a sandboxed frame: no fetch, no remote files, no access to the 
 The user gives a verdict, pass, fail or needs-work, with an optional note; read it with answers or wait --key update-<number>.
 --type explainer is a decision shown with a narrated video you made: one --media .mp4 or .webm (50 MB or less), copied into evidence/<number>/ like evidence
 and played on the card. --about is its short summary; up to ${CHAPTERS_MAX} --chapter m:ss=<title> (in order) are buttons that jump the video there. Answers work as for a decision.
+--type report posts an explainer page the user reads, with no answer: a report schema 2 message (${CONTRACT}), refused when it is text only.
+--view is the page and --preview its picture on the card, beside it, both from the board file's folder; \`sign-off-axi report init <folder>\` makes them.
+The page must be filled (no FILL: line left), with a viewport tag, dark mode, a picture, something to tap, its detail folded, nothing from the web, and no block over about five lines on a phone.
+Merges, PR outcomes, receipts and status notes are not reports: post proof of a change as evidence.
 examples:
   sign-off-axi post --type design --title "Pick the sign-in layout" --option a="A: single column" --option b="B: split screen" --mock a=mocks/a.html --mock b=mocks/b.html --tradeoff "B scans fastest; A is simplest." --recommend b
   sign-off-axi post .sign-off/decisions.json --type design --key sign-in --title "Pick the sign-in layout" --option a=A --option b=B --option c=C --mock a=mocks/sign-in/index.html?variant=a --mock b=mocks/sign-in/index.html?variant=b --mock c=mocks/sign-in/index.html?variant=c --tradeoff "..." --recommend b
@@ -205,6 +213,18 @@ examples:
   sign-off-axi post .sign-off/decisions.json --type interactive --title "Does the sign-in flow feel right?" --view mocks/sign-in/demo.html --option yes=Yes --option no="Needs work" --recommend yes
   sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media phone.png --media flow.mp4 --link https://github.com/acme/app/pull/12
   sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "The new sign-in has 2 steps." --media explainer.mp4 --chapter 0:00=Start --chapter 0:12="Step 2"
+  sign-off-axi post .sign-off/decisions.json --type report --title "Sign-in now takes 2 steps" --about "Why the code step moved first." --view mocks/sign-in-flow/index.html --preview mocks/sign-in-flow/preview.svg
+`,
+  report: `usage: sign-off-axi report init <folder>
+Writes a report page to fill: <folder>/index.html and its card picture <folder>/preview.svg. A file already there is kept.
+The page is one self-contained file, phone first, light and dark, in four parts, each one idea:
+  1. the answer in one plain sentence and a picture of it   2. a diagram of how it works
+  3. steps the reader taps through, with Back and Next     4. the detail, folded
+Replace every FILL: line, open the page in a browser 390 px wide and look: mostly text means it is not ready.
+Then post it with the command it prints; the paths are from the board file's folder, so make the folder under it, such as .sign-off/mocks/<key>.
+A report is for an explanation the user asked for, or a concept, design or trade-off they must understand. Proof that something works is evidence.
+examples:
+  sign-off-axi report init .sign-off/mocks/sign-in-flow
 `,
   init: `usage: sign-off-axi init [dir] [--agent auto|<name>[,<name>]...]
 Writes a repo's sign-off setup under <dir>/.sign-off/ (config, an empty board, mocks/ and evidence/ folders, and a .gitignore keeping media and answer files out of git). A file that is already there is kept, never changed, except that a given --agent replaces the config's agent: line; a re-run adds what is missing.
@@ -307,7 +327,10 @@ function contractItems(items: any[], from: string, file: string, replace = false
       throw fail(`${from}: items[${i}]${isKey(m?.key) ? ` key ${m.key}` : ''}: kind is required on a new ${m?.type ?? 'decision'}`, 'VALIDATION_ERROR',
         'Add "contract": 1, "kind" and "schema" to the item, such as "contract": 1, "kind": "ask", "schema": 1');
     }
-    try { checkMessage(check); } catch (e) {
+    try {
+      checkMessage(check);
+      if (check.kind === 'report') reportPage(check, dirname(file));
+    } catch (e) {
       throw e instanceof ContractError ? fail(`${from}: items[${i}]: ${e.message}`, 'VALIDATION_ERROR', e.help) : e;
     }
   });
@@ -614,10 +637,10 @@ const mockFile = (path: string) => path.split('?')[0];
 /** Posts an item. `raise` is the alias for `post --type decision`: same flags as before, same output. */
 function post(args: string[], cmd = 'post') {
   const typed: Flags = cmd === 'post' ? { replace: { type: 'boolean' }, kind: { type: 'string' }, type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
-    media: { type: 'string', multiple: true }, link: { type: 'string' }, view: { type: 'string' }, chapter: { type: 'string', multiple: true } } : {};
+    media: { type: 'string', multiple: true }, link: { type: 'string' }, view: { type: 'string' }, preview: { type: 'string' }, chapter: { type: 'string', multiple: true } } : {};
   const { file, values, on } = parse(cmd, args, { from: { type: 'string' }, filer: { type: 'string' }, ...typed,
     ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: f === 'option' }])) });
-  const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'link', 'view', 'chapter'].filter((f) => values[f] !== undefined);
+  const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'link', 'view', 'preview', 'chapter'].filter((f) => values[f] !== undefined);
   if (values.kind !== undefined) {
     const odd = [...given, ...(values.replace ? ['replace'] : [])][0];
     if (odd) throw fail(`--kind cannot be combined with --${odd}`, 'VALIDATION_ERROR', 'Put every field in the message file: sign-off-axi post --kind ask --from ask.json');
@@ -627,11 +650,13 @@ function post(args: string[], cmd = 'post') {
   if (values.replace) return replace(file, on, values.from, filerOf(values));
   const filer = filerOf(values, true);
   const type = values.type ?? 'decision';
+  if (type === 'report') return postReport(file, on, values);
+  if (values.preview !== undefined) throw fail('--preview needs --type report', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (values.from === undefined && values.title === undefined) {
     throw fail('--title is required (or --from <decisions.json>)', 'VALIDATION_ERROR', type === 'design' ? 'sign-off-axi post --type design --title "<question>" --option a=A --option b=B --recommend a'
       : type === 'evidence' ? 'sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media <file>' : `sign-off-axi ${cmd} --title "<question>" [--recommend <value>]`);
   }
-  if (!['decision', 'design', 'evidence', 'diagram', 'interactive', 'explainer'].includes(type)) throw fail(`--type must be decision, design, evidence, diagram, interactive or explainer`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
+  if (!['decision', 'design', 'evidence', 'diagram', 'interactive', 'explainer'].includes(type)) throw fail(`--type must be decision, design, evidence, diagram, interactive, explainer or report`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (type === 'evidence' || type === 'explainer') return postMedia(file, on, values, type, filer);
   if (values.media !== undefined || values.link !== undefined || values.chapter !== undefined) throw fail('--media, --link and --chapter need --type evidence or explainer', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (type !== 'design' && (values.tradeoff !== undefined || values.mock !== undefined)) throw fail('--tradeoff and --mock need --type design', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
@@ -803,20 +828,41 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
   });
 }
 
-/** Posts one contract message (docs/contract.md), from a file or from stdin with --from -: checked against --kind, then stored like a raised item. */
-async function postKind(file: string, on: string, values: Record<string, any>) {
+/** post --type report: the flags as one report message, posted as post --kind report posts it. A report with no page is refused before anything is read. */
+function postReport(file: string, on: string, values: Record<string, any>) {
+  const odd = ['option', 'recommend', 'default', 'close', 'detail', 'mock', 'tradeoff', 'media', 'chapter'].find((f) => values[f] !== undefined);
+  if (odd) throw fail(`--${odd} does not apply to --type report: a report takes no answer`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
+  const missing = ['title', 'about', 'view', 'preview'].filter((f) => values[f] === undefined).map((f) => `--${f}`);
+  if (missing.length) {
+    throw fail(`a report is a page to tap through, not text: ${missing.join(' and ').replace(/ and (?=.* and )/g, ', ')} ${missing.length > 1 ? 'are' : 'is'} missing`, 'VALIDATION_ERROR',
+      `Run \`${REPORT_INIT}\` to make the page and its picture, fill them, then post --type report --title "<the answer>" --about "<why it matters>" --view <folder>/index.html --preview <folder>/preview.svg`);
+  }
+  const key = values.key ?? slug(values.title), had = existsSync(file) ? readItems(file).items.find((i) => i?.key === key) : undefined;
+  // Posting the same report again is a no-op, so it keeps the time it was first filed.
+  const filed = (had?.kind === 'report' && had.filed) || new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  const { title, about, view, preview, link } = values;
+  return postKind(file, on, values, { contract: 1, kind: 'report', schema: 2, key, title, about, view, preview, ...(link !== undefined && { link }), filed });
+}
+
+/** Posts one contract message (docs/contract.md), from a file or from stdin with --from -: checked against --kind, then stored like a raised item.
+ * `built` is a message post --type report made from its flags. */
+async function postKind(file: string, on: string, values: Record<string, any>, built?: object) {
   const { kind, from } = values, example = 'sign-off-axi post --kind ask --from ask.json';
-  if (!KINDS.includes(kind)) throw fail(`--kind must be one of ${KINDS.join(', ')}`, 'VALIDATION_ERROR', example);
-  if (from === undefined) throw fail('--kind needs --from <message.json>, or --from - to read stdin', 'VALIDATION_ERROR', example);
-  const name = from === '-' ? 'stdin' : from;
-  let bytes, m: any;
-  try { bytes = readFileSync(from === '-' ? 0 : from); } catch (e: any) { throw fail(`${name} ${reasonOf(e.code)}`, 'NOT_FOUND', 'Check the path names a readable file'); }
+  const name = built ? '--type report' : from === '-' ? 'stdin' : from;
+  let bytes, m: any = built;
+  if (!built) {
+    if (!KINDS.includes(kind)) throw fail(`--kind must be one of ${KINDS.join(', ')}`, 'VALIDATION_ERROR', example);
+    if (from === undefined) throw fail('--kind needs --from <message.json>, or --from - to read stdin', 'VALIDATION_ERROR', example);
+    try { bytes = readFileSync(from === '-' ? 0 : from); } catch (e: any) { throw fail(`${name} ${reasonOf(e.code)}`, 'NOT_FOUND', 'Check the path names a readable file'); }
+  }
   let sources: string[] = [];
   try {
-    m = parseMessage(bytes);
-    checkMessage(m, kind);
+    m ??= parseMessage(bytes!);
+    checkMessage(m, built ? 'report' : kind);
     // Media paths read from the message file's folder, or from the current folder for stdin.
     if (m.kind === 'evidence') sources = mediaFiles(m, from === '-' ? process.cwd() : dirname(resolve(from)));
+    // A report's page is served from the board file's folder, as --view is.
+    if (m.kind === 'report') reportPage(m, dirname(file));
   } catch (e) { throw e instanceof ContractError ? fail(`${name}: ${e.message}`, 'VALIDATION_ERROR', e.help) : e; }
   if (m.filer !== undefined && values.filer !== undefined && m.filer !== values.filer) {
     throw fail(`${name}: key ${m.key}: filer ${m.filer} is not --filer ${values.filer}`, 'VALIDATION_ERROR', 'Leave "filer" out of the message, or pass the same --filer');
@@ -857,6 +903,7 @@ function validate(args: string[]) {
       m = parseMessage(raw);
       const kind = checkMessage(m, want);
       if (m.kind === 'evidence') mediaFiles(m, dirname(resolve(file)));
+      if (m.kind === 'report') reportPage(m, dirname(resolve(file)));
       return { file, ...kind, ok: true, error: '', help: '' };
     } catch (e) {
       if (!(e instanceof ContractError)) throw e;
@@ -1187,6 +1234,34 @@ function init(args: string[]) {
       `Run \`sign-off-axi doctor ${shellPath(dir)}\` to check the setup`, `Run \`sign-off-axi open ${shellPath(board)}\` to show the board to the user`]);
 }
 
+/** report init <folder>: the scaffold page and its picture, kept when already there, with the post command that names them. */
+function report(args: string[]) {
+  let parsed;
+  try { parsed = parseArgs({ args, allowPositionals: true, strict: true, options: {} }); } catch (e: any) { throw fail(e.message, 'VALIDATION_ERROR', 'Run `sign-off-axi report --help`'); }
+  const [sub, dir, extra] = parsed.positionals;
+  if (sub !== 'init' || dir === undefined || extra !== undefined) {
+    throw fail(sub !== 'init' ? `unknown report command ${sub ?? '(none)'}` : extra !== undefined ? `unexpected argument ${extra}: report init takes one folder` : 'report init needs the folder to write the page in', 'VALIDATION_ERROR', 'sign-off-axi report init .sign-off/mocks/<key>');
+  }
+  const out = resolve(dir), created: string[] = [], kept: string[] = [];
+  mkdirSync(out, { recursive: true });
+  for (const [name, from] of [['index.html', 'report.html'], ['preview.svg', 'report-preview.svg']]) {
+    const path = join(out, name);
+    if (existsSync(path)) kept.push(shellPath(path));
+    else {
+      writeFileSync(path, readFileSync(new URL(`../web/${from}`, import.meta.url)), { flag: 'wx' });
+      created.push(shellPath(path));
+    }
+  }
+  // The board serves a report's page from its own folder, so the post command names the page from there.
+  const board = boardHere(), rel = relative(dirname(board), out).split(sep).join('/'), served = rel && !rel.startsWith('../') && rel !== '..' && !isAbsolute(rel);
+  return toon({ folder: shellPath(out), created: created.length ? created : 'nothing new (re-run is a no-op)', kept }, [
+    'Replace every FILL: line: the answer and its picture first, then the diagram, the steps to tap, and the folded detail',
+    'Open index.html in a browser 390 px wide and look before posting: mostly text means it is not ready',
+    served ? `Run \`sign-off-axi post ${shellPath(board)} --type report --title "<the answer>" --about "<why it matters>" --view ${rel}/index.html --preview ${rel}/preview.svg\``
+      : `Run \`sign-off-axi post <board.json> --type report --title "<the answer>" --about "<why it matters>" --view <path>/index.html --preview <path>/preview.svg\`, both paths from the board file's folder, which must hold this folder`,
+  ]);
+}
+
 async function doctor(args: string[]) {
   const { dir: folder, given } = repoDir('doctor', args), dir = given ? folder : setupFolderHere() ?? folder, so = join(dir, '.sign-off'), rerun = `sign-off-axi init ${shellPath(dir)}`;
   const checks: { name: string; ok: string; fix?: string }[] = [];
@@ -1423,6 +1498,7 @@ async function exportBoard(args: string[]) {
     }
     // A diagram or an interactive page is the item's own view, inlined the same way.
     if (d.view) await inline(at(d.key, '', d.view));
+    if (d.preview) await inline(at(d.key, '', d.preview));
     for (const i of (d.media ?? []).keys()) await inline(`/api/media?key=${q(d.key)}&i=${i}`);
     for (const m of d.evidenceCard?.media ?? []) await inline(m.url);
   }
@@ -1716,7 +1792,7 @@ await runAxiCli({
   topLevelHelp: TOP_HELP,
   getCommandHelp: (cmd) => HELP[cmd],
   home: axi('list', list),
-  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), doctor: axi('doctor', doctor), validate, help: ([name, ...rest]) => {
+  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), report: axi('report', report), doctor: axi('doctor', doctor), validate, help: ([name, ...rest]) => {
     if (rest.length || (name && !HELP[name])) throw fail(`unknown command or argument: ${[name, ...rest].join(' ')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi --help` to see the commands');
     return name ? HELP[name] : TOP_HELP;
   } },

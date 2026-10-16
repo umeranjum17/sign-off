@@ -1,0 +1,11 @@
+{
+  "contract": 1,
+  "kind": "report",
+  "schema": 2,
+  "key": "why-two-step-sign-in",
+  "title": "Why sign-in takes two steps",
+  "about": "A stolen password alone no longer opens the account.\nUmer has nothing to do.",
+  "filed": "2026-10-12T23:59:59Z",
+  "view": "page/index.html",
+  "preview": "page/preview.svg"
+}

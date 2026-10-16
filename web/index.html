@@ -119,7 +119,23 @@
   .report .row { padding: 0; border: 0; background: none; box-shadow: none; }
   .report .rung > .meta { display: none; }
   .report .shot { aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: 0.625rem; box-shadow: none; }
-  .report .thumb { width: 100%; aspect-ratio: 16 / 9; border-radius: 0.625rem; object-fit: contain; background: #fff; }
+  .report .thumb { width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 0.625rem; object-fit: contain; background: var(--sunk); }
+  /* A report's card is one big tap target, its picture first: the title's link covers the card; only the × sits above it. */
+  .report.page { position: relative; }
+  .report.page h3 a { color: inherit; text-decoration: none; }
+  .report.page h3 a::after { content: ""; position: absolute; z-index: 1; inset: 0; border-radius: inherit; }
+  .report.page .x { position: relative; z-index: 2; }
+  .report.page:has(h3 a:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .report.page:hover { border-color: var(--c-reports); }
+  .report .go { color: var(--accent); font-weight: 650; }
+  /* A report opens over the whole board, on a phone and a desk alike: a bar with the way back, then its page. */
+  #reader { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; background: var(--bg); }
+  #reader[hidden] { display: none; }
+  #reader header { display: flex; align-items: center; gap: 0.5rem; min-height: 3.5rem; padding: 0.25rem 1rem; border-bottom: 1px solid var(--line); background: var(--surface); }
+  #reader .close { display: inline-flex; flex: none; align-items: center; min-height: 3rem; margin-left: -0.5rem; padding: 0 0.5rem; border-radius: 0.625rem; color: var(--accent); font-weight: 650; text-decoration: none; }
+  #reader h1 { margin: 0; min-width: 0; overflow: hidden; font-size: 1rem; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+  #reader iframe { flex: 1; width: 100%; border: 0; background: var(--bg); }
+  body.reading { overflow: hidden; }
   .foot { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
   .foot .meta { margin: 0 auto 0 0; }
   .foot a { color: var(--accent); font-weight: 600; text-decoration: none; }
@@ -195,14 +211,14 @@
   .choices button[aria-pressed="true"]::before { position: absolute; right: 1rem; top: 50%; translate: 0 -50%; margin: 0; }
   .row > .note, .row > .err { grid-column: 1 / -1; }
   /* Other answer is a plain row with a chevron. */
-  .other summary { display: flex; align-items: center; min-height: 2.75rem; margin: 0; padding: 0 0.25rem 0 0; list-style: none; color: var(--text); font-size: 0.9375rem; font-weight: 600; }
-  .other summary::-webkit-details-marker { display: none; }
+  .other > summary { display: flex; align-items: center; min-height: 2.75rem; margin: 0; padding: 0 0.25rem 0 0; list-style: none; color: var(--text); font-size: 0.9375rem; font-weight: 600; }
+  .other > summary::-webkit-details-marker { display: none; }
   .other:not([open]) > :not(summary), .done:not([open]) > :not(summary) { display: none; }
-  .other summary::after { content: ""; width: 0.4375rem; height: 0.4375rem; margin: -0.25rem 0 0 0.75rem; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(45deg); }
-  .other[open] summary::after { margin-top: 0.25rem; transform: rotate(-135deg); }
+  .other > summary::after { content: ""; width: 0.4375rem; height: 0.4375rem; margin: -0.25rem 0 0 0.75rem; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  .other[open] > summary::after { margin-top: 0.25rem; transform: rotate(-135deg); }
   .actions .quick { border-radius: 999px; }
   /* After a tap: what was saved, and an Undo for a few seconds. */
-  #toast { position: fixed; z-index: 2; left: 1rem; right: 1rem; bottom: max(1rem, env(safe-area-inset-bottom)); max-width: 30rem; margin: 0 auto;
+  #toast { position: fixed; z-index: 3; left: 1rem; right: 1rem; bottom: max(1rem, env(safe-area-inset-bottom)); max-width: 30rem; margin: 0 auto;
     display: flex; align-items: center; gap: 0.75rem; padding: 0.375rem 0.375rem 0.375rem 1rem; border-radius: 0.75rem;
     background: var(--text); color: var(--bg); box-shadow: var(--shadow); }
   #toast[hidden] { display: none; }
@@ -339,6 +355,7 @@
 <body>
 <nav class="side" id="nav" aria-label="Board areas"></nav>
 <main><p class="banner" id="banner" role="alert" hidden></p><div id="board"></div></main>
+<div id="reader" role="dialog" aria-modal="true" aria-labelledby="reader-title" hidden></div>
 <div id="toast" role="status" hidden><span id="toast-text"></span><button id="undo" hidden>Undo</button></div>
 <script>
   let state = { decisions: [], answers: {} };
@@ -618,7 +635,7 @@
   /** A diagram shows inline at card width; an interactive page runs in a sandboxed frame. A tap or the link opens either full size. */
   function rung(d) {
     if (!d.view) return '';
-    const url = mockUrl(d.key, '', d.view), page = d.type === 'interactive';
+    const url = mockUrl(d.key, '', d.view), page = reads(d);
     const open = { href: src(url), target: '_blank', rel: 'noopener' }, name = page ? 'interactive page' : 'diagram';
     let body;
     if (page) body = el('div', { class: 'frame' }, el('iframe', { src: src(url), title: `Interactive page: ${d.title}`, sandbox: 'allow-scripts', loading: 'lazy' }));
@@ -725,15 +742,21 @@
   const icon = (a) => { const s = el('span', { class: `icon i-${a}`, 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[a]}"/></svg>`; return s; };
   const isAnswered = (d) => Object.hasOwn(state.answers, d.key);
   /** Each item lives in one area: answered items, then the area the item names, then evidence updates, then what is only to read (explainers, pages with nothing to answer), then the open asks. */
-  const area = (d) => (isAnswered(d) ? 'answered' : d.area ?? (d.type === 'evidence' ? 'evidence'
-    : state.readonly || d.type === 'explainer' || !(d.options.length || d.reply) ? 'reports' : 'waiting'));
+  const area = (d) => {
+    const a = isAnswered(d) ? 'answered' : d.area ?? (d.type === 'evidence' ? 'evidence'
+      : state.readonly || d.type === 'explainer' || !(d.options.length || d.reply) ? 'reports' : 'waiting');
+    // Reports lists only what explains: a page to tap through, or a narrated video. Text alone (a receipt, a status line) is a note, folded under it.
+    return a === 'reports' && !state.readonly && d.type !== 'explainer' && !reads(d) ? 'notes' : a;
+  };
+  /** A page to open: an .html view, framed in a sandbox. */
+  const reads = (d) => /\.html$/i.test(d.view ?? '');
   const hhmm = (at) => new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   const isToday = (at) => new Date(at).toDateString() === new Date().toDateString();
   const day = (at) => new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   const when = (at) => (isToday(at) ? hhmm(at) : `${day(at)} ${hhmm(at)}`);
   const pic = (d) => {
     const i = d.media?.findIndex((m) => !/\.(mp4|webm)$/i.test(m.path)), m = d.mocks?.find((x) => !/\.html?$/i.test(x.path));
-    return i >= 0 ? `/api/media?key=${encodeURIComponent(d.key)}&i=${i}` : d.type === 'diagram' ? mockUrl(d.key, '', d.view)
+    return i >= 0 ? `/api/media?key=${encodeURIComponent(d.key)}&i=${i}` : d.preview ? mockUrl(d.key, '', d.preview) : d.type === 'diagram' ? mockUrl(d.key, '', d.view)
       : m ? mockUrl(d.key, m.value, m.path) : d.evidenceCard?.media.find((x) => x.type.startsWith('image/'))?.url;
   };
   const thumb = (a, url) => { if (!url) return icon(a); const img = el('img', { class: 'thumb', src: src(url), alt: '' }); img.onerror = () => img.replaceWith(icon(a)); return img; };
@@ -784,7 +807,7 @@
   /** A short list of an area on the Summary: a picture and the title; a tap opens the area at that item. */
   function section(a, items) {
     const SHOWN = 4, line = (d) => {
-      const link = el('a', { class: 'compact', href: `#${a}` }, ...compact(d, a));
+      const link = el('a', { class: 'compact', href: a === 'reports' && reads(d) ? `#reports/${d.key}` : `#${a}` }, ...compact(d, a));
       link.onclick = () => (jump = d.key);
       return el('li', {}, link, xBtn(d));
     };
@@ -815,9 +838,10 @@
   const MARKS = { ai: 'AI model', store: 'Stores', gate: 'Gate', fail: 'Hard fail' };
   const marks = (t) => el('span', { class: 'marks' }, ...(t.marks ?? []).map((m) => el('span', { class: `mk mk-${m}`, role: 'img', 'aria-label': MARKS[m] })));
   const opened = new Set(); // Reports and answered rows opened in place, kept open across redraws.
-  /** A report: its kind and title, what it says, then its steps on a line (or a picture of its page when it lists none) and what it decided; Open shows the whole flow, or the full card, in place. */
+  /** A report: a picture of it (its steps on a line, or its preview), its title and what it says; a tap opens its page over the board.
+   *  An explainer's Open shows its video card, or its whole flow, in place. */
   function report(d) {
-    const open = opened.has(d.key), n = d.steps?.length, url = d.view && src(mockUrl(d.key, '', d.view)), look = pic(d);
+    const page = reads(d), open = !page && opened.has(d.key), n = d.steps?.length, look = pic(d);
     const toggle = el('button', { 'aria-expanded': open, 'aria-label': `${open ? 'Close' : 'Open'}, ${d.title}` }, open ? 'Close' : 'Open');
     toggle.onclick = () => {
       if (open) opened.delete(d.key); else opened.add(d.key);
@@ -826,18 +850,50 @@
     };
     const fresh = d.filed && isToday(d.filed), st = d.filed && el('span', { class: `st ${fresh ? 'new' : 'ok'}` }, fresh ? 'New today' : 'Current');
     const decided = d.decided ? el('p', { class: 'decided', dir: 'auto' }, el('span', { class: 'lbl' }, 'What it decided'), d.decided) : '';
-    const brow = [kind(d), st].filter(Boolean);
-    const lead = [el('div', { class: 'lead' }, xBtn(d), brow.length ? el('p', { class: 'eyebrow' }, ...brow) : '', el('h3', { dir: 'auto' }, title(d))),
-      d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : ''];
+    const brow = [kind(d) || 'Report', st].filter(Boolean);
+    const lead = [el('div', { class: 'lead' }, xBtn(d), el('p', { class: 'eyebrow' }, ...brow),
+      el('h3', { dir: 'auto' }, page ? el('a', { href: `#reports/${d.key}` }, title(d)) : title(d))), d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : ''];
+    const flow = n && el('ol', { class: 'flow', style: `--n: ${n}`, 'aria-label': `${n} steps: ${d.steps.map((t) => t.title).join(', ')}` }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), marks(t))));
+    if (page) {
+      const picture = flow || (look ? thumb('reports', look) : el('div', { class: 'shot', 'aria-hidden': 'true' }, el('iframe', { src: src(mockUrl(d.key, '', d.view)), sandbox: 'allow-scripts', tabindex: '-1', loading: 'lazy' })));
+      return el('article', { class: 'card report page', id: `item-${d.key}` }, picture, ...lead, decided,
+        el('div', { class: 'foot' }, el('span', { class: 'meta' }, n ? `${n} steps` : ''), el('span', { class: 'go', 'aria-hidden': 'true' }, 'Open ›')));
+    }
     const full = open && !n ? row(d) : null;
     full?.removeAttribute('id');
-    const body = full ? [full, decided] : [...lead, n ? (open ? el('ol', { class: 'steps' }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), el('span', { dir: 'auto' }, t.title), marks(t))))
-      : el('ol', { class: 'flow', style: `--n: ${n}`, 'aria-label': `${n} steps: ${d.steps.map((t) => t.title).join(', ')}` }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), marks(t)))))
-      : d.type === 'interactive' ? el('div', { class: 'shot', 'aria-hidden': 'true' }, el('iframe', { src: url, sandbox: 'allow-scripts', tabindex: '-1', loading: 'lazy' }))
-        : look ? thumb('reports', look) : '', decided];
-    return el('article', { class: 'card report', id: `item-${d.key}` }, ...body, el('div', { class: 'foot' }, el('span', { class: 'meta' }, n ? `${n} steps` : ''),
-      url ? el('a', { href: url, target: '_blank', rel: 'noopener', 'aria-label': `Open full page, ${d.title}` }, 'Open full page') : '', toggle));
+    const body = full ? [full, decided] : [...lead, n ? (open ? el('ol', { class: 'steps' }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), el('span', { dir: 'auto' }, t.title), marks(t)))) : flow)
+      : look ? thumb('reports', look) : '', decided];
+    return el('article', { class: 'card report', id: `item-${d.key}` }, ...body, el('div', { class: 'foot' }, el('span', { class: 'meta' }, n ? `${n} steps` : ''), toggle));
   }
+
+  /** What landed under Reports with no page and nothing to answer (receipts, status notes): folded under one row, each opening to its card in place. */
+  function notes(items) {
+    if (!items.length) return '';
+    const box = el('details', { class: 'other notes', ...(opened.has('#notes') && { open: '' }) }, el('summary', {}, `Notes (${items.length})`),
+      el('p', { class: 'meta' }, 'Receipts and status notes: short text, with no page to open.'),
+      el('ul', { class: 'card rows' }, ...items.map((d) => {
+        const line = el('details', { class: 'done', ...(opened.has(d.key) && { open: '' }) }, el('summary', { class: 'compact' }, ...compact(d, 'reports')), row(d, { x: false }));
+        line.ontoggle = () => (line.open ? opened.add(d.key) : opened.delete(d.key));
+        return el('li', {}, line, xBtn(d));
+      })));
+    box.ontoggle = () => (box.open ? opened.add('#notes') : opened.delete('#notes'));
+    return box;
+  }
+
+  /** The report a #reports/<key> link opens, over the whole board: a bar with the way back and its title, then its page in a sandboxed frame.
+   *  The frame is made again only for another page, so a redraw never resets a demo halfway through. */
+  const reader = document.getElementById('reader');
+  function readPage(d) {
+    document.body.classList.toggle('reading', !!d);
+    for (const n of [document.querySelector('main'), document.getElementById('nav')]) n.inert = !!d;
+    reader.hidden = !d;
+    const url = d ? src(mockUrl(d.key, '', d.view)) : '';
+    if (reader.dataset.url === url) return d && (reader.querySelector('h1').textContent = d.title);
+    Object.assign(reader.dataset, { url, key: d?.key ?? '' });
+    reader.replaceChildren(...(d ? [el('header', {}, el('a', { class: 'close', href: '#reports' }, '‹ Reports'), el('h1', { id: 'reader-title', tabindex: '-1', dir: 'auto' }, d.title)),
+      el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' })] : []));
+  }
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !reader.hidden) location.hash = '#reports'; });
 
   /** Reports in sections, one per `group` in the order each first shows, each head with the newest filed time; items with no group come last, under Other reports when there are groups. */
   function reportGroups(items) {
@@ -902,14 +958,14 @@
   });
 
   function render() {
-    const by = { waiting: [], evidence: [], reports: [], answered: [] };
+    const by = { waiting: [], evidence: [], reports: [], answered: [], notes: [] };
     // The board file appends new items at the end: asks are answered oldest first, the rest read newest first, answers by their time.
     const gone = new Set(state.dismissed ?? []);
     for (const d of [...state.decisions].reverse()) if (!gone.has(d.key)) by[area(d)].push(d);
     by.waiting.reverse();
     const hidden = state.decisions.filter((d) => gone.has(d.key) && area(d) === 'waiting');
     by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
-    const at = /^#(waiting|evidence|reports|answered)$/.exec(location.hash)?.[1];
+    const [, at, key] = /^#(waiting|evidence|reports|answered)(?:\/([\w.-]+))?$/.exec(location.hash) ?? [];
     const link = (a, name, n) => el('a', { href: `#${a}`, ...(a === (at ?? '') && { 'aria-current': 'page' }) }, icon(a || 'summary'), name, n === undefined ? '' : el('span', { class: 'n' }, String(n)));
     document.getElementById('nav').replaceChildren(el('p', { class: 'brand' }, 'sign-off'), link('', 'Summary'), ...Object.keys(AREAS).map((a) => link(a, AREAS[a], by[a].length)));
     const ro = state.readonly ? 'Read only' : FROZEN ? `Read-only copy, ${FROZEN.exported}` : '';
@@ -917,18 +973,19 @@
       : el('p', { class: 'date' }, new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })),
     el('h1', { tabindex: '-1' }, at ? AREAS[at] : 'Summary'), at ? '' : icon('you'), ro ? el('p', { class: 'meta' }, ro) : '',
     at === 'reports' && !state.readonly && by.reports.length ? el('p', { class: 'lede' }, by.reports.some((d) => d.steps)
-      ? 'How the tools work, step by step. Tap Open to see the whole flow.' : 'What the agents filed for you to read. Tap Open to see more.')
+      ? 'How the tools work, step by step. Tap one to open it.' : 'Explainers the agents made for you. Tap one to open it.')
       : at === 'answered' && by.answered.length ? el('p', { class: 'lede' }, `${by.answered.filter((d) => isToday(state.answers[d.key].at)).length} answered today.`)
       : at === 'evidence' && by.evidence.length ? el('p', { class: 'lede' }, updates(by.evidence)) : '');
     const first = by.waiting[0], more = by.waiting.length > 1 ? `Answer all ${by.waiting.length} in Triage →` : 'Open in Triage →';
     const needs = el('section', { class: 'card needs' }, el('h2', {}, 'Needs you first'), ...(first ? [first.filed ? el('p', { class: 'meta since' }, `Waiting since ${when(first.filed)}`) : '', row(first, { x: false }),
       el('div', { class: 'foot' }, xBtn(first, 'Dismiss'), el('a', { class: 'more', href: '#waiting' }, more))] : [el('p', { class: 'meta' }, 'Nothing is waiting on you.')]), dismissed(hidden));
     document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [triage(by.waiting, hidden)]
-      : at === 'reports' && !state.readonly && by.reports.length ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
-        ...reportGroups(by.reports)] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [at === 'evidence' && by[at].length ? el('div', { class: 'sec-head' }, el('h2', {}, 'Updates')) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
+      : at === 'reports' && !state.readonly ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
+        ...(by.reports.length ? reportGroups(by.reports) : [el('p', { class: 'empty' }, EMPTY.reports)]), notes(by.notes)] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [at === 'evidence' && by[at].length ? el('div', { class: 'sec-head' }, el('h2', {}, 'Updates')) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [el('div', { class: 'tiles' }, ...Object.keys(AREAS).map((a) => tile(a, by[a]))),
       el('div', { class: 'pair' }, needs, today(by.answered)), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()]),
       el('div', { class: 'areas' }, ...Object.keys(AREAS).map((a) => section(a, by[a])))]));
+    readPage(at === 'reports' && key ? state.decisions.find((d) => d.key === key && reads(d) && !gone.has(d.key)) : undefined);
     if (FROZEN) freeze();
   }
   function freeze() {
@@ -938,13 +995,16 @@
     document.querySelectorAll('#board a[href^="data:"]').forEach((a) => a.removeAttribute('href'));
   }
   // A new screen starts at its top, or at the item tapped on the Summary, with the focus on its title.
+  // Closing a report goes back to its card, with the focus on its link; an open report takes the focus on its title.
   addEventListener('hashchange', () => {
+    const back = !reader.hidden && reader.dataset.key;
     if (jump && location.hash === '#waiting') [cur, jump] = [jump, null];
     render();
-    const item = jump && document.getElementById(`item-${jump}`);
+    if (!reader.hidden) return reader.querySelector('h1').focus();
+    const item = (jump || back) && document.getElementById(`item-${jump || back}`);
     jump = null;
     item ? item.scrollIntoView() : scrollTo(0, 0);
-    document.querySelector('h1').focus({ preventScroll: true });
+    ((back && item?.querySelector('h3 a')) || document.querySelector('#board h1')).focus({ preventScroll: true });
   });
   // An interactive page may post its own height, `{ height: <px> }`, and its frame then fits it with no blank below.
   // Only a frame's own message sizes that frame, and never past 10000px.

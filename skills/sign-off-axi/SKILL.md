@@ -1,6 +1,6 @@
 ---
 name: sign-off-axi
-description: "Ask the user yes/no, pick-one or A/B/C design questions on a local review board and read back their answers, using the sign-off-axi CLI. Use when you need a yes/no decision, a choice between a few options, a design pick between mocks, or approval from the user before going on, want the user to review or sign off on something, or need to read back the answers the user already gave."
+description: "Ask the user yes/no, pick-one or A/B/C design questions on a local review board and read back their answers, using the sign-off-axi CLI. Use when you need a yes/no decision, a choice between a few options, a design pick between mocks, or approval from the user before going on, want the user to review or sign off on something, need to read back the answers the user already gave, or must explain a concept, design or trade-off to the user as an interactive report."
 license: MIT
 metadata:
   author: umeranjum17
@@ -53,6 +53,20 @@ The user often reads the board on a phone. Each card must make sense in 10 secon
 - Show the proof on the card: post a result to check as `--type evidence` with a screenshot or recording (`--media`); the user picks Pass, Fail or Needs work. When a picture explains more than words, add a diagram or an interactive page (see below).
 - Ask for one decision per card, and recommend the answer you would pick.
 - Put the pull request or page in `--link`. In a contract evidence message with a `run`, the `outcome` line heads the card: write it as the result the user can see.
+
+## Evidence proves; a report explains
+
+- Evidence: proof that a thing works, screens or a clip of the real product (`--type evidence`).
+- Report: an in-depth explainer, only when the user asked for an explanation, or a concept, design or trade-off must be understood. A merge, a PR outcome, a receipt, a verdict or a status note is never a report.
+- A report is a page to tap through, never a text card; text alone is refused. Run `npx -y sign-off-axi report init .sign-off/mocks/<key>`, fill every `FILL:` line, then post with the command it prints.
+- Build it for the reader:
+  - Answer first: the first screen gives the answer in 1 to 3 short plain lines and one picture.
+  - One idea per screen: the answer, then a diagram, then a demo to tap (steps, a slider, before and after, real data), then the detail.
+  - Visual first: draw the idea; words only label the picture.
+  - Progressive disclosure: the detail comes last, folded.
+  - Recognition over recall: keep the steps and terms on screen; never make the reader remember one from earlier.
+  - Phone first: 390 px wide, light and dark, big tap targets, at most 5 lines of text per block, plain words, no internal labels or ids.
+- Open it in a browser 390 px wide and look before posting: mostly text means it is not ready.
 
 ## Design decisions: show A/B/C mocks, not words
 

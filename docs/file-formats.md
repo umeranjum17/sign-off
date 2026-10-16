@@ -73,7 +73,9 @@
 - `area`: optional, the board area the item shows in: `waiting`, `evidence`, `reports` or `answered`
   (Waiting on you, Evidence, Reports and explainers, Answered). Without it an `evidence` item is in Evidence;
   an `explainer`, an item with nothing to answer, or any item on a read-only board is in Reports and
-  explainers; any other item is in Waiting on you. An answered item is always in Answered. A feed's
+  explainers; any other item is in Waiting on you. An answered item is always in Answered. On a board
+  that is not read-only, Reports and explainers lists only an `explainer` and an item with an `.html`
+  `view`; any other item there is folded under Notes, a short row that opens to its card. A feed's
   evidence page, an `interactive` item, can say `"area": "evidence"` to count and open under Evidence.
 - `steps`: optional, how it works step by step: 2 to 12 entries of a `title` (80 characters or fewer)
   and optional `marks`, each once, from `ai` (AI model), `store` (Stores), `gate` (Gate) and `fail`
@@ -87,6 +89,7 @@
   ```
 - `contract`, `kind`, `schema`: an item posted as a contract message keeps them ([contract.md](contract.md)).
   An item with `"kind": "report"` is only read, on any board, and never waits; it takes no `options`, `reply`, `area` or `type` ([contract.md](contract.md) section 5).
+  It keeps its page, `view` (`.html`), and that page's picture, `preview`, from the board file's folder; a report stored before reports had pages has neither and still loads.
   An item with `"kind": "gate"` waits like a decision and keeps the done-done `run` it holds (`run_id` and `commit`) as sent; its answer is the `done-done respond --action` to take.
   An item with `"kind": "finding"` waits like a decision and keeps its `cause`, `incidents`, `days`, `evidence_ids`, `change_kind` and `proposal` as sent; its answer, `apply` or `skip`, says whether to make the proposed change.
 - `filed`: optional, when the item was filed, an ISO 8601 date-time such as `2026-10-13T07:19:00Z`.

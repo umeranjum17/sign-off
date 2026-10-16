@@ -23,7 +23,12 @@ const ask = { contract: 1, kind: 'ask', schema: 1, key: 'ship-signin-2', title: 
   options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }], recommend_value: 'yes' };
 const gate = JSON.parse(readFileSync(join(fixtures, 'gate.v1', 'valid-three-actions.json')));
 const finding = JSON.parse(readFileSync(join(fixtures, 'finding.v1', 'valid-apply.json')));
-const report = { contract: 1, kind: 'report', schema: 1, key: 'slice-5-live', title: 'Board slice 5 is live', about: 'Umer can see the new cards.', filed: '2026-10-13T07:19:00Z' };
+// A report is a page and its picture: the scaffold report init writes, filled in, beside the boards these tests write.
+const fill = (file) => writeFileSync(file, readFileSync(file, 'utf8').replace(/FILL: [^<"']*/g, 'Umer taps through it'));
+spawnSync('node', [cli, 'report', 'init', join(scratch, 'page')], { env: { ...process.env, HOME: join(scratch, 'home') } });
+for (const f of ['index.html', 'preview.svg']) fill(join(scratch, 'page', f));
+const report = { contract: 1, kind: 'report', schema: 2, key: 'slice-5-live', title: 'How the new cards work', about: 'Umer can see the new cards.', filed: '2026-10-13T07:19:00Z',
+  view: 'page/index.html', preview: 'page/preview.svg' };
 
 test('every shipped fixture: valid files pass, each invalid file is refused on the field its name gives', () => {
   for (const folder of readdirSync(fixtures).filter((f) => !f.endsWith('.md'))) {
@@ -180,6 +185,16 @@ test('a stored report with reply, area or type is refused: it can never wait, be
     assert.equal(listed.status, 2, JSON.stringify(extra));
     assert.match(listed.stdout, /must be left out: a report takes no answer and shows only under Reports/);
   }
+  // A text-only report stored before reports had pages still loads, and a feed that sends it unchanged keeps it; a new one is refused.
+  const old = { contract: 1, kind: 'report', schema: 1, key: 'merged-12', title: 'Merged: fix the sign-in button', about: 'Checks passed.', filed: '2026-10-13T07:19:00Z' };
+  writeFileSync(board, JSON.stringify({ schema: 2, items: [old] }));
+  assert.equal(cli2('list', board).status, 0);
+  const kept = cli2('post', board, '--from', message('old-report-feed.json', JSON.stringify({ schema: 2, items: [old] })), '--replace');
+  assert.equal(kept.status, 0, kept.stdout);
+  const fresh = cli2('post', board, '--from', message('new-text-report-feed.json', JSON.stringify({ schema: 2, items: [old, { ...old, key: 'merged-13' }] })), '--replace');
+  assert.equal(fresh.status, 2, fresh.stdout);
+  assert.match(fresh.stdout, /items\[1\]: key merged-13: schema 1 of report is text only[^]*report init <folder>/);
+  assert.deepEqual(JSON.parse(readFileSync(board, 'utf8')).items.map((i) => i.key), ['merged-12']);
 });
 
 test('a report counts its group and decision in characters, not UTF-16 units: 21 emoji fit a 40 limit', () => {
@@ -262,6 +277,40 @@ test('post --kind: one message from a file or stdin, checked against its kind, r
   }
   assert.equal(readFileSync(board, 'utf8'), before);
   assert.equal(post('', '--kind', 'ask', '--from', join(scratch, 'missing.json')).status, 1);
+  // A report is a page: text alone is refused with what is missing and the command that makes the page, and nothing is written.
+  const text = post('', '--type', 'report', '--title', 'Merged #12', '--about', 'Checks passed.');
+  assert.equal(text.status, 2, text.stdout);
+  assert.match(text.stdout, /a report is a page to tap through, not text: --view and --preview are missing/);
+  assert.match(text.stdout, /help\[1\]: "Run `sign-off-axi report init <folder>` to make the page and its picture/);
+  assert.match(post(JSON.stringify({ ...report, schema: 1, view: undefined, preview: undefined }), '--kind', 'report', '--from', '-').stdout,
+    /stdin: key slice-5-live: schema 1 of report is text only[^]*report init <folder>/);
+  // report init writes the page; posted unfilled, or as text with nothing to tap, or with a block longer than a phone shows, it is refused.
+  const made = spawnSync('node', [cli, 'report', 'init', join(scratch, 'draft')], { encoding: 'utf8', env });
+  assert.equal(made.status, 0, made.stdout);
+  assert.match(made.stdout, /created\[2\]:.*draft\/index\.html,.*draft\/preview\.svg/);
+  assert.match(made.stdout, /390 px wide and look before posting: mostly text means it is not ready/);
+  const draft = ['--type', 'report', '--title', 'How sign-in works', '--about', 'Two steps now.', '--view', 'draft/index.html', '--preview', 'draft/preview.svg'];
+  assert.match(post('', ...draft).stdout, /--type report: key how-sign-in-works: view \\"draft\/index\.html\\" still has FILL: lines/);
+  fill(join(scratch, 'draft', 'index.html'));
+  assert.match(post('', ...draft).stdout, /preview \\"draft\/preview\.svg\\" still has FILL: lines/);
+  fill(join(scratch, 'draft', 'preview.svg'));
+  const page = readFileSync(join(scratch, 'draft', 'index.html'), 'utf8');
+  for (const [broken, error] of [[page.replace(/<button\b[^>]*>.*?<\/button>/g, ''), /has nothing to tap or slide, so it is text, not a report/],
+    [page.replace('</main>', `<p>${'Umer reads a long block. '.repeat(12)}</p></main>`), /has a block of \d+ characters, over 240/]]) {
+    writeFileSync(join(scratch, 'draft', 'index.html'), broken);
+    const refused = post('', ...draft);
+    assert.equal(refused.status, 2, refused.stdout);
+    assert.match(refused.stdout, error);
+  }
+  writeFileSync(join(scratch, 'draft', 'index.html'), page);
+  assert.equal(readFileSync(board, 'utf8'), before);
+  // Filled, it posts; the same flags again are the same report.
+  const filed = post('', ...draft);
+  assert.equal(filed.status, 0, filed.stdout);
+  assert.match(filed.stdout, /how-sign-in-works,raised,[^]*so the user can read it/);
+  assert.match(post('', ...draft).stdout, /how-sign-in-works,already posted/);
+  const stored = JSON.parse(readFileSync(board, 'utf8')).items.at(-1);
+  assert.deepEqual([stored.kind, stored.schema, stored.view, stored.preview], ['report', 2, 'draft/index.html', 'draft/preview.svg']);
   // An item already on the board is not checked again, even one the current rules would refuse.
   const old = { ...ask, title: 'Old \u0007 title' };
   writeFileSync(board, JSON.stringify({ schema: 2, items: [old] }));
@@ -639,7 +688,7 @@ test('every guard refuses bad input with a reason and one fix line, and never fa
     [['wait', board, '--filer', 'x', '--json', '--events'], 2, /does not take --json/, /--events/],
     [['wait', board, '--events'], 2, /needs --filer/, /--events/],
     // post: the type, view, mock and media guards.
-    [['post', board, '--type', 'nope', '--title', 'T?'], 2, /--type must be decision, design, evidence, diagram, interactive or explainer/, /post --help/],
+    [['post', board, '--type', 'nope', '--title', 'T?'], 2, /--type must be decision, design, evidence, diagram, interactive, explainer or report/, /post --help/],
     [['post', board, '--type', 'decision', '--title', 'T?', '--media', 'shot.png'], 2, /--media, --link and --chapter need --type evidence or explainer/, /post --help/],
     [['post', board, '--type', 'diagram', '--title', 'T?'], 2, /--type diagram needs --view <path>/, /post --help/],
     [['post', board, '--type', 'decision', '--title', 'T?', '--view', 'x.svg'], 2, /--view needs --type diagram or interactive/, /post --help/],
