@@ -3,3 +3,4 @@ dist/
 *.answers.jsonl
 *.board.log
 *.tgz
+.live-check/
