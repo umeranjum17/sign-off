@@ -1847,17 +1847,19 @@ type SigninRun = { child: ChildProcess; argv: string[]; url?: string; why?: stri
 const runs = new Map<string, SigninRun>(), failures = new Map<string, string>();
 const SIGNIN_WAIT = 20_000, SIGNIN_LIFE = 600_000;
 const signinState = (key: string) => (runs.get(key)?.url ? 'live' : runs.has(key) ? 'starting' : failures.has(key) ? `failed: ${failures.get(key)}` : 'none');
-/** Stops a run and its child processes (it leads its own process group). */
+/** Stops a run and its child processes (it leads its own process group): SIGTERM first, SIGKILL if it stays. */
 function stopRun(key: string, why: string) {
   const run = runs.get(key);
   if (!run) return;
   run.why ??= why;
-  try { process.kill(-run.child.pid!, 'SIGTERM'); } catch { run.child.kill('SIGTERM'); }
+  const signal = (sig: NodeJS.Signals) => { try { process.kill(-run.child.pid!, sig); } catch { run.child.kill(sig); } };
+  signal('SIGTERM');
+  setTimeout(() => { if (runs.get(key) === run) signal('SIGKILL'); }, 2_000).unref();
 }
 /** Stops each run whose card closed: done, gone from the board, no longer a start-command sign-in, or swapped for another command. */
 function reap() {
   if (!runs.size) return;
-  const items = new Map(board(file).map((d) => [d.key, d]));
+  const items = new Map(board(file, () => {}).map((d) => [d.key, d]));
   for (const key of runs.keys()) {
     const d = items.get(key), run = runs.get(key)!;
     if (!d?.start || d.answer) stopRun(key, 'The card closed.');
