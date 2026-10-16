@@ -61,3 +61,4 @@ Kun's tools set the patterns this family follows: firstmate, no-mistakes, and qu
 sign-off owns one communication contract for asks, reports, evidence, gates and retro findings. In its v1 every message is strict and versioned, and a message that does not match is refused with one fix line, never shown half-broken. It is being built: the status line in [docs/contract.md](docs/contract.md) says what works today.
 
 Conformance will run on shared fixtures from the sign-off package. Each tool runs them in its CI with `sign-off-axi validate`, pinned to an exact version.
+<!-- docs-only CI skip check -->
