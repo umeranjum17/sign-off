@@ -73,7 +73,7 @@
 - `area`: optional, the board area the item shows in: `waiting`, `evidence`, `reports` or `answered`
   (Waiting on you, Evidence, Reports and explainers, Answered). Without it an `evidence` item is in Evidence;
   an `explainer`, an item with nothing to answer, or any item on a read-only board is in Reports and
-  explainers; any other item is in Waiting on you. An answered item is always in Answered. On a board
+  explainers; a `signin` and any other item is in Waiting on you, a sign-in on top of them. An answered item is always in Answered. On a board
   that is not read-only, Reports and explainers lists only an `explainer` and an item with an `.html`
   `view`; any other item there is folded under Notes, a short row that opens to its card. A feed's
   evidence page, an `interactive` item, can say `"area": "evidence"` to count and open under Evidence.
@@ -104,9 +104,10 @@
   today or `Current` before that. `decided` (200 characters or fewer) shows under the label
   `What it decided`. An item without these keeps its kind chip and its about line.
 - `type`: optional, `decision` (default), `design`, `evidence`, `diagram`,
-  `interactive` or `explainer`. A design item
+  `interactive`, `explainer` or `signin`. A design item
   is a pick between mock options shown side by side. An evidence item is a
-  numbered update the person gives a verdict on (below). Any other lowercase
+  numbered update the person gives a verdict on (below). A sign-in asks the
+  person to sign in (below). Any other lowercase
   word (1-32 of `a-z 0-9 -`, starting with a letter) also loads; the dashboard
   shows it as a plain card with its options until that type has its own view.
 - `view`: required on `diagram` and `interactive` items, the path of one file
@@ -140,6 +141,22 @@
     "media": [{ "path": "evidence/3/1.mp4", "sha256": "<64 hex>", "bytes": 358743 }],
     "chapters": [{ "at": 0, "title": "Start" }, { "at": 12, "title": "Step 2" }] }
   ```
+- `signin` items ask the person to sign in: `title` is the service, `link`
+  (required) the `http(s)` sign-in link, 2000 characters or fewer, with no user
+  name or password in it, `unlocks` and `waits` (required, 120 characters or
+  fewer each) what it unlocks and who waits on it, and `expires` (optional) an
+  ISO 8601 date-time when the link stops working. In place of `link` and
+  `expires`, `start` is a command as a list of 1 to 64 texts, such as
+  `["npm", "login", "--auth-type=web"]`: each tap on Open runs it on the board's
+  computer with no shell and opens the first https link it prints on stdout
+  (on stderr when stdout has none within 2 seconds). A sign-in takes no `options`,
+  `reply`, `recommend_value` or `default_if_silent`: `signin done` saves its
+  answer, `done` with the label `Signed in`.
+
+  ```json
+  { "key": "npm-login", "type": "signin", "title": "npm", "link": "https://example.com/login",
+    "unlocks": "Publish the release", "waits": "Main", "expires": "2026-10-16T17:10:00Z" }
+  ```
 - `tradeoff`: optional on design items, plain text up to 1000 characters, shown
   next to the mocks.
 - `mocks`: optional on design items, up to 6 entries of an option `value` and a
@@ -165,7 +182,8 @@
   characters. Tag and words are only a safety check, so empty words for a field are
   fine.
 - Every item that asks something has one place to type, folded behind
-  **Other answer** after its buttons (a design's Picks too): a short text,
+  **Other answer** after its buttons (a design's Picks too; a sign-in has none,
+  it closes with `signin done`): a short text,
   500 characters or fewer. **Send reply** saves it as the answer `text` with
   the words as its `note`; typed before a button is picked, it goes with that
   answer as its note. On a normal board the same box also asks for
@@ -180,7 +198,7 @@
 - `options`: optional, 2 to 6 choices, or `[]` on a read-only or answers-only board for an item that is only shown and waits on nothing (unless it has `reply`). Each has a `value` (1-128 of `A-Z a-z 0-9 . _ -`, unique within the question) and a non-empty `label` shown on its button. Leave it out for **Yes** (`yes`) and **No** (`no`); files written before options existed read exactly as before.
 - `recommend_value`, `default_if_silent`: optional, the `value` of one of the question's own options (`yes` or `no` when `options` is left out). Shown, never applied.
 - `close`: optional, `done` (default) or `release`; copied into the answer.
-- `link`: optional on any item, an `http(s)` link (shown on its card as **Open on** and the site name) or a 7-40 character commit hash (shown under **Details**).
+- `link`: optional on any item, an `http(s)` link (shown on its card as **Open on** and the site name) or a 7-40 character commit hash (shown under **Details**); a sign-in's link is its own and shows as its **Open** button (above).
 - Other keys are ignored.
 - `evidence`: optional read-only link to a done-done schema 1 run. Set `run_id`, its full 40-character `commit`, and the four plain-text Checks lines (`outcome`, `repro`, `proof`, `evidence`), each non-empty trimmed text up to 1000 characters. Start `serve` with `--evidence-root <store-root>` (the directory containing `.done-done/`); the board only reads that root and only opens media listed and hash-matched in that run record. The card reports the run command outcome, not a persisted claim-check receipt. done-done has no receipt schema yet; a missing or mismatched record stays `UNVERIFIED` in `evidenceCard.result`. On the card the result is a plain line over the title (**Check passed**, **Check failed**, **Check did not finish**, or **Could not check** with a one-sentence reason); an evidence update takes `outcome` (160 characters or fewer) as its headline, shows the run's media when it has none of its own, and folds its own title, the commit and the four lines under **Details**. Without `--evidence-root` the board checks nothing and the card shows no result.
 

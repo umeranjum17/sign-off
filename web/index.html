@@ -174,6 +174,11 @@
   .in-waiting .row { box-shadow: inset 3px 0 0 var(--accent), var(--shadow); }
   .in-answered .row { background: transparent; box-shadow: none; }
   .in-answered .row h3 { color: var(--muted); font-weight: 500; }
+  /* A sign-in: one big Open for its link, off once the link expired. */
+  .open-link { display: grid; place-items: center; min-height: 3.5rem; border-radius: 1rem; background: var(--accent); color: var(--on-accent);
+    font-size: 1.125rem; font-weight: 700; text-decoration: none; }
+  button.open-link:disabled { border: 1px solid var(--line); background: var(--sunk); color: var(--muted); cursor: not-allowed; }
+  .signin .line { margin: 0.375rem 0 0; } .signin .expiry { margin: 0.5rem 0 0; font-weight: 700; } .signin .expiry.gone { color: var(--danger); }
   .row h3, .report h3 { font-size: 1.1875rem; font-weight: 650; line-height: 1.3; letter-spacing: -0.005em; margin: 0; }
   .about, details p { margin: 0.375rem 0 0; max-width: 70ch; }
   details p { color: var(--muted); }
@@ -462,7 +467,7 @@
         el('p', { dir: 'auto' }, el('strong', {}, `${name}: `), run[name].replace(new RegExp(`^${name}:\\s*(?=\\S)`, 'i'), '')))] : []));
   }
 
-  const NAMES = { decision: 'Decision', design: 'Design', evidence: 'Evidence', diagram: 'Diagram', interactive: 'Interactive', explainer: 'Explainer' };
+  const NAMES = { decision: 'Decision', design: 'Design', evidence: 'Evidence', diagram: 'Diagram', interactive: 'Interactive', explainer: 'Explainer', signin: 'Sign-in' };
   // Any other type gets the plain card until it has its own renderer; a plain question needs no name.
   const kind = (d) => (d.type === 'decision' ? '' : NAMES[d.type] ?? d.type.replace(/-/g, ' '));
   // A done-done run's outcome line is the plain result a person can now see; the title it sends only names the run.
@@ -517,6 +522,7 @@
     const brow = [update ? `Update ${d.number}` : kind(d), result ? el('span', { class: `st ${result[0]}` }, result[1]) : '',
       update && d.filed ? (isToday(d.filed) ? el('span', { class: 'st new' }, 'New') : day(d.filed)) : '', seen].filter(Boolean);
     const lead = el('div', { class: 'lead' }, x ? xBtn(d) : '', brow.length ? el('p', { class: 'eyebrow' }, ...brow) : '', el('h3', { dir: 'auto' }, name));
+    if (d.type === 'signin') return signin(d, lead, saved, err);
     const silent = d.default_if_silent && !ro ? `If no answer: ${d.options.find((o) => o.value === d.default_if_silent).label}` : '';
     if (design) {
       return el('article', { class: 'row design', id: `item-${d.key}` }, lead,
@@ -538,6 +544,65 @@
       ro || !buttons.length ? '' : el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': name }, ...ranked),
       ro ? '' : other(d, saved, err), err, tech(d));
   }
+
+  /** The time left on a sign-in link, in whole minutes. */
+  const expiry = (at) => {
+    const m = Math.ceil((Date.parse(at) - Date.now()) / 60_000);
+    return m <= 0 ? 'Link expired. Ask for a new link.' : `Expires in ${m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`}`;
+  };
+  /** A sign-in: the service, what it unlocks, who waits, the time left and one Open for its link. Its poster closes it with signin done. */
+  function signin(d, lead, saved, err) {
+    if (d.start) return started(d, lead, saved, err);
+    const gone = !!d.expires && Date.parse(d.expires) <= Date.now();
+    const open = saved ? '' : gone ? el('button', { class: 'open-link', disabled: '' }, 'Open')
+      : el('a', { class: 'open-link', href: d.link, target: '_blank', rel: 'noopener noreferrer', 'aria-label': `Open the ${d.title} sign-in` }, 'Open');
+    // The time left counts down on the page (data-expires); an expired link is drawn once more, with Open off.
+    const left = saved ? el('p', { class: 'meta' }, `Signed in at ${when(saved.at)}.`) : d.expires
+      ? el('p', { class: gone ? 'expiry gone' : 'expiry', ...(!gone && { 'data-expires': d.expires }) }, expiry(d.expires)) : '';
+    return el('article', { class: 'row signin', id: `item-${d.key}` }, el('div', {}, lead,
+      el('p', { class: 'line', dir: 'auto' }, `Unlocks: ${d.unlocks}`), el('p', { class: 'line', dir: 'auto' }, `Waits: ${d.waits}`), left), open, err);
+  }
+  /** What a tap-time sign-in did last, in plain words. */
+  const RUNS = { none: 'Each tap gets a new link.', starting: 'Getting a new link…', live: 'The sign-in page is open. Finish it there.' };
+  /** A sign-in whose link this host makes at each tap: Open starts it and sends a new tab to the new link, so its link never expires on the card. */
+  function started(d, lead, saved, err) {
+    const failed = d.run?.startsWith('failed: ') && d.run.slice(8);
+    const open = saved ? '' : FROZEN || state.readonly ? el('button', { class: 'open-link', disabled: '' }, 'Open')
+      : el('button', { class: 'open-link', 'aria-label': `Open the ${d.title} sign-in` }, 'Open');
+    if (open && !open.disabled) open.onclick = async () => {
+      // The tab opens on the tap itself, so a browser does not block it; it goes to the link once this host has made one.
+      const tab = window.open('', '_blank');
+      if (tab) tab.opener = null;
+      open.disabled = true;
+      open.textContent = 'Getting a new link…';
+      try {
+        const res = await fetch('/api/signin', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key }) });
+        const body = await res.json().catch(() => ({ error: `The server replied ${res.status}` }));
+        if (body.state) state = body.state;
+        if (!res.ok) throw new Error(body.error);
+        if (!body.open) tab?.close();
+        else if (tab) tab.location.href = body.open;
+        else location.href = body.open;
+        render();
+      } catch (e) {
+        tab?.close();
+        render();
+        shown(err).textContent = `The sign-in did not start: ${e.message}`;
+      }
+    };
+    const line = saved ? `Signed in at ${when(saved.at)}.` : failed ? `The last try failed: ${failed} Tap Open to try again.` : RUNS[d.run] ?? RUNS.none;
+    return el('article', { class: 'row signin', id: `item-${d.key}` }, el('div', {}, lead,
+      el('p', { class: 'line', dir: 'auto' }, `Unlocks: ${d.unlocks}`), el('p', { class: 'line', dir: 'auto' }, `Waits: ${d.waits}`),
+      el('p', { class: failed ? 'expiry gone' : saved ? 'meta' : 'expiry' }, line)), open, err);
+  }
+  setInterval(() => {
+    // While a sign-in runs on this host, the page checks often, so the card closes soon after the sign-in is done.
+    if (!FROZEN && state.decisions.some((d) => d.run === 'live' || d.run === 'starting')) refresh();
+    for (const p of document.querySelectorAll('[data-expires]')) {
+      if (Date.parse(p.dataset.expires) <= Date.now()) return render();
+      p.textContent = expiry(p.dataset.expires);
+    }
+  }, 5000);
 
   /** Boxes the person unfolded, kept open across redraws. */
   const unfolded = new Set();
@@ -744,7 +809,7 @@
   /** Each item lives in one area: answered items, then the area the item names, then evidence updates, then what is only to read (explainers, pages with nothing to answer), then the open asks. */
   const area = (d) => {
     const a = isAnswered(d) ? 'answered' : d.area ?? (d.type === 'evidence' ? 'evidence'
-      : state.readonly || d.type === 'explainer' || !(d.options.length || d.reply) ? 'reports' : 'waiting');
+      : state.readonly || d.type === 'explainer' || !(d.options.length || d.reply || d.type === 'signin') ? 'reports' : 'waiting');
     // Reports lists only what explains: a page to tap through, or a narrated video. Text alone (a receipt, a status line) is a note, folded under it.
     return a === 'reports' && !state.readonly && d.type !== 'explainer' && !reads(d) ? 'notes' : a;
   };
@@ -795,7 +860,7 @@
   }
 
   /** A short row's second line: what changed, unless the headline already says it. */
-  const sub = (d) => (d.about && d.about !== headline(d) ? d.about : NAMES[d.type] ?? d.type);
+  const sub = (d) => (d.type === 'signin' ? `Unlocks: ${d.unlocks}` : d.about && d.about !== headline(d) ? d.about : NAMES[d.type] ?? d.type);
   /** A short row: a picture (or the area's mark) and the title; an answered item has its answer and time under the title. */
   const compact = (d, a) => {
     const s = state.answers[d.key];
@@ -963,6 +1028,8 @@
     const gone = new Set(state.dismissed ?? []);
     for (const d of [...state.decisions].reverse()) if (!gone.has(d.key)) by[area(d)].push(d);
     by.waiting.reverse();
+    // A sign-in blocks someone now, so sign-ins come first.
+    by.waiting.sort((x, y) => (y.type === 'signin') - (x.type === 'signin'));
     const hidden = state.decisions.filter((d) => gone.has(d.key) && area(d) === 'waiting');
     by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
     const [, at, key] = /^#(waiting|evidence|reports|answered)(?:\/([\w.-]+))?$/.exec(location.hash) ?? [];
@@ -1051,7 +1118,7 @@
     banner.textContent = `Can't read the board file: ${e.message}`;
     banner.hidden = false;
   };
-  // Another program rewrites a read-only or answers-only board's file, so the page checks it every 20 seconds and redraws only on a change.
+  // Another program can change the board file (a feed, a new sign-in, signin done), so the page checks it every 20 seconds and redraws only on a change.
   async function refresh() {
     try {
       const res = await fetch('/api/decisions'), body = await res.json().catch(() => ({ error: `The server replied ${res.status}` }));
@@ -1069,7 +1136,7 @@
   if (FROZEN) (state = FROZEN), render();
   else call('/api/decisions').then(() => {
     banner.hidden = true;
-    if (state.readonly || state.answers_only) setInterval(refresh, 20_000);
+    setInterval(refresh, 20_000);
   }, failed);
 </script>
 </body>

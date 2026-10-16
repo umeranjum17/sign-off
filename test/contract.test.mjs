@@ -688,7 +688,7 @@ test('every guard refuses bad input with a reason and one fix line, and never fa
     [['wait', board, '--filer', 'x', '--json', '--events'], 2, /does not take --json/, /--events/],
     [['wait', board, '--events'], 2, /needs --filer/, /--events/],
     // post: the type, view, mock and media guards.
-    [['post', board, '--type', 'nope', '--title', 'T?'], 2, /--type must be decision, design, evidence, diagram, interactive, explainer or report/, /post --help/],
+    [['post', board, '--type', 'nope', '--title', 'T?'], 2, /--type must be decision, design, evidence, diagram, interactive, explainer, report or signin/, /post --help/],
     [['post', board, '--type', 'decision', '--title', 'T?', '--media', 'shot.png'], 2, /--media, --link and --chapter need --type evidence or explainer/, /post --help/],
     [['post', board, '--type', 'diagram', '--title', 'T?'], 2, /--type diagram needs --view <path>/, /post --help/],
     [['post', board, '--type', 'decision', '--title', 'T?', '--view', 'x.svg'], 2, /--view needs --type diagram or interactive/, /post --help/],

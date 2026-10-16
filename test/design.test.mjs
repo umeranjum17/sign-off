@@ -869,6 +869,84 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   proc.kill();
 });
 
+test('a sign-in card: posted on top of what waits with its link and time left, the link expires on the page, a new link under the same key opens it again, and signin done closes it, all without a reload; a start command makes the link at tap time and its exit 0 closes the card', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'signin'), file = join(dir, 'board.json'), link = 'https://example.com/login?code=one-time-1';
+  mkdirSync(dir);
+  assert.equal(run('raise', file, '--title', 'Keep the weekly digest?', '--recommend', 'yes').code, 0);
+  const signin = (key, service, url, expires) => run('post', file, '--type', 'signin', '--key', key, '--service', service, '--link', url, '--unlocks', `Publish ${service}`, '--waits', 'Main', '--expires', expires);
+  const posted = signin('npm-login', 'npm', link, '15m');
+  assert.equal(posted.code, 0);
+  // A sign-in link can hold a one-time code: no output prints it.
+  assert.match(posted.out, /npm-login,posted,npm,/);
+  assert.doesNotMatch(posted.out, /one-time|example\.com/);
+  assert.match(signin('gh-login', 'GitHub', 'https://example.com/device?code=one-time-2', '3s').out, /gh-login,posted,GitHub,/);
+  // Only an http(s) link with no user name or password in it, and a time still to come.
+  for (const [url, expires] of [['ftp://example.com/login', '15m'], ['https://user:pw@example.com/login', '15m'], ['https://example.com/login', '2020-01-01T00:00:00Z']]) assert.equal(signin('bad', 'npm', url, expires).code, 2);
+  assert.equal(run('signin', 'done', file, '--key', 'missing').code, 1);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'live'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+  // A sign-in blocks someone now, so both come before the older question.
+  const queue = () => evaluate('[...document.querySelectorAll(".queue strong")].map((s) => s.textContent).join("|")');
+  await until(async () => (await queue()) === 'npm|GitHub|Keep the weekly digest?');
+  const card = (key) => evaluate(`(() => { const c = document.getElementById("item-${key}"), o = c?.querySelector(".open-link");
+    return c && [c.querySelector("h3").textContent, ...[...c.querySelectorAll(".line, .expiry, .meta")].map((p) => p.textContent), o ? [o.tagName, o.getAttribute("href"), o.target, o.rel, o.disabled].join(" ") : "no open"].join("|"); })()`);
+  assert.equal(await card('npm-login'), `npm|Unlocks: Publish npm|Waits: Main|Expires in 15 min|A ${link} _blank noopener noreferrer `);
+  // The page is not loaded again from here on: a mark set now is still there at the end.
+  await evaluate('window.stillHere = true');
+  // Past its time the link expires on the page: it says so plainly and Open is off.
+  await until(async () => (await evaluate('[...document.querySelectorAll(".queue button")].find((b) => b.textContent.startsWith("GitHub"))?.click() ?? true')) && /^GitHub/.test(await card('gh-login') ?? ''));
+  await until(async () => (await card('gh-login')) === 'GitHub|Unlocks: Publish GitHub|Waits: Main|Link expired. Ask for a new link.|BUTTON    true');
+  // The same key with a new link puts it on the same card, open again.
+  assert.match(signin('gh-login', 'GitHub', 'https://example.com/device?code=one-time-3', '10m').out, /gh-login,new link,GitHub,/);
+  await until(async () => (await card('gh-login')) === 'GitHub|Unlocks: Publish GitHub|Waits: Main|Expires in 10 min|A https://example.com/device?code=one-time-3 _blank noopener noreferrer ');
+  // signin done closes a card: it leaves what waits and shows as done.
+  assert.match(run('signin', 'done', file, '--key', 'npm-login').out, /npm-login,done,npm/);
+  assert.match(run('signin', 'done', file, '--key', 'npm-login').out, /npm-login,already done,npm/);
+  await until(async () => (await queue()) === 'GitHub|Keep the weekly digest?');
+  assert.match(run('answers', file).out, /npm-login,done,/);
+  await evaluate('location.hash = "#answered"');
+  await until(async () => /npm\s*Signed in/.test(await evaluate('document.querySelector("ul.i-answered")?.textContent') ?? ''));
+  assert.equal(await evaluate('window.stillHere'), true);
+  // A new link after done is a new sign-in: the card waits again.
+  signin('npm-login', 'npm', 'https://example.com/login?code=one-time-4', '15m');
+  assert.match(run('list', file).out, /npm-login,npm/);
+  // A start command makes the link at tap time: Open runs it on this host, and the new tab goes to the first https link it prints on stdout,
+  // not a notice link it prints on stderr first, as npm login does.
+  const starts = (key, script) => run('post', file, '--type', 'signin', '--key', key, '--service', key, '--unlocks', 'Publish', '--waits', 'Main',
+    '--start', JSON.stringify(['node', '-e', script]));
+  assert.match(starts('fresh', 'console.error("Notice: see https://example.com/notice"); console.log("Open https://example.com/login?x=1"); setInterval(() => require("fs").existsSync("signed-in") && process.exit(0), 100)').out, /fresh,posted,fresh/);
+  assert.match(starts('broken', 'process.exit(3)').out, /broken,posted,broken/);
+  assert.equal(run('post', file, '--type', 'signin', '--key', 'fresh', '--service', 'x', '--unlocks', 'a', '--waits', 'b', '--start', 'npm login').code, 2);
+  // The page never gets the command, only that a tap makes a new link.
+  assert.equal((await (await fetch(`${url}api/decisions`)).json()).decisions.find((d) => d.key === 'fresh').start, true);
+  await evaluate(`window.open = () => ({ close() {}, location: { set href(u) { window.tabUrl = u; } } })`);
+  // Triage shows one card at a time: tap the key in its queue first.
+  const show = (key) => until(async () => evaluate(`[...document.querySelectorAll(".queue button")].find((b) => b.textContent.startsWith("${key}"))?.click() ?? true`)
+    .then(() => evaluate(`!!document.querySelector("#item-${key} .open-link")`)));
+  const tapOpen = async (key) => { await show(key); await evaluate(`document.querySelector("#item-${key} .open-link").click()`); };
+  const line = (key) => evaluate(`document.querySelector("#item-${key} .expiry, #item-${key} .meta")?.textContent`);
+  await evaluate('location.hash = "#waiting"');
+  await show('fresh');
+  assert.equal(await line('fresh'), 'Each tap gets a new link.');
+  await tapOpen('fresh');
+  await until(async () => (await evaluate('window.tabUrl')) === 'https://example.com/login?x=1' && (await line('fresh')) === 'The sign-in page is open. Finish it there.');
+  // A second tap while it runs gives the same link from the same run.
+  assert.equal((await (await post(url, 'api/signin', { key: 'fresh' })).json()).open, 'https://example.com/login?x=1');
+  // A run that fails says why on the card, and Open stays on to try again.
+  await tapOpen('broken');
+  await until(async () => (await line('broken')) === 'The last try failed: It stopped with exit code 3. Tap Open to try again.');
+  assert.equal(await evaluate('document.querySelector("#item-broken .open-link").disabled'), false);
+  // Its exit 0 is the sign-in done: the card closes by itself.
+  writeFileSync(join(dir, 'signed-in'), '');
+  await until(async () => /fresh,done,/.test(run('answers', file).out) && !(await queue()).includes('fresh'));
+  assert.equal(await evaluate('window.stillHere'), true);
+  close();
+  proc.kill();
+});
+
 test('Clear all done on 201 answered items, set two across on a wide screen: the page empties in chunks, says so, and Undo brings all 201 back', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'many-answered'), file = join(dir, 'board.json');
   mkdirSync(dir);

@@ -21,6 +21,10 @@ export type Decision = {
   steps?: Step[];
   /** Reports: the section it is grouped under and what it decided. `filed` (ISO date-time) is when any item was filed. */
   group?: string; filed?: string; decided?: string;
+  /** Sign-ins: what the sign-in unlocks, who waits on it, and when its link stops working (ISO date-time). */
+  unlocks?: string; waits?: string; expires?: string;
+  /** A sign-in's start command, an argv run with no shell on the board's host when Open is tapped: the first https link it prints is the live sign-in link. */
+  start?: string[];
 };
 export type Answer = { key: string; answer: string; label: string; close: string; at: string; note?: string; comments?: Sent[] };
 export type Round = { key: string; note: string; at: string; comments?: Sent[] };
@@ -40,6 +44,8 @@ export function unreadable(code?: string): string {
 }
 
 const YES_NO: Option[] = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
+/** The answer `signin done` saves: the sign-in is done and its card leaves the open list. */
+export const SIGNED_IN: Option = { value: 'done', label: 'Signed in' };
 /** The answer a `reply: true` item saves for a short text reply; the text is its note. */
 export const REPLY: Option = { value: 'text', label: 'Reply' };
 const VERDICTS: Option[] = [{ value: 'pass', label: 'Pass' }, { value: 'fail', label: 'Fail' }, { value: 'needs-work', label: 'Needs work' }];
@@ -132,7 +138,25 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     if (d.filed !== undefined && !(isText(d.filed) && /^\d{4}-\d{2}-\d{2}T/.test(d.filed) && !Number.isNaN(Date.parse(d.filed)))) throw bad('filed', 'must be an ISO 8601 date-time such as 2026-10-13T07:19:00Z');
     if (d.decided !== undefined && !(isText(d.decided) && d.decided.trim() && [...d.decided].length <= 200)) throw bad('decided', 'must be text of 200 characters or fewer');
     if (d.type === 'evidence' && !(Number.isInteger(d.number) && d.number >= 1)) throw bad('number', 'must be a whole number from 1');
-    if (d.link !== undefined && !(isText(d.link) && /^(https?:\/\/\S{1,500}|[a-f0-9]{7,40})$/u.test(d.link))) throw bad('link', 'must be an http(s) link or a commit hash');
+    const signin = d.type === 'signin';
+    if (d.link !== undefined && !(isText(d.link) && /^(https?:\/\/\S{1,500}|[a-f0-9]{7,40})$/u.test(d.link)) && !signin) throw bad('link', 'must be an http(s) link or a commit hash');
+    // A sign-in is a link to open, what it unlocks and who waits; its answer is the `signin done` its poster saves, so the user gets no buttons.
+    if (signin) {
+      // A start command makes a new link at each tap, so it needs no fixed link and never expires.
+      const start = d.start !== undefined;
+      if (start && !(Array.isArray(d.start) && d.start.length >= 1 && d.start.length <= 64 && d.start.every((a: any) => isText(a) && a.length <= 4096 && !a.includes('\0')) && d.start[0].trim())) {
+        throw bad('start', 'must be a command and its arguments as a list of 1 to 64 texts, such as ["npm", "login", "--auth-type=web"]');
+      }
+      if (start && d.expires !== undefined) throw bad('expires', 'must be left out with start: each tap makes a new link');
+      let url: URL | undefined;
+      try { url = new URL(d.link); } catch {}
+      if ((!start || d.link !== undefined) && (!(isText(d.link) && /^https?:\/\/\S{1,2000}$/u.test(d.link)) || !url || url.username || url.password)) {
+        throw bad('link', `must be an http(s) sign-in link of 2000 characters or fewer, with no user name or password in it${start ? '' : ' (or give a start command)'}`);
+      }
+      for (const f of ['unlocks', 'waits']) if (!(isText(d[f]) && d[f].trim() && [...d[f]].length <= 120)) throw bad(f, 'must be text of 120 characters or fewer');
+      if (d.expires !== undefined && !(isText(d.expires) && /^\d{4}-\d{2}-\d{2}T/.test(d.expires) && !Number.isNaN(Date.parse(d.expires)))) throw bad('expires', 'must be an ISO 8601 date-time such as 2026-10-13T07:19:00Z');
+      for (const f of ['options', 'reply', 'recommend_value', 'default_if_silent']) if (d[f] !== undefined) throw bad(f, 'must be left out: a sign-in closes with signin done, not with an answer');
+    }
     // A ladder rung: a diagram image, or an interactive page the board frames in a sandbox.
     // A report is a page and its picture; one stored before reports had pages still loads, as a note with neither.
     const report = d.kind === 'report';
@@ -142,9 +166,9 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     if (report && views && !viewOk(d.preview, VIEWS.diagram)) throw bad('preview', `must be a board-relative ${VIEWS.diagram[0]} file`);
     // A report (contract kind report) takes no answer: it has no options, on any board.
     if (report) for (const f of ['options', 'reply', 'area', 'type']) if (d[f] !== undefined) throw bad(f, `must be left out: a report takes no answer${f === 'options' ? '' : ' and shows only under Reports'}`);
-    const options = d.options ?? (report ? [] : d.type === 'evidence' ? VERDICTS : YES_NO);
-    // An empty list is an item to look at only, unless it takes a reply: only a board another program feeds, or a report, shows those.
-    if (!Array.isArray(options) || options.length === 1 || (!options.length && !fed && !report) || options.length > 6
+    const options = d.options ?? (report || signin ? [] : d.type === 'evidence' ? VERDICTS : YES_NO);
+    // An empty list is an item to look at only, unless it takes a reply: only a board another program feeds, a report or a sign-in shows those.
+    if (!Array.isArray(options) || options.length === 1 || (!options.length && !fed && !report && !signin) || options.length > 6
       || !options.every((o) => isKey(o?.value) && isText(o.label) && o.label.trim())) {
       throw bad('options', 'must be 2 to 6 items (or empty on a readonly or answers_only board), each a value of 1-128 of A-Z a-z 0-9 . _ - and a label');
     }
@@ -169,6 +193,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done', evidence: d.evidence,
       type: d.type ?? 'decision', tradeoff: d.tradeoff, link: d.link, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path })),
       ...(views && { view: d.view }), ...(report && views && { preview: d.preview }), ...(d.reply && { reply: true }), ...(d.filer && { filer: d.filer }), ...(d.area && { area: d.area }),
+      ...(signin && { unlocks: d.unlocks, waits: d.waits, ...(d.expires && { expires: d.expires }), ...(d.start && { start: [...d.start] }) }),
       ...(d.group && { group: d.group }), ...(d.filed && { filed: d.filed }), ...(d.decided && { decided: d.decided }),
       ...(d.steps && { steps: d.steps.map(({ title, marks }: Step) => ({ title, ...(marks?.length && { marks }) })) }),
       ...(stored && d.media && { media: d.media.map(({ path, sha256, bytes }: MediaRef) => ({ path, sha256, bytes })) }),
