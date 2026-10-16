@@ -140,6 +140,22 @@
     "media": [{ "path": "evidence/3/1.mp4", "sha256": "<64 hex>", "bytes": 358743 }],
     "chapters": [{ "at": 0, "title": "Start" }, { "at": 12, "title": "Step 2" }] }
   ```
+- `signin` items ask the person to sign in: `title` is the service, `link`
+  (required) the `http(s)` sign-in link, 2000 characters or fewer, with no user
+  name or password in it, `unlocks` and `waits` (required, 120 characters or
+  fewer each) what it unlocks and who waits on it, and `expires` (optional) an
+  ISO 8601 date-time when the link stops working. In place of `link` and
+  `expires`, `start` is a command as a list of 1 to 64 texts, such as
+  `["npm", "login", "--auth-type=web"]`: each tap on Open runs it on the board's
+  computer with no shell and opens the first https link it prints on stdout
+  (on stderr when stdout has none within 2 seconds). A sign-in takes no `options`,
+  `reply`, `recommend_value` or `default_if_silent`: `signin done` saves its
+  answer, `done` with the label `Signed in`.
+
+  ```json
+  { "key": "npm-login", "type": "signin", "title": "npm", "link": "https://example.com/login",
+    "unlocks": "Publish the release", "waits": "Main", "expires": "2026-10-16T17:10:00Z" }
+  ```
 - `tradeoff`: optional on design items, plain text up to 1000 characters, shown
   next to the mocks.
 - `mocks`: optional on design items, up to 6 entries of an option `value` and a

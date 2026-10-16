@@ -2,7 +2,7 @@
 import { createServer, type IncomingMessage } from 'node:http';
 import { type AddressInfo, isIP } from 'node:net';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { spawn, spawnSync } from 'node:child_process';
+import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
 import { accessSync, closeSync, constants, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, watch, writeFileSync, type Stats } from 'node:fs';
 import { lookup } from 'node:dns/promises';
 import { homedir, networkInterfaces, tmpdir, userInfo } from 'node:os';
@@ -10,7 +10,7 @@ import { basename, delimiter, dirname, extname, isAbsolute, join, relative, reso
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { type Answer, CHAPTERS_MAX, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { type Answer, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
@@ -28,8 +28,8 @@ const AGENTS: Record<string, { bin: string; dir: string; home: string }> = {
   'gemini-cli': { bin: 'gemini', dir: '.agents/skills', home: join(homedir(), '.gemini', 'skills') },
 };
 const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
-commands[16]:
-  (none)=list, raise, post, answers, wait, poll, open, status, stop, serve, export, init, report, doctor, validate, help
+commands[17]:
+  (none)=list, raise, post, answers, wait, poll, open, status, stop, serve, export, init, report, signin, doctor, validate, help
 board: the nearest .sign-off/ board (the walk's bounds and SIGN_OFF_HOME: README, "Test runs never touch your board"), else ~/.sign-off/decisions.json; a board file given always wins
 flags: --full and --json on list, answers and wait, --events on wait, --json on status, --filer on post, raise and wait, --help on every command, -v/--version
 examples:
@@ -41,6 +41,8 @@ examples:
   sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "The new sign-in has 2 steps." --media explainer.mp4 --chapter 0:00=Start
   sign-off-axi report init .sign-off/mocks/sign-in-flow
   sign-off-axi post .sign-off/decisions.json --type report --title "Sign-in now takes 2 steps" --about "Why the code step moved first." --view mocks/sign-in-flow/index.html --preview mocks/sign-in-flow/preview.svg
+  sign-off-axi post --type signin --key npm-login --service npm --link https://example.com/login --unlocks "Publish the release" --waits "Main" --expires 15m
+  sign-off-axi signin done --key npm-login
   sign-off-axi init
   sign-off-axi doctor
   sign-off-axi validate ask.json
@@ -169,6 +171,8 @@ examples:
        sign-off-axi post [board.json] --kind <kind> --from <message.json|-> [--filer <id>]
        sign-off-axi post [board.json] --type explainer --title "<question>" --media <video> [--about <summary>] [--chapter <m:ss>=<title>]... [--key <key>] [--option <value>=<label>]... [--recommend <value>]
        sign-off-axi post [board.json] --type report --title "<the answer>" --about "<why it matters>" --view <page.html> --preview <picture> [--key <key>] [--link <commit or URL>] [--filer <id>]
+       sign-off-axi post [board.json] --type signin --service "<name>" --link <sign-in URL> --unlocks "<what it unlocks>" --waits "<who waits>" [--expires <ISO time or 15m>] [--key <key>] [--filer <id>]
+       sign-off-axi post [board.json] --type signin --service "<name>" --start '<command as a JSON list>' --unlocks "<what it unlocks>" --waits "<who waits>" [--key <key>] [--filer <id>]
 Posts an item for the user. --type decision (the default) is a yes/no or pick-one question, exactly like raise.
 --kind posts one contract message (${CONTRACT}), read from a file or from stdin with --from -: it must be that kind and pass every rule,
 else it is refused with one fix line and nothing is written. A key already on the board takes only the same message again; anything else exits 2.
@@ -202,6 +206,14 @@ and played on the card. --about is its short summary; up to ${CHAPTERS_MAX} --ch
 --view is the page and --preview its picture on the card, beside it, both from the board file's folder; \`sign-off-axi report init <folder>\` makes them.
 The page must be filled (no FILL: line left), with a viewport tag, dark mode, a picture, something to tap, its detail folded, nothing from the web, and no block over about five lines on a phone.
 Merges, PR outcomes, receipts and status notes are not reports: post proof of a change as evidence.
+--type signin asks the user to sign in, at the top of what waits: the service, one Open button for the http(s) --link, what it unlocks,
+who waits, and the time left until --expires (an ISO date-time, or 90s, 15m, 2h, 1d from now). After that time the card says the link expired.
+No output prints the link. Post again with the same --key and a new --link or --expires to put a new link on the same card; it waits again.
+When the sign-in is done, run \`sign-off-axi signin done [board.json] --key <key>\`: the card leaves the open list and shows as done.
+For a link that expires fast, give --start, the command that prints a new sign-in link, as a JSON list such as '["npm", "login", "--auth-type=web"]'.
+Each tap on Open then runs it on the computer that serves the board (no shell, in the board file's folder) and opens the first https link it prints on stdout
+(on stderr when stdout has none within 2 seconds), so the card never shows an expired link. A tap while it runs opens the same link again. Its exit 0 closes the card as done; a failure, or no link
+within 20 seconds, shows on the card and Open can try again. It is stopped after 10 minutes, or when the card closes. The link is never stored or printed.
 examples:
   sign-off-axi post --type design --title "Pick the sign-in layout" --option a="A: single column" --option b="B: split screen" --mock a=mocks/a.html --mock b=mocks/b.html --tradeoff "B scans fastest; A is simplest." --recommend b
   sign-off-axi post .sign-off/decisions.json --type design --key sign-in --title "Pick the sign-in layout" --option a=A --option b=B --option c=C --mock a=mocks/sign-in/index.html?variant=a --mock b=mocks/sign-in/index.html?variant=b --mock c=mocks/sign-in/index.html?variant=c --tradeoff "..." --recommend b
@@ -214,6 +226,14 @@ examples:
   sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media phone.png --media flow.mp4 --link https://github.com/acme/app/pull/12
   sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "The new sign-in has 2 steps." --media explainer.mp4 --chapter 0:00=Start --chapter 0:12="Step 2"
   sign-off-axi post .sign-off/decisions.json --type report --title "Sign-in now takes 2 steps" --about "Why the code step moved first." --view mocks/sign-in-flow/index.html --preview mocks/sign-in-flow/preview.svg
+  sign-off-axi post --type signin --key npm-login --service npm --link https://example.com/login --unlocks "Publish the release" --waits "Main" --expires 15m
+  sign-off-axi post --type signin --key npm-login --service npm --start '["npm", "login", "--auth-type=web"]' --unlocks "Publish the release" --waits "Main"
+`,
+  signin: `usage: sign-off-axi signin done [board.json] --key <key>
+Closes a sign-in card that post --type signin made: the sign-in is done, so the card leaves the open list and shows as done.
+Run it when you see the sign-in worked. A card posted with --start also closes by itself when its command ends with exit 0. wait --key <key> also returns once it is done.
+examples:
+  sign-off-axi signin done --key npm-login
 `,
   report: `usage: sign-off-axi report init <folder>
 Writes a report page to fill: <folder>/index.html and its card picture <folder>/preview.svg. A file already there is kept.
@@ -401,7 +421,7 @@ const waitFor = (on: string, filer?: string, key?: string) => (filer ? `Run \`si
   : `Run \`sign-off-axi wait${on}${key ? ` --key ${key}` : ''}\` to block until the user answers`);
 
 /** Still waiting on the user: not answered, not dismissed, and something to answer (an item with no options and no reply is only shown). */
-const waits = (d: Decision & { answer?: unknown; dismissed?: boolean }) => !d.dismissed && !d.answer && (d.options.length > 0 || !!d.reply);
+const waits = (d: Decision & { answer?: unknown; dismissed?: boolean }) => !d.dismissed && !d.answer && (d.options.length > 0 || !!d.reply || d.type === 'signin');
 /** The board's decisions with their latest answer; a missing board file is an empty board.
  *  A dismissal hides an item from the board and is not waiting here either, checked against the same dismissed log the board reads. */
 function board(file: string, say = warn) {
@@ -637,10 +657,11 @@ const mockFile = (path: string) => path.split('?')[0];
 /** Posts an item. `raise` is the alias for `post --type decision`: same flags as before, same output. */
 function post(args: string[], cmd = 'post') {
   const typed: Flags = cmd === 'post' ? { replace: { type: 'boolean' }, kind: { type: 'string' }, type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
-    media: { type: 'string', multiple: true }, link: { type: 'string' }, view: { type: 'string' }, preview: { type: 'string' }, chapter: { type: 'string', multiple: true } } : {};
+    media: { type: 'string', multiple: true }, link: { type: 'string' }, view: { type: 'string' }, preview: { type: 'string' }, chapter: { type: 'string', multiple: true },
+    ...Object.fromEntries(SIGNIN_FIELDS.map((f) => [f, { type: 'string' as const }])) } : {};
   const { file, values, on } = parse(cmd, args, { from: { type: 'string' }, filer: { type: 'string' }, ...typed,
     ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: f === 'option' }])) });
-  const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'link', 'view', 'preview', 'chapter'].filter((f) => values[f] !== undefined);
+  const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'link', 'view', 'preview', 'chapter', ...SIGNIN_FIELDS].filter((f) => values[f] !== undefined);
   if (values.kind !== undefined) {
     const odd = [...given, ...(values.replace ? ['replace'] : [])][0];
     if (odd) throw fail(`--kind cannot be combined with --${odd}`, 'VALIDATION_ERROR', 'Put every field in the message file: sign-off-axi post --kind ask --from ask.json');
@@ -651,12 +672,15 @@ function post(args: string[], cmd = 'post') {
   const filer = filerOf(values, true);
   const type = values.type ?? 'decision';
   if (type === 'report') return postReport(file, on, values);
+  if (type === 'signin') return postSignin(file, on, values, filer);
+  const odd = SIGNIN_FIELDS.find((f) => values[f] !== undefined);
+  if (odd) throw fail(`--${odd} needs --type signin`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (values.preview !== undefined) throw fail('--preview needs --type report', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (values.from === undefined && values.title === undefined) {
     throw fail('--title is required (or --from <decisions.json>)', 'VALIDATION_ERROR', type === 'design' ? 'sign-off-axi post --type design --title "<question>" --option a=A --option b=B --recommend a'
       : type === 'evidence' ? 'sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media <file>' : `sign-off-axi ${cmd} --title "<question>" [--recommend <value>]`);
   }
-  if (!['decision', 'design', 'evidence', 'diagram', 'interactive', 'explainer'].includes(type)) throw fail(`--type must be decision, design, evidence, diagram, interactive, explainer or report`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
+  if (!['decision', 'design', 'evidence', 'diagram', 'interactive', 'explainer'].includes(type)) throw fail(`--type must be decision, design, evidence, diagram, interactive, explainer, report or signin`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (type === 'evidence' || type === 'explainer') return postMedia(file, on, values, type, filer);
   if (values.media !== undefined || values.link !== undefined || values.chapter !== undefined) throw fail('--media, --link and --chapter need --type evidence or explainer', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (type !== 'design' && (values.tradeoff !== undefined || values.mock !== undefined)) throw fail('--tradeoff and --mock need --type design', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
@@ -692,6 +716,68 @@ function post(args: string[], cmd = 'post') {
     return { value: m.slice(0, at), path };
   });
   return storeIncoming(file, on, buildIncoming(values, { type, tradeoff: values.tradeoff, mocks }, filer, file), filer);
+}
+
+const SIGNIN_FIELDS = ['service', 'unlocks', 'waits', 'expires', 'start'];
+const SIGNIN_EXAMPLE = 'sign-off-axi post --type signin --key npm-login --service npm --link https://example.com/login --unlocks "Publish the release" --waits "Main" --expires 15m';
+const SIGNIN_START_EXAMPLE = 'sign-off-axi post --type signin --key npm-login --service npm --start \'["npm", "login", "--auth-type=web"]\' --unlocks "Publish the release" --waits "Main"';
+/** --expires: an ISO date-time, or a time from now such as 90s, 15m, 2h or 1d; refused when it is already past. */
+function expiresAt(value: string) {
+  const span = /^(\d{1,6})([smhd])$/.exec(value), at = span ? Date.now() + Number(span[1]) * { s: 1e3, m: 6e4, h: 36e5, d: 864e5 }[span[2] as 's']
+    : /^\d{4}-\d{2}-\d{2}T/.test(value) ? Date.parse(value) : NaN;
+  if (!(at > Date.now())) throw fail(`--expires ${value} must be a time still to come: an ISO date-time such as 2026-10-13T07:19:00Z, or a time from now such as 15m`, 'VALIDATION_ERROR', SIGNIN_EXAMPLE);
+  return new Date(at).toISOString().replace(/\.\d+Z$/, 'Z');
+}
+/** post --type signin: one card with a link to open. The same key again with another link or time swaps them on that card, which waits again.
+ * The link can hold a one-time code, so no output prints it. */
+function postSignin(file: string, on: string, values: Record<string, any>, filer?: string) {
+  const odd = ['title', 'about', 'detail', 'option', 'recommend', 'default', 'close', 'tradeoff', 'mock', 'media', 'view', 'preview', 'chapter'].find((f) => values[f] !== undefined);
+  if (odd) throw fail(`--${odd} does not apply to --type signin`, 'VALIDATION_ERROR', SIGNIN_EXAMPLE);
+  const missing = ['service', ...(values.start === undefined ? ['link'] : []), 'unlocks', 'waits'].filter((f) => values[f] === undefined);
+  if (missing.length) throw fail(`--type signin needs ${missing.map((f) => `--${f}`).join(', ')}${values.link === undefined ? ' (or --start in place of --link)' : ''}`, 'VALIDATION_ERROR', SIGNIN_EXAMPLE);
+  const { service, link, unlocks, waits: who, key = `signin-${slug(service)}` } = values;
+  let start: string[] | undefined;
+  if (values.start !== undefined) {
+    try { start = JSON.parse(values.start); } catch { start = undefined; }
+    if (!Array.isArray(start)) throw fail('--start must be the command as a JSON list, such as \'["npm", "login", "--auth-type=web"]\'', 'VALIDATION_ERROR', SIGNIN_START_EXAMPLE);
+    if (values.expires !== undefined) throw fail('--expires does not apply with --start: each tap makes a new link', 'VALIDATION_ERROR', SIGNIN_START_EXAMPLE);
+  }
+  const expires = values.expires === undefined ? undefined : expiresAt(values.expires);
+  const { incoming: [d], raw: [item] } = buildIncoming({ title: service, key }, { type: 'signin', link, unlocks, waits: who, ...(expires && { expires }), ...(start && { start }) }, filer, file);
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+  return locked(`${file}.lock`, () => {
+    const items = existsSync(file) ? readItems(file).items : [], at = items.findIndex((x) => x?.key === d.key), had = items[at];
+    if (had && had.type !== 'signin') throw fail(`key ${d.key} already holds a different question on ${tilde(file)}`, 'CONFLICT', 'Post the sign-in under a new --key');
+    const same = had && canon({ ...had, filed: undefined, filer: undefined }) === canon({ ...item, filed: undefined, filer: undefined });
+    const done = readAnswers(file)[d.key];
+    let status = same ? (done ? 'already done' : 'already waiting') : had ? 'new link' : 'posted';
+    if (!same) {
+      fits(d.title, d.key);
+      const next = { ...item, filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+      if (had) items[at] = next; else items.push(next);
+      writeItems(file, items);
+      // A new link is a new sign-in: the card waits again, also when it was done or dismissed.
+      appendAnswer(file, d, CLEARED);
+      if (had) appendDismissed(file, [d.key], false);
+    }
+    return toon({ board: tilde(file), posted: [{ key: d.key, status, service: d.title, ...(expires && { expires }) }] }, [
+      ...(status === 'already done' ? [] : [`Run \`sign-off-axi open${on}\` so the user can sign in`]),
+      `Run \`sign-off-axi signin done${on} --key ${d.key}\` when the sign-in is done; the card then closes`,
+      ...(start ? [] : [`Run \`sign-off-axi post${on} --type signin --key ${d.key} ...\` again with a new --link and --expires when this link expires`])]);
+  });
+}
+/** signin done [board.json] --key <key>: the sign-in is done, so its card leaves the open list and shows as done. */
+function signin(args: string[]) {
+  const [sub, ...rest] = args;
+  if (sub !== 'done') throw fail(`unknown signin command ${sub ?? '(none)'}`, 'VALIDATION_ERROR', 'sign-off-axi signin done [board.json] --key <key>');
+  const { file, values, on } = parse('signin done', rest, { key: { type: 'string' } });
+  if (values.key === undefined) throw fail('signin done needs --key <key>', 'VALIDATION_ERROR', 'sign-off-axi signin done [board.json] --key <key>');
+  return locked(`${file}.lock`, () => {
+    const d = board(file).find((x) => x.key === values.key);
+    if (d?.type !== 'signin') throw fail(`no sign-in with key ${values.key} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi list${on}\` to see the waiting keys`);
+    const saved = appendAnswer(file, d, SIGNED_IN);
+    return toon({ board: tilde(file), closed: [{ key: d.key, status: saved ? 'done' : 'already done', service: d.title }] }, [`Run \`sign-off-axi list${on}\` to see what still waits on the user`]);
+  });
 }
 
 /** For a program that feeds the board: the --from file, checked like any post, becomes the whole board, items and top-level fields. Answers stay.
@@ -1441,6 +1527,7 @@ async function serve(args: string[]) {
   const repeat = async () => {
     if (!server.listening) return;
     await sweep('periodic');
+    reap();
     if (server.listening) setTimeout(repeat, 5_000).unref();
   };
   setTimeout(repeat, 5_000).unref();
@@ -1518,6 +1605,7 @@ const page = readFileSync(new URL('../web/index.html', import.meta.url));
 const pointer = Buffer.from(`<script>${readFileSync(new URL('../web/point.js', import.meta.url), 'utf8')}</script>`);
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 const state = () => {
+  reap();
   // The page marks sent comments in annotations, so answers and rounds go without theirs: a read-only board or an export carries none.
   const answers = Object.fromEntries(Object.entries(readAnswers(file, warn)).map(([k, { comments: _, ...a }]) => [k, a])), taken = seenBy(file);
   const rounds = readRounds(file, warn).map(({ comments: _, ...r }) => r);
@@ -1525,7 +1613,8 @@ const state = () => {
     file,
     mockBase: `/mock/${loopback(bind) ? 'local' : mockPass(tokenOf(file))}/`,
     // Who filed an item stays in the file: the page only learns that its filer took the answer.
-    decisions: loadDecisions(file).map(({ filer: _, ...d }) => ({ ...d, evidenceCard: d.evidence ? evidenceCard(d.evidence) : null,
+    // A sign-in's start command stays on this host too: the page only learns that a tap makes a new link, and how the last run went.
+    decisions: loadDecisions(file).map(({ filer: _, start, ...d }) => ({ ...d, ...(start && { start: true, run: signinState(d.key) }), evidenceCard: d.evidence ? evidenceCard(d.evidence) : null,
       ...(d.mocks && { mocks: d.mocks.map((m) => ({ ...m, hash: mockHash(m.path) })) }) })),
     readonly: readOnly(),
     answers_only: answersOnly(),
@@ -1652,10 +1741,10 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   if (req.method === 'GET' && req.url === '/api/decisions') {
     return [200, state()];
   }
-  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
+  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/signin'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
   if (readOnly()) return [403, { error: 'This board is read-only' }];
   // Dismiss only hides an item on this page and sends nothing to the feeding program, so an answers-only board takes it too.
-  if (!['/api/answers', '/api/dismiss'].includes(req.url!) && answersOnly()) return [403, { error: 'This board takes answers only' }];
+  if (!['/api/answers', '/api/dismiss', '/api/signin'].includes(req.url!) && answersOnly()) return [403, { error: 'This board takes answers only' }];
   if (!req.headers['content-type']?.startsWith('application/json')) return [415, { error: 'Send JSON' }];
   let body = '';
   for await (const chunk of req) body += chunk;
@@ -1689,6 +1778,16 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     const same = live.find((a) => a.key === key && a.mock === mock && a.hash === hash && a.ref === ref && !sent.has(a.id));
     appendAnnotation(file, { id: same?.id, key, mock, hash, ref, tag, words, text: text.trim() });
     return [200, state()];
+  }
+  if (req.url === '/api/signin') {
+    // Only the key comes from the page: the command is the one the poster stored on this host.
+    const { key } = JSON.parse(body) ?? {}, d = board(file).find((x) => x.key === key);
+    if (!d?.start) return [404, { error: 'This card has no sign-in to start' }];
+    if (d.answer) return [409, { error: 'This sign-in is already done' }];
+    try { return [200, { open: await signinLink(d), state: state() }]; } catch (e: any) {
+      // A run that ended with exit 0 before it printed a link was already signed in: the card is done, with no link to open.
+      return board(file).find((x) => x.key === key)?.answer ? [200, { state: state() }] : [502, { error: e.message, state: state() }];
+    }
   }
   if (req.url === '/api/dismiss') {
     const { keys, dismissed } = JSON.parse(body) ?? {};
@@ -1743,6 +1842,74 @@ function answered(a?: Answer, d?: Decision) {
   child.stdin.end(`${JSON.stringify({ event: 'answer', ...kindOf(file)(a.key), ...a, ...(d && { title: d.title }), ...(d?.filer && { filer: d.filer }) })}\n`);
 }
 
+/** Live sign-in runs by key, and why the last one failed: kept in memory only, so a captured link is gone once its run ends. */
+type SigninRun = { child: ChildProcess; url?: string; why?: string; link: Promise<string> };
+const runs = new Map<string, SigninRun>(), failures = new Map<string, string>();
+const SIGNIN_WAIT = 20_000, SIGNIN_LIFE = 600_000;
+const signinState = (key: string) => (runs.get(key)?.url ? 'live' : runs.has(key) ? 'starting' : failures.has(key) ? `failed: ${failures.get(key)}` : 'none');
+/** Stops a run and its child processes (it leads its own process group). */
+function stopRun(key: string, why: string) {
+  const run = runs.get(key);
+  if (!run) return;
+  run.why ??= why;
+  try { process.kill(-run.child.pid!, 'SIGTERM'); } catch { run.child.kill('SIGTERM'); }
+}
+/** Stops each run whose card closed: done, gone from the board, or no longer a start-command sign-in. */
+function reap() {
+  if (!runs.size) return;
+  const items = new Map(board(file).map((d) => [d.key, d]));
+  for (const key of runs.keys()) if (!items.get(key)?.start || items.get(key)!.answer) stopRun(key, 'The card closed.');
+}
+/** The live link for a tap on Open: a run still going gives its link again; else the start command runs with no shell in the board's folder,
+ * and the first https link it prints on stdout (else on stderr) is the link. Its exit 0 closes the card as done. The link is never logged or stored. */
+function signinLink(d: Decision): Promise<string> {
+  const had = runs.get(d.key);
+  if (had) return had.link;
+  failures.delete(d.key);
+  const [cmd, ...rest] = d.start!, child = spawn(cmd, rest, { cwd: dirname(file), stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+  let found!: (url: string) => void, lost!: (why: string) => void, aside: NodeJS.Timeout | undefined;
+  const run: SigninRun = { child, link: new Promise<string>((ok, no) => { found = ok; lost = (why) => no(new Error(why)); }) };
+  run.link.catch(() => {});
+  runs.set(d.key, run);
+  const take = (url: string) => { if (!run.url) found((run.url = url)); };
+  // The link is the first https link on stdout: tools such as npm print notices with other links on stderr first.
+  // ponytail: a tool that prints its link only on stderr (gh) is read from there after 2 s of nothing on stdout; add a link pattern per card if a tool needs one.
+  const reader = (onOut: boolean) => {
+    let seen = '';
+    return (b: Buffer) => {
+      if (run.url) return;
+      seen = (seen + b).slice(-8000);
+      const url = /https:\/\/[^\s"'<>`]+/.exec(seen)?.[0];
+      if (url && onOut) take(url);
+      else if (url) aside ??= setTimeout(() => take(url), 2000);
+    };
+  };
+  child.stdout!.on('data', reader(true));
+  child.stderr!.on('data', reader(false));
+  const wait = setTimeout(() => run.url || stopRun(d.key, 'It gave no sign-in link within 20 seconds.'), SIGNIN_WAIT);
+  const life = setTimeout(() => stopRun(d.key, 'It was not done within 10 minutes, so it was stopped.'), SIGNIN_LIFE);
+  const end = (why?: string) => {
+    clearTimeout(aside);
+    clearTimeout(wait);
+    clearTimeout(life);
+    if (runs.get(d.key) !== run) return;
+    runs.delete(d.key);
+    if (why) failures.set(d.key, why);
+    lost(why ?? 'The sign-in is done.');
+  };
+  child.on('error', (e: any) => end(e.code === 'ENOENT' ? `${basename(cmd)} is not on this computer.` : `It did not start (${e.code ?? e.message}).`));
+  child.on('exit', (code) => {
+    if (code === 0) {
+      const now = board(file).find((x) => x.key === d.key);
+      if (now?.start && !now.answer) answered(appendAnswer(file, now, SIGNED_IN), now);
+      return end();
+    }
+    end(run.why ?? (code === null ? "It was stopped." : `It stopped with exit code ${code}.`));
+  });
+  return run.link;
+}
+process.on('exit', () => { for (const key of runs.keys()) stopRun(key, 'The board stopped.'); });
+
 const server = createServer(async (req, res) => {
   const { port: bound } = server.address() as AddressInfo;
   // Only loopback names, the bound address and the config's hosts: names: blocks DNS rebinding from a web page.
@@ -1792,7 +1959,7 @@ await runAxiCli({
   topLevelHelp: TOP_HELP,
   getCommandHelp: (cmd) => HELP[cmd],
   home: axi('list', list),
-  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), report: axi('report', report), doctor: axi('doctor', doctor), validate, help: ([name, ...rest]) => {
+  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), report: axi('report', report), signin: axi('signin', signin), doctor: axi('doctor', doctor), validate, help: ([name, ...rest]) => {
     if (rest.length || (name && !HELP[name])) throw fail(`unknown command or argument: ${[name, ...rest].join(' ')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi --help` to see the commands');
     return name ? HELP[name] : TOP_HELP;
   } },

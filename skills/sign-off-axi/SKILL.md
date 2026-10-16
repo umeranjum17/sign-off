@@ -1,6 +1,6 @@
 ---
 name: sign-off-axi
-description: "Ask the user yes/no, pick-one or A/B/C design questions on a local review board and read back their answers, using the sign-off-axi CLI. Use when you need a yes/no decision, a choice between a few options, a design pick between mocks, or approval from the user before going on, want the user to review or sign off on something, need to read back the answers the user already gave, or must explain a concept, design or trade-off to the user as an interactive report."
+description: "Ask the user yes/no, pick-one or A/B/C design questions on a local review board and read back their answers, using the sign-off-axi CLI. Use when you need a yes/no decision, a choice between a few options, a design pick between mocks, or approval from the user before going on, want the user to review or sign off on something, need to read back the answers the user already gave, must explain a concept, design or trade-off to the user as an interactive report, or need the user to sign in to a service."
 license: MIT
 metadata:
   author: umeranjum17
@@ -68,6 +68,15 @@ The user often reads the board on a phone. Each card must make sense in 10 secon
   - Recognition over recall: keep the steps and terms on screen; never make the reader remember one from earlier.
   - Phone first: 390 px wide, light and dark, big tap targets, at most 5 lines of text per block, plain words, no internal labels or ids.
 - Open it in a browser 390 px wide and look before posting: mostly text means it is not ready.
+
+## Ask the user to sign in
+
+When your work needs the user to sign in (for example a login link from `npm login`), post one sign-in card. It goes to the top of what waits.
+
+1. Post it: `npx -y sign-off-axi post --type signin --key <key> --service "<service>" --link <sign-in URL> --unlocks "<what it unlocks>" --waits "<who waits>" --expires 15m`. `--expires` is when the link stops working: an ISO date-time, or a time from now such as 15m. Post only an http(s) link, never a password or a token.
+2. When you see the sign-in worked, close the card: `npx -y sign-off-axi signin done --key <key>`. `wait --key <key>` returns once it is done.
+3. When the link expires, the card says so. Get a new link and post again with the same `--key`: the card shows the new link and waits again.
+4. When links expire fast (an `npm login --auth-type=web` link lasts about 5 minutes), post `--start '["npm", "login", "--auth-type=web"]'` in place of `--link` and `--expires`: each tap on Open runs that command on the board's computer and opens the new link it prints. When the command ends with exit 0, the card closes by itself.
 
 ## Design decisions: show A/B/C mocks, not words
 
