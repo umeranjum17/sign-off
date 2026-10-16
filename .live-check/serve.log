@@ -1,6 +1,0 @@
-board: ~/.no-mistakes/worktrees/5319504797ee/01M51XEYVZS5R3Q77XS9EFCB5N/.live-check/decisions.json
-url: "http://127.0.0.1:4937/"
-pid: 2066749
-help[2]:
-  Tell the user to answer at http://127.0.0.1:4937/
-  Run `sign-off-axi answers decisions.json` to read their answers
