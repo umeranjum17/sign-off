@@ -11,18 +11,29 @@
       "title": "Turn on dark mode by default for new users?",
       "about": "Most test users switch to dark within a day.",
       "detail": "Changes the first-run default only.",
+      "why": "The setting ships with Friday's release.",
+      "options": [
+        { "value": "yes", "label": "Yes", "outcome": "New users start in dark mode." },
+        { "value": "no", "label": "No", "outcome": "New users start in light mode, as today." }
+      ],
       "recommend_value": "yes",
-      "default_if_silent": "no"
+      "recommend_reason": "Most users pick dark anyway.",
+      "default_if_silent": "no",
+      "silent_by": "2026-10-17T16:00Z"
     },
     {
       "key": "release-window",
       "title": "When should the new sign-in screen go out?",
+      "why": "Two fixes are still in review.",
       "options": [
-        { "value": "today", "label": "Today" },
-        { "value": "friday", "label": "Friday" },
-        { "value": "next-week", "label": "Next week" }
+        { "value": "today", "label": "Today", "outcome": "It ships without the fixes." },
+        { "value": "friday", "label": "Friday", "outcome": "It ships with both fixes." },
+        { "value": "next-week", "label": "Next week", "outcome": "It waits for the redesign." }
       ],
-      "recommend_value": "friday"
+      "recommend_value": "friday",
+      "recommend_reason": "Both fixes land by Thursday.",
+      "default_if_silent": "friday",
+      "merges": ["sign-in-date"]
     }
   ]
 }
@@ -199,6 +210,8 @@
 - `options`: optional, 2 to 6 choices, or `[]` on a read-only or answers-only board for an item that is only shown and waits on nothing (unless it has `reply`). Each has a `value` (1-128 of `A-Z a-z 0-9 . _ -`, unique within the question) and a non-empty `label` shown on its button. Leave it out for **Yes** (`yes`) and **No** (`no`); files written before options existed read exactly as before.
 - `recommend_value`, `default_if_silent`: optional, the `value` of one of the question's own options (`yes` or `no` when `options` is left out). Shown, never applied.
 - `close`: optional, `done` (default) or `release`; copied into the answer.
+- `why`, `recommend_reason`, `silent_by`, an option's `outcome` and `merges`: the question standard ([contract.md](contract.md) section 5). `raise` and `post --type decision` require `why`, an `outcome` on every option, `recommend_reason` and `default_if_silent` on a new question, and check its title and buttons; items already on the board read as before. The card shows `why` under the title, each outcome under its button, the reason under **Recommended**, and "If you stay quiet: <label>, at <`silent_by`>".
+  `merges` lists other keys on the board this question replaces: the board hides them while it waits, and its answer is also written for each of them, with that item's own `close` and the note `Answered with <key>`.
 - `link`: optional on any item, an `http(s)` link (shown on its card as **Open on** and the site name) or a 7-40 character commit hash (shown under **Details**); a sign-in's link is its own and shows as its **Open** button (above).
 - Other keys are ignored.
 - `evidence`: optional read-only link to a done-done schema 1 run. Set `run_id`, its full 40-character `commit`, and the four plain-text Checks lines (`outcome`, `repro`, `proof`, `evidence`), each non-empty trimmed text up to 1000 characters. Start `serve` with `--evidence-root <store-root>` (the directory containing `.done-done/`); the board only reads that root and only opens media listed and hash-matched in that run record. The card reports the run command outcome, not a persisted claim-check receipt. done-done has no receipt schema yet; a missing or mismatched record stays `UNVERIFIED` in `evidenceCard.result`. On the card the result is a plain line over the title (**Check passed**, **Check failed**, **Check did not finish**, or **Could not check** with a one-sentence reason); an evidence update takes `outcome` (160 characters or fewer) as its headline, shows the run's media when it has none of its own, and folds its own title, the commit and the four lines under **Details**. Without `--evidence-root` the board checks nothing and the card shows no result.

@@ -1,1 +1,1 @@
-{"contract":1,"kind":"ask","schema":1,"key":"pick-a","title":"Pick the sign-in layout","options":[{"value":"a","label":"A"},{"value":"b","label":"B"}]}
+{"contract":1,"kind":"ask","schema":1,"key":"pick-a","title":"Which sign-in layout should ship?","why":"Umer wants one layout before the demo.","options":[{"value":"a","label":"A: One column","outcome":"The form stays in one column."},{"value":"b","label":"B: Split","outcome":"The form sits beside a picture."}]}

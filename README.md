@@ -26,7 +26,16 @@ npm install -g sign-off-axi
 sign-off-axi raise \
   --title "Keep the weekly \
 digest?" \
-  --recommend yes
+  --why "The paid plan \
+renews Monday." \
+  --outcome yes="It keeps \
+going out." \
+  --outcome no="It stops \
+this week." \
+  --recommend yes \
+  --recommend-reason "Readers \
+still open it." \
+  --default yes
 sign-off-axi open
 ```
 
@@ -38,7 +47,11 @@ sign-off-axi answers \
   --key keep-the-weekly-digest
 ```
 
-That is the whole loop: the agent raises, you tap, the agent reads. The
+That is the whole loop: the agent raises, you tap, the agent reads.
+Every question says why it is asked, what each answer does, which one the
+agent recommends and why, and what happens if you stay quiet; a question
+that does not is refused before it reaches you (see
+[the question standard](docs/contract.md#ask-schema-1)). The
 board is the default one (`~/.sign-off/decisions.json`); name a file after
 any command to use another board.
 
@@ -57,7 +70,17 @@ digest?" \
   --about "Open rate held \
 steady at about a third \
 for two months." \
-  --recommend yes
+  --why "The paid plan \
+renews Monday." \
+  --outcome yes="It keeps \
+going out each Monday." \
+  --outcome no="It stops \
+after this week." \
+  --recommend yes \
+  --recommend-reason "Readers \
+still open it." \
+  --default yes \
+  --silent-by 2026-10-19T09:00Z
 ```
 
 <picture>
@@ -78,11 +101,21 @@ page go out?" \
 bug reports for three \
 weeks. Support is fully \
 staffed on Friday." \
+  --why "Support is fully \
+staffed on Friday." \
   --option today=Today \
   --option friday=Friday \
   --option next-week="Next \
 week" \
+  --outcome today="It goes \
+out now." \
+  --outcome friday="It goes \
+out with support on hand." \
+  --outcome next-week="It \
+waits a week." \
   --recommend friday \
+  --recommend-reason "Support \
+can answer questions." \
   --default next-week
 ```
 

@@ -59,8 +59,40 @@ The user often reads the board on a phone. Each card must make sense in 10 secon
 - Title: the result or the question, in one short sentence: "You can now sign in with a passkey", "Ship the new sign-in this week?". Never a tool name, run id, version label, file path or error code.
 - \`--about\`: what changed for the user, in 1 or 2 short sentences. Write in ASD-STE100 Simplified Technical English: short sentences, active voice, common words.
 - Show the proof on the card: post a result to check as \`--type evidence\` with a screenshot or recording (\`--media\`); the user picks Pass, Fail or Needs work. When a picture explains more than words, add a diagram or an interactive page (see below).
-- Ask for one decision per card, and recommend the answer you would pick.
+- Ask for one decision per card, and recommend the answer you would pick (see the question standard below).
 - Put the pull request or page in \`--link\`. In a contract evidence message with a \`run\`, the \`outcome\` line heads the card: write it as the result the user can see.
+
+## Ask a good question
+
+sign-off refuses a question that breaks these rules, naming the field and one fix; \`raise --help\` has the current flags.
+
+- One decision is one card. Before you post, run \`npx -y sign-off-axi list --full\` and look at the open cards. If the same decision is already there, do not ask it again: wait on that card, or, to ask it better, post one card with \`--merge <its key>\`: the old card is hidden and the answer closes it too. Never post a second card for one decision.
+- Title: one plain question of 12 words or fewer, ending in "?", that the buttons answer. No "Say yes or no:" or "<task>:" prefix, no task names or ids.
+- \`--why\`: 1 or 2 short lines on what it is about and why it needs an answer now.
+- The buttons are the choices in the text: Yes and No for a yes/no question; for a pick, one \`--option\` per choice, each label starting with its letter (A, B, C). Never A/B/C in the text with Yes/No buttons, and never Done or Not now buttons on a question.
+- \`--outcome <value>=<text>\`: what happens next if that answer is picked, one line each, on every option.
+- \`--recommend\` the answer you would pick, with \`--recommend-reason\` in one line.
+- \`--default\`: what happens if the user stays quiet, and \`--silent-by <ISO UTC time>\` when.
+
+A good yes/no question:
+
+\`\`\`
+npx -y sign-off-axi raise --title "Ship the new sign-in screen this week?" \\
+  --why "The screen is ready and the release goes out Friday." \\
+  --outcome yes="It ships to everyone on Friday." --outcome no="It waits for next week's release." \\
+  --recommend yes --recommend-reason "Every check passed on 3 phones." \\
+  --default no --silent-by 2026-10-17T16:00Z
+\`\`\`
+
+A good A/B/C pick:
+
+\`\`\`
+npx -y sign-off-axi raise --title "Which day should the release ship?" \\
+  --why "Two fixes are still in review." \\
+  --option a="A: Today" --option b="B: Friday" --option c="C: Next week" \\
+  --outcome a="It ships now, without the 2 fixes." --outcome b="It ships with both fixes." --outcome c="It waits for the redesign too." \\
+  --recommend b --recommend-reason "Both fixes land by Thursday." --default b
+\`\`\`
 
 ## Evidence proves; a report explains
 

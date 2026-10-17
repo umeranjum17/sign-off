@@ -3,14 +3,33 @@
   "kind": "ask",
   "schema": 1,
   "key": "release-day",
-  "title": "When should the sign-in screen ship?",
+  "title": "Which day should the sign-in screen ship?",
   "link": "https://example.com/pull/41",
   "detail": "Umer asked for a date before the weekly demo.\nFriday leaves a day for fixes.",
+  "why": "Umer wants a date before the weekly demo: A, B or C.",
   "options": [
-    { "value": "today", "label": "Today" },
-    { "value": "friday", "label": "Friday" },
-    { "value": "next-week", "label": "Next week" }
+    {
+      "value": "a",
+      "label": "A: Today",
+      "outcome": "It ships now, without the 2 fixes."
+    },
+    {
+      "value": "b",
+      "label": "B: Friday",
+      "outcome": "It ships with both fixes."
+    },
+    {
+      "value": "c",
+      "label": "C: Next week",
+      "outcome": "It waits for the redesign too."
+    }
   ],
-  "recommend_value": "friday",
-  "close": "release"
+  "recommend_value": "b",
+  "recommend_reason": "Both fixes land by Thursday.",
+  "default_if_silent": "b",
+  "silent_by": "2026-10-17T16:00Z",
+  "close": "release",
+  "merges": [
+    "release-friday"
+  ]
 }

@@ -34,7 +34,7 @@ board: the nearest .sign-off/ board (the walk's bounds and SIGN_OFF_HOME: README
 flags: --full and --json on list, answers and wait, --events on wait, --json on status, --filer on post, raise and wait, --help on every command, -v/--version
 examples:
   sign-off-axi
-  sign-off-axi raise --title "Ship the new sign-in screen this week?" --recommend yes
+  sign-off-axi raise --title "Ship the new sign-in screen this week?" --why "The screen is ready; the release goes out Friday." --outcome yes="It ships Friday." --outcome no="It waits a week." --recommend yes --recommend-reason "Tests pass on every phone." --default no
   sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media shot.png
   sign-off-axi post .sign-off/decisions.json --type design --title "Pick the sign-in layout" --option a=A --option b=B --mock a=mocks/a.html --mock b=mocks/b.html --recommend b
   sign-off-axi post .sign-off/decisions.json --type diagram --title "Is this the sign-in flow?" --view mocks/sign-in/flow.svg
@@ -62,20 +62,28 @@ examples:
   sign-off-axi
   sign-off-axi list ./decisions.json --full
 `,
-  raise: `usage: sign-off-axi raise [board.json] --title "<question>" [--key <key>] [--about <text>] [--detail <text>] [--option <value>=<label>]... [--recommend <value>] [--default <value>] [--close done|release] [--filer <id>]
+  raise: `usage: sign-off-axi raise [board.json] --title "<question>" [--key <key>] [--about <text>] [--detail <text>] --why <text> [--option <value>=<label>]... --outcome <value>=<text>... --recommend <value> --recommend-reason <text> --default <value> [--silent-by <ISO time>] [--merge <key>]... [--close done|release] [--filer <id>]
        sign-off-axi raise [board.json] --from <decisions.json> [--filer <id>]
 Adds questions to the board: yes/no, or 2 to 6 choices with one --option each. --key defaults to a slug of the title.
 raise is the alias for post --type decision: same flags, same output.
---recommend and --default name a value (yes or no without --option). --default is what happens if the user stays silent; it is shown, never applied.
---recommend is required when you list --option (or "options" in a --from file): the board shows that option first and marks it.
-A plain yes/no may leave it out; then nothing is marked. The user answers with one tap and can undo it for a few seconds.
+Every question meets the question standard (docs/contract.md, "Asking a good question"); a question that does not is refused with the field and one fix line:
+  --title is one plain question the buttons answer: it ends in "?", has 12 words or fewer, no "Say yes or no:" or "<key>:" prefix and no key-like word.
+  --why says what it is about and why it needs an answer now (200 characters or fewer).
+  --outcome <value>=<text> says what happens next if that answer is picked (120 or fewer), one for every option: yes and no without --option.
+  --recommend names the answer you would pick, --recommend-reason why in one line (160 or fewer).
+  --default is what happens if the user stays quiet, shown and never applied; --silent-by (an ISO UTC time such as 2026-10-18T09:00Z) says when.
+  The buttons match the text: a title or why that names choices A, B, C needs one --option per letter, each label starting with its letter, never Yes/No.
+  yes and no are labelled Yes and No; a question never takes Done, OK or Not now buttons.
+One decision is one card: look at the open cards first. --merge <key> (up to 10) names other cards on the board that ask the same thing:
+they are hidden while this one waits, and its answer closes them too, with the same value and a note naming this key.
+The user answers with one tap and can undo it for a few seconds.
 --from adds every decision in a decisions file: ${FORMAT}
 Raising the same question again is a no-op that reports its status; a different question under a used key is refused.
 --filer names who asks (your agent session or any id of 1-128 of A-Z a-z 0-9 . _ -), saved on the item so \`wait --filer\` with the same id gets the answer.
 SIGN_OFF_FILER sets it for every command; with neither, the Claude Code session id is saved when there is one.
 examples:
-  sign-off-axi raise --title "Keep the weekly digest?" --about "Open rate held steady." --recommend yes
-  sign-off-axi raise --title "When should it ship?" --option today=Today --option friday=Friday --option next-week="Next week" --recommend friday
+  sign-off-axi raise --title "Keep the weekly digest?" --why "Open rate held steady; the paid plan ends Monday." --outcome yes="It keeps going out each Monday." --outcome no="It stops after this week." --recommend yes --recommend-reason "Readers still open it." --default yes --silent-by 2026-10-19T09:00Z
+  sign-off-axi raise --title "Which day should the release ship?" --why "Two fixes are still in review." --option a="A: Today" --option b="B: Friday" --option c="C: Next week" --outcome a="Ships now without the fixes." --outcome b="Ships with both fixes." --outcome c="Ships with the redesign too." --recommend b --recommend-reason "Both fixes land by Thursday." --default b --merge release-day
   sign-off-axi raise --from ./decisions.json
 `,
   validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>] [--expect-invalid]
@@ -174,13 +182,14 @@ examples:
        sign-off-axi post [board.json] --type report --title "<the answer>" --about "<why it matters>" --view <page.html> --preview <picture> [--key <key>] [--link <commit or URL>] [--filer <id>]
        sign-off-axi post [board.json] --type signin --service "<name>" --link <sign-in URL> --unlocks "<what it unlocks>" --waits "<who waits>" [--expires <ISO time or 15m>] [--key <key>] [--filer <id>]
        sign-off-axi post [board.json] --type signin --service "<name>" --start '<command as a JSON list>' --unlocks "<what it unlocks>" --waits "<who waits>" [--key <key>] [--filer <id>]
-Posts an item for the user. --type decision (the default) is a yes/no or pick-one question, exactly like raise.
+Posts an item for the user. --type decision (the default) is a yes/no or pick-one question, exactly like raise, with the same question standard and flags (--why, --outcome, --recommend-reason, --silent-by, --merge).
 --kind posts one contract message (${CONTRACT}), read from a file or from stdin with --from -: it must be that kind and pass every rule,
 else it is refused with one fix line and nothing is written. A key already on the board takes only the same message again; anything else exits 2.
 --kind evidence copies its media, read from the message file's folder (the current folder for stdin), into evidence/<number>/ like --type evidence;
 a "run" is the update's proof: its outcome line heads the card, so write it as the result the user can see. With no key it posts the next update-<number>.
 --kind gate holds a done-done run for the user: it waits like an ask; run done-done respond --action <the picked value>.
 --kind finding asks the user to apply or skip a retro's proposed change: it waits like an ask.
+An ask, posted with --kind ask, in a --from file, or changed in a --replace feed, is held to the question standard too (see raise --help); items already on the board are not checked again.
 Listing --option needs --recommend <value>, on every type: the option you would pick, shown first and marked. --from --replace feeds are not held to it.
 --filer names who posts (your agent session or any id of 1-128 of A-Z a-z 0-9 . _ -), saved on the item; then \`wait --filer <id>\` gets the answer.
 SIGN_OFF_FILER sets it for every command; with neither, the Claude Code session id is saved when there is one.
@@ -218,7 +227,7 @@ within 20 seconds, shows on the card and Open can try again. It is stopped after
 examples:
   sign-off-axi post --type design --title "Pick the sign-in layout" --option a="A: single column" --option b="B: split screen" --mock a=mocks/a.html --mock b=mocks/b.html --tradeoff "B scans fastest; A is simplest." --recommend b
   sign-off-axi post .sign-off/decisions.json --type design --key sign-in --title "Pick the sign-in layout" --option a=A --option b=B --option c=C --mock a=mocks/sign-in/index.html?variant=a --mock b=mocks/sign-in/index.html?variant=b --mock c=mocks/sign-in/index.html?variant=c --tradeoff "..." --recommend b
-  sign-off-axi post --type decision --title "Keep the weekly digest?" --recommend yes
+  sign-off-axi post --type decision --title "Keep the weekly digest?" --why "Open rate held steady." --outcome yes="It keeps going out." --outcome no="It stops this week." --recommend yes --recommend-reason "Readers still open it." --default yes
   sign-off-axi post --kind ask --from ask.json --filer agent-41
   sign-off-axi post --kind evidence --from proof/evidence.json --filer done-done
   sign-off-axi post --kind gate --from gate.json --filer done-done
@@ -311,6 +320,16 @@ function fits(title: unknown, key?: string) {
   const n = typeof title === 'string' ? [...title].length : 0;
   if (n > TITLE_MAX) throw fail(`${key ? `key ${key}: ` : ''}title is ${n} characters, over ${TITLE_MAX}`, 'VALIDATION_ERROR', `Shorten the title to ${TITLE_MAX} characters and put the rest in about`);
 }
+/** The question standard's flags: a decision's why, each option's outcome, the reason for the recommendation, when silence decides, the cards it merges. */
+const ASK_FLAGS = ['why', 'outcome', 'recommend-reason', 'silent-by', 'merge'];
+const MANY = ['option', 'outcome', 'merge'];
+/** A flag post's refusal names its flags, not the message fields they fill. */
+const FLAG_OF: Record<string, string> = { why: 'why', recommend_reason: 'recommend-reason', default_if_silent: 'default', silent_by: 'silent-by', merges: 'merge', recommend_value: 'recommend', title: 'title', detail: 'detail' };
+const asFlags = (text: string) => text.replace(/"outcome" to option ([\w.-]+):/g, '--outcome $1=<text>:')
+  .replace(/\{"value":"(\w+)","label":"([^"]*)","outcome":"[^"]*"\}/g, '--option $1="$2" --outcome $1=<text>')
+  .replace(/"recommend_value": "([\w.-]+)"/g, '--recommend $1')
+  .replace(/(?<=^key [\w.-]+: )merges\[\d+\]/, 'merges')
+  .replace(/"(why|recommend_reason|default_if_silent|silent_by|merges|recommend_value|title|detail)"|(?<=^key [\w.-]+: )(why|recommend_reason|default_if_silent|silent_by|merges|recommend_value|title)\b/g, (_, q, f) => `--${FLAG_OF[q ?? f]}`);
 /** Board types that are contract kinds: a decision (the default type) is an ask. */
 const CONTRACT_TYPES = ['decision', 'ask', 'evidence', 'report', 'plan'];
 /** The stored item as the message it came from: the board's own `filed` stamp is not part of a message that names none. */
@@ -357,7 +376,7 @@ function contractItems(items: any[], from: string, file: string, replace = false
     }
   });
 }
-const RAISE_FIELDS = ['title', 'key', 'about', 'detail', 'option', 'recommend', 'default', 'close'];
+const RAISE_FIELDS = ['title', 'key', 'about', 'detail', 'option', 'recommend', 'default', 'close', ...ASK_FLAGS];
 
 /** Parses one command's flags strictly; `on` carries a given board file into the next-step hints. */
 function parse(cmd: string, args: string[], flags: Flags) {
@@ -668,7 +687,7 @@ function post(args: string[], cmd = 'post') {
     media: { type: 'string', multiple: true }, link: { type: 'string' }, view: { type: 'string' }, preview: { type: 'string' }, chapter: { type: 'string', multiple: true },
     ...Object.fromEntries(SIGNIN_FIELDS.map((f) => [f, { type: 'string' as const }])) } : {};
   const { file, values, on } = parse(cmd, args, { from: { type: 'string' }, filer: { type: 'string' }, ...typed,
-    ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: f === 'option' }])) });
+    ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: MANY.includes(f) }])) });
   const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'link', 'view', 'preview', 'chapter', ...SIGNIN_FIELDS].filter((f) => values[f] !== undefined);
   if (values.kind !== undefined) {
     const odd = [...given, ...(values.replace ? ['replace'] : [])][0];
@@ -678,7 +697,8 @@ function post(args: string[], cmd = 'post') {
   if (values.from !== undefined && given.length) throw fail(`--from cannot be combined with --${given[0]}`, 'VALIDATION_ERROR', `Put every field in the --from file, or ${cmd} with flags only`);
   if (values.replace) return replace(file, on, values.from, filerOf(values));
   const filer = filerOf(values, true);
-  const type = values.type ?? 'decision';
+  const type = values.type ?? 'decision', told = ASK_FLAGS.find((f) => values[f] !== undefined);
+  if (told && type !== 'decision') throw fail(`--${told} needs --type decision`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (type === 'report') return postReport(file, on, values);
   if (type === 'signin') return postSignin(file, on, values, filer);
   const odd = SIGNIN_FIELDS.find((f) => values[f] !== undefined);
@@ -1015,6 +1035,16 @@ const optionsOf = (values: Record<string, any>) => values.option?.map((o: string
   if (at < 1) throw fail(`--option ${o} must be <value>=<label>`, 'VALIDATION_ERROR', 'sign-off-axi raise --title "<question>" --option friday=Friday --option next-week="Next week" --recommend friday');
   return { value: o.slice(0, at), label: o.slice(at + 1) };
 });
+/** A decision's options with what each does next: its --option list, or Yes and No, each given one --outcome <value>=<text>. */
+const outcomesOf = (values: Record<string, any>) => {
+  const options: Option[] = optionsOf(values) ?? [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
+  for (const o of values.outcome ?? []) {
+    const at = o.indexOf('='), hit = options.find((x) => x.value === o.slice(0, at));
+    if (at < 1 || !hit) throw fail(`--outcome ${o} must be <value>=<what happens next>, for one of ${options.map((x) => x.value).join(', ')}`, 'VALIDATION_ERROR', 'sign-off-axi raise --title "<question>" --outcome yes="<what happens if Yes>" --outcome no="<what happens if No>"');
+    hit.outcome = o.slice(at + 1);
+  }
+  return options;
+};
 /** Whoever lists the choices names the one they would pick: the board puts it first and marks it. A plain yes/no may leave it out,
  * and a program feeding a whole board with --replace is not held to it. */
 function recommended(items: any[], flags: boolean) {
@@ -1036,10 +1066,19 @@ function buildIncoming(values: Record<string, any>, extra: object, filer: string
   const scratch = mkdtempSync(join(tmpdir(), 'sign-off-'));
   const source = join(scratch, 'flags');
   try {
-    const { title, key = slug(title), about, detail, recommend: recommend_value, default: default_if_silent, close } = values;
-    writeFileSync(source, JSON.stringify({ schema: 2, items: [{ key, title, about, detail, options: optionsOf(values), recommend_value, default_if_silent, close, ...extra, filer }] }));
+    const { title, key = slug(title), about, detail, why, recommend: recommend_value, default: default_if_silent, close } = values;
+    const ask = !Object.hasOwn(extra, 'type'), options = ask ? outcomesOf(values) : optionsOf(values);
+    const told = ask && { why, recommend_reason: values['recommend-reason'], silent_by: values['silent-by'], merges: values.merge };
+    writeFileSync(source, JSON.stringify({ schema: 2, items: [{ key, title, about, detail, ...told, options, recommend_value, default_if_silent, close, ...extra, filer }] }));
     const incoming = loadDecisions(source, board), raw = readItems(source).items;
-    recommended(raw, true);
+    if (!ask) recommended(raw, true);
+    // A decision is an ask: the same question standard as post --kind ask, its refusals naming the flags.
+    // A key already on the board is not a new question: storing it reports it, or refuses a different one.
+    if (ask && !(existsSync(file) && readItems(file).items.some((i: any) => i?.key === key))) {
+      try { checkMessage({ contract: 1, kind: 'ask', schema: 1, ...raw[0] }); } catch (e) {
+        throw e instanceof ContractError ? fail(asFlags(e.message), 'VALIDATION_ERROR', asFlags(e.help)) : e;
+      }
+    }
     return { incoming, raw };
   } finally {
     rmSync(scratch, { recursive: true, force: true });

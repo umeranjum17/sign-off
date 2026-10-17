@@ -12,7 +12,7 @@ export const SCHEMAS: Record<string, number> = { ask: 1, report: 2, evidence: 1,
 export const KINDS = Object.keys(SCHEMAS);
 const COMMON = ['contract', 'kind', 'schema', 'key', 'title', 'filer', 'link', 'about'];
 const FIELDS: Record<string, string[]> = {
-  ask: [...COMMON, 'detail', 'options', 'recommend_value', 'default_if_silent', 'close'],
+  ask: [...COMMON, 'detail', 'why', 'options', 'recommend_value', 'recommend_reason', 'default_if_silent', 'silent_by', 'close', 'merges'],
   report: [...COMMON, 'filed', 'group', 'decided', 'view', 'preview'],
   evidence: [...COMMON, 'media', 'run'],
   gate: [...COMMON, 'run', 'options', 'recommend_value', 'close'],
@@ -107,8 +107,8 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
     });
     return v;
   };
-  /** Each option: exactly value and label (and on a plan's decision, outcome), its value unique. Ask, gate, finding and plan decisions share it. */
-  const checkOptions = (field: string, options: any[], outcome = false) => options.forEach((o: any, n: number) => {
+  /** Each option: exactly value and label (and an outcome on a plan's decision, or on an ask, where it is required and short), its value unique. Ask, gate, finding and plan decisions share it. */
+  const checkOptions = (field: string, options: any[], outcome: boolean | 'ask' = false) => options.forEach((o: any, n: number) => {
     const at = `${field}[${n}]`, fields = outcome ? ['value', 'label', 'outcome'] : ['value', 'label'];
     if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad(at, 'must be an object', `Write each option as {"value":"<id>","label":"<text>"${outcome ? ',"outcome":"<what it leads to>"' : ''}}`);
     const odd = Object.keys(o).find((f) => !fields.includes(f));
@@ -116,7 +116,11 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
     if (!isKey(o.value)) throw bad(`${at}.value`, 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "value" to a short id such as "yes"');
     if (options.slice(0, n).some((p: any) => p.value === o.value)) throw bad(`${at}.value`, `repeats ${o.value}`, 'Give every option its own value');
     text(`${at}.label`, o.label, 80, 'the button text, in 80 characters or fewer');
-    if (outcome) text(`${at}.outcome`, o.outcome, 200, 'what picking it leads to, in 200 characters or fewer');
+    if (outcome === 'ask') {
+      const OUTCOME = `what happens next if ${o.value} is picked, in one line (120 characters or fewer)`;
+      if (!Object.hasOwn(o, 'outcome')) throw bad(`${at}.outcome`, 'is required', `Add "outcome" to option ${o.value}: ${OUTCOME}`);
+      text(`${at}.outcome`, o.outcome, 120, OUTCOME);
+    } else if (outcome) text(`${at}.outcome`, o.outcome, 200, 'what picking it leads to, in 200 characters or fewer');
   });
   /** The option the poster would pick, `field` on `o`: required, and one of the option values, which it returns. */
   const recommend = (field: string, o: any, options: any[]): string[] => {
@@ -216,19 +220,40 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
   }
   if (Object.hasOwn(m, 'about')) text('about', m.about, 500, 'a short note, or leave it out');
   if (Object.hasOwn(m, 'detail')) text('detail', m.detail, 1000, 'the longer note, or leave it out');
+  // An ask is read on a phone with no other context: it says why it is asked, what each answer does, why one is recommended and what silence does.
+  const ask = m.kind === 'ask', WHY = 'what it is about and why it needs an answer now, in 1 or 2 short lines (200 characters or fewer)';
+  if (ask && !Object.hasOwn(m, 'why')) throw bad('why', 'is required', `Add "why": ${WHY}`);
+  if (ask) text('why', m.why, 200, WHY);
   // A gate offers 2 or 3 of done-done's actions and a finding both of apply and skip, in any order, each with its own label.
   const options = m.options, actions = ACTIONS[m.kind], max = actions ? Object.keys(actions).length : 6;
   const named = actions && Object.entries(actions).map(([value, label]) => show({ value, label })).join(', ');
   const listed = !actions ? 'Set "options" to 2-6 objects such as {"value":"yes","label":"Yes"}' : max === 3 ? `Set "options" to 2 or 3 of ${named}` : `Set "options" to ${named}`;
   if (!Array.isArray(options) || options.length < 2 || options.length > max) throw bad('options', Object.hasOwn(m, 'options') ? `must list ${({ 2: '2', 3: '2 or 3' } as Record<number, string>)[max] ?? '2 to 6'} options` : 'is required', listed);
-  checkOptions('options', options);
+  checkOptions('options', options, ask ? 'ask' : false);
   const odd = actions && options.find((o: any) => !Object.hasOwn(actions, o.value) || actions[o.value] !== o.label);
   if (odd) throw bad('options', `${show(odd)} is not a ${m.kind} action: ${Object.keys(actions).join(', ')}, each with its label`, listed);
   const values = recommend('recommend_value', m, options);
+  const REASON = `why you recommend ${m.recommend_value}, in one line (160 characters or fewer)`;
+  if (ask && !Object.hasOwn(m, 'recommend_reason')) throw bad('recommend_reason', 'is required', `Add "recommend_reason": ${REASON}`);
+  if (ask) text('recommend_reason', m.recommend_reason, 160, REASON);
+  if (ask && !Object.hasOwn(m, 'default_if_silent')) throw bad('default_if_silent', 'is required', `Add "default_if_silent": the option that happens if the person stays quiet, one of ${values.join(', ')}`);
   if (Object.hasOwn(m, 'default_if_silent') && !values.includes(m.default_if_silent)) {
-    throw bad('default_if_silent', `${show(m.default_if_silent)} is not an option value`, `Set "default_if_silent" to one of ${values.join(', ')}, or leave it out`);
+    throw bad('default_if_silent', `${show(m.default_if_silent)} is not an option value`, `Set "default_if_silent" to one of ${values.join(', ')}${ask ? '' : ', or leave it out'}`);
   }
+  // A real UTC time to the minute, seconds optional: Date.parse would roll 2026-02-30 over to March.
+  const utc = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?Z$/.test(v) && !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().startsWith(v.slice(0, -1));
+  if (Object.hasOwn(m, 'silent_by') && !utc(m.silent_by)) throw bad('silent_by', `${show(m.silent_by)} is not a UTC time such as 2026-10-17T18:00:00Z`, 'Set "silent_by" to when the silent default happens, as YYYY-MM-DDTHH:MM:SSZ in UTC, or leave it out');
   if (Object.hasOwn(m, 'close') && m.close !== 'done' && m.close !== 'release') throw bad('close', 'must be done or release', 'Set "close" to "done" or "release", or leave it out');
+  if (Object.hasOwn(m, 'merges')) {
+    const keys = m.merges, MERGES = 'Set "merges" to the keys of 1 to 10 other cards on the board that ask the same thing, such as ["ship-signin"]';
+    if (!Array.isArray(keys) || !keys.length || keys.length > 10) throw bad('merges', 'must list 1 to 10 keys', MERGES);
+    keys.forEach((k: unknown, n: number) => {
+      if (!isKey(k)) throw bad(`merges[${n}]`, 'must be 1-128 of A-Z a-z 0-9 . _ -', MERGES);
+      if (k === m.key) throw bad(`merges[${n}]`, 'is this ask\'s own key', 'Name the other cards that ask the same thing, not this one');
+      if (keys.indexOf(k) < n) throw bad(`merges[${n}]`, `repeats ${k}`, 'List each key once');
+    });
+  }
+  if (ask) question(m, bad);
   // A gate's run is its own rule (section 5), so it comes after the field rules of section 4.
   if (m.kind === 'gate') {
     if (!Object.hasOwn(m, 'run')) throw bad('run', 'is required', 'Add "run": {"run_id": "<done-done run id>", "commit": "<full commit>"}, the run held for approval');
@@ -252,6 +277,52 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
     text('proposal', m.proposal, 500, 'the change, in 500 characters or fewer');
   }
   return { kind: m.kind, schema: m.schema };
+}
+
+/** Short words that join a plain compound such as end-to-end or one-at-a-time; a hyphenated word of 3 or more parts with none of them is an id. */
+const JOINS = new Set(['a', 'an', 'and', 'at', 'by', 'for', 'in', 'of', 'on', 'or', 'per', 'the', 'to']);
+/** An id or task name, never a word a person says: lowercase parts joined by hyphens that end in a number (slice-5), or 3 or more parts with no joining word. */
+const idWord = (w: string) => {
+  const parts = w.split('-');
+  return /^[a-z0-9]+(-[a-z0-9]+)+$/.test(w) && /[a-z]/.test(w) && (/^\d+$/.test(parts.at(-1)!) || (parts.length >= 3 && !parts.some((p) => JOINS.has(p))));
+};
+/** Buttons that close a card but answer no question. */
+const NOT_ANSWERS = /^(done|not now|ok|okay|got it|noted|seen|acknowledged?|dismiss)$/i;
+/** The lettered choices a text names, such as "A/B/C", "A, B or C", "Option A", "A:" or "(A)"; an A/B test is not a choice. */
+function lettered(text: string) {
+  const found = new Set<string>();
+  for (const [g] of text.matchAll(/\b[A-F](\s*(,|\/|\bor\b|\band\b)\s*[A-F]\b)+(?!\s*test)/g)) for (const c of g.match(/\b[A-F]\b/g)!) found.add(c);
+  for (const [, c] of text.matchAll(/\b[Oo]ption ([A-F])\b/g)) found.add(c);
+  for (const [, c] of text.matchAll(/(?:^|[\s(])([A-F])[:)](?=\s|$)/gm)) found.add(c);
+  for (const [, c] of text.matchAll(/^([A-F])\.(?=\s|$)/gm)) found.add(c);
+  return [...found].sort();
+}
+/** The question standard on a new ask: a plain question the buttons answer, with buttons that match the choices its words name. */
+function question(m: any, bad: (field: string, rule: string, help: string) => ContractError) {
+  const title = m.title.trim(), words = title.split(/\s+/).length, PLAIN = 'Write one plain question the buttons answer, in 12 words or fewer, such as "Ship the new sign-in screen this week?"';
+  if (/say yes or no|captain hold/i.test(title) || /^captain\s*:/i.test(title) || /^[A-Za-z0-9._-]*[\d._-][A-Za-z0-9._-]*:/.test(title)) {
+    throw bad('title', 'starts with a label for agents, not the question', 'Remove the label in front (such as "Say yes or no:" or "captain hold <id>:") and ask the question itself');
+  }
+  const id = title.split(/\s+/).map((w: string) => w.replace(/^[^\w]+|[^\w]+$/g, '')).find(idWord);
+  if (id) throw bad('title', `has the id ${show(id)}, which the person does not know`, 'Say what it is in plain words, and put ids in "link" or "detail"');
+  if (!title.endsWith('?')) throw bad('title', 'must be a question ending in "?"', PLAIN);
+  if (words > 12) throw bad('title', `is ${words} words, over 12`, `${PLAIN}; put the rest in "why"`);
+  const options: { value: string; label: string }[] = m.options, letters = lettered([m.title, m.why, m.detail].filter(Boolean).join('\n'));
+  const PICK = `Give one option per choice, each label starting with its letter, such as {"value":"a","label":"A: <short label>","outcome":"<what happens next>"}`;
+  if (letters.length >= 2) {
+    const named = letters.join(', ');
+    if (options.some((o) => o.value === 'yes' || o.value === 'no')) throw bad('options', `are Yes/No, but the text names choices ${named}`, PICK);
+    if (options.length !== letters.length) throw bad('options', `has ${options.length} options, but the text names ${letters.length} choices: ${named}`, PICK);
+    for (const c of letters) {
+      const n = options.filter((o) => new RegExp(`^(Option\\s+)?${c}(?![a-z])`).test(o.label.trim())).length;
+      if (n !== 1) throw bad('options', n ? `has ${n} option labels that start with ${c}` : `has no option label that starts with ${c}`, PICK);
+    }
+  }
+  options.forEach((o, n) => {
+    const want = ({ yes: 'Yes', no: 'No' } as Record<string, string>)[o.value];
+    if (want && o.label !== want) throw bad(`options[${n}].label`, `of option ${o.value} is ${show(o.label)}, not ${want}`, `Set the label of ${o.value} to "${want}"`);
+    if (NOT_ANSWERS.test(o.label.trim())) throw bad(`options[${n}].label`, `${show(o.label)} does not answer a question`, 'Use buttons that answer the title: Yes and No, or one per choice');
+  });
 }
 
 /** An evidence message's media files, from `base`, the message file's folder: each a file of 50,000,000 bytes or fewer whose real path,

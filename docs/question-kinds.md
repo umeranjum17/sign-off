@@ -13,10 +13,15 @@ retro proposals are `finding` (schema 1), read-only pages are `report`
 
 With no `--option` a question is Yes/No; 2 to 6 `--option` flags make it
 pick-one (`--option friday=Friday --option next-week="Next week"`).
-`--recommend` and `--default` name one of its values. Listing options needs
-`--recommend` (on `raise`, `post` and `--from` files): the board shows that
-option first and marks it; a plain Yes/No may leave it out. `--default` is
-what happens if the user stays silent; it is shown, never applied.
+Every new question meets the question standard ([contract.md](contract.md)
+section 5): a title of 12 words or fewer that ends in `?`, a `--why` line,
+an `--outcome <value>=<text>` for every option (yes and no too), a
+`--recommend` value with its `--recommend-reason`, and a `--default` for when
+the user stays silent (shown, never applied), with an optional `--silent-by`
+time. Lettered choices in the text need one lettered `--option` each, never
+Yes/No buttons. `--merge <key>` folds another card asking the same thing into
+this one: it is hidden, and this answer closes it too. A question that breaks
+a rule is refused with the field and one fix line.
 
 Each answer is one tap, with an Undo for a few seconds after it (an Undo is
 saved as an answer change). Typing is last: every question with options has
