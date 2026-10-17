@@ -251,7 +251,7 @@ export const CLEARED: Option = { value: '', label: '' };
  * One decision is one card: the answer also goes, as its own line, to each card on the board this ask merges, under that card's close mode. */
 export function appendAnswer(decisionsPath: string, d: Decision, option: Option, note = '', comments: Sent[] = []): Answer | undefined {
   const answer = saveAnswer(decisionsPath, d, option, note, comments);
-  if (!answer || !d.merges?.length) return answer;
+  if (!d.merges?.length) return answer;
   const on = loadDecisions(decisionsPath);
   for (const key of d.merges) {
     const merged = on.find((x) => x.key === key);
