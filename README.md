@@ -298,21 +298,14 @@ The waiting list and the summary at desk width, light and dark.
 
 ## How agents use it
 
-Every item records who filed it, and that agent gets the answer as an event,
-by itself:
-
-```sh
-sign-off-axi raise \
-  --title "Keep the weekly digest?" \
-  --filer my-agent
-sign-off-axi wait \
-  --filer my-agent
-```
-
-`wait --filer` returns only that filer's answers, each once, and the card
-shows **Seen by agent**. An agent that cannot block can be woken instead:
-an `on_answer:` line in the `config.yaml` beside the board names a command
-the board runs for every answer.
+Every item records who filed it, and that agent gets the answer as an
+event, by itself: the agent raises with `--filer my-agent` and blocks on
+`sign-off-axi wait --filer my-agent`, which returns only that filer's
+answers, each once, and the card shows **Seen by agent**. An agent that
+cannot block can be woken instead: an `on_answer:` line in the
+`config.yaml` beside the board names a command the board runs for every
+answer. The full reference, with the worked example, is in
+[docs/commands.md](docs/commands.md).
 
 Every command takes `--help` and prints compact output with next-step hints.
 sign-off itself calls no model and inherits the calling agent's model routing.
