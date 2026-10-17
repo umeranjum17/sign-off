@@ -1007,6 +1007,46 @@ test('Waiting on you: a type label on each ask, type chips with counts, and the 
   proc.kill();
 });
 
+// Fed boards arrive with shapes the poster chose: a stored type-ask keeps its stored type but shows the type its shape answers as,
+// and one shared classifier names every ask and groups the type chips, so a card's label is always the chip it sits under.
+test('Waiting on you: a reply-only ask shows Reply, a type-ask yes/no shows Yes/No, and a decision with mocks but no design type shows Pick one', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'fed-types'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  writeFileSync(file, JSON.stringify({ schema: 2, answers_only: true, items: [
+    { key: 'ready', type: 'ask', title: 'Say ready when you are', options: [], reply: true },
+    { key: 'ship', type: 'ask', title: 'Ship it?' },
+    { key: 'cover', title: 'Pick a cover', options: ['a', 'b'].map((v) => ({ value: v, label: v.toUpperCase() })), recommend_value: 'b',
+      mocks: [{ value: 'a', path: 'mocks/a/index.html' }, { value: 'b', path: 'mocks/b/index.html' }] },
+  ] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+  const chips = () => evaluate('[...document.querySelectorAll(".chips button")].map((b) => b.textContent + (b.getAttribute("aria-pressed") === "true" ? "*" : "")).join("|")');
+  const queue = () => evaluate('[...document.querySelectorAll(".queue strong")].map((s) => s.textContent).join("|")');
+  const tap = (name) => evaluate(`[...document.querySelectorAll(".queue button")].find((b) => b.textContent.includes("${name}"))?.click() ?? true`);
+  // Newest first: the mocks decision leads, as a plain pick-one card with its two buttons and no mock frames.
+  await until(async () => (await evaluate('document.querySelector(".fhead")?.textContent')) === '1 of 3');
+  assert.equal(await queue(), 'Pick a cover|Ship it?|Say ready when you are');
+  assert.equal(await evaluate('document.querySelector(".focus .eyebrow")?.textContent'), 'Pick one');
+  assert.equal(await evaluate('document.querySelectorAll(".focus .choices button").length'), 2);
+  assert.equal(await evaluate('document.querySelector(".focus .mock")'), null);
+  assert.equal(await chips(), 'All 3*|Yes/No 1|Pick one 1|Reply 1');
+  // The stored type-ask with the default yes/no options shows Yes/No, on the card and in its chip.
+  await until(async () => (await tap('Ship it?')) && (await evaluate('document.querySelector(".focus .eyebrow")?.textContent')) === 'Yes/No');
+  assert.equal(await evaluate('document.querySelectorAll(".focus .choices button").length'), 2);
+  // The reply-only ask is a Reply, answered in the one place to type.
+  await until(async () => (await tap('Say ready')) && (await evaluate('document.querySelector(".focus .eyebrow")?.textContent')) === 'Reply');
+  assert.equal(await evaluate('document.querySelectorAll(".focus .choices button").length'), 0);
+  assert.notEqual(await evaluate('document.querySelector(".focus textarea")'), null);
+  // Its chip filters to just the reply-only ask.
+  await until(async () => (await evaluate('[...document.querySelectorAll(".chips button")].find((b) => b.textContent.startsWith("Reply"))?.click() ?? true')) && (await queue()) === 'Say ready when you are');
+  assert.equal(await evaluate('document.querySelector(".fhead")?.textContent'), '1 of 1');
+  close();
+  proc.kill();
+});
+
 test('Clear all done on 201 answered items, set two across on a wide screen: the page empties in chunks, says so, and Undo brings all 201 back', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'many-answered'), file = join(dir, 'board.json');
   mkdirSync(dir);
