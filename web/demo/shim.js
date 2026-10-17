@@ -10,7 +10,6 @@
   const DIGEST = window.SIGN_OFF_DEMO_DIGEST || 'v1';
   if (!SEED) return;
   const KEY = `sign-off-demo-${DIGEST}`;
-  const clone = (v) => JSON.parse(JSON.stringify(v));
 
   // Saved taps, kept in this browser only.
   const load = () => {
@@ -31,7 +30,6 @@
     seen: [],
     rounds: saved.rounds ?? [],
     messages: saved.messages ?? [],
-    annotations: saved.annotations ?? [],
     dismissed: saved.dismissed ?? [],
   });
   const keep = () => {
@@ -41,7 +39,6 @@
         dismissed: saved.dismissed ?? [],
         messages: saved.messages ?? [],
         rounds: saved.rounds ?? [],
-        annotations: saved.annotations ?? [],
       }));
     } catch {}
   };
@@ -54,7 +51,6 @@
 
   async function api(url, init = {}) {
     const method = (init.method || 'GET').toUpperCase();
-    if (method === 'GET' && url === '/api/board') return ok({ file: 'demo', pid: 0 });
     if (method === 'GET' && url === '/api/decisions') return ok(state());
     if (method !== 'POST') return err(404, 'Not found');
     let body = {};
@@ -112,23 +108,6 @@
       keep();
       return ok(state());
     }
-    if (url === '/api/annotations') {
-      const { id, deleted } = body;
-      saved.annotations ??= [];
-      if (deleted === true) {
-        saved.annotations = saved.annotations.filter((a) => a.id !== id);
-        keep();
-        return ok(state());
-      }
-      const { key, mock, ref, tag, words, text, hash } = body;
-      if (!decision(key)) return err(404, 'This mock is no longer on the board');
-      if (typeof text !== 'string' || !text.trim()) return err(400, 'Write the comment first');
-      const found = id !== undefined && saved.annotations.find((a) => a.id === id);
-      const row = { id: found?.id ?? rid(), key, mock, hash, ref, tag, words, text: text.trim(), at: now() };
-      saved.annotations = [...saved.annotations.filter((a) => a.id !== row.id), row];
-      keep();
-      return ok(state());
-    }
     return err(404, 'Not found');
   }
 
@@ -164,7 +143,7 @@
 
   // The demo bar and the agent view: demo-only controls above the real board.
   const css = document.createElement('style');
-  css.textContent = `#demo-bar{margin:1rem 0 0;padding:.625rem .875rem;border:1px dashed var(--border);border-radius:.75rem;background:var(--surface);display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;font-size:.875rem;color:var(--muted)}#demo-bar>*{min-width:0}#demo-bar b{color:var(--text)}#demo-bar button{min-height:2.25rem;padding:0 .875rem;border-radius:999px;font-size:.875rem}#demo-answers{margin:.5rem 0 0;flex-basis:100%;min-width:0;max-width:100%}#demo-answers summary{color:var(--accent);font-weight:600;min-height:2rem;font-size:.875rem}#demo-answers pre{margin:.25rem 0 0;padding:.625rem .75rem;border-radius:.5rem;background:var(--sunk);font-size:.8125rem;white-space:pre-wrap;overflow-wrap:anywhere}`;
+  css.textContent = `#demo-bar{margin:1rem 0 0;padding:.625rem .875rem;border:1px dashed var(--border);border-radius:.75rem;background:var(--surface);display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;font-size:.875rem;color:var(--muted)}#demo-bar>*{min-width:0}#demo-bar b{color:var(--text)}#demo-bar button{min-height:2.25rem;padding:0 .875rem;border-radius:999px;font-size:.875rem}#demo-answers{margin:.5rem 0 0;flex-basis:100%;min-width:0;max-width:100%}#demo-answers summary{color:var(--accent);font-weight:600;min-height:2rem;font-size:.875rem}#demo-answers pre{margin:.25rem 0 0;padding:.625rem .75rem;border-radius:.5rem;background:var(--sunk);font-size:.8125rem;white-space:pre-wrap;overflow-wrap:anywhere}.ann button.quick[aria-label^="Comment on the mocks"]{display:none}`;
   document.head.append(css);
   const bar = document.createElement('div');
   bar.id = 'demo-bar';
