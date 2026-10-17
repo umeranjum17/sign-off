@@ -48,7 +48,7 @@ the message rules are in [docs/contract.md](docs/contract.md).
 sign-off-axi raise --title "Keep the weekly digest?" --recommend yes
 ```
 
-<img src="docs/media/kind-yes-no.webp" width="860" alt="A yes/no question with the recommended Yes marked">
+<img src="docs/media/kind-yes-no.webp" width="700" alt="A yes/no question with the recommended Yes marked">
 
 ### Pick one, with a recommendation
 
@@ -56,7 +56,7 @@ sign-off-axi raise --title "Keep the weekly digest?" --recommend yes
 sign-off-axi raise --title "When should the new settings page go out?" --option today=Today --option friday=Friday --option next-week="Next week" --recommend friday --default next-week
 ```
 
-<img src="docs/media/kind-pick-one.webp" width="860" alt="A pick-one question with three options and Friday recommended">
+<img src="docs/media/kind-pick-one.webp" width="700" alt="A pick-one question with three options and Friday recommended">
 
 ### Design pick, with mocks A/B/C
 
@@ -64,7 +64,7 @@ sign-off-axi raise --title "When should the new settings page go out?" --option 
 sign-off-axi post --type design --title "Pick the settings layout" --option a="Layout A" --option b="Layout B" --mock a=mocks/a.html --mock b=mocks/b.html --tradeoff "A is fastest to tap; B shows both choices." --recommend b
 ```
 
-<img src="docs/media/kind-design.webp" width="860" alt="Three mock-ups side by side in phone frames with Pick buttons, Layout B recommended">
+<img src="docs/media/kind-design.webp" width="700" alt="Three mock-ups side by side in phone frames with Pick buttons, Layout B recommended">
 
 ### Proof update, with Pass / Fail / Needs work
 
@@ -72,7 +72,7 @@ sign-off-axi post --type design --title "Pick the settings layout" --option a="L
 sign-off-axi post --type evidence --title "Settings page loads in a second" --about "Umer opens the new page on a phone." --media shot-light.png --media shot-dark.png
 ```
 
-<img src="docs/media/kind-evidence.webp" width="860" alt="Evidence update 1 with two captures and Pass, Fail, Needs work buttons">
+<img src="docs/media/kind-evidence.webp" width="700" alt="Evidence update 1 with two captures and Pass, Fail, Needs work buttons">
 
 ### Explainer video, with chapters
 
@@ -80,7 +80,7 @@ sign-off-axi post --type evidence --title "Settings page loads in a second" --ab
 sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "Two steps: password, then a code." --media explainer.mp4 --chapter 0:00=Start --chapter 0:02="The code step"
 ```
 
-<img src="docs/media/kind-explainer.webp" width="860" alt="An explainer card with a video player, chapter buttons and Yes/No">
+<img src="docs/media/kind-explainer.webp" width="700" alt="An explainer card with a video player, chapter buttons and Yes/No">
 
 ### Explainer page, to read
 
@@ -97,7 +97,7 @@ sign-off-axi post --type report --title "Sign-in now takes 2 steps" --about "Why
 sign-off-axi post --type diagram --title "Is this the sign-in flow?" --view flow.svg --recommend yes
 ```
 
-<img src="docs/media/kind-diagram.webp" width="860" alt="A question shown with a three-box flow diagram at card width">
+<img src="docs/media/kind-diagram.webp" width="700" alt="A question shown with a three-box flow diagram at card width">
 
 ### Interactive page
 
@@ -105,7 +105,7 @@ sign-off-axi post --type diagram --title "Is this the sign-in flow?" --view flow
 sign-off-axi post --type interactive --title "How many testers approved?" --view counter.html --recommend yes
 ```
 
-<img src="docs/media/kind-interactive.webp" width="860" alt="A question with a sandboxed counter page to tap">
+<img src="docs/media/kind-interactive.webp" width="700" alt="A question with a sandboxed counter page to tap">
 
 ### Sign-in link
 
@@ -115,7 +115,7 @@ sign-off-axi post --type signin --service "npm" --link https://example.com/sign-
 sign-off-axi signin done --key npm-login
 ```
 
-<img src="docs/media/kind-signin.webp" width="860" alt="A sign-in card on top with an Open button, what it unlocks, who waits and the time left">
+<img src="docs/media/kind-signin.webp" width="700" alt="A sign-in card on top with an Open button, what it unlocks, who waits and the time left">
 
 ### Release gate
 
@@ -123,7 +123,7 @@ sign-off-axi signin done --key npm-login
 sign-off-axi post --kind gate --from gate.json   # holds a run for the user: Approve or Fix first
 ```
 
-<img src="docs/media/kind-gate.webp" width="860" alt="A gate question with Approve recommended and Fix first">
+<img src="docs/media/kind-gate.webp" width="700" alt="A gate question with Approve recommended and Fix first">
 
 ### Retro finding
 
@@ -131,7 +131,7 @@ sign-off-axi post --kind gate --from gate.json   # holds a run for the user: App
 sign-off-axi post --kind finding --from finding.json   # asks the user to Apply or Skip a proposed fix
 ```
 
-<img src="docs/media/kind-finding.webp" width="860" alt="A finding question with Skip recommended and Apply">
+<img src="docs/media/kind-finding.webp" width="700" alt="A finding question with Skip recommended and Apply">
 
 ## Phone
 
