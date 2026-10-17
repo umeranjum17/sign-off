@@ -1074,9 +1074,10 @@
     // The board file appends new items at the end, so each list reads newest first; answers sort by their time.
     // One decision is one card: an open ask that a shown open ask merges is not shown, and that ask's answer closes it. A chain shows its last link.
     const gone = new Set(state.dismissed ?? []), open = state.decisions.filter((d) => !gone.has(d.key) && !isAnswered(d));
+    const openKeys = new Set(open.map((d) => d.key));
     let live = open, merged = new Set();
     for (let pass = 0; pass <= open.length; pass++) {
-      merged = new Set(live.flatMap((d) => d.merges ?? []));
+      merged = new Set(live.flatMap((d) => d.merges ?? []).filter((k) => openKeys.has(k)));
       live = open.filter((d) => !merged.has(d.key));
     }
     const folded = (d) => merged.has(d.key) && !isAnswered(d);

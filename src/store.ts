@@ -262,7 +262,8 @@ export function appendAnswer(decisionsPath: string, d: Decision, option: Option,
       continue;
     }
     if ((own && !fanned) || (option !== REPLY && !merged.options.some((o) => o.value === option.value))) continue;
-    saveAnswer(decisionsPath, merged, option, `Answered with ${d.key}${note ? `: ${note}` : ''}`, [], d.key);
+    const same = option === REPLY ? option : merged.options.find((o) => o.value === option.value)!;
+    saveAnswer(decisionsPath, merged, same, `Answered with ${d.key}${note ? `: ${note}` : ''}`, [], d.key);
   }
   return answer;
 }

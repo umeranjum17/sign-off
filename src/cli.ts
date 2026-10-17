@@ -75,7 +75,7 @@ Every question meets the question standard (docs/contract.md, "Asking a good que
   The buttons match the text: a title or why that names choices A, B, C needs one --option per letter, each label starting with its letter, never Yes/No.
   yes and no are labelled Yes and No; a question never takes Done, OK or Not now buttons.
 One decision is one card: look at the open cards first. --merge <key> (up to 10) names other cards on the board that ask the same thing and offer every option of this one:
-they are hidden while this one waits, and its answer closes them too, with the same value and a note naming this key.
+they are hidden while this one waits, and its answer closes them too, with the same value and a note naming this key. A card merges into one open ask only, and an answered or dismissed card cannot be merged.
 The user answers with one tap and can undo it for a few seconds.
 --from adds every decision in a decisions file: ${FORMAT}
 Raising the same question again is a no-op that reports its status; a different question under a used key is refused.
@@ -822,7 +822,8 @@ function replace(file: string, on: string, from?: string, filer?: string) {
     for (const i of fed.items) if (i?.kind !== undefined && !first.has(i?.key) && Object.hasOwn(saved, i?.key)) {
       throw fail(`key ${i.key} was answered on ${tilde(file)} and is no longer there`, 'CONFLICT', 'Post it under a new key');
     }
-    for (const had of board(file)) {
+    const current = board(file);
+    for (const had of current) {
       const d = incoming.find((x) => x.key === had.key);
       if (filer && d && had.filer && had.filer !== filer) throw fail(`key ${d.key} on ${tilde(file)} was posted by another filer`, 'CONFLICT', 'Feed it under a new key');
       if (had.answer && d && question(d) !== question(had)) {
@@ -845,7 +846,7 @@ function replace(file: string, on: string, from?: string, filer?: string) {
         rmSync(check, { force: true });
       }
     }
-    checkMerges(incoming, resulting);
+    checkMerges(incoming, resulting, current);
     // Written only when it changed, so a feeder that runs every few seconds leaves the file alone.
     const changed = JSON.stringify(old && { ...old.extra, schema: old.schema, items: old.items }) !== JSON.stringify({ ...extra, schema: 2, items });
     if (changed) writeItems(file, items, extra);
@@ -1081,21 +1082,30 @@ function buildIncoming(values: Record<string, any>, extra: object, filer: string
 
 /** JSON with object fields in key order, so the same message compares equal in any field order. */
 const canon = (v: unknown) => JSON.stringify(v, (_, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x));
-/** A merge names cards on the board that take this card's answer: each is on the board, offers every option of this card, and does not merge back. */
-function checkMerges(incoming: Decision[], resulting: Decision[]) {
-  const byKey = new Map(resulting.map((d) => [d.key, d]));
+/** A merge names cards on the board that take this card's answer: each is on the board, offers every option of this card, and does not merge back.
+ * A merge new to the board also names a card still open, and no other open card that already merges it. */
+function checkMerges(incoming: Decision[], resulting: Decision[], current: ReturnType<typeof board>) {
+  const byKey = new Map(resulting.map((d) => [d.key, d])), before = new Map(current.map((c) => [c.key, c]));
+  const closed = (key: string) => !!(before.get(key)?.answer || before.get(key)?.dismissed);
   const leadsTo = (from: string, to: string, seen = new Set<string>()): boolean => {
     if (from === to) return true;
     if (seen.has(from)) return false;
     seen.add(from);
     return (byKey.get(from)?.merges ?? []).some((k) => leadsTo(k, to, seen));
   };
-  for (const d of incoming) for (const key of d.merges ?? []) {
-    const merged = byKey.get(key);
-    if (!merged) throw fail(`key ${d.key} merges ${key}, which is not on the board`, 'VALIDATION_ERROR', `Post ${key} first, or leave it out of --merge`);
-    const offered = new Set(merged.options.map((o) => o.value)), lacks = d.options.find((o) => !offered.has(o.value));
-    if (lacks) throw fail(`key ${d.key} merges ${key}, which has no ${lacks.value} option`, 'VALIDATION_ERROR', `Merge only a card that offers every option of ${d.key}`);
-    if (leadsTo(key, d.key)) throw fail(`key ${d.key} merges ${key}, which merges ${d.key} back`, 'VALIDATION_ERROR', 'Merge the cards one way only');
+  for (const d of incoming) {
+    const had = new Set(before.get(d.key)?.merges ?? []);
+    for (const key of d.merges ?? []) {
+      const merged = byKey.get(key);
+      if (!merged) throw fail(`key ${d.key} merges ${key}, which is not on the board`, 'VALIDATION_ERROR', `Post ${key} first, or leave it out of --merge`);
+      const offered = new Set(merged.options.map((o) => o.value)), lacks = d.options.find((o) => !offered.has(o.value));
+      if (lacks) throw fail(`key ${d.key} merges ${key}, which has no ${lacks.value} option`, 'VALIDATION_ERROR', `Merge only a card that offers every option of ${d.key}`);
+      if (leadsTo(key, d.key)) throw fail(`key ${d.key} merges ${key}, which merges ${d.key} back`, 'VALIDATION_ERROR', 'Merge the cards one way only');
+      if (had.has(key)) continue;
+      if (closed(key)) throw fail(`key ${d.key} merges ${key}, which is already ${before.get(key)?.answer ? 'answered' : 'dismissed'}`, 'VALIDATION_ERROR', 'That decision is closed: post the new question without --merge');
+      const other = resulting.find((x) => x.key !== d.key && !closed(x.key) && x.merges?.includes(key));
+      if (other) throw fail(`key ${d.key} merges ${key}, which open ${other.key} already merges`, 'VALIDATION_ERROR', `Update ${other.key} instead of posting a second card`);
+    }
   }
 }
 /** exact: a contract post, where a key takes only the same message again, filer and filed included (contract section 4). */
@@ -1103,7 +1113,7 @@ function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: 
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
     const current = board(file), items = existsSync(file) ? readItems(file).items : [], saved = readAnswers(file), now = new Date().toISOString();
-    checkMerges(incoming, [...current.filter((c) => !incoming.some((d) => d.key === c.key)), ...incoming]);
+    checkMerges(incoming, [...current.filter((c) => !incoming.some((d) => d.key === c.key)), ...incoming], current);
     const raised = incoming.map((d, i) => {
       const had = current.find((c) => c.key === d.key);
       // A contract message refused for its key exits 2 like any other refusal (contract section 4); raise --title keeps exit 1.

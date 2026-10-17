@@ -186,8 +186,8 @@ test('a fanned answer follows its parent: a re-answer replaces it, an undo clear
   const yes = { value: 'yes', label: 'Yes' }, no = { value: 'no', label: 'No' };
   assert.equal(run('raise', board, '--key', 're-b', ...good.slice(2), '--title', 'Can the sign-in screen go out?').status, 0);
   assert.equal(run('raise', board, '--key', 're-c', ...good.slice(2), '--title', 'Should the sign-in screen wait?').status, 0);
-  store.appendAnswer(board, store.loadDecisions(board).find((d) => d.key === 're-c'), yes, 'Answered with re-a: my own words');
   assert.equal(run('raise', board, '--key', 're-a', ...good.slice(2), '--title', 'Ship the sign-in screen?', '--merge', 're-b', '--merge', 're-c').status, 0);
+  store.appendAnswer(board, store.loadDecisions(board).find((d) => d.key === 're-c'), yes, 'Answered with re-a: my own words');
   const a = store.loadDecisions(board).find((d) => d.key === 're-a');
   store.appendAnswer(board, a, yes);
   store.appendAnswer(board, a, no);
@@ -199,4 +199,40 @@ test('a fanned answer follows its parent: a re-answer replaces it, an undo clear
   got = JSON.parse(run('answers', board, '--json').stdout);
   assert.equal(got['re-b'], undefined);
   assert.equal(got['re-c'].answer, 'yes');
+});
+
+test('a card has one open merging ask: a second ask may not merge a card another open ask already merges', () => {
+  const board = join(scratch, 'one-parent.json');
+  assert.equal(run('raise', board, '--key', 'one-c', ...good.slice(2), '--title', 'Ship the sign-in screen?').status, 0);
+  assert.equal(run('raise', board, '--key', 'one-a', ...good.slice(2), '--title', 'Can the sign-in screen go out?', '--merge', 'one-c').status, 0);
+  const second = run('raise', board, '--key', 'one-b', ...good.slice(2), '--title', 'Should the sign-in screen wait?', '--merge', 'one-c');
+  assert.equal(second.status, 2, second.stdout);
+  assert.match(second.stdout, /merges one-c, which open one-a already merges/);
+  assert.match(second.stdout, /Update one-a instead of posting a second card/);
+});
+
+test('a merge cannot name a card that is already answered or dismissed', async () => {
+  const store = await import(new URL('../dist/store.js', import.meta.url));
+  const board = join(scratch, 'closed-merge.json');
+  for (const key of ['closed-c', 'closed-d']) assert.equal(run('raise', board, '--key', key, ...good.slice(2), '--title', 'Ship the sign-in screen?').status, 0);
+  store.appendAnswer(board, store.loadDecisions(board).find((d) => d.key === 'closed-c'), { value: 'yes', label: 'Yes' });
+  store.appendDismissed(board, ['closed-d'], true);
+  for (const [key, state] of [['closed-c', 'answered'], ['closed-d', 'dismissed']]) {
+    const r = run('raise', board, '--key', `new-${key}`, ...good.slice(2), '--title', 'Can the sign-in screen go out?', '--merge', key);
+    assert.equal(r.status, 2, r.stdout);
+    assert.match(r.stdout, new RegExp(`merges ${key}, which is already ${state}`));
+    assert.match(r.stdout, /post the new question without --merge/);
+  }
+});
+
+test('a fanned answer takes the merged card\'s own label for that value', async () => {
+  const store = await import(new URL('../dist/store.js', import.meta.url));
+  const board = join(scratch, 'label.json');
+  const labelled = (title, a, b) => ['--title', title, '--why', 'Two fixes are still in review.', '--option', `a=${a}`, '--option', `b=${b}`,
+    '--outcome', 'a=It ships now.', '--outcome', 'b=It ships with the fixes.', '--recommend', 'b', '--recommend-reason', 'The fixes land Thursday.', '--default', 'b'];
+  assert.equal(run('raise', board, '--key', 'label-b', ...labelled('Can the sign-in screen go out?', 'A: Today, ship it', 'B: Friday, with fixes')).status, 0);
+  assert.equal(run('raise', board, '--key', 'label-a', ...labelled('Ship the sign-in screen?', 'A: Today', 'B: Friday'), '--merge', 'label-b').status, 0);
+  store.appendAnswer(board, store.loadDecisions(board).find((d) => d.key === 'label-a'), { value: 'a', label: 'A: Today' });
+  const got = JSON.parse(run('answers', board, '--json').stdout);
+  assert.equal(got['label-b'].label, 'A: Today, ship it');
 });
