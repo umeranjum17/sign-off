@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -138,6 +138,22 @@ test('a merge names a card on the board that offers every option of this ask, an
   const loop = run('raise', board, '--key', 'ship-x', ...good.slice(2), '--title', 'Ship the sign-in screen?', '--merge', 'ship-y');
   assert.equal(loop.status, 2, loop.stdout);
   assert.match(loop.stdout, /merges ship-y, which merges ship-x back/);
+});
+
+const chrome = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'].flatMap((b) => process.env.PATH.split(':').map((d) => join(d, b))).find(existsSync);
+
+test('a chain of merges shows only its head: the card in the middle is hidden by the card that merges it', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const board = join(scratch, 'chain.json');
+  assert.equal(run('raise', board, '--key', 'chain-z', ...good.slice(2), '--title', 'Keep the old login screen?').status, 0);
+  assert.equal(run('raise', board, '--key', 'chain-y', ...good.slice(2), '--title', 'Retire the old login screen?', '--merge', 'chain-z').status, 0);
+  assert.equal(run('raise', board, '--key', 'chain-x', ...good.slice(2), '--title', 'Ship the new login screen?', '--merge', 'chain-y').status, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', board, '--port', '0'], { env });
+  procs.push(proc);
+  const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+  const dom = execFileSync(chrome, ['--headless', '--no-sandbox', '--disable-gpu', '--virtual-time-budget=10000', '--dump-dom', `${url}#waiting`], { env: { ...env, TMPDIR: scratch }, encoding: 'utf8', timeout: 60000 });
+  assert.match(dom, /Ship the new login screen\?/);
+  assert.match(dom, /Keep the old login screen\?/);
+  assert.doesNotMatch(dom, /Retire the old login screen\?/);
 });
 
 test('the title rules accept plain questions that merely contain a label or id-like word', () => {
