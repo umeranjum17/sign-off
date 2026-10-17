@@ -1049,6 +1049,30 @@ test('Waiting on you: a reply-only ask shows Reply, a type-ask yes/no shows Yes/
 
 // Any question can wait, whatever type it names: while it waits, its card names the type of answer it takes, the same name as the chip
 // counting it; outside Waiting the same card keeps its own name.
+test('Answered: a design keeps its Design label and an answered yes/no decision has no eyebrow', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'answered-labels'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    { key: 'look', type: 'design', title: 'Pick the look', options: ['a', 'b'].map((v) => ({ value: v, label: v.toUpperCase() })), recommend_value: 'b' },
+    { key: 'digest', title: 'Keep the weekly digest?', options: yesNo, recommend_value: 'yes' },
+  ] }));
+  writeFileSync(file.replace(/\.json$/, '.answers.jsonl'), [
+    { key: 'look', answer: 'a', label: 'A', close: 'done', at: new Date().toISOString() },
+    { key: 'digest', answer: 'yes', label: 'Yes', close: 'done', at: new Date().toISOString() },
+  ].map((a) => JSON.stringify(a)).join('\n') + '\n');
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#answered`)}`);
+  await until(async () => (await evaluate('document.querySelectorAll("article.row").length')) === 2);
+  assert.equal(await evaluate('document.querySelector("#item-look .eyebrow")?.textContent'), 'Design');
+  assert.ok(await evaluate('document.querySelector("#item-digest .eyebrow") === null'));
+  close();
+  proc.kill();
+});
+
 test('Waiting on you: a diagram, an interactive page, an explainer and a free-form fed type each show the name of the chip counting them', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'view-types'), file = join(dir, 'board.json'), mocks = join(dir, 'mocks');
   mkdirSync(mocks, { recursive: true });
