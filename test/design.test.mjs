@@ -1022,9 +1022,31 @@ test('Waiting on you: newest and oldest first follow each ask\'s filed time, and
   const { evaluate, close } = await browse(join(dir, 'b'), 390);
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
   const queue = () => evaluate('[...document.querySelectorAll(".queue strong")].map((s) => s.textContent).join("|")');
-  await until(async () => (await queue()) === 'Relinked ask|Plain ask|Older ask');
+  await until(async () => (await queue()) === 'Plain ask|Relinked ask|Older ask');
   await evaluate('(() => { const s = document.querySelector(".sort select"); s.value = "oldest"; s.dispatchEvent(new Event("change")); })()');
-  await until(async () => (await queue()) === 'Older ask|Plain ask|Relinked ask');
+  await until(async () => (await queue()) === 'Older ask|Relinked ask|Plain ask');
+  close();
+  proc.kill();
+});
+
+test('Waiting on you: a board with no filed times lists newest first as the file reversed and oldest first as the file', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'unfiled-sort'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    { key: 'first', title: 'First ask', options: yesNo, recommend_value: 'yes' },
+    { key: 'second', title: 'Second ask', options: yesNo, recommend_value: 'yes' },
+    { key: 'third', title: 'Third ask', options: yesNo, recommend_value: 'yes' },
+  ] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+  const queue = () => evaluate('[...document.querySelectorAll(".queue strong")].map((s) => s.textContent).join("|")');
+  await until(async () => (await queue()) === 'Third ask|Second ask|First ask');
+  await evaluate('(() => { const s = document.querySelector(".sort select"); s.value = "oldest"; s.dispatchEvent(new Event("change")); })()');
+  await until(async () => (await queue()) === 'First ask|Second ask|Third ask');
   close();
   proc.kill();
 });

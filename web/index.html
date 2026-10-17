@@ -927,7 +927,7 @@
     };
     const fresh = d.filed && isToday(d.filed), st = d.filed && el('span', { class: `st ${fresh ? 'new' : 'ok'}` }, fresh ? 'New today' : 'Current');
     const decided = d.decided ? el('p', { class: 'decided', dir: 'auto' }, el('span', { class: 'lbl' }, 'What it decided'), d.decided) : '';
-    const brow = [d.type === 'decision' ? 'Report' : kind(d), st].filter(Boolean);
+    const brow = [kind(d) || 'Report', st].filter(Boolean);
     const lead = [el('div', { class: 'lead' }, xBtn(d), el('p', { class: 'eyebrow' }, ...brow),
       el('h3', { dir: 'auto' }, page ? el('a', { href: `#reports/${d.key}` }, title(d)) : title(d))), d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : ''];
     const flow = n && el('ol', { class: 'flow', style: `--n: ${n}`, 'aria-label': `${n} steps: ${d.steps.map((t) => t.title).join(', ')}` }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), marks(t))));
@@ -1060,11 +1060,10 @@
     const gone = new Set(state.dismissed ?? []);
     for (const d of [...state.decisions].reverse()) if (!gone.has(d.key)) by[area(d)].push(d);
     // Waiting on you reads newest first unless the viewer chose oldest first. A sign-in blocks someone now, so sign-ins come first either way.
-    const oldest = waitSort === 'oldest', filed = (d) => Date.parse(d.filed);
-    const slots = by.waiting.flatMap((d, i) => (Number.isNaN(filed(d)) ? [] : [i]));
-    const byTime = slots.map((i) => by.waiting[i]).sort((x, y) => (oldest ? 1 : -1) * (filed(x) - filed(y)));
-    const asked = [...by.waiting];
-    slots.forEach((slot, n) => { asked[slot] = byTime[n]; });
+    let latest = -Infinity;
+    const inFileOrder = by.waiting.slice().reverse().map((d, i) => { const t = Date.parse(d.filed); if (!Number.isNaN(t)) latest = t; return { d, t: latest, i }; });
+    const byTime = inFileOrder.sort((x, y) => (x.t === y.t ? x.i - y.i : x.t - y.t)).map((x) => x.d);
+    const asked = waitSort === 'oldest' ? byTime : byTime.reverse();
     by.waiting = [...asked.filter((d) => d.type === 'signin'), ...asked.filter((d) => d.type !== 'signin')];
     // A type chip whose asks are all answered or dismissed falls back to All.
     if (waitType !== 'all' && !by.waiting.some((d) => typeOf(d) === waitType)) waitType = 'all';
