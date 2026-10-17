@@ -29,10 +29,6 @@ for (const d of seed.decisions) {
     const base = basename(m.path.split('?')[0]);
     add(`${seed.mockBase}${d.key}~${m.value}/${base}`, m.path, `assets/${d.key}-${m.value}-${base}`);
   }
-  for (const view of [d.view, d.preview].filter(Boolean)) {
-    const base = basename(view.split('?')[0]);
-    add(`${seed.mockBase}${d.key}~/${base}`, view, `assets/${d.key}-view-${base}`);
-  }
   (d.media ?? []).forEach((m, i) => {
     const base = basename(m.path);
     add(`/api/media?key=${encodeURIComponent(d.key)}&i=${i}`, m.path, `assets/${d.key}-${i}-${base}`);
