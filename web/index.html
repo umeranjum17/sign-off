@@ -548,7 +548,7 @@
     const lead = el('div', { class: 'lead' }, x ? xBtn(d) : '', brow.length ? el('p', { class: 'eyebrow' }, ...brow) : '', el('h3', { dir: 'auto' }, name));
     if (d.type === 'signin') return signin(d, lead, saved, err);
     const quiet = !ro && d.options.find((o) => o.value === d.default_if_silent);
-    const silent = quiet ? `If you stay quiet: ${quiet.label}${d.silent_by ? `, at ${when(d.silent_by)}` : '. Nothing is due.'}` : '';
+    const silent = quiet ? `If you stay quiet: ${quiet.label}${d.silent_by ? `, at ${when(d.silent_by)}` : ' (no deadline)'}` : '';
     // The other cards this ask replaced are hidden; its answer closes them too.
     const merged = (d.merges ?? []).filter((k) => state.decisions.some((x) => x.key === k)).length;
     if (design) {
