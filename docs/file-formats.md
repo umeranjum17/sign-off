@@ -1,6 +1,6 @@
 # File formats
 
-**Questions**, written by the agent (`decisions.json`). `sign-off-axi raise` writes them into the board it names, or the default board when none is named (see the board rule under [Commands in the README](../README.md#commands)); a file in this format can be raised with `raise --from` or served as its own board:
+**Questions**, written by the agent (`decisions.json`). `sign-off-axi raise` writes them into the board it names, or the default board when none is named (see the board rule under [Commands](commands.md)); a file in this format can be raised with `raise --from` or served as its own board:
 
 ```json
 {
