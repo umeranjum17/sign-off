@@ -24,7 +24,8 @@
 ```sh
 npm install -g sign-off-axi
 sign-off-axi raise \
-  --title "Keep the weekly digest?" \
+  --title "Keep the weekly \
+digest?" \
   --recommend yes
 sign-off-axi open
 ```
@@ -51,9 +52,11 @@ the message rules are in [docs/contract.md](docs/contract.md).
 
 ```sh
 sign-off-axi raise \
-  --title "Keep the weekly digest?" \
-  --about "Open rate held steady \
-at about a third for two months." \
+  --title "Keep the weekly \
+digest?" \
+  --about "Open rate held \
+steady at about a third \
+for two months." \
   --recommend yes
 ```
 
@@ -68,14 +71,17 @@ at about a third for two months." \
 
 ```sh
 sign-off-axi raise \
-  --title "When should the new \
-settings page go out?" \
-  --about "No new bug reports \
-for three weeks. Support is \
-fully staffed on Friday." \
+  --title "When should \
+the new settings \
+page go out?" \
+  --about "No new \
+bug reports for three \
+weeks. Support is fully \
+staffed on Friday." \
   --option today=Today \
   --option friday=Friday \
-  --option next-week="Next week" \
+  --option next-week="Next \
+week" \
   --recommend friday \
   --default next-week
 ```
@@ -92,16 +98,18 @@ fully staffed on Friday." \
 ```sh
 sign-off-axi post \
   --type design \
-  --title "Pick the settings layout" \
+  --title "Pick the settings \
+layout" \
   --option a="Layout A" \
   --option b="Layout B" \
   --option c="Layout C" \
   --mock a=mocks/a.html \
   --mock b=mocks/b.html \
   --mock c=mocks/c.html \
-  --tradeoff "A is fastest to tap; \
-B shows both choices; \
-C fits small screens." \
+  --tradeoff "A is fastest \
+to tap; B shows both \
+choices; C fits small \
+screens." \
   --recommend b
 ```
 
@@ -117,10 +125,10 @@ C fits small screens." \
 ```sh
 sign-off-axi post \
   --type evidence \
-  --title "Settings page loads \
-in a second" \
-  --about "Umer opens the new \
-page on a phone." \
+  --title "Settings page \
+loads in a second" \
+  --about "Umer opens \
+the new page on a phone." \
   --media shot-light.png \
   --media shot-dark.png
 ```
@@ -137,9 +145,10 @@ page on a phone." \
 ```sh
 sign-off-axi post \
   --type explainer \
-  --title "Is the new sign-in clear?" \
-  --about "Two steps: password, \
-then a code." \
+  --title "Is the new \
+sign-in clear?" \
+  --about "Two steps: \
+password, then a code." \
   --media explainer.mp4 \
   --chapter 0:00=Start \
   --chapter 0:02="The tap"
@@ -157,13 +166,15 @@ then a code." \
 ```sh
 sign-off-axi report init \
   .sign-off/mocks/sign-in
+d=mocks/sign-in
 sign-off-axi post \
   --type report \
-  --title "Sign-in now takes 2 steps" \
-  --about "Why the code step \
-moved first." \
-  --view mocks/sign-in/index.html \
-  --preview mocks/sign-in/preview.svg
+  --title "Sign-in now \
+takes 2 steps" \
+  --about "Why the code \
+step moved first." \
+  --view $d/index.html \
+  --preview $d/preview.svg
 ```
 
 <picture>
@@ -178,7 +189,8 @@ moved first." \
 ```sh
 sign-off-axi post \
   --type diagram \
-  --title "Is this the sign-in flow?" \
+  --title "Is this the \
+sign-in flow?" \
   --about "Password first, \
 then a code, then in." \
   --view flow.svg \
@@ -197,12 +209,14 @@ then a code, then in." \
 ```sh
 sign-off-axi post \
   --type interactive \
-  --title "How many testers approved?" \
-  --about "Tap the counter to \
-add yourself." \
+  --title "How many \
+testers approved?" \
+  --about "Tap the counter \
+to add yourself." \
   --view counter.html \
   --option yes=Yes \
-  --option no="Needs work" \
+  --option no="Needs \
+work" \
   --recommend yes
 ```
 
@@ -219,8 +233,10 @@ add yourself." \
 sign-off-axi post \
   --type signin \
   --service "npm" \
-  --link https://example.com/abc123 \
-  --unlocks "Publish the release" \
+  --link \
+https://example.com/abc123 \
+  --unlocks "Publish \
+the release" \
   --waits "Umer" \
   --expires 15m \
   --key npm-login
@@ -335,11 +351,16 @@ npx -y sign-off-axi init
 Builds first, then runs the integration journeys against the real CLI:
 
 ```sh
-npm test            # full journeys
-npm run build:skill # skill stub
-npm run build:demo            # builds the static demo site into demo-dist/ (GitHub Pages, the Try-it-live link)
-npm pack            # tarball
+npm test
+npm run build:skill
+npm run build:demo
+npm pack
 ```
+
+- `npm test`: full journeys
+- `npm run build:skill`: skill stub
+- `npm run build:demo`: demo site (Try it live)
+- `npm pack`: tarball
 
 A release is a merged version-bump PR: CI publishes the new version to npm.
 
@@ -357,7 +378,8 @@ always wins.
 ```sh
 tmp=$(mktemp -d)
 export SIGN_OFF_HOME="$tmp"
-(cd "$tmp" && sign-off-axi raise \
+(cd "$tmp" &&
+  sign-off-axi raise \
   --title "Probe?")
 ```
 
