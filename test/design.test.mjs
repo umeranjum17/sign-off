@@ -1047,6 +1047,36 @@ test('Waiting on you: a reply-only ask shows Reply, a type-ask yes/no shows Yes/
   proc.kill();
 });
 
+// Any question can wait, whatever type it names: while it waits, its card names the type of answer it takes, the same name as the chip
+// counting it; outside Waiting the same card keeps its own name.
+test('Waiting on you: a diagram, an interactive page, an explainer and a free-form fed type each show the name of the chip counting them', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'view-types'), file = join(dir, 'board.json'), mocks = join(dir, 'mocks');
+  mkdirSync(mocks, { recursive: true });
+  writeFileSync(join(mocks, 'flow.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8"/></svg>');
+  writeFileSync(join(mocks, 'walk.html'), '<p>The new flow</p>');
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    { key: 'flow', type: 'diagram', title: 'Is this the sign-in flow?', view: 'mocks/flow.svg' },
+    { key: 'walk', type: 'interactive', title: 'Walk through the new flow?', view: 'mocks/walk.html' },
+    { key: 'tour', type: 'explainer', title: 'Take the tour?', media: [{ path: 'evidence/1/tour.webm', sha256: 'a'.repeat(64), bytes: 0 }], area: 'waiting' },
+    { key: 'site', type: 'site-check', title: 'Check the site?' },
+  ] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+  const chips = () => evaluate('[...document.querySelectorAll(".chips button")].map((b) => b.textContent + (b.getAttribute("aria-pressed") === "true" ? "*" : "")).join("|")');
+  const tap = (name) => evaluate(`[...document.querySelectorAll(".queue button")].find((b) => b.textContent.includes("${name}"))?.click() ?? true`);
+  // All four take a yes or a no, so one Yes/No chip counts them all, and each waiting card says Yes/No, never its type word.
+  await until(async () => (await evaluate('document.querySelector(".fhead")?.textContent')) === '1 of 4');
+  assert.equal(await chips(), 'All 4*|Yes/No 4');
+  for (const name of ['Check the site?', 'Take the tour?', 'Walk through the new flow?', 'Is this the sign-in flow?']) {
+    await until(async () => (await tap(name)) && (await evaluate('document.querySelector(".focus .eyebrow")?.textContent')) === 'Yes/No');
+  }
+  close();
+  proc.kill();
+});
+
 test('Clear all done on 201 answered items, set two across on a wide screen: the page empties in chunks, says so, and Undo brings all 201 back', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'many-answered'), file = join(dir, 'board.json');
   mkdirSync(dir);

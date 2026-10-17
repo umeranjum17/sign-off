@@ -479,8 +479,8 @@
   const TYPE_NAMES = { design: 'Design pick', 'yes-no': 'Yes/No', 'pick-one': 'Pick one', reply: 'Reply', approval: 'Approval', signin: 'Sign-in', info: 'Info', evidence: 'Evidence' };
   const typeOf = (d) => (d.type === 'design' ? 'design' : d.type === 'signin' ? 'signin' : d.type === 'evidence' ? 'evidence' : d.run ? 'approval'
     : !d.options.length ? d.reply ? 'reply' : 'info' : d.options.map((o) => o.value).sort().join() === 'no,yes' ? 'yes-no' : 'pick-one');
-  // Any other type gets the plain card until it has its own renderer.
-  const kind = (d) => (d.type === 'decision' || d.type === 'design' || d.type === 'ask' ? TYPE_NAMES[typeOf(d)] : NAMES[d.type] ?? d.type.replace(/-/g, ' '));
+  // Any other type gets the plain card until it has its own renderer. What waits shows its answer's name; what only reads keeps its own.
+  const kind = (d) => (area(d) === 'waiting' || d.type === 'decision' || d.type === 'design' || d.type === 'ask' ? TYPE_NAMES[typeOf(d)] : NAMES[d.type] ?? d.type.replace(/-/g, ' '));
   // A done-done run's outcome line is the plain result a person can now see; the title it sends only names the run.
   const headline = (d) => (d.type === 'evidence' && d.evidence?.outcome.length <= 160 ? d.evidence.outcome : d.title);
   const title = (d) => (d.type === 'evidence' ? `Update ${d.number} · ${headline(d)}` : d.title);
