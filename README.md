@@ -13,34 +13,34 @@
 <p align="center"><b>One calm page for every question the programs working for you need answered.</b><br>Yes or no, pick-one, mock-ups, proof photos, short videos, sign-in links: each lands on a board<br>on your own machine, you answer with one tap, and the answer is saved for the asker to read.</p>
 
 <p align="center">
-  <img src="docs/flow-ask.svg" width="240" alt="1. Agent asks: pick a layout?">
-  <img src="docs/flow-answer.svg" width="240" alt="2. You tap an answer.">
-  <img src="docs/flow-receipt.svg" width="240" alt="3. Agent reads your saved answer.">
-</p>
-
-<p align="center">
-  <img src="docs/media/desktop-light.webp" width="860" alt="Light desktop: the board summary with Waiting on you, Evidence, Reports and explainers, and Answered tiles, one question open and one answer saved">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/media/hero-dark.gif">
+    <img src="docs/media/hero.gif" width="420" alt="Ask, tap, answer: an agent raises a yes/no question, you tap Yes on your phone, the agent reads the saved answer">
+  </picture>
 </p>
 
 ## One-minute quick start
 
 ```sh
 npm install -g sign-off-axi
-sign-off-axi raise --title "Keep the weekly digest?" --recommend yes
-sign-off-axi open            # prints the page URL, e.g. http://127.0.0.1:4410/
+sign-off-axi raise \
+  --title "Keep the weekly \
+digest?" \
+  --recommend yes
+sign-off-axi open
 ```
 
-Open the URL, click **Yes**, then read the answer back the way an agent would:
+Open the printed URL, click **Yes**, then read the answer back the way an
+agent would:
 
 ```sh
-sign-off-axi answers --key keep-the-weekly-digest
-# answers[1]{key,answer,at}:
-#   keep-the-weekly-digest,yes,"2026-10-17T06:37:29Z"
+sign-off-axi answers \
+  --key keep-the-weekly-digest
 ```
 
-That is the whole loop: the agent raises, you tap, the agent reads. The board
-is the default one (`~/.sign-off/decisions.json`); name a file after any
-command to use another board.
+That is the whole loop: the agent raises, you tap, the agent reads. The
+board is the default one (`~/.sign-off/decisions.json`); name a file after
+any command to use another board.
 
 ## What you can ask
 
@@ -51,204 +51,316 @@ the message rules are in [docs/contract.md](docs/contract.md).
 ### Yes or no
 
 ```sh
-sign-off-axi raise --title "Keep the weekly digest?" --recommend yes
+sign-off-axi raise \
+  --title "Keep the weekly \
+digest?" \
+  --about "Open rate held \
+steady at about a third \
+for two months." \
+  --recommend yes
 ```
 
-<img src="docs/media/kind-yes-no.webp" width="700" alt="A yes/no question with the recommended Yes marked">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-yes-no-dark.webp">
+  <img src="docs/media/kind-yes-no.webp" alt="A yes/no question with the recommended Yes marked">
+</picture>
+
+*A yes/no ask. The recommended answer is marked.*
 
 ### Pick one, with a recommendation
 
 ```sh
-sign-off-axi raise --title "When should the new settings page go out?" --option today=Today --option friday=Friday --option next-week="Next week" --recommend friday --default next-week
+sign-off-axi raise \
+  --title "When should \
+the new settings \
+page go out?" \
+  --about "No new \
+bug reports for three \
+weeks. Support is fully \
+staffed on Friday." \
+  --option today=Today \
+  --option friday=Friday \
+  --option next-week="Next \
+week" \
+  --recommend friday \
+  --default next-week
 ```
 
-<img src="docs/media/kind-pick-one.webp" width="700" alt="A pick-one question with three options and Friday recommended">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-pick-one-dark.webp">
+  <img src="docs/media/kind-pick-one.webp" alt="A pick-one question with three options and Friday recommended">
+</picture>
+
+*Pick one of three. Friday is recommended; silence means next week.*
 
 ### Design pick, with mocks A/B/C
 
 ```sh
-sign-off-axi post --type design --title "Pick the settings layout" --option a="Layout A" --option b="Layout B" --mock a=mocks/a.html --mock b=mocks/b.html --tradeoff "A is fastest to tap; B shows both choices." --recommend b
+sign-off-axi post \
+  --type design \
+  --title "Pick the settings \
+layout" \
+  --option a="Layout A" \
+  --option b="Layout B" \
+  --option c="Layout C" \
+  --mock a=mocks/a.html \
+  --mock b=mocks/b.html \
+  --mock c=mocks/c.html \
+  --tradeoff "A is fastest \
+to tap; B shows both \
+choices; C fits small \
+screens." \
+  --recommend b
 ```
 
-<img src="docs/media/kind-design.webp" width="700" alt="Three mock-ups side by side in phone frames with Pick buttons, Layout B recommended">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-design-dark.webp">
+  <img src="docs/media/kind-design.webp" alt="Three mock-ups side by side in phone frames with Pick buttons, Layout B recommended">
+</picture>
+
+*Three layouts side by side. Layout B is recommended.*
 
 ### Proof update, with Pass / Fail / Needs work
 
 ```sh
-sign-off-axi post --type evidence --title "Settings page loads in a second" --about "Umer opens the new page on a phone." --media shot-light.png --media shot-dark.png
+sign-off-axi post \
+  --type evidence \
+  --title "Settings page \
+loads in a second" \
+  --about "Umer opens \
+the new page on a phone." \
+  --media shot-light.png \
+  --media shot-dark.png
 ```
 
-<img src="docs/media/kind-evidence.webp" width="700" alt="Evidence update 1 with two captures and Pass, Fail, Needs work buttons">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-evidence-dark.webp">
+  <img src="docs/media/kind-evidence.webp" alt="Evidence update 1 with two captures and Pass, Fail, Needs work buttons">
+</picture>
+
+*Proof of a fix, with two captures. Pass, Fail, or Needs work.*
 
 ### Explainer video, with chapters
 
 ```sh
-sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "Two steps: password, then a code." --media explainer.mp4 --chapter 0:00=Start --chapter 0:02="The code step"
+sign-off-axi post \
+  --type explainer \
+  --title "Is the new \
+sign-in clear?" \
+  --about "Two steps: \
+password, then a code." \
+  --media explainer.mp4 \
+  --chapter 0:00=Start \
+  --chapter 0:02="The tap"
 ```
 
-<img src="docs/media/kind-explainer.webp" width="700" alt="An explainer card with a video player, chapter buttons and Yes/No">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-explainer-dark.webp">
+  <img src="docs/media/kind-explainer.webp" alt="An explainer card with a video player, chapter buttons and Yes/No">
+</picture>
+
+*A short video with chapters, then Yes or No.*
 
 ### Explainer page, to read
 
 ```sh
-sign-off-axi report init .sign-off/mocks/sign-in-flow   # writes the page to fill
-sign-off-axi post --type report --title "Sign-in now takes 2 steps" --about "Why the code step moved first." --view mocks/sign-in-flow/index.html --preview mocks/sign-in-flow/preview.svg
+sign-off-axi report init \
+  .sign-off/mocks/sign-in
+d=mocks/sign-in
+sign-off-axi post \
+  --type report \
+  --title "Sign-in now \
+takes 2 steps" \
+  --about "Why the code \
+step moved first." \
+  --view $d/index.html \
+  --preview $d/preview.svg
 ```
 
-<img src="docs/media/kind-report.webp" width="860" alt="An explainer page: the answer in one sentence, a diagram, steps to tap through, folded details">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-report-dark.webp">
+  <img src="docs/media/kind-report.webp" alt="An explainer page: the answer in one sentence, a diagram, steps to tap through, folded details">
+</picture>
+
+*An explainer page to tap through and read.*
 
 ### Diagram
 
 ```sh
-sign-off-axi post --type diagram --title "Is this the sign-in flow?" --view flow.svg --recommend yes
+sign-off-axi post \
+  --type diagram \
+  --title "Is this the \
+sign-in flow?" \
+  --about "Password first, \
+then a code, then in." \
+  --view flow.svg \
+  --recommend yes
 ```
 
-<img src="docs/media/kind-diagram.webp" width="700" alt="A question shown with a three-box flow diagram at card width">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-diagram-dark.webp">
+  <img src="docs/media/kind-diagram.webp" alt="A question shown with a three-box flow diagram at card width">
+</picture>
+
+*A question drawn as a three-box flow.*
 
 ### Interactive page
 
 ```sh
-sign-off-axi post --type interactive --title "How many testers approved?" --view counter.html --recommend yes
+sign-off-axi post \
+  --type interactive \
+  --title "How many \
+testers approved?" \
+  --about "Tap the counter \
+to add yourself." \
+  --view counter.html \
+  --option yes=Yes \
+  --option no="Needs \
+work" \
+  --recommend yes
 ```
 
-<img src="docs/media/kind-interactive.webp" width="700" alt="A question with a sandboxed counter page to tap">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-interactive-dark.webp">
+  <img src="docs/media/kind-interactive.webp" alt="A question with a sandboxed counter page to tap">
+</picture>
+
+*A live counter to tap, in a sandboxed page.*
 
 ### Sign-in link
 
 ```sh
-sign-off-axi post --type signin --service "npm" --link https://example.com/sign-in/abc123 --unlocks "Publish the release" --waits "Umer" --expires 15m --key npm-login
-# later, when it worked:
-sign-off-axi signin done --key npm-login
+sign-off-axi post \
+  --type signin \
+  --service "npm" \
+  --link \
+https://example.com/abc123 \
+  --unlocks "Publish \
+the release" \
+  --waits "Umer" \
+  --expires 15m \
+  --key npm-login
 ```
 
-<img src="docs/media/kind-signin.webp" width="700" alt="A sign-in card on top with an Open button, what it unlocks, who waits and the time left">
+Later, when it worked:
+
+```sh
+sign-off-axi signin done \
+  --key npm-login
+```
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-signin-dark.webp">
+  <img src="docs/media/kind-signin.webp" alt="A sign-in card on top with an Open button, what it unlocks, who waits and the time left">
+</picture>
+
+*A sign-in card: what it unlocks, who waits, the time left.*
 
 ### Release gate
 
 ```sh
-sign-off-axi post --kind gate --from gate.json   # holds a run for the user: Approve or Fix first
+sign-off-axi post \
+  --kind gate \
+  --from gate.json
 ```
 
-<img src="docs/media/kind-gate.webp" width="700" alt="A gate question with Approve recommended and Fix first">
+A `gate.json` holds a run for the user: Approve or Fix first.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-gate-dark.webp">
+  <img src="docs/media/kind-gate.webp" alt="A gate question with Approve recommended and Fix first">
+</picture>
+
+*A held run: Approve it or Fix first.*
 
 ### Retro finding
 
 ```sh
-sign-off-axi post --kind finding --from finding.json   # asks the user to Apply or Skip a proposed fix
+sign-off-axi post \
+  --kind finding \
+  --from finding.json
 ```
 
-<img src="docs/media/kind-finding.webp" width="700" alt="A finding question with Skip recommended and Apply">
+A `finding.json` asks the user to Apply or Skip a proposed fix.
 
-## Phone
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-finding-dark.webp">
+  <img src="docs/media/kind-finding.webp" alt="A finding question with Apply recommended and Skip">
+</picture>
 
-The same board on a phone, light and dark. Mock frames swipe sideways; videos
-and recordings play inline.
+*A retro fix to Apply or Skip.*
 
-<p>
-  <img src="docs/media/phone-light.webp" width="300" alt="Board summary on a phone in light mode">
-  <img src="docs/media/phone-dark.webp" width="300" alt="Board summary on a phone in dark mode">
-</p>
+## On your phone
+
+The same board on a phone, light and dark.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-dark.webp">
+  <img src="docs/media/phone-light.webp" width="320" alt="Board summary on a phone in light mode">
+</picture>
+
+*The summary, the waiting list, and the answers, in a phone frame.*
 
 ## On your screen
 
-The waiting list and the summary in dark, from the same demo board.
+The waiting list and the summary at desk width, light and dark.
 
-<p align="center">
-  <img src="docs/media/desktop-light-list.webp" width="860" alt="Light desktop waiting list with the pick-one question open">
-</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/desktop-dark.webp">
+  <img src="docs/media/desktop-light.webp" alt="Board summary at desk width in light mode">
+</picture>
 
-<p align="center">
-  <img src="docs/media/desktop-dark-list.webp" width="860" alt="Dark desktop waiting list with the pick-one question open">
-</p>
+*Everything in one glance: waiting, evidence, explainers, answered.*
 
-<p align="center">
-  <img src="docs/media/desktop-dark.webp" width="860" alt="Dark desktop board summary with one answer saved">
-</p>
+## How agents use it
 
-## Commands
+Every item records who filed it, and that agent gets the answer as an
+event, by itself: the agent raises with `--filer my-agent` and blocks on
+`sign-off-axi wait --filer my-agent`, which returns only that filer's
+answers, each once, and the card shows **Seen by agent**. An agent that
+cannot block can be woken instead: an `on_answer:` line in the
+`config.yaml` beside the board names a command the board runs for every
+answer. The full reference, with the worked example, is in
+[docs/commands.md](docs/commands.md).
 
-Every command takes `--help`. Output is compact, with next-step hints.
-The CLI is driven from a shell with no setup; sign-off itself calls no model
-and inherits the calling agent's model routing.
+Every command takes `--help` and prints compact output with next-step hints.
+sign-off itself calls no model and inherits the calling agent's model routing.
 
-| Command | In a few words |
-|---|---|
-| `list` | show what is waiting on you |
-| `raise` | ask a yes/no or pick-one question |
-| `post` | ask any kind, or post a contract message |
-| `answers` | read the saved answers |
-| `wait` | block until the user answers |
-| `poll` | block until a comment or prompt arrives |
-| `open` | start the board in the background |
-| `status` | is this board's server running? |
-| `stop` | stop this board's server |
-| `serve` | run the board in the foreground |
-| `export` | freeze the board as one HTML file |
-| `init` | set up a repo and install agent skills |
-| `report` | build an explainer page to post |
-| `signin` | close a sign-in card as done |
-| `doctor` | check the setup; each failure names its fix |
-| `validate` | check messages against the contract |
-| `update` | upgrade the CLI (`--check` reports only) |
+## Install
 
-```
-$ sign-off-axi raise --title "Keep the weekly digest?" --recommend yes
-board: ~/.sign-off/decisions.json
-raised[1]{key,status,title}:
-  keep-the-weekly-digest,raised,Keep the weekly digest?
-help[2]:
-  Run `sign-off-axi open` so the user can answer
-  Run `sign-off-axi answers --key keep-the-weekly-digest` to read the answer
+```sh
+npm install -g sign-off-axi
 ```
 
-Exit codes: `0` ok, including no-ops; `1` the request cannot be done;
-`2` usage or input error. Errors print on stdout as `error:`, `code:` and
-`help:` lines.
-
-## Agent setup
-
-In a project folder, one command writes `.sign-off/` (config, board,
-`mocks/` and `evidence/` folders) and installs the sign-off skill for each
-coding agent on your `PATH`:
+In a project folder, one command sets up `.sign-off/` and installs the
+skill for each coding agent on your `PATH`:
 
 ```sh
 npx -y sign-off-axi init
 ```
 
-| Agent | `--agent` name | Detected by | Skill folder in the project |
-|---|---|---|---|
-| Claude Code | `claude-code` | `claude` | `.claude/skills/` |
-| Codex | `codex` | `codex` | `.agents/skills/` |
-| OpenCode | `opencode` | `opencode` | `.agents/skills/` |
-| Pi | `pi` | `pi` | `.agents/skills/` |
-| Gemini CLI | `gemini-cli` | `gemini` | `.agents/skills/` |
+## Docs and reference
 
-The skill teaches the agent to ask through `npx -y sign-off-axi` and stays a
-short stub pointing at `--help`, so it cannot go stale. `doctor` checks the
-setup; `open` and `serve` use the config's `port:` unless `--port` is given.
-
-Every item records who filed it, and that agent gets the answer as an event,
-by itself:
-
-```sh
-sign-off-axi raise --title "Keep the weekly digest?" --filer my-agent   # or export SIGN_OFF_FILER=my-agent
-sign-off-axi wait --filer my-agent                                      # blocks until you answer, then prints it
-```
-
-`wait --filer` returns only that filer's answers, each once, and the card
-shows **Seen by agent**. An agent that cannot block can be woken instead:
-an `on_answer:` line in the `config.yaml` beside the board names a command
-the board runs for every answer. Detail in
-[docs/question-kinds.md](docs/question-kinds.md).
+- [Commands](docs/commands.md): every command, the agent setup, exit codes.
+- [Question kinds](docs/question-kinds.md): the reference for each kind.
+- [Contract](docs/contract.md): the message rules agents post by.
+- [File formats](docs/file-formats.md): board and message files.
 
 ## Development
 
+Builds first, then runs the integration journeys against the real CLI:
+
 ```sh
-npm test                      # builds, then runs the integration journeys against the real CLI and server
-npm run build:skill           # regenerates skills/sign-off-axi/SKILL.md from src/skill.ts (CI runs it with -- --check)
-npm run build:demo            # builds the static demo site into demo-dist/ (GitHub Pages, the Try-it-live link)
-npm pack                      # builds the publishable sign-off-axi tarball
+npm test
+npm run build:skill
+npm run build:demo
+npm pack
 ```
+
+- `npm test`: full journeys
+- `npm run build:skill`: skill stub
+- `npm run build:demo`: demo site (Try it live)
+- `npm pack`: tarball
 
 A release is a merged version-bump PR: CI publishes the new version to npm.
 
@@ -265,7 +377,10 @@ always wins.
 
 ```sh
 tmp=$(mktemp -d)
-(cd "$tmp" && SIGN_OFF_HOME="$tmp" sign-off-axi raise --title "Probe?")   # lands in $tmp/.sign-off/decisions.json
+export SIGN_OFF_HOME="$tmp"
+(cd "$tmp" &&
+  sign-off-axi raise \
+  --title "Probe?")
 ```
 
 Proof lives in [`.done-done.yaml`](.done-done.yaml): the `install`, `test`
