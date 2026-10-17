@@ -141,6 +141,7 @@ test('a plan: sections, decisions with a recommended pick and a page pass valida
     [{ ...plan, decisions: undefined }, /decisions is required/, /Set "decisions" to 0-5 objects/],
     [decision({ recommend: 'maybe' }), /decisions\[0\]\.recommend "maybe" is not an option value/, /one of one, each/],
     [decision({ question: 'Send every answer back as one event.' }), /decisions\[0\]\.question must be one question of 12 words or fewer, ending in \?/, /put the rest in "why"/],
+    [decision({ question: '?' }), /decisions\[0\]\.question must be one question of 12 words or fewer, ending in \?/, /Ask it in 12 words or fewer/],
     [decision({ options: d.options.slice(0, 1) }), /decisions\[0\]\.options must list 2 to 6 options/, /"outcome"/],
     [decision({ options: [{ value: 'one', label: 'One event' }, d.options[1]] }), /decisions\[0\]\.options\[0\]\.outcome must be text/, /Set "outcome"/],
     [decision({ options: [{ ...d.options[0], note: 'x' }, d.options[1]] }), /decisions\[0\]\.options\[0\]\.note is not a field of an option/, /only value, label and outcome/],
