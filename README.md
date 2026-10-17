@@ -19,8 +19,6 @@
   </picture>
 </p>
 
-<!-- Demo lane: put the "Try it live" link on the line below this comment. -->
-
 ## One-minute quick start
 
 ```sh
@@ -54,6 +52,8 @@ the message rules are in [docs/contract.md](docs/contract.md).
 ```sh
 sign-off-axi raise \
   --title "Keep the weekly digest?" \
+  --about "Open rate held steady \
+at about a third for two months." \
   --recommend yes
 ```
 
@@ -70,6 +70,9 @@ sign-off-axi raise \
 sign-off-axi raise \
   --title "When should the new \
 settings page go out?" \
+  --about "No new bug reports \
+for three weeks. Support is \
+fully staffed on Friday." \
   --option today=Today \
   --option friday=Friday \
   --option next-week="Next week" \
@@ -139,7 +142,7 @@ sign-off-axi post \
 then a code." \
   --media explainer.mp4 \
   --chapter 0:00=Start \
-  --chapter 0:02="The code step"
+  --chapter 0:02="The tap"
 ```
 
 <picture>
@@ -176,6 +179,8 @@ moved first." \
 sign-off-axi post \
   --type diagram \
   --title "Is this the sign-in flow?" \
+  --about "Password first, \
+then a code, then in." \
   --view flow.svg \
   --recommend yes
 ```
@@ -193,7 +198,11 @@ sign-off-axi post \
 sign-off-axi post \
   --type interactive \
   --title "How many testers approved?" \
+  --about "Tap the counter to \
+add yourself." \
   --view counter.html \
+  --option yes=Yes \
+  --option no="Needs work" \
   --recommend yes
 ```
 
