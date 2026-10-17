@@ -1046,7 +1046,7 @@
   }
   // Triage keys at a desk: a number picks that answer (in the order shown), E skips, Z takes back the last tap.
   addEventListener('keydown', (e) => {
-    if (location.hash !== '#waiting' || e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.('textarea, input')) return;
+    if (location.hash !== '#waiting' || e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.('textarea, input, select')) return;
     const k = e.key.toLowerCase(), pick = /^[1-9]$/.test(k) && document.querySelectorAll('.focus .choices button')[k - 1];
     const act = pick || (k === 'e' ? document.querySelector('.quiet .skip') : k === 'z' && !toast.hidden && !undoBtn.hidden ? undoBtn : null);
     if (act && !act.disabled) e.preventDefault(), act.click();
