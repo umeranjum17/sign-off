@@ -1072,16 +1072,11 @@
   function render() {
     const by = { waiting: [], evidence: [], reports: [], answered: [], notes: [] };
     // The board file appends new items at the end, so each list reads newest first; answers sort by their time.
-    // One decision is one card: an open ask that a shown open ask merges is not shown, and that ask's answer closes it. A chain shows its last link.
+    // One decision is one card: a card an open ask merges is not shown; that ask's answer closes it.
     const gone = new Set(state.dismissed ?? []), open = state.decisions.filter((d) => !gone.has(d.key) && !isAnswered(d));
     const openKeys = new Set(open.map((d) => d.key));
-    let live = open, merged = new Set();
-    for (let pass = 0; pass <= open.length; pass++) {
-      merged = new Set(live.flatMap((d) => d.merges ?? []).filter((k) => openKeys.has(k)));
-      live = open.filter((d) => !merged.has(d.key));
-    }
-    const folded = (d) => merged.has(d.key) && !isAnswered(d);
-    for (const d of [...state.decisions].reverse()) if (!gone.has(d.key) && !folded(d)) by[area(d)].push(d);
+    const merged = new Set(open.flatMap((d) => d.merges ?? []).filter((k) => openKeys.has(k)));
+    for (const d of [...state.decisions].reverse()) if (!gone.has(d.key) && !merged.has(d.key)) by[area(d)].push(d);
     // Waiting on you reads newest first unless the viewer chose oldest first. A sign-in blocks someone now, so sign-ins come first either way.
     let latest = -Infinity;
     const inFileOrder = by.waiting.slice().reverse().map((d, i) => { const t = Date.parse(d.filed); if (!Number.isNaN(t)) latest = t; return { d, t: latest, i }; });
@@ -1091,7 +1086,7 @@
     // A type chip whose asks are all answered or dismissed falls back to All.
     if (waitType !== 'all' && !by.waiting.some((d) => typeOf(d) === waitType)) waitType = 'all';
     const shown = waitType === 'all' ? by.waiting : by.waiting.filter((d) => typeOf(d) === waitType);
-    const hidden = state.decisions.filter((d) => gone.has(d.key) && area(d) === 'waiting' && !folded(d));
+    const hidden = state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'waiting');
     by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
     const [, at, key] = /^#(waiting|evidence|reports|answered)(?:\/([\w.-]+))?$/.exec(location.hash) ?? [];
     const link = (a, name, n) => el('a', { href: `#${a}`, ...(a === (at ?? '') && { 'aria-current': 'page' }) }, icon(a || 'summary'), name, n === undefined ? '' : el('span', { class: 'n' }, String(n)));

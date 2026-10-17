@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -137,23 +137,20 @@ test('a merge names a card on the board that offers every option of this ask, an
   assert.equal(run('raise', board, '--key', 'ship-y', ...good.slice(2), '--title', 'Can the sign-in screen go out?', '--merge', 'ship-x').status, 0);
   const loop = run('raise', board, '--key', 'ship-x', ...good.slice(2), '--title', 'Ship the sign-in screen?', '--merge', 'ship-y');
   assert.equal(loop.status, 2, loop.stdout);
-  assert.match(loop.stdout, /merges ship-y, which merges ship-x back/);
+  assert.match(loop.stdout, /key ship-x merges others, but ship-y already merges ship-x/);
 });
 
-const chrome = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'].flatMap((b) => process.env.PATH.split(':').map((d) => join(d, b))).find(existsSync);
-
-test('a chain of merges shows only its head: the card in the middle is hidden by the card that merges it', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('a merged card merges nothing itself: a chain of merges is refused at post time, in either order', () => {
   const board = join(scratch, 'chain.json');
   assert.equal(run('raise', board, '--key', 'chain-z', ...good.slice(2), '--title', 'Keep the old login screen?').status, 0);
   assert.equal(run('raise', board, '--key', 'chain-y', ...good.slice(2), '--title', 'Retire the old login screen?', '--merge', 'chain-z').status, 0);
-  assert.equal(run('raise', board, '--key', 'chain-x', ...good.slice(2), '--title', 'Ship the new login screen?', '--merge', 'chain-y').status, 0);
-  const proc = spawn(process.execPath, [cli, 'serve', board, '--port', '0'], { env });
-  procs.push(proc);
-  const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
-  const dom = execFileSync(chrome, ['--headless', '--no-sandbox', '--disable-gpu', '--virtual-time-budget=10000', '--dump-dom', `${url}#waiting`], { env: { ...env, TMPDIR: scratch }, encoding: 'utf8', timeout: 60000 });
-  assert.match(dom, /Ship the new login screen\?/);
-  assert.match(dom, /Keep the old login screen\?/);
-  assert.doesNotMatch(dom, /Retire the old login screen\?/);
+  const chain = run('raise', board, '--key', 'chain-x', ...good.slice(2), '--title', 'Ship the new login screen?', '--merge', 'chain-y');
+  assert.equal(chain.status, 2, chain.stdout);
+  assert.match(chain.stdout, /key chain-x merges chain-y, which merges others/);
+  assert.equal(run('raise', board, '--key', 'chain-w', ...good.slice(2), '--title', 'Keep the new login screen?').status, 0);
+  const grown = run('raise', board, '--key', 'chain-z', ...good.slice(2), '--title', 'Keep the old login screen?', '--merge', 'chain-w');
+  assert.equal(grown.status, 2, grown.stdout);
+  assert.match(grown.stdout, /key chain-z merges others, but chain-y already merges chain-z/);
 });
 
 test('the title rules accept plain questions that merely contain a label or id-like word', () => {
@@ -207,8 +204,21 @@ test('a card has one open merging ask: a second ask may not merge a card another
   assert.equal(run('raise', board, '--key', 'one-a', ...good.slice(2), '--title', 'Can the sign-in screen go out?', '--merge', 'one-c').status, 0);
   const second = run('raise', board, '--key', 'one-b', ...good.slice(2), '--title', 'Should the sign-in screen wait?', '--merge', 'one-c');
   assert.equal(second.status, 2, second.stdout);
-  assert.match(second.stdout, /merges one-c, which open one-a already merges/);
-  assert.match(second.stdout, /Update one-a instead of posting a second card/);
+  assert.match(second.stdout, /merges one-c, which one-a already merges/);
+  assert.match(second.stdout, /Answer or restore one-a instead of posting a second card/);
+});
+
+test('a dismissed ask still names its merged card until it is answered, dismissed or restored', () => {
+  const board = join(scratch, 'dismissed-parent.json');
+  assert.equal(run('raise', board, '--key', 'dis-c', ...good.slice(2), '--title', 'Ship the sign-in screen?').status, 0);
+  assert.equal(run('raise', board, '--key', 'dis-a', ...good.slice(2), '--title', 'Can the sign-in screen go out?', '--merge', 'dis-c').status, 0);
+  const dismissed = (on) => appendFileSync(join(scratch, 'dismissed-parent.dismissed.jsonl'), `${JSON.stringify({ key: 'dis-a', dismissed: on, at: new Date().toISOString() })}\n`);
+  dismissed(true);
+  const refused = run('raise', board, '--key', 'dis-b', ...good.slice(2), '--title', 'Should the sign-in screen wait?', '--merge', 'dis-c');
+  assert.equal(refused.status, 2, refused.stdout);
+  assert.match(refused.stdout, /merges dis-c, which dis-a already merges/);
+  dismissed(false);
+  assert.equal(run('raise', board, '--key', 'dis-b', ...good.slice(2), '--title', 'Should the sign-in screen wait?', '--merge', 'dis-c').status, 2);
 });
 
 test('a merge cannot name a card that is already answered or dismissed', async () => {

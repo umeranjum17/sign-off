@@ -20,7 +20,7 @@ an `--outcome <value>=<text>` for every option (yes and no too), a
 the user stays silent (shown, never applied), with an optional `--silent-by`
 time. Lettered choices in the text need one lettered `--option` each, never
 Yes/No buttons. `--merge <key>` folds another card asking the same thing into
-this one: it is hidden, and this answer closes it too. A card merges into one open ask only, never an answered or dismissed one. A question that breaks
+this one: it is hidden, and this answer closes it too. A card is named by one ask until that ask is answered, and a merged card merges nothing itself. A question that breaks
 a rule is refused with the field and one fix line.
 
 Each answer is one tap, with an Undo for a few seconds after it (an Undo is
