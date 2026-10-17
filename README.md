@@ -10,7 +10,7 @@
 
 <h1 align="center">sign-off</h1>
 
-<p align="center"><b>One calm page for every question the programs working for you need answered.</b><br>Yes or no, pick-one, mock-ups, proof photos, short videos, sign-in links: each lands on a board<br>on your own machine, you answer with one tap, and the answer is saved for the asker to read.</p>
+<p align="center"><b>One calm page for every question the programs working for you need answered.</b><br>Yes or no, pick-one, mock-ups, proof photos, short videos, sign-in links: each lands on a board on your own machine, you answer with one tap, and the answer is saved for the asker to read.</p>
 
 <p align="center">
   <picture>
