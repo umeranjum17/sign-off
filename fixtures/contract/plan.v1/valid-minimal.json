@@ -1,0 +1,13 @@
+{
+  "contract": 1,
+  "kind": "plan",
+  "schema": 1,
+  "key": "plan-filter-waiting",
+  "title": "Filter Waiting on you by type",
+  "about": "Umer can show only one type of question at a time.",
+  "sections": [
+    { "id": "goals", "heading": "Goals", "body": "Add a type filter above Waiting on you." }
+  ],
+  "decisions": [],
+  "view": "page/index.html"
+}
