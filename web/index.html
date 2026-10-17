@@ -1006,16 +1006,17 @@
     const chip = (id, label) => el('button', { 'aria-pressed': String(waitType === id) }, `${label} ${count(id)}`);
     const chips = ['all', ...Object.keys(TYPE_NAMES).filter((id) => count(id))].map((id) => {
       const b = chip(id, id === 'all' ? 'All' : TYPE_NAMES[id]);
-      b.onclick = () => { waitType = id; render(); };
+      b.onclick = () => { waitType = id; reshow('.chips [aria-pressed="true"]'); };
       return b;
     });
     const sel = el('select', { 'aria-label': 'Sort waiting questions' }, el('option', { value: 'newest' }, 'Newest first'), el('option', { value: 'oldest' }, 'Oldest first'));
     sel.value = waitSort;
-    sel.onchange = () => { waitSort = sel.value; try { localStorage.setItem(SORT_KEY, waitSort); } catch {} render(); };
+    sel.onchange = () => { waitSort = sel.value; try { localStorage.setItem(SORT_KEY, waitSort); } catch {} reshow('.sort select'); };
     return el('div', { class: 'filters' }, el('div', { class: 'chips', role: 'group', 'aria-label': 'Filter by type' }, ...chips), el('label', { class: 'sort' }, 'Sort', sel));
   }
   /** Triage: the open asks one at a time, in the order the filters chose. Skip moves on without answering and is not stored; an answer moves on to the next ask. */
   let cur = null, curAt = 0;
+  const reshow = (control) => { cur = null; curAt = 0; render(); document.querySelector(control)?.focus({ preventScroll: true }); };
   function triage(items, hidden) {
     if (!items.length) return el('section', { class: 'card caught' }, el('h2', {}, 'All caught up'), el('p', { class: 'meta' }, 'Nothing is waiting on you.'),
       el('a', { class: 'more', href: '#' }, 'Back to Summary'), dismissed(hidden));
@@ -1059,7 +1060,8 @@
     const gone = new Set(state.dismissed ?? []);
     for (const d of [...state.decisions].reverse()) if (!gone.has(d.key)) by[area(d)].push(d);
     // Waiting on you reads newest first unless the viewer chose oldest first. A sign-in blocks someone now, so sign-ins come first either way.
-    const asked = waitSort === 'oldest' ? [...by.waiting].reverse() : by.waiting;
+    const oldest = waitSort === 'oldest', filedAt = (d) => Date.parse(d.filed) || 0;
+    const asked = (oldest ? [...by.waiting].reverse() : by.waiting).sort((x, y) => (oldest ? 1 : -1) * (filedAt(x) - filedAt(y)));
     by.waiting = [...asked.filter((d) => d.type === 'signin'), ...asked.filter((d) => d.type !== 'signin')];
     // A type chip whose asks are all answered or dismissed falls back to All.
     if (waitType !== 'all' && !by.waiting.some((d) => typeOf(d) === waitType)) waitType = 'all';
