@@ -42,7 +42,7 @@ The bar is the best human-computer interaction on every surface. Every screen, m
 
 ## Shared patterns
 
-Patterns follow Kun's tools. See the Works with section below for the list.
+The tools share a few patterns: the AXI CLI shape, TOON output, next-command help lines, skill install, and npm distribution.
 
 ## Sign-off's role
 
@@ -55,8 +55,6 @@ sign-off owns the written communication contract. The contract covers the file a
 ## Works with
 
 Integrations live in this section. They stay out of the description and the intro.
-
-Kun's tools set the patterns this family follows: firstmate, no-mistakes, and quota-axi. The shared patterns are the AXI CLI shape, TOON output, next-command help lines, skill install, and npm distribution.
 
 sign-off owns one communication contract for asks, reports, evidence, gates and retro findings. In its v1 every message is strict and versioned, and a message that does not match is refused with one fix line, never shown half-broken. It is being built: the status line in [docs/contract.md](docs/contract.md) says what works today.
 
