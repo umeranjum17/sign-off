@@ -36,7 +36,7 @@ export type Decision = {
   /** Plans: the sections to approve or change and the decisions to answer, all sent back as one answer. */
   sections?: PlanSection[]; decisions?: PlanDecision[];
 };
-export type Answer = { key: string; answer: string; label: string; close: string; at: string; note?: string; comments?: Sent[];
+export type Answer = { key: string; answer: string; label: string; close: string; at: string; note?: string; comments?: Sent[]; merged_by?: string;
   /** A plan's send-back: every section's verdict, and the option picked for each decision key. */
   notes?: PlanNote[]; decisions?: Record<string, string> };
 export type Round = { key: string; note: string; at: string; comments?: Sent[] };
@@ -249,7 +249,6 @@ export function readAnswers(decisionsPath: string, warn: (msg: string) => void =
 export const CLEARED: Option = { value: '', label: '' };
 /** Appends one answer line unless it equals the current answer and note, and returns the saved answer. Starts a new line after a torn fragment.
  * One decision is one card: the answer also goes, as its own line, to each card on the board this ask merges, under that card's close mode. */
-const fannedBy = (a: Answer | undefined, key: string) => a?.note?.split(':')[0] === `Answered with ${key}`;
 export function appendAnswer(decisionsPath: string, d: Decision, option: Option, note = '', comments: Sent[] = []): Answer | undefined {
   const answer = saveAnswer(decisionsPath, d, option, note, comments);
   if (!d.merges?.length) return answer;
@@ -257,19 +256,20 @@ export function appendAnswer(decisionsPath: string, d: Decision, option: Option,
   for (const key of d.merges) {
     const merged = on.find((x) => x.key === key), own = answers[key];
     if (!merged) continue;
+    const fanned = own?.merged_by === d.key;
     if (option === CLEARED) {
-      if (fannedBy(own, d.key)) saveAnswer(decisionsPath, merged, CLEARED, '');
+      if (fanned) saveAnswer(decisionsPath, merged, CLEARED, '');
       continue;
     }
-    if (own || (option !== REPLY && !merged.options.some((o) => o.value === option.value))) continue;
-    saveAnswer(decisionsPath, merged, option, `Answered with ${d.key}${note ? `: ${note}` : ''}`);
+    if ((own && !fanned) || (option !== REPLY && !merged.options.some((o) => o.value === option.value))) continue;
+    saveAnswer(decisionsPath, merged, option, `Answered with ${d.key}${note ? `: ${note}` : ''}`, [], d.key);
   }
   return answer;
 }
-function saveAnswer(decisionsPath: string, d: Decision, option: Option, note: string, comments: Sent[] = []): Answer | undefined {
+function saveAnswer(decisionsPath: string, d: Decision, option: Option, note: string, comments: Sent[] = [], by?: string): Answer | undefined {
   const current = readAnswers(decisionsPath)[d.key];
   if (option === CLEARED ? !current : current?.answer === option.value && (current.note ?? '') === note && !comments.length) return;
-  const answer: Answer = { key: d.key, answer: option.value, label: option.label, close: d.close, at: now(), ...(note && { note }), ...(comments.length && { comments }) };
+  const answer: Answer = { key: d.key, answer: option.value, label: option.label, close: d.close, at: now(), ...(note && { note }), ...(comments.length && { comments }), ...(by && { merged_by: by }) };
   appendLine(answersPath(decisionsPath), answer);
   return answer;
 }

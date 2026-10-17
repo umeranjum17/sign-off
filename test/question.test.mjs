@@ -163,3 +163,24 @@ test('a merge fans its answer out to the merged cards that have none, and a retr
   assert.deepEqual(Object.fromEntries(Object.entries(got).map(([k, a]) => [k, a.answer])), { 'fan-a': 'yes', 'fan-b': 'yes', 'fan-c': 'no' });
   assert.equal(got['fan-b'].note, 'Answered with fan-a');
 });
+
+test('a fanned answer follows its parent: a re-answer replaces it, an undo clears it, and a card\'s own note that names the parent is its own', async () => {
+  const store = await import(new URL('../dist/store.js', import.meta.url));
+  const board = join(scratch, 'refan.json');
+  const yes = { value: 'yes', label: 'Yes' }, no = { value: 'no', label: 'No' };
+  assert.equal(run('raise', board, '--key', 're-b', ...good.slice(2), '--title', 'Can the sign-in screen go out?').status, 0);
+  assert.equal(run('raise', board, '--key', 're-c', ...good.slice(2), '--title', 'Should the sign-in screen wait?').status, 0);
+  store.appendAnswer(board, store.loadDecisions(board).find((d) => d.key === 're-c'), yes, 'Answered with re-a: my own words');
+  assert.equal(run('raise', board, '--key', 're-a', ...good.slice(2), '--title', 'Ship the sign-in screen?', '--merge', 're-b', '--merge', 're-c').status, 0);
+  const a = store.loadDecisions(board).find((d) => d.key === 're-a');
+  store.appendAnswer(board, a, yes);
+  store.appendAnswer(board, a, no);
+  let got = JSON.parse(run('answers', board, '--json').stdout);
+  assert.equal(got['re-b'].answer, 'no');
+  assert.equal(got['re-b'].note, 'Answered with re-a');
+  assert.equal(got['re-c'].answer, 'yes');
+  store.appendAnswer(board, a, store.CLEARED);
+  got = JSON.parse(run('answers', board, '--json').stdout);
+  assert.equal(got['re-b'], undefined);
+  assert.equal(got['re-c'].answer, 'yes');
+});
