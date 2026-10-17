@@ -1099,6 +1099,7 @@
   addEventListener('hashchange', () => {
     const back = !reader.hidden && reader.dataset.key;
     if (jump && location.hash === '#waiting') [cur, jump] = [jump, null];
+    if (location.hash === '#waiting') waitType = 'all';
     render();
     if (!reader.hidden) return reader.querySelector('h1').focus();
     const item = (jump || back) && document.getElementById(`item-${jump || back}`);

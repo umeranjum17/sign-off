@@ -989,6 +989,20 @@ test('Waiting on you: a type label on each ask, type chips with counts, and the 
   await until(async () => (await fhead()) === '1 of 3');
   assert.equal(await evaluate('document.querySelector(".sort select").value'), 'oldest');
   assert.equal(await evaluate('document.querySelector(".focus h3")?.textContent'), 'Keep the weekly digest?');
+  // A type chip narrows this visit only: ‹ Summary and back through the way to Triage opens everything its count promises, in All again.
+  await until(async () => (await pick('Yes/No')) && (await queue()) === 'Keep the weekly digest?');
+  await evaluate('document.querySelector(".back").click()');
+  await until(async () => (await evaluate('document.querySelector(".needs a.more")?.textContent')) === 'Answer all 3 in Triage →');
+  await evaluate('document.querySelector(".needs a.more").click()');
+  await until(async () => (await fhead()) === '1 of 3');
+  assert.equal(await queue(), 'Keep the weekly digest?|Which day for release?|Pick the look');
+  assert.equal(await chips(), 'All 3*|Design pick 1|Yes/No 1|Pick one 1');
+  // The same reset lands a Summary tap on the very ask tapped, even one the chip had filtered out.
+  await until(async () => (await pick('Yes/No')) && (await queue()) === 'Keep the weekly digest?');
+  await evaluate('document.querySelector(".back").click()');
+  await until(async () => (await evaluate('!!document.querySelector(".needs a.more")')));
+  await evaluate('[...document.querySelectorAll(".areas .i-waiting a.compact")].find((a) => a.textContent.includes("Pick the look")).click()');
+  await until(async () => (await evaluate('document.querySelector(".focus h3")?.textContent')) === 'Pick the look');
   close();
   proc.kill();
 });
