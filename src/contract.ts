@@ -246,7 +246,7 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
   const odd = actions && options.find((o: any) => !Object.hasOwn(actions, o.value) || actions[o.value] !== o.label);
   if (odd) throw bad('options', `${show(odd)} is not a ${m.kind} action: ${Object.keys(actions).join(', ')}, each with its label`, listed);
   const values = options.map((o: any) => o.value), pick = `the option you would pick: one of ${values.join(', ')}`;
-  if (!Object.hasOwn(m, 'recommend_value')) throw bad('recommend_value', 'is required', `Add ${named('recommend_value', flags)}: ${show(values[0])}, ${pick}`);
+  if (!Object.hasOwn(m, 'recommend_value')) throw bad('recommend_value', 'is required', flags ? `Add --recommend ${values[0]}, ${pick}` : `Add "recommend_value": ${show(values[0])}, ${pick}`);
   if (!values.includes(m.recommend_value)) throw bad('recommend_value', `${show(m.recommend_value)} is not an option value`, `Set ${named('recommend_value', flags)} to ${pick}`);
   const REASON = `why you recommend ${m.recommend_value}, in one line (160 characters or fewer)`;
   if (ask && !Object.hasOwn(m, 'recommend_reason')) throw bad('recommend_reason', 'is required', `Add ${named('recommend_reason', flags)}: ${REASON}`);
