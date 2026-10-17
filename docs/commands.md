@@ -22,7 +22,7 @@ and inherits the calling agent's model routing.
 | `signin` | close a sign-in card as done |
 | `doctor` | check the setup; each failure names its fix |
 | `validate` | check messages against the contract |
-| `update` | upgrade the CLI (`--check` reports only) |
+| `help` | show the commands and flags |
 
 ```
 $ sign-off-axi raise --title "Keep the weekly digest?" --recommend yes
