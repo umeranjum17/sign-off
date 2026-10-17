@@ -5,6 +5,9 @@
   <g font-family="system-ui, -apple-system, Segoe UI, sans-serif" fill="#34336B">
     <text x="30" y="38" text-anchor="middle" font-size="16" font-weight="600">1</text>
     <text x="52" y="39" font-size="20" font-weight="600">Agent asks</text>
-    <path d="M28 66h184v42H56l-16 12v-12H28z" fill="#FFFFFF" stroke="#CCCDF0"/><text x="44" y="93" font-size="18">Keep the digest?</text>
+    <path d="M28 66h184v42H56l-16 12v-12H28z" fill="#FFFFFF" stroke="#CCCDF0"/><text x="44" y="93" font-size="18">Pick a layout?</text>
+    <rect x="84" y="114" width="44" height="22" rx="11" fill="#FFFFFF" stroke="#CCCDF0"/><text x="106" y="130" font-size="13" text-anchor="middle">A</text>
+    <rect x="134" y="114" width="44" height="22" rx="11" fill="#FFFFFF" stroke="#CCCDF0"/><text x="156" y="130" font-size="13" text-anchor="middle">B</text>
+    <rect x="184" y="114" width="40" height="22" rx="11" fill="#FFFFFF" stroke="#CCCDF0"/><text x="204" y="130" font-size="13" text-anchor="middle">C</text>
   </g>
 </svg>
