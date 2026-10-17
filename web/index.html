@@ -550,7 +550,7 @@
     const quiet = !ro && d.options.find((o) => o.value === d.default_if_silent);
     const silent = quiet ? `If you stay quiet: ${quiet.label}${d.silent_by ? `, at ${when(d.silent_by)}` : ' (no deadline)'}` : '';
     // The other cards this ask replaced are hidden; its answer closes them too.
-    const merged = (d.merges ?? []).filter((k) => state.decisions.some((x) => x.key === k)).length;
+    const merged = !saved && !state.dismissed?.includes(d.key) ? (d.merges ?? []).filter((k) => state.decisions.some((x) => x.key === k) && !answerOf(k)).length : 0;
     if (design) {
       return el('article', { class: 'row design', id: `item-${d.key}` }, lead,
         d.tradeoff ? el('p', { class: 'tradeoff', dir: 'auto' }, el('strong', {}, 'Trade-off '), d.tradeoff) : '',

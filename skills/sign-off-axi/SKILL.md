@@ -58,7 +58,7 @@ The user often reads the board on a phone. Each card must make sense in 10 secon
 
 sign-off refuses a question that breaks these rules, naming the field and one fix; `raise --help` has the current flags.
 
-- One decision is one card. Before you post, run `npx -y sign-off-axi list --full` and look at the open cards. If the same decision is already there, do not ask it again: wait on that card, or, to ask it better, post one card with `--merge <its key>`: the old card is hidden and the answer closes it too. Never post a second card for one decision.
+- One decision is one card. Before you post, run `npx -y sign-off-axi list --full` and look at the open cards. If the same decision is already there, do not ask it again: wait on that card, or, to ask it better, post one card with `--merge <its key>`: the old card must offer every option of the new one, and it is hidden and closed by the answer too. Never post a second card for one decision.
 - Title: one plain question of 12 words or fewer, ending in "?", that the buttons answer. No "Say yes or no:" or "<task>:" prefix, no task names or ids.
 - `--why`: 1 or 2 short lines on what it is about and why it needs an answer now.
 - The buttons are the choices in the text: Yes and No for a yes/no question; for a pick, one `--option` per choice, each label starting with its letter (A, B, C). Never A/B/C in the text with Yes/No buttons, and never Done or Not now buttons on a question.

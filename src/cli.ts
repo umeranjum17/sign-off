@@ -74,7 +74,7 @@ Every question meets the question standard (docs/contract.md, "Asking a good que
   --default is what happens if the user stays quiet, shown and never applied; --silent-by (an ISO UTC time such as 2026-10-18T09:00Z) says when.
   The buttons match the text: a title or why that names choices A, B, C needs one --option per letter, each label starting with its letter, never Yes/No.
   yes and no are labelled Yes and No; a question never takes Done, OK or Not now buttons.
-One decision is one card: look at the open cards first. --merge <key> (up to 10) names other cards on the board that ask the same thing:
+One decision is one card: look at the open cards first. --merge <key> (up to 10) names other cards on the board that ask the same thing and offer every option of this one:
 they are hidden while this one waits, and its answer closes them too, with the same value and a note naming this key.
 The user answers with one tap and can undo it for a few seconds.
 --from adds every decision in a decisions file: ${FORMAT}
@@ -323,13 +323,6 @@ function fits(title: unknown, key?: string) {
 /** The question standard's flags: a decision's why, each option's outcome, the reason for the recommendation, when silence decides, the cards it merges. */
 const ASK_FLAGS = ['why', 'outcome', 'recommend-reason', 'silent-by', 'merge'];
 const MANY = ['option', 'outcome', 'merge'];
-/** A flag post's refusal names its flags, not the message fields they fill. */
-const FLAG_OF: Record<string, string> = { why: 'why', recommend_reason: 'recommend-reason', default_if_silent: 'default', silent_by: 'silent-by', merges: 'merge', recommend_value: 'recommend', title: 'title', detail: 'detail' };
-const asFlags = (text: string) => text.replace(/"outcome" to option ([\w.-]+):/g, '--outcome $1=<text>:')
-  .replace(/\{"value":"(\w+)","label":"([^"]*)","outcome":"[^"]*"\}/g, '--option $1="$2" --outcome $1=<text>')
-  .replace(/"recommend_value": "([\w.-]+)"/g, '--recommend $1')
-  .replace(/(?<=^key [\w.-]+: )merges\[\d+\]/, 'merges')
-  .replace(/"(why|recommend_reason|default_if_silent|silent_by|merges|recommend_value|title|detail)"|(?<=^key [\w.-]+: )(why|recommend_reason|default_if_silent|silent_by|merges|recommend_value|title)\b/g, (_, q, f) => `--${FLAG_OF[q ?? f]}`);
 /** Board types that are contract kinds: a decision (the default type) is an ask. */
 const CONTRACT_TYPES = ['decision', 'ask', 'evidence', 'report', 'plan'];
 /** The stored item as the message it came from: the board's own `filed` stamp is not part of a message that names none. */
@@ -837,7 +830,7 @@ function replace(file: string, on: string, from?: string, filer?: string) {
       }
     }
     const old = existsSync(file) ? readItems(file) : undefined;
-    let items = feed, extra = fed.extra;
+    let items = feed, extra = fed.extra, resulting = incoming;
     if (filer) {
       // The feed's items first: the board shows the file's last item first, so the other filers' items keep showing on top.
       const named = new Set(feed.map((i) => i.key));
@@ -846,12 +839,13 @@ function replace(file: string, on: string, from?: string, filer?: string) {
       // The merged board is checked before it is written, so a feed that breaks another filer's items leaves the board as it was.
       const check = `${file}.${process.pid}.check`;
       writeFileSync(check, JSON.stringify({ ...extra, schema: 2, items }), { mode: 0o600 });
-      try { loadDecisions(check); } catch (e) {
+      try { resulting = loadDecisions(check); } catch (e) {
         throw e instanceof InputError ? new InputError(e.message.replace(basename(check), basename(file))) : e;
       } finally {
         rmSync(check, { force: true });
       }
     }
+    checkMerges(incoming, resulting);
     // Written only when it changed, so a feeder that runs every few seconds leaves the file alone.
     const changed = JSON.stringify(old && { ...old.extra, schema: old.schema, items: old.items }) !== JSON.stringify({ ...extra, schema: 2, items });
     if (changed) writeItems(file, items, extra);
@@ -1075,8 +1069,8 @@ function buildIncoming(values: Record<string, any>, extra: object, filer: string
     // A decision is an ask: the same question standard as post --kind ask, its refusals naming the flags.
     // A key already on the board is not a new question: storing it reports it, or refuses a different one.
     if (ask && !(existsSync(file) && readItems(file).items.some((i: any) => i?.key === key))) {
-      try { checkMessage({ contract: 1, kind: 'ask', schema: 1, ...raw[0] }); } catch (e) {
-        throw e instanceof ContractError ? fail(asFlags(e.message), 'VALIDATION_ERROR', asFlags(e.help)) : e;
+      try { checkMessage({ contract: 1, kind: 'ask', schema: 1, ...raw[0] }, undefined, true); } catch (e) {
+        throw e instanceof ContractError ? fail(e.message, 'VALIDATION_ERROR', e.help) : e;
       }
     }
     return { incoming, raw };
@@ -1087,11 +1081,29 @@ function buildIncoming(values: Record<string, any>, extra: object, filer: string
 
 /** JSON with object fields in key order, so the same message compares equal in any field order. */
 const canon = (v: unknown) => JSON.stringify(v, (_, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x));
+/** A merge names cards on the board that take this card's answer: each is on the board, offers every option of this card, and does not merge back. */
+function checkMerges(incoming: Decision[], resulting: Decision[]) {
+  const byKey = new Map(resulting.map((d) => [d.key, d]));
+  const leadsTo = (from: string, to: string, seen = new Set<string>()): boolean => {
+    if (from === to) return true;
+    if (seen.has(from)) return false;
+    seen.add(from);
+    return (byKey.get(from)?.merges ?? []).some((k) => leadsTo(k, to, seen));
+  };
+  for (const d of incoming) for (const key of d.merges ?? []) {
+    const merged = byKey.get(key);
+    if (!merged) throw fail(`key ${d.key} merges ${key}, which is not on the board`, 'VALIDATION_ERROR', `Post ${key} first, or leave it out of --merge`);
+    const offered = new Set(merged.options.map((o) => o.value)), lacks = d.options.find((o) => !offered.has(o.value));
+    if (lacks) throw fail(`key ${d.key} merges ${key}, which has no ${lacks.value} option`, 'VALIDATION_ERROR', `Merge only a card that offers every option of ${d.key}`);
+    if (leadsTo(key, d.key)) throw fail(`key ${d.key} merges ${key}, which merges ${d.key} back`, 'VALIDATION_ERROR', 'Merge the cards one way only');
+  }
+}
 /** exact: a contract post, where a key takes only the same message again, filer and filed included (contract section 4). */
 function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: Decision[]; raw: any[] }, filer?: string, exact = false) {
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
     const current = board(file), items = existsSync(file) ? readItems(file).items : [], saved = readAnswers(file), now = new Date().toISOString();
+    checkMerges(incoming, [...current.filter((c) => !incoming.some((d) => d.key === c.key)), ...incoming]);
     const raised = incoming.map((d, i) => {
       const had = current.find((c) => c.key === d.key);
       // A contract message refused for its key exits 2 like any other refusal (contract section 4); raise --title keeps exit 1.

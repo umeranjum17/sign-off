@@ -249,13 +249,20 @@ export function readAnswers(decisionsPath: string, warn: (msg: string) => void =
 export const CLEARED: Option = { value: '', label: '' };
 /** Appends one answer line unless it equals the current answer and note, and returns the saved answer. Starts a new line after a torn fragment.
  * One decision is one card: the answer also goes, as its own line, to each card on the board this ask merges, under that card's close mode. */
+const fannedBy = (a: Answer | undefined, key: string) => a?.note?.split(':')[0] === `Answered with ${key}`;
 export function appendAnswer(decisionsPath: string, d: Decision, option: Option, note = '', comments: Sent[] = []): Answer | undefined {
   const answer = saveAnswer(decisionsPath, d, option, note, comments);
   if (!d.merges?.length) return answer;
-  const on = loadDecisions(decisionsPath);
+  const on = loadDecisions(decisionsPath), answers = readAnswers(decisionsPath);
   for (const key of d.merges) {
-    const merged = on.find((x) => x.key === key);
-    if (merged) saveAnswer(decisionsPath, merged, option, option === CLEARED ? '' : `Answered with ${d.key}${note ? `: ${note}` : ''}`);
+    const merged = on.find((x) => x.key === key), own = answers[key];
+    if (!merged) continue;
+    if (option === CLEARED) {
+      if (fannedBy(own, d.key)) saveAnswer(decisionsPath, merged, CLEARED, '');
+      continue;
+    }
+    if (own || (option !== REPLY && !merged.options.some((o) => o.value === option.value))) continue;
+    saveAnswer(decisionsPath, merged, option, `Answered with ${d.key}${note ? `: ${note}` : ''}`);
   }
   return answer;
 }

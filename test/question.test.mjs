@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -28,22 +28,22 @@ test('the question standard: every rule refuses a new question at post time, nam
   // [flags, the field it names, the fix line]
   const cases = [
     [without('--why'), /--why is required/, /Add --why: what it is about and why it needs an answer now/],
-    [without('--outcome').concat('--outcome', 'yes=It ships.'), /options\[1\]\.outcome is required/, /Add --outcome no=<text>: what happens next if no is picked/],
+    [without('--outcome').concat('--outcome', 'yes=It ships.'), /--outcome is required/, /Add --outcome no=<text>: what happens next if no is picked/],
     [without('--recommend-reason'), /--recommend-reason is required/, /Add --recommend-reason: why you recommend yes/],
     [without('--default'), /--default is required/, /Add --default: the option that happens if the person stays quiet/],
     [[...good, '--silent-by', 'tomorrow'], /--silent-by "tomorrow" is not a UTC time/, /YYYY-MM-DDTHH:MM:SSZ/],
     [[...good.slice(2), '--title', 'Say yes or no: ship the sign-in screen?'], /--title starts with a label for agents/, /ask the question itself/],
     [[...good.slice(2), '--title', 'Captain: ship the sign-in screen?'], /--title starts with a label for agents/, /ask the question itself/],
     [[...good.slice(2), '--title', 'fm-signin-7: ship it?'], /--title starts with a label for agents/, /ask the question itself/],
-    [[...good.slice(2), '--title', 'Ship fm-sign-off-question this week?'], /--title has the id "fm-sign-off-question"/, /plain words/],
+    [[...good.slice(2), '--title', 'Ship sign-in-v2 this week?'], /--title has the id "sign-in-v2"/, /plain words/],
     [[...good.slice(2), '--title', 'Ship the new sign-in screen this week'], /--title must be a question ending in "\?"/, /12 words or fewer/],
     [[...good.slice(2), '--title', 'Should we ship the new sign-in screen to every single user this week?'], /--title is 13 words, over 12/, /put the rest in --why/],
-    [[...good.slice(2), '--title', 'Which day should it ship: A, B or C?'], /options are Yes\/No, but the text names choices A, B, C/, /--option a="A: <short label>" --outcome a=<text>/],
-    [pick('Which day should it ship: A, B or C?'), /options has 2 options, but the text names 3 choices: A, B, C/, /one option per choice/],
-    [[...pick('Which day should it ship: A or B?').slice(0, 4), '--option', 'a=Today', ...pick('').slice(6)], /options has no option label that starts with A/, /each label starting with its letter/],
-    [[...good, '--option', 'yes=Sure', '--option', 'no=No'], /label of option yes is "Sure", not Yes/, /Set the label of yes to "Yes"/],
+    [[...good.slice(2), '--title', 'Which day: A) today, B) Friday or C) later?'], /--option are Yes\/No, but the text names choices A, B, C/, /--option a="A: <short label>" --outcome a=<text>/],
+    [pick('Which day: A) today, B) Friday or C) later?'), /--option has 2 options, but the text names 3 choices: A, B, C/, /one option per choice/],
+    [[...pick('Which day: A) today or B) later?').slice(0, 4), '--option', 'a=Today', ...pick('').slice(6)], /--option has no option label that starts with A/, /each label starting with its letter/],
+    [[...good, '--option', 'yes=Sure', '--option', 'no=No'], /--option is "Sure", not Yes/, /Set the label of yes to "Yes"/],
     [[...without('--outcome', '--recommend', '--default'), '--option', 'done=Done', '--option', 'later=Not now', '--outcome', 'done=It closes.', '--outcome', 'later=It waits.', '--recommend', 'done', '--default', 'later'],
-      /options\[0\]\.label "Done" does not answer a question/, /Yes and No, or one per choice/],
+      /--option "Done" does not answer a question/, /Yes and No, or one per choice/],
     [[...good, '--merge', 'ship-the-new-sign-in-screen-this-week'], /--merge is this ask's own key/, /Name the other cards/],
     [[...good, '--outcome', 'maybe=It might.'], /--outcome maybe=It might\. must be <value>=<what happens next>, for one of yes, no/, /--outcome yes=/],
   ];
@@ -106,7 +106,7 @@ test('one decision, one card: an ask that merges others closes them with its ans
   const board = join(scratch, 'merge.json');
   assert.equal(run('raise', board, '--key', 'ship-a', ...good.slice(2), '--title', 'Ship the sign-in screen?').status, 0);
   assert.equal(run('raise', board, '--key', 'ship-b', '--close', 'release', ...good.slice(2), '--title', 'Can the sign-in screen go out?').status, 0);
-  const merged = run('raise', board, ...good, '--merge', 'ship-a', '--merge', 'ship-b', '--merge', 'gone-key');
+  const merged = run('raise', board, ...good, '--merge', 'ship-a', '--merge', 'ship-b');
   assert.equal(merged.status, 0, merged.stdout);
   const proc = spawn(process.execPath, [cli, 'serve', board, '--port', '0'], { env });
   procs.push(proc);
@@ -117,10 +117,49 @@ test('one decision, one card: an ask that merges others closes them with its ans
   assert.deepEqual([got['ship-a'], got['ship-b']].map(({ answer, label, close, note }) => ({ answer, label, close, note })), [
     { answer: 'yes', label: 'Yes', close: 'done', note: 'Answered with ship-the-new-sign-in-screen-this-week: Go.' },
     { answer: 'yes', label: 'Yes', close: 'release', note: 'Answered with ship-the-new-sign-in-screen-this-week: Go.' }]);
-  assert.equal(got['gone-key'], undefined, 'a merged key not on the board is ignored');
   // A wait on a merged key returns the answer too.
   assert.match(run('wait', board, '--key', 'ship-b', '--timeout', '1').stdout, /ship-b,yes/);
   // Undo: the answer goes back to none, on every card it closed.
   assert.equal((await answer({ key: 'ship-the-new-sign-in-screen-this-week', answer: '' })).status, 200);
   assert.deepEqual(Object.keys(JSON.parse(run('answers', board, '--json').stdout)), []);
+});
+
+test('a merge names a card on the board that offers every option of this ask, and never merges back', () => {
+  const board = join(scratch, 'merge-refuse.json');
+  assert.equal(run('raise', board, '--key', 'release-day', ...pick('Which day should it ship?')).status, 0);
+  const missing = run('raise', board, ...good, '--merge', 'not-yet');
+  assert.equal(missing.status, 2, missing.stdout);
+  assert.match(missing.stdout, /merges not-yet, which is not on the board/);
+  const lacking = run('raise', board, ...good, '--merge', 'release-day');
+  assert.equal(lacking.status, 2, lacking.stdout);
+  assert.match(lacking.stdout, /merges release-day, which has no yes option/);
+  assert.equal(run('raise', board, '--key', 'ship-x', ...good.slice(2), '--title', 'Ship the sign-in screen?').status, 0);
+  assert.equal(run('raise', board, '--key', 'ship-y', ...good.slice(2), '--title', 'Can the sign-in screen go out?', '--merge', 'ship-x').status, 0);
+  const loop = run('raise', board, '--key', 'ship-x', ...good.slice(2), '--title', 'Ship the sign-in screen?', '--merge', 'ship-y');
+  assert.equal(loop.status, 2, loop.stdout);
+  assert.match(loop.stdout, /merges ship-y, which merges ship-x back/);
+});
+
+test('the title rules accept plain questions that merely contain a label or id-like word', () => {
+  const board = join(scratch, 'titles.json');
+  for (const title of ['Switch to pay-as-you-go pricing?', 'Turn on two-factor-auth?', 'Should we say yes or no to the offer?', 'Keep the A and B tabs?']) {
+    const r = run('raise', board, ...good.slice(2), '--title', title);
+    assert.equal(r.status, 0, `${title}\n${r.stdout}`);
+  }
+});
+
+test('a merge fans its answer out to the merged cards that have none, and a retry fills only those', async () => {
+  const store = await import(new URL('../dist/store.js', import.meta.url));
+  const board = join(scratch, 'fan.json');
+  const yes = { value: 'yes', label: 'Yes' }, no = { value: 'no', label: 'No' };
+  assert.equal(run('raise', board, '--key', 'fan-b', ...good.slice(2), '--title', 'Can the sign-in screen go out?').status, 0);
+  assert.equal(run('raise', board, '--key', 'fan-c', ...good.slice(2), '--title', 'Should the sign-in screen wait?').status, 0);
+  assert.equal(run('raise', board, '--key', 'fan-a', ...good.slice(2), '--title', 'Ship the sign-in screen?', '--merge', 'fan-b', '--merge', 'fan-c').status, 0);
+  store.appendAnswer(board, { key: 'fan-c', close: 'done' }, no);
+  // A crash after the parent's own line, before any merged card: the retry fills fan-b and keeps fan-c's own answer.
+  appendFileSync(store.answersPath(board), `${JSON.stringify({ key: 'fan-a', answer: 'yes', label: 'Yes', close: 'done', at: new Date().toISOString() })}\n`);
+  store.appendAnswer(board, store.loadDecisions(board).find((d) => d.key === 'fan-a'), yes, '');
+  const got = JSON.parse(run('answers', board, '--json').stdout);
+  assert.deepEqual(Object.fromEntries(Object.entries(got).map(([k, a]) => [k, a.answer])), { 'fan-a': 'yes', 'fan-b': 'yes', 'fan-c': 'no' });
+  assert.equal(got['fan-b'].note, 'Answered with fan-a');
 });
