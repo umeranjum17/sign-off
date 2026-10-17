@@ -149,6 +149,7 @@ sign-off-axi wait [--filer <id>] [--key <key>] [--timeout 600] [--events (needs 
                                                 (--filer: only that filer's items, each marked taken; without --key each answer once)
 sign-off-axi poll [--timeout 600]               block until the user comments or queues a prompt, then print each new one once
 sign-off-axi export [--out <file.html>]          write a frozen read-only copy of the board as one HTML file
+sign-off-axi update [--check]                    upgrade a CLI installed on this machine to the latest published version (--check: report only)
 ```
 
 - The board is the one you name right after the command (`sign-off-axi answers ./decisions.json`). With none, it is the nearest `.sign-off/` board that `init` set up, found by the walk described in [Test runs never touch your board](#test-runs-never-touch-your-board); otherwise the default board there (`~/.sign-off/decisions.json`, or under `SIGN_OFF_HOME`). Answers are saved next to it.
