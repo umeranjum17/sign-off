@@ -246,6 +246,7 @@ the board runs for every answer. Detail in
 ```sh
 npm test                      # builds, then runs the integration journeys against the real CLI and server
 npm run build:skill           # regenerates skills/sign-off-axi/SKILL.md from src/skill.ts (CI runs it with -- --check)
+npm run build:demo            # builds the static demo site into demo-dist/ (GitHub Pages, the Try-it-live link)
 npm pack                      # builds the publishable sign-off-axi tarball
 ```
 
