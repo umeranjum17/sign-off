@@ -18,7 +18,6 @@ test('demo build carries the shim and seed; the server page does not', async (t)
 
   // The demo page is the real page plus the seed and the shim.
   const demo = readFileSync(join(out, 'index.html'), 'utf8');
-  const page = readFileSync(join(root, 'web/index.html'), 'utf8');
   assert.match(demo, /<title>Dashboard/);
   assert.match(demo, /window\.SIGN_OFF_DEMO_SEED/);
   assert.match(demo, /demo-shim\.js/);
@@ -40,11 +39,7 @@ test('demo build carries the shim and seed; the server page does not', async (t)
     assert.ok(existsSync(join(out, dest.slice(2))), `${dest} is in the build`);
   }
 
-  // The normal server build is unchanged: no demo hooks in the source page.
-  assert.ok(!page.includes('SIGN_OFF_DEMO'), 'web/index.html has no demo hooks');
-  assert.ok(!page.includes('demo-shim'), 'web/index.html loads no shim');
-
-  // ... nor in the page the server serves.
+  // The normal server build is unchanged: no demo hooks in the page it serves.
   const board = join(scratch, 'board.json');
   writeFileSync(board, JSON.stringify({ schema: 1, decisions: [{ key: 'probe', title: 'Probe?' }] }));
   const proc = spawn('node', [join(root, 'dist/cli.js'), 'serve', board, '--port', '0'], { cwd: tmpdir(), stdio: ['ignore', 'pipe', 'pipe'] });
