@@ -11,7 +11,7 @@ import { join } from 'node:path';
 const root = new URL('..', import.meta.url).pathname;
 const scratch = mkdtempSync(join(tmpdir(), 'sign-off-demo-'));
 
-test('demo build carries the shim and seed; the server page does not', async (t) => {
+test('demo build carries the shim and seed; the server page does not', { timeout: 60_000 }, async (t) => {
   t.after(() => rmSync(scratch, { recursive: true, force: true }));
   const out = join(scratch, 'demo');
   execFileSync('node', [join(root, 'scripts/build-demo.mjs'), '--out', out], { cwd: root, stdio: 'pipe' });
@@ -45,16 +45,26 @@ test('demo build carries the shim and seed; the server page does not', async (t)
   const proc = spawn('node', [join(root, 'dist/cli.js'), 'serve', board, '--port', '0'], { cwd: tmpdir(), stdio: ['ignore', 'pipe', 'pipe'] });
   t.after(async () => {
     if (proc.exitCode === null && proc.signalCode === null) {
-      proc.kill();
+      proc.kill('SIGKILL');
       await new Promise((ok) => proc.once('exit', ok));
     }
   });
-  const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b.toString())[0])));
-  const html = await new Promise((ok, no) => get(url, (res) => {
-    let body = '';
-    res.on('data', (c) => (body += c));
-    res.on('end', () => ok(body));
-  }).once('error', no));
+  const url = await new Promise((ok, no) => {
+    const timer = setTimeout(() => no(new Error('the server printed no URL within 15s')), 15_000);
+    proc.stdout.once('data', (b) => {
+      clearTimeout(timer);
+      ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b.toString())[0]);
+    });
+  });
+  const html = await new Promise((ok, no) => {
+    const req = get(url, (res) => {
+      let body = '';
+      res.on('data', (c) => (body += c));
+      res.on('end', () => ok(body));
+    });
+    req.setTimeout(15_000, () => req.destroy(new Error(`${url} did not answer within 15s`)));
+    req.once('error', no);
+  });
   assert.match(html, /<title>Dashboard/);
   assert.ok(!html.includes('SIGN_OFF_DEMO'), 'the served page has no demo hooks');
 });
