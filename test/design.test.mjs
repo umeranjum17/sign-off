@@ -756,7 +756,7 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   assert.equal(run('report', 'init', join(dir, 'mocks', 'how')).code, 0);
   for (const f of ['index.html', 'preview.svg']) writeFileSync(join(dir, 'mocks', 'how', f), readFileSync(join(dir, 'mocks', 'how', f), 'utf8').replace(/FILL: [^<"']*/g, 'Umer taps through it'));
   writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key: 'ship', title: 'When should it ship?', options: abc, recommend_value: 'b', filed: nine },
-    { key: 'look', type: 'design', title: 'Pick the look', options: abc, recommend_value: 'b' },
+    { key: 'look', type: 'design', title: 'Pick the look', options: abc, recommend_value: 'b', filed: nine },
     { contract: 1, kind: 'report', schema: 1, key: 'merged', title: 'Merged: the sign-in fix', about: 'Checks passed.', filed: nine },
     { contract: 1, kind: 'report', schema: 2, key: 'how', title: 'How it ships', group: 'How it works', filed: new Date().toISOString(), decided: 'Ships only when the check passes.',
       view: 'mocks/how/index.html', preview: 'mocks/how/preview.svg', steps: [{ title: 'Build', marks: ['store'] }, { title: 'Check' }, { title: 'Ship', marks: ['gate', 'fail'] }] }] }));
@@ -772,8 +772,7 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   assert.match(waiting, /1 of 2/);
   // Above it, the type chips with their counts (All first, the one on, then each type present) and the sort on Newest first.
   assert.match(waiting, /<div class="filters"><div class="chips" role="group" aria-label="Filter by type"><button aria-pressed="true">All 2<\/button><button aria-pressed="false">Design pick 1<\/button><button aria-pressed="false">Pick one 1<\/button><\/div><label class="sort">Sort<select aria-label="Sort waiting questions"><option value="newest">Newest first<\/option><option value="oldest">Oldest first<\/option><\/select><\/label><\/div>/);
-  // The ask in focus has no filed time here, so no "Waiting since" under the progress bar.
-  assert.match(waiting, /<div class="pbar"[^>]*><i[^>]*><\/i><\/div>/);
+  assert.match(waiting, /<div class="pbar"[^>]*><i[^>]*><\/i><\/div><p class="meta since">Waiting since 09:15<\/p>/);
   assert.equal(waiting.match(/<ol class="queue"[^>]*>.*?<\/ol>/s)[0].match(/<button/g).length, 2);
   // Under the ask, Skip for now and Dismiss sit side by side; the ask has no × of its own.
   assert.match(waiting, /<div class="quiet"><button class="skip">Skip for now<\/button><button class="dis" aria-label="Dismiss, Pick the look">Dismiss<\/button><\/div>/);
@@ -783,7 +782,7 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   assert.match(home, /<div class="foot"><button class="dis" aria-label="Dismiss, Pick the look">Dismiss<\/button><a class="more" href="#waiting">Answer all 2 in Triage →<\/a><\/div>/);
   assert.doesNotMatch(home.match(/<section class="card needs.*?<\/section>/s)[0], /class="x"/);
   // Under its heading, when that ask was raised.
-  assert.match(home, /<h2>Needs you first<\/h2><article class="row design" id="item-look">/);
+  assert.match(home, /<h2>Needs you first<\/h2><p class="meta since">Waiting since 09:15<\/p><article class="row design" id="item-look">/);
   // Summary has the person's mark beside its title, and the Waiting on you tile one clock and the oldest ask's time (the design ask has none).
   assert.match(home, /<h1 tabindex="-1">Summary<\/h1><span class="icon i-you" aria-hidden="true">/);
   const vis = (dom, a) => dom.match(new RegExp(`<a class="tile i-${a}".*?<span class="vis" aria-hidden="true">(.*?)<\\/span><span class="detail"`, 's'))[1];
@@ -794,8 +793,8 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   writeFileSync(gone, JSON.stringify({ key: 'ship', dismissed: true, at: new Date().toISOString() }) + '\n');
   const pages = {};
   for (const hash of ['', '#waiting']) assert.match(pages[hash] = await dump(hash), /<details class="other gone-asks"><summary>Dismissed \(1\)<\/summary><ul class="rows"><li><strong dir="auto">When should it ship\?<\/strong><button class="dis" aria-label="Restore, When should it ship\?">Restore<\/button><\/li><\/ul><\/details>/, hash);
-  // Only the design ask waits now, and it has no time: the tile keeps its count.
-  assert.match(pages[''], /<a class="tile i-waiting".*?<span class="detail" dir="auto">1 waiting<\/span>/s);
+  // Only the design ask waits now, and its filed time is the tile's oldest.
+  assert.match(pages[''], /<a class="tile i-waiting".*?<span class="detail" dir="auto">Oldest 09:15<\/span>/s);
   // Restore puts it back in Triage (behind the ask in focus) through the same dismiss log, and the row goes once nothing is dismissed.
   const { evaluate, close } = await browse(join(dir, 'live'));
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);

@@ -473,7 +473,7 @@
         el('p', { dir: 'auto' }, el('strong', {}, `${name}: `), run[name].replace(new RegExp(`^${name}:\\s*(?=\\S)`, 'i'), '')))] : []));
   }
 
-  const NAMES = { design: 'Design', evidence: 'Evidence', diagram: 'Diagram', interactive: 'Interactive', explainer: 'Explainer', signin: 'Sign-in' };
+  const NAMES = { decision: 'Decision', design: 'Design', evidence: 'Evidence', diagram: 'Diagram', interactive: 'Interactive', explainer: 'Explainer', signin: 'Sign-in' };
   // The type a question shows as, read from what it already carries: a design pick is a design, a gate has its run, a yes/no has exactly
   // yes and no, any other choice is a pick-one, one answered in words is a reply, and a question with nothing to answer is info.
   const TYPE_NAMES = { design: 'Design pick', 'yes-no': 'Yes/No', 'pick-one': 'Pick one', reply: 'Reply', approval: 'Approval', signin: 'Sign-in', info: 'Info', evidence: 'Evidence' };
@@ -871,7 +871,7 @@
   }
 
   /** A short row's second line: what changed, unless the headline already says it. */
-  const sub = (d) => (d.type === 'signin' ? `Unlocks: ${d.unlocks}` : d.about && d.about !== headline(d) ? d.about : kind(d));
+  const sub = (d) => (d.type === 'signin' ? `Unlocks: ${d.unlocks}` : d.about && d.about !== headline(d) ? d.about : area(d) === 'waiting' ? kind(d) : NAMES[d.type] ?? d.type);
   /** A short row: a picture (or the area's mark) and the title; an answered item has its answer and time under the title. */
   const compact = (d, a) => {
     const s = state.answers[d.key];
