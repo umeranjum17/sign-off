@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -219,6 +219,27 @@ test('a dismissed ask still names its merged card until it is answered, dismisse
   assert.match(refused.stdout, /merges dis-c, which dis-a already merges/);
   dismissed(false);
   assert.equal(run('raise', board, '--key', 'dis-b', ...good.slice(2), '--title', 'Should the sign-in screen wait?', '--merge', 'dis-c').status, 2);
+});
+
+const chrome = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'].flatMap((b) => (process.env.PATH ?? '').split(':').map((d) => join(d, b))).find(existsSync);
+
+test('a merged card is hidden while its shown merger waits, and shown again once the merger is dismissed', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const board = join(scratch, 'merged-hide.json');
+  assert.equal(run('raise', board, '--key', 'hide-x', ...good.slice(2), '--title', 'Keep the old login screen?').status, 0);
+  assert.equal(run('raise', board, '--key', 'hide-y', ...good.slice(2), '--title', 'Ship the new login screen?', '--merge', 'hide-x').status, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', board, '--port', '0'], { env });
+  procs.push(proc);
+  const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+  const waiting = () => execFileSync(chrome, ['--headless', '--no-sandbox', '--disable-gpu', '--virtual-time-budget=10000', '--dump-dom', `${url}#waiting`], { env: { ...env, TMPDIR: scratch }, encoding: 'utf8', timeout: 60000 });
+  const before = waiting();
+  assert.match(before, /Ship the new login screen\?/);
+  assert.doesNotMatch(before, /Keep the old login screen\?/);
+  const dismissed = await fetch(`${url}api/dismiss`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keys: ['hide-y'], dismissed: true }) });
+  assert.equal(dismissed.status, 200);
+  assert.match(waiting(), /Keep the old login screen\?/);
+  const undone = await fetch(`${url}api/dismiss`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keys: ['hide-y'], dismissed: false }) });
+  assert.equal(undone.status, 200);
+  assert.doesNotMatch(waiting(), /Keep the old login screen\?/);
 });
 
 test('a merge cannot name a card that is already answered or dismissed', async () => {

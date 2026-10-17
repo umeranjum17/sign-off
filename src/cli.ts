@@ -1096,9 +1096,9 @@ function checkMerges(incoming: Decision[], resulting: Decision[], current: Retur
       if (!merged) throw fail(`key ${d.key} merges ${key}, which is not on the board`, 'VALIDATION_ERROR', `Post ${key} first, or leave it out of --merge`);
       const offered = new Set(merged.options.map((o) => o.value)), lacks = d.options.find((o) => !offered.has(o.value));
       if (lacks) throw fail(`key ${d.key} merges ${key}, which has no ${lacks.value} option`, 'VALIDATION_ERROR', `Merge only a card that offers every option of ${d.key}`);
+      if (!had.has(key) && closed(key)) throw fail(`key ${d.key} merges ${key}, which is already ${before.get(key)?.answer ? 'answered' : 'dismissed'}`, 'VALIDATION_ERROR', 'That decision is closed: post the new question without --merge');
       if (merged.merges?.length) throw fail(`key ${d.key} merges ${key}, which merges others`, 'VALIDATION_ERROR', `Merge only a card that merges nothing: name its duplicates in ${d.key} instead`);
       if (had.has(key)) continue;
-      if (closed(key)) throw fail(`key ${d.key} merges ${key}, which is already ${before.get(key)?.answer ? 'answered' : 'dismissed'}`, 'VALIDATION_ERROR', 'That decision is closed: post the new question without --merge');
       const other = holder(key, d.key);
       if (other) throw fail(`key ${d.key} merges ${key}, which ${other.key} already merges`, 'VALIDATION_ERROR', `Answer or restore ${other.key} instead of posting a second card`);
     }
