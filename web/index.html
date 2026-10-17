@@ -266,6 +266,12 @@
   .gone-asks .rows { padding: 0; } .gone-asks li { justify-content: space-between; gap: 0.75rem; min-height: 2.75rem; }
   .gone-asks .dis { flex: none; padding: 0 0.5rem; border-color: transparent; background: none; color: var(--accent); font-weight: 600; }
   .sec-head .clear { margin-left: auto; }
+  /* Waiting on you: one row of type chips, and the sort beside them (or below them on a phone). */
+  .filters { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 0.75rem; margin: 0 0 0.75rem; }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.375rem; }
+  .chips button { min-height: 2.25rem; padding: 0 0.75rem; border-radius: 999px; font-size: 0.875rem; font-weight: 600; }
+  .sort { display: flex; align-items: center; gap: 0.5rem; color: var(--muted); font-size: 0.875rem; font-weight: 600; }
+  .sort select { min-height: 2.25rem; padding: 0 0.5rem; border: 1px solid var(--border); border-radius: 0.5rem; background: var(--surface); color: var(--text); font: inherit; }
   .chip { padding: 0 0.5rem; border: 1px solid currentColor; border-radius: 999px; color: var(--accent);
     font-size: 0.6875rem; font-weight: 600; line-height: 1.25rem; letter-spacing: 0.04em; text-transform: uppercase; }
   /* Each option is a tall phone frame, side by side; on a phone the row swipes, one frame at a time, and the next one peeks in.
@@ -467,9 +473,14 @@
         el('p', { dir: 'auto' }, el('strong', {}, `${name}: `), run[name].replace(new RegExp(`^${name}:\\s*(?=\\S)`, 'i'), '')))] : []));
   }
 
-  const NAMES = { decision: 'Decision', design: 'Design', evidence: 'Evidence', diagram: 'Diagram', interactive: 'Interactive', explainer: 'Explainer', signin: 'Sign-in' };
-  // Any other type gets the plain card until it has its own renderer; a plain question needs no name.
-  const kind = (d) => (d.type === 'decision' ? '' : NAMES[d.type] ?? d.type.replace(/-/g, ' '));
+  const NAMES = { evidence: 'Evidence', diagram: 'Diagram', interactive: 'Interactive', explainer: 'Explainer', signin: 'Sign-in' };
+  // The type a question shows as, read from what it already carries: mocks make a design pick, a gate has its run, a yes/no has
+  // exactly yes and no, and any other choice is a pick-one. A question with nothing to answer is info.
+  const TYPE_NAMES = { design: 'Design pick', 'yes-no': 'Yes/No', 'pick-one': 'Pick one', approval: 'Approval', signin: 'Sign-in', info: 'Info', evidence: 'Evidence' };
+  const typeOf = (d) => (d.type === 'design' || d.mocks?.length ? 'design' : d.type === 'signin' ? 'signin' : d.type === 'evidence' ? 'evidence' : d.run ? 'approval'
+    : !d.options.length ? 'info' : d.options.map((o) => o.value).sort().join() === 'no,yes' ? 'yes-no' : 'pick-one');
+  // Any other type gets the plain card until it has its own renderer.
+  const kind = (d) => (d.type === 'decision' || d.type === 'design' ? TYPE_NAMES[typeOf(d)] : NAMES[d.type] ?? d.type.replace(/-/g, ' '));
   // A done-done run's outcome line is the plain result a person can now see; the title it sends only names the run.
   const headline = (d) => (d.type === 'evidence' && d.evidence?.outcome.length <= 160 ? d.evidence.outcome : d.title);
   const title = (d) => (d.type === 'evidence' ? `Update ${d.number} · ${headline(d)}` : d.title);
@@ -860,7 +871,7 @@
   }
 
   /** A short row's second line: what changed, unless the headline already says it. */
-  const sub = (d) => (d.type === 'signin' ? `Unlocks: ${d.unlocks}` : d.about && d.about !== headline(d) ? d.about : NAMES[d.type] ?? d.type);
+  const sub = (d) => (d.type === 'signin' ? `Unlocks: ${d.unlocks}` : d.about && d.about !== headline(d) ? d.about : kind(d));
   /** A short row: a picture (or the area's mark) and the title; an answered item has its answer and time under the title. */
   const compact = (d, a) => {
     const s = state.answers[d.key];
@@ -915,7 +926,7 @@
     };
     const fresh = d.filed && isToday(d.filed), st = d.filed && el('span', { class: `st ${fresh ? 'new' : 'ok'}` }, fresh ? 'New today' : 'Current');
     const decided = d.decided ? el('p', { class: 'decided', dir: 'auto' }, el('span', { class: 'lbl' }, 'What it decided'), d.decided) : '';
-    const brow = [kind(d) || 'Report', st].filter(Boolean);
+    const brow = [d.type === 'decision' ? 'Report' : kind(d), st].filter(Boolean);
     const lead = [el('div', { class: 'lead' }, xBtn(d), el('p', { class: 'eyebrow' }, ...brow),
       el('h3', { dir: 'auto' }, page ? el('a', { href: `#reports/${d.key}` }, title(d)) : title(d))), d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : ''];
     const flow = n && el('ol', { class: 'flow', style: `--n: ${n}`, 'aria-label': `${n} steps: ${d.steps.map((t) => t.title).join(', ')}` }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), marks(t))));
@@ -983,7 +994,26 @@
     box.ontoggle = () => (box.open ? opened.add('#dismissed') : opened.delete('#dismissed'));
     return box;
   }
-  /** Triage: the open asks one at a time, oldest first. Skip moves on without answering and is not stored; an answer moves on to the next ask. */
+  // Waiting on you reads newest first; the viewer may choose oldest first, which stays in this browser (a failed read or write keeps the default).
+  const SORT_KEY = 'sign-off-waiting-sort';
+  let waitSort = 'newest', waitType = 'all';
+  try { if (localStorage.getItem(SORT_KEY) === 'oldest') waitSort = 'oldest'; } catch {}
+  /** The type chips (All, then each type present with its count) and the sort, above Waiting on you. Nothing when nothing waits. */
+  function filters(items) {
+    if (!items.length) return '';
+    const count = (id) => (id === 'all' ? items : items.filter((d) => typeOf(d) === id)).length;
+    const chip = (id, label) => el('button', { 'aria-pressed': String(waitType === id) }, `${label} ${count(id)}`);
+    const chips = ['all', ...Object.keys(TYPE_NAMES).filter((id) => count(id))].map((id) => {
+      const b = chip(id, id === 'all' ? 'All' : TYPE_NAMES[id]);
+      b.onclick = () => { waitType = id; render(); };
+      return b;
+    });
+    const sel = el('select', { 'aria-label': 'Sort waiting questions' }, el('option', { value: 'newest' }, 'Newest first'), el('option', { value: 'oldest' }, 'Oldest first'));
+    sel.value = waitSort;
+    sel.onchange = () => { waitSort = sel.value; try { localStorage.setItem(SORT_KEY, waitSort); } catch {} render(); };
+    return el('div', { class: 'filters' }, el('div', { class: 'chips', role: 'group', 'aria-label': 'Filter by type' }, ...chips), el('label', { class: 'sort' }, 'Sort', sel));
+  }
+  /** Triage: the open asks one at a time, in the order the filters chose. Skip moves on without answering and is not stored; an answer moves on to the next ask. */
   let cur = null, curAt = 0;
   function triage(items, hidden) {
     if (!items.length) return el('section', { class: 'card caught' }, el('h2', {}, 'All caught up'), el('p', { class: 'meta' }, 'Nothing is waiting on you.'),
@@ -1024,12 +1054,15 @@
 
   function render() {
     const by = { waiting: [], evidence: [], reports: [], answered: [], notes: [] };
-    // The board file appends new items at the end: asks are answered oldest first, the rest read newest first, answers by their time.
+    // The board file appends new items at the end, so each list reads newest first; answers sort by their time.
     const gone = new Set(state.dismissed ?? []);
     for (const d of [...state.decisions].reverse()) if (!gone.has(d.key)) by[area(d)].push(d);
-    by.waiting.reverse();
-    // A sign-in blocks someone now, so sign-ins come first.
-    by.waiting.sort((x, y) => (y.type === 'signin') - (x.type === 'signin'));
+    // Waiting on you reads newest first unless the viewer chose oldest first. A sign-in blocks someone now, so sign-ins come first either way.
+    const asked = waitSort === 'oldest' ? [...by.waiting].reverse() : by.waiting;
+    by.waiting = [...asked.filter((d) => d.type === 'signin'), ...asked.filter((d) => d.type !== 'signin')];
+    // A type chip whose asks are all answered or dismissed falls back to All.
+    if (waitType !== 'all' && !by.waiting.some((d) => typeOf(d) === waitType)) waitType = 'all';
+    const shown = waitType === 'all' ? by.waiting : by.waiting.filter((d) => typeOf(d) === waitType);
     const hidden = state.decisions.filter((d) => gone.has(d.key) && area(d) === 'waiting');
     by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
     const [, at, key] = /^#(waiting|evidence|reports|answered)(?:\/([\w.-]+))?$/.exec(location.hash) ?? [];
@@ -1046,9 +1079,9 @@
     const first = by.waiting[0], more = by.waiting.length > 1 ? `Answer all ${by.waiting.length} in Triage →` : 'Open in Triage →';
     const needs = el('section', { class: 'card needs' }, el('h2', {}, 'Needs you first'), ...(first ? [first.filed ? el('p', { class: 'meta since' }, `Waiting since ${when(first.filed)}`) : '', row(first, { x: false }),
       el('div', { class: 'foot' }, xBtn(first, 'Dismiss'), el('a', { class: 'more', href: '#waiting' }, more))] : [el('p', { class: 'meta' }, 'Nothing is waiting on you.')]), dismissed(hidden));
-    document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [triage(by.waiting, hidden)]
+    document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [filters(by.waiting), triage(shown, hidden)]
       : at === 'reports' && !state.readonly ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
-        ...(by.reports.length ? reportGroups(by.reports) : [el('p', { class: 'empty' }, EMPTY.reports)]), notes(by.notes)] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [at === 'evidence' && by[at].length ? el('div', { class: 'sec-head' }, el('h2', {}, 'Updates')) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
+        ...(by.reports.length ? reportGroups(by.reports) : [el('p', { class: 'empty' }, EMPTY.reports)]), notes(by.notes)] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [at === 'evidence' && by[at].length ? el('div', { class: 'sec-head' }, el('h2', {}, 'Updates')) : '', at === 'waiting' ? filters(by.waiting) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...(at === 'waiting' ? shown : by[at]).map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [el('div', { class: 'tiles' }, ...Object.keys(AREAS).map((a) => tile(a, by[a]))),
       el('div', { class: 'pair' }, needs, today(by.answered)), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()]),
       el('div', { class: 'areas' }, ...Object.keys(AREAS).map((a) => section(a, by[a])))]));

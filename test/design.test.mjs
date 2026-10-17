@@ -766,22 +766,24 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   const dump = (hash) => new Promise((ok, no) => execFile(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${join(dir, 'profile')}`,
     '--window-size=800,4000', '--virtual-time-budget=10000', '--dump-dom', url + hash], { env: chromeEnv, maxBuffer: 1 << 24 }, (e, out) => (e ? no(e) : ok(out))));
   const cards = (dom) => [...dom.matchAll(/<article class="row[^"]*" id="item-(\w+)">(.*?)<\/article>/gs)].map((m) => [m[1], m[2]]);
-  // Waiting on you is Triage: the oldest ask alone, with the queue of both beside it and Skip to the next.
+  // Waiting on you is Triage: the newest ask alone (the file's last item), with the queue of both beside it and Skip to the next.
   const waiting = await dump('#waiting');
-  assert.deepEqual(cards(waiting).map(([key]) => key), ['ship']);
+  assert.deepEqual(cards(waiting).map(([key]) => key), ['look']);
   assert.match(waiting, /1 of 2/);
-  // Under the progress bar, when the ask in focus was raised.
-  assert.match(waiting, /<div class="pbar"[^>]*><i[^>]*><\/i><\/div><p class="meta since">Waiting since 09:15<\/p>/);
+  // Above it, the type chips with their counts (All first, the one on, then each type present) and the sort on Newest first.
+  assert.match(waiting, /<div class="filters"><div class="chips" role="group" aria-label="Filter by type"><button aria-pressed="true">All 2<\/button><button aria-pressed="false">Design pick 1<\/button><button aria-pressed="false">Pick one 1<\/button><\/div><label class="sort">Sort<select aria-label="Sort waiting questions"><option value="newest">Newest first<\/option><option value="oldest">Oldest first<\/option><\/select><\/label><\/div>/);
+  // The ask in focus has no filed time here, so no "Waiting since" under the progress bar.
+  assert.match(waiting, /<div class="pbar"[^>]*><i[^>]*><\/i><\/div>/);
   assert.equal(waiting.match(/<ol class="queue"[^>]*>.*?<\/ol>/s)[0].match(/<button/g).length, 2);
   // Under the ask, Skip for now and Dismiss sit side by side; the ask has no × of its own.
-  assert.match(waiting, /<div class="quiet"><button class="skip">Skip for now<\/button><button class="dis" aria-label="Dismiss, When should it ship\?">Dismiss<\/button><\/div>/);
+  assert.match(waiting, /<div class="quiet"><button class="skip">Skip for now<\/button><button class="dis" aria-label="Dismiss, Pick the look">Dismiss<\/button><\/div>/);
   assert.doesNotMatch(waiting.match(/<div class="focus">.*?<\/article>/s)[0], /class="x"/);
   // Needs you first ends with Dismiss on the left and the way to Triage on the right; its card has no × of its own.
   const home = await dump('');
-  assert.match(home, /<div class="foot"><button class="dis" aria-label="Dismiss, When should it ship\?">Dismiss<\/button><a class="more" href="#waiting">Answer all 2 in Triage →<\/a><\/div>/);
+  assert.match(home, /<div class="foot"><button class="dis" aria-label="Dismiss, Pick the look">Dismiss<\/button><a class="more" href="#waiting">Answer all 2 in Triage →<\/a><\/div>/);
   assert.doesNotMatch(home.match(/<section class="card needs.*?<\/section>/s)[0], /class="x"/);
   // Under its heading, when that ask was raised.
-  assert.match(home, /<h2>Needs you first<\/h2><p class="meta since">Waiting since 09:15<\/p>/);
+  assert.match(home, /<h2>Needs you first<\/h2><article class="row design" id="item-look">/);
   // Summary has the person's mark beside its title, and the Waiting on you tile one clock and the oldest ask's time (the design ask has none).
   assert.match(home, /<h1 tabindex="-1">Summary<\/h1><span class="icon i-you" aria-hidden="true">/);
   const vis = (dom, a) => dom.match(new RegExp(`<a class="tile i-${a}".*?<span class="vis" aria-hidden="true">(.*?)<\\/span><span class="detail"`, 's'))[1];
@@ -799,7 +801,7 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
   await until(async () => (await evaluate('document.querySelector(".fhead")?.textContent')) === '1 of 1');
   await evaluate('document.querySelector(".gone-asks .dis").click()');
-  await until(async () => (await evaluate('!document.querySelector(".gone-asks") && document.querySelector(".fhead").textContent')) === '2 of 2');
+  await until(async () => (await evaluate('!document.querySelector(".gone-asks") && document.querySelector(".fhead").textContent')) === '1 of 2');
   close();
   assert.deepEqual(readFileSync(gone, 'utf8').trim().split('\n').map((l) => JSON.parse(l)).map(({ key, dismissed }) => [key, dismissed]), [['ship', true], ['ship', false]]);
   // Reports and explainers says what the page is under its title, draws a report's steps as numbered nodes, each with only the marks it lists, and the legend once.
@@ -888,11 +890,13 @@ test('a sign-in card: posted on top of what waits with its link and time left, t
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const { evaluate, close } = await browse(join(dir, 'live'), 390);
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
-  // A sign-in blocks someone now, so both come before the older question.
+  // A sign-in blocks someone now, so both come before the question, newest first among them.
   const queue = () => evaluate('[...document.querySelectorAll(".queue strong")].map((s) => s.textContent).join("|")');
-  await until(async () => (await queue()) === 'npm|GitHub|Keep the weekly digest?');
+  await until(async () => (await queue()) === 'GitHub|npm|Keep the weekly digest?');
   const card = (key) => evaluate(`(() => { const c = document.getElementById("item-${key}"), o = c?.querySelector(".open-link");
     return c && [c.querySelector("h3").textContent, ...[...c.querySelectorAll(".line, .expiry, .meta")].map((p) => p.textContent), o ? [o.tagName, o.getAttribute("href"), o.target, o.rel, o.disabled].join(" ") : "no open"].join("|"); })()`);
+  // Triage shows the card in focus: the GitHub sign-in is newest, so the npm one is tapped in the queue first.
+  await until(async () => (await evaluate('[...document.querySelectorAll(".queue button")].find((b) => b.textContent.startsWith("npm"))?.click() ?? true')) && (await card('npm-login')) !== null);
   assert.equal(await card('npm-login'), `npm|Unlocks: Publish npm|Waits: Main|Expires in 15 min|A ${link} _blank noopener noreferrer `);
   // The page is not loaded again from here on: a mark set now is still there at the end.
   await evaluate('window.stillHere = true');
@@ -943,6 +947,48 @@ test('a sign-in card: posted on top of what waits with its link and time left, t
   writeFileSync(join(dir, 'signed-in'), '');
   await until(async () => /fresh,done,/.test(run('answers', file).out) && !(await queue()).includes('fresh'));
   assert.equal(await evaluate('window.stillHere'), true);
+  close();
+  proc.kill();
+});
+
+// Waiting on you: each ask names its type, the type chips filter the list and count each type, and the list reads newest first until the
+// viewer picks oldest first, which the browser keeps. On a phone, the chips and the sort sit above the one ask in focus.
+test('Waiting on you: a type label on each ask, type chips with counts, and the order newest first or oldest first kept per browser', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'types'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    { key: 'digest', title: 'Keep the weekly digest?', options: yesNo, recommend_value: 'yes' },
+    { key: 'release', title: 'Which day for release?', options: ['today', 'friday', 'next-week'].map((v) => ({ value: v, label: v })), recommend_value: 'friday' },
+    { key: 'look', type: 'design', title: 'Pick the look', options: ['a', 'b', 'c'].map((v) => ({ value: v, label: v.toUpperCase() })), recommend_value: 'b' },
+  ] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+  const chips = () => evaluate('[...document.querySelectorAll(".chips button")].map((b) => b.textContent + (b.getAttribute("aria-pressed") === "true" ? "*" : "")).join("|")');
+  const queue = () => evaluate('[...document.querySelectorAll(".queue strong")].map((s) => s.textContent).join("|")');
+  const fhead = () => evaluate('document.querySelector(".fhead")?.textContent');
+  const pick = (label) => evaluate(`[...document.querySelectorAll(".chips button")].find((b) => b.textContent.startsWith("${label}"))?.click() ?? true`);
+  // Newest first by default: the file's last ask leads, with its type on its card.
+  await until(async () => (await fhead()) === '1 of 3');
+  assert.equal(await queue(), 'Pick the look|Which day for release?|Keep the weekly digest?');
+  assert.equal(await evaluate('document.querySelector(".focus .eyebrow")?.textContent'), 'Design pick');
+  assert.equal(await chips(), 'All 3*|Design pick 1|Yes/No 1|Pick one 1');
+  // One type at a time: Yes/No leaves the one yes/no ask, and All brings the rest back.
+  await until(async () => (await pick('Yes/No')) && (await queue()) === 'Keep the weekly digest?');
+  assert.equal(await chips(), 'All 3|Design pick 1|Yes/No 1*|Pick one 1');
+  assert.equal(await fhead(), '1 of 1');
+  await until(async () => (await pick('All')) && (await queue()) === 'Pick the look|Which day for release?|Keep the weekly digest?');
+  // Oldest first is one choice away, and it stays after a reload in this browser.
+  await evaluate('(() => { const s = document.querySelector(".sort select"); s.value = "oldest"; s.dispatchEvent(new Event("change")); })()');
+  await until(async () => (await queue()) === 'Keep the weekly digest?|Which day for release?|Pick the look');
+  assert.equal(await evaluate('localStorage.getItem("sign-off-waiting-sort")'), 'oldest');
+  await evaluate('location.reload()');
+  await until(async () => (await fhead()) === '1 of 3');
+  assert.equal(await evaluate('document.querySelector(".sort select").value'), 'oldest');
+  assert.equal(await evaluate('document.querySelector(".focus h3")?.textContent'), 'Keep the weekly digest?');
   close();
   proc.kill();
 });
