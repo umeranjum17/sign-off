@@ -756,7 +756,7 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   assert.equal(run('report', 'init', join(dir, 'mocks', 'how')).code, 0);
   for (const f of ['index.html', 'preview.svg']) writeFileSync(join(dir, 'mocks', 'how', f), readFileSync(join(dir, 'mocks', 'how', f), 'utf8').replace(/FILL: [^<"']*/g, 'Umer taps through it'));
   writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key: 'ship', title: 'When should it ship?', options: abc, recommend_value: 'b', filed: nine },
-    { key: 'look', type: 'design', title: 'Pick the look', options: abc, recommend_value: 'b' },
+    { key: 'look', type: 'design', title: 'Pick the look', options: abc, recommend_value: 'b', filed: nine },
     { contract: 1, kind: 'report', schema: 1, key: 'merged', title: 'Merged: the sign-in fix', about: 'Checks passed.', filed: nine },
     { contract: 1, kind: 'report', schema: 2, key: 'how', title: 'How it ships', group: 'How it works', filed: new Date().toISOString(), decided: 'Ships only when the check passes.',
       view: 'mocks/how/index.html', preview: 'mocks/how/preview.svg', steps: [{ title: 'Build', marks: ['store'] }, { title: 'Check' }, { title: 'Ship', marks: ['gate', 'fail'] }] }] }));
@@ -766,22 +766,23 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   const dump = (hash) => new Promise((ok, no) => execFile(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${join(dir, 'profile')}`,
     '--window-size=800,4000', '--virtual-time-budget=10000', '--dump-dom', url + hash], { env: chromeEnv, maxBuffer: 1 << 24 }, (e, out) => (e ? no(e) : ok(out))));
   const cards = (dom) => [...dom.matchAll(/<article class="row[^"]*" id="item-(\w+)">(.*?)<\/article>/gs)].map((m) => [m[1], m[2]]);
-  // Waiting on you is Triage: the oldest ask alone, with the queue of both beside it and Skip to the next.
+  // Waiting on you is Triage: the newest ask alone (the file's last item), with the queue of both beside it and Skip to the next.
   const waiting = await dump('#waiting');
-  assert.deepEqual(cards(waiting).map(([key]) => key), ['ship']);
+  assert.deepEqual(cards(waiting).map(([key]) => key), ['look']);
   assert.match(waiting, /1 of 2/);
-  // Under the progress bar, when the ask in focus was raised.
+  // Above it, the type chips with their counts (All first, the one on, then each type present) and the sort on Newest first.
+  assert.match(waiting, /<div class="filters"><div class="chips" role="group" aria-label="Filter by type"><button aria-pressed="true">All 2<\/button><button aria-pressed="false">Design pick 1<\/button><button aria-pressed="false">Pick one 1<\/button><\/div><label class="sort">Sort<select aria-label="Sort waiting questions"><option value="newest">Newest first<\/option><option value="oldest">Oldest first<\/option><\/select><\/label><\/div>/);
   assert.match(waiting, /<div class="pbar"[^>]*><i[^>]*><\/i><\/div><p class="meta since">Waiting since 09:15<\/p>/);
   assert.equal(waiting.match(/<ol class="queue"[^>]*>.*?<\/ol>/s)[0].match(/<button/g).length, 2);
   // Under the ask, Skip for now and Dismiss sit side by side; the ask has no × of its own.
-  assert.match(waiting, /<div class="quiet"><button class="skip">Skip for now<\/button><button class="dis" aria-label="Dismiss, When should it ship\?">Dismiss<\/button><\/div>/);
+  assert.match(waiting, /<div class="quiet"><button class="skip">Skip for now<\/button><button class="dis" aria-label="Dismiss, Pick the look">Dismiss<\/button><\/div>/);
   assert.doesNotMatch(waiting.match(/<div class="focus">.*?<\/article>/s)[0], /class="x"/);
   // Needs you first ends with Dismiss on the left and the way to Triage on the right; its card has no × of its own.
   const home = await dump('');
-  assert.match(home, /<div class="foot"><button class="dis" aria-label="Dismiss, When should it ship\?">Dismiss<\/button><a class="more" href="#waiting">Answer all 2 in Triage →<\/a><\/div>/);
+  assert.match(home, /<div class="foot"><button class="dis" aria-label="Dismiss, Pick the look">Dismiss<\/button><a class="more" href="#waiting">Answer all 2 in Triage →<\/a><\/div>/);
   assert.doesNotMatch(home.match(/<section class="card needs.*?<\/section>/s)[0], /class="x"/);
   // Under its heading, when that ask was raised.
-  assert.match(home, /<h2>Needs you first<\/h2><p class="meta since">Waiting since 09:15<\/p>/);
+  assert.match(home, /<h2>Needs you first<\/h2><p class="meta since">Waiting since 09:15<\/p><article class="row design" id="item-look">/);
   // Summary has the person's mark beside its title, and the Waiting on you tile one clock and the oldest ask's time (the design ask has none).
   assert.match(home, /<h1 tabindex="-1">Summary<\/h1><span class="icon i-you" aria-hidden="true">/);
   const vis = (dom, a) => dom.match(new RegExp(`<a class="tile i-${a}".*?<span class="vis" aria-hidden="true">(.*?)<\\/span><span class="detail"`, 's'))[1];
@@ -792,14 +793,14 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   writeFileSync(gone, JSON.stringify({ key: 'ship', dismissed: true, at: new Date().toISOString() }) + '\n');
   const pages = {};
   for (const hash of ['', '#waiting']) assert.match(pages[hash] = await dump(hash), /<details class="other gone-asks"><summary>Dismissed \(1\)<\/summary><ul class="rows"><li><strong dir="auto">When should it ship\?<\/strong><button class="dis" aria-label="Restore, When should it ship\?">Restore<\/button><\/li><\/ul><\/details>/, hash);
-  // Only the design ask waits now, and it has no time: the tile keeps its count.
-  assert.match(pages[''], /<a class="tile i-waiting".*?<span class="detail" dir="auto">1 waiting<\/span>/s);
+  // Only the design ask waits now, and its filed time is the tile's oldest.
+  assert.match(pages[''], /<a class="tile i-waiting".*?<span class="detail" dir="auto">Oldest 09:15<\/span>/s);
   // Restore puts it back in Triage (behind the ask in focus) through the same dismiss log, and the row goes once nothing is dismissed.
   const { evaluate, close } = await browse(join(dir, 'live'));
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
   await until(async () => (await evaluate('document.querySelector(".fhead")?.textContent')) === '1 of 1');
   await evaluate('document.querySelector(".gone-asks .dis").click()');
-  await until(async () => (await evaluate('!document.querySelector(".gone-asks") && document.querySelector(".fhead").textContent')) === '2 of 2');
+  await until(async () => (await evaluate('!document.querySelector(".gone-asks") && document.querySelector(".fhead").textContent')) === '1 of 2');
   close();
   assert.deepEqual(readFileSync(gone, 'utf8').trim().split('\n').map((l) => JSON.parse(l)).map(({ key, dismissed }) => [key, dismissed]), [['ship', true], ['ship', false]]);
   // Reports and explainers says what the page is under its title, draws a report's steps as numbered nodes, each with only the marks it lists, and the legend once.
@@ -888,11 +889,13 @@ test('a sign-in card: posted on top of what waits with its link and time left, t
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const { evaluate, close } = await browse(join(dir, 'live'), 390);
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
-  // A sign-in blocks someone now, so both come before the older question.
+  // A sign-in blocks someone now, so both come before the question, newest first among them.
   const queue = () => evaluate('[...document.querySelectorAll(".queue strong")].map((s) => s.textContent).join("|")');
-  await until(async () => (await queue()) === 'npm|GitHub|Keep the weekly digest?');
+  await until(async () => (await queue()) === 'GitHub|npm|Keep the weekly digest?');
   const card = (key) => evaluate(`(() => { const c = document.getElementById("item-${key}"), o = c?.querySelector(".open-link");
     return c && [c.querySelector("h3").textContent, ...[...c.querySelectorAll(".line, .expiry, .meta")].map((p) => p.textContent), o ? [o.tagName, o.getAttribute("href"), o.target, o.rel, o.disabled].join(" ") : "no open"].join("|"); })()`);
+  // Triage shows the card in focus: the GitHub sign-in is newest, so the npm one is tapped in the queue first.
+  await until(async () => (await evaluate('[...document.querySelectorAll(".queue button")].find((b) => b.textContent.startsWith("npm"))?.click() ?? true')) && (await card('npm-login')) !== null);
   assert.equal(await card('npm-login'), `npm|Unlocks: Publish npm|Waits: Main|Expires in 15 min|A ${link} _blank noopener noreferrer `);
   // The page is not loaded again from here on: a mark set now is still there at the end.
   await evaluate('window.stillHere = true');
@@ -943,6 +946,252 @@ test('a sign-in card: posted on top of what waits with its link and time left, t
   writeFileSync(join(dir, 'signed-in'), '');
   await until(async () => /fresh,done,/.test(run('answers', file).out) && !(await queue()).includes('fresh'));
   assert.equal(await evaluate('window.stillHere'), true);
+  close();
+  proc.kill();
+});
+
+// Waiting on you: each ask names its type, the type chips filter the list and count each type, and the list reads newest first until the
+// viewer picks oldest first, which the browser keeps. On a phone, the chips and the sort sit above the one ask in focus.
+test('Waiting on you: a type label on each ask, type chips with counts, and the order newest first or oldest first kept per browser', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'types'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    { key: 'digest', title: 'Keep the weekly digest?', options: yesNo, recommend_value: 'yes' },
+    { key: 'release', title: 'Which day for release?', options: ['today', 'friday', 'next-week'].map((v) => ({ value: v, label: v })), recommend_value: 'friday' },
+    { key: 'look', type: 'design', title: 'Pick the look', options: ['a', 'b', 'c'].map((v) => ({ value: v, label: v.toUpperCase() })), recommend_value: 'b' },
+  ] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+  const chips = () => evaluate('[...document.querySelectorAll(".chips button")].map((b) => b.textContent + (b.getAttribute("aria-pressed") === "true" ? "*" : "")).join("|")');
+  const queue = () => evaluate('[...document.querySelectorAll(".queue strong")].map((s) => s.textContent).join("|")');
+  const fhead = () => evaluate('document.querySelector(".fhead")?.textContent');
+  const pick = (label) => evaluate(`[...document.querySelectorAll(".chips button")].find((b) => b.textContent.startsWith("${label}"))?.click() ?? true`);
+  // Newest first by default: the file's last ask leads, with its type on its card.
+  await until(async () => (await fhead()) === '1 of 3');
+  assert.equal(await queue(), 'Pick the look|Which day for release?|Keep the weekly digest?');
+  assert.equal(await evaluate('document.querySelector(".focus .eyebrow")?.textContent'), 'Design pick');
+  assert.equal(await chips(), 'All 3*|Design pick 1|Yes/No 1|Pick one 1');
+  // One type at a time: Yes/No leaves the one yes/no ask, and All brings the rest back.
+  await until(async () => (await pick('Yes/No')) && (await queue()) === 'Keep the weekly digest?');
+  assert.equal(await chips(), 'All 3|Design pick 1|Yes/No 1*|Pick one 1');
+  assert.equal(await fhead(), '1 of 1');
+  await until(async () => (await pick('All')) && (await queue()) === 'Pick the look|Which day for release?|Keep the weekly digest?');
+  // Oldest first is one choice away, and it stays after a reload in this browser.
+  await evaluate('(() => { const s = document.querySelector(".sort select"); s.value = "oldest"; s.dispatchEvent(new Event("change")); })()');
+  await until(async () => (await queue()) === 'Keep the weekly digest?|Which day for release?|Pick the look');
+  assert.equal(await evaluate('localStorage.getItem("sign-off-waiting-sort")'), 'oldest');
+  await evaluate('location.reload()');
+  await until(async () => (await fhead()) === '1 of 3');
+  assert.equal(await evaluate('document.querySelector(".sort select").value'), 'oldest');
+  assert.equal(await evaluate('document.querySelector(".focus h3")?.textContent'), 'Keep the weekly digest?');
+  // A type chip narrows this visit only: ‹ Summary and back through the way to Triage opens everything its count promises, in All again.
+  await until(async () => (await pick('Yes/No')) && (await queue()) === 'Keep the weekly digest?');
+  await evaluate('document.querySelector(".back").click()');
+  await until(async () => (await evaluate('document.querySelector(".needs a.more")?.textContent')) === 'Answer all 3 in Triage →');
+  await evaluate('document.querySelector(".needs a.more").click()');
+  await until(async () => (await fhead()) === '1 of 3');
+  assert.equal(await queue(), 'Keep the weekly digest?|Which day for release?|Pick the look');
+  assert.equal(await chips(), 'All 3*|Design pick 1|Yes/No 1|Pick one 1');
+  // The same reset lands a Summary tap on the very ask tapped, even one the chip had filtered out.
+  await until(async () => (await pick('Yes/No')) && (await queue()) === 'Keep the weekly digest?');
+  await evaluate('document.querySelector(".back").click()');
+  await until(async () => (await evaluate('!!document.querySelector(".needs a.more")')));
+  await evaluate('[...document.querySelectorAll(".areas .i-waiting a.compact")].find((a) => a.textContent.includes("Pick the look")).click()');
+  await until(async () => (await evaluate('document.querySelector(".focus h3")?.textContent')) === 'Pick the look');
+  close();
+  proc.kill();
+});
+
+// Waiting on you sorts by when each ask was filed, not by where it sits in the file: an ask re-filed later leads the newest-first list.
+test('Waiting on you: newest and oldest first follow each ask\'s filed time, and an ask with no filed time keeps its place in the file', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'filed-sort'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    { key: 'relinked', title: 'Relinked ask', options: yesNo, recommend_value: 'yes', filed: '2026-10-17T10:00:00Z' },
+    { key: 'plain', title: 'Plain ask', options: yesNo, recommend_value: 'yes' },
+    { key: 'older', title: 'Older ask', options: yesNo, recommend_value: 'yes', filed: '2026-10-17T09:00:00Z' },
+  ] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+  const queue = () => evaluate('[...document.querySelectorAll(".queue strong")].map((s) => s.textContent).join("|")');
+  await until(async () => (await queue()) === 'Plain ask|Relinked ask|Older ask');
+  await evaluate('(() => { const s = document.querySelector(".sort select"); s.value = "oldest"; s.dispatchEvent(new Event("change")); })()');
+  await until(async () => (await queue()) === 'Older ask|Relinked ask|Plain ask');
+  close();
+  proc.kill();
+});
+
+test('Waiting on you: a board with no filed times lists newest first as the file reversed and oldest first as the file', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'unfiled-sort'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    { key: 'first', title: 'First ask', options: yesNo, recommend_value: 'yes' },
+    { key: 'second', title: 'Second ask', options: yesNo, recommend_value: 'yes' },
+    { key: 'third', title: 'Third ask', options: yesNo, recommend_value: 'yes' },
+  ] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+  const queue = () => evaluate('[...document.querySelectorAll(".queue strong")].map((s) => s.textContent).join("|")');
+  await until(async () => (await queue()) === 'Third ask|Second ask|First ask');
+  await evaluate('(() => { const s = document.querySelector(".sort select"); s.value = "oldest"; s.dispatchEvent(new Event("change")); })()');
+  await until(async () => (await queue()) === 'First ask|Second ask|Third ask');
+  close();
+  proc.kill();
+});
+
+// Changing a type chip or the sort starts at the first ask of the new list, and keeps the focus on the control changed.
+test('Waiting on you: a chip or sort change starts at the first ask of the new list and keeps the focus on that control', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'chip-focus'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }], pick = ['a', 'b', 'c'].map((v) => ({ value: v, label: v.toUpperCase() }));
+  const ask = (letter, options) => ({ key: `ask-${letter}`, title: `Ask ${letter.toUpperCase()}`, options, recommend_value: options[0].value });
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    ask('e', pick), ask('d', yesNo), ask('c', yesNo), ask('b', pick), ask('a', yesNo),
+  ] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+  const queue = () => evaluate('[...document.querySelectorAll(".queue strong")].map((s) => s.textContent).join("|")');
+  const fhead = () => evaluate('document.querySelector(".fhead")?.textContent');
+  await until(async () => (await fhead()) === '1 of 5');
+  await until(async () => (await evaluate('[...document.querySelectorAll(".queue button")].find((b) => b.textContent.includes("Ask D"))?.click() ?? true')) && (await fhead()) === '4 of 5');
+  await until(async () => (await evaluate('[...document.querySelectorAll(".chips button")].find((b) => b.textContent.startsWith("Pick one"))?.click() ?? true')) && (await queue()) === 'Ask B|Ask E');
+  assert.equal(await fhead(), '1 of 2');
+  assert.equal(await evaluate('document.querySelector(".focus h3")?.textContent'), 'Ask B');
+  assert.equal(await evaluate('document.activeElement?.getAttribute("aria-pressed") === "true" && document.activeElement.textContent.startsWith("Pick one")'), true);
+  await evaluate('(() => { const s = document.querySelector(".sort select"); s.value = "oldest"; s.dispatchEvent(new Event("change")); })()');
+  await until(async () => (await queue()) === 'Ask E|Ask B');
+  assert.equal(await fhead(), '1 of 2');
+  assert.equal(await evaluate('document.querySelector(".focus h3")?.textContent'), 'Ask E');
+  assert.equal(await evaluate('document.activeElement?.matches(".sort select")'), true);
+  close();
+  proc.kill();
+});
+
+// Fed boards arrive with shapes the poster chose: a stored type-ask keeps its stored type but shows the type its shape answers as,
+// and one shared classifier names every ask and groups the type chips, so a card's label is always the chip it sits under.
+test('Waiting on you: a reply-only ask shows Reply, a type-ask yes/no shows Yes/No, and a decision with mocks but no design type shows Pick one', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'fed-types'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  writeFileSync(file, JSON.stringify({ schema: 2, answers_only: true, items: [
+    { key: 'ready', type: 'ask', title: 'Say ready when you are', options: [], reply: true },
+    { key: 'ship', type: 'ask', title: 'Ship it?' },
+    { key: 'cover', title: 'Pick a cover', options: ['a', 'b'].map((v) => ({ value: v, label: v.toUpperCase() })), recommend_value: 'b',
+      mocks: [{ value: 'a', path: 'mocks/a/index.html' }, { value: 'b', path: 'mocks/b/index.html' }] },
+  ] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+  const chips = () => evaluate('[...document.querySelectorAll(".chips button")].map((b) => b.textContent + (b.getAttribute("aria-pressed") === "true" ? "*" : "")).join("|")');
+  const queue = () => evaluate('[...document.querySelectorAll(".queue strong")].map((s) => s.textContent).join("|")');
+  const tap = (name) => evaluate(`[...document.querySelectorAll(".queue button")].find((b) => b.textContent.includes("${name}"))?.click() ?? true`);
+  // Newest first: the mocks decision leads, as a plain pick-one card with its two buttons and no mock frames.
+  await until(async () => (await evaluate('document.querySelector(".fhead")?.textContent')) === '1 of 3');
+  assert.equal(await queue(), 'Pick a cover|Ship it?|Say ready when you are');
+  assert.equal(await evaluate('document.querySelector(".focus .eyebrow")?.textContent'), 'Pick one');
+  assert.equal(await evaluate('document.querySelectorAll(".focus .choices button").length'), 2);
+  assert.equal(await evaluate('document.querySelector(".focus .mock")'), null);
+  assert.equal(await chips(), 'All 3*|Yes/No 1|Pick one 1|Reply 1');
+  // The stored type-ask with the default yes/no options shows Yes/No, on the card and in its chip.
+  await until(async () => (await tap('Ship it?')) && (await evaluate('document.querySelector(".focus .eyebrow")?.textContent')) === 'Yes/No');
+  assert.equal(await evaluate('document.querySelectorAll(".focus .choices button").length'), 2);
+  // The reply-only ask is a Reply, answered in the one place to type.
+  await until(async () => (await tap('Say ready')) && (await evaluate('document.querySelector(".focus .eyebrow")?.textContent')) === 'Reply');
+  assert.equal(await evaluate('document.querySelectorAll(".focus .choices button").length'), 0);
+  assert.notEqual(await evaluate('document.querySelector(".focus textarea")'), null);
+  // Its chip filters to just the reply-only ask.
+  await until(async () => (await evaluate('[...document.querySelectorAll(".chips button")].find((b) => b.textContent.startsWith("Reply"))?.click() ?? true')) && (await queue()) === 'Say ready when you are');
+  assert.equal(await evaluate('document.querySelector(".fhead")?.textContent'), '1 of 1');
+  close();
+  proc.kill();
+});
+
+test('Waiting on you: an update waiting for a verdict reads Evidence on its card, the name of its chip, not Update N', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'waiting-update'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    { key: 'upd', type: 'evidence', number: 5, title: 'Login checked', area: 'waiting', media: [{ path: 'evidence/5/shot.png', sha256: 'a'.repeat(64), bytes: 0 }] },
+    { key: 'ship', type: 'ask', title: 'Ship it?' },
+  ] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+  await until(async () => (await evaluate('document.querySelector(".fhead")?.textContent')) === '1 of 2');
+  await until(async () => (await evaluate('[...document.querySelectorAll(".queue button")].find((b) => b.textContent.includes("Login checked"))?.click() ?? true')) && (await evaluate('document.querySelector(".focus h3")?.textContent')) === 'Login checked');
+  assert.equal(await evaluate('document.querySelector(".focus .eyebrow")?.textContent'), 'Evidence');
+  assert.ok(await evaluate('[...document.querySelectorAll(".chips button")].some((b) => b.textContent.startsWith("Evidence 1"))'));
+  close();
+  proc.kill();
+});
+
+// Any question can wait, whatever type it names: while it waits, its card names the type of answer it takes, the same name as the chip
+// counting it; outside Waiting the same card keeps its own name.
+test('Answered: a design keeps its Design label and an answered yes/no decision has no eyebrow', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'answered-labels'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    { key: 'look', type: 'design', title: 'Pick the look', options: ['a', 'b'].map((v) => ({ value: v, label: v.toUpperCase() })), recommend_value: 'b' },
+    { key: 'digest', title: 'Keep the weekly digest?', options: yesNo, recommend_value: 'yes' },
+  ] }));
+  writeFileSync(file.replace(/\.json$/, '.answers.jsonl'), [
+    { key: 'look', answer: 'a', label: 'A', close: 'done', at: new Date().toISOString() },
+    { key: 'digest', answer: 'yes', label: 'Yes', close: 'done', at: new Date().toISOString() },
+  ].map((a) => JSON.stringify(a)).join('\n') + '\n');
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#answered`)}`);
+  await until(async () => (await evaluate('document.querySelectorAll("article.row").length')) === 2);
+  assert.equal(await evaluate('document.querySelector("#item-look .eyebrow")?.textContent'), 'Design');
+  assert.ok(await evaluate('document.querySelector("#item-digest .eyebrow") === null'));
+  close();
+  proc.kill();
+});
+
+test('Waiting on you: a diagram, an interactive page, an explainer and a free-form fed type each show the name of the chip counting them', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'view-types'), file = join(dir, 'board.json'), mocks = join(dir, 'mocks');
+  mkdirSync(mocks, { recursive: true });
+  writeFileSync(join(mocks, 'flow.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8"/></svg>');
+  writeFileSync(join(mocks, 'walk.html'), '<p>The new flow</p>');
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    { key: 'flow', type: 'diagram', title: 'Is this the sign-in flow?', view: 'mocks/flow.svg' },
+    { key: 'walk', type: 'interactive', title: 'Walk through the new flow?', view: 'mocks/walk.html' },
+    { key: 'tour', type: 'explainer', title: 'Take the tour?', media: [{ path: 'evidence/1/tour.webm', sha256: 'a'.repeat(64), bytes: 0 }], area: 'waiting' },
+    { key: 'site', type: 'site-check', title: 'Check the site?' },
+  ] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+  const chips = () => evaluate('[...document.querySelectorAll(".chips button")].map((b) => b.textContent + (b.getAttribute("aria-pressed") === "true" ? "*" : "")).join("|")');
+  const tap = (name) => evaluate(`[...document.querySelectorAll(".queue button")].find((b) => b.textContent.includes("${name}"))?.click() ?? true`);
+  // All four take a yes or a no, so one Yes/No chip counts them all, and each waiting card says Yes/No, never its type word.
+  await until(async () => (await evaluate('document.querySelector(".fhead")?.textContent')) === '1 of 4');
+  assert.equal(await chips(), 'All 4*|Yes/No 4');
+  for (const name of ['Check the site?', 'Take the tour?', 'Walk through the new flow?', 'Is this the sign-in flow?']) {
+    await until(async () => (await tap(name)) && (await evaluate('document.querySelector(".focus .eyebrow")?.textContent')) === 'Yes/No');
+  }
   close();
   proc.kill();
 });
