@@ -1046,6 +1046,26 @@ test('Waiting on you: a reply-only ask shows Reply, a type-ask yes/no shows Yes/
   proc.kill();
 });
 
+test('Waiting on you: an update waiting for a verdict reads Evidence on its card, the name of its chip, not Update N', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'waiting-update'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    { key: 'upd', type: 'evidence', number: 5, title: 'Login checked', area: 'waiting', media: [{ path: 'evidence/5/shot.png', sha256: 'a'.repeat(64), bytes: 0 }] },
+    { key: 'ship', type: 'ask', title: 'Ship it?' },
+  ] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+  await until(async () => (await evaluate('document.querySelector(".fhead")?.textContent')) === '1 of 2');
+  await until(async () => (await evaluate('[...document.querySelectorAll(".queue button")].find((b) => b.textContent.includes("Login checked"))?.click() ?? true')) && (await evaluate('document.querySelector(".focus h3")?.textContent')) === 'Login checked');
+  assert.equal(await evaluate('document.querySelector(".focus .eyebrow")?.textContent'), 'Evidence');
+  assert.ok(await evaluate('[...document.querySelectorAll(".chips button")].some((b) => b.textContent.startsWith("Evidence 1"))'));
+  close();
+  proc.kill();
+});
+
 // Any question can wait, whatever type it names: while it waits, its card names the type of answer it takes, the same name as the chip
 // counting it; outside Waiting the same card keeps its own name.
 test('Answered: a design keeps its Design label and an answered yes/no decision has no eyebrow', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
