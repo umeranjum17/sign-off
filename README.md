@@ -1,3 +1,9 @@
+<p align="center"><b>▶ <a href="https://umeranjum17.github.io/sign-off/">Try it live</a></b> — the real board on demo data: tap an answer and watch it save. No install, nothing leaves your browser.</p>
+
+<p align="center">
+  <img src="docs/media/demo-tap.gif" width="300" alt="Tap Yes on a demo question, see it saved, and read the saved answer back">
+</p>
+
 <p align="center">
   <img src="docs/logo.svg" width="72" height="72" alt="sign-off logo">
 </p>
@@ -240,6 +246,7 @@ the board runs for every answer. Detail in
 ```sh
 npm test                      # builds, then runs the integration journeys against the real CLI and server
 npm run build:skill           # regenerates skills/sign-off-axi/SKILL.md from src/skill.ts (CI runs it with -- --check)
+npm run build:demo            # builds the static demo site into demo-dist/ (GitHub Pages, the Try-it-live link)
 npm pack                      # builds the publishable sign-off-axi tarball
 ```
 

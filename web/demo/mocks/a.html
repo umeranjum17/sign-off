@@ -1,0 +1,26 @@
+<!doctype html>
+<!-- Demo mock A: a single-column settings list. Self-contained; no network. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Layout A</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 1rem; background: #f6f3ee; color: #1f1b16; font: 1rem/1.5 system-ui, sans-serif; }
+  h1 { font-size: 1.25rem; margin: 0 0 .75rem; }
+  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+  li { display: flex; justify-content: space-between; align-items: center; padding: .75rem 1rem; background: #fff; border: 1px solid #e6e0d6; border-radius: .75rem; }
+  .on { color: #1e7034; font-weight: 700; }
+</style>
+</head>
+<body>
+<h1>Settings</h1>
+<ul>
+  <li>Weekly digest <span class="on">On</span></li>
+  <li>Dark mode <span>Off</span></li>
+  <li>Upload retries <span class="on">On</span></li>
+  <li>Sign-in alerts <span>Off</span></li>
+</ul>
+</body>
+</html>

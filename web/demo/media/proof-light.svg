@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="500" viewBox="0 0 390 500" role="img" aria-label="Demo capture: settings page in light mode, loaded">
+  <rect width="390" height="500" fill="#f6f3ee"/>
+  <rect x="24" y="28" width="342" height="44" rx="12" fill="#ffffff" stroke="#e6e0d6"/>
+  <rect x="44" y="43" width="180" height="14" rx="7" fill="#1f1b16"/>
+  <rect x="24" y="92" width="342" height="120" rx="12" fill="#ffffff" stroke="#e6e0d6"/>
+  <rect x="44" y="112" width="120" height="12" rx="6" fill="#6a6157"/>
+  <rect x="44" y="134" width="200" height="12" rx="6" fill="#e6e0d6"/>
+  <rect x="44" y="156" width="160" height="12" rx="6" fill="#e6e0d6"/>
+  <rect x="44" y="180" width="90" height="12" rx="6" fill="#2b8a3e"/>
+  <rect x="24" y="232" width="342" height="52" rx="12" fill="#c2410c"/>
+  <rect x="44" y="249" width="140" height="14" rx="7" fill="#ffffff"/>
+</svg>

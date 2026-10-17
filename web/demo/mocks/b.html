@@ -1,0 +1,33 @@
+<!doctype html>
+<!-- Demo mock B: settings in two groups with short helper lines. Self-contained; no network. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Layout B</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 1rem; background: #f6f3ee; color: #1f1b16; font: 1rem/1.5 system-ui, sans-serif; }
+  h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+  h2 { font-size: .8125rem; text-transform: uppercase; letter-spacing: .05em; color: #6a6157; margin: 1rem 0 .375rem; }
+  section { background: #fff; border: 1px solid #e6e0d6; border-radius: .75rem; }
+  label { display: flex; justify-content: space-between; gap: 1rem; padding: .75rem 1rem; }
+  label + label { border-top: 1px solid #e6e0d6; }
+  small { display: block; color: #6a6157; }
+  .pill { flex: none; align-self: center; padding: .125rem .625rem; border-radius: 999px; background: #efebe4; font-size: .8125rem; font-weight: 650; }
+</style>
+</head>
+<body>
+<h1>Settings</h1>
+<h2>Notifications</h2>
+<section>
+  <label><span>Weekly digest<small>Every Monday morning</small></span><span class="pill">On</span></label>
+  <label><span>Sign-in alerts<small>New device only</small></span><span class="pill">Off</span></label>
+</section>
+<h2>Appearance</h2>
+<section>
+  <label><span>Dark mode<small>Follows the phone</small></span><span class="pill">Auto</span></label>
+  <label><span>Upload retries<small>Up to three times</small></span><span class="pill">On</span></label>
+</section>
+</body>
+</html>
