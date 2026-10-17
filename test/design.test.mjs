@@ -411,7 +411,7 @@ test('doctor prints a fix a shell can run for a path with a space, and fails wit
 test('doctor ignores config keys it does not use and names a malformed port line', () => {
   const dir = join(scratch, 'extra-keys'), sod = join(dir, '.sign-off');
   run('init', dir);
-  writeFileSync(join(sod, 'config.yaml'), 'board: decisions.json\nport: 0\nowner: Umer Anjum\nmax-items: 5\n');
+  writeFileSync(join(sod, 'config.yaml'), 'board: decisions.json\nport: 0\nowner: Umer\nmax-items: 5\n');
   assert.equal(run('doctor', dir).code, 0);
   writeFileSync(join(sod, 'config.yaml'), 'board: decisions.json\nport:\n');
   const broken = run('doctor', dir);
@@ -1016,7 +1016,7 @@ test('a long answer at 390 px sits under its long title, which keeps most of the
   proc.kill();
 });
 
-// The Summary at 390 with 1, 10 and 100 answers today, as on the captain's phone: one answer at 8:00 and the rest at 9:30, and at
+// The Summary at 390 with 1, 10 and 100 answers today, as on a narrow phone: one answer at 8:00 and the rest at 9:30, and at
 // 100 all of them in one column. The last board is a last-bucket one: one answer at 9:00 and ten at 9:58, so the ten sit at
 // `left: 100%`, where a wrapping count would reach the caption. The Answered count stays on one line at its full width while its
 // checks give way; each Today column carries its own count, the counts add up to the caption, and none reaches it or another label.
