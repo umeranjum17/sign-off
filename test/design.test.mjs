@@ -1012,8 +1012,8 @@ test('Waiting on you: newest and oldest first follow each ask\'s filed time, and
   mkdirSync(dir);
   const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
   writeFileSync(file, JSON.stringify({ schema: 2, items: [
-    { key: 'plain', title: 'Plain ask', options: yesNo, recommend_value: 'yes' },
     { key: 'relinked', title: 'Relinked ask', options: yesNo, recommend_value: 'yes', filed: '2026-10-17T10:00:00Z' },
+    { key: 'plain', title: 'Plain ask', options: yesNo, recommend_value: 'yes' },
     { key: 'older', title: 'Older ask', options: yesNo, recommend_value: 'yes', filed: '2026-10-17T09:00:00Z' },
   ] }));
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
@@ -1022,9 +1022,9 @@ test('Waiting on you: newest and oldest first follow each ask\'s filed time, and
   const { evaluate, close } = await browse(join(dir, 'b'), 390);
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
   const queue = () => evaluate('[...document.querySelectorAll(".queue strong")].map((s) => s.textContent).join("|")');
-  await until(async () => (await queue()) === 'Relinked ask|Older ask|Plain ask');
+  await until(async () => (await queue()) === 'Relinked ask|Plain ask|Older ask');
   await evaluate('(() => { const s = document.querySelector(".sort select"); s.value = "oldest"; s.dispatchEvent(new Event("change")); })()');
-  await until(async () => (await queue()) === 'Plain ask|Older ask|Relinked ask');
+  await until(async () => (await queue()) === 'Older ask|Plain ask|Relinked ask');
   close();
   proc.kill();
 });

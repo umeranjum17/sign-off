@@ -1060,8 +1060,11 @@
     const gone = new Set(state.dismissed ?? []);
     for (const d of [...state.decisions].reverse()) if (!gone.has(d.key)) by[area(d)].push(d);
     // Waiting on you reads newest first unless the viewer chose oldest first. A sign-in blocks someone now, so sign-ins come first either way.
-    const oldest = waitSort === 'oldest', filedAt = (d) => Date.parse(d.filed) || 0;
-    const asked = (oldest ? [...by.waiting].reverse() : by.waiting).sort((x, y) => (oldest ? 1 : -1) * (filedAt(x) - filedAt(y)));
+    const oldest = waitSort === 'oldest', filed = (d) => Date.parse(d.filed);
+    const slots = by.waiting.flatMap((d, i) => (Number.isNaN(filed(d)) ? [] : [i]));
+    const byTime = slots.map((i) => by.waiting[i]).sort((x, y) => (oldest ? 1 : -1) * (filed(x) - filed(y)));
+    const asked = [...by.waiting];
+    slots.forEach((slot, n) => { asked[slot] = byTime[n]; });
     by.waiting = [...asked.filter((d) => d.type === 'signin'), ...asked.filter((d) => d.type !== 'signin')];
     // A type chip whose asks are all answered or dismissed falls back to All.
     if (waitType !== 'all' && !by.waiting.some((d) => typeOf(d) === waitType)) waitType = 'all';
