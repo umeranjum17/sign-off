@@ -1799,9 +1799,9 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   if (req.url === '/api/dismiss') {
     const { keys, dismissed } = JSON.parse(body) ?? {};
     if (!Array.isArray(keys) || !keys.length || keys.length > 200 || typeof dismissed !== 'boolean') return [400, { error: 'Send 1 to 200 keys and dismissed true or false' }];
-    const have = new Map(loadDecisions(file).map((x) => [x.key, x]));
+    const have = new Map(board(file).map((x) => [x.key, x]));
     if (!keys.every((k) => isKey(k) && have.has(k))) return [404, { error: 'This item is no longer in the file' }];
-    if (dismissed && keys.some((k) => have.get(k)?.type === 'plan')) return [400, { error: 'A plan cannot be dismissed' }];
+    if (dismissed && keys.some((k) => have.get(k)?.type === 'plan' && !have.get(k)?.answer)) return [400, { error: 'A plan waits until it is sent back, so it cannot be dismissed' }];
     appendDismissed(file, [...new Set<string>(keys)], dismissed);
     return [200, state()];
   }

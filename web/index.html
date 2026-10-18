@@ -502,16 +502,15 @@
   }
   const canDismiss = () => !state.readonly && !FROZEN;
   function xBtn(d, label) {
-    if (!canDismiss() || d.type === 'plan') return '';
+    if (!canDismiss() || (d.type === 'plan' && !Object.hasOwn(state.answers, d.key))) return '';
     const b = el('button', { class: label ? 'dis' : 'x', 'aria-label': `Dismiss, ${title(d)}` }, label ?? '×');
     b.onclick = () => dismiss([d.key], area(d) === 'waiting' ? 'Dismissed · the agent still waits' : `Dismissed: ${title(d)}`);
     return b;
   }
   function clearAll(items) {
-    const done = items.filter((d) => d.type !== 'plan');
-    if (!canDismiss() || !done.length) return '';
+    if (!canDismiss() || !items.length) return '';
     const b = el('button', { class: 'clear' }, 'Clear all done');
-    b.onclick = () => dismiss(done.map((d) => d.key), `${done.length} cleared`);
+    b.onclick = () => dismiss(items.map((d) => d.key), `${items.length} cleared`);
     return b;
   }
 
