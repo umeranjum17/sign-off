@@ -114,21 +114,25 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
     return v;
   };
   /** Each option: exactly value and label (and on a plan's decision, outcome), its value unique. Ask, gate, finding and plan decisions share it. */
-  const checkOptions = (field: string, options: any[], outcome = false) => options.forEach((o: any, n: number) => {
+  const checkOptions = (field: string, options: any[], outcome: false | 'plan' | 'ask' = false) => options.forEach((o: any, n: number) => {
     const at = `${field}[${n}]`, fields = outcome ? ['value', 'label', 'outcome'] : ['value', 'label'];
     if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad(at, 'must be an object', `Write each option as {"value":"<id>","label":"<text>"${outcome ? ',"outcome":"<what it leads to>"' : ''}}`);
     const odd = Object.keys(o).find((f) => !fields.includes(f));
     if (odd !== undefined) throw bad(`${at}.${escaped(odd) || '""'}`, 'is not a field of an option', `Remove ${show(odd)}; an option has only ${fields.join(', ')}`);
-    if (!isKey(o.value)) throw bad(`${at}.value`, 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "value" to a short id such as "yes"');
+    if (!isKey(o.value)) throw bad(`${at}.value`, 'must be 1-128 of A-Z a-z 0-9 . _ -', flags ? 'Give each --option a short value before the =, such as yes=Yes' : 'Set "value" to a short id such as "yes"');
     if (options.slice(0, n).some((p: any) => p.value === o.value)) throw bad(`${at}.value`, `repeats ${o.value}`, 'Give every option its own value');
     text(`${at}.label`, o.label, 80, 'the button text, in 80 characters or fewer');
-    if (outcome) text(`${at}.outcome`, o.outcome, 200, 'what picking it leads to, in 200 characters or fewer');
+    if (outcome === 'ask') {
+      const OUTCOME = `what happens next if ${o.value} is picked, in one line (120 characters or fewer)`;
+      if (!Object.hasOwn(o, 'outcome')) throw bad(`${at}.outcome`, 'is required', `Add ${flags ? `--outcome ${o.value}=<text>` : `"outcome" to option ${o.value}`}: ${OUTCOME}`);
+      text(`${at}.outcome`, o.outcome, 120, OUTCOME);
+    } else if (outcome) text(`${at}.outcome`, o.outcome, 200, 'what picking it leads to, in 200 characters or fewer');
   });
   /** The option the poster would pick, `field` on `o`: required, and one of the option values, which it returns. */
   const recommend = (field: string, o: any, options: any[]): string[] => {
-    const name = field.replace(/^.*\./, ''), values = options.map((p: any) => p.value), pick = `the option you would pick: one of ${values.join(', ')}`;
-    if (!Object.hasOwn(o, name)) throw bad(field, 'is required', `Add "${name}": ${show(values[0])}, ${pick}`);
-    if (!values.includes(o[name])) throw bad(field, `${show(o[name])} is not an option value`, `Set "${name}" to ${pick}`);
+    const name = field.replace(/^.*\./, ''), values = options.map((p: any) => p.value), pick = `the option you would pick: one of ${values.join(', ')}`, rec = named(name, flags);
+    if (!Object.hasOwn(o, name)) throw bad(field, 'is required', flags ? `Add ${rec} ${values[0]}, ${pick}` : `Add ${rec}: ${show(values[0])}, ${pick}`);
+    if (!values.includes(o[name])) throw bad(field, `${show(o[name])} is not an option value`, `Set ${rec} to ${pick}`);
     return values;
   };
   /** A page path, as a report's view and preview are: relative, inside the board file's folder, with the given ending. */
@@ -213,7 +217,7 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
       if (!/[\p{L}\p{N}]/u.test(q) || q.split(/\s+/).length > 12) throw bad(`${at}.question`, 'must be one question of 12 words or fewer, ending in a question mark', 'Ask it in 12 words or fewer, ending in a question mark; put the rest in "why"');
       text(`${at}.why`, o.why, 500, 'why it matters, in 500 characters or fewer');
       if (!Array.isArray(o.options) || o.options.length < 2 || o.options.length > 6) throw bad(`${at}.options`, Object.hasOwn(o, 'options') ? 'must list 2 to 6 options' : 'is required', 'Set "options" to 2-6 objects such as {"value":"yes","label":"Yes","outcome":"Plans live in the board file"}');
-      checkOptions(`${at}.options`, o.options, true);
+      checkOptions(`${at}.options`, o.options, 'plan');
       recommend(`${at}.recommend`, o, o.options);
     });
     if (Object.hasOwn(m, 'steps')) list('steps', 2, 12, ['title'], '{"title":"The agent posts the plan"}').forEach((o, n) => text(`steps[${n}].title`, o.title, 80, 'the step, in 80 characters or fewer'));
@@ -231,23 +235,10 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
   const actionList = actions && Object.entries(actions).map(([value, label]) => show({ value, label })).join(', ');
   const listed = !actions ? (flags ? 'Give 2 to 6 --option flags, such as --option yes="Yes" --option no="No"' : 'Set "options" to 2-6 objects such as {"value":"yes","label":"Yes"}') : max === 3 ? `Set "options" to 2 or 3 of ${actionList}` : `Set "options" to ${actionList}`;
   if (!Array.isArray(options) || options.length < 2 || options.length > max) throw bad('options', Object.hasOwn(m, 'options') ? `must list ${({ 2: '2', 3: '2 or 3' } as Record<number, string>)[max] ?? '2 to 6'} options` : 'is required', listed);
-  options.forEach((o: any, n: number) => {
-    const field = `options[${n}]`;
-    if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad(field, 'must be an object', `Write each option as {"value":"<id>","label":"<text>"${ask ? ',"outcome":"<what happens next>"' : ''}}`);
-    const has = ask ? ['value', 'label', 'outcome'] : ['value', 'label'], odd = Object.keys(o).find((f) => !has.includes(f));
-    if (odd !== undefined) throw bad(`${field}.${escaped(odd) || '""'}`, 'is not a field of an option', `Remove ${show(odd)}; an option has only ${has.join(', ').replace(/, (?=\w+$)/, ' and ')}`);
-    if (!isKey(o.value)) throw bad(`${field}.value`, 'must be 1-128 of A-Z a-z 0-9 . _ -', flags ? 'Give each --option a short value before the =, such as yes=Yes' : 'Set "value" to a short id such as "yes"');
-    if (options.slice(0, n).some((p: any) => p.value === o.value)) throw bad(`${field}.value`, `repeats ${o.value}`, 'Give every option its own value');
-    text(`${field}.label`, o.label, 80, 'the button text, in 80 characters or fewer');
-    const OUTCOME = `what happens next if ${o.value} is picked, in one line (120 characters or fewer)`;
-    if (ask && !Object.hasOwn(o, 'outcome')) throw bad(`${field}.outcome`, 'is required', `Add ${flags ? `--outcome ${o.value}=<text>` : `"outcome" to option ${o.value}`}: ${OUTCOME}`);
-    if (ask) text(`${field}.outcome`, o.outcome, 120, OUTCOME);
-  });
+  checkOptions('options', options, ask ? 'ask' : false);
   const odd = actions && options.find((o: any) => !Object.hasOwn(actions, o.value) || actions[o.value] !== o.label);
   if (odd) throw bad('options', `${show(odd)} is not a ${m.kind} action: ${Object.keys(actions).join(', ')}, each with its label`, listed);
-  const values = options.map((o: any) => o.value), pick = `the option you would pick: one of ${values.join(', ')}`;
-  if (!Object.hasOwn(m, 'recommend_value')) throw bad('recommend_value', 'is required', flags ? `Add --recommend ${values[0]}, ${pick}` : `Add "recommend_value": ${show(values[0])}, ${pick}`);
-  if (!values.includes(m.recommend_value)) throw bad('recommend_value', `${show(m.recommend_value)} is not an option value`, `Set ${named('recommend_value', flags)} to ${pick}`);
+  const values = recommend('recommend_value', m, options);
   const REASON = `why you recommend ${m.recommend_value}, in one line (160 characters or fewer)`;
   if (ask && !Object.hasOwn(m, 'recommend_reason')) throw bad('recommend_reason', 'is required', `Add ${named('recommend_reason', flags)}: ${REASON}`);
   if (ask) text('recommend_reason', m.recommend_reason, 160, REASON);
