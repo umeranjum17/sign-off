@@ -341,6 +341,7 @@ test('the skill and README command checklist runs as written on a fresh install'
   assert.equal(axi('-v').out.trim(), JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version);
   // README: init writes the repo setup; doctor checks it and exits 0 clean.
   assert.match(ok(axi('init', app), 'init'), /\.sign-off\/config\.yaml/);
+  writeFileSync(join(so, 'config.yaml'), 'board: decisions.json\nport: 0\n');
   assert.match(ok(axi('doctor', '.'), 'doctor'), /checks\[\d+\]/);
 
   // SKILL.md: 3 structural variants under mocks/<key>/, one --option and one --mock each, a --tradeoff and a --recommend.
