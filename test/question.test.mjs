@@ -155,7 +155,7 @@ test('a merged card merges nothing itself: a chain of merges is refused at post 
 
 test('the title rules accept plain questions that merely contain a label or id-like word', () => {
   const board = join(scratch, 'titles.json');
-  for (const title of ['Switch to pay-as-you-go pricing?', 'Turn on two-factor-auth?', 'Should we say yes or no to the offer?', 'Keep the A and B tabs?']) {
+  for (const title of ['Switch to pay-as-you-go pricing?', 'Turn on two-factor-auth?', 'Should we say yes or no to the offer?', 'Keep the A and B tabs?', 'Ship the 3-day trial?']) {
     const r = run('raise', board, ...good.slice(2), '--title', title);
     assert.equal(r.status, 0, `${title}\n${r.stdout}`);
   }

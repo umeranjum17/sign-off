@@ -294,8 +294,8 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
   return { kind: m.kind, schema: m.schema };
 }
 
-/** An id or task name, never a word a person says: a lowercase token with a digit, underscore or slash, such as slice-5, ship_1 or ch/cloud. */
-const idWord = (w: string) => /^[a-z0-9]+(?:[-_/][a-z0-9]+)+$/.test(w) && /[a-z]/.test(w) && /[\d_/]/.test(w);
+/** An id or task name, never a word a person says: a lowercase token with an underscore or slash, or a letter-first token with a digit, such as slice-5, ship_1 or ch/cloud. */
+const idWord = (w: string) => /^[a-z0-9]+(?:[-_/][a-z0-9]+)+$/.test(w) && (/[_/]/.test(w) || (/^[a-z]/.test(w) && /\d/.test(w)));
 /** Buttons that close a card but answer no question. */
 const NOT_ANSWERS = /^(done|not now|ok|okay|got it|noted|seen|acknowledged?|dismiss)$/i;
 /** The lettered choices a text names in a choice form: "Option A", "A:", "A.", "A)" or "(A)". Letters in prose, such as "the A and B tabs", are not choices. */
