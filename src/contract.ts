@@ -309,7 +309,7 @@ function lettered(text: string) {
 /** The question standard on a new ask: a plain question the buttons answer, with buttons that match the choices its words name. */
 function question(m: any, bad: (field: string, rule: string, help: string) => ContractError, flags: boolean) {
   const title = m.title.trim(), words = title.split(/\s+/).length, PLAIN = 'Write one plain question the buttons answer, in 12 words or fewer, such as "Ship the new sign-in screen this week?"';
-  if (/^(say yes or no|captain hold)\b/i.test(title) || /^captain\s*:/i.test(title) || /^[A-Za-z0-9._-]*[\d._-][A-Za-z0-9._-]*:/.test(title)) {
+  if (/^(say yes or no|captain(\s+hold\b[^:?]*)?)\s*:/i.test(title)) {
     throw bad('title', 'starts with a label for agents, not the question', 'Remove the label in front (such as "Say yes or no:" or "captain hold <id>:") and ask the question itself');
   }
   const id = title.split(/\s+/).map((w: string) => w.replace(/^[^\w]+|[^\w]+$/g, '')).find(idWord);

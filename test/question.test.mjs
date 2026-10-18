@@ -34,7 +34,8 @@ test('the question standard: every rule refuses a new question at post time, nam
     [[...good, '--silent-by', 'tomorrow'], /--silent-by "tomorrow" is not a UTC time/, /YYYY-MM-DDTHH:MM:SSZ/],
     [[...good.slice(2), '--title', 'Say yes or no: ship the sign-in screen?'], /--title starts with a label for agents/, /ask the question itself/],
     [[...good.slice(2), '--title', 'Captain: ship the sign-in screen?'], /--title starts with a label for agents/, /ask the question itself/],
-    [[...good.slice(2), '--title', 'fm-signin-7: ship it?'], /--title starts with a label for agents/, /ask the question itself/],
+    [[...good.slice(2), '--title', 'Captain hold 5: ship the sign-in screen?'], /--title starts with a label for agents/, /ask the question itself/],
+    [[...good.slice(2), '--title', 'fm-signin-7: ship it?'], /--title has the id "fm-signin-7"/, /plain words/],
     [[...good.slice(2), '--title', 'Ship sign-in-v2 this week?'], /--title has the id "sign-in-v2"/, /plain words/],
     [[...good.slice(2), '--title', 'Ship the new sign-in screen this week'], /--title must be a question ending in "\?"/, /12 words or fewer/],
     [[...good.slice(2), '--title', 'Should we ship the new sign-in screen to every single user this week?'], /--title is 13 words, over 12/, /put the rest in --why/],
@@ -155,7 +156,7 @@ test('a merged card merges nothing itself: a chain of merges is refused at post 
 
 test('the title rules accept plain questions that merely contain a label or id-like word', () => {
   const board = join(scratch, 'titles.json');
-  for (const title of ['Switch to pay-as-you-go pricing?', 'Turn on two-factor-auth?', 'Should we say yes or no to the offer?', 'Keep the A and B tabs?', 'Ship the 3-day trial?']) {
+  for (const title of ['Switch to pay-as-you-go pricing?', 'Turn on two-factor-auth?', 'Should we say yes or no to the offer?', 'Keep the A and B tabs?', 'Ship the 3-day trial?', 'Go-live: ship this week?']) {
     const r = run('raise', board, ...good.slice(2), '--title', title);
     assert.equal(r.status, 0, `${title}\n${r.stdout}`);
   }
@@ -177,7 +178,7 @@ test('a merge fans its answer out to the merged cards that have none, and a retr
   assert.equal(got['fan-b'].note, 'Answered with fan-a');
 });
 
-test('a fanned answer follows its parent: a re-answer replaces it, an undo clears it, and a card\'s own note that names the parent is its own', async () => {
+test('a fanned answer keeps its first value on a parent re-answer, an undo clears it, and a card\'s own note that names the parent is its own', async () => {
   const store = await import(new URL('../dist/store.js', import.meta.url));
   const board = join(scratch, 'refan.json');
   const yes = { value: 'yes', label: 'Yes' }, no = { value: 'no', label: 'No' };
@@ -189,8 +190,9 @@ test('a fanned answer follows its parent: a re-answer replaces it, an undo clear
   store.appendAnswer(board, a, yes);
   store.appendAnswer(board, a, no);
   let got = JSON.parse(run('answers', board, '--json').stdout);
-  assert.equal(got['re-b'].answer, 'no');
+  assert.equal(got['re-b'].answer, 'yes');
   assert.equal(got['re-b'].note, 'Answered with re-a');
+  assert.equal(got['re-a'].answer, 'no');
   assert.equal(got['re-c'].answer, 'yes');
   store.appendAnswer(board, a, store.CLEARED);
   got = JSON.parse(run('answers', board, '--json').stdout);

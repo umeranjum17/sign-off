@@ -67,7 +67,7 @@ examples:
 Adds questions to the board: yes/no, or 2 to 6 choices with one --option each. --key defaults to a slug of the title.
 raise is the alias for post --type decision: same flags, same output.
 Every question meets the question standard (docs/contract.md, "Asking a good question"); a question that does not is refused with the field and one fix line:
-  --title is one plain question the buttons answer: it ends in "?", has 12 words or fewer, no "Say yes or no:" or "<key>:" prefix and no key-like word.
+  --title is one plain question the buttons answer: it ends in "?", has 12 words or fewer, no "Say yes or no:", "Captain hold:" or "Captain:" prefix and no key-like word.
   --why says what it is about and why it needs an answer now (200 characters or fewer).
   --outcome <value>=<text> says what happens next if that answer is picked (120 or fewer), one for every option: yes and no without --option.
   --recommend names the answer you would pick, --recommend-reason why in one line (160 or fewer).
