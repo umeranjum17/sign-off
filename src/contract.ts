@@ -307,7 +307,7 @@ function question(m: any, bad: (field: string, rule: string, help: string) => Co
   if (id) throw bad('title', `has the id ${show(id)}, which the person does not know`, 'Say what it is in plain words, and put ids in "link" or "detail"');
   if (!title.endsWith('?')) throw bad('title', 'must be a question ending in "?"', PLAIN);
   if (words > 12) throw bad('title', `is ${words} words, over 12`, `${PLAIN}; put the rest in ${named('why', flags)}`);
-  const options: { value: string; label: string }[] = m.options, letters = lettered([m.title, m.why, m.detail].filter(Boolean).join('\n'));
+  const options: { value: string; label: string }[] = m.options, letters = lettered([m.title, m.why, m.about, m.detail].filter(Boolean).join('\n'));
   const PICK = `Give one option per choice, each label starting with its letter, such as ${flags ? '--option a="A: <short label>" --outcome a=<text>' : '{"value":"a","label":"A: <short label>","outcome":"<what happens next>"}'}`;
   if (letters.length >= 2) {
     const letterList = letters.join(', ');
