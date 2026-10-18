@@ -103,7 +103,7 @@
   It keeps its page, `view` (`.html`), and that page's picture, `preview`, from the board file's folder; a report stored before reports had pages has neither and still loads.
   An item with `"kind": "gate"` waits like a decision and keeps the done-done `run` it holds (`run_id` and `commit`) as sent; its answer is the `done-done respond --action` to take.
   An item with `"kind": "finding"` waits like a decision and keeps its `cause`, `incidents`, `days`, `evidence_ids`, `change_kind` and `proposal` as sent; its answer, `apply` or `skip`, says whether to make the proposed change.
-  An item with `"kind": "plan"` keeps its `about`, `sections`, `decisions`, `steps` and `view` as sent; its answer is the one send-back ([contract.md](contract.md) section 7). Its card shows the title, how many sections and decisions it has, and Open plan, which opens the `view` page over the board. The board has no send-back control yet.
+  An item with `"kind": "plan"` keeps its `about`, `sections`, `decisions`, `steps` and `view` as sent; its answer is the one send-back ([contract.md](contract.md) section 7). Its card shows the title, how many sections and decisions it has, and Open plan, which opens the `view` page over the board. Its page reviews each section and decision and sends them back at once.
 - `filed`: optional, when the item was filed, an ISO 8601 date-time such as `2026-10-13T07:19:00Z`.
   `raise` and `post` write the current time when the item or flags give none, and `post --replace`
   keeps the time an item already has, so a feeder that runs every few seconds does not reset it.
