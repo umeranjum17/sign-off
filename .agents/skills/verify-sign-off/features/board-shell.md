@@ -19,7 +19,7 @@ Open the URL seed-board.sh prints, in a browser; tap an area in the sidebar or t
 ## Driving it
 
 1. Launch as SKILL.md says and keep BASE.
-2. For the R2 outcome, capture Waiting and Decide separately at both widths/themes so each shot has one screen claim. Waiting uses `shots.sh BASE "$DONE_DONE_EVIDENCE_ROOT" waiting`; for Decide, open `BASE#decide/ship` and save `decide.<theme>.<width>w.png`. Use filenames `<screen>.<theme>.<width>w.png`. Force light with `--color-scheme light` for every light capture; do not rely on the host preference.
+2. For the R2 outcome, capture Waiting and Decide separately at both widths/themes so each shot has one screen claim. Waiting uses `shots.sh BASE "$DONE_DONE_EVIDENCE_ROOT" waiting`; for Decide, open `BASE#decide/look` (the seeded design pick with previews) and save `decide.<theme>.<width>w.png`. Use filenames `<screen>.<theme>.<width>w.png`. Force light with `--color-scheme light` for every light capture; do not rely on the host preference.
 3. Toast: at 390, open BASE#evidence, click Pass from the page, then screenshot toast.<theme>.390w.png; the toast's bottom is above the tab bar's top.
 4. Focus: press Tab until a sidebar link (1280) or a tab (390) has the focus, then screenshot focus.<theme>.<width>w.png (one theme and width in a verify run).
    When the outcome is about one width only ("on a computer" or "on a phone"), drive that width alone: SHOTS_WIDTHS=1280 (computer)
