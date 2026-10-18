@@ -10,7 +10,7 @@ import { basename, delimiter, dirname, extname, isAbsolute, join, relative, reso
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { type Answer, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendSendBack, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { type Answer, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
@@ -88,7 +88,7 @@ examples:
 `,
   validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>] [--expect-invalid]
 Checks message files against the communication contract without posting them: ${CONTRACT}
-A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate, finding and plan at schema 1, and report at schema 2.
+A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate, finding, plan and design at schema 1, and report at schema 2.
 An evidence message's media paths read from the message file's folder: each file must be there, inside it, and 50 MB or less.
 A report is a page to tap through: its "view" (.html) and "preview" (its picture, beside it) are checked for their shape here; the files themselves are checked at post, from the board file's folder, filled with no FILL: lines left (see report init).
 A plan's "view" (.html) is checked for its shape here; the file itself is checked at post, from the board file's folder.
@@ -233,6 +233,8 @@ examples:
   sign-off-axi post --kind gate --from gate.json --filer done-done
   sign-off-axi post --kind finding --from finding.json --filer learn-from-mistakes
   sign-off-axi post --kind plan --from plan.json --filer agent-41
+  sign-off-axi post --kind design --from design.json --filer agent-41
+A design message lists project journeys, per-screen image or HTML view variants, and a card preview; post checks every asset stays under the board folder.
   sign-off-axi post .sign-off/decisions.json --type interactive --title "Does the sign-in flow feel right?" --view mocks/sign-in/demo.html --option yes=Yes --option no="Needs work" --recommend yes
   sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media phone.png --media flow.mp4 --link https://github.com/acme/app/pull/12
   sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "The new sign-in has 2 steps." --media explainer.mp4 --chapter 0:00=Start --chapter 0:12="Step 2"
@@ -324,7 +326,7 @@ function fits(title: unknown, key?: string) {
 const ASK_FLAGS = ['why', 'outcome', 'recommend-reason', 'silent-by', 'merge'];
 const MANY = ['option', 'outcome', 'merge'];
 /** Board types that are contract kinds: a decision (the default type) is an ask. */
-const CONTRACT_TYPES = ['decision', 'ask', 'evidence', 'report', 'plan'];
+const CONTRACT_TYPES = ['decision', 'ask', 'evidence', 'report', 'plan', 'design'];
 /** The stored item as the message it came from: the board's own `filed` stamp is not part of a message that names none. */
 const asSent = ({ filed: _filed, ...rest }: any) => rest;
 /** Items of a --from file that carry contract or kind are contract messages: each is checked against its kind's rules before anything is stored.
@@ -364,10 +366,23 @@ function contractItems(items: any[], from: string, file: string, replace = false
     try {
       checkMessage(check);
       if (check.kind === 'report' || check.kind === 'plan') reportPage(check, dirname(file));
+      if (check.kind === 'design') designFiles(check, dirname(file));
     } catch (e) {
       throw e instanceof ContractError ? fail(`${from}: items[${i}]: ${e.message}`, 'VALIDATION_ERROR', e.help) : e;
     }
   });
+}
+function designFiles(m: any, base: string) {
+  const paths = [m.preview, ...m.journeys.flatMap((j: any) => j.screens.flatMap((s: any) => Object.values(s.views)))];
+  for (const path of paths) {
+    let actual: string;
+    try { actual = realpathSync(resolve(base, path as string)); } catch { throw new ContractError(`design path ${JSON.stringify(path)} is not there`, `Put ${path} in the board folder or fix its path`); }
+    const rel = relative(realpathSync(base), actual);
+    if (!rel || rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel)) throw new ContractError(`design path ${JSON.stringify(path)} leads outside the board folder`, 'Copy every design view into the board folder');
+    const info = statSync(actual);
+    if (!info.isFile() || info.size > 5_000_000) throw new ContractError(`design path ${JSON.stringify(path)} must be a file of 5 MB or less`, 'Shrink the design view');
+    try { accessSync(actual, constants.R_OK); } catch { throw new ContractError(`design path ${JSON.stringify(path)} cannot be read`, 'Make the design view readable'); }
+  }
 }
 const RAISE_FIELDS = ['title', 'key', 'about', 'detail', 'option', 'recommend', 'default', 'close', ...ASK_FLAGS];
 
@@ -435,7 +450,7 @@ const waitFor = (on: string, filer?: string, key?: string) => (filer ? `Run \`si
   : `Run \`sign-off-axi wait${on}${key ? ` --key ${key}` : ''}\` to block until the user answers`);
 
 /** Still waiting on the user: not answered, not dismissed, and something to answer (an item with no options and no reply is only shown). */
-const waits = (d: Decision & { answer?: unknown; dismissed?: boolean }) => !d.dismissed && !d.answer && (d.options.length > 0 || !!d.reply || d.type === 'signin' || d.type === 'plan');
+const waits = (d: Decision & { answer?: unknown; dismissed?: boolean }) => !d.dismissed && !d.answer && (d.options.length > 0 || !!d.reply || d.type === 'signin' || d.type === 'plan' || d.type === 'design');
 /** The board's decisions with their latest answer; a missing board file is an empty board.
  *  A dismissal hides an item from the board and is not waiting here either, checked against the same dismissed log the board reads. */
 function board(file: string, say = warn) {
@@ -482,13 +497,13 @@ function printAnswers(file: string, rows: ReturnType<typeof board>, waiting: num
   const rounds = readRounds(file).filter((r) => rows.some((d) => d.key === r.key));
   if (values.json) {
     const asked = (key: string) => rounds.filter((r) => r.key === key).map(({ note, at, comments }) => ({ note, at, comments }));
-    const out: Record<string, any> = Object.fromEntries(done.map(({ key, answer, label, close, at, note, comments, notes, decisions }) => [key, { answer, label, close, at, note, comments, notes, decisions, ...(asked(key).length && { rounds: asked(key) }) }]));
+    const out: Record<string, any> = Object.fromEntries(done.map(({ key, answer, label, close, at, note, comments, notes, decisions, pick }) => [key, { answer, label, close, at, note, comments, notes, decisions, pick, ...(asked(key).length && { rounds: asked(key) }) }]));
     for (const r of rounds) if (!out[r.key]) out[r.key] = { rounds: asked(r.key) };
     return JSON.stringify(out);
   }
   const notes = done.some((a) => a.note), sent = [...done, ...rounds].flatMap(({ key, comments = [] }) => comments.map(({ mock, ref, tag, words, text }) => ({ key, mock, ref, tag, words, text })));
   const plan = done.flatMap(({ key, notes: sections = [], decisions: picks = {} }) => [
-    ...sections.map(({ section, verdict, note = '' }) => ({ key, section, verdict, note })),
+    ...sections.map((n: any) => ({ key, section: n.section ?? `${n.journey}/${n.screen}`, verdict: n.verdict ?? 'change', note: n.note ?? '' })),
     ...Object.entries(picks).map(([decision, pick]) => ({ key, decision, pick })),
   ]);
   return toon({
@@ -524,7 +539,7 @@ function eventLines(file: string, rows: Decision[], answers: Answer[], rounds: R
   const kind = kindOf(file), item = new Map(rows.map((d) => [d.key, d]));
   const head = (event: string, key: string) => ({ event, ...kind(key), key, title: item.get(key)?.title });
   const tail = (key: string, comments?: Sent[]) => ({ ...(item.get(key)?.filer && { filer: item.get(key)!.filer }), ...(comments?.length && { comments }) });
-  return [...answers.map(({ key, answer, label, close, at, note, comments, notes, decisions }) => ({ at, line: { ...head('answer', key), answer, label, close, at, ...(note && { note }), ...(notes && { notes, decisions }), ...tail(key, comments) } })),
+  return [...answers.map(({ key, answer, label, close, at, note, comments, notes, decisions, pick }) => ({ at, line: { ...head('answer', key), answer, label, close, at, ...(note && { note }), ...(notes && { notes, decisions }), ...(pick !== undefined && { pick }), ...tail(key, comments) } })),
     ...rounds.map(({ key, note, at, comments }) => ({ at, line: { ...head('round', key), note, at, ...tail(key, comments) } }))]
     .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0)).map(({ line }) => JSON.stringify(line)).join('\n');
 }
@@ -973,6 +988,7 @@ async function postKind(file: string, on: string, values: Record<string, any>, b
     if (m.kind === 'evidence') sources = mediaFiles(m, from === '-' ? process.cwd() : dirname(resolve(from)));
     // A report's or plan's page is served from the board file's folder, as --view is.
     if (m.kind === 'report' || m.kind === 'plan') reportPage(m, dirname(file));
+    if (m.kind === 'design') designFiles(m, dirname(file));
   } catch (e) { throw e instanceof ContractError ? fail(`${name}: ${e.message}`, 'VALIDATION_ERROR', e.help) : e; }
   if (m.filer !== undefined && values.filer !== undefined && m.filer !== values.filer) {
     throw fail(`${name}: key ${m.key}: filer ${m.filer} is not --filer ${values.filer}`, 'VALIDATION_ERROR', 'Leave "filer" out of the message, or pass the same --filer');
@@ -1043,9 +1059,12 @@ const outcomesOf = (values: Record<string, any>) => {
 /** Whoever lists the choices names the one they would pick: the board puts it first and marks it. A plain yes/no may leave it out,
  * and a program feeding a whole board with --replace is not held to it. */
 function recommended(items: any[], flags: boolean) {
-  const d = items.find((i) => i?.options?.length && i.recommend_value === undefined), values = d?.options.map((o: Option) => o.value).join(', ');
+  const d = items.find((i) => i?.options?.length && (flags || i.type !== 'design' && i.kind !== 'design' ? i.recommend_value === undefined : i.recommend === undefined)), values = d?.options.map((o: Option) => o.value).join(', ');
   if (d && flags) throw fail('--recommend is required when you list options', 'VALIDATION_ERROR', `Add --recommend <value>, the option you would pick: one of ${values}`);
-  if (d) throw fail(`items[${items.indexOf(d)}] (key ${d.key}) lists options but no recommend_value`, 'VALIDATION_ERROR', `Add "recommend_value": "<value>", the option you would pick: one of ${values}`);
+  if (d) {
+    const field = !flags && (d.type === 'design' || d.kind === 'design') ? 'recommend' : 'recommend_value';
+    throw fail(`items[${items.indexOf(d)}] (key ${d.key}) lists options but no ${field}`, 'VALIDATION_ERROR', `Add "${field}": "<value>", the option you would pick: one of ${values}`);
+  }
 }
 /** Flags are validated by the same loader as a file: write them as a one-decision file first. Items are checked against the board they go to, so its answers_only or readonly holds. */
 function buildIncoming(values: Record<string, any>, extra: object, filer: string | undefined, file: string): { incoming: Decision[]; raw: object[] } {
@@ -1679,7 +1698,7 @@ const state = () => {
     mockBase: `/mock/${loopback(bind) ? 'local' : mockPass(tokenOf(file))}/`,
     // Who filed an item stays in the file: the page only learns that its filer took the answer.
     // A sign-in's start command stays on this host too: the page only learns that a tap makes a new link, and how the last run went.
-    decisions: loadDecisions(file).map(({ filer: _, start, ...d }) => ({ ...d, ...(start && { start: true, run: signinState(d.key) }), evidenceCard: d.evidence ? evidenceCard(d.evidence) : null,
+    decisions: loadDecisions(file).map(({ filer: _, start, ...d }) => ({ ...d, ...(d.type === 'design' && answers[d.key]?.answer === 'approve' && { status: 'approved' }), ...(start && { start: true, run: signinState(d.key) }), evidenceCard: d.evidence ? evidenceCard(d.evidence) : null,
       ...(d.mocks && { mocks: d.mocks.map((m) => ({ ...m, hash: mockHash(m.path) })) }) })),
     readonly: readOnly(),
     answers_only: answersOnly(),
@@ -1765,6 +1784,18 @@ function evidenceCard(link: NonNullable<Decision['evidence']>) {
 
 const MESSAGE_MAX = 2000;
 async function route(req: IncomingMessage): Promise<[number, unknown]> {
+  if (req.method === 'GET' && req.url?.startsWith('/design/')) {
+    const [, , , key, ...parts] = new URL(req.url, 'http://localhost').pathname.split('/');
+    const path = parts.map(decodeURIComponent).join('/'), d = loadDecisions(file).find(x => x.key === key && x.type === 'design');
+    const allowed = d?.journeys?.some(j => j.screens.some(s => Object.values(s.views).includes(path)));
+    const type = assetTypes[extname(path).toLowerCase()];
+    try {
+      if (!allowed || !type) return [404, { error: 'Design view is unavailable' }];
+      const actual = under(dirname(file), path);
+      if (statSync(actual).size > MOCK_BYTES) return [404, { error: 'Design view is unavailable' }];
+      return [200, { media: readFileSync(actual), type, point: type === 'text/html' }];
+    } catch { return [404, { error: 'Design view is unavailable' }]; }
+  }
   if (req.method === 'GET' && req.url?.startsWith('/mock/')) {
     // /mock/<pass>/<key>~<value>/<file>: that option's design mock, or with no value the item's own view (a diagram or interactive page),
     // and the files beside it in its own folder, so a mock page's relative css, scripts and images load.
@@ -1874,7 +1905,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     appendRound(file, key, note.trim(), comments);
     return [200, state()];
   }
-  const { key, answer, note = '', notes, decisions } = JSON.parse(body) ?? {};
+  const { key, answer, note = '', notes, decisions, verdict, pick } = JSON.parse(body) ?? {};
   if (typeof note !== 'string' || [...note.trim()].length > NOTE_MAX) return [400, { error: `The note must be text of ${NOTE_MAX} characters or fewer` }];
   const d = loadDecisions(file).find((x) => x.key === key);
   if (answer === REPLY.value && !note.trim() && !d?.options.some((o) => o.value === answer)) return [400, { error: 'Write the reply first' }];
@@ -1888,6 +1919,10 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     // The program feeding the board may drop an item while the person answers it: the answer is still saved.
     if (!answersOnly() || !isKey(key) || !isKey(answer)) return [404, { error: 'This question is no longer in the file' }];
     answered(appendAnswer(file, { key, close: 'done' } as Decision, answer === REPLY.value ? REPLY : { value: answer, label: answer }, note.trim()));
+    return [200, state()];
+  }
+  if (d.kind === 'design') {
+    try { answered(appendDesignAnswer(file, d, verdict, notes, pick), d); } catch (e) { if (e instanceof InputError) return [400, { error: e.message }]; throw e; }
     return [200, state()];
   }
   // A plan's answer is its one send-back: every section's verdict and note, and a pick for each decision.
@@ -1995,7 +2030,7 @@ const server = createServer(async (req, res) => {
     // Beyond loopback every request carries the token: once in the link, then in a cookie the link sets.
     // The file is read on every request, so deleting or replacing it shuts old links out at once.
     const token = tokenOf(file), cookie = `sign-off-${bound}`, given = req.url?.startsWith('/?') ? new URL(req.url, 'http://x').searchParams.get('token') : null;
-    const pass = /^\/mock\/([^/?]*)\//.exec(req.url ?? '')?.[1], want = Buffer.from(pass === undefined ? token : mockPass(token));
+    const pass = /^\/(?:mock|design)\/([^/?]*)\//.exec(req.url ?? '')?.[1], want = Buffer.from(pass === undefined ? token : mockPass(token));
     const sent = Buffer.from(pass ?? given ?? req.headers.cookie?.split(/;\s*/).find((c) => c.startsWith(`${cookie}=`))?.slice(cookie.length + 1) ?? '');
     if (!/^[\w-]{32,}$/.test(token) || sent.length !== want.length || !timingSafeEqual(sent, want)) {
       return res.writeHead(401, { 'content-type': 'text/plain; charset=utf-8' }).end('This board needs its access link: run sign-off-axi open on the computer that serves it and open the link it prints.');

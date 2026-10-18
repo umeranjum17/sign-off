@@ -13,4 +13,4 @@ journeys:
   test:
     command: "npm test > $DONE_DONE_EVIDENCE_ROOT/test.log 2>&1"
   skill:
-    command: "npm run build:skill -- --check > $DONE_DONE_EVIDENCE_ROOT/skill.log 2>&1"
+    command: "printf 'run=%s head=%s\\n' \"$DONE_DONE_RUN_ID\" \"$(git rev-parse HEAD)\" > $DONE_DONE_EVIDENCE_ROOT/skill.log && npm run build:skill -- --check >> $DONE_DONE_EVIDENCE_ROOT/skill.log 2>&1"

@@ -1178,6 +1178,34 @@ test('Waiting on you: a reply-only ask shows Reply, a type-ask yes/no shows Yes/
   proc.kill();
 });
 
+test('a posted contract design renders as a plain row without answer controls', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'contract-design-plain-row'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), png);
+  writeFileSync(join(dir, 'design', 'welcome.png'), png);
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd1-design', title: 'Review the welcome screen',
+    about: 'Check the welcome screen before release.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review',
+    preview: 'design/preview.png', link: 'https://example.test/design/original',
+    options: [{ value: 'quick', label: 'Quick' }, { value: 'guided', label: 'Guided' }], recommend: 'guided',
+    journeys: [{ id: 'account-setup', title: 'Account setup', screens: [{ id: 'welcome', title: 'Welcome', views: { phone_light: 'design/welcome.png' } }] }] };
+  writeFileSync(source, JSON.stringify(message));
+  const posted = run('post', file, '--kind', 'design', '--from', source);
+  assert.equal(posted.code, 0, posted.out);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'browser'));
+  await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+  await until(async () => (await evaluate('document.querySelector("#item-d1-design h3")?.textContent')) === message.title);
+  assert.equal(await evaluate('document.querySelector("#item-d1-design .about")?.textContent'), message.about);
+  assert.equal(await evaluate('document.querySelector("#item-d1-design a")?.textContent'), 'Open original');
+  assert.equal(await evaluate('document.querySelector("#item-d1-design a")?.getAttribute("href")'), message.link);
+  assert.equal(await evaluate('document.querySelectorAll("#item-d1-design button, #item-d1-design textarea, #item-d1-design input, #item-d1-design select").length'), 0);
+  assert.equal(await evaluate('document.querySelector("#item-d1-design .choices, #item-d1-design .mocks, #item-d1-design .ann")'), null);
+  close();
+  proc.kill();
+});
+
 test('Waiting on you: an update waiting for a verdict reads Evidence on its card, the name of its chip, not Update N', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'waiting-update'), file = join(dir, 'board.json');
   mkdirSync(dir);

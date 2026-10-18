@@ -606,6 +606,12 @@
   }
 
   function row(d, { x = true } = {}) {
+    if (d.kind === 'design') {
+      const original = /^https?:/.test(d.link ?? '') ? el('p', { class: 'meta' }, el('a', { href: d.link, target: '_blank', rel: 'noopener noreferrer',
+        'aria-label': `Open original, ${d.title}` }, 'Open original')) : '';
+      return el('article', { class: 'row design', id: `item-${d.key}` },
+        el('div', {}, el('h3', { dir: 'auto' }, d.title), el('p', { class: 'about', dir: 'auto' }, d.about)), original);
+    }
     const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` });
     const saved = Object.hasOwn(state.answers, d.key) ? state.answers[d.key] : undefined;
     // A read-only board, or an item with nothing to answer, shows no answer, note or comment controls.
@@ -932,7 +938,7 @@
    *  A plan has no options but waits for its send-back. */
   const area = (d) => {
     const a = isAnswered(d) ? 'answered' : d.area ?? (d.type === 'evidence' ? 'evidence'
-      : state.readonly || d.type === 'explainer' || !(d.options.length || d.reply || d.type === 'signin' || d.type === 'plan') ? 'reports' : 'waiting');
+      : state.readonly || d.type === 'explainer' || !(d.options.length || d.reply || d.type === 'signin' || d.type === 'plan' || d.kind === 'design') ? 'reports' : 'waiting');
     // Reports lists only what explains: a page to tap through, or a narrated video. Text alone (a receipt, a status line) is a note, folded under it.
     return a === 'reports' && !state.readonly && d.type !== 'explainer' && !reads(d) ? 'notes' : a;
   };
