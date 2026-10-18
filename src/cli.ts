@@ -792,6 +792,7 @@ function postSignin(file: string, on: string, values: Record<string, any>, filer
       const next = { ...item, filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
       if (had) items[at] = next; else items.push(next);
       writeItems(file, items);
+      if (!had) notifyWaiting(file, [items[items.length - 1]]);
       // A new link is a new sign-in: the card waits again, also when it was done or dismissed.
       appendAnswer(file, d, CLEARED);
       if (had) appendDismissed(file, [d.key], false);
@@ -864,7 +865,10 @@ function replace(file: string, on: string, from?: string, filer?: string) {
     checkMerges(incoming, resulting, current);
     // Written only when it changed, so a feeder that runs every few seconds leaves the file alone.
     const changed = JSON.stringify(old && { ...old.extra, schema: old.schema, items: old.items }) !== JSON.stringify({ ...extra, schema: 2, items });
-    if (changed) writeItems(file, items, extra);
+    if (changed) {
+      writeItems(file, items, extra);
+      notifyWaiting(file, feed.filter((item) => !first.has(item.key)));
+    }
     return toon({ board: tilde(file), items: items.length, changed }, [`Run \`sign-off-axi answers${on}\` to read the answers`]);
   });
 }
@@ -946,6 +950,7 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
       rmSync(check, { force: true });
     }
     writeItems(file, items);
+    notifyWaiting(file, [items[items.length - 1]]);
     if (explainer) return toon({ board: tilde(file), raised: [{ key, status: 'raised', title }] }, [`Run \`sign-off-axi open${on}\` so the user can watch and answer`, waitFor(on, filer, key)]);
     return toon({ board: tilde(file), posted: [{ key, number, media: media.length, title, ...(message && { status: 'posted' }) }] },
       [`Run \`sign-off-axi open${on}\` so the user can give a verdict`, waitFor(on, filer, key)]);
@@ -1151,7 +1156,10 @@ function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: 
       }
       return { key: d.key, status: !had ? 'raised' : had.answer ? `already answered ${had.answer.answer}` : waits({ ...had, dismissed: false }) ? 'already waiting' : 'already posted', title: d.title };
     });
-    if (raised.some((r) => r.status === 'raised')) writeItems(file, items);
+    if (raised.some((r) => r.status === 'raised')) {
+      writeItems(file, items);
+      notifyWaiting(file, items.filter((item) => raised.some((r) => r.key === item.key && r.status === 'raised')));
+    }
     const key = raised.length === 1 ? ` --key ${raised[0].key}` : '';
     // Reports take no answer, so a post with nothing waiting asks the user to read it, never to answer.
     const anyWaiting = incoming.some((d, i) => waits(d) && !raised[i].status.startsWith('already answered'));
@@ -1355,6 +1363,31 @@ function readSetup(so: string) {
   const bind = config.bind ?? '127.0.0.1';
   if (!privateBind(bind)) problems.push(`bind ${bind} is not 127.0.0.1 or a private address`);
   return { board: join(so, goodBoard ? config.board : 'decisions.json'), port: goodPort ? Number(port) : 4410, bind, hosts, onAnswer, goodBoard, problems };
+}
+
+/** Sends one best-effort notice per newly stored waiting card; failures never expose the configured URL. */
+function notifyWaiting(boardFile: string, cards: any[]) {
+  const config = join(dirname(boardFile), 'config.yaml');
+  if (!existsSync(config)) return;
+  const line = readFileSync(config, 'utf8').split(/\r?\n/).find((l) => /^notify\s*:/i.test(l));
+  if (!line) return;
+  const fields = Object.fromEntries([...line.replace(/^notify\s*:\s*\{|\}\s*$/gi, '').matchAll(/([a-z_]+)\s*:\s*([^,}]+)/gi)].map((m) => [m[1], m[2].trim().replace(/^['"]|['"]$/g, '')]));
+  const { url, token_env, link_base } = fields;
+  let destination: URL;
+  try { destination = new URL(url); } catch { return; }
+  if (!link_base || !(destination.protocol === 'https:' || (destination.protocol === 'http:' && ['127.0.0.1', '::1', 'localhost'].includes(destination.hostname))) || (token_env && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(token_env))) return;
+  const token = token_env ? process.env[token_env] : undefined;
+  for (const d of cards) {
+    if (!waits(d)) continue;
+    const kind = d.kind ?? ({ decision: 'ask', explainer: 'report' } as Record<string, string>)[d.type] ?? d.type;
+    const body = JSON.stringify({ v: 1, source: 'sign-off', id: d.key, kind: ['ask', 'plan', 'design', 'evidence', 'report'].includes(kind) ? kind : 'ask',
+      title: [...String(d.title ?? '')].slice(0, 120).join(''), text: [...String(d.about ?? d.detail ?? d.why ?? d.title ?? '').replace(/[\r\n]+/g, ' ')].slice(0, 200).join(''),
+      url: `${link_base.replace(/\/$/, '')}#waiting/${encodeURIComponent(d.key)}`, at: d.filed ?? new Date().toISOString() });
+    const sender = `void (async()=>{const delays=[2000,10000,60000];for(let i=0;i<4;i++){try{if((await fetch(process.env.SIGN_OFF_NOTIFY_URL,{method:'POST',headers:{'content-type':'application/json',...(process.env.SIGN_OFF_NOTIFY_TOKEN&&{authorization:'Bearer '+process.env.SIGN_OFF_NOTIFY_TOKEN})},body:process.env.SIGN_OFF_NOTIFY_BODY,signal:AbortSignal.timeout(10000)})).ok)return}catch{}if(i<3)await new Promise(r=>setTimeout(r,delays[i]))}console.error('sign-off: notification send failed for card '+process.env.SIGN_OFF_NOTIFY_ID)})();`;
+    const child = spawn(process.execPath, ['-e', sender], { detached: true, stdio: ['ignore', 'ignore', 'inherit'], env: { ...process.env, SIGN_OFF_NOTIFY_URL: url, SIGN_OFF_NOTIFY_BODY: body, SIGN_OFF_NOTIFY_TOKEN: token ?? '', SIGN_OFF_NOTIFY_ID: d.key } });
+    child.on('error', () => warn(`notification sender could not start for card ${d.key}`));
+    child.unref();
+  }
 }
 /** --port, else the port in a config.yaml beside the board (init writes one), else 4410. */
 const boardPort = (named: string, given?: string) => portOf(given ?? String(setupOf(named)?.port ?? 4410));

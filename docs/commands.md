@@ -74,5 +74,5 @@ sign-off-axi wait \
 `wait --filer` returns only that filer's answers, each once, and the card
 shows **Seen by agent**. An agent that cannot block can be woken instead:
 an `on_answer:` line in the `config.yaml` beside the board names a command
-the board runs for every answer. Detail is in
+the board runs for every answer. A `notify: { url: https://..., token_env: ENV_NAME, link_base: https://... }` line optionally sends an HTTP POST when a new card enters Waiting on you; the bearer token is read only from the named environment variable. Detail is in
 [question-kinds.md](question-kinds.md).

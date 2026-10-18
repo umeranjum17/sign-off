@@ -352,7 +352,9 @@ event, by itself: the agent raises with `--filer my-agent` and blocks on
 answers, each once, and the card shows **Seen by agent**. An agent that
 cannot block can be woken instead: an `on_answer:` line in the
 `config.yaml` beside the board names a command the board runs for every
-answer. The full reference, with the worked example, is in
+answer. A `notify:` block in that config can send a background HTTP POST for
+new cards waiting on you; its optional bearer token comes only from the named
+environment variable. The full reference, with the worked example, is in
 [docs/commands.md](docs/commands.md).
 
 Every command takes `--help` and prints compact output with next-step hints.
