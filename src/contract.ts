@@ -132,11 +132,11 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
     return values;
   };
   /** A page path, as a report's view and preview are: relative, inside the board file's folder, with the given ending. */
-  const page = (f: string, ends: RegExp, kinds: string, example: string, need: string) => {
-    if (!Object.hasOwn(m, f)) throw bad(f, `is required: ${need}`, PAGE_HELP);
+  const page = (f: string, ends: RegExp, kinds: string, example: string, need: string, help = PAGE_HELP) => {
+    if (!Object.hasOwn(m, f)) throw bad(f, `is required: ${need}`, help);
     text(f, m[f], 256, `${example}, a path from the board file's folder`);
     if (/^([\\/]|[A-Za-z]:)/.test(m[f]) || m[f].split(/[\\/]/).includes('..') || /[?#\\]/.test(m[f])) throw bad(f, `${show(m[f])} must be a relative path with no .., ?, # or \\`, `Set "${f}" to ${example}, a path from the board file's folder`);
-    if (!ends.test(m[f])) throw bad(f, `${show(m[f])} must end in ${kinds}`, PAGE_HELP);
+    if (!ends.test(m[f])) throw bad(f, `${show(m[f])} must end in ${kinds}`, help);
   };
   need('contract');
   if (m.contract !== 1) throw bad('contract', `must be 1, not ${show(m.contract)}`, whole(m.contract) ? 'Upgrade sign-off-axi: this one knows contract 1' : 'Set "contract": 1');
@@ -216,7 +216,7 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
       recommend(`${at}.recommend`, o, o.options);
     });
     if (Object.hasOwn(m, 'steps')) list('steps', 2, 12, ['title'], '{"title":"The agent posts the plan"}').forEach((o, n) => text(`steps[${n}].title`, o.title, 80, 'the step, in 80 characters or fewer'));
-    page('view', /\.html$/i, '.html', '"mocks/<key>/index.html"', 'a plan shows where it goes as a diagram on a page');
+    page('view', /\.html$/i, '.html', '"mocks/<key>/index.html"', 'a plan shows where it goes as a diagram on a page', 'Set "view" to "mocks/<key>/index.html", a path from the board file\'s folder');
     return { kind: m.kind, schema: m.schema };
   }
   if (Object.hasOwn(m, 'about')) text('about', m.about, 500, 'a short note, or leave it out');
