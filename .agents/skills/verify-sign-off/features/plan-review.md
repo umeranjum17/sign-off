@@ -3,7 +3,7 @@
 ## Sub-features
 
 - Plan document icons on Summary rows and cards, and no pointer-focus box on the reader title.
-- Sandboxed direction page, section Approve/Change controls, required Change note, decision outcomes and recommendations, step taps.
+- Sandboxed direction page, plan summary, mobile Go to next navigation, section Approve/Change controls, required Change note, decision outcomes and recommendations, step taps.
 - Send back stays disabled until every part is answered; unsent browser drafts survive reload.
 - Send back saves structured section notes and decision picks for `answers --json` and `wait --json`, removes the plan from Waiting and lists it in Answered.
 - Sent answers open read-only; read-only/exported boards cannot send answers.

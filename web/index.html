@@ -156,8 +156,9 @@
   .plan-layout { max-width: 72rem; margin: auto; display: grid; gap: 2rem; }
   .plan-main { min-width: 0; }
   .plan-main > h2 { margin: 2rem 0 0.75rem; }
-  .plan-main > h2:first-of-type { font-size: 2.125rem; margin: 0.5rem 0; }
+  .plan-main > h2:first-of-type { font-size: 3.5rem; line-height: 1.15; margin: 0.5rem 0; }
   .plan-main > p { margin: 0.5rem 0 1.5rem; }
+  .plan-summary { display: flex; gap: 0.75rem; color: var(--muted); font-size: 1.125rem; line-height: 1.5; margin: 1.5rem 0 2rem; }
   #reader .plan-view { width: 100%; height: 22rem; flex: none; border-radius: 1rem; }
   .plan-section, .plan-decision, .plan-explain { background: var(--surface); border-radius: 1.125rem; padding: 1rem; margin: 1rem 0; scroll-margin-top: 1rem; }
   .plan-section h3, .plan-decision h3 { font-size: 1.375rem; line-height: 1.3; margin: 0 0 0.75rem; }
@@ -181,10 +182,12 @@
   .plan-send { position: absolute; bottom: 0; left: 0; right: 0; padding: 0.625rem 1rem calc(0.75rem + env(safe-area-inset-bottom)); background: var(--bar); border-top: 1px solid var(--line); }
   .plan-send p { margin: 0 0 0.5rem; }
   .plan-send button { width: 100%; }
+  .plan-next-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.5rem; }
+  .plan-next { width: auto !important; padding: 0; border: 0; background: none; color: var(--accent); font-weight: 600; }
   .plan-send .err:empty { display: none; }
   .plan-progress button { width: 100%; padding: 0.5rem 0; display: flex; justify-content: space-between; gap: 1rem; background: none; text-align: left; border-radius: 0.5rem; font-size: 1rem; }
   .plan-progress span { color: var(--muted); }
-  @media (max-width: 59.999rem) { .plan-send h2, .plan-progress { display: none; } .plan-send p { font-size: 1rem; } }
+  @media (max-width: 59.999rem) { #reader .plan-scroll { margin-bottom: calc(9rem + env(safe-area-inset-bottom)); } #reader .plan-scroll.sent { margin-bottom: 0; } .plan-send h2, .plan-progress { display: none; } .plan-send p { font-size: 1rem; } }
   #reader .plan-sent .back { display: inline-flex; }
   .plan-sent { text-align: center; padding-top: 2rem; }
   .plan-sent h2 { color: var(--ok); font-size: 2.125rem; }
@@ -195,6 +198,7 @@
     #reader .plan-scroll { padding: 2rem 3rem; }
     .plan-layout { grid-template-columns: minmax(0, 42.5rem) minmax(15rem, 1fr); }
     .plan-send { position: sticky; align-self: start; top: 0; border: 0; border-radius: 1.125rem; padding: 1.25rem; }
+    .plan-next { display: none; }
     .plan-section, .plan-decision { padding: 1.5rem; }
   }
   body.reading { overflow: hidden; }
@@ -1072,12 +1076,17 @@
     const remember = () => { drafts.set(draftKey, JSON.stringify({ notes: [...notes.values()], decisions: Object.fromEntries(picks) })); keep(); };
     const main = el('div', { class: 'plan-main' }), panel = el('aside', { class: 'plan-send' });
     const status = el('p', { role: 'status' }), err = el('p', { class: 'err', role: 'alert' }), progress = el('div', { class: 'plan-progress' });
-    const send = el('button', { class: 'open-link' }, 'Send back');
+    const send = el('button', { class: 'open-link' }, 'Send back'), next = el('button', { class: 'plan-next' }, 'Go to next');
     const complete = (s) => { const n = notes.get(s.id); return n?.verdict === 'approve' || (n?.verdict === 'change' && n.note?.trim()); };
+    next.onclick = () => {
+      const section = d.sections.find((s) => !complete(s)), decision = d.decisions.find((q) => !q.options.some((o) => o.value === picks.get(q.key)));
+      document.getElementById(section ? `plan-section-${section.id}` : `plan-decision-${decision?.key}`)?.scrollIntoView({ block: 'start' });
+    };
     const update = () => {
       const left = d.sections.filter((s) => !complete(s)).length, decisions = d.decisions.filter((q) => !q.options.some((o) => o.value === picks.get(q.key))).length;
       status.textContent = saved ? 'Sent back. Your answers are saved.' : left || decisions ? `${left} section${left === 1 ? '' : 's'} and ${decisions} decision${decisions === 1 ? '' : 's'} left` : 'Ready. Every part has an answer.';
       send.disabled = ro || !!left || !!decisions;
+      next.hidden = !left && !decisions;
       progress.replaceChildren(...d.sections.map((s) => {
         const verdict = notes.get(s.id)?.verdict, b = el('button', {}, s.heading, el('span', {}, verdict === 'approve' ? 'Approved' : verdict === 'change' ? 'Change' : 'To review'));
         b.onclick = () => document.getElementById(`plan-section-${s.id}`).scrollIntoView(); return b;
@@ -1088,7 +1097,8 @@
         el('a', { class: 'back', href: '#answered' }, 'See it in Answered')));
     }
     main.append(el('p', { class: 'eyebrow' }, icon('plan'), 'Plan'), el('h2', { dir: 'auto' }, d.title), el('p', { dir: 'auto' }, d.about ?? ''));
-    if (!saved) main.append(el('iframe', { class: 'plan-view', src: url, title: `Plan: ${d.title}`, sandbox: 'allow-scripts' }));
+    if (!saved) main.append(el('iframe', { class: 'plan-view', src: url, title: `Plan: ${d.title}`, sandbox: 'allow-scripts' }),
+      el('p', { class: 'plan-summary' }, icon('plan'), `${d.sections.length} sections to approve or change, and ${d.decisions.length} decisions to make. Nothing is built until you send back.`));
     main.append(el('h2', {}, saved ? 'What you sent' : 'The plan'), saved ? '' : el('p', { class: 'meta' }, 'Approve or change each part. A change needs a note.'));
     d.sections.forEach((s, i) => {
       const card = el('section', { class: 'plan-section', id: `plan-section-${s.id}`, 'aria-label': s.heading });
@@ -1125,7 +1135,7 @@
         b.onclick = () => { picks.set(q.key, o.value); remember(); [...choices.children].forEach((b, i) => b.setAttribute('aria-pressed', q.options[i].value === o.value)); update(); };
         choices.append(b);
       });
-      main.append(el('section', { class: 'plan-decision' }, el('h3', { dir: 'auto' }, q.question), el('p', { class: 'meta', dir: 'auto' }, q.why), choices));
+      main.append(el('section', { class: 'plan-decision', id: `plan-decision-${q.key}` }, el('h3', { dir: 'auto' }, q.question), el('p', { class: 'meta', dir: 'auto' }, q.why), choices));
     });
     if (d.steps?.length && !saved) {
       let step = 0;
@@ -1141,8 +1151,8 @@
         drafts.delete(draftKey); keep(); location.hash = `#answered/${d.key}`;
       }).catch((e) => { err.textContent = `Couldn't send back: ${e.message}`; update(); });
     };
-    panel.append(el('h2', {}, 'Your answers'), progress, status, send, err); panel.hidden = !!saved; update();
-    return el('div', { class: 'plan-scroll' }, el('div', { class: `plan-layout${saved ? ' sent' : ''}` }, main, panel));
+    panel.append(el('h2', {}, 'Your answers'), progress, el('div', { class: 'plan-next-row' }, status, next), send, err); panel.hidden = !!saved; update();
+    return el('div', { class: `plan-scroll${saved ? ' sent' : ''}` }, el('div', { class: `plan-layout${saved ? ' sent' : ''}` }, main, panel));
   }
 
   /** The report a #reports/<key> link opens (or the plan a #waiting/<key> link opens), over the whole board: a bar with the way back and its title, then its page in a sandboxed frame.

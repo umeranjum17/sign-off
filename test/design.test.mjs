@@ -1023,6 +1023,10 @@ test('Waiting on you: a type label on each ask, type chips with counts, and the 
   await evaluate('document.querySelector(".focus .open-link").click()');
   await until(async () => (await evaluate('location.hash + "|" + document.querySelector("#reader iframe")?.title')) === '#waiting/plan-kind-board|Plan: Show plans on the board');
   await until(async () => await evaluate('document.querySelector("#reader .plan-view")?.clientHeight > 352'));
+  assert.equal(await evaluate('document.querySelector(".plan-scroll").getBoundingClientRect().bottom <= document.querySelector(".plan-send").getBoundingClientRect().top'), true);
+  assert.equal(await evaluate('document.querySelector(".plan-summary").textContent.includes("5 sections") && document.querySelector(".plan-next").textContent === "Go to next"'), true);
+  await evaluate('document.querySelector(".plan-next").click()');
+  await evaluate('document.querySelector(".plan-next").click()');
   const view = await evaluate('fetch(document.querySelector("#reader iframe").src).then(async (r) => [r.headers.get("content-security-policy"), await r.text()])');
   assert.match(view[0], /connect-src 'none'.*sandbox allow-scripts$/);
   // The way back leads to Waiting on you with the plan still shown, and the focus on its Open plan.
@@ -1039,6 +1043,7 @@ test('Waiting on you: a type label on each ask, type chips with counts, and the 
   assert.equal(await evaluate('document.querySelector(".plan-send .open-link").disabled'), false);
   await evaluate('document.querySelector(".plan-send .open-link").click()');
   await until(async () => await evaluate('!!document.querySelector(".plan-sent")'));
+  assert.equal(await evaluate('getComputedStyle(document.querySelector(".plan-scroll")).marginBottom'), '0px');
   const sent = JSON.parse(run('answers', file, '--json').out)['plan-kind-board'];
   assert.deepEqual(sent.notes[0], { section: 'goals', verdict: 'change', note: 'Keep the desktop layout too.' });
   assert.deepEqual(sent.decisions, { 'send-back': 'one', where: 'waiting' });

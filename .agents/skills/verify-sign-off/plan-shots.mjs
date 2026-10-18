@@ -18,7 +18,7 @@ const run = (bin, args, options = {}) => {
   assert.equal(r.status, 0, r.stdout + r.stderr); return r.stdout;
 };
 const cli = (...args) => run(process.execPath, ['dist/cli.js', ...args], { env });
-const browserEnv = { ...process.env, CHROME_DEVTOOLS_AXI_SESSION: `so-plan-${theme}-${width}-${process.pid}` };
+const browserEnv = { ...process.env, CHROME_DEVTOOLS_AXI_SESSION: `so-plan-${theme}-${width}-${process.pid}-${Date.now()}` };
 const browser = (...args) => run('chrome-devtools-axi', args, { env: browserEnv });
 const drive = (script) => run('chrome-devtools-axi', ['run'], { env: browserEnv, input: 'const wait = async (s) => { for (let i=0;i<100;i++) { if (await page.eval(`!!document.querySelector(${JSON.stringify(s)})`)) return; await new Promise(r=>setTimeout(r,100)); } throw new Error("Not ready: " + s); };\n' + script });
 const measure = () => {
@@ -71,15 +71,15 @@ try {
   browser('open', frame.url); browser('emulate', '--viewport', `${frame.width}x${frame.height}x1`, '--color-scheme', theme);
   writeFileSync(join(records, 'direction.dom.json'), JSON.stringify(probe()));
   browser('open', frame.back); browser('emulate', '--viewport', width === 390 ? '390x844x2,mobile,touch' : '1280x800x1', '--color-scheme', theme);
-  drive('await wait(".plan-section");');
+  drive('await wait(".plan-section"); await page.eval(() => document.querySelector(".plan-next").click());');
   if (process.env.PLAN_REVIEW_TRACE) browser('perf-start', '--no-reload', '--no-auto-stop', '--file', join(out, 'interaction.trace.json.gz'));
-  drive('await page.eval(() => document.querySelector(".plan-section").scrollIntoView()); await page.eval(() => document.querySelector(".plan-verdicts .approve").click());');
+  drive('await page.eval(() => document.querySelector(".plan-verdicts .approve").click());');
   capture('approved', 'The first section is marked Approved with a selected Approve button.');
-  drive('await page.eval(() => { document.querySelectorAll(".plan-section")[1].scrollIntoView(); document.querySelector(".plan-section:nth-of-type(2) .change").click(); });');
+  drive('await page.eval(() => document.querySelector(".plan-next").click()); await page.eval(() => document.querySelector(".plan-section:nth-of-type(2) .change").click());');
   const noteRef = /uid=(\S+) textbox/.exec(browser('snapshot'))[1];
   browser('fill', `@${noteRef}`, 'Keep the desktop layout too.');
   capture('note', 'The second section is marked Change with the note Keep the desktop layout too.');
-  drive('await page.eval(() => document.querySelector(".plan-decision").scrollIntoView()); await page.eval(() => document.querySelector(".plan-decision .choices button").click());');
+  drive('await page.eval(() => document.querySelector(".plan-next").click()); await page.eval(() => document.querySelector(".plan-decision .choices button").click());');
   capture('decision', 'A decision is picked, Recommended and its outcome are visible, and Send back is enabled.');
   drive(`await page.eval(() => document.querySelector('.plan-explain').scrollIntoView()); await page.eval(() => document.querySelector('[aria-label="Next step"]').click());`);
   capture('explain', 'The step explainer shows step 2 and Previous and Next controls.');
