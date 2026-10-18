@@ -1022,14 +1022,34 @@ test('Waiting on you: a type label on each ask, type chips with counts, and the 
   assert.equal(existsSync(file.replace(/\.json$/, '.dismissed.jsonl')), false);
   await evaluate('document.querySelector(".focus .open-link").click()');
   await until(async () => (await evaluate('location.hash + "|" + document.querySelector("#reader iframe")?.title')) === '#waiting/plan-kind-board|Plan: Show plans on the board');
+  await until(async () => await evaluate('document.querySelector("#reader .plan-view")?.clientHeight > 352'));
+  assert.equal(await evaluate('document.querySelector(".plan-scroll").getBoundingClientRect().bottom <= document.querySelector(".plan-send").getBoundingClientRect().top'), true);
+  assert.equal(await evaluate('document.querySelector(".plan-summary").textContent.includes("5 sections") && document.querySelector(".plan-next").textContent === "Go to next"'), true);
+  await evaluate('document.querySelector(".plan-next").click()');
+  await evaluate('document.querySelector(".plan-next").click()');
   const view = await evaluate('fetch(document.querySelector("#reader iframe").src).then(async (r) => [r.headers.get("content-security-policy"), await r.text()])');
   assert.match(view[0], /connect-src 'none'.*sandbox allow-scripts$/);
   // The way back leads to Waiting on you with the plan still shown, and the focus on its Open plan.
   await evaluate('document.querySelector("#reader .close").click()');
   await until(async () => (await evaluate('location.hash + "|" + document.activeElement.textContent')) === '#waiting|Open plan');
+  // Review through the real controls: a Change must have a note, drafts survive reload, and Send back returns every answer.
+  await evaluate('document.querySelector(".focus .open-link").click()');
+  await until(async () => await evaluate('!!document.querySelector(".plan-send .open-link:disabled")'));
+  await evaluate('document.querySelectorAll(".plan-verdicts .approve").forEach((b) => b.click()); document.querySelector(".plan-verdicts .change").click(); document.querySelectorAll(".plan-decision .choices").forEach((c) => c.querySelector("button").click())');
+  assert.equal(await evaluate('document.querySelector(".plan-send .open-link").disabled'), true);
+  await evaluate('(() => { const t = document.querySelector(".plan-section textarea"); t.value = "Keep the desktop layout too."; t.dispatchEvent(new Event("input")); })()');
+  await evaluate('location.reload()');
+  await until(async () => await evaluate('document.querySelector(".plan-section textarea")?.value === "Keep the desktop layout too."'));
+  assert.equal(await evaluate('document.querySelector(".plan-send .open-link").disabled'), false);
+  await evaluate('document.querySelector(".plan-send .open-link").click()');
+  await until(async () => await evaluate('!!document.querySelector(".plan-sent")'));
+  assert.equal(await evaluate('getComputedStyle(document.querySelector(".plan-scroll")).marginBottom'), '0px');
+  const sent = JSON.parse(run('answers', file, '--json').out)['plan-kind-board'];
+  assert.deepEqual(sent.notes[0], { section: 'goals', verdict: 'change', note: 'Keep the desktop layout too.' });
+  assert.deepEqual(sent.decisions, { 'send-back': 'one', where: 'waiting' });
+  assert.equal(sent.notes.slice(1).every((n) => n.verdict === 'approve'), true);
+  assert.equal(await evaluate('[...document.querySelectorAll(".plan-verdicts button, .plan-decision button")].every((b) => b.disabled)'), true);
   // Clear all done on Answered clears the answered ask and the sent-back plan too.
-  const sent = { notes: ['goals', 'architecture', 'slices', 'standards', 'risks'].map((section) => ({ section, verdict: 'approve' })), decisions: { 'send-back': 'one', where: 'waiting' } };
-  assert.equal(await evaluate(`fetch('api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: 'plan-kind-board', ...${JSON.stringify(sent)} }) }).then((r) => r.status)`), 200);
   assert.equal(await evaluate("fetch('api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: 'digest', answer: 'yes' }) }).then((r) => r.status)"), 200);
   assert.equal(await evaluate('fetch("api/dismiss", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ keys: ["plan-kind-board"], dismissed: true }) }).then((r) => r.status)'), 200);
   assert.equal(await evaluate('fetch("api/dismiss", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ keys: ["plan-kind-board"], dismissed: false }) }).then((r) => r.status)'), 200);

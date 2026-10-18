@@ -6,6 +6,8 @@ app: "sign-off"
 # Every check the CI gate enforces, as a re-runnable journey. Each command
 # proves itself by writing its log under $DONE_DONE_EVIDENCE_ROOT and exiting 0.
 journeys:
+  plan-review:
+    command: 'node .agents/skills/verify-sign-off/plan-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${PLAN_REVIEW_THEME:-light}" "${PLAN_REVIEW_WIDTH:-390}"'
   install:
     command: "npm ci > $DONE_DONE_EVIDENCE_ROOT/install.log 2>&1"
   test:
