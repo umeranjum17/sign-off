@@ -1003,6 +1003,39 @@ test('Waiting on you: a type label on each ask, type chips with counts, and the 
   await until(async () => (await evaluate('!!document.querySelector(".needs a.more")')));
   await evaluate('[...document.querySelectorAll(".areas .i-waiting a.compact")].find((a) => a.textContent.includes("Pick the look")).click()');
   await until(async () => (await evaluate('document.querySelector(".focus h3")?.textContent')) === 'Pick the look');
+  // A posted plan waits with the asks: its card gives the title, its counts and one Open plan, which opens its page over the board with the pointing script.
+  const fixture = new URL('../fixtures/contract/plan.v1/', import.meta.url).pathname;
+  mkdirSync(join(dir, 'page'));
+  writeFileSync(join(dir, 'page', 'index.html'), readFileSync(join(fixture, 'page', 'index.html')));
+  assert.equal(run('post', file, '--kind', 'plan', '--from', join(fixture, 'valid-full.json')).code, 0);
+  await evaluate('location.reload()');
+  await until(async () => (await chips()) === 'All 4*|Design pick 1|Plan 1|Yes/No 1|Pick one 1');
+  await until(async () => (await pick('Plan')) && (await queue()) === 'Show plans on the board');
+  assert.equal(await evaluate('document.querySelector(".focus .eyebrow").textContent + "|" + document.querySelector(".focus .plan .meta").textContent'), 'Plan|5 sections · 2 decisions');
+  // On a 390 px phone the title and Open plan fit with nothing to scroll sideways.
+  assert.equal(await evaluate('document.documentElement.scrollWidth <= 390 && document.querySelector(".focus .open-link").getBoundingClientRect().right <= 390'), true);
+  // A plan waits until it is sent back, so it has no Dismiss on its card or in Triage.
+  assert.equal(await evaluate('!document.querySelector("#board .plan .x, #board .plan .dis, #board .quiet .dis")'), true);
+  assert.equal(await evaluate('fetch("api/dismiss", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ keys: ["plan-kind-board"], dismissed: true }) }).then((r) => r.status)'), 400);
+  assert.equal(existsSync(file.replace(/\.json$/, '.dismissed.jsonl')), false);
+  await evaluate('document.querySelector(".focus .open-link").click()');
+  await until(async () => (await evaluate('location.hash + "|" + document.querySelector("#reader iframe")?.title')) === '#waiting/plan-kind-board|Plan: Show plans on the board');
+  const view = await evaluate('fetch(document.querySelector("#reader iframe").src).then(async (r) => [r.headers.get("content-security-policy"), await r.text()])');
+  assert.match(view[0], /connect-src 'none'.*sandbox allow-scripts$/);
+  // The way back leads to Waiting on you with the plan still shown, and the focus on its Open plan.
+  await evaluate('document.querySelector("#reader .close").click()');
+  await until(async () => (await evaluate('location.hash + "|" + document.activeElement.textContent')) === '#waiting|Open plan');
+  // Clear all done on Answered clears the answered ask and the sent-back plan too.
+  const sent = { notes: ['goals', 'architecture', 'slices', 'standards', 'risks'].map((section) => ({ section, verdict: 'approve' })), decisions: { 'send-back': 'one', where: 'waiting' } };
+  assert.equal(await evaluate(`fetch('api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: 'plan-kind-board', ...${JSON.stringify(sent)} }) }).then((r) => r.status)`), 200);
+  assert.equal(await evaluate("fetch('api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: 'digest', answer: 'yes' }) }).then((r) => r.status)"), 200);
+  assert.equal(await evaluate('fetch("api/dismiss", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ keys: ["plan-kind-board"], dismissed: true }) }).then((r) => r.status)'), 200);
+  assert.equal(await evaluate('fetch("api/dismiss", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ keys: ["plan-kind-board"], dismissed: false }) }).then((r) => r.status)'), 200);
+  const answeredTitles = 'Array.from(document.querySelectorAll("ul.i-answered strong"), (s) => s.textContent).join("|")';
+  await evaluate("location.hash = '#answered'");
+  await until(async () => (await evaluate(answeredTitles)).includes('Keep the weekly digest?') && (await evaluate(answeredTitles)).includes('Show plans on the board'));
+  await evaluate('document.querySelector(".clear").click()');
+  await until(async () => (await evaluate(answeredTitles)) === '');
   close();
   proc.kill();
 });

@@ -483,12 +483,12 @@
         el('p', { dir: 'auto' }, el('strong', {}, `${name}: `), run[name].replace(new RegExp(`^${name}:\\s*(?=\\S)`, 'i'), '')))] : []));
   }
 
-  const NAMES = { decision: 'Decision', design: 'Design', evidence: 'Evidence', diagram: 'Diagram', interactive: 'Interactive', explainer: 'Explainer', signin: 'Sign-in' };
+  const NAMES = { decision: 'Decision', design: 'Design', evidence: 'Evidence', diagram: 'Diagram', interactive: 'Interactive', explainer: 'Explainer', signin: 'Sign-in', plan: 'Plan' };
   // The type a question shows as, read from what it already carries: a design pick is a design, a gate has its run, a yes/no has exactly
   // yes and no, any other choice is a pick-one, one answered in words is a reply, and a question with nothing to answer is info.
   // A gate keeps the Approval name even with yes/no options: the brief names it as its own type.
   const TYPE_NAMES = { ...NAMES, design: 'Design pick', 'yes-no': 'Yes/No', 'pick-one': 'Pick one', reply: 'Reply', approval: 'Approval', info: 'Info' };
-  const typeOf = (d) => (d.type === 'design' ? 'design' : d.type === 'signin' ? 'signin' : d.type === 'evidence' ? 'evidence' : d.run ? 'approval'
+  const typeOf = (d) => (d.type === 'design' ? 'design' : d.type === 'signin' || d.type === 'plan' ? d.type : d.type === 'evidence' ? 'evidence' : d.run ? 'approval'
     : !d.options.length ? d.reply ? 'reply' : 'info' : d.options.map((o) => o.value).sort().join() === 'no,yes' ? 'yes-no' : 'pick-one');
   // Any other type gets the plain card until it has its own renderer. What waits shows its answer's name; what only reads keeps its own.
   const kind = (d) => (area(d) === 'waiting' ? TYPE_NAMES[typeOf(d)] : d.type === 'decision' ? '' : NAMES[d.type] ?? d.type.replace(/-/g, ' '));
@@ -512,15 +512,15 @@
   }
   const canDismiss = () => !state.readonly && !FROZEN;
   function xBtn(d, label) {
-    if (!canDismiss()) return '';
+    if (!canDismiss() || (d.type === 'plan' && !Object.hasOwn(state.answers, d.key))) return '';
     const b = el('button', { class: label ? 'dis' : 'x', 'aria-label': `Dismiss, ${title(d)}` }, label ?? '×');
     b.onclick = () => dismiss([d.key], area(d) === 'waiting' ? 'Dismissed · the agent still waits' : `Dismissed: ${title(d)}`);
     return b;
   }
-  function clearAll(done) {
-    if (!canDismiss() || !done.length) return '';
+  function clearAll(items) {
+    if (!canDismiss() || !items.length) return '';
     const b = el('button', { class: 'clear' }, 'Clear all done');
-    b.onclick = () => dismiss(done.map((d) => d.key), `${done.length} cleared`);
+    b.onclick = () => dismiss(items.map((d) => d.key), `${items.length} cleared`);
     return b;
   }
 
@@ -547,6 +547,7 @@
       update && d.filed ? (isToday(d.filed) ? el('span', { class: 'st new' }, 'New') : day(d.filed)) : '', seen].filter(Boolean);
     const lead = el('div', { class: 'lead' }, x ? xBtn(d) : '', brow.length ? el('p', { class: 'eyebrow' }, ...brow) : '', el('h3', { dir: 'auto' }, name));
     if (d.type === 'signin') return signin(d, lead, saved, err);
+    if (d.type === 'plan') return plan(d, lead);
     const quiet = !ro && d.options.find((o) => o.value === d.default_if_silent);
     const silent = quiet ? `If you stay quiet: ${quiet.label}${d.silent_by ? `, at ${when(d.silent_by)}` : ' (no deadline)'}` : '';
     // The other cards this ask replaced are hidden; its answer closes them too.
@@ -572,6 +573,13 @@
       ro ? '' : other(d, saved, err), err, tech(d));
   }
 
+  /** A plan: its one-line answer, how many sections and decisions it asks about, and one Open plan for its page over the board. */
+  function plan(d, lead) {
+    const count = (n, one) => `${n} ${one}${n === 1 ? '' : 's'}`;
+    return el('article', { class: 'row plan', id: `item-${d.key}` }, el('div', {}, lead,
+      el('p', { class: 'meta' }, `${count(d.sections.length, 'section')} · ${count(d.decisions.length, 'decision')}`)),
+    el('a', { class: 'open-link', href: `#${area(d)}/${d.key}`, 'aria-label': `Open plan, ${d.title}` }, 'Open plan'));
+  }
   /** The time left on a sign-in link, in whole minutes. */
   const expiry = (at) => {
     const m = Math.ceil((Date.parse(at) - Date.now()) / 60_000);
@@ -833,10 +841,11 @@
   // The drawings are fixed strings from this page, never text from the board file.
   const icon = (a) => { const s = el('span', { class: `icon i-${a}`, 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[a]}"/></svg>`; return s; };
   const isAnswered = (d) => Object.hasOwn(state.answers, d.key);
-  /** Each item lives in one area: answered items, then the area the item names, then evidence updates, then what is only to read (explainers, pages with nothing to answer), then the open asks. */
+  /** Each item lives in one area: answered items, then the area the item names, then evidence updates, then what is only to read (explainers, pages with nothing to answer), then the open asks.
+   *  A plan has no options but waits for its send-back. */
   const area = (d) => {
     const a = isAnswered(d) ? 'answered' : d.area ?? (d.type === 'evidence' ? 'evidence'
-      : state.readonly || d.type === 'explainer' || !(d.options.length || d.reply || d.type === 'signin') ? 'reports' : 'waiting');
+      : state.readonly || d.type === 'explainer' || !(d.options.length || d.reply || d.type === 'signin' || d.type === 'plan') ? 'reports' : 'waiting');
     // Reports lists only what explains: a page to tap through, or a narrated video. Text alone (a receipt, a status line) is a note, folded under it.
     return a === 'reports' && !state.readonly && d.type !== 'explainer' && !reads(d) ? 'notes' : a;
   };
@@ -972,20 +981,20 @@
     return box;
   }
 
-  /** The report a #reports/<key> link opens, over the whole board: a bar with the way back and its title, then its page in a sandboxed frame.
+  /** The report a #reports/<key> link opens (or the plan a #waiting/<key> link opens), over the whole board: a bar with the way back and its title, then its page in a sandboxed frame.
    *  The frame is made again only for another page, so a redraw never resets a demo halfway through. */
   const reader = document.getElementById('reader');
-  function readPage(d) {
+  function readPage(d, from = 'reports') {
     document.body.classList.toggle('reading', !!d);
     for (const n of [document.querySelector('main'), document.getElementById('nav')]) n.inert = !!d;
     reader.hidden = !d;
     const url = d ? src(mockUrl(d.key, '', d.view)) : '';
     if (reader.dataset.url === url) return d && (reader.querySelector('h1').textContent = d.title);
-    Object.assign(reader.dataset, { url, key: d?.key ?? '' });
-    reader.replaceChildren(...(d ? [el('header', {}, el('a', { class: 'close', href: '#reports' }, '‹ Reports'), el('h1', { id: 'reader-title', tabindex: '-1', dir: 'auto' }, d.title)),
-      el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' })] : []));
+    Object.assign(reader.dataset, { url, key: d?.key ?? '', from });
+    reader.replaceChildren(...(d ? [el('header', {}, el('a', { class: 'close', href: `#${from}` }, `‹ ${from === 'reports' ? 'Reports' : AREAS[from]}`), el('h1', { id: 'reader-title', tabindex: '-1', dir: 'auto' }, d.title)),
+      el('iframe', { src: url, title: `${d.type === 'plan' ? 'Plan' : 'Report'}: ${d.title}`, sandbox: 'allow-scripts' })] : []));
   }
-  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !reader.hidden) location.hash = '#reports'; });
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !reader.hidden) location.hash = `#${reader.dataset.from}`; });
 
   /** Reports in sections, one per `group` in the order each first shows, each head with the newest filed time; items with no group come last, under Other reports when there are groups. */
   function reportGroups(items) {
@@ -1108,7 +1117,7 @@
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [el('div', { class: 'tiles' }, ...Object.keys(AREAS).map((a) => tile(a, by[a]))),
       el('div', { class: 'pair' }, needs, today(by.answered)), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()]),
       el('div', { class: 'areas' }, ...Object.keys(AREAS).map((a) => section(a, by[a])))]));
-    readPage(at === 'reports' && key ? state.decisions.find((d) => d.key === key && reads(d) && !gone.has(d.key)) : undefined);
+    readPage(key ? state.decisions.find((d) => d.key === key && reads(d) && !gone.has(d.key) && (at === 'reports' || (d.type === 'plan' && area(d) === at))) : undefined, at);
     if (FROZEN) freeze();
   }
   function freeze() {
@@ -1118,7 +1127,7 @@
     document.querySelectorAll('#board a[href^="data:"]').forEach((a) => a.removeAttribute('href'));
   }
   // A new screen starts at its top, or at the item tapped on the Summary, with the focus on its title.
-  // Closing a report goes back to its card, with the focus on its link; an open report takes the focus on its title.
+  // Closing a report or plan goes back to its card, with the focus on its link; an open report takes the focus on its title.
   addEventListener('hashchange', () => {
     const back = !reader.hidden && reader.dataset.key;
     if (jump && location.hash === '#waiting') [cur, jump] = [jump, null];
@@ -1128,7 +1137,7 @@
     const item = (jump || back) && document.getElementById(`item-${jump || back}`);
     jump = null;
     item ? item.scrollIntoView() : scrollTo(0, 0);
-    ((back && item?.querySelector('h3 a')) || document.querySelector('#board h1')).focus({ preventScroll: true });
+    ((back && item?.querySelector('h3 a, .open-link')) || document.querySelector('#board h1')).focus({ preventScroll: true });
   });
   // An interactive page may post its own height, `{ height: <px> }`, and its frame then fits it with no blank below.
   // Only a frame's own message sizes that frame, and never past 10000px.

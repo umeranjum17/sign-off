@@ -1665,7 +1665,7 @@ async function exportBoard(args: string[]) {
 
 
 const page = readFileSync(new URL('../web/index.html', import.meta.url));
-/** Added to each design mock page so the person can point at a part of it; see web/point.js. */
+/** Added to each design mock page and plan page so the person can point at a part of it; see web/point.js. */
 const pointer = Buffer.from(`<script>${readFileSync(new URL('../web/point.js', import.meta.url), 'utf8')}</script>`);
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 const state = () => {
@@ -1775,8 +1775,8 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
       if (!mock || !type) return [404, { error: 'Mock is unavailable' }];
       const actual = under(dirname(under(dirname(file), mockFile(mock))), path);
       if (statSync(actual).size > MOCK_BYTES) return [404, { error: 'Mock is unavailable' }];
-      // A design mock page gets the pointing bridge when served; export inlines the page as written.
-      return [200, { media: readFileSync(actual), type, point: Boolean(value) && type === 'text/html' }];
+      // A design mock page, and a plan's page, get the pointing bridge when served; export inlines the page as written.
+      return [200, { media: readFileSync(actual), type, point: (Boolean(value) || d!.type === 'plan') && type === 'text/html' }];
     } catch { return [404, { error: 'Mock is unavailable' }]; }
   }
   if (req.method === 'GET' && req.url?.startsWith('/api/evidence?')) {
@@ -1856,8 +1856,9 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   if (req.url === '/api/dismiss') {
     const { keys, dismissed } = JSON.parse(body) ?? {};
     if (!Array.isArray(keys) || !keys.length || keys.length > 200 || typeof dismissed !== 'boolean') return [400, { error: 'Send 1 to 200 keys and dismissed true or false' }];
-    const have = new Set(loadDecisions(file).map((x) => x.key));
+    const have = new Map(board(file).map((x) => [x.key, x]));
     if (!keys.every((k) => isKey(k) && have.has(k))) return [404, { error: 'This item is no longer in the file' }];
+    if (dismissed && keys.some((k) => have.get(k)?.type === 'plan' && !have.get(k)?.answer)) return [400, { error: 'A plan waits until it is sent back, so it cannot be dismissed' }];
     appendDismissed(file, [...new Set<string>(keys)], dismissed);
     return [200, state()];
   }

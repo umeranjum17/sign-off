@@ -151,7 +151,7 @@ without posting.
 
 ## The person can also
 
-- Filter **Waiting on you** by type with the chips: **All**, then each type with asks waiting, with its count. Each card's type label is its chip's name (Yes/No, Pick one, Reply, Info, Design pick, Approval, Evidence, Sign-in). The list reads **Newest first** by default, or **Oldest first** by each ask's `filed` time (an ask with no `filed` takes the time of the nearest earlier ask in the file that has one). The sort is kept in this browser; the type filter is not, so opening Waiting on you again shows All.
+- Filter **Waiting on you** by type with the chips: **All**, then each type with asks waiting, with its count. Each card's type label is its chip's name (Yes/No, Pick one, Reply, Info, Design pick, Approval, Evidence, Sign-in, Plan). The list reads **Newest first** by default, or **Oldest first** by each ask's `filed` time (an ask with no `filed` takes the time of the nearest earlier ask in the file that has one). The sort is kept in this browser; the type filter is not, so opening Waiting on you again shows All.
 - Tap **Another round** inside **Other answer** (with the typed note), which
   wakes a waiting agent the same way an answer does; the agent reads it back
   in `answers --json` under `rounds`, with any comments on mock elements it
