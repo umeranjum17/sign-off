@@ -1,0 +1,228 @@
+{
+  "schema": 2,
+  "items": [
+    {
+      "filed": "2026-10-18T07:06:06.516Z",
+      "key": "keep-the-weekly-digest",
+      "title": "Keep the weekly digest?",
+      "about": "Open rate held steady at about a third for two months.",
+      "why": "Open rate held steady for two months.",
+      "recommend_reason": "Readers still open it.",
+      "options": [
+        {
+          "value": "yes",
+          "label": "Yes",
+          "outcome": "It keeps going out each week."
+        },
+        {
+          "value": "no",
+          "label": "No",
+          "outcome": "It stops after this week."
+        }
+      ],
+      "recommend_value": "yes",
+      "default_if_silent": "yes",
+      "filer": "verify"
+    },
+    {
+      "filed": "2026-10-18T07:06:06.573Z",
+      "key": "ship",
+      "title": "When should the new settings page ship?",
+      "about": "No new bug reports for three weeks.",
+      "why": "No new bug reports for three weeks.",
+      "recommend_reason": "Three quiet weeks support shipping.",
+      "options": [
+        {
+          "value": "friday",
+          "label": "Friday",
+          "outcome": "The page ships Friday."
+        },
+        {
+          "value": "next-week",
+          "label": "Next week",
+          "outcome": "The page ships next week."
+        }
+      ],
+      "recommend_value": "friday",
+      "default_if_silent": "next-week",
+      "filer": "verify"
+    },
+    {
+      "filed": "2026-10-18T07:06:20.935Z",
+      "key": "look",
+      "title": "Which settings layout should ship?",
+      "options": [
+        {
+          "value": "a",
+          "label": "A: one column"
+        },
+        {
+          "value": "b",
+          "label": "B: two columns"
+        }
+      ],
+      "recommend_value": "b",
+      "default_if_silent": "b",
+      "type": "design",
+      "tradeoff": "B scans faster; A is simpler.",
+      "mocks": [
+        {
+          "value": "a",
+          "path": "mocks/a.webp"
+        },
+        {
+          "value": "b",
+          "path": "mocks/b.webp"
+        }
+      ]
+    },
+    {
+      "key": "npm",
+      "title": "npm",
+      "type": "signin",
+      "link": "https://example.com/login",
+      "unlocks": "Publishing the release",
+      "waits": "Release agent",
+      "expires": "2026-10-18T09:06:21Z",
+      "filed": "2026-10-18T07:06:21Z"
+    },
+    {
+      "filed": "2026-10-18T07:06:21.076Z",
+      "filer": "agent-41",
+      "contract": 1,
+      "kind": "plan",
+      "schema": 1,
+      "key": "plan-kind-board",
+      "title": "Show plans on the board",
+      "about": "Umer reviews an agent's plan on a phone: approve or change each section, answer each decision, then send it all back at once.",
+      "sections": [
+        {
+          "id": "goals",
+          "heading": "Goals and non-goals",
+          "body": "Goal: one page per plan that Umer can review on a phone in a few minutes.\nNon-goal: line-by-line notes on the plan text."
+        },
+        {
+          "id": "architecture",
+          "heading": "Architecture",
+          "body": "A plan is a new contract kind. The board stores it like a report, shows it under Waiting on you, and sends the answers back as one event."
+        },
+        {
+          "id": "slices",
+          "heading": "Slices and order",
+          "body": "1. The contract kind. 2. Store and post. 3. The plan page. 4. Send back. 5. The skill. 6. The demo."
+        },
+        {
+          "id": "standards",
+          "heading": "Coding standards",
+          "body": "Each slice stays under 300 changed lines, tests are integration tests only, and every refusal names the field and one fix."
+        },
+        {
+          "id": "risks",
+          "heading": "Risks",
+          "body": "A long plan does not fit a phone: sections are capped at 8 and each body at 1000 characters."
+        }
+      ],
+      "decisions": [
+        {
+          "key": "send-back",
+          "question": "Send every answer back as one event?",
+          "why": "The agent can act on the whole review at once, instead of one answer at a time.",
+          "options": [
+            {
+              "value": "one",
+              "label": "One event",
+              "outcome": "The agent gets every approval, note and pick together."
+            },
+            {
+              "value": "each",
+              "label": "One per answer",
+              "outcome": "The agent gets each answer as Umer gives it."
+            }
+          ],
+          "recommend": "one"
+        },
+        {
+          "key": "where",
+          "question": "Show plans under Waiting on you?",
+          "why": "A plan waits for answers, so it sits with the other questions.",
+          "options": [
+            {
+              "value": "waiting",
+              "label": "Waiting on you",
+              "outcome": "Plans sit with the open questions."
+            },
+            {
+              "value": "own",
+              "label": "Own section",
+              "outcome": "Plans get a Plans section of their own."
+            }
+          ],
+          "recommend": "waiting"
+        }
+      ],
+      "steps": [
+        {
+          "title": "The agent posts the plan"
+        },
+        {
+          "title": "The board stores it"
+        },
+        {
+          "title": "Umer answers each section and decision"
+        },
+        {
+          "title": "Send back returns every answer"
+        }
+      ],
+      "view": "page/plan.html"
+    },
+    {
+      "key": "update-1",
+      "type": "evidence",
+      "number": 1,
+      "title": "Sign-in screen on a phone",
+      "about": "Umer checks the new layout.",
+      "link": "https://example.com/pr/4",
+      "media": [
+        {
+          "path": "evidence/1/1.webp",
+          "sha256": "d15d8e7d71e9654fa85245d388f5774d1c082db3e40ca8baa9e4d430b7176c57",
+          "bytes": 56854
+        }
+      ],
+      "filed": "2026-10-18T07:06:21.169Z"
+    },
+    {
+      "filed": "2026-10-18T07:06:21Z",
+      "contract": 1,
+      "kind": "report",
+      "schema": 2,
+      "key": "sign-in-now-takes-2-steps",
+      "title": "Sign-in now takes 2 steps",
+      "about": "Why the code step moved first.",
+      "view": "page/index.html",
+      "preview": "page/preview.svg"
+    },
+    {
+      "filed": "2026-10-18T07:06:21.379Z",
+      "key": "digest-old",
+      "title": "Send the digest on Mondays?",
+      "why": "Choose the weekly digest schedule.",
+      "recommend_reason": "A weekly update stays useful.",
+      "options": [
+        {
+          "value": "yes",
+          "label": "Yes",
+          "outcome": "The digest goes out Mondays."
+        },
+        {
+          "value": "no",
+          "label": "No",
+          "outcome": "The digest is paused."
+        }
+      ],
+      "recommend_value": "yes",
+      "default_if_silent": "yes"
+    }
+  ]
+}

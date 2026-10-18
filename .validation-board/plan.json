@@ -1,0 +1,45 @@
+{
+  "contract": 1,
+  "kind": "plan",
+  "schema": 1,
+  "key": "plan-kind-board",
+  "title": "Show plans on the board",
+  "filer": "agent-41",
+  "about": "Umer reviews an agent's plan on a phone: approve or change each section, answer each decision, then send it all back at once.",
+  "sections": [
+    { "id": "goals", "heading": "Goals and non-goals", "body": "Goal: one page per plan that Umer can review on a phone in a few minutes.\nNon-goal: line-by-line notes on the plan text." },
+    { "id": "architecture", "heading": "Architecture", "body": "A plan is a new contract kind. The board stores it like a report, shows it under Waiting on you, and sends the answers back as one event." },
+    { "id": "slices", "heading": "Slices and order", "body": "1. The contract kind. 2. Store and post. 3. The plan page. 4. Send back. 5. The skill. 6. The demo." },
+    { "id": "standards", "heading": "Coding standards", "body": "Each slice stays under 300 changed lines, tests are integration tests only, and every refusal names the field and one fix." },
+    { "id": "risks", "heading": "Risks", "body": "A long plan does not fit a phone: sections are capped at 8 and each body at 1000 characters." }
+  ],
+  "decisions": [
+    {
+      "key": "send-back",
+      "question": "Send every answer back as one event?",
+      "why": "The agent can act on the whole review at once, instead of one answer at a time.",
+      "options": [
+        { "value": "one", "label": "One event", "outcome": "The agent gets every approval, note and pick together." },
+        { "value": "each", "label": "One per answer", "outcome": "The agent gets each answer as Umer gives it." }
+      ],
+      "recommend": "one"
+    },
+    {
+      "key": "where",
+      "question": "Show plans under Waiting on you?",
+      "why": "A plan waits for answers, so it sits with the other questions.",
+      "options": [
+        { "value": "waiting", "label": "Waiting on you", "outcome": "Plans sit with the open questions." },
+        { "value": "own", "label": "Own section", "outcome": "Plans get a Plans section of their own." }
+      ],
+      "recommend": "waiting"
+    }
+  ],
+  "steps": [
+    { "title": "The agent posts the plan" },
+    { "title": "The board stores it" },
+    { "title": "Umer answers each section and decision" },
+    { "title": "Send back returns every answer" }
+  ],
+  "view": "page/plan.html"
+}

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" font-family="system-ui, sans-serif">
+  <style>
+    .before { fill: #FFFFFF; stroke: #5B5BD6; } .after, .tip { fill: #5B5BD6; } .arrow { stroke: #5B5BD6; }
+    .label { fill: #16161A; } .on-after { fill: #FFFFFF; }
+    @media (prefers-color-scheme: dark) {
+      .before { fill: #26264A; stroke: #9491FF; } .after, .tip { fill: #9491FF; } .arrow { stroke: #9491FF; }
+      .label { fill: #EDEDF0; } .on-after { fill: #111114; }
+    }
+  </style>
+  <rect class="before" x="40" y="110" width="220" height="140" rx="20" stroke-width="4"/>
+  <text class="label" x="150" y="188" text-anchor="middle" font-size="26" font-weight="600">Password</text>
+  <path class="arrow" d="M280 180H346" stroke-width="6" fill="none"/>
+  <path class="tip" d="M346 166L370 180L346 194z"/>
+  <rect class="after" x="380" y="110" width="220" height="140" rx="20"/>
+  <text class="on-after" x="490" y="188" text-anchor="middle" font-size="26" font-weight="600">+ a code</text>
+</svg>
