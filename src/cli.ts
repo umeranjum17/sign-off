@@ -967,7 +967,8 @@ async function postKind(file: string, on: string, values: Record<string, any>, b
   let sources: string[] = [];
   try {
     m ??= parseMessage(bytes!);
-    checkMessage(m, built ? 'report' : kind);
+    const existingAsk = !built && kind === 'ask' && existsSync(file) && readItems(file).items.some((i: any) => i?.key === m.key);
+    checkMessage(m, built ? 'report' : kind, !built && kind === 'ask' && !existingAsk);
     // Media paths read from the message file's folder, or from the current folder for stdin.
     if (m.kind === 'evidence') sources = mediaFiles(m, from === '-' ? process.cwd() : dirname(resolve(from)));
     // A report's or plan's page is served from the board file's folder, as --view is.
