@@ -2002,6 +2002,7 @@ const server = createServer(async (req, res) => {
     }
     if (given !== null) return res.writeHead(303, { location: '/', 'set-cookie': `${cookie}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000` }).end();
   }
+  if (req.method === 'GET' && req.url === '/favicon.ico') return res.writeHead(204).end();
   if (req.method === 'GET' && req.url === '/') {
     return res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'self' 'unsafe-inline'" }).end(page);
   }
