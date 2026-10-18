@@ -961,11 +961,13 @@ test('a sign-in card: posted on top of what waits with its link and time left, t
 test('Waiting and Decide: Spacious ask cards, decision options, answer and undo, with plan card navigation', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'types'), file = join(dir, 'board.json');
   mkdirSync(dir);
+  mkdirSync(join(dir, 'mocks'));
+  writeFileSync(join(dir, 'mocks', 'one.webp'), readFileSync(new URL('../docs/media/phone-light.webp', import.meta.url)));
   const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
   writeFileSync(file, JSON.stringify({ schema: 2, items: [
     { key: 'digest', title: 'Keep the weekly digest?', options: yesNo, recommend_value: 'yes' },
     { key: 'release', title: 'Which day for release?', options: ['today', 'friday', 'next-week'].map((v) => ({ value: v, label: v })), recommend_value: 'friday' },
-    { key: 'look', type: 'design', title: 'Pick the look', options: ['a', 'b', 'c'].map((v) => ({ value: v, label: v.toUpperCase() })), recommend_value: 'b', tradeoff: 'B is faster; A is simpler.' },
+    { key: 'look', type: 'design', title: 'Pick the look', options: ['a', 'b', 'c'].map((v) => ({ value: v, label: v.toUpperCase() })), recommend_value: 'b', tradeoff: 'B is faster; A is simpler.', mocks: [{ value: 'b', path: 'mocks/one.webp' }] }
   ] }));
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
@@ -982,6 +984,8 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await evaluate('document.querySelector("#item-look").click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/look');
   assert.equal(await evaluate('document.querySelector(".decide .why")?.textContent'), 'B is faster; A is simpler.');
+  assert.equal(await evaluate('document.querySelectorAll(".decide-preview .mock").length'), 1);
+  assert.equal(await evaluate('!document.querySelector(".decide-preview .shot.none")'), true);
   await evaluate('location.hash = "#waiting"');
   await until(async () => (await askTitles()) === 'Pick the look|Which day for release?|Keep the weekly digest?');
   await until(async () => (await pick('Yes/No')) && (await askTitles()) === 'Keep the weekly digest?');
