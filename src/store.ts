@@ -10,6 +10,8 @@ export type Step = { title: string; marks?: string[] };
 /** A plan's section to approve or change, and a decision it asks: one question, options that each say where they lead, and the pick it recommends. */
 export type PlanSection = { id: string; heading: string; body: string };
 export type PlanDecision = { key: string; question: string; why: string; options: (Option & { outcome: string })[]; recommend: string };
+export type DesignNote = { journey: string; screen: string; note: string };
+export type DesignJourney = { id: string; title: string; screens: { id: string; title: string; views: Record<string, string> }[] };
 /** One section in a plan's send-back: approved, or changed with a note on what to change. */
 export type PlanNote = { section: string; verdict: 'approve' | 'change'; note?: string };
 export type EvidenceLink = { run_id: string; commit: string; outcome: string; repro: string; proof: string; evidence: string };
@@ -20,6 +22,7 @@ export type Decision = {
    * and the other cards on the board this ask replaces, which its answer closes too. */
   why?: string; recommend_reason?: string; silent_by?: string; merges?: string[]; evidence?: EvidenceLink; run?: { run_id: string; commit: string };
   finding?: { cause: string; incidents: number; days: number; evidence_ids: string[]; change_kind: string; proposal: string };
+  kind?: string;
   type: string; tradeoff?: string; mocks?: MockRef[]; number?: number; media?: MediaRef[]; link?: string; view?: string; preview?: string; chapters?: Chapter[]; reply?: boolean;
   /** Who posted it: an agent session or caller id, so that caller's `wait --filer` gets the answer. */
   filer?: string;
@@ -35,10 +38,12 @@ export type Decision = {
   start?: string[];
   /** Plans: the sections to approve or change and the decisions to answer, all sent back as one answer. */
   sections?: PlanSection[]; decisions?: PlanDecision[];
+  /** Designs: project, date, review status, preview and screen views. */
+  status?: 'draft' | 'in_review' | 'approved'; journeys?: DesignJourney[]; recommend?: string;
 };
 export type Answer = { key: string; answer: string; label: string; close: string; at: string; note?: string; comments?: Sent[]; merged_by?: string;
   /** A plan's send-back: every section's verdict, and the option picked for each decision key. */
-  notes?: PlanNote[]; decisions?: Record<string, string> };
+  notes?: PlanNote[] | DesignNote[]; decisions?: Record<string, string>; pick?: string };
 export type Round = { key: string; note: string; at: string; comments?: Sent[] };
 /** A comment on a mock element as it went to the agent with an answer or a round. */
 export type Sent = Pick<Annotation, 'id' | 'mock' | 'hash' | 'ref' | 'tag' | 'words' | 'text'>;
@@ -172,7 +177,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     }
     // A ladder rung: a diagram image, or an interactive page the board frames in a sandbox.
     // A report is a page and its picture; one stored before reports had pages still loads, as a note with neither.
-    const report = d.kind === 'report', plan = d.kind === 'plan';
+    const report = d.kind === 'report', plan = d.kind === 'plan', design = d.kind === 'design';
     if (d.type === 'plan' && !plan) throw bad('type', 'plan needs "kind": "plan": post it with sign-off-axi post --kind plan');
     const views = report ? (d.view !== undefined || d.preview !== undefined ? VIEWS.interactive : undefined) : plan ? VIEWS.interactive : Object.hasOwn(VIEWS, d.type ?? '') ? VIEWS[d.type] : undefined;
     const viewOk = (v: any, [, ends]: [string, RegExp]) => isText(v) && v.length <= 256 && /^[^?#]+$/.test(v) && ends.test(v);
@@ -181,9 +186,9 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     // A report (contract kind report) takes no answer: it has no options, on any board.
     if (report) for (const f of ['options', 'reply', 'area', 'type']) if (d[f] !== undefined) throw bad(f, `must be left out: a report takes no answer${f === 'options' ? '' : ' and shows only under Reports'}`);
     // A plan takes its answer from its sections and decisions, sent back at once, so it has no options of its own.
-    const options = d.options ?? (report || signin || plan ? [] : d.type === 'evidence' ? VERDICTS : YES_NO);
+    const options = d.options ?? (report || signin || plan || design ? [] : d.type === 'evidence' ? VERDICTS : YES_NO);
     // An empty list is an item to look at only, unless it takes a reply: only a board another program feeds, a report or a sign-in shows those.
-    if (!Array.isArray(options) || options.length === 1 || (!options.length && !fed && !report && !signin && !plan) || options.length > 6
+    if (!Array.isArray(options) || options.length === 1 || (!options.length && !fed && !report && !signin && !plan && !design) || options.length > 6
       || !options.every((o) => isKey(o?.value) && isText(o.label) && o.label.trim() && (o.outcome === undefined || isText(o.outcome)))) {
       throw bad('options', 'must be 2 to 6 items (or empty on a readonly or answers_only board), each a value of 1-128 of A-Z a-z 0-9 . _ - and a label');
     }
@@ -219,6 +224,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       // So is a finding's proposal, with the counts and records behind it.
       ...(d.kind === 'finding' && { finding: { cause: d.cause, incidents: d.incidents, days: d.days, evidence_ids: d.evidence_ids, change_kind: d.change_kind, proposal: d.proposal } }),
       ...(plan && { sections: d.sections, decisions: d.decisions }),
+      ...(design && { kind: 'design', type: 'design', group: d.group, filed: d.filed, status: d.status, preview: d.preview, journeys: d.journeys, ...(d.options && { options: d.options, recommend_value: d.recommend }) }),
       ...(d.type === 'explainer' && d.chapters && { chapters: d.chapters.map(({ at, title }: Chapter) => ({ at, title })) }),
     };
   });
@@ -276,6 +282,22 @@ function saveAnswer(decisionsPath: string, d: Decision, option: Option, note: st
 }
 
 /** Saves a plan's one send-back as its answer: each section approved or changed (a change says what to change), and one option per decision. An identical send-back again saves nothing. */
+export function appendDesignAnswer(decisionsPath: string, d: Decision, verdict: unknown, notes: unknown, pick?: unknown): Answer | undefined {
+  const bad = (rule: string) => new InputError(`key ${d.key}: ${rule}`);
+  if (verdict !== 'approve' && verdict !== 'change') throw bad('verdict must be approve or change');
+  if (!Array.isArray(notes) || (verdict === 'change' && !notes.length)) throw bad('notes must be a list, with at least one note on change');
+  const screens = new Set((d.journeys ?? []).flatMap(j => j.screens.map(s => `${j.id}/${s.id}`)));
+  for (const n of notes) if (!n || !screens.has(`${n.journey}/${n.screen}`) || !isText(n.note) || !n.note.trim() || [...n.note].length > NOTE_MAX) throw bad('each note needs a known journey and screen, and text of 500 characters or fewer');
+  if (new Set(notes.map(n => `${n.journey}/${n.screen}`)).size !== notes.length) throw bad('notes must name each screen once');
+  const options = d.options ?? [];
+  if (options.length ? !options.some(o => o.value === pick) : pick !== undefined) throw bad('pick must be one listed option, or omitted when no options were offered');
+  const answer: Answer = { key: d.key, answer: verdict, label: verdict === 'approve' ? 'Approved' : 'Changes requested', close: d.close ?? 'done', at: now(), notes, ...(pick !== undefined && { pick: pick as string }) };
+  const current = readAnswers(decisionsPath)[d.key];
+  if (current?.answer === answer.answer && JSON.stringify([current.notes, current.pick]) === JSON.stringify([answer.notes, answer.pick])) return;
+  appendLine(answersPath(decisionsPath), answer);
+  return answer;
+}
+
 export function appendSendBack(decisionsPath: string, d: Decision, notes: unknown, picks: unknown = {}): Answer | undefined {
   const bad = (rule: string) => new InputError(`key ${d.key}: ${rule}`), ids = d.sections!.map((s) => s.id), keys = d.decisions!.map((q) => q.key);
   if (!Array.isArray(notes) || notes.length !== ids.length || !ids.every((id) => notes.filter((n) => n?.section === id).length === 1)) throw bad(`notes must list each section once: ${ids.join(', ')}`);

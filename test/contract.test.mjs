@@ -31,6 +31,52 @@ for (const f of ['index.html', 'preview.svg']) fill(join(scratch, 'page', f));
 const report = { contract: 1, kind: 'report', schema: 2, key: 'slice-5-live', title: 'How the new cards work', about: 'Umer can see the new cards.', filed: '2026-10-13T07:19:00Z',
   view: 'page/index.html', preview: 'page/preview.svg' };
 
+test('design review posts journeys and returns change notes through answers --json', async () => {
+  const dir = join(scratch, 'design-review'), board = join(dir, 'board.json'), env = { ...process.env, HOME: join(scratch, 'design-home') };
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), Buffer.from('image'));
+  const variants = ['phone_light', 'phone_dark', 'computer_light', 'computer_dark'];
+  const screens = ['welcome', 'confirm'].map((id, i) => {
+    const views = Object.fromEntries(variants.map((variant) => {
+      const path = `design/${id}-${variant}.html`;
+      writeFileSync(join(dir, path), `<!doctype html><html><head><meta name="viewport" content="width=device-width"></head><body>${id}</body></html>`);
+      return [variant, path];
+    }));
+    return { id, title: i ? 'Confirm email' : 'Welcome', views };
+  });
+  const msg = { ...JSON.parse(readFileSync(join(fixtures, 'design.v1', 'valid-basic.json'))),
+    key: 'beacon-account-setup', title: 'Which account setup should we ship?', about: 'Choose the first-run experience for Beacon.', group: 'Beacon', status: 'in_review',
+    options: [{ value: 'guided', label: 'Guided setup' }, { value: 'quick', label: 'Quick setup' }], recommend: 'guided',
+    journeys: [{ id: 'account-setup', title: 'Account setup', screens }] };
+  const run = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const source = message('design-message.json', JSON.stringify(msg)), posted = run('post', board, '--kind', 'design', '--from', source);
+  assert.equal(posted.status, 0, posted.stdout + posted.stderr);
+  const duplicateScreen = { ...msg, key: 'duplicate-screen', journeys: [{ ...msg.journeys[0], screens: [msg.journeys[0].screens[0], msg.journeys[0].screens[0]] }] };
+  const duplicate = run('post', board, '--kind', 'design', '--from', message('duplicate-screen.json', JSON.stringify(duplicateScreen)));
+  assert.equal(duplicate.status, 2); assert.match(duplicate.stdout, /journeys\[0\]\.screens\[1\]\.id.*repeats welcome/);
+  assert.match(run('list', board).stdout, /beacon-account-setup/);
+  const outside = join(scratch, 'outside-design.png'); writeFileSync(outside, 'image'); symlinkSync(outside, join(dir, 'design', 'escape.png'));
+  const escaped = run('post', board, '--kind', 'design', '--from', message('escaped-design.json', JSON.stringify({ ...msg, key: 'escaped-design', journeys: [{ ...msg.journeys[0], screens: [{ ...msg.journeys[0].screens[0], views: { phone_light: 'design/escape.png' } }] }] })));
+  assert.equal(escaped.status, 2); assert.match(escaped.stdout, /outside the board folder/);
+  const proc = spawn('node', [cli, 'serve', board], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  try {
+    const url = await new Promise(ok => proc.stdout.once('data', b => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+    const answer = body => fetch(`${url}api/answers`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: msg.key, ...body }) });
+    assert.equal((await answer({ verdict: 'change', pick: 'guided', notes: [] })).status, 400);
+    assert.equal((await answer({ verdict: 'change', pick: 'guided', notes: [{ journey: 'account-setup', screen: 'welcome', note: 'Move the button higher.' }] })).status, 200);
+    const got = JSON.parse(run('answers', board, '--json').stdout)[msg.key];
+    assert.deepEqual([got.answer, got.notes, got.pick], ['change', [{ journey: 'account-setup', screen: 'welcome', note: 'Move the button higher.' }], 'guided']);
+    assert.equal(JSON.parse(run('wait', board, '--key', msg.key, '--json', '--timeout', '0').stdout)[msg.key].answer, 'change');
+    assert.equal((await answer({ verdict: 'approve', pick: 'quick', notes: [] })).status, 200);
+    const revised = JSON.parse(run('answers', board, '--json').stdout)[msg.key];
+    assert.deepEqual([revised.answer, revised.pick], ['approve', 'quick']);
+    const approval = { ...msg, key: 'approved-design' };
+    assert.equal(run('post', board, '--kind', 'design', '--from', message('approved-design.json', JSON.stringify(approval))).status, 0);
+    const approved = await fetch(`${url}api/answers`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: approval.key, verdict: 'approve', pick: 'guided', notes: [] }) });
+    assert.equal((await approved.json()).decisions.find(d => d.key === approval.key).status, 'approved');
+  } finally { proc.kill(); }
+});
+
 test('every shipped fixture: valid files pass, each invalid file is refused on the field its name gives', () => {
   for (const folder of readdirSync(fixtures).filter((f) => !f.endsWith('.md'))) {
     const files = readdirSync(join(fixtures, folder)).map((f) => join(fixtures, folder, f));
