@@ -17,9 +17,10 @@ Open the URL seed-board.sh prints, in a browser; tap an area in the sidebar or t
 ## Driving it
 
 1. Launch as SKILL.md says and keep BASE.
-2. shots.sh BASE "$DONE_DONE_EVIDENCE_ROOT": 20 captures, <screen>.<theme>.<width>w.png.
+2. shots.sh BASE "$DONE_DONE_EVIDENCE_ROOT" summary waiting: 8 captures, <screen>.<theme>.<width>w.png. One check judges at most 10 captures, so a
+   verify run keeps these 8 plus one toast and one focus capture; capture the other screens (shots.sh with no screens) outside the run folder.
 3. Toast: at 390, open BASE#evidence, click Pass from the page, then screenshot toast.<theme>.390w.png; the toast's bottom is above the tab bar's top.
-4. Focus: press Tab until a sidebar link (1280) or a tab (390) has the focus, then screenshot focus.<theme>.<width>w.png.
+4. Focus: press Tab until a sidebar link (1280) or a tab (390) has the focus, then screenshot focus.<theme>.<width>w.png (one theme and width in a verify run).
 5. Look at every capture: no text under the tab bar, nothing cut, the right area marked.
 6. Stop what you started.
 
