@@ -298,12 +298,12 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
 const idWord = (w: string) => /^[a-z0-9]+(?:[-_/][a-z0-9]+)+$/.test(w) && (/[_/]/.test(w) || (/^[a-z]/.test(w) && /\d/.test(w)));
 /** Buttons that close a card but answer no question. */
 const NOT_ANSWERS = /^(done|not now|ok|okay|got it|noted|seen|acknowledged?|dismiss)$/i;
-/** The lettered choices a text names: "Option A", or a line that starts with "A:", "A.", "A)" or "(A)". Letters in prose, such as "D. A. Brown", are not choices. */
+/** The lettered choices a text names: "Option A", "A)", "(A)" or "A:" anywhere, and "A." only at a line start, so initials such as "D. A. Brown" are not choices. */
 function lettered(text: string) {
   const found = new Set<string>();
   for (const [, c] of text.matchAll(/\b[Oo]ption ([A-F])\b/g)) found.add(c);
-  for (const [, c] of text.matchAll(/(?:^|[\s(])([A-F])[:)](?=\s|$)/gm)) found.add(c);
-  for (const [, c] of text.matchAll(/^([A-F])\.(?=\s|$)/gm)) found.add(c);
+  for (const [, c] of text.matchAll(/(?:^|[\s(,;])\(?([A-F])[:)](?!\w)/gm)) found.add(c);
+  for (const [, c] of text.matchAll(/^[ \t]*([A-F])\.(?!\w)/gm)) found.add(c);
   return [...found].sort();
 }
 /** The question standard on a new ask: a plain question the buttons answer, with buttons that match the choices its words name. */
