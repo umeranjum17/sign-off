@@ -26,7 +26,6 @@ Read-only: is this instance worth driving? The URL answers with the page titled 
 Harness: a browser (chrome-devtools-axi, one CHROME_DEVTOOLS_AXI_SESSION per run) for the board, a terminal for the CLI. Prefer the repo's real handles (hash routes, button labels) over coordinates:
 
 - [Board shell](features/board-shell.md): the areas, the sidebar on a desk, the tab bar on a phone, light and dark
-- [Main command](features/main.md): the CLI a user runs first
 
 shots.sh BASE <folder> captures every screen at 390 and 1280, light and dark. An emulated tap can miss; click a button from the page (eval "() => document.querySelector('[aria-label^=\"Pass,\"]').click()") when a tap does not land.
 
