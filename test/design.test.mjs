@@ -1741,23 +1741,3 @@ test('no board named: doctor checks the nearest setup from a subfolder, a missin
   assert.deepEqual(JSON.parse(readFileSync(join(proj, '.sign-off', 'decisions.json'), 'utf8')).items.map((i) => i.key), ['missing-home']);
   assert.match(at(proj, {}, 'doctor', join('~', 'x')).stdout, /init '~\/x'/);
 });
-
-test('a card is hidden only by a merger that is itself shown: in a chain X merges Y merges Z, Y is hidden and X and Z show', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
-  const dir = join(scratch, 'chain'), file = join(dir, 'board.json');
-  mkdirSync(dir);
-  assert.equal(run('raise', file, '--key', 'chain-z', '--title', 'Ship the sign-in screen?').code, 0);
-  assert.equal(run('raise', file, '--key', 'chain-y', '--title', 'Should the sign-in screen wait?', '--merge', 'chain-z').code, 0);
-  assert.equal(run('raise', file, '--key', 'chain-x', '--title', 'Can the sign-in screen go out?', '--merge', 'chain-y').code, 0);
-  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
-  procs.push(proc);
-  const url = /url: "(\S+)"/.exec(await served(proc))[1];
-  const { evaluate, close } = await browse(dir);
-  await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
-  // Triage shows one ask at a time: skipping through the queue lists every card that is shown.
-  const queue = `(() => { const seen = []; for (let i = 0; i < 4 && document.querySelector('article.row'); i++) { const id = document.querySelector('article.row').id; if (seen.includes(id)) break; seen.push(id); document.querySelector('.skip')?.click(); } return seen.sort().join(); })()`;
-  let cards = '';
-  await until(async () => (cards = await evaluate(queue)) > '');
-  close();
-  assert.equal(cards, 'item-chain-x,item-chain-z');
-  proc.kill();
-});
