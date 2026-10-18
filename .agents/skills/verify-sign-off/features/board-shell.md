@@ -9,6 +9,8 @@ The board page (web/index.html) in the Spacious look: system font, large titles,
 - Phone: a solid tab bar at the bottom (Waiting, Designs, Evidence, Reports, Answered); the area on screen is blue; area screens keep a ‹ Summary link.
 - Designs groups contract design reviews by project, with preview, date, status and any saved pick or note. Open a design to approve it or request a change with a note; on multi-screen designs, a native selector targets the note and full-preview link, while designs with no screens accept a design-level note. The preview is readable and scrollable, with a link to open its full asset. At 1280 the board sidebar remains visible with Designs selected; on Summary and Waiting, a design's primary action is Open designs.
 - After an answer, a toast with Undo sits above the tab bar.
+- Waiting on you shows each ask as a card, with its kind, why and waiting-since time; plan cards open the plan page.
+- Decide keeps large questions and recommended pill answers; Skip for now and Dismiss stay quiet, and its phone actions remain above the tab bar while scrolling.
 - Focus rings show on every link and button in both themes.
 
 ## How to get to it (user POV)
