@@ -2,7 +2,7 @@ import { appendFileSync, existsSync, readFileSync, renameSync, rmSync, writeFile
 import { basename, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 
-export type Option = { value: string; label: string };
+export type Option = { value: string; label: string; outcome?: string };
 export type MockRef = { value: string; path: string };
 export type MediaRef = { path: string; sha256: string; bytes: number };
 export type Chapter = { at: number; title: string };
@@ -15,7 +15,10 @@ export type PlanNote = { section: string; verdict: 'approve' | 'change'; note?: 
 export type EvidenceLink = { run_id: string; commit: string; outcome: string; repro: string; proof: string; evidence: string };
 export type Decision = {
   key: string; title: string; about?: string; detail?: string; options: Option[];
-  recommend_value?: string; default_if_silent?: string; close: string; evidence?: EvidenceLink; run?: { run_id: string; commit: string };
+  recommend_value?: string; default_if_silent?: string; close: string;
+  /** An ask's question standard: why it is asked, why one option is recommended, when the silent default happens (ISO UTC),
+   * and the other cards on the board this ask replaces, which its answer closes too. */
+  why?: string; recommend_reason?: string; silent_by?: string; merges?: string[]; evidence?: EvidenceLink; run?: { run_id: string; commit: string };
   finding?: { cause: string; incidents: number; days: number; evidence_ids: string[]; change_kind: string; proposal: string };
   type: string; tradeoff?: string; mocks?: MockRef[]; number?: number; media?: MediaRef[]; link?: string; view?: string; preview?: string; chapters?: Chapter[]; reply?: boolean;
   /** Who posted it: an agent session or caller id, so that caller's `wait --filer` gets the answer. */
@@ -33,7 +36,7 @@ export type Decision = {
   /** Plans: the sections to approve or change and the decisions to answer, all sent back as one answer. */
   sections?: PlanSection[]; decisions?: PlanDecision[];
 };
-export type Answer = { key: string; answer: string; label: string; close: string; at: string; note?: string; comments?: Sent[];
+export type Answer = { key: string; answer: string; label: string; close: string; at: string; note?: string; comments?: Sent[]; merged_by?: string;
   /** A plan's send-back: every section's verdict, and the option picked for each decision key. */
   notes?: PlanNote[]; decisions?: Record<string, string> };
 export type Round = { key: string; note: string; at: string; comments?: Sent[] };
@@ -116,7 +119,8 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     if (seen.has(d.key)) throw bad('key', `repeats ${list}[${seen.get(d.key)}]`);
     seen.set(d.key, i);
     if (!isText(d.title) || !d.title.trim()) throw bad('title', 'must be non-empty text');
-    for (const f of ['about', 'detail']) if (d[f] !== undefined && !isText(d[f])) throw bad(f, 'must be text');
+    for (const f of ['about', 'detail', 'why', 'recommend_reason', 'silent_by']) if (d[f] !== undefined && !isText(d[f])) throw bad(f, 'must be text');
+    if (d.merges !== undefined && !(Array.isArray(d.merges) && d.merges.every(isKey))) throw bad('merges', 'must list keys of 1-128 of A-Z a-z 0-9 . _ -');
     if (d.evidence !== undefined && (!d.evidence || !/^[A-Za-z0-9._-]{1,128}$/.test(d.evidence.run_id ?? '')
       || !/^[a-f0-9]{40}$/.test(d.evidence.commit ?? '')
       || ['outcome', 'repro', 'proof', 'evidence'].some((f) => !isText(d.evidence[f]) || !d.evidence[f].trim() || [...d.evidence[f]].length > 1000))) {
@@ -180,7 +184,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     const options = d.options ?? (report || signin || plan ? [] : d.type === 'evidence' ? VERDICTS : YES_NO);
     // An empty list is an item to look at only, unless it takes a reply: only a board another program feeds, a report or a sign-in shows those.
     if (!Array.isArray(options) || options.length === 1 || (!options.length && !fed && !report && !signin && !plan) || options.length > 6
-      || !options.every((o) => isKey(o?.value) && isText(o.label) && o.label.trim())) {
+      || !options.every((o) => isKey(o?.value) && isText(o.label) && o.label.trim() && (o.outcome === undefined || isText(o.outcome)))) {
       throw bad('options', 'must be 2 to 6 items (or empty on a readonly or answers_only board), each a value of 1-128 of A-Z a-z 0-9 . _ - and a label');
     }
     const values = options.map((o: Option) => o.value);
@@ -200,7 +204,8 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       for (const m of d.mocks) if (!values.includes(m.value)) throw bad('mocks', `value ${m.value} is not one of ${values.join(', ')}`);
     }
     return {
-      key: d.key, title: d.title, about: d.about, detail: d.detail, options: options.map((o: Option) => ({ value: o.value, label: o.label })),
+      key: d.key, title: d.title, about: d.about, detail: d.detail, options: options.map((o: Option) => ({ value: o.value, label: o.label, ...(o.outcome && { outcome: o.outcome }) })),
+      ...(d.why && { why: d.why }), ...(d.recommend_reason && { recommend_reason: d.recommend_reason }), ...(d.silent_by && { silent_by: d.silent_by }), ...(d.merges && { merges: [...d.merges] }),
       recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done', evidence: d.evidence,
       type: plan ? 'plan' : d.type ?? 'decision', tradeoff: d.tradeoff, link: d.link, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path })),
       ...(views && { view: d.view }), ...(report && views && { preview: d.preview }), ...(d.reply && { reply: true }), ...(d.filer && { filer: d.filer }), ...(d.area && { area: d.area }),
@@ -242,11 +247,30 @@ export function readAnswers(decisionsPath: string, warn: (msg: string) => void =
 
 /** The option an Undo saves when the item had no answer before: an empty answer, so the item waits again. */
 export const CLEARED: Option = { value: '', label: '' };
-/** Appends one answer line unless it equals the current answer and note, and returns the saved answer. Starts a new line after a torn fragment. */
+/** Appends one answer line unless it equals the current answer and note, and returns the saved answer. Starts a new line after a torn fragment.
+ * One decision is one card: the answer also goes, as its own line, to each card on the board this ask merges, under that card's close mode. */
 export function appendAnswer(decisionsPath: string, d: Decision, option: Option, note = '', comments: Sent[] = []): Answer | undefined {
+  const answer = saveAnswer(decisionsPath, d, option, note, comments);
+  if (!d.merges?.length) return answer;
+  const on = loadDecisions(decisionsPath), answers = readAnswers(decisionsPath);
+  for (const key of d.merges) {
+    const merged = on.find((x) => x.key === key), own = answers[key];
+    if (!merged) continue;
+    const fanned = own?.merged_by === d.key;
+    if (option === CLEARED) {
+      if (fanned) saveAnswer(decisionsPath, merged, CLEARED, '');
+      continue;
+    }
+    if (own || (option !== REPLY && !merged.options.some((o) => o.value === option.value))) continue;
+    const same = option === REPLY ? option : merged.options.find((o) => o.value === option.value)!;
+    saveAnswer(decisionsPath, merged, same, `Answered with ${d.key}${note ? `: ${note}` : ''}`, [], d.key);
+  }
+  return answer;
+}
+function saveAnswer(decisionsPath: string, d: Decision, option: Option, note: string, comments: Sent[] = [], by?: string): Answer | undefined {
   const current = readAnswers(decisionsPath)[d.key];
   if (option === CLEARED ? !current : current?.answer === option.value && (current.note ?? '') === note && !comments.length) return;
-  const answer: Answer = { key: d.key, answer: option.value, label: option.label, close: d.close, at: now(), ...(note && { note }), ...(comments.length && { comments }) };
+  const answer: Answer = { key: d.key, answer: option.value, label: option.label, close: d.close, at: now(), ...(note && { note }), ...(comments.length && { comments }), ...(by && { merged_by: by }) };
   appendLine(answersPath(decisionsPath), answer);
   return answer;
 }

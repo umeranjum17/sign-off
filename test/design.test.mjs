@@ -8,6 +8,7 @@ import { createServer } from 'node:net';
 import { networkInterfaces, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { crc32, deflateSync } from 'node:zlib';
+import { asked } from './ask.mjs';
 
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
 const scratch = mkdtempSync(join(tmpdir(), 'sign-off-design-'));
@@ -28,7 +29,7 @@ delete env.npm_command;
 delete env.npm_config_package;
 const run = (...args) => {
   try {
-    return { out: execFileSync(process.execPath, [cli, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env }), code: 0 };
+    return { out: execFileSync(process.execPath, [cli, ...asked(args)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env }), code: 0 };
   } catch (e) {
     return { out: `${e.stdout}`, code: e.status };
   }
@@ -1637,7 +1638,7 @@ test('answer events: a filer takes only its own answers, once, the card shows it
   // The answer reaches the hook on stdin only: its arguments are the config's words, never the answer.
   writeFileSync(join(dir, 'config.yaml'), 'board: board.json\non_answer: node hook.mjs --from-board\n');
   const as = (extra, ...args) => {
-    try { return { out: execFileSync(process.execPath, [cli, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: { ...env, ...extra } }), code: 0 }; }
+    try { return { out: execFileSync(process.execPath, [cli, ...asked(args)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: { ...env, ...extra } }), code: 0 }; }
     catch (e) { return { out: `${e.stdout}`, code: e.status }; }
   };
   assert.match(as({}, 'raise', file, '--key', 'a', '--title', 'Ship A?', '--filer', 'agent-a').out, /Run `sign-off-axi wait \S+ --filer agent-a`/);
@@ -1689,7 +1690,7 @@ test('answer events: a filer takes only its own answers, once, the card shows it
 });
 
 test('no board named: the nearest .sign-off/ up to the repo root, else the home board, never a board above a folder outside both; SIGN_OFF_HOME; doctor checks on_answer; init and hints under npx', () => {
-  const at = (cwd, more, ...args) => spawnSync(process.execPath, [cli, ...args], { cwd, env: { ...env, ...more }, encoding: 'utf8' });
+  const at = (cwd, more, ...args) => spawnSync(process.execPath, [cli, ...asked(args)], { cwd, env: { ...env, ...more }, encoding: 'utf8' });
   const proj = join(scratch, 'walk'), deep = join(proj, 'src', 'deep'), inner = join(proj, 'inner'), items = (b) => JSON.parse(readFileSync(b, 'utf8')).items.map((i) => i.key);
   mkdirSync(deep, { recursive: true });
   mkdirSync(join(proj, '.git'));
@@ -1756,14 +1757,14 @@ test('no board named under a symlinked HOME: the walk stops at the real HOME, ne
   mkdirSync(proj, { recursive: true });
   writeFileSync(join(realHome, '.sign-off', 'config.yaml'), 'board: home-trap.json\nport: 0\n');
   symlinkSync(realHome, linkHome);
-  const r = spawnSync(process.execPath, [cli, 'raise', '--title', 'From linked home'], { cwd: join(linkHome, 'proj'), env: { ...env, HOME: linkHome }, encoding: 'utf8' });
+  const r = spawnSync(process.execPath, [cli, ...asked(['raise', '--title', 'From linked home?'])], { cwd: join(linkHome, 'proj'), env: { ...env, HOME: linkHome }, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stdout);
   assert.deepEqual(JSON.parse(readFileSync(join(linkHome, '.sign-off', 'decisions.json'), 'utf8')).items.map((i) => i.key), ['from-linked-home']);
   assert.equal(existsSync(join(realHome, '.sign-off', 'home-trap.json')), false);
 });
 
 test('no board named: doctor checks the nearest setup from a subfolder, a missing HOME uses the working folder, and a folder named ~ is printed quoted', () => {
-  const at = (cwd, more, ...args) => spawnSync(process.execPath, [cli, ...args], { cwd, env: { ...env, ...more }, encoding: 'utf8' });
+  const at = (cwd, more, ...args) => spawnSync(process.execPath, [cli, ...asked(args)], { cwd, env: { ...env, ...more }, encoding: 'utf8' });
   const proj = join(scratch, 'doctor-walk'), deep = join(proj, 'src', 'deep');
   mkdirSync(join(proj, '.git'), { recursive: true });
   mkdirSync(deep, { recursive: true });

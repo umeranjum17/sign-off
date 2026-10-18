@@ -5,6 +5,7 @@ import { appendFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readd
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { decode } from '@toon-format/toon';
+import { asked } from './ask.mjs';
 
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
 const fixtures = new URL('../fixtures/contract/', import.meta.url).pathname;
@@ -19,8 +20,8 @@ const message = (name, text) => {
   writeFileSync(path, text);
   return path;
 };
-const ask = { contract: 1, kind: 'ask', schema: 1, key: 'ship-signin-2', title: 'Ship the new sign-in screen this week?',
-  options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }], recommend_value: 'yes' };
+const ask = JSON.parse(readFileSync(join(fixtures, 'ask.v1', 'valid-yes-no.json')));
+delete ask.filer;
 const gate = JSON.parse(readFileSync(join(fixtures, 'gate.v1', 'valid-three-actions.json')));
 const finding = JSON.parse(readFileSync(join(fixtures, 'finding.v1', 'valid-apply.json')));
 // A report is a page and its picture: the scaffold report init writes, filled in, beside the boards these tests write.
@@ -108,7 +109,7 @@ test('refusals: strict at every level, in contract order, with one fix line each
 test('a field name holding a newline is refused on one help line, shown escaped', () => {
   const unknown = validate(message('newline-unknown.json', JSON.stringify({ ...ask, 'a\nb': 'x' })));
   assert.equal(unknown.status, 2, unknown.raw);
-  assert.equal(unknown.out.files[0].help, 'Remove "a\\nb"; ask takes key, title, filer, link, about, detail, options, recommend_value, default_if_silent, close');
+  assert.equal(unknown.out.files[0].help, 'Remove "a\\nb"; ask takes key, title, filer, link, about, detail, why, options, recommend_value, recommend_reason, default_if_silent, silent_by, close, merges');
   const repeated = validate(message('newline-twice.json', JSON.stringify(ask).slice(0, -1) + ',"a\\nb":1,"a\\nb":2}'));
   assert.equal(repeated.status, 2, repeated.raw);
   assert.equal(repeated.out.files[0].error, 'field "a\\nb" is written twice');
@@ -235,7 +236,7 @@ test('a report in a raise --from file: checked by its kind, stored with no optio
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;
   delete env.SIGN_OFF_FILER;
-  const board = join(scratch, 'reports.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const board = join(scratch, 'reports.json'), cli2 = (...args) => spawnSync('node', [cli, ...asked(args)], { encoding: 'utf8', env });
   const feed = (name, ...items) => message(name, JSON.stringify({ schema: 2, items }));
   const posted = cli2('raise', board, '--from', feed('feed.json', { ...report, about: 'Umer can see the new cards \u{1F600}' }));
   assert.equal(posted.status, 0, posted.stdout);
@@ -261,7 +262,7 @@ test('the 160 title limit applies to new items only: a re-post of an item alread
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;
   delete env.SIGN_OFF_FILER;
-  const board = join(scratch, 'repost.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const board = join(scratch, 'repost.json'), cli2 = (...args) => spawnSync('node', [cli, ...asked(args)], { encoding: 'utf8', env });
   assert.equal(cli2('raise', board, '--title', 'Ship the sign-in screen?', '--key', 'signin').status, 0);
   const doc = JSON.parse(readFileSync(board, 'utf8'));
   doc.items[0].title = 'T'.repeat(200);
@@ -280,7 +281,7 @@ test('a stored report with reply, area or type is refused: it can never wait, be
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;
   delete env.SIGN_OFF_FILER;
-  const board = join(scratch, 'stored-report.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const board = join(scratch, 'stored-report.json'), cli2 = (...args) => spawnSync('node', [cli, ...asked(args)], { encoding: 'utf8', env });
   for (const extra of [{ reply: true }, { area: 'waiting' }, { type: 'design' }]) {
     writeFileSync(board, JSON.stringify({ schema: 2, items: [{ ...report, ...extra }] }));
     const listed = cli2('list', board);
@@ -303,7 +304,7 @@ test('a report counts its group and decision in characters, not UTF-16 units: 21
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;
   delete env.SIGN_OFF_FILER;
-  const board = join(scratch, 'emoji.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const board = join(scratch, 'emoji.json'), cli2 = (...args) => spawnSync('node', [cli, ...asked(args)], { encoding: 'utf8', env });
   const feed = (name, ...items) => message(name, JSON.stringify({ schema: 2, items }));
   const emoji = { ...report, key: 'emoji', group: '\u{1F600}'.repeat(21), decided: '\u{1F600}'.repeat(100), link: `https://${'\u{1F600}'.repeat(300)}` };
   const posted = cli2('raise', board, '--from', feed('emoji.json', emoji));
@@ -316,7 +317,7 @@ test('a report re-posted under its key reports already posted, and a feed with n
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;
   delete env.SIGN_OFF_FILER;
-  const board = join(scratch, 'repost-report.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const board = join(scratch, 'repost-report.json'), cli2 = (...args) => spawnSync('node', [cli, ...asked(args)], { encoding: 'utf8', env });
   const feed = (name, ...items) => message(name, JSON.stringify({ schema: 2, items }));
   assert.equal(cli2('raise', board, '--from', feed('one.json', report)).status, 0);
   const again = cli2('raise', board, '--from', feed('two.json', report));
@@ -332,7 +333,7 @@ test('a re-post of an answered ask beside a new report gets the read hint, never
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;
   delete env.SIGN_OFF_FILER;
-  const board = join(scratch, 'answered.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const board = join(scratch, 'answered.json'), cli2 = (...args) => spawnSync('node', [cli, ...asked(args)], { encoding: 'utf8', env });
   const feed = (name, ...items) => message(name, JSON.stringify({ schema: 2, items }));
   assert.equal(cli2('raise', board, '--from', feed('ask.json', ask)).status, 0);
   appendFileSync(join(scratch, 'answered.answers.jsonl'), `${JSON.stringify({ key: ask.key, answer: 'yes', label: 'Yes', close: 'done', at: '2026-10-13T08:00:00Z' })}\n`);
@@ -372,7 +373,7 @@ test('post --kind: one message from a file or stdin, checked against its kind, r
   assert.equal(gone.status, 2, gone.stdout);
   assert.match(gone.stdout, /view \\"page\/gone\.html\\" is not there/);
   assert.match(gone.stdout, /Put the file at page\/gone\.html from the board file's folder/);
-  spawnSync('node', [cli, 'raise', board, '--title', 'Plain?', '--key', 'plain'], { env });
+  spawnSync('node', [cli, ...asked(['raise', board, '--title', 'Plain?', '--key', 'plain'])], { env });
   const before = readFileSync(board, 'utf8');
   // A key takes only the same message again: another filer, another filed time, or a plain item under it is a conflict.
   for (const [input, args, error, help] of [
@@ -438,7 +439,7 @@ test('a feed item that carries kind but no contract, under a key that holds a di
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;
   delete env.SIGN_OFF_FILER;
-  const board = join(scratch, 'kind-only.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const board = join(scratch, 'kind-only.json'), cli2 = (...args) => spawnSync('node', [cli, ...asked(args)], { encoding: 'utf8', env });
   assert.equal(cli2('raise', board, '--title', 'Plain?', '--key', 'pick').status, 0);
   const kindOnly = { kind: 'ask', schema: 1, key: 'pick', title: ask.title, options: ask.options, recommend_value: ask.recommend_value };
   const feed = message('kind-only-feed.json', JSON.stringify({ schema: 2, items: [kindOnly] }));
@@ -453,7 +454,7 @@ test('post --replace: a changed item is checked against its kind again, an uncha
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;
   delete env.SIGN_OFF_FILER;
-  const board = join(scratch, 'replace-check.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const board = join(scratch, 'replace-check.json'), cli2 = (...args) => spawnSync('node', [cli, ...asked(args)], { encoding: 'utf8', env });
   assert.equal(cli2('post', board, '--kind', 'ask', '--from', message('replace-ask.json', JSON.stringify(ask)), '--filer', 'agent-41').status, 0);
   const feed = (name, item) => message(`replace-${name}.json`, JSON.stringify({ schema: 2, items: [item] }));
   const boardText = () => readFileSync(board, 'utf8'), before = boardText();
@@ -507,7 +508,7 @@ test('post --replace: an answer does not re-attach to a key the feed dropped and
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;
   delete env.SIGN_OFF_FILER;
-  const board = join(scratch, 'replace-orphan.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const board = join(scratch, 'replace-orphan.json'), cli2 = (...args) => spawnSync('node', [cli, ...asked(args)], { encoding: 'utf8', env });
   const report2 = { ...report, key: 'slice-note' };
   assert.equal(cli2('post', board, '--kind', 'ask', '--from', message('orphan-ask.json', JSON.stringify(ask))).status, 0);
   assert.equal(cli2('post', board, '--kind', 'report', '--from', message('orphan-report.json', JSON.stringify(report2))).status, 0);
@@ -530,7 +531,7 @@ test('post --kind evidence: a key the feed dropped after it was answered cannot 
   delete env.CLAUDE_CODE_SESSION_ID;
   delete env.SIGN_OFF_FILER;
   const dir = mkdtempSync(join(scratch, 'orphan-evidence-')), board = join(dir, 'board.json');
-  const cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const cli2 = (...args) => spawnSync('node', [cli, ...asked(args)], { encoding: 'utf8', env });
   const shot = readFileSync(join(fixtures, 'evidence.v1', 'shot.png'));
   writeFileSync(join(dir, 'one.png'), shot);
   writeFileSync(join(dir, 'two.png'), Buffer.concat([shot, Buffer.from('\n')]));
@@ -558,7 +559,7 @@ test('post --replace: a board-shaped evidence item with malformed media is refus
   delete env.CLAUDE_CODE_SESSION_ID;
   delete env.SIGN_OFF_FILER;
   const dir = mkdtempSync(join(scratch, 'media-shape-')), board = join(dir, 'board.json');
-  const cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const cli2 = (...args) => spawnSync('node', [cli, ...asked(args)], { encoding: 'utf8', env });
   const write = (name, body) => {
     const path = join(dir, name);
     writeFileSync(path, JSON.stringify(body));
@@ -602,7 +603,7 @@ test('post --kind evidence: media copied and hashed from the message folder, a r
   assert.match(ran.stdout, /update-2,2,0,Sign-in screen on a phone,posted/);
   const [, update] = items();
   assert.deepEqual([update.type, update.kind, update.media, update.evidence.commit, update.run], ['evidence', 'evidence', undefined, '0123456789abcdef0123456789abcdef01234567', undefined]);
-  assert.equal(spawnSync('node', [cli, 'raise', board, '--title', 'Plain?', '--key', 'plain'], { encoding: 'utf8', env }).status, 0);
+  assert.equal(spawnSync('node', [cli, ...asked(['raise', board, '--title', 'Plain?', '--key', 'plain'])], { encoding: 'utf8', env }).status, 0);
   // Media that leads out of the folder, to a non-image or to an unreadable file, evidence in any feed, and a contract key conflict in a feed:
   // each exits 2 and writes nothing.
   const dir = mkdtempSync(join(scratch, 'msg-')), valid = JSON.parse(readFileSync(file, 'utf8')), before = readFileSync(board, 'utf8');
@@ -634,7 +635,7 @@ test('post --kind gate: a done-done run waits for approval like an ask, its run 
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;
   delete env.SIGN_OFF_FILER;
-  const board = join(scratch, 'gate.json'), cli2 = (input, ...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env, input });
+  const board = join(scratch, 'gate.json'), cli2 = (input, ...args) => spawnSync('node', [cli, ...asked(args)], { encoding: 'utf8', env, input });
   const posted = cli2(JSON.stringify(gate), 'post', board, '--kind', 'gate', '--from', '-');
   assert.equal(posted.status, 0, posted.stdout);
   assert.match(posted.stdout, /dd-gate-a1b2c3d4,raised,[^]*wait .*--filer done-done/);
@@ -679,7 +680,7 @@ test('post --kind finding: a retro proposal waits like an ask, a changed proposa
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;
   delete env.SIGN_OFF_FILER;
-  const board = join(scratch, 'finding.json'), cli2 = (input, ...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env, input });
+  const board = join(scratch, 'finding.json'), cli2 = (input, ...args) => spawnSync('node', [cli, ...asked(args)], { encoding: 'utf8', env, input });
   const posted = cli2(JSON.stringify(finding), 'post', board, '--kind', 'finding', '--from', '-');
   assert.equal(posted.status, 0, posted.stdout);
   assert.match(posted.stdout, /lfm-missing-env,raised,[^]*wait .*--filer learn-from-mistakes/);
@@ -718,7 +719,7 @@ test('post --kind evidence: an answered update keeps the media and run it was an
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;
   delete env.SIGN_OFF_FILER;
-  const board = join(scratch, 'evidence-replace.json'), cli2 = (input, ...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env, input });
+  const board = join(scratch, 'evidence-replace.json'), cli2 = (input, ...args) => spawnSync('node', [cli, ...asked(args)], { encoding: 'utf8', env, input });
   const dir = mkdtempSync(join(scratch, 'evmsg-'));
   writeFileSync(join(dir, 'shot.png'), readFileSync(join(fixtures, 'evidence.v1', 'shot.png')));
   const run = { run_id: '20261011T120000Z-a1b2c3d4', commit: '0123456789abcdef0123456789abcdef01234567',
@@ -747,16 +748,16 @@ test('post --kind evidence: an answered update keeps the media and run it was an
   assert.equal(readFileSync(board, 'utf8'), before);
   // The unchanged feed still resyncs, and asking about the key still returns the saved verdict.
   assert.equal(cli2('', 'post', board, '--from', message('ev-same.json', before), '--replace').status, 0);
-  const asked = cli2('', 'answers', board, '--key', 'k1');
-  assert.equal(asked.status, 0, asked.stdout);
-  assert.match(asked.stdout, /k1,fail/);
+  const read = cli2('', 'answers', board, '--key', 'k1');
+  assert.equal(read.status, 0, read.stdout);
+  assert.match(read.stdout, /k1,fail/);
 });
 
 test('wait --events: one line per answer and per another-round ask, with the item kind and schema; a board-format item reports as ask', async () => {
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;
   delete env.SIGN_OFF_FILER;
-  const board = join(scratch, 'events.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const board = join(scratch, 'events.json'), cli2 = (...args) => spawnSync('node', [cli, ...asked(args)], { encoding: 'utf8', env });
   assert.equal(spawnSync('node', [cli, 'post', board, '--kind', 'gate', '--from', '-'], { encoding: 'utf8', env, input: JSON.stringify(gate) }).status, 0);
   // A board-format item, even one with a type of its own, reports as ask schema 1.
   assert.equal(cli2('post', board, '--type', 'design', '--key', 'plain', '--title', 'Plain?', '--option', 'a=A', '--option', 'b=B', '--recommend', 'a', '--filer', 'done-done').status, 0);
@@ -794,12 +795,11 @@ test('every guard refuses bad input with a reason and one fix line, and never fa
   const env = { ...process.env, HOME: join(scratch, 'guards-home') };
   delete env.CLAUDE_CODE_SESSION_ID; delete env.SIGN_OFF_FILER;
   const dir = mkdtempSync(join(scratch, 'guards-')), board = join(dir, '.sign-off', 'decisions.json');
-  const cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', cwd: dir, env, input: '' });
+  const cli2 = (...args) => spawnSync('node', [cli, ...asked(args)], { encoding: 'utf8', cwd: dir, env, input: '' });
   const at = (name) => join(dir, name);
   assert.equal(cli2('init', dir).status, 0);
   writeFileSync(at('shot.png'), readFileSync(join(fixtures, 'evidence.v1', 'shot.png')));
-  writeFileSync(at('ask.json'), JSON.stringify({ contract: 1, kind: 'ask', schema: 1, key: 'k', title: 'Ship it?',
-    options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }], recommend_value: 'yes' }));
+  writeFileSync(at('ask.json'), JSON.stringify({ ...ask, key: 'k', title: 'Ship it?' }));
   writeFileSync(at('bad.json'), '{"schema":2,');
   writeFileSync(at('not-utf8.json'), Buffer.from('{"contract":1,"kind":"ask","schema":1,"key":"k","title":"Caf\u00e9?"}', 'latin1'));
   mkdirSync(join(dir, '.sign-off', 'mocks', 'k'), { recursive: true });
@@ -818,7 +818,7 @@ test('every guard refuses bad input with a reason and one fix line, and never fa
     [['raise', board, '--title', 'T?', '--port', '99999'], 2, /unknown flag --port for `raise`/, /valid flags/],
     [['raise', board, '--title', 'T?', '--filer', 'bad id!'], 2, /--filer bad id! must be 1-128/, /session id/],
     [['raise', board, '--title', 'T?', '--option', 'noequals', '--recommend', 'noequals'], 2, /--option noequals must be <value>=<label>/, /--recommend/],
-    [['raise', board, '--title', 'T?', '--option', 'a=A', '--option', 'b=B'], 2, /--recommend is required/, /one of a, b/],
+    [['raise', board, '--title', 'T?', '--why', 'Why.', '--option', 'a=A', '--option', 'b=B', '--outcome', 'a=A goes.', '--outcome', 'b=B goes.'], 2, /--recommend is required/, /one of a, b/],
     [['raise', board, '--title', 'T?', 'extra'], 2, /unexpected argument extra/, /--help/],
     [['frobnicate'], 2, /Unknown command: frobnicate/, /--help/],
     [['wait', board, '--timeout', '1.5'], 2, /--timeout must be whole seconds/, /wait --help/],
