@@ -61,7 +61,7 @@ try {
   drive('await wait(".plan .open-link"); await page.eval(() => scrollTo(0, 0));');
   capture('home', 'Summary shows the plan card with a document icon and Open plan.');
   const openRef = /uid=(\S+) link "Open plan,/.exec(browser('snapshot'))[1];
-  browser('click', `@${openRef}`); drive('await wait(".plan-section");');
+  browser('click', `@${openRef}`); drive('await wait(".plan-section"); await wait(".plan-view[style]");');
   assert.equal(JSON.parse(drive('console.log(JSON.stringify(await page.eval(() => getComputedStyle(document.querySelector("#reader h1")).outlineStyle)));')), 'none');
   capture('plan', 'Plan page is open with no title focus box, direction page and Send back disabled.');
   // The iframe is sandboxed: inspect its real served page separately at its exact frame size.
