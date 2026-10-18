@@ -1329,6 +1329,7 @@
       if (touch && Math.abs(end.clientX - touch.clientX) > 60 && Math.abs(end.clientX - touch.clientX) > Math.abs(end.clientY - touch.clientY) * 1.5) step(end.clientX < touch.clientX ? 1 : -1);
       touch = null;
     });
+    const controlsNext = controls.nextSibling;
     open.onclick = () => {
       session.open = true; panel.append(controls); root.append(viewer); draw(); viewer.showModal();
     };
@@ -1341,7 +1342,7 @@
         document.querySelector(`[data-design="${CSS.escape(d.key)}"]`)?.focus();
         return;
       }
-      root.append(controls); approve.textContent = 'Approve'; change.textContent = 'Change';
+      root.insertBefore(controls, controlsNext); approve.textContent = 'Approve'; change.textContent = 'Change';
       open.focus();
     };
     return root;

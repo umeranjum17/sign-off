@@ -1264,6 +1264,7 @@ test('a posted contract design is listed with its preview and date, and opens fo
   await evaluate('document.querySelector("[aria-label=\\"Close viewer\\"]").click()');
   await until(() => evaluate('!document.querySelector(".design-viewer[open]")'));
   assert.equal(await evaluate('location.hash'), '#designs/d1-design');
+  assert.equal(await evaluate('String(document.querySelector(".design-review textarea").compareDocumentPosition([...document.querySelectorAll(".design-review > a")].find((a) => a.textContent === "Open original design")))'), '4');
   await evaluate('location.reload()');
   await until(() => evaluate('!!document.querySelector("[aria-haspopup=dialog]")'));
   await evaluate('document.querySelector("[aria-haspopup=dialog]").click()');
@@ -1274,6 +1275,9 @@ test('a posted contract design is listed with its preview and date, and opens fo
   assert.match(await evaluate('document.querySelector(".design-viewer header").textContent'), /17 of 17/);
   assert.equal(await evaluate('document.querySelector("[aria-label=\\"Next screen\\"]").disabled'), true);
   assert.equal(JSON.parse(run('answers', file, '--json').out)['d1-design'].notes.length, 3);
+  await evaluate('document.querySelector("[aria-label=\\"Close viewer\\"]").click()');
+  await until(() => evaluate('!document.querySelector(".design-viewer[open]")'));
+  assert.equal(await evaluate('String(document.querySelector(".design-review textarea").compareDocumentPosition([...document.querySelectorAll(".design-review > a")].find((a) => a.textContent === "Open original design")))'), '4');
   close();
   proc.kill();
 });
