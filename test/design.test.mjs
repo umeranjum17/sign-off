@@ -966,7 +966,7 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   writeFileSync(file, JSON.stringify({ schema: 2, items: [
     { key: 'digest', title: 'Keep the weekly digest?', options: yesNo, recommend_value: 'yes' },
     { key: 'release', title: 'Which day for release?', options: ['today', 'friday', 'next-week'].map((v) => ({ value: v, label: v })), recommend_value: 'friday' },
-    { key: 'look', type: 'design', title: 'Pick the look', options: ['a', 'b', 'c'].map((v) => ({ value: v, label: v.toUpperCase() })), recommend_value: 'b', tradeoff: 'B is faster; A is simpler.', mocks: [{ value: 'b', path: 'mocks/one.webp' }] }
+    { key: 'look', type: 'design', title: 'Pick the look', options: ['a', 'b', 'c'].map((v) => ({ value: v, label: v.toUpperCase() })), recommend_value: 'b', tradeoff: 'B is faster; A is simpler.', default_if_silent: 'c', mocks: [{ value: 'b', path: 'mocks/one.webp' }] }
   ] }));
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
@@ -985,6 +985,8 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   assert.equal(await evaluate('document.querySelector(".decide .why")?.textContent'), 'B is faster; A is simpler.');
   assert.equal(await evaluate('document.querySelectorAll(".decide-preview .mock").length'), 1);
   assert.equal(await evaluate('!document.querySelector(".decide-preview .shot.none")'), true);
+  assert.equal(await evaluate('document.querySelector(".silent-line")?.textContent'), 'If you stay quiet: C');
+  assert.equal(await evaluate('(() => { const b = document.querySelector(".decide-bar").getBoundingClientRect().top; return [".pick-list", ".silent-line"].every(s => document.querySelector(s).getBoundingClientRect().bottom <= b); })()'), true);
   await evaluate('location.hash = "#waiting"');
   await until(async () => (await askTitles()) === 'Pick the look|Which day for release?|Keep the weekly digest?');
   await until(async () => (await pick('Yes/No')) && (await askTitles()) === 'Keep the weekly digest?');
