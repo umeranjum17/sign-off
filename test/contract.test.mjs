@@ -358,6 +358,20 @@ test('post --kind: one message from a file or stdin, checked against its kind, r
   const read = post(JSON.stringify(report), '--kind', 'report', '--from', '-');
   assert.equal(read.status, 0, read.stdout);
   assert.match(read.stdout, /slice-5-live,raised,[^]*so the user can read it/);
+  // A report's page is read at post from the board file's folder: validate passes a page beside the board but not beside the message file.
+  const beside = join(scratch, 'beside'), feedDir = join(beside, 'feed');
+  mkdirSync(join(beside, 'page'), { recursive: true });
+  mkdirSync(feedDir);
+  for (const f of ['index.html', 'preview.svg']) writeFileSync(join(beside, 'page', f), readFileSync(join(scratch, 'page', f)));
+  const feedFile = (name, view) => { const path = join(feedDir, name); writeFileSync(path, JSON.stringify({ ...report, key: name, view, preview: 'page/preview.svg' })); return path; };
+  const reportAt = feedFile('beside.json', 'page/index.html');
+  assert.equal(spawnSync('node', [cli, 'validate', reportAt], { encoding: 'utf8', env }).status, 0);
+  const beside2 = spawnSync('node', [cli, 'post', join(beside, 'board.json'), '--kind', 'report', '--from', reportAt], { encoding: 'utf8', env });
+  assert.equal(beside2.status, 0, beside2.stdout);
+  const gone = spawnSync('node', [cli, 'post', join(beside, 'board.json'), '--kind', 'report', '--from', feedFile('gone.json', 'page/gone.html')], { encoding: 'utf8', env });
+  assert.equal(gone.status, 2, gone.stdout);
+  assert.match(gone.stdout, /view \\"page\/gone\.html\\" is not there/);
+  assert.match(gone.stdout, /Put the file at page\/gone\.html from the board file's folder/);
   spawnSync('node', [cli, 'raise', board, '--title', 'Plain?', '--key', 'plain'], { env });
   const before = readFileSync(board, 'utf8');
   // A key takes only the same message again: another filer, another filed time, or a plain item under it is a conflict.
