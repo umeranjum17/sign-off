@@ -102,7 +102,7 @@ Each file gets a row with ok, or the error and one help line that names the fix.
   --expect-invalid  every file must be refused: exits 0 only then, 2 when any passes (the conformance check of invalid fixtures)
 Exits 0 when every file passes, 2 when any is refused or no file is named, and 1 when any file cannot be read.
 example message:
-  {"contract":1,"kind":"ask","schema":1,"key":"ship-signin-2","title":"Ship the new sign-in screen this week?","options":[{"value":"yes","label":"Yes"},{"value":"no","label":"No"}],"recommend_value":"yes"}
+  {"contract":1,"kind":"ask","schema":1,"key":"ship-signin-2","title":"Ship the new sign-in screen this week?","about":"Slice 5 passed its checks.","why":"The screen is ready and the release goes out Friday.","options":[{"value":"yes","label":"Yes","outcome":"It ships to everyone on Friday."},{"value":"no","label":"No","outcome":"It waits for next week's release."}],"recommend_value":"yes","recommend_reason":"Every check passed on 3 phones.","default_if_silent":"no","silent_by":"2026-10-19T16:00Z"}
 examples:
   sign-off-axi validate ask.json
   sign-off-axi validate --kind ask messages/*.json
@@ -699,7 +699,7 @@ function post(args: string[], cmd = 'post') {
   if (values.preview !== undefined) throw fail('--preview needs --type report', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (values.from === undefined && values.title === undefined) {
     throw fail('--title is required (or --from <decisions.json>)', 'VALIDATION_ERROR', type === 'design' ? 'sign-off-axi post --type design --title "<question>" --option a=A --option b=B --recommend a'
-      : type === 'evidence' ? 'sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media <file>' : `sign-off-axi ${cmd} --title "<question>" [--recommend <value>]`);
+      : type === 'evidence' ? 'sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media <file>' : `sign-off-axi ${cmd} --title "<question>" --why "<why>" --outcome yes="<outcome>" --outcome no="<outcome>" --recommend yes --recommend-reason "<reason>" --default no`);
   }
   if (!['decision', 'design', 'evidence', 'diagram', 'interactive', 'explainer'].includes(type)) throw fail(`--type must be decision, design, evidence, diagram, interactive, explainer, report or signin`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (type === 'evidence' || type === 'explainer') return postMedia(file, on, values, type, filer);
