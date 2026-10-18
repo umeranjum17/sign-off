@@ -70,8 +70,6 @@ const whole = (v: unknown) => Number.isSafeInteger(v) && (v as number) >= 0;
 const show = (v: unknown) => JSON.stringify(v);
 /** A field name as it reads inside a sentence: escaped, so a newline or control character shows as \n or \u001b. */
 const escaped = (v: string) => show(v).slice(1, -1);
-/** A list in a sentence: "a, b and c". */
-const and = (v: string[]) => v.join(', ').replace(/, (?=[^,]*$)/, ' and ');
 
 /** Checks one message against its kind's rules and returns its kind and schema; the first broken rule throws, in the order docs/contract.md gives.
  * `want` is the kind the caller expects, so the wrong file is refused before its fields are read. */
@@ -109,7 +107,7 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
     v.forEach((o: any, n: number) => {
       if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad(`${f}[${n}]`, 'must be an object', set);
       const odd = Object.keys(o).find((k) => !fields.includes(k));
-      if (odd !== undefined) throw bad(`${f}[${n}].${escaped(odd) || '""'}`, `is not a field of a ${one}`, `Remove ${show(odd)}; a ${one} has only ${and(fields)}`);
+      if (odd !== undefined) throw bad(`${f}[${n}].${escaped(odd) || '""'}`, `is not a field of a ${one}`, `Remove ${show(odd)}; a ${one} has only ${fields.join(', ')}`);
     });
     return v;
   };
@@ -118,7 +116,7 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
     const at = `${field}[${n}]`, fields = outcome ? ['value', 'label', 'outcome'] : ['value', 'label'];
     if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad(at, 'must be an object', `Write each option as {"value":"<id>","label":"<text>"${outcome ? ',"outcome":"<what it leads to>"' : ''}}`);
     const odd = Object.keys(o).find((f) => !fields.includes(f));
-    if (odd !== undefined) throw bad(`${at}.${escaped(odd) || '""'}`, 'is not a field of an option', `Remove ${show(odd)}; an option has only ${and(fields)}`);
+    if (odd !== undefined) throw bad(`${at}.${escaped(odd) || '""'}`, 'is not a field of an option', `Remove ${show(odd)}; an option has only ${fields.join(', ')}`);
     if (!isKey(o.value)) throw bad(`${at}.value`, 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "value" to a short id such as "yes"');
     if (options.slice(0, n).some((p: any) => p.value === o.value)) throw bad(`${at}.value`, `repeats ${o.value}`, 'Give every option its own value');
     text(`${at}.label`, o.label, 80, 'the button text, in 80 characters or fewer');
@@ -208,8 +206,9 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
       if (all.slice(0, n).some((p) => p.key === o.key)) throw bad(`${at}.key`, `repeats ${o.key}`, 'Give every decision its own key');
       text(`${at}.question`, o.question, 160, 'the question, ending in ?');
       // One question: a single ?, as its last character, so "Keep A? Or B?" is two decisions.
-      if (o.question.indexOf('?') !== o.question.length - 1) throw bad(`${at}.question`, 'must be one question, with one ? as its last character', 'Ask one question ending in ?, and split any other into its own decision');
-      if (!/[\p{L}\p{N}]/u.test(o.question) || o.question.trim().split(/\s+/).length > 12) throw bad(`${at}.question`, 'must be one question of 12 words or fewer, ending in ?', 'Ask it in 12 words or fewer, ending in ?; put the rest in "why"');
+      const q = o.question.trim();
+      if (q.indexOf('?') !== q.length - 1) throw bad(`${at}.question`, 'must be one question, with one ? as its last character', 'Ask one question ending in ?, and split any other into its own decision');
+      if (!/[\p{L}\p{N}]/u.test(q) || q.split(/\s+/).length > 12) throw bad(`${at}.question`, 'must be one question of 12 words or fewer, ending in ?', 'Ask it in 12 words or fewer, ending in ?; put the rest in "why"');
       text(`${at}.why`, o.why, 500, 'why it matters, in 500 characters or fewer');
       if (!Array.isArray(o.options) || o.options.length < 2 || o.options.length > 6) throw bad(`${at}.options`, Object.hasOwn(o, 'options') ? 'must list 2 to 6 options' : 'is required', 'Set "options" to 2-6 objects such as {"value":"yes","label":"Yes","outcome":"Plans live in the board file"}');
       checkOptions(`${at}.options`, o.options, true);
