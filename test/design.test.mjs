@@ -1178,7 +1178,7 @@ test('Waiting on you: a reply-only ask shows Reply, a type-ask yes/no shows Yes/
   proc.kill();
 });
 
-test('a posted contract design renders as a plain row without answer controls', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('a posted contract design is listed with its preview and date, and opens for a saved approve/change review', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'contract-design-plain-row'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
   mkdirSync(join(dir, 'design'), { recursive: true });
   writeFileSync(join(dir, 'design', 'preview.png'), png);
@@ -1200,8 +1200,20 @@ test('a posted contract design renders as a plain row without answer controls', 
   assert.equal(await evaluate('document.querySelector("#item-d1-design .about")?.textContent'), message.about);
   assert.equal(await evaluate('document.querySelector("#item-d1-design a")?.textContent'), 'Open original');
   assert.equal(await evaluate('document.querySelector("#item-d1-design a")?.getAttribute("href")'), message.link);
-  assert.equal(await evaluate('document.querySelectorAll("#item-d1-design button, #item-d1-design textarea, #item-d1-design input, #item-d1-design select").length'), 0);
-  assert.equal(await evaluate('document.querySelector("#item-d1-design .choices, #item-d1-design .mocks, #item-d1-design .ann")'), null);
+  assert.equal(await evaluate('document.querySelector(".quiet a.open-link")?.textContent'), 'Open designs');
+  await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
+  await until(async () => (await evaluate('document.querySelector(".design-card h3")?.textContent')) === message.title);
+  assert.equal(await evaluate('document.querySelector(".design-card img")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent(message.preview)}`);
+  assert.equal(await evaluate('document.querySelector(".design-card .meta")?.textContent'), '18 Oct');
+  await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
+  await until(async () => (await evaluate('document.querySelector(".design-review button")?.textContent')) === 'Approve');
+  await evaluate('document.querySelector(".design-review select").value = "quick"');
+  await evaluate('document.querySelector(".design-review button").click()');
+  await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Approved');
+  await evaluate('document.querySelector(".design-review textarea").value = "Make the title clearer"');
+  await evaluate('document.querySelector(".design-review button:last-of-type").click()');
+  await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Changes requested');
+  assert.match(run('answers', file, '--json').out, /Make the title clearer/);
   close();
   proc.kill();
 });

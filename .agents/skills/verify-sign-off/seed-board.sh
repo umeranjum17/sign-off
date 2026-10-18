@@ -21,6 +21,9 @@ so post "$board" --key ship --title "When should the new settings page ship?" --
 # A design pick takes mocks and a tradeoff; the question standard (--why, --outcome) is for --type decision only.
 so post "$board" --type design --key look --title "Which settings layout should ship?" --option a="A: one column" --option b="B: two columns" \
   --mock a=mocks/a.webp --mock b=mocks/b.webp --tradeoff "B scans faster; A is simpler." --recommend b
+mkdir -p "$dir/design"; cp "$f/design.v1/design/"* "$dir/design/"; cp "$repo/docs/media/phone-light.webp" "$dir/design/preview.webp"
+sed 's#design/preview.png#design/preview.webp#' "$f/design.v1/valid-basic.json" > "$dir/design-message.json"
+so post "$board" --kind design --from "$dir/design-message.json"
 so post "$board" --type signin --key npm --service "npm" --link https://example.com/login --unlocks "Publishing the release" --waits "Release agent" --expires 2h
 so post "$board" --kind plan --from "$dir/plan.json"
 so post "$board" --type evidence --title "Sign-in screen on a phone" --about "Umer checks the new layout." --media "$dir/shot.webp" --link https://example.com/pr/4
