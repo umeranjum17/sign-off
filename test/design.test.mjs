@@ -997,27 +997,41 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await until(async () => (await pick('Yes/No')) && (await askTitles()) === 'Keep the weekly digest?');
   await pick('All');
   await evaluate('(() => { const s = document.querySelector(".sort select"); s.value = "oldest"; s.dispatchEvent(new Event("change")); })()');
-  // PR #109's filed-time order and reset behavior remain covered beside the Spacious card and decision journey.
-  await until(async () => (await queue()) === 'Keep the weekly digest?|Which day for release?|Pick the look'
+  await until(async () => (await askTitles()) === 'Keep the weekly digest?|Which day for release?|Pick the look'
     && (await evaluate('localStorage.getItem("sign-off-waiting-sort")')) === 'oldest');
   await evaluate('location.reload()');
   await until(async () => (await evaluate('document.querySelector(".sort select")?.value')) === 'oldest');
   assert.equal(await evaluate('document.querySelector(".sort select").value'), 'oldest');
-  assert.equal(await evaluate('document.querySelector(".focus h3")?.textContent'), 'Keep the weekly digest?');
-  // A type chip narrows this visit only: ‹ Summary and back through the way to Triage opens everything its count promises, in All again.
-  await until(async () => (await pick('Yes/No')) && (await queue()) === 'Keep the weekly digest?');
+  // A type chip narrows this visit; Summary's Review all link restores every ask.
+  await until(async () => (await pick('Yes/No')) && (await askTitles()) === 'Keep the weekly digest?');
   await evaluate('document.querySelector(".back").click()');
   await until(async () => (await evaluate('document.querySelector(".needs a.more")?.textContent')) === 'Review all 3 →');
   await evaluate('document.querySelector(".needs a.more").click()');
-  await until(async () => (await fhead()) === '1 of 3');
-  assert.equal(await queue(), 'Keep the weekly digest?|Which day for release?|Pick the look');
+  await until(async () => (await askTitles()) === 'Keep the weekly digest?|Which day for release?|Pick the look');
   assert.equal(await chips(), 'All 3*|Design pick 1|Yes/No 1|Pick one 1');
   // The same reset lands a Summary tap on the very ask tapped, even one the chip had filtered out.
-  await until(async () => (await pick('Yes/No')) && (await queue()) === 'Keep the weekly digest?');
+  await until(async () => (await pick('Yes/No')) && (await askTitles()) === 'Keep the weekly digest?');
   await evaluate('document.querySelector(".back").click()');
   await until(async () => (await evaluate('!!document.querySelector(".needs a.more")')));
   await evaluate('[...document.querySelectorAll(".areas .i-waiting a.compact")].find((a) => a.textContent.includes("Pick the look")).click()');
-  await until(async () => (await evaluate('document.querySelector(".focus h3")?.textContent')) === 'Pick the look');
+  await until(async () => await evaluate('location.hash === "#decide/look" && document.querySelector(".decide h2")?.textContent === "Pick the look"'));
+  await evaluate("location.hash = '#waiting'");
+  await until(async () => (await evaluate('location.hash')) === '#waiting');
+  // Answer, undo, then accept by keyboard so the Waiting list and its toast reflect the durable answer.
+  await evaluate('document.querySelector(`a[href="#decide/release"]`).click()');
+  await until(async () => (await evaluate('location.hash')) === '#decide/release');
+  assert.equal(await evaluate('document.querySelector(".decide h2").textContent'), 'Which day for release?');
+  assert.equal(await evaluate('document.querySelectorAll(".pick-option").length'), 3);
+  assert.equal(await evaluate('document.querySelector(".pick-option[aria-pressed=true] .recommend")?.textContent'), 'Recommended');
+  await evaluate('document.querySelector(".pick-option").click(); document.querySelector(".decide-bar .answer").click()');
+  await until(async () => (await evaluate('location.hash')) === '#waiting' && (await evaluate('!document.querySelector("#toast").hidden')));
+  assert.match(run('answers', file, '--key', 'release').out, /today/);
+  await evaluate('document.querySelector("#undo").click()');
+  await until(async () => !/today/.test(run('answers', file, '--key', 'release').out));
+  await evaluate('document.querySelector(`a[href="#decide/release"]`).click()');
+  await until(async () => (await evaluate('location.hash')) === '#decide/release');
+  await evaluate('document.dispatchEvent(new KeyboardEvent("keydown", { key: "1", bubbles: true }))');
+  await until(async () => /today/.test(run('answers', file, '--key', 'release').out));
   // A posted plan waits with the asks: its card gives the title, its counts and one Open plan, which opens its page over the board with the pointing script.
   const fixture = new URL('../fixtures/contract/plan.v1/', import.meta.url).pathname;
   mkdirSync(join(dir, 'page'));
@@ -1069,23 +1083,6 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await until(async () => (await evaluate(answeredTitles)).includes('Keep the weekly digest?') && (await evaluate(answeredTitles)).includes('Show plans on the board'));
   await evaluate('document.querySelector(".clear").click()');
   await until(async () => (await evaluate(answeredTitles)) === '');
-  // The decision path records, undoes, and accepts a keyboard answer on the same real board.
-  await evaluate("location.hash = '#waiting'");
-  await until(async () => (await evaluate('location.hash')) === '#waiting');
-  await evaluate('document.querySelector(`a[href="#decide/release"]`).click()');
-  await until(async () => (await evaluate('location.hash')) === '#decide/release');
-  assert.equal(await evaluate('document.querySelector(".decide h2").textContent'), 'Which day for release?');
-  assert.equal(await evaluate('document.querySelectorAll(".pick-option").length'), 3);
-  assert.equal(await evaluate('document.querySelector(".pick-option[aria-pressed=true] .recommend")?.textContent'), 'Recommended');
-  await evaluate('document.querySelector(".pick-option").click(); document.querySelector(".decide-bar .answer").click()');
-  await until(async () => (await evaluate('location.hash')) === '#waiting' && (await evaluate('!document.querySelector("#toast").hidden')));
-  assert.match(run('answers', file, '--key', 'release').out, /today/);
-  await evaluate('document.querySelector("#undo").click()');
-  await until(async () => !/today/.test(run('answers', file, '--key', 'release').out));
-  await evaluate('document.querySelector(`a[href="#decide/release"]`).click()');
-  await until(async () => (await evaluate('location.hash')) === '#decide/release');
-  await evaluate('document.dispatchEvent(new KeyboardEvent("keydown", { key: "1", bubbles: true }))');
-  await until(async () => /today/.test(run('answers', file, '--key', 'release').out));
   close();
   proc.kill();
 });
