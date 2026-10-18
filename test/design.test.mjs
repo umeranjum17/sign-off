@@ -1207,6 +1207,7 @@ test('a posted contract design is listed with its preview and date, and opens fo
   assert.equal(await evaluate('document.querySelector(".design-card .meta")?.textContent'), '18 Oct');
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
   await until(async () => (await evaluate('document.querySelector(".design-review button")?.textContent')) === 'Approve');
+  assert.equal(await evaluate('document.querySelector(".design-preview-full")?.getAttribute("target")'), '_blank');
   await evaluate('document.querySelector(".design-review select").value = "quick"');
   await evaluate('document.querySelector(".design-review button").click()');
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Approved');
@@ -1214,6 +1215,15 @@ test('a posted contract design is listed with its preview and date, and opens fo
   await evaluate('document.querySelector(".design-review button:last-of-type").click()');
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Changes requested');
   assert.match(run('answers', file, '--json').out, /Make the title clearer/);
+  const desktop = await browse(join(dir, 'desktop-browser'), 1280);
+  await desktop.evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
+  await until(async () => (await desktop.evaluate('document.querySelector("#nav a[href=\\"#designs\\"][aria-current=page]")?.textContent.trim()')) === 'Designs1');
+  await desktop.evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
+  await until(async () => (await desktop.evaluate('document.querySelector(".design-review button")?.textContent')) === 'Approve');
+  assert.equal(await desktop.evaluate('document.querySelector("#nav a[href=\\"#designs\\"][aria-current=page]")?.getClientRects().length > 0'), true);
+  assert.equal(await desktop.evaluate('document.querySelector(".design-review")?.getBoundingClientRect().bottom <= innerHeight'), true);
+  assert.equal(await desktop.evaluate('document.querySelector("#reader").getBoundingClientRect().left >= document.querySelector("#nav").getBoundingClientRect().right'), true);
+  desktop.close();
   close();
   proc.kill();
 });
