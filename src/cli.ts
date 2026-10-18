@@ -12,7 +12,7 @@ import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
 import { type Answer, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
-import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, mediaFiles, parseMessage, reportPage } from './contract.js';
+import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, mediaFiles, parseMessage, postable, reportPage } from './contract.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
 
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
@@ -80,7 +80,7 @@ examples:
 `,
   validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>] [--expect-invalid]
 Checks message files against the communication contract without posting them: ${CONTRACT}
-A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate and finding at schema 1, and report at schema 2.
+A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate, finding and plan at schema 1, and report at schema 2.
 An evidence message's media paths read from the message file's folder: each file must be there, inside it, and 50 MB or less.
 A report is a page to tap through: its "view" (.html) and "preview" (its picture, beside it) read from the message file's folder, filled with no FILL: lines left (see report init).
 A gate names its done-done run (run_id and commit) and offers 2 or 3 of approve (Approve), skip (Skip the judge) and fix (Fix first).
@@ -349,6 +349,7 @@ function contractItems(items: any[], from: string, file: string, replace = false
     }
     try {
       checkMessage(check);
+      postable(check);
       if (check.kind === 'report') reportPage(check, dirname(file));
     } catch (e) {
       throw e instanceof ContractError ? fail(`${from}: items[${i}]: ${e.message}`, 'VALIDATION_ERROR', e.help) : e;
@@ -945,6 +946,7 @@ async function postKind(file: string, on: string, values: Record<string, any>, b
   try {
     m ??= parseMessage(bytes!);
     checkMessage(m, built ? 'report' : kind);
+    postable(m);
     // Media paths read from the message file's folder, or from the current folder for stdin.
     if (m.kind === 'evidence') sources = mediaFiles(m, from === '-' ? process.cwd() : dirname(resolve(from)));
     // A report's page is served from the board file's folder, as --view is.

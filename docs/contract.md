@@ -1,12 +1,12 @@
 # Communication contract, v1
 
-sign-off owns this contract. Agents and tools use it to post asks, reports, evidence, gates and retro findings to the board, and to read the answers back. Every message has the same strict shape, so the person reading the board sees one kind of card per kind of message, whoever sent it.
+sign-off owns this contract. Agents and tools use it to post asks, reports, evidence, gates, retro findings and plans to the board, and to read the answers back. Every message has the same strict shape, so the person reading the board sees one kind of card per kind of message, whoever sent it.
 
-Status: v1 target, built in parts. Built: all five kinds, `ask`, `report` (schema 2, a page), `evidence`, `gate` and `finding`; `validate`, with `--expect-invalid` (section 9), and their fixtures in the npm package; `post --kind`, from a file or stdin with `--from -`, where a key conflict exits 2; in a `raise --from` or `post --from` file, a new item that carries `contract` or `kind` is checked as a message before anything is stored, a new item of a contract kind without `kind` is refused, and a new item's title is held to 1-160. New contract evidence is posted with `post --kind evidence`, never in a `--from` file; `post --type evidence` keeps the board format. Answer events are built: `wait --events` and the contract fields on `on_answer` (section 7). Not built yet: `schema`. `raise --title` and `post --type decision` still post board-format items (they do not fill in `contract`, `kind` and `schema` yet), and their key conflicts still exit 1.
+Status: v1 target, built in parts. Built: five kinds, `ask`, `report` (schema 2, a page), `evidence`, `gate` and `finding`; the sixth, `plan`, in `validate` only (`post` refuses it until the board shows plans); `validate`, with `--expect-invalid` (section 9), and their fixtures in the npm package; `post --kind`, from a file or stdin with `--from -`, where a key conflict exits 2; in a `raise --from` or `post --from` file, a new item that carries `contract` or `kind` is checked as a message before anything is stored, a new item of a contract kind without `kind` is refused, and a new item's title is held to 1-160. New contract evidence is posted with `post --kind evidence`, never in a `--from` file; `post --type evidence` keeps the board format. Answer events are built: `wait --events` and the contract fields on `on_answer` (section 7). Not built yet: `schema`. `raise --title` and `post --type decision` still post board-format items (they do not fill in `contract`, `kind` and `schema` yet), and their key conflicts still exit 1.
 
 ## 1. Versions
 
-- One contract, `"contract": 1`. Five kinds: `ask`, `report`, `evidence`, `gate` and `finding`.
+- One contract, `"contract": 1`. Six kinds: `ask`, `report`, `evidence`, `gate`, `finding` and `plan`.
 - Each kind has its own `"schema"` number, starting at `1`. Every message carries `contract`, `kind` and `schema`.
 - Strict: an unlisted field, a wrong type or a broken limit refuses the whole message, at every level (options, `run`, `media`). Nothing is dropped quietly, and nothing is stored or shown half-valid.
 - Inside one `contract`, `kind` and `schema`, no field is added, removed, renamed or retyped. Any such change is a new `schema`.
@@ -34,7 +34,7 @@ A message file holds one JSON object, in any layout. The validator reads it with
 
 | Producer | Kinds it sends |
 |---|---|
-| An agent, alone or under a supervisor | `ask`, `report` |
+| An agent, alone or under a supervisor | `ask`, `report`, `plan` |
 | done-done | `evidence`, `gate` |
 | learn-from-mistakes | `finding` |
 
@@ -86,6 +86,16 @@ An explainer the person reads: made when they asked for an explanation, or when 
 - `post --type report --title --about --view --preview` posts the same message from flags, with `filed` set to the time of the first post.
 - No `options` key, not even `[]`: it is refused with the fix "post an ask to get an answer". On the board it is stored with no options, shows under Reports and explainers on any board, and never waits. A stored report that carries `options`, `reply`, `area` or `type` is refused when the board is read, the same way.
 
+### plan, schema 1
+
+An agent's plan the person reviews before the work starts: each section approved or changed with a note, each decision answered. It is not a report, because it takes answers. The board does not show plans yet, so `post` refuses one with a fix line to check it with `validate`.
+
+- Required: the common fields, `about` (the plan, answer first), `sections`, `decisions` and `view`.
+- `sections`: 1 to 8 objects of exactly `id` (1-40 of `a-z 0-9 -`, unique in the plan), `heading` (text, 1-80) and `body` (text, 1-1000), such as goals and non-goals, architecture, slices and order, coding standards, risks.
+- `decisions`: 0 to 5 objects of exactly `key` (a key-set id, unique in the plan), `question` (text, 1-160: one question of 12 words or fewer, with one question mark (`?` or `？`) as its last character; `"Keep A? Or B?"` is refused), `why` (text, 1-500), `options` (2-6 ask options, each also with `outcome`, text 1-200: what picking it leads to) and `recommend` (one listed option `value`).
+- `view`: the one page, with the direction diagram, with the report rules for its path. `validate` checks the path, not the file. Optional: `steps`, 2 to 12 tap-through steps, each exactly `title` (text, 1-80). The message lists step titles only; each step's explanation lives on the plan's view page.
+- No `options` key: a plan's answers come from its sections and decisions, so top-level `options` is refused with a fix line to put each question in `decisions`.
+
 ### evidence, schema 1
 
 Proof the person gives a verdict on. Shows in Evidence. Its options are fixed and not in the message: `pass` (Pass), `fail` (Fail) and `needs-work` (Needs work).
@@ -124,6 +134,7 @@ One per kind, each written on one line here. Demo data uses the name Umer.
 {"contract":1,"kind":"report","schema":2,"key":"new-sign-in","title":"How the new sign-in works","filer":"sign-off-builder","about":"Sign-in now asks for a code after the password, so a stolen password alone opens nothing.","filed":"2026-10-13T07:19:00Z","group":"Sign-in","decided":"Umer keeps the code step.","view":"mocks/new-sign-in/index.html","preview":"mocks/new-sign-in/preview.svg"}
 {"contract":1,"kind":"evidence","schema":1,"title":"Sign-in screen on a phone","filer":"done-done","about":"Umer signs in on a phone. The screen loads in 1 second.","media":["evidence-out/after.png"],"run":{"run_id":"20261011T120000Z-a1b2c3d4","commit":"0123456789abcdef0123456789abcdef01234567","outcome":"Umer can see the updated sign-in screen.","repro":"repro: n/a: no bug","proof":"done-done: real browser journey","evidence":"after.png"}}
 {"contract":1,"kind":"gate","schema":1,"key":"dd-gate-a1b2c3d4","title":"Move the sign-in run on past its judge?","filer":"done-done","about":"The judge could not tell the screens apart.","run":{"run_id":"20261011T120000Z-a1b2c3d4","commit":"0123456789abcdef0123456789abcdef01234567"},"options":[{"value":"approve","label":"Approve"},{"value":"skip","label":"Skip the judge"},{"value":"fix","label":"Fix first"}],"recommend_value":"fix","close":"done"}
+{"contract":1,"kind":"plan","schema":1,"key":"plan-filter-waiting","title":"Filter Waiting on you by type","about":"Umer can show only one type of question at a time.","sections":[{"id":"goals","heading":"Goals","body":"Add a type filter above Waiting on you."}],"decisions":[{"key":"default","question":"Show every type when the board opens?","why":"A remembered filter can hide a new question.","options":[{"value":"all","label":"All types","outcome":"Nothing is hidden on open."},{"value":"last","label":"Last filter","outcome":"The board opens as Umer left it."}],"recommend":"all"}],"view":"mocks/plan-filter-waiting/index.html"}
 {"contract":1,"kind":"finding","schema":1,"key":"lfm-missing-env","title":"Repeated cause: missing env var in CI","filer":"learn-from-mistakes","about":"4 incidents over 3 days in 2 sources.","cause":"missing-env","incidents":4,"days":3,"evidence_ids":["rec-7f3a","rec-91be"],"change_kind":"doc","proposal":"Add the env var to the CI setup page.","options":[{"value":"apply","label":"Apply"},{"value":"skip","label":"Skip"}],"recommend_value":"apply"}
 ```
 
@@ -160,6 +171,8 @@ error: "ask.json: key pick-a: recommend_value is required"
 code: VALIDATION_ERROR
 help[1]: "Add \"recommend_value\": \"a\", the option you would pick: one of a, b"
 ```
+
+For a plan, the same order then runs: `sections` (count, fields, `id`, unique ids), `decisions` (each `key`, `question`, `why`, `options`, `recommend`), `steps`, then `view`. A plan with no sections, two sections with one id, a decision question with more than one question mark, a decision with no `recommend` or one that names no option, a plan with no `view`, and a plan with top-level `options` are each refused with one fix line.
 
 To recover: read the `help` line, fix the message file, post it again. Never edit the board file by hand.
 

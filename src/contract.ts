@@ -8,7 +8,7 @@ export class ContractError extends Error {
   constructor(message: string, readonly help: string) { super(message); }
 }
 /** The kinds, with the schema number of each. */
-export const SCHEMAS: Record<string, number> = { ask: 1, report: 2, evidence: 1, gate: 1, finding: 1 };
+export const SCHEMAS: Record<string, number> = { ask: 1, report: 2, evidence: 1, gate: 1, finding: 1, plan: 1 };
 export const KINDS = Object.keys(SCHEMAS);
 const COMMON = ['contract', 'kind', 'schema', 'key', 'title', 'filer', 'link', 'about'];
 const FIELDS: Record<string, string[]> = {
@@ -17,6 +17,7 @@ const FIELDS: Record<string, string[]> = {
   evidence: [...COMMON, 'media', 'run'],
   gate: [...COMMON, 'run', 'options', 'recommend_value', 'close'],
   finding: [...COMMON, 'cause', 'incidents', 'days', 'evidence_ids', 'change_kind', 'proposal', 'options', 'recommend_value'],
+  plan: [...COMMON, 'sections', 'decisions', 'steps', 'view'],
 };
 /** A done-done run: its id, full commit and the four Checks lines. */
 const RUN = ['run_id', 'commit', 'outcome', 'repro', 'proof', 'evidence'];
@@ -29,6 +30,10 @@ export const MEDIA_BYTES = 50_000_000;
 /** The command that makes a report's page, named in every refusal of a report without one. */
 export const REPORT_INIT = 'sign-off-axi report init <folder>';
 const PAGE_HELP = `Run \`${REPORT_INIT}\` to make the page, fill it, then post it with "view" and "preview"`;
+/** A plan passes validate, but the board cannot show one yet: post refuses it rather than store it as a yes/no ask. */
+export function postable(m: any): void {
+  if (m.kind === 'plan') throw new ContractError(`${isKey(m.key) ? `key ${m.key}: ` : ''}kind plan cannot be posted yet: the board does not show plans`, 'Check it with `sign-off-axi validate <file.json>`; post it once sign-off-axi shows plans');
+}
 
 /** Parses one message; a field written twice in any object refuses it, since plain JSON.parse keeps the last one quietly. */
 export function parseMessage(bytes: Uint8Array): unknown {
@@ -95,6 +100,42 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
     if (!(typeof r.commit === 'string' && /^[a-f0-9]{40}$/.test(r.commit))) throw bad('run.commit', 'must be a full 40-character lowercase commit', 'Set "commit" to the full hash, such as the output of git rev-parse HEAD');
     for (const f of fields.slice(2)) text(`run.${f}`, r[f], 1000, `the run's ${f} Checks line, in 1000 characters or fewer`);
   };
+  /** A list of min to max objects, each with only `fields`: a plan's sections, decisions and steps. */
+  const list = (f: string, min: number, max: number, fields: string[], example: string): any[] => {
+    const v = m[f], one = f.slice(0, -1), set = `Set "${f}" to ${min}-${max} objects such as ${example}`;
+    if (!Array.isArray(v) || v.length < min || v.length > max) throw bad(f, Object.hasOwn(m, f) ? `must list ${min} to ${max} ${f}` : 'is required', set);
+    v.forEach((o: any, n: number) => {
+      if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad(`${f}[${n}]`, 'must be an object', set);
+      const odd = Object.keys(o).find((k) => !fields.includes(k));
+      if (odd !== undefined) throw bad(`${f}[${n}].${escaped(odd) || '""'}`, `is not a field of a ${one}`, `Remove ${show(odd)}; a ${one} has only ${fields.join(', ')}`);
+    });
+    return v;
+  };
+  /** Each option: exactly value and label (and on a plan's decision, outcome), its value unique. Ask, gate, finding and plan decisions share it. */
+  const checkOptions = (field: string, options: any[], outcome = false) => options.forEach((o: any, n: number) => {
+    const at = `${field}[${n}]`, fields = outcome ? ['value', 'label', 'outcome'] : ['value', 'label'];
+    if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad(at, 'must be an object', `Write each option as {"value":"<id>","label":"<text>"${outcome ? ',"outcome":"<what it leads to>"' : ''}}`);
+    const odd = Object.keys(o).find((f) => !fields.includes(f));
+    if (odd !== undefined) throw bad(`${at}.${escaped(odd) || '""'}`, 'is not a field of an option', `Remove ${show(odd)}; an option has only ${fields.join(', ')}`);
+    if (!isKey(o.value)) throw bad(`${at}.value`, 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "value" to a short id such as "yes"');
+    if (options.slice(0, n).some((p: any) => p.value === o.value)) throw bad(`${at}.value`, `repeats ${o.value}`, 'Give every option its own value');
+    text(`${at}.label`, o.label, 80, 'the button text, in 80 characters or fewer');
+    if (outcome) text(`${at}.outcome`, o.outcome, 200, 'what picking it leads to, in 200 characters or fewer');
+  });
+  /** The option the poster would pick, `field` on `o`: required, and one of the option values, which it returns. */
+  const recommend = (field: string, o: any, options: any[]): string[] => {
+    const name = field.replace(/^.*\./, ''), values = options.map((p: any) => p.value), pick = `the option you would pick: one of ${values.join(', ')}`;
+    if (!Object.hasOwn(o, name)) throw bad(field, 'is required', `Add "${name}": ${show(values[0])}, ${pick}`);
+    if (!values.includes(o[name])) throw bad(field, `${show(o[name])} is not an option value`, `Set "${name}" to ${pick}`);
+    return values;
+  };
+  /** A page path, as a report's view and preview are: relative, inside the board file's folder, with the given ending. */
+  const page = (f: string, ends: RegExp, kinds: string, example: string, need: string, help = PAGE_HELP) => {
+    if (!Object.hasOwn(m, f)) throw bad(f, `is required: ${need}`, help);
+    text(f, m[f], 256, `${example}, a path from the board file's folder`);
+    if (/^([\\/]|[A-Za-z]:)/.test(m[f]) || m[f].split(/[\\/]/).includes('..') || /[?#\\]/.test(m[f])) throw bad(f, `${show(m[f])} must be a relative path with no .., ?, # or \\`, `Set "${f}" to ${example}, a path from the board file's folder`);
+    if (!ends.test(m[f])) throw bad(f, `${show(m[f])} must end in ${kinds}`, help);
+  };
   need('contract');
   if (m.contract !== 1) throw bad('contract', `must be 1, not ${show(m.contract)}`, whole(m.contract) ? 'Upgrade sign-off-axi: this one knows contract 1' : 'Set "contract": 1');
   need('kind');
@@ -106,6 +147,7 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
   if (m.schema !== SCHEMAS[m.kind]) throw bad('schema', `${m.schema} of ${m.kind} is not in this sign-off-axi`, `Upgrade sign-off-axi, or post ${m.kind} schema ${SCHEMAS[m.kind]}`);
   const fields = FIELDS[m.kind], extra = Object.keys(m).find((f) => !fields.includes(f));
   if (extra === 'options' && m.kind === 'report') throw bad('options', 'is not a field of report: a report takes no answer', 'Remove "options", or post an ask to get an answer');
+  if (extra === 'options' && m.kind === 'plan') throw bad('options', 'is not a field of plan: its answers come from its sections and decisions', 'Remove "options"; put each question in "decisions", with its options and "recommend"');
   if (extra !== undefined) throw bad(escaped(extra) || '""', `is not a field of ${m.kind} schema ${m.schema}`, `Remove ${show(extra)}; ${m.kind} takes ${fields.slice(3).join(', ')}`);
   if (!(m.kind === 'evidence' && !Object.hasOwn(m, 'key')) && !isKey(m.key)) throw bad('key', Object.hasOwn(m, 'key') ? `${show(m.key)} must be 1-128 of A-Z a-z 0-9 . _ -` : 'is required', 'Set "key" to a short id such as "ship-signin-2"');
   if (!Object.hasOwn(m, 'title')) throw bad('title', 'is required', 'Add "title": the question, in 160 characters or fewer');
@@ -116,7 +158,7 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
       'Set "link" to a URL such as "https://example.com/pr/4" or a commit hash, or leave it out');
   }
   if (m.kind !== 'ask') {
-    const what = ({ report: 'what happened', gate: 'why the run is held', finding: 'the counts, with no record text' } as Record<string, string>)[m.kind] ?? 'what this shows';
+    const what = ({ report: 'what happened', plan: 'the plan, answer first', gate: 'why the run is held', finding: 'the counts, with no record text' } as Record<string, string>)[m.kind] ?? 'what this shows';
     if (!Object.hasOwn(m, 'about')) throw bad('about', 'is required', `Add "about": ${what}, in 500 characters or fewer`);
     text('about', m.about, 500, `${what}, in 500 characters or fewer`);
   }
@@ -142,15 +184,38 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
     if (Object.hasOwn(m, 'group')) text('group', m.group, 40, 'the section it belongs to, in 40 characters or fewer, or leave it out');
     if (Object.hasOwn(m, 'decided')) text('decided', m.decided, 200, 'what was decided, in 200 characters or fewer, or leave it out');
     // A report is a page to tap through and a picture of it for the card: text alone is a status note, not a report.
-    const page = (f: string, ends: RegExp, kinds: string, example: string) => {
-      if (!Object.hasOwn(m, f)) throw bad(f, `is required: a report is a page to tap through, not text`, PAGE_HELP);
-      text(f, m[f], 256, `${example}, a path from the board file's folder`);
-      if (/^([\\/]|[A-Za-z]:)/.test(m[f]) || m[f].split(/[\\/]/).includes('..') || /[?#\\]/.test(m[f])) throw bad(f, `${show(m[f])} must be a relative path with no .., ?, # or \\`, `Set "${f}" to ${example}, a path from the board file's folder`);
-      if (!ends.test(m[f])) throw bad(f, `${show(m[f])} must end in ${kinds}`, PAGE_HELP);
-    };
-    page('view', /\.html$/i, '.html', '"mocks/<key>/index.html"');
-    page('preview', /\.(svg|png|jpe?g|webp)$/i, '.svg, .png, .jpg, .jpeg or .webp', '"mocks/<key>/preview.svg"');
+    const need = 'a report is a page to tap through, not text';
+    page('view', /\.html$/i, '.html', '"mocks/<key>/index.html"', need);
+    page('preview', /\.(svg|png|jpe?g|webp)$/i, '.svg, .png, .jpg, .jpeg or .webp', '"mocks/<key>/preview.svg"', need);
     if (dirname(m.preview) !== dirname(m.view)) throw bad('preview', `${show(m.preview)} must sit in the folder of ${show(m.view)}`, `Put the picture beside the page, such as "${dirname(m.view)}/preview.svg"`);
+    return { kind: m.kind, schema: m.schema };
+  }
+  // A plan is sections to approve or change, decisions with a recommended pick, steps to tap through, and where it goes as a diagram.
+  if (m.kind === 'plan') {
+    const ids = list('sections', 1, 8, ['id', 'heading', 'body'], '{"id":"goals","heading":"Goals and non-goals","body":"<what it does and does not do>"}').map((o, n) => {
+      if (!(typeof o.id === 'string' && /^[a-z0-9-]{1,40}$/.test(o.id))) throw bad(`sections[${n}].id`, 'must be 1-40 of a-z 0-9 -', 'Set "id" to a short slug such as "goals"');
+      text(`sections[${n}].heading`, o.heading, 80, 'the section heading, in 80 characters or fewer');
+      text(`sections[${n}].body`, o.body, 1000, 'the section, in 1000 characters or fewer');
+      return o.id;
+    });
+    const twice = ids.findIndex((id, n) => ids.indexOf(id) < n);
+    if (twice >= 0) throw bad(`sections[${twice}].id`, `repeats ${ids[twice]}`, 'Give every section its own id');
+    list('decisions', 0, 5, ['key', 'question', 'why', 'options', 'recommend'], '{"key":"store","question":"Keep plans in the board file?","why":"...","options":[...],"recommend":"yes"}').forEach((o, n, all) => {
+      const at = `decisions[${n}]`;
+      if (!isKey(o.key)) throw bad(`${at}.key`, 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "key" to a short id such as "store"');
+      if (all.slice(0, n).some((p) => p.key === o.key)) throw bad(`${at}.key`, `repeats ${o.key}`, 'Give every decision its own key');
+      text(`${at}.question`, o.question, 160, 'the question, ending in a question mark');
+      // One question: a single ?, as its last character, so "Keep A? Or B?" is two decisions.
+      const q = o.question.trim();
+      if (q.search(/[?？]/) !== q.length - 1) throw bad(`${at}.question`, 'must be one question, with one question mark as its last character', 'Ask one question ending in a question mark, and split any other into its own decision');
+      if (!/[\p{L}\p{N}]/u.test(q) || q.split(/\s+/).length > 12) throw bad(`${at}.question`, 'must be one question of 12 words or fewer, ending in a question mark', 'Ask it in 12 words or fewer, ending in a question mark; put the rest in "why"');
+      text(`${at}.why`, o.why, 500, 'why it matters, in 500 characters or fewer');
+      if (!Array.isArray(o.options) || o.options.length < 2 || o.options.length > 6) throw bad(`${at}.options`, Object.hasOwn(o, 'options') ? 'must list 2 to 6 options' : 'is required', 'Set "options" to 2-6 objects such as {"value":"yes","label":"Yes","outcome":"Plans live in the board file"}');
+      checkOptions(`${at}.options`, o.options, true);
+      recommend(`${at}.recommend`, o, o.options);
+    });
+    if (Object.hasOwn(m, 'steps')) list('steps', 2, 12, ['title'], '{"title":"The agent posts the plan"}').forEach((o, n) => text(`steps[${n}].title`, o.title, 80, 'the step, in 80 characters or fewer'));
+    page('view', /\.html$/i, '.html', '"mocks/<key>/index.html"', 'a plan shows where it goes as a diagram on a page', 'Set "view" to "mocks/<key>/index.html", a path from the board file\'s folder');
     return { kind: m.kind, schema: m.schema };
   }
   if (Object.hasOwn(m, 'about')) text('about', m.about, 500, 'a short note, or leave it out');
@@ -160,20 +225,10 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
   const named = actions && Object.entries(actions).map(([value, label]) => show({ value, label })).join(', ');
   const listed = !actions ? 'Set "options" to 2-6 objects such as {"value":"yes","label":"Yes"}' : max === 3 ? `Set "options" to 2 or 3 of ${named}` : `Set "options" to ${named}`;
   if (!Array.isArray(options) || options.length < 2 || options.length > max) throw bad('options', Object.hasOwn(m, 'options') ? `must list ${({ 2: '2', 3: '2 or 3' } as Record<number, string>)[max] ?? '2 to 6'} options` : 'is required', listed);
-  options.forEach((o: any, n: number) => {
-    const field = `options[${n}]`;
-    if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad(field, 'must be an object', 'Write each option as {"value":"<id>","label":"<text>"}');
-    const odd = Object.keys(o).find((f) => f !== 'value' && f !== 'label');
-    if (odd !== undefined) throw bad(`${field}.${escaped(odd) || '""'}`, 'is not a field of an option', `Remove ${show(odd)}; an option has only value and label`);
-    if (!isKey(o.value)) throw bad(`${field}.value`, 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "value" to a short id such as "yes"');
-    if (options.slice(0, n).some((p: any) => p.value === o.value)) throw bad(`${field}.value`, `repeats ${o.value}`, 'Give every option its own value');
-    text(`${field}.label`, o.label, 80, 'the button text, in 80 characters or fewer');
-  });
+  checkOptions('options', options);
   const odd = actions && options.find((o: any) => !Object.hasOwn(actions, o.value) || actions[o.value] !== o.label);
   if (odd) throw bad('options', `${show(odd)} is not a ${m.kind} action: ${Object.keys(actions).join(', ')}, each with its label`, listed);
-  const values = options.map((o: any) => o.value), pick = `the option you would pick: one of ${values.join(', ')}`;
-  if (!Object.hasOwn(m, 'recommend_value')) throw bad('recommend_value', 'is required', `Add "recommend_value": ${show(values[0])}, ${pick}`);
-  if (!values.includes(m.recommend_value)) throw bad('recommend_value', `${show(m.recommend_value)} is not an option value`, `Set "recommend_value" to ${pick}`);
+  const values = recommend('recommend_value', m, options);
   if (Object.hasOwn(m, 'default_if_silent') && !values.includes(m.default_if_silent)) {
     throw bad('default_if_silent', `${show(m.default_if_silent)} is not an option value`, `Set "default_if_silent" to one of ${values.join(', ')}, or leave it out`);
   }

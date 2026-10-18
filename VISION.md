@@ -56,6 +56,6 @@ sign-off owns the written communication contract. The contract covers the file a
 
 Integrations live in this section. They stay out of the description and the intro.
 
-sign-off owns one communication contract for asks, reports, evidence, gates and retro findings. In its v1 every message is strict and versioned, and a message that does not match is refused with one fix line, never shown half-broken. It is being built: the status line in [docs/contract.md](docs/contract.md) says what works today.
+sign-off owns one communication contract for asks, reports, evidence, gates, retro findings and plans. In its v1 every message is strict and versioned, and a message that does not match is refused with one fix line, never shown half-broken. It is being built: the status line in [docs/contract.md](docs/contract.md) says what works today.
 
 Conformance will run on shared fixtures from the sign-off package. Each tool runs them in its CI with `sign-off-axi validate`, pinned to an exact version.
