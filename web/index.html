@@ -488,6 +488,10 @@
   button:focus-visible, summary:focus-visible, textarea:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .shot:focus-visible { outline-offset: -2px; }
   .empty { margin: 0; padding: 1.5rem 1rem; color: var(--muted); text-align: center; border: 1px dashed var(--line); border-radius: 0.875rem; }
+  @media (max-width: 44.999rem) {
+    .plan-preview { display: none; }
+    .plan-copy .about { display: block; -webkit-line-clamp: unset; -webkit-box-orient: initial; overflow: visible; }
+  }
   @media (min-width: 45rem) {
     main { padding: 0 2rem; }
     .row { grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 0.875rem 2rem; padding: 1.125rem 1.25rem; }

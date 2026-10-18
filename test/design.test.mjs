@@ -1042,8 +1042,18 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await until(async () => (await chips()) === 'All 3*|Design pick 1|Plan 1|Yes/No 1');
   assert.equal(await evaluate('document.querySelector(".plan-hero .plan-meta").textContent.includes("5 sections")'), true);
   assert.equal(await evaluate('document.querySelector(".plan-hero h2").textContent'), 'Show plans on the board');
+  assert.equal(await evaluate('getComputedStyle(document.querySelector(".plan-preview")).display'), 'none');
+  assert.equal(await evaluate('document.querySelectorAll(".plan-copy h2").length'), 1);
+  assert.equal(await evaluate('document.querySelector(".plan-copy .about").textContent'), "Umer reviews an agent's plan on a phone: approve or change each section, answer each decision, then send it all back at once.");
+  assert.equal(await evaluate('(() => { const e = document.querySelector(".plan-copy .about"), s = getComputedStyle(e); return s.display === "block" && s.overflow === "visible" && e.scrollHeight <= e.clientHeight + 1; })()'), true);
   assert.equal(await evaluate('document.documentElement.scrollWidth <= 390 && document.querySelector(".plan-open").getBoundingClientRect().right <= 390'), true);
   assert.equal(await evaluate('!document.querySelector(".plan-hero .x")'), true);
+  const desk = await browse(join(dir, 'desk'), 1280);
+  await desk.evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+  await until(async () => await desk.evaluate('!!document.querySelector(".plan-hero .plan-preview")'));
+  assert.equal(await desk.evaluate('getComputedStyle(document.querySelector(".plan-preview")).display'), 'block');
+  assert.equal(await desk.evaluate('getComputedStyle(document.querySelector(".plan-hero")).gridTemplateColumns.split(" ").length'), 2);
+  desk.close();
   assert.equal(await evaluate('fetch("api/dismiss", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ keys: ["plan-kind-board"], dismissed: true }) }).then((r) => r.status)'), 400);
   assert.equal(existsSync(file.replace(/\.json$/, '.dismissed.jsonl')), false);
   await evaluate('document.querySelector(".plan-open").click()');
