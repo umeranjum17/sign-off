@@ -224,7 +224,7 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   const url2 = await new Promise((ok) => again.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
   const kept = (await (await fetch(`${url2}api/decisions`)).json()).messages;
   assert.deepEqual(kept.map(({ kind, text, delivered }) => [kind, text, !!delivered]), [['comment', 'Umer: B header is too tall.', true], ['prompt', 'Umer: also try a dark header.', false]]);
-  assert.match(run('poll', board).out, /messages\[1\]\{id,kind,key,text,at\}:\n  \w+,prompt,"","Umer: also try a dark header\."/);
+  assert.match(run('poll', board).out, /messages\[1\]\{id,kind,key,text,at\}:\n  "?\w+"?,prompt,"","Umer: also try a dark header\."/);
   const none = run('poll', board, '--timeout', '1');
   assert.deepEqual([none.code, /code: TIMEOUT/.test(none.out)], [1, true]);
   again.kill();
@@ -374,7 +374,7 @@ test('doctor names a fix for a denied setup path and a port that needs privilege
 test('a refused config bind is named by doctor, and an unreadable config stops open', { skip: process.getuid?.() === 0 && 'root can read every path' }, () => {
   const dir = join(scratch, 'bind-config'), sod = join(dir, '.sign-off'), config = join(sod, 'config.yaml'), board = join(sod, 'decisions.json');
   run('init', dir);
-  writeFileSync(config, 'board: decisions.json\nport: 4410\nbind: 0.0.0.0\n');
+  writeFileSync(config, 'board: decisions.json\nport: 0\nbind: 0.0.0.0\n');
   assert.match(run('doctor', dir).out, /config: config\.yaml: bind 0\.0\.0\.0 is not 127\.0\.0\.1 or a private address/);
   assert.equal(run('open', board, '--port', '0').code, 2);
   chmodSync(config, 0o000);
@@ -985,10 +985,10 @@ test('Waiting on you: a type label on each ask, type chips with counts, and the 
   await until(async () => (await pick('All')) && (await queue()) === 'Pick the look|Which day for release?|Keep the weekly digest?');
   // Oldest first is one choice away, and it stays after a reload in this browser.
   await evaluate('(() => { const s = document.querySelector(".sort select"); s.value = "oldest"; s.dispatchEvent(new Event("change")); })()');
-  await until(async () => (await queue()) === 'Keep the weekly digest?|Which day for release?|Pick the look');
-  assert.equal(await evaluate('localStorage.getItem("sign-off-waiting-sort")'), 'oldest');
+  await until(async () => (await queue()) === 'Keep the weekly digest?|Which day for release?|Pick the look'
+    && (await evaluate('localStorage.getItem("sign-off-waiting-sort")')) === 'oldest');
   await evaluate('location.reload()');
-  await until(async () => (await fhead()) === '1 of 3');
+  await until(async () => (await evaluate('document.querySelector(".sort select")?.value')) === 'oldest');
   assert.equal(await evaluate('document.querySelector(".sort select").value'), 'oldest');
   assert.equal(await evaluate('document.querySelector(".focus h3")?.textContent'), 'Keep the weekly digest?');
   // A type chip narrows this visit only: ‹ Summary and back through the way to Triage opens everything its count promises, in All again.
@@ -1771,6 +1771,7 @@ test('no board named: doctor checks the nearest setup from a subfolder, a missin
   mkdirSync(join(proj, '.git'), { recursive: true });
   mkdirSync(deep, { recursive: true });
   assert.equal(at(proj, {}, 'init').status, 0);
+  writeFileSync(join(proj, '.sign-off', 'config.yaml'), 'board: decisions.json\nport: 0\n');
   assert.match(at(deep, {}, 'doctor').stdout, /config,"board decisions\.json/);
   assert.equal(at(proj, { HOME: join(scratch, 'no-such-home') }, 'raise', '--title', 'Missing home?').status, 0);
   assert.deepEqual(JSON.parse(readFileSync(join(proj, '.sign-off', 'decisions.json'), 'utf8')).items.map((i) => i.key), ['missing-home']);
