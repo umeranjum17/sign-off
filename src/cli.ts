@@ -797,7 +797,7 @@ function replace(file: string, on: string, from?: string, filer?: string) {
     const feed = fed.items.map((i) => ({ filed: first.get(i?.key)?.filed ?? now, ...i, ...(filer && { filer }) }));
     // An answer belongs to its question: an answered key may not come back asking something else.
     // Evidence is answered for the media and run it shows, so those are part of its question too, as a gate's run and a finding's proposal are.
-    const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply, d.run, d.finding, d.evidence, d.media, d.type === 'signin' ? [d.link, d.start] : '']);
+    const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply, d.run, d.finding, d.evidence, d.media, d.sections, d.decisions, d.type === 'signin' ? [d.link, d.start] : '']);
     // A key whose answer outlived it may not come back: the board and the answers are read here, under the lock the feed writes with.
     const saved = readAnswers(file);
     for (const i of fed.items) if (i?.kind !== undefined && !first.has(i?.key) && Object.hasOwn(saved, i?.key)) {
