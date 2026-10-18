@@ -275,7 +275,7 @@ export function mediaFiles(m: any, base: string): string[] {
 
 /** The longest a block of plain text on a report page may run: about five lines on a phone. */
 const BLOCK_CHARS = 240;
-/** A report's page and picture, from `base`, the board file's folder (or, for validate, the message file's): each a file of 5 MB or less
+/** A report's or plan's page, and a report's picture, from `base`, the board file's folder (or, for validate, the message file's): each a file of 5 MB or less
  * whose real path stays inside that folder, and a page filled in the ladder shape the scaffold gives. The first broken rule throws. */
 export function reportPage(m: any, base: string): void {
   const at = isKey(m.key) ? `key ${m.key}: ` : '';
@@ -283,7 +283,7 @@ export function reportPage(m: any, base: string): void {
   let root = resolve(base);
   try { root = realpathSync(base); } catch {}
   const bad = (rule: string, help = PAGE_HELP) => new ContractError(`${at}${rule}`, help);
-  const files = (['view', 'preview'] as const).map((f) => {
+  const read = (f: 'view' | 'preview') => {
     let real;
     try { real = realpathSync(resolve(root, m[f])); } catch { throw bad(`${f} ${show(m[f])} is not there`, `Put the file at ${m[f]} from the board file's folder, or fix the path`); }
     const rel = relative(root, real);
@@ -292,8 +292,8 @@ export function reportPage(m: any, base: string): void {
     if (!info.isFile() || info.size > 5_000_000) throw bad(`${f} ${show(m[f])} must be a file of 5 MB or less`, 'Shrink the page or its picture');
     try { accessSync(real, constants.R_OK); } catch { throw bad(`${f} ${show(m[f])} cannot be read`, 'Make the file readable, then post again'); }
     return /\.(html|svg)$/i.test(real) ? readFileSync(real, 'utf8') : '';
-  });
-  const [html, picture] = files, page = `view ${show(m.view)}`;
+  };
+  const html = read('view'), picture = m.preview === undefined ? '' : read('preview'), page = `view ${show(m.view)}`;
   for (const [f, t] of [[page, html], [`preview ${show(m.preview)}`, picture]]) {
     if (/FILL:/.test(t)) throw bad(`${f} still has FILL: lines from the scaffold`, 'Replace every FILL: line with your own words and pictures, then post again');
   }
@@ -307,16 +307,4 @@ export function reportPage(m: any, base: string): void {
   const long = [...html.matchAll(/<(p|li|dd|blockquote)\b[^>]*>([\s\S]*?)<\/\1>/gi)].map((b) => b[2].replace(/<[^>]*>/g, '').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim())
     .find((t) => [...t].length > BLOCK_CHARS);
   if (long) throw bad(`${page} has a block of ${[...long].length} characters, over ${BLOCK_CHARS} (about five lines on a phone): "${[...long].slice(0, 40).join('')}..."`, 'Split it, cut it, or show it as a picture or step');
-}
-
-/** A plan's page, from `base`, the board file's folder: a file that is there, whose real path stays inside that folder. */
-export function planView(m: any, base: string): void {
-  const at = isKey(m.key) ? `key ${m.key}: ` : '', help = `Put the page at ${m.view} from the board file's folder, or fix the path`;
-  let root = resolve(base);
-  try { root = realpathSync(base); } catch {}
-  let real;
-  try { real = realpathSync(resolve(root, m.view)); } catch { throw new ContractError(`${at}view ${show(m.view)} is not there`, help); }
-  const rel = relative(root, real);
-  if (!rel || rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel)) throw new ContractError(`${at}view ${show(m.view)} leads outside the board file's folder`, 'Copy the page into the board file\'s folder, such as under mocks/<key>/');
-  if (!statSync(real).isFile()) throw new ContractError(`${at}view ${show(m.view)} is not a file`, help);
 }

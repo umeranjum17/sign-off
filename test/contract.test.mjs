@@ -207,8 +207,8 @@ test('a plan: validate checks each rule with one fix line; post stores it, it wa
   const answer = JSON.parse(run('answers', board, '--json').stdout)[plan.key];
   assert.deepEqual([answer.answer, answer.notes, answer.decisions], ['sent', notes, { 'send-back': 'one', where: 'own' }]);
   assert.deepEqual(decode(run('answers', board).stdout.split('\nhelp[')[0]).plan, [...notes.map(({ section, verdict, note = '' }) => ({ key: plan.key, section, verdict, note })), { key: plan.key, decision: 'send-back', pick: 'one' }, { key: plan.key, decision: 'where', pick: 'own' }]);
-  writeFileSync(join(planDir, 'page', 'other.html'), '<html>other</html>');
-  const revised = [{ ...plan, decisions: plan.decisions.slice(0, 1) }, { ...plan, sections: plan.sections.map((s, i) => (i ? s : { ...s, body: `${s.body} Changed.` })) }, { ...plan, view: 'page/other.html' }, { ...plan, steps: [...plan.steps].reverse() }];
+  writeFileSync(join(planDir, 'page', 'other.html'), readFileSync(join(fixtures, 'plan.v1', 'page', 'index.html')));
+  const revised = [{ ...plan, decisions: plan.decisions.slice(0, 1) }, { ...plan, about: `${plan.about} Changed.` }, { ...plan, sections: plan.sections.map((s, i) => (i ? s : { ...s, body: `${s.body} Changed.` })) }, { ...plan, view: 'page/other.html' }, { ...plan, steps: [...plan.steps].reverse() }];
   for (const item of revised) {
     const conflict = run('post', board, '--from', message('plan-revised.json', JSON.stringify({ schema: 2, items: [item] })), '--replace');
     assert.equal(conflict.status, 1, conflict.stdout);
@@ -216,6 +216,19 @@ test('a plan: validate checks each rule with one fix line; post stores it, it wa
   }
   const events = run('wait', board, '--filer', 'agent-41', '--events', '--timeout', '0').stdout.trim().split('\n').map((l) => JSON.parse(l));
   assert.deepEqual(events.map(({ event, kind, key, notes: n, decisions: p }) => [event, kind, key, n, p]), [['answer', 'plan', plan.key, notes, { 'send-back': 'one', where: 'own' }]]);
+});
+
+test('a plan view is held to the report page rules at post: a page a phone cannot read is refused', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const plan = JSON.parse(readFileSync(join(fixtures, 'plan.v1', 'valid-full.json')));
+  const dir = join(scratch, 'plan-rules'), board = join(dir, 'board.json');
+  mkdirSync(join(dir, 'page'), { recursive: true });
+  writeFileSync(join(dir, 'page', 'index.html'), readFileSync(join(fixtures, 'plan.v1', 'page', 'index.html'), 'utf8').replace(/<meta[^>]*viewport[^>]*>/, ''));
+  const refused = spawnSync('node', [cli, 'post', board, '--kind', 'plan', '--from', '-'], { encoding: 'utf8', env, input: JSON.stringify(plan) });
+  assert.equal(refused.status, 2, refused.stdout);
+  assert.match(refused.stdout, /has no viewport tag/);
 });
 
 test('a report in a raise --from file: checked by its kind, stored with no options, never waiting; a new title over 160 is refused', () => {
