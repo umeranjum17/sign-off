@@ -1251,8 +1251,10 @@ test('a posted contract design is listed with its preview and date, and opens fo
   assert.match(await evaluate('document.querySelector(".design-viewer header").textContent'), /4 of 17/);
   await evaluate('document.querySelector(".design-viewer textarea").dispatchEvent(new KeyboardEvent("keydown", {key:"ArrowLeft", bubbles:true}))');
   assert.match(await evaluate('document.querySelector(".design-viewer header").textContent'), /4 of 17/);
+  await evaluate('window.viewerNode = document.querySelector(".design-viewer")');
   await evaluate('document.querySelector(".design-viewer .open-link").click()');
   await until(async () => (await evaluate('document.querySelector(".design-viewer[open] [role=status]")?.textContent')) === 'Screen approved');
+  assert.equal(await evaluate('document.querySelector(".design-viewer") === window.viewerNode'), true);
   const legacy = { journey: 'account-setup', screen: 'security', note: 'Make the title clearer' };
   assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-design'].notes, [legacy, { journey: 'account-setup', screen: 'screen-4', verdict: 'approve', note: '' }]);
   await evaluate('document.querySelector("[aria-label=\\"Next screen\\"]").click()');

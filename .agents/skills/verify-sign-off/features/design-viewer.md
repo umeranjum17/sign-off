@@ -9,7 +9,7 @@
 
 ## Drive
 
-Build with `npm run build`. Run `.agents/skills/verify-sign-off/viewer-shots.sh "$DONE_DONE_EVIDENCE_ROOT"` from the repo root.
+Build with `npm run build`. Run `node .agents/skills/verify-sign-off/viewer-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"` from the repo root.
 It seeds a 17-screen design in a throwaway HOME, serves it, and captures screen 1 and screen 4 (an .html view) in the viewer at 390 and 1280, light and dark: `viewer-screen-<n>.<theme>.<width>w.png`.
 It prints each viewer's header and whether the page scrolls sideways.
 
