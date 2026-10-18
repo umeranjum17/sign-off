@@ -260,6 +260,7 @@
   .decide-preview .rung { width: 100%; }
   .decide-preview .rung .frame, .decide-preview .rung iframe { max-height: 15rem; }
   .decide-preview .mocks { --tall: min(32svh, 16rem); }
+  .decide-preview .shot { aspect-ratio: 236 / 273; }
   .decide-preview .mock figcaption .label { flex: 1 1 auto; min-width: 0; font-size: .75rem; }
   .decide-preview .mock figcaption .badge { padding: .1rem .25rem; font-size: .6875rem; white-space: nowrap; }
   @media (max-width: 59.999rem) {
@@ -285,6 +286,7 @@
   .pick-option .recommend { color: var(--accent); font-size: .9375rem; }
   .pick-option .check { width: 1.5rem; color: var(--accent); font-size: 1.5rem; visibility: hidden; }
   .pick-option[aria-pressed="true"] { color: var(--text); background: transparent; }
+  .pick-option[aria-pressed="true"]::before { content: none; }
   .pick-option[aria-pressed="true"] .check { visibility: visible; }
   .silent-line { margin: 1.25rem 0; color: var(--muted); }
   .decide-bar { position: sticky; bottom: calc(4.125rem + env(safe-area-inset-bottom)); z-index: 1; display: flex; align-items: center; gap: .5rem; margin: 1rem -1.25rem 0; padding: .75rem 1.25rem; background: var(--bg); }
