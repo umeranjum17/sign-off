@@ -117,3 +117,10 @@ test('doctor reports a notify line it cannot use, and nothing is sent', { timeou
   const report = await cli(dir, ['doctor', dir]).catch((e) => e.message);
   assert.match(report, /line 2 is not one/);
 });
+
+test('a notify url on a DNS name starting with 127 is not treated as this machine', async () => {
+  const dir = join(scratch, 'spoof'); mkdirSync(dir);
+  setup(dir, notifyBlock('http://127.evil.example/notify'));
+  const output = await cli(dir, ['doctor', dir]).catch((e) => e.message);
+  assert.match(output, /notify needs url/);
+});

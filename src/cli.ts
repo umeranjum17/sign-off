@@ -1248,7 +1248,7 @@ async function running(file: string) {
 /** Loopback, or one private address: 10/8, 172.16/12, 192.168/16, the 100.64/10 range mesh VPNs use, IPv6 fc00::/7. Never all interfaces or a public one. */
 const PRIVATE = /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|::1$|f[cd][0-9a-f]{2}:)/i;
 const privateBind = (host: string) => isIP(host) > 0 && PRIVATE.test(host);
-const loopback = (host: string) => /^127\./.test(host) || host === '::1';
+const loopback = (host: string) => isIP(host) > 0 && (/^127\./.test(host) || host === '::1');
 const urlHost = (host: string) => (isIP(host) === 6 ? `[${host}]` : host);
 /** The config.yaml beside the board as it is named, never beside the file a symlinked board points to: the one place open, serve and doctor read it. */
 function setupOf(named: string) {
