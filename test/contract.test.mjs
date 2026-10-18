@@ -129,7 +129,7 @@ test('exit codes: --kind must match, an unreadable file wins over a refusal, no 
   assert.match(none.stdout, /code: VALIDATION_ERROR/);
 });
 
-test('a plan: sections, decisions with a recommended pick and a page pass validate; each broken rule is refused with one fix line; post refuses it', () => {
+test('a plan: validate checks each rule with one fix line; post stores it, it waits, and its one send-back reads back from answers and wait', async () => {
   const plan = JSON.parse(readFileSync(join(fixtures, 'plan.v1', 'valid-full.json')));
   const [d] = plan.decisions, decision = (o) => ({ ...plan, decisions: [{ ...d, ...o }] });
   const ok = validate('--kind', 'plan', message('plan.json', JSON.stringify(plan)), message('no-steps.json', JSON.stringify({ ...plan, steps: undefined })));
@@ -164,15 +164,37 @@ test('a plan: sections, decisions with a recommended pick and a page pass valida
     assert.match(row.error, error);
     assert.match(row.help, help);
   }
-  // The board cannot show a plan yet: post --kind and a --from feed both refuse it, and nothing is written.
+  // A plan posts with post --kind or in a --from feed, waits on the board, and its one send-back is its answer.
   const board = join(scratch, 'plan-board.json'), env = { ...process.env, HOME: join(scratch, 'home') };
-  for (const args of [['--kind', 'plan', '--from', '-'], ['--from', message('plan-feed.json', JSON.stringify({ schema: 2, items: [plan] }))]]) {
-    const refused = spawnSync('node', [cli, 'post', board, ...args], { encoding: 'utf8', env, input: JSON.stringify(plan) });
-    assert.equal(refused.status, 2, refused.stdout);
-    assert.match(refused.stdout, /key plan-kind-board: kind plan cannot be posted yet/);
-    assert.match(refused.stdout, /sign-off-axi validate/);
-    assert.equal(existsSync(board), false);
+  const run = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env, input: JSON.stringify(plan) });
+  assert.equal(run('post', board, '--kind', 'plan', '--from', '-').status, 0);
+  const fed = run('post', board, '--from', message('plan-feed.json', JSON.stringify({ schema: 2, items: [{ ...plan, key: 'plan-two' }] })));
+  assert.equal(fed.status, 0, fed.stdout);
+  const odd = run('post', board, '--from', message('plan-odd.json', JSON.stringify({ schema: 2, items: [{ key: 'odd', title: 'Odd', type: 'plan' }] })));
+  assert.match(odd.stdout, /kind is required on a new plan/);
+  assert.deepEqual(decode(run('list', board).stdout.split('\nhelp[')[0]).waiting.map((w) => w.key), ['plan-kind-board', 'plan-two']);
+  const [item] = JSON.parse(run('list', board, '--json').stdout).decisions;
+  assert.deepEqual([item.type, item.options, item.sections, item.decisions, item.steps, item.view], ['plan', [], plan.sections, plan.decisions, plan.steps, plan.view]);
+  const approve = plan.sections.map(({ id }) => ({ section: id, verdict: 'approve' })), notes = [{ section: 'goals', verdict: 'change', note: 'Add a non-goal: no desktop layout.' }, ...approve.slice(1)];
+  const decisions = { 'send-back': 'one', where: 'own' };
+  const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: tmpdir(), env });
+  try {
+    const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+    const send = (body) => fetch(`${url}api/answers`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: plan.key, ...body }) });
+    for (const [body, error] of [[{ notes: approve.slice(1), decisions }, /notes must list each section once: goals, architecture/], [{ notes: [{ section: 'goals', verdict: 'change' }, ...approve.slice(1)], decisions }, /section goals needs a note/],
+      [{ notes, decisions: { 'send-back': 'one' } }, /decisions must pick one listed option for each of: send-back, where/], [{ notes, decisions: { ...decisions, where: 'maybe' } }, /decisions must pick/]]) {
+      const refused = await send(body);
+      assert.equal(refused.status, 400);
+      assert.match((await refused.json()).error, error);
+    }
+    assert.equal((await send({ notes, decisions })).status, 200);
+  } finally {
+    await new Promise((ok) => proc.once('exit', ok).kill());
   }
+  const answer = JSON.parse(run('answers', board, '--json').stdout)[plan.key];
+  assert.deepEqual([answer.answer, answer.notes, answer.decisions], ['sent', notes, { 'send-back': 'one', where: 'own' }]);
+  const events = run('wait', board, '--filer', 'agent-41', '--events', '--timeout', '0').stdout.trim().split('\n').map((l) => JSON.parse(l));
+  assert.deepEqual(events.map(({ event, kind, key, notes: n, decisions: p }) => [event, kind, key, n, p]), [['answer', 'plan', plan.key, notes, { 'send-back': 'one', where: 'own' }]]);
 });
 
 test('a report in a raise --from file: checked by its kind, stored with no options, never waiting; a new title over 160 is refused', () => {

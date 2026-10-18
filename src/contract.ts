@@ -30,10 +30,6 @@ export const MEDIA_BYTES = 50_000_000;
 /** The command that makes a report's page, named in every refusal of a report without one. */
 export const REPORT_INIT = 'sign-off-axi report init <folder>';
 const PAGE_HELP = `Run \`${REPORT_INIT}\` to make the page, fill it, then post it with "view" and "preview"`;
-/** A plan passes validate, but the board cannot show one yet: post refuses it rather than store it as a yes/no ask. */
-export function postable(m: any): void {
-  if (m.kind === 'plan') throw new ContractError(`${isKey(m.key) ? `key ${m.key}: ` : ''}kind plan cannot be posted yet: the board does not show plans`, 'Check it with `sign-off-axi validate <file.json>`; post it once sign-off-axi shows plans');
-}
 
 /** Parses one message; a field written twice in any object refuses it, since plain JSON.parse keeps the last one quietly. */
 export function parseMessage(bytes: Uint8Array): unknown {

@@ -2,7 +2,7 @@
 
 sign-off owns this contract. Agents and tools use it to post asks, reports, evidence, gates, retro findings and plans to the board, and to read the answers back. Every message has the same strict shape, so the person reading the board sees one kind of card per kind of message, whoever sent it.
 
-Status: v1 target, built in parts. Built: five kinds, `ask`, `report` (schema 2, a page), `evidence`, `gate` and `finding`; the sixth, `plan`, in `validate` only (`post` refuses it until the board shows plans); `validate`, with `--expect-invalid` (section 9), and their fixtures in the npm package; `post --kind`, from a file or stdin with `--from -`, where a key conflict exits 2; in a `raise --from` or `post --from` file, a new item that carries `contract` or `kind` is checked as a message before anything is stored, a new item of a contract kind without `kind` is refused, and a new item's title is held to 1-160. New contract evidence is posted with `post --kind evidence`, never in a `--from` file; `post --type evidence` keeps the board format. Answer events are built: `wait --events` and the contract fields on `on_answer` (section 7). Not built yet: `schema`. `raise --title` and `post --type decision` still post board-format items (they do not fill in `contract`, `kind` and `schema` yet), and their key conflicts still exit 1.
+Status: v1 target, built in parts. Built: six kinds, `ask`, `report` (schema 2, a page), `evidence`, `gate`, `finding` and `plan` (stored and answered; the board does not draw a plan card or page yet); `validate`, with `--expect-invalid` (section 9), and their fixtures in the npm package; `post --kind`, from a file or stdin with `--from -`, where a key conflict exits 2; in a `raise --from` or `post --from` file, a new item that carries `contract` or `kind` is checked as a message before anything is stored, a new item of a contract kind without `kind` is refused, and a new item's title is held to 1-160. New contract evidence is posted with `post --kind evidence`, never in a `--from` file; `post --type evidence` keeps the board format. Answer events are built: `wait --events` and the contract fields on `on_answer` (section 7). Not built yet: `schema`. `raise --title` and `post --type decision` still post board-format items (they do not fill in `contract`, `kind` and `schema` yet), and their key conflicts still exit 1.
 
 ## 1. Versions
 
@@ -88,7 +88,7 @@ An explainer the person reads: made when they asked for an explanation, or when 
 
 ### plan, schema 1
 
-An agent's plan the person reviews before the work starts: each section approved or changed with a note, each decision answered. It is not a report, because it takes answers. The board does not show plans yet, so `post` refuses one with a fix line to check it with `validate`.
+An agent's plan the person reviews before the work starts: each section approved or changed with a note, each decision answered. It is not a report, because it takes answers. `post --kind plan` (or a `--from` feed) stores it as item type `plan`, with its sections, decisions, steps and view, under Waiting on you until it is sent back; a new item with `type` `plan` and no `kind` is refused.
 
 - Required: the common fields, `about` (the plan, answer first), `sections`, `decisions` and `view`.
 - `sections`: 1 to 8 objects of exactly `id` (1-40 of `a-z 0-9 -`, unique in the plan), `heading` (text, 1-80) and `body` (text, 1-1000), such as goals and non-goals, architecture, slices and order, coding standards, risks.
@@ -155,7 +155,8 @@ One per kind, each written on one line here. Demo data uses the name Umer.
 - Lines come oldest first, by `at`. `--events` does not take `--json` or `--full`. A private vault item that expired or was refused still reaches a filer wait as it does without `--events` (exit 1, no event line).
 - `wait --json` and `answers --json` keep their map keyed by item key, so existing readers keep working.
 - An `on_answer:` command in `config.yaml` keeps every field it gets today (`key`, `answer`, `label`, `close`, `at`, `note`, `title`, `filer`) and gains `event`, `contract`, `kind` and `schema`. An answer line that carried comments on mock elements also has `comments`, each with `id`, `mock`, `hash`, `ref`, `tag`, `words` and `text`. An Undo back to no answer still reaches it, with `"answer": ""`; `wait` never returns one.
-- What each answer means: `ask`, act on the picked value. `evidence`, the verdict goes back to the producer. `gate`, run `done-done respond --action <value>`. `finding`, `apply` means apply the change and `skip` means leave it. A `report` has no answer.
+- A plan's answer is its one send-back, which the board saves from `POST /api/answers` with `{"key", "notes", "decisions"}`: `"answer": "sent"`, `"label": "Sent back"`, plus `notes`, one per section in plan order, each `section` (its id), `verdict` (`approve` or `change`) and `note` (text, 1-500; required on `change`), and `decisions`, a map of each decision `key` to its picked option `value`, every decision answered. `answers --json`, `wait --json`, `wait --events` and `on_answer` carry both. A send-back that misses a section or decision, or a `change` with no note, is refused (HTTP 400) and nothing is saved.
+- What each answer means: `ask`, act on the picked value. `evidence`, the verdict goes back to the producer. `gate`, run `done-done respond --action <value>`. `finding`, `apply` means apply the change and `skip` means leave it. `plan`, act on each `change` note and each picked decision value. A `report` has no answer.
 
 ## 8. Refusals
 
