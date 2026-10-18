@@ -30,6 +30,11 @@ so post "$board" --key digest-old --title "Send the digest on Mondays?" --recomm
 node "$repo/dist/cli.js" serve "$board" --port 0 > "$dir/serve.log" 2>&1 &
 echo $! > "$dir/serve.pid"
 for _ in $(seq 50); do url=$(grep -o 'http://127.0.0.1:[0-9]*/' "$dir/serve.log" | head -1) && [ -n "$url" ] && break; sleep 0.2; done
+if [ -z "${url:-}" ]; then
+  printf 'Server failed to start:\n' >&2
+  cat "$dir/serve.log" >&2
+  exit 1
+fi
 # One answered item, answered through the page's own API as a tap would.
 curl -sf "${url}api/answers" -H 'content-type: application/json' -d '{"key":"digest-old","answer":"yes","note":""}' >/dev/null
 echo "$url"
