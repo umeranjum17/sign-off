@@ -203,7 +203,7 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
     if (!at || Number.isNaN(at.getTime()) || at.toISOString().replace('.000', '') !== m.filed) throw bad('filed', 'must be a real UTC time with seconds', 'Set "filed" to YYYY-MM-DDTHH:MM:SSZ');
     if (!['draft', 'in_review'].includes(m.status)) throw bad('status', 'must be draft or in_review', 'Set "status" to "draft" or "in_review"');
     page('preview', /\.(png|jpe?g|webp)$/i, '.png, .jpg, .jpeg or .webp', '"design/preview.png"', 'a design preview');
-    const journeys = list('journeys', 1, 40, ['id', 'title', 'screens'], '{"id":"signup","title":"Sign up","screens":[...]}');
+    const journeys = list('journeys', 0, 40, ['id', 'title', 'screens'], '{"id":"signup","title":"Sign up","screens":[...]}');
     const ids: string[] = [];
     journeys.forEach((j, n) => {
       if (typeof j.id !== 'string' || !/^[a-z0-9-]{1,40}$/.test(j.id)) throw bad(`journeys[${n}].id`, 'must be a short lowercase id', 'Set it to a slug such as "signup"');

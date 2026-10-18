@@ -130,19 +130,16 @@ A run held for the person's approval. Shows in Waiting on you.
 
 ### design, schema 1
 
-A set of design journeys and screen views for review.
-The board shows a plain row with its title and about, plus "Open original" for an HTTP link, without pick, approve or change controls.
-Submit answers through the API and read them with `answers --json` or `wait`.
-The journey viewer is a later slice.
+A set of project design reviews and screen views. The board groups reviews by project, with a preview, filed date and status; the review screen supports an optional direction pick, screen-targeted notes and design-level notes when there are no screens. A full screen-by-screen viewer remains a later slice.
 
 - Required: the common fields, `about`, `group` (project name, text 1-40), `filed` (real UTC date-time with seconds), `status` (`draft` or `in_review`), `preview` (relative `.png`, `.jpg`, `.jpeg` or `.webp` path), and `journeys`.
-- `journeys`: 1-40 objects with unique lowercase slug `id`, `title` (text 1-120), and 1-80 `screens`.
+- `journeys`: 0-40 objects with unique lowercase slug `id`, `title` (text 1-120), and 1-80 `screens`. An empty list is a design-level review with no screen-specific views.
 - Each screen has a lowercase slug `id`, `title` (text 1-120), and `views`, a nonempty map of `phone_light`, `phone_dark`, `computer_light` or `computer_dark` to a relative `.png`, `.jpg`, `.jpeg`, `.webp` or `.html` path.
 - Every preview and view must exist inside the board folder when posted, be readable and no larger than 5 MB.
 - HTML views are served in the board's sandbox with point annotations enabled.
 - Optional `options` (2-6 `{value,label}` choices) and `recommend` (one option value) let the reviewer pick a direction.
-- The answer is `{verdict:"approve"|"change",pick?,notes:[{journey,screen,note}]}`.
-- A change needs at least one note; each note names an existing screen and gives text of 500 characters or fewer.
+- The answer is `{verdict:"approve"|"change",pick?,notes:[{journey?,screen?,note}]}`. When a design has screens, the reviewer can target a note at one screen by supplying both `journey` and `screen`; a design-level note omits both.
+- A change needs at least one note; each note gives text of 500 characters or fewer and either names an existing screen or omits both target fields for a design-level review.
 - Approval sets the displayed status to `approved`.
 
 ### finding, schema 1
@@ -187,7 +184,7 @@ One per kind, each written on one line here. Demo data uses the name Umer.
 - Lines come oldest first, by `at`. `--events` does not take `--json` or `--full`. A private vault item that expired or was refused still reaches a filer wait as it does without `--events` (exit 1, no event line).
 - `wait --json` and `answers --json` keep their map keyed by item key, so existing readers keep working.
 - An `on_answer:` command in `config.yaml` keeps every field it gets today (`key`, `answer`, `label`, `close`, `at`, `note`, `title`, `filer`) and gains `event`, `contract`, `kind` and `schema`. An answer line that carried comments on mock elements also has `comments`, each with `id`, `mock`, `hash`, `ref`, `tag`, `words` and `text`. An Undo back to no answer still reaches it, with `"answer": ""`; `wait` never returns one.
-- A design's answer is `{verdict:"approve"|"change",pick?,notes:[{journey,screen,note}]}`; `change` requires a note and optional `pick` must name a listed direction. `answers --json`, `wait --json` and `wait --events` return these fields, and approve displays status approved.
+- A design's answer is `{verdict:"approve"|"change",pick?,notes:[{journey?,screen?,note}]}`; `change` requires a note, screen targets are paired, and an untargeted note is design-level. Optional `pick` must name a listed direction. `answers --json`, `wait --json` and `wait --events` return these fields, and approve displays status approved.
 - A plan's answer is its one send-back, which the board saves from `POST /api/answers` with `{"key", "notes", "decisions", "note"?}`: `"answer": "sent"`, `"label": "Sent back"`, plus `notes`, one per section in plan order, each `section` (its id), `verdict` (`approve` or `change`) and `note` (text, 1-500; required on `change`, a comment on `approve`), `decisions`, a map of each decision `key` to its answer — the picked option `value`, or the person's own words (Other, text, 1-500) when none fits — every decision answered, and `note` (text, 1-500), the optional whole-plan comment. `answers --json`, `wait --json`, `wait --events` and `on_answer` carry all three. A send-back that misses a section or decision, a `change` with no note, or text over 500 characters, is refused (HTTP 400) and nothing is saved.
 - What each answer means: `ask`, act on the picked value. `evidence`, the verdict goes back to the producer. `gate`, run `done-done respond --action <value>`. `finding`, `apply` means apply the change and `skip` means leave it. `plan`, act on each `change` note and each picked decision value. A `report` has no answer.
 - An answer to an ask with `merges` also reaches each merged key as its own answer line (section 5), so a `wait` on either key returns it. `on_answer` runs once, for the ask that was answered.

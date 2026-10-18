@@ -7,7 +7,7 @@ The board page (web/index.html) in the Spacious look: system font, large titles,
 - Summary (`#`), Waiting on you (`#waiting`), Designs (`#designs`), Evidence (`#evidence`), Reports (`#reports`), Answered (`#answered`).
 - Desk (60rem and wider): a sidebar with Summary and the five areas, each with its count; the screen on show is marked.
 - Phone: a solid tab bar at the bottom (Waiting, Designs, Evidence, Reports, Answered); the area on screen is blue; area screens keep a ‹ Summary link.
-- Designs groups contract design reviews by project, with preview, date, status and any saved pick or note. Open a design to approve it or request a change with a screen note; the first-screen preview is readable and scrollable, with a link to open its full asset. At 1280 the board sidebar remains visible with Designs selected; on Summary and Waiting, a design's primary action is Open designs.
+- Designs groups contract design reviews by project, with preview, date, status and any saved pick or note. Open a design to approve it or request a change with a note; on multi-screen designs, a native selector targets the note and full-preview link, while designs with no screens accept a design-level note. The preview is readable and scrollable, with a link to open its full asset. At 1280 the board sidebar remains visible with Designs selected; on Summary and Waiting, a design's primary action is Open designs.
 - After an answer, a toast with Undo sits above the tab bar.
 - Focus rings show on every link and button in both themes.
 

@@ -54,6 +54,8 @@ test('design review posts journeys and returns change notes through answers --js
   const duplicateScreen = { ...msg, key: 'duplicate-screen', journeys: [{ ...msg.journeys[0], screens: [msg.journeys[0].screens[0], msg.journeys[0].screens[0]] }] };
   const duplicate = run('post', board, '--kind', 'design', '--from', message('duplicate-screen.json', JSON.stringify(duplicateScreen)));
   assert.equal(duplicate.status, 2); assert.match(duplicate.stdout, /journeys\[0\]\.screens\[1\]\.id.*repeats welcome/);
+  const noScreens = { ...msg, key: 'design-level', journeys: [] };
+  assert.equal(run('post', board, '--kind', 'design', '--from', message('design-level.json', JSON.stringify(noScreens))).status, 0);
   assert.match(run('list', board).stdout, /beacon-account-setup/);
   const outside = join(scratch, 'outside-design.png'); writeFileSync(outside, 'image'); symlinkSync(outside, join(dir, 'design', 'escape.png'));
   const escaped = run('post', board, '--kind', 'design', '--from', message('escaped-design.json', JSON.stringify({ ...msg, key: 'escaped-design', journeys: [{ ...msg.journeys[0], screens: [{ ...msg.journeys[0].screens[0], views: { phone_light: 'design/escape.png' } }] }] })));
@@ -61,11 +63,15 @@ test('design review posts journeys and returns change notes through answers --js
   const proc = spawn('node', [cli, 'serve', board], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   try {
     const url = await new Promise(ok => proc.stdout.once('data', b => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
-    const answer = body => fetch(`${url}api/answers`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: msg.key, ...body }) });
+    const answer = (body, key = msg.key) => fetch(`${url}api/answers`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key, ...body }) });
     assert.equal((await answer({ verdict: 'change', pick: 'guided', notes: [] })).status, 400);
+    assert.equal((await answer({ verdict: 'change', pick: 'guided', notes: [{ journey: 'account-setup', note: 'Targets must be paired.' }] })).status, 400);
     assert.equal((await answer({ verdict: 'change', pick: 'guided', notes: [{ journey: 'account-setup', screen: 'welcome', note: 'Move the button higher.' }] })).status, 200);
+    assert.equal((await answer({ verdict: 'change', pick: 'guided', notes: [{ journey: 'account-setup', screen: 'confirm', note: 'Clarify the confirmation step.' }] })).status, 200);
     const got = JSON.parse(run('answers', board, '--json').stdout)[msg.key];
-    assert.deepEqual([got.answer, got.notes, got.pick], ['change', [{ journey: 'account-setup', screen: 'welcome', note: 'Move the button higher.' }], 'guided']);
+    assert.deepEqual([got.answer, got.notes, got.pick], ['change', [{ journey: 'account-setup', screen: 'confirm', note: 'Clarify the confirmation step.' }], 'guided']);
+    assert.equal((await answer({ verdict: 'change', pick: 'guided', notes: [{ note: 'Clarify the overall direction.' }] }, noScreens.key)).status, 200);
+    assert.deepEqual(JSON.parse(run('answers', board, '--json').stdout)[noScreens.key].notes, [{ note: 'Clarify the overall direction.' }]);
     assert.equal(JSON.parse(run('wait', board, '--key', msg.key, '--json', '--timeout', '0').stdout)[msg.key].answer, 'change');
     assert.equal((await answer({ verdict: 'approve', pick: 'quick', notes: [] })).status, 200);
     const revised = JSON.parse(run('answers', board, '--json').stdout)[msg.key];

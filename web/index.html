@@ -1210,28 +1210,36 @@
   }
 
   function designReview(d) {
-    const saved = state.answers[d.key], screen = d.journeys?.[0]?.screens?.[0], note = el('textarea', { maxlength: '500', placeholder: 'What should change? (optional for approval)' });
-    const pick = el('select', {}, el('option', { value: '' }, 'Choose a direction'));
+    const saved = state.answers[d.key], screens = (d.journeys ?? []).flatMap((journey) => journey.screens.map((screen) => ({ journey, screen }))), savedNote = saved?.notes?.[0];
+    const screenKey = (target) => target && `${target.journey.id}/${target.screen.id}`, screenFor = (key) => screens.find((target) => screenKey(target) === key);
+    const note = el('textarea', { maxlength: '500', placeholder: 'What should change? (optional for approval)' });
+    const pick = el('select', { 'aria-label': 'Pick a direction' }, el('option', { value: '' }, 'Choose a direction'));
     for (const option of d.options ?? []) pick.append(el('option', { value: option.value }, option.label));
     pick.value = saved?.pick ?? '';
-    note.value = saved?.notes?.[0]?.note ?? '';
-    const previewPath = screen && Object.values(screen.views)[0] || d.preview;
+    const screenSelect = screens.length > 1 ? el('select', { 'aria-label': 'Screen for note' }, ...screens.map((target) => el('option', { value: screenKey(target) }, `${target.journey.title} — ${target.screen.title}`))) : '';
+    const selectedKey = savedNote?.journey && savedNote?.screen ? `${savedNote.journey}/${savedNote.screen}` : screenKey(screens[0]);
+    if (screenSelect) screenSelect.value = screenFor(selectedKey) ? selectedKey : screenKey(screens[0]);
+    const target = () => screenSelect ? screenFor(screenSelect.value) : screens[0];
+    note.value = savedNote?.note ?? '';
+    const previewPath = (target() && Object.values(target().screen.views)[0]) || d.preview;
     const preview = d.preview ? el('div', { class: 'design-preview-window' }, el('img', { class: 'design-review-preview', src: src(designUrl(d, d.preview)), alt: `Design preview: ${d.title}` })) : '';
     const fullPreview = previewPath ? el('a', { class: 'design-preview-full', href: src(designUrl(d, previewPath)), target: '_blank', rel: 'noopener noreferrer' }, 'Open full preview') : '';
+    if (screenSelect) screenSelect.onchange = () => { fullPreview.href = src(designUrl(d, Object.values(target().screen.views)[0] || d.preview)); };
     const status = el('p', { class: 'meta', role: 'status' }, saved ? saved.label : d.status === 'draft' ? 'Draft' : 'In review');
     const err = el('p', { class: 'err', role: 'alert' });
     const save = (verdict) => {
       if (d.options?.length && !pick.value) { err.textContent = 'Choose a direction before sending your review.'; pick.focus(); return Promise.resolve(); }
+      const selected = target(), text = note.value.trim();
       return call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, verdict,
-        notes: screen && note.value.trim() ? [{ journey: d.journeys[0].id, screen: screen.id, note: note.value.trim() }] : [], ...(pick.value && { pick: pick.value }) }) }, render);
+        notes: text ? [{ ...(selected && { journey: selected.journey.id, screen: selected.screen.id }), note: text }] : [], ...(pick.value && { pick: pick.value }) }) }, render);
     };
     const approve = el('button', { class: 'open-link' }, 'Approve'), change = el('button', {}, 'Change');
-    approve.disabled = state.readonly || !!state.answers_only;
-    change.disabled = approve.disabled || !screen;
+    approve.disabled = change.disabled = state.readonly || !!state.answers_only;
     approve.onclick = () => save('approve').catch((e) => { err.textContent = `Couldn't save: ${e.message}`; });
     change.onclick = () => { if (!note.value.trim()) { err.textContent = 'Add a note describing what should change.'; note.focus(); return; } save('change').catch((e) => { err.textContent = `Couldn't save: ${e.message}`; }); };
     return el('div', { class: 'design-review' }, status, d.about ? el('p', { class: 'about' }, d.about) : '', preview, fullPreview,
-      d.options?.length ? el('label', {}, 'Pick a direction', pick) : '', screen ? el('label', {}, 'Screen note', note) : '', el('div', { class: 'foot' }, approve, change), err,
+      screenSelect ? el('label', {}, 'Screen for note', screenSelect) : '', d.options?.length ? el('label', {}, 'Pick a direction', pick) : '',
+      el('label', {}, screens.length ? 'Screen note' : 'Design note', note), el('div', { class: 'foot' }, approve, change), err,
       d.link ? el('a', { href: d.link, target: '_blank', rel: 'noopener noreferrer' }, 'Open original design') : '');
   }
 
