@@ -56,8 +56,10 @@ test('design review posts journeys and returns change notes through answers --js
     const got = JSON.parse(run('answers', board, '--json').stdout)[msg.key];
     assert.deepEqual([got.answer, got.notes], ['change', [{ journey: 'onboarding', screen: 'welcome', note: 'Make the button clearer.' }]]);
     assert.equal(JSON.parse(run('wait', board, '--key', msg.key, '--json', '--timeout', '0').stdout)[msg.key].answer, 'change');
-    const approved = await answer({ verdict: 'approve', notes: [] });
-    assert.equal((await approved.json()).decisions.find(d => d.key === msg.key).status, 'approved');
+    const approval = { ...msg, key: 'approved-design' };
+    assert.equal(run('post', board, '--kind', 'design', '--from', message('approved-design.json', JSON.stringify(approval))).status, 0);
+    const approved = await fetch(`${url}api/answers`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: approval.key, verdict: 'approve', notes: [] }) });
+    assert.equal((await approved.json()).decisions.find(d => d.key === approval.key).status, 'approved');
   } finally { proc.kill(); }
 });
 
