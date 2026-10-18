@@ -31,6 +31,10 @@
   };
   addEventListener('message', (m) => {
     if (m.source === parent && m.data?.['sign-off'] === 'point') on = m.data.on === true;
+    if (m.source === parent && m.data?.['sign-off'] === 'size') {
+      const size = () => parent.postMessage({ height: document.documentElement.scrollHeight }, '*');
+      new ResizeObserver(size).observe(document.body); size();
+    }
   });
   for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) addEventListener(type, (m) => {
     if (!on) return;
