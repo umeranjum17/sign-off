@@ -36,11 +36,10 @@
     }
   ],
   "steps": [
-    { "title": "The agent posts the plan", "marks": ["ai"] },
-    { "title": "The board stores it", "marks": ["store"] },
+    { "title": "The agent posts the plan" },
+    { "title": "The board stores it" },
     { "title": "Umer answers each section and decision" },
-    { "title": "Send back returns every answer", "marks": ["gate"] }
+    { "title": "Send back returns every answer" }
   ],
-  "view": "page/index.html",
-  "preview": "page/preview.svg"
+  "view": "page/index.html"
 }

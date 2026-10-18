@@ -60,7 +60,7 @@ const isText = (v: unknown) => typeof v === 'string';
 export const isKey = (v: unknown) => isText(v) && /^[A-Za-z0-9._-]{1,128}$/.test(v as string);
 const ONE_OF: Record<string, unknown[]> = { close: ['done', 'release'], area: ['waiting', 'evidence', 'reports', 'answered'] };
 /** What a step uses or can stop on: an AI model, a store, a gate, a hard fail. */
-export const MARKS = ['ai', 'store', 'gate', 'fail'];
+const MARKS = ['ai', 'store', 'gate', 'fail'];
 export const NOTE_MAX = 500;
 const TRADEOFF_MAX = 1000;
 const VIEWS: Record<string, [string, RegExp]> = { diagram: ['.svg, .png, .jpg, .jpeg or .webp', /\.(svg|png|jpe?g|webp)$/i], interactive: ['.html', /\.html$/i] };

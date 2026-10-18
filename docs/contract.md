@@ -92,8 +92,8 @@ An agent's plan the person reviews before the work starts: each section approved
 
 - Required: the common fields, `about` (the plan, answer first), `sections`, `decisions` and `view`.
 - `sections`: 1 to 8 objects of exactly `id` (1-40 of `a-z 0-9 -`, unique in the plan), `heading` (text, 1-80) and `body` (text, 1-1000), such as goals and non-goals, architecture, slices and order, coding standards, risks.
-- `decisions`: 0 to 5 objects of exactly `key` (a key-set id, unique in the plan), `question` (text, 1-160: one question of 12 words or fewer, ending in `?`), `why` (text, 1-500), `options` (2-6 ask options, each also with `outcome`, text 1-200: what picking it leads to) and `recommend` (one listed option `value`).
-- `view`: the page with the direction diagram, with the report rules for its path. Optional: `preview` (its picture, report rules, in the same folder) and `steps` (2 to 12 tap-through steps, each exactly `title`, text 1-80, and optional `marks`, each of `ai`, `store`, `gate`, `fail` at most once). `validate` checks the paths, not the files.
+- `decisions`: 0 to 5 objects of exactly `key` (a key-set id, unique in the plan), `question` (text, 1-160: one question of 12 words or fewer, with one `?`, as its last character; `"Keep A? Or B?"` is refused), `why` (text, 1-500), `options` (2-6 ask options, each also with `outcome`, text 1-200: what picking it leads to) and `recommend` (one listed option `value`).
+- `view`: the one page, with the direction diagram, with the report rules for its path. `validate` checks the path, not the file. Optional: `steps`, 2 to 12 tap-through steps, each exactly `title` (text, 1-80).
 - No `options` key: a plan's answers come from its sections and decisions, so top-level `options` is refused with a fix line to put each question in `decisions`.
 
 ### evidence, schema 1
@@ -172,7 +172,7 @@ code: VALIDATION_ERROR
 help[1]: "Add \"recommend_value\": \"a\", the option you would pick: one of a, b"
 ```
 
-For a plan, the same order then runs: `sections` (count, fields, `id`, unique ids), `decisions` (each `key`, `question`, `why`, `options`, `recommend`), `steps`, then `view` and `preview`. A plan with no sections, two sections with one id, a decision with no `recommend` or one that names no option, a plan with no `view`, and a plan with top-level `options` are each refused with one fix line.
+For a plan, the same order then runs: `sections` (count, fields, `id`, unique ids), `decisions` (each `key`, `question`, `why`, `options`, `recommend`), `steps`, then `view`. A plan with no sections, two sections with one id, a decision question with more than one `?`, a decision with no `recommend` or one that names no option, a plan with no `view`, and a plan with top-level `options` are each refused with one fix line.
 
 To recover: read the `help` line, fix the message file, post it again. Never edit the board file by hand.
 

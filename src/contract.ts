@@ -1,7 +1,7 @@
 // The v1 communication contract (docs/contract.md): one strict, versioned shape per kind of message.
 import { accessSync, constants, readFileSync, realpathSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
-import { isKey, MARKS, MEDIA_MAX } from './store.js';
+import { isKey, MEDIA_MAX } from './store.js';
 
 /** A message that does not match: what is wrong, and the one line that says how to fix it. */
 export class ContractError extends Error {
@@ -17,7 +17,7 @@ const FIELDS: Record<string, string[]> = {
   evidence: [...COMMON, 'media', 'run'],
   gate: [...COMMON, 'run', 'options', 'recommend_value', 'close'],
   finding: [...COMMON, 'cause', 'incidents', 'days', 'evidence_ids', 'change_kind', 'proposal', 'options', 'recommend_value'],
-  plan: [...COMMON, 'sections', 'decisions', 'steps', 'view', 'preview'],
+  plan: [...COMMON, 'sections', 'decisions', 'steps', 'view'],
 };
 /** A done-done run: its id, full commit and the four Checks lines. */
 const RUN = ['run_id', 'commit', 'outcome', 'repro', 'proof', 'evidence'];
@@ -138,12 +138,6 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
     if (/^([\\/]|[A-Za-z]:)/.test(m[f]) || m[f].split(/[\\/]/).includes('..') || /[?#\\]/.test(m[f])) throw bad(f, `${show(m[f])} must be a relative path with no .., ?, # or \\`, `Set "${f}" to ${example}, a path from the board file's folder`);
     if (!ends.test(m[f])) throw bad(f, `${show(m[f])} must end in ${kinds}`, PAGE_HELP);
   };
-  const views = (need: string) => {
-    page('view', /\.html$/i, '.html', '"mocks/<key>/index.html"', need);
-    if (m.kind === 'plan' && !Object.hasOwn(m, 'preview')) return;
-    page('preview', /\.(svg|png|jpe?g|webp)$/i, '.svg, .png, .jpg, .jpeg or .webp', '"mocks/<key>/preview.svg"', need);
-    if (dirname(m.preview) !== dirname(m.view)) throw bad('preview', `${show(m.preview)} must sit in the folder of ${show(m.view)}`, `Put the picture beside the page, such as "${dirname(m.view)}/preview.svg"`);
-  };
   need('contract');
   if (m.contract !== 1) throw bad('contract', `must be 1, not ${show(m.contract)}`, whole(m.contract) ? 'Upgrade sign-off-axi: this one knows contract 1' : 'Set "contract": 1');
   need('kind');
@@ -192,7 +186,10 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
     if (Object.hasOwn(m, 'group')) text('group', m.group, 40, 'the section it belongs to, in 40 characters or fewer, or leave it out');
     if (Object.hasOwn(m, 'decided')) text('decided', m.decided, 200, 'what was decided, in 200 characters or fewer, or leave it out');
     // A report is a page to tap through and a picture of it for the card: text alone is a status note, not a report.
-    views('a report is a page to tap through, not text');
+    const need = 'a report is a page to tap through, not text';
+    page('view', /\.html$/i, '.html', '"mocks/<key>/index.html"', need);
+    page('preview', /\.(svg|png|jpe?g|webp)$/i, '.svg, .png, .jpg, .jpeg or .webp', '"mocks/<key>/preview.svg"', need);
+    if (dirname(m.preview) !== dirname(m.view)) throw bad('preview', `${show(m.preview)} must sit in the folder of ${show(m.view)}`, `Put the picture beside the page, such as "${dirname(m.view)}/preview.svg"`);
     return { kind: m.kind, schema: m.schema };
   }
   // A plan is sections to approve or change, decisions with a recommended pick, steps to tap through, and where it goes as a diagram.
@@ -210,19 +207,16 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
       if (!isKey(o.key)) throw bad(`${at}.key`, 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "key" to a short id such as "store"');
       if (all.slice(0, n).some((p) => p.key === o.key)) throw bad(`${at}.key`, `repeats ${o.key}`, 'Give every decision its own key');
       text(`${at}.question`, o.question, 160, 'the question, ending in ?');
-      if (!o.question.trim().endsWith('?') || !/[\p{L}\p{N}]/u.test(o.question) || o.question.trim().split(/\s+/).length > 12) throw bad(`${at}.question`, 'must be one question of 12 words or fewer, ending in ?', 'Ask it in 12 words or fewer, ending in ?; put the rest in "why"');
+      // One question: a single ?, as its last character, so "Keep A? Or B?" is two decisions.
+      if (o.question.indexOf('?') !== o.question.length - 1) throw bad(`${at}.question`, 'must be one question, with one ? as its last character', 'Ask one question ending in ?, and split any other into its own decision');
+      if (!/[\p{L}\p{N}]/u.test(o.question) || o.question.trim().split(/\s+/).length > 12) throw bad(`${at}.question`, 'must be one question of 12 words or fewer, ending in ?', 'Ask it in 12 words or fewer, ending in ?; put the rest in "why"');
       text(`${at}.why`, o.why, 500, 'why it matters, in 500 characters or fewer');
       if (!Array.isArray(o.options) || o.options.length < 2 || o.options.length > 6) throw bad(`${at}.options`, Object.hasOwn(o, 'options') ? 'must list 2 to 6 options' : 'is required', 'Set "options" to 2-6 objects such as {"value":"yes","label":"Yes","outcome":"Plans live in the board file"}');
       checkOptions(`${at}.options`, o.options, true);
       recommend(`${at}.recommend`, o, o.options);
     });
-    if (Object.hasOwn(m, 'steps')) list('steps', 2, 12, ['title', 'marks'], '{"title":"The agent posts the plan"}').forEach((o, n) => {
-      text(`steps[${n}].title`, o.title, 80, 'the step, in 80 characters or fewer');
-      if (Object.hasOwn(o, 'marks') && !(Array.isArray(o.marks) && o.marks.every((k: unknown) => MARKS.includes(k as string)) && new Set(o.marks).size === o.marks.length)) {
-        throw bad(`steps[${n}].marks`, `must list each of ${MARKS.join(', ')} at most once`, `Set "marks" to some of ${MARKS.join(', ')}, or leave it out`);
-      }
-    });
-    views('a plan shows where it goes as a diagram on a page');
+    if (Object.hasOwn(m, 'steps')) list('steps', 2, 12, ['title'], '{"title":"The agent posts the plan"}').forEach((o, n) => text(`steps[${n}].title`, o.title, 80, 'the step, in 80 characters or fewer'));
+    page('view', /\.html$/i, '.html', '"mocks/<key>/index.html"', 'a plan shows where it goes as a diagram on a page');
     return { kind: m.kind, schema: m.schema };
   }
   if (Object.hasOwn(m, 'about')) text('about', m.about, 500, 'a short note, or leave it out');

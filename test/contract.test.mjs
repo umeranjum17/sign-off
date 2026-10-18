@@ -132,7 +132,7 @@ test('exit codes: --kind must match, an unreadable file wins over a refusal, no 
 test('a plan: sections, decisions with a recommended pick and a page pass validate; each broken rule is refused with one fix line; post refuses it', () => {
   const plan = JSON.parse(readFileSync(join(fixtures, 'plan.v1', 'valid-full.json')));
   const [d] = plan.decisions, decision = (o) => ({ ...plan, decisions: [{ ...d, ...o }] });
-  const ok = validate('--kind', 'plan', message('plan.json', JSON.stringify(plan)), message('no-steps.json', JSON.stringify({ ...plan, steps: undefined, preview: undefined })));
+  const ok = validate('--kind', 'plan', message('plan.json', JSON.stringify(plan)), message('no-steps.json', JSON.stringify({ ...plan, steps: undefined })));
   assert.equal(ok.status, 0, ok.raw);
   for (const [m, error, help] of [
     [{ ...plan, sections: [] }, /sections must list 1 to 8 sections/, /Set "sections" to 1-8 objects/],
@@ -140,17 +140,20 @@ test('a plan: sections, decisions with a recommended pick and a page pass valida
     [{ ...plan, sections: [{ ...plan.sections[0], id: 'Goals' }] }, /sections\[0\]\.id must be 1-40 of a-z 0-9 -/, /short slug/],
     [{ ...plan, decisions: undefined }, /decisions is required/, /Set "decisions" to 0-5 objects/],
     [decision({ recommend: 'maybe' }), /decisions\[0\]\.recommend "maybe" is not an option value/, /one of one, each/],
-    [decision({ question: 'Send every answer back as one event.' }), /decisions\[0\]\.question must be one question of 12 words or fewer, ending in \?/, /put the rest in "why"/],
+    [decision({ question: 'Send every answer back as one event.' }), /decisions\[0\]\.question must be one question, with one \? as its last character/, /Ask one question ending in \?/],
+    [decision({ question: 'Should the board send every answer back to the agent as one single event?' }), /decisions\[0\]\.question must be one question of 12 words or fewer, ending in \?/, /put the rest in "why"/],
     [decision({ question: '?' }), /decisions\[0\]\.question must be one question of 12 words or fewer, ending in \?/, /Ask it in 12 words or fewer/],
     [decision({ options: d.options.slice(0, 1) }), /decisions\[0\]\.options must list 2 to 6 options/, /"outcome"/],
     [decision({ options: [{ value: 'one', label: 'One event' }, d.options[1]] }), /decisions\[0\]\.options\[0\]\.outcome must be text/, /Set "outcome"/],
     [decision({ options: [{ ...d.options[0], note: 'x' }, d.options[1]] }), /decisions\[0\]\.options\[0\]\.note is not a field of an option/, /only value, label and outcome/],
     [{ ...plan, decisions: [d, d] }, /decisions\[1\]\.key repeats send-back/, /its own key/],
     [{ ...plan, steps: plan.steps.slice(0, 1) }, /steps must list 2 to 12 steps/, /Set "steps"/],
-    [{ ...plan, steps: [{ title: 'A', marks: ['ai', 'ai'] }, plan.steps[1]] }, /steps\[0\]\.marks must list each of ai, store, gate, fail at most once/, /leave it out/],
-    [{ ...plan, preview: 'elsewhere/preview.svg' }, /preview "elsewhere\/preview.svg" must sit in the folder of "page\/index.html"/, /beside the page/],
+    [{ ...plan, steps: [{ title: 'A', marks: ['ai'] }, plan.steps[1]] }, /steps\[0\]\.marks is not a field of a step/, /a step has only title/],
+    [{ ...plan, preview: 'page/preview.svg' }, /preview is not a field of plan schema 1/, /Remove "preview"/],
+    [decision({ question: 'Keep A? Or B?' }), /decisions\[0\]\.question must be one question, with one \? as its last character/, /split any other into its own decision/],
+    [decision({ question: 'Send every answer back as one event? ' }), /decisions\[0\]\.question must be one question, with one \? as its last character/, /Ask one question ending in \?/],
     [{ ...plan, view: '../index.html' }, /view "..\/index.html" must be a relative path/, /Set "view"/],
-    [{ ...plan, filed: '2026-10-13T07:19:00Z' }, /filed is not a field of plan schema 1/, /plan takes key, title, filer, link, about, sections, decisions, steps, view, preview/],
+    [{ ...plan, filed: '2026-10-13T07:19:00Z' }, /filed is not a field of plan schema 1/, /plan takes key, title, filer, link, about, sections, decisions, steps, view$/],
   ]) {
     const { status, out: { files: [row] } } = validate(message('plan-bad.json', JSON.stringify(m)));
     assert.equal(status, 2, JSON.stringify(m));

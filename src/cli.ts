@@ -80,7 +80,7 @@ examples:
 `,
   validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>] [--expect-invalid]
 Checks message files against the communication contract without posting them: ${CONTRACT}
-A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate and finding at schema 1, and report at schema 2.
+A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate, finding and plan at schema 1, and report at schema 2.
 An evidence message's media paths read from the message file's folder: each file must be there, inside it, and 50 MB or less.
 A report is a page to tap through: its "view" (.html) and "preview" (its picture, beside it) read from the message file's folder, filled with no FILL: lines left (see report init).
 A gate names its done-done run (run_id and commit) and offers 2 or 3 of approve (Approve), skip (Skip the judge) and fix (Fix first).
