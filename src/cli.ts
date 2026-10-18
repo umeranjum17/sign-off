@@ -1070,7 +1070,7 @@ function buildIncoming(values: Record<string, any>, extra: object, filer: string
     const source = resolve(values.from), raw = readItems(source).items;
     contractItems(raw, values.from, file);
     const incoming = loadDecisions(source, board);
-    recommended(raw, false);
+    recommended(incoming, false);
     return { incoming: incoming.map((d) => ({ filer, ...d })), raw: raw.map((i) => ({ filer, ...i })) };
   }
   const scratch = mkdtempSync(join(tmpdir(), 'sign-off-'));
