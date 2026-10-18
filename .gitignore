@@ -5,3 +5,4 @@ demo-dist/
 *.board.log
 *.tgz
 .live-check/
+.validation-board/

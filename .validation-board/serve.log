@@ -1,6 +1,0 @@
-board: ~/.no-mistakes/worktrees/5319504797ee/01M56WCKY71T05NKGCE2JWFQ3Z/.validation-board/board.json
-url: "http://127.0.0.1:42421/"
-pid: 1238784
-help[2]:
-  Tell the user to answer at http://127.0.0.1:42421/
-  Run `sign-off-axi answers .validation-board/board.json` to read their answers
