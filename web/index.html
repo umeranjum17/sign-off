@@ -359,6 +359,25 @@
   .design-review .foot > * { flex: 1; }
   .design-review .foot button.open-link { background: var(--action); color: var(--on-accent); }
   .design-review > a { display: block; max-width: 56rem; margin: 1rem auto; color: var(--accent); }
+  .design-viewer { position: fixed; inset: 0; width: 100%; max-width: none; height: 100dvh; max-height: none; margin: 0; padding: 0; border: 0; background: var(--bg); color: var(--text); }
+  .design-viewer[open] { display: flex; flex-direction: column; }
+  .design-viewer header { display: flex; gap: 1rem; align-items: center; padding: 0.75rem max(1rem, env(safe-area-inset-right)) 0.75rem max(1rem, env(safe-area-inset-left)); border-bottom: 1px solid var(--line); }
+  .design-viewer header > div { flex: 1; min-width: 0; max-height: 22dvh; overflow: auto; }
+  .design-viewer h2, .design-viewer p { margin: 0; }
+  .design-viewer h2 { font-size: 1.125rem; }
+  .design-viewer button, .design-viewer select { min-height: 2.75rem; }
+  .design-viewer-body { display: grid; grid-template-rows: minmax(8rem, 1fr) auto; flex: 1; min-height: 0; }
+  .design-stage { min-width: 0; min-height: 0; overflow: auto; background: var(--sunk); touch-action: pan-y; }
+  .design-stage img { display: block; width: 100%; height: auto; margin: auto; }
+  .design-stage iframe { display: block; width: 100%; height: 100%; border: 0; background: var(--surface); }
+  .design-viewer-panel { overflow: auto; padding: 0.75rem max(1rem, env(safe-area-inset-right)) max(0.75rem, env(safe-area-inset-bottom)); background: var(--surface); }
+  .design-viewer-panel .foot { display: flex; gap: 0.75rem; margin: 0.5rem 0; }
+  .design-viewer-panel .foot > * { flex: 1; }
+  .design-viewer-panel label { display: grid; gap: 0.25rem; margin: 0.5rem 0; }
+  .design-viewer-panel textarea { min-height: 3rem; max-height: 6rem; margin: 0; }
+  .design-viewer-panel .open-link { background: var(--action); color: var(--on-accent); }
+  @media (min-width: 60rem) { .design-viewer-body { grid-template: minmax(0, 1fr) / minmax(0, 1fr) 22rem; } .design-viewer-panel { padding: 1.5rem; } }
+  @media (max-height: 550px) { .design-viewer-body { overflow: auto; grid-template-rows: minmax(12rem, 1fr) auto; } }
   .needs .foot .open-link { min-height: 2.75rem; padding: 0 1rem; background: var(--action); color: var(--on-accent); text-align: center; }
   /* The asks dismissed from Waiting on you: one muted row that opens to a list, each with Restore. */
   .gone-asks { margin-top: 0.5rem; } .gone-asks summary { color: var(--muted); }
@@ -1206,6 +1225,11 @@
     return el('div', { class: `plan-scroll${saved ? ' sent' : ''}` }, el('div', { class: `plan-layout${saved ? ' sent' : ''}` }, main, panel));
   }
 
+  let designSession;
+  addEventListener('message', (e) => {
+    const viewer = document.querySelector('.design-viewer[open]');
+    if (viewer && e.source === viewer.querySelector('iframe')?.contentWindow && e.data?.['sign-off'] === 'viewer-nav') viewer.dispatchEvent(new KeyboardEvent('keydown', { key: e.data.key }));
+  });
   function designReview(d) {
     const saved = state.answers[d.key], screens = (d.journeys ?? []).flatMap((journey) => journey.screens.map((screen) => ({ journey, screen }))), savedNote = saved?.notes?.[0];
     const screenKey = (target) => target && `${target.journey.id}/${target.screen.id}`, screenFor = (key) => screens.find((target) => screenKey(target) === key);
@@ -1214,11 +1238,18 @@
     for (const option of d.options ?? []) pick.append(el('option', { value: option.value }, option.label));
     pick.value = saved?.pick ?? '';
     const screenSelect = screens.length > 1 ? el('select', { 'aria-label': 'Screen for note' }, ...screens.map((target) => el('option', { value: screenKey(target) }, `${target.journey.title} — ${target.screen.title}`))) : '';
-    const selectedKey = savedNote?.journey && savedNote?.screen ? `${savedNote.journey}/${savedNote.screen}` : screenKey(screens[0]);
+    if (designSession?.key !== d.key) designSession = { key: d.key, open: false, selected: '', drafts: new Map() };
+    const session = designSession;
+    const selectedKey = session.selected || (savedNote?.journey && savedNote?.screen ? `${savedNote.journey}/${savedNote.screen}` : screenKey(screens[0]));
     if (screenSelect) screenSelect.value = screenFor(selectedKey) ? selectedKey : screenKey(screens[0]);
     const target = () => screenSelect ? screenFor(screenSelect.value) : screens[0];
-    note.value = savedNote?.note ?? '';
-    const previewPath = () => (target() && Object.values(target().screen.views)[0]) || d.preview;
+    const currentNote = () => state.answers[d.key]?.notes?.find((n) => n.journey === target()?.journey.id && n.screen === target()?.screen.id);
+    note.value = session.drafts.get(screenKey(target())) ?? currentNote()?.note ?? '';
+    note.oninput = () => session.drafts.set(screenKey(target()), note.value);
+    const previewPath = () => {
+      const views = target()?.screen.views, form = innerWidth < 960 ? 'phone' : 'computer', theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      return views?.[`${form}_${theme}`] || views?.[`${form}_${theme === 'dark' ? 'light' : 'dark'}`] || (views && Object.values(views)[0]) || d.preview;
+    };
     const previewElement = (path) => /\.html?$/i.test(path) ? el('iframe', { class: 'design-review-preview', src: src(designUrl(d, path)), title: `Design preview: ${d.title}`, sandbox: 'allow-scripts' }) : el('img', { class: 'design-review-preview', src: src(designUrl(d, path)), alt: `Design preview: ${d.title}` });
     const preview = previewPath() ? el('div', { class: 'design-preview-window' }, previewElement(previewPath())) : '';
     const fullPreview = previewPath() ? el('a', { class: 'design-preview-full', href: src(designUrl(d, previewPath())), target: '_blank', rel: 'noopener noreferrer' }, 'Open full preview') : '';
@@ -1226,23 +1257,81 @@
       const path = previewPath();
       if (preview) preview.replaceChildren(previewElement(path));
       if (fullPreview) fullPreview.href = src(designUrl(d, path));
+      session.selected = screenKey(target());
+      note.value = session.drafts.get(session.selected) ?? currentNote()?.note ?? '';
     };
     const status = el('p', { class: 'meta', role: 'status' }, saved ? saved.label : d.status === 'draft' ? 'Draft' : 'In review');
     const err = el('p', { class: 'err', role: 'alert' });
+    let saving = false;
     const save = (verdict) => {
       if (d.options?.length && !pick.value) { err.textContent = 'Choose a direction before sending your review.'; pick.focus(); return Promise.resolve(); }
-      const selected = target(), text = note.value.trim();
+      const selected = target(), text = note.value.trim(), notes = (state.answers[d.key]?.notes ?? []).filter((n) => n.journey !== selected?.journey.id || n.screen !== selected?.screen.id);
+      if (selected && session.open || text) notes.push({ ...(selected && { journey: selected.journey.id, screen: selected.screen.id, ...(session.open && { verdict }) }), note: text });
+      saving = true; approve.disabled = change.disabled = true;
       return call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, verdict,
-        notes: text ? [{ ...(selected && { journey: selected.journey.id, screen: selected.screen.id }), note: text }] : [], ...(pick.value && { pick: pick.value }) }) }, render);
+        notes, ...(pick.value && { pick: pick.value }) }) }, () => session.drafts.delete(screenKey(selected)))
+        .finally(() => { saving = false; approve.disabled = change.disabled = state.readonly || !!state.answers_only; });
     };
     const approve = el('button', { class: 'open-link' }, 'Approve'), change = el('button', {}, 'Change');
     approve.disabled = change.disabled = state.readonly || !!state.answers_only;
     approve.onclick = () => save('approve').catch((e) => { err.textContent = `Couldn't save: ${e.message}`; });
     change.onclick = () => { if (!note.value.trim()) { err.textContent = 'Add a note describing what should change.'; note.focus(); return; } save('change').catch((e) => { err.textContent = `Couldn't save: ${e.message}`; }); };
-    return el('div', { class: 'design-review' }, status, d.about ? el('p', { class: 'about' }, d.about) : '', preview, fullPreview,
-      screenSelect ? el('label', {}, 'Screen for note', screenSelect) : '', d.options?.length ? el('label', {}, 'Pick a direction', pick) : '',
-      el('label', {}, screens.length ? 'Screen note' : 'Design note', note), el('div', { class: 'foot' }, approve, change), err,
+    const controls = el('div', {}, d.options?.length ? el('label', {}, 'Pick a direction', pick) : '',
+      el('label', {}, screens.length ? 'Screen note' : 'Design note', note), el('div', { class: 'foot' }, approve, change), err);
+    const open = el('button', { class: 'open-link', 'aria-haspopup': 'dialog' }, 'Review full screen');
+    const root = el('div', { class: 'design-review' }, status, d.about ? el('p', { class: 'about' }, d.about) : '', preview, fullPreview,
+      screens.length ? open : '', screenSelect ? el('label', {}, 'Screen for note', screenSelect) : '', controls,
       d.link ? el('a', { href: d.link, target: '_blank', rel: 'noopener noreferrer' }, 'Open original design') : '');
+    if (!screens.length) return root;
+    const heading = el('h2', { id: 'design-screen-title', dir: 'auto' }), count = el('p', { class: 'meta', 'aria-live': 'polite' });
+    const stage = el('div', { class: 'design-stage' }), screenStatus = el('p', { class: 'meta', role: 'status' });
+    const previous = el('button', { 'aria-label': 'Previous screen' }, '‹ Previous'), next = el('button', { 'aria-label': 'Next screen' }, 'Next ›');
+    const close = el('button', { 'aria-label': 'Close viewer' }, 'Close');
+    const viewer = el('dialog', { class: 'design-viewer', 'aria-labelledby': heading.id }, el('header', {}, el('div', {}, count, heading), close),
+      el('div', { class: 'design-viewer-body' }, stage, el('section', { class: 'design-viewer-panel', 'aria-label': 'Screen review' },
+        el('div', { class: 'foot' }, previous, next), screenStatus)));
+    const panel = viewer.querySelector('.design-viewer-panel');
+    const draw = () => {
+      const i = screens.indexOf(target());
+      heading.textContent = `${target().journey.title} — ${target().screen.title}`;
+      count.textContent = `${i + 1} of ${screens.length}`;
+      previous.disabled = i === 0; next.disabled = i === screens.length - 1;
+      stage.replaceChildren(previewElement(previewPath())); stage.scrollTop = 0;
+      screenStatus.textContent = currentNote() ? (currentNote().verdict === 'approve' ? 'Screen approved' : 'Changes requested') : 'Not reviewed yet';
+      approve.textContent = 'Approve screen'; change.textContent = 'Request change'; err.textContent = '';
+    };
+    const step = (delta) => {
+      const i = screens.indexOf(target()) + delta;
+      if (i < 0 || i >= screens.length || saving) return;
+      session.drafts.set(screenKey(target()), note.value);
+      if (screenSelect) { screenSelect.value = screenKey(screens[i]); screenSelect.onchange(); }
+      draw();
+    };
+    previous.onclick = () => step(-1); next.onclick = () => step(1);
+    const key = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); viewer.close(); }
+      else if (!e.target.closest?.('textarea, input, select') && !e.ctrlKey && !e.metaKey && !e.altKey && ['ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault(); step(e.key === 'ArrowRight' ? 1 : -1);
+      }
+    };
+    viewer.onkeydown = key;
+    let touch;
+    stage.addEventListener('touchstart', (e) => { touch = e.touches[0]; }, { passive: true });
+    stage.addEventListener('touchend', (e) => {
+      const end = e.changedTouches[0];
+      if (touch && Math.abs(end.clientX - touch.clientX) > 60 && Math.abs(end.clientX - touch.clientX) > Math.abs(end.clientY - touch.clientY) * 1.5) step(end.clientX < touch.clientX ? 1 : -1);
+      touch = null;
+    });
+    open.onclick = () => {
+      session.open = true; panel.append(controls); root.append(viewer); draw(); viewer.showModal();
+    };
+    close.onclick = () => viewer.close();
+    viewer.onclose = () => {
+      session.open = false; root.append(controls); approve.textContent = 'Approve'; change.textContent = 'Change';
+      open.focus();
+    };
+    if (session.open) queueMicrotask(() => { if (root.isConnected) open.click(); });
+    return root;
   }
 
   /** The report a #reports/<key> link opens (or the plan a #waiting/<key> link opens), over the whole board: a bar with the way back and its title, then its page in a sandboxed frame.

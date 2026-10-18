@@ -17,7 +17,17 @@
   };
   window.signOffFind = find;
   if (parent === window) return;
-  let on = false;
+  let on = false, touch;
+  const navigate = (key) => parent.postMessage({ 'sign-off': 'viewer-nav', key }, '*');
+  addEventListener('keydown', (e) => {
+    if (!e.target.closest?.('textarea, input, select, [contenteditable]') && !e.ctrlKey && !e.metaKey && !e.altKey && ['ArrowLeft', 'ArrowRight', 'Escape'].includes(e.key)) navigate(e.key);
+  });
+  addEventListener('touchstart', (e) => { touch = e.touches[0]; }, { passive: true });
+  addEventListener('touchend', (e) => {
+    const end = e.changedTouches[0];
+    if (touch && Math.abs(end.clientX - touch.clientX) > 60 && Math.abs(end.clientX - touch.clientX) > Math.abs(end.clientY - touch.clientY) * 1.5) navigate(end.clientX < touch.clientX ? 'ArrowRight' : 'ArrowLeft');
+    touch = null;
+  }, { passive: true });
   const ref = (e) => {
     if (e === document.documentElement) return 'html';
     const path = [];

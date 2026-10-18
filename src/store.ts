@@ -10,7 +10,7 @@ export type Step = { title: string; marks?: string[] };
 /** A plan's section to approve or change, and a decision it asks: one question, options that each say where they lead, and the pick it recommends. */
 export type PlanSection = { id: string; heading: string; body: string };
 export type PlanDecision = { key: string; question: string; why: string; options: (Option & { outcome: string })[]; recommend: string };
-export type DesignNote = { journey?: string; screen?: string; note: string };
+export type DesignNote = { journey?: string; screen?: string; verdict?: 'approve' | 'change'; note?: string };
 export type DesignJourney = { id: string; title: string; screens: { id: string; title: string; views: Record<string, string> }[] };
 /** One section in a plan's send-back: approved, or changed with a note on what to change. */
 export type PlanNote = { section: string; verdict: 'approve' | 'change'; note?: string };
@@ -289,8 +289,10 @@ export function appendDesignAnswer(decisionsPath: string, d: Decision, verdict: 
   const screens = new Set((d.journeys ?? []).flatMap(j => j.screens.map(s => `${j.id}/${s.id}`)));
   for (const n of notes) {
     const hasJourney = n?.journey !== undefined, hasScreen = n?.screen !== undefined;
-    if (!n || hasJourney !== hasScreen || (hasJourney && !screens.has(`${n.journey}/${n.screen}`)) || !isText(n.note) || !n.note.trim() || [...n.note].length > NOTE_MAX) {
-      throw bad('each note needs both a known journey and screen, or neither for a design-level note, with text of 500 characters or fewer');
+    if (!n || hasJourney !== hasScreen || (hasJourney && !screens.has(`${n.journey}/${n.screen}`)) ||
+      (n.verdict !== undefined && (!hasJourney || !['approve', 'change'].includes(n.verdict))) ||
+      (n.note !== undefined && (!isText(n.note) || [...n.note].length > NOTE_MAX)) || ((n.verdict ?? 'change') === 'change' && !n.note?.trim())) {
+      throw bad('each note needs both a known journey and screen, or neither for a design-level note; screen verdict must be approve or change, with text required on change (500 characters or fewer)');
     }
   }
   if (new Set(notes.map(n => n.journey === undefined ? '' : `${n.journey}/${n.screen}`)).size !== notes.length) throw bad('notes must name each screen once, or contain one design-level note');

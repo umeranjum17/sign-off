@@ -1191,6 +1191,7 @@ test('a posted contract design is listed with its preview and date, and opens fo
     journeys: [{ id: 'account-setup', title: 'Account setup', screens: [
       { id: 'welcome', title: 'Welcome', views: { phone_light: 'design/welcome.png' } },
       { id: 'security', title: 'Security', views: { phone_light: 'design/security.html' } },
+      ...Array.from({ length: 15 }, (_, i) => ({ id: `screen-${i + 3}`, title: `Journey screen ${i + 3}`, views: { phone_light: 'design/welcome.png' } })),
     ] }] };
   writeFileSync(source, JSON.stringify(message));
   const posted = run('post', file, '--kind', 'design', '--from', source);
@@ -1210,20 +1211,20 @@ test('a posted contract design is listed with its preview and date, and opens fo
   assert.equal(await evaluate('document.querySelector(".design-card img")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent(message.preview)}`);
   assert.equal(await evaluate('document.querySelector(".design-card .meta")?.textContent'), '18 Oct');
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
-  await until(async () => (await evaluate('document.querySelector(".design-review button")?.textContent')) === 'Approve');
+  await until(async () => (await evaluate('document.querySelector(".design-review .foot button")?.textContent')) === 'Approve');
   assert.equal(await evaluate('document.querySelector(".design-preview-full")?.getAttribute("target")'), '_blank');
   assert.equal(await evaluate('document.querySelector(".design-review-preview")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent('design/welcome.png')}`);
-  assert.equal(await evaluate('document.querySelector("[aria-label=\\"Screen for note\\"]")?.options.length'), 2);
+  assert.equal(await evaluate('document.querySelector("[aria-label=\\"Screen for note\\"]")?.options.length'), 17);
   await evaluate('(() => { const s = document.querySelector("[aria-label=\\"Screen for note\\"]"); s.value = "account-setup/security"; s.dispatchEvent(new Event("change")); })()');
   assert.equal(await evaluate('document.querySelector(".design-preview-full")?.getAttribute("href")'), `/design/local/d1-design/${encodeURIComponent('design/security.html')}`);
   assert.equal(await evaluate('document.querySelector(".design-review-preview")?.tagName'), 'IFRAME');
   assert.equal(await evaluate('document.querySelector(".design-review-preview")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent('design/security.html')}`);
   await evaluate('document.querySelector("[aria-label=\\"Pick a direction\\"]").value = "quick"');
-  await evaluate('document.querySelector(".design-review button").click()');
+  await evaluate('document.querySelector(".design-review .foot button").click()');
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Approved');
   await evaluate('document.querySelector("[aria-label=\\"Screen for note\\"]").value = "account-setup/security"');
   await evaluate('document.querySelector(".design-review textarea").value = "Make the title clearer"');
-  await evaluate('document.querySelector(".design-review button:last-of-type").click()');
+  await evaluate('document.querySelector(".design-review .foot button:last-child").click()');
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Changes requested');
   assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-design'].notes, [{ journey: 'account-setup', screen: 'security', note: 'Make the title clearer' }]);
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
@@ -1232,11 +1233,45 @@ test('a posted contract design is listed with its preview and date, and opens fo
   await desktop.evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
   await until(async () => (await desktop.evaluate('document.querySelector("#nav a[href=\\"#designs\\"][aria-current=page]")?.textContent.trim()')) === 'Designs1');
   await desktop.evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
-  await until(async () => (await desktop.evaluate('document.querySelector(".design-review button")?.textContent')) === 'Approve');
+  await until(async () => (await desktop.evaluate('document.querySelector(".design-review .foot button")?.textContent')) === 'Approve');
   assert.equal(await desktop.evaluate('document.querySelector("#nav a[href=\\"#designs\\"][aria-current=page]")?.getClientRects().length > 0'), true);
   assert.equal(await desktop.evaluate('document.querySelector(".design-review")?.getBoundingClientRect().bottom <= innerHeight'), true);
   assert.equal(await desktop.evaluate('document.querySelector("#reader").getBoundingClientRect().left >= document.querySelector("#nav").getBoundingClientRect().right'), true);
   desktop.close();
+  // The legacy note has no verdict: the viewer must treat it as a change, not an approval.
+  await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
+  await until(async () => (await evaluate('document.querySelector("[aria-haspopup=dialog]")?.textContent')) === 'Review full screen');
+  await evaluate('document.querySelector("[aria-haspopup=dialog]").click()');
+  await until(() => evaluate('!!document.querySelector(".design-viewer[open]")'));
+  assert.match(await evaluate('document.querySelector(".design-viewer header").textContent'), /2 of 17.*Security/);
+  assert.equal(await evaluate('document.querySelector(".design-viewer [role=status]").textContent'), 'Changes requested');
+  assert.equal(await evaluate('document.querySelector(".design-viewer textarea").value'), 'Make the title clearer');
+  await evaluate('document.querySelector("[aria-label=\\"Next screen\\"]").click()');
+  await evaluate('document.querySelector(".design-viewer").dispatchEvent(new KeyboardEvent("keydown", {key:"ArrowRight"}))');
+  assert.match(await evaluate('document.querySelector(".design-viewer header").textContent'), /4 of 17/);
+  await evaluate('document.querySelector(".design-viewer textarea").dispatchEvent(new KeyboardEvent("keydown", {key:"ArrowLeft", bubbles:true}))');
+  assert.match(await evaluate('document.querySelector(".design-viewer header").textContent'), /4 of 17/);
+  await evaluate('document.querySelector(".design-viewer .open-link").click()');
+  await until(async () => (await evaluate('document.querySelector(".design-viewer[open] [role=status]")?.textContent')) === 'Screen approved');
+  const legacy = { journey: 'account-setup', screen: 'security', note: 'Make the title clearer' };
+  assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-design'].notes, [legacy, { journey: 'account-setup', screen: 'screen-4', verdict: 'approve', note: '' }]);
+  await evaluate('document.querySelector("[aria-label=\\"Next screen\\"]").click()');
+  await evaluate('document.querySelector(".design-viewer textarea").value = "Give the next action more space"');
+  await evaluate('document.querySelector(".design-viewer .foot button:last-child:not([aria-label])").click()');
+  await until(async () => (await evaluate('document.querySelector(".design-viewer[open] [role=status]")?.textContent')) === 'Changes requested');
+  await evaluate('document.querySelector("[aria-label=\\"Close viewer\\"]").click()');
+  await until(() => evaluate('!document.querySelector(".design-viewer[open]")'));
+  assert.equal(await evaluate('location.hash'), '#designs/d1-design');
+  await evaluate('location.reload()');
+  await until(() => evaluate('!!document.querySelector("[aria-haspopup=dialog]")'));
+  await evaluate('document.querySelector("[aria-haspopup=dialog]").click()');
+  await until(() => evaluate('!!document.querySelector(".design-viewer[open]")'));
+  await evaluate('document.querySelector("[aria-label=\\"Next screen\\"]").click(); document.querySelector("[aria-label=\\"Next screen\\"]").click()');
+  assert.equal(await evaluate('document.querySelector(".design-viewer [role=status]").textContent'), 'Screen approved');
+  for (let i = 0; i < 13; i++) await evaluate('document.querySelector("[aria-label=\\"Next screen\\"]").click()');
+  assert.match(await evaluate('document.querySelector(".design-viewer header").textContent'), /17 of 17/);
+  assert.equal(await evaluate('document.querySelector("[aria-label=\\"Next screen\\"]").disabled'), true);
+  assert.equal(JSON.parse(run('answers', file, '--json').out)['d1-design'].notes.length, 3);
   close();
   proc.kill();
 });
