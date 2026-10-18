@@ -79,7 +79,12 @@
   /* On Summary the recommended answer is the large button, and the others are pills under it. */
   .needs .choices button { font-weight: 600; } .needs .choices button:not(.rec) { justify-self: start; border-radius: 999px; }
   .needs .choices button[aria-pressed="true"] { padding-right: 2.75rem; }
-  @media (max-width: 59.999rem) { body:has(.decide) { padding-bottom: calc(9rem + env(safe-area-inset-bottom)); } }
+  @media (max-width: 59.999rem) {
+    body:has(.decide) { padding-bottom: calc(9rem + env(safe-area-inset-bottom)); }
+    .top:has(+ .decide) { padding: .75rem 0 .5rem; }
+    .top:has(+ .decide) .back { display: none; }
+    .decide-preview .mocks { --tall: min(20svh, 10rem); }
+  }
 
   /* Reports: a card per report, its steps as numbered nodes on a line with only the marks that matter under each; Open lists them in place. */
   .reports { display: grid; gap: 0.75rem; }
