@@ -31,7 +31,7 @@ const measure = () => {
     for (const n of nodes) { const r = document.createRange(); r.selectNodeContents(n); for (const b of r.getClientRects()) if (b.width) tops.add(Math.round(b.top)); }
     if ((chars < 8 && ctx.measureText(text).width > width + 1) || tops.size > words) squashed_text.push({ element: e.tagName.toLowerCase(), text: text.slice(0, 40), chars: Math.round(chars * 10) / 10, lines: tops.size, words });
   }
-  return { url: location.href, text: document.body.innerText.replace(/\s+/g, ' ').trim(), overflow: document.documentElement.scrollWidth > w, overflowing: [...document.querySelectorAll('body *')].filter(e => e.getClientRects().length && e.getBoundingClientRect().right > w + 1).slice(0, 10).map(e => e.tagName.toLowerCase()), squashed_text };
+  return { url: location.href, text: document.body.innerText.replace(/\s+/g, ' ').trim(), values: [...document.querySelectorAll('input, textarea')].map(e => e.value), overflow: document.documentElement.scrollWidth > w, overflowing: [...document.querySelectorAll('body *')].filter(e => e.getClientRects().length && e.getBoundingClientRect().right > w + 1).slice(0, 10).map(e => e.tagName.toLowerCase()), squashed_text };
 };
 const probe = () => JSON.parse(drive(`console.log(JSON.stringify(await page.eval(${measure.toString()})));`));
 const plan = JSON.parse(readFileSync('fixtures/contract/plan.v1/valid-full.json'));
