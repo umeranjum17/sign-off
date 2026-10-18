@@ -1212,9 +1212,11 @@ test('a posted contract design is listed with its preview and date, and opens fo
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
   await until(async () => (await evaluate('document.querySelector(".design-review button")?.textContent')) === 'Approve');
   assert.equal(await evaluate('document.querySelector(".design-preview-full")?.getAttribute("target")'), '_blank');
+  assert.equal(await evaluate('document.querySelector(".design-review-preview")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent('design/welcome.png')}`);
   assert.equal(await evaluate('document.querySelector("[aria-label=\\"Screen for note\\"]")?.options.length'), 2);
   await evaluate('(() => { const s = document.querySelector("[aria-label=\\"Screen for note\\"]"); s.value = "account-setup/security"; s.dispatchEvent(new Event("change")); })()');
   assert.equal(await evaluate('document.querySelector(".design-preview-full")?.getAttribute("href")'), `/design/local/d1-design/${encodeURIComponent('design/security.png')}`);
+  assert.equal(await evaluate('document.querySelector(".design-review-preview")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent('design/security.png')}`);
   await evaluate('document.querySelector("[aria-label=\\"Pick a direction\\"]").value = "quick"');
   await evaluate('document.querySelector(".design-review button").click()');
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Approved');

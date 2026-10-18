@@ -1221,10 +1221,14 @@
     if (screenSelect) screenSelect.value = screenFor(selectedKey) ? selectedKey : screenKey(screens[0]);
     const target = () => screenSelect ? screenFor(screenSelect.value) : screens[0];
     note.value = savedNote?.note ?? '';
-    const previewPath = (target() && Object.values(target().screen.views)[0]) || d.preview;
-    const preview = d.preview ? el('div', { class: 'design-preview-window' }, el('img', { class: 'design-review-preview', src: src(designUrl(d, d.preview)), alt: `Design preview: ${d.title}` })) : '';
-    const fullPreview = previewPath ? el('a', { class: 'design-preview-full', href: src(designUrl(d, previewPath)), target: '_blank', rel: 'noopener noreferrer' }, 'Open full preview') : '';
-    if (screenSelect) screenSelect.onchange = () => { fullPreview.href = src(designUrl(d, Object.values(target().screen.views)[0] || d.preview)); };
+    const previewPath = () => (target() && Object.values(target().screen.views)[0]) || d.preview;
+    const preview = previewPath() ? el('div', { class: 'design-preview-window' }, el('img', { class: 'design-review-preview', src: src(designUrl(d, previewPath())), alt: `Design preview: ${d.title}` })) : '';
+    const fullPreview = previewPath() ? el('a', { class: 'design-preview-full', href: src(designUrl(d, previewPath())), target: '_blank', rel: 'noopener noreferrer' }, 'Open full preview') : '';
+    if (screenSelect) screenSelect.onchange = () => {
+      const path = previewPath();
+      if (preview) preview.querySelector('img').src = src(designUrl(d, path));
+      if (fullPreview) fullPreview.href = src(designUrl(d, path));
+    };
     const status = el('p', { class: 'meta', role: 'status' }, saved ? saved.label : d.status === 'draft' ? 'Draft' : 'In review');
     const err = el('p', { class: 'err', role: 'alert' });
     const save = (verdict) => {
