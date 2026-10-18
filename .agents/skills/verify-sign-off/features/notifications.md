@@ -2,7 +2,7 @@
 
 Drive the sender through the CLI and a local HTTP receiver, not an internal function.
 
-Start a local receiver that records one JSON POST, write its URL into the `notify.url` field of `.sign-off/config.yaml`, then run:
+Start a local receiver that records one JSON POST, add a `notify:` block with indented `url:` and `link_base:` lines to `.sign-off/config.yaml`, then run:
 
 ```sh
 sign-off-axi post --title "Should this ship?" --why "Umer: the real flow works." --outcome yes=Ship --outcome no=Wait --recommend yes --recommend-reason "The checks passed." --default no

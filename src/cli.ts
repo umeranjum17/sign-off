@@ -791,11 +791,12 @@ function postSignin(file: string, on: string, values: Record<string, any>, filer
       fits(d.title, d.key);
       const next = { ...item, filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
       if (had) items[at] = next; else items.push(next);
+      const before = waitingKeys(file);
       writeItems(file, items);
-      if (!had) notifyWaiting(file, [items[items.length - 1]]);
       // A new link is a new sign-in: the card waits again, also when it was done or dismissed.
       appendAnswer(file, d, CLEARED);
       if (had) appendDismissed(file, [d.key], false);
+      notifyEntered(file, before);
     }
     return toon({ board: tilde(file), posted: [{ key: d.key, status, service: d.title, ...(expires && { expires }) }] }, [
       ...(status === 'already done' ? [] : [`Run \`sign-off-axi open${on}\` so the user can sign in`]),
@@ -866,8 +867,9 @@ function replace(file: string, on: string, from?: string, filer?: string) {
     // Written only when it changed, so a feeder that runs every few seconds leaves the file alone.
     const changed = JSON.stringify(old && { ...old.extra, schema: old.schema, items: old.items }) !== JSON.stringify({ ...extra, schema: 2, items });
     if (changed) {
+      const before = waitingKeys(file);
       writeItems(file, items, extra);
-      notifyWaiting(file, feed.filter((item) => !first.has(item.key)));
+      notifyEntered(file, before);
     }
     return toon({ board: tilde(file), items: items.length, changed }, [`Run \`sign-off-axi answers${on}\` to read the answers`]);
   });
@@ -949,8 +951,9 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
     } finally {
       rmSync(check, { force: true });
     }
+    const before = waitingKeys(file);
     writeItems(file, items);
-    notifyWaiting(file, [items[items.length - 1]]);
+    notifyEntered(file, before);
     if (explainer) return toon({ board: tilde(file), raised: [{ key, status: 'raised', title }] }, [`Run \`sign-off-axi open${on}\` so the user can watch and answer`, waitFor(on, filer, key)]);
     return toon({ board: tilde(file), posted: [{ key, number, media: media.length, title, ...(message && { status: 'posted' }) }] },
       [`Run \`sign-off-axi open${on}\` so the user can give a verdict`, waitFor(on, filer, key)]);
@@ -1157,8 +1160,9 @@ function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: 
       return { key: d.key, status: !had ? 'raised' : had.answer ? `already answered ${had.answer.answer}` : waits({ ...had, dismissed: false }) ? 'already waiting' : 'already posted', title: d.title };
     });
     if (raised.some((r) => r.status === 'raised')) {
+      const before = waitingKeys(file);
       writeItems(file, items);
-      notifyWaiting(file, items.filter((item) => raised.some((r) => r.key === item.key && r.status === 'raised')));
+      notifyEntered(file, before);
     }
     const key = raised.length === 1 ? ` --key ${raised[0].key}` : '';
     // Reports take no answer, so a post with nothing waiting asks the user to read it, never to answer.
@@ -1340,10 +1344,19 @@ const GITIGNORE = 'mocks/\nevidence/\n*.answers.jsonl\n*.rounds.jsonl\n*.message
 /** The board, port, bind and hosts in <so>/config.yaml (the `key: value` lines init writes). A bad line falls back on its own default
  * (decisions.json, 4410) and `problems` says what is wrong; a file that cannot be read throws. */
 function readSetup(so: string) {
-  const config: Record<string, string> = {}, problems: string[] = [], hosts: string[] = [];
-  let onAnswer: string[] = [];
+  const config: Record<string, string> = {}, problems: string[] = [], hosts: string[] = [], notify: Record<string, string> = {};
+  let onAnswer: string[] = [], notifyBlock = false, inNotify = false;
   readFileSync(join(so, 'config.yaml'), 'utf8').split(/\r?\n/).forEach((l, n) => {
-    const line = l.split('#')[0].trim(), kv = line.match(/^([A-Za-z]+)\s*:\s*(\S+)$/), key = line.match(/^(board|port|bind)(\s|:|$)/i);
+    // The notify block's indented lines keep their # , and } characters: only a # after a space starts a comment.
+    if (inNotify && (!l.trim() || /^\s/.test(l))) {
+      const text = l.replace(/(^|\s+)#.*$/, '').trim(), field = text.match(/^(url|token_env|link_base)\s*:\s*(.+)$/);
+      if (field) notify[field[1]] = field[2].replace(/^(['"])(.*)\1$/, '$2');
+      else if (text) problems.push(`line ${n + 1} is not one "url", "token_env" or "link_base" line under notify`);
+      return;
+    }
+    inNotify = false;
+    const line = l.split('#')[0].trim(), kv = line.match(/^([A-Za-z]+)\s*:\s*(\S+)$/), key = line.match(/^(board|port|bind|notify)(\s|:|$)/i);
+    if (/^notify\s*:$/i.test(line)) return void (inNotify = notifyBlock = true);
     // hosts: private DNS names that reach the bind address (a mesh VPN name), let in besides it; commas or spaces between them.
     const names = /^hosts\s*:(.*)$/i.exec(line)?.[1].split(/[\s,]+/).filter(Boolean).map((h) => h.toLowerCase().replace(/\.$/, ''));
     for (const h of names ?? []) {
@@ -1362,32 +1375,40 @@ function readSetup(so: string) {
   if (!goodPort) problems.push(`port ${port} is not a number from 0 to 65535`);
   const bind = config.bind ?? '127.0.0.1';
   if (!privateBind(bind)) problems.push(`bind ${bind} is not 127.0.0.1 or a private address`);
-  return { board: join(so, goodBoard ? config.board : 'decisions.json'), port: goodPort ? Number(port) : 4410, bind, hosts, onAnswer, goodBoard, problems };
+  const parsed = (u?: string) => { try { return new URL(u ?? ''); } catch { return undefined; } };
+  const sendTo = parsed(notify.url), base = parsed(notify.link_base), loopback = ['127.0.0.1', 'localhost', '[::1]'];
+  const usable = !!sendTo && !!base && (sendTo.protocol === 'https:' || (sendTo.protocol === 'http:' && loopback.includes(sendTo.hostname)))
+    && ['http:', 'https:'].includes(base.protocol) && (notify.token_env === undefined || /^[A-Za-z_]\w*$/.test(notify.token_env));
+  if (notifyBlock && !usable) problems.push('notify needs url (https://, or http:// on this machine) and link_base (http:// or https://) lines, and token_env must name an environment variable');
+  return { board: join(so, goodBoard ? config.board : 'decisions.json'), port: goodPort ? Number(port) : 4410, bind, hosts, onAnswer, goodBoard, problems,
+    notify: notifyBlock && usable ? { url: notify.url, token_env: notify.token_env, link_base: notify.link_base } : undefined };
 }
 
-/** Sends one best-effort notice per newly stored waiting card; failures never expose the configured URL. */
-function notifyWaiting(boardFile: string, cards: any[]) {
-  const config = join(dirname(boardFile), 'config.yaml');
-  if (!existsSync(config)) return;
-  const line = readFileSync(config, 'utf8').split(/\r?\n/).find((l) => /^notify\s*:/i.test(l));
-  if (!line) return;
-  const fields = Object.fromEntries([...line.replace(/^notify\s*:\s*\{|\}\s*$/gi, '').matchAll(/([a-z_]+)\s*:\s*([^,}]+)/gi)].map((m) => [m[1], m[2].trim().replace(/^['"]|['"]$/g, '')]));
-  const { url, token_env, link_base } = fields;
-  let destination: URL;
-  try { destination = new URL(url); } catch { return; }
-  if (!link_base || !(destination.protocol === 'https:' || (destination.protocol === 'http:' && ['127.0.0.1', '::1', 'localhost'].includes(destination.hostname))) || (token_env && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(token_env))) return;
-  const token = token_env ? process.env[token_env] : undefined;
-  for (const d of cards) {
-    if (!waits(d)) continue;
-    const kind = d.kind ?? ({ decision: 'ask', explainer: 'report' } as Record<string, string>)[d.type] ?? d.type;
-    const body = JSON.stringify({ v: 1, source: 'sign-off', id: d.key, kind: ['ask', 'plan', 'design', 'evidence', 'report'].includes(kind) ? kind : 'ask',
-      title: [...String(d.title ?? '')].slice(0, 120).join(''), text: [...String(d.about ?? d.detail ?? d.why ?? d.title ?? '').replace(/[\r\n]+/g, ' ')].slice(0, 200).join(''),
-      url: `${link_base.replace(/\/$/, '')}#waiting/${encodeURIComponent(d.key)}`, at: d.filed ?? new Date().toISOString() });
-    const sender = `void (async()=>{const delays=[2000,10000,60000];for(let i=0;i<4;i++){try{if((await fetch(process.env.SIGN_OFF_NOTIFY_URL,{method:'POST',headers:{'content-type':'application/json',...(process.env.SIGN_OFF_NOTIFY_TOKEN&&{authorization:'Bearer '+process.env.SIGN_OFF_NOTIFY_TOKEN})},body:process.env.SIGN_OFF_NOTIFY_BODY,signal:AbortSignal.timeout(10000)})).ok)return}catch{}if(i<3)await new Promise(r=>setTimeout(r,delays[i]))}console.error('sign-off: notification send failed for card '+process.env.SIGN_OFF_NOTIFY_ID)})();`;
-    const child = spawn(process.execPath, ['-e', sender], { detached: true, stdio: ['ignore', 'ignore', 'inherit'], env: { ...process.env, SIGN_OFF_NOTIFY_URL: url, SIGN_OFF_NOTIFY_BODY: body, SIGN_OFF_NOTIFY_TOKEN: token ?? '', SIGN_OFF_NOTIFY_ID: d.key } });
-    child.on('error', () => warn(`notification sender could not start for card ${d.key}`));
-    child.unref();
-  }
+const NOTIFY_SENDER = `void (async()=>{const delays=[2000,10000,60000];for(let i=0;i<4;i++){try{if((await fetch(process.env.SIGN_OFF_NOTIFY_URL,{method:'POST',headers:{'content-type':'application/json',...(process.env.SIGN_OFF_NOTIFY_TOKEN&&{authorization:'Bearer '+process.env.SIGN_OFF_NOTIFY_TOKEN})},body:process.env.SIGN_OFF_NOTIFY_BODY,signal:AbortSignal.timeout(10000)})).ok)return}catch{}if(i<3)await new Promise(r=>setTimeout(r,delays[i]))}require('node:fs').appendFileSync(process.env.SIGN_OFF_NOTIFY_LOG,new Date().toISOString()+' notification send failed for card '+process.env.SIGN_OFF_NOTIFY_ID+'\\n')})();`;
+
+/** The cards waiting on the user before a write: a card waiting after the write but not before it has entered Waiting on you. */
+function waitingKeys(file: string) {
+  try { return new Set(board(file, () => {}).filter(waits).map((d) => d.key)); } catch { return undefined; }
+}
+
+/** Announces each card that entered Waiting on you with a write. The card is already stored, so nothing here fails the command. */
+function notifyEntered(file: string, before: Set<string> | undefined) {
+  try {
+    const so = dirname(file), notify = before ? readSetup(so).notify : undefined;
+    if (!before || !notify) return;
+    for (const d of board(file, () => {}).filter((d) => waits(d) && !before.has(d.key))) sendNotice(so, notify, d);
+  } catch {}
+}
+
+function sendNotice(so: string, notify: { url: string; token_env?: string; link_base: string }, d: Decision) {
+  const token = notify.token_env ? process.env[notify.token_env] : undefined;
+  const kind = d.kind ?? ({ decision: 'ask', explainer: 'report' } as Record<string, string>)[d.type] ?? d.type;
+  const body = JSON.stringify({ v: 1, source: 'sign-off', id: d.key, kind: ['ask', 'plan', 'design', 'evidence', 'report'].includes(kind) ? kind : 'ask',
+    title: [...d.title].slice(0, 120).join(''), text: [...(d.about ?? d.detail ?? d.why ?? d.title).replace(/[\r\n]+/g, ' ')].slice(0, 200).join(''),
+    url: `${notify.link_base.replace(/\/$/, '')}#waiting/${encodeURIComponent(d.key)}`, at: d.filed ?? new Date().toISOString() });
+  const child = spawn(process.execPath, ['-e', NOTIFY_SENDER], { detached: true, stdio: 'ignore', env: { ...process.env, SIGN_OFF_NOTIFY_URL: notify.url, SIGN_OFF_NOTIFY_BODY: body, SIGN_OFF_NOTIFY_TOKEN: token ?? '', SIGN_OFF_NOTIFY_ID: d.key, SIGN_OFF_NOTIFY_LOG: join(so, 'notify.log') } });
+  child.on('error', () => warn(`notification sender could not start for card ${d.key}`));
+  child.unref();
 }
 /** --port, else the port in a config.yaml beside the board (init writes one), else 4410. */
 const boardPort = (named: string, given?: string) => portOf(given ?? String(setupOf(named)?.port ?? 4410));
