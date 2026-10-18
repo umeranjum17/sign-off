@@ -25,7 +25,7 @@ and inherits the calling agent's model routing.
 | `help` | show the commands and flags |
 
 ```
-$ sign-off-axi raise --title "Keep the weekly digest?" --recommend yes
+$ sign-off-axi raise --title "Keep the weekly digest?" --why "Open rate held steady." --outcome yes="It keeps going out." --outcome no="It stops this week." --recommend yes --recommend-reason "Readers still open it." --default yes
 board: ~/.sign-off/decisions.json
 raised[1]{key,status,title}:
   keep-the-weekly-digest,raised,Keep the weekly digest?

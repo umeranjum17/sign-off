@@ -4,6 +4,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { appendFileSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { asked } from './ask.mjs';
 
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
 const scratch = mkdtempSync(join(tmpdir(), 'sign-off-evidence-'));
@@ -12,7 +13,7 @@ const board = join(so, 'decisions.json');
 // No PATH: init finds no agent to install the skill for.
 const run = (...args) => {
   try {
-    return { out: execFileSync(process.execPath, [cli, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, PATH: '' } }), code: 0 };
+    return { out: execFileSync(process.execPath, [cli, ...asked(args)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, PATH: '' } }), code: 0 };
   } catch (e) {
     return { out: `${e.stdout}`, code: e.status };
   }
@@ -50,7 +51,7 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
   // A second board in the same folder shares evidence/: it takes the next free number and never writes into a used one.
   const other = join(so, 'other.json');
   assert.match(run('post', other, '--type', 'evidence', '--title', 'Other board', '--about', 'Note.', '--media', rec).out, /update-3,3,1/);
-  run('raise', other, '--title', 'Manual', '--key', 'update-4');
+  run('raise', other, '--title', 'Manual?', '--key', 'update-4');
   assert.match(run('post', other, '--type', 'evidence', '--title', 'After a raised key', '--about', 'Note.', '--media', rec).out, /update-5,5,1/);
   assert.equal(run('post', other, '--type', 'evidence', '--title', 'Bad link', '--about', 'Note.', '--media', rec, '--link', 'nope').code, 2);
   assert.deepEqual(readdirSync(join(so, 'evidence')).sort(), ['1', '2', '3', '5']);

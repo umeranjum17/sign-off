@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import { get } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { asked } from './ask.mjs';
 
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
 const scratch = mkdtempSync(join(tmpdir(), 'sign-off-'));
@@ -110,7 +111,7 @@ test('agent journey: raise, open, answer, read back in TOON and JSON', async () 
   const env = { ...process.env, HOME: mkdtempSync(join(scratch, 'home-')) };
   const run = (...args) => {
     try {
-      return { out: execFileSync('node', [cli, ...args], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }), code: 0 };
+      return { out: execFileSync('node', [cli, ...asked(args)], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }), code: 0 };
     } catch (e) {
       return { out: e.stdout, code: e.status };
     }
@@ -123,7 +124,7 @@ test('agent journey: raise, open, answer, read back in TOON and JSON', async () 
   assert.ok(Date.now() - Date.parse(first) < 60_000, first);
   assert.match(run('raise', '--title', 'Keep the weekly digest?', '--recommend', 'yes').out, /already waiting/);
   assert.equal(filed(), first);
-  assert.deepEqual([run('raise', '--title', 'Keep the weekly digest?').code, run('raise', '--title', 'x', '--recommend', 'maybe').code, run('list', '--stat').code], [1, 2, 2]);
+  assert.deepEqual([run('raise', '--title', 'Keep the weekly digest?', '--recommend', 'no').code, run('raise', '--title', 'x', '--recommend', 'maybe').code, run('list', '--stat').code], [1, 2, 2]);
   assert.match(run().out, /waiting\[1\]\{key,title\}:\n  keep-the-weekly-digest,Keep the weekly digest\?/);
   const opened = run('open', '--port', '0');
   const url = /url: "(.+)"/.exec(opened.out)[1], pid = Number(/pid: (\d+)/.exec(opened.out)[1]);
@@ -159,9 +160,9 @@ test('agent journey: raise, open, answer, read back in TOON and JSON', async () 
   assert.equal((await post(url, { key: 'which-tab-first', answer: 'text' })).status, 200);
   assert.equal(JSON.parse(run('answers', '--key', 'which-tab-first', '--json').out)['which-tab-first'].label, 'Text');
   // Listing options needs a recommendation; a plain yes/no may leave it out. A new decision in a file must be a contract ask, which always names one.
-  const unmarked = run('raise', '--title', 'When should it ship?', '--option', 'today=Today', '--option', 'friday=Friday');
+  const unmarked = run('raise', '--title', 'When should it ship?', '--why', 'Umer plans the week.', '--option', 'today=Today', '--option', 'friday=Friday', '--outcome', 'today=It ships now.', '--outcome', 'friday=It ships Friday.');
   assert.equal(unmarked.code, 2);
-  assert.match(unmarked.out, /--recommend is required when you list options[^]*Add --recommend <value>, the option you would pick: one of today, friday/);
+  assert.match(unmarked.out, /--recommend is required[^]*Add --recommend today, the option you would pick: one of today, friday/);
   assert.match(run('raise', join(env.HOME, 'picks.json'), '--title', 'When should it ship?', '--option', 'today=Today', '--option', 'friday=Friday', '--recommend', 'friday').out, /when-should-it-ship,raised/);
   assert.equal(run('post', '--type', 'design', '--title', 'Pick one', '--option', 'a=A', '--option', 'b=B').code, 2);
   const listed = join(env.HOME, 'listed.json');
@@ -173,7 +174,7 @@ test('agent journey: raise, open, answer, read back in TOON and JSON', async () 
   assert.match(run().out, /waiting\[1\]\{key,title\}:\n  toString,Only toString\?/);
   assert.match(run('help', 'raise').out, /raise \[board.json\] --title/);
   assert.deepEqual([run('help', 'nope').code, run('open', '--port', '0', '--evidence-root', join(env.HOME, 'missing')).code], [2, 2]);
-  await Promise.all(Array.from({ length: 20 }, (_, i) => new Promise((ok) => spawn('node', [cli, 'raise', '--title', `Parallel question ${i}?`], { env }).on('exit', ok))));
+  await Promise.all(Array.from({ length: 20 }, (_, i) => new Promise((ok) => spawn('node', [cli, ...asked(['raise', '--title', `Parallel question ${i}?`])], { env }).on('exit', ok))));
   assert.match(run().out, /waiting\[21\]/);
   const timedOut = run('wait', '--key', 'toString', '--timeout', '1');
   assert.deepEqual([timedOut.code, /code: TIMEOUT/.test(timedOut.out)], [1, true]);
@@ -187,7 +188,7 @@ test('three dismissed updates are not waiting on the CLI either: list and answer
   const home = mkdtempSync(join(scratch, 'dismiss-'));
   const env = { ...process.env, HOME: home };
   const run = (...args) => {
-    try { return { out: execFileSync('node', [cli, ...args], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }), code: 0 }; }
+    try { return { out: execFileSync('node', [cli, ...asked(args)], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }), code: 0 }; }
     catch (e) { return { out: e.stdout, code: e.status }; }
   };
   run('init', home);
@@ -244,12 +245,12 @@ test('old files and answers read as before; a one-of-few answer with a note surv
   proc.kill();
   // The first write upgrades the schema 1 board to schema 2 and keeps the old file once beside it; nothing is lost.
   const before = readFileSync(old), beforeAnswers = execFileSync('node', [cli, 'answers', old, '--json'], { encoding: 'utf8' });
-  execFileSync('node', [cli, 'raise', old, '--title', 'Umer: one more question?'], { stdio: 'ignore' });
+  execFileSync('node', [cli, ...asked(['raise', old, '--title', 'Umer: one more question?'])], { stdio: 'ignore' });
   const upgraded = JSON.parse(readFileSync(old, 'utf8'));
   assert.deepEqual([upgraded.schema, upgraded.owner, upgraded.items.slice(0, -1)], [2, 'Umer', JSON.parse(before).decisions]);
   assert.deepEqual(readFileSync(`${old}.schema-1.bak`), before);
   assert.equal(execFileSync('node', [cli, 'answers', old, '--json'], { encoding: 'utf8' }), beforeAnswers);
-  execFileSync('node', [cli, 'raise', old, '--title', 'Umer: and another?'], { stdio: 'ignore' });
+  execFileSync('node', [cli, ...asked(['raise', old, '--title', 'Umer: and another?'])], { stdio: 'ignore' });
   assert.deepEqual(readFileSync(`${old}.schema-1.bak`), before);
 
   const opts = join(scratch, 'options.json');
@@ -293,7 +294,7 @@ test('old files and answers read as before; a one-of-few answer with a note surv
   const env = { ...process.env, HOME: mkdtempSync(join(scratch, 'home-')) };
   const run = (...args) => {
     try {
-      return { out: execFileSync('node', [cli, ...args], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }), code: 0 };
+      return { out: execFileSync('node', [cli, ...asked(args)], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }), code: 0 };
     } catch (e) {
       return { out: `${e.stdout}${e.stderr}`, code: e.status };
     }
@@ -326,7 +327,7 @@ test('the skill and README command checklist runs as written on a fresh install'
   mkdirSync(app);
   const axi = (...args) => {
     // PATH is empty so init finds no coding agent to install the skill for, so name the interpreter by its real path.
-    try { return { out: execFileSync(process.execPath, [cli, ...args], { cwd: app, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }), code: 0 }; }
+    try { return { out: execFileSync(process.execPath, [cli, ...asked(args)], { cwd: app, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }), code: 0 }; }
     catch (e) { return { out: `${e.stdout}`, code: e.status }; }
   };
   const ok = (result, what) => { assert.equal(result.code, 0, `${what}: ${result.out}`); return result.out; };
@@ -397,8 +398,7 @@ test('the skill and README command checklist runs as written on a fresh install'
 
   // README/validate --help: a valid message passes, --kind must match, and --expect-invalid takes the shipped invalid fixtures.
   const ask = join(app, 'ask.json');
-  writeFileSync(ask, JSON.stringify({ contract: 1, kind: 'ask', schema: 1, key: 'ship-signin-2', title: 'Ship the new sign-in screen this week?',
-    options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }], recommend_value: 'yes' }));
+  copyFileSync(new URL('../fixtures/contract/ask.v1/valid-yes-no.json', import.meta.url), ask);
   assert.match(ok(axi('validate', 'ask.json'), 'validate'), /ask,1,true/);
   assert.match(axi('validate', '--kind', 'finding', 'ask.json').out, /is ask, not --kind finding/);
   assert.match(ok(axi('validate', '--kind', 'evidence', join(new URL('../fixtures/contract/evidence.v1', import.meta.url).pathname, 'valid-media.json')), 'validate --kind evidence'), /evidence,1,true/);

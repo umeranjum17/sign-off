@@ -241,6 +241,14 @@
   button[aria-pressed="true"] .tag { color: inherit; }
   button:disabled { opacity: 0.6; cursor: progress; }
   .choices.many { display: flex; flex-wrap: wrap; }
+  /* An ask that says what each answer does: one answer per line on a phone, its outcome and the reason for the recommended one under its label. */
+  .choices.told { grid-template-columns: minmax(0, 1fr); }
+  .needs .choices.told button { justify-self: stretch; border-radius: 1rem; }
+  .choices .out, .choices .reason { font-size: 1rem; font-weight: 400; line-height: 1.35; }
+  .choices .reason { margin-top: 0.25rem; color: var(--muted); }
+  button[aria-pressed="true"] .reason { color: inherit; }
+  .ask-why, .silent { margin: 0.375rem 0 0; max-width: 70ch; font-size: 1rem; }
+  .silent { color: var(--muted); }
   .choices.many button { flex: 1 1 auto; max-width: 100%; padding: 0.5rem 1rem; }
   .note label { display: block; color: var(--muted); font-size: 0.8125rem; margin-top: 0.5rem; }
   .tradeoff { margin: 0; max-width: 70ch; }
@@ -331,6 +339,8 @@
     .row:has(.choices.many) { row-gap: 0.875rem; }
     .choices.many { grid-column: 1 / -1; }
     .choices.many button { flex: 0 1 auto; min-width: 5.5rem; }
+    .row:has(.choices.told) { grid-template-columns: minmax(0, 1fr); }
+    .choices.told { grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
   }
   /* A wide screen keeps the areas in a sidebar; the Summary puts its tiles in one row and its lists in two columns. */
   @media (min-width: 60rem) {
@@ -521,8 +531,10 @@
     const design = d.type === 'design', ro = state.readonly || !(d.options.length || d.reply), name = headline(d);
     const buttons = d.options.map((o) => {
       const rec = o.value === d.recommend_value && !design;
-      return el('button', { class: rec ? 'rec' : '', 'aria-label': `${o.label}, ${name}`, 'aria-pressed': o.value === saved?.answer, ...(rec && { 'aria-describedby': `rec-${d.key}` }) },
-        design ? (o.value === saved?.answer ? 'Picked' : 'Pick') : o.label, rec ? el('span', { class: 'tag', id: `rec-${d.key}` }, 'Recommended') : '');
+      return el('button', { class: rec ? 'rec' : '', 'aria-label': `${o.label}${o.outcome ? `: ${o.outcome}` : ''}, ${name}`, 'aria-pressed': o.value === saved?.answer, ...(rec && { 'aria-describedby': `rec-${d.key}` }) },
+        design ? (o.value === saved?.answer ? 'Picked' : 'Pick') : o.label, rec ? el('span', { class: 'tag', id: `rec-${d.key}` }, 'Recommended') : '',
+        // What happens next if this is picked, and why the recommended one is.
+        o.outcome ? el('span', { class: 'out', dir: 'auto' }, o.outcome) : '', rec && d.recommend_reason ? el('span', { class: 'reason', dir: 'auto' }, `Why: ${d.recommend_reason}`) : '');
     });
     buttons.forEach((b, i) => (b.onclick = () => save(d, d.options[i], buttons, err)));
     // The recommended answer is the first button.
@@ -535,25 +547,28 @@
       update && d.filed ? (isToday(d.filed) ? el('span', { class: 'st new' }, 'New') : day(d.filed)) : '', seen].filter(Boolean);
     const lead = el('div', { class: 'lead' }, x ? xBtn(d) : '', brow.length ? el('p', { class: 'eyebrow' }, ...brow) : '', el('h3', { dir: 'auto' }, name));
     if (d.type === 'signin') return signin(d, lead, saved, err);
-    const silent = d.default_if_silent && !ro ? `If no answer: ${d.options.find((o) => o.value === d.default_if_silent).label}` : '';
+    const quiet = !ro && d.options.find((o) => o.value === d.default_if_silent);
+    const silent = quiet ? `If you stay quiet: ${quiet.label}${d.silent_by ? `, at ${when(d.silent_by)}` : ' (no deadline)'}` : '';
+    // The other cards this ask replaced are hidden; its answer closes them too.
+    const merged = !saved && !state.dismissed?.includes(d.key) ? (d.merges ?? []).filter((k) => state.decisions.some((x) => x.key === k) && !answerOf(k)).length : 0;
     if (design) {
       return el('article', { class: 'row design', id: `item-${d.key}` }, lead,
         d.tradeoff ? el('p', { class: 'tradeoff', dir: 'auto' }, el('strong', {}, 'Trade-off '), d.tradeoff) : '',
-        mockCards(d, ro ? [] : buttons), annotations(d), silent ? el('p', { class: 'meta' }, silent) : '', ro ? '' : other(d, saved, err), err);
+        mockCards(d, ro ? [] : buttons), annotations(d), silent ? el('p', { class: 'silent' }, silent) : '', ro ? '' : other(d, saved, err), err);
     }
-    // Yes/No rows keep the two fixed buttons they always had; any other choice set wraps.
-    const many = d.options.map((o) => o.value).sort().join() !== 'no,yes';
-    const words = [d.about && d.about !== name ? el('p', { class: d.media ? 'about full' : 'about', dir: 'auto' }, d.about) : '',
+    // Yes/No rows keep the two fixed buttons they always had; any other choice set wraps; answers that say what they do stack.
+    const many = d.options.some((o) => o.outcome) ? 'told' : d.options.map((o) => o.value).sort().join() !== 'no,yes' ? 'many' : '';
+    const words = [d.why ? el('p', { class: 'ask-why', dir: 'auto' }, d.why) : '', d.about && d.about !== name ? el('p', { class: d.media ? 'about full' : 'about', dir: 'auto' }, d.about) : '',
       d.detail || (!d.media && d.about?.length > 180) ? el('details', {}, el('summary', {}, 'Show more'),
         ...[d.about, d.detail].filter(Boolean).map((t) => el('p', { dir: 'auto' }, t))) : '',
       // A web link names the site it opens; a commit goes under Details.
       /^https?:/.test(d.link ?? '') ? el('p', { class: 'meta' }, el('a', { href: d.link, target: '_blank', rel: 'noopener' }, `Open on ${d.link.split('/')[2]}`)) : '',
-      silent ? el('p', { class: 'meta' }, silent) : ''];
+      silent ? el('p', { class: 'silent' }, silent) : '', merged ? el('p', { class: 'silent' }, `This also answers ${merged} other ${merged > 1 ? 'cards' : 'card'} that asked the same thing.`) : ''];
     return el('article', { class: update ? 'row update' : 'row', id: `item-${d.key}` }, el('div', {}, lead, ...words), proof(d),
       card?.status === 'unverified' ? el('p', { class: 'why' }, `${card.reason} Ask the agent to run the check again.`) : '', chapters(d), rung(d),
       // An update states a result, so the one decision is asked in words above its buttons.
       update && !ro && buttons.length ? el('p', { class: 'ask-line' }, 'Does this look right?') : '',
-      ro || !buttons.length ? '' : el('div', { class: many ? 'choices many' : 'choices', role: 'group', 'aria-label': name }, ...ranked),
+      ro || !buttons.length ? '' : el('div', { class: `choices ${many}`.trim(), role: 'group', 'aria-label': name }, ...ranked),
       ro ? '' : other(d, saved, err), err, tech(d));
   }
 
@@ -1057,8 +1072,11 @@
   function render() {
     const by = { waiting: [], evidence: [], reports: [], answered: [], notes: [] };
     // The board file appends new items at the end, so each list reads newest first; answers sort by their time.
-    const gone = new Set(state.dismissed ?? []);
-    for (const d of [...state.decisions].reverse()) if (!gone.has(d.key)) by[area(d)].push(d);
+    // One decision is one card: a card an open ask merges is not shown; that ask's answer closes it.
+    const gone = new Set(state.dismissed ?? []), open = state.decisions.filter((d) => !gone.has(d.key) && !isAnswered(d));
+    const openKeys = new Set(open.map((d) => d.key));
+    const merged = new Set(open.flatMap((d) => d.merges ?? []).filter((k) => openKeys.has(k)));
+    for (const d of [...state.decisions].reverse()) if (!gone.has(d.key) && !merged.has(d.key)) by[area(d)].push(d);
     // Waiting on you reads newest first unless the viewer chose oldest first. A sign-in blocks someone now, so sign-ins come first either way.
     let latest = -Infinity;
     const inFileOrder = by.waiting.slice().reverse().map((d, i) => { const t = Date.parse(d.filed); if (!Number.isNaN(t)) latest = t; return { d, t: latest, i }; });
@@ -1068,7 +1086,7 @@
     // A type chip whose asks are all answered or dismissed falls back to All.
     if (waitType !== 'all' && !by.waiting.some((d) => typeOf(d) === waitType)) waitType = 'all';
     const shown = waitType === 'all' ? by.waiting : by.waiting.filter((d) => typeOf(d) === waitType);
-    const hidden = state.decisions.filter((d) => gone.has(d.key) && area(d) === 'waiting');
+    const hidden = state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'waiting');
     by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
     const [, at, key] = /^#(waiting|evidence|reports|answered)(?:\/([\w.-]+))?$/.exec(location.hash) ?? [];
     const link = (a, name, n) => el('a', { href: `#${a}`, ...(a === (at ?? '') && { 'aria-current': 'page' }) }, icon(a || 'summary'), name, n === undefined ? '' : el('span', { class: 'n' }, String(n)));
