@@ -19,7 +19,7 @@
       "recommend_value": "yes",
       "recommend_reason": "Most users pick dark anyway.",
       "default_if_silent": "no",
-      "silent_by": "2026-10-17T16:00Z"
+      "silent_by": "2026-10-19T16:00Z"
     },
     {
       "key": "release-window",
