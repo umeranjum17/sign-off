@@ -1178,16 +1178,20 @@ test('Waiting on you: a reply-only ask shows Reply, a type-ask yes/no shows Yes/
   proc.kill();
 });
 
-test('a posted contract design renders as a plain row without answer controls', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('a posted contract design is listed with its preview and date, and opens for a saved approve/change review', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'contract-design-plain-row'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
   mkdirSync(join(dir, 'design'), { recursive: true });
   writeFileSync(join(dir, 'design', 'preview.png'), png);
   writeFileSync(join(dir, 'design', 'welcome.png'), png);
+  writeFileSync(join(dir, 'design', 'security.html'), '<!doctype html><title>Security view</title><h1>Security preview</h1>');
   const message = { contract: 1, kind: 'design', schema: 1, key: 'd1-design', title: 'Review the welcome screen',
     about: 'Check the welcome screen before release.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review',
     preview: 'design/preview.png', link: 'https://example.test/design/original',
     options: [{ value: 'quick', label: 'Quick' }, { value: 'guided', label: 'Guided' }], recommend: 'guided',
-    journeys: [{ id: 'account-setup', title: 'Account setup', screens: [{ id: 'welcome', title: 'Welcome', views: { phone_light: 'design/welcome.png' } }] }] };
+    journeys: [{ id: 'account-setup', title: 'Account setup', screens: [
+      { id: 'welcome', title: 'Welcome', views: { phone_light: 'design/welcome.png' } },
+      { id: 'security', title: 'Security', views: { phone_light: 'design/security.html' } },
+    ] }] };
   writeFileSync(source, JSON.stringify(message));
   const posted = run('post', file, '--kind', 'design', '--from', source);
   assert.equal(posted.code, 0, posted.out);
@@ -1200,8 +1204,67 @@ test('a posted contract design renders as a plain row without answer controls', 
   assert.equal(await evaluate('document.querySelector("#item-d1-design .about")?.textContent'), message.about);
   assert.equal(await evaluate('document.querySelector("#item-d1-design a")?.textContent'), 'Open original');
   assert.equal(await evaluate('document.querySelector("#item-d1-design a")?.getAttribute("href")'), message.link);
-  assert.equal(await evaluate('document.querySelectorAll("#item-d1-design button, #item-d1-design textarea, #item-d1-design input, #item-d1-design select").length'), 0);
-  assert.equal(await evaluate('document.querySelector("#item-d1-design .choices, #item-d1-design .mocks, #item-d1-design .ann")'), null);
+  assert.equal(await evaluate('document.querySelector(".quiet a.open-link")?.textContent'), 'Open designs');
+  await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
+  await until(async () => (await evaluate('document.querySelector(".design-card h3")?.textContent')) === message.title);
+  assert.equal(await evaluate('document.querySelector(".design-card img")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent(message.preview)}`);
+  assert.equal(await evaluate('document.querySelector(".design-card .meta")?.textContent'), '18 Oct');
+  await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
+  await until(async () => (await evaluate('document.querySelector(".design-review button")?.textContent')) === 'Approve');
+  assert.equal(await evaluate('document.querySelector(".design-preview-full")?.getAttribute("target")'), '_blank');
+  assert.equal(await evaluate('document.querySelector(".design-review-preview")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent('design/welcome.png')}`);
+  assert.equal(await evaluate('document.querySelector("[aria-label=\\"Screen for note\\"]")?.options.length'), 2);
+  await evaluate('(() => { const s = document.querySelector("[aria-label=\\"Screen for note\\"]"); s.value = "account-setup/security"; s.dispatchEvent(new Event("change")); })()');
+  assert.equal(await evaluate('document.querySelector(".design-preview-full")?.getAttribute("href")'), `/design/local/d1-design/${encodeURIComponent('design/security.html')}`);
+  assert.equal(await evaluate('document.querySelector(".design-review-preview")?.tagName'), 'IFRAME');
+  assert.equal(await evaluate('document.querySelector(".design-review-preview")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent('design/security.html')}`);
+  await evaluate('document.querySelector("[aria-label=\\"Pick a direction\\"]").value = "quick"');
+  await evaluate('document.querySelector(".design-review button").click()');
+  await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Approved');
+  await evaluate('document.querySelector("[aria-label=\\"Screen for note\\"]").value = "account-setup/security"');
+  await evaluate('document.querySelector(".design-review textarea").value = "Make the title clearer"');
+  await evaluate('document.querySelector(".design-review button:last-of-type").click()');
+  await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Changes requested');
+  assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-design'].notes, [{ journey: 'account-setup', screen: 'security', note: 'Make the title clearer' }]);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
+  await until(async () => (await evaluate('document.querySelector(".design-card .eyebrow")?.textContent')) === 'Changes requested');
+  const desktop = await browse(join(dir, 'desktop-browser'), 1280);
+  await desktop.evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
+  await until(async () => (await desktop.evaluate('document.querySelector("#nav a[href=\\"#designs\\"][aria-current=page]")?.textContent.trim()')) === 'Designs1');
+  await desktop.evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
+  await until(async () => (await desktop.evaluate('document.querySelector(".design-review button")?.textContent')) === 'Approve');
+  assert.equal(await desktop.evaluate('document.querySelector("#nav a[href=\\"#designs\\"][aria-current=page]")?.getClientRects().length > 0'), true);
+  assert.equal(await desktop.evaluate('document.querySelector(".design-review")?.getBoundingClientRect().bottom <= innerHeight'), true);
+  assert.equal(await desktop.evaluate('document.querySelector("#reader").getBoundingClientRect().left >= document.querySelector("#nav").getBoundingClientRect().right'), true);
+  desktop.close();
+  close();
+  proc.kill();
+});
+
+test('a design without journey screens accepts a design-level change note', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'design-level-note'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), png);
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd1-no-screens', title: 'Review the settings direction',
+    about: 'Check the overall settings direction.', group: 'Settings', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png', journeys: [] };
+  writeFileSync(source, JSON.stringify(message));
+  const posted = run('post', file, '--kind', 'design', '--from', source);
+  assert.equal(posted.code, 0, posted.out);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1], { evaluate, close } = await browse(join(dir, 'browser'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-no-screens`)}`);
+  await until(async () => (await evaluate('document.querySelector(".design-review button:last-of-type")?.textContent')) === 'Change');
+  assert.equal(await evaluate('document.querySelector(".design-review label")?.textContent.includes("Design note")'), true);
+  assert.equal(await evaluate('document.querySelector("[aria-label=\\"Screen for note\\"]")'), null);
+  assert.equal(await evaluate('document.querySelector(".design-review button:last-of-type").disabled'), false);
+  await evaluate('document.querySelector(".design-review textarea").value = "Clarify the overall hierarchy."');
+  await evaluate('document.querySelector(".design-review button:last-of-type").click()');
+  await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Changes requested');
+  assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-no-screens'].notes, [{ note: 'Clarify the overall hierarchy.' }]);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
+  await until(async () => (await evaluate('document.querySelector(".design-card .eyebrow")?.textContent')) === 'Changes requested');
+  assert.match(await evaluate('document.querySelector(".design-card")?.textContent'), /Clarify the overall hierarchy/);
   close();
   proc.kill();
 });

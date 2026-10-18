@@ -1787,7 +1787,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   if (req.method === 'GET' && req.url?.startsWith('/design/')) {
     const [, , , key, ...parts] = new URL(req.url, 'http://localhost').pathname.split('/');
     const path = parts.map(decodeURIComponent).join('/'), d = loadDecisions(file).find(x => x.key === key && x.type === 'design');
-    const allowed = d?.journeys?.some(j => j.screens.some(s => Object.values(s.views).includes(path)));
+    const allowed = d?.preview === path || d?.journeys?.some(j => j.screens.some(s => Object.values(s.views).includes(path)));
     const type = assetTypes[extname(path).toLowerCase()];
     try {
       if (!allowed || !type) return [404, { error: 'Design view is unavailable' }];
