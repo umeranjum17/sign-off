@@ -311,7 +311,7 @@ function question(m: any, bad: (field: string, rule: string, help: string) => Co
   const PICK = `Give one option per choice, each label starting with its letter, such as ${flags ? '--option a="A: <short label>" --outcome a=<text>' : '{"value":"a","label":"A: <short label>","outcome":"<what happens next>"}'}`;
   if (letters.length >= 2) {
     const letterList = letters.join(', ');
-    if (options.some((o) => o.value === 'yes' || o.value === 'no')) throw bad('options', `are Yes/No, but the text names choices ${letterList}`, PICK);
+    if (options.some((o) => o.value === 'yes' || o.value === 'no')) throw bad('options', `must not be Yes/No, because the text names choices ${letterList}`, PICK);
     if (options.length !== letters.length) throw bad('options', `has ${options.length} options, but the text names ${letters.length} choices: ${letterList}`, PICK);
     for (const c of letters) {
       const n = options.filter((o) => new RegExp(`^(Option\\s+)?${c}(?![a-z])`).test(o.label.trim())).length;
