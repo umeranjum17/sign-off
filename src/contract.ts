@@ -308,3 +308,11 @@ export function reportPage(m: any, base: string): void {
     .find((t) => [...t].length > BLOCK_CHARS);
   if (long) throw bad(`${page} has a block of ${[...long].length} characters, over ${BLOCK_CHARS} (about five lines on a phone): "${[...long].slice(0, 40).join('')}..."`, 'Split it, cut it, or show it as a picture or step');
 }
+
+/** A plan's page, from `base` (the board file's folder, or the message file's for validate): a file that is there. */
+export function planView(m: any, base: string): void {
+  const at = isKey(m.key) ? `key ${m.key}: ` : '', help = `Put the page at ${m.view} from the board file's folder, or fix the path`;
+  let real;
+  try { real = realpathSync(resolve(base, m.view)); } catch { throw new ContractError(`${at}view ${show(m.view)} is not there`, help); }
+  if (!statSync(real).isFile()) throw new ContractError(`${at}view ${show(m.view)} is not a file`, help);
+}

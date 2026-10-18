@@ -157,6 +157,7 @@ test('a plan: validate checks each rule with one fix line; post stores it, it wa
     [decision({ question: 'Keep A? Or B?' }), /decisions\[0\]\.question must be one question, with one question mark as its last character/, /split any other into its own decision/],
     [decision({ question: 'Keep A？ Or B?' }), /decisions\[0\]\.question must be one question, with one question mark as its last character/, /split any other into its own decision/],
     [{ ...plan, view: '../index.html' }, /view "..\/index.html" must be a relative path/, /Set "view"/],
+    [{ ...plan, view: 'page/gone.html' }, /view "page\/gone.html" is not there/, /Put the page at page\/gone.html/],
     [{ ...plan, filed: '2026-10-13T07:19:00Z' }, /filed is not a field of plan schema 1/, /plan takes key, title, filer, link, about, sections, decisions, steps, view$/],
   ]) {
     const { status, out: { files: [row] } } = validate(message('plan-bad.json', JSON.stringify(m)));
@@ -168,6 +169,9 @@ test('a plan: validate checks each rule with one fix line; post stores it, it wa
   const board = join(scratch, 'plan-board.json'), env = { ...process.env, HOME: join(scratch, 'home') };
   const run = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env, input: JSON.stringify(plan) });
   assert.equal(run('post', board, '--kind', 'plan', '--from', '-').status, 0);
+  const missing = spawnSync('node', [cli, 'post', board, '--kind', 'plan', '--from', '-'], { encoding: 'utf8', env, input: JSON.stringify({ ...plan, key: 'plan-gone', view: 'page/gone.html' }) });
+  assert.equal(missing.status, 2);
+  assert.match(missing.stdout, /view \\"page\/gone.html\\" is not there/);
   const fed = run('post', board, '--from', message('plan-feed.json', JSON.stringify({ schema: 2, items: [{ ...plan, key: 'plan-two' }] })));
   assert.equal(fed.status, 0, fed.stdout);
   const odd = run('post', board, '--from', message('plan-odd.json', JSON.stringify({ schema: 2, items: [{ key: 'odd', title: 'Odd', type: 'plan' }] })));

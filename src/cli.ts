@@ -12,7 +12,7 @@ import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
 import { type Answer, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendSendBack, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
-import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, mediaFiles, parseMessage, reportPage } from './contract.js';
+import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, mediaFiles, parseMessage, planView, reportPage } from './contract.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
 
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
@@ -351,6 +351,7 @@ function contractItems(items: any[], from: string, file: string, replace = false
     try {
       checkMessage(check);
       if (check.kind === 'report') reportPage(check, dirname(file));
+      if (check.kind === 'plan') planView(check, dirname(file));
     } catch (e) {
       throw e instanceof ContractError ? fail(`${from}: items[${i}]: ${e.message}`, 'VALIDATION_ERROR', e.help) : e;
     }
@@ -950,6 +951,7 @@ async function postKind(file: string, on: string, values: Record<string, any>, b
     if (m.kind === 'evidence') sources = mediaFiles(m, from === '-' ? process.cwd() : dirname(resolve(from)));
     // A report's page is served from the board file's folder, as --view is.
     if (m.kind === 'report') reportPage(m, dirname(file));
+    if (m.kind === 'plan') planView(m, dirname(file));
   } catch (e) { throw e instanceof ContractError ? fail(`${name}: ${e.message}`, 'VALIDATION_ERROR', e.help) : e; }
   if (m.filer !== undefined && values.filer !== undefined && m.filer !== values.filer) {
     throw fail(`${name}: key ${m.key}: filer ${m.filer} is not --filer ${values.filer}`, 'VALIDATION_ERROR', 'Leave "filer" out of the message, or pass the same --filer');
@@ -991,6 +993,7 @@ function validate(args: string[]) {
       const kind = checkMessage(m, want);
       if (m.kind === 'evidence') mediaFiles(m, dirname(resolve(file)));
       if (m.kind === 'report') reportPage(m, dirname(resolve(file)));
+      if (m.kind === 'plan') planView(m, dirname(resolve(file)));
       return { file, ...kind, ok: true, error: '', help: '' };
     } catch (e) {
       if (!(e instanceof ContractError)) throw e;
