@@ -475,12 +475,18 @@ function printAnswers(file: string, rows: ReturnType<typeof board>, waiting: num
     return JSON.stringify(out);
   }
   const notes = done.some((a) => a.note), sent = [...done, ...rounds].flatMap(({ key, comments = [] }) => comments.map(({ mock, ref, tag, words, text }) => ({ key, mock, ref, tag, words, text })));
+  const plan = done.flatMap(({ key, notes: sections = [], decisions: picks = {} }) => [
+    ...sections.map(({ section, verdict, note = '' }) => ({ key, section, verdict, note })),
+    ...Object.entries(picks).map(([decision, pick]) => ({ key, decision, pick })),
+  ]);
   return toon({
     board: tilde(file),
     answers: done.length ? done.map(({ key, answer, at, label, close, title, note = '' }) => ({ key, answer, at, ...(values.full && { label, close, title }), ...(notes && { note }) })) : '0 saved yet',
     ...(rounds.length && { rounds: rounds.map(({ key, note, at }) => ({ key, note, at })) }),
     // Comments on mock elements that went with an answer or a round, each with the element it points at.
     ...(sent.length && { comments: sent }),
+    // A plan's send-back: each section's verdict and note, and each decision's pick.
+    ...(plan.length && { plan }),
     waiting,
   }, help);
 }
@@ -797,7 +803,7 @@ function replace(file: string, on: string, from?: string, filer?: string) {
     const feed = fed.items.map((i) => ({ filed: first.get(i?.key)?.filed ?? now, ...i, ...(filer && { filer }) }));
     // An answer belongs to its question: an answered key may not come back asking something else.
     // Evidence is answered for the media and run it shows, so those are part of its question too, as a gate's run and a finding's proposal are.
-    const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply, d.run, d.finding, d.evidence, d.media, d.sections, d.decisions, d.type === 'signin' ? [d.link, d.start] : '']);
+    const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply, d.run, d.finding, d.evidence, d.media, d.sections, d.decisions, d.type === 'signin' ? [d.link, d.start] : '', d.type === 'plan' ? [d.view, d.steps] : '']);
     // A key whose answer outlived it may not come back: the board and the answers are read here, under the lock the feed writes with.
     const saved = readAnswers(file);
     for (const i of fed.items) if (i?.kind !== undefined && !first.has(i?.key) && Object.hasOwn(saved, i?.key)) {
