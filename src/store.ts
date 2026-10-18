@@ -251,8 +251,8 @@ export function appendAnswer(decisionsPath: string, d: Decision, option: Option,
   return answer;
 }
 
-/** Saves a plan's one send-back as its answer: each section approved or changed (a change says what to change), and one option per decision. */
-export function appendSendBack(decisionsPath: string, d: Decision, notes: unknown, picks: unknown = {}): Answer {
+/** Saves a plan's one send-back as its answer: each section approved or changed (a change says what to change), and one option per decision. An identical send-back again saves nothing. */
+export function appendSendBack(decisionsPath: string, d: Decision, notes: unknown, picks: unknown = {}): Answer | undefined {
   const bad = (rule: string) => new InputError(`key ${d.key}: ${rule}`), ids = d.sections!.map((s) => s.id), keys = d.decisions!.map((q) => q.key);
   if (!Array.isArray(notes) || notes.length !== ids.length || !ids.every((id) => notes.filter((n) => n?.section === id).length === 1)) throw bad(`notes must list each section once: ${ids.join(', ')}`);
   for (const { section, verdict, note } of notes) {
@@ -266,6 +266,8 @@ export function appendSendBack(decisionsPath: string, d: Decision, notes: unknow
   }
   const answer: Answer = { key: d.key, answer: 'sent', label: 'Sent back', close: d.close, at: now(),
     notes: ids.map((id) => notes.find((n) => n.section === id)).map(({ section, verdict, note }) => ({ section, verdict, ...(note?.trim() && { note: note.trim() }) })), decisions: Object.fromEntries(keys.map((k) => [k, p[k] as string])) };
+  const current = readAnswers(decisionsPath)[d.key];
+  if (current?.answer === answer.answer && JSON.stringify([current.notes, current.decisions]) === JSON.stringify([answer.notes, answer.decisions])) return;
   appendLine(answersPath(decisionsPath), answer);
   return answer;
 }

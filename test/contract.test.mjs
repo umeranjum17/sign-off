@@ -192,6 +192,7 @@ test('a plan: validate checks each rule with one fix line; post stores it, it wa
       assert.match((await refused.json()).error, error);
     }
     assert.equal((await send({ notes, decisions })).status, 200);
+    assert.equal((await send({ notes, decisions })).status, 200);
   } finally {
     await new Promise((ok) => proc.once('exit', ok).kill());
   }
@@ -436,6 +437,27 @@ test('post --replace: a changed item is checked against its kind again, an uncha
   const kept = cli2('post', board, '--from', feed('kept', old), '--replace');
   assert.equal(kept.status, 0, kept.stdout);
   assert.equal(JSON.parse(boardText()).items[0].title, 'Old title');
+});
+
+test('post --replace: a plan answered by a send-back is refused when a revision drops a decision or rewrites a section', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const plan = JSON.parse(readFileSync(join(fixtures, 'plan.v1', 'valid-full.json')));
+  const board = join(scratch, 'replace-plan-board.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const feed = (name, item) => message(`replace-plan-${name}.json`, JSON.stringify({ schema: 2, items: [item] }));
+  assert.equal(cli2('post', board, '--kind', 'plan', '--from', message('replace-plan-first.json', JSON.stringify(plan))).status, 0);
+  const notes = plan.sections.map(({ id }) => ({ section: id, verdict: 'approve' }));
+  const decisions = Object.fromEntries(plan.decisions.map((q) => [q.key, q.options[0].value]));
+  appendFileSync(join(scratch, 'replace-plan-board.answers.jsonl'), `${JSON.stringify({ key: plan.key, answer: 'sent', label: 'Sent back', close: 'done', at: '2026-10-13T08:00:00Z', notes, decisions })}\n`);
+  const dropped = cli2('post', board, '--from', feed('dropped', { ...plan, decisions: plan.decisions.slice(0, 1) }), '--replace');
+  assert.equal(dropped.status, 1, dropped.stdout);
+  assert.match(dropped.stdout, /was answered and now holds a different question/);
+  const rewritten = cli2('post', board, '--from', feed('rewritten', { ...plan, sections: plan.sections.map((s, i) => (i ? s : { ...s, body: `${s.body} Changed.` })) }), '--replace');
+  assert.equal(rewritten.status, 1, rewritten.stdout);
+  assert.match(rewritten.stdout, /was answered and now holds a different question/);
+  const same = cli2('post', board, '--from', feed('same', plan), '--replace');
+  assert.equal(same.status, 0, same.stdout);
 });
 
 test('post --replace: an answer does not re-attach to a key the feed dropped and re-added, for every contract kind', () => {
