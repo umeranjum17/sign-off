@@ -1215,6 +1215,8 @@ test('a posted contract design is listed with its preview and date, and opens fo
   await evaluate('document.querySelector(".design-review button:last-of-type").click()');
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Changes requested');
   assert.match(run('answers', file, '--json').out, /Make the title clearer/);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
+  await until(async () => (await evaluate('document.querySelector(".design-card .eyebrow")?.textContent')) === 'Changes requested');
   const desktop = await browse(join(dir, 'desktop-browser'), 1280);
   await desktop.evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
   await until(async () => (await desktop.evaluate('document.querySelector("#nav a[href=\\"#designs\\"][aria-current=page]")?.textContent.trim()')) === 'Designs1');

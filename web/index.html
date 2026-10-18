@@ -1275,7 +1275,7 @@
     const groups = [...new Set(items.map((d) => d.group || ''))];
     return groups.flatMap((group) => [group ? el('div', { class: 'sec-h' }, el('h2', {}, group)) : '',
       el('div', { class: 'design-list' }, ...items.filter((d) => (d.group || '') === group).map((d) => {
-        const saved = state.answers[d.key], status = saved?.answer === 'approve' ? 'Approved' : d.status === 'draft' ? 'Draft' : 'In review';
+        const saved = state.answers[d.key], status = saved?.answer === 'approve' ? 'Approved' : saved?.answer === 'change' ? 'Changes requested' : d.status === 'draft' ? 'Draft' : 'In review';
         const href = `#designs/${d.key}`, image = pic(d);
         return el('article', { class: 'card design-card', id: `item-${d.key}` }, image ? el('a', { href, class: 'design-preview', 'aria-label': `Open design, ${d.title}` }, thumb('designs', image)) : '',
           el('div', {}, el('p', { class: 'eyebrow' }, status), el('h3', {}, el('a', { href }, d.title)), el('p', { class: 'meta' }, [d.filed ? day(d.filed) : '', saved?.pick ? `Pick: ${saved.pick}` : '', saved?.notes?.[0]?.note ?? ''].filter(Boolean).join(' · '))));
