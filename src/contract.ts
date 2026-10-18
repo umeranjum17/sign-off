@@ -346,7 +346,7 @@ export function mediaFiles(m: any, base: string): string[] {
 
 /** The longest a block of plain text on a report page may run: about five lines on a phone. */
 const BLOCK_CHARS = 240;
-/** A report's or plan's page, and a report's picture, from `base`, the board file's folder (or, for validate, the message file's): each a file of 5 MB or less
+/** A report's or plan's page, and a report's picture, from `base`, the board file's folder: each a file of 5 MB or less
  * whose real path stays inside that folder, and a page filled in the ladder shape the scaffold gives. The first broken rule throws. */
 export function reportPage(m: any, base: string): void {
   const at = isKey(m.key) ? `key ${m.key}: ` : '';

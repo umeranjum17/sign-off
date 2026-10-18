@@ -90,7 +90,7 @@ examples:
 Checks message files against the communication contract without posting them: ${CONTRACT}
 A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate, finding and plan at schema 1, and report at schema 2.
 An evidence message's media paths read from the message file's folder: each file must be there, inside it, and 50 MB or less.
-A report is a page to tap through: its "view" (.html) and "preview" (its picture, beside it) read from the message file's folder, filled with no FILL: lines left (see report init).
+A report is a page to tap through: its "view" (.html) and "preview" (its picture, beside it) are checked for their shape here; the files themselves are checked at post, from the board file's folder, filled with no FILL: lines left (see report init).
 A plan's "view" (.html) is checked for its shape here; the file itself is checked at post, from the board file's folder.
 A gate names its done-done run (run_id and commit) and offers 2 or 3 of approve (Approve), skip (Skip the judge) and fix (Fix first).
 A finding gives a repeated cause, its counts, record ids (never record text) and a proposed change, and offers apply (Apply) and skip (Skip).
@@ -1012,7 +1012,6 @@ function validate(args: string[]) {
       m = parseMessage(raw);
       const kind = checkMessage(m, want);
       if (m.kind === 'evidence') mediaFiles(m, dirname(resolve(file)));
-      if (m.kind === 'report') reportPage(m, dirname(resolve(file)));
       return { file, ...kind, ok: true, error: '', help: '' };
     } catch (e) {
       if (!(e instanceof ContractError)) throw e;
