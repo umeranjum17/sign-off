@@ -1059,7 +1059,7 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await evaluate('document.querySelector("#reader .close").click()');
   await until(async () => (await evaluate('location.hash + "|" + document.activeElement.textContent')) === '#waiting|Open plan');
   // Review through the real controls: a Change must have a note, drafts survive reload, and Send back returns every answer.
-  await evaluate('document.querySelector(".focus .open-link").click()');
+  await evaluate('document.querySelector(".plan-open").click()');
   await until(async () => await evaluate('!!document.querySelector(".plan-send .open-link:disabled")'));
   await evaluate('document.querySelectorAll(".plan-verdicts .approve").forEach((b) => b.click()); document.querySelector(".plan-verdicts .change").click(); document.querySelectorAll(".plan-decision .choices").forEach((c) => c.querySelector("button").click())');
   assert.equal(await evaluate('document.querySelector(".plan-send .open-link").disabled'), true);
