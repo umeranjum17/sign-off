@@ -73,7 +73,7 @@
 - `area`: optional, the board area the item shows in: `waiting`, `evidence`, `reports` or `answered`
   (Waiting on you, Evidence, Reports and explainers, Answered). Without it an `evidence` item is in Evidence;
   an `explainer`, an item with nothing to answer, or any item on a read-only board is in Reports and
-  explainers; a `signin` and any other item is in Waiting on you, a sign-in on top of them. An answered item is always in Answered. On a board
+  explainers; a `signin`, a `plan` and any other item is in Waiting on you, a sign-in on top of them; a plan stays there until it is sent back. An answered item is always in Answered. On a board
   that is not read-only, Reports and explainers lists only an `explainer` and an item with an `.html`
   `view`; any other item there is folded under Notes, a short row that opens to its card. A feed's
   evidence page, an `interactive` item, can say `"area": "evidence"` to count and open under Evidence.
@@ -92,7 +92,7 @@
   It keeps its page, `view` (`.html`), and that page's picture, `preview`, from the board file's folder; a report stored before reports had pages has neither and still loads.
   An item with `"kind": "gate"` waits like a decision and keeps the done-done `run` it holds (`run_id` and `commit`) as sent; its answer is the `done-done respond --action` to take.
   An item with `"kind": "finding"` waits like a decision and keeps its `cause`, `incidents`, `days`, `evidence_ids`, `change_kind` and `proposal` as sent; its answer, `apply` or `skip`, says whether to make the proposed change.
-  An item with `"kind": "plan"` keeps its `about`, `sections`, `decisions`, `steps` and `view` as sent; its answer is the one send-back ([contract.md](contract.md) section 7). The board does not draw a plan card or send-back control yet, so a plan shows there without an answer.
+  An item with `"kind": "plan"` keeps its `about`, `sections`, `decisions`, `steps` and `view` as sent; its answer is the one send-back ([contract.md](contract.md) section 7). Its card shows the title, how many sections and decisions it has, and Open plan, which opens the `view` page over the board. The board has no send-back control yet.
 - `filed`: optional, when the item was filed, an ISO 8601 date-time such as `2026-10-13T07:19:00Z`.
   `raise` and `post` write the current time when the item or flags give none, and `post --replace`
   keeps the time an item already has, so a feeder that runs every few seconds does not reset it.
@@ -170,7 +170,7 @@
   `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.woff2`, `.mp4` and `.webm` files
   from inside that page's own folder only, never anything above it. `export`
   inlines the page itself, so those files show only on the running board.
-  The board adds a small pointing script to each `.html` mock page it serves
+  The board adds a small pointing script to each `.html` mock page and plan page it serves
   (see the README); it passes only text to the board. A pointed element is
   kept as `{ ref, tag, text }`: `ref` is a path to it, and anything that finds
   it again must check `tag` and `text` and show nothing when they differ. The

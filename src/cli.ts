@@ -1608,7 +1608,7 @@ async function exportBoard(args: string[]) {
 
 
 const page = readFileSync(new URL('../web/index.html', import.meta.url));
-/** Added to each design mock page so the person can point at a part of it; see web/point.js. */
+/** Added to each design mock page and plan page so the person can point at a part of it; see web/point.js. */
 const pointer = Buffer.from(`<script>${readFileSync(new URL('../web/point.js', import.meta.url), 'utf8')}</script>`);
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 const state = () => {
@@ -1718,8 +1718,8 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
       if (!mock || !type) return [404, { error: 'Mock is unavailable' }];
       const actual = under(dirname(under(dirname(file), mockFile(mock))), path);
       if (statSync(actual).size > MOCK_BYTES) return [404, { error: 'Mock is unavailable' }];
-      // A design mock page gets the pointing bridge when served; export inlines the page as written.
-      return [200, { media: readFileSync(actual), type, point: Boolean(value) && type === 'text/html' }];
+      // A design mock page, and a plan's page, get the pointing bridge when served; export inlines the page as written.
+      return [200, { media: readFileSync(actual), type, point: (Boolean(value) || d!.type === 'plan') && type === 'text/html' }];
     } catch { return [404, { error: 'Mock is unavailable' }]; }
   }
   if (req.method === 'GET' && req.url?.startsWith('/api/evidence?')) {

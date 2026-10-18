@@ -1002,6 +1002,26 @@ test('Waiting on you: a type label on each ask, type chips with counts, and the 
   await until(async () => (await evaluate('!!document.querySelector(".needs a.more")')));
   await evaluate('[...document.querySelectorAll(".areas .i-waiting a.compact")].find((a) => a.textContent.includes("Pick the look")).click()');
   await until(async () => (await evaluate('document.querySelector(".focus h3")?.textContent')) === 'Pick the look');
+  // A posted plan waits with the asks: its card gives the title, its counts and one Open plan, which opens its page over the board with the pointing script.
+  const fixture = new URL('../fixtures/contract/plan.v1/', import.meta.url).pathname;
+  mkdirSync(join(dir, 'page'));
+  writeFileSync(join(dir, 'page', 'index.html'), readFileSync(join(fixture, 'page', 'index.html')));
+  assert.equal(run('post', file, '--kind', 'plan', '--from', join(fixture, 'valid-full.json')).code, 0);
+  await evaluate('location.reload()');
+  await until(async () => (await chips()) === 'All 4*|Design pick 1|Plan 1|Yes/No 1|Pick one 1');
+  await until(async () => (await pick('Plan')) && (await queue()) === 'Show plans on the board');
+  assert.equal(await evaluate('document.querySelector(".focus .eyebrow").textContent + "|" + document.querySelector(".focus .plan .meta").textContent'), 'Plan|5 sections · 2 decisions');
+  // On a 390 px phone the title and Open plan fit with nothing to scroll sideways.
+  assert.equal(await evaluate('document.documentElement.scrollWidth <= 390 && document.querySelector(".focus .open-link").getBoundingClientRect().right <= 390'), true);
+  await evaluate('document.querySelector(".focus .open-link").click()');
+  await until(async () => (await evaluate('location.hash + "|" + document.querySelector("#reader iframe")?.title')) === '#waiting/plan-kind-board|Plan: Show plans on the board');
+  const view = await evaluate('fetch(document.querySelector("#reader iframe").src).then(async (r) => [r.headers.get("content-security-policy"), await r.text()])');
+  assert.match(view[0], /connect-src 'none'.*sandbox allow-scripts$/);
+  assert.match(view[1], /Filter Waiting on you by type[\s\S]*window\.signOffFind/);
+  // The way back leads to Waiting on you with the plan still shown, and the focus on its Open plan.
+  await evaluate('document.querySelector("#reader .close").click()');
+  await until(async () => (await evaluate('location.hash + "|" + document.activeElement.textContent')) === '#waiting|Open plan');
+  assert.equal(await queue(), 'Show plans on the board');
   close();
   proc.kill();
 });
