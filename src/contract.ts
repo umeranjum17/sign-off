@@ -114,7 +114,7 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
     return v;
   };
   /** Each option: exactly value and label (and on a plan's decision, outcome), its value unique. Ask, gate, finding and plan decisions share it. */
-  const checkOptions = (field: string, options: any[], outcome: false | 'plan' | 'ask' = false) => options.forEach((o: any, n: number) => {
+  const checkOptions = (field: string, options: any[], outcome: false | 'plan' | 'ask' | 'legacy-ask' = false) => options.forEach((o: any, n: number) => {
     const at = `${field}[${n}]`, fields = outcome ? ['value', 'label', 'outcome'] : ['value', 'label'];
     if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad(at, 'must be an object', `Write each option as {"value":"<id>","label":"<text>"${outcome ? ',"outcome":"<what it leads to>"' : ''}}`);
     const odd = Object.keys(o).find((f) => !fields.includes(f));
@@ -126,7 +126,7 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
       const OUTCOME = `what happens next if ${o.value} is picked, in one line (120 characters or fewer)`;
       if (!Object.hasOwn(o, 'outcome')) throw bad(`${at}.outcome`, 'is required', `Add ${flags ? `--outcome ${o.value}=<text>` : `"outcome" to option ${o.value}`}: ${OUTCOME}`);
       text(`${at}.outcome`, o.outcome, 120, OUTCOME);
-    } else if (outcome) text(`${at}.outcome`, o.outcome, 200, 'what picking it leads to, in 200 characters or fewer');
+    } else if (outcome === 'plan' || (outcome === 'legacy-ask' && Object.hasOwn(o, 'outcome'))) text(`${at}.outcome`, o.outcome, 200, 'what picking it leads to, in 200 characters or fewer');
   });
   /** The option the poster would pick, `field` on `o`: required, and one of the option values, which it returns. */
   const recommend = (field: string, o: any, options: any[]): string[] => {
@@ -228,27 +228,27 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
   if (Object.hasOwn(m, 'detail')) text('detail', m.detail, 1000, 'the longer note, or leave it out');
   // An ask is read on a phone with no other context: it says why it is asked, what each answer does, why one is recommended and what silence does.
   const ask = m.kind === 'ask', WHY = 'what it is about and why it needs an answer now, in 1 or 2 short lines (200 characters or fewer)';
-  if (ask && !Object.hasOwn(m, 'why')) throw bad('why', 'is required', `Add ${named('why', flags)}: ${WHY}`);
-  if (ask) text('why', m.why, 200, WHY);
+  if (ask && flags && !Object.hasOwn(m, 'why')) throw bad('why', 'is required', `Add ${named('why', flags)}: ${WHY}`);
+  if (ask && flags) text('why', m.why, 200, WHY);
   // A gate offers 2 or 3 of done-done's actions and a finding both of apply and skip, in any order, each with its own label.
   const options = m.options, actions = ACTIONS[m.kind], max = actions ? Object.keys(actions).length : 6;
   const actionList = actions && Object.entries(actions).map(([value, label]) => show({ value, label })).join(', ');
   const listed = !actions ? (flags ? 'Give 2 to 6 --option flags, such as --option yes="Yes" --option no="No"' : 'Set "options" to 2-6 objects such as {"value":"yes","label":"Yes"}') : max === 3 ? `Set "options" to 2 or 3 of ${actionList}` : `Set "options" to ${actionList}`;
   if (!Array.isArray(options) || options.length < 2 || options.length > max) throw bad('options', Object.hasOwn(m, 'options') ? `must list ${({ 2: '2', 3: '2 or 3' } as Record<number, string>)[max] ?? '2 to 6'} options` : 'is required', listed);
-  checkOptions('options', options, ask ? 'ask' : false);
+  checkOptions('options', options, ask ? (flags ? 'ask' : 'legacy-ask') : false);
   const odd = actions && options.find((o: any) => !Object.hasOwn(actions, o.value) || actions[o.value] !== o.label);
   if (odd) throw bad('options', `${show(odd)} is not a ${m.kind} action: ${Object.keys(actions).join(', ')}, each with its label`, listed);
   const values = recommend('recommend_value', m, options);
   const REASON = `why you recommend ${m.recommend_value}, in one line (160 characters or fewer)`;
-  if (ask && !Object.hasOwn(m, 'recommend_reason')) throw bad('recommend_reason', 'is required', `Add ${named('recommend_reason', flags)}: ${REASON}`);
-  if (ask) text('recommend_reason', m.recommend_reason, 160, REASON);
-  if (ask && !Object.hasOwn(m, 'default_if_silent')) throw bad('default_if_silent', 'is required', `Add ${named('default_if_silent', flags)}: the option that happens if the person stays quiet, one of ${values.join(', ')}`);
+  if (ask && flags && !Object.hasOwn(m, 'recommend_reason')) throw bad('recommend_reason', 'is required', `Add ${named('recommend_reason', flags)}: ${REASON}`);
+  if (ask && flags) text('recommend_reason', m.recommend_reason, 160, REASON);
+  if (ask && flags && !Object.hasOwn(m, 'default_if_silent')) throw bad('default_if_silent', 'is required', `Add ${named('default_if_silent', flags)}: the option that happens if the person stays quiet, one of ${values.join(', ')}`);
   if (Object.hasOwn(m, 'default_if_silent') && !values.includes(m.default_if_silent)) {
     throw bad('default_if_silent', `${show(m.default_if_silent)} is not an option value`, `Set ${named('default_if_silent', flags)} to one of ${values.join(', ')}${ask ? '' : ', or leave it out'}`);
   }
   // A real UTC time to the minute, seconds optional: Date.parse would roll 2026-02-30 over to March.
   const utc = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?Z$/.test(v) && !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().startsWith(v.slice(0, -1));
-  if (Object.hasOwn(m, 'silent_by') && !utc(m.silent_by)) throw bad('silent_by', `${show(m.silent_by)} is not a UTC time such as 2026-10-17T18:00:00Z`, `Set ${named('silent_by', flags)} to when the silent default happens, as YYYY-MM-DDTHH:MM:SSZ in UTC, or leave it out`);
+  if (Object.hasOwn(m, 'silent_by') && (!ask || flags) && !utc(m.silent_by)) throw bad('silent_by', `${show(m.silent_by)} is not a UTC time such as 2026-10-17T18:00:00Z`, `Set ${named('silent_by', flags)} to when the silent default happens, as YYYY-MM-DDTHH:MM:SSZ in UTC, or leave it out`);
   if (Object.hasOwn(m, 'close') && m.close !== 'done' && m.close !== 'release') throw bad('close', 'must be done or release', 'Set "close" to "done" or "release", or leave it out');
   if (Object.hasOwn(m, 'merges')) {
     const keys = m.merges, MERGES = `Set ${named('merges', flags)} to the keys of 1 to 10 other cards on the board that ask the same thing, such as ${flags ? '--merge ship-signin' : '["ship-signin"]'}`;
@@ -259,7 +259,7 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
       if (keys.indexOf(k) < n) throw bad(`merges[${n}]`, `repeats ${k}`, 'List each key once');
     });
   }
-  if (ask) question(m, bad, flags);
+  if (ask && flags) question(m, bad, flags);
   // A gate's run is its own rule (section 5), so it comes after the field rules of section 4.
   if (m.kind === 'gate') {
     if (!Object.hasOwn(m, 'run')) throw bad('run', 'is required', 'Add "run": {"run_id": "<done-done run id>", "commit": "<full commit>"}, the run held for approval');

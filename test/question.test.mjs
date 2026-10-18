@@ -85,11 +85,18 @@ test('the question standard holds in post --kind ask and in a feed, for changed 
   assert.equal(kept.status, 0, kept.stdout);
   writeFileSync(file, JSON.stringify({ schema: 2, items: [{ ...old, title: 'Ship it today?' }, { ...ask, key: 'new' }] }));
   const changed = run('post', board, '--from', file, '--replace');
-  assert.equal(changed.status, 2, changed.stdout);
-  assert.match(changed.stdout, /key old: why is required[^]*Add \\"why\\"/);
+  assert.equal(changed.status, 0, changed.stdout);
+  assert.equal(JSON.parse(readFileSync(board)).items.find((i) => i.key === 'old').title, 'Ship it today?');
+  writeFileSync(file, JSON.stringify({ contract: 1, kind: 'ask', schema: 1, ...old, key: 'new-legacy' }));
+  const legacyPost = run('post', board, '--kind', 'ask', '--from', file);
+  assert.equal(legacyPost.status, 2, legacyPost.stdout);
+  assert.match(legacyPost.stdout, /why is required/);
+  writeFileSync(board, JSON.stringify({ schema: 2, items: [old] }));
+  writeFileSync(file, JSON.stringify({ contract: 1, kind: 'ask', schema: 1, ...old }));
+  assert.equal(run('post', board, '--kind', 'ask', '--from', file).status, 0);
 });
 
-test('an old board reads as before: no why, outcome or reason is asked of what is already stored', () => {
+test('an old board reads and answers as before: no new-question fields are asked of what is already stored', async () => {
   const board = join(scratch, 'old.json');
   const items = [{ key: 'dark-default', title: 'Say yes or no: dark mode by default', about: 'Most test users switch to dark.', recommend_value: 'yes', default_if_silent: 'no' },
     { key: 'release-window', title: 'Pick A, B or C', options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }], recommend_value: 'yes' }];
@@ -102,6 +109,12 @@ test('an old board reads as before: no why, outcome or reason is asked of what i
   // Raising an old question again is the no-op it always was, and the file is not rewritten.
   assert.match(run('raise', board, '--title', items[0].title, '--key', 'dark-default', '--recommend', 'yes', '--default', 'no', '--about', items[0].about).stdout, /already waiting/);
   assert.equal(readFileSync(board, 'utf8'), before);
+  const proc = spawn(process.execPath, [cli, 'serve', board, '--port', '0'], { env });
+  procs.push(proc);
+  const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+  const answered = await fetch(`${url}api/answers`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: 'release-window', answer: 'no' }) });
+  assert.equal(answered.status, 200);
+  assert.equal(JSON.parse(run('answers', board, '--json').stdout)['release-window'].answer, 'no');
 });
 
 test('one decision, one card: an ask that merges others closes them with its answer, and an Undo clears them too', async () => {
