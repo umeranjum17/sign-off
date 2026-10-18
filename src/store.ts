@@ -293,7 +293,10 @@ export function appendDesignAnswer(decisionsPath: string, d: Decision, verdict: 
   if (options.length ? !options.some(o => o.value === pick) : pick !== undefined) throw bad('pick must be one listed option, or omitted when no options were offered');
   const answer: Answer = { key: d.key, answer: verdict, label: verdict === 'approve' ? 'Approved' : 'Changes requested', close: d.close ?? 'done', at: now(), notes, ...(pick !== undefined && { pick: pick as string }) };
   const current = readAnswers(decisionsPath)[d.key];
-  if (current?.answer === answer.answer && JSON.stringify([current.notes, current.pick]) === JSON.stringify([answer.notes, answer.pick])) return;
+  if (current) {
+    if (current.answer === answer.answer && JSON.stringify([current.notes, current.pick]) === JSON.stringify([answer.notes, answer.pick])) return;
+    throw bad('already answered');
+  }
   appendLine(answersPath(decisionsPath), answer);
   return answer;
 }
