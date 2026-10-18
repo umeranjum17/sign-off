@@ -1094,6 +1094,23 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await until(async () => (await evaluate(answeredTitles)).includes('Keep the weekly digest?') && (await evaluate(answeredTitles)).includes('Show plans on the board'));
   await evaluate('document.querySelector(".clear").click()');
   await until(async () => (await evaluate(answeredTitles)) === '');
+  // The decision path records, undoes, and accepts a keyboard answer on the same real board.
+  await evaluate("location.hash = '#waiting'");
+  await until(async () => (await evaluate('location.hash')) === '#waiting');
+  await evaluate('document.querySelector(`a[href="#decide/release"]`).click()');
+  await until(async () => (await evaluate('location.hash')) === '#decide/release');
+  assert.equal(await evaluate('document.querySelector(".decide h2").textContent'), 'Which day for release?');
+  assert.equal(await evaluate('document.querySelectorAll(".pick-option").length'), 3);
+  assert.equal(await evaluate('document.querySelector(".pick-option[aria-pressed=true] .recommend")?.textContent'), 'Recommended');
+  await evaluate('document.querySelector(".pick-option").click(); document.querySelector(".decide-bar .answer").click()');
+  await until(async () => (await evaluate('location.hash')) === '#waiting' && (await evaluate('!document.querySelector("#toast").hidden')));
+  assert.match(run('answers', file, '--key', 'release').out, /today/);
+  await evaluate('document.querySelector("#undo").click()');
+  await until(async () => !/today/.test(run('answers', file, '--key', 'release').out));
+  await evaluate('document.querySelector(`a[href="#decide/release"]`).click()');
+  await until(async () => (await evaluate('location.hash')) === '#decide/release');
+  await evaluate('document.dispatchEvent(new KeyboardEvent("keydown", { key: "1", bubbles: true }))');
+  await until(async () => /today/.test(run('answers', file, '--key', 'release').out));
   close();
   proc.kill();
 });
