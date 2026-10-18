@@ -13,15 +13,20 @@ retro proposals are `finding` (schema 1), read-only pages are `report`
 
 With no `--option` a question is Yes/No; 2 to 6 `--option` flags make it
 pick-one (`--option friday=Friday --option next-week="Next week"`).
-Every new question meets the question standard ([contract.md](contract.md)
-section 5): a title of 12 words or fewer that ends in `?`, a `--why` line,
-an `--outcome <value>=<text>` for every option (yes and no too), a
-`--recommend` value with its `--recommend-reason`, and a `--default` for when
-the user stays silent (shown, never applied), with an optional `--silent-by`
-time. Lettered choices in the text need one lettered `--option` each, never
-Yes/No buttons. `--merge <key>` folds another card asking the same thing into
-this one: it is hidden, and this answer closes it too. A card is named by one ask until that ask is answered, and a merged card merges nothing itself. A question that breaks
-a rule is refused with the field and one fix line.
+The question standard ([contract.md](contract.md) section 5) decides what each
+new question needs and when it is refused. Its flags:
+
+- `--why <text>`: what it is about and why it needs an answer now.
+- `--outcome <value>=<text>`: what happens next if that option is picked, one
+  for every option (yes and no too).
+- `--recommend <value>` with `--recommend-reason <text>`: the option you would
+  pick, and why.
+- `--default <value>`: what happens if the user stays silent. The board shows
+  it and never applies it; the asking agent takes it after `--silent-by`.
+- `--silent-by <ISO UTC time>`: optional, when that happens, such as
+  `2026-10-19T09:00Z`.
+- `--merge <key>`: up to 10 other cards that ask the same thing. They are
+  hidden while this one waits, and its answer closes them too.
 
 Each answer is one tap, with an Undo for a few seconds after it (an Undo is
 saved as an answer change). Typing is last: every question with options has

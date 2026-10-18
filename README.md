@@ -99,8 +99,7 @@ the new settings \
 page go out?" \
   --about "No new \
 bug reports for three \
-weeks. Support is fully \
-staffed on Friday." \
+weeks." \
   --why "Support is fully \
 staffed on Friday." \
   --option today=Today \
