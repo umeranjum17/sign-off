@@ -14,7 +14,7 @@ npm run build, then seed a new board in an empty folder and serve it (one real p
 d=$(mktemp -d); .agents/skills/verify-sign-off/seed-board.sh "$d"
 
 It prints the board URL (BASE). It sets HOME and XDG_* to that folder, so your own board (~/.sign-off) is never read or written.
-Ready when the URL answers. Tear down what you started with kill "$(cat "$d/serve.pid")"; never kill by process name.
+Ready when the URL answers. The server stops on its own after 30 minutes (SEED_SERVE_SECONDS); to stop it sooner, kill "$(cat "$d/serve.pid")". If that kill is refused, leave the server to stop itself: that is a finished teardown, not a failed drive. Never kill by process name.
 When the repo's .done-done.yaml has an instance block, done-done already runs the app at $DONE_DONE_BASE_URL (its own port and HOME): BASE is then that URL, never a hard-coded port.
 
 ## Doctor

@@ -2,7 +2,7 @@
 # Fills a new board with one real posted item of each kind, then serves it.
 # Usage, from the repo root after `npm run build`: seed-board.sh <empty folder>
 # It sets HOME and XDG_* to that folder, so your own board (~/.sign-off) is never read or written.
-# Prints the board URL; stop the server it started with: kill "$(cat <folder>/serve.pid)"
+# Prints the board URL. The server stops on its own after SEED_SERVE_SECONDS (default 1800); to stop it sooner: kill "$(cat <folder>/serve.pid)"
 set -euo pipefail
 dir=$(cd "$1" && pwd) repo=$(pwd) board="$1/board.json"
 export HOME=$dir XDG_CONFIG_HOME=$dir/.config XDG_DATA_HOME=$dir/.local/share XDG_STATE_HOME=$dir/.local/state XDG_CACHE_HOME=$dir/.cache SIGN_OFF_FILER=verify
@@ -28,7 +28,7 @@ so post "$board" --kind report --from "$f/report.v2/valid-full.json" || \
   so post "$board" --type report --title "Sign-in now takes 2 steps" --about "Why the code step moved first." --view page/index.html --preview page/preview.svg
 so post "$board" --key digest-old --title "Send the digest on Mondays?" --why "Choose the weekly digest schedule." --outcome yes="The digest goes out Mondays." --outcome no="The digest is paused." --recommend yes --recommend-reason "A weekly update stays useful." --default yes
 
-node "$repo/dist/cli.js" serve "$board" --port 0 > "$dir/serve.log" 2>&1 &
+timeout "${SEED_SERVE_SECONDS:-1800}" node "$repo/dist/cli.js" serve "$board" --port 0 > "$dir/serve.log" 2>&1 &
 echo $! > "$dir/serve.pid"
 for _ in $(seq 50); do url=$(grep -o 'http://127.0.0.1:[0-9]*/' "$dir/serve.log" | head -1) && [ -n "$url" ] && break; sleep 0.2; done
 if [ -z "${url:-}" ]; then
