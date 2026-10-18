@@ -309,10 +309,14 @@ export function reportPage(m: any, base: string): void {
   if (long) throw bad(`${page} has a block of ${[...long].length} characters, over ${BLOCK_CHARS} (about five lines on a phone): "${[...long].slice(0, 40).join('')}..."`, 'Split it, cut it, or show it as a picture or step');
 }
 
-/** A plan's page, from `base` (the board file's folder, or the message file's for validate): a file that is there. */
+/** A plan's page, from `base`, the board file's folder: a file that is there, whose real path stays inside that folder. */
 export function planView(m: any, base: string): void {
   const at = isKey(m.key) ? `key ${m.key}: ` : '', help = `Put the page at ${m.view} from the board file's folder, or fix the path`;
+  let root = resolve(base);
+  try { root = realpathSync(base); } catch {}
   let real;
-  try { real = realpathSync(resolve(base, m.view)); } catch { throw new ContractError(`${at}view ${show(m.view)} is not there`, help); }
+  try { real = realpathSync(resolve(root, m.view)); } catch { throw new ContractError(`${at}view ${show(m.view)} is not there`, help); }
+  const rel = relative(root, real);
+  if (!rel || rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel)) throw new ContractError(`${at}view ${show(m.view)} leads outside the board file's folder`, 'Copy the page into the board file\'s folder, such as under mocks/<key>/');
   if (!statSync(real).isFile()) throw new ContractError(`${at}view ${show(m.view)} is not a file`, help);
 }

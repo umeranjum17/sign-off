@@ -157,7 +157,6 @@ test('a plan: validate checks each rule with one fix line; post stores it, it wa
     [decision({ question: 'Keep A? Or B?' }), /decisions\[0\]\.question must be one question, with one question mark as its last character/, /split any other into its own decision/],
     [decision({ question: 'Keep A？ Or B?' }), /decisions\[0\]\.question must be one question, with one question mark as its last character/, /split any other into its own decision/],
     [{ ...plan, view: '../index.html' }, /view "..\/index.html" must be a relative path/, /Set "view"/],
-    [{ ...plan, view: 'page/gone.html' }, /view "page\/gone.html" is not there/, /Put the page at page\/gone.html/],
     [{ ...plan, filed: '2026-10-13T07:19:00Z' }, /filed is not a field of plan schema 1/, /plan takes key, title, filer, link, about, sections, decisions, steps, view$/],
   ]) {
     const { status, out: { files: [row] } } = validate(message('plan-bad.json', JSON.stringify(m)));
@@ -166,12 +165,21 @@ test('a plan: validate checks each rule with one fix line; post stores it, it wa
     assert.match(row.help, help);
   }
   // A plan posts with post --kind or in a --from feed, waits on the board, and its one send-back is its answer.
-  const board = join(scratch, 'plan-board.json'), env = { ...process.env, HOME: join(scratch, 'home') };
+  const planDir = join(scratch, 'plan'), board = join(planDir, 'plan-board.json'), env = { ...process.env, HOME: join(scratch, 'home') };
   const run = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env, input: JSON.stringify(plan) });
+  mkdirSync(join(planDir, 'page'), { recursive: true });
+  writeFileSync(join(planDir, 'page', 'index.html'), readFileSync(join(fixtures, 'plan.v1', 'page', 'index.html')));
   assert.equal(run('post', board, '--kind', 'plan', '--from', '-').status, 0);
   const missing = spawnSync('node', [cli, 'post', board, '--kind', 'plan', '--from', '-'], { encoding: 'utf8', env, input: JSON.stringify({ ...plan, key: 'plan-gone', view: 'page/gone.html' }) });
   assert.equal(missing.status, 2);
   assert.match(missing.stdout, /view \\"page\/gone.html\\" is not there/);
+  const away = mkdtempSync(join(tmpdir(), 'plan-away-'));
+  writeFileSync(join(away, 'index.html'), '<html>away</html>');
+  symlinkSync(join(away, 'index.html'), join(planDir, 'escape.html'));
+  const escaped = spawnSync('node', [cli, 'post', board, '--kind', 'plan', '--from', '-'], { encoding: 'utf8', env, input: JSON.stringify({ ...plan, key: 'plan-escape', view: 'escape.html' }) });
+  rmSync(away, { recursive: true, force: true });
+  assert.equal(escaped.status, 2);
+  assert.match(escaped.stdout, /leads outside the board file/);
   const fed = run('post', board, '--from', message('plan-feed.json', JSON.stringify({ schema: 2, items: [{ ...plan, key: 'plan-two' }] })));
   assert.equal(fed.status, 0, fed.stdout);
   const odd = run('post', board, '--from', message('plan-odd.json', JSON.stringify({ schema: 2, items: [{ key: 'odd', title: 'Odd', type: 'plan' }] })));
@@ -198,6 +206,14 @@ test('a plan: validate checks each rule with one fix line; post stores it, it wa
   }
   const answer = JSON.parse(run('answers', board, '--json').stdout)[plan.key];
   assert.deepEqual([answer.answer, answer.notes, answer.decisions], ['sent', notes, { 'send-back': 'one', where: 'own' }]);
+  assert.deepEqual(decode(run('answers', board).stdout.split('\nhelp[')[0]).plan, [...notes.map(({ section, verdict, note = '' }) => ({ key: plan.key, section, verdict, note })), { key: plan.key, decision: 'send-back', pick: 'one' }, { key: plan.key, decision: 'where', pick: 'own' }]);
+  writeFileSync(join(planDir, 'page', 'other.html'), '<html>other</html>');
+  const revised = [{ ...plan, decisions: plan.decisions.slice(0, 1) }, { ...plan, sections: plan.sections.map((s, i) => (i ? s : { ...s, body: `${s.body} Changed.` })) }, { ...plan, view: 'page/other.html' }, { ...plan, steps: [...plan.steps].reverse() }];
+  for (const item of revised) {
+    const conflict = run('post', board, '--from', message('plan-revised.json', JSON.stringify({ schema: 2, items: [item] })), '--replace');
+    assert.equal(conflict.status, 1, conflict.stdout);
+    assert.match(conflict.stdout, /was answered and now holds a different question/);
+  }
   const events = run('wait', board, '--filer', 'agent-41', '--events', '--timeout', '0').stdout.trim().split('\n').map((l) => JSON.parse(l));
   assert.deepEqual(events.map(({ event, kind, key, notes: n, decisions: p }) => [event, kind, key, n, p]), [['answer', 'plan', plan.key, notes, { 'send-back': 'one', where: 'own' }]]);
 });
