@@ -1024,6 +1024,15 @@ test('Waiting on you: a type label on each ask, type chips with counts, and the 
   // The way back leads to Waiting on you with the plan still shown, and the focus on its Open plan.
   await evaluate('document.querySelector("#reader .close").click()');
   await until(async () => (await evaluate('location.hash + "|" + document.activeElement.textContent')) === '#waiting|Open plan');
+  // Clear all done on Answered clears the answered ask and leaves the sent-back plan there.
+  const sent = { notes: ['goals', 'architecture', 'slices', 'standards', 'risks'].map((section) => ({ section, verdict: 'approve' })), decisions: { 'send-back': 'one', where: 'waiting' } };
+  assert.equal(await evaluate(`fetch('api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: 'plan-kind-board', ...${JSON.stringify(sent)} }) }).then((r) => r.status)`), 200);
+  assert.equal(await evaluate("fetch('api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: 'digest', answer: 'yes' }) }).then((r) => r.status)"), 200);
+  const answeredTitles = 'Array.from(document.querySelectorAll("ul.i-answered strong"), (s) => s.textContent).join("|")';
+  await evaluate("location.hash = '#answered'");
+  await until(async () => (await evaluate(answeredTitles)).includes('Keep the weekly digest?') && (await evaluate(answeredTitles)).includes('Show plans on the board'));
+  await evaluate('document.querySelector(".clear").click()');
+  await until(async () => (await evaluate(answeredTitles)) === 'Show plans on the board');
   close();
   proc.kill();
 });
