@@ -84,6 +84,7 @@
   .focus .since { margin: -0.375rem 0 1rem; font-weight: 600; } .needs > .since { margin: -0.25rem 0 0.5rem; font-weight: 600; }
   .focus .row h3 { font-size: 1.75rem; line-height: 1.2; letter-spacing: -0.01em; }
   .focus .choices button, .needs .choices .rec { min-height: 4rem; border-radius: 1rem; font-size: 1.125rem; font-weight: 600; }
+  @media (min-width: 60rem) { .focus .choices button, .needs .choices .rec { min-height: 2.75rem; } }
   /* On Summary the recommended answer is the large button, and the others are pills under it. */
   .needs .choices button { font-weight: 600; } .needs .choices button:not(.rec) { justify-self: start; border-radius: 999px; }
   .needs .choices button[aria-pressed="true"] { padding-right: 2.75rem; }
@@ -200,7 +201,7 @@
   .about { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .row:has(details:not(.note, .other, .tech)[open]) .about { display: none; }
   .about.full { display: block; }
-  summary { cursor: pointer; color: var(--accent); font-size: 0.875rem; margin-top: 0.25rem; width: fit-content; }
+  summary { cursor: pointer; color: var(--accent); font-size: 0.875rem; margin-top: 0.25rem; width: fit-content; min-height: 2.75rem; }
   .meta { color: var(--muted); font-size: 0.875rem; margin: 0.5rem 0 0; }
   /* Every card reads top down in one order: a short status line, the result as its headline, what changed, the proof, then the one decision.
      The headline keeps the card's whole width: the dismiss x floats at the corner, never in a row that squeezes the title. */
