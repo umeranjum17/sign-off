@@ -24,7 +24,7 @@ Open the URL seed-board.sh prints, in a browser; tap an area in the sidebar or t
    When the outcome is about one width only ("on a computer" or "on a phone"), drive that width alone: SHOTS_WIDTHS=1280 (computer)
    or SHOTS_WIDTHS=390 (phone) for shots.sh, and the toast and focus captures at that width. A capture judged alone must show the whole claim.
 5. Look at every capture: no text under the tab bar, nothing cut, the right area marked.
-6. Stop what you started.
+6. Stop the browser session you started; leave the board server, which stops itself.
 
 ## Gotchas
 
