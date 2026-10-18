@@ -364,19 +364,21 @@
   .design-viewer header { display: flex; gap: 1rem; align-items: center; padding: 0.75rem max(1rem, env(safe-area-inset-right)) 0.75rem max(1rem, env(safe-area-inset-left)); border-bottom: 1px solid var(--line); }
   .design-viewer header > div { flex: 1; min-width: 0; max-height: 22dvh; overflow: auto; }
   .design-viewer h2, .design-viewer p { margin: 0; }
-  .design-viewer h2 { font-size: 1.125rem; }
+  .design-viewer h2 { font-size: 1.25rem; line-height: 1.2; }
+  .design-viewer .meta { font-size: 1rem; }
+  .design-viewer-panel button { padding: 0 0.75rem; font-size: 1rem; white-space: nowrap; }
   .design-viewer button, .design-viewer select { min-height: 2.75rem; }
-  .design-viewer-body { display: grid; grid-template-rows: minmax(8rem, 1fr) auto; flex: 1; min-height: 0; }
-  .design-stage { min-width: 0; min-height: 0; overflow: auto; background: var(--sunk); touch-action: pan-y; }
-  .design-stage img { display: block; width: 100%; height: auto; margin: auto; }
-  .design-stage iframe { display: block; width: 100%; height: 100%; border: 0; background: var(--surface); }
+  .design-viewer-body { display: grid; grid-template-rows: minmax(0, 1fr) auto; flex: 1; min-height: 0; }
+  .design-stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: var(--sunk); touch-action: pan-y; }
+  .design-stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .design-stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: var(--surface); }
   .design-viewer-panel { overflow: auto; padding: 0.75rem max(1rem, env(safe-area-inset-right)) max(0.75rem, env(safe-area-inset-bottom)); background: var(--surface); }
   .design-viewer-panel .foot { display: flex; gap: 0.75rem; margin: 0.5rem 0; }
   .design-viewer-panel .foot > * { flex: 1; }
   .design-viewer-panel label { display: grid; gap: 0.25rem; margin: 0.5rem 0; }
   .design-viewer-panel textarea { min-height: 3rem; max-height: 6rem; margin: 0; }
   .design-viewer-panel .open-link { background: var(--action); color: var(--on-accent); }
-  @media (min-width: 60rem) { .design-viewer-body { grid-template: minmax(0, 1fr) / minmax(0, 1fr) 22rem; } .design-viewer-panel { padding: 1.5rem; } }
+  @media (min-width: 60rem) { .design-viewer header h2 { font-size: 2.125rem; } .design-viewer-body { grid-template: minmax(0, 1fr) / minmax(0, 1fr) 22.5rem; } .design-viewer-panel { padding: 1.25rem; } }
   @media (max-height: 550px) { .design-viewer-body { overflow: auto; grid-template-rows: minmax(12rem, 1fr) auto; } }
   .needs .foot .open-link { min-height: 2.75rem; padding: 0 1rem; background: var(--action); color: var(--on-accent); text-align: center; }
   /* The asks dismissed from Waiting on you: one muted row that opens to a list, each with Restore. */
