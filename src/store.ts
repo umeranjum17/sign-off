@@ -281,11 +281,18 @@ function saveAnswer(decisionsPath: string, d: Decision, option: Option, note: st
   return answer;
 }
 
-/** Saves a design answer with screen-specific notes and an optional listed direction pick. */
+/** A design answer that holds only screen notes while the design has no design-wide verdict: it still waits for one. */
+export const SCREENS_ONLY = 'screens';
+/** True while an answer leaves the item waiting: none yet, or only screen notes. */
+export const awaitsVerdict = (a?: { answer?: string }) => !a || a.answer === SCREENS_ONLY;
+const DESIGN_LABEL: Record<string, string> = { approve: 'Approved', change: 'Changes requested', [SCREENS_ONLY]: 'Screens reviewed' };
+
+/** Saves a design answer with screen-specific notes and an optional listed direction pick. A screen save omits the verdict: the design keeps its saved verdict, or waits as screens-only when it has none. */
 export function appendDesignAnswer(decisionsPath: string, d: Decision, verdict: unknown, notes: unknown, pick?: unknown): Answer | undefined {
   const bad = (rule: string) => new InputError(`key ${d.key}: ${rule}`);
-  if (verdict !== 'approve' && verdict !== 'change') throw bad('verdict must be approve or change');
+  if (verdict !== undefined && verdict !== 'approve' && verdict !== 'change') throw bad('verdict must be approve or change, or omitted to save a screen');
   if (!Array.isArray(notes) || (verdict === 'change' && !notes.length)) throw bad('notes must be a list, with at least one note on change');
+  if (verdict === undefined && !notes.some(n => n?.journey !== undefined)) throw bad('a screen save names its screen');
   const screens = new Set((d.journeys ?? []).flatMap(j => j.screens.map(s => `${j.id}/${s.id}`)));
   for (const n of notes) {
     const hasJourney = n?.journey !== undefined, hasScreen = n?.screen !== undefined;
@@ -298,8 +305,9 @@ export function appendDesignAnswer(decisionsPath: string, d: Decision, verdict: 
   if (new Set(notes.map(n => n.journey === undefined ? '' : `${n.journey}/${n.screen}`)).size !== notes.length) throw bad('notes must name each screen once, or contain one design-level note');
   const options = d.options ?? [];
   if (options.length ? !options.some(o => o.value === pick) : pick !== undefined) throw bad('pick must be one listed option, or omitted when no options were offered');
-  const answer: Answer = { key: d.key, answer: verdict, label: verdict === 'approve' ? 'Approved' : 'Changes requested', close: d.close ?? 'done', at: now(), notes, ...(pick !== undefined && { pick: pick as string }) };
   const current = readAnswers(decisionsPath)[d.key];
+  const kept = (verdict ?? (current?.answer === 'approve' || current?.answer === 'change' ? current.answer : SCREENS_ONLY)) as string;
+  const answer: Answer = { key: d.key, answer: kept, label: DESIGN_LABEL[kept], close: d.close ?? 'done', at: now(), notes, ...(pick !== undefined && { pick: pick as string }) };
   if (current?.answer === answer.answer && JSON.stringify([current.notes, current.pick]) === JSON.stringify([answer.notes, answer.pick])) return;
   appendLine(answersPath(decisionsPath), answer);
   return answer;

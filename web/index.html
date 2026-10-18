@@ -976,7 +976,8 @@
     you: 'M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4.5 20.5c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5' };
   // The drawings are fixed strings from this page, never text from the board file.
   const icon = (a) => { const s = el('span', { class: `icon i-${a}`, 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[a]}"/></svg>`; return s; };
-  const isAnswered = (d) => Object.hasOwn(state.answers, d.key);
+  // A design with only screen notes (answer 'screens') still waits for its design-wide verdict.
+  const isAnswered = (d) => Object.hasOwn(state.answers, d.key) && state.answers[d.key].answer !== 'screens';
   /** Each item lives in one area: answered items, then the area the item names, then evidence updates, then what is only to read (explainers, pages with nothing to answer), then the open asks.
    *  A plan has no options but waits for its send-back. */
   const area = (d) => {
@@ -1267,10 +1268,11 @@
     let saving = false;
     const save = (verdict) => {
       if (d.options?.length && !pick.value) { err.textContent = 'Choose a direction before sending your review.'; pick.focus(); return Promise.resolve(); }
-      const selected = target(), text = note.value.trim(), notes = (state.answers[d.key]?.notes ?? []).filter((n) => n.journey !== selected?.journey.id || n.screen !== selected?.screen.id);
-      if (selected && session.open || text) notes.push({ ...(selected && { journey: selected.journey.id, screen: selected.screen.id, ...(session.open && { verdict }) }), note: text });
+      // A screen save (the viewer) sends its screen verdict only: the design-wide verdict stays as it is.
+      const screen = session.open, selected = target(), text = note.value.trim(), notes = (state.answers[d.key]?.notes ?? []).filter((n) => n.journey !== selected?.journey.id || n.screen !== selected?.screen.id);
+      if (selected && screen || text) notes.push({ ...(selected && { journey: selected.journey.id, screen: selected.screen.id, ...(screen && { verdict }) }), note: text });
       saving = true; approve.disabled = change.disabled = true;
-      return call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, verdict,
+      return call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, ...(!screen && { verdict }),
         notes, ...(pick.value && { pick: pick.value }) }) }, () => session.drafts.delete(screenKey(selected)))
         .finally(() => { saving = false; approve.disabled = change.disabled = state.readonly || !!state.answers_only; });
     };
