@@ -1058,9 +1058,12 @@ const outcomesOf = (values: Record<string, any>) => {
 /** Whoever lists the choices names the one they would pick: the board puts it first and marks it. A plain yes/no may leave it out,
  * and a program feeding a whole board with --replace is not held to it. */
 function recommended(items: any[], flags: boolean) {
-  const d = items.find((i) => i?.options?.length && i.recommend_value === undefined), values = d?.options.map((o: Option) => o.value).join(', ');
+  const d = items.find((i) => i?.options?.length && (flags || i.type !== 'design' && i.kind !== 'design' ? i.recommend_value === undefined : i.recommend === undefined)), values = d?.options.map((o: Option) => o.value).join(', ');
   if (d && flags) throw fail('--recommend is required when you list options', 'VALIDATION_ERROR', `Add --recommend <value>, the option you would pick: one of ${values}`);
-  if (d) throw fail(`items[${items.indexOf(d)}] (key ${d.key}) lists options but no recommend_value`, 'VALIDATION_ERROR', `Add "recommend_value": "<value>", the option you would pick: one of ${values}`);
+  if (d) {
+    const field = !flags && (d.type === 'design' || d.kind === 'design') ? 'recommend' : 'recommend_value';
+    throw fail(`items[${items.indexOf(d)}] (key ${d.key}) lists options but no ${field}`, 'VALIDATION_ERROR', `Add "${field}": "<value>", the option you would pick: one of ${values}`);
+  }
 }
 /** Flags are validated by the same loader as a file: write them as a one-decision file first. Items are checked against the board they go to, so its answers_only or readonly holds. */
 function buildIncoming(values: Record<string, any>, extra: object, filer: string | undefined, file: string): { incoming: Decision[]; raw: object[] } {
@@ -1070,7 +1073,7 @@ function buildIncoming(values: Record<string, any>, extra: object, filer: string
     const source = resolve(values.from), raw = readItems(source).items;
     contractItems(raw, values.from, file);
     const incoming = loadDecisions(source, board);
-    recommended(incoming, false);
+    recommended(raw, false);
     return { incoming: incoming.map((d) => ({ filer, ...d })), raw: raw.map((i) => ({ filer, ...i })) };
   }
   const scratch = mkdtempSync(join(tmpdir(), 'sign-off-'));
