@@ -132,10 +132,14 @@ A run held for the person's approval. Shows in Waiting on you.
 A set of design journeys and screen views for review. It waits for the reviewer to approve or request changes.
 
 - Required: the common fields, `about`, `group` (project name, text 1-40), `filed` (real UTC date-time with seconds), `status` (`draft` or `in_review`), `preview` (relative `.png`, `.jpg`, `.jpeg` or `.webp` path), and `journeys`.
-- `journeys`: 1-40 objects with unique lowercase slug `id`, `title` (text 1-120), and 1-80 `screens`. Each screen has a lowercase slug `id`, `title` (text 1-120), and `views`, a nonempty map of `phone_light`, `phone_dark`, `computer_light` or `computer_dark` to a relative `.png`, `.jpg`, `.jpeg`, `.webp` or `.html` path.
-- Every preview and view must exist inside the board folder when posted, be readable and no larger than 5 MB. HTML views are served in the board's sandbox with point annotations enabled.
+- `journeys`: 1-40 objects with unique lowercase slug `id`, `title` (text 1-120), and 1-80 `screens`.
+- Each screen has a lowercase slug `id`, `title` (text 1-120), and `views`, a nonempty map of `phone_light`, `phone_dark`, `computer_light` or `computer_dark` to a relative `.png`, `.jpg`, `.jpeg`, `.webp` or `.html` path.
+- Every preview and view must exist inside the board folder when posted, be readable and no larger than 5 MB.
+- HTML views are served in the board's sandbox with point annotations enabled.
 - Optional `options` (2-6 `{value,label}` choices) and `recommend` (one option value) let the reviewer pick a direction.
-- The answer is `{verdict:"approve"|"change",pick?,notes:[{journey,screen,note}]}`. A change needs at least one note; each note names an existing screen and gives text of 500 characters or fewer. Approval sets the displayed status to `approved`.
+- The answer is `{verdict:"approve"|"change",pick?,notes:[{journey,screen,note}]}`.
+- A change needs at least one note; each note names an existing screen and gives text of 500 characters or fewer.
+- Approval sets the displayed status to `approved`.
 
 ### finding, schema 1
 

@@ -52,6 +52,9 @@ test('design review posts journeys and returns change notes through answers --js
     assert.equal((await answer({ verdict: 'change', notes: [{ journey: 'onboarding', screen: 'welcome', note: 'Make the button clearer.' }] })).status, 200);
     const got = JSON.parse(run('answers', board, '--json').stdout)[msg.key];
     assert.deepEqual([got.answer, got.notes], ['change', [{ journey: 'onboarding', screen: 'welcome', note: 'Make the button clearer.' }]]);
+    assert.equal(JSON.parse(run('wait', board, '--key', msg.key, '--json', '--timeout', '0').stdout)[msg.key].answer, 'change');
+    const approved = await answer({ verdict: 'approve', notes: [] });
+    assert.equal((await approved.json()).decisions.find(d => d.key === msg.key).status, 'approved');
   } finally { proc.kill(); }
 });
 
