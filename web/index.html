@@ -502,7 +502,7 @@
   }
   const canDismiss = () => !state.readonly && !FROZEN;
   function xBtn(d, label) {
-    if (!canDismiss()) return '';
+    if (!canDismiss() || d.type === 'plan') return '';
     const b = el('button', { class: label ? 'dis' : 'x', 'aria-label': `Dismiss, ${title(d)}` }, label ?? '×');
     b.onclick = () => dismiss([d.key], area(d) === 'waiting' ? 'Dismissed · the agent still waits' : `Dismissed: ${title(d)}`);
     return b;
@@ -1099,7 +1099,7 @@
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [el('div', { class: 'tiles' }, ...Object.keys(AREAS).map((a) => tile(a, by[a]))),
       el('div', { class: 'pair' }, needs, today(by.answered)), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()]),
       el('div', { class: 'areas' }, ...Object.keys(AREAS).map((a) => section(a, by[a])))]));
-    readPage(key ? state.decisions.find((d) => d.key === key && reads(d) && !gone.has(d.key) && area(d) === at) : undefined, at);
+    readPage(key ? state.decisions.find((d) => d.key === key && reads(d) && !gone.has(d.key) && (at === 'reports' || (d.type === 'plan' && area(d) === at))) : undefined, at);
     if (FROZEN) freeze();
   }
   function freeze() {

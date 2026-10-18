@@ -1013,6 +1013,8 @@ test('Waiting on you: a type label on each ask, type chips with counts, and the 
   assert.equal(await evaluate('document.querySelector(".focus .eyebrow").textContent + "|" + document.querySelector(".focus .plan .meta").textContent'), 'Plan|5 sections · 2 decisions');
   // On a 390 px phone the title and Open plan fit with nothing to scroll sideways.
   assert.equal(await evaluate('document.documentElement.scrollWidth <= 390 && document.querySelector(".focus .open-link").getBoundingClientRect().right <= 390'), true);
+  // A plan waits until it is sent back, so it has no Dismiss on its card or in Triage.
+  assert.equal(await evaluate('!document.querySelector("#board .plan .x, #board .plan .dis, #board .quiet .dis")'), true);
   await evaluate('document.querySelector(".focus .open-link").click()');
   await until(async () => (await evaluate('location.hash + "|" + document.querySelector("#reader iframe")?.title')) === '#waiting/plan-kind-board|Plan: Show plans on the board');
   const view = await evaluate('fetch(document.querySelector("#reader iframe").src).then(async (r) => [r.headers.get("content-security-policy"), await r.text()])');
