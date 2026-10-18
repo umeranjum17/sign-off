@@ -1927,7 +1927,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   }
   // A plan's answer is its one send-back: every section's verdict and note, and a pick for each decision.
   if (d.type === 'plan') {
-    try { answered(appendSendBack(file, d, notes, decisions), d); } catch (e) { if (e instanceof InputError) return [400, { error: e.message }]; throw e; }
+    try { answered(appendSendBack(file, d, notes, decisions, note), d); } catch (e) { if (e instanceof InputError) return [400, { error: e.message }]; throw e; }
     return [200, state()];
   }
   // Every item that asks something takes an Other answer: the words, saved as the answer `text`, unless an option is named text.

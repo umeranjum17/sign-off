@@ -74,13 +74,17 @@ try {
   drive('await wait(".plan-section"); await page.eval(() => document.querySelector(".plan-next").click());');
   if (process.env.PLAN_REVIEW_TRACE) browser('perf-start', '--no-reload', '--no-auto-stop', '--file', join(out, 'interaction.trace.json.gz'));
   drive('await page.eval(() => document.querySelector(".plan-verdicts .approve").click());');
-  capture('approved', 'The first section is marked Approved with a selected Approve button.');
+  drive('await page.eval(() => { const t = document.querySelector("#plan-note-goals"); t.value = "Start with the phone layout."; t.dispatchEvent(new Event("input", { bubbles: true })); });');
+  capture('approved', 'The first section is marked Approved with a selected Approve button and the comment Start with the phone layout.');
   drive('await page.eval(() => document.querySelector(".plan-next").click()); await page.eval(() => document.querySelector(".plan-section:nth-of-type(2) .change").click());');
-  const noteRef = /uid=(\S+) textbox/.exec(browser('snapshot'))[1];
-  browser('fill', `@${noteRef}`, 'Keep the desktop layout too.');
+  drive('await page.eval(() => { const t = document.querySelector("#plan-note-architecture"); t.value = "Keep the desktop layout too."; t.dispatchEvent(new Event("input", { bubbles: true })); });');
   capture('note', 'The second section is marked Change with the note Keep the desktop layout too.');
-  drive('await page.eval(() => document.querySelector(".plan-next").click()); await page.eval(() => document.querySelector(".plan-decision .choices button").click());');
-  capture('decision', 'A decision is picked, Recommended and its outcome are visible, and Send back is enabled.');
+  drive('await page.eval(() => document.querySelector(".plan-next").click());');
+  drive('await page.eval(() => { const t = document.querySelector("#plan-other-send-back"); t.value = "Neither: decide it in the review."; t.dispatchEvent(new Event("input", { bubbles: true })); });');
+  capture('decision', 'A decision has an Other answer Neither: decide it in the review, no option is picked, and Send back is enabled.');
+  drive('await page.eval(() => document.querySelector("#plan-comment").scrollIntoView({ block: "center" }));');
+  drive('await page.eval(() => { const t = document.querySelector("#plan-comment"); t.value = "Overall: start with slice 1."; t.dispatchEvent(new Event("input", { bubbles: true })); });');
+  capture('comment', 'The whole-plan comment Overall: start with slice 1 is filled and Send back is enabled.');
   drive(`await page.eval(() => document.querySelector('.plan-explain').scrollIntoView()); await page.eval(() => document.querySelector('[aria-label="Next step"]').click());`);
   capture('explain', 'The step explainer shows step 2 and Previous and Next controls.');
   drive('await page.eval(() => document.querySelector(".plan-send .open-link").click()); await wait(".plan-sent");');
@@ -90,8 +94,11 @@ try {
     assert.ok(existsSync(join(out, 'interaction.trace.json.gz')));
   }
   const answers = cli('answers', board, '--json'), answer = JSON.parse(answers)[plan.key];
-  assert.deepEqual(answer.notes, [{ section: plan.sections[0].id, verdict: 'approve' }, { section: plan.sections[1].id, verdict: 'change', note: 'Keep the desktop layout too.' }]);
-  assert.equal(answer.decisions[plan.decisions[0].key], plan.decisions[0].options[0].value);
+  assert.deepEqual(answer.notes, [{ section: plan.sections[0].id, verdict: 'approve', note: 'Start with the phone layout.' }, { section: plan.sections[1].id, verdict: 'change', note: 'Keep the desktop layout too.' }]);
+  assert.equal(answer.decisions[plan.decisions[0].key], 'Neither: decide it in the review.');
+  assert.equal(answer.note, 'Overall: start with slice 1.');
+  const waitedBack = JSON.parse(cli('wait', board, '--key', plan.key, '--json', '--timeout', '0'))[plan.key];
+  assert.deepEqual([waitedBack.note, waitedBack.notes, waitedBack.decisions], [answer.note, answer.notes, answer.decisions]);
   const waited = cli('wait', board, '--filer', plan.filer, '--json', '--timeout', '0');
   if (!process.env.PLAN_REVIEW_STAGE || process.env.PLAN_REVIEW_STAGE === 'sent') {
     writeFileSync(join(records, 'answers.json'), answers); writeFileSync(join(records, 'wait.json'), waited);

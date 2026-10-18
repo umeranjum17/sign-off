@@ -281,7 +281,7 @@ function saveAnswer(decisionsPath: string, d: Decision, option: Option, note: st
   return answer;
 }
 
-/** Saves a plan's one send-back as its answer: each section approved or changed (a change says what to change), and one option per decision. An identical send-back again saves nothing. */
+/** Saves a design answer with screen-specific notes and an optional listed direction pick. */
 export function appendDesignAnswer(decisionsPath: string, d: Decision, verdict: unknown, notes: unknown, pick?: unknown): Answer | undefined {
   const bad = (rule: string) => new InputError(`key ${d.key}: ${rule}`);
   if (verdict !== 'approve' && verdict !== 'change') throw bad('verdict must be approve or change');
@@ -298,7 +298,10 @@ export function appendDesignAnswer(decisionsPath: string, d: Decision, verdict: 
   return answer;
 }
 
-export function appendSendBack(decisionsPath: string, d: Decision, notes: unknown, picks: unknown = {}): Answer | undefined {
+/** Saves a plan's one send-back as its answer: each section approved or changed (a change says what to change, an approval may carry a comment),
+ * one answer per decision (a listed option value, or the person's own words when none fits), and an optional whole-plan comment.
+ * An identical send-back again saves nothing. */
+export function appendSendBack(decisionsPath: string, d: Decision, notes: unknown, picks: unknown = {}, comment: unknown = ''): Answer | undefined {
   const bad = (rule: string) => new InputError(`key ${d.key}: ${rule}`), ids = d.sections!.map((s) => s.id), keys = d.decisions!.map((q) => q.key);
   if (!Array.isArray(notes) || notes.length !== ids.length || !ids.every((id) => notes.filter((n) => n?.section === id).length === 1)) throw bad(`notes must list each section once: ${ids.join(', ')}`);
   for (const { section, verdict, note } of notes) {
@@ -307,13 +310,16 @@ export function appendSendBack(decisionsPath: string, d: Decision, notes: unknow
     if (verdict === 'change' && !note?.trim()) throw bad(`section ${section} needs a note on what to change`);
   }
   const p = picks as Record<string, unknown>;
-  if (!p || typeof p !== 'object' || Array.isArray(p) || Object.keys(p).length !== keys.length || !d.decisions!.every((q) => q.options.some((o) => o.value === p[q.key]))) {
-    throw bad(`decisions must pick one listed option for each of: ${keys.join(', ') || 'none'}`);
+  if (!p || typeof p !== 'object' || Array.isArray(p) || Object.keys(p).length !== keys.length || !d.decisions!.every((q) =>
+    isText(p[q.key]) && (p[q.key] as string).trim() && [...(p[q.key] as string).trim()].length <= NOTE_MAX)) {
+    throw bad(`decisions must answer each of: ${keys.join(', ') || 'none'}, with an option or your own words of ${NOTE_MAX} characters or fewer`);
   }
-  const answer: Answer = { key: d.key, answer: 'sent', label: 'Sent back', close: d.close, at: now(),
-    notes: ids.map((id) => notes.find((n) => n.section === id)).map(({ section, verdict, note }) => ({ section, verdict, ...(note?.trim() && { note: note.trim() }) })), decisions: Object.fromEntries(keys.map((k) => [k, p[k] as string])) };
+  if (comment !== '' && comment !== undefined && (!isText(comment) || [...(comment as string).trim()].length > NOTE_MAX)) throw bad(`comment must be text of ${NOTE_MAX} characters or fewer`);
+  const note = typeof comment === 'string' ? comment.trim() : '';
+  const answer: Answer = { key: d.key, answer: 'sent', label: 'Sent back', close: d.close, at: now(), ...(note && { note }),
+    notes: ids.map((id) => notes.find((n) => n.section === id)).map(({ section, verdict, note }) => ({ section, verdict, ...(note?.trim() && { note: note.trim() }) })), decisions: Object.fromEntries(keys.map((k) => [k, (p[k] as string).trim()])) };
   const current = readAnswers(decisionsPath)[d.key];
-  if (current?.answer === answer.answer && JSON.stringify([current.notes, current.decisions]) === JSON.stringify([answer.notes, answer.decisions])) return;
+  if (current?.answer === answer.answer && JSON.stringify([current.note ?? '', current.notes, current.decisions]) === JSON.stringify([answer.note ?? '', answer.notes, answer.decisions])) return;
   appendLine(answersPath(decisionsPath), answer);
   return answer;
 }

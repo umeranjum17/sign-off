@@ -242,7 +242,7 @@ test('a plan: validate checks each rule with one fix line; post stores it, it wa
     assert.equal((await fetch(`${url}favicon.ico`)).status, 204);
     const send = (body) => fetch(`${url}api/answers`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: plan.key, ...body }) });
     for (const [body, error] of [[{ notes: approve.slice(1), decisions }, /notes must list each section once: goals, architecture/], [{ notes: [{ section: 'goals', verdict: 'change' }, ...approve.slice(1)], decisions }, /section goals needs a note/],
-      [{ notes, decisions: { 'send-back': 'one' } }, /decisions must pick one listed option for each of: send-back, where/], [{ notes, decisions: { ...decisions, where: 'maybe' } }, /decisions must pick/]]) {
+      [{ notes, decisions: { 'send-back': 'one' } }, /decisions must answer each of: send-back, where/], [{ notes, decisions: { ...decisions, where: '' } }, /decisions must answer/]]) {
       const refused = await send(body);
       assert.equal(refused.status, 400);
       assert.match((await refused.json()).error, error);
@@ -267,6 +267,39 @@ test('a plan: validate checks each rule with one fix line; post stores it, it wa
   }
   const events = run('wait', board, '--filer', 'agent-41', '--events', '--timeout', '0').stdout.trim().split('\n').map((l) => JSON.parse(l));
   assert.deepEqual(events.map(({ event, kind, key, notes: n, decisions: p }) => [event, kind, key, n, p]), [['answer', 'plan', plan.key, notes, { 'send-back': 'one', where: 'own' }]]);
+});
+
+test('a plan send-back takes an Other decision answer, a comment on an approval and a whole-plan comment', async () => {
+  const plan = JSON.parse(readFileSync(join(fixtures, 'plan.v1', 'valid-full.json')));
+  const dir = join(scratch, 'plan-other'), board = join(dir, 'board.json'), env = { ...process.env, HOME: join(scratch, 'home') };
+  mkdirSync(join(dir, 'page'), { recursive: true });
+  writeFileSync(join(dir, 'page', 'index.html'), readFileSync(join(fixtures, 'plan.v1', 'page', 'index.html')));
+  writeFileSync(join(dir, 'plan.json'), JSON.stringify(plan));
+  assert.equal(spawnSync('node', [cli, 'post', board, '--kind', 'plan', '--from', join(dir, 'plan.json')], { encoding: 'utf8', env }).status, 0);
+  const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: tmpdir(), env });
+  try {
+    const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+    const send = (body) => fetch(`${url}api/answers`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: plan.key, ...body }) });
+    const notes = plan.sections.map(({ id }, n) => (n ? { section: id, verdict: 'approve' } : { section: id, verdict: 'approve', note: 'Fine as is.' }));
+    const decisions = Object.fromEntries(plan.decisions.map((q, n) => [q.key, n ? q.options[0].value : 'Neither: decide it in the review.']));
+    const over = 'x'.repeat(501);
+    for (const body of [{ notes, decisions: { ...decisions, where: '' } }, { notes, decisions: { ...decisions, where: over } },
+      { notes, decisions, note: over },
+      { notes: notes.map((n) => ({ ...n, verdict: 'maybe' })), decisions }]) {
+      const refused = await send(body);
+      assert.equal(refused.status, 400);
+    }
+    assert.equal((await send({ notes, decisions, note: 'Overall: start with slice 1.' })).status, 200);
+    const answer = JSON.parse(spawnSync('node', [cli, 'answers', board, '--key', plan.key, '--json'], { encoding: 'utf8', env }).stdout)[plan.key];
+    assert.deepEqual([answer.answer, answer.note, answer.notes, answer.decisions], ['sent', 'Overall: start with slice 1.', notes, decisions]);
+    const waited = JSON.parse(spawnSync('node', [cli, 'wait', board, '--key', plan.key, '--json', '--timeout', '0'], { encoding: 'utf8', env }).stdout)[plan.key];
+    assert.deepEqual([waited.answer, waited.note, waited.notes, waited.decisions], ['sent', 'Overall: start with slice 1.', notes, decisions]);
+    const events = spawnSync('node', [cli, 'wait', board, '--filer', plan.filer, '--events', '--timeout', '0'], { encoding: 'utf8', env }).stdout.trim().split('\n').map((l) => JSON.parse(l));
+    assert.deepEqual(events.map(({ event, kind, key, note, notes: n, decisions: p }) => [event, kind, key, note, n, p]),
+      [['answer', 'plan', plan.key, 'Overall: start with slice 1.', notes, decisions]]);
+  } finally {
+    await new Promise((ok) => proc.once('exit', ok).kill());
+  }
 });
 
 test('a plan view is held to the report page rules at post: a page a phone cannot read is refused', () => {
