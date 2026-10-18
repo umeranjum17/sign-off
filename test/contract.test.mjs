@@ -40,6 +40,9 @@ test('design review posts journeys and returns change notes through answers --js
   const run = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
   const source = message('design-message.json', JSON.stringify(msg)), posted = run('post', board, '--kind', 'design', '--from', source);
   assert.equal(posted.status, 0, posted.stdout + posted.stderr);
+  const duplicateScreen = { ...msg, key: 'duplicate-screen', journeys: [{ ...msg.journeys[0], screens: [msg.journeys[0].screens[0], msg.journeys[0].screens[0]] }] };
+  const duplicate = run('post', board, '--kind', 'design', '--from', message('duplicate-screen.json', JSON.stringify(duplicateScreen)));
+  assert.equal(duplicate.status, 2); assert.match(duplicate.stdout, /journeys\[0\]\.screens\[1\]\.id.*repeats welcome/);
   assert.match(run('list', board).stdout, /chat-journeys/);
   const outside = join(scratch, 'outside-design.png'); writeFileSync(outside, 'image'); symlinkSync(outside, join(dir, 'design', 'escape.png'));
   const escaped = run('post', board, '--kind', 'design', '--from', message('escaped-design.json', JSON.stringify({ ...msg, key: 'escaped-design', journeys: [{ ...msg.journeys[0], screens: [{ ...msg.journeys[0].screens[0], views: { phone_light: 'design/escape.png' } }] }] })));

@@ -210,10 +210,12 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
       if (ids.includes(j.id)) throw bad(`journeys[${n}].id`, `repeats ${j.id}`, 'Give each journey its own id'); ids.push(j.id);
       text(`journeys[${n}].title`, j.title, 120, 'the journey title');
       if (!Array.isArray(j.screens) || !j.screens.length || j.screens.length > 80) throw bad(`journeys[${n}].screens`, 'must list 1 to 80 screens', 'Add at least one screen with a view');
+      const screenIds: string[] = [];
       j.screens.forEach((s: any, k: number) => {
         const p = `journeys[${n}].screens[${k}]`;
         if (!s || typeof s !== 'object' || Array.isArray(s) || Object.keys(s).some(x => !['id','title','views'].includes(x))) throw bad(p, 'must have only id, title and views', 'Use {"id":"welcome","title":"Welcome","views":{...}}');
         if (typeof s.id !== 'string' || !/^[a-z0-9-]{1,40}$/.test(s.id)) throw bad(`${p}.id`, 'must be a short lowercase id', 'Set it to a slug such as "welcome"');
+        if (screenIds.includes(s.id)) throw bad(`${p}.id`, `repeats ${s.id}`, 'Give each screen its own id'); screenIds.push(s.id);
         text(`${p}.title`, s.title, 120, 'the screen title');
         const views = s.views, variants = ['phone_light','phone_dark','computer_light','computer_dark'];
         if (!views || typeof views !== 'object' || Array.isArray(views) || Object.keys(views).some(v => !variants.includes(v)) || !Object.keys(views).length) throw bad(`${p}.views`, 'must map at least one supported view to a path', 'Add a phone_light, phone_dark, computer_light or computer_dark path');
