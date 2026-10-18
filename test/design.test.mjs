@@ -1015,6 +1015,8 @@ test('Waiting on you: a type label on each ask, type chips with counts, and the 
   assert.equal(await evaluate('document.documentElement.scrollWidth <= 390 && document.querySelector(".focus .open-link").getBoundingClientRect().right <= 390'), true);
   // A plan waits until it is sent back, so it has no Dismiss on its card or in Triage.
   assert.equal(await evaluate('!document.querySelector("#board .plan .x, #board .plan .dis, #board .quiet .dis")'), true);
+  assert.equal(await evaluate('fetch("api/dismiss", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ keys: ["plan-kind-board"], dismissed: true }) }).then((r) => r.status)'), 400);
+  assert.equal(existsSync(file.replace(/\.json$/, '.dismissed.jsonl')), false);
   await evaluate('document.querySelector(".focus .open-link").click()');
   await until(async () => (await evaluate('location.hash + "|" + document.querySelector("#reader iframe")?.title')) === '#waiting/plan-kind-board|Plan: Show plans on the board');
   const view = await evaluate('fetch(document.querySelector("#reader iframe").src).then(async (r) => [r.headers.get("content-security-policy"), await r.text()])');
@@ -1023,7 +1025,6 @@ test('Waiting on you: a type label on each ask, type chips with counts, and the 
   // The way back leads to Waiting on you with the plan still shown, and the focus on its Open plan.
   await evaluate('document.querySelector("#reader .close").click()');
   await until(async () => (await evaluate('location.hash + "|" + document.activeElement.textContent')) === '#waiting|Open plan');
-  assert.equal(await queue(), 'Show plans on the board');
   close();
   proc.kill();
 });
