@@ -172,6 +172,8 @@
   .plan-section label { display: grid; gap: 0.5rem; margin-top: 1rem; color: var(--muted); }
   .plan-section label[hidden] { display: none; }
   .plan-section textarea { width: 100%; min-height: 7rem; padding: 0.75rem; background: var(--sunk); }
+.plan-decision label { display: grid; gap: 0.5rem; margin-top: 0.75rem; color: var(--muted); }
+.plan-decision textarea { width: 100%; min-height: 4rem; padding: 0.75rem; background: var(--sunk); }
   .plan-decision .choices { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.625rem; }
   .plan-decision .choices button { text-align: left; border-radius: 0.875rem; padding: 0.875rem; gap: 0.25rem; }
   .plan-decision .choices button .tag { margin: 0; text-transform: none; letter-spacing: normal; color: var(--accent); }
@@ -1072,18 +1074,20 @@
     let draft;
     try { draft = JSON.parse(drafts.get(draftKey) ?? '{}'); } catch { draft = {}; }
     const notes = new Map((saved?.notes ?? draft.notes ?? []).filter((n) => d.sections.some((s) => s.id === n.section)).map((n) => [n.section, n]));
-    const picks = new Map(Object.entries(saved?.decisions ?? draft.decisions ?? {}).filter(([key, value]) => d.decisions.some((q) => q.key === key && q.options.some((o) => o.value === value))));
-    const remember = () => { drafts.set(draftKey, JSON.stringify({ notes: [...notes.values()], decisions: Object.fromEntries(picks) })); keep(); };
+    const picks = new Map(Object.entries(saved?.decisions ?? draft.decisions ?? {}).filter(([key, value]) => d.decisions.some((q) => q.key === key) && typeof value === 'string' && value.trim()));
+    let comment = saved?.note ?? (typeof draft.comment === 'string' ? draft.comment : '');
+    const answered = (q) => typeof picks.get(q.key) === 'string' && !!picks.get(q.key).trim();
+    const remember = () => { drafts.set(draftKey, JSON.stringify({ notes: [...notes.values()], decisions: Object.fromEntries(picks), ...(comment.trim() && { comment }) })); keep(); };
     const main = el('div', { class: 'plan-main' }), panel = el('aside', { class: 'plan-send' });
     const status = el('p', { role: 'status' }), err = el('p', { class: 'err', role: 'alert' }), progress = el('div', { class: 'plan-progress' });
     const send = el('button', { class: 'open-link' }, 'Send back'), next = el('button', { class: 'plan-next' }, 'Go to next');
     const complete = (s) => { const n = notes.get(s.id); return n?.verdict === 'approve' || (n?.verdict === 'change' && n.note?.trim()); };
     next.onclick = () => {
-      const section = d.sections.find((s) => !complete(s)), decision = d.decisions.find((q) => !q.options.some((o) => o.value === picks.get(q.key)));
+      const section = d.sections.find((s) => !complete(s)), decision = d.decisions.find((q) => !answered(q));
       document.getElementById(section ? `plan-section-${section.id}` : `plan-decision-${decision?.key}`)?.scrollIntoView({ block: 'start' });
     };
     const update = () => {
-      const left = d.sections.filter((s) => !complete(s)).length, decisions = d.decisions.filter((q) => !q.options.some((o) => o.value === picks.get(q.key))).length;
+      const left = d.sections.filter((s) => !complete(s)).length, decisions = d.decisions.filter((q) => !answered(q)).length;
       status.textContent = saved ? 'Sent back. Your answers are saved.' : left || decisions ? `${left} section${left === 1 ? '' : 's'} and ${decisions} decision${decisions === 1 ? '' : 's'} left` : 'Ready. Every part has an answer.';
       send.disabled = ro || !!left || !!decisions;
       next.hidden = !left && !decisions;
@@ -1094,12 +1098,13 @@
     };
     if (saved) {
       main.append(el('div', { class: 'plan-sent', role: 'status' }, icon('answered'), el('h2', {}, 'Sent back'), el('p', {}, 'Your section notes and decisions are saved for the agent.'),
-        el('a', { class: 'back', href: '#answered' }, 'See it in Answered')));
+        el('a', { class: 'back', href: '#answered' }, 'See it in Answered'),
+        saved.note ? el('p', { dir: 'auto' }, `Your whole-plan comment: ${saved.note}`) : ''));
     }
     main.append(el('p', { class: 'eyebrow' }, icon('plan'), 'Plan'), el('h2', { dir: 'auto' }, d.title), el('p', { dir: 'auto' }, d.about ?? ''));
     if (!saved) main.append(el('iframe', { class: 'plan-view', src: url, title: `Plan: ${d.title}`, sandbox: 'allow-scripts' }),
       el('p', { class: 'plan-summary' }, icon('plan'), `${d.sections.length} sections to approve or change, and ${d.decisions.length} decisions to make. Nothing is built until you send back.`));
-    main.append(el('h2', {}, saved ? 'What you sent' : 'The plan'), saved ? '' : el('p', { class: 'meta' }, 'Approve or change each part. A change needs a note.'));
+    main.append(el('h2', {}, saved ? 'What you sent' : 'The plan'), saved ? '' : el('p', { class: 'meta' }, 'Approve or change each part. A change needs a note, an approval can carry a comment, and a decision takes an option or your own words.'));
     d.sections.forEach((s, i) => {
       const card = el('section', { class: 'plan-section', id: `plan-section-${s.id}`, 'aria-label': s.heading });
       const approve = el('button', { class: 'approve', 'aria-label': `Approve, ${s.heading}` }, 'Approve');
@@ -1107,7 +1112,8 @@
       const field = el('textarea', { id: `plan-note-${s.id}`, maxlength: '500', placeholder: 'Write your note for the agent' });
       field.value = notes.get(s.id)?.note ?? '';
       field.disabled = ro;
-      const note = el('label', { for: field.id }, `What should change in ${s.heading.toLowerCase()}?`, field);
+      const caption = el('span', {}, '');
+      const note = el('label', { for: field.id }, caption, field);
       const draw = () => {
         const verdict = notes.get(s.id)?.verdict;
         card.dataset.verdict = verdict ?? '';
@@ -1115,27 +1121,38 @@
         approve.textContent = verdict === 'approve' ? '✓ Approved' : 'Approve';
         change.setAttribute('aria-pressed', verdict === 'change');
         approve.disabled = change.disabled = ro;
-        note.hidden = verdict !== 'change';
+        caption.textContent = verdict === 'approve' ? `Comment for the agent on ${s.heading.toLowerCase()} (optional)` : `What should change in ${s.heading.toLowerCase()}?`;
+        note.hidden = !verdict && !field.value;
         update();
       };
       [approve, change].forEach((b, n) => b.onclick = () => {
-        notes.set(s.id, { section: s.id, verdict: n ? 'change' : 'approve', ...(n && { note: field.value }) });
+        notes.set(s.id, { section: s.id, verdict: n ? 'change' : 'approve', ...(field.value.trim() && { note: field.value }) });
         remember(); draw(); if (n) field.focus();
       });
-      field.oninput = () => { notes.set(s.id, { section: s.id, verdict: 'change', note: field.value }); remember(); update(); };
+      field.oninput = () => { notes.set(s.id, { section: s.id, verdict: notes.get(s.id)?.verdict ?? 'change', note: field.value }); remember(); draw(); };
       card.append(el('h3', { dir: 'auto' }, `${i + 1}. ${s.heading}`), el('p', { dir: 'auto' }, s.body), el('div', { class: 'plan-verdicts', role: 'group', 'aria-label': s.heading }, approve, change), note);
       main.append(card); draw();
     });
     if (d.decisions.length) main.append(el('h2', {}, 'Decisions for you'));
     d.decisions.forEach((q) => {
       const choices = el('div', { class: 'choices', role: 'group', 'aria-label': q.question });
+      const other = el('textarea', { id: `plan-other-${q.key}`, maxlength: '500', placeholder: 'Other: write your own answer' });
+      other.value = q.options.some((o) => o.value === picks.get(q.key)) ? '' : (picks.get(q.key) ?? '');
+      other.disabled = ro;
+      const press = () => [...choices.children].forEach((b, i) => b.setAttribute('aria-pressed', q.options[i].value === picks.get(q.key)));
+      other.oninput = () => {
+        if (other.value.trim()) picks.set(q.key, other.value);
+        else if (!q.options.some((o) => o.value === picks.get(q.key))) picks.delete(q.key);
+        remember(); press(); update();
+      };
       q.options.forEach((o) => {
         const b = el('button', { 'aria-pressed': picks.get(q.key) === o.value, ...(ro && { disabled: '' }) }, el('strong', {}, o.label),
           o.value === q.recommend ? el('span', { class: 'tag' }, 'Recommended') : '', el('span', { class: 'out', dir: 'auto' }, o.outcome));
-        b.onclick = () => { picks.set(q.key, o.value); remember(); [...choices.children].forEach((b, i) => b.setAttribute('aria-pressed', q.options[i].value === o.value)); update(); };
+        b.onclick = () => { picks.set(q.key, o.value); other.value = ''; remember(); press(); update(); };
         choices.append(b);
       });
-      main.append(el('section', { class: 'plan-decision', id: `plan-decision-${q.key}` }, el('h3', { dir: 'auto' }, q.question), el('p', { class: 'meta', dir: 'auto' }, q.why), choices));
+      main.append(el('section', { class: 'plan-decision', id: `plan-decision-${q.key}` }, el('h3', { dir: 'auto' }, q.question), el('p', { class: 'meta', dir: 'auto' }, q.why), choices,
+        el('label', { for: other.id }, 'Other (optional)', other)));
     });
     if (d.steps?.length && !saved) {
       let step = 0;
@@ -1144,10 +1161,16 @@
       prev.onclick = () => { step--; draw(); }; next.onclick = () => { step++; draw(); }; draw();
       main.append(el('section', { class: 'plan-explain' }, el('h3', {}, 'How it works'), text, el('div', { class: 'foot' }, prev, next), el('p', { class: 'meta' }, 'The direction page above explains these steps.')));
     }
+    const commentBox = el('textarea', { id: 'plan-comment', maxlength: '500', placeholder: 'Comment for the agent on the whole plan' });
+    commentBox.value = comment;
+    commentBox.disabled = ro;
+    commentBox.oninput = () => { comment = commentBox.value; remember(); };
+    if (!saved || saved.note) main.append(el('section', { class: 'plan-section', id: 'plan-comment-section', 'aria-label': 'Whole-plan comment' },
+      el('h3', {}, 'Whole-plan comment'), el('label', { for: commentBox.id }, 'Comment for the agent on the whole plan (optional)', commentBox)));
     send.onclick = () => {
       send.disabled = true; err.textContent = '';
-      call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key,
-        notes: d.sections.map((s) => notes.get(s.id)), decisions: Object.fromEntries(picks) }) }, () => {
+      call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, note: comment,
+        notes: d.sections.map((s) => notes.get(s.id)), decisions: Object.fromEntries([...picks].map(([k, v]) => [k, v.trim()])) }) }, () => {
         drafts.delete(draftKey); keep(); location.hash = `#answered/${d.key}`;
       }).catch((e) => { err.textContent = `Couldn't send back: ${e.message}`; update(); });
     };
