@@ -18,9 +18,9 @@ sed 's#"page/index.html"#"page/plan.html"#' "$f/plan.v1/valid-full.json" > "$dir
 so post "$board" --title "Keep the weekly digest?" --about "Open rate held steady at about a third for two months." --why "Open rate held steady for two months." --outcome yes="It keeps going out each week." --outcome no="It stops after this week." --recommend yes --recommend-reason "Readers still open it." --default yes
 so post "$board" --key ship --title "When should the new settings page ship?" --about "No new bug reports for three weeks." --why "No new bug reports for three weeks." \
   --option friday=Friday --option next-week="Next week" --outcome friday="The page ships Friday." --outcome next-week="The page ships next week." --recommend friday --recommend-reason "Three quiet weeks support shipping." --default next-week
-so post "$board" --type decision --key look --title "Which settings layout should ship?" --why "Choose the layout for the settings page." --option a="A: one column" --option b="B: two columns" \
-  --outcome a="The page uses one column." --outcome b="The page uses two columns." --recommend b --recommend-reason "B scans faster." --default b \
-  --mock a=mocks/a.webp --mock b=mocks/b.webp --tradeoff "B scans faster; A is simpler."
+# A design pick takes mocks and a tradeoff; the question standard (--why, --outcome) is for --type decision only.
+so post "$board" --type design --key look --title "Which settings layout should ship?" --option a="A: one column" --option b="B: two columns" \
+  --mock a=mocks/a.webp --mock b=mocks/b.webp --tradeoff "B scans faster; A is simpler." --recommend b
 so post "$board" --type signin --key npm --service "npm" --link https://example.com/login --unlocks "Publishing the release" --waits "Release agent" --expires 2h
 so post "$board" --kind plan --from "$dir/plan.json"
 so post "$board" --type evidence --title "Sign-in screen on a phone" --about "Umer checks the new layout." --media "$dir/shot.webp" --link https://example.com/pr/4
