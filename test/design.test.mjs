@@ -816,7 +816,9 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   assert.match(reports, /<span class="st new">New today<\/span><\/p><h3 dir="auto"><a href="#reports\/how">How it ships<\/a><\/h3>.*<span class="lbl">What it decided<\/span>Ships only when the check passes\./s);
   // Only the report is a card and counted; the text-only one is folded under Notes, a short row with no page to open.
   assert.deepEqual([...reports.matchAll(/<article class="card report[^"]*" id="item-(\w+)"/g)].map((m) => m[1]), ['how']);
-  assert.match(reports, /Reports and explainers<span class="n">1<\/span>/);
+  // The sidebar counts it under its short name; the phone's tab bar marks Reports as the area on screen and reads its count.
+  assert.match(reports, /<\/svg><\/span>Reports<span class="n">1<\/span>/);
+  assert.match(reports, /<a href="#reports" aria-label="Reports and explainers, 1" aria-current="page"><span class="icon i-reports" aria-hidden="true">.*?<\/span>Reports<\/a>/);
   assert.match(reports, /<details class="other notes"><summary>Notes \(1\)<\/summary>.*<strong dir="auto">Merged: the sign-in fix<\/strong>/s);
   // On a phone, a tap on the card opens the report over the whole board with the focus on its title; the board under it takes no taps.
   // ‹ Reports goes back to the card with the focus on its link, and Escape closes it too.
