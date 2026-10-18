@@ -1924,7 +1924,10 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     return [200, state()];
   }
   if (d.kind === 'design') {
-    try { answered(appendDesignAnswer(file, d, verdict, notes, pick), d); } catch (e) { if (e instanceof InputError) return [400, { error: e.message }]; throw e; }
+    try {
+      const before = readAnswers(file)[d.key]?.answer, a = appendDesignAnswer(file, d, verdict, notes, pick);
+      if (a && !awaitsVerdict(a) && (verdict !== undefined || a.answer !== before)) answered(a, d);
+    } catch (e) { if (e instanceof InputError) return [400, { error: e.message }]; throw e; }
     return [200, state()];
   }
   // A plan's answer is its one send-back: every section's verdict and note, and a pick for each decision.
