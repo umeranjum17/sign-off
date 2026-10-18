@@ -1027,9 +1027,23 @@ test('Waiting on you: a type label on each ask, type chips with counts, and the 
   // The way back leads to Waiting on you with the plan still shown, and the focus on its Open plan.
   await evaluate('document.querySelector("#reader .close").click()');
   await until(async () => (await evaluate('location.hash + "|" + document.activeElement.textContent')) === '#waiting|Open plan');
+  // Review through the real controls: a Change must have a note, drafts survive reload, and Send back returns every answer.
+  await evaluate('document.querySelector(".focus .open-link").click()');
+  await until(async () => await evaluate('!!document.querySelector(".plan-send .open-link:disabled")'));
+  await evaluate('document.querySelectorAll(".plan-verdicts .approve").forEach((b) => b.click()); document.querySelector(".plan-verdicts .change").click(); document.querySelectorAll(".plan-decision .choices").forEach((c) => c.querySelector("button").click())');
+  assert.equal(await evaluate('document.querySelector(".plan-send .open-link").disabled'), true);
+  await evaluate('(() => { const t = document.querySelector(".plan-section textarea"); t.value = "Keep the desktop layout too."; t.dispatchEvent(new Event("input")); })()');
+  await evaluate('location.reload()');
+  await until(async () => await evaluate('document.querySelector(".plan-section textarea")?.value === "Keep the desktop layout too."'));
+  assert.equal(await evaluate('document.querySelector(".plan-send .open-link").disabled'), false);
+  await evaluate('document.querySelector(".plan-send .open-link").click()');
+  await until(async () => await evaluate('!!document.querySelector(".plan-sent")'));
+  const sent = JSON.parse(run('answers', file, '--json').out)['plan-kind-board'];
+  assert.deepEqual(sent.notes[0], { section: 'goals', verdict: 'change', note: 'Keep the desktop layout too.' });
+  assert.deepEqual(sent.decisions, { 'send-back': 'one', where: 'waiting' });
+  assert.equal(sent.notes.slice(1).every((n) => n.verdict === 'approve'), true);
+  assert.equal(await evaluate('[...document.querySelectorAll(".plan-verdicts button, .plan-decision button")].every((b) => b.disabled)'), true);
   // Clear all done on Answered clears the answered ask and the sent-back plan too.
-  const sent = { notes: ['goals', 'architecture', 'slices', 'standards', 'risks'].map((section) => ({ section, verdict: 'approve' })), decisions: { 'send-back': 'one', where: 'waiting' } };
-  assert.equal(await evaluate(`fetch('api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: 'plan-kind-board', ...${JSON.stringify(sent)} }) }).then((r) => r.status)`), 200);
   assert.equal(await evaluate("fetch('api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: 'digest', answer: 'yes' }) }).then((r) => r.status)"), 200);
   assert.equal(await evaluate('fetch("api/dismiss", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ keys: ["plan-kind-board"], dismissed: true }) }).then((r) => r.status)'), 200);
   assert.equal(await evaluate('fetch("api/dismiss", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ keys: ["plan-kind-board"], dismissed: false }) }).then((r) => r.status)'), 200);

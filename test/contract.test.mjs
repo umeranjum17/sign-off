@@ -205,6 +205,9 @@ test('a plan: validate checks each rule with one fix line; post stores it, it wa
   } finally {
     await new Promise((ok) => proc.once('exit', ok).kill());
   }
+  const listed = decode(run('list', board).stdout.split('\nhelp[')[0]);
+  assert.deepEqual(listed.waiting.map((w) => w.key), ['plan-two']);
+  assert.equal(listed.answered, 1);
   const answer = JSON.parse(run('answers', board, '--json').stdout)[plan.key];
   assert.deepEqual([answer.answer, answer.notes, answer.decisions], ['sent', notes, { 'send-back': 'one', where: 'own' }]);
   assert.deepEqual(decode(run('answers', board).stdout.split('\nhelp[')[0]).plan, [...notes.map(({ section, verdict, note = '' }) => ({ key: plan.key, section, verdict, note })), { key: plan.key, decision: 'send-back', pick: 'one' }, { key: plan.key, decision: 'where', pick: 'own' }]);
