@@ -1,7 +1,7 @@
 // Real CLI post -> browser review -> CLI answers, in one isolated board per matrix cell.
 // Usage: node .agents/skills/verify-sign-off/plan-shots.mjs <output> [light|dark] [390|1280]
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import assert from 'node:assert/strict';
@@ -83,7 +83,10 @@ try {
   capture('explain', 'The step explainer shows step 2 and Previous and Next controls.');
   drive('await page.eval(() => document.querySelector(".plan-send .open-link").click()); await wait(".plan-sent");');
   capture('sent', 'Sent back confirms the answers were saved for the agent.');
-  if (process.env.PLAN_REVIEW_TRACE) browser('perf-stop');
+  if (process.env.PLAN_REVIEW_TRACE) {
+    writeFileSync(join(out, 'interaction-trace.txt'), browser('perf-stop', '--file', join(out, 'interaction.trace.json.gz')));
+    assert.ok(existsSync(join(out, 'interaction.trace.json.gz')));
+  }
   const answers = cli('answers', board, '--json'), answer = JSON.parse(answers)[plan.key];
   assert.deepEqual(answer.notes, [{ section: plan.sections[0].id, verdict: 'approve' }, { section: plan.sections[1].id, verdict: 'change', note: 'Keep the desktop layout too.' }]);
   assert.equal(answer.decisions[plan.decisions[0].key], plan.decisions[0].options[0].value);
