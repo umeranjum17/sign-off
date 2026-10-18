@@ -58,7 +58,7 @@ try {
     writeFileSync(join(out, `${stem}.dom.json`), JSON.stringify(dom));
     writeFileSync(join(out, `${stem}.claim.txt`), `${width}px ${theme}: ${claim}\n`);
   };
-  drive('await wait(".plan .open-link"); await page.eval(() => document.querySelector(".needs").scrollIntoView());');
+  drive('await wait(".plan .open-link"); await page.eval(() => scrollTo(0, 0));');
   capture('home', 'Summary shows the plan card with a document icon and Open plan.');
   const openRef = /uid=(\S+) link "Open plan,/.exec(browser('snapshot'))[1];
   browser('click', `@${openRef}`); drive('await wait(".plan-section");');
