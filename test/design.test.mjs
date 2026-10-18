@@ -1183,14 +1183,14 @@ test('a posted contract design is listed with its preview and date, and opens fo
   mkdirSync(join(dir, 'design'), { recursive: true });
   writeFileSync(join(dir, 'design', 'preview.png'), png);
   writeFileSync(join(dir, 'design', 'welcome.png'), png);
-  writeFileSync(join(dir, 'design', 'security.png'), png);
+  writeFileSync(join(dir, 'design', 'security.html'), '<!doctype html><title>Security view</title><h1>Security preview</h1>');
   const message = { contract: 1, kind: 'design', schema: 1, key: 'd1-design', title: 'Review the welcome screen',
     about: 'Check the welcome screen before release.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review',
     preview: 'design/preview.png', link: 'https://example.test/design/original',
     options: [{ value: 'quick', label: 'Quick' }, { value: 'guided', label: 'Guided' }], recommend: 'guided',
     journeys: [{ id: 'account-setup', title: 'Account setup', screens: [
       { id: 'welcome', title: 'Welcome', views: { phone_light: 'design/welcome.png' } },
-      { id: 'security', title: 'Security', views: { phone_light: 'design/security.png' } },
+      { id: 'security', title: 'Security', views: { phone_light: 'design/security.html' } },
     ] }] };
   writeFileSync(source, JSON.stringify(message));
   const posted = run('post', file, '--kind', 'design', '--from', source);
@@ -1215,8 +1215,9 @@ test('a posted contract design is listed with its preview and date, and opens fo
   assert.equal(await evaluate('document.querySelector(".design-review-preview")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent('design/welcome.png')}`);
   assert.equal(await evaluate('document.querySelector("[aria-label=\\"Screen for note\\"]")?.options.length'), 2);
   await evaluate('(() => { const s = document.querySelector("[aria-label=\\"Screen for note\\"]"); s.value = "account-setup/security"; s.dispatchEvent(new Event("change")); })()');
-  assert.equal(await evaluate('document.querySelector(".design-preview-full")?.getAttribute("href")'), `/design/local/d1-design/${encodeURIComponent('design/security.png')}`);
-  assert.equal(await evaluate('document.querySelector(".design-review-preview")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent('design/security.png')}`);
+  assert.equal(await evaluate('document.querySelector(".design-preview-full")?.getAttribute("href")'), `/design/local/d1-design/${encodeURIComponent('design/security.html')}`);
+  assert.equal(await evaluate('document.querySelector(".design-review-preview")?.tagName'), 'IFRAME');
+  assert.equal(await evaluate('document.querySelector(".design-review-preview")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent('design/security.html')}`);
   await evaluate('document.querySelector("[aria-label=\\"Pick a direction\\"]").value = "quick"');
   await evaluate('document.querySelector(".design-review button").click()');
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Approved');

@@ -1222,11 +1222,12 @@
     const target = () => screenSelect ? screenFor(screenSelect.value) : screens[0];
     note.value = savedNote?.note ?? '';
     const previewPath = () => (target() && Object.values(target().screen.views)[0]) || d.preview;
-    const preview = previewPath() ? el('div', { class: 'design-preview-window' }, el('img', { class: 'design-review-preview', src: src(designUrl(d, previewPath())), alt: `Design preview: ${d.title}` })) : '';
+    const previewElement = (path) => /\.html?$/i.test(path) ? el('iframe', { class: 'design-review-preview', src: src(designUrl(d, path)), title: `Design preview: ${d.title}`, sandbox: 'allow-scripts' }) : el('img', { class: 'design-review-preview', src: src(designUrl(d, path)), alt: `Design preview: ${d.title}` });
+    const preview = previewPath() ? el('div', { class: 'design-preview-window' }, previewElement(previewPath())) : '';
     const fullPreview = previewPath() ? el('a', { class: 'design-preview-full', href: src(designUrl(d, previewPath())), target: '_blank', rel: 'noopener noreferrer' }, 'Open full preview') : '';
     if (screenSelect) screenSelect.onchange = () => {
       const path = previewPath();
-      if (preview) preview.querySelector('img').src = src(designUrl(d, path));
+      if (preview) preview.replaceChildren(previewElement(path));
       if (fullPreview) fullPreview.href = src(designUrl(d, path));
     };
     const status = el('p', { class: 'meta', role: 'status' }, saved ? saved.label : d.status === 'draft' ? 'Draft' : 'In review');
