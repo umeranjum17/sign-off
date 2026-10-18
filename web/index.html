@@ -481,9 +481,6 @@
 <div id="toast" role="status" hidden><span id="toast-text"></span><button id="undo" hidden>Undo</button></div>
 <script>
   let state = { decisions: [], answers: {} };
-  let keyboardNav = false;
-  addEventListener('keydown', () => (keyboardNav = true), true);
-  addEventListener('pointerdown', () => (keyboardNav = false), true);
   // An exported copy carries its state and files inline and is read-only.
   const FROZEN = window.FROZEN, src = (url) => FROZEN?.files[url] ?? url;
   // Typed notes not yet sent, kept across re-renders and reloads in this browser, per board file.
@@ -1425,11 +1422,11 @@
     if (jump && location.hash === '#waiting') [cur, jump] = [jump, null];
     if (location.hash === '#waiting') waitType = 'all';
     render();
-    if (!reader.hidden) { scrollTo(0, 0); return reader.querySelector('h1').focus({ preventScroll: true, focusVisible: keyboardNav }); }
+    if (!reader.hidden) { scrollTo(0, 0); return reader.querySelector('h1').focus({ preventScroll: true }); }
     const item = (jump || back) && document.getElementById(`item-${jump || back}`);
     jump = null;
     item ? item.scrollIntoView() : scrollTo(0, 0);
-    ((back && item?.querySelector('h3 a, .open-link')) || document.querySelector('#board h1')).focus({ preventScroll: true, focusVisible: keyboardNav });
+    ((back && item?.querySelector('h3 a, .open-link')) || document.querySelector('#board h1')).focus({ preventScroll: true });
   });
   // An interactive page may post its own height, `{ height: <px> }`, and its frame then fits it with no blank below.
   // Only a frame's own message sizes that frame, and never past 10000px.
