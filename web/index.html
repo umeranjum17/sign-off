@@ -876,9 +876,11 @@
   }
 
   /** One phone frame per option, the recommended one first: its label and Recommended badge, the mock (tap opens it full size) and its Pick button. */
-  function mockCards(d, buttons) {
+  function mockCards(d, buttons, onlyAvailable = false) {
     const rec = (i) => d.options[i].value === d.recommend_value, order = d.options.map((_, i) => i).sort((a, b) => rec(b) - rec(a));
-    return el('div', { class: 'mocks', role: 'group', 'aria-label': d.title }, ...order.map((i) => {
+    const hasMock = (i) => d.mocks?.some((m) => m.value === d.options[i].value && m.hash !== null);
+    const shown = onlyAvailable && order.some(hasMock) ? order.filter(hasMock) : order;
+    return el('div', { class: 'mocks', role: 'group', 'aria-label': d.title }, ...shown.map((i) => {
       const o = d.options[i], m = d.mocks?.find((x) => x.value === o.value);
       // A `page.html?variant=b` mock keeps its variant in the frame's query, where the page reads it.
       const [path, query] = m?.path.split('?') ?? [];
@@ -1324,7 +1326,7 @@
     const selectedOption = () => opts.find((o) => o.value === (selected.get(d.key) ?? initial));
     const answer = el('button', { class: 'answer' }, `Answer ${selectedOption()?.label ?? 'now'}`);
     answer.onclick = () => { const o = selectedOption(); if (o) save(d, o, optionButtons, err); };
-    const preview = d.type === 'design' || d.mocks?.length ? mockCards(d, []) : d.view ? rung(d) : pic(d) ? thumb('waiting', pic(d)) : proof(d);
+    const preview = d.type === 'design' || d.mocks?.length ? mockCards(d, [], true) : d.view ? rung(d) : pic(d) ? thumb('waiting', pic(d)) : proof(d);
     const quiet = opts.find((o) => o.value === d.default_if_silent);
     const silent = quiet ? `If you stay quiet: ${quiet.label}${d.silent_by ? ` · ${left(d.silent_by)}` : ''}` : '';
     const head = el('div', { class: 'lead' }, el('p', { class: 'eyebrow' }, kind(d)), el('h2', { dir: 'auto' }, headline(d)));
