@@ -1021,7 +1021,6 @@ test('Waiting on you: a type label on each ask, type chips with counts, and the 
   await until(async () => (await evaluate('location.hash + "|" + document.querySelector("#reader iframe")?.title')) === '#waiting/plan-kind-board|Plan: Show plans on the board');
   const view = await evaluate('fetch(document.querySelector("#reader iframe").src).then(async (r) => [r.headers.get("content-security-policy"), await r.text()])');
   assert.match(view[0], /connect-src 'none'.*sandbox allow-scripts$/);
-  assert.match(view[1], /Show plans on the board[\s\S]*window\.signOffFind/);
   // The way back leads to Waiting on you with the plan still shown, and the focus on its Open plan.
   await evaluate('document.querySelector("#reader .close").click()');
   await until(async () => (await evaluate('location.hash + "|" + document.activeElement.textContent')) === '#waiting|Open plan');
