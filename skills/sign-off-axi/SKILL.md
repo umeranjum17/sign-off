@@ -73,7 +73,7 @@ npx -y sign-off-axi raise --title "Ship the new sign-in screen this week?" \
   --why "The screen is ready and the release goes out Friday." \
   --outcome yes="It ships to everyone on Friday." --outcome no="It waits for next week's release." \
   --recommend yes --recommend-reason "Every check passed on 3 phones." \
-  --default no --silent-by 2026-10-17T16:00Z
+  --default no --silent-by 2026-10-19T16:00Z
 ```
 
 A good A/B/C pick:
