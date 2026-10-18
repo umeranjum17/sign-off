@@ -1376,8 +1376,8 @@ function readSetup(so: string) {
   const bind = config.bind ?? '127.0.0.1';
   if (!privateBind(bind)) problems.push(`bind ${bind} is not 127.0.0.1 or a private address`);
   const parsed = (u?: string) => { try { return new URL(u ?? ''); } catch { return undefined; } };
-  const sendTo = parsed(notify.url), base = parsed(notify.link_base), loopback = ['127.0.0.1', 'localhost', '[::1]'];
-  const usable = !!sendTo && !!base && (sendTo.protocol === 'https:' || (sendTo.protocol === 'http:' && loopback.includes(sendTo.hostname)))
+  const sendTo = parsed(notify.url), base = parsed(notify.link_base);
+  const usable = !!sendTo && !!base && (sendTo.protocol === 'https:' || (sendTo.protocol === 'http:' && (loopback(sendTo.hostname.replace(/^\[|\]$/g, '')) || sendTo.hostname === 'localhost')))
     && ['http:', 'https:'].includes(base.protocol) && (notify.token_env === undefined || /^[A-Za-z_]\w*$/.test(notify.token_env));
   if (notifyBlock && !usable) problems.push('notify needs url (https://, or http:// on this machine) and link_base (http:// or https://) lines, and token_env must name an environment variable');
   return { board: join(so, goodBoard ? config.board : 'decisions.json'), port: goodPort ? Number(port) : 4410, bind, hosts, onAnswer, goodBoard, problems,
