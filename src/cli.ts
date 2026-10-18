@@ -10,9 +10,9 @@ import { basename, delimiter, dirname, extname, isAbsolute, join, relative, reso
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { type Answer, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { type Answer, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendSendBack, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
-import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, mediaFiles, parseMessage, postable, reportPage } from './contract.js';
+import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
 
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
@@ -83,6 +83,7 @@ Checks message files against the communication contract without posting them: ${
 A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate, finding and plan at schema 1, and report at schema 2.
 An evidence message's media paths read from the message file's folder: each file must be there, inside it, and 50 MB or less.
 A report is a page to tap through: its "view" (.html) and "preview" (its picture, beside it) read from the message file's folder, filled with no FILL: lines left (see report init).
+A plan's "view" (.html) is checked for its shape here; the file itself is checked at post, from the board file's folder.
 A gate names its done-done run (run_id and commit) and offers 2 or 3 of approve (Approve), skip (Skip the judge) and fix (Fix first).
 A finding gives a repeated cause, its counts, record ids (never record text) and a proposed change, and offers apply (Apply) and skip (Skip).
 Post one with \`sign-off-axi post --kind <kind> --from <message.json>\`, or --from - to read stdin.
@@ -222,6 +223,7 @@ examples:
   sign-off-axi post --kind evidence --from proof/evidence.json --filer done-done
   sign-off-axi post --kind gate --from gate.json --filer done-done
   sign-off-axi post --kind finding --from finding.json --filer learn-from-mistakes
+  sign-off-axi post --kind plan --from plan.json --filer agent-41
   sign-off-axi post .sign-off/decisions.json --type interactive --title "Does the sign-in flow feel right?" --view mocks/sign-in/demo.html --option yes=Yes --option no="Needs work" --recommend yes
   sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media phone.png --media flow.mp4 --link https://github.com/acme/app/pull/12
   sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "The new sign-in has 2 steps." --media explainer.mp4 --chapter 0:00=Start --chapter 0:12="Step 2"
@@ -310,7 +312,7 @@ function fits(title: unknown, key?: string) {
   if (n > TITLE_MAX) throw fail(`${key ? `key ${key}: ` : ''}title is ${n} characters, over ${TITLE_MAX}`, 'VALIDATION_ERROR', `Shorten the title to ${TITLE_MAX} characters and put the rest in about`);
 }
 /** Board types that are contract kinds: a decision (the default type) is an ask. */
-const CONTRACT_TYPES = ['decision', 'ask', 'evidence', 'report'];
+const CONTRACT_TYPES = ['decision', 'ask', 'evidence', 'report', 'plan'];
 /** The stored item as the message it came from: the board's own `filed` stamp is not part of a message that names none. */
 const asSent = ({ filed: _filed, ...rest }: any) => rest;
 /** Items of a --from file that carry contract or kind are contract messages: each is checked against its kind's rules before anything is stored.
@@ -349,8 +351,7 @@ function contractItems(items: any[], from: string, file: string, replace = false
     }
     try {
       checkMessage(check);
-      postable(check);
-      if (check.kind === 'report') reportPage(check, dirname(file));
+      if (check.kind === 'report' || check.kind === 'plan') reportPage(check, dirname(file));
     } catch (e) {
       throw e instanceof ContractError ? fail(`${from}: items[${i}]: ${e.message}`, 'VALIDATION_ERROR', e.help) : e;
     }
@@ -422,7 +423,7 @@ const waitFor = (on: string, filer?: string, key?: string) => (filer ? `Run \`si
   : `Run \`sign-off-axi wait${on}${key ? ` --key ${key}` : ''}\` to block until the user answers`);
 
 /** Still waiting on the user: not answered, not dismissed, and something to answer (an item with no options and no reply is only shown). */
-const waits = (d: Decision & { answer?: unknown; dismissed?: boolean }) => !d.dismissed && !d.answer && (d.options.length > 0 || !!d.reply || d.type === 'signin');
+const waits = (d: Decision & { answer?: unknown; dismissed?: boolean }) => !d.dismissed && !d.answer && (d.options.length > 0 || !!d.reply || d.type === 'signin' || d.type === 'plan');
 /** The board's decisions with their latest answer; a missing board file is an empty board.
  *  A dismissal hides an item from the board and is not waiting here either, checked against the same dismissed log the board reads. */
 function board(file: string, say = warn) {
@@ -469,17 +470,23 @@ function printAnswers(file: string, rows: ReturnType<typeof board>, waiting: num
   const rounds = readRounds(file).filter((r) => rows.some((d) => d.key === r.key));
   if (values.json) {
     const asked = (key: string) => rounds.filter((r) => r.key === key).map(({ note, at, comments }) => ({ note, at, comments }));
-    const out: Record<string, any> = Object.fromEntries(done.map(({ key, answer, label, close, at, note, comments }) => [key, { answer, label, close, at, note, comments, ...(asked(key).length && { rounds: asked(key) }) }]));
+    const out: Record<string, any> = Object.fromEntries(done.map(({ key, answer, label, close, at, note, comments, notes, decisions }) => [key, { answer, label, close, at, note, comments, notes, decisions, ...(asked(key).length && { rounds: asked(key) }) }]));
     for (const r of rounds) if (!out[r.key]) out[r.key] = { rounds: asked(r.key) };
     return JSON.stringify(out);
   }
   const notes = done.some((a) => a.note), sent = [...done, ...rounds].flatMap(({ key, comments = [] }) => comments.map(({ mock, ref, tag, words, text }) => ({ key, mock, ref, tag, words, text })));
+  const plan = done.flatMap(({ key, notes: sections = [], decisions: picks = {} }) => [
+    ...sections.map(({ section, verdict, note = '' }) => ({ key, section, verdict, note })),
+    ...Object.entries(picks).map(([decision, pick]) => ({ key, decision, pick })),
+  ]);
   return toon({
     board: tilde(file),
     answers: done.length ? done.map(({ key, answer, at, label, close, title, note = '' }) => ({ key, answer, at, ...(values.full && { label, close, title }), ...(notes && { note }) })) : '0 saved yet',
     ...(rounds.length && { rounds: rounds.map(({ key, note, at }) => ({ key, note, at })) }),
     // Comments on mock elements that went with an answer or a round, each with the element it points at.
     ...(sent.length && { comments: sent }),
+    // A plan's send-back: each section's verdict and note, and each decision's pick.
+    ...(plan.length && { plan }),
     waiting,
   }, help);
 }
@@ -505,7 +512,7 @@ function eventLines(file: string, rows: Decision[], answers: Answer[], rounds: R
   const kind = kindOf(file), item = new Map(rows.map((d) => [d.key, d]));
   const head = (event: string, key: string) => ({ event, ...kind(key), key, title: item.get(key)?.title });
   const tail = (key: string, comments?: Sent[]) => ({ ...(item.get(key)?.filer && { filer: item.get(key)!.filer }), ...(comments?.length && { comments }) });
-  return [...answers.map(({ key, answer, label, close, at, note, comments }) => ({ at, line: { ...head('answer', key), answer, label, close, at, ...(note && { note }), ...tail(key, comments) } })),
+  return [...answers.map(({ key, answer, label, close, at, note, comments, notes, decisions }) => ({ at, line: { ...head('answer', key), answer, label, close, at, ...(note && { note }), ...(notes && { notes, decisions }), ...tail(key, comments) } })),
     ...rounds.map(({ key, note, at, comments }) => ({ at, line: { ...head('round', key), note, at, ...tail(key, comments) } }))]
     .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0)).map(({ line }) => JSON.stringify(line)).join('\n');
 }
@@ -796,7 +803,7 @@ function replace(file: string, on: string, from?: string, filer?: string) {
     const feed = fed.items.map((i) => ({ filed: first.get(i?.key)?.filed ?? now, ...i, ...(filer && { filer }) }));
     // An answer belongs to its question: an answered key may not come back asking something else.
     // Evidence is answered for the media and run it shows, so those are part of its question too, as a gate's run and a finding's proposal are.
-    const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply, d.run, d.finding, d.evidence, d.media, d.type === 'signin' ? [d.link, d.start] : '']);
+    const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply, d.run, d.finding, d.evidence, d.media, d.sections, d.decisions, d.type === 'signin' ? [d.link, d.start] : '', d.type === 'plan' ? [d.about, d.view, d.steps] : '']);
     // A key whose answer outlived it may not come back: the board and the answers are read here, under the lock the feed writes with.
     const saved = readAnswers(file);
     for (const i of fed.items) if (i?.kind !== undefined && !first.has(i?.key) && Object.hasOwn(saved, i?.key)) {
@@ -946,11 +953,10 @@ async function postKind(file: string, on: string, values: Record<string, any>, b
   try {
     m ??= parseMessage(bytes!);
     checkMessage(m, built ? 'report' : kind);
-    postable(m);
     // Media paths read from the message file's folder, or from the current folder for stdin.
     if (m.kind === 'evidence') sources = mediaFiles(m, from === '-' ? process.cwd() : dirname(resolve(from)));
-    // A report's page is served from the board file's folder, as --view is.
-    if (m.kind === 'report') reportPage(m, dirname(file));
+    // A report's or plan's page is served from the board file's folder, as --view is.
+    if (m.kind === 'report' || m.kind === 'plan') reportPage(m, dirname(file));
   } catch (e) { throw e instanceof ContractError ? fail(`${name}: ${e.message}`, 'VALIDATION_ERROR', e.help) : e; }
   if (m.filer !== undefined && values.filer !== undefined && m.filer !== values.filer) {
     throw fail(`${name}: key ${m.key}: filer ${m.filer} is not --filer ${values.filer}`, 'VALIDATION_ERROR', 'Leave "filer" out of the message, or pass the same --filer');
@@ -1810,7 +1816,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     appendRound(file, key, note.trim(), comments);
     return [200, state()];
   }
-  const { key, answer, note = '' } = JSON.parse(body) ?? {};
+  const { key, answer, note = '', notes, decisions } = JSON.parse(body) ?? {};
   if (typeof note !== 'string' || [...note.trim()].length > NOTE_MAX) return [400, { error: `The note must be text of ${NOTE_MAX} characters or fewer` }];
   const d = loadDecisions(file).find((x) => x.key === key);
   if (answer === REPLY.value && !note.trim() && !d?.options.some((o) => o.value === answer)) return [400, { error: 'Write the reply first' }];
@@ -1824,6 +1830,11 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     // The program feeding the board may drop an item while the person answers it: the answer is still saved.
     if (!answersOnly() || !isKey(key) || !isKey(answer)) return [404, { error: 'This question is no longer in the file' }];
     answered(appendAnswer(file, { key, close: 'done' } as Decision, answer === REPLY.value ? REPLY : { value: answer, label: answer }, note.trim()));
+    return [200, state()];
+  }
+  // A plan's answer is its one send-back: every section's verdict and note, and a pick for each decision.
+  if (d.type === 'plan') {
+    try { answered(appendSendBack(file, d, notes, decisions), d); } catch (e) { if (e instanceof InputError) return [400, { error: e.message }]; throw e; }
     return [200, state()];
   }
   // Every item that asks something takes an Other answer: the words, saved as the answer `text`, unless an option is named text.

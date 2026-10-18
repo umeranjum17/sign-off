@@ -5,9 +5,9 @@ one line and one screenshot per kind; this page keeps every fact.
 
 Contract kinds behind the types: most questions are `ask` (schema 1),
 proof updates are `evidence` (schema 1), holds are `gate` (schema 1),
-retro proposals are `finding` (schema 1), and read-only pages are `report`
-(schema 2). The rules are in [contract.md](contract.md); the file layout is
-in [file-formats.md](file-formats.md).
+retro proposals are `finding` (schema 1), read-only pages are `report`
+(schema 2), and an agent's plan is `plan` (schema 1). The rules are in
+[contract.md](contract.md); the file layout is in [file-formats.md](file-formats.md).
 
 ## Decision (yes/no and pick-one)
 

@@ -129,7 +129,7 @@ test('exit codes: --kind must match, an unreadable file wins over a refusal, no 
   assert.match(none.stdout, /code: VALIDATION_ERROR/);
 });
 
-test('a plan: sections, decisions with a recommended pick and a page pass validate; each broken rule is refused with one fix line; post refuses it', () => {
+test('a plan: validate checks each rule with one fix line; post stores it, it waits, and its one send-back reads back from answers and wait', async () => {
   const plan = JSON.parse(readFileSync(join(fixtures, 'plan.v1', 'valid-full.json')));
   const [d] = plan.decisions, decision = (o) => ({ ...plan, decisions: [{ ...d, ...o }] });
   const ok = validate('--kind', 'plan', message('plan.json', JSON.stringify(plan)), message('no-steps.json', JSON.stringify({ ...plan, steps: undefined })));
@@ -164,15 +164,71 @@ test('a plan: sections, decisions with a recommended pick and a page pass valida
     assert.match(row.error, error);
     assert.match(row.help, help);
   }
-  // The board cannot show a plan yet: post --kind and a --from feed both refuse it, and nothing is written.
-  const board = join(scratch, 'plan-board.json'), env = { ...process.env, HOME: join(scratch, 'home') };
-  for (const args of [['--kind', 'plan', '--from', '-'], ['--from', message('plan-feed.json', JSON.stringify({ schema: 2, items: [plan] }))]]) {
-    const refused = spawnSync('node', [cli, 'post', board, ...args], { encoding: 'utf8', env, input: JSON.stringify(plan) });
-    assert.equal(refused.status, 2, refused.stdout);
-    assert.match(refused.stdout, /key plan-kind-board: kind plan cannot be posted yet/);
-    assert.match(refused.stdout, /sign-off-axi validate/);
-    assert.equal(existsSync(board), false);
+  // A plan posts with post --kind or in a --from feed, waits on the board, and its one send-back is its answer.
+  const planDir = join(scratch, 'plan'), board = join(planDir, 'plan-board.json'), env = { ...process.env, HOME: join(scratch, 'home') };
+  const run = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env, input: JSON.stringify(plan) });
+  mkdirSync(join(planDir, 'page'), { recursive: true });
+  writeFileSync(join(planDir, 'page', 'index.html'), readFileSync(join(fixtures, 'plan.v1', 'page', 'index.html')));
+  assert.equal(run('post', board, '--kind', 'plan', '--from', '-').status, 0);
+  const missing = spawnSync('node', [cli, 'post', board, '--kind', 'plan', '--from', '-'], { encoding: 'utf8', env, input: JSON.stringify({ ...plan, key: 'plan-gone', view: 'page/gone.html' }) });
+  assert.equal(missing.status, 2);
+  assert.match(missing.stdout, /view \\"page\/gone.html\\" is not there/);
+  const away = mkdtempSync(join(tmpdir(), 'plan-away-'));
+  writeFileSync(join(away, 'index.html'), '<html>away</html>');
+  symlinkSync(join(away, 'index.html'), join(planDir, 'escape.html'));
+  const escaped = spawnSync('node', [cli, 'post', board, '--kind', 'plan', '--from', '-'], { encoding: 'utf8', env, input: JSON.stringify({ ...plan, key: 'plan-escape', view: 'escape.html' }) });
+  rmSync(away, { recursive: true, force: true });
+  assert.equal(escaped.status, 2);
+  assert.match(escaped.stdout, /leads outside the board file/);
+  const fed = run('post', board, '--from', message('plan-feed.json', JSON.stringify({ schema: 2, items: [{ ...plan, key: 'plan-two' }] })));
+  assert.equal(fed.status, 0, fed.stdout);
+  const odd = run('post', board, '--from', message('plan-odd.json', JSON.stringify({ schema: 2, items: [{ key: 'odd', title: 'Odd', type: 'plan' }] })));
+  assert.match(odd.stdout, /kind is required on a new plan/);
+  assert.deepEqual(decode(run('list', board).stdout.split('\nhelp[')[0]).waiting.map((w) => w.key), ['plan-kind-board', 'plan-two']);
+  const [item] = JSON.parse(run('list', board, '--json').stdout).decisions;
+  assert.deepEqual([item.type, item.options, item.sections, item.decisions, item.steps, item.view], ['plan', [], plan.sections, plan.decisions, plan.steps, plan.view]);
+  const approve = plan.sections.map(({ id }) => ({ section: id, verdict: 'approve' })), notes = [{ section: 'goals', verdict: 'change', note: 'Add a non-goal: no desktop layout.' }, ...approve.slice(1)];
+  const decisions = { 'send-back': 'one', where: 'own' };
+  const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: tmpdir(), env });
+  try {
+    const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+    const send = (body) => fetch(`${url}api/answers`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: plan.key, ...body }) });
+    for (const [body, error] of [[{ notes: approve.slice(1), decisions }, /notes must list each section once: goals, architecture/], [{ notes: [{ section: 'goals', verdict: 'change' }, ...approve.slice(1)], decisions }, /section goals needs a note/],
+      [{ notes, decisions: { 'send-back': 'one' } }, /decisions must pick one listed option for each of: send-back, where/], [{ notes, decisions: { ...decisions, where: 'maybe' } }, /decisions must pick/]]) {
+      const refused = await send(body);
+      assert.equal(refused.status, 400);
+      assert.match((await refused.json()).error, error);
+    }
+    assert.equal((await send({ notes, decisions })).status, 200);
+    assert.equal((await send({ notes, decisions })).status, 200);
+  } finally {
+    await new Promise((ok) => proc.once('exit', ok).kill());
   }
+  const answer = JSON.parse(run('answers', board, '--json').stdout)[plan.key];
+  assert.deepEqual([answer.answer, answer.notes, answer.decisions], ['sent', notes, { 'send-back': 'one', where: 'own' }]);
+  assert.deepEqual(decode(run('answers', board).stdout.split('\nhelp[')[0]).plan, [...notes.map(({ section, verdict, note = '' }) => ({ key: plan.key, section, verdict, note })), { key: plan.key, decision: 'send-back', pick: 'one' }, { key: plan.key, decision: 'where', pick: 'own' }]);
+  writeFileSync(join(planDir, 'page', 'other.html'), readFileSync(join(fixtures, 'plan.v1', 'page', 'index.html')));
+  const revised = [{ ...plan, decisions: plan.decisions.slice(0, 1) }, { ...plan, about: `${plan.about} Changed.` }, { ...plan, sections: plan.sections.map((s, i) => (i ? s : { ...s, body: `${s.body} Changed.` })) }, { ...plan, view: 'page/other.html' }, { ...plan, steps: [...plan.steps].reverse() }];
+  for (const item of revised) {
+    const conflict = run('post', board, '--from', message('plan-revised.json', JSON.stringify({ schema: 2, items: [item] })), '--replace');
+    assert.equal(conflict.status, 1, conflict.stdout);
+    assert.match(conflict.stdout, /was answered and now holds a different question/);
+  }
+  const events = run('wait', board, '--filer', 'agent-41', '--events', '--timeout', '0').stdout.trim().split('\n').map((l) => JSON.parse(l));
+  assert.deepEqual(events.map(({ event, kind, key, notes: n, decisions: p }) => [event, kind, key, n, p]), [['answer', 'plan', plan.key, notes, { 'send-back': 'one', where: 'own' }]]);
+});
+
+test('a plan view is held to the report page rules at post: a page a phone cannot read is refused', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const plan = JSON.parse(readFileSync(join(fixtures, 'plan.v1', 'valid-full.json')));
+  const dir = join(scratch, 'plan-rules'), board = join(dir, 'board.json');
+  mkdirSync(join(dir, 'page'), { recursive: true });
+  writeFileSync(join(dir, 'page', 'index.html'), readFileSync(join(fixtures, 'plan.v1', 'page', 'index.html'), 'utf8').replace(/<meta[^>]*viewport[^>]*>/, ''));
+  const refused = spawnSync('node', [cli, 'post', board, '--kind', 'plan', '--from', '-'], { encoding: 'utf8', env, input: JSON.stringify(plan) });
+  assert.equal(refused.status, 2, refused.stdout);
+  assert.match(refused.stdout, /has no viewport tag/);
 });
 
 test('a report in a raise --from file: checked by its kind, stored with no options, never waiting; a new title over 160 is refused', () => {
@@ -410,6 +466,27 @@ test('post --replace: a changed item is checked against its kind again, an uncha
   const kept = cli2('post', board, '--from', feed('kept', old), '--replace');
   assert.equal(kept.status, 0, kept.stdout);
   assert.equal(JSON.parse(boardText()).items[0].title, 'Old title');
+});
+
+test('post --replace: a plan answered by a send-back is refused when a revision drops a decision or rewrites a section', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const plan = JSON.parse(readFileSync(join(fixtures, 'plan.v1', 'valid-full.json')));
+  const board = join(scratch, 'replace-plan-board.json'), cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const feed = (name, item) => message(`replace-plan-${name}.json`, JSON.stringify({ schema: 2, items: [item] }));
+  assert.equal(cli2('post', board, '--kind', 'plan', '--from', message('replace-plan-first.json', JSON.stringify(plan))).status, 0);
+  const notes = plan.sections.map(({ id }) => ({ section: id, verdict: 'approve' }));
+  const decisions = Object.fromEntries(plan.decisions.map((q) => [q.key, q.options[0].value]));
+  appendFileSync(join(scratch, 'replace-plan-board.answers.jsonl'), `${JSON.stringify({ key: plan.key, answer: 'sent', label: 'Sent back', close: 'done', at: '2026-10-13T08:00:00Z', notes, decisions })}\n`);
+  const dropped = cli2('post', board, '--from', feed('dropped', { ...plan, decisions: plan.decisions.slice(0, 1) }), '--replace');
+  assert.equal(dropped.status, 1, dropped.stdout);
+  assert.match(dropped.stdout, /was answered and now holds a different question/);
+  const rewritten = cli2('post', board, '--from', feed('rewritten', { ...plan, sections: plan.sections.map((s, i) => (i ? s : { ...s, body: `${s.body} Changed.` })) }), '--replace');
+  assert.equal(rewritten.status, 1, rewritten.stdout);
+  assert.match(rewritten.stdout, /was answered and now holds a different question/);
+  const same = cli2('post', board, '--from', feed('same', plan), '--replace');
+  assert.equal(same.status, 0, same.stdout);
 });
 
 test('post --replace: an answer does not re-attach to a key the feed dropped and re-added, for every contract kind', () => {

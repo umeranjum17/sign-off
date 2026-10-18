@@ -30,10 +30,6 @@ export const MEDIA_BYTES = 50_000_000;
 /** The command that makes a report's page, named in every refusal of a report without one. */
 export const REPORT_INIT = 'sign-off-axi report init <folder>';
 const PAGE_HELP = `Run \`${REPORT_INIT}\` to make the page, fill it, then post it with "view" and "preview"`;
-/** A plan passes validate, but the board cannot show one yet: post refuses it rather than store it as a yes/no ask. */
-export function postable(m: any): void {
-  if (m.kind === 'plan') throw new ContractError(`${isKey(m.key) ? `key ${m.key}: ` : ''}kind plan cannot be posted yet: the board does not show plans`, 'Check it with `sign-off-axi validate <file.json>`; post it once sign-off-axi shows plans');
-}
 
 /** Parses one message; a field written twice in any object refuses it, since plain JSON.parse keeps the last one quietly. */
 export function parseMessage(bytes: Uint8Array): unknown {
@@ -279,7 +275,7 @@ export function mediaFiles(m: any, base: string): string[] {
 
 /** The longest a block of plain text on a report page may run: about five lines on a phone. */
 const BLOCK_CHARS = 240;
-/** A report's page and picture, from `base`, the board file's folder (or, for validate, the message file's): each a file of 5 MB or less
+/** A report's or plan's page, and a report's picture, from `base`, the board file's folder (or, for validate, the message file's): each a file of 5 MB or less
  * whose real path stays inside that folder, and a page filled in the ladder shape the scaffold gives. The first broken rule throws. */
 export function reportPage(m: any, base: string): void {
   const at = isKey(m.key) ? `key ${m.key}: ` : '';
@@ -287,7 +283,7 @@ export function reportPage(m: any, base: string): void {
   let root = resolve(base);
   try { root = realpathSync(base); } catch {}
   const bad = (rule: string, help = PAGE_HELP) => new ContractError(`${at}${rule}`, help);
-  const files = (['view', 'preview'] as const).map((f) => {
+  const read = (f: 'view' | 'preview') => {
     let real;
     try { real = realpathSync(resolve(root, m[f])); } catch { throw bad(`${f} ${show(m[f])} is not there`, `Put the file at ${m[f]} from the board file's folder, or fix the path`); }
     const rel = relative(root, real);
@@ -296,8 +292,8 @@ export function reportPage(m: any, base: string): void {
     if (!info.isFile() || info.size > 5_000_000) throw bad(`${f} ${show(m[f])} must be a file of 5 MB or less`, 'Shrink the page or its picture');
     try { accessSync(real, constants.R_OK); } catch { throw bad(`${f} ${show(m[f])} cannot be read`, 'Make the file readable, then post again'); }
     return /\.(html|svg)$/i.test(real) ? readFileSync(real, 'utf8') : '';
-  });
-  const [html, picture] = files, page = `view ${show(m.view)}`;
+  };
+  const html = read('view'), picture = m.preview === undefined ? '' : read('preview'), page = `view ${show(m.view)}`;
   for (const [f, t] of [[page, html], [`preview ${show(m.preview)}`, picture]]) {
     if (/FILL:/.test(t)) throw bad(`${f} still has FILL: lines from the scaffold`, 'Replace every FILL: line with your own words and pictures, then post again');
   }
