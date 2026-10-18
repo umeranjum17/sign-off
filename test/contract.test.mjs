@@ -31,6 +31,30 @@ for (const f of ['index.html', 'preview.svg']) fill(join(scratch, 'page', f));
 const report = { contract: 1, kind: 'report', schema: 2, key: 'slice-5-live', title: 'How the new cards work', about: 'Umer can see the new cards.', filed: '2026-10-13T07:19:00Z',
   view: 'page/index.html', preview: 'page/preview.svg' };
 
+test('design review posts journeys and returns change notes through answers --json', async () => {
+  const dir = join(scratch, 'design-review'), board = join(dir, 'board.json'), env = { ...process.env, HOME: join(scratch, 'design-home') };
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  for (const f of ['preview.png', 'welcome.png']) writeFileSync(join(dir, 'design', f), Buffer.from('image'));
+  writeFileSync(join(dir, 'design', 'welcome.html'), '<!doctype html><html><head><meta name="viewport" content="width=device-width"><style>@media(prefers-color-scheme:dark){body{color:white}}</style></head><body><button>Next</button></body></html>');
+  const msg = JSON.parse(readFileSync(join(fixtures, 'design.v1', 'valid-basic.json')));
+  const run = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const source = message('design-message.json', JSON.stringify(msg)), posted = run('post', board, '--kind', 'design', '--from', source);
+  assert.equal(posted.status, 0, posted.stdout + posted.stderr);
+  assert.match(run('list', board).stdout, /chat-journeys/);
+  const outside = join(scratch, 'outside-design.png'); writeFileSync(outside, 'image'); symlinkSync(outside, join(dir, 'design', 'escape.png'));
+  const escaped = run('post', board, '--kind', 'design', '--from', message('escaped-design.json', JSON.stringify({ ...msg, key: 'escaped-design', journeys: [{ ...msg.journeys[0], screens: [{ ...msg.journeys[0].screens[0], views: { phone_light: 'design/escape.png' } }] }] })));
+  assert.equal(escaped.status, 2); assert.match(escaped.stdout, /outside the board folder/);
+  const proc = spawn('node', [cli, 'serve', board], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  try {
+    const url = await new Promise(ok => proc.stdout.once('data', b => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+    const answer = body => fetch(`${url}api/answers`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: msg.key, ...body }) });
+    assert.equal((await answer({ verdict: 'change', notes: [] })).status, 400);
+    assert.equal((await answer({ verdict: 'change', notes: [{ journey: 'onboarding', screen: 'welcome', note: 'Make the button clearer.' }] })).status, 200);
+    const got = JSON.parse(run('answers', board, '--json').stdout)[msg.key];
+    assert.deepEqual([got.answer, got.notes], ['change', [{ journey: 'onboarding', screen: 'welcome', note: 'Make the button clearer.' }]]);
+  } finally { proc.kill(); }
+});
+
 test('every shipped fixture: valid files pass, each invalid file is refused on the field its name gives', () => {
   for (const folder of readdirSync(fixtures).filter((f) => !f.endsWith('.md'))) {
     const files = readdirSync(join(fixtures, folder)).map((f) => join(fixtures, folder, f));

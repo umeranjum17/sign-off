@@ -8,7 +8,7 @@ export class ContractError extends Error {
   constructor(message: string, readonly help: string) { super(message); }
 }
 /** The kinds, with the schema number of each. */
-export const SCHEMAS: Record<string, number> = { ask: 1, report: 2, evidence: 1, gate: 1, finding: 1, plan: 1 };
+export const SCHEMAS: Record<string, number> = { ask: 1, report: 2, evidence: 1, gate: 1, finding: 1, plan: 1, design: 1 };
 export const KINDS = Object.keys(SCHEMAS);
 const COMMON = ['contract', 'kind', 'schema', 'key', 'title', 'filer', 'link', 'about'];
 const FIELDS: Record<string, string[]> = {
@@ -18,6 +18,7 @@ const FIELDS: Record<string, string[]> = {
   gate: [...COMMON, 'run', 'options', 'recommend_value', 'close'],
   finding: [...COMMON, 'cause', 'incidents', 'days', 'evidence_ids', 'change_kind', 'proposal', 'options', 'recommend_value'],
   plan: [...COMMON, 'sections', 'decisions', 'steps', 'view'],
+  design: [...COMMON, 'group', 'filed', 'status', 'preview', 'journeys', 'options', 'recommend'],
 };
 /** A done-done run: its id, full commit and the four Checks lines. */
 const RUN = ['run_id', 'commit', 'outcome', 'repro', 'proof', 'evidence'];
@@ -194,6 +195,39 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
     page('view', /\.html$/i, '.html', '"mocks/<key>/index.html"', need);
     page('preview', /\.(svg|png|jpe?g|webp)$/i, '.svg, .png, .jpg, .jpeg or .webp', '"mocks/<key>/preview.svg"', need);
     if (dirname(m.preview) !== dirname(m.view)) throw bad('preview', `${show(m.preview)} must sit in the folder of ${show(m.view)}`, `Put the picture beside the page, such as "${dirname(m.view)}/preview.svg"`);
+    return { kind: m.kind, schema: m.schema };
+  }
+  if (m.kind === 'design') {
+    text('group', m.group, 40, 'the project name, in 40 characters or fewer');
+    const at = typeof m.filed === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(m.filed) ? new Date(m.filed) : undefined;
+    if (!at || Number.isNaN(at.getTime()) || at.toISOString().replace('.000', '') !== m.filed) throw bad('filed', 'must be a real UTC time with seconds', 'Set "filed" to YYYY-MM-DDTHH:MM:SSZ');
+    if (!['draft', 'in_review'].includes(m.status)) throw bad('status', 'must be draft or in_review', 'Set "status" to "draft" or "in_review"');
+    page('preview', /\.(png|jpe?g|webp)$/i, '.png, .jpg, .jpeg or .webp', '"design/preview.png"', 'a design preview');
+    const journeys = list('journeys', 1, 40, ['id', 'title', 'screens'], '{"id":"signup","title":"Sign up","screens":[...]}');
+    const ids: string[] = [];
+    journeys.forEach((j, n) => {
+      if (typeof j.id !== 'string' || !/^[a-z0-9-]{1,40}$/.test(j.id)) throw bad(`journeys[${n}].id`, 'must be a short lowercase id', 'Set it to a slug such as "signup"');
+      if (ids.includes(j.id)) throw bad(`journeys[${n}].id`, `repeats ${j.id}`, 'Give each journey its own id'); ids.push(j.id);
+      text(`journeys[${n}].title`, j.title, 120, 'the journey title');
+      if (!Array.isArray(j.screens) || !j.screens.length || j.screens.length > 80) throw bad(`journeys[${n}].screens`, 'must list 1 to 80 screens', 'Add at least one screen with a view');
+      j.screens.forEach((s: any, k: number) => {
+        const p = `journeys[${n}].screens[${k}]`;
+        if (!s || typeof s !== 'object' || Array.isArray(s) || Object.keys(s).some(x => !['id','title','views'].includes(x))) throw bad(p, 'must have only id, title and views', 'Use {"id":"welcome","title":"Welcome","views":{...}}');
+        if (typeof s.id !== 'string' || !/^[a-z0-9-]{1,40}$/.test(s.id)) throw bad(`${p}.id`, 'must be a short lowercase id', 'Set it to a slug such as "welcome"');
+        text(`${p}.title`, s.title, 120, 'the screen title');
+        const views = s.views, variants = ['phone_light','phone_dark','computer_light','computer_dark'];
+        if (!views || typeof views !== 'object' || Array.isArray(views) || Object.keys(views).some(v => !variants.includes(v)) || !Object.keys(views).length) throw bad(`${p}.views`, 'must map at least one supported view to a path', 'Add a phone_light, phone_dark, computer_light or computer_dark path');
+        for (const [variant, path] of Object.entries(views)) {
+          text(`${p}.views.${variant}`, path, 256, 'a board-relative image or HTML path');
+          if (/^([\\/]|[A-Za-z]:)/.test(path as string) || (path as string).split(/[\\/]/).includes('..') || /[?#\\]/.test(path as string) || !/\.(png|jpe?g|webp|html)$/i.test(path as string)) throw bad(`${p}.views.${variant}`, 'must be a relative .png, .jpg, .jpeg, .webp or .html path without ..', 'Put the view under the board folder');
+        }
+      });
+    });
+    if (m.options !== undefined) {
+      if (!Array.isArray(m.options) || m.options.length < 2 || m.options.length > 6) throw bad('options', 'must list 2 to 6 options', 'Set options to 2-6 {"value":"...","label":"..."} choices');
+      checkOptions('options', m.options);
+      recommend('recommend', m, m.options);
+    } else if (m.recommend !== undefined) throw bad('recommend', 'requires options', 'Add options or remove recommend');
     return { kind: m.kind, schema: m.schema };
   }
   // A plan is sections to approve or change, decisions with a recommended pick, steps to tap through, and where it goes as a diagram.
