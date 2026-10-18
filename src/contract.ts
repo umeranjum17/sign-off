@@ -204,11 +204,11 @@ export function checkMessage(m: any, want?: string): { kind: string; schema: num
       const at = `decisions[${n}]`;
       if (!isKey(o.key)) throw bad(`${at}.key`, 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "key" to a short id such as "store"');
       if (all.slice(0, n).some((p) => p.key === o.key)) throw bad(`${at}.key`, `repeats ${o.key}`, 'Give every decision its own key');
-      text(`${at}.question`, o.question, 160, 'the question, ending in ?');
+      text(`${at}.question`, o.question, 160, 'the question, ending in a question mark');
       // One question: a single ?, as its last character, so "Keep A? Or B?" is two decisions.
       const q = o.question.trim();
-      if (q.indexOf('?') !== q.length - 1) throw bad(`${at}.question`, 'must be one question, with one ? as its last character', 'Ask one question ending in ?, and split any other into its own decision');
-      if (!/[\p{L}\p{N}]/u.test(q) || q.split(/\s+/).length > 12) throw bad(`${at}.question`, 'must be one question of 12 words or fewer, ending in ?', 'Ask it in 12 words or fewer, ending in ?; put the rest in "why"');
+      if (q.search(/[?？]/) !== q.length - 1) throw bad(`${at}.question`, 'must be one question, with one question mark as its last character', 'Ask one question ending in a question mark, and split any other into its own decision');
+      if (!/[\p{L}\p{N}]/u.test(q) || q.split(/\s+/).length > 12) throw bad(`${at}.question`, 'must be one question of 12 words or fewer, ending in a question mark', 'Ask it in 12 words or fewer, ending in a question mark; put the rest in "why"');
       text(`${at}.why`, o.why, 500, 'why it matters, in 500 characters or fewer');
       if (!Array.isArray(o.options) || o.options.length < 2 || o.options.length > 6) throw bad(`${at}.options`, Object.hasOwn(o, 'options') ? 'must list 2 to 6 options' : 'is required', 'Set "options" to 2-6 objects such as {"value":"yes","label":"Yes","outcome":"Plans live in the board file"}');
       checkOptions(`${at}.options`, o.options, true);
