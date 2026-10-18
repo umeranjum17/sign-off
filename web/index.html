@@ -83,7 +83,6 @@
     body:has(.decide) { padding-bottom: calc(9rem + env(safe-area-inset-bottom)); }
     .top:has(+ .decide) { padding: .75rem 0 .5rem; }
     .top:has(+ .decide) .back { display: none; }
-    .decide-preview .mocks { --tall: min(20svh, 10rem); }
   }
 
   /* Reports: a card per report, its steps as numbered nodes on a line with only the marks that matter under each; Open lists them in place. */
@@ -261,6 +260,7 @@
   .decide-preview .rung { width: 100%; }
   .decide-preview .rung .frame, .decide-preview .rung iframe { max-height: 15rem; }
   .decide-preview .mocks { --tall: min(32svh, 16rem); }
+  @media (max-width: 59.999rem) { .decide-preview .mocks { --tall: min(20svh, 10rem); } }
   .decide h2 { margin: .5rem 0 .5rem; font-size: 1.75rem; line-height: 1.15; letter-spacing: -.01em; }
   .decide .why { margin: 0; color: var(--muted); font-size: 1.0625rem; font-weight: 400; }
   .pick-label { margin: 1.5rem 0 .5rem; color: var(--muted); font-size: .875rem; letter-spacing: .02em; }
@@ -1323,11 +1323,12 @@
     const quiet = opts.find((o) => o.value === d.default_if_silent);
     const silent = quiet ? `If you stay quiet: ${quiet.label}${d.silent_by ? ` · ${left(d.silent_by)}` : ''}` : '';
     const head = el('div', { class: 'lead' }, el('p', { class: 'eyebrow' }, kind(d)), el('h2', { dir: 'auto' }, headline(d)));
+    const why = d.why || d.tradeoff;
     const back = el('a', { class: 'later', href: '#waiting' }, 'Later');
     const choices = opts.length ? [el('p', { class: 'pick-label' }, typeOf(d) === 'yes-no' ? 'YES OR NO' : 'PICK ONE'),
       el('ul', { class: 'pick-list', role: 'group', 'aria-label': d.title }, ...optionButtons)] : [other(d, answerOf(d.key), err)];
     return el('section', { class: 'decide' }, preview ? el('div', { class: 'decide-preview' }, preview) : '', head,
-      d.why ? el('p', { class: 'why', dir: 'auto' }, d.why) : '', ...choices, silent ? el('p', { class: 'silent-line' }, silent) : '', err,
+      why ? el('p', { class: 'why', dir: 'auto' }, why) : '', ...choices, silent ? el('p', { class: 'silent-line' }, silent) : '', err,
       el('div', { class: 'decide-bar' }, opts.length ? answer : '', back));
   }
   const reshow = (control) => { render(); document.querySelector(control)?.focus({ preventScroll: true }); };

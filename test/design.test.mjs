@@ -964,7 +964,7 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   writeFileSync(file, JSON.stringify({ schema: 2, items: [
     { key: 'digest', title: 'Keep the weekly digest?', options: yesNo, recommend_value: 'yes' },
     { key: 'release', title: 'Which day for release?', options: ['today', 'friday', 'next-week'].map((v) => ({ value: v, label: v })), recommend_value: 'friday' },
-    { key: 'look', type: 'design', title: 'Pick the look', options: ['a', 'b', 'c'].map((v) => ({ value: v, label: v.toUpperCase() })), recommend_value: 'b' },
+    { key: 'look', type: 'design', title: 'Pick the look', options: ['a', 'b', 'c'].map((v) => ({ value: v, label: v.toUpperCase() })), recommend_value: 'b', tradeoff: 'B is faster; A is simpler.' },
   ] }));
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
@@ -978,6 +978,11 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   assert.equal(await evaluate('document.querySelector(".waiting-lede").textContent.includes("3 items need you")'), true);
   assert.equal(await evaluate('document.querySelector(".ask-card .kind").textContent'), 'Design pick');
   assert.equal(await chips(), 'All 3*|Design pick 1|Yes/No 1|Pick one 1');
+  await evaluate('document.querySelector("#item-look").click()');
+  await until(async () => (await evaluate('location.hash')) === '#decide/look');
+  assert.equal(await evaluate('document.querySelector(".decide .why")?.textContent'), 'B is faster; A is simpler.');
+  await evaluate('location.hash = "#waiting"');
+  await until(async () => (await askTitles()) === 'Pick the look|Which day for release?|Keep the weekly digest?');
   await until(async () => (await pick('Yes/No')) && (await askTitles()) === 'Keep the weekly digest?');
   await pick('All');
   await evaluate('(() => { const s = document.querySelector(".sort select"); s.value = "oldest"; s.dispatchEvent(new Event("change")); })()');
