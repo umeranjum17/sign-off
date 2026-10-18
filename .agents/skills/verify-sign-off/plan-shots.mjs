@@ -9,6 +9,8 @@ const out = resolve(process.argv[2] ?? process.env.DONE_DONE_EVIDENCE_ROOT);
 const theme = process.argv[3] ?? process.env.DONE_DONE_THEME ?? 'light', width = +(process.argv[4] ?? process.env.DONE_DONE_WIDTH ?? 390);
 assert.ok(['light', 'dark'].includes(theme) && [390, 1280].includes(width));
 mkdirSync(out, { recursive: true });
+const records = process.env.PLAN_REVIEW_DIAGNOSTICS ? resolve(process.env.PLAN_REVIEW_DIAGNOSTICS) : out;
+mkdirSync(records, { recursive: true });
 const dir = mkdtempSync(join(tmpdir(), 'so-plan-')), board = join(dir, 'board.json');
 const env = { ...process.env, HOME: dir, XDG_CONFIG_HOME: join(dir, 'config'), XDG_DATA_HOME: join(dir, 'data'), XDG_CACHE_HOME: join(dir, 'cache'), XDG_STATE_HOME: join(dir, 'state') };
 const run = (bin, args, options = {}) => {
@@ -50,13 +52,13 @@ try {
     const dom = probe();
     assert.equal(dom.overflow, false); assert.deepEqual(dom.overflowing, []);
     const consoleLog = browser('console', '--type', 'error'), network = browser('network', '--limit', '100');
-    writeFileSync(join(out, `${stem}.network.txt`), network);
+    writeFileSync(join(records, `${stem}.network.txt`), network);
     assert.match(consoleLog, /no console messages found/);
     dom.console_errors = [];
     dom.failed_requests = [...network.matchAll(/reqid=\d+ \w+ (\S+) \[(\d+|failed)\]/g)].flatMap(([, url, status]) => status === 'failed' || +status >= 400 ? [{ url, status: +status || 0 }] : []);
     assert.deepEqual(dom.failed_requests, []);
-    writeFileSync(join(out, `${stem}.dom.json`), JSON.stringify(dom));
-    writeFileSync(join(out, `${stem}.claim.txt`), `${width}px ${theme}: ${claim}\n`);
+    writeFileSync(join(records, `${stem}.dom.json`), JSON.stringify(dom));
+    writeFileSync(join(records, `${stem}.claim.txt`), `${width}px ${theme}: ${claim}\n`);
   };
   drive('await wait(".plan .open-link"); await page.eval(() => scrollTo(0, 0));');
   capture('home', 'Summary shows the plan card with a document icon and Open plan.');
@@ -67,7 +69,7 @@ try {
   // The iframe is sandboxed: inspect its real served page separately at its exact frame size.
   const frame = JSON.parse(drive('console.log(JSON.stringify(await page.eval(() => { const f=document.querySelector("#reader iframe"),r=f.getBoundingClientRect(); return {url:f.src,width:Math.round(r.width),height:Math.round(r.height),back:location.href}; })));'));
   browser('open', frame.url); browser('emulate', '--viewport', `${frame.width}x${frame.height}x1`, '--color-scheme', theme);
-  writeFileSync(join(out, 'direction.dom.json'), JSON.stringify(probe()));
+  writeFileSync(join(records, 'direction.dom.json'), JSON.stringify(probe()));
   browser('open', frame.back); browser('emulate', '--viewport', width === 390 ? '390x844x2,mobile,touch' : '1280x800x1', '--color-scheme', theme);
   drive('await wait(".plan-section");');
   if (process.env.PLAN_REVIEW_TRACE) browser('perf-start', '--no-reload', '--no-auto-stop', '--file', join(out, 'interaction.trace.json.gz'));
@@ -92,11 +94,11 @@ try {
   assert.equal(answer.decisions[plan.decisions[0].key], plan.decisions[0].options[0].value);
   const waited = cli('wait', board, '--filer', plan.filer, '--json', '--timeout', '0');
   if (!process.env.PLAN_REVIEW_STAGE || process.env.PLAN_REVIEW_STAGE === 'sent') {
-    writeFileSync(join(out, 'answers.json'), answers); writeFileSync(join(out, 'wait.json'), waited);
+    writeFileSync(join(records, 'answers.json'), answers); writeFileSync(join(records, 'wait.json'), waited);
   }
   drive('await page.eval(() => document.querySelector(".plan-sent a").click()); await wait(".i-answered .compact");');
   capture('answered', 'The plan is in Answered with Sent back and no longer waits.');
-  if (!process.env.PLAN_REVIEW_STAGE || process.env.PLAN_REVIEW_STAGE === 'answered') writeFileSync(join(out, 'list.txt'), cli('list', board));
+  if (!process.env.PLAN_REVIEW_STAGE || process.env.PLAN_REVIEW_STAGE === 'answered') writeFileSync(join(records, 'list.txt'), cli('list', board));
 } finally {
   browser('stop'); server.kill();
   console.log(`Scratch for cleanup: ${dir}`);
