@@ -67,36 +67,20 @@
   .i-waiting .vis .icon svg { width: 2.25rem; height: 2.25rem; }
   .i-reports .mark { width: 0.375rem; height: 1.25rem; border-radius: 2px; background: var(--area); }
   .pair, .areas { display: grid; gap: 1rem; margin-top: 1rem; }
-  /* What needs you first and the ask in Triage: its pictures side by side and its answers stacked at one width. */
-  .needs .row, .focus .row { padding: 0; border: 0; background: none; box-shadow: none; grid-template-columns: minmax(0, 1fr); }
-  .needs .row .choices, .focus .row .choices { display: grid; grid-template-columns: minmax(0, 1fr); }
+  /* Needs you first keeps the existing answer controls at a readable width. */
+  .needs .row { padding: 0; border: 0; background: none; box-shadow: none; grid-template-columns: minmax(0, 1fr); }
+  .needs .row .choices { display: grid; grid-template-columns: minmax(0, 1fr); }
   .needs .row .choices, .needs .rung { max-width: 28rem; }
-  .needs .media, .focus .media { flex-wrap: nowrap; }
-  .needs .media > *, .focus .media > * { flex: 1 1 0; min-width: 0; }
-  .needs .mocks, .focus .mocks { grid-auto-columns: minmax(0, 1fr); max-width: 16rem; margin: 0; }
-  .focus .mocks { max-width: 24rem; }
-  .focus .shot { aspect-ratio: 3 / 4; }
+  .needs .media { flex-wrap: nowrap; }
+  .needs .media > * { flex: 1 1 0; min-width: 0; }
+  .needs .mocks { grid-auto-columns: minmax(0, 1fr); max-width: 16rem; margin: 0; }
   .needs .shot { aspect-ratio: 1; }
-  /* Triage: the open asks one at a time, the question big and the answers big enough for a thumb; at desktop the queue sits beside it. */
-  .fhead { margin: 0; color: var(--muted); font-size: 0.875rem; font-weight: 650; }
-  .pbar { height: 4px; margin: 0.5rem 0 1rem; border-radius: 4px; background: var(--line); overflow: hidden; }
-  .pbar i { display: block; height: 100%; background: var(--c-waiting); }
-  .focus .since { margin: -0.375rem 0 1rem; font-weight: 600; } .needs > .since { margin: -0.25rem 0 0.5rem; font-weight: 600; }
-  .focus .row h3 { font-size: 1.75rem; line-height: 1.2; letter-spacing: -0.01em; }
-  .focus .choices button { min-height: 3.125rem; border-radius: 999px; font-size: 1.0625rem; font-weight: 600; }
-  @media (min-width: 60rem) { .focus .choices button, .needs .choices .rec { min-height: 2.75rem; } }
+  .needs > .since { margin: -0.25rem 0 0.5rem; font-weight: 600; }
   /* On Summary the recommended answer is the large button, and the others are pills under it. */
   .needs .choices button { font-weight: 600; } .needs .choices button:not(.rec) { justify-self: start; border-radius: 999px; }
   .needs .choices button[aria-pressed="true"] { padding-right: 2.75rem; }
-  .quiet { display: flex; gap: 0.25rem; margin-top: 0.5rem; }
-  .quiet button { min-height: 2.75rem; border: 0; background: none; color: var(--muted); font-weight: 600; }
-  .quiet .skip { color: var(--accent); }
-  .focus > .quiet { position: sticky; bottom: calc(5.125rem + env(safe-area-inset-bottom)); z-index: 1; margin: 1rem -1rem 0; padding: 0.5rem 1rem; background: var(--page); }
-  .upnext { display: grid; margin-top: 1rem; }
-  .upnext .meta { margin: 0; font-weight: 700; }
-  .hint { text-align: center; }
-  .queue, .keys { display: none; }
-  .caught { text-align: center; }
+  @media (max-width: 59.999rem) { body:has(.decide) { padding-bottom: calc(9rem + env(safe-area-inset-bottom)); } }
+
   /* Reports: a card per report, its steps as numbered nodes on a line with only the marks that matter under each; Open lists them in place. */
   .reports { display: grid; gap: 0.75rem; }
   .report { display: grid; gap: 0.75rem; scroll-margin-top: 4.5rem; }
@@ -246,10 +230,54 @@
   .readonly .rung iframe { height: 80vh; }
   .row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.875rem; padding: 1rem; scroll-margin-top: 4.5rem;
     background: var(--surface); border-radius: 0.875rem; }
-  /* Waiting cards follow the Spacious grouped-card treatment; no dense list stripe. */
-  .in-waiting .row { border: 0; padding-left: 1rem; }
-  .in-waiting .row .eyebrow { text-transform: none; letter-spacing: 0; }
-  .in-waiting .row .about, .in-waiting .row .ask-why { max-width: 62ch; }
+  /* Waiting and Decide use separate board cards; the R1 answer renderer remains the source of answer writes. */
+  .waiting-lede { margin: 0; color: var(--muted); }
+  .plan-hero { display: grid; overflow: hidden; margin: 0 0 2rem; border-radius: 1.125rem; background: var(--surface); }
+  .plan-preview { width: 100%; height: 12rem; min-width: 0; overflow: hidden; background: var(--sunk); }
+  .plan-preview .rung { height: 100%; }
+  .plan-preview .rung .frame, .plan-preview .rung iframe { height: 100%; min-height: 0; border: 0; border-radius: 0; }
+  .plan-preview .rung > .meta { display: none; }
+  .plan-copy { display: grid; align-content: center; gap: .5rem; padding: 1.25rem; }
+  .plan-copy .eyebrow, .ask-card .kind { margin: 0; color: var(--warn); font-size: .875rem; font-weight: 600; }
+  .plan-copy h2 { margin: 0; font-size: 1.75rem; }
+  .plan-copy .about { margin: 0; color: var(--muted); -webkit-line-clamp: 1; }
+  .plan-meta { display: flex; flex-wrap: wrap; gap: .35rem 1rem; color: var(--muted); font-size: .875rem; }
+  .plan-meta span { white-space: nowrap; }
+  .open-link.plan-open { display: inline-flex; width: fit-content; min-height: 2.75rem; padding: 0 1.25rem; font-size: 1rem; }
+  .ask-group { list-style: none; margin: .5rem 0 0; padding: 0 0 0 1rem; overflow: hidden; border-radius: 1rem; background: var(--surface); }
+  .ask-group > li { position: relative; display: flex; align-items: center; gap: .75rem; min-height: 4.125rem; padding: .5rem .5rem .5rem 0; }
+  .ask-group > li + li { border-top: .5px solid var(--line); }
+  .ask-card { display: flex; flex: 1; min-width: 0; align-items: center; gap: .75rem; color: inherit; text-decoration: none; }
+  .ask-card .icon { width: 2rem; height: 2rem; border-radius: .5rem; background: var(--action); }
+  .ask-card .icon svg { width: 1.125rem; height: 1.125rem; stroke: white; }
+  .ask-card .copy { display: grid; flex: 1; min-width: 0; gap: .125rem; }
+  .ask-card .title { font-size: 1.0625rem; font-weight: 550; line-height: 1.3; }
+  .ask-card .meta { margin: 0; color: var(--muted); font-size: .9375rem; }
+  .ask-group .x { margin: 0; }
+  .decide { max-width: 44rem; margin: 0 auto; padding-bottom: 1rem; }
+  .decide-preview { margin: .5rem 0 1.25rem; padding: 1rem; min-height: 8rem; display: grid; place-items: center; overflow: hidden; border-radius: 1.125rem; background: var(--surface); }
+  .decide-preview > img { display: block; max-width: 100%; max-height: 15rem; object-fit: contain; border-radius: .75rem; }
+  .decide-preview .rung { width: 100%; }
+  .decide-preview .rung .frame, .decide-preview .rung iframe { max-height: 15rem; }
+  .decide-preview .mocks { --tall: min(32svh, 16rem); }
+  .decide h2 { margin: .5rem 0 .5rem; font-size: 1.75rem; line-height: 1.15; letter-spacing: -.01em; }
+  .decide .why { margin: 0; color: var(--muted); font-size: 1.0625rem; font-weight: 400; }
+  .pick-label { margin: 1.5rem 0 .5rem; color: var(--muted); font-size: .875rem; letter-spacing: .02em; }
+  .pick-list { list-style: none; margin: 0; padding: 0 0 0 1rem; overflow: hidden; border-radius: 1rem; background: var(--surface); }
+  .pick-list li + li { border-top: .5px solid var(--line); }
+  .pick-option { display: flex; width: 100%; min-height: 4.5rem; align-items: center; gap: .75rem; padding: .625rem 1rem .625rem 0; border: 0; border-radius: 0; background: transparent; text-align: left; }
+  .pick-option .words { display: grid; flex: 1; min-width: 0; gap: .125rem; }
+  .pick-option .label { font-size: 1.25rem; line-height: 1.3; }
+  .pick-option .reason { color: var(--muted); font-size: 1rem; line-height: 1.35; }
+  .pick-option .recommend { color: var(--accent); font-size: .9375rem; }
+  .pick-option .check { width: 1.5rem; color: var(--accent); font-size: 1.5rem; visibility: hidden; }
+  .pick-option[aria-pressed="true"] { color: var(--text); background: transparent; }
+  .pick-option[aria-pressed="true"] .check { visibility: visible; }
+  .silent-line { margin: 1.25rem 0; color: var(--muted); }
+  .decide-bar { position: sticky; bottom: calc(4.125rem + env(safe-area-inset-bottom)); z-index: 1; display: flex; align-items: center; gap: .5rem; margin: 1rem -1.25rem 0; padding: .75rem 1.25rem; background: var(--bg); }
+  .decide-bar .answer { flex: 1; background: var(--action); color: var(--on-accent); }
+  .decide-bar .later { color: var(--accent); background: transparent; }
+  .ask-group + .gone-asks { margin-top: 1rem; }
   .in-answered .row { background: transparent; box-shadow: none; }
   .in-answered .row h3 { color: var(--muted); font-weight: 500; }
   /* A sign-in: one big Open for its link, off once the link expired. */
@@ -449,6 +477,7 @@
     /* The frames share the card width down to 11rem each; only a list longer than that scrolls. */
     .mocks { grid-auto-columns: minmax(11rem, calc(var(--tall) * 9 / 19.5)); }
     .rung iframe { height: min(32rem, 75vh); }
+    .plan-hero { grid-template-columns: 46% minmax(0, 1fr); min-height: 20rem; }
     /* A picture card stacks like a design card: the picture, then its buttons at their own width. */
     .row:has(> .rung) { grid-template-columns: minmax(0, 1fr); gap: 0.875rem; }
     .row:has(> .rung) .choices { justify-content: start; }
@@ -481,13 +510,12 @@
     .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .pair { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
     .areas { grid-template-columns: 1fr 1fr; align-items: start; }
-    .tri { display: grid; grid-template-columns: minmax(16rem, 2fr) minmax(0, 3fr); gap: 2rem; align-items: start; }
-    .queue { display: grid; gap: 0.25rem; margin: 0; padding: 0; list-style: none; }
-    .queue button { display: grid; width: 100%; padding: 0.75rem 1rem; border-color: transparent; background: none; text-align: left; }
-    .queue button[aria-current] { border-color: var(--line); background: var(--surface); }
-    .queue .meta { margin: 0.125rem 0 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .hint, .upnext { display: none; }
-    .focus > .quiet { position: static; margin: 0.5rem 0 0; padding: 0; background: none; }
+    .plan-hero { grid-template-columns: 46% minmax(0, 1fr); min-height: 20rem; }
+    .plan-preview { height: 20rem; }
+    .plan-preview .rung .frame, .plan-preview .rung iframe { min-height: 0; }
+    .plan-copy { padding: 2rem; }
+    .plan-copy h2, .decide h2 { font-size: 2.5rem; line-height: 1.1; }
+    .decide-bar { position: static; margin: 1rem 0 0; padding: .75rem 0; background: transparent; }
     .reports { grid-template-columns: 1fr 1fr; align-items: start; }
     /* Answered sets each row as its own card, two across; an opened row takes the whole width. */
     .rows.i-answered { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; align-items: start; padding: 0; border: 0; background: none; box-shadow: none; }
@@ -576,10 +604,10 @@
   function offerUndo(d, before) {
     const now = answerOf(d.key);
     if (!now) return;
+    if (location.hash.startsWith('#decide/')) location.hash = '#waiting';
     undoBtn.setAttribute('aria-label', `Undo, ${headline(d)}`);
     say(`Saved: ${now.answer === 'text' ? 'your reply' : now.label}`, 5000, () => {
       undoBtn.disabled = true;
-      cur = d.key; // Triage shows the ask again.
       call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ key: d.key, answer: before?.answer ?? '', note: before?.note ?? '' }) })
         .then(() => say(before ? `Back to: ${before.answer === 'text' ? 'your reply' : before.label}` : 'Undone: not answered', 3000),
@@ -997,6 +1025,7 @@
   /** A page to open: an .html view, framed in a sandbox. */
   const reads = (d) => /\.html$/i.test(d.view ?? '');
   const hhmm = (at) => new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const left = (at) => { const m = Math.ceil((Date.parse(at) - Date.now()) / 60_000); return m <= 0 ? 'deadline passed' : `${Math.floor(m / 60)} h ${m % 60} min left`; };
   const isToday = (at) => new Date(at).toDateString() === new Date().toDateString();
   const day = (at) => new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   const when = (at) => (isToday(at) ? hhmm(at) : `${day(at)} ${hhmm(at)}`);
@@ -1053,7 +1082,7 @@
   /** A short list of an area on the Summary: a picture and the title; a tap opens the area at that item. */
   function section(a, items) {
     const SHOWN = 4, line = (d) => {
-      const link = el('a', { class: 'compact', href: a === 'reports' && reads(d) ? `#reports/${d.key}` : `#${a}` }, ...compact(d, a));
+      const link = el('a', { class: 'compact', href: a === 'reports' && reads(d) ? `#reports/${d.key}` : a === 'waiting' ? (d.type === 'plan' ? `#waiting/${d.key}` : d.kind === 'design' ? `#designs/${d.key}` : `#decide/${d.key}`) : `#${a}` }, ...compact(d, a));
       link.onclick = () => (jump = d.key);
       return el('li', {}, link, xBtn(d));
     };
@@ -1435,43 +1464,64 @@
     sel.onchange = () => { waitSort = sel.value; try { localStorage.setItem(SORT_KEY, waitSort); } catch {} reshow('.sort select'); };
     return el('div', { class: 'filters' }, el('div', { class: 'chips', role: 'group', 'aria-label': 'Filter by type' }, ...chips), el('label', { class: 'sort' }, 'Sort', sel));
   }
-  /** Triage: the open asks one at a time, in the order the filters chose. Skip moves on without answering and is not stored; an answer moves on to the next ask. */
-  let cur = null, curAt = 0;
-  const reshow = (control) => { cur = null; curAt = 0; render(); document.querySelector(control)?.focus({ preventScroll: true }); };
-  function triage(items, hidden) {
-    if (!items.length) return el('section', { class: 'card caught' }, el('h2', {}, 'All caught up'), el('p', { class: 'meta' }, 'Nothing is waiting on you.'),
-      el('a', { class: 'more', href: '#' }, 'Back to Summary'), dismissed(hidden));
-    let i = items.findIndex((d) => d.key === cur);
-    if (i < 0) i = Math.min(curAt, items.length - 1);
-    const d = items[i], next = items[i + 1], n = items.length, card = row(d, { x: false }), dis = xBtn(d, 'Dismiss');
-    [cur, curAt] = [d.key, i];
-    const go = (key) => () => { cur = key; render(); scrollTo(0, 0); }, skip = n > 1 && el('button', { class: 'skip' }, 'Skip for now'), rec = card.querySelector('.choices .rec');
-    if (skip) skip.onclick = go(items[(i + 1) % n].key);
-    // On a phone a swipe right on the ask picks the recommended answer and a swipe left skips; a swipe in the picture row only scrolls it.
-    let start;
-    card.addEventListener('touchstart', (e) => (start = e.target.closest('.mocks, textarea') ? null : e.touches[0]), { passive: true });
-    card.addEventListener('touchend', (e) => {
-      const t = e.changedTouches[0], dx = start ? t.clientX - start.clientX : 0;
-      if (Math.abs(dx) > 90 && Math.abs(t.clientY - start.clientY) < Math.abs(dx) / 2) (dx > 0 ? rec : skip)?.click();
-    });
-    const hint = [rec && 'Swipe right for the recommended answer', skip && (rec ? 'left to skip' : 'Swipe left to skip')].filter(Boolean).join(', ');
-    const keys = [d.options.length && d.type !== 'design' && `1 to ${Math.min(d.options.length, 9)} answer`, skip && 'E skip', 'Z undo'].filter(Boolean).join(' · ');
-    const queue = el('ol', { class: 'queue', 'aria-label': `${n} ${n > 1 ? 'asks' : 'ask'}, one at a time` }, ...items.map((x) => {
-      const b = el('button', { ...(x === d && { 'aria-current': 'true' }) }, el('strong', { dir: 'auto' }, title(x)), el('span', { class: 'meta', dir: 'auto' }, sub(x)));
-      b.onclick = go(x.key);
-      return el('li', {}, b);
-    }));
-    return el('div', { class: 'tri' }, queue, el('div', { class: 'focus' }, el('p', { class: 'fhead' }, `${i + 1} of ${n}`),
-      el('div', { class: 'pbar', 'aria-hidden': 'true' }, el('i', { style: `width: ${((i + 1) / n) * 100}%` })),
-      d.filed ? el('p', { class: 'meta since' }, `Waiting since ${when(d.filed)}`) : '', card,
-      d.kind === 'design' || skip || dis ? el('div', { class: 'quiet' }, d.kind === 'design' ? el('a', { class: 'open-link', href: `#designs/${d.key}` }, 'Open designs') : skip || '', dis) : '', next ? el('div', { class: 'card upnext' }, el('p', { class: 'meta' }, 'Up next'), el('strong', { dir: 'auto' }, title(next))) : '',
-      hint ? el('p', { class: 'meta hint' }, hint) : '', el('p', { class: 'meta keys' }, `Keys: ${keys}`), dismissed(hidden)));
+  /** The plan is the lead card; the remaining asks are a grouped list linking to a focused decision. */
+  function planCard(d) {
+    const meta = [el('span', {}, `${d.sections.length} sections`), el('span', {}, `${d.decisions.length} decisions`),
+      el('span', {}, `${d.filer || 'Agent'}${d.filed ? ` · ${when(d.filed)}` : ''}`)];
+    return el('article', { class: 'plan-hero', id: `item-${d.key}` }, el('div', { class: 'plan-preview' }, rung(d)),
+      el('div', { class: 'plan-copy' }, el('p', { class: 'eyebrow' }, `Plan${d.project ? ` · ${d.project}` : ''}`),
+        el('h2', { dir: 'auto' }, d.title), el('p', { class: 'about', dir: 'auto' }, d.about ?? ''),
+        el('div', { class: 'plan-meta' }, ...meta), el('a', { class: 'open-link plan-open', href: `#waiting/${d.key}` }, 'Open plan')));
   }
-  // Triage keys at a desk: a number picks that answer (in the order shown), E skips, Z takes back the last tap.
+  function waitingPage(items, hidden) {
+    const plans = items.filter((d) => d.type === 'plan'), asks = items.filter((d) => d.type !== 'plan');
+    const rows = asks.map((d) => {
+      const label = `${d.filer || 'Agent'}${d.silent_by ? ` · closes at ${when(d.silent_by)}` : d.filed ? ` · waiting since ${when(d.filed)}` : ''}`;
+      const link = el('a', { class: 'ask-card', id: `item-${d.key}`, href: d.kind === 'design' ? `#designs/${d.key}` : `#decide/${d.key}` }, icon(({ 'yes-no': 'toggle', 'pick-one': 'calendar', design: 'grid', signin: 'layout', approval: 'shield', reply: 'chat' })[typeOf(d)] ?? 'waiting'),
+        el('span', { class: 'copy' }, el('span', { class: 'kind' }, kind(d)), el('strong', { class: 'title', dir: 'auto' }, title(d)),
+          d.why || d.about ? el('span', { class: 'meta', dir: 'auto' }, d.why || d.about) : '', el('span', { class: 'meta' }, label)));
+      return el('li', {}, link, xBtn(d));
+    });
+    return el('div', { class: 'waiting-page' },
+      ...plans.map(planCard), ...(asks.length ? [el('p', { class: 'pick-label' }, 'ASKS'), el('ul', { class: 'ask-group' }, ...rows)] : []),
+      !items.length ? el('p', { class: 'empty' }, EMPTY.waiting) : '', dismissed(hidden));
+  }
+  const selected = new Map();
+  function decidePage(d) {
+    if (!d) return el('p', { class: 'empty' }, EMPTY.waiting);
+    if (d.type === 'signin') return el('div', { class: 'decide' }, row(d, { x: false }), el('div', { class: 'decide-bar' }, el('a', { class: 'later', href: '#waiting' }, 'Later')));
+    const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` }), opts = d.options ?? [];
+    const initial = selected.get(d.key) ?? d.recommend_value ?? opts[0]?.value;
+    const optionButtons = opts.map((o) => {
+      const recommended = o.value === d.recommend_value, b = el('button', { class: 'pick-option', 'aria-pressed': String(o.value === initial),
+        'aria-label': `${o.label}${recommended ? ', Recommended' : ''}` },
+        el('span', { class: 'words' }, el('span', { class: 'label' }, o.label), o.outcome ? el('span', { class: 'reason', dir: 'auto' }, o.outcome) : '',
+          recommended ? el('span', { class: 'recommend' }, 'Recommended') : ''), el('span', { class: 'check', 'aria-hidden': 'true' }, '✓'));
+      b.onclick = () => { selected.set(d.key, o.value); optionButtons.forEach((btn) => btn.setAttribute('aria-pressed', String(btn === b))); answer.textContent = `Answer ${o.label}`; };
+      return b;
+    });
+    const selectedOption = () => opts.find((o) => o.value === (selected.get(d.key) ?? initial));
+    const answer = el('button', { class: 'answer' }, `Answer ${selectedOption()?.label ?? 'now'}`);
+    answer.onclick = () => { const o = selectedOption(); if (o) save(d, o, optionButtons, err); };
+    const preview = d.type === 'design' || d.mocks?.length ? mockCards(d, []) : d.view ? rung(d) : pic(d) ? thumb('waiting', pic(d)) : proof(d);
+    const quiet = opts.find((o) => o.value === d.default_if_silent);
+    const silent = quiet ? `If you stay quiet: ${quiet.label}${d.silent_by ? ` · ${left(d.silent_by)}` : ''}` : '';
+    const head = el('div', { class: 'lead' }, el('p', { class: 'eyebrow' }, kind(d)), el('h2', { dir: 'auto' }, headline(d)));
+    const back = el('a', { class: 'later', href: '#waiting' }, 'Later');
+    const choices = opts.length ? [el('p', { class: 'pick-label' }, typeOf(d) === 'yes-no' ? 'YES OR NO' : 'PICK ONE'),
+      el('ul', { class: 'pick-list', role: 'group', 'aria-label': d.title }, ...optionButtons)] : [other(d, answerOf(d.key), err)];
+    return el('section', { class: 'decide' }, preview ? el('div', { class: 'decide-preview' }, preview) : '', head,
+      d.why ? el('p', { class: 'why', dir: 'auto' }, d.why) : '', ...choices, silent ? el('p', { class: 'silent-line' }, silent) : '', err,
+      el('div', { class: 'decide-bar' }, opts.length ? answer : '', back));
+  }
+  const reshow = (control) => { render(); document.querySelector(control)?.focus({ preventScroll: true }); };
+  // On Decide, a number selects and submits an answer; E goes back to Waiting, Z undoes the last answer.
   addEventListener('keydown', (e) => {
-    if (location.hash !== '#waiting' || e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.('textarea, input, select')) return;
-    const k = e.key.toLowerCase(), pick = /^[1-9]$/.test(k) && document.querySelectorAll('.focus .choices button')[k - 1];
-    const act = pick || (k === 'e' ? document.querySelector('.quiet .skip') : k === 'z' && !toast.hidden && !undoBtn.hidden ? undoBtn : null);
+    if (e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.('textarea, input, select')) return;
+    const k = e.key.toLowerCase(), onDecide = /^#decide\//.test(location.hash), choices = [...document.querySelectorAll('.decide .pick-option')];
+    const pick = onDecide && /^[1-9]$/.test(k) ? choices[Number(k) - 1] : null;
+    if (pick) { e.preventDefault(); pick.click(); document.querySelector('.decide-bar .answer')?.click(); return; }
+    const act = k === 'e' && onDecide ? document.querySelector('.decide-bar .later') : k === 'z' && !toast.hidden && !undoBtn.hidden ? undoBtn : null;
     if (act && !act.disabled) e.preventDefault(), act.click();
   });
 
@@ -1496,23 +1546,27 @@
     const shown = waitType === 'all' ? by.waiting : by.waiting.filter((d) => typeOf(d) === waitType);
     const hidden = state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'waiting');
     by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
-    const [, at, key] = /^#(waiting|designs|evidence|reports|answered)(?:\/([\w.-]+))?$/.exec(location.hash) ?? [];
-    const link = (a, name, n) => el('a', { href: `#${a}`, ...(a === (at ?? '') && { 'aria-current': 'page' }) }, icon(a || 'summary'), name, n === undefined ? '' : el('span', { class: 'n' }, String(n)));
+    const [, at, key] = /^#(waiting|decide|designs|evidence|reports|answered)(?:\/([\w.-]+))?$/.exec(location.hash) ?? [];
+    const active = at === 'decide' ? 'waiting' : at;
+    const link = (a, name, n) => el('a', { href: `#${a}`, ...(a === (active ?? '') && { 'aria-current': 'page' }) }, icon(a || 'summary'), name, n === undefined ? '' : el('span', { class: 'n' }, String(n)));
     document.getElementById('nav').replaceChildren(el('p', { class: 'brand' }, 'sign-off'), link('', 'Summary'), ...Object.keys(AREAS).map((a) => link(a, NAV[a], by[a].length)));
     document.getElementById('tabs').replaceChildren(...Object.keys(AREAS).map((a) => el('a', { href: `#${a}`, 'aria-label': `${AREAS[a]}, ${by[a].length}`,
-      ...(a === at && { 'aria-current': 'page' }) }, icon(a), TAB[a])));
+      ...(a === active && { 'aria-current': 'page' }) }, icon(a), TAB[a])));
     const ro = state.readonly ? 'Read only' : FROZEN ? `Read-only copy, ${FROZEN.exported}` : '';
-    const top = el('header', { class: 'top' }, at ? el('a', { class: 'back', href: '#' }, '‹ Summary')
+    const pageTitle = at === 'decide' ? 'Decide' : AREAS[at];
+    const top = el('header', { class: 'top' }, at ? el('a', { class: 'back', href: at === 'decide' ? '#waiting' : '#' }, at === 'decide' ? '‹ Waiting on you' : '‹ Summary')
       : el('p', { class: 'date' }, new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })),
-    el('h1', { tabindex: '-1' }, at ? AREAS[at] : 'Summary'), at ? '' : icon('you'), ro ? el('p', { class: 'meta' }, ro) : '',
-    at === 'reports' && !state.readonly && by.reports.length ? el('p', { class: 'lede' }, by.reports.some((d) => d.steps)
+    el('h1', { tabindex: '-1' }, at ? pageTitle : 'Summary'), at ? '' : icon('you'), ro ? el('p', { class: 'meta' }, ro) : '',
+    at === 'waiting' && !state.readonly && by.waiting.length ? el('p', { class: 'lede waiting-lede' }, `${shown.length} ${shown.length === 1 ? 'item needs' : 'items need'} you · ${new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}`)
+      : at === 'reports' && !state.readonly && by.reports.length ? el('p', { class: 'lede' }, by.reports.some((d) => d.steps)
       ? 'How the tools work, step by step. Tap one to open it.' : 'Explainers the agents made for you. Tap one to open it.')
       : at === 'answered' && by.answered.length ? el('p', { class: 'lede' }, `${by.answered.filter((d) => isToday(state.answers[d.key].at)).length} answered today.`)
       : at === 'evidence' && by.evidence.length ? el('p', { class: 'lede' }, updates(by.evidence)) : '');
-    const first = by.waiting[0], more = by.waiting.length > 1 ? `Answer all ${by.waiting.length} in Triage →` : 'Open in Triage →';
+    const first = by.waiting[0], more = by.waiting.length > 1 ? `Review all ${by.waiting.length} →` : 'Review ask →';
     const needs = el('section', { class: 'card needs' }, el('h2', {}, 'Needs you first'), ...(first ? [first.filed ? el('p', { class: 'meta since' }, `Waiting since ${when(first.filed)}`) : '', row(first, { x: false }),
       el('div', { class: 'foot' }, xBtn(first, 'Dismiss'), first.kind === 'design' ? el('a', { class: 'open-link', href: `#designs/${first.key}` }, 'Open designs') : el('a', { class: 'more', href: '#waiting' }, more))] : [el('p', { class: 'meta' }, 'Nothing is waiting on you.')]), dismissed(hidden));
-    document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [filters(by.waiting), triage(shown, hidden)]
+    document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [filters(by.waiting), waitingPage(shown, hidden)]
+      : at === 'decide' && !state.readonly ? [decidePage(by.waiting.find((d) => d.key === key && !gone.has(d.key)))]
       : at === 'designs' ? [...designGroups(by.designs)] : at === 'reports' && !state.readonly ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
         ...(by.reports.length ? reportGroups(by.reports) : [el('p', { class: 'empty' }, EMPTY.reports)]), notes(by.notes)] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [at === 'evidence' && by[at].length ? el('div', { class: 'sec-head' }, el('h2', {}, 'Updates')) : '', at === 'waiting' ? filters(by.waiting) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...(at === 'waiting' ? shown : by[at]).map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [el('div', { class: 'tiles' }, ...Object.keys(AREAS).map((a) => tile(a, by[a]))),
@@ -1531,7 +1585,7 @@
   // Closing a report or plan goes back to its card, with the focus on its link; an open report takes the focus on its title.
   addEventListener('hashchange', () => {
     const back = !reader.hidden && reader.dataset.key;
-    if (jump && location.hash === '#waiting') [cur, jump] = [jump, null];
+    if (jump && location.hash === '#waiting') jump = null;
     if (location.hash === '#waiting') waitType = 'all';
     render();
     if (!reader.hidden) { scrollTo(0, 0); return reader.querySelector('h1').focus({ preventScroll: true }); }
