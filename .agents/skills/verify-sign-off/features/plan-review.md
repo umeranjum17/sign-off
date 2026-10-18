@@ -15,6 +15,8 @@ Repeat with dark/390, light/1280 and dark/1280, each in its own output folder (8
 The script posts a real two-section, one-decision plan through the CLI into a fresh throwaway HOME and drives its real browser controls through chrome-devtools-axi.
 It captures home, plan on load, section approved, Change note, decision picked, step 2, sent and Answered, and writes answers.json, wait.json, list.txt and per-shot claims and DOM records.
 Light captures must be light. Inspect every capture before keeping it. Check each claim separately; the home does not prove a decision, and a sent screen does not prove the CLI payload.
+For one concrete claim per screenshot, run `PLAN_REVIEW_STAGE=note PLAN_REVIEW_THEME=light PLAN_REVIEW_WIDTH=390 done-done verify plan-review --outcome "At 390px in light, Change has the note Keep the desktop layout too."`; repeat for each stage/theme/width. The driver still completes the entire real journey but emits only that stage's screenshot. Set `PLAN_REVIEW_TRACE=1` for a native browser performance recording of the interactions.
+The run API's selector wait and selector click can fail with `fn is not a function`; this driver uses plain-expression polling, real functions for page evaluation, and native snapshot refs for the initial pointer click and note input.
 
 The existing Waiting type-filter integration journey in `test/design.test.mjs` also reviews a plan, checks an empty Change blocks sending, reloads an unsent draft, sends through the UI and checks the saved answer and disabled controls.
 The plan CLI case in `test/contract.test.mjs` checks list counts and structured answers/events.

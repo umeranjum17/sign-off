@@ -44,6 +44,7 @@ try {
   const base = await new Promise((ok, no) => { let log = ''; server.stdout.on('data', (b) => { log += b; const m = /http:\/\/127\.0\.0\.1:\d+\//.exec(log); if (m) ok(m[0]); }); server.once('exit', (code) => no(new Error(`Server exited ${code}`))); });
   browser('open', base); browser('emulate', '--viewport', width === 390 ? '390x844x2,mobile,touch' : '1280x800x1', '--color-scheme', theme);
   const capture = (name, claim) => {
+    if (process.env.PLAN_REVIEW_STAGE && process.env.PLAN_REVIEW_STAGE !== name) return;
     const stem = `${name}.${theme}.${width}w`;
     browser('screenshot', join(out, `${stem}.png`));
     const dom = probe();
@@ -69,6 +70,7 @@ try {
   writeFileSync(join(out, 'direction.dom.json'), JSON.stringify(probe()));
   browser('open', frame.back); browser('emulate', '--viewport', width === 390 ? '390x844x2,mobile,touch' : '1280x800x1', '--color-scheme', theme);
   drive('await wait(".plan-section");');
+  if (process.env.PLAN_REVIEW_TRACE) browser('perf-start', '--no-reload', '--no-auto-stop', '--file', join(out, 'interaction.trace.json.gz'));
   drive('await page.eval(() => document.querySelector(".plan-section").scrollIntoView()); await page.eval(() => document.querySelector(".plan-verdicts .approve").click());');
   capture('approved', 'The first section is marked Approved with a selected Approve button.');
   drive('await page.eval(() => { document.querySelectorAll(".plan-section")[1].scrollIntoView(); document.querySelector(".plan-section:nth-of-type(2) .change").click(); });');
@@ -81,14 +83,17 @@ try {
   capture('explain', 'The step explainer shows step 2 and Previous and Next controls.');
   drive('await page.eval(() => document.querySelector(".plan-send .open-link").click()); await wait(".plan-sent");');
   capture('sent', 'Sent back confirms the answers were saved for the agent.');
+  if (process.env.PLAN_REVIEW_TRACE) browser('perf-stop');
   const answers = cli('answers', board, '--json'), answer = JSON.parse(answers)[plan.key];
   assert.deepEqual(answer.notes, [{ section: plan.sections[0].id, verdict: 'approve' }, { section: plan.sections[1].id, verdict: 'change', note: 'Keep the desktop layout too.' }]);
   assert.equal(answer.decisions[plan.decisions[0].key], plan.decisions[0].options[0].value);
-  writeFileSync(join(out, 'answers.json'), answers);
-  writeFileSync(join(out, 'wait.json'), cli('wait', board, '--filer', plan.filer, '--json', '--timeout', '0'));
+  const waited = cli('wait', board, '--filer', plan.filer, '--json', '--timeout', '0');
+  if (!process.env.PLAN_REVIEW_STAGE || process.env.PLAN_REVIEW_STAGE === 'sent') {
+    writeFileSync(join(out, 'answers.json'), answers); writeFileSync(join(out, 'wait.json'), waited);
+  }
   drive('await page.eval(() => document.querySelector(".plan-sent a").click()); await wait(".i-answered .compact");');
   capture('answered', 'The plan is in Answered with Sent back and no longer waits.');
-  writeFileSync(join(out, 'list.txt'), cli('list', board));
+  if (!process.env.PLAN_REVIEW_STAGE || process.env.PLAN_REVIEW_STAGE === 'answered') writeFileSync(join(out, 'list.txt'), cli('list', board));
 } finally {
   browser('stop'); server.kill();
   console.log(`Scratch for cleanup: ${dir}`);
