@@ -282,8 +282,8 @@ also copies each file into `evidence/<number>/` next to the board:
 - An ask carries the card's comments on mock elements not sent yet in `comments`, as an answer does; with any, its `note` may be empty.
 
 **Dismissed items**, written by sign-off next to the questions (`decisions.dismissed.jsonl`, mode 600, one line
-per item per tap, the latest line per key wins). **Dismiss** (the × or the Dismiss button on an item) and **Clear all done** (on Answered) hide
-items from the page; an unanswered plan cannot be dismissed, and appears here only after its send-back. **Undo**, or **Restore** under **Dismissed (N)**, saves `"dismissed": false`. `list` does not count a dismissed item as waiting or answered, and `answers` does not count it as waiting either (`list --full` says `dismissed` for an unanswered one and still its answer for an answered one, `list --json` adds `"dismissed": true`); the agent is not told, so an ask it waits on keeps waiting, and `answers` still returns a dismissed answer.
+per item per tap, the latest line per key wins). **Dismiss** (the × or the Dismiss button on an item) (on every card, a plan included) and **Clear all** (at the right of every tab title, over what that tab lists) hide
+items from the page; **Undo**, or **Restore** under **Dismissed (N)**, saves `"dismissed": false`. `list` does not count a dismissed item as waiting or answered, and `answers` does not count it as waiting either (`list --full` says `dismissed` for an unanswered one and still its answer for an answered one, `list --json` adds `"dismissed": true`); the agent is not told, so an ask it waits on keeps waiting, and `answers` still returns a dismissed answer.
 A new answer or another round after the line brings the item back. Read-only boards refuse it; answers-only boards take it.
 `*.dismissed.jsonl` is git-ignored here like `*.answers.jsonl`.
 
