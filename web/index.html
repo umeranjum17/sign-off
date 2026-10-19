@@ -127,7 +127,7 @@
   /* Each row's picture is a 60px tile holding one line icon for what the report explains with; a hairline starts under the words, not the picture. */
   .rows.reports .rth { display: grid; flex: none; place-items: center; width: 3.75rem; height: 3.75rem; border-radius: 0.75rem; background: var(--sunk); color: var(--muted); overflow: hidden; }
   .rows.reports .rth svg { width: 3.25rem; height: 3.25rem; }
-  .rows.reports .rth .icon svg { width: 1.75rem; height: 1.75rem; stroke: var(--muted); }
+  .rows.reports .rth .icon { width: auto; height: auto; background: none; } .rows.reports .rth .icon svg { width: 1.75rem; height: 1.75rem; stroke: var(--muted); }
   #reader .read > .dis { min-height: 2.75rem; margin-top: 1rem; padding: 0 0.5rem; border: 0; background: none; color: var(--muted); }
   .rows.reports > li + li { position: relative; border-top: 0; }
   .rows.reports > li + li::before { content: ""; position: absolute; top: 0; right: 0; left: 4.5rem; border-top: 0.5px solid var(--line); }
