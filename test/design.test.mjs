@@ -1986,6 +1986,8 @@ test('Summary on a phone: Proven today swipes inside its row and a long title wr
   await until(async () => (await evaluate('document.querySelectorAll(".areas .compact").length')) > 0);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= 390'));
   assert.ok(await evaluate('[...document.querySelectorAll(".tabs a")].every((a) => a.getBoundingClientRect().right <= 390)'));
+  // Proven today starts at the page gutter, not flush at the screen edge.
+  assert.ok(await evaluate('document.querySelector(".ev-scroll-row .ev-card").getBoundingClientRect().left >= 20'));
   // With no designs filed, the Designs screen still opens and its tab is the lit one.
   await evaluate('location.hash = "#designs"');
   await until(async () => (await evaluate('document.querySelector("#board h1").textContent')) === 'Designs');
