@@ -1271,9 +1271,8 @@
       const screen = session.open;
       if (!screen && d.options?.length && !pick.value) { err.textContent = 'Choose a direction before sending your review.'; pick.focus(); return Promise.resolve(); }
       // A screen save (the viewer) sends no design-wide verdict; a note carries the verdict of the button that saved it, on a screen or at design level.
-      const selected = target(), text = note.value.trim(), writes = (selected && screen) || text;
-      const replaces = !selected || writes;
-      const notes = (state.answers[d.key]?.notes ?? []).filter((n) => !replaces || n.journey !== selected?.journey.id || n.screen !== selected?.screen.id);
+      const selected = target(), text = note.value.trim(), writes = (selected && screen) || text, live = new Set(screens.map(screenKey));
+      const notes = (state.answers[d.key]?.notes ?? []).filter((n) => (!n.journey || live.has(`${n.journey}/${n.screen}`)) && (n.journey !== selected?.journey.id || n.screen !== selected?.screen.id));
       if (writes) notes.push({ ...(selected && { journey: selected.journey.id, screen: selected.screen.id }), verdict, note: text });
       saving = true; approve.disabled = change.disabled = true;
       return call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, ...(!screen && { verdict }), ...(screen && { requested: verdict === 'change' }),
