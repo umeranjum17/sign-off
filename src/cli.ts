@@ -853,7 +853,7 @@ function signin(args: string[]) {
 function dismiss(restoring: boolean) {
   const cmd = restoring ? 'restore' : 'dismiss';
   return (args: string[]) => {
-    const at = args.findIndex((a) => !a.startsWith('-')), key = args[at];
+    const at = args.findIndex((a) => !a.startsWith('-') && !existsSync(a)), key = args[at];
     if (at < 0) throw fail(`${cmd} needs a card key`, 'VALIDATION_ERROR', `sign-off-axi ${cmd} <key> [board.json]`);
     const { file, on } = parse(cmd, args.filter((_, i) => i !== at), {});
     return locked(`${file}.lock`, () => {

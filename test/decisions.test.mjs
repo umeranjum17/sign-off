@@ -227,6 +227,10 @@ test('three dismissed updates are not waiting on the CLI either: list and answer
   assert.equal(run('dismiss', 'update-1', board).code, 0);
   assert.ok((await hidden()).includes('update-1'));
   assert.notEqual(run('dismiss', 'no-such-card', board).code, 0);
+  const before = await hidden(), missingKey = run('dismiss', board);
+  assert.notEqual(missingKey.code, 0);
+  assert.match(missingKey.out, /VALIDATION_ERROR/);
+  assert.deepEqual(await hidden(), before);
   proc.kill();
   // The agent is not told: answers still returns a dismissed answer, and a wait on the dismissed updates runs to its timeout.
   assert.match(run('answers', board, '--key', 'ship-the-new-sign-in-screen').out, /ship-the-new-sign-in-screen,yes/);
