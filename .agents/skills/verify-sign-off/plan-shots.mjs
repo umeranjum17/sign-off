@@ -62,6 +62,8 @@ try {
   };
   drive('await wait(".plan .open-link"); await page.eval(() => scrollTo(0, 0));');
   capture('home', 'Summary shows the plan card with a document icon and Open plan.');
+  // The phone tab bar covers the bottom edge, so bring the link clear of it before the real click.
+  drive('await page.eval(() => document.querySelector(".plan .open-link").scrollIntoView({ block: "center" }));');
   const openRef = /uid=(\S+) link "Open plan,/.exec(browser('snapshot'))[1];
   browser('click', `@${openRef}`); drive('await wait(".plan-section"); await wait(".plan-view[style]");');
   assert.equal(JSON.parse(drive('console.log(JSON.stringify(await page.eval(() => getComputedStyle(document.querySelector("#reader h1")).outlineStyle)));')), 'none');
