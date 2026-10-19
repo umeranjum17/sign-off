@@ -790,7 +790,7 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key: 'ship', title: 'When should it ship?', options: abc, recommend_value: 'b', filed: nine },
     { key: 'look', type: 'design', title: 'Pick the look', options: abc, recommend_value: 'b', filed: nine },
     { contract: 1, kind: 'report', schema: 1, key: 'merged', title: 'Merged: the sign-in fix', about: 'Checks passed.', filed: nine },
-    { contract: 1, kind: 'report', schema: 2, key: 'how', title: 'How it ships', group: 'How it works', filed: new Date().toISOString(), decided: 'Ships only when the check passes.',
+    { contract: 1, kind: 'report', schema: 2, key: 'how', title: 'How it ships', group: 'How it works', form: 'diagram', video: '0:28', asked_by: 'You asked', filed: new Date().toISOString(), decided: 'Ships only when the check passes.',
       view: 'mocks/how/index.html', preview: 'mocks/how/preview.svg', steps: [{ title: 'Build', marks: ['store'] }, { title: 'Check' }, { title: 'Ship', marks: ['gate', 'fail'] }] }] }));
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
@@ -835,11 +835,13 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   const reports = await dump('#reports');
   assert.match(reports, /<p class="lede">How the tools work, step by step\. Tap one to open it\.<\/p>/);
   assert.equal(reports.match(/class="card legend"/g).length, 1);
+  // The list row has no ×: Dismiss lives on the report's page.
+  assert.doesNotMatch(reports, /aria-label="Dismiss, How it ships"/);
   const flow = reports.match(/<ol class="flow"[^>]*>(.*?)<\/ol>/s)[1];
   assert.deepEqual([...flow.matchAll(/<li>(.*?)<\/li>/gs)].map((m) => [...m[1].matchAll(/mk mk-(\w+)/g)].map((x) => x[1])), [['store'], [], ['gate', 'fail']]);
   // Its group heads a grouped list with the filed time; its row is a link that opens it, with its title, its kind, steps and time, and a dot for New today.
   assert.match(reports, /<div class="sec-h"><h2>New<\/h2><\/div><ul class="card rows reports">/);
-  assert.match(reports, /<a class="compact" href="#reports\/how">.*?<strong dir="auto">How it ships<\/strong>.*?<span class="when">How it works · [^<]* · 3 steps · \d\d:\d\d<\/span>.*?<span class="new" role="img" aria-label="New today"><\/span><\/a>/s);
+  assert.match(reports, /<a class="compact" href="#reports\/how">.*?<strong dir="auto">How it ships<\/strong>.*?<span class="when">Diagram · Interactive · Video 0:28 · You asked, \d\d:\d\d<\/span>.*?<span class="new" role="img" aria-label="New today"><\/span><\/a>/s);
   // Only the report is a row and counted; the text-only one is folded under Notes, a short row with no page to open.
   assert.deepEqual([...reports.matchAll(/<li class="report" id="item-(\w+)"/g)].map((m) => m[1]), ['how']);
   // The sidebar counts it under its short name; the phone's tab bar marks Reports as the area on screen and reads its count.

@@ -32,6 +32,8 @@ export type Decision = {
   steps?: Step[];
   /** Reports: the section it is grouped under and what it decided. `filed` (ISO date-time) is when any item was filed. */
   group?: string; filed?: string; decided?: string;
+  /** Reports: what it explains with (an icon), the length of its narrated video, and who asked for it. */
+  form?: string; video?: string; asked_by?: string;
   /** Sign-ins: what the sign-in unlocks, who waits on it, and when its link stops working (ISO date-time). */
   unlocks?: string; waits?: string; expires?: string;
   /** A sign-in's start command, an argv run with no shell on the board's host when Open is tapped: the first https link it prints is the live sign-in link. */
@@ -77,6 +79,8 @@ const isText = (v: unknown) => typeof v === 'string';
 export const isKey = (v: unknown) => isText(v) && /^[A-Za-z0-9._-]{1,128}$/.test(v as string);
 const ONE_OF: Record<string, unknown[]> = { close: ['done', 'release'], area: ['waiting', 'evidence', 'reports', 'answered'] };
 /** What a step uses or can stop on: an AI model, a store, a gate, a hard fail. */
+/** What a report explains with: the board draws one line icon per form. */
+export const REPORT_FORMS = ['diagram', 'chart', 'before-after'];
 const MARKS = ['ai', 'store', 'gate', 'fail'];
 export const NOTE_MAX = 500;
 const TRADEOFF_MAX = 1000;
@@ -154,6 +158,9 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     }
     if (d.group !== undefined && !(isText(d.group) && d.group.trim() && [...d.group].length <= 40)) throw bad('group', 'must be text of 40 characters or fewer');
     if (d.filed !== undefined && !(isText(d.filed) && /^\d{4}-\d{2}-\d{2}T/.test(d.filed) && !Number.isNaN(Date.parse(d.filed)))) throw bad('filed', 'must be an ISO 8601 date-time such as 2026-10-13T07:19:00Z');
+    if (d.form !== undefined && !REPORT_FORMS.includes(d.form)) throw bad('form', `must be one of ${REPORT_FORMS.join(', ')}`);
+    if (d.video !== undefined && !(isText(d.video) && d.video.trim() && [...d.video].length <= 10)) throw bad('video', 'must be text of 10 characters or fewer');
+    if (d.asked_by !== undefined && !(isText(d.asked_by) && d.asked_by.trim() && [...d.asked_by].length <= 40)) throw bad('asked_by', 'must be text of 40 characters or fewer');
     if (d.decided !== undefined && !(isText(d.decided) && d.decided.trim() && [...d.decided].length <= 200)) throw bad('decided', 'must be text of 200 characters or fewer');
     if (d.type === 'evidence' && !(Number.isInteger(d.number) && d.number >= 1)) throw bad('number', 'must be a whole number from 1');
     const signin = d.type === 'signin';
@@ -216,6 +223,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       ...(views && { view: d.view }), ...(report && views && { preview: d.preview }), ...(d.reply && { reply: true }), ...(d.filer && { filer: d.filer }), ...(d.area && { area: d.area }),
       ...(signin && { unlocks: d.unlocks, waits: d.waits, ...(d.expires && { expires: d.expires }), ...(d.start && { start: [...d.start] }) }),
       ...(d.group && { group: d.group }), ...(d.filed && { filed: d.filed }), ...(d.decided && { decided: d.decided }),
+      ...(d.form && { form: d.form }), ...(d.video && { video: d.video }), ...(d.asked_by && { asked_by: d.asked_by }),
       ...(d.steps && { steps: d.steps.map(({ title, marks }: Step) => ({ title, ...(marks?.length && { marks }) })) }),
       ...(stored && d.media && { media: d.media.map(({ path, sha256, bytes }: MediaRef) => ({ path, sha256, bytes })) }),
       ...(d.type === 'evidence' && { number: d.number }),
