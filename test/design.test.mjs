@@ -812,18 +812,17 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   assert.doesNotMatch(home.match(/<section class="card needs.*?<\/section>/s)[0], /class="x"/);
   // Under its heading, when that ask was raised.
   assert.match(home, /<h2>Needs you first<\/h2><p class="meta since">Waiting since 09:15<\/p><article class="row design" id="item-look">/);
-  // Summary has the person's mark beside its title, and the Waiting on you tile one clock and the oldest ask's time (the design ask has none).
+  // Summary has the person's mark beside its title, then the glance lines with the oldest ask's time (the design ask has none), and the Waiting on you tile's count.
   assert.match(home, /<h1 tabindex="-1">Summary<\/h1><span class="icon i-you" aria-hidden="true">/);
-  const vis = (dom, a) => dom.match(new RegExp(`<a class="tile i-${a}".*?<span class="vis" aria-hidden="true">(.*?)<\\/span><span class="detail"`, 's'))[1];
-  assert.deepEqual(vis(home, 'waiting').match(/class="icon i-\w+"/g), ['class="icon i-waiting"']);
-  assert.match(home, /<a class="tile i-waiting".*?<span class="detail" dir="auto">Oldest 09:15<\/span>/s);
+  assert.match(home, /<p class="card glance"><b>2 asks need you\. <\/b><span>Oldest since 09:15\. <\/span>/);
+  assert.match(home, /<a class="tile i-waiting" href="#waiting" aria-label="Waiting on you, 2">.*?<span class="n">2<\/span>/s);
   // An ask dismissed from Waiting on you sits under Dismissed (1) at the end of Needs you first and of Waiting on you, with Restore.
   const gone = file.replace(/\.json$/, '.dismissed.jsonl');
   writeFileSync(gone, JSON.stringify({ key: 'ship', dismissed: true, at: new Date().toISOString() }) + '\n');
   const pages = {};
   for (const hash of ['', '#waiting']) assert.match(pages[hash] = await dump(hash), /<details class="other gone-asks"><summary>Dismissed \(1\)<\/summary><ul class="rows"><li><strong dir="auto">When should it ship\?<\/strong><button class="dis" aria-label="Restore, When should it ship\?">Restore<\/button><\/li><\/ul><\/details>/, hash);
   // Only the design ask waits now, and its filed time is the tile's oldest.
-  assert.match(pages[''], /<a class="tile i-waiting".*?<span class="detail" dir="auto">Oldest 09:15<\/span>/s);
+  assert.match(pages[''], /<b>1 ask needs you\. <\/b><span>Oldest since 09:15\. <\/span>/);
   // Restore returns the dismissed ask to the grouped list.
   const { evaluate, close } = await browse(join(dir, 'live'));
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
@@ -877,9 +876,10 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   }
   // Answered is Done today: a count under the title, Clear all done on the section head, and a short row per item with its answer and time under the title, beside its ×.
   writeFileSync(file.replace(/\.json$/, '.answers.jsonl'), ['ship', 'look'].map((key) => JSON.stringify({ key, answer: 'a', label: 'A', close: 'done', at: new Date().toISOString() })).join('\n') + '\n');
-  // Once both are answered, the Answered tile has a check for each and Waiting on you no clock.
+  // Once both are answered, the Answered tile counts both, Waiting on you none, and the glance says so.
   const after = await dump('');
-  assert.deepEqual([vis(after, 'answered').match(/class="icon i-\w+"/g), vis(after, 'waiting')], [['class="icon i-answered"', 'class="icon i-answered"'], '']);
+  assert.match(after, /<p class="card glance"><b>Nothing is waiting on you\. <\/b>(?:(?!<\/p>).)*<span>2 answered today\. <\/span><\/p>/);
+  assert.match(after, /aria-label="Answered, 2">.*?<span class="n">2<\/span>/s);
   const answered = await dump('#answered');
   assert.match(answered, /<p class="lede">2 answered today\.<\/p><\/header><div class="sec-head"><h2>Done today<\/h2><button class="clear">Clear all done<\/button><\/div>/);
   const lines = [...answered.matchAll(/<summary class="compact">.*?<strong[^>]*>(.*?)<\/strong>.*?<span class="ans"><b[^>]*>(\w+)<\/b><time>\d\d:\d\d<\/time><\/span><\/span><\/summary>.*?<\/details><button class="x" aria-label="Dismiss, [^"]+">×<\/button>/gs)];
@@ -2029,7 +2029,7 @@ test('Waiting on you: a diagram, an interactive page, an explainer and a free-fo
   proc.kill();
 });
 
-test('Clear all done on 201 answered items, set two across on a wide screen: the page empties in chunks, says so, and Undo brings all 201 back', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Clear all done on 201 answered items, one grouped list on a wide screen: the page empties in chunks, says so, and Undo brings all 201 back', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'many-answered'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l }));
@@ -2043,8 +2043,8 @@ test('Clear all done on 201 answered items, set two across on a wide screen: the
   const rows = 'document.querySelectorAll("article.row").length';
   await evaluate(`location.href = ${JSON.stringify(`${url}#answered`)}`);
   await until(async () => (await evaluate(`${rows} === 201`)));
-  // On a wide screen the rows are cards two across: the first two share a line, side by side.
-  assert.ok(await evaluate('(([a, b]) => a.top === b.top && b.left > a.right)([...document.querySelectorAll(".rows.i-answered > li")].map((li) => li.getBoundingClientRect()))'));
+  // On a wide screen the rows stay one grouped list: the second row sits under the first, at the same left edge.
+  assert.ok(await evaluate('(([a, b]) => b.top >= a.bottom && b.left === a.left)([...document.querySelectorAll(".rows.i-answered > li")].map((li) => li.getBoundingClientRect()))'));
   await evaluate('document.querySelector(".clear").click()');
   await until(async () => (await evaluate(`${rows} === 0 && document.querySelector(".empty")?.textContent === "All done items cleared."`)));
   await evaluate('document.getElementById("undo").click()');
@@ -2192,9 +2192,9 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   // The two sign-off proof lines differ only in case and share one head; the passed update whose proof names no project goes under Other.
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".sec-head h2")].map((h) => h.textContent)'), ['sign-off', 'Other']);
   assert.equal(await evaluate('document.querySelector(\'#nav a[href="#evidence"] .n\').textContent'), '3');
-  // The Summary tile names the newest listed update.
+  // The Summary's glance names the newest listed update.
   await evaluate('location.hash = ""');
-  await until(async () => (await evaluate('document.querySelector(".tile.i-evidence .detail")?.textContent')) === 'Newest: Update 4');
+  await until(async () => (await evaluate('document.querySelector(".glance")?.textContent.includes("Newest: Update 4.")')) === true);
   await evaluate('location.hash = "#evidence"');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 3);
   // Cards sit two across: the sign-off pair first, newest on the left, then Other under its own head.
