@@ -60,7 +60,7 @@ test('design review posts journeys and returns change notes through answers --js
   const outside = join(scratch, 'outside-design.png'); writeFileSync(outside, 'image'); symlinkSync(outside, join(dir, 'design', 'escape.png'));
   const escaped = run('post', board, '--kind', 'design', '--from', message('escaped-design.json', JSON.stringify({ ...msg, key: 'escaped-design', journeys: [{ ...msg.journeys[0], screens: [{ ...msg.journeys[0].screens[0], views: { phone_light: 'design/escape.png' } }] }] })));
   assert.equal(escaped.status, 2); assert.match(escaped.stdout, /outside the board folder/);
-  const proc = spawn('node', [cli, 'serve', board], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   try {
     const url = await new Promise(ok => proc.stdout.once('data', b => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
     const answer = (body, key = msg.key) => fetch(`${url}api/answers`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key, ...body }) });
