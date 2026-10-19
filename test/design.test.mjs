@@ -939,6 +939,13 @@ test('a sign-in card: posted on top of what waits with its link and time left, t
   await until(async () => (await evaluate('location.hash')) !== at);
   // The page is not loaded again from here on: a mark set now is still there at the end.
   await evaluate('window.stillHere = true');
+  // Dismiss on a sign-in's Decide page moves on to the next ask like any other ask, not to "Nothing to decide".
+  signin('tmp-login', 'Tmp', 'https://example.com/tmp', '15m');
+  await evaluate('location.hash = "#decide/tmp-login"');
+  await until(async () => (await card('tmp-login')) !== null);
+  await evaluate('document.querySelector(".decide-bar .dis").click()');
+  await until(async () => /^#decide\/(?!tmp-login)/.test(await evaluate('location.hash')));
+  assert.equal(await evaluate('document.querySelector("#board .empty")?.textContent'), undefined);
   // Past its time the link expires on the page: it says so plainly and Open is off.
   await evaluate('location.hash = "#waiting"');
   await evaluate('document.querySelector("#item-gh-login").click()');
