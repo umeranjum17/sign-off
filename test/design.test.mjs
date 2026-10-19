@@ -1266,7 +1266,7 @@ test('a posted contract design is listed with its preview and date, and opens fo
   assert.equal(await evaluate('location.hash'), '#designs/d1-design');
   assert.equal(await evaluate('String(document.querySelector(".design-review textarea").compareDocumentPosition([...document.querySelectorAll(".design-review > a")].find((a) => a.textContent === "Open original design")))'), '4');
   await evaluate('location.reload()');
-  await until(() => evaluate('!!document.querySelector("[aria-haspopup=dialog]")'));
+  await until(async () => (await evaluate('document.querySelector("[aria-haspopup=dialog]")?.textContent')) === 'Review full screen');
   await evaluate('document.querySelector("[aria-haspopup=dialog]").click()');
   await until(() => evaluate('!!document.querySelector(".design-viewer[open]")'));
   await evaluate('document.querySelector("[aria-label=\\"Next screen\\"]").click(); document.querySelector("[aria-label=\\"Next screen\\"]").click()');
@@ -1277,7 +1277,7 @@ test('a posted contract design is listed with its preview and date, and opens fo
   assert.equal(JSON.parse(run('answers', file, '--json').out)['d1-design'].notes.length, 3);
   await evaluate('document.querySelector("[aria-label=\\"Close viewer\\"]").click()');
   await until(() => evaluate('!document.querySelector(".design-viewer[open]")'));
-  assert.equal(await evaluate('String(document.querySelector(".design-review textarea").compareDocumentPosition([...document.querySelectorAll(".design-review > a")].find((a) => a.textContent === "Open original design")))'), '4');
+  await until(async () => (await evaluate('String(document.querySelector(".design-review textarea").compareDocumentPosition([...document.querySelectorAll(".design-review > a")].find((a) => a.textContent === "Open original design")))')) === '4');
   close();
   proc.kill();
 });
@@ -1362,7 +1362,7 @@ test('design screen saves: a screen-only save runs no on_answer, a change on a s
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
-  const screen = (notes) => post(url, 'api/answers', { key: 'd3-verdicts', notes });
+  const screen = (notes, requested) => post(url, 'api/answers', { key: 'd3-verdicts', notes, ...(requested && { requested: true }) });
   const design = (verdict, notes) => post(url, 'api/answers', { key: 'd3-verdicts', verdict, pick: 'a', notes });
   const saved = () => JSON.parse(run('answers', file, '--json').out)['d3-verdicts'];
   const approveA = { journey: 'flow', screen: 'a', verdict: 'approve', note: '' };
@@ -1371,7 +1371,7 @@ test('design screen saves: a screen-only save runs no on_answer, a change on a s
   assert.deepEqual([saved().answer, saved().label], ['screens', 'Screens reviewed']);
   assert.equal((await design('approve', [approveA])).status, 200);
   assert.deepEqual([saved().answer, saved().label], ['approve', 'Approved']);
-  assert.equal((await screen([approveA, changeB])).status, 200);
+  assert.equal((await screen([approveA, changeB], true)).status, 200);
   assert.deepEqual([saved().answer, saved().label, saved().pick], ['change', 'Changes requested', 'a']);
   assert.equal((await screen([{ ...approveA, note: 'Looks right' }, changeB])).status, 200);
   assert.equal(saved().answer, 'change');
@@ -1421,8 +1421,36 @@ test('design screen change: a change with new text on a screen that already had 
   assert.equal((await post(url, 'api/answers', { key: 'd3-change-again', notes: [changeB('Fix the title')] })).status, 200);
   assert.equal((await post(url, 'api/answers', { key: 'd3-change-again', verdict: 'approve', pick: 'a', notes: [changeB('Fix the title')] })).status, 200);
   assert.equal(saved().answer, 'approve');
-  assert.equal((await post(url, 'api/answers', { key: 'd3-change-again', notes: [changeB('Still wrong')] })).status, 200);
+  assert.equal((await post(url, 'api/answers', { key: 'd3-change-again', notes: [changeB('Still wrong')], requested: true })).status, 200);
   assert.deepEqual([saved().answer, saved().pick], ['change', 'a']);
+  proc.kill();
+});
+
+test('a viewer request for a change already stored on an approved design still sets it to change', async () => {
+  const dir = join(scratch, 'screen-rerequest'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), png);
+  writeFileSync(join(dir, 'design', 'a.png'), png);
+  writeFileSync(join(dir, 'design', 'b.png'), png);
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd3-rerequest', title: 'Review the flow screens',
+    about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
+    options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend: 'a',
+    journeys: [{ id: 'flow', title: 'Flow', screens: [
+      { id: 'a', title: 'First', views: { phone_light: 'design/a.png' } },
+      { id: 'b', title: 'Second', views: { phone_light: 'design/b.png' } },
+    ] }] };
+  writeFileSync(source, JSON.stringify(message));
+  assert.equal(run('post', file, '--kind', 'design', '--from', source).code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const saved = () => JSON.parse(run('answers', file, '--json').out)['d3-rerequest'];
+  const changeB = { journey: 'flow', screen: 'b', verdict: 'change', note: 'fix spacing' };
+  assert.equal((await post(url, 'api/answers', { key: 'd3-rerequest', notes: [changeB] })).status, 200);
+  assert.equal((await post(url, 'api/answers', { key: 'd3-rerequest', verdict: 'approve', pick: 'a', notes: [changeB] })).status, 200);
+  assert.equal(saved().answer, 'approve');
+  assert.equal((await post(url, 'api/answers', { key: 'd3-rerequest', notes: [changeB], requested: true })).status, 200);
+  assert.deepEqual([saved().answer, saved().label], ['change', 'Changes requested']);
   proc.kill();
 });
 

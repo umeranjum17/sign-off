@@ -1907,7 +1907,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     appendRound(file, key, note.trim(), comments);
     return [200, state()];
   }
-  const { key, answer, note = '', notes, decisions, verdict, pick } = JSON.parse(body) ?? {};
+  const { key, answer, note = '', notes, decisions, verdict, pick, requested } = JSON.parse(body) ?? {};
   if (typeof note !== 'string' || [...note.trim()].length > NOTE_MAX) return [400, { error: `The note must be text of ${NOTE_MAX} characters or fewer` }];
   const d = loadDecisions(file).find((x) => x.key === key);
   if (answer === REPLY.value && !note.trim() && !d?.options.some((o) => o.value === answer)) return [400, { error: 'Write the reply first' }];
@@ -1925,7 +1925,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   }
   if (d.kind === 'design') {
     try {
-      const before = readAnswers(file)[d.key]?.answer, a = appendDesignAnswer(file, d, verdict, notes, pick);
+      const before = readAnswers(file)[d.key]?.answer, a = appendDesignAnswer(file, d, verdict, notes, pick, requested);
       if (a && !awaitsVerdict(d.type, a) && (verdict !== undefined || a.answer !== before)) answered(a, d);
     } catch (e) { if (e instanceof InputError) return [400, { error: e.message }]; throw e; }
     return [200, state()];

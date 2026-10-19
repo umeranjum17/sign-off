@@ -288,11 +288,12 @@ export const awaitsVerdict = (type: string | undefined, a?: { answer?: string })
 const DESIGN_LABEL: Record<string, string> = { approve: 'Approved', change: 'Changes requested', [SCREENS_ONLY]: 'Screens reviewed' };
 
 /** Saves a design answer with screen-specific notes and an optional listed direction pick. A screen save omits the verdict: the design keeps its saved verdict, a change on a screen of an approved design sets it to change, and with none yet it waits as screens-only. */
-export function appendDesignAnswer(decisionsPath: string, d: Decision, verdict: unknown, notes: unknown, pick?: unknown): Answer | undefined {
+export function appendDesignAnswer(decisionsPath: string, d: Decision, verdict: unknown, notes: unknown, pick?: unknown, requested?: unknown): Answer | undefined {
   const bad = (rule: string) => new InputError(`key ${d.key}: ${rule}`);
   if (verdict !== undefined && verdict !== 'approve' && verdict !== 'change') throw bad('verdict must be approve or change, or omitted to save a screen');
   if (!Array.isArray(notes) || (verdict === 'change' && !notes.length)) throw bad('notes must be a list, with at least one note on change');
   if (verdict === undefined && !notes.some(n => n?.journey !== undefined)) throw bad('a screen save names its screen');
+  if (requested === true && (verdict !== undefined || !notes.some(n => n?.journey !== undefined && (n.verdict ?? 'change') === 'change'))) throw bad('a requested change is a screen save with a change note on a screen');
   const screens = new Set((d.journeys ?? []).flatMap(j => j.screens.map(s => `${j.id}/${s.id}`)));
   for (const n of notes) {
     const hasJourney = n?.journey !== undefined, hasScreen = n?.screen !== undefined;
@@ -307,10 +308,7 @@ export function appendDesignAnswer(decisionsPath: string, d: Decision, verdict: 
   if (pick !== undefined ? !options.some(o => o.value === pick) : verdict !== undefined && options.length > 0) throw bad('pick must be one listed option, and a design verdict needs one when options were offered');
   const current = readAnswers(decisionsPath)[d.key];
   const decided = current?.answer === 'approve' || current?.answer === 'change' ? current.answer : undefined;
-  const stored = (current?.notes ?? []) as DesignNote[];
-  const alreadyChange = (n: DesignNote) => stored.some(s => s.journey === n.journey && s.screen === n.screen && (s.verdict ?? 'change') === 'change' && s.note === n.note);
-  const requestsChange = notes.some((n: DesignNote) => n.journey !== undefined && (n.verdict ?? 'change') === 'change' && !alreadyChange(n));
-  const kept = (verdict ?? (decided === 'approve' && requestsChange ? 'change' : decided ?? SCREENS_ONLY)) as string;
+  const kept = (verdict ?? (decided === 'approve' && requested === true ? 'change' : decided ?? SCREENS_ONLY)) as string;
   const keptPick = (pick ?? current?.pick) as string | undefined;
   const answer: Answer = { key: d.key, answer: kept, label: DESIGN_LABEL[kept], close: d.close ?? 'done', at: now(), notes, ...(keptPick !== undefined && { pick: keptPick }) };
   if (current?.answer === answer.answer && JSON.stringify([current.notes, current.pick]) === JSON.stringify([answer.notes, answer.pick])) return;
