@@ -2,7 +2,7 @@
 
 ## Sub-features
 
-- Plan document icons on Summary rows and cards, and no pointer-focus box on the reader title.
+- Plan document icons on Today rows and cards, and no pointer-focus box on the reader title.
 - Sandboxed direction page, plan summary, mobile Go to next navigation, section Approve/Change controls, required Change note, an optional comment on an approval, decision outcomes and recommendations with an Other free-text answer, and a whole-plan comment, step taps.
 - Send back stays disabled until every part is answered; unsent browser drafts survive reload.
 - Send back saves structured section notes, decision picks or Other words, and the whole-plan comment for `answers --json` and `wait --json`, removes the plan from Waiting and lists it in Answered.
