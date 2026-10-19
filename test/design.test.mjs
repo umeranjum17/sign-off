@@ -1263,6 +1263,77 @@ test('Decide on a pick-one ask: the reply box sits under the options, and Skip f
   proc.kill();
 });
 
+test('Decide on a design pick with an HTML mock: Comment on the mocks is there before the pick and turns pointing on for that mock', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'decide-annotate'), file = join(dir, 'board.json');
+  mkdirSync(join(dir, 'mocks'), { recursive: true });
+  writeFileSync(join(dir, 'mocks', 'a.html'), '<main><button>Sign in</button></main>');
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key: 'look', type: 'design', title: 'Pick the look',
+    options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend_value: 'a', mocks: [{ value: 'a', path: 'mocks/a.html' }] }] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#decide/look`)}`);
+  await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'Pick the look');
+  const toggle = 'document.querySelector(\'.decide .ann button[aria-label^="Comment on the mocks"]\')';
+  assert.equal(await evaluate(`!!${toggle}`), true);
+  assert.equal(await evaluate(`${toggle}.getAttribute('aria-pressed')`), 'false');
+  await evaluate(`${toggle}.click()`);
+  await until(async () => (await evaluate(`${toggle}?.getAttribute('aria-pressed')`)) === 'true' && (await evaluate("pointing.get('look~a')")) === true);
+  assert.equal(await evaluate('document.querySelector(".decide .ann .meta")?.textContent'), 'Tap an element in a mock to comment on it. Turn this off to open a mock full size.');
+  await evaluate('document.querySelector(".decide .pick-option").click(); document.querySelector(".decide-bar .answer").click()');
+  await until(async () => (await evaluate('location.hash')) !== '#decide/look');
+  close();
+  proc.kill();
+});
+
+test('Undo on a card outside Waiting takes the answer back and stays on that area instead of opening a Decide page without it', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'undo-area'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key: 'build', title: 'Did the build pass?',
+    options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }], area: 'evidence' }] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
+  const choices = 'document.querySelectorAll("#item-build .choices button").length';
+  await until(async () => (await evaluate(choices)) === 2);
+  await evaluate('[...document.querySelectorAll("#item-build .choices button")].find((b) => b.textContent.startsWith("Yes")).click()');
+  await until(async () => (await evaluate('!document.querySelector("#toast").hidden')));
+  await evaluate('document.querySelector("#undo").click()');
+  await until(async () => (await evaluate('document.getElementById("toast-text").textContent')) === 'Undone: not answered');
+  assert.equal(await evaluate('location.hash'), '#evidence');
+  assert.equal(await evaluate(choices), 2);
+  close();
+  proc.kill();
+});
+
+test('Decide after an ask is replaced under the same key: the pick remembered from the old options is not offered, and Answer still answers', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'decide-options-changed'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  const doc = (options) => JSON.stringify({ schema: 2, items: [{ key: 'when', title: 'When should it ship?', options, recommend_value: options[0].value }] });
+  writeFileSync(file, doc([{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }]));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#decide/when`)}`);
+  await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'When should it ship?');
+  await evaluate('[...document.querySelectorAll(".decide .pick-option")].find((b) => b.textContent.startsWith("B")).click()');
+  assert.equal(await evaluate('document.querySelector(".decide-bar .answer").textContent'), 'Answer B');
+  writeFileSync(file, doc([{ value: 'c', label: 'C' }, { value: 'd', label: 'D' }]));
+  await evaluate('refresh()');
+  await until(async () => (await evaluate('document.querySelector(".decide .pick-option .label")?.textContent')) === 'C');
+  assert.equal(await evaluate('document.querySelectorAll(".decide .pick-option[aria-pressed=true]").length'), 1);
+  assert.equal(await evaluate('document.querySelector(".decide-bar .answer").textContent'), 'Answer C');
+  await evaluate('document.querySelector(".decide-bar .answer").click()');
+  await until(async () => (await evaluate('location.hash')) !== '#decide/when');
+  assert.equal(JSON.parse(run('answers', file, '--json').out).when.answer, 'c');
+  close();
+  proc.kill();
+});
+
 test('a posted contract design is listed with its preview and date, and opens for a saved approve/change review', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'contract-design-plain-row'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
   mkdirSync(join(dir, 'design'), { recursive: true });

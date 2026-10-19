@@ -1060,8 +1060,12 @@
   /** A page to open: an .html view, framed in a sandbox. */
   const reads = (d) => /\.html$/i.test(d.view ?? '');
   const hhmm = (at) => new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  /** Where an ask opens: a plan or a design has its own screen; every other ask opens on Decide. */
-  const askHref = (d) => (d.type === 'plan' ? `#waiting/${d.key}` : d.kind === 'design' ? `#designs/${d.key}` : `#decide/${d.key}`);
+  /** Where an item opens: its own area, and inside Waiting on you a plan or a design has its own screen; every other ask opens on Decide. */
+  const askHref = (d) => {
+    const a = area(d);
+    if (a !== 'waiting') return `#${a === 'notes' ? 'reports' : a}`;
+    return d.type === 'plan' ? `#waiting/${d.key}` : d.kind === 'design' ? `#designs/${d.key}` : `#decide/${d.key}`;
+  };
   const left = (at) => { const m = Math.ceil((Date.parse(at) - Date.now()) / 60_000); return m <= 0 ? 'deadline passed' : `${mins(m)} left`; };
   const isToday = (at) => new Date(at).toDateString() === new Date().toDateString();
   const day = (at) => new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
@@ -1565,7 +1569,8 @@
     const head = el('div', { class: 'lead' }, el('p', { class: 'eyebrow' }, kind(d)), el('h2', { dir: 'auto' }, headline(d)));
     const why = d.why || d.tradeoff;
     const back = el('a', { class: 'later', href: '#waiting' }, 'Later');
-    const page = el('section', { class: 'decide' }, preview ? el('div', { class: 'decide-preview' }, preview) : '', head,
+    const page = el('section', { class: 'decide' }, preview ? el('div', { class: 'decide-preview' }, preview) : '',
+      ...(d.mocks?.length ? [annotations(d)] : []), head,
       why ? el('p', { class: 'why', dir: 'auto' }, why) : '',
       ...(live && opts.length ? [el('p', { class: 'pick-label' }, typeOf(d) === 'yes-no' ? 'YES OR NO' : 'PICK ONE'),
         el('ul', { class: 'pick-list', 'aria-label': d.title }, ...optionButtons.map((b) => el('li', {}, b)))] : []),
