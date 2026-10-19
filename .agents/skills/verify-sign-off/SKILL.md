@@ -29,6 +29,7 @@ Harness: a browser (chrome-devtools-axi, one CHROME_DEVTOOLS_AXI_SESSION per run
 - [Plan review](features/plan-review.md): open a plan, approve or change sections, answer decisions and send back structured answers
 - [Evidence](features/evidence.md): the Evidence list grouped by project with the capture as the card's hero, and the update's own screen with the whole capture, the proof rows and the verdicts
 - [Notification sender](features/notifications.md): configure a local receiver, post a new ask and verify the exact received JSON, once per card
+- [Board actions](features/board-actions.md): every card kind on every tab, every action clicked, both widths and themes, with done-done's look step
 - [Design viewer](features/design-viewer.md): the full-screen screen review, its note box against its buttons at 390, 820 and 1280
 
 shots.sh BASE <folder> captures every screen at 390, 820 and 1280, light and dark. An emulated tap can miss; click a button from the page (eval "() => document.querySelector('[aria-label^=\"Pass,\"]').click()") when a tap does not land.
