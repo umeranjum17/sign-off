@@ -414,6 +414,7 @@
     margin-top: 1rem; padding: .75rem 0 .5rem; background: var(--bg); }
   /* Answer takes the row on one line; when a long label leaves no room, Skip and Later move under it rather than squeeze it. */
   .decide-bar > * { white-space: nowrap; }
+  .decide-bar > .silent-line { white-space: normal; min-width: 0; } /* the stay-quiet line wraps; nowrap pushed it past a phone's edge in a wider font */
   .decide-bar .answer { flex: 1 1 auto; background: var(--action); color: var(--on-accent); font-weight: 400; }
   .decide-bar .later { display: inline-flex; flex: none; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0 0.75rem; color: var(--accent); background: transparent; text-decoration: none; }
   .decide-bar .skip { flex: none; padding: 0 0.75rem; color: var(--muted); background: transparent; }
