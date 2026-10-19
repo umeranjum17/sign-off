@@ -1266,8 +1266,10 @@ test('a posted contract design is listed with its preview and date, and opens fo
   await until(() => evaluate('!document.querySelector(".design-viewer[open]")'));
   assert.equal(await evaluate('location.hash'), '#designs/d1-design');
   await until(async () => (await evaluate('String(document.querySelector(".design-review textarea").compareDocumentPosition([...document.querySelectorAll(".design-review > a")].find((a) => a.textContent === "Open original design")))')) === '4');
-  await evaluate('location.reload()');
-  await until(async () => (await evaluate('document.querySelector("[aria-haspopup=dialog]")?.textContent')) === 'Review full screen');
+  // The old page stays readable for a moment after location.reload(), so the wait names this load: a button read and clicked
+  // on the outgoing page goes away with it, and the viewer it opened never shows.
+  await evaluate('window.old = true, location.reload()');
+  await until(async () => (await evaluate('!window.old && document.querySelector("[aria-haspopup=dialog]")?.textContent')) === 'Review full screen');
   await evaluate('document.querySelector("[aria-haspopup=dialog]").click()');
   await until(() => evaluate('!!document.querySelector(".design-viewer[open]")'));
   await evaluate('document.querySelector("[aria-label=\\"Next screen\\"]").click(); document.querySelector("[aria-label=\\"Next screen\\"]").click()');
