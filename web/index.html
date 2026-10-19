@@ -327,6 +327,17 @@
   .pick-option[aria-pressed="true"]::before { content: none; }
   .pick-option[aria-pressed="true"] .check { visibility: visible; }
   .silent-line { margin: 1.25rem 0; color: var(--muted); }
+  .pager { position: absolute; top: .5rem; right: 0; display: flex; align-items: center; color: var(--muted); font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  .pager .of { white-space: nowrap; }
+  .pager .step { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; color: var(--accent); font-size: 1.75rem; text-decoration: none; }
+  .pager .step[aria-disabled] { color: var(--muted); opacity: .4; }
+  .decide-lists { margin-top: 2rem; }
+  .decide-lists .sec-head { margin: 0 0 .5rem; } .decide-lists .rows + .sec-head { margin-top: 1.75rem; }
+  .decide-lists .sec-head h2 { color: var(--muted); font-size: .8125rem; font-weight: 400; letter-spacing: .02em; text-transform: uppercase; }
+  .decide-lists .compact strong { font-weight: 400; } .decide-lists .compact .meta { font-size: .9375rem; }
+  .decide-lists .compact .thumb { width: 2rem; height: 2rem; border-radius: .5rem; }
+  .decide-lists .compact .icon { width: 2rem; height: 2rem; border-radius: .5rem; }
+  .decide-lists a.compact::after { content: "" / ""; flex: none; width: .5rem; height: .5rem; margin-right: .5rem; border: solid var(--border); border-width: 2px 2px 0 0; transform: rotate(45deg); }
   .decide-bar { position: fixed; z-index: 1; left: 0; right: 0; bottom: calc(4.125rem + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: .5rem;
     padding: .75rem max(1.25rem, env(safe-area-inset-right)) .75rem max(1.25rem, env(safe-area-inset-left)); background: var(--bg); }
   .decide-bar .answer { flex: 1; background: var(--action); color: var(--on-accent); }
@@ -1728,7 +1739,22 @@
       !items.length ? el('p', { class: 'empty' }, EMPTY.waiting) : '', dismissed(hidden));
   }
   const selected = new Map();
-  function decidePage(d, next) {
+  /** The bar's "‹ 1 of N ›": steps through the open asks; an end is a dimmed mark, not a link. */
+  const pager = (queue, i) => {
+    const step = (to, label, mark) => to < 0 || to >= queue.length ? el('span', { class: 'step', 'aria-disabled': 'true', 'aria-label': label }, mark)
+      : el('a', { class: 'step', href: `#decide/${queue[to].key}`, 'aria-label': label }, mark);
+    return el('nav', { class: 'pager', 'aria-label': 'Asks' }, step(i - 1, 'Previous ask', '‹'), el('span', { class: 'of' }, `${i + 1} of ${queue.length}`), step(i + 1, 'Next ask', '›'));
+  };
+  /** Under the actions: the other open asks, then what was answered today; the first opens on Decide, the second only reads. */
+  function decideLists(d, queue) {
+    const group = (name, rows) => rows.length ? [el('div', { class: 'sec-head' }, el('h2', {}, name)), el('ul', { class: 'card rows' }, ...rows)] : [];
+    const up = queue.filter((x) => x.key !== d.key).map((x) => el('li', {}, el('a', { class: 'compact', href: `#decide/${x.key}` },
+      thumb('waiting', pic(x)), el('span', { class: 't' }, el('strong', { dir: 'auto' }, title(x)), el('span', { class: 'meta' }, x.silent_by ? `Closes at ${when(x.silent_by)}` : 'No deadline')))));
+    const fresh = state.decisions.filter((x) => isAnswered(x) && isToday(state.answers[x.key].at)).sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at))
+      .map((x) => el('li', {}, el('div', { class: 'compact' }, ...compact(x, 'answered'))));
+    return el('div', { class: 'decide-lists' }, ...group('Up next', up), ...group('Answered today', fresh));
+  }
+  function decidePage(d, next, queue = []) {
     if (!d) return el('p', { class: 'empty' }, EMPTY.waiting);
     const to = next ? `#decide/${next.key}` : '#waiting', skip = next && !state.readonly ? el('button', { class: 'skip' }, 'Skip for now') : null;
     if (skip) skip.onclick = () => (location.hash = to);
@@ -1742,7 +1768,7 @@
       });
     };
     if (d.type === 'signin') {
-      const signinPage = el('div', { class: 'decide' }, row(d, { x: false }), el('div', { class: 'decide-bar' }, skip || '', el('a', { class: 'later', href: '#waiting' }, 'Later')));
+      const signinPage = el('div', { class: 'decide' }, row(d, { x: false }), el('div', { class: 'decide-bar' }, skip || '', el('a', { class: 'later', href: '#waiting' }, 'Later')), decideLists(d, queue));
       if (!state.readonly) swipe(signinPage);
       return signinPage;
     }
@@ -1776,7 +1802,7 @@
         el('ul', { class: 'pick-list', 'aria-label': d.title }, ...optionButtons.map((b) => el('li', {}, b)))] : []),
       ...(live ? [other(d, answerOf(d.key), err, () => (location.hash = to))] : []),
       silent ? el('p', { class: 'silent-line' }, silent) : '', err,
-      el('div', { class: 'decide-bar' }, live && opts.length ? answer : '', skip || '', back));
+      el('div', { class: 'decide-bar' }, live && opts.length ? answer : '', skip || '', back), decideLists(d, queue));
     if (live) swipe(page, () => { if (recOpt && !answer.disabled) answerWith(recOpt); });
     return page;
   }
@@ -1825,6 +1851,7 @@
     const top = el('header', { class: 'top' }, at ? el('a', { class: 'back', href: at === 'decide' ? '#waiting' : '#' }, at === 'decide' ? '‹ Waiting on you' : '‹ Summary') : '',
     el('h1', { tabindex: '-1' }, at ? pageTitle : 'Summary'), at ? '' : icon('you'), at ? '' : el('p', { class: 'date' }, new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })),
     ro ? el('p', { class: 'meta' }, ro) : '',
+    at === 'decide' && decideAt >= 0 ? pager(decideQueue, decideAt) : '',
     at === 'waiting' && !state.readonly && by.waiting.length ? el('p', { class: 'lede waiting-lede' }, `${shown.length} ${shown.length === 1 ? 'item needs' : 'items need'} you · ${new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}`)
       : at === 'reports' && !state.readonly && by.reports.length ? el('p', { class: 'lede' }, by.reports.some((d) => d.steps)
       ? 'How the tools work, step by step. Tap one to open it.' : 'Explainers the agents made for you. Tap one to open it.')
@@ -1835,7 +1862,7 @@
       el('div', { class: 'foot' }, xBtn(first, 'Dismiss'), first.kind === 'design' ? el('a', { class: 'open-link', href: `#designs/${first.key}` }, 'Open designs') : el('a', { class: 'more', href: '#waiting' }, more))] : [el('p', { class: 'meta' }, 'Nothing is waiting on you.')]), dismissed(hidden));
     document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [filters(by.waiting), waitingPage(shown, hidden)]
       : at === 'decide' ? [decideAt < 0 ? el('p', { class: 'empty' }, 'Nothing to decide for that question.')
-        : decidePage(decideQueue[decideAt], decideQueue.length > 1 ? decideQueue[(decideAt + 1) % decideQueue.length] : undefined)]
+        : decidePage(decideQueue[decideAt], decideQueue.length > 1 ? decideQueue[(decideAt + 1) % decideQueue.length] : undefined, decideQueue)]
       : at === 'designs' ? [...designGroups(by.designs)] : at === 'evidence' ? evidenceGroups(by.evidence) : at === 'reports' && !state.readonly ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
         ...(by.reports.length ? reportGroups(by.reports) : [el('p', { class: 'empty' }, EMPTY.reports)]), notes(by.notes)] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [at === 'waiting' ? filters(by.waiting) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...(at === 'waiting' ? shown : by[at]).map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [glance(by), el('div', { class: 'tiles' }, ...Object.keys(AREAS).map((a) => tile(a, by[a]))),
