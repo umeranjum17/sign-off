@@ -1444,7 +1444,7 @@ function init(args: string[]) {
   let board = join(so, 'decisions.json');
   try { board = readSetup(so).board; } catch {}
   const files: [string, string][] = [
-    [join(so, 'config.yaml'), `# sign-off repo setup. board: path under .sign-off/, port: dashboard port, agent: auto or the coding agents to install the skill for.\n# bind: 127.0.0.1 keeps the dashboard on this machine; a private address such as its VPN address lets a phone open it.\n# hosts: (optional) private DNS names that lead to that address, such as its mesh VPN name, commas between them.\n# on_answer: (optional) a command run for each answer, with the answer as one JSON line on its stdin; no shell, so | > && do nothing: on_answer: node hook.mjs\nboard: decisions.json\nport: 4410\nbind: 127.0.0.1\nagent: ${agent}\n`],
+    [join(so, 'config.yaml'), `# sign-off repo setup. board: path under .sign-off/, port: dashboard port, agent: auto or the coding agents to install the skill for.\n# bind: 127.0.0.1 keeps the dashboard on this machine; a private address such as its VPN address lets a phone open it.\n# hosts: (optional) private DNS names that lead to that address, such as its mesh VPN name, commas between them.\n# on_answer: (optional) a command run for each answer, with the answer as one JSON line on its stdin; no shell, so | > && do nothing: on_answer: node hook.mjs\n# name: (optional) your name, shown on the board. leash: how much agents may do without asking: ask, matters (the default) or act; the board's Leash control sets it.\nboard: decisions.json\nport: 4410\nbind: 127.0.0.1\nagent: ${agent}\n`],
     [board, `{"schema": 2, "items": []}\n`],
     [join(so, '.gitignore'), GITIGNORE],
   ];
@@ -1661,11 +1661,12 @@ async function doctor(args: string[]) {
     [`Run \`sign-off-axi open ${shellPath(board)}\` to show the board to the user`]);
 }
 
-let file = '', evidenceRoot = '', bind = '127.0.0.1', hosts: string[] = [], onAnswer: string[] = [];
+let file = '', config = '', evidenceRoot = '', bind = '127.0.0.1', hosts: string[] = [], onAnswer: string[] = [];
 async function serve(args: string[]) {
   const parsed = parse('serve', args, BOARD_FLAGS), port = boardPort(parsed.named, parsed.values.port);
   ready(parsed.file, parsed.on, parsed.values['evidence-root']);
   bind = bindOf(parsed.named, parsed.values.bind);
+  config = join(dirname(parsed.named), 'config.yaml');
   ({ hosts = [], onAnswer = [] } = setupOf(parsed.named) ?? {});
   let warned = false;
   const sweep = async (phase: 'startup' | 'periodic') => {
@@ -1730,6 +1731,7 @@ async function exportBoard(args: string[]) {
   const parsed = parse('export', args, { out: { type: 'string' }, 'evidence-root': { type: 'string' } });
   ready(parsed.file, parsed.on, parsed.values['evidence-root']);
   [file, evidenceRoot] = [parsed.file, parsed.values['evidence-root'] ? resolve(parsed.values['evidence-root']) : ''];
+  config = join(dirname(parsed.named), 'config.yaml');
   guardReady = warmGuard();
   await guardReady;
   const { file: _, messages: _messages, annotations: _annotations, ...frozen } = state(), files: Record<string, string> = {}, q = encodeURIComponent;
@@ -1824,6 +1826,17 @@ const warmGuard = () => new Promise<void>((done) => {
   };
   pass(true);
 });
+/** How much agents may do without asking, from the leash: line of config.yaml: ask (wait on every ask), matters (take the default at the
+ * silent-by time, the default) or act (take the recommended pick now and report it). With the name: line it is the page's only setting. */
+const LEASHES = ['ask', 'matters', 'act'];
+const configLine = (text: string, key: string) => new RegExp(`^[ \\t]*${key}[ \\t]*:([^#\\n]*)`, 'm').exec(text)?.[1].trim() || undefined;
+/** The user's name and leash; none for a board with no config.yaml beside it. */
+function profile() {
+  let text: string;
+  try { text = readFileSync(config, 'utf8'); } catch { return {}; }
+  const leash = configLine(text, 'leash') ?? '';
+  return { name: configLine(text, 'name')?.slice(0, 40), leash: LEASHES.includes(leash) ? leash : 'matters' };
+}
 const state = () => {
   reap();
   // The page marks sent comments in annotations, so answers and rounds go without theirs: a read-only board or an export carries none.
@@ -1838,6 +1851,7 @@ const state = () => {
       ...(d.mocks && { mocks: d.mocks.map((m) => ({ ...m, hash: mockHash(m.path) })) }) })),
     readonly: readOnly(),
     answers_only: answersOnly(),
+    ...profile(),
     answers,
     seen: Object.values(answers).filter(taken).map((a) => a.key),
     rounds,
@@ -1976,7 +1990,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     clearTimeout(timer);
     return [200, state()];
   }
-  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/signin'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
+  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/signin', '/api/leash'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
   if (readOnly()) return [403, { error: 'This board is read-only' }];
   // Dismiss only hides an item on this page and sends nothing to the feeding program, so an answers-only board takes it too.
   if (!['/api/answers', '/api/dismiss', '/api/signin'].includes(req.url!) && answersOnly()) return [403, { error: 'This board takes answers only' }];
@@ -2023,6 +2037,15 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
       // A run that ended with exit 0 before it printed a link was already signed in: the card is done, with no link to open.
       return board(file).find((x) => x.key === key)?.answer ? [200, { state: state() }] : [502, { error: e.message, state: state() }];
     }
+  }
+  if (req.url === '/api/leash') {
+    const { leash } = JSON.parse(body) ?? {};
+    if (!LEASHES.includes(leash)) return [400, { error: `Send a leash of ${LEASHES.join(', ')}` }];
+    let text: string;
+    try { text = readFileSync(config, 'utf8'); } catch { return [409, { error: 'This board has no config.yaml to keep the leash in; run sign-off-axi init' }]; }
+    const line = /^[ \t]*leash[ \t]*:.*$/m;
+    writeFileSync(config, line.test(text) ? text.replace(line, `leash: ${leash}`) : `${text.replace(/\n?$/, '\n')}leash: ${leash}\n`);
+    return [200, state()];
   }
   if (req.url === '/api/dismiss') {
     const { keys, dismissed } = JSON.parse(body) ?? {};
