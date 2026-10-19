@@ -86,10 +86,19 @@
     .top:has(+ .decide) .back { display: none; }
   }
 
-  /* Reports: a card per report, its steps as numbered nodes on a line with only the marks that matter under each; Open lists them in place. */
-  .reports { display: grid; gap: 0.75rem; }
-  .report { display: grid; gap: 0.75rem; scroll-margin-top: 4.5rem; }
-  .report .about, .report .decided { margin: 0; }
+  /* Reports: a grouped list under small section heads, a row per report: its picture, title, what it says, then its kind, steps and date.
+     A blue dot marks one filed today. A row with steps draws them as numbered nodes on a line, with only the marks that matter under each. */
+  .report { scroll-margin-top: 4.5rem; }
+  .rows.reports > li, .rows.reports .compact { align-items: start; }
+  .rows.reports .x { margin-top: 0.5rem; }
+  .rows.reports .thumb { object-fit: contain; }
+  .rows.reports .when { margin-top: 0.25rem; color: var(--muted); font-size: 0.875rem; }
+  .rows.reports .flow { margin-top: 0.625rem; max-width: 20rem; }
+  .rows.reports .new { flex: none; width: 0.625rem; height: 0.625rem; margin: 0.4375rem 0.25rem 0 0; border-radius: 50%; background: var(--action); }
+  .rows.reports .done > :not(summary) { margin: 0 0 1rem 4.25rem; }
+  .sec-h:has(+ .reports) { margin: 1.75rem 1rem 0.5rem; }
+  .sec-h:has(+ .reports) h2 { color: var(--muted); font-size: 0.8125rem; font-weight: 400; letter-spacing: 0.02em; text-transform: uppercase; }
+  .sec-h:has(+ .reports) .meta { font-size: 0.8125rem; }
   .st { display: inline-flex; flex: none; align-items: center; gap: 0.375rem; padding: 0.125rem 0.625rem; border-radius: 999px; background: var(--sunk);
     font-size: 0.875rem; font-weight: 650; white-space: nowrap; }
   .st::before { content: ""; width: 0.4375rem; height: 0.4375rem; border-radius: 50%; background: currentColor; }
@@ -121,27 +130,25 @@
   .steps .mk::before { width: 0.75rem; height: 0.75rem; }
   .steps .mk-fail::before { width: 0.9375rem; height: 0.375rem; }
   .steps li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; font-weight: 600; }
-  .report .row { padding: 0; border: 0; background: none; box-shadow: none; }
   .report .rung > .meta { display: none; }
-  .report .shot { aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: 0.625rem; box-shadow: none; }
-  .report .thumb { width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 0.625rem; object-fit: contain; background: var(--sunk); }
-  /* A report's card is one big tap target, its picture first: the title's link covers the card; only the × sits above it. */
-  .report.page { position: relative; }
-  .report.page h3 a { color: inherit; text-decoration: none; }
-  .report.page h3 a::after { content: ""; position: absolute; z-index: 1; inset: 0; border-radius: inherit; }
-  .report.page .x { position: relative; z-index: 2; }
-  .report.page:has(h3 a:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
-  .report.page:hover { border-color: var(--c-reports); }
-  .report .go { color: var(--accent); font-weight: 650; }
   /* A report opens over the whole board, on a phone and a desk alike: a bar with the way back, then its page. */
   #reader { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; background: var(--bg); }
   #reader[hidden] { display: none; }
   #reader header { display: flex; align-items: center; gap: 0.5rem; min-height: 3.5rem; padding: 0.25rem 1rem; border-bottom: 1px solid var(--line); background: var(--surface); }
+  #reader:has(.read) header { border-bottom: 0; background: none; }
   #reader .close { display: inline-flex; flex: none; align-items: center; min-height: 3rem; margin-left: -0.5rem; padding: 0 0.5rem; border-radius: 0.625rem; color: var(--accent); font-weight: 650; text-decoration: none; }
   #reader h1 { margin: 0; min-width: 0; overflow: hidden; font-size: 1rem; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
   #reader iframe { flex: 1; width: 100%; border: 0; background: var(--bg); }
   #reader h1:not(:focus-visible) { outline: none; }
   #reader h1:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* A report reads as a page of its own: what it is and when, its title in large type, what it says, then its page in a tile. */
+  #reader .read { flex: 1; min-height: 0; overflow: auto; padding: 0 1.25rem 2rem; }
+  #reader .read > * { max-width: 42.5rem; margin-left: auto; margin-right: auto; }
+  #reader .read .eyebrow { margin-top: 0.5rem; }
+  #reader .read h1 { margin-bottom: 0.75rem; font-size: 2.125rem; line-height: 1.1765; font-weight: 700; letter-spacing: 0.011em; white-space: normal; overflow: visible; }
+  #reader .read .about { margin-bottom: 1rem; font-size: 1.25rem; line-height: 1.4; }
+  #reader .read .decided { margin-bottom: 1.25rem; }
+  #reader .read iframe { display: block; width: 100%; height: max(30rem, calc(100dvh - 8rem)); border-radius: 1rem; background: var(--surface); }
   .i-plan { --area: var(--c-waiting); }
   #reader .plan-scroll { flex: 1; min-height: 0; overflow: auto; padding: 1.25rem 1.25rem 9rem; }
   .plan-layout { max-width: 72rem; margin: auto; display: grid; gap: 2rem; }
@@ -196,8 +203,10 @@
   }
   body.reading { overflow: hidden; }
   @media (min-width: 60rem) {
-    body.design-reading main { display: none; }
-    body.design-reading #reader { position: static; inset: auto; z-index: auto; grid-column: 2; grid-row: 1; width: 100%; height: 100vh; min-width: 0; }
+    #reader .read { padding: 0 3rem 3rem; }
+    #reader .read h1 { font-size: 3rem; line-height: 1.0833; letter-spacing: -0.003em; }
+    body.pane-reading main { display: none; }
+    body.pane-reading #reader { position: static; inset: auto; z-index: auto; grid-column: 2; grid-row: 1; width: 100%; height: 100vh; min-width: 0; }
   }
   .foot { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
   .foot .meta { margin: 0 auto 0 0; }
@@ -542,7 +551,7 @@
     .plan-copy { padding: 2rem; }
     .plan-copy h2, .decide h2 { font-size: 2.5rem; line-height: 1.1; }
     .decide-bar { position: static; margin: 1rem 0 0; padding: .75rem 0; background: transparent; }
-    .reports { grid-template-columns: 1fr 1fr; align-items: start; }
+    .rows.reports, .sec-h:has(+ .reports), .legend { max-width: 50rem; }
     /* Answered sets each row as its own card, two across; an opened row takes the whole width. */
     .rows.i-answered { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; align-items: start; padding: 0; border: 0; background: none; box-shadow: none; }
     .rows.i-answered > li { padding: 0 0.5rem 0 1rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); }
@@ -1156,32 +1165,21 @@
   const MARKS = { ai: 'AI model', store: 'Stores', gate: 'Gate', fail: 'Hard fail' };
   const marks = (t) => el('span', { class: 'marks' }, ...(t.marks ?? []).map((m) => el('span', { class: `mk mk-${m}`, role: 'img', 'aria-label': MARKS[m] })));
   const opened = new Set(); // Reports and answered rows opened in place, kept open across redraws.
-  /** A report: a picture of it (its steps on a line, or its preview), its title and what it says; a tap opens its page over the board.
-   *  An explainer's Open shows its video card, or its whole flow, in place. */
+  const decided = (d) => (d.decided ? el('p', { class: 'decided', dir: 'auto' }, el('span', { class: 'lbl' }, 'What it decided'), d.decided) : '');
+  /** A report: a row with its picture, title, what it says, then its kind, steps and date, and a dot when it was filed today. A tap opens its page over the board;
+   *  an explainer with no page opens in place, to its numbered steps or its video card. */
   function report(d) {
-    const page = reads(d), open = !page && opened.has(d.key), n = d.steps?.length, look = pic(d);
-    const toggle = el('button', { 'aria-expanded': open, 'aria-label': `${open ? 'Close' : 'Open'}, ${d.title}` }, open ? 'Close' : 'Open');
-    toggle.onclick = () => {
-      if (open) opened.delete(d.key); else opened.add(d.key);
-      render();
-      document.getElementById(`item-${d.key}`)?.querySelector('.foot button').focus();
-    };
-    const fresh = d.filed && isToday(d.filed), st = d.filed && el('span', { class: `st ${fresh ? 'new' : 'ok'}` }, fresh ? 'New today' : 'Current');
-    const decided = d.decided ? el('p', { class: 'decided', dir: 'auto' }, el('span', { class: 'lbl' }, 'What it decided'), d.decided) : '';
-    const brow = [kind(d) || 'Report', st].filter(Boolean);
-    const lead = [el('div', { class: 'lead' }, xBtn(d), el('p', { class: 'eyebrow' }, ...brow),
-      el('h3', { dir: 'auto' }, page ? el('a', { href: `#reports/${d.key}` }, title(d)) : title(d))), d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : ''];
-    const flow = n && el('ol', { class: 'flow', style: `--n: ${n}`, 'aria-label': `${n} steps: ${d.steps.map((t) => t.title).join(', ')}` }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), marks(t))));
-    if (page) {
-      const picture = flow || (look ? thumb('reports', look) : el('div', { class: 'shot', 'aria-hidden': 'true' }, el('iframe', { src: src(mockUrl(d.key, '', d.view)), sandbox: 'allow-scripts', tabindex: '-1', loading: 'lazy' })));
-      return el('article', { class: 'card report page', id: `item-${d.key}` }, picture, ...lead, decided,
-        el('div', { class: 'foot' }, el('span', { class: 'meta' }, n ? `${n} steps` : ''), el('span', { class: 'go', 'aria-hidden': 'true' }, 'Open ›')));
-    }
-    const full = open && !n ? row(d) : null;
-    full?.removeAttribute('id');
-    const body = full ? [full, decided] : [...lead, n ? (open ? el('ol', { class: 'steps' }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), el('span', { dir: 'auto' }, t.title), marks(t)))) : flow)
-      : look ? thumb('reports', look) : '', decided];
-    return el('article', { class: 'card report', id: `item-${d.key}` }, ...body, el('div', { class: 'foot' }, el('span', { class: 'meta' }, n ? `${n} steps` : ''), toggle));
+    const n = d.steps?.length;
+    const face = [thumb('reports', pic(d)), el('span', { class: 't' }, el('strong', { dir: 'auto' }, title(d)), d.about ? el('span', { class: 'meta', dir: 'auto' }, d.about) : '',
+      el('span', { class: 'when' }, [kind(d) || 'Report', n ? `${n} steps` : '', d.filed ? (isToday(d.filed) ? hhmm(d.filed) : day(d.filed)) : ''].filter(Boolean).join(' · ')),
+      n ? el('ol', { class: 'flow', style: `--n: ${n}`, 'aria-label': `${n} steps: ${d.steps.map((t) => t.title).join(', ')}` }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), marks(t)))) : ''),
+    d.filed && isToday(d.filed) ? el('span', { class: 'new', role: 'img', 'aria-label': 'New today' }) : ''];
+    if (reads(d)) return el('li', { class: 'report', id: `item-${d.key}` }, el('a', { class: 'compact', href: `#reports/${d.key}` }, ...face), xBtn(d));
+    const full = n ? el('ol', { class: 'steps' }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), el('span', { dir: 'auto' }, t.title), marks(t)))) : row(d, { x: false });
+    full.removeAttribute('id');
+    const box = el('details', { class: 'done', ...(opened.has(d.key) && { open: '' }) }, el('summary', { class: 'compact' }, ...face), full, decided(d));
+    box.ontoggle = () => (box.open ? opened.add(d.key) : opened.delete(d.key));
+    return el('li', { class: 'report', id: `item-${d.key}` }, box, xBtn(d));
   }
 
   /** What landed under Reports with no page and nothing to answer (receipts, status notes): folded under one row, each opening to its card in place. */
@@ -1432,13 +1430,14 @@
    *  The frame is made again only for another page, so a redraw never resets a demo halfway through. */
   const reader = document.getElementById('reader');
   function readPage(d, from = 'reports') {
+    // A design or a report takes the board's place beside the sidebar on a desk; a plan, and anything on a phone, opens over the whole board.
+    const pane = !!d && d.type !== 'plan', inline = pane && matchMedia('(min-width: 60rem)').matches;
     document.body.classList.toggle('reading', !!d);
-    document.body.classList.toggle('design-reading', !!d && d.kind === 'design');
-    const inlineDesign = !!d && d.kind === 'design' && matchMedia('(min-width: 60rem)').matches;
-    reader.setAttribute('role', inlineDesign ? 'region' : 'dialog');
-    if (inlineDesign) reader.removeAttribute('aria-modal'); else reader.setAttribute('aria-modal', 'true');
+    document.body.classList.toggle('pane-reading', pane);
+    reader.setAttribute('role', inline ? 'region' : 'dialog');
+    if (inline) reader.removeAttribute('aria-modal'); else reader.setAttribute('aria-modal', 'true');
     document.querySelector('main').inert = !!d;
-    document.getElementById('nav').inert = !!d && !inlineDesign;
+    document.getElementById('nav').inert = !!d && !inline;
     document.getElementById('tabs').inert = !!d;
     reader.hidden = !d;
     const url = d?.kind === 'design' ? `design:${d.key}` : d ? src(mockUrl(d.key, '', d.view)) : '';
@@ -1447,20 +1446,27 @@
     if (reader.dataset.url === url && reader.dataset.answer === answer && reader.dataset.plan === plan) return d && (reader.querySelector('h1').textContent = d.title);
     Object.assign(reader.dataset, { answer, plan });
     Object.assign(reader.dataset, { url, key: d?.key ?? '', from });
-    reader.replaceChildren(...(d ? [el('header', {}, el('a', { class: 'close', href: `#${from}` }, `‹ ${from === 'reports' ? 'Reports' : AREAS[from]}`), el('h1', { id: 'reader-title', tabindex: '-1', dir: 'auto' }, d.title)),
-      d.type === 'plan' ? planReview(d, url) : d.kind === 'design' ? designReview(d) : el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' })] : []));
+    if (!d) return reader.replaceChildren();
+    const back = el('a', { class: 'close', href: `#${from}` }, `‹ ${from === 'reports' ? 'Reports' : AREAS[from]}`), h1 = el('h1', { id: 'reader-title', tabindex: '-1', dir: 'auto' }, d.title);
+    // A report's page reads under its own head: what it is and when, its title, what it says and decided; a plan or a design keeps its title in the bar.
+    reader.replaceChildren(...(d.type === 'plan' ? [el('header', {}, back, h1), planReview(d, url)] : d.kind === 'design' ? [el('header', {}, back, h1), designReview(d)]
+      : [el('header', {}, back), el('div', { class: 'read' }, el('p', { class: 'eyebrow' }, [kind(d) || 'Report', d.filed ? when(d.filed) : ''].filter(Boolean).join(' · ')), h1,
+        d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided(d), el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }))]));
   }
   addEventListener('keydown', (e) => { if (e.key === 'Escape' && !reader.hidden) location.hash = `#${reader.dataset.from}`; });
   addEventListener('resize', () => { if (!reader.hidden) readPage(state.decisions.find((d) => d.key === reader.dataset.key), reader.dataset.from); });
 
-  /** Reports in sections, one per `group` in the order each first shows, each head with the newest filed time; items with no group come last, under Other reports when there are groups. */
+  /** Reports in grouped lists, one per `group` in the order each first shows, each head with the newest filed time; items with no group come last, under Other reports.
+   *  With no groups at all, the list splits into New (filed today) and Earlier. */
   function reportGroups(items) {
     const groups = [...new Set(items.map((d) => d.group ?? ''))].sort((a, b) => (a === '') - (b === ''));
-    return groups.flatMap((g) => {
-      const list = items.filter((d) => (d.group ?? '') === g), at = list.map((d) => d.filed).filter(Boolean).sort((a, b) => Date.parse(b) - Date.parse(a))[0];
-      const name = g || (groups.length > 1 ? 'Other reports' : '');
-      return [name ? el('div', { class: 'sec-h' }, el('h2', {}, name), at ? el('span', { class: 'meta' }, `Filed ${isToday(at) ? `${hhmm(at)} today` : day(at)}`) : '') : '',
-        el('div', { class: 'reports' }, ...list.map(report))];
+    const fresh = (d) => !!d.filed && isToday(d.filed);
+    const sections = groups.length > 1 || groups[0] ? groups.map((g) => [g || 'Other reports', items.filter((d) => (d.group ?? '') === g)])
+      : [['New', items.filter(fresh)], ['Earlier', items.filter((d) => !fresh(d))]].filter(([, list]) => list.length);
+    return sections.flatMap(([name, list]) => {
+      const at = list.map((d) => d.filed).filter(Boolean).sort((a, b) => Date.parse(b) - Date.parse(a))[0];
+      return [el('div', { class: 'sec-h' }, el('h2', {}, name), at ? el('span', { class: 'meta' }, `Filed ${isToday(at) ? `${hhmm(at)} today` : day(at)}`) : ''),
+        el('ul', { class: 'card rows reports' }, ...list.map(report))];
     });
   }
 
@@ -1624,7 +1630,7 @@
     document.getElementById('tabs').replaceChildren(...Object.keys(AREAS).map((a) => el('a', { href: `#${a}`, 'aria-label': `${AREAS[a]}, ${by[a].length}`,
       ...(a === active && { 'aria-current': 'page' }) }, icon(a), TAB[a])));
     const ro = state.readonly ? 'Read only' : FROZEN ? `Read-only copy, ${FROZEN.exported}` : '';
-    const pageTitle = at === 'decide' ? 'Decide' : AREAS[at];
+    const pageTitle = at === 'decide' ? 'Decide' : at === 'reports' ? NAV.reports : AREAS[at];
     const top = el('header', { class: 'top' }, at ? el('a', { class: 'back', href: at === 'decide' ? '#waiting' : '#' }, at === 'decide' ? '‹ Waiting on you' : '‹ Summary')
       : el('p', { class: 'date' }, new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })),
     el('h1', { tabindex: '-1' }, at ? pageTitle : 'Summary'), at ? '' : icon('you'), ro ? el('p', { class: 'meta' }, ro) : '',
@@ -1664,12 +1670,12 @@
     const item = (jump || back) && document.getElementById(`item-${jump || back}`);
     jump = null;
     item ? item.scrollIntoView() : scrollTo(0, 0);
-    ((back && item?.querySelector('h3 a, .open-link')) || document.querySelector('#board h1')).focus({ preventScroll: true });
+    ((back && item?.querySelector('h3 a, .open-link, a.compact')) || document.querySelector('#board h1')).focus({ preventScroll: true });
   });
   // An interactive page may post its own height, `{ height: <px> }`, and its frame then fits it with no blank below.
   // Only a frame's own message sizes that frame, and never past 10000px.
   addEventListener('message', (e) => {
-    const frame = [...document.querySelectorAll('.rung iframe, iframe.plan-view')].find((f) => f.contentWindow === e.source), h = e.data?.height;
+    const frame = [...document.querySelectorAll('.rung iframe, iframe.plan-view, #reader .read iframe')].find((f) => f.contentWindow === e.source), h = e.data?.height;
     if (frame?.classList.contains('plan-view') && e.data?.['sign-off'] === 'ready') frame.contentWindow.postMessage({ 'sign-off': 'size' }, '*');
     if (frame && Number.isFinite(h) && h > 0) frame.style.height = `${Math.ceil(Math.min(h, 10_000))}px`;
   });

@@ -111,10 +111,11 @@
   with no `filed` on any waiting ask the tile keeps its count.
 - `group` and `decided`: on Reports and explainers. `group` (40 characters or fewer)
   puts items under one section head, such as `How it works`, in the order each group first shows;
-  items with no group come last, under `Other reports`. With `filed` (above), the
-  section head shows the newest (`Filed 07:19 today`), and the card says `New today` when it was filed
-  today or `Current` before that. `decided` (200 characters or fewer) shows under the label
-  `What it decided`. An item without these keeps its kind chip and its about line.
+  items with no group come last, under `Other reports`; with no groups at all the list splits into
+  `New` (filed today) and `Earlier`. With `filed` (above), the section head shows the newest
+  (`Filed 07:19 today`), the row its date, and a blue dot when it was filed today. `decided`
+  (200 characters or fewer) shows under the label `What it decided` on the report's page, or in the opened row of an explainer with no page.
+  An item without these keeps its kind and its about line.
 - `type`: optional, `decision` (default), `design`, `evidence`, `diagram`,
   `interactive`, `explainer` or `signin`. A design item
   is a pick between mock options shown side by side. An evidence item is a
