@@ -152,6 +152,13 @@ without posting.
 ## The person can also
 
 - Filter **Waiting on you** by type with the chips: **All**, then each type with asks waiting, with its count. Each card's type label is its chip's name (Yes/No, Pick one, Reply, Info, Design pick, Approval, Evidence, Sign-in, Plan). The list reads **Newest first** by default, or **Oldest first** by each ask's `filed` time (an ask with no `filed` takes the time of the nearest earlier ask in the file that has one). The sort is kept in this browser; the type filter is not, so opening Waiting on you again shows All.
+- Tap an ask in **Waiting on you** to open it on **Decide**: one ask at a
+  time, its picture or page, what it is and why, its options in one list with
+  the recommended one marked, and a bar at the bottom with **Answer**,
+  **Skip for now** and **Later**. **1**–**9** picks an option and answers it,
+  **E** skips to the next ask, **Z** undoes the last answer, and a swipe right
+  takes the recommended answer while a swipe left skips. A plan opens its own
+  page instead, and a design its screens.
 - Tap **Another round** inside **Other answer** (with the typed note), which
   wakes a waiting agent the same way an answer does; the agent reads it back
   in `answers --json` under `rounds`, with any comments on mock elements it
@@ -164,11 +171,11 @@ without posting.
   as read by the agent. Typed notes that are not sent yet stay in the
   browser across reloads; everything sent is saved next to the board and
   survives a restart.
-- **Dismiss** (the × on an item in a list, **Dismiss** under Needs you first
-  and beside **Skip for now** in Triage, or **Clear all done** on Answered)
-  hides items from the board, Today included; **Undo** in the toast brings
-  them back, and so does **Restore** under **Dismissed (N)** at the end of
-  Needs you first and Triage. `list` counts a dismissed item as neither
+- **Dismiss** (the × on an ask or item in a list, **Dismiss** under Needs you
+  first, or **Clear all done** on Answered) hides items from the board, Today
+  included; **Undo** in the toast brings them back, and so does **Restore**
+  under **Dismissed (N)** at the end of Needs you first and Waiting on you.
+  `list` counts a dismissed item as neither
   waiting nor answered, as the board does (`list --full` says `dismissed`
   for an unanswered one and still its answer for an answered one), and
   `answers` does not count it as waiting; the agent is not told, so an ask it
@@ -193,8 +200,8 @@ without posting.
 - Raising a question that is already on the board is a no-op that reports its
   status, so an agent can re-run it safely. `--key` defaults to a slug of
   the title.
-- Each raised or posted item records when it was filed (`filed`), so Triage
-  shows `Waiting since 09:15` and the Waiting on you tile `Oldest 09:15`;
+- Each raised or posted item records when it was filed (`filed`), so Waiting
+  on you shows `waiting since 09:15` and the Waiting on you tile `Oldest 09:15`;
   `post --replace` keeps an item's first time.
 - `open` is a no-op when the same board is already open on the same address,
   and fails with `CONFLICT` when it runs on another one. `--evidence-root`

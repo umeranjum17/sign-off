@@ -776,7 +776,7 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   assert.match(waiting, /Design pick/);
   assert.match(waiting, /<option value="newest">Newest first/);
   assert.doesNotMatch(waiting, /<ol class="queue"|<p class="fhead"/);
-  // Needs you first ends with Dismiss on the left and the way to Triage on the right; its card has no × of its own.
+  // Needs you first ends with Dismiss on the left and the way to Waiting on you on the right; its card has no × of its own.
   const home = await dump('');
   assert.match(home, /<div class="foot"><button class="dis" aria-label="Dismiss, Pick the look">Dismiss<\/button><a class="more" href="#waiting">Review all 2 →<\/a><\/div>/);
   assert.doesNotMatch(home.match(/<section class="card needs.*?<\/section>/s)[0], /class="x"/);
@@ -787,7 +787,7 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   const vis = (dom, a) => dom.match(new RegExp(`<a class="tile i-${a}".*?<span class="vis" aria-hidden="true">(.*?)<\\/span><span class="detail"`, 's'))[1];
   assert.deepEqual(vis(home, 'waiting').match(/class="icon i-\w+"/g), ['class="icon i-waiting"']);
   assert.match(home, /<a class="tile i-waiting".*?<span class="detail" dir="auto">Oldest 09:15<\/span>/s);
-  // An ask dismissed from Waiting on you sits under Dismissed (1) at the end of Needs you first and of Triage, with Restore.
+  // An ask dismissed from Waiting on you sits under Dismissed (1) at the end of Needs you first and of Waiting on you, with Restore.
   const gone = file.replace(/\.json$/, '.dismissed.jsonl');
   writeFileSync(gone, JSON.stringify({ key: 'ship', dismissed: true, at: new Date().toISOString() }) + '\n');
   const pages = {};
@@ -895,10 +895,14 @@ test('a sign-in card: posted on top of what waits with its link and time left, t
   await until(async () => (await queue()) === 'GitHub|npm|Keep the weekly digest?');
   const card = (key) => evaluate(`(() => { const c = document.getElementById("item-${key}"), o = c?.querySelector(".open-link");
     return c && [c.querySelector(".title, h3")?.textContent, ...[...c.querySelectorAll(".line, .expiry, .meta")].map((p) => p.textContent), o ? [o.tagName, o.getAttribute("href"), o.target, o.rel, o.disabled].join(" ") : "no open"].join("|"); })()`);
-  // Triage shows the card in focus: the GitHub sign-in is newest, so the npm one is tapped in the queue first.
+  // Decide shows the card in focus: the GitHub sign-in is newest, so the npm one is tapped in the queue first.
   await evaluate('document.querySelector("#item-npm-login").click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/npm-login' && (await card('npm-login')) !== null);
   assert.equal(await card('npm-login'), `npm|Unlocks: Publish npm|Waits: Main|Expires in 15 min|A ${link} _blank noopener noreferrer `);
+  // A sign-in ask skips on to the next ask like any other, with E as its key.
+  assert.equal(await evaluate('!!document.querySelector(".decide-bar .skip")'), true);
+  await evaluate('document.dispatchEvent(new KeyboardEvent("keydown", { key: "e", bubbles: true }))');
+  await until(async () => /^#decide\/(?!npm-login)/.test(await evaluate('location.hash')));
   // The page is not loaded again from here on: a mark set now is still there at the end.
   await evaluate('window.stillHere = true');
   // Past its time the link expires on the page: it says so plainly and Open is off.
@@ -931,7 +935,7 @@ test('a sign-in card: posted on top of what waits with its link and time left, t
   // The page never gets the command, only that a tap makes a new link.
   assert.equal((await (await fetch(`${url}api/decisions`)).json()).decisions.find((d) => d.key === 'fresh').start, true);
   await evaluate(`window.open = () => ({ close() {}, location: { set href(u) { window.tabUrl = u; } } })`);
-  // Triage shows one card at a time: tap the key in its queue first.
+  // Decide shows one card at a time: tap the key in its queue first.
   const show = (key) => until(async () => evaluate(`document.querySelector("#item-${key}")?.click() ?? true`)
     .then(() => evaluate(`location.hash === "#decide/${key}" && !!document.querySelector("#item-${key} .open-link")`)));
   const tapOpen = async (key) => { await show(key); await evaluate(`document.querySelector("#item-${key} .open-link").click()`); };
@@ -1036,6 +1040,18 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await until(async () => (await evaluate('location.hash')) === '#decide/release');
   await evaluate('document.dispatchEvent(new KeyboardEvent("keydown", { key: "1", bubbles: true }))');
   await until(async () => /today/.test(run('answers', file, '--key', 'release').out));
+  await evaluate("location.hash = '#waiting'");
+  await until(async () => (await evaluate('location.hash')) === '#waiting');
+  // An undo of a changed answer from Answered puts it back and stays there; Decide says so when its key is not in its queue.
+  await evaluate("location.hash = '#answered'");
+  await until(async () => (await evaluate('document.querySelectorAll("#item-release .choices button").length')) === 3);
+  await evaluate('[...document.querySelectorAll("#item-release .choices button")].find((b) => b.textContent.startsWith("friday")).click()');
+  await until(async () => /friday/.test(run('answers', file, '--key', 'release').out));
+  await evaluate('document.querySelector("#undo").click()');
+  await until(async () => /today/.test(run('answers', file, '--key', 'release').out));
+  assert.equal(await evaluate('location.hash'), '#answered');
+  await evaluate("location.hash = '#decide/release'");
+  await until(async () => (await evaluate('document.querySelector("#board .empty")?.textContent')) === 'Nothing to decide for that question.');
   await evaluate("location.hash = '#waiting'");
   await until(async () => (await evaluate('location.hash')) === '#waiting');
   // A posted plan waits with the asks: its card gives the title, its counts and one Open plan, which opens its page over the board with the pointing script.
