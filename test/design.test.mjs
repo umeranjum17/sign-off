@@ -521,7 +521,14 @@ async function browse(dir, width = 800) {
   const click = async ([x, y]) => { await painted(); for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await call('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 }); };
   // A real touch tap at a point of the page, as a phone's would.
   const tap = async ([x, y]) => { await painted(); await call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] }); await call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); };
-  return { evaluate, click, tap, close: () => { ws.close(); browser.kill(); } };
+  // A real finger swipe across the page, as a phone's would.
+  const swipe = async (from, to) => {
+    await painted();
+    await call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [from] });
+    await call('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [to] });
+    await call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  };
+  return { evaluate, click, tap, swipe, close: () => { ws.close(); browser.kill(); } };
 }
 
 test('an interactive page that posts its height gets a frame that fits it, each frame only its own and never past 10000px; a design shows the recommended phone frame first', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
@@ -888,7 +895,7 @@ test('a sign-in card: posted on top of what waits with its link and time left, t
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
-  const { evaluate, close } = await browse(join(dir, 'live'), 390);
+  const { evaluate, swipe, close } = await browse(join(dir, 'live'), 390);
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
   // A sign-in blocks someone now, so both come before the question, newest first among them.
   const queue = () => evaluate('[...document.querySelectorAll(".ask-card .title")].map((s) => s.textContent).join("|")');
@@ -899,10 +906,13 @@ test('a sign-in card: posted on top of what waits with its link and time left, t
   await evaluate('document.querySelector("#item-npm-login").click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/npm-login' && (await card('npm-login')) !== null);
   assert.equal(await card('npm-login'), `npm|Unlocks: Publish npm|Waits: Main|Expires in 15 min|A ${link} _blank noopener noreferrer `);
-  // A sign-in ask skips on to the next ask like any other, with E as its key.
+  // A sign-in ask skips on to the next ask like any other, by its button, by a swipe left and with E as its key.
   assert.equal(await evaluate('!!document.querySelector(".decide-bar .skip")'), true);
-  await evaluate('document.dispatchEvent(new KeyboardEvent("keydown", { key: "e", bubbles: true }))');
+  await swipe({ x: 340, y: 300 }, { x: 40, y: 300 });
   await until(async () => /^#decide\/(?!npm-login)/.test(await evaluate('location.hash')));
+  const at = await evaluate('location.hash');
+  await evaluate('document.dispatchEvent(new KeyboardEvent("keydown", { key: "e", bubbles: true }))');
+  await until(async () => (await evaluate('location.hash')) !== at);
   // The page is not loaded again from here on: a mark set now is still there at the end.
   await evaluate('window.stillHere = true');
   // Past its time the link expires on the page: it says so plainly and Open is off.

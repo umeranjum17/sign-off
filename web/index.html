@@ -1529,7 +1529,20 @@
     if (!d) return el('p', { class: 'empty' }, EMPTY.waiting);
     const to = next ? `#decide/${next.key}` : '#waiting', skip = next && !state.readonly ? el('button', { class: 'skip' }, 'Skip for now') : null;
     if (skip) skip.onclick = () => (location.hash = to);
-    if (d.type === 'signin') return el('div', { class: 'decide' }, row(d, { x: false }), el('div', { class: 'decide-bar' }, skip || '', el('a', { class: 'later', href: '#waiting' }, 'Later')));
+    const swipe = (page, right) => {
+      let start;
+      page.addEventListener('touchstart', (e) => (start = e.target.closest('.mocks, textarea') ? null : e.touches[0]), { passive: true });
+      page.addEventListener('touchend', (e) => {
+        const t = e.changedTouches[0], dx = start ? t.clientX - start.clientX : 0;
+        if (!start || Math.abs(dx) <= 90 || Math.abs(t.clientY - start.clientY) >= Math.abs(dx) / 2) return;
+        if (dx > 0) right?.(); else skip?.click();
+      });
+    };
+    if (d.type === 'signin') {
+      const signinPage = el('div', { class: 'decide' }, row(d, { x: false }), el('div', { class: 'decide-bar' }, skip || '', el('a', { class: 'later', href: '#waiting' }, 'Later')));
+      if (!state.readonly) swipe(signinPage);
+      return signinPage;
+    }
     const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` }), opts = d.options ?? [], live = !state.readonly;
     // A pick remembered from an earlier round only counts while the ask still offers it.
     if (!opts.some((o) => o.value === selected.get(d.key))) selected.delete(d.key);
@@ -1559,16 +1572,7 @@
       ...(live ? [other(d, answerOf(d.key), err, () => (location.hash = to))] : []),
       silent ? el('p', { class: 'silent-line' }, silent) : '', err,
       el('div', { class: 'decide-bar' }, live && opts.length ? answer : '', skip || '', back));
-    if (live) {
-      let start;
-      page.addEventListener('touchstart', (e) => (start = e.target.closest('.mocks, textarea') ? null : e.touches[0]), { passive: true });
-      page.addEventListener('touchend', (e) => {
-        const t = e.changedTouches[0], dx = start ? t.clientX - start.clientX : 0;
-        if (Math.abs(dx) <= 90 || Math.abs(t.clientY - start.clientY) >= Math.abs(dx) / 2) return;
-        if (dx > 0) recOpt && !answer.disabled && answerWith(recOpt);
-        else skip?.click();
-      });
-    }
+    if (live) swipe(page, () => { if (recOpt && !answer.disabled) answerWith(recOpt); });
     return page;
   }
   const reshow = (control) => { render(); document.querySelector(control)?.focus({ preventScroll: true }); };
