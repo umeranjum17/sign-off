@@ -13,6 +13,7 @@ import { AxiError, runAxiCli } from 'axi-sdk-js';
 import { type Answer, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, mediaFiles, parseMessage, reportPage } from './contract.js';
+import { isMostlyText } from './evidence-text.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
 
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
@@ -208,7 +209,7 @@ An empty items list removes that filer's items.
 --type diagram and --type interactive are a decision shown with a picture: --view names one board-relative file,
 an image (.svg, .png, .jpg, .jpeg, .webp, 5 MB or less) shown at card width for a diagram, or one self-contained .html page for interactive.
 The page runs in a sandboxed frame: no fetch, no remote files, no access to the dashboard or its tab. Answers work as for a decision.
---type evidence posts the next numbered update (key update-<number>): 1 to ${MEDIA_MAX} screenshots or recordings (.png, .jpg, .jpeg, .webp, .mp4, .webm, 50 MB each), copied into evidence/<number>/ next to the board, with a short note and an optional commit or PR link.
+--type evidence posts the next numbered update (key update-<number>): 1 to ${MEDIA_MAX} screenshots or recordings (.png, .jpg, .jpeg, .webp, .mp4, .webm, 50 MB each), copied into evidence/<number>/ next to the board, with a short note and an optional commit or PR link. A picture that is mostly text (a log, receipt or summary) is refused: post a real capture of the running product.
 The user gives a verdict, pass, fail or needs-work, with an optional note; read it with answers or wait --key update-<number>.
 --type explainer is a decision shown with a narrated video you made: one --media .mp4 or .webm (50 MB or less), copied into evidence/<number>/ like evidence
 and played on the card. --about is its short summary; up to ${CHAPTERS_MAX} --chapter m:ss=<title> (in order) are buttons that jump the video there. Answers work as for a decision.
@@ -905,6 +906,9 @@ function postMedia(file: string, named: string, on: string, values: Record<strin
     if (info.size > MEDIA_BYTES) throw fail(`--media ${tilde(path)} is over 50 MB`, 'VALIDATION_ERROR', 'Trim or compress the recording');
     return path;
   });
+  // A picture of text (a log, receipt or summary) is not evidence: each still is measured before anything is copied.
+  const text = !explainer && sources.find((src) => /\.(png|jpe?g|webp)$/i.test(src) && isMostlyText(src));
+  if (text) throw fail(`--media ${tilde(text)} is mostly text: a picture of a log, receipt or summary is not evidence`, 'VALIDATION_ERROR', 'Post a real capture of the running product instead: a screenshot or recording of the screen the user sees');
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
     const { items, extra } = existsSync(file) ? readItems(file) : { items: [] as any[], extra: {} };

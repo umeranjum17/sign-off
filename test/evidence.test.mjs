@@ -19,6 +19,9 @@ const run = (...args) => {
   }
 };
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=', 'base64');
+// A rendered log (text only) and a real capture of the running board, from the repo's fixtures.
+const fixtures = new URL('../fixtures/evidence/', import.meta.url).pathname;
+const textLog = join(fixtures, 'text-log.png'), capture = join(fixtures, 'product-board.png');
 const clip = Buffer.from('0123456789 a short recording stand-in');
 const procs = [];
 after(async () => {
@@ -36,12 +39,17 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
   assert.equal(evidence('--title', 'No media', '--about', 'Note.').code, 2);
   assert.equal(evidence('--title', 'No note', '--media', shot).code, 2);
   assert.equal(evidence('--title', 'Bad type', '--about', 'Note.', '--media', join(scratch, 'notes.txt')).code, 2);
+  // A picture of text is refused before anything is copied, and the refusal says what to post instead.
+  const refused = evidence('--title', 'Rendered log', '--about', 'Note.', '--media', textLog);
+  assert.equal(refused.code, 2);
+  assert.match(refused.out, /is mostly text: a picture of a log, receipt or summary is not evidence/);
+  assert.match(refused.out, /Post a real capture of the running product/);
   assert.match(evidence('--title', 'Missing', '--about', 'Note.', '--media', join(scratch, 'gone.png')).out, /gone\.png is not there/);
   assert.equal(evidence('--title', 'Bad link', '--about', 'Note.', '--media', shot, '--link', 'javascript:alert(1)').code, 2);
   assert.equal(evidence('--title', 'Options', '--about', 'Note.', '--media', shot, '--option', 'a=A', '--option', 'b=B').code, 2);
   assert.deepEqual(readdirSync(join(so, 'evidence')), []);
 
-  assert.match(evidence('--title', 'Sign-in screen', '--about', 'The screen loads.', '--media', shot).out, /update-1,1,1/);
+  assert.match(evidence('--title', 'Sign-in screen', '--about', 'The screen loads.', '--media', capture).out, /update-1,1,1/);
   assert.match(evidence('--title', 'Sign-in flow', '--about', 'Umer signs in on a phone.', '--media', shot, '--media', rec,
     '--link', 'https://github.com/acme/app/pull/12').out, /update-2,2,2/);
   assert.deepEqual(readdirSync(join(so, 'evidence', '2')).sort(), ['1.png', '2.webm']);
@@ -55,7 +63,7 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
   assert.match(run('post', other, '--type', 'evidence', '--title', 'After a raised key', '--about', 'Note.', '--media', rec).out, /update-5,5,1/);
   assert.equal(run('post', other, '--type', 'evidence', '--title', 'Bad link', '--about', 'Note.', '--media', rec, '--link', 'nope').code, 2);
   assert.deepEqual(readdirSync(join(so, 'evidence')).sort(), ['1', '2', '3', '5']);
-  assert.deepEqual(readFileSync(join(so, 'evidence', '1', '1.png')), png);
+  assert.deepEqual(readFileSync(join(so, 'evidence', '1', '1.png')), readFileSync(capture));
 
   const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: tmpdir() });
   procs.push(proc);
