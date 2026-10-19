@@ -15,4 +15,6 @@ Accepted: post a real capture of the running product, such as a screenshot of th
 
 Board: a card that already holds a colour-bar or placeholder picture (posted before the guard, so the board file holds it) does not appear on the Evidence page; the real cards around it still do.
 
+Recording: a card that also holds an `.mp4` or `.webm` is never handed to ImageMagick when the board loads. Serve a board with a recording on it and read `/api/decisions`: it answers in a few seconds on the first read and at once after, and no `convert` or `ffmpeg` process runs.
+
 Keep the transcripts outside the repository.

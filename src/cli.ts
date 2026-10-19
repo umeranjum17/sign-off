@@ -5,7 +5,8 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
 import { accessSync, closeSync, constants, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, watch, writeFileSync, type Stats } from 'node:fs';
 import { lookup } from 'node:dns/promises';
-import { homedir, networkInterfaces, tmpdir, userInfo } from 'node:os';
+import { availableParallelism, homedir, networkInterfaces, tmpdir, userInfo } from 'node:os';
+import { Worker } from 'node:worker_threads';
 import { basename, delimiter, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
@@ -13,7 +14,7 @@ import { AxiError, runAxiCli } from 'axi-sdk-js';
 import { type Answer, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, mediaFiles, parseMessage, reportPage } from './contract.js';
-import { type Fault, faults } from './evidence-text.js';
+import { type Fault, faults, isStill } from './evidence-text.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
 
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
@@ -916,7 +917,7 @@ function postMedia(file: string, named: string, on: string, values: Record<strin
     return path;
   });
   // A still that is not a picture of the product (text, colour bars or a placeholder) is measured before anything is copied.
-  const [unfit] = explainer ? [] : sources.flatMap((src) => /\.(png|jpe?g|webp)$/i.test(src) ? faults(src).map((f) => ({ src, f })) : []);
+  const [unfit] = explainer ? [] : sources.flatMap((src) => isStill(src) ? faults(src).map((f) => ({ src, f })) : []);
   if (unfit) throw fail(UNFIT[unfit.f](tilde(unfit.src)), 'VALIDATION_ERROR', 'Post a real capture of the running product instead: a screenshot or recording of the screen the user sees');
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
@@ -1679,6 +1680,7 @@ async function serve(args: string[]) {
     if (!loopback(bind)) tokenOf(parsed.file, true);
     await sweep('startup');
     [file, evidenceRoot] = [parsed.file, parsed.values['evidence-root'] ? resolve(parsed.values['evidence-root']) : ''];
+    guardReady = warmGuard();
     await new Promise<void>((ok, no) => server.once('error', no).listen(port, bind, ok)).catch((e) => {
       throw fail(e.code === 'EADDRINUSE' ? `port ${port} is in use; pass --port` : e.code === 'EADDRNOTAVAIL' ? `${bind} is not an address of this machine; pass another --bind` : e.message, 'SERVE_FAILED', 'Run `sign-off-axi --help` for the flags, then start it again');
     });
@@ -1770,12 +1772,45 @@ const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex
  * stored hash, so each picture is measured once. */
 const unfitMedia = new Map<string, boolean>();
 const fakeEvidence = (d: Decision) => d.type === 'evidence' && (d.media ?? []).some((m) => {
+  if (!isStill(m.path)) return false;
   if (!unfitMedia.has(m.sha256)) {
     let found: boolean;
     try { found = faults(under(dirname(file), m.path)).some((f) => f !== 'text'); } catch { return false; }
     unfitMedia.set(m.sha256, found);
   }
   return unfitMedia.get(m.sha256)!;
+});
+/** Every still on the board, once, so a request never walks the media: the board's files are hash-checked and immutable. */
+const stillJobs = () => {
+  const jobs: { path: string; sha256: string }[] = [], seen = new Set<string>();
+  for (const d of loadDecisions(file)) {
+    if (d.type !== 'evidence') continue;
+    for (const m of d.media ?? []) {
+      if (!isStill(m.path) || seen.has(m.sha256)) continue;
+      seen.add(m.sha256);
+      try { jobs.push({ path: under(dirname(file), m.path), sha256: m.sha256 }); } catch { /* an absent file has no faults */ }
+    }
+  }
+  return jobs;
+};
+/** Measures the board's stills in parallel and off the request path. A fresh board is therefore ready before it is asked for cards: the
+ * page and media answer at once, and the guard's one-time pass never blocks them. */
+let guardReady: Promise<void> = Promise.resolve();
+const warmGuard = () => new Promise<void>((done) => {
+  let jobs: { path: string; sha256: string }[];
+  try { jobs = stillJobs(); } catch { return done(); }
+  if (!jobs.length) return done();
+  const workers = Math.max(1, Math.min(8, availableParallelism(), jobs.length));
+  let left = workers;
+  const ended = () => { if (--left === 0) done(); };
+  for (let i = 0; i < workers; i++) {
+    let worker: Worker;
+    try { worker = new Worker(new URL('./stills-worker.js', import.meta.url), { workerData: jobs.filter((_, j) => j % workers === i) }); }
+    catch { ended(); continue; }
+    worker.once('message', (measured: [string, boolean][]) => { for (const [sha, unfit] of measured) unfitMedia.set(sha, unfit); });
+    worker.once('error', () => { /* a worker that fails leaves its stills to the lazy read below */ });
+    worker.once('exit', ended);
+  }
 });
 const state = () => {
   reap();
@@ -1924,6 +1959,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   }
   if (req.method === 'GET' && req.url === '/api/board') return [200, { file, pid: process.pid }];
   if (req.method === 'GET' && req.url === '/api/decisions') {
+    await guardReady;
     return [200, state()];
   }
   if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/signin'].includes(req.url ?? '')) return [404, { error: 'Not found' }];

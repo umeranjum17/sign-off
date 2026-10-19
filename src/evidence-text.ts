@@ -67,9 +67,17 @@ export function palette(file: string): { ink: number; off: number; solid: number
   return { ink: ink / total, off: off / total, solid, top, bars, barShare };
 }
 
+/** The still formats this guard measures. A recording is never measured: it is not a still, and decoding it would push a video through
+ * ImageMagick on every board load. */
+const STILL = /\.(png|jpe?g|webp)$/i;
+
+/** Whether the guard has a still to measure. Callers that scan a whole board use this to skip recordings, as post does. */
+export const isStill = (file: string) => STILL.test(file);
+
 /** Why a still is not a picture of the product: text (a log, receipt or summary), colour bars (a test card) or a placeholder (a flat card
- * standing in for a picture). A file that cannot be decoded has no faults: it is not refused. */
+ * standing in for a picture). Anything that is not a still, and a file that cannot be decoded, has no faults: it is not refused. */
 export function faults(file: string): Fault[] {
+  if (!isStill(file)) return [];
   const share = palette(file);
   if (!share) return [];
   const text = share.ink >= INK_MIN && share.off <= OFF_LINE_MAX && share.solid <= SOLID_MAX;

@@ -2,7 +2,7 @@ import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { asked } from './ask.mjs';
@@ -76,10 +76,19 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
     media: [{ path: 'evidence/9/1.png', sha256: createHash('sha256').update(bars).digest('hex'), bytes: bars.length }] };
   writeFileSync(board, JSON.stringify({ ...stored, items: [...stored.items, legacy] }));
 
-  const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: tmpdir() });
+  // A recording is not a still: loading a card that holds one must never push it through ImageMagick. This convert would leave a marker
+  // and stall the request, so a guarded board answers at once and leaves no marker.
+  const fakeBin = join(scratch, 'fake-bin'), marked = join(scratch, 'convert-called');
+  mkdirSync(fakeBin, { recursive: true });
+  writeFileSync(join(fakeBin, 'convert'), `#!/bin/sh\ntouch '${marked}'\nsleep 5\n`, { mode: 0o755 });
+  const proc = spawn('node', [cli, 'serve', board, '--port', '0'], {
+    cwd: tmpdir(), env: { ...process.env, PATH: `${fakeBin}:${process.env.PATH}` } });
   procs.push(proc);
   const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+  const started = Date.now();
   const api = await (await fetch(`${url}api/decisions`)).json();
+  assert.ok(Date.now() - started < 3000, `first board read took ${Date.now() - started} ms`);
+  assert.equal(existsSync(marked), false, 'a recording was handed to ImageMagick');
   assert.deepEqual(api.decisions.map((d) => [d.key, d.number, d.media.length]), [['update-1', 1, 1], ['update-2', 2, 2]]);
   assert.deepEqual(api.decisions[1].options.map((o) => o.value), ['pass', 'fail', 'needs-work']);
   assert.equal(api.decisions[1].link, 'https://github.com/acme/app/pull/12');
