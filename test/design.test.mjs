@@ -1017,7 +1017,8 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await evaluate('(() => { const s = document.querySelector(".sort select"); s.value = "oldest"; s.dispatchEvent(new Event("change")); })()');
   await until(async () => (await askTitles()) === 'Keep the weekly digest?|Which day for release?|Pick the look'
     && (await evaluate('localStorage.getItem("sign-off-waiting-sort")')) === 'oldest');
-  await evaluate('location.reload()');
+  await evaluate('window.old = true, location.reload()');
+  await until(() => evaluate('!window.old'));
   await until(async () => (await evaluate('document.querySelector(".sort select")?.value')) === 'oldest');
   assert.equal(await evaluate('document.querySelector(".sort select").value'), 'oldest');
   // A type chip narrows this visit; Summary's Review all link restores every ask.
@@ -1078,7 +1079,8 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   mkdirSync(join(dir, 'page'));
   writeFileSync(join(dir, 'page', 'index.html'), readFileSync(join(fixture, 'page', 'index.html')));
   assert.equal(run('post', file, '--kind', 'plan', '--from', join(fixture, 'valid-full.json')).code, 0);
-  await evaluate('location.reload()');
+  await evaluate('window.old = true, location.reload()');
+  await until(() => evaluate('!window.old'));
   await until(async () => (await chips()) === 'All 3*|Design pick 1|Plan 1|Yes/No 1');
   assert.equal(await evaluate('document.querySelector(".plan-hero .plan-meta").textContent.includes("5 sections")'), true);
   assert.equal(await evaluate('document.querySelector(".plan-hero h2").textContent'), 'Show plans on the board');
@@ -1114,7 +1116,8 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await evaluate('document.querySelectorAll(".plan-verdicts .approve").forEach((b) => b.click()); document.querySelector(".plan-verdicts .change").click(); document.querySelectorAll(".plan-decision .choices").forEach((c) => c.querySelector("button").click())');
   assert.equal(await evaluate('document.querySelector(".plan-send .open-link").disabled'), true);
   await evaluate('(() => { const t = document.querySelector(".plan-section textarea"); t.value = "Keep the desktop layout too."; t.dispatchEvent(new Event("input")); })()');
-  await evaluate('location.reload()');
+  await evaluate('window.old = true, location.reload()');
+  await until(() => evaluate('!window.old'));
   await until(async () => await evaluate('document.querySelector(".plan-section textarea")?.value === "Keep the desktop layout too."'));
   assert.equal(await evaluate('document.querySelector(".plan-send .open-link").disabled'), false);
   await evaluate('document.querySelector(".plan-send .open-link").click()');
@@ -1137,7 +1140,8 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   // A plan with one section and no decisions reads in the singular.
   assert.equal(run('post', file, '--kind', 'plan', '--from', join(fixture, 'valid-minimal.json')).code, 0);
   await evaluate('location.hash = "#waiting"');
-  await evaluate('location.reload()');
+  await evaluate('window.old = true, location.reload()');
+  await until(() => evaluate('!window.old'));
   await until(async () => (await evaluate('[...document.querySelectorAll("#item-plan-filter-waiting .plan-meta span")].slice(0, 2).map((s) => s.textContent).join("|")')) === '1 section|0 decisions');
   close();
   proc.kill();
