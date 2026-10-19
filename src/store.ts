@@ -10,7 +10,7 @@ export type Step = { title: string; marks?: string[] };
 /** A plan's section to approve or change, and a decision it asks: one question, options that each say where they lead, and the pick it recommends. */
 export type PlanSection = { id: string; heading: string; body: string };
 export type PlanDecision = { key: string; question: string; why: string; options: (Option & { outcome: string })[]; recommend: string };
-export type DesignNote = { journey?: string; screen?: string; note: string };
+export type DesignNote = { journey?: string; screen?: string; verdict?: 'approve' | 'change'; note?: string };
 export type DesignJourney = { id: string; title: string; screens: { id: string; title: string; views: Record<string, string> }[] };
 /** One section in a plan's send-back: approved, or changed with a note on what to change. */
 export type PlanNote = { section: string; verdict: 'approve' | 'change'; note?: string };
@@ -281,23 +281,36 @@ function saveAnswer(decisionsPath: string, d: Decision, option: Option, note: st
   return answer;
 }
 
-/** Saves a design answer with screen-specific notes and an optional listed direction pick. */
-export function appendDesignAnswer(decisionsPath: string, d: Decision, verdict: unknown, notes: unknown, pick?: unknown): Answer | undefined {
+/** A design answer that holds only screen notes while the design has no design-wide verdict: it still waits for one. */
+export const SCREENS_ONLY = 'screens';
+/** True while an answer leaves the item waiting: none yet, or only screen notes. */
+export const awaitsVerdict = (type: string | undefined, a?: { answer?: string }) => !a || (type === 'design' && a.answer === SCREENS_ONLY);
+const DESIGN_LABEL: Record<string, string> = { approve: 'Approved', change: 'Changes requested', [SCREENS_ONLY]: 'Screens reviewed' };
+
+/** Saves a design answer with screen-specific notes and an optional listed direction pick. A screen save omits the verdict: the design keeps its saved verdict, a change on a screen of an approved design sets it to change, and with none yet it waits as screens-only. */
+export function appendDesignAnswer(decisionsPath: string, d: Decision, verdict: unknown, notes: unknown, pick?: unknown, requested?: unknown): Answer | undefined {
   const bad = (rule: string) => new InputError(`key ${d.key}: ${rule}`);
-  if (verdict !== 'approve' && verdict !== 'change') throw bad('verdict must be approve or change');
+  if (verdict !== undefined && verdict !== 'approve' && verdict !== 'change') throw bad('verdict must be approve or change, or omitted to save a screen');
   if (!Array.isArray(notes) || (verdict === 'change' && !notes.length)) throw bad('notes must be a list, with at least one note on change');
+  if (verdict === undefined && !notes.some(n => n?.journey !== undefined)) throw bad('a screen save names its screen');
+  if (requested === true && (verdict !== undefined || !notes.some(n => n?.journey !== undefined && (n.verdict ?? 'change') === 'change'))) throw bad('a requested change is a screen save with a change note on a screen');
   const screens = new Set((d.journeys ?? []).flatMap(j => j.screens.map(s => `${j.id}/${s.id}`)));
   for (const n of notes) {
     const hasJourney = n?.journey !== undefined, hasScreen = n?.screen !== undefined;
-    if (!n || hasJourney !== hasScreen || (hasJourney && !screens.has(`${n.journey}/${n.screen}`)) || !isText(n.note) || !n.note.trim() || [...n.note].length > NOTE_MAX) {
-      throw bad('each note needs both a known journey and screen, or neither for a design-level note, with text of 500 characters or fewer');
+    if (!n || hasJourney !== hasScreen || (hasJourney && !screens.has(`${n.journey}/${n.screen}`)) ||
+      (n.verdict !== undefined && !['approve', 'change'].includes(n.verdict)) ||
+      (n.note !== undefined && (!isText(n.note) || [...n.note].length > NOTE_MAX)) || ((n.verdict ?? 'change') === 'change' && !n.note?.trim())) {
+      throw bad('each note needs both a known journey and screen, or neither for a design-level note; verdict must be approve or change, with text required on change (500 characters or fewer)');
     }
   }
   if (new Set(notes.map(n => n.journey === undefined ? '' : `${n.journey}/${n.screen}`)).size !== notes.length) throw bad('notes must name each screen once, or contain one design-level note');
   const options = d.options ?? [];
-  if (options.length ? !options.some(o => o.value === pick) : pick !== undefined) throw bad('pick must be one listed option, or omitted when no options were offered');
-  const answer: Answer = { key: d.key, answer: verdict, label: verdict === 'approve' ? 'Approved' : 'Changes requested', close: d.close ?? 'done', at: now(), notes, ...(pick !== undefined && { pick: pick as string }) };
+  if (pick !== undefined ? !options.some(o => o.value === pick) : verdict !== undefined && options.length > 0) throw bad('pick must be one listed option, and a design verdict needs one when options were offered');
   const current = readAnswers(decisionsPath)[d.key];
+  const decided = current?.answer === 'approve' || current?.answer === 'change' ? current.answer : undefined;
+  const kept = (verdict ?? (decided === 'approve' && requested === true ? 'change' : decided ?? SCREENS_ONLY)) as string;
+  const keptPick = (pick ?? (options.some(o => o.value === current?.pick) ? current?.pick : undefined)) as string | undefined;
+  const answer: Answer = { key: d.key, answer: kept, label: DESIGN_LABEL[kept], close: d.close ?? 'done', at: now(), notes, ...(keptPick !== undefined && { pick: keptPick }) };
   if (current?.answer === answer.answer && JSON.stringify([current.notes, current.pick]) === JSON.stringify([answer.notes, answer.pick])) return;
   appendLine(answersPath(decisionsPath), answer);
   return answer;

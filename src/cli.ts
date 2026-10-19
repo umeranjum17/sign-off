@@ -10,7 +10,7 @@ import { basename, delimiter, dirname, extname, isAbsolute, join, relative, reso
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { type Answer, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { type Answer, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
@@ -450,7 +450,7 @@ const waitFor = (on: string, filer?: string, key?: string) => (filer ? `Run \`si
   : `Run \`sign-off-axi wait${on}${key ? ` --key ${key}` : ''}\` to block until the user answers`);
 
 /** Still waiting on the user: not answered, not dismissed, and something to answer (an item with no options and no reply is only shown). */
-const waits = (d: Decision & { answer?: unknown; dismissed?: boolean }) => !d.dismissed && !d.answer && (d.options.length > 0 || !!d.reply || d.type === 'signin' || d.type === 'plan' || d.type === 'design');
+const waits = (d: Decision & { answer?: unknown; dismissed?: boolean }) => !d.dismissed && awaitsVerdict(d.type, d.answer as { answer?: string } | undefined) && (d.options.length > 0 || !!d.reply || d.type === 'signin' || d.type === 'plan' || d.type === 'design');
 /** The board's decisions with their latest answer; a missing board file is an empty board.
  *  A dismissal hides an item from the board and is not waiting here either, checked against the same dismissed log the board reads. */
 function board(file: string, say = warn) {
@@ -472,7 +472,7 @@ function ready(file: string, on: string, root?: string) {
 
 function list(args: string[]) {
   const { file, values, on } = parse('list', args, TIERS);
-  const rows = board(file), waiting = rows.filter(waits), answered = rows.filter((d) => d.answer && !d.dismissed).length;
+  const rows = board(file), waiting = rows.filter(waits), answered = rows.filter((d) => d.answer && !awaitsVerdict(d.type, d.answer) && !d.dismissed).length;
   if (values.json) return JSON.stringify({ board: file, decisions: rows.map(({ dismissed, ...d }) => ({ ...d, ...(d.type === 'signin' && { link: undefined }), ...(dismissed && { dismissed }) })) });
   const help = [
     ...(waiting.length ? [`Run \`sign-off-axi open${on}\` to show the board to the user`] : []),
@@ -481,7 +481,7 @@ function list(args: string[]) {
   ];
   const where = tilde(file) + (existsSync(file) ? '' : ' (no file yet; raise creates it)');
   if (values.full) {
-    return toon({ board: where, decisions: rows.map((d) => ({ key: d.key, status: d.answer?.answer ?? (d.dismissed ? 'dismissed' : 'waiting'), title: d.title, about: d.about ?? '', detail: d.detail ?? '',
+    return toon({ board: where, decisions: rows.map((d) => ({ key: d.key, status: awaitsVerdict(d.type, d.answer) ? (d.dismissed ? 'dismissed' : 'waiting') : d.answer!.answer, title: d.title, about: d.about ?? '', detail: d.detail ?? '',
       recommend: d.recommend_value ?? '', default_if_silent: d.default_if_silent ?? '', close: d.close })) }, help);
   }
   return toon({
@@ -556,7 +556,9 @@ async function wait(args: string[]) {
   const seconds = Number(values.timeout), deadline = Date.now() + seconds * 1000, key = values.key === undefined ? '' : ` --key ${values.key}`;
   // With a filer, only its own items count, and an answer it has not taken yet is new however old it is.
   const mine = (rows: ReturnType<typeof board>) => (filer === undefined ? rows : rows.filter((d) => d.filer === filer));
-  const before = new Set(board(file).flatMap((d) => (d.answer ? [d.key] : [])));
+  // A design with only screen notes still waits: it counts as unanswered here until its design verdict lands.
+  const open = (rows: ReturnType<typeof board>) => rows.map((d) => (awaitsVerdict(d.type, d.answer) ? { ...d, answer: undefined } : d));
+  const before = new Map(open(board(file)).flatMap((d) => (d.answer ? [[d.key, JSON.stringify(d.answer)] as const] : [])));
   // Rounds seen before waiting starts stay quiet; only a newly asked round wakes the loop.
   const seenRounds = new Map<string, number>();
   for (const r of readRounds(file)) seenRounds.set(r.key, (seenRounds.get(r.key) ?? 0) + 1);
@@ -566,8 +568,8 @@ async function wait(args: string[]) {
   try {
     try { watcher = watch(dirname(file), (_, changed) => changed === name && wake()).on('error', () => {}); } catch {}
     for (let first = true; ; first = false) {
-      const rows = mine(board(file, first ? warn : () => {})), waiting = rows.filter(waits).length, taken = filer === undefined ? undefined : seenBy(file);
-      const hit = rows.filter((d) => (values.key !== undefined ? d.key === values.key : d.answer && (taken ? !taken(d.answer) : !before.has(d.key))));
+      const rows = mine(open(board(file, first ? warn : () => {}))), waiting = rows.filter(waits).length, taken = filer === undefined ? undefined : seenBy(file);
+      const hit = rows.filter((d) => (values.key !== undefined ? d.key === values.key : d.answer && (taken ? !taken(d.answer) : before.get(d.key) !== JSON.stringify(d.answer))));
       const counts = new Map<string, number>(), asked: Round[] = [];
       for (const r of readRounds(file, first ? warn : () => {})) {
         counts.set(r.key, (counts.get(r.key) ?? 0) + 1);
@@ -836,14 +838,14 @@ function replace(file: string, named: string, on: string, from?: string, filer?:
     const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply, d.run, d.finding, d.evidence, d.media, d.sections, d.decisions, d.type === 'signin' ? [d.link, d.start] : '', d.type === 'plan' ? [d.about, d.view, d.steps] : '']);
     // A key whose answer outlived it may not come back: the board and the answers are read here, under the lock the feed writes with.
     const saved = readAnswers(file);
-    for (const i of fed.items) if (i?.kind !== undefined && !first.has(i?.key) && Object.hasOwn(saved, i?.key)) {
+    for (const i of fed.items) if (i?.kind !== undefined && !first.has(i?.key) && Object.hasOwn(saved, i?.key) && !awaitsVerdict(i.kind, saved[i.key])) {
       throw fail(`key ${i.key} was answered on ${tilde(file)} and is no longer there`, 'CONFLICT', 'Post it under a new key');
     }
     const current = board(file);
     for (const had of current) {
       const d = incoming.find((x) => x.key === had.key);
       if (filer && d && had.filer && had.filer !== filer) throw fail(`key ${d.key} on ${tilde(file)} was posted by another filer`, 'CONFLICT', 'Feed it under a new key');
-      if (had.answer && d && question(d) !== question(had)) {
+      if (had.answer && !awaitsVerdict(had.type, had.answer) && d && question(d) !== question(had)) {
         throw fail(`key ${d.key} was answered and now holds a different question on ${tilde(file)}`, 'CONFLICT', 'Post the new question under a new key');
       }
     }
@@ -917,7 +919,8 @@ function postMedia(file: string, named: string, on: string, values: Record<strin
       }
       return toon({ board: tilde(file), posted: [{ key: own, number: had.number, media: sources.length, title: had.title, status: 'already posted' }] }, [`Run \`sign-off-axi open${on}\` so the user can give a verdict`]);
     }
-    if (message && own && Object.hasOwn(readAnswers(file), own)) throw fail(`key ${own} was answered on ${tilde(file)} and is no longer there`, 'CONFLICT', 'Post it under a new key');
+    const answers = readAnswers(file);
+    if (message && own && Object.hasOwn(answers, own) && !awaitsVerdict(message.kind, answers[own])) throw fail(`key ${own} was answered on ${tilde(file)} and is no longer there`, 'CONFLICT', 'Post it under a new key');
     if (own && current.some((d) => d.key === own)) throw fail(`key ${own} is already used on ${tilde(file)}`, 'CONFLICT', 'Post it under a new --key');
     mkdirSync(store, { recursive: true, mode: 0o700 });
     let number = Math.max(0, ...taken, ...readdirSync(store).map(Number).filter(Number.isInteger)) + 1;
@@ -1146,7 +1149,7 @@ function storeIncoming(file: string, named: string, on: string, { incoming, raw 
         return fail(`key ${d.key} ${why}`, 'CONFLICT', contract ? 'Post it under a new key' : 'Raise it under a new --key');
       };
       // An answer outlives its item: a new question under that key would inherit it.
-      if (!had && Object.hasOwn(saved, d.key)) throw refuse(`already has a saved answer on ${tilde(file)} from an item no longer there`);
+      if (!had && Object.hasOwn(saved, d.key) && !awaitsVerdict(d.type, saved[d.key])) throw refuse(`already has a saved answer on ${tilde(file)} from an item no longer there`);
       // The same question from another filer, or at another time, is the same question: it keeps its first filer and time.
       const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, dismissed: undefined, filer: undefined, filed: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
       // A message that names no filed time matches the one the board stamped.
@@ -1157,7 +1160,7 @@ function storeIncoming(file: string, named: string, on: string, { incoming, raw 
         fits(d.title, d.key);
         items.push({ filed: now, ...raw[i] });
       }
-      return { key: d.key, status: !had ? 'raised' : had.answer ? `already answered ${had.answer.answer}` : waits({ ...had, dismissed: false }) ? 'already waiting' : 'already posted', title: d.title };
+      return { key: d.key, status: !had ? 'raised' : had.answer && !awaitsVerdict(had.type, had.answer) ? `already answered ${had.answer.answer}` : waits({ ...had, dismissed: false }) ? 'already waiting' : 'already posted', title: d.title };
     });
     if (raised.some((r) => r.status === 'raised')) {
       const before = waitingKeys(file);
@@ -1960,7 +1963,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     appendRound(file, key, note.trim(), comments);
     return [200, state()];
   }
-  const { key, answer, note = '', notes, decisions, verdict, pick } = JSON.parse(body) ?? {};
+  const { key, answer, note = '', notes, decisions, verdict, pick, requested } = JSON.parse(body) ?? {};
   if (typeof note !== 'string' || [...note.trim()].length > NOTE_MAX) return [400, { error: `The note must be text of ${NOTE_MAX} characters or fewer` }];
   const d = loadDecisions(file).find((x) => x.key === key);
   if (answer === REPLY.value && !note.trim() && !d?.options.some((o) => o.value === answer)) return [400, { error: 'Write the reply first' }];
@@ -1977,7 +1980,10 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     return [200, state()];
   }
   if (d.kind === 'design') {
-    try { answered(appendDesignAnswer(file, d, verdict, notes, pick), d); } catch (e) { if (e instanceof InputError) return [400, { error: e.message }]; throw e; }
+    try {
+      const before = readAnswers(file)[d.key]?.answer, a = appendDesignAnswer(file, d, verdict, notes, pick, requested);
+      if (a && !awaitsVerdict(d.type, a) && (verdict !== undefined || a.answer !== before)) answered(a, d);
+    } catch (e) { if (e instanceof InputError) return [400, { error: e.message }]; throw e; }
     return [200, state()];
   }
   // A plan's answer is its one send-back: every section's verdict and note, and a pick for each decision.

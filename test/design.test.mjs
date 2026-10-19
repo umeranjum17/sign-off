@@ -497,8 +497,9 @@ const until = async (check) => {
 };
 /** A headless Chrome driven over its DevTools socket: evaluate(js) returns the value, or undefined while a page is still loading. */
 async function browse(dir, width = 800) {
-  const profile = join(dir, 'profile'), active = join(profile, 'DevToolsActivePort');
   mkdirSync(dir, { recursive: true });
+  // A profile of its own: a killed Chrome leaves its DevToolsActivePort behind, which a later browse in the same folder would read.
+  const profile = mkdtempSync(join(dir, 'profile-')), active = join(profile, 'DevToolsActivePort');
   const browser = spawn(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${profile}`, `--window-size=${width},4000`, '--remote-debugging-port=0', 'about:blank'],
     { env: chromeEnv, stdio: 'ignore' });
   procs.push(browser);
@@ -1191,6 +1192,7 @@ test('a posted contract design is listed with its preview and date, and opens fo
     journeys: [{ id: 'account-setup', title: 'Account setup', screens: [
       { id: 'welcome', title: 'Welcome', views: { phone_light: 'design/welcome.png' } },
       { id: 'security', title: 'Security', views: { phone_light: 'design/security.html' } },
+      ...Array.from({ length: 15 }, (_, i) => ({ id: `screen-${i + 3}`, title: `Journey screen ${i + 3}`, views: { phone_light: 'design/welcome.png' } })),
     ] }] };
   writeFileSync(source, JSON.stringify(message));
   const posted = run('post', file, '--kind', 'design', '--from', source);
@@ -1210,33 +1212,73 @@ test('a posted contract design is listed with its preview and date, and opens fo
   assert.equal(await evaluate('document.querySelector(".design-card img")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent(message.preview)}`);
   assert.equal(await evaluate('document.querySelector(".design-card .meta")?.textContent'), '18 Oct');
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
-  await until(async () => (await evaluate('document.querySelector(".design-review button")?.textContent')) === 'Approve');
+  await until(async () => (await evaluate('document.querySelector(".design-review .foot button")?.textContent')) === 'Approve');
   assert.equal(await evaluate('document.querySelector(".design-preview-full")?.getAttribute("target")'), '_blank');
   assert.equal(await evaluate('document.querySelector(".design-review-preview")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent('design/welcome.png')}`);
-  assert.equal(await evaluate('document.querySelector("[aria-label=\\"Screen for note\\"]")?.options.length'), 2);
+  assert.equal(await evaluate('document.querySelector("[aria-label=\\"Screen for note\\"]")?.options.length'), 17);
   await evaluate('(() => { const s = document.querySelector("[aria-label=\\"Screen for note\\"]"); s.value = "account-setup/security"; s.dispatchEvent(new Event("change")); })()');
   assert.equal(await evaluate('document.querySelector(".design-preview-full")?.getAttribute("href")'), `/design/local/d1-design/${encodeURIComponent('design/security.html')}`);
   assert.equal(await evaluate('document.querySelector(".design-review-preview")?.tagName'), 'IFRAME');
   assert.equal(await evaluate('document.querySelector(".design-review-preview")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent('design/security.html')}`);
   await evaluate('document.querySelector("[aria-label=\\"Pick a direction\\"]").value = "quick"');
-  await evaluate('document.querySelector(".design-review button").click()');
+  await evaluate('document.querySelector(".design-review .foot button").click()');
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Approved');
   await evaluate('document.querySelector("[aria-label=\\"Screen for note\\"]").value = "account-setup/security"');
   await evaluate('document.querySelector(".design-review textarea").value = "Make the title clearer"');
-  await evaluate('document.querySelector(".design-review button:last-of-type").click()');
+  await evaluate('document.querySelector(".design-review .foot button:last-child").click()');
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Changes requested');
-  assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-design'].notes, [{ journey: 'account-setup', screen: 'security', note: 'Make the title clearer' }]);
+  assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-design'].notes, [{ journey: 'account-setup', screen: 'security', verdict: 'change', note: 'Make the title clearer' }]);
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
   await until(async () => (await evaluate('document.querySelector(".design-card .eyebrow")?.textContent')) === 'Changes requested');
   const desktop = await browse(join(dir, 'desktop-browser'), 1280);
   await desktop.evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
   await until(async () => (await desktop.evaluate('document.querySelector("#nav a[href=\\"#designs\\"][aria-current=page]")?.textContent.trim()')) === 'Designs1');
   await desktop.evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
-  await until(async () => (await desktop.evaluate('document.querySelector(".design-review button")?.textContent')) === 'Approve');
+  await until(async () => (await desktop.evaluate('document.querySelector(".design-review .foot button")?.textContent')) === 'Approve');
   assert.equal(await desktop.evaluate('document.querySelector("#nav a[href=\\"#designs\\"][aria-current=page]")?.getClientRects().length > 0'), true);
   assert.equal(await desktop.evaluate('document.querySelector(".design-review")?.getBoundingClientRect().bottom <= innerHeight'), true);
   assert.equal(await desktop.evaluate('document.querySelector("#reader").getBoundingClientRect().left >= document.querySelector("#nav").getBoundingClientRect().right'), true);
   desktop.close();
+  // The inline Change saved a change note on this screen: the viewer must show it as a change, not an approval.
+  await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
+  await until(async () => (await evaluate('document.querySelector("[aria-haspopup=dialog]")?.textContent')) === 'Review full screen');
+  await evaluate('document.querySelector("[aria-haspopup=dialog]").click()');
+  await until(() => evaluate('!!document.querySelector(".design-viewer[open]")'));
+  assert.match(await evaluate('document.querySelector(".design-viewer header").textContent'), /2 of 17.*Security/);
+  assert.equal(await evaluate('document.querySelector(".design-viewer [role=status]").textContent'), 'Changes requested');
+  assert.equal(await evaluate('document.querySelector(".design-viewer textarea").value'), 'Make the title clearer');
+  await evaluate('document.querySelector("[aria-label=\\"Next screen\\"]").click()');
+  await evaluate('document.querySelector(".design-viewer").dispatchEvent(new KeyboardEvent("keydown", {key:"ArrowRight"}))');
+  assert.match(await evaluate('document.querySelector(".design-viewer header").textContent'), /4 of 17/);
+  await evaluate('document.querySelector(".design-viewer textarea").dispatchEvent(new KeyboardEvent("keydown", {key:"ArrowLeft", bubbles:true}))');
+  assert.match(await evaluate('document.querySelector(".design-viewer header").textContent'), /4 of 17/);
+  await evaluate('window.viewerNode = document.querySelector(".design-viewer")');
+  await evaluate('document.querySelector(".design-viewer .open-link").click()');
+  await until(async () => (await evaluate('document.querySelector(".design-viewer[open] [role=status]")?.textContent')) === 'Screen approved');
+  assert.equal(await evaluate('document.querySelector(".design-viewer") === window.viewerNode'), true);
+  const legacy = { journey: 'account-setup', screen: 'security', verdict: 'change', note: 'Make the title clearer' };
+  assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-design'].notes, [legacy, { journey: 'account-setup', screen: 'screen-4', verdict: 'approve', note: '' }]);
+  await evaluate('document.querySelector("[aria-label=\\"Next screen\\"]").click()');
+  await evaluate('document.querySelector(".design-viewer textarea").value = "Give the next action more space"');
+  await evaluate('document.querySelector(".design-viewer .foot button:last-child:not([aria-label])").click()');
+  await until(async () => (await evaluate('document.querySelector(".design-viewer[open] [role=status]")?.textContent')) === 'Changes requested');
+  await evaluate('document.querySelector("[aria-label=\\"Close viewer\\"]").click()');
+  await until(() => evaluate('!document.querySelector(".design-viewer[open]")'));
+  assert.equal(await evaluate('location.hash'), '#designs/d1-design');
+  await until(async () => (await evaluate('String(document.querySelector(".design-review textarea").compareDocumentPosition([...document.querySelectorAll(".design-review > a")].find((a) => a.textContent === "Open original design")))')) === '4');
+  await evaluate('location.reload()');
+  await until(async () => (await evaluate('document.querySelector("[aria-haspopup=dialog]")?.textContent')) === 'Review full screen');
+  await evaluate('document.querySelector("[aria-haspopup=dialog]").click()');
+  await until(() => evaluate('!!document.querySelector(".design-viewer[open]")'));
+  await evaluate('document.querySelector("[aria-label=\\"Next screen\\"]").click(); document.querySelector("[aria-label=\\"Next screen\\"]").click()');
+  assert.equal(await evaluate('document.querySelector(".design-viewer [role=status]").textContent'), 'Screen approved');
+  for (let i = 0; i < 13; i++) await evaluate('document.querySelector("[aria-label=\\"Next screen\\"]").click()');
+  assert.match(await evaluate('document.querySelector(".design-viewer header").textContent'), /17 of 17/);
+  assert.equal(await evaluate('document.querySelector("[aria-label=\\"Next screen\\"]").disabled'), true);
+  assert.equal(JSON.parse(run('answers', file, '--json').out)['d1-design'].notes.length, 3);
+  await evaluate('document.querySelector("[aria-label=\\"Close viewer\\"]").click()');
+  await until(() => evaluate('!document.querySelector(".design-viewer[open]")'));
+  await until(async () => (await evaluate('String(document.querySelector(".design-review textarea").compareDocumentPosition([...document.querySelectorAll(".design-review > a")].find((a) => a.textContent === "Open original design")))')) === '4');
   close();
   proc.kill();
 });
@@ -1261,10 +1303,357 @@ test('a design without journey screens accepts a design-level change note', { sk
   await evaluate('document.querySelector(".design-review textarea").value = "Clarify the overall hierarchy."');
   await evaluate('document.querySelector(".design-review button:last-of-type").click()');
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Changes requested');
-  assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-no-screens'].notes, [{ note: 'Clarify the overall hierarchy.' }]);
+  assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-no-screens'].notes, [{ verdict: 'change', note: 'Clarify the overall hierarchy.' }]);
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
   await until(async () => (await evaluate('document.querySelector(".design-card .eyebrow")?.textContent')) === 'Changes requested');
   assert.match(await evaluate('document.querySelector(".design-card")?.textContent'), /Clarify the overall hierarchy/);
+  close();
+  proc.kill();
+});
+
+test('a screen approval on a design with no design verdict saves the screen and keeps the design waiting', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'screen-only'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), png);
+  writeFileSync(join(dir, 'design', 'a.png'), png);
+  writeFileSync(join(dir, 'design', 'b.png'), png);
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd2-screens', title: 'Review the flow screens',
+    about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
+    journeys: [{ id: 'flow', title: 'Flow', screens: [
+      { id: 'a', title: 'First', views: { phone_light: 'design/a.png' } },
+      { id: 'b', title: 'Second', views: { phone_light: 'design/b.png' } },
+    ] }] };
+  writeFileSync(source, JSON.stringify(message));
+  assert.equal(run('post', file, '--kind', 'design', '--from', source).code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1], { evaluate, close } = await browse(join(dir, 'browser'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d2-screens`)}`);
+  await until(async () => (await evaluate('document.querySelector("[aria-haspopup=dialog]")?.textContent')) === 'Review full screen');
+  await evaluate('document.querySelector("[aria-haspopup=dialog]").click()');
+  await until(() => evaluate('!!document.querySelector(".design-viewer[open]")'));
+  await evaluate('document.querySelector(".design-viewer .open-link").click()');
+  await until(async () => (await evaluate('document.querySelector(".design-viewer[open] [role=status]")?.textContent')) === 'Screen approved');
+  const saved = JSON.parse(run('answers', file, '--json').out)['d2-screens'];
+  assert.deepEqual(saved.notes, [{ journey: 'flow', screen: 'a', verdict: 'approve', note: '' }]);
+  assert.equal(saved.answer, 'screens');
+  assert.match(run('list', file).out, /answered: 0/);
+  assert.match(run('list', file, '--full').out, /waiting/);
+  close();
+  proc.kill();
+});
+
+test('design screen saves: a screen-only save runs no on_answer, a change on a screen of an approved design sets it to change, and other screen saves keep the verdict', async () => {
+  const dir = join(scratch, 'screen-verdicts'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json'), out = join(dir, 'hook.out');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), png);
+  writeFileSync(join(dir, 'design', 'a.png'), png);
+  writeFileSync(join(dir, 'design', 'b.png'), png);
+  writeFileSync(join(dir, 'hook.mjs'), `import { appendFileSync, readFileSync } from 'node:fs';\nappendFileSync(${JSON.stringify(out)}, readFileSync(0, 'utf8'));\n`);
+  writeFileSync(join(dir, 'config.yaml'), 'board: board.json\non_answer: node hook.mjs\n');
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd3-verdicts', title: 'Review the flow screens',
+    about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
+    options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend: 'a',
+    journeys: [{ id: 'flow', title: 'Flow', screens: [
+      { id: 'a', title: 'First', views: { phone_light: 'design/a.png' } },
+      { id: 'b', title: 'Second', views: { phone_light: 'design/b.png' } },
+    ] }] };
+  writeFileSync(source, JSON.stringify(message));
+  assert.equal(run('post', file, '--kind', 'design', '--from', source).code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const screen = (notes, requested) => post(url, 'api/answers', { key: 'd3-verdicts', notes, ...(requested && { requested: true }) });
+  const design = (verdict, notes) => post(url, 'api/answers', { key: 'd3-verdicts', verdict, pick: 'a', notes });
+  const saved = () => JSON.parse(run('answers', file, '--json').out)['d3-verdicts'];
+  const approveA = { journey: 'flow', screen: 'a', verdict: 'approve', note: '' };
+  const changeB = { journey: 'flow', screen: 'b', verdict: 'change', note: 'Fix the title' };
+  assert.equal((await screen([approveA])).status, 200);
+  assert.deepEqual([saved().answer, saved().label], ['screens', 'Screens reviewed']);
+  assert.equal((await design('approve', [approveA])).status, 200);
+  assert.deepEqual([saved().answer, saved().label], ['approve', 'Approved']);
+  assert.equal((await screen([approveA, changeB], true)).status, 200);
+  assert.deepEqual([saved().answer, saved().label, saved().pick], ['change', 'Changes requested', 'a']);
+  assert.equal((await screen([{ ...approveA, note: 'Looks right' }, changeB])).status, 200);
+  assert.equal(saved().answer, 'change');
+  assert.equal((await design('approve', [approveA, changeB])).status, 200);
+  assert.equal((await screen([{ ...approveA, note: 'Looks right' }, changeB])).status, 200);
+  assert.deepEqual([saved().answer, saved().pick], ['approve', 'a']);
+  const hooked = () => readFileSync(out, 'utf8').trim().split('\n').map((l) => JSON.parse(l).answer);
+  for (let i = 0; i < 50 && (!existsSync(out) || hooked().length < 3); i++) await new Promise((ok) => setTimeout(ok, 100));
+  await new Promise((ok) => setTimeout(ok, 500));
+  assert.deepEqual(hooked().sort(), ['approve', 'approve', 'change']);
+  proc.kill();
+});
+
+const flowMessage = (key, screens) => ({ contract: 1, kind: 'design', schema: 1, key, title: 'Review the flow screens',
+  about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
+  options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend: 'a', journeys: [{ id: 'flow', title: 'Flow', screens: screens.map((id) => ({ id, title: id, views: { phone_light: 'design/preview.png' } })) }] });
+
+test('an empty inline save clears the selected screen note', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'empty-inline-save'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), png);
+  writeFileSync(source, JSON.stringify(flowMessage('d3-empty-save', ['a', 'b'])));
+  assert.equal(run('post', file, '--kind', 'design', '--from', source).code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1], { evaluate, close } = await browse(join(dir, 'browser'), 1280);
+  const saved = () => JSON.parse(run('answers', file, '--json').out)['d3-empty-save'];
+  await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d3-empty-save`)}`);
+  await until(async () => (await evaluate('document.querySelector(".design-review .foot button")?.textContent')) === 'Approve');
+  await evaluate('document.querySelector("[aria-label=\\"Screen for note\\"]").value = "flow/b"');
+  await evaluate('document.querySelector("[aria-label=\\"Pick a direction\\"]").value = "a"');
+  await evaluate('document.querySelector(".design-review textarea").value = "Fix the title"');
+  await evaluate('document.querySelector(".design-review .foot button:last-child").click()');
+  await until(async () => saved()?.notes?.length === 1);
+  await evaluate('document.querySelector(".design-review textarea").value = ""');
+  await evaluate('document.querySelector(".design-review .foot button").click()');
+  await until(async () => saved().answer === 'approve' && saved().notes.length === 0);
+  assert.deepEqual([saved().answer, saved().notes], ['approve', []]);
+  close();
+  proc.kill();
+});
+
+test('a save drops a stored screen note whose screen a re-post removed', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'stale-screen-note'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), png);
+  writeFileSync(source, JSON.stringify(flowMessage('d3-stale', ['a', 'b'])));
+  assert.equal(run('post', file, '--kind', 'design', '--from', source).code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1], { evaluate, close } = await browse(join(dir, 'browser'), 1280);
+  const saved = () => JSON.parse(run('answers', file, '--json').out)['d3-stale'];
+  const change = await post(url, 'api/answers', { key: 'd3-stale', verdict: 'change', pick: 'a', notes: [{ journey: 'flow', screen: 'b', verdict: 'change', note: 'Fix the title' }] });
+  assert.equal(change.status, 200);
+  const stored = JSON.parse(readFileSync(file, 'utf8'));
+  stored.items.find((i) => i.key === 'd3-stale').journeys = flowMessage('d3-stale', ['a']).journeys;
+  writeFileSync(file, JSON.stringify(stored));
+  await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d3-stale`)}`);
+  await until(async () => (await evaluate('document.querySelector(".design-review .foot button")?.textContent')) === 'Approve');
+  await evaluate('document.querySelector("[aria-label=\\"Pick a direction\\"]").value = "a"');
+  await evaluate('document.querySelector(".design-review .foot button").click()');
+  await until(async () => saved().answer === 'approve');
+  assert.deepEqual([saved().answer, saved().notes], ['approve', []]);
+  assert.equal(await evaluate('document.querySelector(".design-review .err").textContent'), '');
+  close();
+  proc.kill();
+});
+
+test('a design holding only screen notes does not lock its key or its question', async () => {
+  const dir = join(scratch, 'screens-only-relock'), file = join(dir, 'board.json'), message = join(dir, 'design-message.json');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), png);
+  writeFileSync(join(dir, 'design', 'a.png'), png);
+  const design = { contract: 1, kind: 'design', schema: 1, key: 'd4-relock', title: 'Review the flow screens',
+    about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
+    journeys: [{ id: 'flow', title: 'Flow', screens: [{ id: 'a', title: 'First', views: { phone_light: 'design/a.png' } }] }] };
+  writeFileSync(message, JSON.stringify(design));
+  assert.equal(run('post', file, '--kind', 'design', '--from', message).code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  assert.equal((await post(url, 'api/answers', { key: 'd4-relock', notes: [{ journey: 'flow', screen: 'a', verdict: 'approve', note: '' }] })).status, 200);
+  assert.equal(JSON.parse(run('answers', file, '--json').out)['d4-relock'].answer, 'screens');
+  proc.kill();
+  const doc = JSON.parse(readFileSync(file, 'utf8'));
+  writeFileSync(file, JSON.stringify({ ...doc, items: doc.items.filter((i) => i.key !== 'd4-relock') }));
+  assert.equal(run('post', file, '--kind', 'design', '--from', message).code, 0);
+});
+
+test('a screen save drops a stored pick that is no longer a listed option', async () => {
+  const dir = join(scratch, 'screens-pick-relisted'), file = join(dir, 'board.json'), message = join(dir, 'design-message.json');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), png);
+  writeFileSync(join(dir, 'design', 'a.png'), png);
+  const design = (options) => ({ contract: 1, kind: 'design', schema: 1, key: 'd5-pick', title: 'Look', about: 'Pick a look.', group: 'Sign-in',
+    filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png', options, recommend: options[0].value,
+    journeys: [{ id: 'flow', title: 'Flow', screens: [{ id: 'a', title: 'First', views: { phone_light: 'design/a.png' } }] }] });
+  writeFileSync(message, JSON.stringify(design([{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }])));
+  assert.equal(run('post', file, '--kind', 'design', '--from', message).code, 0);
+  let proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  let url = /url: "(\S+)"/.exec(await served(proc))[1];
+  assert.equal((await post(url, 'api/answers', { key: 'd5-pick', pick: 'a', notes: [{ journey: 'flow', screen: 'a', verdict: 'approve', note: '' }] })).status, 200);
+  proc.kill();
+  const doc = JSON.parse(readFileSync(file, 'utf8'));
+  writeFileSync(file, JSON.stringify({ ...doc, items: doc.items.map((i) => i.key === 'd5-pick' ? { ...i, options: [{ value: 'c', label: 'C' }, { value: 'd', label: 'D' }], recommend_value: 'c' } : i) }));
+  proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  url = /url: "(\S+)"/.exec(await served(proc))[1];
+  assert.equal((await post(url, 'api/answers', { key: 'd5-pick', notes: [{ journey: 'flow', screen: 'a', verdict: 'approve', note: '' }] })).status, 200);
+  const read = JSON.parse(run('answers', file, '--json').out)['d5-pick'];
+  assert.equal(read.answer, 'screens');
+  assert.equal(read.pick, undefined);
+  proc.kill();
+});
+
+test('an ask whose option is named screens is answered, not left waiting', async () => {
+  const dir = join(scratch, 'screens-option'), file = join(dir, 'board.json');
+  mkdirSync(dir, { recursive: true });
+  assert.equal(run('post', file, '--title', 'Which view?', '--key', 'pick-view', '--option', 'screens=Screens', '--option', 'list=List').code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  assert.equal((await post(url, 'api/answers', { key: 'pick-view', answer: 'screens' })).status, 200);
+  assert.equal(JSON.parse(run('answers', file, '--json').out)['pick-view'].answer, 'screens');
+  assert.match(run('list', file).out, /waiting: 0 of 1 decisions/);
+  proc.kill();
+});
+
+test('design screen change: a change with new text on a screen that already had a change note still sets an approved design to change', async () => {
+  const dir = join(scratch, 'screen-change-again'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), png);
+  writeFileSync(join(dir, 'design', 'a.png'), png);
+  writeFileSync(join(dir, 'design', 'b.png'), png);
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd3-change-again', title: 'Review the flow screens',
+    about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
+    options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend: 'a',
+    journeys: [{ id: 'flow', title: 'Flow', screens: [
+      { id: 'a', title: 'First', views: { phone_light: 'design/a.png' } },
+      { id: 'b', title: 'Second', views: { phone_light: 'design/b.png' } },
+    ] }] };
+  writeFileSync(source, JSON.stringify(message));
+  assert.equal(run('post', file, '--kind', 'design', '--from', source).code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const saved = () => JSON.parse(run('answers', file, '--json').out)['d3-change-again'];
+  const changeB = (note) => ({ journey: 'flow', screen: 'b', verdict: 'change', note });
+  assert.equal((await post(url, 'api/answers', { key: 'd3-change-again', notes: [changeB('Fix the title')] })).status, 200);
+  assert.equal((await post(url, 'api/answers', { key: 'd3-change-again', verdict: 'approve', pick: 'a', notes: [changeB('Fix the title')] })).status, 200);
+  assert.equal(saved().answer, 'approve');
+  assert.equal((await post(url, 'api/answers', { key: 'd3-change-again', notes: [changeB('Still wrong')], requested: true })).status, 200);
+  assert.deepEqual([saved().answer, saved().pick], ['change', 'a']);
+  proc.kill();
+});
+
+test('a viewer request for a change already stored on an approved design still sets it to change', async () => {
+  const dir = join(scratch, 'screen-rerequest'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), png);
+  writeFileSync(join(dir, 'design', 'a.png'), png);
+  writeFileSync(join(dir, 'design', 'b.png'), png);
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd3-rerequest', title: 'Review the flow screens',
+    about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
+    options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend: 'a',
+    journeys: [{ id: 'flow', title: 'Flow', screens: [
+      { id: 'a', title: 'First', views: { phone_light: 'design/a.png' } },
+      { id: 'b', title: 'Second', views: { phone_light: 'design/b.png' } },
+    ] }] };
+  writeFileSync(source, JSON.stringify(message));
+  assert.equal(run('post', file, '--kind', 'design', '--from', source).code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const saved = () => JSON.parse(run('answers', file, '--json').out)['d3-rerequest'];
+  const changeB = { journey: 'flow', screen: 'b', verdict: 'change', note: 'fix spacing' };
+  assert.equal((await post(url, 'api/answers', { key: 'd3-rerequest', notes: [changeB] })).status, 200);
+  assert.equal((await post(url, 'api/answers', { key: 'd3-rerequest', verdict: 'approve', pick: 'a', notes: [changeB] })).status, 200);
+  assert.equal(saved().answer, 'approve');
+  assert.equal((await post(url, 'api/answers', { key: 'd3-rerequest', notes: [changeB], requested: true })).status, 200);
+  assert.deepEqual([saved().answer, saved().label], ['change', 'Changes requested']);
+  proc.kill();
+});
+
+test('a plain wait wakes when a viewer request changes an approved design', async () => {
+  const dir = join(scratch, 'approved-rewake'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), png);
+  writeFileSync(join(dir, 'design', 'a.png'), png);
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd5-rewake', title: 'Review the flow screens',
+    about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
+    options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend: 'a',
+    journeys: [{ id: 'flow', title: 'Flow', screens: [{ id: 'a', title: 'First', views: { phone_light: 'design/a.png' } }] }] };
+  writeFileSync(source, JSON.stringify(message));
+  assert.equal(run('post', file, '--kind', 'design', '--from', source).code, 0);
+  assert.equal(run('raise', file, '--title', 'Keep the digest?').code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  assert.equal((await post(url, 'api/answers', { key: 'd5-rewake', verdict: 'approve', pick: 'a', notes: [] })).status, 200);
+  const watching = "import fs from 'node:fs'; import { syncBuiltinESMExports } from 'node:module'; const { watch } = fs;"
+    + " fs.watch = (...a) => { try { return watch(...a); } finally { process.stderr.write('watching'); } }; syncBuiltinESMExports();";
+  const waiting = spawn('node', ['--import', `data:text/javascript,${encodeURIComponent(watching)}`, cli, 'wait', file, '--timeout', '20'], { env });
+  let waited = '';
+  waiting.stdout.on('data', (b) => (waited += b));
+  const exited = new Promise((ok) => waiting.on('exit', ok));
+  await new Promise((ok) => { waiting.stderr.on('data', (b) => /watching/.test(b) && ok()); waiting.once('exit', ok); });
+  const changeA = { journey: 'flow', screen: 'a', verdict: 'change', note: 'fix spacing' };
+  assert.equal((await post(url, 'api/answers', { key: 'd5-rewake', notes: [changeA], requested: true })).status, 200);
+  assert.equal(await exited, 0);
+  assert.match(waited, /d5-rewake/);
+  proc.kill();
+});
+
+test('design review: a viewer approve needs no direction pick, and an inline Approve with a note gives that screen the same verdict', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'screen-approve-pick'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), png);
+  writeFileSync(join(dir, 'design', 'a.png'), png);
+  writeFileSync(join(dir, 'design', 'b.png'), png);
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd3-direction', title: 'Review the flow screens',
+    about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
+    options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend: 'a',
+    journeys: [{ id: 'flow', title: 'Flow', screens: [
+      { id: 'a', title: 'First', views: { phone_light: 'design/a.png' } },
+      { id: 'b', title: 'Second', views: { phone_light: 'design/b.png' } },
+    ] }] };
+  writeFileSync(source, JSON.stringify(message));
+  assert.equal(run('post', file, '--kind', 'design', '--from', source).code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1], { evaluate, close } = await browse(join(dir, 'browser'), 1280);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d3-direction`)}`);
+  await until(async () => (await evaluate('document.querySelector("[aria-haspopup=dialog]")?.textContent')) === 'Review full screen');
+  await evaluate('document.querySelector("[aria-haspopup=dialog]").click()');
+  await until(() => evaluate('!!document.querySelector(".design-viewer[open]")'));
+  await evaluate('document.querySelector(".design-viewer .open-link").click()');
+  await until(async () => (await evaluate('document.querySelector(".design-viewer[open] [role=status]")?.textContent')) === 'Screen approved');
+  assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d3-direction'].notes, [{ journey: 'flow', screen: 'a', verdict: 'approve', note: '' }]);
+  await evaluate('document.querySelector(".design-viewer header button").click()');
+  await until(() => evaluate('!document.querySelector(".design-viewer[open]")'));
+  await evaluate('[...document.querySelectorAll(".design-review label")].find((l) => l.textContent.startsWith("Pick a direction")).querySelector("select").value = "a"');
+  await evaluate('const s = [...document.querySelectorAll(".design-review label")].find((l) => l.textContent.startsWith("Screen for note")).querySelector("select"); s.value = "flow/b"; s.dispatchEvent(new Event("change"))');
+  await evaluate('document.querySelector(".design-review textarea").value = "Tighten spacing"');
+  await evaluate('document.querySelector(".design-review .foot button").click()');
+  await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Approved');
+  const saved = JSON.parse(run('answers', file, '--json').out)['d3-direction'];
+  assert.equal(saved.answer, 'approve');
+  assert.deepEqual(saved.notes, [{ journey: 'flow', screen: 'a', verdict: 'approve', note: '' }, { journey: 'flow', screen: 'b', verdict: 'approve', note: 'Tighten spacing' }]);
+  close();
+  proc.kill();
+});
+
+test('a design-level inline Approve or Change stores its verdict with the note, and an empty Approve drops the earlier design-level note', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'design-level-note'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), png);
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd3-plain', title: 'Review the plain page',
+    about: 'One page.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png', journeys: [] };
+  writeFileSync(source, JSON.stringify(message));
+  assert.equal(run('post', file, '--kind', 'design', '--from', source).code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1], { evaluate, close } = await browse(join(dir, 'browser'), 1280);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d3-plain`)}`);
+  await until(async () => (await evaluate('document.querySelector(".design-review .foot button")?.textContent')) === 'Approve');
+  await evaluate('document.querySelector(".design-review textarea").value = "Fix spacing"');
+  await evaluate('document.querySelector(".design-review .foot button:last-child").click()');
+  await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Changes requested');
+  assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d3-plain'].notes, [{ verdict: 'change', note: 'Fix spacing' }]);
+  await evaluate('document.querySelector(".design-review textarea").value = ""');
+  await evaluate('document.querySelector(".design-review .foot button").click()');
+  await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Approved');
+  const saved = JSON.parse(run('answers', file, '--json').out)['d3-plain'];
+  assert.deepEqual([saved.answer, saved.notes], ['approve', []]);
+  await evaluate('document.querySelector(".design-review textarea").value = "Looks good"');
+  await until(() => evaluate('!document.querySelector(".design-review .foot button").disabled'));
+  await evaluate('document.querySelector(".design-review .foot button").click()');
+  await until(() => JSON.parse(run('answers', file, '--json').out)['d3-plain'].notes.length === 1);
+  assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d3-plain'].notes, [{ verdict: 'approve', note: 'Looks good' }]);
   close();
   proc.kill();
 });
