@@ -90,7 +90,20 @@
         { "path": "media/proof-dark.svg", "sha256": null, "bytes": 0 }
       ],
       "number": 1,
-      "evidenceCard": null
+      "evidence": {
+        "run_id": "20261017T080000Z-a1b2c3d4",
+        "commit": "0123456789abcdef0123456789abcdef01234567",
+        "outcome": "The settings page opens in under a second.",
+        "repro": "repro: npm test",
+        "proof": "verify-settings: npm test, phone, 390, passed",
+        "evidence": "proof-light.svg"
+      },
+      "evidenceCard": {
+        "status": "verified",
+        "result": "RUN PASS",
+        "commit": "0123456789abcdef0123456789abcdef01234567",
+        "media": []
+      }
     },
     {
       "key": "sign-in-tour",
