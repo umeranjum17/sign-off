@@ -53,15 +53,16 @@
   .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
   .card, .tile { background: var(--surface); border-radius: 1rem; }
   .card { padding: 1rem; }
-  .tile { display: grid; align-content: start; gap: 0.25rem; padding: 1rem; color: var(--text); text-decoration: none; }
+  .tile { display: grid; align-content: start; gap: 0.25rem; padding: 0.875rem; color: var(--text); text-decoration: none; }
   .tile .icon { justify-self: start; width: auto; height: auto; background: none; }
   .tile .icon svg { width: 1.5rem; height: 1.5rem; stroke: var(--area, var(--muted)); stroke-width: 1.75; }
-  .tile .n { margin-top: 0.5rem; font-size: 2.5rem; font-weight: 700; line-height: 1.1; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+  .tile .n { margin-top: 0.5rem; font-size: 2.125rem; font-weight: 700; line-height: 1.1; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
   .tile .name { color: var(--muted); font-size: 0.9375rem; line-height: 1.3; }
   .tile:focus-visible { outline-offset: 2px; }
   .pair, .areas { display: grid; gap: 1rem; margin-top: 1rem; }
   .areas { gap: 2rem; margin-top: 2.5rem; }
-  .areas .sec-head { margin-bottom: 0.75rem; } .areas h2 { font-size: 1.75rem; line-height: 1.15; }
+  /* The section names grow only where the row has room for them beside their links (a phone keeps the base size). */
+  .areas .sec-head { margin-bottom: 0.75rem; } @media (min-width: 45rem) { .areas h2 { font-size: 1.75rem; line-height: 1.15; } }
   /* The Summary's short lists are grouped inset lists: a filled square in the area's colour, the title and a line under it, then a chevron on a row with no ×, so the title keeps the row. */
   .areas .compact .icon { width: 2rem; height: 2rem; border-radius: 0.5rem; background: var(--area, var(--muted)); } .areas .compact .icon svg { stroke: #FFFFFF; }
   .areas li:not(:has(.x)) .compact::after { content: "" / ""; flex: none; width: 0.5rem; height: 0.5rem; margin-right: 0.5rem; border: solid var(--border); border-width: 2px 2px 0 0; transform: rotate(45deg); }
