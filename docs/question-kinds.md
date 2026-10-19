@@ -234,11 +234,13 @@ without posting.
   that the command can run.
 - `notify:` in the `config.yaml` beside the board sends a notice when a write
   (`post`, `raise`, `replace` or a sign-in link) leaves a card waiting on you
-  that was not waiting before. It takes indented `url:` (`https://`, or
-  `http://` on this machine) and `link_base:` (the address people open the
-  board at) lines, and an optional `token_env:` line naming the environment
-  variable that holds a bearer token. Each notice is one JSON POST,
-  `{"v":1,"source":"sign-off","id","kind","title","text","url","at"}`,
+  that was not waiting before. Each card is announced once: the card keeps
+  the record, so a card that leaves Waiting and comes back (a new sign-in
+  link, an undone answer) is not announced again. It takes indented `url:`
+  (`https://`, or `http://` on this machine) and `link_base:` (the address
+  people open the board at) lines, and an optional `token_env:` line naming
+  the environment variable that holds a bearer token. Each notice is one JSON
+  POST, `{"v":1,"source":"sign-off","id","kind","title","text","url","at"}`,
   where `kind` is `ask`, `plan`, `design`, `evidence` or `report`, and `url`
   is `link_base` with `#waiting/<key>` added. The sender runs detached, so
   the card is stored whether or not the notice arrives. A failed notice is

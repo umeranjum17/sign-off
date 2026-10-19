@@ -27,9 +27,10 @@ Harness: a browser (chrome-devtools-axi, one CHROME_DEVTOOLS_AXI_SESSION per run
 
 - [Board shell](features/board-shell.md): the areas, the sidebar on a desk, the tab bar on a phone, light and dark
 - [Plan review](features/plan-review.md): open a plan, approve or change sections, answer decisions and send back structured answers
-- [Notification sender](features/notifications.md): configure a local receiver, post a new ask and verify the exact received JSON
+- [Notification sender](features/notifications.md): configure a local receiver, post a new ask and verify the exact received JSON, once per card
+- [Design viewer](features/design-viewer.md): the full-screen screen review, its note box against its buttons at 390, 820 and 1280
 
-shots.sh BASE <folder> captures every screen at 390 and 1280, light and dark. An emulated tap can miss; click a button from the page (eval "() => document.querySelector('[aria-label^=\"Pass,\"]').click()") when a tap does not land.
+shots.sh BASE <folder> captures every screen at 390, 820 and 1280, light and dark. An emulated tap can miss; click a button from the page (eval "() => document.querySelector('[aria-label^=\"Pass,\"]').click()") when a tap does not land.
 
 ## Evidence
 

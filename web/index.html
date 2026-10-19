@@ -409,7 +409,8 @@
   .design-preview-full { display: block; max-width: 56rem; margin: 0 auto; color: var(--accent); }
   @media (min-width: 60rem) { .design-preview-window { max-width: 24.375rem; } }
   .design-review label { display: grid; gap: 0.5rem; max-width: 56rem; margin: 1rem auto; color: var(--muted); }
-  .design-review textarea { min-height: 6rem; padding: 0.75rem; background: var(--surface); }
+  /* The design note fills its column, so it lines up with the buttons under it at every width (the 70ch prose cap would narrow it at tablet width). */
+  .design-review textarea { max-width: none; min-height: 6rem; padding: 0.75rem; background: var(--surface); }
   .design-review .foot { max-width: 56rem; margin: 1rem auto; }
   .design-review .foot > * { flex: 1; }
   .design-review .foot button.open-link { background: var(--action); color: var(--on-accent); }
@@ -431,7 +432,7 @@
   .design-viewer-panel .foot { display: flex; gap: 0.75rem; margin: 0.5rem 0; }
   .design-viewer-panel .foot > * { flex: 1; }
   .design-viewer-panel label { display: grid; gap: 0.25rem; margin: 0.5rem 0; }
-  .design-viewer-panel textarea { min-height: 3rem; max-height: 6rem; margin: 0; }
+  .design-viewer-panel textarea { max-width: none; min-height: 3rem; max-height: 6rem; margin: 0; }
   .design-viewer-panel .open-link { background: var(--action); color: var(--on-accent); }
   @media (min-width: 60rem) { .design-viewer header h2 { font-size: 2.125rem; } .design-viewer-body { grid-template: minmax(0, 1fr) / minmax(0, 1fr) 22.5rem; } .design-viewer-panel { padding: 1.25rem; } }
   @media (max-height: 550px) { .design-viewer-body { overflow: auto; grid-template-rows: minmax(12rem, 1fr) auto; } }

@@ -328,8 +328,10 @@ const ASK_FLAGS = ['why', 'outcome', 'recommend-reason', 'silent-by', 'merge'];
 const MANY = ['option', 'outcome', 'merge'];
 /** Board types that are contract kinds: a decision (the default type) is an ask. */
 const CONTRACT_TYPES = ['decision', 'ask', 'evidence', 'report', 'plan', 'design'];
-/** The stored item as the message it came from: the board's own `filed` stamp is not part of a message that names none. */
-const asSent = ({ filed: _filed, ...rest }: any) => rest;
+/** The stored item as the message it came from: the board's own `filed` stamp is not part of a message that names none, and the notice record (`announced`) is the board's too. */
+const asSent = ({ filed: _filed, announced: _announced, ...rest }: any) => rest;
+/** A report names its own `filed` time, so only the notice record goes. */
+const asReport = ({ announced: _announced, ...rest }: any) => rest;
 /** Items of a --from file that carry contract or kind are contract messages: each is checked against its kind's rules before anything is stored.
  * A new item of a contract kind must carry them (contract section 2). A --replace feed replaces the stored item, so an item under an existing key
  * that changed is checked again; an unchanged item, a board-format one and every item outside a --replace feed are not checked again. */
@@ -350,7 +352,7 @@ function contractItems(items: any[], from: string, file: string, replace = false
     // `number` and media copies read as the message's `media` paths, and its `evidence` run reads as `run`. An unchanged
     // item, a board-format one and every item outside a --replace feed are not checked again.
     const asMessage = (x: any) => {
-      if (m?.kind !== 'evidence') return m?.kind === 'report' ? x : asSent(x);
+      if (m?.kind !== 'evidence') return m?.kind === 'report' ? asReport(x) : asSent(x);
       const { type: _type, number: _number, media, evidence: run, ...message } = asSent(x);
       return { ...message, ...(media !== undefined && { media: Array.isArray(media) ? media.map((r: any) => r?.path) : media }), ...(run && { run }) };
     };
@@ -792,7 +794,7 @@ function postSignin(file: string, named: string, on: string, values: Record<stri
     let status = same ? (done ? 'already done' : 'already waiting') : had ? 'new link' : 'posted';
     if (!same) {
       fits(d.title, d.key);
-      const next = { ...item, filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+      const next = { ...item, ...(had?.announced && { announced: had.announced }), filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
       if (had) items[at] = next; else items.push(next);
       const before = waitingKeys(file);
       writeItems(file, items);
@@ -851,7 +853,9 @@ function replace(file: string, named: string, on: string, from?: string, filer?:
       }
     }
     const old = existsSync(file) ? readItems(file) : undefined;
-    let items = feed, extra = fed.extra, resulting = incoming;
+    // The notice record belongs to the card key, so a feed that rewrites a card keeps it: the receiver was told once.
+    const told = new Map((old?.items ?? []).filter((i) => i?.key && i.announced).map((i) => [i.key, i.announced]));
+    let items = feed.map((i) => (told.has(i?.key) ? { ...i, announced: told.get(i.key) } : i)), extra = fed.extra, resulting = incoming;
     if (filer) {
       // The feed's items first: the board shows the file's last item first, so the other filers' items keep showing on top.
       const fedKeys = new Set(feed.map((i) => i.key));
@@ -921,8 +925,8 @@ function postMedia(file: string, named: string, on: string, values: Record<strin
     const current = board(file), store = join(dirname(file), 'evidence'), taken = current.map((d) => Number(/^update-(\d+)$/.exec(d.key)?.[1] ?? 0));
     const own = message ? message.key : explainer && (values.key ?? slug(values.title)), had = message && own && items.find((x) => x?.key === own);
     if (had) {
-      // The stored item, read back as the message it came from: its run, and each media file by hash.
-      const asMessage = ({ type: _t, number: _n, filed: _f, evidence: run, media: kept, ...rest }: any) => canon({ ...rest, run, media: kept?.map((x: any) => x.sha256) });
+      // The stored item, read back as the message it came from: its run, and each media file by hash. The notice record is the board's, not the message's.
+      const asMessage = ({ type: _t, number: _n, filed: _f, announced: _a, evidence: run, media: kept, ...rest }: any) => canon({ ...rest, run, media: kept?.map((x: any) => x.sha256) });
       if (asMessage(had) !== canon({ ...message, media: sources.length ? sources.map((src) => sha256(readFileSync(src))) : undefined })) {
         throw fail(`key ${own} already holds a different message on ${tilde(file)}`, 'CONFLICT', 'Post it under a new key');
       }
@@ -1162,7 +1166,7 @@ function storeIncoming(file: string, named: string, on: string, { incoming, raw 
       // The same question from another filer, or at another time, is the same question: it keeps its first filer and time.
       const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, dismissed: undefined, filer: undefined, filed: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
       // A message that names no filed time matches the one the board stamped.
-      const differs = () => exact ? canon({ ...items.find((x) => x?.key === d.key), ...(raw[i].filed === undefined && { filed: undefined }) }) !== canon(raw[i]) : same(had!) !== same(d);
+      const differs = () => exact ? canon({ ...items.find((x) => x?.key === d.key), ...(raw[i].filed === undefined && { filed: undefined }), announced: undefined }) !== canon(raw[i]) : same(had!) !== same(d);
       if (had && differs()) throw refuse(`already holds a different ${contract ? 'message' : 'question'} on ${tilde(file)}`);
       // Each new item records when it was raised, unless it names its own time.
       if (!had) {
@@ -1403,12 +1407,19 @@ function waitingKeys(file: string) {
   try { return new Set(board(file, () => {}).filter(waits).map((d) => d.key)); } catch { return undefined; }
 }
 
-/** Announces each card that entered Waiting on you with a write. The card is already stored, so nothing here fails the command. */
+/** Announces each card that entered Waiting on you with a write. The card is already stored, so nothing here fails the command.
+ * A card is announced once: the card keeps the record, so one that leaves Waiting and comes back (a new sign-in link) stays quiet,
+ * the same silent return an Undo gets. */
 function notifyEntered(file: string, named: string, before: Set<string> | undefined) {
   try {
     const so = dirname(named), notify = before ? readSetup(so).notify : undefined;
     if (!before || !notify || (notify.token_env && !process.env[notify.token_env])) return;
-    for (const d of board(file, () => {}).filter((d) => waits(d) && !before.has(d.key))) sendNotice(so, notify, d);
+    const { items } = readItems(file), fresh = board(file, () => {}).filter((d) => waits(d) && !before.has(d.key) && !items.some((i) => i?.key === d.key && i.announced));
+    if (!fresh.length) return;
+    const at = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+    for (const i of items) if (fresh.some((d) => d.key === i?.key)) i.announced = at;
+    writeItems(file, items);
+    for (const d of fresh) sendNotice(so, notify, d);
   } catch {}
 }
 
