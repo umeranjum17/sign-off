@@ -2140,7 +2140,7 @@ test('Summary at 390 with 1, 10, 100 answers today and a last-bucket board: the 
   }
 });
 
-test('Evidence: a card per passed update with its capture as the hero, its result, its time and what it proves, grouped under the project its check names (else Other), every other update waiting on you; the card opens the update, which shows the whole shot, what ran, who checked it, the change, when, and its verdict; two across at 1440 and nothing squashed at 390', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Evidence: a card per passed update with its capture as the hero, its result, its time and what it proves, grouped under the project its check names (else Other), a capture with no linked run listed as No result yet, every other update waiting on you; the card opens the update, which shows the whole shot, what ran, who checked it, the change, when, and its verdict; two across at 1440 and nothing squashed at 390', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'updates'), file = join(dir, '.sign-off', 'decisions.json');
   mkdirSync(dir);
   run('init', dir);
@@ -2169,7 +2169,7 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   const pr = 'https://github.com/umeranjum17/sign-off/pull/12';
   doc.items.push({ key: 'update-4', type: 'evidence', number: 4, title: 'sign-off board verify: pass', about: outcome, filed: new Date().toISOString(), link: pr,
     media: [{ path: 'evidence/4/1.png', sha256: hash, bytes: wideBytes.length }], evidence: link(runs[0]) });
-  // A plain update with no linked run has no result, so it waits on you instead of being listed.
+  // A plain update with its own capture and no linked run is listed too, newest first, with no result yet.
   doc.items.push({ key: 'update-5', type: 'evidence', number: 5, title: 'Sign-in, plain update', about: 'Umer checks the plain update.', filed: new Date(Date.now() + 1000).toISOString(),
     media: [{ path: 'evidence/4/1.png', sha256: hash, bytes: wideBytes.length }] });
   // A run whose capture changed after it ran cannot be checked, so its update waits on you instead of being listed.
@@ -2181,35 +2181,35 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   let { evaluate, close } = await browse(join(dir, 'b'), 1440);
   await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
   // Per card: its id, what it proves, its result and the picture that leads it; every card is drawn.
-  const cards = '[...document.querySelectorAll(".ev-card")].map((a) => [a.id, a.querySelector(".t").textContent, a.querySelector(".ev-ok").textContent, a.querySelector(".ev-ok svg path")?.getAttribute("d") ?? "", a.querySelectorAll(".ev-media img").length])';
-  await until(async () => (await evaluate(`${cards}.length === 3 && [...document.querySelectorAll(".ev-media img")].every((i) => i.complete && i.naturalWidth)`)));
+  const cards = '[...document.querySelectorAll(".ev-card")].map((a) => [a.id, a.querySelector(".t").textContent, (a.querySelector(".ev-ok") ?? a.querySelector(".m span")).textContent, a.querySelector(".ev-ok svg path")?.getAttribute("d") ?? "", a.querySelectorAll(".ev-media img").length])';
+  await until(async () => (await evaluate(`${cards}.length === 4 && [...document.querySelectorAll(".ev-media img")].every((i) => i.complete && i.naturalWidth)`)));
   const clock = (at) => at.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   const at = (i) => new Date(doc.items[i - 1].filed);
-  // Evidence lists passed proof only: the failed, unchecked and no-result updates are not on it.
-  assert.deepEqual(await evaluate(cards), [['item-update-4', outcome, 'Passed', 'm9 12 2 2 4-4', 1], ['item-update-3', outcome, 'Passed', 'm9 12 2 2 4-4', 1],
-    ['item-update-2', outcome, 'Passed', 'm9 12 2 2 4-4', 1]]);
-  for (const n of [4, 3, 2]) assert.equal(await evaluate(`document.getElementById("item-update-${n}").querySelector(".m > span:last-child").textContent`), `Today, ${clock(at(n))}`, `update ${n}`);
+  // Evidence lists passed proof and captures with no checked run, newest first; the failed and unchecked updates are not on it.
+  assert.deepEqual(await evaluate(cards), [['item-update-5', 'Sign-in, plain update', 'No result yet', '', 1], ['item-update-2', outcome, 'Passed', 'm9 12 2 2 4-4', 1],
+    ['item-update-4', outcome, 'Passed', 'm9 12 2 2 4-4', 1], ['item-update-3', outcome, 'Passed', 'm9 12 2 2 4-4', 1]]);
+  for (const n of [5, 4, 3, 2]) assert.equal(await evaluate(`document.getElementById("item-update-${n}").querySelector(".m > span:last-child").textContent`), `Today, ${clock(at(n))}`, `update ${n}`);
   // The two sign-off proof lines differ only in case and share one head; the passed update whose proof names no project goes under Other.
-  assert.deepEqual(await evaluate('[...document.querySelectorAll(".sec-head h2")].map((h) => h.textContent)'), ['sign-off', 'Other']);
-  assert.equal(await evaluate('document.querySelector(\'#nav a[href="#evidence"] .n\').textContent'), '3');
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".sec-head h2")].map((h) => h.textContent)'), ['Other', 'sign-off']);
+  assert.equal(await evaluate('document.querySelector(\'#nav a[href="#evidence"] .n\').textContent'), '4');
   // The Summary's glance names the newest listed update.
   await evaluate('location.hash = ""');
-  await until(async () => (await evaluate('document.querySelector(".glance")?.textContent.includes("Newest: Update 4.")')) === true);
+  await until(async () => (await evaluate('document.querySelector(".glance")?.textContent.includes("Newest: Update 5.")')) === true);
   await evaluate('location.hash = "#evidence"');
-  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 3);
-  // Cards sit two across: the sign-off pair first, newest on the left, then Other under its own head.
-  const boxes = `[4, 3, 2].map((n) => { const r = document.getElementById(\`item-update-\${n}\`).getBoundingClientRect(); return { n, top: r.top, left: r.left, right: r.right, bottom: r.bottom }; })`;
-  const [four, three, two] = await evaluate(boxes);
-  assert.ok(four.top === three.top && three.left > four.right, 'the two passed sign-off updates share the first row, newest on the left');
-  assert.ok(two.top > four.bottom && two.left === four.left, 'the Other update follows its own head');
+  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 4);
+  // Cards sit two across: the newest group first (Other: the plain update, then update 2), then the sign-off pair under its own head, newest on the left.
+  const boxes = `[5, 2, 4, 3].map((n) => { const r = document.getElementById(\`item-update-\${n}\`).getBoundingClientRect(); return { n, top: r.top, left: r.left, right: r.right, bottom: r.bottom }; })`;
+  const [five, two, four, three] = await evaluate(boxes);
+  assert.ok(five.top === two.top && two.left > five.right, 'the two Other updates share the first row, newest on the left');
+  assert.ok(four.top > five.bottom && four.left === five.left && three.top === four.top && three.left > four.right, 'the sign-off pair follows its own head, newest on the left');
   // Under the title: how many are listed, how many filed today and when the newest came.
-  assert.equal(await evaluate('document.querySelector(".top .lede").textContent'), `3 updates, 3 new. The page changed at ${clock(at(4))}.`);
+  assert.equal(await evaluate('document.querySelector(".top .lede").textContent'), `4 updates, 4 new. The page changed at ${clock(at(5))}.`);
   // Every update that is not passed proof waits on you instead, with its honest badge, the reason a run could not be checked,
   // and the normal verdict and dismiss controls, so the person sees a failed check and the agent always gets an answer.
   await evaluate('location.hash = "#waiting"');
-  await until(async () => (await evaluate('["update-1", "update-5", "update-6"].every((k) => document.getElementById(`item-${k}`))')));
-  assert.deepEqual(await evaluate('["update-1", "update-5", "update-6"].map((k) => [document.querySelector(`#item-${k} .st`)?.textContent ?? "", !!document.getElementById(`item-${k}`).parentElement.querySelector("button[aria-label^=Dismiss]")])'),
-    [['Check failed', true], ['', true], ['Could not check', true]]);
+  await until(async () => (await evaluate('["update-1", "update-6"].every((k) => document.getElementById(`item-${k}`))')));
+  assert.deepEqual(await evaluate('["update-1", "update-6"].map((k) => [document.querySelector(`#item-${k} .st`)?.textContent ?? "", !!document.getElementById(`item-${k}`).parentElement.querySelector("button[aria-label^=Dismiss]")])'),
+    [['Check failed', true], ['Could not check', true]]);
   // Each opens on Decide with its badge, the reason a run could not be checked, and the normal answers.
   for (const [k, st, why] of [['update-1', 'Check failed', 'Loads in 1 second.'], ['update-6', 'Could not check', 'A picture or recording changed after the run. Ask the agent to run the check again.']]) {
     await evaluate(`location.hash = "#decide/${k}"`);
@@ -2218,9 +2218,9 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   }
   await evaluate('location.hash = "#waiting"');
   await until(async () => (await evaluate('!!document.getElementById("item-update-1")')));
-  assert.ok(await evaluate('!["item-update-2", "item-update-3", "item-update-4"].some((id) => document.getElementById(id))'));
+  assert.ok(await evaluate('!["item-update-2", "item-update-3", "item-update-4", "item-update-5"].some((id) => document.getElementById(id))'));
   await evaluate('location.hash = "#evidence"');
-  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 3);
+  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 4);
   // An update that waits on nothing is only shown, even on a board that takes answers: no verdict, note or comment controls.
   const kept = doc.items[1].options;
   doc.answers_only = true;
@@ -2236,7 +2236,7 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   doc.items[1].options = kept;
   writeFileSync(file, JSON.stringify(doc));
   await evaluate('refresh()');
-  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 3);
+  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 4);
   // The card opens the update itself: the whole capture, what it proves, then what the check recorded.
   await evaluate('document.getElementById("item-update-4").click()');
   await until(async () => (await evaluate('location.hash')) === '#evidence/update-4' && (await evaluate('!!document.querySelector(".ev-item")')));
@@ -2273,12 +2273,12 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   assert.equal(await evaluate('location.hash'), '#evidence/update-4');
   // Back on the list, that update is answered, so it leaves Evidence for Answered.
   await evaluate('location.hash = "#evidence"');
-  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 2);
+  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 3);
   close();
   // On a phone the card keeps the screen's width, the update's own screen never scrolls sideways and nothing squashes.
   ({ evaluate, close } = await browse(join(dir, 'p'), 390));
   await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
-  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length === 2')));
+  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length === 3')));
   assert.deepEqual(await evaluate(SQUASH), []);
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-card")].filter((a) => a.getBoundingClientRect().width < 0.95 * document.querySelector(".ev-grid").getBoundingClientRect().width).map((a) => a.id)'), []);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'));

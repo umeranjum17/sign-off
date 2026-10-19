@@ -27,7 +27,7 @@ so post "$board" --kind design --from "$dir/design-message.json"
 so post "$board" --type signin --key npm --service "npm" --link https://example.com/login --unlocks "Publishing the release" --waits "Release agent" --expires 2h
 so post "$board" --kind plan --from "$dir/plan.json"
 so post "$board" --type evidence --title "Sign-in screen on a phone" --about "Umer checks the new layout." --media "$dir/shot.webp" --link https://example.com/pr/4
-# One update links a done-done run, so Evidence shows its project head with a Passed result, a change link and the run's proof rows; the plain update above has no result, so it waits on you instead.
+# One update links a done-done run, so Evidence shows its project head with a Passed result, a change link and the run's proof rows; the plain update above has a capture and no run, so it is listed too, with No result yet.
 mkdir -p "$dir/.done-done/runs"
 run=20260101T000000Z-a1b2c3d4 commit=0000000000000000000000000000000000000000
 sha=$(node -e 'const c=require("crypto"),f=require("fs");process.stdout.write(c.createHash("sha256").update(f.readFileSync(process.argv[1])).digest("hex"))' "$dir/shot.webp")
