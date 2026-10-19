@@ -1004,8 +1004,8 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await evaluate('document.querySelector("#item-look").click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/look');
   assert.equal(await evaluate('document.querySelector(".decide .why")?.textContent'), 'No new bugs in three weeks, and support is fully staffed on Friday.');
-  assert.equal(await evaluate('document.querySelectorAll(".decide-preview .mock").length'), 1);
-  assert.equal(await evaluate('!document.querySelector(".decide-preview .shot.none")'), true);
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-preview .mock")].map((f) => [f.querySelector(".label").textContent, f.querySelector(".shot.none")?.textContent ?? null])'),
+    [['B', null], ['A', 'No mock for this option'], ['C', 'No mock for this option']]);
   assert.equal(await evaluate('document.querySelector(".silent-line")?.textContent'), 'If you stay quiet: C');
   assert.equal(await evaluate('getComputedStyle(document.querySelector(".pick-option[aria-pressed=true]"), "::before").content'), 'none');
   assert.equal(await evaluate('(() => { const b = document.querySelector(".decide-bar").getBoundingClientRect().top; return [".pick-list", ".silent-line"].every(s => document.querySelector(s).getBoundingClientRect().bottom <= b); })()'), true);
@@ -1336,12 +1336,37 @@ test('Decide on an ask with no mock to show: no empty preview frame, and an ask 
   assert.equal(await evaluate('document.querySelectorAll(".decide .shot.none, .decide .mock").length'), 0);
   await evaluate('location.hash = "#decide/shot"');
   await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'Pick the shot');
-  assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-preview .mock .label")].map((s) => s.textContent)'), ['B']);
-  assert.equal(await evaluate('document.querySelectorAll(".decide-preview .shot.none").length'), 0);
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-preview .mock")].map((f) => [f.querySelector(".label").textContent, f.querySelector(".shot.none")?.textContent ?? null])'),
+    [['A', 'No mock for this option'], ['B', null]]);
   await evaluate('location.hash = "#decide/lost"');
   await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'Pick the lost look');
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-preview .mock")].map((f) => [f.querySelector(".label").textContent, f.querySelector(".shot.none")?.textContent ?? null])'),
-    [['B', 'No mock for this option']]);
+    [['A', 'No mock for this option'], ['B', 'No mock for this option']]);
+  close();
+  proc.kill();
+});
+
+test('Decide keeps every option in its preview when only some have a mock: the rest say "No mock for this option" and can still be picked', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'decide-partial-mocks'), file = join(dir, 'board.json');
+  mkdirSync(join(dir, 'mocks'), { recursive: true });
+  writeFileSync(join(dir, 'mocks', 'b.png'), png);
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    { key: 'look', type: 'design', title: 'Pick the look', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend_value: 'a',
+      mocks: [{ value: 'b', path: 'mocks/b.png' }],
+    },
+    { key: 'next', type: 'decision', title: 'And then?', options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }], recommend_value: 'yes' },
+  ] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#decide/look`)}`);
+  await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'Pick the look');
+  // A is the recommended option and has no mock: it stays in the preview, saying so, instead of dropping out of it.
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-preview .mock")].map((f) => [f.querySelector(".label").textContent, f.querySelector(".shot.none")?.textContent ?? null])'),
+    [['A', 'No mock for this option'], ['B', null]]);
+  await evaluate('[...document.querySelectorAll(".decide .pick-option")].find((b) => b.textContent.startsWith("A")).click(); document.querySelector(".decide-bar .answer").click()');
+  await until(async () => (await evaluate('location.hash')) === '#decide/next');
   close();
   proc.kill();
 });
