@@ -2242,8 +2242,8 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   await until(async () => (await evaluate('location.hash')) === '#evidence/update-4' && (await evaluate('!!document.querySelector(".ev-item")')));
   const rows = '[...document.querySelectorAll(".ev-grp .cell")].map((c) => [c.querySelector(".k").textContent, (c.querySelector(".v") ?? c.querySelector(".x")).textContent.trim()])';
   // Checked by is the checker before the proof line's first colon; What ran is the rest of that line.
-  assert.deepEqual(await evaluate(rows), [['Result', 'Passed'], ['What ran', 'npm test, phone, 390, passed'], ['Checked by', 'verify-sign-off'],
-    ['Project', 'sign-off'], ['When', `Today, ${clock(at(4))}`], ['Change', 'Pull request 12']]);
+  assert.deepEqual(await evaluate(rows), [['Result', 'Passed'], ['What ran', 'npm test, phone, 390, passed'], ['Change', 'Pull request 12'],
+    ['Project', 'sign-off'], ['Checked by', 'verify-sign-off'], ['When', `Today, ${clock(at(4))}`]]);
   assert.deepEqual(await evaluate('[document.querySelector(".ev-grp a.cell[href]").getAttribute("href"), document.querySelector("header .change-link").getAttribute("href")]'), [pr, pr]);
   assert.deepEqual(await evaluate('[document.querySelector(".ev-title").textContent, document.querySelectorAll(".ev-hero img").length, document.querySelectorAll(".ev-verdict .choices button").length]'),
     [outcome, 1, 3]);
