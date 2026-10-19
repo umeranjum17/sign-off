@@ -20,6 +20,8 @@ and inherits the calling agent's model routing.
 | `init` | set up a repo and install agent skills |
 | `report` | build an explainer page to post |
 | `signin` | close a sign-in card as done |
+| `dismiss` | hide a card, like its Dismiss button |
+| `restore` | bring a dismissed card back |
 | `doctor` | check the setup; each failure names its fix |
 | `notify` | check device notifications, or send a test notice |
 | `validate` | check messages against the contract |
