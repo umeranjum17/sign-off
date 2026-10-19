@@ -952,8 +952,8 @@
   /** One phone frame per option, the recommended one first: its label and Recommended badge, the mock (tap opens it full size) and its Pick button. */
   function mockCards(d, buttons, onlyAvailable = false) {
     const rec = (i) => d.options[i].value === d.recommend_value, order = d.options.map((_, i) => i).sort((a, b) => rec(b) - rec(a));
-    const hasMock = (i) => d.mocks?.some((m) => m.value === d.options[i].value && m.hash !== null);
-    const shown = onlyAvailable ? order.filter(hasMock) : order;
+    const hasRef = (i) => d.mocks?.some((m) => m.value === d.options[i].value);
+    const shown = onlyAvailable ? order.filter(hasRef) : order;
     return el('div', { class: 'mocks', role: 'group', 'aria-label': d.title }, ...shown.map((i) => {
       const o = d.options[i], m = d.mocks?.find((x) => x.value === o.value);
       // A `page.html?variant=b` mock keeps its variant in the frame's query, where the page reads it.

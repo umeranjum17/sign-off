@@ -1323,6 +1323,8 @@ test('Decide on an ask with no mock to show: no empty preview frame, and an ask 
     { key: 'look', type: 'design', title: 'Pick the look', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend_value: 'a' },
     { key: 'shot', type: 'design', title: 'Pick the shot', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend_value: 'a',
       mocks: [{ value: 'b', path: 'mocks/one.png' }] },
+    { key: 'lost', type: 'design', title: 'Pick the lost look', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend_value: 'a',
+      mocks: [{ value: 'b', path: 'mocks/gone.png' }] },
   ] }));
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
@@ -1336,6 +1338,10 @@ test('Decide on an ask with no mock to show: no empty preview frame, and an ask 
   await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'Pick the shot');
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-preview .mock .label")].map((s) => s.textContent)'), ['B']);
   assert.equal(await evaluate('document.querySelectorAll(".decide-preview .shot.none").length'), 0);
+  await evaluate('location.hash = "#decide/lost"');
+  await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'Pick the lost look');
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-preview .mock")].map((f) => [f.querySelector(".label").textContent, f.querySelector(".shot.none")?.textContent ?? null])'),
+    [['B', 'No mock for this option']]);
   close();
   proc.kill();
 });
