@@ -1975,7 +1975,9 @@
       });
     };
     if (d.type === 'signin') {
-      const signinPage = el('div', { class: 'decide' }, row(d, { x: false }), el('div', { class: 'decide-bar' }, skip || '', el('a', { class: 'later', href: '#waiting' }, 'Later'), xBtn(d, 'Dismiss')), decideLists(d, queue));
+      const gone = xBtn(d, 'Dismiss');
+      if (gone) gone.addEventListener('click', () => (location.hash = to));
+      const signinPage = el('div', { class: 'decide' }, row(d, { x: false }), el('div', { class: 'decide-bar' }, skip || '', el('a', { class: 'later', href: '#waiting' }, 'Later'), gone), decideLists(d, queue));
       if (!state.readonly) swipe(signinPage);
       return signinPage;
     }
