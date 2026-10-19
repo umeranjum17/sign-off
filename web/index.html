@@ -1064,7 +1064,7 @@
   function evCard(d) {
     return el('a', { class: 'ev-card', href: `#evidence/${d.key}`, id: `item-${d.key}` }, el('span', { class: 'ev-media' }, ...hero(d)),
       el('span', { class: 't', dir: 'auto' }, headline(d)),
-      el('span', { class: 'm' }, el('span', { class: 'ev-ok' }, mark('ok'), 'Passed'), d.filed ? el('span', {}, stamp(d.filed)) : ''));
+      el('span', { class: 'm' }, d.evidenceCard ? el('span', { class: 'ev-ok' }, mark('ok'), 'Passed') : el('span', {}, 'No result yet'), d.filed ? el('span', {}, stamp(d.filed)) : ''));
   }
   /** Evidence as its own screen: a card per passed update, grouped under the project its check names, in the order each project first shows;
    * proof that names no project goes under Other. An item put in this area that is not an update (a page, a diagram) keeps the card it always had. */
@@ -1247,8 +1247,10 @@
   const isAnswered = (d) => Object.hasOwn(state.answers, d.key) && !(d.type === 'design' && state.answers[d.key].answer === 'screens');
   /** Each item lives in one area: answered items, then an evidence update that is not passed proof (it waits on you with its honest result), then the area the item names, then evidence updates, then what is only to read (explainers, pages with nothing to answer), then the open asks.
    *  A plan has no options but waits for its send-back. */
+  /** An update the Evidence list shows: a passed run, or its own captures when no run was checked for it (a failed or unfinished check waits on you). */
+  const listed = (d) => (d.evidenceCard ? d.evidenceCard.result === 'RUN PASS' : Boolean(d.media?.length));
   const area = (d) => {
-    const a = isAnswered(d) ? 'answered' : d.type === 'evidence' && d.evidenceCard?.result !== 'RUN PASS' ? 'waiting' : d.area ?? (d.type === 'evidence' ? 'evidence'
+    const a = isAnswered(d) ? 'answered' : d.type === 'evidence' && !listed(d) ? 'waiting' : d.area ?? (d.type === 'evidence' ? 'evidence'
       : state.readonly || d.type === 'explainer' || !(d.options.length || d.reply || d.type === 'signin' || d.type === 'plan' || d.kind === 'design') ? 'reports' : 'waiting');
     // Reports lists only what explains: a page to tap through, or a narrated video. Text alone (a receipt, a status line) is a note, folded under it.
     return a === 'reports' && !state.readonly && d.type !== 'explainer' && !reads(d) ? 'notes' : a;
@@ -1842,6 +1844,7 @@
     const openKeys = new Set(open.map((d) => d.key));
     const merged = new Set(open.flatMap((d) => d.merges ?? []).filter((k) => openKeys.has(k)));
     for (const d of [...state.decisions].reverse()) if (!gone.has(d.key) && !merged.has(d.key)) by[area(d)].push(d);
+    by.evidence.sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
     by.designs = [...state.decisions].reverse().filter((d) => d.kind === 'design' && !gone.has(d.key));
     // Waiting on you reads newest first unless the viewer chose oldest first. A sign-in blocks someone now, so sign-ins come first either way.
     let latest = -Infinity;
