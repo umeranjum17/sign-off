@@ -27,11 +27,27 @@ so post "$board" --kind design --from "$dir/design-message.json"
 so post "$board" --type signin --key npm --service "npm" --link https://example.com/login --unlocks "Publishing the release" --waits "Release agent" --expires 2h
 so post "$board" --kind plan --from "$dir/plan.json"
 so post "$board" --type evidence --title "Sign-in screen on a phone" --about "Umer checks the new layout." --media "$dir/shot.webp" --link https://example.com/pr/4
+# One update links a done-done run, so Evidence shows its project head with a Passed result, a change link and the run's proof rows; the plain update above has no result, so it waits on you instead.
+mkdir -p "$dir/.done-done/runs"
+run=20260101T000000Z-a1b2c3d4 commit=0000000000000000000000000000000000000000
+sha=$(node -e 'const c=require("crypto"),f=require("fs");process.stdout.write(c.createHash("sha256").update(f.readFileSync(process.argv[1])).digest("hex"))' "$dir/shot.webp")
+bytes=$(wc -c < "$dir/shot.webp")
+cat > "$dir/.done-done/runs/$run.json" <<JSON
+{"schema": 1, "run_id": "$run", "commit": "$commit", "tree": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "dirty": false, "exit": 0,
+ "files": [{"path": "shot.webp", "sha256": "$sha", "bytes": $bytes}]}
+JSON
+cat > "$dir/evidence-run.json" <<JSON
+{"contract": 1, "kind": "evidence", "schema": 1, "title": "The sign-in screen fits a phone", "filer": "verify",
+ "about": "Umer sees the whole screen without scrolling sideways.", "media": ["shot.webp"], "link": "https://example.com/pr/4",
+ "run": {"run_id": "$run", "commit": "$commit", "outcome": "Umer sees the whole screen without scrolling sideways.",
+  "repro": "repro: npm test", "proof": "verify-sign-off: npm test, phone, 390, passed", "evidence": "shot.webp"}}
+JSON
+so post "$board" --kind evidence --from "$dir/evidence-run.json" >/dev/null
 so post "$board" --kind report --from "$f/report.v2/valid-full.json" || \
   so post "$board" --type report --title "Sign-in now takes 2 steps" --about "Why the code step moved first." --view page/index.html --preview page/preview.svg
 so post "$board" --key digest-old --title "Send the digest on Mondays?" --why "Choose the weekly digest schedule." --outcome yes="The digest goes out Mondays." --outcome no="The digest is paused." --recommend yes --recommend-reason "A weekly update stays useful." --default yes
 
-timeout "${SEED_SERVE_SECONDS:-1800}" node "$repo/dist/cli.js" serve "$board" --port 0 > "$dir/serve.log" 2>&1 &
+timeout "${SEED_SERVE_SECONDS:-1800}" node "$repo/dist/cli.js" serve "$board" --port 0 --evidence-root "$dir" > "$dir/serve.log" 2>&1 &
 echo $! > "$dir/serve.pid"
 for _ in $(seq 50); do url=$(grep -o 'http://127.0.0.1:[0-9]*/' "$dir/serve.log" | head -1) && [ -n "$url" ] && break; sleep 0.2; done
 if [ -z "${url:-}" ]; then

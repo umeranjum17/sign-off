@@ -137,7 +137,9 @@
   #reader header { display: flex; align-items: center; gap: 0.5rem; min-height: 3.5rem; padding: 0.25rem 1rem; border-bottom: 1px solid var(--line); background: var(--surface); }
   #reader:has(.read) header { border-bottom: 0; background: none; }
   #reader .close { display: inline-flex; flex: none; align-items: center; min-height: 3rem; margin-left: -0.5rem; padding: 0 0.5rem; border-radius: 0.625rem; color: var(--accent); font-weight: 650; text-decoration: none; }
-  #reader h1 { margin: 0; min-width: 0; overflow: hidden; font-size: 1rem; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+  #reader header .change-link { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; margin-left: auto; border-radius: 0.625rem; color: var(--accent); }
+  #reader header .change-link svg { width: 1.5rem; height: 1.5rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  #reader header h1 { margin: 0; min-width: 0; overflow: hidden; font-size: 1rem; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
   #reader iframe { flex: 1; width: 100%; border: 0; background: var(--bg); }
   #reader h1:not(:focus-visible) { outline: none; }
   #reader h1:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -221,7 +223,7 @@
   .events { list-style: none; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.25rem; font-size: 0.9375rem; }
   .events time, .sec-head .meta { font-weight: 700; font-variant-numeric: tabular-nums; margin-right: 0.5rem; }
   .sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
-  .sec-head h2 { margin: 0; overflow-wrap: normal; } /* A long count beside a section name wraps itself, never the name mid-word. */ .sec-head:has(+ .in-evidence) { margin: 1rem 0 0.375rem; }
+  .sec-head h2 { margin: 0; overflow-wrap: normal; } /* A long count beside a section name wraps itself, never the name mid-word. */
   /* A grouped list: hairlines between rows, inset from the left as on iOS. */
   .rows { list-style: none; margin: 0; padding: 0 0 0 1rem; }
   .rows > li { padding-right: 0.5rem; }
@@ -310,6 +312,49 @@
   .decide-bar .later { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0 0.75rem; color: var(--accent); background: transparent; }
   .decide-bar .skip { color: var(--muted); background: transparent; }
   .ask-group + .gone-asks { margin-top: 1rem; }
+  /* Evidence: a card per update with its capture as the hero, grouped under the project its check names; the whole card opens the update. */
+  .ev-group { display: grid; gap: 0.75rem; margin-top: 1.5rem; }
+  .ev-group + .ev-group { margin-top: 2rem; }
+  .ev-grid { display: grid; gap: 1.75rem; grid-template-columns: minmax(0, 1fr); }
+  .ev-card { display: flex; flex-direction: column; gap: 0.75rem; color: inherit; text-align: left; text-decoration: none; }
+  .ev-media { position: relative; display: grid; place-items: end center; aspect-ratio: 16 / 11; padding: 1.5rem 1.5rem 0.75rem; overflow: hidden;
+    border-radius: 1.125rem; background: var(--surface); }
+  .ev-card:hover .ev-media { background: color-mix(in srgb, var(--surface) 94%, var(--text)); }
+  .ev-media img, .ev-media video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; padding: 1.5rem 1.5rem 0.75rem; box-sizing: border-box; object-fit: contain; object-position: center bottom; border-radius: 1.125rem; }
+  .ev-media .no-shot { display: grid; place-items: center; width: 4rem; height: 4rem; margin-bottom: 1.5rem; border-radius: 1rem; background: var(--sunk); }
+  .ev-media .no-shot svg { width: 2rem; height: 2rem; }
+  .ev-badge { position: absolute; z-index: 1; top: 0.75rem; left: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 1rem;
+    background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.8125rem; font-weight: 600; }
+  .ev-missing { margin: 0 0 1rem; color: var(--muted); font-size: 0.9375rem; }
+  .ev-card .t { font-size: 1.1875rem; font-weight: 600; line-height: 1.32; letter-spacing: -0.012em; }
+  .ev-card .m { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; color: var(--muted); font-size: 0.9375rem; }
+  .ev-ok { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--ok); font-weight: 600; }
+  .ev-ok svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  /* One update: the whole capture on its tile, what it proves in a line, what the check recorded, then its verdict. */
+  #reader .ev-scroll { flex: 1; min-height: 0; overflow: auto; padding: 1rem 1.25rem 3rem; }
+  .ev-item { display: grid; gap: 1rem; max-width: 42.5rem; margin: 0 auto; }
+  .ev-hero { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; padding: 2rem 1.5rem; border-radius: 1.125rem; background: var(--surface); }
+  .ev-hero img, .ev-hero video { display: block; max-width: 100%; max-height: min(26rem, 55vh); border-radius: 0.75rem; }
+  .ev-hero .gone { margin: 0; color: var(--danger); font-size: 0.9375rem; }
+  .ev-say { text-align: center; }
+  .ev-title { margin: 0.875rem 0 0.5rem; font-size: 1.75rem; line-height: 1.22; font-weight: 700; letter-spacing: 0.007em; text-wrap: balance; }
+  .ev-intro { margin: 0; color: var(--muted); font-size: 1.1875rem; line-height: 1.47; }
+  .ev-gl { margin: 1rem 0 0; color: var(--muted); font-size: 0.875rem; letter-spacing: 0.02em; text-transform: uppercase; }
+  .ev-grp { overflow: hidden; border-radius: 0.75rem; background: var(--surface); }
+  .ev-grp .cell { display: flex; align-items: center; gap: 0.875rem; min-height: 3.5rem; padding: 0.625rem 1rem; color: inherit; font-size: 1.0625rem; text-decoration: none; }
+  .ev-grp .cell + .cell { border-top: 0.5px solid var(--line); }
+  .ev-grp a.cell:hover { background: color-mix(in srgb, var(--surface) 94%, var(--text)); }
+  .ev-grp .k { flex: none; min-width: 6.5rem; }
+  .ev-grp .v { min-width: 0; margin-left: auto; color: var(--muted); text-align: right; }
+  .ev-grp .v.ok { color: var(--ok); font-weight: 600; } .ev-grp .v.bad { color: var(--danger); font-weight: 600; } .ev-grp .v.warn { color: var(--warn); font-weight: 600; }
+  .ev-grp .v svg { width: 1.15rem; height: 1.15rem; margin-right: 0.2rem; vertical-align: -0.2rem; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .ev-grp .v.go { color: var(--accent); }
+  .ev-grp .cell.long { display: grid; gap: 0.25rem; align-items: start; }
+  .ev-grp .cell.long .k { min-width: 0; }
+  .ev-grp .x { display: block; width: auto; min-height: 0; margin: 0; padding: 0; border: 0; background: none; color: var(--muted); font-size: 0.9375rem; line-height: 1.4; }
+  .ev-grp .chev { margin-left: 0.25rem; color: var(--muted); }
+  .ev-verdict { display: grid; gap: 0.5rem; }
+  .ev-ask { margin: 1rem 0 0.25rem; font-weight: 650; }
   .in-answered .row { background: transparent; box-shadow: none; }
   .in-answered .row h3 { color: var(--muted); font-weight: 500; }
   /* A sign-in: one big Open for its link, off once the link expired. */
@@ -556,8 +601,13 @@
     .rows.i-answered { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; align-items: start; padding: 0; border: 0; background: none; box-shadow: none; }
     .rows.i-answered > li { padding: 0 0.5rem 0 1rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); }
     .rows.i-answered > li:has(.done[open]) { grid-column: 1 / -1; }
-    /* Evidence sets its updates two across; a page that is not an update keeps the whole width. */
-    .list.in-evidence { grid-template-columns: 1fr 1fr; align-items: start; } .in-evidence > .row:not(.update) { grid-column: 1 / -1; }
+    /* Evidence sets its cards two across, the whole capture on each tile; a page that is not an update keeps the whole width. */
+    .ev-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; }
+    .ev-grid > .row { grid-column: 1 / -1; }
+    #reader .ev-scroll { padding: 2rem 3rem 4rem; }
+    .ev-grp { border-radius: 1.125rem; }
+    .ev-title { font-size: 2.5rem; line-height: 1.1; margin-top: 1.25rem; }
+    .ev-intro { font-size: 1.3125rem; }
   }
 </style>
 </head>
@@ -673,8 +723,8 @@
     });
   }
 
-  /** A linked run's result in plain words, for the line over the headline. */
-  const RESULT = { 'RUN PASS': ['ok', 'Check passed'], 'RUN FAIL': ['bad', 'Check failed'], INCONCLUSIVE: ['warn', 'Check did not finish'], UNVERIFIED: ['warn', 'Could not check'] };
+  /** A linked run's result in plain words, for the line over the headline; the third word is the one the Evidence screens use. */
+  const RESULT = { 'RUN PASS': ['ok', 'Check passed', 'Passed'], 'RUN FAIL': ['bad', 'Check failed', 'Failed'], INCONCLUSIVE: ['warn', 'Check did not finish', 'Did not finish'], UNVERIFIED: ['warn', 'Could not check', 'Could not check'] };
   /** What an engineer may want of a linked run or a commit, folded under Details so the card leads with the result. */
   function tech(d) {
     const run = d.evidence, commit = run?.commit ?? (/^[a-f0-9]{7,40}$/.test(d.link ?? '') ? d.link : '');
@@ -910,11 +960,12 @@
 
   /** The proof on the card itself: its own captures, or else the media of its linked run.
    * Each file is hash-checked by the server; one that changed or went missing says so instead of a broken frame. */
-  function proof(d) {
-    const files = d.media?.map((m, i) => [`/api/media?key=${encodeURIComponent(d.key)}&i=${i}`, /\.(mp4|webm)$/i.test(m.path)])
-      ?? d.evidenceCard?.media.map((m) => [m.url, m.type.startsWith('video/')]) ?? [];
+  const filesOf = (d) => d.media?.map((m, i) => [`/api/media?key=${encodeURIComponent(d.key)}&i=${i}`, /\.(mp4|webm)$/i.test(m.path)])
+    ?? d.evidenceCard?.media.map((m) => [m.url, m.type.startsWith('video/')]) ?? [];
+  function captures(d, cls) {
+    const files = filesOf(d);
     if (!files.length) return '';
-    return el('div', { class: 'media proof' }, ...files.map(([path, video], i) => {
+    return el('div', { class: cls }, ...files.map(([path, video], i) => {
       const url = src(path);
       const name = d.type === 'explainer' ? `Explainer video, ${d.title}` : `${d.type === 'evidence' ? `Update ${d.number}` : 'Proof'}, capture ${i + 1} of ${files.length}`;
       const node = video ? el('video', { src: url, controls: '', playsinline: '', preload: 'metadata', 'aria-label': name })
@@ -922,6 +973,77 @@
       (node.tagName === 'A' ? node.firstChild : node).onerror = () => node.replaceWith(el('p', { class: 'gone' }, `${name} can't be shown: the file is missing, changed since it was posted, or in a format this browser can't play.`));
       return node;
     }));
+  }
+  const proof = (d) => captures(d, 'media proof');
+
+  /** A result's mark: the pass tick only for passed proof, a cross for failed, an alert for not finished or unchecked. */
+  const mark = (kind) => { const s = el('span', { 'aria-hidden': 'true' }); s.innerHTML = kind === 'ok'
+    ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>'
+    : kind === 'bad' ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 9 6 6m0-6-6 6"/></svg>'
+    : '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 7v6"/><path d="M12 16.2v.1"/></svg>'; return s; };
+  /** The board's reason a run could not be checked, with the next step the docs promise. */
+  const unchecked = (d) => (d.evidenceCard?.status === 'unverified' && d.evidenceCard.reason ? `${d.evidenceCard.reason} Ask the agent to run the check again.` : '');
+  /** The project an update proves something for, read from the check line its run recorded: "verify-margin: …" names margin. */
+  const projectOf = (d) => /^verify-([\w-]{1,40}):/i.exec((d.evidence?.proof ?? '').trim())?.[1]?.toLowerCase() ?? '';
+  /** A link to a change names its number; any other link names the site it opens, as it always has. */
+  const changeName = (url) => { const m = /\/(?:pull|pulls|merge_requests)\/(\d+)/.exec(url); return m ? `Pull request ${m[1]}` : `Open on ${new URL(url).host}`; };
+  /** A link to a change, only when it is a full http(s) URL: a bare `http:` is text, not a place to open. */
+  const changeHref = (d) => { try { const u = new URL(d.link ?? ''); return /^https?:$/.test(u.protocol) ? u.href : ''; } catch { return ''; } };
+  /** A card's hero: the first picture of its proof, else its first clip, else the area's mark. */
+  function hero(d) {
+    const files = filesOf(d), [path, video] = files.find(([, clip]) => !clip) ?? files[0] ?? [];
+    if (!path) return [el('span', { class: 'no-shot', 'aria-hidden': 'true' }, icon('evidence'))];
+    const url = src(path);
+    if (video) {
+      const clip = el('video', { src: url, muted: '', playsinline: '', preload: 'metadata', 'aria-label': `Clip, ${headline(d)}` });
+      clip.onerror = () => clip.replaceWith(el('p', { class: 'ev-missing' }, 'The capture is missing or changed.'));
+      return [el('span', { class: 'ev-badge' }, 'Clip'), clip];
+    }
+    const img = el('img', { src: url, alt: '' });
+    img.onerror = () => img.replaceWith(el('p', { class: 'ev-missing' }, 'The capture is missing or changed.'));
+    return [img];
+  }
+  /** One update on the Evidence screen: its capture as the hero, what it proves and how it went; the whole card opens the update. */
+  function evCard(d) {
+    return el('a', { class: 'ev-card', href: `#evidence/${d.key}`, id: `item-${d.key}` }, el('span', { class: 'ev-media' }, ...hero(d)),
+      el('span', { class: 't', dir: 'auto' }, headline(d)),
+      el('span', { class: 'm' }, el('span', { class: 'ev-ok' }, mark('ok'), 'Passed'), d.filed ? el('span', {}, stamp(d.filed)) : ''));
+  }
+  /** Evidence as its own screen: a card per passed update, grouped under the project its check names, in the order each project first shows;
+   * proof that names no project goes under Other. An item put in this area that is not an update (a page, a diagram) keeps the card it always had. */
+  function evidenceGroups(items) {
+    if (!items.length) return [el('p', { class: 'empty' }, EMPTY.evidence)];
+    const groups = [...new Set(items.map(projectOf))], node = (d) => (d.type === 'evidence' ? evCard(d) : row(d));
+    return groups.map((g) => {
+      return el('section', { class: 'ev-group' }, el('div', { class: 'sec-head' }, el('h2', {}, g || 'Other')),
+        el('div', { class: 'ev-grid' }, ...items.filter((d) => projectOf(d) === g).map(node)));
+    });
+  }
+  /** An update's verdict: one tap per option, marked once it is saved. A read-only board takes none. */
+  function verdicts(d) {
+    const saved = state.answers[d.key], err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` });
+    const buttons = d.options.map((o) => el('button', { 'aria-pressed': o.value === saved?.answer, 'aria-label': `${o.label}, ${headline(d)}` }, o.label));
+    buttons.forEach((b, i) => (b.onclick = () => save(d, d.options[i], buttons, err)));
+    return el('div', { class: 'ev-verdict' }, el('p', { class: 'ev-ask' }, 'Does this look right?'),
+      el('div', { class: 'choices', role: 'group', 'aria-label': headline(d) }, ...buttons), err, other(d, saved, err), xBtn(d, 'Dismiss'));
+  }
+  /** One update as its own screen: the whole capture, what it proves in a line, then what the check recorded and the verdict. */
+  function evidenceItem(d) {
+    const run = d.evidence ?? {}, result = RESULT[d.evidenceCard?.result], name = headline(d), proofLine = (run.proof ?? '').trim(),
+      // Checked by is the checker's name before the line's first colon ("verify-sign-off: …"); a sentence with a colon names no checker.
+      [, checker = '', ran = proofLine] = /^([\w.-]{1,40}):\s*(.*)$/s.exec(proofLine) ?? [];
+    const short = (label, value) => (value ? el('div', { class: 'cell' }, el('span', { class: 'k' }, label), el('span', { class: 'v', dir: 'auto' }, value)) : '');
+    const long = (label, text) => (text ? el('div', { class: 'cell long' }, el('span', { class: 'k' }, label), el('p', { class: 'x', dir: 'auto' }, text)) : '');
+    const change = changeHref(d);
+    return el('div', { class: 'ev-scroll' }, el('div', { class: 'ev-item' }, captures(d, 'ev-hero'),
+      el('div', { class: 'ev-say' }, el('h1', { class: 'ev-title', id: 'reader-title', tabindex: '-1', dir: 'auto' }, name), d.about && d.about !== name ? el('p', { class: 'ev-intro', dir: 'auto' }, d.about) : ''),
+      el('p', { class: 'ev-gl' }, 'Proof'),
+      el('div', { class: 'ev-grp' },
+        el('div', { class: 'cell' }, el('span', { class: 'k' }, 'Result'), result ? el('span', { class: `v ${result[0]}` }, mark(result[0]), ' ', result[2]) : el('span', { class: 'v', dir: 'auto' }, 'No result yet')),
+        long('Why', unchecked(d)), long('What ran', ran), long('Checked by', checker), short('Project', projectOf(d)), short('When', d.filed ? stamp(d.filed) : ''),
+        change ? el('a', { class: 'cell', href: change, target: '_blank', rel: 'noopener', 'aria-label': `Open the change for ${name}` },
+          el('span', { class: 'k' }, 'Change'), el('span', { class: 'v go' }, changeName(change)), el('span', { class: 'chev', 'aria-hidden': 'true' }, '›')) : ''),
+      state.readonly || FROZEN || !(d.options.length || d.reply) ? '' : verdicts(d), tech(d)));
   }
 
   /** An explainer's chapter list: each button starts the video at that chapter. */
@@ -1060,10 +1182,10 @@
   const icon = (a) => { const s = el('span', { class: `icon i-${a}`, 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[a]}"/></svg>`; return s; };
   // A design with only screen notes (answer 'screens') still waits for its design-wide verdict.
   const isAnswered = (d) => Object.hasOwn(state.answers, d.key) && !(d.type === 'design' && state.answers[d.key].answer === 'screens');
-  /** Each item lives in one area: answered items, then the area the item names, then evidence updates, then what is only to read (explainers, pages with nothing to answer), then the open asks.
+  /** Each item lives in one area: answered items, then an evidence update that is not passed proof (it waits on you with its honest result), then the area the item names, then evidence updates, then what is only to read (explainers, pages with nothing to answer), then the open asks.
    *  A plan has no options but waits for its send-back. */
   const area = (d) => {
-    const a = isAnswered(d) ? 'answered' : d.area ?? (d.type === 'evidence' ? 'evidence'
+    const a = isAnswered(d) ? 'answered' : d.type === 'evidence' && d.evidenceCard?.result !== 'RUN PASS' ? 'waiting' : d.area ?? (d.type === 'evidence' ? 'evidence'
       : state.readonly || d.type === 'explainer' || !(d.options.length || d.reply || d.type === 'signin' || d.type === 'plan' || d.kind === 'design') ? 'reports' : 'waiting');
     // Reports lists only what explains: a page to tap through, or a narrated video. Text alone (a receipt, a status line) is a note, folded under it.
     return a === 'reports' && !state.readonly && d.type !== 'explainer' && !reads(d) ? 'notes' : a;
@@ -1081,6 +1203,8 @@
   const isToday = (at) => new Date(at).toDateString() === new Date().toDateString();
   const day = (at) => new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   const when = (at) => (isToday(at) ? hhmm(at) : `${day(at)} ${hhmm(at)}`);
+  /** A time as a person says it: today needs no date. */
+  const stamp = (at) => (isToday(at) ? `Today, ${hhmm(at)}` : `${day(at)}, ${hhmm(at)}`);
   const pic = (d) => {
     const i = d.media?.findIndex((m) => !/\.(mp4|webm)$/i.test(m.path)), m = d.mocks?.find((x) => !/\.html?$/i.test(x.path));
     return d.kind === 'design' && d.preview ? designUrl(d, d.preview) : i >= 0 ? `/api/media?key=${encodeURIComponent(d.key)}&i=${i}` : d.preview ? mockUrl(d.key, '', d.preview) : d.type === 'diagram' ? mockUrl(d.key, '', d.view)
@@ -1092,7 +1216,8 @@
     const answeredToday = a === 'answered' && items.filter((d) => new Date(state.answers[d.key].at).toDateString() === new Date().toDateString()).length;
     // A short count line that never cuts off on a phone. Waiting gives the oldest ask's time when its items carry one.
     const oldest = items.map((d) => d.filed).filter(Boolean).sort((x, y) => Date.parse(x) - Date.parse(y))[0];
-    const detail = { waiting: oldest ? `Oldest ${when(oldest)}` : `${items.length} waiting`, designs: `${items.length} to review`, evidence: items[0]?.number ? `Newest: Update ${items[0].number}` : `${items.length} to see`,
+    const newest = items.filter((d) => d.number).sort((x, y) => Date.parse(y.filed ?? 0) - Date.parse(x.filed ?? 0))[0];
+    const detail = { waiting: oldest ? `Oldest ${when(oldest)}` : `${items.length} waiting`, designs: `${items.length} to review`, evidence: newest ? `Newest: Update ${newest.number}` : `${items.length} to see`,
       reports: `${items.length} to read`, answered: `${answeredToday} today` }[a];
     const thumbs = a === 'evidence' ? items.map(pic).filter(Boolean).slice(0, 3).map((u) => el('img', { src: src(u), alt: '' })) : [];
     const marks = thumbs.length ? thumbs : a === 'waiting' ? [items.length ? icon(a) : '']
@@ -1440,16 +1565,22 @@
     document.getElementById('nav').inert = !!d && !inline;
     document.getElementById('tabs').inert = !!d;
     reader.hidden = !d;
-    const url = d?.kind === 'design' ? `design:${d.key}` : d ? src(mockUrl(d.key, '', d.view)) : '';
-    const answer = d?.type === 'plan' || d?.kind === 'design' ? JSON.stringify(state.answers[d.key] ?? null) : '';
+    const url = d?.kind === 'design' ? `design:${d.key}` : d?.type === 'evidence' ? `evidence:${d.key}` : d ? src(mockUrl(d.key, '', d.view)) : '';
+    const answer = d?.type === 'plan' || d?.kind === 'design' || d?.type === 'evidence' ? JSON.stringify(state.answers[d.key] ?? null) : '';
     const plan = d?.type === 'plan' ? JSON.stringify(d) : '';
-    if (reader.dataset.url === url && reader.dataset.answer === answer && reader.dataset.plan === plan) return d && (reader.querySelector('h1').textContent = d.title);
-    Object.assign(reader.dataset, { answer, plan });
+    const evidence = d?.type === 'evidence' ? JSON.stringify([d, (state.messages ?? []).filter((m) => m.key === d.key), (state.rounds ?? []).filter((r) => r.key === d.key)]) : '';
+    if (reader.dataset.url === url && reader.dataset.answer === answer && reader.dataset.plan === plan && reader.dataset.evidence === evidence) return d && (reader.querySelector('h1').textContent = d.type === 'evidence' ? headline(d) : d.title);
+    Object.assign(reader.dataset, { answer, plan, evidence });
     Object.assign(reader.dataset, { url, key: d?.key ?? '', from });
     if (!d) return reader.replaceChildren();
     const back = el('a', { class: 'close', href: `#${from}` }, `‹ ${from === 'reports' ? 'Reports' : AREAS[from]}`), h1 = el('h1', { id: 'reader-title', tabindex: '-1', dir: 'auto' }, d.title);
-    // A report's page reads under its own head: what it is and when, its title, what it says and decided; a plan or a design keeps its title in the bar.
+    const change = d.type === 'evidence' ? changeHref(d) : '';
+    const out = change ? el('a', { class: 'change-link', href: change, target: '_blank', rel: 'noopener', 'aria-label': `Open the change for ${d.title}` }) : '';
+    if (change) { const s = el('span', { 'aria-hidden': 'true' }); s.innerHTML = '<svg viewBox="0 0 24 24"><path d="M14 3h7v7M21 3l-9 9M19 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/></svg>'; out.append(s); }
+    // A report's page reads under its own head: what it is and when, its title, what it says and decided; a plan or a design keeps its title in the bar;
+    // an update shows its own title on its screen, with the change link in the bar.
     reader.replaceChildren(...(d.type === 'plan' ? [el('header', {}, back, h1), planReview(d, url)] : d.kind === 'design' ? [el('header', {}, back, h1), designReview(d)]
+      : d.type === 'evidence' ? [el('header', {}, back, out), evidenceItem(d)]
       : [el('header', {}, back), el('div', { class: 'read' }, el('p', { class: 'eyebrow' }, [kind(d) || 'Report', d.filed ? when(d.filed) : ''].filter(Boolean).join(' · ')), h1,
         d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided(d), el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }))]));
   }
@@ -1523,12 +1654,14 @@
         el('div', { class: 'plan-meta' }, ...meta), el('a', { class: 'open-link plan-open', href: `#waiting/${d.key}` }, 'Open plan')));
   }
   const askIcon = (d) => { const a = { design: 'designs', signin: 'you', plan: 'plan' }[typeOf(d)] ?? 'waiting'; return ICONS[a] ? a : 'waiting'; };
+  /** An update that waits on you says how its linked run went, in plain words. */
+  const badge = (d) => { const r = RESULT[d.evidenceCard?.result]; return r ? el('span', { class: `st ${r[0]}` }, r[1]) : ''; };
   function waitingPage(items, hidden) {
     const plans = items.filter((d) => d.type === 'plan'), asks = items.filter((d) => d.type !== 'plan');
     const rows = asks.map((d) => {
       const label = `Agent${d.silent_by ? ` · closes at ${when(d.silent_by)}` : d.filed ? ` · waiting since ${when(d.filed)}` : ''}`;
       const link = el('a', { class: 'ask-card', id: `item-${d.key}`, href: askHref(d) }, icon(askIcon(d)),
-        el('span', { class: 'copy' }, el('span', { class: 'kind' }, kind(d)), el('strong', { class: 'title', dir: 'auto' }, title(d)),
+        el('span', { class: 'copy' }, el('span', { class: 'kind' }, kind(d), badge(d)), el('strong', { class: 'title', dir: 'auto' }, title(d)),
           d.why || d.about ? el('span', { class: 'meta', dir: 'auto' }, d.why || d.about) : '', el('span', { class: 'meta' }, label)));
       return el('li', {}, link, xBtn(d));
     });
@@ -1575,8 +1708,8 @@
     const preview = cards ?? (d.view ? rung(d) : pic(d) ? thumb('waiting', pic(d)) : proof(d));
     const quiet = opts.find((o) => o.value === d.default_if_silent);
     const silent = quiet ? `If you stay quiet: ${quiet.label}${d.silent_by ? ` · ${left(d.silent_by)}` : ''}` : '';
-    const head = el('div', { class: 'lead' }, el('p', { class: 'eyebrow' }, kind(d)), el('h2', { dir: 'auto' }, headline(d)));
-    const why = d.why || d.tradeoff || d.about;
+    const head = el('div', { class: 'lead' }, el('p', { class: 'eyebrow' }, kind(d), badge(d)), el('h2', { dir: 'auto' }, headline(d)));
+    const why = unchecked(d) || d.why || d.tradeoff || d.about;
     const back = el('a', { class: 'later', href: '#waiting' }, 'Later');
     const page = el('section', { class: 'decide' }, preview ? el('div', { class: 'decide-preview' }, preview) : '',
       ...(d.mocks?.length ? [annotations(d)] : []), head,
@@ -1645,12 +1778,12 @@
     document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [filters(by.waiting), waitingPage(shown, hidden)]
       : at === 'decide' ? [decideAt < 0 ? el('p', { class: 'empty' }, 'Nothing to decide for that question.')
         : decidePage(decideQueue[decideAt], decideQueue.length > 1 ? decideQueue[(decideAt + 1) % decideQueue.length] : undefined)]
-      : at === 'designs' ? [...designGroups(by.designs)] : at === 'reports' && !state.readonly ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
-        ...(by.reports.length ? reportGroups(by.reports) : [el('p', { class: 'empty' }, EMPTY.reports)]), notes(by.notes)] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [at === 'evidence' && by[at].length ? el('div', { class: 'sec-head' }, el('h2', {}, 'Updates')) : '', at === 'waiting' ? filters(by.waiting) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...(at === 'waiting' ? shown : by[at]).map(row))
+      : at === 'designs' ? [...designGroups(by.designs)] : at === 'evidence' ? evidenceGroups(by.evidence) : at === 'reports' && !state.readonly ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
+        ...(by.reports.length ? reportGroups(by.reports) : [el('p', { class: 'empty' }, EMPTY.reports)]), notes(by.notes)] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [at === 'waiting' ? filters(by.waiting) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...(at === 'waiting' ? shown : by[at]).map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [el('div', { class: 'tiles' }, ...Object.keys(AREAS).map((a) => tile(a, by[a]))),
       el('div', { class: 'pair' }, needs, today(by.answered)), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()]),
       el('div', { class: 'areas' }, ...Object.keys(AREAS).map((a) => section(a, by[a])))]));
-    readPage(key ? state.decisions.find((d) => d.key === key && !gone.has(d.key) && (at === 'reports' && reads(d) || at === 'designs' && d.kind === 'design' || d.type === 'plan' && area(d) === at)) : undefined, at);
+    readPage(key ? state.decisions.find((d) => d.key === key && !gone.has(d.key) && (at === 'reports' && reads(d) || at === 'designs' && d.kind === 'design' || at === 'evidence' && d.type === 'evidence' || d.type === 'plan' && area(d) === at)) : undefined, at);
     if (FROZEN) freeze();
   }
   function freeze() {
