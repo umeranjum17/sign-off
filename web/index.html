@@ -1599,7 +1599,7 @@
   }
   function freeze() {
     // Answers stay as they are, but nothing in the copy can be sent.
-    document.querySelectorAll('#board .choices button, #board .mock button, #board .note button, #board .note textarea').forEach((e) => (e.disabled = true));
+    document.querySelectorAll('#board .choices button, #board .pick-list button, #board .decide-bar .answer, #board .mock button, #board .note button, #board .note textarea').forEach((e) => (e.disabled = true));
     // A browser will not open a data: link in a new tab; the inline preview is the copy.
     document.querySelectorAll('#board a[href^="data:"]').forEach((a) => a.removeAttribute('href'));
   }
