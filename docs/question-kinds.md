@@ -154,11 +154,13 @@ without posting.
 - Filter **Waiting on you** by type with the chips: **All**, then each type with asks waiting, with its count. Each card's type label is its chip's name (Yes/No, Pick one, Reply, Info, Design pick, Approval, Evidence, Sign-in, Plan). The list reads **Newest first** by default, or **Oldest first** by each ask's `filed` time (an ask with no `filed` takes the time of the nearest earlier ask in the file that has one). The sort is kept in this browser; the type filter is not, so opening Waiting on you again shows All.
 - Tap an ask in **Waiting on you** to open it on **Decide**: one ask at a
   time, its picture or page, what it is and why, its options in one list with
-  the recommended one marked, and a bar at the bottom with **Answer**,
-  **Skip for now** and **Later**. **1**–**9** picks an option and answers it,
-  **E** skips to the next ask, **Z** undoes the last answer, and a swipe right
-  takes the recommended answer while a swipe left skips. A plan opens its own
-  page instead, and a design its screens.
+  the recommended one marked, and a bar at the bottom with **Answer** (an ask
+  with options), **Skip for now** (another ask follows) and **Later**.
+  **Answer** saves and opens the next ask, or the list after the last.
+  **1**–**9** picks an option and answers it, **E** skips to the next ask,
+  **Z** undoes the last answer, and a swipe right takes the recommended answer
+  while a swipe left skips. A plan opens its own page instead, and a design
+  review its screens.
 - Tap **Another round** inside **Other answer** (with the typed note), which
   wakes a waiting agent the same way an answer does; the agent reads it back
   in `answers --json` under `rounds`, with any comments on mock elements it
