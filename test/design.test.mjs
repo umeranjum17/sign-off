@@ -1968,6 +1968,32 @@ test('Waiting on you: an update waiting for a verdict reads Evidence on its card
   proc.kill();
 });
 
+test('Summary on a phone: Proven today swipes inside its row and a long title wraps, so the page never scrolls sideways', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'summary-wide'), file = join(dir, 'board.json');
+  mkdirSync(join(dir, 'page'), { recursive: true });
+  const fixture = new URL('../fixtures/contract/plan.v1/', import.meta.url).pathname;
+  writeFileSync(join(dir, 'page', 'index.html'), readFileSync(join(fixture, 'page', 'index.html')));
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    { key: 'a', type: 'ask', title: 'Keep the whole-fleet nightly reconciliation of the cross-repository dependency graph running at three in the morning?', about: `https://example.com/${'very-long-path/'.repeat(12)}end` },
+    ...[1, 2, 3].map((n) => ({ key: `u${n}`, type: 'evidence', number: n, title: `Update ${n} proves it`, filed: new Date().toISOString(), media: [{ path: `evidence/${n}/shot.png`, sha256: 'a'.repeat(64), bytes: 0 }] })),
+  ] }));
+  assert.equal(run('post', file, '--kind', 'plan', '--from', join(fixture, 'valid-full.json')).code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(url)}`);
+  await until(async () => (await evaluate('document.querySelectorAll(".areas .compact").length')) > 0);
+  assert.ok(await evaluate('document.documentElement.scrollWidth <= 390'));
+  assert.ok(await evaluate('[...document.querySelectorAll(".tabs a")].every((a) => a.getBoundingClientRect().right <= 390)'));
+  // With no designs filed, the Designs screen still opens and its tab is the lit one.
+  await evaluate('location.hash = "#designs"');
+  await until(async () => (await evaluate('document.querySelector("#board h1").textContent')) === 'Designs');
+  assert.equal(await evaluate('document.querySelector(".tabs [aria-current]").textContent'), 'Designs');
+  close();
+  proc.kill();
+});
+
 // Any question can wait, whatever type it names: while it waits, its card names the type of answer it takes, the same name as the chip
 // counting it; outside Waiting the same card keeps its own name.
 test('Answered: a design keeps its Design label and an answered yes/no decision has no eyebrow', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
