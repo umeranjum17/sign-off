@@ -979,7 +979,7 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   writeFileSync(join(dir, 'mocks', 'one.webp'), readFileSync(new URL('../docs/media/phone-light.webp', import.meta.url)));
   const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
   writeFileSync(file, JSON.stringify({ schema: 2, items: [
-    { key: 'digest', title: 'Keep the weekly digest?', options: yesNo, recommend_value: 'yes' },
+    { key: 'digest', title: 'Keep the weekly digest?', about: 'Open rate held steady.', options: yesNo, recommend_value: 'yes' },
     { key: 'release', title: 'Which day for release?', options: ['today', 'friday', 'next-week'].map((v) => ({ value: v, label: v })), recommend_value: 'friday' },
     { key: 'look', type: 'design', title: 'Pick the look', options: [
       { value: 'a', label: 'A', outcome: 'Fastest. Support is thin on Saturday.' },
@@ -1034,7 +1034,13 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await until(async () => await evaluate('location.hash === "#decide/look" && document.querySelector(".decide h2")?.textContent === "Pick the look"'));
   await evaluate("location.hash = '#waiting'");
   await until(async () => (await evaluate('location.hash')) === '#waiting');
+  // Decide shows the ask's context line when it carries no reason text of its own.
+  await evaluate('location.hash = "#decide/digest"');
+  await until(async () => (await evaluate('location.hash')) === '#decide/digest');
+  assert.equal(await evaluate('document.querySelector(".decide .why")?.textContent'), 'Open rate held steady.');
   // Answer, undo, then accept by keyboard so the Waiting list and its toast reflect the durable answer.
+  await evaluate("location.hash = '#waiting'");
+  await until(async () => (await askTitles()) === 'Keep the weekly digest?|Which day for release?|Pick the look');
   await evaluate('document.querySelector(`a[href="#decide/release"]`).click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/release');
   assert.equal(await evaluate('document.querySelector(".decide h2").textContent'), 'Which day for release?');

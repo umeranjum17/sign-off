@@ -1567,7 +1567,7 @@
     const quiet = opts.find((o) => o.value === d.default_if_silent);
     const silent = quiet ? `If you stay quiet: ${quiet.label}${d.silent_by ? ` · ${left(d.silent_by)}` : ''}` : '';
     const head = el('div', { class: 'lead' }, el('p', { class: 'eyebrow' }, kind(d)), el('h2', { dir: 'auto' }, headline(d)));
-    const why = d.why || d.tradeoff;
+    const why = d.why || d.tradeoff || d.about;
     const back = el('a', { class: 'later', href: '#waiting' }, 'Later');
     const page = el('section', { class: 'decide' }, preview ? el('div', { class: 'decide-preview' }, preview) : '',
       ...(d.mocks?.length ? [annotations(d)] : []), head,
