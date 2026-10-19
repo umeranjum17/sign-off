@@ -495,40 +495,63 @@ const until = async (check) => {
   for (const end = Date.now() + 60000; Date.now() < end; await new Promise((r) => setTimeout(r, 100))) if (await check()) return;
   assert.fail('the page did not reach the expected state');
 };
-/** A headless Chrome driven over its DevTools socket: evaluate(js) returns the value, or undefined while a page is still loading. */
-async function browse(dir, width = 800, height = 4000) {
-  mkdirSync(dir, { recursive: true });
-  // A profile of its own: a killed Chrome leaves its DevToolsActivePort behind, which a later browse in the same folder would read.
-  const profile = mkdtempSync(join(dir, 'profile-')), active = join(profile, 'DevToolsActivePort');
-  const browser = spawn(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${profile}`, `--window-size=${width},${height}`, '--remote-debugging-port=0', 'about:blank'],
+/** One headless Chrome for the whole file, driven over its DevTools socket. A file of browser tests then starts one browser and waits
+ * for one DevToolsActivePort, instead of starting a fresh Chrome for every test on a runner that is already drawing other boards. */
+let shared;
+const browserFor = async () => {
+  if (shared?.proc.exitCode === null && shared.ws.readyState === WebSocket.OPEN) return shared;
+  const profile = mkdtempSync(join(scratch, 'chrome-')), active = join(profile, 'DevToolsActivePort');
+  const proc = spawn(chrome, ['--headless', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', `--user-data-dir=${profile}`, '--window-size=800,4000', '--remote-debugging-port=0', 'about:blank'],
     { env: chromeEnv, stdio: 'ignore' });
-  procs.push(browser);
+  procs.push(proc);
   await until(() => existsSync(active) && readFileSync(active, 'utf8').includes('\n'));
-  const page = (await (await fetch(`http://127.0.0.1:${readFileSync(active, 'utf8').split('\n')[0]}/json`)).json()).find((t) => t.type === 'page');
-  const ws = new WebSocket(page.webSocketDebuggerUrl);
-  await new Promise((ok) => { ws.onopen = ok; });
+  const version = await (await fetch(`http://127.0.0.1:${readFileSync(active, 'utf8').split('\n')[0]}/json/version`)).json();
+  const ws = new WebSocket(version.webSocketDebuggerUrl);
+  await new Promise((ok, no) => { ws.onopen = ok; ws.onerror = no; });
   const replies = new Map();
   let seq = 0;
-  ws.onmessage = (m) => { const msg = JSON.parse(m.data); replies.get(msg.id)?.(msg.result?.result?.value); };
+  ws.onmessage = (m) => { const msg = JSON.parse(m.data), done = replies.get(msg.id); if (!done) return; replies.delete(msg.id); done(msg.result); };
   // A call the browser never answers (a page torn down mid-call) gives undefined after 10 s, so until() asks again instead of hanging.
-  const call = (method, params) => new Promise((ok) => { const id = ++seq; replies.set(id, ok); setTimeout(ok, 10000).unref(); ws.send(JSON.stringify({ id, method, params })); });
-  const evaluate = (expression) => call('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+  const call = (method, params, sessionId) => new Promise((ok) => {
+    const id = ++seq;
+    replies.set(id, ok);
+    setTimeout(() => { if (replies.delete(id)) ok(undefined); }, 10000).unref();
+    ws.send(JSON.stringify({ id, method, params, ...(sessionId && { sessionId }) }));
+  });
+  return (shared = { proc, ws, call });
+};
+/** A page of its own in the shared browser: evaluate(js) returns the value, or undefined while a page is still loading. */
+async function browse(_dir, width = 800, height = 4000) {
+  const { call } = await browserFor();
+  // A browser context of its own is a fresh profile per test: no localStorage, cookies or cache from an earlier board on the same port.
+  const { browserContextId } = await call('Target.createBrowserContext', { disposeOnDetach: true });
+  const { targetId } = await call('Target.createTarget', { url: 'about:blank', browserContextId });
+  const { sessionId } = await call('Target.attachToTarget', { targetId, flatten: true });
+  const send = (method, params) => call(method, params, sessionId);
+  // A step lets the page finish what the last one started (a dialog's close, a hashchange, a click's navigation) before the next
+  // command reads the DOM, so a test never acts on a panel the page has already left.
+  const settle = () => send('Runtime.evaluate', { expression: 'new Promise((ok) => setTimeout(ok, 0))', awaitPromise: true });
+  const evaluate = async (expression) => {
+    const value = (await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }))?.result?.value;
+    await settle();
+    return value;
+  };
   // On a busy host, input sent right after a redraw can miss the sandboxed frame it aims at, so each input waits for the page to paint first.
-  const painted = () => call('Runtime.evaluate', { expression: 'new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)))', awaitPromise: true });
+  const painted = () => send('Runtime.evaluate', { expression: 'new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)))', awaitPromise: true });
   // Headless Chrome keeps a window at least 500 px wide, so the page is set to the asked width as a phone would be.
-  await call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
+  await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
   // A real mouse click at a point of the page, which reaches into a frame there as a person's would.
-  const click = async ([x, y]) => { await painted(); for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await call('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 }); };
+  const click = async ([x, y]) => { await painted(); for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 }); };
   // A real touch tap at a point of the page, as a phone's would.
-  const tap = async ([x, y]) => { await painted(); await call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] }); await call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); };
+  const tap = async ([x, y]) => { await painted(); await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] }); await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); };
   // A real finger swipe across the page, as a phone's would.
   const swipe = async (from, to) => {
     await painted();
-    await call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [from] });
-    await call('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [to] });
-    await call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [from] });
+    await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [to] });
+    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   };
-  return { evaluate, click, tap, swipe, close: () => { ws.close(); browser.kill(); } };
+  return { evaluate, click, tap, swipe, close: () => call('Target.disposeBrowserContext', { browserContextId }).catch(() => {}) };
 }
 
 test('an interactive page that posts its height gets a frame that fits it, each frame only its own and never past 10000px; a design shows the recommended phone frame first', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
@@ -1993,10 +2016,13 @@ test('Waiting on you: a diagram, an interactive page, an explainer and a free-fo
   await until(async () => (await titles()).length === 4);
   assert.equal(await chips(), 'All 4*|Yes/No 4');
   for (const [name, key] of [['Check the site?', 'site'], ['Take the tour?', 'tour'], ['Walk through the new flow?', 'walk'], ['Is this the sign-in flow?', 'flow']]) {
-    await evaluate(`document.querySelector("#item-${key}").click()`);
-    await until(async () => (await evaluate('location.hash')) === `#decide/${key}`);
+    // A click is retried while the list is still drawing: a card that is not there yet is not a missed tap.
+    await until(async () => (await evaluate(`document.querySelector("#item-${key}")?.click() ?? true`))
+      && (await evaluate('location.hash')) === `#decide/${key}`);
     assert.equal(await evaluate('document.querySelector(".decide .eyebrow")?.textContent'), 'Yes/No');
     await evaluate('location.hash = "#waiting"');
+    // Wait for the list to come back before the next card is tapped.
+    await until(async () => (await titles()).length === 4);
   }
   close();
   proc.kill();
