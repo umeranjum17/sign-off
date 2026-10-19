@@ -109,11 +109,9 @@
   keeps the time an item already has, so a feeder that runs every few seconds does not reset it.
   An open ask's card says `waiting since 07:19`, and the Waiting on you tile shows the oldest (`Oldest 07:19`);
   with no `filed` on any waiting ask the tile keeps its count.
-- `group` and `decided`: on Reports and explainers. `group` (40 characters or fewer)
-  puts items under one section head, such as `How it works`, in the order each group first shows;
-  items with no group come last, under `Other reports`; with no groups at all the list splits into
-  `New` (filed today) and `Earlier`. With `filed` (above), the section head shows the newest
-  (`Filed 07:19 today`), the row its date, and a blue dot when it was filed today. `decided`
+- `group` and `decided`: on Reports and explainers. The list is two sections, `New` (filed today) above `Earlier`,
+  newest first in each. `group` (40 characters or fewer) leads a row's line, such as `How it works · Report · 07:19`.
+  With `filed` (above), the row shows its time or date, and a blue dot when it was filed today. `decided`
   (200 characters or fewer) shows under the label `What it decided` on the report's page, or in the opened row of an explainer with no page.
   An item without these keeps its kind and its about line.
 - `type`: optional, `decision` (default), `design`, `evidence`, `diagram`,

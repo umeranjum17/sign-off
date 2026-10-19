@@ -838,8 +838,8 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   const flow = reports.match(/<ol class="flow"[^>]*>(.*?)<\/ol>/s)[1];
   assert.deepEqual([...flow.matchAll(/<li>(.*?)<\/li>/gs)].map((m) => [...m[1].matchAll(/mk mk-(\w+)/g)].map((x) => x[1])), [['store'], [], ['gate', 'fail']]);
   // Its group heads a grouped list with the filed time; its row is a link that opens it, with its title, its kind, steps and time, and a dot for New today.
-  assert.match(reports, /<div class="sec-h"><h2>How it works<\/h2><span class="meta">Filed \d\d:\d\d today<\/span><\/div><ul class="card rows reports">/);
-  assert.match(reports, /<a class="compact" href="#reports\/how">.*?<strong dir="auto">How it ships<\/strong>.*?<span class="when">[^<]* · 3 steps · \d\d:\d\d<\/span>.*?<span class="new" role="img" aria-label="New today"><\/span><\/a>/s);
+  assert.match(reports, /<div class="sec-h"><h2>New<\/h2><\/div><ul class="card rows reports">/);
+  assert.match(reports, /<a class="compact" href="#reports\/how">.*?<strong dir="auto">How it ships<\/strong>.*?<span class="when">How it works · [^<]* · 3 steps · \d\d:\d\d<\/span>.*?<span class="new" role="img" aria-label="New today"><\/span><\/a>/s);
   // Only the report is a row and counted; the text-only one is folded under Notes, a short row with no page to open.
   assert.deepEqual([...reports.matchAll(/<li class="report" id="item-(\w+)"/g)].map((m) => m[1]), ['how']);
   // The sidebar counts it under its short name; the phone's tab bar marks Reports as the area on screen and reads its count.
@@ -2231,7 +2231,7 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   assert.ok(five.top === two.top && two.left > five.right, 'the two Other updates share the first row, newest on the left');
   assert.ok(four.top > five.bottom && four.left === five.left && three.top === four.top && three.left > four.right, 'the sign-off pair follows its own head, newest on the left');
   // Under the title: how many are listed, how many filed today and when the newest came.
-  assert.equal(await evaluate('document.querySelector(".top .lede").textContent'), `4 updates, 4 new. The page changed at ${clock(at(5))}.`);
+  assert.equal(await evaluate('document.querySelector(".top .lede").textContent'), 'Passed proof that a change works, newest first.');
   // Every update that is not passed proof waits on you instead, with its honest badge, the reason a run could not be checked,
   // and the normal verdict and dismiss controls, so the person sees a failed check and the agent always gets an answer.
   await evaluate('location.hash = "#waiting"');
