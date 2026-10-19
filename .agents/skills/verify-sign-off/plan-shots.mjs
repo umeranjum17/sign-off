@@ -52,7 +52,8 @@ try {
     const dom = probe();
     assert.equal(dom.overflow, false); assert.deepEqual(dom.overflowing, []);
     const consoleLog = browser('console', '--type', 'error'), network = browser('network', '--limit', '100');
-    writeFileSync(join(records, `${stem}.network.txt`), network);
+    // The network log is the same JSON on every capture of one page, and a byte-identical capture fails the check;
+    // the failures it carries already go into the dom.json beside the screenshot.
     assert.match(consoleLog, /no console messages found/);
     dom.console_errors = [];
     dom.failed_requests = [...network.matchAll(/reqid=\d+ \w+ (\S+) \[(\d+|failed)\]/g)].flatMap(([, url, status]) => status === 'failed' || +status >= 400 ? [{ url, status: +status || 0 }] : []);
