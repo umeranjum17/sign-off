@@ -497,8 +497,9 @@ const until = async (check) => {
 };
 /** A headless Chrome driven over its DevTools socket: evaluate(js) returns the value, or undefined while a page is still loading. */
 async function browse(dir, width = 800) {
-  const profile = join(dir, 'profile'), active = join(profile, 'DevToolsActivePort');
   mkdirSync(dir, { recursive: true });
+  // A profile of its own: a killed Chrome leaves its DevToolsActivePort behind, which a later browse in the same folder would read.
+  const profile = mkdtempSync(join(dir, 'profile-')), active = join(profile, 'DevToolsActivePort');
   const browser = spawn(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${profile}`, `--window-size=${width},4000`, '--remote-debugging-port=0', 'about:blank'],
     { env: chromeEnv, stdio: 'ignore' });
   procs.push(browser);
@@ -1264,7 +1265,7 @@ test('a posted contract design is listed with its preview and date, and opens fo
   await evaluate('document.querySelector("[aria-label=\\"Close viewer\\"]").click()');
   await until(() => evaluate('!document.querySelector(".design-viewer[open]")'));
   assert.equal(await evaluate('location.hash'), '#designs/d1-design');
-  assert.equal(await evaluate('String(document.querySelector(".design-review textarea").compareDocumentPosition([...document.querySelectorAll(".design-review > a")].find((a) => a.textContent === "Open original design")))'), '4');
+  await until(async () => (await evaluate('String(document.querySelector(".design-review textarea").compareDocumentPosition([...document.querySelectorAll(".design-review > a")].find((a) => a.textContent === "Open original design")))')) === '4');
   await evaluate('location.reload()');
   await until(async () => (await evaluate('document.querySelector("[aria-haspopup=dialog]")?.textContent')) === 'Review full screen');
   await evaluate('document.querySelector("[aria-haspopup=dialog]").click()');
