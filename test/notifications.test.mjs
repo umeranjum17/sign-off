@@ -80,7 +80,7 @@ test('an evidence post with notify configured stores the card and sends it once'
   assert.equal(JSON.parse(await cli(dir, ['list', board(dir), '--json'])).decisions.length, 1);
 });
 
-test('a sign-in that gets a new link enters Waiting on you again and is announced again', { timeout: 15_000 }, async (t) => {
+test('a card is announced once, so a sign-in that gets a new link is not announced again', { timeout: 15_000 }, async (t) => {
   const dir = join(scratch, 'signin'); mkdirSync(dir);
   const { server, hits, url } = await listen();
   t.after(() => server.close());
@@ -90,10 +90,29 @@ test('a sign-in that gets a new link enters Waiting on you again and is announce
   await until(() => hits.length === 1);
   await cli(dir, ['signin', 'done', board(dir), '--key', 'npm-login'], TOKEN);
   await signin('https://example.com/login/2');
+  await sleep(400);
+  assert.deepEqual(hits.map((h) => h.body.id), ['npm-login'], 'the card left Waiting and came back: the receiver already knows it');
+  assert.equal(JSON.parse(await cli(dir, ['list', board(dir), '--json'])).decisions[0].key, 'npm-login');
+});
+
+test('an undone answer puts the card back in Waiting without another notice', { timeout: 20_000 }, async (t) => {
+  const dir = join(scratch, 'undo'); mkdirSync(dir);
+  const { server, hits, url } = await listen();
+  t.after(() => server.close());
+  setup(dir, notifyBlock(url));
+  const proc = spawn('node', [join(root, 'dist/cli.js'), 'serve', board(dir), '--port', '0'], { cwd: dir, env: { ...process.env, ...TOKEN } });
+  t.after(() => proc.kill());
+  const base = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+  await raise(dir, TOKEN);
+  await until(() => hits.length === 1);
+  const answer = (body) => fetch(`${base}api/answers`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  assert.equal((await answer({ key: 'review-this', answer: 'yes' })).status, 200);
+  assert.equal((await answer({ key: 'review-this', answer: '' })).status, 200);
+  assert.deepEqual(JSON.parse(await cli(dir, ['answers', board(dir), '--json'])), {}, 'the undone card waits again');
+  await cli(dir, ['post', board(dir), '--key', 'second', '--title', 'Ship this too?', '--why', 'Umer: one line.', '--outcome', 'yes=Go', '--outcome', 'no=Stop', '--recommend', 'yes', '--recommend-reason', 'Safe.', '--default', 'no'], TOKEN);
   await until(() => hits.length === 2);
-  await signin('https://example.com/login/2');
-  await sleep(200);
-  assert.deepEqual(hits.map((h) => h.body.id), ['npm-login', 'npm-login']);
+  await sleep(400);
+  assert.deepEqual(hits.map((h) => h.body.id), ['review-this', 'second'], 'the undone card is not announced again');
 });
 
 test('a post returns at once when the receiver is down and the sender holds no caller output', { timeout: 15_000 }, async (t) => {
