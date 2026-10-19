@@ -38,7 +38,7 @@ jobs:
           node-version: 24
           cache: npm
       - if: steps.changes.outputs.docs_only != 'true'
-        run: npm install -g done-done-axi@0.4.0
+        run: npm install -g done-done-axi@0.4.1
       - if: steps.changes.outputs.docs_only != 'true'
         run: done-done run install
       - if: steps.changes.outputs.docs_only != 'true'
