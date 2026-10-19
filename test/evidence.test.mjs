@@ -1,7 +1,8 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { appendFileSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { asked } from './ask.mjs';
@@ -21,7 +22,7 @@ const run = (...args) => {
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=', 'base64');
 // A rendered log (text only) and a real capture of the running board, from the repo's fixtures.
 const fixtures = new URL('../fixtures/evidence/', import.meta.url).pathname;
-const textLog = join(fixtures, 'text-log.png'), capture = join(fixtures, 'product-board.png');
+const textLog = join(fixtures, 'text-log.png'), colourBars = join(fixtures, 'colour-bars.png'), capture = join(fixtures, 'product-board.png');
 const clip = Buffer.from('0123456789 a short recording stand-in');
 const procs = [];
 after(async () => {
@@ -44,13 +45,15 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
   assert.equal(refused.code, 2);
   assert.match(refused.out, /is mostly text: a picture of a log, receipt or summary is not evidence/);
   assert.match(refused.out, /Post a real capture of the running product/);
+  // A colour-bar test card is refused the same way, not posted as evidence.
+  assert.match(evidence('--title', 'Test card', '--about', 'Note.', '--media', colourBars).out, /is a colour-bar test card, not evidence/);
   assert.match(evidence('--title', 'Missing', '--about', 'Note.', '--media', join(scratch, 'gone.png')).out, /gone\.png is not there/);
   assert.equal(evidence('--title', 'Bad link', '--about', 'Note.', '--media', shot, '--link', 'javascript:alert(1)').code, 2);
   assert.equal(evidence('--title', 'Options', '--about', 'Note.', '--media', shot, '--option', 'a=A', '--option', 'b=B').code, 2);
   assert.deepEqual(readdirSync(join(so, 'evidence')), []);
 
   assert.match(evidence('--title', 'Sign-in screen', '--about', 'The screen loads.', '--media', capture).out, /update-1,1,1/);
-  assert.match(evidence('--title', 'Sign-in flow', '--about', 'Umer signs in on a phone.', '--media', shot, '--media', rec,
+  assert.match(evidence('--title', 'Sign-in flow', '--about', 'Umer signs in on a phone.', '--media', capture, '--media', rec,
     '--link', 'https://github.com/acme/app/pull/12').out, /update-2,2,2/);
   assert.deepEqual(readdirSync(join(so, 'evidence', '2')).sort(), ['1.png', '2.webm']);
   assert.deepEqual(readFileSync(join(so, 'evidence', '2', '2.webm')), clip);
@@ -64,6 +67,14 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
   assert.equal(run('post', other, '--type', 'evidence', '--title', 'Bad link', '--about', 'Note.', '--media', rec, '--link', 'nope').code, 2);
   assert.deepEqual(readdirSync(join(so, 'evidence')).sort(), ['1', '2', '3', '5']);
   assert.deepEqual(readFileSync(join(so, 'evidence', '1', '1.png')), readFileSync(capture));
+
+  // A card posted before the guard can hold a colour-bar test card: the board does not show that card, and keeps the real ones.
+  const stored = JSON.parse(readFileSync(board, 'utf8')), bars = readFileSync(colourBars);
+  mkdirSync(join(so, 'evidence', '9'), { recursive: true });
+  writeFileSync(join(so, 'evidence', '9', '1.png'), bars);
+  const legacy = { ...stored.items[0], key: 'legacy-bars', number: 9, title: 'Old test card',
+    media: [{ path: 'evidence/9/1.png', sha256: createHash('sha256').update(bars).digest('hex'), bytes: bars.length }] };
+  writeFileSync(board, JSON.stringify({ ...stored, items: [...stored.items, legacy] }));
 
   const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: tmpdir() });
   procs.push(proc);

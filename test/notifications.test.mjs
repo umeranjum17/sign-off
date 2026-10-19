@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,7 +9,7 @@ import { join } from 'node:path';
 const root = new URL('..', import.meta.url).pathname;
 const scratch = mkdtempSync(join(tmpdir(), 'sign-off-notify-'));
 after(() => rmSync(scratch, { recursive: true, force: true }));
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=', 'base64');
+const png = readFileSync(new URL('../fixtures/evidence/product-small.png', import.meta.url));
 const TOKEN = { SIGN_OFF_TEST_TOKEN: 'private-token' };
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const until = async (ok) => { for (let i = 0; i < 100 && !ok(); i++) await sleep(100); };

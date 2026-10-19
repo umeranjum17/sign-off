@@ -35,7 +35,7 @@ const run = (...args) => {
   }
 };
 const post = (url, path, body) => fetch(`${url}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=', 'base64');
+const png = readFileSync(new URL('../fixtures/evidence/product-small.png', import.meta.url));
 // A plain PNG of a given size, for a capture of a known shape.
 const sized = (w, h) => {
   const chunk = (type, data) => { const n = Buffer.alloc(8), t = Buffer.concat([Buffer.from(type), data]); n.writeUInt32BE(data.length); n.writeUInt32BE(crc32(t), 4); return Buffer.concat([n.subarray(0, 4), t, n.subarray(4)]); };
@@ -43,7 +43,7 @@ const sized = (w, h) => {
   head.writeUInt32BE(w);
   head.writeUInt32BE(h, 4);
   head[8] = 8;
-  return Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), chunk('IHDR', head), chunk('IDAT', deflateSync(Buffer.alloc((w + 1) * h))), chunk('IEND', Buffer.alloc(0))]);
+  return Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), chunk('IHDR', head), chunk('IDAT', deflateSync(Buffer.from(Array.from({ length: (w + 1) * h }, (_, i) => (i % (w + 1) === 0 ? 0 : (i * 37) % 251))))), chunk('IEND', Buffer.alloc(0))]);
 };
 const procs = [];
 after(async () => {

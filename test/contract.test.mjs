@@ -682,7 +682,7 @@ test('post --kind evidence: media copied and hashed from the message folder, a r
   const file = join(fixtures, 'evidence.v1', 'valid-media.json'), items = () => JSON.parse(readFileSync(board, 'utf8')).items;
   assert.match(post('', '--kind', 'evidence', '--from', file, '--filer', 'agent-41').stdout, /signin-phone-2,1,1,"Sign-in screen, second pass",posted/);
   assert.deepEqual(readFileSync(join(scratch, 'ev', 'evidence', '1', '1.png')), readFileSync(join(fixtures, 'evidence.v1', 'shot.png')));
-  assert.equal(items()[0].media[0].bytes, 69);
+  assert.equal(items()[0].media[0].bytes, readFileSync(join(fixtures, 'evidence.v1', 'shot.png')).length);
   assert.match(post('', '--kind', 'evidence', '--from', file, '--filer', 'agent-41').stdout, /signin-phone-2,1,1,[^\n]*already posted/);
   const other = post('', '--kind', 'evidence', '--from', file, '--filer', 'agent-9');
   assert.equal(other.status, 2, other.stdout);

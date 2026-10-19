@@ -9,6 +9,15 @@ import { inflateSync } from 'node:zlib';
 const OFF_LINE_MAX = 0.005;
 /** The largest flat area in a third colour (any colour but the paper or the ink), as a share of the picture. */
 const SOLID_MAX = 0.04;
+export type Fault = 'text' | 'colour bars' | 'placeholder';
+/** A saturated colour is at least this far between its brightest and dimmest channel; a colour band must cover this share of the picture.
+ * A colour-bar card has at least five such bands, together most of the picture; the real captures measured have one at most. */
+const SATURATED = 96;
+const BAND_MIN = 0.05;
+const BARS_MIN = 5;
+const BARS_SHARE_MIN = 0.6;
+/** A placeholder is one flat colour over this share of the picture; the real captures measured top out at 75%, the text renders are text. */
+const PLACEHOLDER_MIN = 0.9;
 /** A picture with no ink at all (a flat colour) is not text, so it passes. */
 const INK_MIN = 0.005;
 /** How close (0-255 RGB distance) a pixel must be to the paper or to the paper-ink line to count as text. */
@@ -22,7 +31,7 @@ const WHOLE = [[0, 0, 1, 1]];
 
 /** The share of pixels that are ink (a colour off the paper), of pixels off the paper-ink line, and of the largest flat area in any other colour,
  * or undefined when the file cannot be decoded. */
-export function palette(file: string): { ink: number; off: number; solid: number } | undefined {
+export function palette(file: string): { ink: number; off: number; solid: number; top: number; bars: number; barShare: number } | undefined {
   const rgb = decode(file);
   if (!rgb) return undefined;
   const total = rgb.length / 3, bins = new Uint32Array(32768);
@@ -37,7 +46,14 @@ export function palette(file: string): { ink: number; off: number; solid: number
   bins.forEach((count, b) => {
     if (b !== paperBin && b !== inkBin && count / total > solid) solid = count / total;
   });
-  if (inkBin < 0) return { ink: 0, off: 0, solid: 0 };
+  // Saturated flat colours: a colour-bar test card has several, each a band of the picture.
+  let bars = 0, barShare = 0;
+  bins.forEach((count, b) => {
+    const c = centre(b), share = count / total;
+    if (Math.max(...c) - Math.min(...c) >= SATURATED && share >= BAND_MIN) bars++, (barShare += share);
+  });
+  const top = bins[paperBin] / total;
+  if (inkBin < 0) return { ink: 0, off: 0, solid: 0, top, bars, barShare };
   const [pr, pg, pb] = paper, [ar, ag, ab] = centre(inkBin).map((c, i) => c - paper[i]), len2 = ar * ar + ag * ag + ab * ab;
   let ink = 0, off = 0;
   for (let i = 0; i < rgb.length; i += 3) {
@@ -48,13 +64,20 @@ export function palette(file: string): { ink: number; off: number; solid: number
     if (er * er + eg * eg + eb * eb <= NEAR * NEAR) ink++;
     else off++;
   }
-  return { ink: ink / total, off: off / total, solid };
+  return { ink: ink / total, off: off / total, solid, top, bars, barShare };
 }
 
-/** True when the picture is mostly text. A file that cannot be decoded is not refused: the check says so in the PR rather than guess. */
-export function isMostlyText(file: string): boolean {
+/** Why a still is not a picture of the product: text (a log, receipt or summary), colour bars (a test card) or a placeholder (a flat card
+ * standing in for a picture). A file that cannot be decoded has no faults: it is not refused. */
+export function faults(file: string): Fault[] {
   const share = palette(file);
-  return !!share && share.ink >= INK_MIN && share.off <= OFF_LINE_MAX && share.solid <= SOLID_MAX;
+  if (!share) return [];
+  const text = share.ink >= INK_MIN && share.off <= OFF_LINE_MAX && share.solid <= SOLID_MAX;
+  return [
+    ...(text ? ['text' as const] : []),
+    ...(share.bars >= BARS_MIN && share.barShare >= BARS_SHARE_MIN ? ['colour bars' as const] : []),
+    ...(!text && share.top >= PLACEHOLDER_MIN ? ['placeholder' as const] : []),
+  ];
 }
 
 const dist = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
