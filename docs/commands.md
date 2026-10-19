@@ -21,6 +21,7 @@ and inherits the calling agent's model routing.
 | `report` | build an explainer page to post |
 | `signin` | close a sign-in card as done |
 | `doctor` | check the setup; each failure names its fix |
+| `notify` | check device notifications, or send a test notice |
 | `validate` | check messages against the contract |
 | `help` | show the commands and flags |
 
@@ -75,5 +76,7 @@ sign-off-axi wait \
 shows **Seen by agent**. An agent that cannot block can be woken instead:
 an `on_answer:` line in the `config.yaml` beside the board names a command
 the board runs for every answer. A `notify:` block in that config can send
-an HTTP POST when a card enters Waiting on you. Detail is in
+an HTTP POST when a card enters Waiting on you; `receiver: muxr` there sends
+it to the muxr host, and `sign-off-axi notify [check|test]` checks the setup
+or sends a test notice. Detail is in
 [question-kinds.md](question-kinds.md).

@@ -182,3 +182,70 @@ test('a notify url on a DNS name starting with 127 is not treated as this machin
   const output = await cli(dir, ['doctor', dir]).catch((e) => e.message);
   assert.match(output, /notify needs url/);
 });
+
+const muxrBlock = (url, base = 'https://board.tail1234.ts.net/') => `notify:\n  receiver: muxr\n  url: ${url}\n  link_base: ${base}\n`;
+const muxrHome = (name, token) => {
+  const home = join(scratch, name + '-muxr'); mkdirSync(home);
+  if (token) writeFileSync(join(home, 'notify-token'), token + '\n');
+  return { MUXR_HOME: home };
+};
+
+test('muxr receiver: a raised card posts title, body, url and id with the bearer token read from the token file at send time', { timeout: 15_000 }, async (t) => {
+  const dir = join(scratch, 'muxr'); mkdirSync(dir);
+  const { server, hits, url } = await listen();
+  t.after(() => server.close());
+  setup(dir, muxrBlock(url));
+  const env = muxrHome('muxr', 'file-token-123');
+  const long = 'Authentication infrastructure modernization recommendations considered thoroughly yesterday afternoon, regardless?';
+  const output = await cli(dir, ['post', board(dir), '--title', long, '--why', 'Umer: one line.', '--outcome', 'yes=Go', '--outcome', 'no=Stop', '--recommend', 'yes', '--recommend-reason', 'Safe.', '--default', 'no'], env);
+  await until(() => hits.length === 1);
+  assert.equal(hits[0].auth, 'Bearer file-token-123');
+  assert.deepEqual(Object.keys(hits[0].body).sort(), ['body', 'id', 'title', 'url']);
+  assert.equal([...hits[0].body.title].length, 80);
+  assert.equal(hits[0].body.body, 'Umer: one line.');
+  assert.match(hits[0].body.url, /^https:\/\/board\.tail1234\.ts\.net#waiting\//);
+  assert.ok(!output.includes('file-token-123'));
+});
+
+test('muxr receiver: a missing token file sends nothing and says why in plain words, then works once the file appears', { timeout: 15_000 }, async (t) => {
+  const dir = join(scratch, 'muxr-late'); mkdirSync(dir);
+  const { server, hits, url } = await listen();
+  t.after(() => server.close());
+  setup(dir, muxrBlock(url));
+  const env = muxrHome('muxr-late');
+  await raise(dir, env);
+  await sleep(200);
+  assert.equal(hits.length, 0);
+  const message = await cli(dir, ['notify', 'test', dir], env).catch((e) => e.message);
+  assert.match(message, /notify-token is not there yet/);
+  assert.doesNotMatch(message, /at .*\.js:\d+|TypeError|ENOENT/);
+  assert.match(await cli(dir, ['doctor', dir], env).catch((e) => e.message), /notify-token is not there yet/);
+  writeFileSync(join(env.MUXR_HOME, 'notify-token'), 'late-token\n');
+  assert.match(await cli(dir, ['notify', 'test', dir], env), /test: sent/);
+  assert.equal(hits.at(-1).auth, 'Bearer late-token');
+  assert.equal(hits.at(-1).body.title, 'sign-off test');
+});
+
+test('notify check: off until the config turns it on, and a link that will not open on the iPad is refused', { timeout: 15_000 }, async () => {
+  const dir = join(scratch, 'muxr-check'); mkdirSync(dir);
+  setup(dir);
+  assert.match(await cli(dir, ['notify', dir]), /notifications: off/);
+  setup(dir, muxrBlock('http://127.0.0.1:8793/v1/notify', 'http://127.0.0.1:4410/'));
+  assert.match(await cli(dir, ['notify', dir]).catch((e) => e.message), /https:\/\/ or a tailnet address/);
+  setup(dir, muxrBlock('http://127.0.0.1:8793/v1/notify', 'http://100.101.102.103:4410/'));
+  const env = muxrHome('muxr-check', 'x');
+  const out = await cli(dir, ['notify', dir], env);
+  assert.match(out, /notifications: on/);
+  assert.match(out, /receiver: muxr/);
+  assert.ok(!out.includes('x\n') && !/token: x\b/.test(out));
+});
+
+test('notify test says so when the receiver refuses the token or is not running', { timeout: 15_000 }, async (t) => {
+  const dir = join(scratch, 'muxr-refused'); mkdirSync(dir);
+  const { server, url } = await listen(() => 401);
+  setup(dir, muxrBlock(url));
+  const env = muxrHome('muxr-refused', 'wrong');
+  assert.match(await cli(dir, ['notify', 'test', dir], env).catch((e) => e.message), /refused the token \(HTTP 401\)/);
+  await new Promise((resolve) => server.close(resolve));
+  assert.match(await cli(dir, ['notify', 'test', dir], env).catch((e) => e.message), /nothing answered at/);
+});

@@ -249,6 +249,16 @@ without posting.
   retried a few times, then logged to `notify.log` beside the board. The
   token is read only from the named variable; when that variable is unset,
   nothing is sent and `doctor` says so.
+  Notifications are off until this block is there. For the muxr receiver on
+  the same machine, give `receiver: muxr` and a `link_base:` that is https or
+  a tailnet address (a `.ts.net` name or a `100.x` address), so the link opens
+  on the iPad; `url:` defaults to `http://127.0.0.1:8793/v1/notify`. The notice
+  is then `{"title","body","url","id"}` (title cut to 80 characters), and the
+  bearer token is read at send time from the file `<MUXR_HOME>/notify-token`
+  (default `~/.muxr/notify-token`), never stored in the config or printed. A
+  missing token file sends nothing and `doctor` and `notify` say so in plain
+  words. `sign-off-axi notify` checks the setup and `notify test` sends one
+  real notice.
 - `post --from <file> --replace --filer <id>` lets several programs feed one
   board: it replaces only that filer's items (and items with no filer that
   the file names by key), keeps every other item, the board's other

@@ -43,6 +43,7 @@ The answer comes to you; nobody has to notice it for you.
 2. Post every item with `--filer <id>`, or export `SIGN_OFF_FILER=<id>` once for every command.
 3. Right after posting, run `npx -y sign-off-axi wait --filer <id>` (same board file as the post). It returns every answer to your items you have not taken yet, even one given before you started waiting, and the board then shows **Seen by agent** on that card. Run it again for the next one; `TIMEOUT` means keep waiting, `NOT_FOUND` means none of your items wait.
 4. If you cannot block, the board owner can set `on_answer: <command>` in the `config.yaml` beside the board: it runs for each answer with the answer as JSON on its stdin, with no shell (so `|` and `>` do nothing; name a script instead), and `npx -y sign-off-axi doctor` checks it can run.
+5. Device notifications are off until the owner turns them on in that config. If `npx -y sign-off-axi notify` says `notifications: off`, ask the user once whether they want them on; never turn them on yourself.
 
 ## Write each card for a 10-second read on a phone
 

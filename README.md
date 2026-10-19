@@ -356,7 +356,8 @@ cannot block can be woken instead: an `on_answer:` line in the
 `config.yaml` beside the board names a command the board runs for every
 answer. A `notify:` block in that config can send an HTTP POST when a card
 enters Waiting on you, with its bearer token read from a named environment
-variable. The full reference, with the worked example, is in
+variable, or, with `receiver: muxr`, from the muxr host's `notify-token`
+file; `sign-off-axi notify test` sends a test notice. The full reference, with the worked example, is in
 [docs/commands.md](docs/commands.md).
 
 Every command takes `--help` and prints compact output with next-step hints.
