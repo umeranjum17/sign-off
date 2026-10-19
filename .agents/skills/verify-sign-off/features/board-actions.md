@@ -3,6 +3,7 @@
 ## Sub-features
 
 - Every card kind (evidence, design, plan, signin, ask) on every tab (Today, Waiting, Decide, Designs, Evidence, Reports, Answered) offers its actions: open links, Dismiss, Select / pick / Dismiss N / Cancel / Clear all, answer buttons, plan and design verdicts, comment / Another round / Send reply.
+- CLI twin: `sign-off-axi dismiss <key>` / `restore <key>` write the same dismissed log; prove with a throwaway HOME: dismiss, `list --full` shows `dismissed`, restore, an unknown key exits 1. test/decisions.test.mjs covers it against a live board.
 - A missing or disabled action fails the journey. Dismiss and answers are taken back with Undo; the irreversible ones (comment, round, reply, design verdict) run last.
 - Every capture is measured by done-done's look code (squashed, clipped or cut-off text, overflow); `done-done look` also runs on each page. A hit fails the journey.
 

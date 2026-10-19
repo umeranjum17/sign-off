@@ -220,6 +220,13 @@ test('three dismissed updates are not waiting on the CLI either: list and answer
   assert.equal(run('raise', board, '--title', 'Keep the weekly digest email?', '--recommend', 'yes').code, 0);
   assert.equal((await dismiss(['keep-the-weekly-digest-email'])).status, 200);
   assert.match(run('raise', board, '--title', 'Keep the weekly digest email?', '--recommend', 'yes').out, /keep-the-weekly-digest-email,already waiting/);
+  // The CLI's dismiss and restore write the log the board reads: the card hides and comes back on the live board, and a key not on the board is refused.
+  const hidden = async () => (await (await fetch(`${url}api/decisions`)).json()).dismissed;
+  assert.equal(run('restore', 'update-1', board).code, 0);
+  assert.ok(!(await hidden()).includes('update-1'));
+  assert.equal(run('dismiss', 'update-1', board).code, 0);
+  assert.ok((await hidden()).includes('update-1'));
+  assert.notEqual(run('dismiss', 'no-such-card', board).code, 0);
   proc.kill();
   // The agent is not told: answers still returns a dismissed answer, and a wait on the dismissed updates runs to its timeout.
   assert.match(run('answers', board, '--key', 'ship-the-new-sign-in-screen').out, /ship-the-new-sign-in-screen,yes/);

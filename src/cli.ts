@@ -30,8 +30,8 @@ const AGENTS: Record<string, { bin: string; dir: string; home: string }> = {
   'gemini-cli': { bin: 'gemini', dir: '.agents/skills', home: join(homedir(), '.gemini', 'skills') },
 };
 const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
-commands[18]:
-  (none)=list, raise, post, answers, wait, poll, open, status, stop, serve, export, init, report, signin, doctor, notify, validate, help
+commands[20]:
+  (none)=list, raise, post, answers, wait, poll, open, status, stop, serve, export, init, report, signin, dismiss, restore, doctor, notify, validate, help
 board: the nearest .sign-off/ board (the walk's bounds and SIGN_OFF_HOME: README, "Test runs never touch your board"), else ~/.sign-off/decisions.json; a board file given always wins
 flags: --full and --json on list, answers and wait, --events on wait, --json on status, --filer on post, raise and wait, --help on every command, -v/--version
 examples:
@@ -45,6 +45,7 @@ examples:
   sign-off-axi post .sign-off/decisions.json --type report --title "Sign-in now takes 2 steps" --about "Why the code step moved first." --view mocks/sign-in-flow/index.html --preview mocks/sign-in-flow/preview.svg
   sign-off-axi post --type signin --key npm-login --service npm --link https://example.com/login --unlocks "Publish the release" --waits "Main" --expires 15m
   sign-off-axi signin done --key npm-login
+  sign-off-axi dismiss ship-the-new-sign-in-screen-this-week
   sign-off-axi init
   sign-off-axi doctor
   sign-off-axi validate ask.json
@@ -250,6 +251,16 @@ Closes a sign-in card that post --type signin made: the sign-in is done, so the 
 Run it when you see the sign-in worked. A card posted with --start also closes by itself when its command ends with exit 0. wait --key <key> also returns once it is done.
 examples:
   sign-off-axi signin done --key npm-login
+`,
+  dismiss: `usage: sign-off-axi dismiss <key> [board.json]
+Hides a card from the board, like its Dismiss button. The agent is not told, and an ask it waits on keeps waiting.
+restore <key> [board.json] brings it back. Find the key with \`sign-off-axi list --full\`.
+examples:
+  sign-off-axi dismiss ship-the-new-sign-in-screen-this-week
+  sign-off-axi restore ship-the-new-sign-in-screen-this-week
+`,
+  restore: `usage: sign-off-axi restore <key> [board.json]
+Brings back a card that dismiss hid. See \`sign-off-axi dismiss --help\`.
 `,
   report: `usage: sign-off-axi report init <folder>
 Writes a report page to fill: <folder>/index.html and its card picture <folder>/preview.svg. A file already there is kept.
@@ -836,6 +847,21 @@ function signin(args: string[]) {
     const saved = appendAnswer(file, d, SIGNED_IN);
     return toon({ board: tilde(file), closed: [{ key: d.key, status: saved ? 'done' : 'already done', service: d.title }] }, [`Run \`sign-off-axi list${on}\` to see what still waits on the user`]);
   });
+}
+
+/** dismiss|restore <key> [board.json]: the board's Dismiss and Undo, for an agent. The same dismissed log the board writes, for a key that is on the board. */
+function dismiss(restoring: boolean) {
+  const cmd = restoring ? 'restore' : 'dismiss';
+  return (args: string[]) => {
+    const at = args.findIndex((a) => !a.startsWith('-')), key = args[at];
+    if (at < 0) throw fail(`${cmd} needs a card key`, 'VALIDATION_ERROR', `sign-off-axi ${cmd} <key> [board.json]`);
+    const { file, on } = parse(cmd, args.filter((_, i) => i !== at), {});
+    return locked(`${file}.lock`, () => {
+      if (!isKey(key) || !board(file).some((x) => x.key === key)) throw fail(`no card with key ${key} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi list${on} --full\` to see the keys`);
+      appendDismissed(file, [key], !restoring);
+      return toon({ board: tilde(file), [restoring ? 'restored' : 'dismissed']: [key] }, [`Run \`sign-off-axi ${restoring ? 'dismiss' : 'restore'}${on} ${key}\` to undo`]);
+    });
+  };
 }
 
 /** For a program that feeds the board: the --from file, checked like any post, becomes the whole board, items and top-level fields. Answers stay.
@@ -2296,7 +2322,7 @@ await runAxiCli({
   topLevelHelp: TOP_HELP,
   getCommandHelp: (cmd) => HELP[cmd],
   home: axi('list', list),
-  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), report: axi('report', report), signin: axi('signin', signin), doctor: axi('doctor', doctor), notify: axi('notify', notify), validate, help: ([name, ...rest]) => {
+  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), report: axi('report', report), signin: axi('signin', signin), dismiss: axi('dismiss', dismiss(false)), restore: axi('restore', dismiss(true)), doctor: axi('doctor', doctor), notify: axi('notify', notify), validate, help: ([name, ...rest]) => {
     if (rest.length || (name && !HELP[name])) throw fail(`unknown command or argument: ${[name, ...rest].join(' ')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi --help` to see the commands');
     return name ? HELP[name] : TOP_HELP;
   } },
