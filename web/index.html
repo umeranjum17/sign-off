@@ -296,7 +296,7 @@
   .silent-line { margin: 1.25rem 0; color: var(--muted); }
   .decide-bar { position: sticky; bottom: calc(4.125rem + env(safe-area-inset-bottom)); z-index: 1; display: flex; align-items: center; gap: .5rem; margin: 1rem -1.25rem 0; padding: .75rem 1.25rem; background: var(--bg); }
   .decide-bar .answer { flex: 1; background: var(--action); color: var(--on-accent); }
-  .decide-bar .later { color: var(--accent); background: transparent; }
+  .decide-bar .later { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0 0.75rem; color: var(--accent); background: transparent; }
   .decide-bar .skip { color: var(--muted); background: transparent; }
   .ask-group + .gone-asks { margin-top: 1rem; }
   .in-answered .row { background: transparent; box-shadow: none; }
@@ -768,11 +768,12 @@
       ro ? '' : other(d, saved, err), err, tech(d));
   }
 
+  /** A count with its unit in the form it deserves: 1 section, 2 sections. */
+  const plural = (n, one) => `${n} ${one}${n === 1 ? '' : 's'}`;
   /** A plan: its one-line answer, how many sections and decisions it asks about, and one Open plan for its page over the board. */
   function plan(d, lead) {
-    const count = (n, one) => `${n} ${one}${n === 1 ? '' : 's'}`;
     return el('article', { class: 'row plan', id: `item-${d.key}` }, el('div', {}, lead,
-      el('p', { class: 'meta' }, `${count(d.sections.length, 'section')} · ${count(d.decisions.length, 'decision')}`)),
+      el('p', { class: 'meta' }, `${plural(d.sections.length, 'section')} · ${plural(d.decisions.length, 'decision')}`)),
     el('a', { class: 'open-link', href: `#${area(d)}/${d.key}`, 'aria-label': `Open plan, ${d.title}` }, 'Open plan'));
   }
   /** A span of minutes: whole minutes under the hour, hours and the rest over it. */
@@ -1507,7 +1508,7 @@
   }
   /** The plan is the lead card; the remaining asks are a grouped list linking to a focused decision. */
   function planCard(d) {
-    const meta = [el('span', {}, `${d.sections.length} sections`), el('span', {}, `${d.decisions.length} decisions`),
+    const meta = [el('span', {}, plural(d.sections.length, 'section')), el('span', {}, plural(d.decisions.length, 'decision')),
       el('span', {}, `Agent${d.filed ? ` · ${when(d.filed)}` : ''}`)];
     return el('article', { class: 'plan-hero', id: `item-${d.key}` }, el('div', { class: 'plan-preview' }, rung(d)),
       el('div', { class: 'plan-copy' }, el('p', { class: 'eyebrow' }, `Plan${d.project ? ` · ${d.project}` : ''}`),

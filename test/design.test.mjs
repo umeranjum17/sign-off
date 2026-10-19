@@ -980,7 +980,7 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
   writeFileSync(file, JSON.stringify({ schema: 2, items: [
     { key: 'digest', title: 'Keep the weekly digest?', about: 'Open rate held steady.', options: yesNo, recommend_value: 'yes' },
-    { key: 'release', title: 'Which day for release?', options: ['today', 'friday', 'next-week'].map((v) => ({ value: v, label: v })), recommend_value: 'friday' },
+    { key: 'release', title: 'Which day for release?', why: 'The release needs one calm day.', about: 'Two quiet weeks since the last release.', options: ['today', 'friday', 'next-week'].map((v) => ({ value: v, label: v })), recommend_value: 'friday' },
     { key: 'look', type: 'design', title: 'Pick the look', options: [
       { value: 'a', label: 'A', outcome: 'Fastest. Support is thin on Saturday.' },
       { value: 'b', label: 'B', outcome: 'Full support team on the day.' },
@@ -1009,6 +1009,7 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   assert.equal(await evaluate('document.querySelector(".silent-line")?.textContent'), 'If you stay quiet: C');
   assert.equal(await evaluate('getComputedStyle(document.querySelector(".pick-option[aria-pressed=true]"), "::before").content'), 'none');
   assert.equal(await evaluate('(() => { const b = document.querySelector(".decide-bar").getBoundingClientRect().top; return [".pick-list", ".silent-line"].every(s => document.querySelector(s).getBoundingClientRect().bottom <= b); })()'), true);
+  assert.equal(await evaluate('document.querySelector(".decide-bar .later").getBoundingClientRect().height >= 44'), true);
   await evaluate('location.hash = "#waiting"');
   await until(async () => (await askTitles()) === 'Pick the look|Which day for release?|Keep the weekly digest?');
   await until(async () => (await pick('Yes/No')) && (await askTitles()) === 'Keep the weekly digest?');
@@ -1044,6 +1045,8 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await evaluate('document.querySelector(`a[href="#decide/release"]`).click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/release');
   assert.equal(await evaluate('document.querySelector(".decide h2").textContent'), 'Which day for release?');
+  // A reason text wins over the ask's context line.
+  assert.equal(await evaluate('document.querySelector(".decide .why").textContent'), 'The release needs one calm day.');
   assert.equal(await evaluate('document.querySelectorAll(".pick-option").length'), 3);
   assert.equal(await evaluate('document.querySelector(".pick-option[aria-pressed=true] .recommend")?.textContent'), 'Recommended');
   await evaluate('document.querySelector(".pick-option").click(); document.querySelector(".decide-bar .answer").click()');
@@ -1131,6 +1134,11 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await until(async () => (await evaluate(answeredTitles)).includes('Keep the weekly digest?') && (await evaluate(answeredTitles)).includes('Show plans on the board'));
   await evaluate('document.querySelector(".clear").click()');
   await until(async () => (await evaluate(answeredTitles)) === '');
+  // A plan with one section and no decisions reads in the singular.
+  assert.equal(run('post', file, '--kind', 'plan', '--from', join(fixture, 'valid-minimal.json')).code, 0);
+  await evaluate('location.hash = "#waiting"');
+  await evaluate('location.reload()');
+  await until(async () => (await evaluate('[...document.querySelectorAll("#item-plan-filter-waiting .plan-meta span")].slice(0, 2).map((s) => s.textContent).join("|")')) === '1 section|0 decisions');
   close();
   proc.kill();
 });
