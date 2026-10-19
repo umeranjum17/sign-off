@@ -838,12 +838,11 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   assert.equal(reports.match(/class="card legend"/g).length, 1);
   const flow = reports.match(/<ol class="flow"[^>]*>(.*?)<\/ol>/s)[1];
   assert.deepEqual([...flow.matchAll(/<li>(.*?)<\/li>/gs)].map((m) => [...m[1].matchAll(/mk mk-(\w+)/g)].map((x) => x[1])), [['store'], [], ['gate', 'fail']]);
-  assert.match(reports, /3 steps.*>Open ›</s);
-  // Its group heads a section with the filed time; the card says New today over its title, a link that opens it, then what it decided.
-  assert.match(reports, /<div class="sec-h"><h2>How it works<\/h2><span class="meta">Filed \d\d:\d\d today<\/span>/);
-  assert.match(reports, /<span class="st new">New today<\/span><\/p><h3 dir="auto"><a href="#reports\/how">How it ships<\/a><\/h3>.*<span class="lbl">What it decided<\/span>Ships only when the check passes\./s);
-  // Only the report is a card and counted; the text-only one is folded under Notes, a short row with no page to open.
-  assert.deepEqual([...reports.matchAll(/<article class="card report[^"]*" id="item-(\w+)"/g)].map((m) => m[1]), ['how']);
+  // Its group heads a grouped list with the filed time; its row is a link that opens it, with its title, its kind, steps and time, and a dot for New today.
+  assert.match(reports, /<div class="sec-h"><h2>How it works<\/h2><span class="meta">Filed \d\d:\d\d today<\/span><\/div><ul class="card rows reports">/);
+  assert.match(reports, /<a class="compact" href="#reports\/how">.*?<strong dir="auto">How it ships<\/strong>.*?<span class="when">[^<]* · 3 steps · \d\d:\d\d<\/span>.*?<span class="new" role="img" aria-label="New today"><\/span><\/a>/s);
+  // Only the report is a row and counted; the text-only one is folded under Notes, a short row with no page to open.
+  assert.deepEqual([...reports.matchAll(/<li class="report" id="item-(\w+)"/g)].map((m) => m[1]), ['how']);
   // The sidebar counts it under its short name; the phone's tab bar marks Reports as the area on screen and reads its count.
   assert.match(reports, /<\/svg><\/span>Reports<span class="n">1<\/span>/);
   assert.match(reports, /<a href="#reports" aria-label="Reports and explainers, 1" aria-current="page"><span class="icon i-reports" aria-hidden="true">.*?<\/span>Reports<\/a>/);
@@ -855,14 +854,16 @@ test('each card has one place to type: Other answer holds the reply, Another rou
     await evaluate(`location.href = ${JSON.stringify(`${url}#reports`)}`);
     await until(async () => (await evaluate('document.querySelector("#item-how .thumb, #item-how .flow") && innerWidth')) === 390);
     const at = (sel) => evaluate(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`);
-    await tap(await at('#item-how .about, #item-how .decided'));
+    await tap(await at('#item-how strong'));
     await until(async () => (await evaluate('location.hash')) === '#reports/how');
     // The hash lands before its handler draws the reader, so wait for the drawn reader itself, not just the hash.
     let open;
     await until(async () => (open = await evaluate(`(() => { const f = reader.querySelector('iframe').getBoundingClientRect(); return { hidden: reader.hidden, title: document.activeElement.textContent,
       inert: document.querySelector('main').inert, src: reader.querySelector('iframe').getAttribute('src'), sandbox: reader.querySelector('iframe').getAttribute('sandbox'),
-      frame: [f.x, f.width, Math.round(f.bottom) === innerHeight], back: reader.querySelector('a').textContent }; })()`))?.src === '/mock/local/how~/index.html');
-    assert.deepEqual(open, { hidden: false, title: 'How it ships', inert: true, src: '/mock/local/how~/index.html', sandbox: 'allow-scripts', frame: [0, 390, true], back: '‹ Reports' });
+      frame: [f.x, Math.round(f.width) === reader.querySelector('.read').clientWidth - 40], back: reader.querySelector('a').textContent, decided: reader.querySelector('.decided')?.textContent }; })()`))?.src === '/mock/local/how~/index.html');
+    // The page sits in a tile inside the phone's gutters, under its title and what it decided.
+    assert.deepEqual(open, { hidden: false, title: 'How it ships', inert: true, src: '/mock/local/how~/index.html', sandbox: 'allow-scripts', frame: [20, true], back: '‹ Reports',
+      decided: 'What it decidedShips only when the check passes.' });
     // The page itself is served: the filled scaffold, with its steps to tap.
     assert.match(await (await fetch(new URL('/mock/local/how~/index.html', url))).text(), /<button type="button" class="next">Next<\/button>/);
     await tap(await at('#reader .close'));

@@ -104,9 +104,11 @@ they must understand. `sign-off-axi report init <folder>` writes the page to
 fill, one self-contained `.html` file, phone first, light and dark: the
 answer in one plain sentence with a picture and an as-of line naming the
 date the facts were true, then a diagram, then steps the reader taps
-through, then the detail folded. Reports and explainers lists each one as a
-card with its picture; a tap opens the page over the whole board, on a phone
-and a desk alike, with **‹ Reports** (or Escape) to go back. A report of
+through, then the detail folded. Reports lists each one as a row of a
+grouped list: its picture, title, what it says, kind and date, with a dot
+when it was filed today. A tap opens the page under its title and what it
+says, over the whole board on a phone and beside the sidebar on a desk, with
+**‹ Reports** (or Escape) to go back. A report of
 text only is refused with the command that makes the page; one stored before
 reports had pages still loads, folded under **Notes**. Proof that something
 works is evidence, and a merge or a status note is neither.

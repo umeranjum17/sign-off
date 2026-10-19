@@ -88,7 +88,7 @@ A question the person answers by picking an option. Shows in Waiting on you.
 
 ### report, schema 2
 
-An explainer the person reads: made when they asked for an explanation, or when a concept, design or trade-off must be understood. It takes no answer. Shows in Reports and explainers, as a card with its picture; a tap opens its page over the whole board. Proof that something works is `evidence`. A merge, a PR outcome, a receipt or a status note is never a report.
+An explainer the person reads: made when they asked for an explanation, or when a concept, design or trade-off must be understood. It takes no answer. Shows in Reports and explainers, as a row with its picture; a tap opens its page, over the whole board on a phone and beside the sidebar on a desk. Proof that something works is `evidence`. A merge, a PR outcome, a receipt or a status note is never a report.
 
 - Required: the common fields, `about`, `filed` (a real UTC date and time, exactly `YYYY-MM-DDTHH:MM:SSZ` with seconds 00-59, such as `2026-10-13T07:19:00Z`), `view` and `preview`.
 - `view`: the page, a relative `.html` path of 1-256 characters with no `..`, `?`, `#` or `\`. `preview`: its picture on the card, `.svg`, `.png`, `.jpg`, `.jpeg` or `.webp`, in the same folder. `post` reads both from the board file's folder (as `--view` does), where symlinks are followed and the real path must stay inside it, each a file of 5,000,000 bytes or fewer; `validate` checks only their shape, as it does a plan's `view`.
