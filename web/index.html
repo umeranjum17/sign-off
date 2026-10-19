@@ -1216,12 +1216,13 @@
   const tile = (a, items) => el('a', { class: `tile i-${a}`, href: `#${a}`, 'aria-label': `${AREAS[a]}, ${items.length}` }, icon(a),
     el('span', { class: 'n' }, String(items.length)), el('span', { class: 'name' }, NAV[a]));
 
-  /** The Summary at a glance, in a few short sentences: what needs you (and since when) in full colour, the rest quieter. */
+  /** The Summary at a glance, in a few short sentences: what needs you (and since when) and the evidence to see (and its newest update) in full colour, the rest quieter. */
   function glance(by) {
     const oldest = by.waiting.map((d) => d.filed).filter(Boolean).sort((x, y) => Date.parse(x) - Date.parse(y))[0];
     const n = by.waiting.length, fresh = by.answered.filter((d) => isToday(state.answers[d.key].at)).length;
+    const newest = by.evidence.filter((d) => d.number).sort((x, y) => Date.parse(y.filed ?? 0) - Date.parse(x.filed ?? 0))[0];
     const lines = [[n ? `${n} ${n === 1 ? 'ask needs' : 'asks need'} you.` : 'Nothing is waiting on you.', 1], [oldest && `Oldest since ${when(oldest)}.`],
-      [by.evidence.length && `${plural(by.evidence.length, 'evidence update')} to see.`, 1], [by.designs.length && `${plural(by.designs.length, 'design')} to review.`],
+      [by.evidence.length && `${plural(by.evidence.length, 'evidence update')} to see.`, 1], [newest && `Newest: Update ${newest.number}.`], [by.designs.length && `${plural(by.designs.length, 'design')} to review.`],
       [by.reports.length && `${plural(by.reports.length, 'report')} to read.`], [`${fresh} answered today.`]];
     return el('p', { class: 'card glance' }, ...lines.filter(([t]) => t).map(([t, strong]) => el(strong ? 'b' : 'span', {}, `${t} `)));
   }

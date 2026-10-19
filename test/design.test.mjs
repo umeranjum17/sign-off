@@ -2192,9 +2192,9 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   // The two sign-off proof lines differ only in case and share one head; the passed update whose proof names no project goes under Other.
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".sec-head h2")].map((h) => h.textContent)'), ['sign-off', 'Other']);
   assert.equal(await evaluate('document.querySelector(\'#nav a[href="#evidence"] .n\').textContent'), '3');
-  // The Summary tile names the newest listed update.
+  // The Summary's glance names the newest listed update.
   await evaluate('location.hash = ""');
-  await until(async () => (await evaluate('document.querySelector(".tile.i-evidence .detail")?.textContent')) === 'Newest: Update 4');
+  await until(async () => (await evaluate('document.querySelector(".glance")?.textContent.includes("Newest: Update 4.")')) === true);
   await evaluate('location.hash = "#evidence"');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 3);
   // Cards sit two across: the sign-off pair first, newest on the left, then Other under its own head.
