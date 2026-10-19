@@ -26,3 +26,7 @@ the arrow keys, or a swipe on the screen.
 - Squeeze the note box against the buttons at any width, in either theme.
 - Crop the screen, or scroll inside the stage.
 - Leave the board behind it in a different state than the review shows.
+
+## Designs list and review page
+
+`shots.sh BASE <folder> designs design-review` captures them. The list is the Reports pattern (grey caps group label, one tile, a row per design with its picture, title, summary and "In review · date"); the review page opens with the way back, then the status, the title (34 px, 48 px at 1280) and the summary in one centred column, with the preview, Review full screen and the note under them. Look at both at 390 and 1280, light and dark: nothing cut, the button full width at 390.
