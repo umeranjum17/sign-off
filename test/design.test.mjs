@@ -1259,11 +1259,9 @@ test('a posted contract design is listed with its preview and date, and opens fo
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const { evaluate, close } = await browse(join(dir, 'browser'));
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
-  await until(async () => (await evaluate('document.querySelector("#item-d1-design h3")?.textContent')) === message.title);
-  assert.equal(await evaluate('document.querySelector("#item-d1-design .about")?.textContent'), message.about);
-  assert.equal(await evaluate('document.querySelector("#item-d1-design a")?.textContent'), 'Open original');
-  assert.equal(await evaluate('document.querySelector("#item-d1-design a")?.getAttribute("href")'), message.link);
-  assert.equal(await evaluate('document.querySelector(".quiet a.open-link")?.textContent'), 'Open designs');
+  await until(async () => (await evaluate('document.querySelector("#item-d1-design .title")?.textContent')) === message.title);
+  assert.equal(await evaluate('document.querySelector("#item-d1-design .meta")?.textContent'), message.about);
+  assert.equal(await evaluate('document.querySelector("#item-d1-design")?.getAttribute("href")'), '#designs/d1-design');
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
   await until(async () => (await evaluate('document.querySelector(".design-card h3")?.textContent')) === message.title);
   assert.equal(await evaluate('document.querySelector(".design-card img")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent(message.preview)}`);
