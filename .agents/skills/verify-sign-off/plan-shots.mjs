@@ -52,6 +52,7 @@ try {
     const dom = probe();
     assert.equal(dom.overflow, false); assert.deepEqual(dom.overflowing, []);
     const consoleLog = browser('console', '--type', 'error'), network = browser('network', '--limit', '100');
+    writeFileSync(join(records, `${stem}.network.txt`), network);
     assert.match(consoleLog, /no console messages found/);
     dom.console_errors = [];
     dom.failed_requests = [...network.matchAll(/reqid=\d+ \w+ (\S+) \[(\d+|failed)\]/g)].flatMap(([, url, status]) => status === 'failed' || +status >= 400 ? [{ url, status: +status || 0 }] : []);

@@ -79,6 +79,8 @@
   /* On Summary the recommended answer is the large button, and the others are pills under it. */
   .needs .choices button { font-weight: 600; } .needs .choices button:not(.rec) { justify-self: start; border-radius: 999px; }
   .needs .choices button[aria-pressed="true"] { padding-right: 2.75rem; }
+  .needs .choices .rec { min-height: 4rem; border-radius: 1rem; font-size: 1.125rem; font-weight: 600; }
+  @media (min-width: 60rem) { .needs .choices .rec { min-height: 2.75rem; } }
   @media (max-width: 59.999rem) {
     body:has(.decide) { padding-bottom: calc(9rem + env(safe-area-inset-bottom)); }
     .top:has(+ .decide) { padding: .75rem 0 .5rem; }
@@ -297,6 +299,7 @@
   .decide-bar { position: sticky; bottom: calc(4.125rem + env(safe-area-inset-bottom)); z-index: 1; display: flex; align-items: center; gap: .5rem; margin: 1rem -1.25rem 0; padding: .75rem 1.25rem; background: var(--bg); }
   .decide-bar .answer { flex: 1; background: var(--action); color: var(--on-accent); }
   .decide-bar .later { color: var(--accent); background: transparent; }
+  .decide-bar .skip { color: var(--muted); background: transparent; }
   .ask-group + .gone-asks { margin-top: 1rem; }
   .in-answered .row { background: transparent; box-shadow: none; }
   .in-answered .row h3 { color: var(--muted); font-weight: 500; }
@@ -586,7 +589,7 @@
 
   const clearIfSaved = (key, sent) => () => { if (drafts.get(key) === sent) drafts.delete(key); keep(); };
 
-  function save(d, o, buttons, err) {
+  function save(d, o, buttons, err, after) {
     buttons.forEach((b) => (b.disabled = true));
     // An answers-only board takes no comments, and words sent as the answer are the answer itself (a reply item's also go as a comment).
     const typed = state.answers_only || (o.value === 'text' && !d.reply) ? '' : (drafts.get(d.key) ?? '').trim();
@@ -594,7 +597,7 @@
     const drop = clearIfSaved(d.key, drafts.get(d.key));
     call('/api/answers', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
-    }, () => { forget(d.key); if (!typed) drop(); }).then(() => offerUndo(d, before)).then(() => typed && call('/api/messages', {
+    }, () => { forget(d.key); if (!typed) drop(); }).then(() => offerUndo(d, before)).then(() => after?.()).then(() => typed && call('/api/messages', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'comment', key: d.key, text: typed }),
     }, drop)).catch((e) => {
       shown(err).textContent = `Couldn't save: ${e.message}`;
@@ -1487,7 +1490,7 @@
   /** The plan is the lead card; the remaining asks are a grouped list linking to a focused decision. */
   function planCard(d) {
     const meta = [el('span', {}, `${d.sections.length} sections`), el('span', {}, `${d.decisions.length} decisions`),
-      el('span', {}, `${d.filer || 'Agent'}${d.filed ? ` · ${when(d.filed)}` : ''}`)];
+      el('span', {}, `Agent${d.filed ? ` · ${when(d.filed)}` : ''}`)];
     return el('article', { class: 'plan-hero', id: `item-${d.key}` }, el('div', { class: 'plan-preview' }, rung(d)),
       el('div', { class: 'plan-copy' }, el('p', { class: 'eyebrow' }, `Plan${d.project ? ` · ${d.project}` : ''}`),
         el('h2', { dir: 'auto' }, d.title), el('p', { class: 'about', dir: 'auto' }, d.about ?? ''),
@@ -1496,7 +1499,7 @@
   function waitingPage(items, hidden) {
     const plans = items.filter((d) => d.type === 'plan'), asks = items.filter((d) => d.type !== 'plan');
     const rows = asks.map((d) => {
-      const label = `${d.filer || 'Agent'}${d.silent_by ? ` · closes at ${when(d.silent_by)}` : d.filed ? ` · waiting since ${when(d.filed)}` : ''}`;
+      const label = `Agent${d.silent_by ? ` · closes at ${when(d.silent_by)}` : d.filed ? ` · waiting since ${when(d.filed)}` : ''}`;
       const link = el('a', { class: 'ask-card', id: `item-${d.key}`, href: d.kind === 'design' ? `#designs/${d.key}` : `#decide/${d.key}` }, icon(({ 'yes-no': 'toggle', 'pick-one': 'calendar', design: 'grid', signin: 'layout', approval: 'shield', reply: 'chat' })[typeOf(d)] ?? 'waiting'),
         el('span', { class: 'copy' }, el('span', { class: 'kind' }, kind(d)), el('strong', { class: 'title', dir: 'auto' }, title(d)),
           d.why || d.about ? el('span', { class: 'meta', dir: 'auto' }, d.why || d.about) : '', el('span', { class: 'meta' }, label)));
@@ -1507,10 +1510,11 @@
       !items.length ? el('p', { class: 'empty' }, EMPTY.waiting) : '', dismissed(hidden));
   }
   const selected = new Map();
-  function decidePage(d) {
+  function decidePage(d, next) {
     if (!d) return el('p', { class: 'empty' }, EMPTY.waiting);
     if (d.type === 'signin') return el('div', { class: 'decide' }, row(d, { x: false }), el('div', { class: 'decide-bar' }, el('a', { class: 'later', href: '#waiting' }, 'Later')));
-    const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` }), opts = d.options ?? [];
+    const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` }), opts = d.options ?? [], live = !state.readonly;
+    const to = next ? `#decide/${next.key}` : '#waiting';
     const initial = selected.get(d.key) ?? d.recommend_value ?? opts[0]?.value;
     const optionButtons = opts.map((o) => {
       const recommended = o.value === d.recommend_value, b = el('button', { class: 'pick-option', 'aria-pressed': String(o.value === initial),
@@ -1522,27 +1526,44 @@
     });
     const selectedOption = () => opts.find((o) => o.value === (selected.get(d.key) ?? initial));
     const answer = el('button', { class: 'answer' }, `Answer ${selectedOption()?.label ?? 'now'}`);
-    answer.onclick = () => { const o = selectedOption(); if (o) save(d, o, [...optionButtons, answer], err); };
+    const answerWith = (o) => save(d, o, [...optionButtons, answer], err, () => (location.hash = to));
+    answer.onclick = () => { const o = selectedOption(); if (o) answerWith(o); };
+    const skip = next && live ? el('button', { class: 'skip' }, 'Skip for now') : null;
+    if (skip) skip.onclick = () => (location.hash = to);
+    const recOpt = opts.find((o) => o.value === d.recommend_value);
     const preview = d.type === 'design' || d.mocks?.length ? mockCards(d, [], true) : d.view ? rung(d) : pic(d) ? thumb('waiting', pic(d)) : proof(d);
     const quiet = opts.find((o) => o.value === d.default_if_silent);
     const silent = quiet ? `If you stay quiet: ${quiet.label}${d.silent_by ? ` · ${left(d.silent_by)}` : ''}` : '';
     const head = el('div', { class: 'lead' }, el('p', { class: 'eyebrow' }, kind(d)), el('h2', { dir: 'auto' }, headline(d)));
     const why = d.why || d.tradeoff;
     const back = el('a', { class: 'later', href: '#waiting' }, 'Later');
-    const choices = opts.length ? [el('p', { class: 'pick-label' }, typeOf(d) === 'yes-no' ? 'YES OR NO' : 'PICK ONE'),
-      el('ul', { class: 'pick-list', role: 'group', 'aria-label': d.title }, ...optionButtons)] : [other(d, answerOf(d.key), err)];
-    return el('section', { class: 'decide' }, preview ? el('div', { class: 'decide-preview' }, preview) : '', head,
-      why ? el('p', { class: 'why', dir: 'auto' }, why) : '', ...choices, silent ? el('p', { class: 'silent-line' }, silent) : '', err,
-      el('div', { class: 'decide-bar' }, opts.length ? answer : '', back));
+    const page = el('section', { class: 'decide' }, preview ? el('div', { class: 'decide-preview' }, preview) : '', head,
+      why ? el('p', { class: 'why', dir: 'auto' }, why) : '',
+      ...(live && opts.length ? [el('p', { class: 'pick-label' }, typeOf(d) === 'yes-no' ? 'YES OR NO' : 'PICK ONE'),
+        el('ul', { class: 'pick-list', role: 'group', 'aria-label': d.title }, ...optionButtons)] : []),
+      ...(live ? [other(d, answerOf(d.key), err)] : []),
+      silent ? el('p', { class: 'silent-line' }, silent) : '', err,
+      el('div', { class: 'decide-bar' }, live && opts.length ? answer : '', skip || '', back));
+    if (live) {
+      let start;
+      page.addEventListener('touchstart', (e) => (start = e.target.closest('.mocks, textarea') ? null : e.touches[0]), { passive: true });
+      page.addEventListener('touchend', (e) => {
+        const t = e.changedTouches[0], dx = start ? t.clientX - start.clientX : 0;
+        if (Math.abs(dx) <= 90 || Math.abs(t.clientY - start.clientY) >= Math.abs(dx) / 2) return;
+        if (dx > 0) recOpt && !answer.disabled && answerWith(recOpt);
+        else skip?.click();
+      });
+    }
+    return page;
   }
   const reshow = (control) => { render(); document.querySelector(control)?.focus({ preventScroll: true }); };
-  // On Decide, a number selects and submits an answer; E goes back to Waiting, Z undoes the last answer.
+  // On Decide, a number selects and submits an answer; E skips to the next ask, Z undoes the last answer.
   addEventListener('keydown', (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.('textarea, input, select')) return;
     const k = e.key.toLowerCase(), onDecide = /^#decide\//.test(location.hash), choices = [...document.querySelectorAll('.decide .pick-option')];
     const pick = onDecide && /^[1-9]$/.test(k) ? choices[Number(k) - 1] : null;
     if (pick) { e.preventDefault(); pick.click(); document.querySelector('.decide-bar .answer')?.click(); return; }
-    const act = k === 'e' && onDecide ? document.querySelector('.decide-bar .later') : k === 'z' && !toast.hidden && !undoBtn.hidden ? undoBtn : null;
+    const act = k === 'e' && onDecide ? document.querySelector('.decide .skip') : k === 'z' && (location.hash === '#waiting' || onDecide) && !toast.hidden && !undoBtn.hidden ? undoBtn : null;
     if (act && !act.disabled) e.preventDefault(), act.click();
   });
 
@@ -1568,6 +1589,7 @@
     const hidden = state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'waiting');
     by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
     const [, at, key] = /^#(waiting|decide|designs|evidence|reports|answered)(?:\/([\w.-]+))?$/.exec(location.hash) ?? [];
+    const askAt = by.waiting.findIndex((d) => d.key === key);
     const active = at === 'decide' ? 'waiting' : at;
     const link = (a, name, n) => el('a', { href: `#${a}`, ...(a === (active ?? '') && { 'aria-current': 'page' }) }, icon(a || 'summary'), name, n === undefined ? '' : el('span', { class: 'n' }, String(n)));
     document.getElementById('nav').replaceChildren(el('p', { class: 'brand' }, 'sign-off'), link('', 'Summary'), ...Object.keys(AREAS).map((a) => link(a, NAV[a], by[a].length)));
@@ -1587,7 +1609,7 @@
     const needs = el('section', { class: 'card needs' }, el('h2', {}, 'Needs you first'), ...(first ? [first.filed ? el('p', { class: 'meta since' }, `Waiting since ${when(first.filed)}`) : '', row(first, { x: false }),
       el('div', { class: 'foot' }, xBtn(first, 'Dismiss'), first.kind === 'design' ? el('a', { class: 'open-link', href: `#designs/${first.key}` }, 'Open designs') : el('a', { class: 'more', href: '#waiting' }, more))] : [el('p', { class: 'meta' }, 'Nothing is waiting on you.')]), dismissed(hidden));
     document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [filters(by.waiting), waitingPage(shown, hidden)]
-      : at === 'decide' ? [decidePage(by.waiting.find((d) => d.key === key && !gone.has(d.key)))]
+      : at === 'decide' ? [decidePage(by.waiting[askAt], by.waiting.length > 1 ? by.waiting[(askAt + 1) % by.waiting.length] : undefined)]
       : at === 'designs' ? [...designGroups(by.designs)] : at === 'reports' && !state.readonly ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
         ...(by.reports.length ? reportGroups(by.reports) : [el('p', { class: 'empty' }, EMPTY.reports)]), notes(by.notes)] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [at === 'evidence' && by[at].length ? el('div', { class: 'sec-head' }, el('h2', {}, 'Updates')) : '', at === 'waiting' ? filters(by.waiting) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...(at === 'waiting' ? shown : by[at]).map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [el('div', { class: 'tiles' }, ...Object.keys(AREAS).map((a) => tile(a, by[a]))),

@@ -775,7 +775,7 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   assert.match(waiting, /Pick the look/);
   assert.match(waiting, /Design pick/);
   assert.match(waiting, /<option value="newest">Newest first/);
-  assert.doesNotMatch(waiting, /<ol class="queue"|<p class="fhead"|>Skip for now</);
+  assert.doesNotMatch(waiting, /<ol class="queue"|<p class="fhead"/);
   // Needs you first ends with Dismiss on the left and the way to Triage on the right; its card has no × of its own.
   const home = await dump('');
   assert.match(home, /<div class="foot"><button class="dis" aria-label="Dismiss, Pick the look">Dismiss<\/button><a class="more" href="#waiting">Review all 2 →<\/a><\/div>/);
@@ -1025,7 +1025,9 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   assert.equal(await evaluate('document.querySelectorAll(".pick-option").length'), 3);
   assert.equal(await evaluate('document.querySelector(".pick-option[aria-pressed=true] .recommend")?.textContent'), 'Recommended');
   await evaluate('document.querySelector(".pick-option").click(); document.querySelector(".decide-bar .answer").click()');
-  await until(async () => (await evaluate('location.hash')) === '#waiting' && (await evaluate('!document.querySelector("#toast").hidden')));
+  await until(async () => (await evaluate('location.hash')) !== '#decide/release' && (await evaluate('!document.querySelector("#toast").hidden')));
+  await evaluate("location.hash = '#waiting'");
+  await until(async () => (await evaluate('location.hash')) === '#waiting');
   assert.match(run('answers', file, '--key', 'release').out, /today/);
   await evaluate('document.querySelector("#undo").click()');
   await until(async () => !/today/.test(run('answers', file, '--key', 'release').out));
@@ -1033,6 +1035,8 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await until(async () => (await evaluate('location.hash')) === '#decide/release');
   await evaluate('document.dispatchEvent(new KeyboardEvent("keydown", { key: "1", bubbles: true }))');
   await until(async () => /today/.test(run('answers', file, '--key', 'release').out));
+  await evaluate("location.hash = '#waiting'");
+  await until(async () => (await evaluate('location.hash')) === '#waiting');
   // A posted plan waits with the asks: its card gives the title, its counts and one Open plan, which opens its page over the board with the pointing script.
   const fixture = new URL('../fixtures/contract/plan.v1/', import.meta.url).pathname;
   mkdirSync(join(dir, 'page'));
@@ -1094,23 +1098,6 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await until(async () => (await evaluate(answeredTitles)).includes('Keep the weekly digest?') && (await evaluate(answeredTitles)).includes('Show plans on the board'));
   await evaluate('document.querySelector(".clear").click()');
   await until(async () => (await evaluate(answeredTitles)) === '');
-  // The decision path records, undoes, and accepts a keyboard answer on the same real board.
-  await evaluate("location.hash = '#waiting'");
-  await until(async () => (await evaluate('location.hash')) === '#waiting');
-  await evaluate('document.querySelector(`a[href="#decide/release"]`).click()');
-  await until(async () => (await evaluate('location.hash')) === '#decide/release');
-  assert.equal(await evaluate('document.querySelector(".decide h2").textContent'), 'Which day for release?');
-  assert.equal(await evaluate('document.querySelectorAll(".pick-option").length'), 3);
-  assert.equal(await evaluate('document.querySelector(".pick-option[aria-pressed=true] .recommend")?.textContent'), 'Recommended');
-  await evaluate('document.querySelector(".pick-option").click(); document.querySelector(".decide-bar .answer").click()');
-  await until(async () => (await evaluate('location.hash')) === '#waiting' && (await evaluate('!document.querySelector("#toast").hidden')));
-  assert.match(run('answers', file, '--key', 'release').out, /today/);
-  await evaluate('document.querySelector("#undo").click()');
-  await until(async () => !/today/.test(run('answers', file, '--key', 'release').out));
-  await evaluate('document.querySelector(`a[href="#decide/release"]`).click()');
-  await until(async () => (await evaluate('location.hash')) === '#decide/release');
-  await evaluate('document.dispatchEvent(new KeyboardEvent("keydown", { key: "1", bubbles: true }))');
-  await until(async () => /today/.test(run('answers', file, '--key', 'release').out));
   close();
   proc.kill();
 });
@@ -1219,6 +1206,31 @@ test('Waiting on you: a reply-only ask shows Reply, a type-ask yes/no shows Yes/
   await evaluate('document.querySelector("#item-cover").click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/cover');
   assert.equal(await evaluate('document.querySelectorAll(".decide-preview .mock").length'), 2);
+  close();
+  proc.kill();
+});
+
+test('Decide on a pick-one ask: the reply box sits under the options, and Skip for now or E moves to the next ask', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'decide-option-box'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  const abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l }));
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    { key: 'alpha', title: 'Alpha question?', options: abc, recommend_value: 'a' },
+    { key: 'beta', title: 'Beta question?', options: abc, recommend_value: 'b' },
+  ] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 1280);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#decide/beta`)}`);
+  await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'Beta question?');
+  assert.equal(await evaluate('document.querySelectorAll(".decide .pick-option").length'), 3);
+  await evaluate('document.querySelector(".decide .other summary").click()');
+  assert.equal(await evaluate('document.querySelector(".decide .other").open'), true);
+  await evaluate('document.querySelector(".decide .skip").click()');
+  await until(async () => (await evaluate('location.hash')) === '#decide/alpha');
+  await evaluate('window.dispatchEvent(new KeyboardEvent("keydown", { key: "e" }))');
+  await until(async () => (await evaluate('location.hash')) === '#decide/beta');
   close();
   proc.kill();
 });
