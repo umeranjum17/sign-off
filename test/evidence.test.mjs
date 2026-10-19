@@ -2,7 +2,7 @@ import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { asked } from './ask.mjs';
@@ -76,13 +76,36 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
     media: [{ path: 'evidence/9/1.png', sha256: createHash('sha256').update(bars).digest('hex'), bytes: bars.length }] };
   writeFileSync(board, JSON.stringify({ ...stored, items: [...stored.items, legacy] }));
 
-  const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: tmpdir() });
+  // A recording is not a still: loading a card that holds one must never push it through ImageMagick. This convert would leave a marker
+  // and stall the request, so a guarded board answers at once and leaves no marker.
+  const fakeBin = join(scratch, 'fake-bin'), marked = join(scratch, 'convert-called');
+  mkdirSync(fakeBin, { recursive: true });
+  writeFileSync(join(fakeBin, 'convert'), `#!/bin/sh\ntouch '${marked}'\nsleep 5\n`, { mode: 0o755 });
+  const proc = spawn('node', [cli, 'serve', board, '--port', '0'], {
+    cwd: tmpdir(), env: { ...process.env, PATH: `${fakeBin}:${process.env.PATH}` } });
   procs.push(proc);
   const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
-  const api = await (await fetch(`${url}api/decisions`)).json();
+  const started = Date.now();
+  const first = await (await fetch(`${url}api/decisions`)).json();
+  assert.ok(Date.now() - started < 3000, `first board read took ${Date.now() - started} ms`);
+  assert.equal(existsSync(marked), false, 'a recording was handed to ImageMagick');
+  // The old test card is measured off the request path: it leaves the board once the warm pass reports.
+  let api;
+  for (let i = 0; i < 60; i++) {
+    api = await (await fetch(`${url}api/decisions`)).json();
+    if (!api.decisions.some((d) => d.key === 'legacy-bars')) break;
+    await new Promise((ok) => setTimeout(ok, 50));
+  }
+  assert.ok(first.decisions.some((d) => d.key === 'update-2'));
   assert.deepEqual(api.decisions.map((d) => [d.key, d.number, d.media.length]), [['update-1', 1, 1], ['update-2', 2, 2]]);
   assert.deepEqual(api.decisions[1].options.map((o) => o.value), ['pass', 'fail', 'needs-work']);
   assert.equal(api.decisions[1].link, 'https://github.com/acme/app/pull/12');
+
+  // The export runs in its own process and must hide the same pre-guard test card the served board hides.
+  const html = join(scratch, 'board.export.html'), exported = run('export', board, '--out', html);
+  assert.equal(exported.code, 0);
+  const frozen = JSON.parse(/window\.FROZEN = (.*?);<\/script>/s.exec(readFileSync(html, 'utf8'))[1]);
+  assert.deepEqual(frozen.decisions.map((d) => d.key).sort(), ['update-1', 'update-2']);
 
   const media = await fetch(`${url}api/media?key=update-2&i=1`);
   assert.equal(media.headers.get('content-type'), 'video/webm');
@@ -115,5 +138,42 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
   doc.items[0].media[0].path = 'evidence/1/../../../etc/passwd.png';
   writeFileSync(board, JSON.stringify(doc));
   assert.equal((await fetch(`${url}api/media?key=update-1&i=0`)).status, 422);
+  proc.kill();
+});
+
+test('a still whose measurement hangs never holds the board', async () => {
+  // A convert that never returns: the worker measuring this still is stuck for the whole request, so every answer below must come from
+  // what is already known, never from waiting on a measurement or running one on the server's thread.
+  const fakeBin = join(scratch, 'hang-bin'), marked = join(scratch, 'hang-convert-called');
+  mkdirSync(fakeBin, { recursive: true });
+  writeFileSync(join(fakeBin, 'convert'), `#!/bin/sh
+touch '${marked}'
+sleep 10
+`, { mode: 0o755 });
+  const bytes = Buffer.from('a still ImageMagick must decode'), hangBoard = join(so, 'hang.json');
+  mkdirSync(join(so, 'evidence', '20'), { recursive: true });
+  writeFileSync(join(so, 'evidence', '20', '1.jpg'), bytes);
+  writeFileSync(hangBoard, JSON.stringify({ schema: 2, items: [{ key: 'hang-still', type: 'evidence', number: 20, title: 'Hanging still',
+    about: 'Note.', filed: new Date().toISOString(), media: [{ path: 'evidence/20/1.jpg', sha256: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.length }] }] }));
+  const proc = spawn('node', [cli, 'serve', hangBoard, '--port', '0'], {
+    cwd: tmpdir(), env: { ...process.env, PATH: `${fakeBin}:${process.env.PATH}` } });
+  procs.push(proc);
+  const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+  const timed = async (path, init) => {
+    const at = Date.now(), response = await fetch(`${url}${path}`, init);
+    assert.ok(Date.now() - at < 3000, `${path} took ${Date.now() - at} ms`);
+    return response;
+  };
+  assert.equal((await timed('api/board')).status, 200);
+  const cards = await (await timed('api/decisions')).json();
+  assert.deepEqual(cards.decisions.map((d) => d.key), ['hang-still']);
+  assert.equal((await timed('api/decisions')).status, 200);
+  const media = await timed('api/media?key=hang-still&i=0');
+  assert.equal(media.status, 200);
+  assert.deepEqual(Buffer.from(await media.arrayBuffer()), bytes);
+  const posted = await timed('api/messages', { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ kind: 'prompt', text: 'Still there?' }) });
+  assert.equal(posted.status, 200);
+  assert.equal(existsSync(marked), true, 'the hanging still was never measured');
   proc.kill();
 });

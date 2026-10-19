@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
 
@@ -31,9 +31,8 @@ const WHOLE = [[0, 0, 1, 1]];
 
 /** The share of pixels that are ink (a colour off the paper), of pixels off the paper-ink line, and of the largest flat area in any other colour,
  * or undefined when the file cannot be decoded. */
-export function palette(file: string): { ink: number; off: number; solid: number; top: number; bars: number; barShare: number } | undefined {
-  const rgb = decode(file);
-  if (!rgb) return undefined;
+type Share = { ink: number; off: number; solid: number; top: number; bars: number; barShare: number };
+const shareOf = (rgb: Buffer): Share => {
   const total = rgb.length / 3, bins = new Uint32Array(32768);
   const centre = (b: number) => [(b >> 10) * 8 + 4, ((b >> 5) & 31) * 8 + 4, (b & 31) * 8 + 4];
   for (let i = 0; i < rgb.length; i += 3) bins[(rgb[i] >> 3) << 10 | (rgb[i + 1] >> 3) << 5 | (rgb[i + 2] >> 3)]++;
@@ -65,12 +64,23 @@ export function palette(file: string): { ink: number; off: number; solid: number
     else off++;
   }
   return { ink: ink / total, off: off / total, solid, top, bars, barShare };
+};
+
+export function palette(file: string): Share | undefined {
+  const rgb = decode(file);
+  return rgb && shareOf(rgb);
 }
 
+/** The still formats this guard measures. A recording is never measured: it is not a still, and decoding it would push a video through
+ * ImageMagick on every board load. */
+const STILL = /\.(png|jpe?g|webp)$/i;
+
+/** Whether the guard has a still to measure. Callers that scan a whole board use this to skip recordings, as post does. */
+export const isStill = (file: string) => STILL.test(file);
+
 /** Why a still is not a picture of the product: text (a log, receipt or summary), colour bars (a test card) or a placeholder (a flat card
- * standing in for a picture). A file that cannot be decoded has no faults: it is not refused. */
-export function faults(file: string): Fault[] {
-  const share = palette(file);
+ * standing in for a picture). Anything that is not a still, and a file that cannot be decoded, has no faults: it is not refused. */
+function faultsOf(share: Share | undefined): Fault[] {
   if (!share) return [];
   const text = share.ink >= INK_MIN && share.off <= OFF_LINE_MAX && share.solid <= SOLID_MAX;
   return [
@@ -78,6 +88,17 @@ export function faults(file: string): Fault[] {
     ...(share.bars >= BARS_MIN && share.barShare >= BARS_SHARE_MIN ? ['colour bars' as const] : []),
     ...(!text && share.top >= PLACEHOLDER_MIN ? ['placeholder' as const] : []),
   ];
+}
+
+export function faults(file: string): Fault[] {
+  if (!isStill(file)) return [];
+  return faultsOf(palette(file));
+}
+
+/** The same faults, decoded without blocking the caller's thread, so a hung child can be killed instead of holding a worker. */
+export async function faultsAsync(file: string): Promise<Fault[]> {
+  if (!isStill(file)) return [];
+  return faultsOf(await paletteAsync(file));
 }
 
 const dist = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
@@ -89,8 +110,39 @@ function decode(file: string): Buffer | undefined {
     const own = pngRgb(bytes);
     if (own) return own;
   }
-  const out = spawnSync('convert', [file, 'png24:-'], { maxBuffer: 1 << 30, timeout: 30_000 });
+  const out = spawnSync('convert', [file, 'png24:-'], { maxBuffer: 1 << 30, timeout: 30_000, killSignal: 'SIGKILL' });
   return out.status === 0 && out.stdout.subarray(0, 8).equals(PNG_SIGNATURE) ? pngRgb(out.stdout) : undefined;
+}
+
+/** ImageMagick's output, bounded in time and size: the child, and anything it delegated to, is killed when either is passed. */
+async function paletteAsync(file: string): Promise<Share | undefined> {
+  const bytes = readFileSync(file);
+  if (bytes.subarray(0, 8).equals(PNG_SIGNATURE)) {
+    const own = pngRgb(bytes);
+    if (own) return shareOf(own);
+  }
+  const out = await convert(file), rgb = out && out.subarray(0, 8).equals(PNG_SIGNATURE) ? pngRgb(out) : undefined;
+  return rgb && shareOf(rgb);
+}
+
+const CONVERT_WAIT = 30_000, CONVERT_BYTES = 1 << 30;
+function convert(file: string): Promise<Buffer | undefined> {
+  return new Promise((done) => {
+    const child = spawn('convert', [file, 'png24:-'], { detached: true, stdio: ['ignore', 'pipe', 'ignore'] });
+    const chunks: Buffer[] = [];
+    let finished = false, code: number | null = null, bytes = 0;
+    const finish = (out: Buffer | undefined) => { if (!finished) { finished = true; clearTimeout(timer); done(out); } };
+    const stop = () => {
+      finish(undefined);
+      try { process.kill(-child.pid!, 'SIGKILL'); } catch { child.kill('SIGKILL'); }
+      child.stdout!.destroy();
+    };
+    const timer = setTimeout(stop, CONVERT_WAIT);
+    child.stdout!.on('data', (b: Buffer) => { bytes += b.length; if (bytes > CONVERT_BYTES) stop(); else chunks.push(b); });
+    child.on('error', () => finish(undefined));
+    child.on('exit', (c) => { code = c; });
+    child.on('close', () => finish(code === 0 ? Buffer.concat(chunks) : undefined));
+  });
 }
 
 /** Packed 8-bit RGB of a PNG, every colour type and bit depth, interlaced or not. undefined for a PNG it does not read. */
