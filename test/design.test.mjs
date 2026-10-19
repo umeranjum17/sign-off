@@ -881,7 +881,7 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   assert.match(after, /<p class="card glance">(?:<span class="seen">[^<]*<\/span>)?<b>Nothing needs you\. <\/b>/);
   assert.match(after, /<a class="more" href="#answered">Answered \(2\)<\/a>/);
   const answered = await dump('#answered');
-  assert.match(answered, /<p class="lede">2 answers today\. Each one has gone back to its agent\.<\/p><\/header><div class="sec-head"><h2>Today<\/h2><\/div>/);
+  assert.match(answered, /<p class="lede">2 answers today\. Each one has gone back to its agent\.<\/p><div class="bulk">.*?<\/div><\/header><div class="sec-head"><h2>Today<\/h2><\/div>/);
   const lines = [...answered.matchAll(/<summary class="compact">.*?<strong[^>]*>(.*?)<\/strong>.*?<span class="ans"><b[^>]*>(\w+)<\/b><time>\d\d:\d\d<\/time><\/span><\/span><\/summary>.*?<\/details><button class="x" aria-label="Dismiss, [^"]+">×<\/button>/gs)];
   assert.deepEqual(lines.map((m) => [m[1], m[2]]).sort(), [['Pick the look', 'A'], ['When should it ship?', 'A']]);
   // Each row opens to its full card, with its one box.
@@ -1123,6 +1123,14 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   desk.close();
   // A plan that waits can be dismissed from its card, and Undo puts it back.
   await evaluate('document.querySelector(".plan-hero .dis").click()');
+  await until(async () => await evaluate('!document.querySelector(".plan-hero")'));
+  await evaluate('document.getElementById("undo").click()');
+  await until(async () => await evaluate('!!document.querySelector(".plan-hero")'));
+  // Select mode: tap the plan card to pick it, Dismiss N clears it with the same toast and Undo.
+  await evaluate('document.querySelector(".bulk .select").click()');
+  await evaluate('document.querySelector(".plan-open").click()');
+  assert.equal(await evaluate('location.hash + "|" + document.querySelectorAll(".picked").length + "|" + document.querySelector(".sel-go").textContent'), '#waiting|1|Dismiss 1');
+  await evaluate('document.querySelector(".sel-go").click()');
   await until(async () => await evaluate('!document.querySelector(".plan-hero")'));
   await evaluate('document.getElementById("undo").click()');
   await until(async () => await evaluate('!!document.querySelector(".plan-hero")'));

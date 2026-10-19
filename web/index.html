@@ -417,6 +417,7 @@
   .decide-bar .answer { flex: 1 1 auto; background: var(--action); color: var(--on-accent); font-weight: 400; }
   .decide-bar .later { display: inline-flex; flex: none; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0 0.75rem; color: var(--accent); background: transparent; text-decoration: none; }
   .decide-bar .skip { flex: none; padding: 0 0.75rem; color: var(--muted); background: transparent; }
+  .decide-bar .dis { flex: none; padding: 0 0.75rem; background: transparent; color: var(--muted); }
   @media (max-width: 59.999rem) { .decide-bar .skip { display: none; } } /* a phone has Answer and Later; a swipe left still skips */
   .ask-group + .gone-asks { margin-top: 1rem; }
   /* Evidence: a card per update with its capture as the hero, grouped under the project its check names; the whole card opens the update. */
@@ -557,7 +558,7 @@
   .rows > li { display: flex; align-items: center; }
   .rows li .compact { flex: 1; min-width: 0; }
   .rows li .x { margin: 0; }
-  .clear { min-height: 2.75rem; padding: 0; border: 0; background: none; color: var(--accent); font-weight: 400; }
+  .clear, .select { min-height: 2.75rem; padding: 0; border: 0; background: none; color: var(--accent); font-weight: 400; }
   /* An answered row opens to its full card, without the title it already shows. */
   .done { flex: 1; min-width: 0; }
   .done summary { width: auto; margin: 0; list-style: none; font-size: 1rem; cursor: pointer; }
@@ -609,8 +610,11 @@
   .gone-asks .rows { padding: 0; } .gone-asks li { justify-content: space-between; gap: 0.75rem; min-height: 2.75rem; }
   .gone-asks .dis { flex: none; padding: 0 0.5rem; border-color: transparent; background: none; color: var(--accent); font-weight: 600; }
   .sec-head .clear { margin-left: auto; }
-  /* Clear all sits at the right of every screen's title; a card that is a link keeps its dismiss x at its corner. */
-  .top > .clear { position: absolute; top: 1.5rem; right: -0.5rem; padding: 0 0.5rem; }
+  /* Select and Clear all sit in one row at the right, under every screen's title; a card that is a link keeps its dismiss x at its corner. */
+  .bulk { display: flex; justify-content: flex-end; gap: 0.5rem; margin: 0.5rem -0.5rem -0.5rem; }
+  .bulk button { padding: 0 0.5rem; }
+  .decide > .bulk { grid-column: 1 / -1; margin: 0; }
+  .picked { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 1rem; }
   .has-x { position: relative; }
   .has-x > .x { position: absolute; top: 0.25rem; right: 0.25rem; margin: 0; background: color-mix(in srgb, var(--surface) 88%, transparent); }
   .plan-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
@@ -700,7 +704,7 @@
     .brand .av { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 50%; background: var(--action); color: #FFFFFF; font-size: 0.875rem; }
     .side .foot { margin: auto 0 0; padding: 0.75rem; color: var(--muted); font-size: 0.875rem; line-height: 1.43; }
     .seg button { min-height: 2.25rem; }
-    .top { padding: 3.5rem 0 1.5rem; } .top > .clear { top: 3.75rem; }
+    .top { padding: 3.5rem 0 1.5rem; }
     .top h1 { font-size: 3rem; line-height: 1.0833; letter-spacing: -0.003em; }
     button { min-height: 2.75rem; }
     #toast button { min-height: 2.75rem; }
@@ -910,6 +914,27 @@
     return b;
   }
   /** A card that is itself a link keeps its × beside it, at its corner. */
+  /** Select mode: tap cards to pick them, then Dismiss them together; the same bar sits at the right of every tab's title. */
+  let selecting = false;
+  const picked = new Set(), cardOf = (e) => e.closest('li') ?? e.closest('.has-x, article') ?? e;
+  const applyPicks = () => document.querySelectorAll('#board [id^="item-"]').forEach((e) => cardOf(e).classList.toggle('picked', selecting && picked.has(e.id.slice(5))));
+  function bulkBar(items) {
+    if (!canDismiss() || !items.length) return '';
+    const keys = new Set(items.map((d) => d.key)), n = [...picked].filter((k) => keys.has(k)).length;
+    const btn = (cls, text, fn) => { const b = el('button', { class: cls }, text); b.onclick = fn; return b; };
+    const stop = () => { selecting = false; picked.clear(); render(); };
+    return el('div', { class: 'bulk' }, ...(selecting
+      ? [btn('clear', 'Cancel', stop), btn('clear sel-go', n ? `Dismiss ${n}` : 'Dismiss', () => { const ks = [...picked].filter((k) => keys.has(k)); if (ks.length) { dismiss(ks, `${ks.length} dismissed`); stop(); } })]
+      : [btn('select', 'Select', () => { selecting = true; render(); }), clearAll(items)]));
+  }
+  addEventListener('click', (e) => {
+    const hit = selecting && !e.target.closest('.bulk') && e.target.closest('#board [id^="item-"]');
+    if (!hit) return;
+    e.preventDefault(), e.stopPropagation();
+    const k = hit.id.slice(5);
+    picked.has(k) ? picked.delete(k) : picked.add(k);
+    render();
+  }, true);
   const withX = (d, card) => (canDismiss() ? el('div', { class: 'has-x' }, card, xBtn(d)) : card);
 
   function row(d, { x = true } = {}) {
@@ -1950,7 +1975,7 @@
       });
     };
     if (d.type === 'signin') {
-      const signinPage = el('div', { class: 'decide' }, row(d, { x: false }), el('div', { class: 'decide-bar' }, skip || '', el('a', { class: 'later', href: '#waiting' }, 'Later')), decideLists(d, queue));
+      const signinPage = el('div', { class: 'decide' }, row(d, { x: false }), el('div', { class: 'decide-bar' }, skip || '', el('a', { class: 'later', href: '#waiting' }, 'Later'), xBtn(d, 'Dismiss')), decideLists(d, queue));
       if (!state.readonly) swipe(signinPage);
       return signinPage;
     }
@@ -1976,14 +2001,15 @@
     const silent = quiet ? [icon('clock'), el('span', {}, el('b', {}, 'If you stay quiet:'), ` ${quiet.outcome ?? quiet.label}${d.silent_by ? ` At ${when(d.silent_by)}. ${left(d.silent_by)}.` : ''}`)] : '';
     const head = el('div', { class: 'lead' }, badge(d), el('h2', { dir: 'auto' }, headline(d)));
     const why = unchecked(d) || d.why || d.tradeoff || d.about;
-    const back = el('a', { class: 'later', href: '#waiting' }, 'Later');
+    const back = el('a', { class: 'later', href: '#waiting' }, 'Later'), gone = xBtn(d, 'Dismiss');
+    if (gone) gone.addEventListener('click', () => (location.hash = to));
     const page = el('section', { class: 'decide' }, hero || (preview ? el('div', { class: 'decide-preview' }, preview) : ''),
       ...(d.mocks?.length ? [annotations(d)] : []), head,
       why ? el('p', { class: 'why', dir: 'auto' }, why) : '',
       ...(live && opts.length ? [el('p', { class: 'pick-label' }, typeOf(d) === 'yes-no' ? 'YES OR NO' : 'PICK ONE'),
         el('ul', { class: 'pick-list', 'aria-label': d.title }, ...optionButtons.map((b) => el('li', {}, b)))] : []),
       err,
-      el('div', { class: 'decide-bar' }, silent ? el('p', { class: 'silent-line' }, ...silent) : '', live && opts.length ? answer : '', skip || '', back), decideLists(d, queue),
+      el('div', { class: 'decide-bar' }, silent ? el('p', { class: 'silent-line' }, ...silent) : '', live && opts.length ? answer : '', skip || '', back, gone), decideLists(d, queue),
       ...(live ? [el('div', { class: 'decide-other' }, other(d, answerOf(d.key), err, () => (location.hash = to)))] : []));
     if (live) swipe(page, () => { if (recOpt && !answer.disabled) answerWith(recOpt); });
     return page;
@@ -2041,17 +2067,17 @@
       find.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>';
       find.onclick = () => { query = query === null ? '' : null; render(); document.getElementById('find')?.focus(); };
     }
-    const bulk = { waiting: shown, designs: by.designs, evidence: by.evidence, reports: [...by.reports, ...by.notes], answered: by.answered }[at] ?? [];
+    const bulk = { waiting: shown, decide: shown, designs: by.designs, evidence: by.evidence, reports: [...by.reports, ...by.notes], answered: by.answered }[at] ?? [];
     const top = el('header', { class: 'top' }, at && !TABS.some(([a]) => a === at) ? el('a', { class: 'back', href: at === 'decide' ? '#waiting' : '#' }, at === 'decide' ? '‹ Waiting on you' : '‹ Today') : '',
     el('h1', { tabindex: '-1' }, at ? pageTitle : 'Today'), find, at ? '' : el('p', { class: 'date' }, dateLine()),
-    ro ? el('p', { class: 'meta' }, ro) : '', clearAll(bulk),
+    ro ? el('p', { class: 'meta' }, ro) : '',
     at === 'decide' && decideAt >= 0 ? pager(decideQueue, decideAt) : '',
     at === 'waiting' && !state.readonly && by.waiting.length ? el('p', { class: 'lede waiting-lede' }, `${shown.length} ${shown.length === 1 ? 'item needs' : 'items need'} you · ${dateLine()}`)
       : at === 'reports' && !state.readonly && by.reports.length ? el('p', { class: 'lede' }, by.reports.some((d) => d.steps)
       ? 'How the tools work, step by step. Tap one to open it.' : 'Explainers you asked for, or that a decision needs.')
       : at === 'answered' && by.answered.length ? el('p', { class: 'lede' }, (() => { const n = by.answered.filter((d) => isToday(state.answers[d.key].at)).length; return `${n} ${n === 1 ? 'answer' : 'answers'} today. Each one has gone back to its agent.`; })())
       : at === 'designs' && by.designs.length ? el('p', { class: 'lede' }, 'Designs to look over. Approve one, or say what should change.')
-      : at === 'evidence' && by.evidence.length ? el('p', { class: 'lede' }, 'Passed proof that a change works, newest first.') : '');
+      : at === 'evidence' && by.evidence.length ? el('p', { class: 'lede' }, 'Passed proof that a change works, newest first.') : '', at === 'decide' ? '' : bulkBar(bulk));
     document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [filters(by.waiting), waitingPage(shown, hidden)]
       : at === 'decide' ? [decideAt < 0 ? (key ? el('p', { class: 'empty' }, 'Nothing to decide for that question.') : el('div', { class: 'decide' }, decideLists(null, decideQueue)))
         : decidePage(decideQueue[decideAt], decideQueue.length > 1 ? decideQueue[(decideAt + 1) % decideQueue.length] : undefined, decideQueue)]
@@ -2062,6 +2088,8 @@
       el('div', { class: 'areas' }, waitingSection(by.waiting, by.answered, by.designs), proven(by.evidence), newReport(by.reports)), ...(state.leash ? leash() : []),
       ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()])]));
     readPage(key ? state.decisions.find((d) => d.key === key && !gone.has(d.key) && (at === 'reports' && reads(d) || at === 'designs' && d.kind === 'design' || at === 'evidence' && d.type === 'evidence' || d.type === 'plan' && area(d) === at)) : undefined, at);
+    if (at === 'decide') document.querySelector('#board .decide')?.prepend(bulkBar(bulk));
+    applyPicks();
     if (FROZEN) freeze();
   }
   function freeze() {
@@ -2076,6 +2104,7 @@
     const back = !reader.hidden && reader.dataset.key;
     if (jump && location.hash === '#waiting') jump = null;
     if (location.hash === '#waiting') waitType = 'all';
+    selecting = false, picked.clear();
     render();
     if (!reader.hidden) { scrollTo(0, 0); return reader.querySelector('h1').focus({ preventScroll: true }); }
     const item = (jump || back) && document.getElementById(`item-${jump || back}`);

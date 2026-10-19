@@ -176,7 +176,7 @@ without posting.
   browser across reloads; everything sent is saved next to the board and
   survives a restart.
 - **Dismiss** (the × on an ask or item in a list, **Dismiss** under Needs you
-  first, a plan included, or **Clear all** on every tab) hides items from the board, Today
+  first, a plan included, **Select**, or **Clear all** on every tab, Decide included) hides items from the board, Today
   included; **Undo** in the toast brings them back, and so does **Restore**
   under **Dismissed (N)** at the end of Needs you first and Waiting on you.
   `list` counts a dismissed item as neither
