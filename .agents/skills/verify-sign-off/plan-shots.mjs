@@ -5,12 +5,16 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import assert from 'node:assert/strict';
+import { recordsDir } from './records.mjs';
 const out = resolve(process.argv[2] ?? process.env.DONE_DONE_EVIDENCE_ROOT);
 const theme = process.argv[3] ?? process.env.DONE_DONE_THEME ?? 'light', width = +(process.argv[4] ?? process.env.DONE_DONE_WIDTH ?? 390);
 assert.ok(['light', 'dark'].includes(theme) && [390, 1280].includes(width));
 mkdirSync(out, { recursive: true });
-const records = process.env.PLAN_REVIEW_DIAGNOSTICS ? resolve(process.env.PLAN_REVIEW_DIAGNOSTICS) : out;
+// Diagnostics stay out of the evidence folder: identical records between states are expected, and the check
+// must never see them as two captures proving one claim. PLAN_REVIEW_DIAGNOSTICS overrides the location.
+const records = recordsDir(out);
 mkdirSync(records, { recursive: true });
+console.log(`Diagnostics: ${records}`);
 const dir = mkdtempSync(join(tmpdir(), 'so-plan-')), board = join(dir, 'board.json');
 const env = { ...process.env, HOME: dir, XDG_CONFIG_HOME: join(dir, 'config'), XDG_DATA_HOME: join(dir, 'data'), XDG_CACHE_HOME: join(dir, 'cache'), XDG_STATE_HOME: join(dir, 'state') };
 const run = (bin, args, options = {}) => {
@@ -52,8 +56,9 @@ try {
     const dom = probe();
     assert.equal(dom.overflow, false); assert.deepEqual(dom.overflowing, []);
     const consoleLog = browser('console', '--type', 'error'), network = browser('network', '--limit', '100');
-    // The network log is the same JSON on every capture of one page, and a byte-identical capture fails the check;
-    // the failures it carries already go into the dom.json beside the screenshot.
+    // The network log is the same JSON on every capture of one page. It is a diagnostic, not proof of a different
+    // state, so it goes to the diagnostics folder and never becomes evidence the check compares.
+    writeFileSync(join(records, `${stem}.network.txt`), network);
     assert.match(consoleLog, /no console messages found/);
     dom.console_errors = [];
     dom.failed_requests = [...network.matchAll(/reqid=\d+ \w+ (\S+) \[(\d+|failed)\]/g)].flatMap(([, url, status]) => status === 'failed' || +status >= 400 ? [{ url, status: +status || 0 }] : []);
@@ -104,10 +109,9 @@ try {
   assert.deepEqual([waitedBack.note, waitedBack.notes, waitedBack.decisions], [answer.note, answer.notes, answer.decisions]);
   const waited = cli('wait', board, '--filer', plan.filer, '--json', '--timeout', '0');
   if (!process.env.PLAN_REVIEW_STAGE || process.env.PLAN_REVIEW_STAGE === 'sent') {
-    // Answers and the waiting filer's view hold the same bytes when the filer owns one plan, and a byte-identical
-    // capture fails the check; the assert above already pins that both carry the same note, notes and decisions.
+    // Answers and the waiting filer's view hold the same bytes when the filer owns one plan; both are diagnostics.
     writeFileSync(join(records, 'answers.json'), answers);
-    if (waited !== answers) writeFileSync(join(records, 'wait.json'), waited);
+    writeFileSync(join(records, 'wait.json'), waited);
   }
   drive('await page.eval(() => document.querySelector(".plan-sent a").click()); await wait(".i-answered .compact");');
   capture('answered', 'The plan is in Answered with Sent back and no longer waits.');
