@@ -595,20 +595,25 @@
     return () => controls.forEach((b) => (b.disabled = false));
   }
 
-  function save(d, o, buttons, err, after) {
+  async function save(d, o, buttons, err, after) {
     const unlock = lock(...buttons);
     // An answers-only board takes no comments, and words sent as the answer are the answer itself (a reply item's also go as a comment).
     const typed = state.answers_only || (o.value === 'text' && !d.reply) ? '' : (drafts.get(d.key) ?? '').trim();
     const note = drafts.get(d.key) ?? noteOf(d), before = answerOf(d.key);
     const drop = clearIfSaved(d.key, drafts.get(d.key));
-    call('/api/answers', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
-    }, () => { forget(d.key); if (!typed) drop(); }).then(() => offerUndo(d, before)).then(() => after?.()).then(() => typed && call('/api/messages', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'comment', key: d.key, text: typed }),
-    }, drop).catch(() => say('Could not save your comment', 8000))).catch((e) => {
+    try {
+      await call('/api/answers', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
+      }, () => { forget(d.key); if (!typed) drop(); });
+    } catch (e) {
       shown(err).textContent = `Couldn't save: ${e.message}`;
-      unlock();
-    });
+      return unlock();
+    }
+    offerUndo(d, before);
+    after?.();
+    if (typed) call('/api/messages', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'comment', key: d.key, text: typed }),
+    }, drop).catch(() => say('Could not save your comment', 8000));
   }
 
   const toast = document.getElementById('toast'), toastText = document.getElementById('toast-text'), undoBtn = document.getElementById('undo');
@@ -836,14 +841,14 @@
   /** The one place to type on a card, folded behind Other answer so the buttons come first and typing is the last resort.
    * Sent on its own the words are the answer (`text`); typed before a button is picked they go with that answer as its note.
    * On a normal board they can also ask for another round (not on an evidence update) or go as a comment. */
-  function other(d, saved, err) {
+  function other(d, saved, err, after) {
     const box = el('textarea', { id: `note-${d.key}`, rows: 2, maxlength: 500, dir: 'auto' });
     box.value = drafts.get(d.key) ?? (saved?.answer === 'text' ? '' : noteOf(d));
     box.oninput = () => { drafts.set(d.key, box.value); keep(); };
     // An option valued text would be the same answer, so that item takes words only as a note.
     const words = !d.options.some((o) => o.value === 'text'), talk = !state.answers_only, round = talk && d.type !== 'evidence';
     const sendBtn = el('button', { 'aria-label': `Send reply, ${headline(d)}` }, 'Send reply');
-    sendBtn.onclick = () => (box.value.trim() ? save(d, { value: 'text' }, [sendBtn], err) : (shown(err).textContent = 'Write the reply first.'));
+    sendBtn.onclick = () => (box.value.trim() ? save(d, { value: 'text' }, [sendBtn], err, after) : (shown(err).textContent = 'Write the reply first.'));
     const roundBtn = el('button', { class: 'quick', 'aria-label': `Another round, ${headline(d)}` }, 'Another round');
     roundBtn.onclick = () => {
       const unlock = lock(roundBtn);
@@ -1548,7 +1553,7 @@
       why ? el('p', { class: 'why', dir: 'auto' }, why) : '',
       ...(live && opts.length ? [el('p', { class: 'pick-label' }, typeOf(d) === 'yes-no' ? 'YES OR NO' : 'PICK ONE'),
         el('ul', { class: 'pick-list', role: 'group', 'aria-label': d.title }, ...optionButtons)] : []),
-      ...(live ? [other(d, answerOf(d.key), err)] : []),
+      ...(live ? [other(d, answerOf(d.key), err, () => (location.hash = to))] : []),
       silent ? el('p', { class: 'silent-line' }, silent) : '', err,
       el('div', { class: 'decide-bar' }, live && opts.length ? answer : '', skip || '', back));
     if (live) {
