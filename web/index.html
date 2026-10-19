@@ -1057,7 +1057,9 @@
   /** The board's reason a run could not be checked, with the next step the docs promise. */
   const unchecked = (d) => (d.evidenceCard?.status === 'unverified' && d.evidenceCard.reason ? `${d.evidenceCard.reason} Ask the agent to run the check again.` : '');
   /** The project an update proves something for, read from the check line its run recorded: "verify-margin: …" names margin. */
-  const projectOf = (d) => /^verify-([\w-]{1,40}):/i.exec((d.evidence?.proof ?? '').trim())?.[1]?.toLowerCase() ?? '';
+  const projectOf = (d) => /^verify-([\w-]{1,40}):/i.exec((d.evidence?.proof ?? '').trim())?.[1]?.toLowerCase()
+    // A capture with no run names its project by the repository of the change it links, such as github.com/owner/sign-off/pull/9.
+    ?? /\/([\w.-]{1,40})\/(?:-\/)?(?:pull|pulls|merge_requests)\/\d+/.exec(d.link ?? '')?.[1]?.toLowerCase() ?? '';
   /** A link to a change names its number; any other link names the site it opens, as it always has. */
   const changeName = (url) => { const m = /\/(?:pull|pulls|merge_requests)\/(\d+)/.exec(url); return m ? `Pull request ${m[1]}` : `Open on ${new URL(url).host}`; };
   /** A link to a change, only when it is a full http(s) URL: a bare `http:` is text, not a place to open. */
@@ -1083,10 +1085,10 @@
       el('span', { class: 'm' }, d.evidenceCard ? el('span', { class: 'ev-ok' }, mark('ok'), 'Passed') : el('span', {}, 'No result yet'), d.filed ? el('span', {}, stamp(d.filed)) : ''));
   }
   /** Evidence as its own screen: a card per passed update, grouped under the project its check names, in the order each project first shows;
-   * proof that names no project goes under Other. An item put in this area that is not an update (a page, a diagram) keeps the card it always had. */
+   * proof that names no project goes under Other, last. An item put in this area that is not an update (a page, a diagram) keeps the card it always had. */
   function evidenceGroups(items) {
     if (!items.length) return [el('p', { class: 'empty' }, EMPTY.evidence)];
-    const groups = [...new Set(items.map(projectOf))], node = (d) => (d.type === 'evidence' ? evCard(d) : row(d));
+    const groups = [...new Set(items.map(projectOf))].sort((x, y) => (x === '') - (y === '')), node = (d) => (d.type === 'evidence' ? evCard(d) : row(d));
     return groups.map((g) => {
       return el('section', { class: 'ev-group' }, el('div', { class: 'sec-head' }, el('h2', {}, g || 'Other')),
         el('div', { class: 'ev-grid' }, ...items.filter((d) => projectOf(d) === g).map(node)));
