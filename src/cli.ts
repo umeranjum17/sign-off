@@ -1788,34 +1788,41 @@ const stillJobs = () => {
   return jobs;
 };
 /** Measures the board's stills in parallel and off the request path. A fresh board is therefore ready before it is asked for cards: the
- * page and media answer at once, and the guard's one-time pass never blocks them. */
+ * page and media answer at once, and the guard's pass never blocks them. One follow-up pass takes whatever a lost worker never reported. */
 let guardReady: Promise<void> = Promise.resolve();
 /** A board read waits this long for the warm pass, so a still that is slow or stuck never holds the cards. */
 const GUARD_WAIT = 500;
 /** A worker still measuring after this is stuck in a convert that outlived its own timeout: it is stopped and its stills stay unmeasured. */
 const WORKER_WAIT = 35_000;
 const warmGuard = () => new Promise<void>((done) => {
-  let jobs: { path: string; sha256: string }[];
-  try { jobs = stillJobs(); } catch { return done(); }
-  if (!jobs.length) return done();
-  const workers = Math.max(1, Math.min(8, availableParallelism(), jobs.length));
-  let left = workers;
-  const ended = () => { if (--left === 0) done(); };
-  for (let i = 0; i < workers; i++) {
-    let worker: Worker;
-    try { worker = new Worker(new URL('./stills-worker.js', import.meta.url), { workerData: jobs.filter((_, j) => j % workers === i) }); }
-    catch { ended(); continue; }
-    let stop: NodeJS.Timeout;
-    const arm = () => {
-      clearTimeout(stop);
-      stop = setTimeout(() => { void worker.terminate(); }, WORKER_WAIT);
-      stop.unref();
+  const pass = (retry: boolean) => {
+    let jobs: { path: string; sha256: string }[];
+    try { jobs = stillJobs(); } catch { return done(); }
+    if (!jobs.length) return done();
+    const workers = Math.max(1, Math.min(8, availableParallelism(), jobs.length));
+    let left = workers;
+    const ended = () => {
+      if (--left) return;
+      if (retry) pass(false);
+      else done();
     };
-    arm();
-    worker.on('message', ([sha, unfit]: [string, boolean]) => { unfitMedia.set(sha, unfit); arm(); });
-    worker.once('error', () => clearTimeout(stop));
-    worker.once('exit', () => { clearTimeout(stop); ended(); });
-  }
+    for (let i = 0; i < workers; i++) {
+      let worker: Worker;
+      try { worker = new Worker(new URL('./stills-worker.js', import.meta.url), { workerData: jobs.filter((_, j) => j % workers === i) }); }
+      catch { ended(); continue; }
+      let stop: NodeJS.Timeout;
+      const arm = () => {
+        clearTimeout(stop);
+        stop = setTimeout(() => { void worker.terminate(); }, WORKER_WAIT);
+        stop.unref();
+      };
+      arm();
+      worker.on('message', ([sha, unfit]: [string, boolean]) => { unfitMedia.set(sha, unfit); arm(); });
+      worker.once('error', () => clearTimeout(stop));
+      worker.once('exit', () => { clearTimeout(stop); ended(); });
+    }
+  };
+  pass(true);
 });
 const state = () => {
   reap();
