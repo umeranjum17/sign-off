@@ -11,11 +11,11 @@
     --page: #F5F5F7; --tile: #FFFFFF; --desk: #FFFFFF; --desk-tile: #F5F5F7; --bar: #FAFAFC; --sunk: #E8E8ED; --line: #D2D2D7;
     --text: #1D1D1F; --muted: #6E6E73; --border: #8E8E93; --accent: #0066CC; --action: #0071E3; --on-accent: #FFFFFF; --danger: #C00011; --bezel: #1D1D1F;
     --c-waiting: #0071E3; --c-evidence: #17702F; --c-reports: #A34700; --c-answered: #6E6E73; --c-gate: #8A6100; --ok: #17702F; --warn: #A34700;
-    --bg: var(--page); --surface: var(--tile); }
+    --bg: var(--page); --surface: var(--tile); --seg-on: #FFFFFF; }
   @media (prefers-color-scheme: dark) { :root {
     --page: #000000; --tile: #161617; --desk: #000000; --desk-tile: #161617; --bar: #161617; --sunk: #2C2C2E; --line: #424245;
     --text: #F5F5F7; --muted: #86868B; --border: #636366; --accent: #2997FF; --danger: #FF6961; --bezel: #424245;
-    --c-waiting: #0A84FF; --c-evidence: #30D158; --c-reports: #FF9F0A; --c-answered: #98989D; --c-gate: #FFD60A; --ok: #30D158; --warn: #FF9F0A; } }
+    --c-waiting: #0A84FF; --c-evidence: #30D158; --c-reports: #FF9F0A; --c-answered: #98989D; --c-gate: #FFD60A; --ok: #30D158; --warn: #FF9F0A; --seg-on: #636366; } }
   * { box-sizing: border-box; }
   /* A phone keeps room at the bottom for the tab bar. */
   body { margin: 0; padding-bottom: calc(5.125rem + env(safe-area-inset-bottom)); background: var(--bg); color: var(--text); overflow-wrap: anywhere;
@@ -63,6 +63,14 @@
   .rp-eyebrow { color: var(--c-reports); font-size: 0.9375rem; font-weight: 600; }
   .rp-title { font-size: 1.3125rem; line-height: 1.24; font-weight: 700; letter-spacing: 0.005em; }
   .rp-about { color: var(--muted); font-size: 1.0625rem; line-height: 1.47; }
+  /* The Leash: one control for how much agents may do without asking, and what the chosen one means below it. */
+  .leash { display: flex; flex-direction: column; gap: 0.75rem; padding: 0.875rem 1rem 1rem; }
+  .seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--sunk); border-radius: 0.5625rem; padding: 2px; }
+  .seg button { min-height: 2.5rem; border: 0; border-radius: 0.4375rem; background: none; color: var(--text); font: inherit; font-size: 0.9375rem; line-height: 1.2; padding: 0.25rem 0.375rem; }
+  .seg button[aria-pressed="true"] { background: var(--seg-on); box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04); color: var(--text); font-weight: 600; }
+  .seg button[aria-pressed="true"]::before { content: none; }
+  @media (min-width: 45rem) { .leash-h h2 { font-size: 1.75rem; line-height: 1.15; } }
+  .leash-line { margin: 0.5rem 1rem 0; color: var(--muted); font-size: 0.875rem; line-height: 1.43; }
   .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
   .card, .tile { background: var(--surface); border-radius: 1rem; }
   .card { padding: 1rem; }
@@ -625,7 +633,10 @@
     .side a:hover { background: color-mix(in srgb, var(--sunk) 50%, transparent); }
     .side a[aria-current] { background: var(--sunk); }
     .side .n { margin-left: auto; color: var(--muted); font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
-    .brand { margin: 0.25rem 0.75rem 1.25rem; font-weight: 600; }
+    .brand { display: flex; align-items: center; gap: 0.625rem; margin: 0.25rem 0.75rem 1.25rem; font-weight: 600; }
+    .brand .av { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 50%; background: var(--action); color: #FFFFFF; font-size: 0.875rem; }
+    .side .foot { margin: auto 0 0; padding: 0.75rem; color: var(--muted); font-size: 0.875rem; line-height: 1.43; }
+    .seg button { min-height: 2.25rem; }
     .top { padding: 3.5rem 0 1.5rem; }
     .top h1 { font-size: 3rem; line-height: 1.0833; letter-spacing: -0.003em; }
     button { min-height: 2.75rem; }
@@ -1283,6 +1294,27 @@
     el('span', { class: 'n' }, String(items.length)), el('span', { class: 'name' }, NAV[a]));
 
   /** The Summary at a glance, in a few short sentences: what needs you (and since when) and the evidence to see (and its newest update) in full colour, the rest quieter. */
+  const LEASH = { ask: ['Ask me first', 'Ask first', 'Agents wait for you on every ask.'], matters: ['Ask when it matters', 'When it matters', 'At the deadline, agents take the safe default.'],
+    act: ['Act, then tell me', 'Act, then tell', 'Agents take their pick now and report back.'] };
+  /** The Leash on the Summary: three buttons that save the leash: line of config.yaml. A board that takes no changes shows it without them working. */
+  function leash() {
+    const err = el('div', { class: 'err', role: 'alert' }), still = FROZEN || state.readonly || state.answers_only;
+    const seg = el('div', { class: 'seg', role: 'group', 'aria-label': 'Leash' }, ...Object.entries(LEASH).map(([v, [, short]]) => {
+      const b = el('button', { 'aria-pressed': String(state.leash === v) }, short);
+      b.disabled = Boolean(still);
+      b.onclick = () => {
+        if (state.leash === v) return;
+        seg.querySelectorAll('button').forEach((x) => (x.disabled = true));
+        call('/api/leash', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ leash: v }) }).catch((e) => {
+          err.textContent = `Couldn't save the leash: ${e.message}`;
+          seg.querySelectorAll('button').forEach((x) => (x.disabled = false));
+        });
+      };
+      return b;
+    }));
+    return [el('div', { class: 'sec-h leash-h' }, el('h2', {}, 'Leash')), el('div', { class: 'card leash' }, el('span', {}, 'How much may agents do without asking?'), seg, err),
+      el('p', { class: 'leash-line' }, LEASH[state.leash][2])];
+  }
   function glance(by) {
     const oldest = by.waiting.map((d) => d.filed).filter(Boolean).sort((x, y) => Date.parse(x) - Date.parse(y))[0];
     const n = by.waiting.length, fresh = by.answered.filter((d) => isToday(state.answers[d.key].at)).length;
@@ -1863,7 +1895,8 @@
     const askAt = decideQueue.findIndex((d) => d.key === key), decideAt = key ? askAt : 0;
     const active = at === 'decide' ? 'waiting' : at;
     const link = (a, name, n) => el('a', { href: `#${a}`, ...(a === (active ?? '') && { 'aria-current': 'page' }) }, icon(a || 'summary'), name, n === undefined ? '' : el('span', { class: 'n' }, String(n)));
-    document.getElementById('nav').replaceChildren(el('p', { class: 'brand' }, 'sign-off'), link('', 'Summary'), ...Object.keys(AREAS).map((a) => link(a, NAV[a], by[a].length)));
+    document.getElementById('nav').replaceChildren(el('p', { class: 'brand' }, ...(state.name ? [el('span', { class: 'av', 'aria-hidden': 'true' }, [...state.name][0].toUpperCase()), state.name] : ['sign-off'])),
+      link('', 'Summary'), ...Object.keys(AREAS).map((a) => link(a, NAV[a], by[a].length)), state.leash ? el('p', { class: 'foot' }, `Leash: ${LEASH[state.leash][0]}`) : '');
     document.getElementById('tabs').replaceChildren(...Object.keys(AREAS).map((a) => el('a', { href: `#${a}`, 'aria-label': `${AREAS[a]}, ${by[a].length}`,
       ...(a === active && { 'aria-current': 'page' }) }, icon(a), TAB[a])));
     const ro = state.readonly ? 'Read only' : FROZEN ? `Read-only copy, ${FROZEN.exported}` : '';
@@ -1887,7 +1920,7 @@
         ...(by.reports.length ? reportGroups(by.reports) : [el('p', { class: 'empty' }, EMPTY.reports)]), notes(by.notes)] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [at === 'waiting' ? filters(by.waiting) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...(at === 'waiting' ? shown : by[at]).map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [glance(by), el('div', { class: 'tiles' }, ...Object.keys(AREAS).map((a) => tile(a, by[a]))),
       el('div', { class: 'pair' }, needs, today(by.answered)), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()]),
-      el('div', { class: 'areas' }, ...Object.keys(AREAS).map((a) => (a === 'evidence' ? proven(by[a]) : a === 'reports' ? newReport(by[a]) : section(a, by[a]))))]));
+      el('div', { class: 'areas' }, ...Object.keys(AREAS).map((a) => (a === 'evidence' ? proven(by[a]) : a === 'reports' ? newReport(by[a]) : section(a, by[a])))), ...(state.leash ? leash() : [])]));
     readPage(key ? state.decisions.find((d) => d.key === key && !gone.has(d.key) && (at === 'reports' && reads(d) || at === 'designs' && d.kind === 'design' || at === 'evidence' && d.type === 'evidence' || d.type === 'plan' && area(d) === at)) : undefined, at);
     if (FROZEN) freeze();
   }

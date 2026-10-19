@@ -9,6 +9,8 @@ export HOME=$dir XDG_CONFIG_HOME=$dir/.config XDG_DATA_HOME=$dir/.local/share XD
 so() { node "$repo/dist/cli.js" "$@"; }
 f=$repo/fixtures/contract
 mkdir -p "$dir/mocks" "$dir/page"
+# A config.yaml beside the board names the user, so the sidebar shows the avatar brand and the Leash has a file to keep its setting in.
+printf 'board: board.json\nname: Umer\n' > "$dir/config.yaml"
 # Real phone screens from the README, so every card shows a picture a person can read.
 cp "$repo/docs/media/phone-light.webp" "$dir/mocks/a.webp"; cp "$repo/docs/media/phone-dark.webp" "$dir/mocks/b.webp"; cp "$repo/docs/media/phone-light.webp" "$dir/shot.webp"
 cp "$f/report.v2/page/"* "$dir/page/"

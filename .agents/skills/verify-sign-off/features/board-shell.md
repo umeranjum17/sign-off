@@ -16,6 +16,7 @@ The board page (web/index.html) in the Spacious look: system font, large titles,
 - Reports (`#reports`): grouped inset lists, one per `group` (no groups: New and Earlier), each row a picture, title, what it says, kind, steps and date, a blue dot when filed today, and ×. A row with a page opens `#reports/<key>`: ‹ Reports, kind and time, the title in large type, what it says and decided, then the page in a tile; on a desk it opens beside the sidebar, on a phone over the board.
 - Focus rings show on every link and button in both themes.
 - Type follows the Spacious design: row titles 17 px regular with 15 px lines under them, never cut off with "…"; section links, back links and Clear all done in regular weight; Answered heads in small grey caps with a solid grey check badge per row; Decide named by a small centred title over the question, its stay-quiet line led by a clock and a bold "If you stay quiet:", and Answer on one line in the bar pinned above the tabs on a phone.
+- Leash (`name:` and `leash:` lines of the config.yaml beside the board): the sidebar brand is a round avatar with the name's first letter and the name (no name: "sign-off"), and its foot reads "Leash: <setting>". The Summary ends with a Leash card: "How much may agents do without asking?", three buttons (Ask first, When it matters, Act, then tell) with the chosen one raised, and what it means below. A tap saves `leash: ask|matters|act` into config.yaml (no line: matters); a read-only board shows it without working buttons; a board with no config.yaml shows neither.
 
 ## How to get to it (user POV)
 
@@ -30,6 +31,7 @@ Open the URL seed-board.sh prints, in a browser; tap an area in the sidebar or t
 4. Toast: at 390, open BASE#evidence, click Pass from the page, then screenshot toast.<theme>.390w.png; the toast's bottom is above the tab bar's top.
 5. Reports: seed-board.sh posts one report; post one more filed now in the same group and one with no group (`post <board> --kind report --from <json>` with `view` and `preview` from the seeded `page/` folder) so the list shows two sections and a dot.
    Capture `#reports` and `#reports/<key>` at 390 and 1280 in light and dark as `reports.<theme>.<width>w.png` and `report-page.<theme>.<width>w.png`; check the page's ‹ Reports goes back to the row.
+   Leash: on `#`, click "Act, then tell" from the page, check `grep leash: <folder>/config.yaml` prints `leash: act` and the sidebar foot reads "Leash: Act, then tell me"; capture `leash.<theme>.<width>w.png` at 390 (Summary scrolled to the end) and 1280 (sidebar foot in view) in light and dark.
 6. Focus: press Tab until a sidebar link (1280) or a tab (390) has the focus, then screenshot focus.<theme>.<width>w.png (one theme and width in a verify run).
    One check judges at most 10 captures, so keep the Waiting, Decide and Designs captures in separate runs.
    When the outcome is about one width only ("on a computer" or "on a phone"), drive that width alone: SHOTS_WIDTHS=1280 (computer)
