@@ -1461,6 +1461,33 @@ test('a design holding only screen notes does not lock its key or its question',
   assert.equal(run('post', file, '--kind', 'design', '--from', message).code, 0);
 });
 
+test('a screen save drops a stored pick that is no longer a listed option', async () => {
+  const dir = join(scratch, 'screens-pick-relisted'), file = join(dir, 'board.json'), message = join(dir, 'design-message.json');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), png);
+  writeFileSync(join(dir, 'design', 'a.png'), png);
+  const design = (options) => ({ contract: 1, kind: 'design', schema: 1, key: 'd5-pick', title: 'Look', about: 'Pick a look.', group: 'Sign-in',
+    filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png', options, recommend: options[0].value,
+    journeys: [{ id: 'flow', title: 'Flow', screens: [{ id: 'a', title: 'First', views: { phone_light: 'design/a.png' } }] }] });
+  writeFileSync(message, JSON.stringify(design([{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }])));
+  assert.equal(run('post', file, '--kind', 'design', '--from', message).code, 0);
+  let proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  let url = /url: "(\S+)"/.exec(await served(proc))[1];
+  assert.equal((await post(url, 'api/answers', { key: 'd5-pick', pick: 'a', notes: [{ journey: 'flow', screen: 'a', verdict: 'approve', note: '' }] })).status, 200);
+  proc.kill();
+  const doc = JSON.parse(readFileSync(file, 'utf8'));
+  writeFileSync(file, JSON.stringify({ ...doc, items: doc.items.map((i) => i.key === 'd5-pick' ? { ...i, options: [{ value: 'c', label: 'C' }, { value: 'd', label: 'D' }], recommend_value: 'c' } : i) }));
+  proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  url = /url: "(\S+)"/.exec(await served(proc))[1];
+  assert.equal((await post(url, 'api/answers', { key: 'd5-pick', notes: [{ journey: 'flow', screen: 'a', verdict: 'approve', note: '' }] })).status, 200);
+  const read = JSON.parse(run('answers', file, '--json').out)['d5-pick'];
+  assert.equal(read.answer, 'screens');
+  assert.equal(read.pick, undefined);
+  proc.kill();
+});
+
 test('an ask whose option is named screens is answered, not left waiting', async () => {
   const dir = join(scratch, 'screens-option'), file = join(dir, 'board.json');
   mkdirSync(dir, { recursive: true });

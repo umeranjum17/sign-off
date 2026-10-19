@@ -309,7 +309,7 @@ export function appendDesignAnswer(decisionsPath: string, d: Decision, verdict: 
   const current = readAnswers(decisionsPath)[d.key];
   const decided = current?.answer === 'approve' || current?.answer === 'change' ? current.answer : undefined;
   const kept = (verdict ?? (decided === 'approve' && requested === true ? 'change' : decided ?? SCREENS_ONLY)) as string;
-  const keptPick = (pick ?? current?.pick) as string | undefined;
+  const keptPick = (pick ?? (options.some(o => o.value === current?.pick) ? current?.pick : undefined)) as string | undefined;
   const answer: Answer = { key: d.key, answer: kept, label: DESIGN_LABEL[kept], close: d.close ?? 'done', at: now(), notes, ...(keptPick !== undefined && { pick: keptPick }) };
   if (current?.answer === answer.answer && JSON.stringify([current.notes, current.pick]) === JSON.stringify([answer.notes, answer.pick])) return;
   appendLine(answersPath(decisionsPath), answer);
