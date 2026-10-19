@@ -65,6 +65,7 @@
   /* Proven today swipes on a phone, a card a time; New report is one hero card, its picture above the words on a phone and beside them on a desk. */
   .ev-scroll-row { display: flex; gap: 0.75rem; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 1.25rem; margin: 0 -1.25rem; padding: 0 1.25rem 0.25rem; scrollbar-width: none; }
   .ev-scroll-row::-webkit-scrollbar { display: none; }
+  .ev-scroll-row > .has-x { flex: none; width: 15.5rem; scroll-snap-align: start; }
   .ev-scroll-row .ev-card { flex: none; width: 15.5rem; scroll-snap-align: start; }
   /* On Today a proven card is square, its capture standing on the card's bottom edge, with a shorter title than on Evidence. */
   .ev-scroll-row .ev-card { gap: 0.625rem; } .ev-scroll-row .ev-media, .ev-scroll-row .ev-media img, .ev-scroll-row .ev-media video { aspect-ratio: 1 / 1; padding: 1.25rem 1.25rem 0; border-radius: 1rem; }
@@ -608,6 +609,12 @@
   .gone-asks .rows { padding: 0; } .gone-asks li { justify-content: space-between; gap: 0.75rem; min-height: 2.75rem; }
   .gone-asks .dis { flex: none; padding: 0 0.5rem; border-color: transparent; background: none; color: var(--accent); font-weight: 600; }
   .sec-head .clear { margin-left: auto; }
+  /* Clear all sits at the right of every screen's title; a card that is a link keeps its dismiss x at its corner. */
+  .top > .clear { position: absolute; top: 1.5rem; right: -0.5rem; padding: 0 0.5rem; }
+  .has-x { position: relative; }
+  .has-x > .x { position: absolute; top: 0.25rem; right: 0.25rem; margin: 0; background: color-mix(in srgb, var(--surface) 88%, transparent); }
+  .plan-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
+  .plan-actions .dis { min-height: 2.75rem; padding: 0 0.5rem; background: none; color: var(--muted); }
   /* Waiting on you: one row of type chips, and the sort beside them (or below them on a phone). */
   .filters { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 0.75rem; margin: 0 0 0.75rem; }
   .chips { display: flex; flex-wrap: wrap; gap: 0.375rem; }
@@ -693,7 +700,7 @@
     .brand .av { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 50%; background: var(--action); color: #FFFFFF; font-size: 0.875rem; }
     .side .foot { margin: auto 0 0; padding: 0.75rem; color: var(--muted); font-size: 0.875rem; line-height: 1.43; }
     .seg button { min-height: 2.25rem; }
-    .top { padding: 3.5rem 0 1.5rem; }
+    .top { padding: 3.5rem 0 1.5rem; } .top > .clear { top: 3.75rem; }
     .top h1 { font-size: 3rem; line-height: 1.0833; letter-spacing: -0.003em; }
     button { min-height: 2.75rem; }
     #toast button { min-height: 2.75rem; }
@@ -708,7 +715,7 @@
     .top > .find { top: 0.5rem; right: -1rem; }
     .areas .sec-head, .sec-h.leash-h { margin: 3.5rem 0 1rem; } .areas h2, .sec-h.leash-h h2 { font-size: 1.75rem; line-height: 2rem; }
     .ev-scroll-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin: 0; padding: 0; overflow: visible; }
-    .ev-scroll-row .ev-card { width: auto; }
+    .ev-scroll-row > .has-x, .ev-scroll-row .ev-card { width: auto; }
     .rp-card { flex-direction: row; border-radius: 1.125rem; }
     .rp-art { width: 46%; aspect-ratio: auto; min-height: 16rem; }
     .rp-body { flex: 1; justify-content: center; padding: 2rem; }
@@ -891,17 +898,19 @@
   }
   const canDismiss = () => !state.readonly && !FROZEN;
   function xBtn(d, label) {
-    if (!canDismiss() || (d.type === 'plan' && !Object.hasOwn(state.answers, d.key))) return '';
+    if (!canDismiss()) return '';
     const b = el('button', { class: label ? 'dis' : 'x', 'aria-label': `Dismiss, ${title(d)}` }, label ?? '×');
     b.onclick = () => dismiss([d.key], area(d) === 'waiting' ? 'Dismissed · the agent still waits' : `Dismissed: ${title(d)}`);
     return b;
   }
   function clearAll(items) {
     if (!canDismiss() || !items.length) return '';
-    const b = el('button', { class: 'clear' }, 'Clear all done');
-    b.onclick = () => dismiss(items.map((d) => d.key), `${items.length} cleared`);
+    const b = el('button', { class: 'clear' }, 'Clear all');
+    b.onclick = () => dismiss(items.map((d) => d.key), `${items.length} cleared${items.some((d) => area(d) === 'waiting') ? ' · the agent still waits' : ''}`);
     return b;
   }
+  /** A card that is itself a link keeps its × beside it, at its corner. */
+  const withX = (d, card) => (canDismiss() ? el('div', { class: 'has-x' }, card, xBtn(d)) : card);
 
   function row(d, { x = true } = {}) {
     if (d.kind === 'design') {
@@ -1154,7 +1163,7 @@
    * proof that names no project goes under Other, last. An item put in this area that is not an update (a page, a diagram) keeps the card it always had. */
   function evidenceGroups(items) {
     if (!items.length) return [el('p', { class: 'empty' }, EMPTY.evidence)];
-    const groups = [...new Set(items.map(projectOf))].sort((x, y) => (x === '') - (y === '')), node = (d) => (d.type === 'evidence' ? evCard(d) : row(d));
+    const groups = [...new Set(items.map(projectOf))].sort((x, y) => (x === '') - (y === '')), node = (d) => (d.type === 'evidence' ? withX(d, evCard(d)) : row(d));
     return groups.map((g) => {
       return el('section', { class: 'ev-group' }, el('div', { class: 'sec-head' }, el('h2', {}, g || 'Other')),
         el('div', { class: 'ev-grid' }, ...items.filter((d) => projectOf(d) === g).map(node)));
@@ -1441,7 +1450,7 @@
   function proven(items) {
     const fresh = items.filter((d) => d.type === 'evidence' && d.filed && isToday(d.filed));
     return el('section', { class: 'i-evidence wide' }, el('div', { class: 'sec-head' }, el('h2', {}, 'Proven today'), items.length ? el('a', { href: '#evidence' }, 'See all') : ''),
-      fresh.length ? el('div', { class: 'ev-scroll-row' }, ...fresh.slice(0, 3).map(evCard)) : el('p', { class: 'empty' }, 'Nothing proven today yet.'));
+      fresh.length ? el('div', { class: 'ev-scroll-row' }, ...fresh.slice(0, 3).map((d) => withX(d, evCard(d)))) : el('p', { class: 'empty' }, 'Nothing proven today yet.'));
   }
   /** New report on Today: the newest report as one hero card, its picture, who and when, its title and what it says. */
   function newReport(items) {
@@ -1491,7 +1500,7 @@
     };
     const fresh = items.filter((d) => isToday(state.answers[d.key].at)), older = items.filter((d) => !fresh.includes(d));
     return [['Today', fresh], ['Earlier', older]].filter(([, list]) => list.length).flatMap(([name, list], i) => [
-      el('div', { class: 'sec-head' }, el('h2', {}, name), i ? '' : clearAll(items)), el('ul', { class: 'card rows i-answered' }, ...list.map(line))]);
+      el('div', { class: 'sec-head' }, el('h2', {}, name)), el('ul', { class: 'card rows i-answered' }, ...list.map(line))]);
   }
 
   /** Step marks: what a step uses or can stop on. The board file names them by word; the shapes are this page's own. */
@@ -1844,7 +1853,7 @@
       el('ul', { class: 'card rows reports designs' }, ...items.filter((d) => (d.group || '') === group).map((d) => {
         const image = pic(d), line = [designStatus(d), d.filed ? day(d.filed) : '', state.answers[d.key]?.pick ? `Pick: ${state.answers[d.key].pick}` : '', state.answers[d.key]?.notes?.[0]?.note ?? ''].filter(Boolean).join(' · ');
         return el('li', { class: 'report', id: `item-${d.key}` }, el('a', { class: 'compact', href: `#designs/${d.key}`, 'aria-label': `Open design, ${d.title}` },
-          el('span', { class: 'rth' }, thumb('designs', image)), el('span', { class: 't' }, el('strong', { dir: 'auto' }, d.title), d.about ? el('span', { class: 'meta', dir: 'auto' }, d.about) : '', el('span', { class: 'when' }, line))));
+          el('span', { class: 'rth' }, thumb('designs', image)), el('span', { class: 't' }, el('strong', { dir: 'auto' }, d.title), d.about ? el('span', { class: 'meta', dir: 'auto' }, d.about) : '', el('span', { class: 'when' }, line))), xBtn(d));
       }))]);
   }
 
@@ -1886,7 +1895,7 @@
     return el('article', { class: 'plan-hero', id: `item-${d.key}` }, el('div', { class: 'plan-preview' }, rung(d)),
       el('div', { class: 'plan-copy' }, el('p', { class: 'eyebrow' }, icon('plan'), `Plan${d.project ? ` · ${d.project}` : ''}`),
         el('h2', { dir: 'auto' }, d.title), el('p', { class: 'about', dir: 'auto' }, d.about ?? ''),
-        el('div', { class: 'plan-meta' }, ...meta), el('a', { class: 'open-link plan-open', href: `#waiting/${d.key}` }, 'Open plan')));
+        el('div', { class: 'plan-meta' }, ...meta), el('div', { class: 'plan-actions' }, el('a', { class: 'open-link plan-open', href: `#waiting/${d.key}` }, 'Open plan'), xBtn(d, 'Dismiss'))));
   }
   // A plain ask is marked by its options, as the design marks a question: a yes or no is a switch, a choice of days is a calendar.
   // ponytail: day names matched in English only; an icon field on the ask would let the agent choose.
@@ -2032,9 +2041,10 @@
       find.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>';
       find.onclick = () => { query = query === null ? '' : null; render(); document.getElementById('find')?.focus(); };
     }
+    const bulk = { waiting: shown, designs: by.designs, evidence: by.evidence, reports: [...by.reports, ...by.notes], answered: by.answered }[at] ?? [];
     const top = el('header', { class: 'top' }, at && !TABS.some(([a]) => a === at) ? el('a', { class: 'back', href: at === 'decide' ? '#waiting' : '#' }, at === 'decide' ? '‹ Waiting on you' : '‹ Today') : '',
     el('h1', { tabindex: '-1' }, at ? pageTitle : 'Today'), find, at ? '' : el('p', { class: 'date' }, dateLine()),
-    ro ? el('p', { class: 'meta' }, ro) : '',
+    ro ? el('p', { class: 'meta' }, ro) : '', clearAll(bulk),
     at === 'decide' && decideAt >= 0 ? pager(decideQueue, decideAt) : '',
     at === 'waiting' && !state.readonly && by.waiting.length ? el('p', { class: 'lede waiting-lede' }, `${shown.length} ${shown.length === 1 ? 'item needs' : 'items need'} you · ${dateLine()}`)
       : at === 'reports' && !state.readonly && by.reports.length ? el('p', { class: 'lede' }, by.reports.some((d) => d.steps)
