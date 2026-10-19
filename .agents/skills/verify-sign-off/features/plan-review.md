@@ -3,7 +3,7 @@
 ## Sub-features
 
 - Plan document icons on Today rows and cards, and no pointer-focus box on the reader title.
-- Sandboxed direction page, plan summary, mobile Go to next navigation, section Approve/Change controls, required Change note, an optional comment on an approval, decision outcomes and recommendations with an Other free-text answer, and a whole-plan comment, step taps.
+- Plan page as designed: an orange `Plan · <project> · Planning agent, time` eyebrow, the title and answer, the diagram alone in a tile (the plan's page has nothing to tap), the counts line, "The plan" with numbered sections, each decision under the section it names (`after`) with "Decision n of N", radio options, "Why:" (`reason`) under the recommended one, "If you stay quiet" and a closed Other answer, "How it works" (each step's `text`) inside the architecture section, and a fold "What the agent gets back". Also: sandboxed direction page, plan summary, mobile Go to next navigation, section Approve/Change controls, required Change note, an optional comment on an approval, decision outcomes and recommendations with an Other free-text answer, and a whole-plan comment, step taps.
 - Send back stays disabled until every part is answered; unsent browser drafts survive reload.
 - Send back saves structured section notes, decision picks or Other words, and the whole-plan comment for `answers --json` and `wait --json`, removes the plan from Waiting and lists it in Answered.
 - Sent answers open read-only; read-only/exported boards cannot send answers.

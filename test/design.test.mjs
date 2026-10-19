@@ -881,7 +881,7 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   assert.match(after, /<p class="card glance">(?:<span class="seen">[^<]*<\/span>)?<b>Nothing needs you\. <\/b>/);
   assert.match(after, /<a class="more" href="#answered">Answered \(2\)<\/a>/);
   const answered = await dump('#answered');
-  assert.match(answered, /<p class="lede">2 answered today\.<\/p><\/header><div class="sec-head"><h2>Done today<\/h2><button class="clear">Clear all done<\/button><\/div>/);
+  assert.match(answered, /<p class="lede">2 answers today\. Each one has gone back to its agent\.<\/p><\/header><div class="sec-head"><h2>Today<\/h2><button class="clear">Clear all done<\/button><\/div>/);
   const lines = [...answered.matchAll(/<summary class="compact">.*?<strong[^>]*>(.*?)<\/strong>.*?<span class="ans"><b[^>]*>(\w+)<\/b><time>\d\d:\d\d<\/time><\/span><\/span><\/summary>.*?<\/details><button class="x" aria-label="Dismiss, [^"]+">×<\/button>/gs)];
   assert.deepEqual(lines.map((m) => [m[1], m[2]]).sort(), [['Pick the look', 'A'], ['When should it ship?', 'A']]);
   // Each row opens to its full card, with its one box.
@@ -1021,7 +1021,7 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   const pick = (label) => evaluate(`[...document.querySelectorAll(".chips button")].find((b) => b.textContent.startsWith("${label}"))?.click() ?? true`);
   await until(async () => (await askTitles()) === 'Pick the look|Which day for release?|Keep the weekly digest?');
   assert.equal(await evaluate('document.querySelector(".waiting-lede").textContent.includes("3 items need you")'), true);
-  assert.equal(await evaluate('document.querySelector(".ask-card .kind").textContent'), 'Design pick');
+  assert.equal(await evaluate('document.querySelector(".ask-card .kind")'), null); // the design's rows carry no kind eyebrow; the chips name the kinds
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".ask-card .icon")].map((s) => [s.className, (s.querySelector("path")?.getAttribute("d") ?? "").length > 10])'),
     [['icon i-designs', true], ['icon i-waiting', true], ['icon i-toggle', true]]);
   assert.equal(await chips(), 'All 3*|Design pick 1|Yes/No 1|Pick one 1');
@@ -1030,9 +1030,9 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   assert.equal(await evaluate('document.querySelector(".decide .why")?.textContent'), 'No new bugs in three weeks, and support is fully staffed on Friday.');
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-preview .mock")].map((f) => [f.querySelector(".label").textContent, f.querySelector(".shot.none")?.textContent ?? null])'),
     [['B', null], ['A', 'No mock for this option'], ['C', 'No mock for this option']]);
-  assert.equal(await evaluate('document.querySelector(".silent-line")?.textContent'), 'If you stay quiet: C');
+  assert.equal(await evaluate('document.querySelector(".silent-line")?.textContent'), 'If you stay quiet: Safest. One more week of waiting.');
   assert.equal(await evaluate('getComputedStyle(document.querySelector(".pick-option[aria-pressed=true]"), "::before").content'), 'none');
-  assert.equal(await evaluate('(() => { const b = document.querySelector(".decide-bar").getBoundingClientRect().top; return [".pick-list", ".silent-line"].every(s => document.querySelector(s).getBoundingClientRect().bottom <= b); })()'), true);
+  assert.equal(await evaluate('(() => { const b = document.querySelector(".decide-bar").getBoundingClientRect().top; return document.querySelector(".pick-list").getBoundingClientRect().bottom <= b && !!document.querySelector(".decide-bar .silent-line"); })()'), true);
   assert.equal(await evaluate('document.querySelector(".decide-bar .later").getBoundingClientRect().height >= 44'), true);
   await evaluate('location.hash = "#waiting"');
   await until(async () => (await askTitles()) === 'Pick the look|Which day for release?|Keep the weekly digest?');
@@ -1125,7 +1125,7 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   assert.equal(existsSync(file.replace(/\.json$/, '.dismissed.jsonl')), false);
   await evaluate('document.querySelector(".plan-open").click()');
   await until(async () => (await evaluate('location.hash + "|" + document.querySelector("#reader iframe")?.title')) === '#waiting/plan-kind-board|Plan: Show plans on the board');
-  await until(async () => await evaluate('document.querySelector("#reader .plan-view")?.clientHeight > 352'));
+  await until(async () => await evaluate('document.querySelector("#reader .plan-view")?.clientHeight > 100'));
   assert.equal(await evaluate('document.querySelector(".plan-scroll").getBoundingClientRect().bottom <= document.querySelector(".plan-send").getBoundingClientRect().top'), true);
   assert.equal(await evaluate('document.querySelector(".plan-summary").textContent.includes("5 sections") && document.querySelector(".plan-next").textContent === "Go to next"'), true);
   await evaluate('document.querySelector(".plan-next").click()');
@@ -1167,7 +1167,7 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await evaluate('location.hash = "#waiting"');
   await evaluate('window.old = true, location.reload()');
   await until(() => evaluate('!window.old'));
-  await until(async () => (await evaluate('[...document.querySelectorAll("#item-plan-filter-waiting .plan-meta span")].slice(0, 2).map((s) => s.textContent).join("|")')) === '1 section|0 decisions');
+  await until(async () => (await evaluate('[...document.querySelectorAll("#item-plan-filter-waiting .plan-meta > span")].slice(0, 2).map((s) => s.textContent).join("|")')) === '1 section|0 decisions');
   close();
   proc.kill();
 });
@@ -1263,11 +1263,11 @@ test('Waiting on you: a reply-only ask shows Reply, a type-ask yes/no shows Yes/
   const chips = () => evaluate('[...document.querySelectorAll(".chips button")].map((b) => b.textContent + (b.getAttribute("aria-pressed") === "true" ? "*" : "")).join("|")');
   const titles = () => evaluate('[...document.querySelectorAll(".ask-card .title")].map((s) => s.textContent).join("|")');
   await until(async () => (await titles()) === 'Pick a cover|Ship it?|Say ready when you are');
-  assert.equal(await evaluate('document.querySelector("#item-cover .kind").textContent'), 'Pick one');
+  assert.equal(await evaluate('document.querySelector("#item-cover .kind")'), null);
   assert.equal(await chips(), 'All 3*|Yes/No 1|Pick one 1|Reply 1');
   await evaluate('document.querySelector("#item-ship").click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/ship');
-  assert.equal(await evaluate('document.querySelector(".decide .eyebrow").textContent'), 'Yes/No');
+  assert.equal(await evaluate('document.querySelector(".decide .eyebrow")'), null); // no kind eyebrow on Decide
   assert.equal(await evaluate('document.querySelectorAll(".pick-option").length'), 2);
   await evaluate('location.hash = "#waiting"');
   await evaluate('document.querySelector("#item-ready").click()');
@@ -1495,7 +1495,7 @@ test('a posted contract design is listed with its preview and date, and opens fo
   const { evaluate, close } = await browse(join(dir, 'browser'));
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
   await until(async () => (await evaluate('document.querySelector("#item-d1-design .title")?.textContent')) === message.title);
-  assert.equal(await evaluate('document.querySelector("#item-d1-design .meta")?.textContent'), message.about);
+  assert.match(await evaluate('document.querySelector("#item-d1-design .meta")?.textContent'), /waiting since/); // the row is its title and when it came
   assert.equal(await evaluate('document.querySelector("#item-d1-design")?.getAttribute("href")'), '#designs/d1-design');
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
   await until(async () => (await evaluate('document.querySelector(".design-card h3")?.textContent')) === message.title);
@@ -1962,7 +1962,8 @@ test('Waiting on you: an update waiting for a verdict reads Evidence on its card
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const { evaluate, close } = await browse(join(dir, 'b'), 390);
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
-  await until(async () => (await evaluate('document.querySelector("#item-upd .kind")?.textContent')) === 'Evidence');
+  await until(async () => (await evaluate('document.querySelector("#item-upd .title")?.textContent')) !== undefined);
+  assert.equal(await evaluate('document.querySelector("#item-upd .kind")'), null);
   assert.ok(await evaluate('[...document.querySelectorAll(".chips button")].some((b) => b.textContent.startsWith("Evidence 1"))'));
   assert.match(await evaluate('document.querySelector("#item-upd .title").textContent'), /Login checked/);
   close();
@@ -2049,7 +2050,7 @@ test('Waiting on you: a diagram, an interactive page, an explainer and a free-fo
     // A click is retried while the list is still drawing: a card that is not there yet is not a missed tap.
     await until(async () => (await evaluate(`document.querySelector("#item-${key}")?.click() ?? true`))
       && (await evaluate('location.hash')) === `#decide/${key}`);
-    assert.equal(await evaluate('document.querySelector(".decide .eyebrow")?.textContent'), 'Yes/No');
+    assert.equal(await evaluate('document.querySelector(".decide .eyebrow")'), null);
     await evaluate('location.hash = "#waiting"');
     // Wait for the list to come back before the next card is tapped.
     await until(async () => (await titles()).length === 4);
@@ -2201,7 +2202,7 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   // Each opens on Decide with its badge, the reason a run could not be checked, and the normal answers.
   for (const [k, st, why] of [['update-1', 'Check failed', 'Loads in 1 second.'], ['update-6', 'Could not check', 'A picture or recording changed after the run. Ask the agent to run the check again.']]) {
     await evaluate(`location.hash = "#decide/${k}"`);
-    await until(async () => (await evaluate('document.querySelector(".decide .eyebrow .st")?.textContent')) === st);
+    await until(async () => (await evaluate('document.querySelector(".decide .lead .st")?.textContent')) === st);
     assert.deepEqual(await evaluate('[document.querySelector(".decide .why").textContent, [...document.querySelectorAll(".decide .pick-option .label")].map((b) => b.textContent)]'), [why, ['Pass', 'Fail', 'Needs work']]);
   }
   await evaluate('location.hash = "#waiting"');

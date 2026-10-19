@@ -161,7 +161,7 @@ test('refusals: strict at every level, in contract order, with one fix line each
 test('a field name holding a newline is refused on one help line, shown escaped', () => {
   const unknown = validate(message('newline-unknown.json', JSON.stringify({ ...ask, 'a\nb': 'x' })));
   assert.equal(unknown.status, 2, unknown.raw);
-  assert.equal(unknown.out.files[0].help, 'Remove "a\\nb"; ask takes key, title, filer, link, about, detail, why, options, recommend_value, recommend_reason, default_if_silent, silent_by, close, merges');
+  assert.equal(unknown.out.files[0].help, 'Remove "a\\nb"; ask takes key, title, filer, link, about, detail, why, options, recommend_value, recommend_reason, default_if_silent, silent_by, close, merges, proof');
   const repeated = validate(message('newline-twice.json', JSON.stringify(ask).slice(0, -1) + ',"a\\nb":1,"a\\nb":2}'));
   assert.equal(repeated.status, 2, repeated.raw);
   assert.equal(repeated.out.files[0].error, 'field "a\\nb" is written twice');
@@ -210,7 +210,7 @@ test('a plan: validate checks each rule with one fix line; post stores it, it wa
     [decision({ question: 'Keep A? Or B?' }), /decisions\[0\]\.question must be one question, with one question mark as its last character/, /split any other into its own decision/],
     [decision({ question: 'Keep A？ Or B?' }), /decisions\[0\]\.question must be one question, with one question mark as its last character/, /split any other into its own decision/],
     [{ ...plan, view: '../index.html' }, /view "..\/index.html" must be a relative path/, /Set "view"/],
-    [{ ...plan, filed: '2026-10-13T07:19:00Z' }, /filed is not a field of plan schema 1/, /plan takes key, title, filer, link, about, sections, decisions, steps, view$/],
+    [{ ...plan, filed: '2026-10-13T07:19:00Z' }, /filed is not a field of plan schema 1/, /plan takes key, title, filer, link, about, project, sections, decisions, steps, view$/],
   ]) {
     const { status, out: { files: [row] } } = validate(message('plan-bad.json', JSON.stringify(m)));
     assert.equal(status, 2, JSON.stringify(m));

@@ -12,12 +12,12 @@ export const SCHEMAS: Record<string, number> = { ask: 1, report: 2, evidence: 1,
 export const KINDS = Object.keys(SCHEMAS);
 const COMMON = ['contract', 'kind', 'schema', 'key', 'title', 'filer', 'link', 'about'];
 const FIELDS: Record<string, string[]> = {
-  ask: [...COMMON, 'detail', 'why', 'options', 'recommend_value', 'recommend_reason', 'default_if_silent', 'silent_by', 'close', 'merges'],
+  ask: [...COMMON, 'detail', 'why', 'options', 'recommend_value', 'recommend_reason', 'default_if_silent', 'silent_by', 'close', 'merges', 'proof'],
   report: [...COMMON, 'filed', 'group', 'decided', 'form', 'video', 'asked_by', 'view', 'preview'],
   evidence: [...COMMON, 'media', 'run'],
   gate: [...COMMON, 'run', 'options', 'recommend_value', 'close'],
   finding: [...COMMON, 'cause', 'incidents', 'days', 'evidence_ids', 'change_kind', 'proposal', 'options', 'recommend_value'],
-  plan: [...COMMON, 'sections', 'decisions', 'steps', 'view'],
+  plan: [...COMMON, 'project', 'sections', 'decisions', 'steps', 'view'],
   design: [...COMMON, 'group', 'filed', 'status', 'preview', 'journeys', 'options', 'recommend'],
 };
 /** A done-done run: its id, full commit and the four Checks lines. */
@@ -68,7 +68,7 @@ const show = (v: unknown) => JSON.stringify(v);
 /** A field name as it reads inside a sentence: escaped, so a newline or control character shows as \n or \u001b. */
 const escaped = (v: string) => show(v).slice(1, -1);
 /** The raise flag each question field fills: a refusal of a flag post names that flag, not the field. */
-const FLAG_OF: Record<string, string> = { why: 'why', about: 'about', detail: 'detail', title: 'title', default_if_silent: 'default', recommend_reason: 'recommend-reason', recommend_value: 'recommend', silent_by: 'silent-by', merges: 'merge', options: 'option', label: 'option', value: 'option', outcome: 'outcome' };
+const FLAG_OF: Record<string, string> = { why: 'why', about: 'about', detail: 'detail', title: 'title', default_if_silent: 'default', recommend_reason: 'recommend-reason', recommend_value: 'recommend', silent_by: 'silent-by', merges: 'merge', proof: 'proof', options: 'option', label: 'option', value: 'option', outcome: 'outcome' };
 /** The flag a field fills: options[1].outcome is --outcome, merges[0] is --merge. */
 const flagOf = (field: string) => { const f = field.replace(/^options\[\d+\]\./, '').replace(/\[\d+\]$/, ''); return `--${FLAG_OF[f] ?? f}`; };
 /** A field as a refusal names it: the JSON field, or the raise flag that fills it. */
@@ -237,6 +237,7 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
   }
   // A plan is sections to approve or change, decisions with a recommended pick, steps to tap through, and where it goes as a diagram.
   if (m.kind === 'plan') {
+    if (Object.hasOwn(m, 'project')) text('project', m.project, 40, 'the project name, in 40 characters or fewer, or leave it out');
     const ids = list('sections', 1, 8, ['id', 'heading', 'body'], '{"id":"goals","heading":"Goals and non-goals","body":"<what it does and does not do>"}').map((o, n) => {
       if (!(typeof o.id === 'string' && /^[a-z0-9-]{1,40}$/.test(o.id))) throw bad(`sections[${n}].id`, 'must be 1-40 of a-z 0-9 -', 'Set "id" to a short slug such as "goals"');
       text(`sections[${n}].heading`, o.heading, 80, 'the section heading, in 80 characters or fewer');
@@ -245,7 +246,7 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
     });
     const twice = ids.findIndex((id, n) => ids.indexOf(id) < n);
     if (twice >= 0) throw bad(`sections[${twice}].id`, `repeats ${ids[twice]}`, 'Give every section its own id');
-    list('decisions', 0, 5, ['key', 'question', 'why', 'options', 'recommend'], '{"key":"store","question":"Keep plans in the board file?","why":"...","options":[...],"recommend":"yes"}').forEach((o, n, all) => {
+    list('decisions', 0, 5, ['key', 'question', 'why', 'reason', 'after', 'options', 'recommend'], '{"key":"store","question":"Keep plans in the board file?","why":"...","options":[...],"recommend":"yes"}').forEach((o, n, all) => {
       const at = `decisions[${n}]`;
       if (!isKey(o.key)) throw bad(`${at}.key`, 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "key" to a short id such as "store"');
       if (all.slice(0, n).some((p) => p.key === o.key)) throw bad(`${at}.key`, `repeats ${o.key}`, 'Give every decision its own key');
@@ -255,11 +256,16 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
       if (q.search(/[?？]/) !== q.length - 1) throw bad(`${at}.question`, 'must be one question, with one question mark as its last character', 'Ask one question ending in a question mark, and split any other into its own decision');
       if (!/[\p{L}\p{N}]/u.test(q) || q.split(/\s+/).length > 12) throw bad(`${at}.question`, 'must be one question of 12 words or fewer, ending in a question mark', 'Ask it in 12 words or fewer, ending in a question mark; put the rest in "why"');
       text(`${at}.why`, o.why, 500, 'why it matters, in 500 characters or fewer');
+      if (Object.hasOwn(o, 'reason')) text(`${at}.reason`, o.reason, 300, 'why the recommended option, in 300 characters or fewer, or leave it out');
+      if (Object.hasOwn(o, 'after') && !ids.includes(o.after)) throw bad(`${at}.after`, `must be the id of one of the plan's sections`, `Set "after" to one of: ${ids.join(', ')}`);
       if (!Array.isArray(o.options) || o.options.length < 2 || o.options.length > 6) throw bad(`${at}.options`, Object.hasOwn(o, 'options') ? 'must list 2 to 6 options' : 'is required', 'Set "options" to 2-6 objects such as {"value":"yes","label":"Yes","outcome":"Plans live in the board file"}');
       checkOptions(`${at}.options`, o.options, 'plan');
       recommend(`${at}.recommend`, o, o.options);
     });
-    if (Object.hasOwn(m, 'steps')) list('steps', 2, 12, ['title'], '{"title":"The agent posts the plan"}').forEach((o, n) => text(`steps[${n}].title`, o.title, 80, 'the step, in 80 characters or fewer'));
+    if (Object.hasOwn(m, 'steps')) list('steps', 2, 12, ['title', 'text'], '{"title":"The agent posts the plan"}').forEach((o, n) => {
+      text(`steps[${n}].title`, o.title, 80, 'the step, in 80 characters or fewer');
+      if (Object.hasOwn(o, 'text')) text(`steps[${n}].text`, o.text, 300, 'what happens in this step, in 300 characters or fewer, or leave it out');
+    });
     page('view', /\.html$/i, '.html', '"mocks/<key>/index.html"', 'a plan shows where it goes as a diagram on a page', 'Set "view" to "mocks/<key>/index.html", a path from the board file\'s folder');
     return { kind: m.kind, schema: m.schema };
   }
@@ -297,6 +303,10 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
       if (k === m.key) throw bad(`merges[${n}]`, 'is this ask\'s own key', 'Name the other cards that ask the same thing, not this one');
       if (keys.indexOf(k) < n) throw bad(`merges[${n}]`, `repeats ${k}`, 'List each key once');
     });
+  }
+  if (Object.hasOwn(m, 'proof')) {
+    if (!isKey(m.proof)) throw bad('proof', 'must be 1-128 of A-Z a-z 0-9 . _ -', `Set ${named('proof', flags)} to the key of an evidence update on the board that this ask rests on, such as ${flags ? '--proof update-3' : '"update-3"'}`);
+    if (m.proof === m.key) throw bad('proof', 'is this ask\'s own key', 'Name the evidence update the ask rests on, not the ask');
   }
   if (ask && flags) question(m, bad, flags);
   // A gate's run is its own rule (section 5), so it comes after the field rules of section 4.
@@ -410,8 +420,9 @@ export function reportPage(m: any, base: string): void {
   if (!/<meta[^>]+name=["']?viewport/i.test(html)) throw bad(`${page} has no viewport tag, so a phone shows it zoomed out`, 'Add <meta name="viewport" content="width=device-width, initial-scale=1">, or start again from report init');
   if (!/prefers-color-scheme/i.test(html)) throw bad(`${page} has no dark mode`, 'Add a @media (prefers-color-scheme: dark) block, or start again from report init');
   if (!/<(svg|img|canvas|video)\b/i.test(html)) throw bad(`${page} has no picture or diagram`, 'Draw the idea: add an <svg> or <img> under the answer and a diagram under it');
-  if (!/<(button|input|select)\b/i.test(html)) throw bad(`${page} has nothing to tap or slide, so it is text, not a report`, 'Add a demo the reader can tap through, such as the scaffold\'s steps with Back and Next');
-  if (!/<details\b/i.test(html)) throw bad(`${page} has no folded detail`, 'Fold the detail into <details><summary>Details</summary>...</details> at the end');
+  // A plan's page is its diagram: the steps and the details are on the board, so it needs nothing to tap and no fold.
+  if (m.kind !== 'plan' && !/<(button|input|select)\b/i.test(html)) throw bad(`${page} has nothing to tap or slide, so it is text, not a report`, 'Add a demo the reader can tap through, such as the scaffold\'s steps with Back and Next');
+  if (m.kind !== 'plan' && !/<details\b/i.test(html)) throw bad(`${page} has no folded detail`, 'Fold the detail into <details><summary>Details</summary>...</details> at the end');
   if (/<(script|img|iframe|link|video|audio|source)\b[^>]*\b(src|href)\s*=\s*["']?\s*(https?:)?\/\//i.test(html)) throw bad(`${page} loads something from the web, which the board blocks`, 'Put scripts, styles and pictures in the page or beside it');
   // A block is one paragraph or list item; about five lines on a phone is the most a reader takes in at once.
   const long = [...html.matchAll(/<(p|li|dd|blockquote)\b[^>]*>([\s\S]*?)<\/\1>/gi)].map((b) => b[2].replace(/<[^>]*>/g, '').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim())

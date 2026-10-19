@@ -115,8 +115,9 @@
     .top:has(+ .decide) .back { display: none; }
   }
   /* Decide names itself in the bar, small and centred, and the question is the headline. */
-  .top:has(+ .decide) { padding: 0.75rem 0 0; }
-  .top:has(+ .decide) h1 { font-size: 1.0625rem; line-height: 1.75rem; font-weight: 600; letter-spacing: -0.022em; text-align: center; }
+  .top:has(+ .decide) { height: 3.25rem; padding: 0; }
+  .top:has(+ .decide) h1 { position: absolute; top: 0; left: 50%; transform: translateX(-50%); font-size: 1.0625rem; line-height: 3.25rem; font-weight: 600; letter-spacing: -0.022em; white-space: nowrap; }
+  @media (min-width: 60rem) { .top:has(+ .decide) { height: 3.75rem; } .top:has(+ .decide) h1 { line-height: 3.75rem; } }
 
   /* Reports: a grouped list under small section heads, a row per report: its picture, title, what it says, then its kind, steps and date.
      A blue dot marks one filed today. A row with steps draws them as numbered nodes on a line, with only the marks that matter under each. */
@@ -225,6 +226,30 @@
   .plan-decision .choices button[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); color: var(--text); border: 2px solid var(--accent); }
   .plan-decision .tag { display: block; color: var(--accent); font-size: 0.875rem; }
   .plan-explain .foot { justify-content: space-between; }
+  /* The plan page as designed: the diagram alone in a tile, the explainer inside its section, each decision under the section it follows. */
+  .plan-diagram { margin: 1.25rem 0; padding: 1rem; border-radius: 1.125rem; background: var(--surface); }
+  #reader .plan-view { height: 9.5rem; border-radius: 0; background: none; } @media (min-width: 60rem) { #reader .plan-view { height: 11rem; } }
+  .plan-h { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 0.75rem; }
+  .plan-h small { color: var(--muted); font-size: 0.9375rem; font-weight: 400; }
+  .plan-main > .plan-fold { margin: 1.5rem 0; color: var(--muted); } .plan-fold summary { cursor: pointer; font-weight: 600; color: var(--text); } .plan-fold p { margin: 0.5rem 0 0; }
+  .plan-section .plan-explain { margin: 0 0 1rem; padding: 1rem; background: var(--sunk); }
+  .plan-explain .eh { display: flex; justify-content: space-between; margin: 0 0 0.5rem; font-weight: 600; } .plan-explain .eh span { color: var(--muted); font-weight: 400; }
+  .plan-explain .narr { margin: 0; } .plan-explain .rnd { width: 2.75rem; height: 2.75rem; padding: 0; border: 0; border-radius: 50%; background: var(--surface); }
+  .plan-decision .eyebrow { display: flex; align-items: center; gap: 0.375rem; margin: 0 0 0.5rem; color: var(--accent); font-size: 0.875rem; font-weight: 600; }
+  .plan-decision .eyebrow .icon { width: auto; height: auto; background: none; } .plan-decision .eyebrow .icon svg { width: 1.125rem; height: 1.125rem; stroke: var(--accent); }
+  .plan-decision .why2 { color: var(--muted); font-size: 0.9375rem; }
+  .plan-decision .quiet { display: flex; gap: 0.5rem; margin: 1rem 0 0; color: var(--muted); font-size: 0.9375rem; } .plan-decision .quiet .icon { width: auto; height: auto; background: none; } .plan-decision .quiet .icon svg { width: 1.125rem; height: 1.125rem; stroke: var(--muted); }
+  .plan-main > .eyebrow { display: flex; align-items: center; gap: 0.375rem; margin: 0; color: var(--warn); font-size: 0.9375rem; font-weight: 600; }
+  .plan-main > .eyebrow .icon, .plan-summary .icon { width: auto; height: auto; background: none; } .plan-main > .eyebrow .icon svg { stroke: var(--warn); } .plan-summary .icon svg { stroke: var(--muted); }
+  .plan-summary { font-size: 0.9375rem; }
+  #reader .plan-view { height: 8rem; } @media (min-width: 60rem) { #reader .plan-view { height: 10rem; } }
+  .plan-decision .choices button { display: grid; grid-template-columns: auto 1fr; align-items: start; column-gap: 0.75rem; background: var(--surface); border: 1px solid var(--line); }
+  .plan-decision .choices button > :not(.rd):not(.lbl) { grid-column: 2; }
+  .plan-decision .choices .rd { display: grid; place-items: center; width: 1.375rem; height: 1.375rem; margin-top: 0.125rem; border-radius: 50%; border: 1.5px solid var(--muted); color: transparent; }
+  .plan-decision .choices .rd .glyph { width: 0.875rem; height: 0.875rem; stroke-width: 3; }
+  .plan-decision .choices button[aria-pressed="true"] .rd { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .plan-decision .choices .lbl .tag { order: 2; display: inline; } .plan-decision .choices .lbl { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 0.5rem; }
+  .plan-other { margin-top: 0.75rem; } .plan-other summary { cursor: pointer; color: var(--muted); font-weight: 600; }
   .plan-send { position: absolute; bottom: 0; left: 0; right: 0; padding: 0.625rem 1rem calc(0.75rem + env(safe-area-inset-bottom)); background: var(--bar); border-top: 1px solid var(--line); }
   .plan-send p { margin: 0 0 0.5rem; }
   .plan-send button { width: 100%; }
@@ -234,6 +259,8 @@
   .plan-progress button { width: 100%; padding: 0.5rem 0; display: flex; justify-content: space-between; gap: 1rem; background: none; text-align: left; border-radius: 0.5rem; font-size: 1rem; }
   .plan-progress span { color: var(--muted); }
   @media (max-width: 59.999rem) { #reader .plan-scroll { margin-bottom: calc(9rem + env(safe-area-inset-bottom)); } #reader .plan-scroll.sent { margin-bottom: 0; } .plan-send h2, .plan-progress { display: none; } .plan-send p { font-size: 1rem; } }
+  /* The plan's own title is the page heading below; the bar keeps the heading for screen readers and focus only. */
+  #reader header h1.plan-name { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   #reader .plan-sent .back { display: inline-flex; }
   .plan-sent { text-align: center; padding-top: 2rem; }
   .plan-sent h2 { color: var(--ok); font-size: 2.125rem; }
@@ -279,6 +306,8 @@
   .compact .icon { background: color-mix(in srgb, var(--area) 14%, var(--surface)); }
   .compact .icon svg { stroke: var(--area); }
   /* An answered row with no picture leads with a small check badge, so the row stays short. */
+  .compact .icon.sent { background: var(--ok); } .compact .icon.sent svg { stroke: #FFFFFF; }
+  .sent-line { display: flex; align-items: center; gap: 0.25rem; color: var(--ok); font-weight: 600; font-size: 0.9375rem; } .sent-line .glyph { width: 1rem; height: 1rem; stroke: currentColor; fill: none; }
   .compact .icon.i-answered { width: 2rem; height: 2rem; border-radius: 0.5rem; background: var(--c-answered); } .compact .icon.i-answered svg { width: 1.125rem; height: 1.125rem; stroke: #FFFFFF; }
   .done .thumb { width: 3rem; height: 3rem; border-radius: 0.75rem; }
   .thumb { flex: none; object-fit: cover; object-position: top; border: 1px solid var(--line); background: var(--sunk); }
@@ -299,7 +328,9 @@
   .plan-copy h2 { margin: 0; font-size: 1.3125rem; line-height: 1.24; }
   .plan-copy .about { display: block; margin: 0; color: var(--muted); overflow: visible; }
   .plan-meta { display: flex; flex-wrap: wrap; gap: .35rem 1rem; color: var(--muted); font-size: .875rem; }
-  .plan-meta span { white-space: nowrap; }
+  .plan-meta span { display: inline-flex; align-items: center; gap: .375rem; white-space: nowrap; }
+  .plan-copy .icon { width: auto; height: auto; border-radius: 0; background: none; } .plan-meta .icon svg { width: 1rem; height: 1rem; stroke: var(--muted); }
+  .plan-copy .eyebrow { display: flex; align-items: center; gap: .375rem; } .plan-copy .eyebrow .icon svg { width: 1.125rem; height: 1.125rem; stroke: var(--warn); }
   .open-link.plan-open { display: inline-flex; justify-content: center; min-height: 3.125rem; padding: 0 1.25rem; font-size: 1.0625rem; font-weight: 400; }
   @media (min-width: 45rem) { .open-link.plan-open { width: fit-content; min-height: 2.75rem; } }
   .ask-group { list-style: none; margin: .5rem 0 0; padding: 0 0 0 1rem; overflow: hidden; border-radius: 1rem; background: var(--surface); }
@@ -312,9 +343,21 @@
   .ask-card .title { font-size: 1.0625rem; font-weight: 400; line-height: 1.3; }
   .ask-card .meta { margin: 0; color: var(--muted); font-size: .9375rem; }
   .ask-group .x { margin: 0; }
-  .decide { max-width: 44rem; margin: 0 auto; padding-bottom: 1rem; }
+  .decide { max-width: 42.5rem; margin: 0 auto; padding-bottom: 1rem; }
   .decide-preview { margin: .5rem 0 .75rem; padding: 1rem; min-height: 8rem; display: grid; place-items: center; overflow: hidden; border-radius: 1.125rem; background: var(--surface); }
   .decide-preview > img { display: block; max-width: 100%; max-height: 15rem; object-fit: contain; border-radius: .75rem; }
+  /* A device frame: a dark bezel round the capture, as the design draws every shot. Wide captures get a slimmer bezel. */
+  .phone { display: block; box-sizing: border-box; padding: 7px 7px 0; border-radius: 28px 28px 0 0; background: #1D1D1F; box-shadow: inset 0 0 0 1px #3A3A3C; }
+  .phone img { display: block; width: 100%; border-radius: 21px 21px 0 0; }
+  .phone.wide { padding: 6px 6px 0; border-radius: 14px 14px 0 0; } .phone.wide img { border-radius: 9px 9px 0 0; }
+  .dhero { position: relative; display: flex; justify-content: center; box-sizing: border-box; max-height: 10.25rem; margin: .5rem 0 0; padding: 1.25rem 1.5rem 0; overflow: hidden; border-radius: 1.125rem; background: var(--surface); color: inherit; text-decoration: none; }
+  .dhero .phone { width: min(150px, 44%); } .dhero .phone.wide { width: min(280px, 80%); }
+  .dhero .phone img { aspect-ratio: 9 / 16; object-fit: cover; object-position: top; } .dhero .phone.wide img { aspect-ratio: 16 / 10; }
+  .dhero .pass, .dhero .open { position: absolute; top: .875rem; display: flex; align-items: center; gap: .375rem; height: 1.875rem; padding: 0 .75rem; border-radius: .9375rem; background: var(--bg); font-size: .9375rem; }
+  .dhero .pass { left: .875rem; font-weight: 600; } .dhero .open { right: .875rem; color: var(--accent); }
+  .dhero .pass.ok { color: var(--ok); } .dhero .pass.bad { color: var(--danger); } .dhero .pass.warn { color: var(--warn); }
+  .dhero .pass svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  @media (min-width: 60rem) { .dhero { max-height: 15rem; padding: 1.75rem 1.5rem 0; } .dhero .phone { width: min(200px, 56%); } }
   .decide-preview .rung { width: 100%; }
   .decide-preview .rung .frame, .decide-preview .rung iframe { max-height: 15rem; }
   .decide-preview .mocks { --tall: min(32svh, 16rem); }
@@ -322,47 +365,50 @@
   .decide-preview .mock figcaption .label { flex: 1 1 auto; min-width: 0; font-size: .75rem; }
   .decide-preview .mock figcaption .badge { padding: .1rem .25rem; font-size: .6875rem; white-space: nowrap; }
   @media (max-width: 59.999rem) {
-    .top:has(+ .decide) { padding: .25rem 0 0; }
     .decide-preview { margin: .25rem 0 .5rem; padding: .75rem; }
     .decide-preview .mocks { grid-auto-columns: min(85%, 8rem); --tall: min(20svh, 10rem); }
     .decide-preview .shot { aspect-ratio: 1; }
     .decide .lead h2 { margin: 1rem 0 .5rem; }
-    .decide .pick-label { margin: .5rem 0; }
-    .decide .silent-line { margin: .5rem 0; }
-    .decide .pick-option { min-height: 3.125rem; padding: .5rem 1rem .5rem 0; }
+    .decide .pick-label { margin-top: 1rem; }
     body:has(.decide) #toast { bottom: calc(9.5rem + env(safe-area-inset-bottom)); }
   }
-  .decide h2 { margin: .5rem 0 .5rem; font-size: 1.75rem; line-height: 1.15; letter-spacing: -.01em; }
+  .decide h2 { margin: .5rem 0 .5rem; text-wrap: balance; font-size: 1.75rem; line-height: 1.15; letter-spacing: -.01em; }
   .decide .why { margin: 0; color: var(--muted); font-size: 1.0625rem; font-weight: 400; }
-  .pick-label { margin: 1rem 0 .5rem; color: var(--muted); font-size: .875rem; letter-spacing: .02em; }
+  .pick-label { margin: 1.75rem 0 0; padding: 0 1rem .5rem; color: var(--muted); font-size: .875rem; line-height: 1.1875rem; letter-spacing: .02em; }
   .pick-list { list-style: none; margin: 0; padding: 0 0 0 1rem; overflow: hidden; border-radius: 1rem; background: var(--surface); }
   .pick-list li + li { border-top: .5px solid var(--line); }
-  .pick-option { display: flex; width: 100%; min-height: 2.75rem; align-items: center; gap: .75rem; padding: .5rem 1rem .5rem 0; border: 0; border-radius: 0; background: transparent; text-align: left; }
+  .pick-option { display: flex; width: 100%; min-height: 3.5rem; align-items: center; gap: .75rem; padding: .625rem 1rem .625rem 0; border: 0; border-radius: 0; background: transparent; text-align: left; }
   .pick-option .words { display: grid; flex: 1; min-width: 0; gap: .125rem; }
   .pick-option .label-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 .5rem; }
   .pick-option .label { font-size: 1.0625rem; line-height: 1.3; }
   .pick-option .reason { color: var(--muted); font-size: 0.9375rem; line-height: 1.35; }
   .pick-option .recommend { color: var(--accent); font-size: .9375rem; }
-  .pick-option .check { width: 1.5rem; color: var(--accent); font-size: 1.5rem; visibility: hidden; }
-  .pick-option[aria-pressed="true"] { color: var(--text); background: transparent; font-weight: 400; }
+  .pick-option .check { display: inline-flex; color: var(--accent); visibility: hidden; } .pick-option .check .glyph { width: 1.375rem; height: 1.375rem; stroke-width: 2.4; }
+  .pick-option, .pick-option[aria-pressed="true"] { color: var(--text); background: transparent; font-weight: 400; }
+  .pick-option[aria-pressed="true"] .reason { color: var(--muted); }
   .pick-option[aria-pressed="true"]::before { content: none; }
   .pick-option[aria-pressed="true"] .check { visibility: visible; }
-  .silent-line { display: flex; gap: 0.625rem; align-items: flex-start; margin: 1.25rem 0; color: var(--muted); font-size: 0.9375rem; line-height: 1.4; }
+  .silent-line { display: flex; flex-basis: 100%; gap: 0.625rem; align-items: flex-start; margin: 0; padding: 0 .25rem .25rem; color: var(--muted); font-size: 0.9375rem; line-height: 1.4; letter-spacing: -0.016em; }
   .silent-line b { color: var(--text); font-weight: 600; }
   .silent-line .icon { width: 1.0625rem; height: 1.0625rem; margin-top: 0.125rem; background: none; } .silent-line .icon svg { width: 1.0625rem; height: 1.0625rem; stroke: currentColor; }
-  .pager { position: absolute; top: .5rem; right: 0; display: flex; align-items: center; color: var(--muted); font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  .pager { position: absolute; top: 0; right: 0; display: flex; align-items: center; gap: .25rem; height: 3.25rem; color: var(--muted); font-size: .9375rem; font-variant-numeric: tabular-nums; }
   .pager .of { white-space: nowrap; }
-  .pager .step { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; color: var(--accent); font-size: 1.75rem; text-decoration: none; }
-  .pager .step[aria-disabled] { color: var(--muted); opacity: .4; }
+  .pager .step { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: 50%; color: var(--accent); text-decoration: none; }
+  .pager .step[aria-disabled] { opacity: .3; }
+  .pager .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.75; }
+  @media (min-width: 60rem) { .pager { height: 3.75rem; } }
   .decide-lists { margin-top: 2rem; }
-  .decide-lists .sec-head { margin: 0 0 .5rem; } .decide-lists .rows + .sec-head { margin-top: 1.75rem; }
+  /* Your own words, a note, another round: the design has no place for them, so they sit under the lists. */
+  .decide-other { margin-top: 1.75rem; } .decide-other .other > summary { padding-left: 1rem; color: var(--accent); font-size: 1.0625rem; font-weight: 400; }
+  .decide-lists .sec-head { margin: 1.75rem 0 .5rem; } .decide-lists .rows + .sec-head { margin-top: 1.75rem; }
   .decide-lists .sec-head h2 { color: var(--muted); font-size: .8125rem; font-weight: 400; letter-spacing: .02em; text-transform: uppercase; }
-  .decide-lists .compact strong { font-weight: 400; } .decide-lists .compact .meta { font-size: .9375rem; }
+  .decide-lists .compact strong { font-weight: 400; line-height: 1.375rem; } .decide-lists .compact .meta { margin: .0625rem 0 0; font-size: .9375rem; line-height: 1.25rem; }
+  .decide-lists .rows { padding-left: 1rem; } .decide-lists .compact { min-height: 3.5rem; box-sizing: border-box; padding: .625rem 0; }
   .decide-lists .compact .thumb { width: 2rem; height: 2rem; border-radius: .5rem; }
   .decide-lists .compact .icon { width: 2rem; height: 2rem; border-radius: .5rem; }
   .decide-lists a.compact::after { content: "" / ""; flex: none; width: .5rem; height: .5rem; margin-right: .5rem; border: solid var(--border); border-width: 2px 2px 0 0; transform: rotate(45deg); }
-  .decide-bar { position: sticky; z-index: 1; bottom: calc(4rem + env(safe-area-inset-bottom)); display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
-    padding: .75rem 0; background: var(--bg); }
+  .decide-bar { position: sticky; z-index: 1; bottom: calc(4.125rem + env(safe-area-inset-bottom)); display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
+    margin-top: 1rem; padding: .75rem 0 .5rem; background: var(--bg); }
   /* Answer takes the row on one line; when a long label leaves no room, Skip and Later move under it rather than squeeze it. */
   .decide-bar > * { white-space: nowrap; }
   .decide-bar .answer { flex: 1 1 auto; background: var(--action); color: var(--on-accent); font-weight: 400; }
@@ -393,6 +439,11 @@
   #reader .ev-scroll { flex: 1; min-height: 0; overflow: auto; padding: 1rem 1.25rem 3rem; }
   .ev-item { display: grid; gap: 1rem; max-width: 42.5rem; margin: 0 auto; }
   .ev-hero { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; padding: 2rem 1.5rem; border-radius: 1.125rem; background: var(--surface); }
+  /* The update's capture in a full phone frame, filling the card as in the design; a wide one gets the slimmer bezel and the width. */
+  .phone.full { width: min(250px, 64%); padding: 9px; border-radius: 40px; }
+  .phone.full img { border-radius: 31px; } .phone.full.wide { width: min(100%, 36rem); padding: 7px; border-radius: 18px; } .phone.full.wide img { border-radius: 11px; }
+  .ev-hero:has(.phone.full) { padding: 2rem 1.5rem; } .ev-hero a { display: contents; } .ev-hero .phone img { max-height: none; aspect-ratio: 10 / 17; object-fit: cover; object-position: top; } .ev-hero .phone.wide img { aspect-ratio: 16 / 10; }
+  @media (min-width: 60rem) { .phone.full { width: 210px; } }
   .ev-hero img, .ev-hero video { display: block; max-width: 100%; max-height: min(26rem, 55vh); border-radius: 0.75rem; }
   .ev-hero .gone { margin: 0; color: var(--danger); font-size: 0.9375rem; }
   .ev-say { text-align: center; }
@@ -664,7 +715,8 @@
     .plan-copy { padding: 2rem; }
     .plan-copy h2 { font-size: 1.75rem; line-height: 1.1429; }
     .decide h2 { font-size: 2.5rem; line-height: 1.1; }
-    .decide-bar { position: static; margin: 1rem 0 0; padding: .75rem 0; background: transparent; }
+    .decide-bar { position: static; margin: 1rem 0 0; padding: 0; background: transparent; }
+    .decide-bar .answer { flex: none; }
     .rows.reports, .sec-h:has(+ .reports), .legend { max-width: 50rem; }
     /* Evidence sets its cards two across, the whole capture on each tile; a page that is not an update keeps the whole width. */
     .ev-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; }
@@ -1042,12 +1094,23 @@
       const url = src(path);
       const name = d.type === 'explainer' ? `Explainer video, ${d.title}` : `${d.type === 'evidence' ? `Update ${d.number}` : 'Proof'}, capture ${i + 1} of ${files.length}`;
       const node = video ? el('video', { src: url, controls: '', playsinline: '', preload: 'metadata', 'aria-label': name })
-        : el('a', { href: url, target: '_blank', rel: 'noopener', 'aria-label': `Open ${name}` }, el('img', { src: url, alt: name }));
-      (node.tagName === 'A' ? node.firstChild : node).onerror = () => node.replaceWith(el('p', { class: 'gone' }, `${name} can't be shown: the file is missing, changed since it was posted, or in a format this browser can't play.`));
+        : el('a', { href: url, target: '_blank', rel: 'noopener', 'aria-label': `Open ${name}` }, cls === 'ev-hero' ? framed(el('img', { src: url, alt: name }), 'full') : el('img', { src: url, alt: name }));
+      (node.tagName === 'A' ? node.querySelector('img') : node).onerror = () => node.replaceWith(el('p', { class: 'gone' }, `${name} can't be shown: the file is missing, changed since it was posted, or in a format this browser can't play.`));
       return node;
     }));
   }
   const proof = (d) => captures(d, 'media proof');
+  /** A capture in a device frame; a wide one (a desktop screen) gets the slimmer bezel. */
+  const framed = (img, cls = '') => { const f = el('span', { class: `phone ${cls}`.trim() }, img); img.addEventListener('load', () => img.naturalWidth / img.naturalHeight > 0.8 && f.classList.add('wide')); return f; };
+  /** The proof an ask rests on, as the top of Decide: its capture in a frame, the check's result and a way into the whole proof. */
+  function proofHero(d) {
+    const of = (d.proof && state.decisions.find((x) => x.key === d.proof)) || d, url = pic(of);
+    if (!url) return '';
+    const img = el('img', { src: src(url), alt: '' }), result = RESULT[of.evidenceCard?.result], update = of.type === 'evidence';
+    img.onerror = () => img.closest('.dhero')?.remove();
+    return el('a', { class: 'dhero', href: update ? `#evidence/${of.key}` : src(url), ...(!update && { target: '_blank', rel: 'noopener' }), 'aria-label': `View proof, ${headline(of)}` },
+      result ? el('span', { class: `pass ${result[0]}` }, mark(result[0]), result[2]) : '', el('span', { class: 'open' }, 'View proof'), framed(img));
+  }
 
   /** A result's mark: the pass tick only for passed proof, a cross for failed, an alert for not finished or unchecked. */
   const mark = (kind) => { const s = el('span', { 'aria-hidden': 'true' }); s.innerHTML = kind === 'ok'
@@ -1255,11 +1318,14 @@
     reports: 'M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z',
     answered: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM9 12l2 2 4-4',
     plan: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7zM14 2v6h6M8 13h8M8 17h8M8 9h2',
+    calendar: 'M8 2v4M16 2v4M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM3 10h18',
+    list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
+    split: 'M16 3h5v5M8 3H3v5M12 22v-8.3a4 4 0 0 0-1.17-2.87L3 3M15 9l6-6',
     clock: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 6v6l4 2',
     you: 'M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4.5 20.5c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5' };
   // The drawings are fixed strings from this page, never text from the board file.
   // Small stroke drawings the plan page puts beside a button label or in a section badge; fixed strings from this page.
-  const GLYPHS = { check: '<path d="M20 6 9 17l-5-5"/>', pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
+  const GLYPHS = { left: '<path d="m15 18-6-6 6-6"/>', right: '<path d="m9 18 6-6-6-6"/>', check: '<path d="M20 6 9 17l-5-5"/>', pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
     send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.112z"/><path d="m21.854 2.147-10.94 10.939"/>' };
   const glyph = (a) => { const s = el('span', { 'aria-hidden': 'true', style: 'display:inline-flex' }); s.innerHTML = `<svg class="glyph" viewBox="0 0 24 24">${GLYPHS[a]}</svg>`; return s; };
   const icon = (a) => { const s = el('span', { class: `icon i-${a}`, 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[a]}"/></svg>`; return s; };
@@ -1391,6 +1457,11 @@
   /** A short row: a picture (or the area's mark) and the title; an answered item has its answer and time under the title. */
   const compact = (d, a) => {
     const s = state.answers[d.key];
+    if (d.type === 'plan' && s?.answer === 'sent') {
+      const changes = (s.notes ?? []).filter((n) => n.verdict === 'change').length, picks = Object.keys(s.decisions ?? {}).length;
+      return [Object.assign(icon('plan'), { className: 'icon i-plan sent' }), el('span', { class: 't' }, el('strong', { dir: 'auto' }, title(d)),
+        el('span', { class: 'sent-line' }, glyph('check'), 'Sent back'), el('span', { class: 'meta' }, `${plural(changes, 'change')}, ${plural(picks, 'decision')} · ${when(s.at)}`))];
+    }
     return [thumb(d.type === 'plan' ? 'plan' : a, pic(d)), el('span', { class: 't' }, el('strong', { dir: 'auto' }, title(d)), s
       ? el('span', { class: 'ans' }, el('b', { dir: 'auto' }, s.answer === 'text' ? 'Your reply' : s.label), el('time', {}, when(s.at)))
       : el('span', { class: 'meta', dir: 'auto' }, sub(d)))];
@@ -1416,7 +1487,7 @@
       return el('li', {}, box, xBtn(d));
     };
     const fresh = items.filter((d) => isToday(state.answers[d.key].at)), older = items.filter((d) => !fresh.includes(d));
-    return [['Done today', fresh], ['Earlier', older]].filter(([, list]) => list.length).flatMap(([name, list], i) => [
+    return [['Today', fresh], ['Earlier', older]].filter(([, list]) => list.length).flatMap(([name, list], i) => [
       el('div', { class: 'sec-head' }, el('h2', {}, name), i ? '' : clearAll(items)), el('ul', { class: 'card rows i-answered' }, ...list.map(line))]);
   }
 
@@ -1507,9 +1578,20 @@
         saved.note ? el('p', { dir: 'auto' }, `Your whole-plan comment: ${saved.note}`) : ''));
     }
     main.append(el('p', { class: 'eyebrow' }, icon('plan'), ['Plan', d.project, `Planning agent${d.filed ? `, ${when(d.filed)}` : ''}`].filter(Boolean).join(' · ')), el('h2', { dir: 'auto' }, d.title), el('p', { dir: 'auto' }, d.about ?? ''));
-    if (!saved) main.append(el('iframe', { class: 'plan-view', src: url, title: `Plan: ${d.title}`, sandbox: 'allow-scripts' }),
+    if (!saved) main.append(el('figure', { class: 'plan-diagram' }, el('iframe', { class: 'plan-view', src: url, title: `Plan: ${d.title}`, sandbox: 'allow-scripts' })),
       el('p', { class: 'plan-summary' }, icon('plan'), `${plural(d.sections.length, 'section')} to approve or change, and ${plural(d.decisions.length, 'decision')} to make. Nothing is built until you send back.`));
-    main.append(el('h2', {}, saved ? 'What you sent' : 'The plan'), saved ? '' : el('p', { class: 'meta' }, 'Approve or change each part. A change needs a note, an approval can carry a comment, and a decision takes an option or your own words.'));
+    main.append(el('h2', { class: 'plan-h' }, saved ? 'What you sent' : 'The plan', saved ? '' : el('small', {}, 'Approve or change each part')));
+    // Each decision sits under the section it names, else after the last; the explainer sits in the architecture section, else the last.
+    const lastId = d.sections.at(-1).id, under = (id) => d.decisions.filter((q) => (d.sections.some((s) => s.id === q.after) ? q.after : lastId) === id);
+    const hostId = (d.sections.find((s) => /architect/i.test(s.id + s.heading)) ?? d.sections.at(-1)).id;
+    let explainer = '';
+    if (d.steps?.length && !saved) {
+      let step = 0;
+      const head = el('p', { class: 'eh' }, 'How it works', el('span', {})), text = el('p', { 'aria-live': 'polite', class: 'narr' }), prev = el('button', { class: 'rnd', 'aria-label': 'Previous step' }, glyph('left')), next = el('button', { class: 'rnd', 'aria-label': 'Next step' }, glyph('right'));
+      const draw = () => { head.lastChild.textContent = `Step ${step + 1} of ${d.steps.length}`; text.textContent = d.steps[step].text ?? d.steps[step].title; prev.disabled = !step; next.disabled = step === d.steps.length - 1; };
+      prev.onclick = () => { step--; draw(); }; next.onclick = () => { step++; draw(); }; draw();
+      explainer = el('div', { class: 'plan-explain' }, head, text, el('div', { class: 'foot' }, prev, next));
+    }
     d.sections.forEach((s, i) => {
       const card = el('section', { class: 'plan-section', id: `plan-section-${s.id}`, 'aria-label': s.heading });
       const approve = el('button', { class: 'approve', 'aria-label': `Approve, ${s.heading}` }, glyph('check'), 'Approve'), badge = el('span', { class: 'num', 'aria-hidden': 'true' }, String(i + 1));
@@ -1536,37 +1618,35 @@
         remember(); draw(); if (n) field.focus();
       });
       field.oninput = () => { notes.set(s.id, { section: s.id, verdict: notes.get(s.id)?.verdict ?? 'change', note: field.value }); remember(); draw(); };
-      card.append(el('h3', { dir: 'auto' }, badge, s.heading), el('p', { dir: 'auto' }, s.body), el('div', { class: 'plan-verdicts', role: 'group', 'aria-label': s.heading }, approve, change), note);
+      card.append(el('h3', { dir: 'auto' }, badge, s.heading), el('p', { dir: 'auto' }, s.body), s.id === hostId && explainer ? explainer : '', el('div', { class: 'plan-verdicts', role: 'group', 'aria-label': s.heading }, approve, change), note);
       main.append(card); draw();
+      under(s.id).forEach((q) => main.append(decisionCard(q)));
     });
-    if (d.decisions.length) main.append(el('h2', {}, 'Decisions for you'));
-    d.decisions.forEach((q) => {
+    function decisionCard(q) {
       const choices = el('div', { class: 'choices', role: 'group', 'aria-label': q.question });
       const other = el('textarea', { id: `plan-other-${q.key}`, maxlength: '500', placeholder: 'Other: write your own answer' });
       other.value = q.options.some((o) => o.value === picks.get(q.key)) ? '' : (picks.get(q.key) ?? '');
       other.disabled = ro;
       const press = () => [...choices.children].forEach((b, i) => b.setAttribute('aria-pressed', q.options[i].value === picks.get(q.key)));
+      const n = d.decisions.indexOf(q) + 1;
       other.oninput = () => {
         if (other.value.trim()) picks.set(q.key, other.value);
         else if (!q.options.some((o) => o.value === picks.get(q.key))) picks.delete(q.key);
         remember(); press(); update();
       };
       q.options.forEach((o) => {
-        const b = el('button', { 'aria-pressed': picks.get(q.key) === o.value, ...(ro && { disabled: '' }) }, el('strong', {}, o.label),
-          o.value === q.recommend ? el('span', { class: 'tag' }, 'Recommended') : '', el('span', { class: 'out', dir: 'auto' }, o.outcome));
+        const b = el('button', { 'aria-pressed': picks.get(q.key) === o.value, ...(ro && { disabled: '' }) }, el('span', { class: 'rd' }, glyph('check')), el('span', { class: 'lbl' }, el('strong', {}, o.label),
+          o.value === q.recommend ? el('span', { class: 'tag' }, 'Recommended') : ''), el('span', { class: 'out', dir: 'auto' }, o.outcome),
+          o.value === q.recommend && q.reason ? el('span', { class: 'out why2', dir: 'auto' }, `Why: ${q.reason}`) : '');
         b.onclick = () => { picks.set(q.key, o.value); other.value = ''; remember(); press(); update(); };
         choices.append(b);
       });
-      main.append(el('section', { class: 'plan-decision', id: `plan-decision-${q.key}` }, el('h3', { dir: 'auto' }, q.question), el('p', { class: 'meta', dir: 'auto' }, q.why), choices,
-        el('label', { for: other.id }, 'Other (optional)', other)));
-    });
-    if (d.steps?.length && !saved) {
-      let step = 0;
-      const text = el('p', { 'aria-live': 'polite' }), prev = el('button', { 'aria-label': 'Previous step' }, '‹ Previous'), next = el('button', { 'aria-label': 'Next step' }, 'Next ›');
-      const draw = () => { text.textContent = `Step ${step + 1} of ${d.steps.length}: ${d.steps[step].title}`; prev.disabled = !step; next.disabled = step === d.steps.length - 1; };
-      prev.onclick = () => { step--; draw(); }; next.onclick = () => { step++; draw(); }; draw();
-      main.append(el('section', { class: 'plan-explain' }, el('h3', {}, 'How it works'), text, el('div', { class: 'foot' }, prev, next), el('p', { class: 'meta' }, 'The direction page above explains these steps.')));
+      return el('section', { class: 'plan-decision', id: `plan-decision-${q.key}` }, el('p', { class: 'eyebrow' }, icon('split'), `Decision ${n} of ${d.decisions.length}`), el('h3', { dir: 'auto' }, q.question), el('p', { class: 'meta', dir: 'auto' }, q.why), choices,
+        el('details', { class: 'plan-other' }, el('summary', {}, 'Other answer'), el('label', { for: other.id }, 'Your own answer (optional)', other)),
+        el('p', { class: 'quiet' }, icon('clock'), el('span', {}, el('b', {}, 'If you stay quiet:'), ' the plan waits, and the agent builds nothing until you send back.')));
     }
+    if (!saved) main.append(el('details', { class: 'plan-fold' }, el('summary', {}, 'What the agent gets back'), el('p', {}, 'One send-back with every answer: each section as Approve or Change with your note, and the option you picked in each decision.'),
+      el('p', {}, 'The agent acts on each change note and each pick, then posts round 2 of the plan here.')));
     const commentBox = el('textarea', { id: 'plan-comment', maxlength: '500', placeholder: 'Comment for the agent on the whole plan' });
     commentBox.value = comment;
     commentBox.disabled = ro;
@@ -1732,7 +1812,7 @@
     if (change) { const s = el('span', { 'aria-hidden': 'true' }); s.innerHTML = '<svg viewBox="0 0 24 24"><path d="M14 3h7v7M21 3l-9 9M19 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/></svg>'; out.append(s); }
     // A report's page reads under its own head: what it is and when, its title, what it says and decided; a plan or a design keeps its title in the bar;
     // an update shows its own title on its screen, with the change link in the bar.
-    reader.replaceChildren(...(d.type === 'plan' ? [el('header', {}, back, h1), planReview(d, url)] : d.kind === 'design' ? [el('header', {}, back, h1), designReview(d)]
+    reader.replaceChildren(...(d.type === 'plan' ? [el('header', {}, back, Object.assign(h1, { className: 'plan-name' })), planReview(d, url)] : d.kind === 'design' ? [el('header', {}, back, h1), designReview(d)]
       : d.type === 'evidence' ? [el('header', {}, back, out), evidenceItem(d)]
       : [el('header', {}, back), el('div', { class: 'read' }, el('p', { class: 'eyebrow' }, [kind(d) || 'Report', d.filed ? when(d.filed) : ''].filter(Boolean).join(' · ')), h1,
         d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided(d), el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }), dismissReport(d))]));
@@ -1798,10 +1878,10 @@
   }
   /** The plan is the lead card; the remaining asks are a grouped list linking to a focused decision. */
   function planCard(d) {
-    const meta = [el('span', {}, plural(d.sections.length, 'section')), el('span', {}, plural(d.decisions.length, 'decision')),
-      el('span', {}, `Agent${d.filed ? ` · ${when(d.filed)}` : ''}`)];
+    const meta = [el('span', {}, icon('list'), plural(d.sections.length, 'section')), el('span', {}, icon('split'), plural(d.decisions.length, 'decision')),
+      el('span', {}, icon('clock'), `Planning agent${d.filed ? `, ${when(d.filed)}` : ''}`)];
     return el('article', { class: 'plan-hero', id: `item-${d.key}` }, el('div', { class: 'plan-preview' }, rung(d)),
-      el('div', { class: 'plan-copy' }, el('p', { class: 'eyebrow' }, `Plan${d.project ? ` · ${d.project}` : ''}`),
+      el('div', { class: 'plan-copy' }, el('p', { class: 'eyebrow' }, icon('plan'), `Plan${d.project ? ` · ${d.project}` : ''}`),
         el('h2', { dir: 'auto' }, d.title), el('p', { class: 'about', dir: 'auto' }, d.about ?? ''),
         el('div', { class: 'plan-meta' }, ...meta), el('a', { class: 'open-link plan-open', href: `#waiting/${d.key}` }, 'Open plan')));
   }
@@ -1816,10 +1896,9 @@
   function waitingPage(items, hidden) {
     const plans = items.filter((d) => d.type === 'plan'), asks = items.filter((d) => d.type !== 'plan');
     const rows = asks.map((d) => {
-      const label = `Agent${d.silent_by ? ` · closes at ${when(d.silent_by)}` : d.filed ? ` · waiting since ${when(d.filed)}` : ''}`;
+      const label = `${d.filer || 'Agent'}${d.silent_by ? ` · closes at ${when(d.silent_by)}` : d.filed ? ` · waiting since ${when(d.filed)}` : ''}`;
       const link = el('a', { class: 'ask-card', id: `item-${d.key}`, href: askHref(d) }, icon(askIcon(d)),
-        el('span', { class: 'copy' }, el('span', { class: 'kind' }, kind(d), badge(d)), el('strong', { class: 'title', dir: 'auto' }, title(d)),
-          d.why || d.about ? el('span', { class: 'meta', dir: 'auto' }, d.why || d.about) : '', el('span', { class: 'meta' }, label)));
+        el('span', { class: 'copy' }, el('strong', { class: 'title', dir: 'auto' }, title(d)), el('span', { class: 'meta' }, label, badge(d))));
       return el('li', {}, link, xBtn(d));
     });
     return el('div', { class: 'waiting-page' },
@@ -1831,28 +1910,31 @@
   const pager = (queue, i) => {
     const step = (to, label, mark) => to < 0 || to >= queue.length ? el('span', { class: 'step', 'aria-disabled': 'true', 'aria-label': label }, mark)
       : el('a', { class: 'step', href: `#decide/${queue[to].key}`, 'aria-label': label }, mark);
-    return el('nav', { class: 'pager', 'aria-label': 'Asks' }, step(i - 1, 'Previous ask', '‹'), el('span', { class: 'of' }, `${i + 1} of ${queue.length}`), step(i + 1, 'Next ask', '›'));
+    return el('nav', { class: 'pager', 'aria-label': 'Asks' }, step(i - 1, 'Previous ask', glyph('left')), el('span', { class: 'of' }, `${i + 1} of ${queue.length}`), step(i + 1, 'Next ask', glyph('right')));
   };
   /** Under the actions: the other open asks, then what was answered today; the first opens on Decide, the second only reads. */
+  let decideCtx = { all: [], shown: [], hidden: [] };
   function decideLists(d, queue) {
     const group = (name, rows) => rows.length ? [el('div', { class: 'sec-head' }, el('h2', {}, name)), el('ul', { class: 'card rows' }, ...rows)] : [];
-    const up = queue.filter((x) => x.key !== d.key).map((x) => el('li', {}, el('a', { class: 'compact', href: `#decide/${x.key}` },
-      thumb('waiting', pic(x)), el('span', { class: 't' }, el('strong', { dir: 'auto' }, title(x)), el('span', { class: 'meta' }, x.silent_by ? `Closes at ${when(x.silent_by)}` : 'No deadline')))));
     const fresh = state.decisions.filter((x) => isAnswered(x) && isToday(state.answers[x.key].at)).sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at))
-      .map((x) => el('li', {}, el('div', { class: 'compact' }, ...compact(x, 'answered'))));
-    return el('div', { class: 'decide-lists' }, ...group('Up next', up), ...group('Answered today', fresh));
+      .map((x) => { const a = state.answers[x.key]; return el('li', {}, el('div', { class: 'compact' }, el('span', { class: 't' }, el('strong', { dir: 'auto' }, title(x)),
+        el('span', { class: 'meta', dir: 'auto' }, `${a.answer === 'text' ? 'Your reply' : a.label} · ${when(a.at)}`)))); });
+    // Everything the Waiting list has: its type chips and sort, plans, the other asks (a design pick opens Designs) with their ×, and Dismissed.
+    const rest = decideCtx.shown.filter((x) => x.key !== d?.key), waiting = state.readonly || !(rest.length || decideCtx.hidden.length) ? '' : [filters(decideCtx.all), waitingPage(rest, decideCtx.hidden)];
+    return el('div', { class: 'decide-lists' }, ...[waiting].flat(), ...group('Answered today', fresh));
   }
   function decidePage(d, next, queue = []) {
     if (!d) return el('p', { class: 'empty' }, EMPTY.waiting);
     const to = next ? `#decide/${next.key}` : '#waiting', skip = next && !state.readonly ? el('button', { class: 'skip' }, 'Skip for now') : null;
     if (skip) skip.onclick = () => (location.hash = to);
+    const goNext = next && !state.readonly ? () => (location.hash = to) : null;
     const swipe = (page, right) => {
       let start;
       page.addEventListener('touchstart', (e) => (start = e.target.closest('.mocks, textarea') ? null : e.touches[0]), { passive: true });
       page.addEventListener('touchend', (e) => {
         const t = e.changedTouches[0], dx = start ? t.clientX - start.clientX : 0;
         if (!start || Math.abs(dx) <= 90 || Math.abs(t.clientY - start.clientY) >= Math.abs(dx) / 2) return;
-        if (dx > 0) right?.(); else skip?.click();
+        if (dx > 0) right?.(); else goNext?.();
       });
     };
     if (d.type === 'signin') {
@@ -1867,7 +1949,7 @@
     const optionButtons = opts.map((o) => {
       const recommended = o.value === d.recommend_value, b = el('button', { class: 'pick-option', 'aria-pressed': String(o.value === initial) },
         el('span', { class: 'words' }, el('span', { class: 'label-line' }, el('span', { class: 'label' }, o.label),
-          recommended ? el('span', { class: 'recommend' }, 'Recommended') : ''), o.outcome ? el('span', { class: 'reason', dir: 'auto' }, o.outcome) : ''), el('span', { class: 'check', 'aria-hidden': 'true' }, '✓'));
+          recommended ? el('span', { class: 'recommend' }, 'Recommended') : ''), o.outcome ? el('span', { class: 'reason', dir: 'auto' }, o.outcome) : ''), el('span', { class: 'check', 'aria-hidden': 'true' }, glyph('check')));
       b.onclick = () => { selected.set(d.key, o.value); optionButtons.forEach((btn) => btn.setAttribute('aria-pressed', String(btn === b))); answer.textContent = `Answer ${o.label}`; };
       return b;
     });
@@ -1877,20 +1959,20 @@
     answer.onclick = () => { const o = selectedOption(); if (o) answerWith(o); };
     const recOpt = opts.find((o) => o.value === d.recommend_value);
     const cards = d.mocks?.length && d.options?.length ? mockCards(d, []) : null;
-    const preview = cards ?? (d.view ? rung(d) : pic(d) ? thumb('waiting', pic(d)) : proof(d));
+    const hero = cards || d.view ? '' : proofHero(d), preview = hero || (cards ?? (d.view ? rung(d) : proof(d)));
     const quiet = opts.find((o) => o.value === d.default_if_silent);
-    const silent = quiet ? [icon('clock'), el('span', {}, el('b', {}, 'If you stay quiet:'), ` ${quiet.label}${d.silent_by ? ` · ${left(d.silent_by)}` : ''}`)] : '';
-    const head = el('div', { class: 'lead' }, el('p', { class: 'eyebrow' }, kind(d), badge(d)), el('h2', { dir: 'auto' }, headline(d)));
+    const silent = quiet ? [icon('clock'), el('span', {}, el('b', {}, 'If you stay quiet:'), ` ${quiet.outcome ?? quiet.label}${d.silent_by ? ` At ${when(d.silent_by)}. ${left(d.silent_by)}.` : ''}`)] : '';
+    const head = el('div', { class: 'lead' }, badge(d), el('h2', { dir: 'auto' }, headline(d)));
     const why = unchecked(d) || d.why || d.tradeoff || d.about;
     const back = el('a', { class: 'later', href: '#waiting' }, 'Later');
-    const page = el('section', { class: 'decide' }, preview ? el('div', { class: 'decide-preview' }, preview) : '',
+    const page = el('section', { class: 'decide' }, hero || (preview ? el('div', { class: 'decide-preview' }, preview) : ''),
       ...(d.mocks?.length ? [annotations(d)] : []), head,
       why ? el('p', { class: 'why', dir: 'auto' }, why) : '',
       ...(live && opts.length ? [el('p', { class: 'pick-label' }, typeOf(d) === 'yes-no' ? 'YES OR NO' : 'PICK ONE'),
         el('ul', { class: 'pick-list', 'aria-label': d.title }, ...optionButtons.map((b) => el('li', {}, b)))] : []),
-      ...(live ? [other(d, answerOf(d.key), err, () => (location.hash = to))] : []),
-      silent ? el('p', { class: 'silent-line' }, ...silent) : '', err,
-      el('div', { class: 'decide-bar' }, live && opts.length ? answer : '', skip || '', back), decideLists(d, queue));
+      err,
+      el('div', { class: 'decide-bar' }, silent ? el('p', { class: 'silent-line' }, ...silent) : '', live && opts.length ? answer : '', skip || '', back), decideLists(d, queue),
+      ...(live ? [el('div', { class: 'decide-other' }, other(d, answerOf(d.key), err, () => (location.hash = to)))] : []));
     if (live) swipe(page, () => { if (recOpt && !answer.disabled) answerWith(recOpt); });
     return page;
   }
@@ -1901,7 +1983,7 @@
     const k = e.key.toLowerCase(), onDecide = /^#decide\//.test(location.hash), choices = [...document.querySelectorAll('.decide .pick-option')];
     const pick = onDecide && /^[1-9]$/.test(k) ? choices[Number(k) - 1] : null;
     if (pick) { e.preventDefault(); pick.click(); document.querySelector('.decide-bar .answer')?.click(); return; }
-    const act = k === 'e' && onDecide ? document.querySelector('.decide .skip') : k === 'z' && (location.hash === '#waiting' || onDecide) && !toast.hidden && !undoBtn.hidden ? undoBtn : null;
+    const act = k === 'e' && onDecide ? document.querySelector('.decide .skip, .pager .step:last-child:not([aria-disabled])') : k === 'z' && (location.hash === '#waiting' || onDecide) && !toast.hidden && !undoBtn.hidden ? undoBtn : null;
     if (act && !act.disabled) e.preventDefault(), act.click();
   });
 
@@ -1926,6 +2008,7 @@
     if (waitType !== 'all' && !by.waiting.some((d) => typeOf(d) === waitType)) waitType = 'all';
     const shown = waitType === 'all' ? by.waiting : by.waiting.filter((d) => typeOf(d) === waitType);
     const hidden = state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'waiting');
+    decideCtx = { all: by.waiting, shown, hidden };
     by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
     const [, at, key] = /^#(waiting|decide|designs|evidence|reports|answered)(?:\/([\w.-]+))?$/.exec(location.hash) ?? [];
     const decideQueue = by.waiting.filter((d) => d.type === 'signin' || (d.type !== 'plan' && d.kind !== 'design'));
@@ -1953,10 +2036,10 @@
     at === 'waiting' && !state.readonly && by.waiting.length ? el('p', { class: 'lede waiting-lede' }, `${shown.length} ${shown.length === 1 ? 'item needs' : 'items need'} you · ${dateLine()}`)
       : at === 'reports' && !state.readonly && by.reports.length ? el('p', { class: 'lede' }, by.reports.some((d) => d.steps)
       ? 'How the tools work, step by step. Tap one to open it.' : 'Explainers you asked for, or that a decision needs.')
-      : at === 'answered' && by.answered.length ? el('p', { class: 'lede' }, `${by.answered.filter((d) => isToday(state.answers[d.key].at)).length} answered today.`)
+      : at === 'answered' && by.answered.length ? el('p', { class: 'lede' }, (() => { const n = by.answered.filter((d) => isToday(state.answers[d.key].at)).length; return `${n} ${n === 1 ? 'answer' : 'answers'} today. Each one has gone back to its agent.`; })())
       : at === 'evidence' && by.evidence.length ? el('p', { class: 'lede' }, 'Passed proof that a change works, newest first.') : '');
     document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [filters(by.waiting), waitingPage(shown, hidden)]
-      : at === 'decide' ? [decideAt < 0 ? el('p', { class: 'empty' }, 'Nothing to decide for that question.')
+      : at === 'decide' ? [decideAt < 0 ? (key ? el('p', { class: 'empty' }, 'Nothing to decide for that question.') : el('div', { class: 'decide' }, decideLists(null, decideQueue)))
         : decidePage(decideQueue[decideAt], decideQueue.length > 1 ? decideQueue[(decideAt + 1) % decideQueue.length] : undefined, decideQueue)]
       : at === 'designs' ? [...designGroups(by.designs)] : at === 'evidence' ? evidenceGroups(by.evidence) : at === 'reports' && !state.readonly ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
         ...(by.reports.length ? reportGroups(by.reports) : [el('p', { class: 'empty' }, EMPTY.reports)]), notes(by.notes)] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [at === 'waiting' ? filters(by.waiting) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...(at === 'waiting' ? shown : by[at]).map(row))

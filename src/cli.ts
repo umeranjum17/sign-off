@@ -64,7 +64,7 @@ examples:
   sign-off-axi
   sign-off-axi list ./decisions.json --full
 `,
-  raise: `usage: sign-off-axi raise [board.json] --title "<question>" [--key <key>] [--about <text>] [--detail <text>] --why <text> [--option <value>=<label>]... --outcome <value>=<text>... --recommend <value> --recommend-reason <text> --default <value> [--silent-by <ISO time>] [--merge <key>]... [--close done|release] [--filer <id>]
+  raise: `usage: sign-off-axi raise [board.json] --title "<question>" [--key <key>] [--about <text>] [--detail <text>] --why <text> [--option <value>=<label>]... --outcome <value>=<text>... --recommend <value> --recommend-reason <text> --default <value> [--silent-by <ISO time>] [--merge <key>]... [--proof <key>] [--close done|release] [--filer <id>]
        sign-off-axi raise [board.json] --from <decisions.json> [--filer <id>]
 Adds questions to the board: yes/no, or 2 to 6 choices with one --option each. --key defaults to a slug of the title.
 raise is the alias for post --type decision: same flags, same output.
@@ -78,6 +78,7 @@ Every question meets the question standard (docs/contract.md, "Asking a good que
   yes and no are labelled Yes and No; a question never takes Done, OK or Not now buttons.
 One decision is one card: look at the open cards first. --merge <key> (up to 10) names other cards on the board that ask the same thing and offer every option of this one:
 they are hidden while this one waits, and its answer closes them too, with the same value and a note naming this key. A merged card merges nothing itself, a card is named by one ask until that ask is answered, and an answered or dismissed card cannot be merged.
+--proof <key> names an evidence update already on the board that this ask rests on: Decide shows its capture and result at the top.
 The user answers with one tap and can undo it for a few seconds.
 --from adds every decision in a decisions file: ${FORMAT}
 Raising the same question again is a no-op that reports its status; a different question under a used key is refused.
@@ -325,7 +326,7 @@ function fits(title: unknown, key?: string) {
   if (n > TITLE_MAX) throw fail(`${key ? `key ${key}: ` : ''}title is ${n} characters, over ${TITLE_MAX}`, 'VALIDATION_ERROR', `Shorten the title to ${TITLE_MAX} characters and put the rest in about`);
 }
 /** The question standard's flags: a decision's why, each option's outcome, the reason for the recommendation, when silence decides, the cards it merges. */
-const ASK_FLAGS = ['why', 'outcome', 'recommend-reason', 'silent-by', 'merge'];
+const ASK_FLAGS = ['why', 'outcome', 'recommend-reason', 'silent-by', 'merge', 'proof'];
 const MANY = ['option', 'outcome', 'merge'];
 /** Board types that are contract kinds: a decision (the default type) is an ask. */
 const CONTRACT_TYPES = ['decision', 'ask', 'evidence', 'report', 'plan', 'design'];
@@ -1107,7 +1108,7 @@ function buildIncoming(values: Record<string, any>, extra: object, filer: string
   try {
     const { title, key = slug(title), about, detail, why, recommend: recommend_value, default: default_if_silent, close } = values;
     const ask = !Object.hasOwn(extra, 'type'), options = ask ? outcomesOf(values) : optionsOf(values);
-    const told = ask && { why, recommend_reason: values['recommend-reason'], silent_by: values['silent-by'], merges: values.merge };
+    const told = ask && { why, recommend_reason: values['recommend-reason'], silent_by: values['silent-by'], merges: values.merge, proof: values.proof };
     writeFileSync(source, JSON.stringify({ schema: 2, items: [{ key, title, about, detail, ...told, options, recommend_value, default_if_silent, close, ...extra, filer }] }));
     const incoming = loadDecisions(source, board), raw = readItems(source).items;
     if (!ask) recommended(raw, true);
@@ -1129,6 +1130,7 @@ const canon = (v: unknown) => JSON.stringify(v, (_, x) => (x && typeof x === 'ob
 /** A merge names cards on the board that take this card's answer: each is on the board, offers every option of this card, and merges nothing itself.
  * A card is named by one ask until that ask is answered, dismissed or not. A merge new to the board also names a card still open. */
 function checkMerges(incoming: Decision[], resulting: Decision[], current: ReturnType<typeof board>) {
+  for (const d of incoming) if (d.proof && resulting.find((x) => x.key === d.proof)?.type !== 'evidence') throw fail(`key ${d.key} rests on ${d.proof}, which is not an evidence update on the board`, 'VALIDATION_ERROR', `Post the evidence update first, or leave out --proof`);
   const byKey = new Map(resulting.map((d) => [d.key, d])), before = new Map(current.map((c) => [c.key, c]));
   const closed = (key: string) => !!(before.get(key)?.answer || before.get(key)?.dismissed);
   const holder = (key: string, self: string) => resulting.find((x) => x.key !== self && !before.get(x.key)?.answer && x.merges?.includes(key));
