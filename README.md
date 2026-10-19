@@ -283,6 +283,8 @@ sign-off-axi signin done \
   --key npm-login
 ```
 
+To hide a card as the Dismiss button does, or bring it back: `sign-off-axi dismiss <key>` and `sign-off-axi restore <key>`.
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-signin-dark.webp">
   <img src="docs/media/kind-signin.webp" alt="A sign-in card on top with an Open button, what it unlocks, who waits and the time left">
