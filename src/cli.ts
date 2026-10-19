@@ -836,14 +836,14 @@ function replace(file: string, on: string, from?: string, filer?: string) {
     const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply, d.run, d.finding, d.evidence, d.media, d.sections, d.decisions, d.type === 'signin' ? [d.link, d.start] : '', d.type === 'plan' ? [d.about, d.view, d.steps] : '']);
     // A key whose answer outlived it may not come back: the board and the answers are read here, under the lock the feed writes with.
     const saved = readAnswers(file);
-    for (const i of fed.items) if (i?.kind !== undefined && !first.has(i?.key) && Object.hasOwn(saved, i?.key)) {
+    for (const i of fed.items) if (i?.kind !== undefined && !first.has(i?.key) && Object.hasOwn(saved, i?.key) && !awaitsVerdict(i.kind, saved[i.key])) {
       throw fail(`key ${i.key} was answered on ${tilde(file)} and is no longer there`, 'CONFLICT', 'Post it under a new key');
     }
     const current = board(file);
     for (const had of current) {
       const d = incoming.find((x) => x.key === had.key);
       if (filer && d && had.filer && had.filer !== filer) throw fail(`key ${d.key} on ${tilde(file)} was posted by another filer`, 'CONFLICT', 'Feed it under a new key');
-      if (had.answer && d && question(d) !== question(had)) {
+      if (had.answer && !awaitsVerdict(had.type, had.answer) && d && question(d) !== question(had)) {
         throw fail(`key ${d.key} was answered and now holds a different question on ${tilde(file)}`, 'CONFLICT', 'Post the new question under a new key');
       }
     }
@@ -913,7 +913,8 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
       }
       return toon({ board: tilde(file), posted: [{ key: own, number: had.number, media: sources.length, title: had.title, status: 'already posted' }] }, [`Run \`sign-off-axi open${on}\` so the user can give a verdict`]);
     }
-    if (message && own && Object.hasOwn(readAnswers(file), own)) throw fail(`key ${own} was answered on ${tilde(file)} and is no longer there`, 'CONFLICT', 'Post it under a new key');
+    const answers = readAnswers(file);
+    if (message && own && Object.hasOwn(answers, own) && !awaitsVerdict(message.kind, answers[own])) throw fail(`key ${own} was answered on ${tilde(file)} and is no longer there`, 'CONFLICT', 'Post it under a new key');
     if (own && current.some((d) => d.key === own)) throw fail(`key ${own} is already used on ${tilde(file)}`, 'CONFLICT', 'Post it under a new --key');
     mkdirSync(store, { recursive: true, mode: 0o700 });
     let number = Math.max(0, ...taken, ...readdirSync(store).map(Number).filter(Number.isInteger)) + 1;
@@ -1140,7 +1141,7 @@ function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: 
         return fail(`key ${d.key} ${why}`, 'CONFLICT', contract ? 'Post it under a new key' : 'Raise it under a new --key');
       };
       // An answer outlives its item: a new question under that key would inherit it.
-      if (!had && Object.hasOwn(saved, d.key)) throw refuse(`already has a saved answer on ${tilde(file)} from an item no longer there`);
+      if (!had && Object.hasOwn(saved, d.key) && !awaitsVerdict(d.type, saved[d.key])) throw refuse(`already has a saved answer on ${tilde(file)} from an item no longer there`);
       // The same question from another filer, or at another time, is the same question: it keeps its first filer and time.
       const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, dismissed: undefined, filer: undefined, filed: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
       // A message that names no filed time matches the one the board stamped.

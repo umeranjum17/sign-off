@@ -1385,6 +1385,27 @@ test('design screen saves: a screen-only save runs no on_answer, a change on a s
   proc.kill();
 });
 
+test('a design holding only screen notes does not lock its key or its question', async () => {
+  const dir = join(scratch, 'screens-only-relock'), file = join(dir, 'board.json'), message = join(dir, 'design-message.json');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), png);
+  writeFileSync(join(dir, 'design', 'a.png'), png);
+  const design = { contract: 1, kind: 'design', schema: 1, key: 'd4-relock', title: 'Review the flow screens',
+    about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
+    journeys: [{ id: 'flow', title: 'Flow', screens: [{ id: 'a', title: 'First', views: { phone_light: 'design/a.png' } }] }] };
+  writeFileSync(message, JSON.stringify(design));
+  assert.equal(run('post', file, '--kind', 'design', '--from', message).code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  assert.equal((await post(url, 'api/answers', { key: 'd4-relock', notes: [{ journey: 'flow', screen: 'a', verdict: 'approve', note: '' }] })).status, 200);
+  assert.equal(JSON.parse(run('answers', file, '--json').out)['d4-relock'].answer, 'screens');
+  proc.kill();
+  const doc = JSON.parse(readFileSync(file, 'utf8'));
+  writeFileSync(file, JSON.stringify({ ...doc, items: doc.items.filter((i) => i.key !== 'd4-relock') }));
+  assert.equal(run('post', file, '--kind', 'design', '--from', message).code, 0);
+});
+
 test('an ask whose option is named screens is answered, not left waiting', async () => {
   const dir = join(scratch, 'screens-option'), file = join(dir, 'board.json');
   mkdirSync(dir, { recursive: true });
