@@ -18,6 +18,8 @@
     --c-waiting: #0A84FF; --c-evidence: #30D158; --c-reports: #FF9F0A; --c-answered: #98989D; --c-gate: #FFD60A; --ok: #30D158; --warn: #FF9F0A; --seg-on: #636366; } }
   * { box-sizing: border-box; }
   /* A phone keeps room at the bottom for the tab bar. */
+  /* A phone keeps the text size it was given on every screen, so the tab bar never grows or shrinks. */
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   body { margin: 0; padding-bottom: calc(5.125rem + env(safe-area-inset-bottom)); background: var(--bg); color: var(--text); overflow-wrap: anywhere;
     -webkit-font-smoothing: antialiased; font: 1.0625rem/1.4706 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif; letter-spacing: -0.022em; }
   /* The board areas each have a colour, used on icons, dots and marks. */
@@ -28,7 +30,7 @@
   .tabs { position: fixed; z-index: 2; left: 0; right: 0; bottom: 0; display: flex; padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     background: var(--bar); border-top: 0.5px solid var(--line); }
   .tabs a { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.125rem; min-height: 4.125rem; color: var(--muted);
-    font-size: 1rem; line-height: 1.125; letter-spacing: -0.01em; text-decoration: none; }
+    min-width: 0; font-size: 0.8125rem; line-height: 1.125; letter-spacing: -0.01em; text-decoration: none; white-space: nowrap; }
   .tabs a[aria-current] { color: var(--accent); }
   .tabs a:focus-visible { outline-offset: -2px; border-radius: 0.75rem; }
   /* The areas' icons in the bar and the sidebar are bare outlines. */
@@ -80,7 +82,7 @@
   .tile .n { margin-top: 0.5rem; font-size: 2.125rem; font-weight: 700; line-height: 1.1; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
   .tile .name { color: var(--muted); font-size: 0.9375rem; line-height: 1.3; }
   .tile:focus-visible { outline-offset: 2px; }
-  .pair, .areas { display: grid; gap: 1rem; margin-top: 1rem; }
+  .pair, .areas { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; margin-top: 1rem; }
   .areas { gap: 2rem; margin-top: 2.5rem; }
   /* The section names grow only where the row has room for them beside their links (a phone keeps the base size). */
   .areas .sec-head { margin-bottom: 0.75rem; } @media (min-width: 45rem) { .areas h2 { font-size: 1.75rem; line-height: 1.15; } }
@@ -649,7 +651,7 @@
     .glance { padding: 1.25rem 1.5rem; }
     .date { font-size: 1.1875rem; }
     .pair { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
-    .areas { grid-template-columns: 1fr 1fr; align-items: start; }
+    .areas { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
     .areas > .wide { grid-column: 1 / -1; }
     .ev-scroll-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; margin: 0; padding: 0; overflow: visible; }
     .ev-scroll-row .ev-card { width: auto; }
@@ -1721,7 +1723,7 @@
   }
 
   function designGroups(items) {
-    if (!items.length) return el('p', { class: 'empty' }, EMPTY.designs);
+    if (!items.length) return [el('p', { class: 'empty' }, EMPTY.designs)];
     const groups = [...new Set(items.map((d) => d.group || ''))];
     return groups.flatMap((group) => [group ? el('div', { class: 'sec-h' }, el('h2', {}, group)) : '',
       el('div', { class: 'design-list' }, ...items.filter((d) => (d.group || '') === group).map((d) => {
