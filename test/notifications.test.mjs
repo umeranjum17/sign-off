@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -116,6 +116,45 @@ test('doctor reports a notify line it cannot use, and nothing is sent', { timeou
   assert.equal(hits.length, 0);
   const report = await cli(dir, ['doctor', dir]).catch((e) => e.message);
   assert.match(report, /line 2 is not one/);
+});
+
+test('a symlinked board reads the config beside the name it was given', { timeout: 15_000 }, async (t) => {
+  const dir = join(scratch, 'linked'); mkdirSync(join(dir, '.sign-off'), { recursive: true });
+  const store = join(scratch, 'linked-store'); mkdirSync(store);
+  writeFileSync(join(store, 'board.json'), '{"schema":2,"items":[]}');
+  symlinkSync(join(store, 'board.json'), board(dir));
+  const { server, hits, url } = await listen();
+  t.after(() => server.close());
+  writeFileSync(join(dir, '.sign-off', 'config.yaml'), `board: board.json\n${notifyBlock(url)}`);
+  await raise(dir, TOKEN);
+  await until(() => hits.length === 1);
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].body.id, 'review-this');
+});
+
+test('a notify token variable that is unset sends nothing, and doctor says so', { timeout: 15_000 }, async (t) => {
+  const dir = join(scratch, 'no-token'); mkdirSync(dir);
+  const { server, hits, url } = await listen();
+  t.after(() => server.close());
+  setup(dir, notifyBlock(url));
+  await raise(dir);
+  await sleep(200);
+  assert.equal(hits.length, 0);
+  const report = await cli(dir, ['doctor', dir]).catch((e) => e.message);
+  assert.match(report, /SIGN_OFF_TEST_TOKEN is not set/);
+});
+
+test('an explainer that waits on the user is announced as an ask', { timeout: 15_000 }, async (t) => {
+  const dir = join(scratch, 'explainer'); mkdirSync(dir);
+  const { server, hits, url } = await listen();
+  t.after(() => server.close());
+  setup(dir, notifyBlock(url));
+  const video = join(scratch, 'explainer.mp4'); writeFileSync(video, 'not a real video');
+  await cli(dir, ['post', board(dir), '--type', 'explainer', '--title', 'Is sign-in clear?', '--about', 'Two steps.', '--media', video, '--option', 'yes=Yes', '--option', 'no=No', '--recommend', 'yes'], TOKEN);
+  await until(() => hits.length === 1);
+  await sleep(200);
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].body.kind, 'ask');
 });
 
 test('a notify url on a DNS name starting with 127 is not treated as this machine', async () => {

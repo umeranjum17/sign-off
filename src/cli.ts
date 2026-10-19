@@ -694,21 +694,21 @@ function post(args: string[], cmd = 'post') {
   const typed: Flags = cmd === 'post' ? { replace: { type: 'boolean' }, kind: { type: 'string' }, type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
     media: { type: 'string', multiple: true }, link: { type: 'string' }, view: { type: 'string' }, preview: { type: 'string' }, chapter: { type: 'string', multiple: true },
     ...Object.fromEntries(SIGNIN_FIELDS.map((f) => [f, { type: 'string' as const }])) } : {};
-  const { file, values, on } = parse(cmd, args, { from: { type: 'string' }, filer: { type: 'string' }, ...typed,
+  const { file, named, values, on } = parse(cmd, args, { from: { type: 'string' }, filer: { type: 'string' }, ...typed,
     ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: MANY.includes(f) }])) });
   const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'link', 'view', 'preview', 'chapter', ...SIGNIN_FIELDS].filter((f) => values[f] !== undefined);
   if (values.kind !== undefined) {
     const odd = [...given, ...(values.replace ? ['replace'] : [])][0];
     if (odd) throw fail(`--kind cannot be combined with --${odd}`, 'VALIDATION_ERROR', 'Put every field in the message file: sign-off-axi post --kind ask --from ask.json');
-    return postKind(file, on, values);
+    return postKind(file, named, on, values);
   }
   if (values.from !== undefined && given.length) throw fail(`--from cannot be combined with --${given[0]}`, 'VALIDATION_ERROR', `Put every field in the --from file, or ${cmd} with flags only`);
-  if (values.replace) return replace(file, on, values.from, filerOf(values));
+  if (values.replace) return replace(file, named, on, values.from, filerOf(values));
   const filer = filerOf(values, true);
   const type = values.type ?? 'decision', told = ASK_FLAGS.find((f) => values[f] !== undefined);
   if (told && type !== 'decision') throw fail(`--${told} needs --type decision`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
-  if (type === 'report') return postReport(file, on, values);
-  if (type === 'signin') return postSignin(file, on, values, filer);
+  if (type === 'report') return postReport(file, named, on, values);
+  if (type === 'signin') return postSignin(file, named, on, values, filer);
   const odd = SIGNIN_FIELDS.find((f) => values[f] !== undefined);
   if (odd) throw fail(`--${odd} needs --type signin`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (values.preview !== undefined) throw fail('--preview needs --type report', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
@@ -717,12 +717,12 @@ function post(args: string[], cmd = 'post') {
       : type === 'evidence' ? 'sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media <file>' : `sign-off-axi ${cmd} --title "<question>" --why "<why>" --outcome yes="<outcome>" --outcome no="<outcome>" --recommend yes --recommend-reason "<reason>" --default no`);
   }
   if (!['decision', 'design', 'evidence', 'diagram', 'interactive', 'explainer'].includes(type)) throw fail(`--type must be decision, design, evidence, diagram, interactive, explainer, report or signin`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
-  if (type === 'evidence' || type === 'explainer') return postMedia(file, on, values, type, filer);
+  if (type === 'evidence' || type === 'explainer') return postMedia(file, named, on, values, type, filer);
   if (values.media !== undefined || values.link !== undefined || values.chapter !== undefined) throw fail('--media, --link and --chapter need --type evidence or explainer', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (type !== 'design' && (values.tradeoff !== undefined || values.mock !== undefined)) throw fail('--tradeoff and --mock need --type design', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   const view = type === 'diagram' || type === 'interactive';
   if (view !== (values.view !== undefined)) throw fail(view ? `--type ${type} needs --view <path>` : '--view needs --type diagram or interactive', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
-  if (type === 'decision') return storeIncoming(file, on, buildIncoming(values, {}, filer, file), filer);
+  if (type === 'decision') return storeIncoming(file, named, on, buildIncoming(values, {}, filer, file), filer);
   const root = resolve(dirname(file));
   if (view) {
     // The same real-path check the board serves with, so a post that passes always renders.
@@ -735,7 +735,7 @@ function post(args: string[], cmd = 'post') {
     let size: Stats;
     try { size = statSync(actual); } catch (e: any) { throw fail(`--view ${values.view} ${reasonOf(e.code)}`, 'VALIDATION_ERROR', 'Shrink the picture, or post an interactive page instead of a diagram'); }
     if (!size.isFile() || size.size > MOCK_BYTES) throw fail(`--view ${values.view} must be a file of 5 MB or less`, 'VALIDATION_ERROR', 'Shrink the picture, or post an interactive page instead of a diagram');
-    return storeIncoming(file, on, buildIncoming(values, { type, view: values.view }, filer, file), filer);
+    return storeIncoming(file, named, on, buildIncoming(values, { type, view: values.view }, filer, file), filer);
   }
   const mocks = values.mock?.map((m: string) => {
     const at = m.indexOf('=');
@@ -751,7 +751,7 @@ function post(args: string[], cmd = 'post') {
     }
     return { value: m.slice(0, at), path };
   });
-  return storeIncoming(file, on, buildIncoming(values, { type, tradeoff: values.tradeoff, mocks }, filer, file), filer);
+  return storeIncoming(file, named, on, buildIncoming(values, { type, tradeoff: values.tradeoff, mocks }, filer, file), filer);
 }
 
 const SIGNIN_FIELDS = ['service', 'unlocks', 'waits', 'expires', 'start'];
@@ -766,7 +766,7 @@ function expiresAt(value: string) {
 }
 /** post --type signin: one card with a link to open. The same key again with another link or time swaps them on that card, which waits again.
  * The link can hold a one-time code, so no output prints it. */
-function postSignin(file: string, on: string, values: Record<string, any>, filer?: string) {
+function postSignin(file: string, named: string, on: string, values: Record<string, any>, filer?: string) {
   const odd = ['title', 'about', 'detail', 'option', 'recommend', 'default', 'close', 'tradeoff', 'mock', 'media', 'view', 'preview', 'chapter'].find((f) => values[f] !== undefined);
   if (odd) throw fail(`--${odd} does not apply to --type signin`, 'VALIDATION_ERROR', SIGNIN_EXAMPLE);
   const missing = ['service', ...(values.start === undefined ? ['link'] : []), 'unlocks', 'waits'].filter((f) => values[f] === undefined);
@@ -796,7 +796,7 @@ function postSignin(file: string, on: string, values: Record<string, any>, filer
       // A new link is a new sign-in: the card waits again, also when it was done or dismissed.
       appendAnswer(file, d, CLEARED);
       if (had) appendDismissed(file, [d.key], false);
-      notifyEntered(file, before);
+      notifyEntered(file, named, before);
     }
     return toon({ board: tilde(file), posted: [{ key: d.key, status, service: d.title, ...(expires && { expires }) }] }, [
       ...(status === 'already done' ? [] : [`Run \`sign-off-axi open${on}\` so the user can sign in`]),
@@ -820,7 +820,7 @@ function signin(args: string[]) {
 
 /** For a program that feeds the board: the --from file, checked like any post, becomes the whole board, items and top-level fields. Answers stay.
  * With a filer it replaces only that filer's items (and items with no filer it names by key); every other item and top-level field stays. */
-function replace(file: string, on: string, from?: string, filer?: string) {
+function replace(file: string, named: string, on: string, from?: string, filer?: string) {
   if (from === undefined) throw fail('--replace needs --from <board file>', 'VALIDATION_ERROR', 'sign-off-axi post board.json --from feed.json --replace');
   const source = resolve(from), fed = readItems(source);
   contractItems(fed.items, from, file, true);
@@ -851,8 +851,8 @@ function replace(file: string, on: string, from?: string, filer?: string) {
     let items = feed, extra = fed.extra, resulting = incoming;
     if (filer) {
       // The feed's items first: the board shows the file's last item first, so the other filers' items keep showing on top.
-      const named = new Set(feed.map((i) => i.key));
-      items = [...feed, ...(old?.items ?? []).filter((i) => i?.filer !== filer && !named.has(i?.key))];
+      const fedKeys = new Set(feed.map((i) => i.key));
+      items = [...feed, ...(old?.items ?? []).filter((i) => i?.filer !== filer && !fedKeys.has(i?.key))];
       extra = { ...old?.extra, ...fed.extra };
       // The merged board is checked before it is written, so a feed that breaks another filer's items leaves the board as it was.
       const check = `${file}.${process.pid}.check`;
@@ -869,7 +869,7 @@ function replace(file: string, on: string, from?: string, filer?: string) {
     if (changed) {
       const before = waitingKeys(file);
       writeItems(file, items, extra);
-      notifyEntered(file, before);
+      notifyEntered(file, named, before);
     }
     return toon({ board: tilde(file), items: items.length, changed }, [`Run \`sign-off-axi answers${on}\` to read the answers`]);
   });
@@ -877,7 +877,7 @@ function replace(file: string, on: string, from?: string, filer?: string) {
 
 /** Copies the media into evidence/<n>/ next to the board and adds the item, numbered under the board lock: update-<n>, or an explainer under its own key.
  * `message` is a checked contract evidence message (post --kind evidence): its key, if any, takes only the same message again, and its run is stored as `evidence`. */
-function postMedia(file: string, on: string, values: Record<string, any>, type: 'evidence' | 'explainer', filer?: string, message?: any) {
+function postMedia(file: string, named: string, on: string, values: Record<string, any>, type: 'evidence' | 'explainer', filer?: string, message?: any) {
   fits(values.title);
   const explainer = type === 'explainer';
   const extra = (explainer ? ['mock', 'tradeoff', 'view', 'link'] : ['key', 'option', 'recommend', 'default', 'mock', 'tradeoff', 'view', 'chapter']).find((f) => values[f] !== undefined);
@@ -953,7 +953,7 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
     }
     const before = waitingKeys(file);
     writeItems(file, items);
-    notifyEntered(file, before);
+    notifyEntered(file, named, before);
     if (explainer) return toon({ board: tilde(file), raised: [{ key, status: 'raised', title }] }, [`Run \`sign-off-axi open${on}\` so the user can watch and answer`, waitFor(on, filer, key)]);
     return toon({ board: tilde(file), posted: [{ key, number, media: media.length, title, ...(message && { status: 'posted' }) }] },
       [`Run \`sign-off-axi open${on}\` so the user can give a verdict`, waitFor(on, filer, key)]);
@@ -961,7 +961,7 @@ function postMedia(file: string, on: string, values: Record<string, any>, type: 
 }
 
 /** post --type report: the flags as one report message, posted as post --kind report posts it. A report with no page is refused before anything is read. */
-function postReport(file: string, on: string, values: Record<string, any>) {
+function postReport(file: string, named: string, on: string, values: Record<string, any>) {
   const odd = ['option', 'recommend', 'default', 'close', 'detail', 'mock', 'tradeoff', 'media', 'chapter'].find((f) => values[f] !== undefined);
   if (odd) throw fail(`--${odd} does not apply to --type report: a report takes no answer`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   const missing = ['title', 'about', 'view', 'preview'].filter((f) => values[f] === undefined).map((f) => `--${f}`);
@@ -973,12 +973,12 @@ function postReport(file: string, on: string, values: Record<string, any>) {
   // Posting the same report again is a no-op, so it keeps the time it was first filed.
   const filed = (had?.kind === 'report' && had.filed) || new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   const { title, about, view, preview, link } = values;
-  return postKind(file, on, values, { contract: 1, kind: 'report', schema: 2, key, title, about, view, preview, ...(link !== undefined && { link }), filed });
+  return postKind(file, named, on, values, { contract: 1, kind: 'report', schema: 2, key, title, about, view, preview, ...(link !== undefined && { link }), filed });
 }
 
 /** Posts one contract message (docs/contract.md), from a file or from stdin with --from -: checked against --kind, then stored like a raised item.
  * `built` is a message post --type report made from its flags. */
-async function postKind(file: string, on: string, values: Record<string, any>, built?: object) {
+async function postKind(file: string, named: string, on: string, values: Record<string, any>, built?: object) {
   const { kind, from } = values, example = 'sign-off-axi post --kind ask --from ask.json';
   const name = built ? '--type report' : from === '-' ? 'stdin' : from;
   let bytes, m: any = built;
@@ -1003,9 +1003,9 @@ async function postKind(file: string, on: string, values: Record<string, any>, b
   }
   const filer = m.filer ?? filerOf(values, true), scratch = mkdtempSync(join(tmpdir(), 'sign-off-')), source = join(scratch, basename(name));
   try {
-    if (m.kind === 'evidence') return await postMedia(file, on, { title: m.title, about: m.about, media: sources }, 'evidence', filer, { ...m, ...(filer && { filer }) });
+    if (m.kind === 'evidence') return await postMedia(file, named, on, { title: m.title, about: m.about, media: sources }, 'evidence', filer, { ...m, ...(filer && { filer }) });
     writeFileSync(source, JSON.stringify({ schema: 2, items: [{ ...m, ...(filer && { filer }) }] }));
-    return await storeIncoming(file, on, buildIncoming({ from: source }, {}, filer, file), filer, true);
+    return await storeIncoming(file, named, on, buildIncoming({ from: source }, {}, filer, file), filer, true);
   } catch (e) {
     if (!(e instanceof AxiError && e.code === 'CONFLICT')) throw e;
     // A key conflict refuses a contract post like any other rule: exit 2 (contract section 4); raise keeps exit 1.
@@ -1132,7 +1132,7 @@ function checkMerges(incoming: Decision[], resulting: Decision[], current: Retur
   }
 }
 /** exact: a contract post, where a key takes only the same message again, filer and filed included (contract section 4). */
-function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: Decision[]; raw: any[] }, filer?: string, exact = false) {
+function storeIncoming(file: string, named: string, on: string, { incoming, raw }: { incoming: Decision[]; raw: any[] }, filer?: string, exact = false) {
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
     const current = board(file), items = existsSync(file) ? readItems(file).items : [], saved = readAnswers(file), now = new Date().toISOString();
@@ -1162,7 +1162,7 @@ function storeIncoming(file: string, on: string, { incoming, raw }: { incoming: 
     if (raised.some((r) => r.status === 'raised')) {
       const before = waitingKeys(file);
       writeItems(file, items);
-      notifyEntered(file, before);
+      notifyEntered(file, named, before);
     }
     const key = raised.length === 1 ? ` --key ${raised[0].key}` : '';
     // Reports take no answer, so a post with nothing waiting asks the user to read it, never to answer.
@@ -1392,17 +1392,17 @@ function waitingKeys(file: string) {
 }
 
 /** Announces each card that entered Waiting on you with a write. The card is already stored, so nothing here fails the command. */
-function notifyEntered(file: string, before: Set<string> | undefined) {
+function notifyEntered(file: string, named: string, before: Set<string> | undefined) {
   try {
-    const so = dirname(file), notify = before ? readSetup(so).notify : undefined;
-    if (!before || !notify) return;
+    const so = dirname(named), notify = before ? readSetup(so).notify : undefined;
+    if (!before || !notify || (notify.token_env && !process.env[notify.token_env])) return;
     for (const d of board(file, () => {}).filter((d) => waits(d) && !before.has(d.key))) sendNotice(so, notify, d);
   } catch {}
 }
 
 function sendNotice(so: string, notify: { url: string; token_env?: string; link_base: string }, d: Decision) {
   const token = notify.token_env ? process.env[notify.token_env] : undefined;
-  const kind = d.kind ?? ({ decision: 'ask', explainer: 'report' } as Record<string, string>)[d.type] ?? d.type;
+  const kind = d.kind ?? ({ decision: 'ask', explainer: d.options.length ? 'ask' : 'report' } as Record<string, string>)[d.type] ?? d.type;
   const body = JSON.stringify({ v: 1, source: 'sign-off', id: d.key, kind: ['ask', 'plan', 'design', 'evidence', 'report'].includes(kind) ? kind : 'ask',
     title: [...d.title].slice(0, 120).join(''), text: [...(d.about ?? d.detail ?? d.why ?? d.title).replace(/[\r\n]+/g, ' ')].slice(0, 200).join(''),
     url: `${notify.link_base.replace(/\/$/, '')}#waiting/${encodeURIComponent(d.key)}`, at: d.filed ?? new Date().toISOString() });
@@ -1528,6 +1528,7 @@ async function doctor(args: string[]) {
         ({ board, port } = setup);
         if (!setup.problems.length) check('config', `board ${basename(board)}, port ${port}`);
         else check('config', `${basename(config)}: ${setup.problems.join('; ')}`, `Edit ${shellPath(config)} to hold "board: <name>.json", "port: <0-65535>" and "bind: <127.0.0.1 or a private address>" lines, such as board: decisions.json, port: 4410 and bind: 127.0.0.1, and hosts: only DNS names${setup.goodBoard ? '' : `, or delete it and run \`${rerun}\``}`);
+        if (setup.notify?.token_env && !process.env[setup.notify.token_env]) check('notify', `${setup.notify.token_env} is not set, so no notice is sent`, `Export ${setup.notify.token_env} with the receiver's token`);
         // A hosts: name is only of use when it leads to the bind address.
         const astray: string[] = [];
         for (const h of setup.hosts) {
