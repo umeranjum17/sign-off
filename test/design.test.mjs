@@ -2176,7 +2176,7 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
   // Per card: its id, what it proves, its result and the picture that leads it; every card is drawn.
   const cards = '[...document.querySelectorAll(".ev-card")].map((a) => [a.id, a.querySelector(".t").textContent, (a.querySelector(".ev-ok") ?? a.querySelector(".m span")).textContent, a.querySelector(".ev-ok svg path")?.getAttribute("d") ?? "", a.querySelectorAll(".ev-media img").length])';
-  await until(async () => (await evaluate(`${cards}.length === 4 && [...document.querySelectorAll(".ev-media img")].every((i) => i.complete && i.naturalWidth)`)));
+  await until(async () => (await evaluate(`${cards}.length === 3 && [...document.querySelectorAll(".ev-media img")].every((i) => i.complete && i.naturalWidth)`)));
   const clock = (at) => at.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   const at = (i) => new Date(doc.items[i - 1].filed);
   // Evidence lists passed proof only, newest first; the failed, unchecked and no-run updates are not on it.
