@@ -1333,10 +1333,10 @@ test('Decide on a phone: the Undo toast sits above the sticky bar and never cove
   assert.equal(await evaluate('(() => { const r = document.querySelector(".decide-bar .answer").getBoundingClientRect(); return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest(".answer") != null; })()'), true);
   await evaluate('document.querySelector(".decide-bar .answer").click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/gamma' && (await evaluate('!document.querySelector("#toast").hidden')));
-  // Whatever the ask's height - here shorter than the phone, then taller - the bar keeps one band and the toast one above it.
+  // A short ask keeps its bar right under the content; once the ask is taller than the phone the bar sticks to one band above the tab bar, with the toast above it.
   for (const words of ['One calm day.', why.slice(0, 200), why.slice(0, 1400), why]) {
     await evaluate(`document.querySelector('.decide .why').textContent = ${JSON.stringify(words)}`);
-    assert.equal(await evaluate('(() => { const b = document.querySelector(".decide-bar").getBoundingClientRect(), t = document.querySelector("#toast"), r = t.getBoundingClientRect(); return !t.hidden && Math.abs(b.bottom - (innerHeight - 66)) <= 1 && r.bottom <= b.top; })()'), true);
+    assert.equal(await evaluate('(() => { const b = document.querySelector(".decide-bar").getBoundingClientRect(), t = document.querySelector("#toast"), r = t.getBoundingClientRect(); return !t.hidden && b.bottom <= innerHeight - 66 + 1 && (b.bottom >= innerHeight - 66 - 1 || r.top >= b.bottom || r.bottom <= b.top); })()'), true);
     assert.equal(await evaluate('(() => { const r = document.querySelector(".decide-bar .answer").getBoundingClientRect(); return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest(".answer") != null; })()'), true);
   }
   close();

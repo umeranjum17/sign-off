@@ -349,13 +349,14 @@
   .decide-lists .compact .thumb { width: 2rem; height: 2rem; border-radius: .5rem; }
   .decide-lists .compact .icon { width: 2rem; height: 2rem; border-radius: .5rem; }
   .decide-lists a.compact::after { content: "" / ""; flex: none; width: .5rem; height: .5rem; margin-right: .5rem; border: solid var(--border); border-width: 2px 2px 0 0; transform: rotate(45deg); }
-  .decide-bar { position: fixed; z-index: 1; left: 0; right: 0; bottom: calc(4.125rem + env(safe-area-inset-bottom)); display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
-    padding: .75rem max(1.25rem, env(safe-area-inset-right)) .75rem max(1.25rem, env(safe-area-inset-left)); background: var(--bg); }
+  .decide-bar { position: sticky; z-index: 1; bottom: calc(4.125rem + env(safe-area-inset-bottom)); display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
+    padding: .75rem 0; background: var(--bg); }
   /* Answer takes the row on one line; when a long label leaves no room, Skip and Later move under it rather than squeeze it. */
   .decide-bar > * { white-space: nowrap; }
   .decide-bar .answer { flex: 1 1 auto; background: var(--action); color: var(--on-accent); font-weight: 400; }
   .decide-bar .later { display: inline-flex; flex: none; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0 0.75rem; color: var(--accent); background: transparent; text-decoration: none; }
   .decide-bar .skip { flex: none; padding: 0 0.75rem; color: var(--muted); background: transparent; }
+  @media (max-width: 59.999rem) { .decide-bar .skip { display: none; } } /* a phone has Answer and Later; a swipe left still skips */
   .ask-group + .gone-asks { margin-top: 1rem; }
   /* Evidence: a card per update with its capture as the hero, grouped under the project its check names; the whole card opens the update. */
   .ev-group { display: grid; gap: 0.75rem; margin-top: 1.5rem; }
