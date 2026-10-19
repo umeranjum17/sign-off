@@ -1174,8 +1174,8 @@ test('Waiting on you: a board with no filed times lists newest first as the file
   proc.kill();
 });
 
-// Changing a type chip or the sort starts at the first ask of the new list, and keeps the focus on the control changed.
-test('Waiting on you: a chip or sort change starts at the first ask of the new list and keeps the focus on that control', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+// Changing a type chip starts at the first ask of the new list, drops the asks of other types, and keeps the focus on the chip changed.
+test('Waiting on you: a chip change shows only that type and keeps the focus on the chip', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'chip-focus'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }], pick = ['a', 'b', 'c'].map((v) => ({ value: v, label: v.toUpperCase() }));
@@ -1191,7 +1191,7 @@ test('Waiting on you: a chip or sort change starts at the first ask of the new l
   const titles = () => evaluate('[...document.querySelectorAll(".ask-card .title")].map((s) => s.textContent).join("|")');
   await until(async () => (await titles()).split('|').length === 5);
   await evaluate('[...document.querySelectorAll(".chips button")].find((b) => b.textContent.startsWith("Pick one"))?.click()');
-  await until(async () => (await titles()).split('|').length === 2);
+  await until(async () => (await titles()) === 'Ask B|Ask E');
   assert.equal(await evaluate('document.activeElement?.getAttribute("aria-pressed") === "true" && document.activeElement.textContent.startsWith("Pick one")'), true);
   close();
   proc.kill();
@@ -1252,6 +1252,7 @@ test('Decide on a pick-one ask: the reply box sits under the options, and Skip f
   await evaluate(`location.href = ${JSON.stringify(`${url}#decide/beta`)}`);
   await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'Beta question?');
   assert.equal(await evaluate('document.querySelectorAll(".decide .pick-option").length'), 3);
+  assert.equal(await evaluate('(() => { const rows = [...document.querySelectorAll(".decide .pick-list > li")]; return rows.length === 3 && rows.every((li) => li.firstElementChild?.classList.contains("pick-option")) && getComputedStyle(rows[1]).borderTopWidth !== "0px"; })()'), true);
   await evaluate('document.querySelector(".decide .other summary").click()');
   assert.equal(await evaluate('document.querySelector(".decide .other").open'), true);
   await evaluate('document.querySelector(".decide .skip").click()');

@@ -1568,7 +1568,7 @@
     const page = el('section', { class: 'decide' }, preview ? el('div', { class: 'decide-preview' }, preview) : '', head,
       why ? el('p', { class: 'why', dir: 'auto' }, why) : '',
       ...(live && opts.length ? [el('p', { class: 'pick-label' }, typeOf(d) === 'yes-no' ? 'YES OR NO' : 'PICK ONE'),
-        el('ul', { class: 'pick-list', role: 'group', 'aria-label': d.title }, ...optionButtons)] : []),
+        el('ul', { class: 'pick-list', 'aria-label': d.title }, ...optionButtons.map((b) => el('li', {}, b)))] : []),
       ...(live ? [other(d, answerOf(d.key), err, () => (location.hash = to))] : []),
       silent ? el('p', { class: 'silent-line' }, silent) : '', err,
       el('div', { class: 'decide-bar' }, live && opts.length ? answer : '', skip || '', back));
