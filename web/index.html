@@ -977,7 +977,7 @@
   // The drawings are fixed strings from this page, never text from the board file.
   const icon = (a) => { const s = el('span', { class: `icon i-${a}`, 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[a]}"/></svg>`; return s; };
   // A design with only screen notes (answer 'screens') still waits for its design-wide verdict.
-  const isAnswered = (d) => Object.hasOwn(state.answers, d.key) && state.answers[d.key].answer !== 'screens';
+  const isAnswered = (d) => Object.hasOwn(state.answers, d.key) && !(d.type === 'design' && state.answers[d.key].answer === 'screens');
   /** Each item lives in one area: answered items, then the area the item names, then evidence updates, then what is only to read (explainers, pages with nothing to answer), then the open asks.
    *  A plan has no options but waits for its send-back. */
   const area = (d) => {
@@ -1270,11 +1270,11 @@
     const save = (verdict) => {
       const screen = session.open;
       if (!screen && d.options?.length && !pick.value) { err.textContent = 'Choose a direction before sending your review.'; pick.focus(); return Promise.resolve(); }
-      // A screen save (the viewer) sends no design-wide verdict; a note on a screen carries the verdict of the button that saved it.
+      // A screen save (the viewer) sends no design-wide verdict; a note carries the verdict of the button that saved it, on a screen or at design level.
       const selected = target(), text = note.value.trim(), writes = (selected && screen) || text;
       const replaces = !selected || writes;
       const notes = (state.answers[d.key]?.notes ?? []).filter((n) => !replaces || n.journey !== selected?.journey.id || n.screen !== selected?.screen.id);
-      if (writes) notes.push({ ...(selected && { journey: selected.journey.id, screen: selected.screen.id, verdict }), note: text });
+      if (writes) notes.push({ ...(selected && { journey: selected.journey.id, screen: selected.screen.id }), verdict, note: text });
       saving = true; approve.disabled = change.disabled = true;
       return call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, ...(!screen && { verdict }),
         notes, ...(pick.value && { pick: pick.value }) }) }, () => session.drafts.delete(screenKey(selected)))

@@ -1302,7 +1302,7 @@ test('a design without journey screens accepts a design-level change note', { sk
   await evaluate('document.querySelector(".design-review textarea").value = "Clarify the overall hierarchy."');
   await evaluate('document.querySelector(".design-review button:last-of-type").click()');
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Changes requested');
-  assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-no-screens'].notes, [{ note: 'Clarify the overall hierarchy.' }]);
+  assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-no-screens'].notes, [{ verdict: 'change', note: 'Clarify the overall hierarchy.' }]);
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
   await until(async () => (await evaluate('document.querySelector(".design-card .eyebrow")?.textContent')) === 'Changes requested');
   assert.match(await evaluate('document.querySelector(".design-card")?.textContent'), /Clarify the overall hierarchy/);
@@ -1385,6 +1385,47 @@ test('design screen saves: a screen-only save runs no on_answer, a change on a s
   proc.kill();
 });
 
+test('an ask whose option is named screens is answered, not left waiting', async () => {
+  const dir = join(scratch, 'screens-option'), file = join(dir, 'board.json');
+  mkdirSync(dir, { recursive: true });
+  assert.equal(run('post', file, '--title', 'Which view?', '--key', 'pick-view', '--option', 'screens=Screens', '--option', 'list=List').code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  assert.equal((await post(url, 'api/answers', { key: 'pick-view', answer: 'screens' })).status, 200);
+  assert.equal(JSON.parse(run('answers', file, '--json').out)['pick-view'].answer, 'screens');
+  assert.match(run('list', file).out, /waiting: 0 of 1 decisions/);
+  proc.kill();
+});
+
+test('design screen change: a change with new text on a screen that already had a change note still sets an approved design to change', async () => {
+  const dir = join(scratch, 'screen-change-again'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), png);
+  writeFileSync(join(dir, 'design', 'a.png'), png);
+  writeFileSync(join(dir, 'design', 'b.png'), png);
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd3-change-again', title: 'Review the flow screens',
+    about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
+    options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend: 'a',
+    journeys: [{ id: 'flow', title: 'Flow', screens: [
+      { id: 'a', title: 'First', views: { phone_light: 'design/a.png' } },
+      { id: 'b', title: 'Second', views: { phone_light: 'design/b.png' } },
+    ] }] };
+  writeFileSync(source, JSON.stringify(message));
+  assert.equal(run('post', file, '--kind', 'design', '--from', source).code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const saved = () => JSON.parse(run('answers', file, '--json').out)['d3-change-again'];
+  const changeB = (note) => ({ journey: 'flow', screen: 'b', verdict: 'change', note });
+  assert.equal((await post(url, 'api/answers', { key: 'd3-change-again', notes: [changeB('Fix the title')] })).status, 200);
+  assert.equal((await post(url, 'api/answers', { key: 'd3-change-again', verdict: 'approve', pick: 'a', notes: [changeB('Fix the title')] })).status, 200);
+  assert.equal(saved().answer, 'approve');
+  assert.equal((await post(url, 'api/answers', { key: 'd3-change-again', notes: [changeB('Still wrong')] })).status, 200);
+  assert.deepEqual([saved().answer, saved().pick], ['change', 'a']);
+  proc.kill();
+});
+
 test('design review: a viewer approve needs no direction pick, and an inline Approve with a note gives that screen the same verdict', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'screen-approve-pick'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
   mkdirSync(join(dir, 'design'), { recursive: true });
@@ -1424,7 +1465,7 @@ test('design review: a viewer approve needs no direction pick, and an inline App
   proc.kill();
 });
 
-test('a design-level inline Approve with an empty note drops the earlier design-level note', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('a design-level inline Approve or Change stores its verdict with the note, and an empty Approve drops the earlier design-level note', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'design-level-note'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
   mkdirSync(join(dir, 'design'), { recursive: true });
   writeFileSync(join(dir, 'design', 'preview.png'), png);
@@ -1440,12 +1481,17 @@ test('a design-level inline Approve with an empty note drops the earlier design-
   await evaluate('document.querySelector(".design-review textarea").value = "Fix spacing"');
   await evaluate('document.querySelector(".design-review .foot button:last-child").click()');
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Changes requested');
-  assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d3-plain'].notes, [{ note: 'Fix spacing' }]);
+  assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d3-plain'].notes, [{ verdict: 'change', note: 'Fix spacing' }]);
   await evaluate('document.querySelector(".design-review textarea").value = ""');
   await evaluate('document.querySelector(".design-review .foot button").click()');
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Approved');
   const saved = JSON.parse(run('answers', file, '--json').out)['d3-plain'];
   assert.deepEqual([saved.answer, saved.notes], ['approve', []]);
+  await evaluate('document.querySelector(".design-review textarea").value = "Looks good"');
+  await until(() => evaluate('!document.querySelector(".design-review .foot button").disabled'));
+  await evaluate('document.querySelector(".design-review .foot button").click()');
+  await until(() => JSON.parse(run('answers', file, '--json').out)['d3-plain'].notes.length === 1);
+  assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d3-plain'].notes, [{ verdict: 'approve', note: 'Looks good' }]);
   close();
   proc.kill();
 });

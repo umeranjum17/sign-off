@@ -450,7 +450,7 @@ const waitFor = (on: string, filer?: string, key?: string) => (filer ? `Run \`si
   : `Run \`sign-off-axi wait${on}${key ? ` --key ${key}` : ''}\` to block until the user answers`);
 
 /** Still waiting on the user: not answered, not dismissed, and something to answer (an item with no options and no reply is only shown). */
-const waits = (d: Decision & { answer?: unknown; dismissed?: boolean }) => !d.dismissed && awaitsVerdict(d.answer as { answer?: string } | undefined) && (d.options.length > 0 || !!d.reply || d.type === 'signin' || d.type === 'plan' || d.type === 'design');
+const waits = (d: Decision & { answer?: unknown; dismissed?: boolean }) => !d.dismissed && awaitsVerdict(d.type, d.answer as { answer?: string } | undefined) && (d.options.length > 0 || !!d.reply || d.type === 'signin' || d.type === 'plan' || d.type === 'design');
 /** The board's decisions with their latest answer; a missing board file is an empty board.
  *  A dismissal hides an item from the board and is not waiting here either, checked against the same dismissed log the board reads. */
 function board(file: string, say = warn) {
@@ -472,7 +472,7 @@ function ready(file: string, on: string, root?: string) {
 
 function list(args: string[]) {
   const { file, values, on } = parse('list', args, TIERS);
-  const rows = board(file), waiting = rows.filter(waits), answered = rows.filter((d) => d.answer && !awaitsVerdict(d.answer) && !d.dismissed).length;
+  const rows = board(file), waiting = rows.filter(waits), answered = rows.filter((d) => d.answer && !awaitsVerdict(d.type, d.answer) && !d.dismissed).length;
   if (values.json) return JSON.stringify({ board: file, decisions: rows.map(({ dismissed, ...d }) => ({ ...d, ...(d.type === 'signin' && { link: undefined }), ...(dismissed && { dismissed }) })) });
   const help = [
     ...(waiting.length ? [`Run \`sign-off-axi open${on}\` to show the board to the user`] : []),
@@ -481,7 +481,7 @@ function list(args: string[]) {
   ];
   const where = tilde(file) + (existsSync(file) ? '' : ' (no file yet; raise creates it)');
   if (values.full) {
-    return toon({ board: where, decisions: rows.map((d) => ({ key: d.key, status: awaitsVerdict(d.answer) ? (d.dismissed ? 'dismissed' : 'waiting') : d.answer!.answer, title: d.title, about: d.about ?? '', detail: d.detail ?? '',
+    return toon({ board: where, decisions: rows.map((d) => ({ key: d.key, status: awaitsVerdict(d.type, d.answer) ? (d.dismissed ? 'dismissed' : 'waiting') : d.answer!.answer, title: d.title, about: d.about ?? '', detail: d.detail ?? '',
       recommend: d.recommend_value ?? '', default_if_silent: d.default_if_silent ?? '', close: d.close })) }, help);
   }
   return toon({
@@ -557,7 +557,7 @@ async function wait(args: string[]) {
   // With a filer, only its own items count, and an answer it has not taken yet is new however old it is.
   const mine = (rows: ReturnType<typeof board>) => (filer === undefined ? rows : rows.filter((d) => d.filer === filer));
   // A design with only screen notes still waits: it counts as unanswered here until its design verdict lands.
-  const open = (rows: ReturnType<typeof board>) => rows.map((d) => (awaitsVerdict(d.answer) ? { ...d, answer: undefined } : d));
+  const open = (rows: ReturnType<typeof board>) => rows.map((d) => (awaitsVerdict(d.type, d.answer) ? { ...d, answer: undefined } : d));
   const before = new Set(open(board(file)).flatMap((d) => (d.answer ? [d.key] : [])));
   // Rounds seen before waiting starts stay quiet; only a newly asked round wakes the loop.
   const seenRounds = new Map<string, number>();
@@ -1926,7 +1926,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   if (d.kind === 'design') {
     try {
       const before = readAnswers(file)[d.key]?.answer, a = appendDesignAnswer(file, d, verdict, notes, pick);
-      if (a && !awaitsVerdict(a) && (verdict !== undefined || a.answer !== before)) answered(a, d);
+      if (a && !awaitsVerdict(d.type, a) && (verdict !== undefined || a.answer !== before)) answered(a, d);
     } catch (e) { if (e instanceof InputError) return [400, { error: e.message }]; throw e; }
     return [200, state()];
   }
