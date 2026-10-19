@@ -550,7 +550,6 @@
     .list.in-waiting { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 1rem; }
     .list.in-waiting > .row { border-radius: 1.125rem; padding: 1.25rem; }
     .list.in-waiting .choices button { min-height: 2.75rem; }
-    .keys { display: block; }
   }
 </style>
 </head>
@@ -1528,7 +1527,7 @@
     });
     const selectedOption = () => opts.find((o) => o.value === (selected.get(d.key) ?? initial));
     const answer = el('button', { class: 'answer' }, `Answer ${selectedOption()?.label ?? 'now'}`);
-    answer.onclick = () => { const o = selectedOption(); if (o) save(d, o, optionButtons, err); };
+    answer.onclick = () => { const o = selectedOption(); if (o) save(d, o, [...optionButtons, answer], err); };
     const preview = d.type === 'design' || d.mocks?.length ? mockCards(d, [], true) : d.view ? rung(d) : pic(d) ? thumb('waiting', pic(d)) : proof(d);
     const quiet = opts.find((o) => o.value === d.default_if_silent);
     const silent = quiet ? `If you stay quiet: ${quiet.label}${d.silent_by ? ` · ${left(d.silent_by)}` : ''}` : '';
@@ -1593,7 +1592,7 @@
     const needs = el('section', { class: 'card needs' }, el('h2', {}, 'Needs you first'), ...(first ? [first.filed ? el('p', { class: 'meta since' }, `Waiting since ${when(first.filed)}`) : '', row(first, { x: false }),
       el('div', { class: 'foot' }, xBtn(first, 'Dismiss'), first.kind === 'design' ? el('a', { class: 'open-link', href: `#designs/${first.key}` }, 'Open designs') : el('a', { class: 'more', href: '#waiting' }, more))] : [el('p', { class: 'meta' }, 'Nothing is waiting on you.')]), dismissed(hidden));
     document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [filters(by.waiting), waitingPage(shown, hidden)]
-      : at === 'decide' && !state.readonly ? [decidePage(by.waiting.find((d) => d.key === key && !gone.has(d.key)))]
+      : at === 'decide' ? [decidePage(by.waiting.find((d) => d.key === key && !gone.has(d.key)))]
       : at === 'designs' ? [...designGroups(by.designs)] : at === 'reports' && !state.readonly ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
         ...(by.reports.length ? reportGroups(by.reports) : [el('p', { class: 'empty' }, EMPTY.reports)]), notes(by.notes)] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [at === 'evidence' && by[at].length ? el('div', { class: 'sec-head' }, el('h2', {}, 'Updates')) : '', at === 'waiting' ? filters(by.waiting) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...(at === 'waiting' ? shown : by[at]).map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [el('div', { class: 'tiles' }, ...Object.keys(AREAS).map((a) => tile(a, by[a]))),
