@@ -101,6 +101,12 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
   assert.deepEqual(api.decisions[1].options.map((o) => o.value), ['pass', 'fail', 'needs-work']);
   assert.equal(api.decisions[1].link, 'https://github.com/acme/app/pull/12');
 
+  // The export runs in its own process and must hide the same pre-guard test card the served board hides.
+  const html = join(scratch, 'board.export.html'), exported = run('export', board, '--out', html);
+  assert.equal(exported.code, 0);
+  const frozen = JSON.parse(/window\.FROZEN = (.*?);<\/script>/s.exec(readFileSync(html, 'utf8'))[1]);
+  assert.deepEqual(frozen.decisions.map((d) => d.key).sort(), ['update-1', 'update-2']);
+
   const media = await fetch(`${url}api/media?key=update-2&i=1`);
   assert.equal(media.headers.get('content-type'), 'video/webm');
   assert.deepEqual(Buffer.from(await media.arrayBuffer()), clip);

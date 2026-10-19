@@ -1730,6 +1730,8 @@ async function exportBoard(args: string[]) {
   const parsed = parse('export', args, { out: { type: 'string' }, 'evidence-root': { type: 'string' } });
   ready(parsed.file, parsed.on, parsed.values['evidence-root']);
   [file, evidenceRoot] = [parsed.file, parsed.values['evidence-root'] ? resolve(parsed.values['evidence-root']) : ''];
+  guardReady = warmGuard();
+  await guardReady;
   const { file: _, messages: _messages, annotations: _annotations, ...frozen } = state(), files: Record<string, string> = {}, q = encodeURIComponent;
   let missing = 0;
   // The same URLs the page asks the server for, read through the same hash and path checks.
@@ -1778,7 +1780,7 @@ const stillJobs = () => {
   for (const d of loadDecisions(file)) {
     if (d.type !== 'evidence') continue;
     for (const m of d.media ?? []) {
-      if (!isStill(m.path) || seen.has(m.sha256)) continue;
+      if (!isStill(m.path) || seen.has(m.sha256) || unfitMedia.has(m.sha256)) continue;
       seen.add(m.sha256);
       try { jobs.push({ path: under(dirname(file), m.path), sha256: m.sha256 }); } catch { /* an absent file has no faults */ }
     }
@@ -1803,12 +1805,14 @@ const warmGuard = () => new Promise<void>((done) => {
     let worker: Worker;
     try { worker = new Worker(new URL('./stills-worker.js', import.meta.url), { workerData: jobs.filter((_, j) => j % workers === i) }); }
     catch { ended(); continue; }
-    const stop = setTimeout(() => { void worker.terminate(); }, WORKER_WAIT);
-    stop.unref();
-    worker.once('message', (measured: [string, boolean][]) => {
+    let stop: NodeJS.Timeout;
+    const arm = () => {
       clearTimeout(stop);
-      for (const [sha, unfit] of measured) unfitMedia.set(sha, unfit);
-    });
+      stop = setTimeout(() => { void worker.terminate(); }, WORKER_WAIT);
+      stop.unref();
+    };
+    arm();
+    worker.on('message', ([sha, unfit]: [string, boolean]) => { unfitMedia.set(sha, unfit); arm(); });
     worker.once('error', () => clearTimeout(stop));
     worker.once('exit', () => { clearTimeout(stop); ended(); });
   }
