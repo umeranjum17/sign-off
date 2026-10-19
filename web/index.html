@@ -631,7 +631,6 @@
   function offerUndo(d, before) {
     const now = answerOf(d.key);
     if (!now) return;
-    if (location.hash.startsWith('#decide/')) location.hash = '#waiting';
     undoBtn.setAttribute('aria-label', `Undo, ${headline(d)}`);
     say(`Saved: ${now.answer === 'text' ? 'your reply' : now.label}`, 5000, () => {
       undoBtn.disabled = true;
@@ -1597,7 +1596,8 @@
     const hidden = state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'waiting');
     by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
     const [, at, key] = /^#(waiting|decide|designs|evidence|reports|answered)(?:\/([\w.-]+))?$/.exec(location.hash) ?? [];
-    const askAt = by.waiting.findIndex((d) => d.key === key);
+    const decideQueue = by.waiting.filter((d) => d.type === 'signin' || (d.type !== 'plan' && d.kind !== 'design'));
+    const askAt = decideQueue.findIndex((d) => d.key === key);
     const active = at === 'decide' ? 'waiting' : at;
     const link = (a, name, n) => el('a', { href: `#${a}`, ...(a === (active ?? '') && { 'aria-current': 'page' }) }, icon(a || 'summary'), name, n === undefined ? '' : el('span', { class: 'n' }, String(n)));
     document.getElementById('nav').replaceChildren(el('p', { class: 'brand' }, 'sign-off'), link('', 'Summary'), ...Object.keys(AREAS).map((a) => link(a, NAV[a], by[a].length)));
@@ -1617,7 +1617,7 @@
     const needs = el('section', { class: 'card needs' }, el('h2', {}, 'Needs you first'), ...(first ? [first.filed ? el('p', { class: 'meta since' }, `Waiting since ${when(first.filed)}`) : '', row(first, { x: false }),
       el('div', { class: 'foot' }, xBtn(first, 'Dismiss'), first.kind === 'design' ? el('a', { class: 'open-link', href: `#designs/${first.key}` }, 'Open designs') : el('a', { class: 'more', href: '#waiting' }, more))] : [el('p', { class: 'meta' }, 'Nothing is waiting on you.')]), dismissed(hidden));
     document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [filters(by.waiting), waitingPage(shown, hidden)]
-      : at === 'decide' ? [decidePage(by.waiting[askAt], by.waiting.length > 1 ? by.waiting[(askAt + 1) % by.waiting.length] : undefined)]
+      : at === 'decide' ? [decidePage(decideQueue[askAt], decideQueue.length > 1 ? decideQueue[(askAt + 1) % decideQueue.length] : undefined)]
       : at === 'designs' ? [...designGroups(by.designs)] : at === 'reports' && !state.readonly ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
         ...(by.reports.length ? reportGroups(by.reports) : [el('p', { class: 'empty' }, EMPTY.reports)]), notes(by.notes)] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [at === 'evidence' && by[at].length ? el('div', { class: 'sec-head' }, el('h2', {}, 'Updates')) : '', at === 'waiting' ? filters(by.waiting) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...(at === 'waiting' ? shown : by[at]).map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [el('div', { class: 'tiles' }, ...Object.keys(AREAS).map((a) => tile(a, by[a]))),
