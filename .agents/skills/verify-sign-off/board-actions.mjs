@@ -2,7 +2,7 @@
 // in the real board, Dismiss and bulk Select included, at 390 and 1280, light and dark, with done-done's look step on every
 // capture. A missing or disabled action, or a look hit, fails the run.
 // Usage: node .agents/skills/verify-sign-off/board-actions.mjs <output> [light|dark] [390|1280]   (no theme or width: all four cells)
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -229,7 +229,7 @@ try {
     const base = run('bash', [resolve('.agents/skills/verify-sign-off/seed-board.sh'), home], { env: { ...process.env, SEED_SERVE_SECONDS: '900' } }).trim().split('\n').pop();
     assert.match(base, /^http:\/\/127\.0\.0\.1:\d+\/$/, base);
     try {
-      if (first && !process.env.SKIP_CLI_LOOK) { await cliLook(base); first = false; }
+      if (first) { await cliLook(base); first = false; }
       // A capture and its look: the page as a user sees it, measured by done-done's own look code.
       const capture = (name, keepToast = false) => {
         // Still: the last step's toast gone and every transition done, so the shot and the measurement see the settled page.
