@@ -40,33 +40,31 @@
   /* The person who answers: a round mark beside the Summary title. The board has no name to show, so it is a plain figure. */
   .top > .i-you { position: absolute; top: 2.4rem; right: 0; width: 2.5rem; height: 2.5rem; border-radius: 50%; --area: var(--action); }
   .top > .i-you svg { width: 1.375rem; height: 1.375rem; }
-  .date { margin: 0; color: var(--muted); font-size: 0.9375rem; font-weight: 600; }
+  .date { margin: 0.375rem 0 0; color: var(--muted); font-size: 1.0625rem; }
   .top h1 { margin: 0; font-size: 2.125rem; line-height: 1.2059; font-weight: 700; letter-spacing: 0.011em; outline: none; }
   .lede { margin: 0.375rem 0 0; color: var(--muted); }
   .back, .sec-head a, .more { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--accent); font-weight: 600; text-decoration: none; }
   h2 { font-size: 1.375rem; line-height: 1.25; margin: 0 0 0.75rem; }
   .icon { flex: none; display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 0.5rem; background: var(--area, var(--muted)); }
   .icon svg { width: 1.125rem; height: 1.125rem; fill: none; stroke: var(--surface); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  /* Summary: a tile per area (each opens its screen), what needs you first, the day so far, then a short list per area. */
-  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  /* Summary: a few lines at a glance, a tile per area (each opens its screen) with its count large, what needs you first, the day so far, then a short list per area. */
+  .glance { margin: 0 0 0.75rem; padding: 1.25rem; color: var(--muted); font-size: 1.1875rem; line-height: 1.45; }
+  .glance b { color: var(--text); font-weight: 500; }
+  .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
   .card, .tile { background: var(--surface); border-radius: 1rem; }
   .card { padding: 1rem; }
-  .tile { position: relative; display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-content: start; gap: 0.25rem 0.5rem; padding: 0.625rem 0.875rem; color: var(--text); text-decoration: none; }
-  .tile::after { content: "›" / ""; position: absolute; top: 0.5rem; right: 0.875rem; color: var(--muted); font-size: 1.5rem; line-height: 1.2; }
-  .tile .name { grid-column: 1 / -1; font-size: 0.875rem; font-weight: 600; color: var(--muted); line-height: 1.3; }
-  .tile .detail { grid-column: 1 / -1; }
-  .tile .n { grid-column: 1 / 3; font-size: 2.125rem; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .tile .detail { font-size: 0.875rem; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
-  /* The marks give way to the count: one line at the right, and a mark with no room left wraps out of sight. */
-  .vis { align-self: center; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 0.25rem; height: 2.25rem; overflow: hidden; }
-  .vis::before { content: ""; height: 100%; }
-  .vis img { width: 1.5rem; height: 2.25rem; object-fit: cover; object-position: top; border: 1px solid var(--line); border-radius: 0.25rem; }
-  .mark { width: 0.875rem; height: 0.875rem; border-radius: 50%; border: 2px solid var(--area); }
-  /* Waiting shows one clock and Answered up to three checks, drawn in the area's colour. */
-  .vis .icon { width: auto; height: auto; background: none; } .vis .icon svg { width: 1.5rem; height: 1.5rem; stroke: var(--area); }
-  .i-waiting .vis .icon svg { width: 2.25rem; height: 2.25rem; }
-  .i-reports .mark { width: 0.375rem; height: 1.25rem; border-radius: 2px; background: var(--area); }
+  .tile { display: grid; align-content: start; gap: 0.25rem; padding: 1rem; color: var(--text); text-decoration: none; }
+  .tile .icon { justify-self: start; width: auto; height: auto; background: none; }
+  .tile .icon svg { width: 1.5rem; height: 1.5rem; stroke: var(--area, var(--muted)); stroke-width: 1.75; }
+  .tile .n { margin-top: 0.5rem; font-size: 2.5rem; font-weight: 700; line-height: 1.1; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+  .tile .name { color: var(--muted); font-size: 0.9375rem; line-height: 1.3; }
+  .tile:focus-visible { outline-offset: 2px; }
   .pair, .areas { display: grid; gap: 1rem; margin-top: 1rem; }
+  .areas { gap: 2rem; margin-top: 2.5rem; }
+  .areas .sec-head { margin-bottom: 0.75rem; } .areas h2 { font-size: 1.75rem; line-height: 1.15; }
+  /* The Summary's short lists are grouped inset lists: a filled square in the area's colour, the title and a line under it, then a chevron. */
+  .areas .compact .icon { width: 2rem; height: 2rem; border-radius: 0.5rem; background: var(--area, var(--muted)); } .areas .compact .icon svg { stroke: #FFFFFF; }
+  .areas .compact::after { content: "" / ""; flex: none; width: 0.5rem; height: 0.5rem; margin-right: 0.5rem; border: solid var(--border); border-width: 2px 2px 0 0; transform: rotate(45deg); }
   /* Needs you first keeps the existing answer controls at a readable width. */
   .needs .row { padding: 0; border: 0; background: none; box-shadow: none; grid-template-columns: minmax(0, 1fr); }
   .needs .row .choices { display: grid; grid-template-columns: minmax(0, 1fr); }
@@ -228,6 +226,8 @@
   .rows { list-style: none; margin: 0; padding: 0 0 0 1rem; }
   .rows > li { padding-right: 0.5rem; }
   .rows > li + li { border-top: 0.5px solid var(--line); }
+  /* Answered: Done today, then Earlier, each one grouped inset list. */
+  #board > .sec-head:has(+ .rows.i-answered) { margin: 0 0 0.5rem; } .rows.i-answered + .sec-head { margin-top: 1.75rem; }
   .compact { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 0; color: var(--text); text-decoration: none; }
   .compact .t { display: grid; flex: 1; min-width: 0; }
   /* The answer sits under the title, never beside it: a long answer beside the title squeezed it to a letter a line. */
@@ -588,7 +588,10 @@
     #toast { bottom: 1.75rem; }
     main { width: 100%; padding: 0 3rem; }
     .back { display: none; }
-    .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .tiles { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .tile { padding: 1.25rem 1.5rem; } .tile .n { font-size: 3rem; }
+    .glance { padding: 1.25rem 1.5rem; }
+    .date { font-size: 1.1875rem; }
     .pair { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
     .areas { grid-template-columns: 1fr 1fr; align-items: start; }
     .plan-preview { height: 20rem; }
@@ -597,10 +600,6 @@
     .plan-copy h2, .decide h2 { font-size: 2.5rem; line-height: 1.1; }
     .decide-bar { position: static; margin: 1rem 0 0; padding: .75rem 0; background: transparent; }
     .rows.reports, .sec-h:has(+ .reports), .legend { max-width: 50rem; }
-    /* Answered sets each row as its own card, two across; an opened row takes the whole width. */
-    .rows.i-answered { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; align-items: start; padding: 0; border: 0; background: none; box-shadow: none; }
-    .rows.i-answered > li { padding: 0 0.5rem 0 1rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); }
-    .rows.i-answered > li:has(.done[open]) { grid-column: 1 / -1; }
     /* Evidence sets its cards two across, the whole capture on each tile; a page that is not an update keeps the whole width. */
     .ev-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; }
     .ev-grid > .row { grid-column: 1 / -1; }
@@ -1212,18 +1211,18 @@
   };
   const thumb = (a, url) => { if (!url) return icon(a); const img = el('img', { class: 'thumb', src: src(url), alt: '' }); img.onerror = () => img.replaceWith(icon(a)); return img; };
 
-  function tile(a, items) {
-    const answeredToday = a === 'answered' && items.filter((d) => new Date(state.answers[d.key].at).toDateString() === new Date().toDateString()).length;
-    // A short count line that never cuts off on a phone. Waiting gives the oldest ask's time when its items carry one.
-    const oldest = items.map((d) => d.filed).filter(Boolean).sort((x, y) => Date.parse(x) - Date.parse(y))[0];
-    const newest = items.filter((d) => d.number).sort((x, y) => Date.parse(y.filed ?? 0) - Date.parse(x.filed ?? 0))[0];
-    const detail = { waiting: oldest ? `Oldest ${when(oldest)}` : `${items.length} waiting`, designs: `${items.length} to review`, evidence: newest ? `Newest: Update ${newest.number}` : `${items.length} to see`,
-      reports: `${items.length} to read`, answered: `${answeredToday} today` }[a];
-    const thumbs = a === 'evidence' ? items.map(pic).filter(Boolean).slice(0, 3).map((u) => el('img', { src: src(u), alt: '' })) : [];
-    const marks = thumbs.length ? thumbs : a === 'waiting' ? [items.length ? icon(a) : '']
-      : Array.from({ length: Math.min(items.length, 3) }, () => (a === 'answered' ? icon(a) : el('span', { class: 'mark' })));
-    return el('a', { class: `tile i-${a}`, href: `#${a}`, 'aria-label': `${AREAS[a]}, ${items.length}` }, icon(a), el('span', { class: 'name' }, AREAS[a]),
-      el('span', { class: 'n' }, String(items.length)), el('span', { class: 'vis', 'aria-hidden': 'true' }, ...marks), el('span', { class: 'detail', dir: 'auto' }, detail));
+  /** A tile per area: its icon, the count large, and its name; it opens the area. */
+  const tile = (a, items) => el('a', { class: `tile i-${a}`, href: `#${a}`, 'aria-label': `${AREAS[a]}, ${items.length}` }, icon(a),
+    el('span', { class: 'n' }, String(items.length)), el('span', { class: 'name' }, NAV[a]));
+
+  /** The Summary at a glance, in a few short sentences: what needs you (and since when) in full colour, the rest quieter. */
+  function glance(by) {
+    const oldest = by.waiting.map((d) => d.filed).filter(Boolean).sort((x, y) => Date.parse(x) - Date.parse(y))[0];
+    const n = by.waiting.length, fresh = by.answered.filter((d) => isToday(state.answers[d.key].at)).length;
+    const lines = [[n ? `${n} ${n === 1 ? 'ask needs' : 'asks need'} you.` : 'Nothing is waiting on you.', 1], [oldest && `Oldest since ${when(oldest)}.`],
+      [by.evidence.length && `${plural(by.evidence.length, 'evidence update')} to see.`, 1], [by.designs.length && `${plural(by.designs.length, 'design')} to review.`],
+      [by.reports.length && `${plural(by.reports.length, 'report')} to read.`], [`${fresh} answered today.`]];
+    return el('p', { class: 'card glance' }, ...lines.filter(([t]) => t).map(([t, strong]) => el(strong ? 'b' : 'span', {}, `${t} `)));
   }
 
   /** The day so far: a mark per answer on a line of hours, and the list of them. Only answers have a place on it; an item's `filed` time is not shown here.
@@ -1252,7 +1251,7 @@
   const compact = (d, a) => {
     const s = state.answers[d.key];
     return [thumb(d.type === 'plan' ? 'plan' : a, pic(d)), el('span', { class: 't' }, el('strong', { dir: 'auto' }, title(d)), s
-      ? el('span', { class: 'ans' }, el('b', { dir: 'auto' }, s.answer === 'text' ? 'Your reply' : s.label), el('time', {}, isToday(s.at) ? hhmm(s.at) : day(s.at)))
+      ? el('span', { class: 'ans' }, el('b', { dir: 'auto' }, s.answer === 'text' ? 'Your reply' : s.label), el('time', {}, when(s.at)))
       : el('span', { class: 'meta', dir: 'auto' }, sub(d)))];
   };
   let jump = null; // The item a Summary row was tapped for, scrolled to on its area's screen.
@@ -1764,9 +1763,9 @@
       ...(a === active && { 'aria-current': 'page' }) }, icon(a), TAB[a])));
     const ro = state.readonly ? 'Read only' : FROZEN ? `Read-only copy, ${FROZEN.exported}` : '';
     const pageTitle = at === 'decide' ? 'Decide' : at === 'reports' ? NAV.reports : AREAS[at];
-    const top = el('header', { class: 'top' }, at ? el('a', { class: 'back', href: at === 'decide' ? '#waiting' : '#' }, at === 'decide' ? '‹ Waiting on you' : '‹ Summary')
-      : el('p', { class: 'date' }, new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })),
-    el('h1', { tabindex: '-1' }, at ? pageTitle : 'Summary'), at ? '' : icon('you'), ro ? el('p', { class: 'meta' }, ro) : '',
+    const top = el('header', { class: 'top' }, at ? el('a', { class: 'back', href: at === 'decide' ? '#waiting' : '#' }, at === 'decide' ? '‹ Waiting on you' : '‹ Summary') : '',
+    el('h1', { tabindex: '-1' }, at ? pageTitle : 'Summary'), at ? '' : icon('you'), at ? '' : el('p', { class: 'date' }, new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })),
+    ro ? el('p', { class: 'meta' }, ro) : '',
     at === 'waiting' && !state.readonly && by.waiting.length ? el('p', { class: 'lede waiting-lede' }, `${shown.length} ${shown.length === 1 ? 'item needs' : 'items need'} you · ${new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}`)
       : at === 'reports' && !state.readonly && by.reports.length ? el('p', { class: 'lede' }, by.reports.some((d) => d.steps)
       ? 'How the tools work, step by step. Tap one to open it.' : 'Explainers the agents made for you. Tap one to open it.')
@@ -1780,7 +1779,7 @@
         : decidePage(decideQueue[decideAt], decideQueue.length > 1 ? decideQueue[(decideAt + 1) % decideQueue.length] : undefined)]
       : at === 'designs' ? [...designGroups(by.designs)] : at === 'evidence' ? evidenceGroups(by.evidence) : at === 'reports' && !state.readonly ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
         ...(by.reports.length ? reportGroups(by.reports) : [el('p', { class: 'empty' }, EMPTY.reports)]), notes(by.notes)] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [at === 'waiting' ? filters(by.waiting) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...(at === 'waiting' ? shown : by[at]).map(row))
-      : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [el('div', { class: 'tiles' }, ...Object.keys(AREAS).map((a) => tile(a, by[a]))),
+      : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [glance(by), el('div', { class: 'tiles' }, ...Object.keys(AREAS).map((a) => tile(a, by[a]))),
       el('div', { class: 'pair' }, needs, today(by.answered)), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()]),
       el('div', { class: 'areas' }, ...Object.keys(AREAS).map((a) => section(a, by[a])))]));
     readPage(key ? state.decisions.find((d) => d.key === key && !gone.has(d.key) && (at === 'reports' && reads(d) || at === 'designs' && d.kind === 'design' || at === 'evidence' && d.type === 'evidence' || d.type === 'plan' && area(d) === at)) : undefined, at);
