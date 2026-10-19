@@ -62,9 +62,9 @@
   .pair, .areas { display: grid; gap: 1rem; margin-top: 1rem; }
   .areas { gap: 2rem; margin-top: 2.5rem; }
   .areas .sec-head { margin-bottom: 0.75rem; } .areas h2 { font-size: 1.75rem; line-height: 1.15; }
-  /* The Summary's short lists are grouped inset lists: a filled square in the area's colour, the title and a line under it, then a chevron. */
+  /* The Summary's short lists are grouped inset lists: a filled square in the area's colour, the title and a line under it, then a chevron on a row with no ×, so the title keeps the row. */
   .areas .compact .icon { width: 2rem; height: 2rem; border-radius: 0.5rem; background: var(--area, var(--muted)); } .areas .compact .icon svg { stroke: #FFFFFF; }
-  .areas .compact::after { content: "" / ""; flex: none; width: 0.5rem; height: 0.5rem; margin-right: 0.5rem; border: solid var(--border); border-width: 2px 2px 0 0; transform: rotate(45deg); }
+  .areas li:not(:has(.x)) .compact::after { content: "" / ""; flex: none; width: 0.5rem; height: 0.5rem; margin-right: 0.5rem; border: solid var(--border); border-width: 2px 2px 0 0; transform: rotate(45deg); }
   /* Needs you first keeps the existing answer controls at a readable width. */
   .needs .row { padding: 0; border: 0; background: none; box-shadow: none; grid-template-columns: minmax(0, 1fr); }
   .needs .row .choices { display: grid; grid-template-columns: minmax(0, 1fr); }
