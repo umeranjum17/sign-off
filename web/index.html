@@ -1508,11 +1508,12 @@
         el('h2', { dir: 'auto' }, d.title), el('p', { class: 'about', dir: 'auto' }, d.about ?? ''),
         el('div', { class: 'plan-meta' }, ...meta), el('a', { class: 'open-link plan-open', href: `#waiting/${d.key}` }, 'Open plan')));
   }
+  const askIcon = (d) => { const a = { design: 'designs', signin: 'you', plan: 'plan' }[typeOf(d)] ?? 'waiting'; return ICONS[a] ? a : 'waiting'; };
   function waitingPage(items, hidden) {
     const plans = items.filter((d) => d.type === 'plan'), asks = items.filter((d) => d.type !== 'plan');
     const rows = asks.map((d) => {
       const label = `Agent${d.silent_by ? ` · closes at ${when(d.silent_by)}` : d.filed ? ` · waiting since ${when(d.filed)}` : ''}`;
-      const link = el('a', { class: 'ask-card', id: `item-${d.key}`, href: d.kind === 'design' ? `#designs/${d.key}` : `#decide/${d.key}` }, icon(({ 'yes-no': 'toggle', 'pick-one': 'calendar', design: 'grid', signin: 'layout', approval: 'shield', reply: 'chat' })[typeOf(d)] ?? 'waiting'),
+      const link = el('a', { class: 'ask-card', id: `item-${d.key}`, href: d.kind === 'design' ? `#designs/${d.key}` : `#decide/${d.key}` }, icon(askIcon(d)),
         el('span', { class: 'copy' }, el('span', { class: 'kind' }, kind(d)), el('strong', { class: 'title', dir: 'auto' }, title(d)),
           d.why || d.about ? el('span', { class: 'meta', dir: 'auto' }, d.why || d.about) : '', el('span', { class: 'meta' }, label)));
       return el('li', {}, link, xBtn(d));

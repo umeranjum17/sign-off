@@ -984,6 +984,8 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await until(async () => (await askTitles()) === 'Pick the look|Which day for release?|Keep the weekly digest?');
   assert.equal(await evaluate('document.querySelector(".waiting-lede").textContent.includes("3 items need you")'), true);
   assert.equal(await evaluate('document.querySelector(".ask-card .kind").textContent'), 'Design pick');
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".ask-card .icon")].map((s) => [s.className, (s.querySelector("path")?.getAttribute("d") ?? "").length > 10])'),
+    [['icon i-designs', true], ['icon i-waiting', true], ['icon i-waiting', true]]);
   assert.equal(await chips(), 'All 3*|Design pick 1|Yes/No 1|Pick one 1');
   await evaluate('document.querySelector("#item-look").click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/look');
