@@ -1530,6 +1530,36 @@ test('a viewer request for a change already stored on an approved design still s
   proc.kill();
 });
 
+test('a plain wait wakes when a viewer request changes an approved design', async () => {
+  const dir = join(scratch, 'approved-rewake'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), png);
+  writeFileSync(join(dir, 'design', 'a.png'), png);
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd5-rewake', title: 'Review the flow screens',
+    about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
+    options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend: 'a',
+    journeys: [{ id: 'flow', title: 'Flow', screens: [{ id: 'a', title: 'First', views: { phone_light: 'design/a.png' } }] }] };
+  writeFileSync(source, JSON.stringify(message));
+  assert.equal(run('post', file, '--kind', 'design', '--from', source).code, 0);
+  assert.equal(run('raise', file, '--title', 'Keep the digest?').code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  assert.equal((await post(url, 'api/answers', { key: 'd5-rewake', verdict: 'approve', pick: 'a', notes: [] })).status, 200);
+  const watching = "import fs from 'node:fs'; import { syncBuiltinESMExports } from 'node:module'; const { watch } = fs;"
+    + " fs.watch = (...a) => { try { return watch(...a); } finally { process.stderr.write('watching'); } }; syncBuiltinESMExports();";
+  const waiting = spawn('node', ['--import', `data:text/javascript,${encodeURIComponent(watching)}`, cli, 'wait', file, '--timeout', '20'], { env });
+  let waited = '';
+  waiting.stdout.on('data', (b) => (waited += b));
+  const exited = new Promise((ok) => waiting.on('exit', ok));
+  await new Promise((ok) => { waiting.stderr.on('data', (b) => /watching/.test(b) && ok()); waiting.once('exit', ok); });
+  const changeA = { journey: 'flow', screen: 'a', verdict: 'change', note: 'fix spacing' };
+  assert.equal((await post(url, 'api/answers', { key: 'd5-rewake', notes: [changeA], requested: true })).status, 200);
+  assert.equal(await exited, 0);
+  assert.match(waited, /d5-rewake/);
+  proc.kill();
+});
+
 test('design review: a viewer approve needs no direction pick, and an inline Approve with a note gives that screen the same verdict', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'screen-approve-pick'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
   mkdirSync(join(dir, 'design'), { recursive: true });

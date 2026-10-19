@@ -558,7 +558,7 @@ async function wait(args: string[]) {
   const mine = (rows: ReturnType<typeof board>) => (filer === undefined ? rows : rows.filter((d) => d.filer === filer));
   // A design with only screen notes still waits: it counts as unanswered here until its design verdict lands.
   const open = (rows: ReturnType<typeof board>) => rows.map((d) => (awaitsVerdict(d.type, d.answer) ? { ...d, answer: undefined } : d));
-  const before = new Set(open(board(file)).flatMap((d) => (d.answer ? [d.key] : [])));
+  const before = new Map(open(board(file)).flatMap((d) => (d.answer ? [[d.key, JSON.stringify(d.answer)] as const] : [])));
   // Rounds seen before waiting starts stay quiet; only a newly asked round wakes the loop.
   const seenRounds = new Map<string, number>();
   for (const r of readRounds(file)) seenRounds.set(r.key, (seenRounds.get(r.key) ?? 0) + 1);
@@ -569,7 +569,7 @@ async function wait(args: string[]) {
     try { watcher = watch(dirname(file), (_, changed) => changed === name && wake()).on('error', () => {}); } catch {}
     for (let first = true; ; first = false) {
       const rows = mine(open(board(file, first ? warn : () => {}))), waiting = rows.filter(waits).length, taken = filer === undefined ? undefined : seenBy(file);
-      const hit = rows.filter((d) => (values.key !== undefined ? d.key === values.key : d.answer && (taken ? !taken(d.answer) : !before.has(d.key))));
+      const hit = rows.filter((d) => (values.key !== undefined ? d.key === values.key : d.answer && (taken ? !taken(d.answer) : before.get(d.key) !== JSON.stringify(d.answer))));
       const counts = new Map<string, number>(), asked: Round[] = [];
       for (const r of readRounds(file, first ? warn : () => {})) {
         counts.set(r.key, (counts.get(r.key) ?? 0) + 1);
