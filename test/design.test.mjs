@@ -612,7 +612,7 @@ test('pointing at a design mock: the board turns it on for a frame, a tap comes 
     return at;
   };
   const ref = { ref: '#app > section:nth-of-type(1) > button:nth-of-type(2)', tag: 'button', text: 'Sign in' };
-  await evaluate(`location.href = ${JSON.stringify(url)}`);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#decide/look`)}`);
   await until(() => evaluate(`!!${frame}`));
   await evaluate("window.got = [], addEventListener('message', (e) => e.data?.['sign-off'] && got.push(e.data))");
   // The board's own function turns pointing on for the frame; a tap that lands before the bridge loads is simply not kept, so the test taps until it is.
@@ -699,7 +699,9 @@ test('comments on mock elements: one per element, kept across a reload, edited a
     await until(() => evaluate(`state.annotations?.some((a) => a.text === ${JSON.stringify(text)})`));
     return before;
   };
-  const reload = async () => { await evaluate(`window.old = true, location.href = ${JSON.stringify(url)}`); await until(() => evaluate(`!window.old && !!${frame}`)); };
+  // The design ask's mocks show on its Decide card.
+  const at = JSON.stringify(`${url}#decide/look`);
+  const reload = async () => { await evaluate(`window.old = true, location.href === ${at} ? location.reload() : (location.href = ${at})`); await until(() => evaluate(`!window.old && !!${frame}`)); };
   await reload();
   assert.deepEqual(await evaluate("[...document.querySelectorAll('.shot.none')].map((n) => n.textContent)"), ['No mock for this option']);
   assert.equal(await write('Make this button green, Umer'), '');
@@ -806,23 +808,19 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   assert.match(waiting, /Design pick/);
   assert.match(waiting, /<option value="newest">Newest first/);
   assert.doesNotMatch(waiting, /<ol class="queue"|<p class="fhead"/);
-  // Needs you first ends with Dismiss on the left and the way to Waiting on you on the right; its card has no × of its own.
+  // Today: the search glass beside its title, the glance with what needs you, the Need you tile's count, and a row per ask under Waiting on you.
   const home = await dump('');
-  assert.match(home, /<div class="foot"><button class="dis" aria-label="Dismiss, Pick the look">Dismiss<\/button><a class="more" href="#waiting">Review all 2 →<\/a><\/div>/);
-  assert.doesNotMatch(home.match(/<section class="card needs.*?<\/section>/s)[0], /class="x"/);
-  // Under its heading, when that ask was raised.
-  assert.match(home, /<h2>Needs you first<\/h2><p class="meta since">Waiting since 09:15<\/p><article class="row design" id="item-look">/);
-  // Summary has the person's mark beside its title, then the glance lines with the oldest ask's time (the design ask has none), and the Waiting on you tile's count.
-  assert.match(home, /<h1 tabindex="-1">Summary<\/h1><span class="icon i-you" aria-hidden="true">/);
-  assert.match(home, /<p class="card glance">(?:<span class="seen">[^<]*<\/span>)?<b>2 asks need you\. <\/b><span>Oldest since 09:15\. <\/span>/);
-  assert.match(home, /<a class="tile i-waiting" href="#waiting" aria-label="Waiting on you, 2">.*?<span class="n">2<\/span>/s);
-  // An ask dismissed from Waiting on you sits under Dismissed (1) at the end of Needs you first and of Waiting on you, with Restore.
+  assert.match(home, /<h1 tabindex="-1">Today<\/h1><button class="find" aria-label="Search" aria-expanded="false">/);
+  assert.match(home, /<p class="card glance">(?:<span class="seen">[^<]*<\/span>)?<b>2 decisions need you\. <\/b>/);
+  assert.match(home, /<a class="tile i-waiting" href="#waiting" aria-label="Need you, 2">.*?<span class="n">2<\/span>/s);
+  assert.deepEqual([...home.matchAll(/<a class="ask-card" href="[^"]*">.*?<strong class="title" dir="auto">(.*?)<\/strong>/gs)].map((m) => m[1]).sort(), ['Pick the look', 'When should it ship?']);
+  // An ask dismissed from Waiting on you sits under Dismissed (1) at its end, with Restore.
   const gone = file.replace(/\.json$/, '.dismissed.jsonl');
   writeFileSync(gone, JSON.stringify({ key: 'ship', dismissed: true, at: new Date().toISOString() }) + '\n');
   const pages = {};
-  for (const hash of ['', '#waiting']) assert.match(pages[hash] = await dump(hash), /<details class="other gone-asks"><summary>Dismissed \(1\)<\/summary><ul class="rows"><li><strong dir="auto">When should it ship\?<\/strong><button class="dis" aria-label="Restore, When should it ship\?">Restore<\/button><\/li><\/ul><\/details>/, hash);
-  // Only the design ask waits now, and its filed time is the tile's oldest.
-  assert.match(pages[''], /<b>1 ask needs you\. <\/b><span>Oldest since 09:15\. <\/span>/);
+  for (const hash of ['#waiting']) assert.match(pages[hash] = await dump(hash), /<details class="other gone-asks"><summary>Dismissed \(1\)<\/summary><ul class="rows"><li><strong dir="auto">When should it ship\?<\/strong><button class="dis" aria-label="Restore, When should it ship\?">Restore<\/button><\/li><\/ul><\/details>/, hash);
+  // Only the design ask waits now.
+  assert.match(await dump(''), /<b>1 decision needs you\. <\/b>/);
   // Restore returns the dismissed ask to the grouped list.
   const { evaluate, close } = await browse(join(dir, 'live'));
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
@@ -846,7 +844,7 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   assert.deepEqual([...reports.matchAll(/<li class="report" id="item-(\w+)"/g)].map((m) => m[1]), ['how']);
   // The sidebar counts it under its short name; the phone's tab bar marks Reports as the area on screen and reads its count.
   assert.match(reports, /<\/svg><\/span>Reports<span class="n">1<\/span>/);
-  assert.match(reports, /<a href="#reports" aria-label="Reports and explainers, 1" aria-current="page"><span class="icon i-reports" aria-hidden="true">.*?<\/span>Reports<\/a>/);
+  assert.match(reports, /<a href="#reports" aria-label="Reports, 1" aria-current="page"><span class="icon i-reports" aria-hidden="true">.*?<\/span>Reports<\/a>/);
   assert.match(reports, /<details class="other notes"><summary>Notes \(1\)<\/summary>.*<strong dir="auto">Merged: the sign-in fix<\/strong>/s);
   // On a phone, a tap on the card opens the report over the whole board with the focus on its title; the board under it takes no taps.
   // ‹ Reports goes back to the card with the focus on its link, and Escape closes it too.
@@ -878,10 +876,10 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   }
   // Answered is Done today: a count under the title, Clear all done on the section head, and a short row per item with its answer and time under the title, beside its ×.
   writeFileSync(file.replace(/\.json$/, '.answers.jsonl'), ['ship', 'look'].map((key) => JSON.stringify({ key, answer: 'a', label: 'A', close: 'done', at: new Date().toISOString() })).join('\n') + '\n');
-  // Once both are answered, the Answered tile counts both, Waiting on you none, and the glance says so.
+  // Once both are answered, nothing needs you, and Today links to Answered with both.
   const after = await dump('');
-  assert.match(after, /<p class="card glance">(?:<span class="seen">[^<]*<\/span>)?<b>Nothing is waiting on you\. <\/b>(?:(?!<\/p>).)*<span>2 answered today\. <\/span><\/p>/);
-  assert.match(after, /aria-label="Answered, 2">.*?<span class="n">2<\/span>/s);
+  assert.match(after, /<p class="card glance">(?:<span class="seen">[^<]*<\/span>)?<b>Nothing needs you\. <\/b>/);
+  assert.match(after, /<a class="more" href="#answered">Answered \(2\)<\/a>/);
   const answered = await dump('#answered');
   assert.match(answered, /<p class="lede">2 answered today\.<\/p><\/header><div class="sec-head"><h2>Done today<\/h2><button class="clear">Clear all done<\/button><\/div>/);
   const lines = [...answered.matchAll(/<summary class="compact">.*?<strong[^>]*>(.*?)<\/strong>.*?<span class="ans"><b[^>]*>(\w+)<\/b><time>\d\d:\d\d<\/time><\/span><\/span><\/summary>.*?<\/details><button class="x" aria-label="Dismiss, [^"]+">×<\/button>/gs)];
@@ -898,7 +896,7 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   writeFileSync(file.replace(/\.json$/, '.dismissed.jsonl'), JSON.stringify({ key: 'look', dismissed: true, at: new Date(Date.now() + 1000).toISOString() }) + '\n');
   const left = await dump('#answered');
   assert.deepEqual(cards(left).map(([key]) => key), ['ship']);
-  assert.match(left, /Answered<span class="n">1<\/span>/);
+  assert.match(await dump(''), /<a class="more" href="#answered">Answered \(1\)<\/a>/);
   writeFileSync(file.replace(/\.json$/, '.dismissed.jsonl'), ['look', 'ship'].map((key) => JSON.stringify({ key, dismissed: true, at: new Date(Date.now() + 1000).toISOString() })).join('\n') + '\n');
   assert.match(await dump('#answered'), /<p class="empty">All done items cleared\.<\/p>/);
   proc.kill();
@@ -1025,7 +1023,7 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   assert.equal(await evaluate('document.querySelector(".waiting-lede").textContent.includes("3 items need you")'), true);
   assert.equal(await evaluate('document.querySelector(".ask-card .kind").textContent'), 'Design pick');
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".ask-card .icon")].map((s) => [s.className, (s.querySelector("path")?.getAttribute("d") ?? "").length > 10])'),
-    [['icon i-designs', true], ['icon i-waiting', true], ['icon i-waiting', true]]);
+    [['icon i-designs', true], ['icon i-waiting', true], ['icon i-toggle', true]]);
   assert.equal(await chips(), 'All 3*|Design pick 1|Yes/No 1|Pick one 1');
   await evaluate('document.querySelector("#item-look").click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/look');
@@ -1047,18 +1045,19 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await until(() => evaluate('!window.old'));
   await until(async () => (await evaluate('document.querySelector(".sort select")?.value')) === 'oldest');
   assert.equal(await evaluate('document.querySelector(".sort select").value'), 'oldest');
-  // A type chip narrows this visit; Summary's Review all link restores every ask.
+  // A type chip narrows this visit; Today's See all link restores every ask.
+  const seeAll = 'document.querySelector(".areas .i-waiting .sec-head a")';
   await until(async () => (await pick('Yes/No')) && (await askTitles()) === 'Keep the weekly digest?');
-  await evaluate('document.querySelector(".back").click()');
-  await until(async () => (await evaluate('document.querySelector(".needs a.more")?.textContent')) === 'Review all 3 →');
-  await evaluate('document.querySelector(".needs a.more").click()');
+  await evaluate('location.hash = ""');
+  await until(async () => (await evaluate(`${seeAll}?.textContent`)) === 'See all');
+  await evaluate(`${seeAll}.click()`);
   await until(async () => (await askTitles()) === 'Keep the weekly digest?|Which day for release?|Pick the look');
   assert.equal(await chips(), 'All 3*|Design pick 1|Yes/No 1|Pick one 1');
-  // The same reset lands a Summary tap on the very ask tapped, even one the chip had filtered out.
+  // The same reset lands a tap on Today on the very ask tapped, even one the chip had filtered out.
   await until(async () => (await pick('Yes/No')) && (await askTitles()) === 'Keep the weekly digest?');
-  await evaluate('document.querySelector(".back").click()');
-  await until(async () => (await evaluate('!!document.querySelector(".needs a.more")')));
-  await evaluate('[...document.querySelectorAll(".areas .i-waiting a.compact")].find((a) => a.textContent.includes("Pick the look")).click()');
+  await evaluate('location.hash = ""');
+  await until(async () => (await evaluate(`!!${seeAll}`)));
+  await evaluate('[...document.querySelectorAll(".areas .i-waiting a.ask-card")].find((a) => a.textContent.includes("Pick the look")).click()');
   await until(async () => await evaluate('location.hash === "#decide/look" && document.querySelector(".decide h2")?.textContent === "Pick the look"'));
   await evaluate("location.hash = '#waiting'");
   await until(async () => (await evaluate('location.hash')) === '#waiting');
@@ -1338,7 +1337,7 @@ test('Decide on a phone: the Undo toast sits above the sticky bar and never cove
   // A short ask keeps its bar right under the content; once the ask is taller than the phone the bar sticks to one band above the tab bar, with the toast above it.
   for (const words of ['One calm day.', why.slice(0, 200), why.slice(0, 1400), why]) {
     await evaluate(`document.querySelector('.decide .why').textContent = ${JSON.stringify(words)}`);
-    assert.equal(await evaluate('(() => { const b = document.querySelector(".decide-bar").getBoundingClientRect(), t = document.querySelector("#toast"), r = t.getBoundingClientRect(); return !t.hidden && b.bottom <= innerHeight - 66 + 1 && (b.bottom >= innerHeight - 66 - 1 || r.top >= b.bottom || r.bottom <= b.top); })()'), true);
+    assert.equal(await evaluate('(() => { const b = document.querySelector(".decide-bar").getBoundingClientRect(), t = document.querySelector("#toast"), r = t.getBoundingClientRect(); return !t.hidden && b.bottom <= innerHeight - 64 + 1 && (b.bottom >= innerHeight - 64 - 1 || r.top >= b.bottom || r.bottom <= b.top); })()'), true);
     assert.equal(await evaluate('(() => { const r = document.querySelector(".decide-bar .answer").getBoundingClientRect(); return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest(".answer") != null; })()'), true);
   }
   close();
@@ -1523,10 +1522,10 @@ test('a posted contract design is listed with its preview and date, and opens fo
   await until(async () => (await evaluate('document.querySelector(".design-card .eyebrow")?.textContent')) === 'Changes requested');
   const desktop = await browse(join(dir, 'desktop-browser'), 1280);
   await desktop.evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
-  await until(async () => (await desktop.evaluate('document.querySelector("#nav a[href=\\"#designs\\"][aria-current=page]")?.textContent.trim()')) === 'Designs1');
+  await until(async () => (await desktop.evaluate('document.querySelector("#nav a[href=\\"#waiting\\"][aria-current=page]")?.textContent.trim().startsWith("Decide")')) === true);
   await desktop.evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
   await until(async () => (await desktop.evaluate('document.querySelector(".design-review .foot button")?.textContent')) === 'Approve');
-  assert.equal(await desktop.evaluate('document.querySelector("#nav a[href=\\"#designs\\"][aria-current=page]")?.getClientRects().length > 0'), true);
+  assert.equal(await desktop.evaluate('document.querySelector("#nav a[href=\\"#waiting\\"][aria-current=page]")?.getClientRects().length > 0'), true);
   assert.equal(await desktop.evaluate('document.querySelector(".design-review")?.getBoundingClientRect().bottom <= innerHeight'), true);
   assert.equal(await desktop.evaluate('document.querySelector("#reader").getBoundingClientRect().left >= document.querySelector("#nav").getBoundingClientRect().right'), true);
   desktop.close();
@@ -1985,15 +1984,15 @@ test('Summary on a phone: Proven today swipes inside its row and a long title wr
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const { evaluate, close } = await browse(join(dir, 'b'), 390);
   await evaluate(`location.href = ${JSON.stringify(url)}`);
-  await until(async () => (await evaluate('document.querySelectorAll(".areas .compact").length')) > 0);
+  await until(async () => (await evaluate('document.querySelectorAll(".areas .ask-card").length')) > 0);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= 390'));
   assert.ok(await evaluate('[...document.querySelectorAll(".tabs a")].every((a) => a.getBoundingClientRect().right <= 390)'));
   // Proven today starts at the page gutter, not flush at the screen edge.
   assert.ok(await evaluate('document.querySelector(".ev-scroll-row .ev-card").getBoundingClientRect().left >= 20'));
-  // With no designs filed, the Designs screen still opens and its tab is the lit one.
+  // With no designs filed, the Designs screen still opens, under the lit Decide tab.
   await evaluate('location.hash = "#designs"');
   await until(async () => (await evaluate('document.querySelector("#board h1").textContent')) === 'Designs');
-  assert.equal(await evaluate('document.querySelector(".tabs [aria-current]").textContent'), 'Designs');
+  assert.equal(await evaluate('document.querySelector(".tabs [aria-current]").getAttribute("href")'), '#waiting');
   close();
   proc.kill();
 });
@@ -2104,7 +2103,7 @@ const SQUASH = `(() => {
   return [...new Set(out)];
 })()`;
 
-test('a long answer at 390 px sits under its long title, which keeps most of the row and wraps by words, on Answered and the Summary', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('a long answer at 390 px sits under its long title, which keeps most of the row and wraps by words, on Answered', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'squash'), file = join(dir, 'board.json'), long = 'A (recommended): you sign in to npm once (1 tap); no key stored anywhere';
   mkdirSync(dir);
   writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key: 'npm', title: 'npm auto-publish on merge: how do GitHub builds get publish rights?', options: [{ value: 'a', label: long }, { value: 'b', label: 'B' }] }] }));
@@ -2117,7 +2116,7 @@ test('a long answer at 390 px sits under its long title, which keeps most of the
   const rows = `[...document.querySelectorAll('.compact')].filter((c) => c.querySelector('.ans')).map((c) => { const s = c.querySelector('strong'), r = document.createRange();
     r.selectNodeContents(s);
     return [s.getBoundingClientRect().width / c.getBoundingClientRect().width, Math.min(...[...r.getClientRects()].map((l) => l.width)) / parseFloat(getComputedStyle(s).fontSize)]; })`;
-  for (const [hash, h1] of [['', 'Summary'], ['#answered', 'Answered']]) {
+  for (const [hash, h1] of [['#answered', 'Answered']]) {
     await evaluate(`location.href = ${JSON.stringify(url + hash)}`);
     await until(async () => (await evaluate(`document.querySelector('h1')?.textContent === '${h1}' && !!document.querySelector('.compact .ans')`)));
     assert.deepEqual(await evaluate(SQUASH), [], h1);
@@ -2127,47 +2126,6 @@ test('a long answer at 390 px sits under its long title, which keeps most of the
   }
   close();
   proc.kill();
-});
-
-// The Summary at 390 with 1, 10 and 100 answers today, as on a narrow phone: one answer at 8:00 and the rest at 9:30, and at
-// 100 all of them in one column. The last board is a last-bucket one: one answer at 9:00 and ten at 9:58, so the ten sit at
-// `left: 100%`, where a wrapping count would reach the caption. The Answered count stays on one line at its full width while its
-// checks give way; each Today column carries its own count, the counts add up to the caption, and none reaches it or another label.
-// The Today list under the chart shows the day's newest answers first, taking the rows in the same order as the Answered list.
-test('Summary at 390 with 1, 10, 100 answers today and a last-bucket board: the Answered count stays whole, the Today counts add up without touching the caption, and the Today list leads with the newest answer in the Answered order', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
-  const today = (h, m) => { const d = new Date(); d.setHours(h, m, 0, 0); return d.toISOString(); };
-  const cases = [{ n: 1, at: () => today(9, 30) }, { n: 10, at: (i) => (i === 0 ? today(8, 0) : today(9, 30)) }, { n: 100, at: () => today(9, 30) },
-    { n: 11, at: (i) => (i === 0 ? today(9, 0) : today(9, 58)) }];
-  // A list row reads `<time><title> · <label>`; the Answered list's own `strong` holds the title alone.
-  const names = (sel) => `[...document.querySelectorAll('${sel}')].map((li) => li.textContent.replace(/^\\d\\d:\\d\\d/, '').split(' · ')[0])`;
-  const seen = {}, want = {}, order = {};
-  for (const { n, at } of cases) {
-    const dir = join(scratch, `fit-${n}`), file = join(dir, 'board.json');
-    mkdirSync(dir, { recursive: true });
-    const rows = Array.from({ length: n }, (_, i) => ({ key: `q${i}`, title: `Question ${i}?`, options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }] }));
-    writeFileSync(file, JSON.stringify({ schema: 2, items: rows }));
-    writeFileSync(file.replace(/\.json$/, '.answers.jsonl'), rows.map((d, i) => JSON.stringify({ key: d.key, answer: 'yes', label: 'Yes', close: 'done', at: at(i) })).join('\n') + '\n');
-    const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
-    procs.push(proc);
-    const url = /url: "(\S+)"/.exec(await served(proc))[1];
-    const { evaluate, close } = await browse(join(dir, 'b'), 390);
-    await evaluate(`location.href = ${JSON.stringify(url)}`);
-    await until(async () => (await evaluate(`document.querySelector('.tile.i-answered .n')?.textContent === '${n}' && !!document.querySelector('.day')`)));
-    seen[n] = await evaluate(`[${SQUASH}, document.querySelector('.today .sec-head .meta').textContent, [...document.querySelectorAll('.col')].map((c) => c.textContent)]`);
-    want[n] = [[], `${n} answered, ${n === 10 ? '8:00' : '9:00'} to 10:00`, n === 10 ? ['1', '9'] : n === 11 ? ['1', '10'] : [String(n)]];
-    // The same page's Answered screen lists every answer, newest first: the day's list must name the same rows in the same order.
-    const list = await evaluate(names('.today .events li'));
-    await evaluate(`location.hash = '#answered'`);
-    await until(async () => (await evaluate(`!!document.querySelector('#board ul.i-answered > li')`)));
-    order[n] = { list, all: await evaluate(names('#board ul.i-answered > li summary .t strong')) };
-    close();
-    proc.kill();
-  }
-  assert.deepEqual(seen, want);
-  for (const { n } of cases) {
-    assert.equal(order[n].all[0], `Question ${n - 1}?`, `${n}: the Answered list leads with the newest answer`);
-    assert.deepEqual(order[n].list, order[n].all.slice(0, 8), `${n}: Today shows the newest answers first, in the Answered list's order`);
-  }
 });
 
 test('Evidence: a card per passed update with its capture as the hero, its result, its time and what it proves, grouped under the project its check names (else Other), a capture with no linked run listed as No result yet, every other update waiting on you; the card opens the update, which shows the whole shot, what ran, who checked it, the change, when, and its verdict; two across at 1440 and nothing squashed at 390', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
@@ -2222,9 +2180,9 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   // The two sign-off proof lines differ only in case and share one head; the passed update whose proof names no project goes under Other.
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".sec-head h2")].map((h) => h.textContent)'), ['Other', 'sign-off']);
   assert.equal(await evaluate('document.querySelector(\'#nav a[href="#evidence"] .n\').textContent'), '4');
-  // The Summary's glance names the newest listed update.
+  // Today's glance counts the updates shipped with proof today.
   await evaluate('location.hash = ""');
-  await until(async () => (await evaluate('document.querySelector(".glance")?.textContent.includes("Newest: Update 5.")')) === true);
+  await until(async () => (await evaluate('document.querySelector(".glance")?.textContent.includes("4 changes shipped with proof.")')) === true);
   await evaluate('location.hash = "#evidence"');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 4);
   // Cards sit two across: the newest group first (Other: the plain update, then update 2), then the sign-off pair under its own head, newest on the left.
