@@ -496,11 +496,11 @@ const until = async (check) => {
   assert.fail('the page did not reach the expected state');
 };
 /** A headless Chrome driven over its DevTools socket: evaluate(js) returns the value, or undefined while a page is still loading. */
-async function browse(dir, width = 800) {
+async function browse(dir, width = 800, height = 4000) {
   mkdirSync(dir, { recursive: true });
   // A profile of its own: a killed Chrome leaves its DevToolsActivePort behind, which a later browse in the same folder would read.
   const profile = mkdtempSync(join(dir, 'profile-')), active = join(profile, 'DevToolsActivePort');
-  const browser = spawn(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${profile}`, `--window-size=${width},4000`, '--remote-debugging-port=0', 'about:blank'],
+  const browser = spawn(chrome, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${profile}`, `--window-size=${width},${height}`, '--remote-debugging-port=0', 'about:blank'],
     { env: chromeEnv, stdio: 'ignore' });
   procs.push(browser);
   await until(() => existsSync(active) && readFileSync(active, 'utf8').includes('\n'));
@@ -516,7 +516,7 @@ async function browse(dir, width = 800) {
   // On a busy host, input sent right after a redraw can miss the sandboxed frame it aims at, so each input waits for the page to paint first.
   const painted = () => call('Runtime.evaluate', { expression: 'new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)))', awaitPromise: true });
   // Headless Chrome keeps a window at least 500 px wide, so the page is set to the asked width as a phone would be.
-  await call('Emulation.setDeviceMetricsOverride', { width, height: 4000, deviceScaleFactor: 1, mobile: false });
+  await call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
   // A real mouse click at a point of the page, which reaches into a frame there as a person's would.
   const click = async ([x, y]) => { await painted(); for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await call('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 }); };
   // A real touch tap at a point of the page, as a phone's would.
@@ -1215,7 +1215,10 @@ test('Waiting on you: a chip change shows only that type and keeps the focus on 
 // and one shared classifier names every ask and groups the type chips, so a card's label is always the chip it sits under.
 test('Waiting on you: a reply-only ask shows Reply, a type-ask yes/no shows Yes/No, and a decision with mocks but no design type shows Pick one', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'fed-types'), file = join(dir, 'board.json');
-  mkdirSync(dir);
+  mkdirSync(join(dir, 'mocks', 'a'), { recursive: true });
+  mkdirSync(join(dir, 'mocks', 'b'));
+  writeFileSync(join(dir, 'mocks', 'a', 'index.html'), '<h1>Cover A</h1>');
+  writeFileSync(join(dir, 'mocks', 'b', 'index.html'), '<h1>Cover B</h1>');
   const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
   writeFileSync(file, JSON.stringify({ schema: 2, answers_only: true, items: [
     { key: 'ready', type: 'ask', title: 'Say ready when you are', options: [], reply: true },
@@ -1273,6 +1276,56 @@ test('Decide on a pick-one ask: the reply box sits under the options, and Skip f
   await until(async () => (await evaluate('location.hash')) === '#decide/alpha');
   await evaluate('window.dispatchEvent(new KeyboardEvent("keydown", { key: "e" }))');
   await until(async () => (await evaluate('location.hash')) === '#decide/beta');
+  close();
+  proc.kill();
+});
+
+test('Decide on a phone: the Undo toast sits above the sticky bar and never covers the next question’s Answer', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'decide-toast'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  const abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l })), why = 'The release needs one calm day. '.repeat(140);
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    { key: 'alpha', title: 'Alpha question?', why, options: abc, recommend_value: 'a' },
+    { key: 'beta', title: 'Beta question?', why, options: abc, recommend_value: 'b' },
+  ] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390, 844);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#decide/alpha`)}`);
+  await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'Alpha question?');
+  // The ask is taller than the phone, so its bar is stuck to the bottom of the screen.
+  assert.equal(await evaluate('document.querySelector(".decide-bar").getBoundingClientRect().bottom <= innerHeight'), true);
+  assert.equal(await evaluate('document.querySelector(".decide-bar").getBoundingClientRect().top > innerHeight / 2'), true);
+  await evaluate('document.querySelector(".decide-bar .answer").click()');
+  await until(async () => (await evaluate('location.hash')) === '#decide/beta' && (await evaluate('!document.querySelector("#toast").hidden')));
+  assert.equal(await evaluate('document.querySelector("#toast").getBoundingClientRect().bottom <= document.querySelector(".decide-bar").getBoundingClientRect().top'), true);
+  assert.equal(await evaluate('(() => { const r = document.querySelector(".decide-bar .answer").getBoundingClientRect(); return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest(".answer") != null; })()'), true);
+  close();
+  proc.kill();
+});
+
+test('Decide on an ask with no mock to show: no empty preview frame, and an ask with one still shows it', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'decide-no-mocks'), file = join(dir, 'board.json');
+  mkdirSync(join(dir, 'mocks'), { recursive: true });
+  writeFileSync(join(dir, 'mocks', 'one.png'), png);
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    { key: 'look', type: 'design', title: 'Pick the look', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend_value: 'a' },
+    { key: 'shot', type: 'design', title: 'Pick the shot', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend_value: 'a',
+      mocks: [{ value: 'b', path: 'mocks/one.png' }] },
+  ] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#decide/look`)}`);
+  await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'Pick the look');
+  assert.equal(await evaluate('document.querySelector(".decide-preview")'), null);
+  assert.equal(await evaluate('document.querySelectorAll(".decide .shot.none, .decide .mock").length'), 0);
+  await evaluate('location.hash = "#decide/shot"');
+  await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'Pick the shot');
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-preview .mock .label")].map((s) => s.textContent)'), ['B']);
+  assert.equal(await evaluate('document.querySelectorAll(".decide-preview .shot.none").length'), 0);
   close();
   proc.kill();
 });
