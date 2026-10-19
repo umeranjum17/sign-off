@@ -223,6 +223,19 @@ without posting.
   arguments, so put a pipeline in a script and name the script; a relative
   path such as `./hook.sh` is found from the board's folder. `doctor` checks
   that the command can run.
+- `notify:` in the `config.yaml` beside the board sends a notice when a write
+  (`post`, `raise`, `replace` or a sign-in link) leaves a card waiting on you
+  that was not waiting before. It takes indented `url:` (`https://`, or
+  `http://` on this machine) and `link_base:` (the address people open the
+  board at) lines, and an optional `token_env:` line naming the environment
+  variable that holds a bearer token. Each notice is one JSON POST,
+  `{"v":1,"source":"sign-off","id","kind","title","text","url","at"}`,
+  where `kind` is `ask`, `plan`, `design`, `evidence` or `report`, and `url`
+  is `link_base` with `#waiting/<key>` added. The sender runs detached, so
+  the card is stored whether or not the notice arrives. A failed notice is
+  retried a few times, then logged to `notify.log` beside the board. The
+  token is read only from the named variable; when that variable is unset,
+  nothing is sent and `doctor` says so.
 - `post --from <file> --replace --filer <id>` lets several programs feed one
   board: it replaces only that filer's items (and items with no filer that
   the file names by key), keeps every other item, the board's other
