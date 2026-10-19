@@ -1771,15 +1771,7 @@ const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex
 /** A card whose picture is a colour-bar test card or a placeholder is not shown: a card posted before the guard can hold one. Read by the
  * stored hash, so each picture is measured once. */
 const unfitMedia = new Map<string, boolean>();
-const fakeEvidence = (d: Decision) => d.type === 'evidence' && (d.media ?? []).some((m) => {
-  if (!isStill(m.path)) return false;
-  if (!unfitMedia.has(m.sha256)) {
-    let found: boolean;
-    try { found = faults(under(dirname(file), m.path)).some((f) => f !== 'text'); } catch { return false; }
-    unfitMedia.set(m.sha256, found);
-  }
-  return unfitMedia.get(m.sha256)!;
-});
+const fakeEvidence = (d: Decision) => d.type === 'evidence' && (d.media ?? []).some((m) => isStill(m.path) && unfitMedia.get(m.sha256) === true);
 /** Every still on the board, once, so a request never walks the media: the board's files are hash-checked and immutable. */
 const stillJobs = () => {
   const jobs: { path: string; sha256: string }[] = [], seen = new Set<string>();
@@ -1796,6 +1788,10 @@ const stillJobs = () => {
 /** Measures the board's stills in parallel and off the request path. A fresh board is therefore ready before it is asked for cards: the
  * page and media answer at once, and the guard's one-time pass never blocks them. */
 let guardReady: Promise<void> = Promise.resolve();
+/** A board read waits this long for the warm pass, so a still that is slow or stuck never holds the cards. */
+const GUARD_WAIT = 500;
+/** A worker still measuring after this is stuck in a convert that outlived its own timeout: it is stopped and its stills stay unmeasured. */
+const WORKER_WAIT = 35_000;
 const warmGuard = () => new Promise<void>((done) => {
   let jobs: { path: string; sha256: string }[];
   try { jobs = stillJobs(); } catch { return done(); }
@@ -1807,9 +1803,14 @@ const warmGuard = () => new Promise<void>((done) => {
     let worker: Worker;
     try { worker = new Worker(new URL('./stills-worker.js', import.meta.url), { workerData: jobs.filter((_, j) => j % workers === i) }); }
     catch { ended(); continue; }
-    worker.once('message', (measured: [string, boolean][]) => { for (const [sha, unfit] of measured) unfitMedia.set(sha, unfit); });
-    worker.once('error', () => { /* a worker that fails leaves its stills to the lazy read below */ });
-    worker.once('exit', ended);
+    const stop = setTimeout(() => { void worker.terminate(); }, WORKER_WAIT);
+    stop.unref();
+    worker.once('message', (measured: [string, boolean][]) => {
+      clearTimeout(stop);
+      for (const [sha, unfit] of measured) unfitMedia.set(sha, unfit);
+    });
+    worker.once('error', () => clearTimeout(stop));
+    worker.once('exit', () => { clearTimeout(stop); ended(); });
   }
 });
 const state = () => {
@@ -1959,7 +1960,9 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   }
   if (req.method === 'GET' && req.url === '/api/board') return [200, { file, pid: process.pid }];
   if (req.method === 'GET' && req.url === '/api/decisions') {
-    await guardReady;
+    let timer: NodeJS.Timeout | undefined;
+    await Promise.race([guardReady, new Promise<void>((ok) => { timer = setTimeout(ok, GUARD_WAIT); })]);
+    clearTimeout(timer);
     return [200, state()];
   }
   if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/signin'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
