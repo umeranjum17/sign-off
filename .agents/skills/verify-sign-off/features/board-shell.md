@@ -7,8 +7,10 @@ The board page (web/index.html) in the Spacious look: system font, large titles,
 - Summary (`#`), Waiting on you (`#waiting`), Designs (`#designs`), Evidence (`#evidence`), Reports (`#reports`), Answered (`#answered`).
 - Desk (60rem and wider): a sidebar with Summary and the five areas, each with its count; the screen on show is marked.
 - Phone: a solid tab bar at the bottom (Waiting, Designs, Evidence, Reports, Answered); the area on screen is blue; area screens keep a ‹ Summary link.
-- Designs groups contract design reviews by project, with preview, date, status and any saved pick or note. Open a design to approve it or request a change with a note; on multi-screen designs, a native selector targets the note and full-preview link, while designs with no screens accept a design-level note. The preview is readable and scrollable, with a link to open its full asset. At 1280 the board sidebar remains visible with Designs selected; on Summary and Waiting, a design's primary action is Open designs.
+- Designs groups contract design reviews by project, with preview, date, status and any saved pick or note. Open a design to approve it or request a change with a note; on multi-screen designs, a native selector targets the note and full-preview link, while designs with no screens accept a design-level note. The preview is readable and scrollable, with a link to open its full asset. At 1280 the board sidebar remains visible with Designs selected; on Summary a design's primary action is Open designs, and on Waiting its ask opens the same review.
 - After an answer, a toast with Undo sits above the tab bar.
+- Waiting on you has its item count and date under the title, a plan hero with a preview (hidden on a phone), summary, sections/decisions/time and Open plan, then asks in a grouped inset list with type, title, deadline and dismiss.
+- Opening an ask links to Decide: proof/preview, question and why, its options in one list with reasons and selected/recommended marks, the reply box, silent default/deadline, Answer (when the ask has options), Skip for now and Later. Skip, E and swipe left go to the next ask; swipe right answers with the recommended option, and a number picks that option and answers. The phone action bar clears the tab bar and content. A read-only board shows no answer controls.
 - Focus rings show on every link and button in both themes.
 
 ## How to get to it (user POV)
@@ -18,11 +20,11 @@ Open the URL seed-board.sh prints, in a browser; tap an area in the sidebar or t
 ## Driving it
 
 1. Launch as SKILL.md says and keep BASE.
-2. Designs: open `#designs`, check one project's preview/date/status, then open that design and exercise approve and change with a screen note. Capture the Designs listing and opened review at 390 and 1280 in light and dark; inspect every capture.
-3. shots.sh BASE "$DONE_DONE_EVIDENCE_ROOT" summary waiting: 8 captures, <screen>.<theme>.<width>w.png. One check judges at most 10 captures, so a
-   verify run keeps these 8 plus one toast and one focus capture; capture the other screens (shots.sh with no screens) outside the run folder.
+2. For the R2 outcome, capture Waiting and Decide separately at both widths/themes so each shot has one screen claim. Waiting uses `shots.sh BASE "$DONE_DONE_EVIDENCE_ROOT" waiting`; for Decide, open `BASE#decide/look` (the seeded design pick with previews), pick an answer, and save `decide.<theme>.<width>w.png`. Use filenames `<screen>.<theme>.<width>w.png`. Force light with `--color-scheme light` for every light capture; do not rely on the host preference.
+3. Designs: open `#designs`, check one project's preview/date/status, then open that design and exercise approve and change with a screen note. Capture `shots.sh BASE "$DONE_DONE_EVIDENCE_ROOT" designs design-review` at 390 and 1280 in light and dark; inspect every capture.
 4. Toast: at 390, open BASE#evidence, click Pass from the page, then screenshot toast.<theme>.390w.png; the toast's bottom is above the tab bar's top.
 5. Focus: press Tab until a sidebar link (1280) or a tab (390) has the focus, then screenshot focus.<theme>.<width>w.png (one theme and width in a verify run).
+   One check judges at most 10 captures, so keep the Waiting, Decide and Designs captures in separate runs.
    When the outcome is about one width only ("on a computer" or "on a phone"), drive that width alone: SHOTS_WIDTHS=1280 (computer)
    or SHOTS_WIDTHS=390 (phone) for shots.sh, and the toast and focus captures at that width. A capture judged alone must show the whole claim.
 6. Look at every capture: no text under the tab bar, nothing cut, the right area marked.

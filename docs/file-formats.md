@@ -107,7 +107,7 @@
 - `filed`: optional, when the item was filed, an ISO 8601 date-time such as `2026-10-13T07:19:00Z`.
   `raise` and `post` write the current time when the item or flags give none, and `post --replace`
   keeps the time an item already has, so a feeder that runs every few seconds does not reset it.
-  An open ask shows `Waiting since 07:19` in Triage, and the Waiting on you tile shows the oldest (`Oldest 07:19`);
+  An open ask's card says `waiting since 07:19`, and the Waiting on you tile shows the oldest (`Oldest 07:19`);
   with no `filed` on any waiting ask the tile keeps its count.
 - `group` and `decided`: on Reports and explainers. `group` (40 characters or fewer)
   puts items under one section head, such as `How it works`, in the order each group first shows;
