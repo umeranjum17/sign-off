@@ -1498,9 +1498,9 @@ test('a posted contract design is listed with its preview and date, and opens fo
   assert.match(await evaluate('document.querySelector("#item-d1-design .meta")?.textContent'), /waiting since/); // the row is its title and when it came
   assert.equal(await evaluate('document.querySelector("#item-d1-design")?.getAttribute("href")'), '#designs/d1-design');
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
-  await until(async () => (await evaluate('document.querySelector(".design-card h3")?.textContent')) === message.title);
-  assert.equal(await evaluate('document.querySelector(".design-card img")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent(message.preview)}`);
-  assert.equal(await evaluate('document.querySelector(".design-card .meta")?.textContent'), '18 Oct');
+  await until(async () => (await evaluate('document.querySelector(".designs strong")?.textContent')) === message.title);
+  assert.equal(await evaluate('document.querySelector(".designs img")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent(message.preview)}`);
+  assert.equal(await evaluate('document.querySelector(".designs .when")?.textContent'), 'In review · 18 Oct');
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
   await until(async () => (await evaluate('document.querySelector(".design-review .foot button")?.textContent')) === 'Approve');
   assert.equal(await evaluate('document.querySelector(".design-preview-full")?.getAttribute("target")'), '_blank');
@@ -1519,7 +1519,7 @@ test('a posted contract design is listed with its preview and date, and opens fo
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Changes requested');
   assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-design'].notes, [{ journey: 'account-setup', screen: 'security', verdict: 'change', note: 'Make the title clearer' }]);
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
-  await until(async () => (await evaluate('document.querySelector(".design-card .eyebrow")?.textContent')) === 'Changes requested');
+  await until(async () => (await evaluate('document.querySelector(".designs .when")?.textContent')).startsWith('Changes requested'));
   const desktop = await browse(join(dir, 'desktop-browser'), 1280);
   await desktop.evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
   await until(async () => (await desktop.evaluate('document.querySelector("#nav a[href=\\"#waiting\\"][aria-current=page]")?.textContent.trim().startsWith("Decide")')) === true);
@@ -1597,8 +1597,8 @@ test('a design without journey screens accepts a design-level change note', { sk
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Changes requested');
   assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-no-screens'].notes, [{ verdict: 'change', note: 'Clarify the overall hierarchy.' }]);
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
-  await until(async () => (await evaluate('document.querySelector(".design-card .eyebrow")?.textContent')) === 'Changes requested');
-  assert.match(await evaluate('document.querySelector(".design-card")?.textContent'), /Clarify the overall hierarchy/);
+  await until(async () => (await evaluate('document.querySelector(".designs .when")?.textContent')).startsWith('Changes requested'));
+  assert.match(await evaluate('document.querySelector(".designs")?.textContent'), /Clarify the overall hierarchy/);
   close();
   proc.kill();
 });

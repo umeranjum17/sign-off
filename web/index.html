@@ -181,6 +181,7 @@
   #reader h1:not(:focus-visible) { outline: none; }
   #reader h1:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   /* A report reads as a page of its own: what it is and when, its title in large type, what it says, then its page in a tile. */
+  #reader .design-review h1 { margin: 0.75rem auto; font-size: 2.125rem; line-height: 1.1765; font-weight: 700; letter-spacing: 0.011em; white-space: normal; overflow: visible; }
   #reader .read { flex: 1; min-height: 0; overflow: auto; padding: 0 1.25rem 2rem; }
   #reader .read > * { max-width: 42.5rem; margin-left: auto; margin-right: auto; }
   #reader .read .eyebrow { margin-top: 0.5rem; font-weight: 400; }
@@ -277,6 +278,7 @@
   body.reading { overflow: hidden; }
   @media (min-width: 60rem) {
     #reader .read { padding: 0 3rem 3rem; }
+    #reader .design-review { padding-bottom: 3rem; } #reader .design-review h1 { font-size: 3rem; line-height: 1.0833; letter-spacing: -0.003em; }
     #reader .read h1 { font-size: 3rem; line-height: 1.0833; letter-spacing: -0.003em; }
     body.pane-reading main { display: none; }
     body.pane-reading #reader { position: static; inset: auto; z-index: auto; grid-column: 2; grid-row: 1; width: 100%; height: 100vh; min-width: 0; }
@@ -563,22 +565,23 @@
   .done > .row .eyebrow, .done > .row h3 { display: none; }
   .done[open] + .x { align-self: start; margin-top: 1rem; }
   .foot .dis { padding: 0 0.5rem; background: none; color: var(--muted); }
-  .design-list { display: grid; gap: 0.75rem; }
-  .design-card { display: grid; grid-template-columns: minmax(4rem, 7rem) minmax(0, 1fr); align-items: center; gap: 1rem; }
-  .design-card h3 a { color: inherit; text-decoration: none; }
-  .design-card .thumb { width: 100%; height: 8rem; object-fit: cover; }
-  .design-review { flex: 1; min-height: 0; overflow: auto; padding: 1.25rem; }
-  .design-preview-window { width: 100%; height: min(65vh, 844px); margin: 1rem auto; overflow: auto; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); }
+  /* A design's review reads like a report's page: the way back in the bar, then what it is, its title and what it says in one centred column. */
+  .design-review { flex: 1; min-height: 0; overflow: auto; padding: 0 max(1.25rem, calc((100% - 42.5rem) / 2)) 2rem; }
+  .design-review > .eyebrow { margin: 0.5rem 0 0; font-weight: 400; }
+  .design-review > .about { margin: 0 0 1rem; font-size: 1.25rem; line-height: 1.4; }
+  .design-preview-window { width: 100%; height: min(65vh, 844px); margin: 1rem auto; overflow: auto; border-radius: 1rem; background: var(--surface); }
   .design-review-preview { display: block; width: 100%; height: auto; }
-  .design-preview-full { display: block; max-width: 56rem; margin: 0 auto; color: var(--accent); }
+  .design-preview-full { display: block; margin: 0 0 1rem; color: var(--accent); text-decoration: none; }
   @media (min-width: 60rem) { .design-preview-window { max-width: 24.375rem; } }
-  .design-review label { display: grid; gap: 0.5rem; max-width: 56rem; margin: 1rem auto; color: var(--muted); }
+  .design-review label { display: grid; gap: 0.5rem; margin: 1rem 0; color: var(--muted); }
   /* The design note fills its column, so it lines up with the buttons under it at every width (the 70ch prose cap would narrow it at tablet width). */
   .design-review textarea { max-width: none; min-height: 6rem; padding: 0.75rem; background: var(--surface); }
-  .design-review .foot { max-width: 56rem; margin: 1rem auto; }
+  .design-review .foot { margin: 1rem 0; }
   .design-review .foot > * { flex: 1; }
   .design-review .foot button.open-link { background: var(--action); color: var(--on-accent); }
-  .design-review > a { display: block; max-width: 56rem; margin: 1rem auto; color: var(--accent); }
+  .design-review > button.open-link { width: 100%; min-height: 3.125rem; padding: 0 1.25rem; font-size: 1.0625rem; font-weight: 400; }
+  @media (min-width: 45rem) { .design-review > button.open-link { width: fit-content; min-height: 2.75rem; } }
+  .design-review > a { display: block; margin: 1rem 0; color: var(--accent); text-decoration: none; }
   .design-viewer { position: fixed; inset: 0; width: 100%; max-width: none; height: 100dvh; max-height: none; margin: 0; padding: 0; border: 0; background: var(--bg); color: var(--text); }
   .design-viewer[open] { display: flex; flex-direction: column; }
   .design-viewer header { display: flex; gap: 1rem; align-items: center; padding: 0.75rem max(1rem, env(safe-area-inset-right)) 0.75rem max(1rem, env(safe-area-inset-left)); border-bottom: 1px solid var(--line); }
@@ -1669,7 +1672,7 @@
     const viewer = document.querySelector('.design-viewer[open]');
     if (viewer && e.source === viewer.querySelector('iframe')?.contentWindow && e.data?.['sign-off'] === 'viewer-nav') viewer.dispatchEvent(new KeyboardEvent('keydown', { key: e.data.key }));
   });
-  function designReview(d) {
+  function designReview(d, h1) {
     const saved = state.answers[d.key], screens = (d.journeys ?? []).flatMap((journey) => journey.screens.map((screen) => ({ journey, screen }))), savedNote = saved?.notes?.[0];
     const screenKey = (target) => target && `${target.journey.id}/${target.screen.id}`, screenFor = (key) => screens.find((target) => screenKey(target) === key);
     const note = el('textarea', { maxlength: '500', placeholder: 'What should change? (optional for approval)' });
@@ -1700,7 +1703,7 @@
       session.selected = screenKey(target());
       note.value = session.drafts.get(session.selected) ?? currentNote()?.note ?? '';
     };
-    const status = el('p', { class: 'meta', role: 'status' }, saved ? saved.label : d.status === 'draft' ? 'Draft' : 'In review');
+    const status = el('p', { class: 'eyebrow', role: 'status' }, saved ? saved.label : d.status === 'draft' ? 'Draft' : 'In review');
     const err = el('p', { class: 'err', role: 'alert' });
     let saving = false;
     const save = (verdict) => {
@@ -1722,7 +1725,7 @@
     const controls = el('div', {}, d.options?.length ? el('label', {}, 'Pick a direction', pick) : '',
       el('label', {}, screens.length ? 'Screen note' : 'Design note', note), el('div', { class: 'foot' }, approve, change), err);
     const open = el('button', { class: 'open-link', 'aria-haspopup': 'dialog', 'data-design': d.key }, 'Review full screen');
-    const root = el('div', { class: 'design-review' }, status, d.about ? el('p', { class: 'about' }, d.about) : '', preview, fullPreview,
+    const root = el('div', { class: 'design-review' }, status, h1, d.about ? el('p', { class: 'about' }, d.about) : '', preview, fullPreview,
       screens.length ? open : '', screenSelect ? el('label', {}, 'Screen for note', screenSelect) : '', controls,
       d.link ? el('a', { href: d.link, target: '_blank', rel: 'noopener noreferrer' }, 'Open original design') : '');
     if (!screens.length) return root;
@@ -1812,7 +1815,7 @@
     if (change) { const s = el('span', { 'aria-hidden': 'true' }); s.innerHTML = '<svg viewBox="0 0 24 24"><path d="M14 3h7v7M21 3l-9 9M19 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/></svg>'; out.append(s); }
     // A report's page reads under its own head: what it is and when, its title, what it says and decided; a plan or a design keeps its title in the bar;
     // an update shows its own title on its screen, with the change link in the bar.
-    reader.replaceChildren(...(d.type === 'plan' ? [el('header', {}, back, Object.assign(h1, { className: 'plan-name' })), planReview(d, url)] : d.kind === 'design' ? [el('header', {}, back, h1), designReview(d)]
+    reader.replaceChildren(...(d.type === 'plan' ? [el('header', {}, back, Object.assign(h1, { className: 'plan-name' })), planReview(d, url)] : d.kind === 'design' ? [el('header', {}, back), designReview(d, h1)]
       : d.type === 'evidence' ? [el('header', {}, back, out), evidenceItem(d)]
       : [el('header', {}, back), el('div', { class: 'read' }, el('p', { class: 'eyebrow' }, [kind(d) || 'Report', d.filed ? when(d.filed) : ''].filter(Boolean).join(' · ')), h1,
         d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided(d), el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }), dismissReport(d))]));
@@ -1833,15 +1836,15 @@
       .flatMap(([name, list]) => [el('div', { class: 'sec-h' }, el('h2', {}, name)), el('ul', { class: 'card rows reports' }, ...list.map(report))]);
   }
 
+  const designStatus = (d) => { const a = state.answers[d.key]?.answer; return a === 'approve' ? 'Approved' : a === 'change' ? 'Changes requested' : d.status === 'draft' ? 'Draft' : 'In review'; };
   function designGroups(items) {
     if (!items.length) return [el('p', { class: 'empty' }, EMPTY.designs)];
     const groups = [...new Set(items.map((d) => d.group || ''))];
     return groups.flatMap((group) => [group ? el('div', { class: 'sec-h' }, el('h2', {}, group)) : '',
-      el('div', { class: 'design-list' }, ...items.filter((d) => (d.group || '') === group).map((d) => {
-        const saved = state.answers[d.key], status = saved?.answer === 'approve' ? 'Approved' : saved?.answer === 'change' ? 'Changes requested' : d.status === 'draft' ? 'Draft' : 'In review';
-        const href = `#designs/${d.key}`, image = pic(d);
-        return el('article', { class: 'card design-card', id: `item-${d.key}` }, image ? el('a', { href, class: 'design-preview', 'aria-label': `Open design, ${d.title}` }, thumb('designs', image)) : '',
-          el('div', {}, el('p', { class: 'eyebrow' }, status), el('h3', {}, el('a', { href }, d.title)), el('p', { class: 'meta' }, [d.filed ? day(d.filed) : '', saved?.pick ? `Pick: ${saved.pick}` : '', saved?.notes?.[0]?.note ?? ''].filter(Boolean).join(' · '))));
+      el('ul', { class: 'card rows reports designs' }, ...items.filter((d) => (d.group || '') === group).map((d) => {
+        const image = pic(d), line = [designStatus(d), d.filed ? day(d.filed) : '', state.answers[d.key]?.pick ? `Pick: ${state.answers[d.key].pick}` : '', state.answers[d.key]?.notes?.[0]?.note ?? ''].filter(Boolean).join(' · ');
+        return el('li', { class: 'report', id: `item-${d.key}` }, el('a', { class: 'compact', href: `#designs/${d.key}`, 'aria-label': `Open design, ${d.title}` },
+          el('span', { class: 'rth' }, thumb('designs', image)), el('span', { class: 't' }, el('strong', { dir: 'auto' }, d.title), d.about ? el('span', { class: 'meta', dir: 'auto' }, d.about) : '', el('span', { class: 'when' }, line))));
       }))]);
   }
 
@@ -2037,6 +2040,7 @@
       : at === 'reports' && !state.readonly && by.reports.length ? el('p', { class: 'lede' }, by.reports.some((d) => d.steps)
       ? 'How the tools work, step by step. Tap one to open it.' : 'Explainers you asked for, or that a decision needs.')
       : at === 'answered' && by.answered.length ? el('p', { class: 'lede' }, (() => { const n = by.answered.filter((d) => isToday(state.answers[d.key].at)).length; return `${n} ${n === 1 ? 'answer' : 'answers'} today. Each one has gone back to its agent.`; })())
+      : at === 'designs' && by.designs.length ? el('p', { class: 'lede' }, 'Designs to look over. Approve one, or say what should change.')
       : at === 'evidence' && by.evidence.length ? el('p', { class: 'lede' }, 'Passed proof that a change works, newest first.') : '');
     document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [filters(by.waiting), waitingPage(shown, hidden)]
       : at === 'decide' ? [decideAt < 0 ? (key ? el('p', { class: 'empty' }, 'Nothing to decide for that question.') : el('div', { class: 'decide' }, decideLists(null, decideQueue)))
