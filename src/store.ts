@@ -6,10 +6,10 @@ export type Option = { value: string; label: string; outcome?: string };
 export type MockRef = { value: string; path: string };
 export type MediaRef = { path: string; sha256: string; bytes: number };
 export type Chapter = { at: number; title: string };
-export type Step = { title: string; marks?: string[] };
+export type Step = { title: string; marks?: string[]; text?: string };
 /** A plan's section to approve or change, and a decision it asks: one question, options that each say where they lead, and the pick it recommends. */
 export type PlanSection = { id: string; heading: string; body: string };
-export type PlanDecision = { key: string; question: string; why: string; options: (Option & { outcome: string })[]; recommend: string };
+export type PlanDecision = { key: string; question: string; why: string; options: (Option & { outcome: string })[]; recommend: string; reason?: string; after?: string };
 export type DesignNote = { journey?: string; screen?: string; verdict?: 'approve' | 'change'; note?: string };
 export type DesignJourney = { id: string; title: string; screens: { id: string; title: string; views: Record<string, string> }[] };
 /** One section in a plan's send-back: approved, or changed with a note on what to change. */
@@ -20,7 +20,7 @@ export type Decision = {
   recommend_value?: string; default_if_silent?: string; close: string;
   /** An ask's question standard: why it is asked, why one option is recommended, when the silent default happens (ISO UTC),
    * and the other cards on the board this ask replaces, which its answer closes too. */
-  why?: string; recommend_reason?: string; silent_by?: string; merges?: string[]; evidence?: EvidenceLink; run?: { run_id: string; commit: string };
+  why?: string; recommend_reason?: string; silent_by?: string; merges?: string[]; /** The evidence update on the board this ask rests on: Decide shows its capture and result at the top. */ proof?: string; evidence?: EvidenceLink; run?: { run_id: string; commit: string };
   finding?: { cause: string; incidents: number; days: number; evidence_ids: string[]; change_kind: string; proposal: string };
   kind?: string;
   type: string; tradeoff?: string; mocks?: MockRef[]; number?: number; media?: MediaRef[]; link?: string; view?: string; preview?: string; chapters?: Chapter[]; reply?: boolean;
@@ -39,7 +39,7 @@ export type Decision = {
   /** A sign-in's start command, an argv run with no shell on the board's host when Open is tapped: the first https link it prints is the live sign-in link. */
   start?: string[];
   /** Plans: the sections to approve or change and the decisions to answer, all sent back as one answer. */
-  sections?: PlanSection[]; decisions?: PlanDecision[];
+  sections?: PlanSection[]; decisions?: PlanDecision[]; project?: string;
   /** Designs: project, date, review status, preview and screen views. */
   status?: 'draft' | 'in_review' | 'approved'; journeys?: DesignJourney[]; recommend?: string;
 };
@@ -130,6 +130,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     if (!isText(d.title) || !d.title.trim()) throw bad('title', 'must be non-empty text');
     for (const f of ['about', 'detail', 'why', 'recommend_reason', 'silent_by']) if (d[f] !== undefined && !isText(d[f])) throw bad(f, 'must be text');
     if (d.merges !== undefined && !(Array.isArray(d.merges) && d.merges.every(isKey))) throw bad('merges', 'must list keys of 1-128 of A-Z a-z 0-9 . _ -');
+    if (d.proof !== undefined && !isKey(d.proof)) throw bad('proof', 'must be a key of 1-128 of A-Z a-z 0-9 . _ -');
     if (d.evidence !== undefined && (!d.evidence || !/^[A-Za-z0-9._-]{1,128}$/.test(d.evidence.run_id ?? '')
       || !/^[a-f0-9]{40}$/.test(d.evidence.commit ?? '')
       || ['outcome', 'repro', 'proof', 'evidence'].some((f) => !isText(d.evidence[f]) || !d.evidence[f].trim() || [...d.evidence[f]].length > 1000))) {
@@ -217,21 +218,21 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     }
     return {
       key: d.key, title: d.title, about: d.about, detail: d.detail, options: options.map((o: Option) => ({ value: o.value, label: o.label, ...(o.outcome && { outcome: o.outcome }) })),
-      ...(d.why && { why: d.why }), ...(d.recommend_reason && { recommend_reason: d.recommend_reason }), ...(d.silent_by && { silent_by: d.silent_by }), ...(d.merges && { merges: [...d.merges] }),
+      ...(d.why && { why: d.why }), ...(d.recommend_reason && { recommend_reason: d.recommend_reason }), ...(d.silent_by && { silent_by: d.silent_by }), ...(d.merges && { merges: [...d.merges] }), ...(d.proof && { proof: d.proof }),
       recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done', evidence: d.evidence,
       type: plan ? 'plan' : d.type ?? 'decision', tradeoff: d.tradeoff, link: d.link, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path })),
       ...(views && { view: d.view }), ...(report && views && { preview: d.preview }), ...(d.reply && { reply: true }), ...(d.filer && { filer: d.filer }), ...(d.area && { area: d.area }),
       ...(signin && { unlocks: d.unlocks, waits: d.waits, ...(d.expires && { expires: d.expires }), ...(d.start && { start: [...d.start] }) }),
       ...(d.group && { group: d.group }), ...(d.filed && { filed: d.filed }), ...(d.decided && { decided: d.decided }),
       ...(d.form && { form: d.form }), ...(d.video && { video: d.video }), ...(d.asked_by && { asked_by: d.asked_by }),
-      ...(d.steps && { steps: d.steps.map(({ title, marks }: Step) => ({ title, ...(marks?.length && { marks }) })) }),
+      ...(d.steps && { steps: d.steps.map(({ title, marks, text }: Step) => ({ title, ...(text && { text }), ...(marks?.length && { marks }) })) }),
       ...(stored && d.media && { media: d.media.map(({ path, sha256, bytes }: MediaRef) => ({ path, sha256, bytes })) }),
       ...(d.type === 'evidence' && { number: d.number }),
       // A gate's run is part of its question: the same key with another run is a different question.
       ...(d.kind === 'gate' && d.run && { run: { run_id: d.run.run_id, commit: d.run.commit } }),
       // So is a finding's proposal, with the counts and records behind it.
       ...(d.kind === 'finding' && { finding: { cause: d.cause, incidents: d.incidents, days: d.days, evidence_ids: d.evidence_ids, change_kind: d.change_kind, proposal: d.proposal } }),
-      ...(plan && { sections: d.sections, decisions: d.decisions }),
+      ...(plan && { sections: d.sections, decisions: d.decisions, ...(d.project && { project: d.project }) }),
       ...(design && { kind: 'design', type: 'design', group: d.group, filed: d.filed, status: d.status, preview: d.preview, journeys: d.journeys, ...(d.options && { options: d.options, recommend_value: d.recommend }) }),
       ...(d.type === 'explainer' && d.chapters && { chapters: d.chapters.map(({ at, title }: Chapter) => ({ at, title })) }),
     };

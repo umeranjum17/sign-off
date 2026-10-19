@@ -155,6 +155,16 @@ test('a merge names a card on the board that offers every option of this ask, an
   assert.match(loop.stdout, /key ship-x merges others, but ship-y already merges ship-x/);
 });
 
+test('--proof names an evidence update on the board: an ask resting on anything else is refused', () => {
+  const board = join(scratch, 'proof-refuse.json');
+  assert.equal(run('raise', board, '--key', 'release-day', ...pick('Which day should it ship?')).status, 0);
+  const refused = run('raise', board, ...good, '--proof', 'release-day');
+  assert.equal(refused.status, 2, refused.stdout);
+  assert.match(refused.stdout, /rests on release-day, which is not an evidence update on the board/);
+  const missing = run('raise', board, ...good, '--proof', 'update-1');
+  assert.equal(missing.status, 2, missing.stdout);
+});
+
 test('a merged card merges nothing itself: a chain of merges is refused at post time, in either order', () => {
   const board = join(scratch, 'chain.json');
   assert.equal(run('raise', board, '--key', 'chain-z', ...good.slice(2), '--title', 'Keep the old login screen?').status, 0);

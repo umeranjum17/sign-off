@@ -5,17 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Plan: show plans on the board</title>
 <style>
-body { font: 16px/1.5 system-ui, sans-serif; margin: 1rem; color: #111; background: #fff; }
-@media (prefers-color-scheme: dark) { body { color: #eee; background: #111; } }
-svg { display: block; width: 100%; max-width: 34rem; height: auto; margin: 1rem 0; }
+:root { color-scheme: light dark; }
+body { font: 16px/1.5 system-ui, sans-serif; margin: 0; color: #111; background: transparent; }
+@media (prefers-color-scheme: dark) { body { color: #eee; } }
+svg { display: block; width: 100%; height: auto; }
 svg text { font: 13px system-ui, sans-serif; fill: currentColor; }
-.step { min-height: 3rem; }
-button { font: inherit; min-height: 2.75rem; padding: 0 1rem; }
 </style>
 </head>
 <body>
-<h1>Show plans on the board</h1>
-<p>Umer reviews an agent's plan on a phone: approve or change each section, answer each decision, then send it all back at once.</p>
 <svg viewBox="0 0 340 110" role="img" aria-label="The agent posts a plan, the board shows it, Umer answers, and one send-back returns to the agent">
   <rect x="2" y="25" width="70" height="40" rx="6" fill="none" stroke="currentColor"/><text x="37" y="50" text-anchor="middle">Agent</text>
   <rect x="134" y="25" width="70" height="40" rx="6" fill="none" stroke="currentColor"/><text x="169" y="50" text-anchor="middle">Board</text>
@@ -23,20 +20,5 @@ button { font: inherit; min-height: 2.75rem; padding: 0 1rem; }
   <path d="M74 40 H130 M206 40 H262" stroke="currentColor" stroke-width="2"/>
   <path d="M301 67 V100 H37 V67" fill="none" stroke="currentColor" stroke-dasharray="4 3"/><text x="169" y="90" text-anchor="middle">one send-back</text>
 </svg>
-<h2>How it works</h2>
-<p class="step" id="step" aria-live="polite"></p>
-<p><button type="button" id="back">Back</button> <button type="button" id="next">Next</button></p>
-<details><summary>Details</summary>
-<p>Sections: goals and non-goals, architecture, slices and order, coding standards, risks. Each takes Approve or Change with a note.</p>
-<p>Decisions: send every answer back as one event, and show plans under Waiting on you.</p>
-</details>
-<script>
-const steps = ['1 of 4. The agent posts the plan.', '2 of 4. The board stores it under Waiting on you.', '3 of 4. Umer answers each section and decision.', '4 of 4. Send back returns every answer to the agent.'];
-let i = 0;
-const show = () => { document.getElementById('step').textContent = steps[i]; };
-document.getElementById('back').onclick = () => { i = Math.max(0, i - 1); show(); };
-document.getElementById('next').onclick = () => { i = Math.min(steps.length - 1, i + 1); show(); };
-show();
-</script>
 </body>
 </html>
