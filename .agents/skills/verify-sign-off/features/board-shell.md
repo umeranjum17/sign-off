@@ -15,6 +15,7 @@ The board page (web/index.html) in the Spacious look: system font, large titles,
 - Opening an ask links to Decide: proof/preview, question and why, its options in one list with reasons and selected/recommended marks, the reply box, silent default/deadline, Answer (when the ask has options), Skip for now and Later. Skip, E and swipe left go to the next ask; swipe right answers with the recommended option, and a number picks that option and answers. The phone action bar clears the tab bar and content. A read-only board shows no answer controls.
 - Reports (`#reports`): grouped inset lists, one per `group` (no groups: New and Earlier), each row a picture, title, what it says, kind, steps and date, a blue dot when filed today, and ×. A row with a page opens `#reports/<key>`: ‹ Reports, kind and time, the title in large type, what it says and decided, then the page in a tile; on a desk it opens beside the sidebar, on a phone over the board.
 - Focus rings show on every link and button in both themes.
+- Type follows the Spacious design: row titles 17 px regular with 15 px lines under them, never cut off with "…"; section links, back links and Clear all done in regular weight; Answered heads in small grey caps with a solid grey check badge per row; Decide named by a small centred title over the question, its stay-quiet line led by a clock and a bold "If you stay quiet:", and Answer on one line in the bar pinned above the tabs on a phone.
 
 ## How to get to it (user POV)
 

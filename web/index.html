@@ -43,7 +43,7 @@
   .date { margin: 0.375rem 0 0; color: var(--muted); font-size: 1.0625rem; }
   .top h1 { margin: 0; font-size: 2.125rem; line-height: 1.2059; font-weight: 700; letter-spacing: 0.011em; outline: none; }
   .lede { margin: 0.375rem 0 0; color: var(--muted); }
-  .back, .sec-head a, .more { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--accent); font-weight: 600; text-decoration: none; }
+  .back, .sec-head a, .more { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--accent); font-weight: 400; text-decoration: none; }
   h2 { font-size: 1.375rem; line-height: 1.25; margin: 0 0 0.75rem; }
   .icon { flex: none; display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 0.5rem; background: var(--area, var(--muted)); }
   .icon svg { width: 1.125rem; height: 1.125rem; fill: none; stroke: var(--surface); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -95,8 +95,13 @@
   @media (min-width: 60rem) { .needs .choices .rec { min-height: 2.75rem; } }
   @media (max-width: 59.999rem) {
     body:has(.decide) { padding-bottom: calc(9rem + env(safe-area-inset-bottom)); }
+    /* The smaller Decide title lifts a short ask; the page still reaches the bar so a swipe anywhere above it skips. */
+    .decide { min-height: calc(100dvh - 13rem - env(safe-area-inset-bottom)); }
     .top:has(+ .decide) .back { display: none; }
   }
+  /* Decide names itself in the bar, small and centred, and the question is the headline. */
+  .top:has(+ .decide) { padding: 0.75rem 0 0; }
+  .top:has(+ .decide) h1 { font-size: 1.0625rem; line-height: 1.75rem; font-weight: 600; letter-spacing: -0.022em; text-align: center; }
 
   /* Reports: a grouped list under small section heads, a row per report: its picture, title, what it says, then its kind, steps and date.
      A blue dot marks one filed today. A row with steps draws them as numbered nodes on a line, with only the marks that matter under each. */
@@ -108,7 +113,8 @@
   .rows.reports .flow { margin-top: 0.625rem; max-width: 20rem; }
   .rows.reports .new { flex: none; width: 0.625rem; height: 0.625rem; margin: 0.4375rem 0.25rem 0 0; border-radius: 50%; background: var(--action); }
   .rows.reports .done > :not(summary) { margin: 0 0 1rem 4.25rem; }
-  .sec-h:has(+ .reports) { margin: 1.75rem 1rem 0.5rem; }
+  .sec-h:has(+ .reports) { margin: 1.75rem 0 0.5rem; padding: 0 1rem; }
+  .rows.reports .compact > .t > .meta { font-size: 0.9375rem; }
   .sec-h:has(+ .reports) h2 { color: var(--muted); font-size: 0.8125rem; font-weight: 400; letter-spacing: 0.02em; text-transform: uppercase; }
   .sec-h:has(+ .reports) .meta { font-size: 0.8125rem; }
   .st { display: inline-flex; flex: none; align-items: center; gap: 0.375rem; padding: 0.125rem 0.625rem; border-radius: 999px; background: var(--sunk);
@@ -146,9 +152,8 @@
   /* A report opens over the whole board, on a phone and a desk alike: a bar with the way back, then its page. */
   #reader { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; background: var(--bg); }
   #reader[hidden] { display: none; }
-  #reader header { display: flex; align-items: center; gap: 0.5rem; min-height: 3.5rem; padding: 0.25rem 1rem; border-bottom: 1px solid var(--line); background: var(--surface); }
-  #reader:has(.read) header { border-bottom: 0; background: none; }
-  #reader .close { display: inline-flex; flex: none; align-items: center; min-height: 3rem; margin-left: -0.5rem; padding: 0 0.5rem; border-radius: 0.625rem; color: var(--accent); font-weight: 650; text-decoration: none; }
+  #reader header { display: flex; align-items: center; gap: 0.5rem; min-height: 3.5rem; padding: 0.25rem 1rem; }
+  #reader .close { display: inline-flex; flex: none; align-items: center; min-height: 3rem; margin-left: -0.5rem; padding: 0 0.5rem; border-radius: 0.625rem; color: var(--accent); font-weight: 400; text-decoration: none; }
   #reader header .change-link { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; margin-left: auto; border-radius: 0.625rem; color: var(--accent); }
   #reader header .change-link svg { width: 1.5rem; height: 1.5rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   #reader header h1 { margin: 0; min-width: 0; overflow: hidden; font-size: 1rem; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
@@ -158,8 +163,8 @@
   /* A report reads as a page of its own: what it is and when, its title in large type, what it says, then its page in a tile. */
   #reader .read { flex: 1; min-height: 0; overflow: auto; padding: 0 1.25rem 2rem; }
   #reader .read > * { max-width: 42.5rem; margin-left: auto; margin-right: auto; }
-  #reader .read .eyebrow { margin-top: 0.5rem; }
-  #reader .read h1 { margin-bottom: 0.75rem; font-size: 2.125rem; line-height: 1.1765; font-weight: 700; letter-spacing: 0.011em; white-space: normal; overflow: visible; }
+  #reader .read .eyebrow { margin-top: 0.5rem; font-weight: 400; }
+  #reader .read h1 { margin-top: 0.75rem; margin-bottom: 0.75rem; font-size: 2.125rem; line-height: 1.1765; font-weight: 700; letter-spacing: 0.011em; white-space: normal; overflow: visible; }
   #reader .read .about { margin-bottom: 1rem; font-size: 1.25rem; line-height: 1.4; }
   #reader .read .decided { margin-bottom: 1.25rem; }
   #reader .read iframe { display: block; width: 100%; height: max(30rem, calc(100dvh - 8rem)); border-radius: 1rem; background: var(--surface); }
@@ -168,12 +173,13 @@
   .plan-layout { max-width: 72rem; margin: auto; display: grid; gap: 2rem; }
   .plan-main { min-width: 0; }
   .plan-main > h2 { margin: 2rem 0 0.75rem; }
-  .plan-main > h2:first-of-type { font-size: 3.5rem; line-height: 1.15; margin: 0.5rem 0; }
+  .plan-main > h2:first-of-type { font-size: 2.125rem; line-height: 1.2059; letter-spacing: 0.011em; margin: 0.5rem 0; }
+  @media (min-width: 60rem) { .plan-main > h2:first-of-type { font-size: 3rem; line-height: 1.0833; letter-spacing: -0.003em; } }
   .plan-main > p { margin: 0.5rem 0 1.5rem; }
   .plan-summary { display: flex; gap: 0.75rem; color: var(--muted); font-size: 1.125rem; line-height: 1.5; margin: 1.5rem 0 2rem; }
   #reader .plan-view { width: 100%; height: 22rem; flex: none; border-radius: 1rem; }
   .plan-section, .plan-decision, .plan-explain { background: var(--surface); border-radius: 1.125rem; padding: 1rem; margin: 1rem 0; scroll-margin-top: 1rem; }
-  .plan-section h3, .plan-decision h3 { font-size: 1.375rem; line-height: 1.3; margin: 0 0 0.75rem; }
+  .plan-section h3, .plan-decision h3 { font-size: 1.25rem; line-height: 1.3; margin: 0 0 0.75rem; }
   .plan-section p { white-space: pre-line; }
   .plan-verdicts { display: flex; gap: 0.625rem; }
   .plan-verdicts button { flex: 1; border: 0; border-radius: 980px; background: var(--sunk); font-weight: 600; }
@@ -248,18 +254,20 @@
   .rows > li { padding-right: 0.5rem; }
   .rows > li + li { border-top: 0.5px solid var(--line); }
   /* Answered: Done today, then Earlier, each one grouped inset list. */
-  #board > .sec-head:has(+ .rows.i-answered) { margin: 0 0 0.5rem; } .rows.i-answered + .sec-head { margin-top: 1.75rem; }
+  #board > .sec-head:has(+ .rows.i-answered) { margin: 0 0 0.5rem; padding: 0 1rem; } .rows.i-answered + .sec-head { margin-top: 1.75rem; }
+  #board > .sec-head:has(+ .rows.i-answered) h2 { color: var(--muted); font-size: 0.875rem; font-weight: 400; letter-spacing: 0.02em; text-transform: uppercase; }
   .compact { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 0; color: var(--text); text-decoration: none; }
   .compact .t { display: grid; flex: 1; min-width: 0; }
   /* The answer sits under the title, never beside it: a long answer beside the title squeezed it to a letter a line. */
-  .ans { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 0.5rem; margin-top: 0.125rem; } .ans b { color: var(--c-answered); } .ans time { color: var(--muted); font-size: 0.875rem; }
-  .compact strong { font-size: 1.0625rem; font-weight: 600; line-height: 1.3; }
-  .compact .meta { margin: 0.125rem 0 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .ans { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 0.5rem; margin-top: 0.125rem; } .ans b { color: var(--muted); font-weight: 400; } .ans time { color: var(--muted); font-size: 0.9375rem; }
+  .compact strong { font-size: 1.0625rem; font-weight: 400; line-height: 1.3; }
+  .rows.reports .compact strong { font-weight: 600; }
+  .compact .meta { margin: 0.125rem 0 0; font-size: 0.9375rem; }
   .thumb, .compact .icon { width: 3.5rem; height: 3.5rem; border-radius: 0.625rem; }
   .compact .icon { background: color-mix(in srgb, var(--area) 14%, var(--surface)); }
   .compact .icon svg { stroke: var(--area); }
   /* An answered row with no picture leads with a small check badge, so the row stays short. */
-  .compact .icon.i-answered { width: 1.75rem; height: 1.75rem; border-radius: 0.5625rem; } .compact .icon.i-answered svg { width: 1rem; height: 1rem; }
+  .compact .icon.i-answered { width: 2rem; height: 2rem; border-radius: 0.5rem; background: var(--c-answered); } .compact .icon.i-answered svg { width: 1.125rem; height: 1.125rem; stroke: #FFFFFF; }
   .done .thumb { width: 3rem; height: 3rem; border-radius: 0.75rem; }
   .thumb { flex: none; object-fit: cover; object-position: top; border: 1px solid var(--line); background: var(--sunk); }
   .list { display: grid; gap: 0.75rem; }
@@ -276,11 +284,12 @@
   .plan-preview .rung > .meta { display: none; }
   .plan-copy { display: grid; align-content: center; gap: .5rem; padding: 1.25rem; }
   .plan-copy .eyebrow, .ask-card .kind { margin: 0; color: var(--warn); font-size: .875rem; font-weight: 600; }
-  .plan-copy h2 { margin: 0; font-size: 1.75rem; }
-  .plan-copy .about { margin: 0; color: var(--muted); -webkit-line-clamp: 1; }
+  .plan-copy h2 { margin: 0; font-size: 1.3125rem; line-height: 1.24; }
+  .plan-copy .about { display: block; margin: 0; color: var(--muted); overflow: visible; }
   .plan-meta { display: flex; flex-wrap: wrap; gap: .35rem 1rem; color: var(--muted); font-size: .875rem; }
   .plan-meta span { white-space: nowrap; }
-  .open-link.plan-open { display: inline-flex; width: fit-content; min-height: 2.75rem; padding: 0 1.25rem; font-size: 1rem; }
+  .open-link.plan-open { display: inline-flex; justify-content: center; min-height: 3.125rem; padding: 0 1.25rem; font-size: 1.0625rem; font-weight: 400; }
+  @media (min-width: 45rem) { .open-link.plan-open { width: fit-content; min-height: 2.75rem; } }
   .ask-group { list-style: none; margin: .5rem 0 0; padding: 0 0 0 1rem; overflow: hidden; border-radius: 1rem; background: var(--surface); }
   .ask-group > li { position: relative; display: flex; align-items: center; gap: .75rem; min-height: 4.125rem; padding: .5rem .5rem .5rem 0; }
   .ask-group > li + li { border-top: .5px solid var(--line); }
@@ -288,7 +297,7 @@
   .ask-card .icon { width: 2rem; height: 2rem; border-radius: .5rem; background: var(--action); }
   .ask-card .icon svg { width: 1.125rem; height: 1.125rem; stroke: white; }
   .ask-card .copy { display: grid; flex: 1; min-width: 0; gap: .125rem; }
-  .ask-card .title { font-size: 1.0625rem; font-weight: 550; line-height: 1.3; }
+  .ask-card .title { font-size: 1.0625rem; font-weight: 400; line-height: 1.3; }
   .ask-card .meta { margin: 0; color: var(--muted); font-size: .9375rem; }
   .ask-group .x { margin: 0; }
   .decide { max-width: 44rem; margin: 0 auto; padding-bottom: 1rem; }
@@ -305,7 +314,7 @@
     .decide-preview { margin: .25rem 0 .5rem; padding: .75rem; }
     .decide-preview .mocks { grid-auto-columns: min(85%, 8rem); --tall: min(20svh, 10rem); }
     .decide-preview .shot { aspect-ratio: 1; }
-    .decide .lead h2 { margin: .25rem 0; }
+    .decide .lead h2 { margin: 1rem 0 .5rem; }
     .decide .pick-label { margin: .5rem 0; }
     .decide .silent-line { margin: .5rem 0; }
     .decide .pick-option { min-height: 3.125rem; padding: .5rem 1rem .5rem 0; }
@@ -319,14 +328,16 @@
   .pick-option { display: flex; width: 100%; min-height: 2.75rem; align-items: center; gap: .75rem; padding: .5rem 1rem .5rem 0; border: 0; border-radius: 0; background: transparent; text-align: left; }
   .pick-option .words { display: grid; flex: 1; min-width: 0; gap: .125rem; }
   .pick-option .label-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 .5rem; }
-  .pick-option .label { font-size: 1.25rem; line-height: 1.3; }
-  .pick-option .reason { color: var(--muted); font-size: 1rem; line-height: 1.35; }
+  .pick-option .label { font-size: 1.0625rem; line-height: 1.3; }
+  .pick-option .reason { color: var(--muted); font-size: 0.9375rem; line-height: 1.35; }
   .pick-option .recommend { color: var(--accent); font-size: .9375rem; }
   .pick-option .check { width: 1.5rem; color: var(--accent); font-size: 1.5rem; visibility: hidden; }
-  .pick-option[aria-pressed="true"] { color: var(--text); background: transparent; }
+  .pick-option[aria-pressed="true"] { color: var(--text); background: transparent; font-weight: 400; }
   .pick-option[aria-pressed="true"]::before { content: none; }
   .pick-option[aria-pressed="true"] .check { visibility: visible; }
-  .silent-line { margin: 1.25rem 0; color: var(--muted); }
+  .silent-line { display: flex; gap: 0.625rem; align-items: flex-start; margin: 1.25rem 0; color: var(--muted); font-size: 0.9375rem; line-height: 1.4; }
+  .silent-line b { color: var(--text); font-weight: 600; }
+  .silent-line .icon { width: 1.0625rem; height: 1.0625rem; margin-top: 0.125rem; background: none; } .silent-line .icon svg { width: 1.0625rem; height: 1.0625rem; stroke: currentColor; }
   .pager { position: absolute; top: .5rem; right: 0; display: flex; align-items: center; color: var(--muted); font-size: .9375rem; font-variant-numeric: tabular-nums; }
   .pager .of { white-space: nowrap; }
   .pager .step { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; color: var(--accent); font-size: 1.75rem; text-decoration: none; }
@@ -338,11 +349,13 @@
   .decide-lists .compact .thumb { width: 2rem; height: 2rem; border-radius: .5rem; }
   .decide-lists .compact .icon { width: 2rem; height: 2rem; border-radius: .5rem; }
   .decide-lists a.compact::after { content: "" / ""; flex: none; width: .5rem; height: .5rem; margin-right: .5rem; border: solid var(--border); border-width: 2px 2px 0 0; transform: rotate(45deg); }
-  .decide-bar { position: fixed; z-index: 1; left: 0; right: 0; bottom: calc(4.125rem + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: .5rem;
+  .decide-bar { position: fixed; z-index: 1; left: 0; right: 0; bottom: calc(4.125rem + env(safe-area-inset-bottom)); display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
     padding: .75rem max(1.25rem, env(safe-area-inset-right)) .75rem max(1.25rem, env(safe-area-inset-left)); background: var(--bg); }
-  .decide-bar .answer { flex: 1; background: var(--action); color: var(--on-accent); }
-  .decide-bar .later { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0 0.75rem; color: var(--accent); background: transparent; }
-  .decide-bar .skip { color: var(--muted); background: transparent; }
+  /* Answer takes the row on one line; when a long label leaves no room, Skip and Later move under it rather than squeeze it. */
+  .decide-bar > * { white-space: nowrap; }
+  .decide-bar .answer { flex: 1 1 auto; background: var(--action); color: var(--on-accent); font-weight: 400; }
+  .decide-bar .later { display: inline-flex; flex: none; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0 0.75rem; color: var(--accent); background: transparent; text-decoration: none; }
+  .decide-bar .skip { flex: none; padding: 0 0.75rem; color: var(--muted); background: transparent; }
   .ask-group + .gone-asks { margin-top: 1rem; }
   /* Evidence: a card per update with its capture as the hero, grouped under the project its check names; the whole card opens the update. */
   .ev-group { display: grid; gap: 0.75rem; margin-top: 1.5rem; }
@@ -374,14 +387,16 @@
   .ev-gl { margin: 1rem 0 0; color: var(--muted); font-size: 0.875rem; letter-spacing: 0.02em; text-transform: uppercase; }
   .ev-grp { overflow: hidden; border-radius: 0.75rem; background: var(--surface); }
   .ev-grp .cell { display: flex; align-items: center; gap: 0.875rem; min-height: 3.5rem; padding: 0.625rem 1rem; color: inherit; font-size: 1.0625rem; text-decoration: none; }
-  .ev-grp .cell + .cell { border-top: 0.5px solid var(--line); }
+  /* The hairline between rows starts at the row's text, as in an iOS inset list. */
+  .ev-grp .cell { position: relative; }
+  .ev-grp .cell + .cell::before { content: ""; position: absolute; top: 0; left: 1rem; right: 0; border-top: 0.5px solid var(--line); }
   .ev-grp a.cell:hover { background: color-mix(in srgb, var(--surface) 94%, var(--text)); }
   .ev-grp .k { flex: none; min-width: 6.5rem; }
   .ev-grp .v { min-width: 0; margin-left: auto; color: var(--muted); text-align: right; }
-  .ev-grp .v.ok { color: var(--ok); font-weight: 600; } .ev-grp .v.bad { color: var(--danger); font-weight: 600; } .ev-grp .v.warn { color: var(--warn); font-weight: 600; }
+  .ev-grp .v.ok { color: var(--ok); } .ev-grp .v.bad { color: var(--danger); font-weight: 600; } .ev-grp .v.warn { color: var(--warn); font-weight: 600; }
   .ev-grp .v svg { width: 1.15rem; height: 1.15rem; margin-right: 0.2rem; vertical-align: -0.2rem; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
   .ev-grp .v.go { color: var(--accent); }
-  .ev-grp .cell.long { display: grid; gap: 0.25rem; align-items: start; }
+  .ev-grp .cell.long { display: grid; gap: 0.0625rem; align-items: start; }
   .ev-grp .cell.long .k { min-width: 0; }
   .ev-grp .x { display: block; width: auto; min-height: 0; margin: 0; padding: 0; border: 0; background: none; color: var(--muted); font-size: 0.9375rem; line-height: 1.4; }
   .ev-grp .chev { margin-left: 0.25rem; color: var(--muted); }
@@ -475,7 +490,7 @@
   .rows > li { display: flex; align-items: center; }
   .rows li .compact { flex: 1; min-width: 0; }
   .rows li .x { margin: 0; }
-  .clear { min-height: 2.75rem; padding: 0; border: 0; background: none; color: var(--accent); font-weight: 600; }
+  .clear { min-height: 2.75rem; padding: 0; border: 0; background: none; color: var(--accent); font-weight: 400; }
   /* An answered row opens to its full card, without the title it already shows. */
   .done { flex: 1; min-width: 0; }
   .done summary { width: auto; margin: 0; list-style: none; font-size: 1rem; cursor: pointer; }
@@ -579,10 +594,7 @@
   button:focus-visible, summary:focus-visible, textarea:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .shot:focus-visible { outline-offset: -2px; }
   .empty { margin: 0; padding: 1.5rem 1rem; color: var(--muted); text-align: center; border: 1px dashed var(--line); border-radius: 0.875rem; }
-  @media (max-width: 44.999rem) {
-    .plan-preview { display: none; }
-    .plan-copy .about { display: block; -webkit-line-clamp: unset; -webkit-box-orient: initial; overflow: visible; }
-  }
+  @media (max-width: 44.999rem) { .plan-preview { display: none; } }
   @media (min-width: 45rem) {
     main { padding: 0 2rem; }
     .row { grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 0.875rem 2rem; padding: 1.125rem 1.25rem; }
@@ -611,7 +623,7 @@
     .side a { display: flex; align-items: center; gap: 0.75rem; min-height: 2.75rem; padding: 0 0.75rem; border-radius: 0.625rem; color: var(--text); text-decoration: none; }
     .side a:hover { background: color-mix(in srgb, var(--sunk) 50%, transparent); }
     .side a[aria-current] { background: var(--sunk); }
-    .side .n { margin-left: auto; color: var(--muted); font-size: 1rem; font-variant-numeric: tabular-nums; }
+    .side .n { margin-left: auto; color: var(--muted); font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
     .brand { margin: 0.25rem 0.75rem 1.25rem; font-weight: 600; }
     .top { padding: 3.5rem 0 1.5rem; }
     .top h1 { font-size: 3rem; line-height: 1.0833; letter-spacing: -0.003em; }
@@ -636,7 +648,8 @@
     .plan-preview { height: 20rem; }
     .plan-preview .rung .frame, .plan-preview .rung iframe { min-height: 0; }
     .plan-copy { padding: 2rem; }
-    .plan-copy h2, .decide h2 { font-size: 2.5rem; line-height: 1.1; }
+    .plan-copy h2 { font-size: 1.75rem; line-height: 1.1429; }
+    .decide h2 { font-size: 2.5rem; line-height: 1.1; }
     .decide-bar { position: static; margin: 1rem 0 0; padding: .75rem 0; background: transparent; }
     .rows.reports, .sec-h:has(+ .reports), .legend { max-width: 50rem; }
     /* Evidence sets its cards two across, the whole capture on each tile; a page that is not an update keeps the whole width. */
@@ -1084,9 +1097,10 @@
       el('p', { class: 'ev-gl' }, 'Proof'),
       el('div', { class: 'ev-grp' },
         el('div', { class: 'cell' }, el('span', { class: 'k' }, 'Result'), result ? el('span', { class: `v ${result[0]}` }, mark(result[0]), ' ', result[2]) : el('span', { class: 'v', dir: 'auto' }, 'No result yet')),
-        long('Why', unchecked(d)), long('What ran', ran), long('Checked by', checker), short('Project', projectOf(d)), short('When', d.filed ? stamp(d.filed) : ''),
+        long('Why', unchecked(d)), long('What ran', ran),
         change ? el('a', { class: 'cell', href: change, target: '_blank', rel: 'noopener', 'aria-label': `Open the change for ${name}` },
-          el('span', { class: 'k' }, 'Change'), el('span', { class: 'v go' }, changeName(change)), el('span', { class: 'chev', 'aria-hidden': 'true' }, '›')) : ''),
+          el('span', { class: 'k' }, 'Change'), el('span', { class: 'v go' }, changeName(change)), el('span', { class: 'chev', 'aria-hidden': 'true' }, '›')) : '',
+        short('Project', projectOf(d)), short('Checked by', checker), short('When', d.filed ? stamp(d.filed) : '')),
       state.readonly || FROZEN || !(d.options.length || d.reply) ? '' : verdicts(d), tech(d)));
   }
 
@@ -1221,6 +1235,7 @@
     reports: 'M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z',
     answered: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM9 12l2 2 4-4',
     plan: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7zM14 2v6h6M8 13h8M8 17h8M8 9h2',
+    clock: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 6v6l4 2',
     you: 'M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4.5 20.5c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5' };
   // The drawings are fixed strings from this page, never text from the board file.
   // Small stroke drawings the plan page puts beside a button label or in a section badge; fixed strings from this page.
@@ -1724,6 +1739,7 @@
   }
   const askIcon = (d) => { const a = { design: 'designs', signin: 'you', plan: 'plan' }[typeOf(d)] ?? 'waiting'; return ICONS[a] ? a : 'waiting'; };
   /** An update that waits on you says how its linked run went, in plain words. */
+  const dateLine = (t = new Date()) => `${t.toLocaleDateString('en-GB', { weekday: 'long' })}, ${t.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}`;
   const badge = (d) => { const r = RESULT[d.evidenceCard?.result]; return r ? el('span', { class: `st ${r[0]}` }, r[1]) : ''; };
   function waitingPage(items, hidden) {
     const plans = items.filter((d) => d.type === 'plan'), asks = items.filter((d) => d.type !== 'plan');
@@ -1791,7 +1807,7 @@
     const cards = d.mocks?.length && d.options?.length ? mockCards(d, []) : null;
     const preview = cards ?? (d.view ? rung(d) : pic(d) ? thumb('waiting', pic(d)) : proof(d));
     const quiet = opts.find((o) => o.value === d.default_if_silent);
-    const silent = quiet ? `If you stay quiet: ${quiet.label}${d.silent_by ? ` · ${left(d.silent_by)}` : ''}` : '';
+    const silent = quiet ? [icon('clock'), el('span', {}, el('b', {}, 'If you stay quiet:'), ` ${quiet.label}${d.silent_by ? ` · ${left(d.silent_by)}` : ''}`)] : '';
     const head = el('div', { class: 'lead' }, el('p', { class: 'eyebrow' }, kind(d), badge(d)), el('h2', { dir: 'auto' }, headline(d)));
     const why = unchecked(d) || d.why || d.tradeoff || d.about;
     const back = el('a', { class: 'later', href: '#waiting' }, 'Later');
@@ -1801,7 +1817,7 @@
       ...(live && opts.length ? [el('p', { class: 'pick-label' }, typeOf(d) === 'yes-no' ? 'YES OR NO' : 'PICK ONE'),
         el('ul', { class: 'pick-list', 'aria-label': d.title }, ...optionButtons.map((b) => el('li', {}, b)))] : []),
       ...(live ? [other(d, answerOf(d.key), err, () => (location.hash = to))] : []),
-      silent ? el('p', { class: 'silent-line' }, silent) : '', err,
+      silent ? el('p', { class: 'silent-line' }, ...silent) : '', err,
       el('div', { class: 'decide-bar' }, live && opts.length ? answer : '', skip || '', back), decideLists(d, queue));
     if (live) swipe(page, () => { if (recOpt && !answer.disabled) answerWith(recOpt); });
     return page;
@@ -1849,10 +1865,10 @@
     const ro = state.readonly ? 'Read only' : FROZEN ? `Read-only copy, ${FROZEN.exported}` : '';
     const pageTitle = at === 'decide' ? 'Decide' : at === 'reports' ? NAV.reports : AREAS[at];
     const top = el('header', { class: 'top' }, at ? el('a', { class: 'back', href: at === 'decide' ? '#waiting' : '#' }, at === 'decide' ? '‹ Waiting on you' : '‹ Summary') : '',
-    el('h1', { tabindex: '-1' }, at ? pageTitle : 'Summary'), at ? '' : icon('you'), at ? '' : el('p', { class: 'date' }, new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })),
+    el('h1', { tabindex: '-1' }, at ? pageTitle : 'Summary'), at ? '' : icon('you'), at ? '' : el('p', { class: 'date' }, dateLine()),
     ro ? el('p', { class: 'meta' }, ro) : '',
     at === 'decide' && decideAt >= 0 ? pager(decideQueue, decideAt) : '',
-    at === 'waiting' && !state.readonly && by.waiting.length ? el('p', { class: 'lede waiting-lede' }, `${shown.length} ${shown.length === 1 ? 'item needs' : 'items need'} you · ${new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}`)
+    at === 'waiting' && !state.readonly && by.waiting.length ? el('p', { class: 'lede waiting-lede' }, `${shown.length} ${shown.length === 1 ? 'item needs' : 'items need'} you · ${dateLine()}`)
       : at === 'reports' && !state.readonly && by.reports.length ? el('p', { class: 'lede' }, by.reports.some((d) => d.steps)
       ? 'How the tools work, step by step. Tap one to open it.' : 'Explainers the agents made for you. Tap one to open it.')
       : at === 'answered' && by.answered.length ? el('p', { class: 'lede' }, `${by.answered.filter((d) => isToday(state.answers[d.key].at)).length} answered today.`)
