@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Captures every board screen at 390 (phone), 820 (pad) and 1280 (desk), light and dark, with chrome-devtools-axi.
 # Usage: shots.sh <board URL from seed-board.sh> <evidence folder> [screen...]
-# Screens include summary, waiting, designs, design-review, design-viewer, evidence, reports and answered (all by default).
+# Screens include summary, waiting, decide (the sign-in ask), designs, design-review, design-viewer, evidence, reports and answered (all by default).
 # Files: <screen>.<theme>.<width>w.png; the design viewer also writes <screen>.<theme>.<width>w.widths.json,
 # the note box against the buttons under it, which must share both edges.
 # SHOTS_WIDTHS="390" or "1280" keeps the widths named (all three by default).
 set -euo pipefail
 url=$1 out=$2; shift 2
-screens=${*:-summary waiting designs design-review design-viewer evidence reports answered}
+screens=${*:-summary waiting decide designs design-review design-viewer evidence reports answered}
 export CHROME_DEVTOOLS_AXI_SESSION=${CHROME_DEVTOOLS_AXI_SESSION:-verify-sign-off}
 mkdir -p "$out"
 chrome-devtools-axi open "$url" >/dev/null  # a page must be selected before emulate
@@ -19,6 +19,7 @@ for theme in light dark; do
     chrome-devtools-axi emulate --viewport "$vp" --color-scheme "$theme" >/dev/null
     for s in $screens; do
       hash=$s; [ "$s" = summary ] && hash=
+      [ "$s" = decide ] && hash=decide/npm
       [ "$s" = design-review ] && hash=designs/chat-journeys
       [ "$s" = design-viewer ] && hash=designs/chat-journeys
       chrome-devtools-axi open "$url#$hash" >/dev/null

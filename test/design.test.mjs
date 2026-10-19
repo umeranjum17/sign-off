@@ -874,14 +874,14 @@ test('each card has one place to type: Other answer holds the reply, Another rou
     await until(async () => (await evaluate('location.hash + reader.hidden')) === '#reportstrue');
     close();
   }
-  // Answered is Done today: a count under the title, Clear all done on the section head, and a short row per item with its answer and time under the title, beside its ×.
+  // Answered is Done today: a count under the title, Clear all beside it, and a short row per item with its answer and time under the title, beside its ×. Clear all sits at the right of the title.
   writeFileSync(file.replace(/\.json$/, '.answers.jsonl'), ['ship', 'look'].map((key) => JSON.stringify({ key, answer: 'a', label: 'A', close: 'done', at: new Date().toISOString() })).join('\n') + '\n');
   // Once both are answered, nothing needs you, and Today links to Answered with both.
   const after = await dump('');
   assert.match(after, /<p class="card glance">(?:<span class="seen">[^<]*<\/span>)?<b>Nothing needs you\. <\/b>/);
   assert.match(after, /<a class="more" href="#answered">Answered \(2\)<\/a>/);
   const answered = await dump('#answered');
-  assert.match(answered, /<p class="lede">2 answers today\. Each one has gone back to its agent\.<\/p><\/header><div class="sec-head"><h2>Today<\/h2><button class="clear">Clear all done<\/button><\/div>/);
+  assert.match(answered, /<p class="lede">2 answers today\. Each one has gone back to its agent\.<\/p><div class="bulk">.*?<\/div><\/header><div class="sec-head"><h2>Today<\/h2><\/div>/);
   const lines = [...answered.matchAll(/<summary class="compact">.*?<strong[^>]*>(.*?)<\/strong>.*?<span class="ans"><b[^>]*>(\w+)<\/b><time>\d\d:\d\d<\/time><\/span><\/span><\/summary>.*?<\/details><button class="x" aria-label="Dismiss, [^"]+">×<\/button>/gs)];
   assert.deepEqual(lines.map((m) => [m[1], m[2]]).sort(), [['Pick the look', 'A'], ['When should it ship?', 'A']]);
   // Each row opens to its full card, with its one box.
@@ -1114,15 +1114,26 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   assert.equal(await evaluate('document.querySelector(".plan-copy .about").textContent'), "Umer reviews an agent's plan on a phone: approve or change each section, answer each decision, then send it all back at once.");
   assert.equal(await evaluate('(() => { const e = document.querySelector(".plan-copy .about"), s = getComputedStyle(e); return s.display === "block" && s.overflow === "visible" && e.scrollHeight <= e.clientHeight + 1; })()'), true);
   assert.equal(await evaluate('document.documentElement.scrollWidth <= 390 && document.querySelector(".plan-open").getBoundingClientRect().right <= 390'), true);
-  assert.equal(await evaluate('!document.querySelector(".plan-hero .x")'), true);
+  assert.equal(await evaluate('!!document.querySelector(".plan-hero .dis[aria-label^=\\"Dismiss, \\"]")'), true);
   const desk = await browse(join(dir, 'desk'), 1280);
   await desk.evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
   await until(async () => await desk.evaluate('!!document.querySelector(".plan-hero .plan-preview")'));
   assert.equal(await desk.evaluate('getComputedStyle(document.querySelector(".plan-preview")).display'), 'block');
   assert.equal(await desk.evaluate('getComputedStyle(document.querySelector(".plan-hero")).gridTemplateColumns.split(" ").length'), 2);
   desk.close();
-  assert.equal(await evaluate('fetch("api/dismiss", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ keys: ["plan-kind-board"], dismissed: true }) }).then((r) => r.status)'), 400);
-  assert.equal(existsSync(file.replace(/\.json$/, '.dismissed.jsonl')), false);
+  // A plan that waits can be dismissed from its card, and Undo puts it back.
+  await evaluate('document.querySelector(".plan-hero .dis").click()');
+  await until(async () => await evaluate('!document.querySelector(".plan-hero")'));
+  await evaluate('document.getElementById("undo").click()');
+  await until(async () => await evaluate('!!document.querySelector(".plan-hero")'));
+  // Select mode: tap the plan card to pick it, Dismiss N clears it with the same toast and Undo.
+  await evaluate('document.querySelector(".bulk .select").click()');
+  await evaluate('document.querySelector(".plan-open").click()');
+  assert.equal(await evaluate('location.hash + "|" + document.querySelectorAll(".picked").length + "|" + document.querySelector(".sel-go").textContent'), '#waiting|1|Dismiss 1');
+  await evaluate('document.querySelector(".sel-go").click()');
+  await until(async () => await evaluate('!document.querySelector(".plan-hero")'));
+  await evaluate('document.getElementById("undo").click()');
+  await until(async () => await evaluate('!!document.querySelector(".plan-hero")'));
   await evaluate('document.querySelector(".plan-open").click()');
   await until(async () => (await evaluate('location.hash + "|" + document.querySelector("#reader iframe")?.title')) === '#waiting/plan-kind-board|Plan: Show plans on the board');
   await until(async () => await evaluate('document.querySelector("#reader .plan-view")?.clientHeight > 100'));
