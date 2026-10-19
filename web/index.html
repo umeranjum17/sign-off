@@ -496,7 +496,6 @@
   @media (min-width: 45rem) {
     main { padding: 0 2rem; }
     .row { grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 0.875rem 2rem; padding: 1.125rem 1.25rem; }
-    .in-waiting .row { padding-left: calc(1.25rem - 3px); }
     .row.design, .row.update { grid-template-columns: minmax(0, 1fr); gap: 0.875rem; }
     /* The frames share the card width down to 11rem each; only a list longer than that scrolls. */
     .mocks { grid-auto-columns: minmax(11rem, calc(var(--tall) * 9 / 19.5)); }
@@ -547,9 +546,6 @@
     .rows.i-answered > li:has(.done[open]) { grid-column: 1 / -1; }
     /* Evidence sets its updates two across; a page that is not an update keeps the whole width. */
     .list.in-evidence { grid-template-columns: 1fr 1fr; align-items: start; } .in-evidence > .row:not(.update) { grid-column: 1 / -1; }
-    .list.in-waiting { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 1rem; }
-    .list.in-waiting > .row { border-radius: 1.125rem; padding: 1.25rem; }
-    .list.in-waiting .choices button { min-height: 2.75rem; }
   }
 </style>
 </head>
