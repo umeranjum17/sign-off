@@ -14,7 +14,7 @@ const file = join(scratch, 'd.json');
 const root = join(scratch, 'proof');
 const runId = '20261011T120000Z-a1b2c3d4';
 const commit = '0123456789abcdef0123456789abcdef01234567';
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=', 'base64');
+const png = readFileSync(new URL('../fixtures/evidence/product-small.png', import.meta.url));
 mkdirSync(join(root, '.done-done', 'runs'), { recursive: true });
 writeFileSync(join(root, 'after.png'), png);
 const makeRecord = (path = 'after.png', bytes = png) => ({ schema: 1, run_id: runId, journey: 'sign-off evidence', command: 'node capture.mjs', commit, tree: 'a'.repeat(40), dirty: false,
