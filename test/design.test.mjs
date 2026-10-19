@@ -1031,7 +1031,6 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   assert.match(run('answers', file, '--key', 'release').out, /today/);
   await evaluate('document.querySelector("#undo").click()');
   await until(async () => !/today/.test(run('answers', file, '--key', 'release').out));
-  await evaluate('document.querySelector(`a[href="#decide/release"]`).click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/release');
   await evaluate('document.dispatchEvent(new KeyboardEvent("keydown", { key: "1", bubbles: true }))');
   await until(async () => /today/.test(run('answers', file, '--key', 'release').out));
