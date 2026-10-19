@@ -164,6 +164,13 @@
   .plan-section p { white-space: pre-line; }
   .plan-verdicts { display: flex; gap: 0.625rem; }
   .plan-verdicts button { flex: 1; border: 0; border-radius: 980px; background: var(--sunk); font-weight: 600; }
+  .plan-verdicts button { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; }
+  .glyph { width: 1.125rem; height: 1.125rem; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .plan-section h3 { display: flex; align-items: center; gap: 0.75rem; }
+  .plan-section .num { width: 2rem; height: 2rem; border-radius: 50%; background: var(--sunk); display: grid; place-items: center; flex: none; font-size: 1rem; font-weight: 600; }
+  .plan-section[data-verdict="approve"] .num { background: color-mix(in srgb, var(--ok) 14%, var(--surface)); color: var(--ok); }
+  .plan-section[data-verdict="change"] .num { background: color-mix(in srgb, var(--warn) 14%, var(--surface)); color: var(--warn); }
+  .plan-send button { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; }
   .plan-verdicts button[aria-pressed="true"] { box-shadow: inset 0 0 0 1.5px currentColor; background: var(--surface); }
   .plan-verdicts button[aria-pressed="true"]::before, .plan-decision button[aria-pressed="true"]::before { content: none; }
   .plan-verdicts .approve[aria-pressed="true"] { color: var(--ok); }
@@ -1179,6 +1186,10 @@
     plan: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7zM14 2v6h6M8 13h8M8 17h8M8 9h2',
     you: 'M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4.5 20.5c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5' };
   // The drawings are fixed strings from this page, never text from the board file.
+  // Small stroke drawings the plan page puts beside a button label or in a section badge; fixed strings from this page.
+  const GLYPHS = { check: '<path d="M20 6 9 17l-5-5"/>', pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
+    send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.112z"/><path d="m21.854 2.147-10.94 10.939"/>' };
+  const glyph = (a) => { const s = el('span', { 'aria-hidden': 'true', style: 'display:inline-flex' }); s.innerHTML = `<svg class="glyph" viewBox="0 0 24 24">${GLYPHS[a]}</svg>`; return s; };
   const icon = (a) => { const s = el('span', { class: `icon i-${a}`, 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[a]}"/></svg>`; return s; };
   // A design with only screen notes (answer 'screens') still waits for its design-wide verdict.
   const isAnswered = (d) => Object.hasOwn(state.answers, d.key) && !(d.type === 'design' && state.answers[d.key].answer === 'screens');
@@ -1334,7 +1345,7 @@
     const remember = () => { drafts.set(draftKey, JSON.stringify({ notes: [...notes.values()], decisions: Object.fromEntries(picks), ...(comment.trim() && { comment }) })); keep(); };
     const main = el('div', { class: 'plan-main' }), panel = el('aside', { class: 'plan-send' });
     const status = el('p', { role: 'status' }), err = el('p', { class: 'err', role: 'alert' }), progress = el('div', { class: 'plan-progress' });
-    const send = el('button', { class: 'open-link' }, 'Send back'), next = el('button', { class: 'plan-next' }, 'Go to next');
+    const send = el('button', { class: 'open-link' }, glyph('send'), 'Send back'), next = el('button', { class: 'plan-next' }, 'Go to next');
     const complete = (s) => { const n = notes.get(s.id); return n?.verdict === 'approve' || (n?.verdict === 'change' && n.note?.trim()); };
     next.onclick = () => {
       const section = d.sections.find((s) => !complete(s)), decision = d.decisions.find((q) => !answered(q));
@@ -1355,14 +1366,14 @@
         el('a', { class: 'back', href: '#answered' }, 'See it in Answered'),
         saved.note ? el('p', { dir: 'auto' }, `Your whole-plan comment: ${saved.note}`) : ''));
     }
-    main.append(el('p', { class: 'eyebrow' }, icon('plan'), 'Plan'), el('h2', { dir: 'auto' }, d.title), el('p', { dir: 'auto' }, d.about ?? ''));
+    main.append(el('p', { class: 'eyebrow' }, icon('plan'), ['Plan', d.project, `Planning agent${d.filed ? `, ${when(d.filed)}` : ''}`].filter(Boolean).join(' · ')), el('h2', { dir: 'auto' }, d.title), el('p', { dir: 'auto' }, d.about ?? ''));
     if (!saved) main.append(el('iframe', { class: 'plan-view', src: url, title: `Plan: ${d.title}`, sandbox: 'allow-scripts' }),
       el('p', { class: 'plan-summary' }, icon('plan'), `${plural(d.sections.length, 'section')} to approve or change, and ${plural(d.decisions.length, 'decision')} to make. Nothing is built until you send back.`));
     main.append(el('h2', {}, saved ? 'What you sent' : 'The plan'), saved ? '' : el('p', { class: 'meta' }, 'Approve or change each part. A change needs a note, an approval can carry a comment, and a decision takes an option or your own words.'));
     d.sections.forEach((s, i) => {
       const card = el('section', { class: 'plan-section', id: `plan-section-${s.id}`, 'aria-label': s.heading });
-      const approve = el('button', { class: 'approve', 'aria-label': `Approve, ${s.heading}` }, 'Approve');
-      const change = el('button', { class: 'change', 'aria-label': `Change, ${s.heading}` }, 'Change');
+      const approve = el('button', { class: 'approve', 'aria-label': `Approve, ${s.heading}` }, glyph('check'), 'Approve'), badge = el('span', { class: 'num', 'aria-hidden': 'true' }, String(i + 1));
+      const change = el('button', { class: 'change', 'aria-label': `Change, ${s.heading}` }, glyph('pencil'), 'Change');
       const field = el('textarea', { id: `plan-note-${s.id}`, maxlength: '500', placeholder: 'Write your note for the agent' });
       field.value = notes.get(s.id)?.note ?? '';
       field.disabled = ro;
@@ -1372,7 +1383,8 @@
         const verdict = notes.get(s.id)?.verdict;
         card.dataset.verdict = verdict ?? '';
         approve.setAttribute('aria-pressed', verdict === 'approve');
-        approve.textContent = verdict === 'approve' ? '✓ Approved' : 'Approve';
+        approve.replaceChildren(glyph('check'), verdict === 'approve' ? 'Approved' : 'Approve');
+        badge.replaceChildren(verdict === 'approve' ? glyph('check') : verdict === 'change' ? glyph('pencil') : String(i + 1));
         change.setAttribute('aria-pressed', verdict === 'change');
         approve.disabled = change.disabled = ro;
         caption.textContent = verdict === 'approve' ? `Comment for the agent on ${s.heading.toLowerCase()} (optional)` : `What should change in ${s.heading.toLowerCase()}?`;
@@ -1384,7 +1396,7 @@
         remember(); draw(); if (n) field.focus();
       });
       field.oninput = () => { notes.set(s.id, { section: s.id, verdict: notes.get(s.id)?.verdict ?? 'change', note: field.value }); remember(); draw(); };
-      card.append(el('h3', { dir: 'auto' }, `${i + 1}. ${s.heading}`), el('p', { dir: 'auto' }, s.body), el('div', { class: 'plan-verdicts', role: 'group', 'aria-label': s.heading }, approve, change), note);
+      card.append(el('h3', { dir: 'auto' }, badge, s.heading), el('p', { dir: 'auto' }, s.body), el('div', { class: 'plan-verdicts', role: 'group', 'aria-label': s.heading }, approve, change), note);
       main.append(card); draw();
     });
     if (d.decisions.length) main.append(el('h2', {}, 'Decisions for you'));
