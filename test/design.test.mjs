@@ -1285,8 +1285,10 @@ test('Decide on a phone: the Undo toast sits above the sticky bar and never cove
   mkdirSync(dir);
   const abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l })), why = 'The release needs one calm day. '.repeat(140);
   writeFileSync(file, JSON.stringify({ schema: 2, items: [
-    { key: 'alpha', title: 'Alpha question?', why, options: abc, recommend_value: 'a' },
+    // The board reads newest first, so the queue answers alpha, then beta, then the short gamma.
+    { key: 'gamma', title: 'Gamma question?', why: 'One calm day.', options: abc, recommend_value: 'c' },
     { key: 'beta', title: 'Beta question?', why, options: abc, recommend_value: 'b' },
+    { key: 'alpha', title: 'Alpha question?', why, options: abc, recommend_value: 'a' },
   ] }));
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
@@ -1301,6 +1303,14 @@ test('Decide on a phone: the Undo toast sits above the sticky bar and never cove
   await until(async () => (await evaluate('location.hash')) === '#decide/beta' && (await evaluate('!document.querySelector("#toast").hidden')));
   assert.equal(await evaluate('document.querySelector("#toast").getBoundingClientRect().bottom <= document.querySelector(".decide-bar").getBoundingClientRect().top'), true);
   assert.equal(await evaluate('(() => { const r = document.querySelector(".decide-bar .answer").getBoundingClientRect(); return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest(".answer") != null; })()'), true);
+  await evaluate('document.querySelector(".decide-bar .answer").click()');
+  await until(async () => (await evaluate('location.hash')) === '#decide/gamma' && (await evaluate('!document.querySelector("#toast").hidden')));
+  // Whatever the ask's height - here shorter than the phone, then taller - the bar keeps one band and the toast one above it.
+  for (const words of ['One calm day.', why.slice(0, 200), why.slice(0, 1400), why]) {
+    await evaluate(`document.querySelector('.decide .why').textContent = ${JSON.stringify(words)}`);
+    assert.equal(await evaluate('(() => { const b = document.querySelector(".decide-bar").getBoundingClientRect(), t = document.querySelector("#toast"), r = t.getBoundingClientRect(); return !t.hidden && Math.abs(b.bottom - (innerHeight - 66)) <= 1 && r.bottom <= b.top; })()'), true);
+    assert.equal(await evaluate('(() => { const r = document.querySelector(".decide-bar .answer").getBoundingClientRect(); return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest(".answer") != null; })()'), true);
+  }
   close();
   proc.kill();
 });

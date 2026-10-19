@@ -295,7 +295,8 @@
   .pick-option[aria-pressed="true"]::before { content: none; }
   .pick-option[aria-pressed="true"] .check { visibility: visible; }
   .silent-line { margin: 1.25rem 0; color: var(--muted); }
-  .decide-bar { position: sticky; bottom: calc(4.125rem + env(safe-area-inset-bottom)); z-index: 1; display: flex; align-items: center; gap: .5rem; margin: 1rem -1.25rem 0; padding: .75rem 1.25rem; background: var(--bg); }
+  .decide-bar { position: fixed; z-index: 1; left: 0; right: 0; bottom: calc(4.125rem + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: .5rem;
+    padding: .75rem max(1.25rem, env(safe-area-inset-right)) .75rem max(1.25rem, env(safe-area-inset-left)); background: var(--bg); }
   .decide-bar .answer { flex: 1; background: var(--action); color: var(--on-accent); }
   .decide-bar .later { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0 0.75rem; color: var(--accent); background: transparent; }
   .decide-bar .skip { color: var(--muted); background: transparent; }
@@ -1233,7 +1234,7 @@
     }
     main.append(el('p', { class: 'eyebrow' }, icon('plan'), 'Plan'), el('h2', { dir: 'auto' }, d.title), el('p', { dir: 'auto' }, d.about ?? ''));
     if (!saved) main.append(el('iframe', { class: 'plan-view', src: url, title: `Plan: ${d.title}`, sandbox: 'allow-scripts' }),
-      el('p', { class: 'plan-summary' }, icon('plan'), `${d.sections.length} sections to approve or change, and ${d.decisions.length} decisions to make. Nothing is built until you send back.`));
+      el('p', { class: 'plan-summary' }, icon('plan'), `${plural(d.sections.length, 'section')} to approve or change, and ${plural(d.decisions.length, 'decision')} to make. Nothing is built until you send back.`));
     main.append(el('h2', {}, saved ? 'What you sent' : 'The plan'), saved ? '' : el('p', { class: 'meta' }, 'Approve or change each part. A change needs a note, an approval can carry a comment, and a decision takes an option or your own words.'));
     d.sections.forEach((s, i) => {
       const card = el('section', { class: 'plan-section', id: `plan-section-${s.id}`, 'aria-label': s.heading });
