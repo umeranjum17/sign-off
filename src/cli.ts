@@ -30,8 +30,8 @@ const AGENTS: Record<string, { bin: string; dir: string; home: string }> = {
   'gemini-cli': { bin: 'gemini', dir: '.agents/skills', home: join(homedir(), '.gemini', 'skills') },
 };
 const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
-commands[17]:
-  (none)=list, raise, post, answers, wait, poll, open, status, stop, serve, export, init, report, signin, doctor, validate, help
+commands[18]:
+  (none)=list, raise, post, answers, wait, poll, open, status, stop, serve, export, init, report, signin, doctor, notify, validate, help
 board: the nearest .sign-off/ board (the walk's bounds and SIGN_OFF_HOME: README, "Test runs never touch your board"), else ~/.sign-off/decisions.json; a board file given always wins
 flags: --full and --json on list, answers and wait, --events on wait, --json on status, --filer on post, raise and wait, --help on every command, -v/--version
 examples:
@@ -289,6 +289,19 @@ It opens from disk with no server and makes no network request. --out defaults t
 examples:
   sign-off-axi export
   sign-off-axi export ./decisions.json --out ~/board-12-oct.html
+`,
+  notify: `usage: sign-off-axi notify [check|test] [dir]
+Device notifications are off until the config.yaml beside the board has a notify: block. For the muxr receiver it is:
+  notify:
+    receiver: muxr
+    link_base: https://my-machine.my-tailnet.ts.net:4410/   (https or a tailnet address, so the link opens on the iPad)
+    url: http://127.0.0.1:8793/v1/notify                    (optional: this is the default)
+The token is read at send time from the file <MUXR_HOME>/notify-token (default ~/.muxr/notify-token), never kept in the config.
+check (the default): says whether notifications are off, misconfigured, waiting on the token file, or ready. It sends nothing.
+test: sends one real "sign-off test" notice now and says plainly what happened (sent, no token file, token refused, receiver not running).
+examples:
+  sign-off-axi notify
+  sign-off-axi notify test
 `,
   doctor: `usage: sign-off-axi doctor [dir]
 Checks the repo setup init wrote: node version, config, board file, answer files, a lock a crashed command left behind, gitignore lines, folders, whether the dashboard port is free,
@@ -1368,9 +1381,9 @@ function readSetup(so: string) {
   readFileSync(join(so, 'config.yaml'), 'utf8').split(/\r?\n/).forEach((l, n) => {
     // The notify block's indented lines keep their # , and } characters: only a # after a space starts a comment.
     if (inNotify && (!l.trim() || /^\s/.test(l))) {
-      const text = l.replace(/(^|\s+)#.*$/, '').trim(), field = text.match(/^(url|token_env|link_base)\s*:\s*(.+)$/);
+      const text = l.replace(/(^|\s+)#.*$/, '').trim(), field = text.match(/^(url|token_env|link_base|receiver)\s*:\s*(.+)$/);
       if (field) notify[field[1]] = field[2].replace(/^(['"])(.*)\1$/, '$2');
-      else if (text) problems.push(`line ${n + 1} is not one "url", "token_env" or "link_base" line under notify`);
+      else if (text) problems.push(`line ${n + 1} is not one "receiver", "url", "token_env" or "link_base" line under notify`);
       return;
     }
     inNotify = false;
@@ -1395,15 +1408,29 @@ function readSetup(so: string) {
   const bind = config.bind ?? '127.0.0.1';
   if (!privateBind(bind)) problems.push(`bind ${bind} is not 127.0.0.1 or a private address`);
   const parsed = (u?: string) => { try { return new URL(u ?? ''); } catch { return undefined; } };
+  const muxr = notify.receiver?.toLowerCase() === 'muxr';
+  if (notifyBlock && notify.receiver && !muxr) problems.push('notify receiver must be muxr, or leave the receiver line out');
+  if (muxr) notify.url ??= MUXR_URL;
   const sendTo = parsed(notify.url), base = parsed(notify.link_base);
   const usable = !!sendTo && !!base && (sendTo.protocol === 'https:' || (sendTo.protocol === 'http:' && (loopback(sendTo.hostname.replace(/^\[|\]$/g, '')) || sendTo.hostname === 'localhost')))
     && ['http:', 'https:'].includes(base.protocol) && (notify.token_env === undefined || /^[A-Za-z_]\w*$/.test(notify.token_env));
   if (notifyBlock && !usable) problems.push('notify needs url (https://, or http:// on this machine) and link_base (http:// or https://) lines, and token_env must name an environment variable');
+  // A phone or iPad opens the link, so a muxr notice's link is https or a tailnet address: 127.0.0.1 or a LAN name would be dead there.
+  const reachable = !!base && (base.protocol === 'https:' || /\.ts\.net$/i.test(base.hostname) || (isIP(base.hostname) === 4 && /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(base.hostname)));
+  if (notifyBlock && usable && muxr && !reachable) problems.push('notify link_base must be https:// or a tailnet address (a .ts.net name or 100.x address) so the link opens on the iPad');
   return { board: join(so, goodBoard ? config.board : 'decisions.json'), port: goodPort ? Number(port) : 4410, bind, hosts, onAnswer, goodBoard, problems,
-    notify: notifyBlock && usable ? { url: notify.url, token_env: notify.token_env, link_base: notify.link_base } : undefined };
+    notify: notifyBlock && usable && (!muxr || reachable) ? { url: notify.url, token_env: notify.token_env, link_base: notify.link_base, muxr } : undefined };
 }
 
-const NOTIFY_SENDER = `void (async()=>{const delays=[2000,10000,60000];for(let i=0;i<4;i++){try{if((await fetch(process.env.SIGN_OFF_NOTIFY_URL,{method:'POST',headers:{'content-type':'application/json',...(process.env.SIGN_OFF_NOTIFY_TOKEN&&{authorization:'Bearer '+process.env.SIGN_OFF_NOTIFY_TOKEN})},body:process.env.SIGN_OFF_NOTIFY_BODY,signal:AbortSignal.timeout(10000)})).ok)return}catch{}if(i<3)await new Promise(r=>setTimeout(r,delays[i]))}require('node:fs').appendFileSync(process.env.SIGN_OFF_NOTIFY_LOG,new Date().toISOString()+' notification send failed for card '+process.env.SIGN_OFF_NOTIFY_ID+'\\n')})();`;
+const MUXR_URL = 'http://127.0.0.1:8793/v1/notify';
+type Notify = { url: string; token_env?: string; link_base: string; muxr: boolean };
+/** The muxr receiver's token file, read at send time and never stored: <MUXR_HOME>/notify-token, MUXR_HOME defaulting to ~/.muxr. */
+const muxrTokenFile = () => join(process.env.MUXR_HOME || join(homedir(), '.muxr'), 'notify-token');
+/** Why a notice cannot be sent yet, in plain words; undefined when its token is there. */
+const tokenMissing = (n: Notify) => n.muxr
+  ? (() => { try { return readFileSync(muxrTokenFile(), 'utf8').trim() ? undefined : `${tilde(muxrTokenFile())} is empty`; } catch { return `${tilde(muxrTokenFile())} is not there yet (the muxr host writes it when it updates)`; } })()
+  : n.token_env && !process.env[n.token_env] ? `${n.token_env} is not set` : undefined;
+const NOTIFY_SENDER = `void (async()=>{const delays=[2000,10000,60000],f=process.env.SIGN_OFF_NOTIFY_TOKEN_FILE;for(let i=0;i<4;i++){try{const t=f?require('node:fs').readFileSync(f,'utf8').trim():process.env.SIGN_OFF_NOTIFY_TOKEN;if((await fetch(process.env.SIGN_OFF_NOTIFY_URL,{method:'POST',headers:{'content-type':'application/json',...(t&&{authorization:'Bearer '+t})},body:process.env.SIGN_OFF_NOTIFY_BODY,signal:AbortSignal.timeout(10000)})).ok)return}catch{}if(i<3)await new Promise(r=>setTimeout(r,delays[i]))}require('node:fs').appendFileSync(process.env.SIGN_OFF_NOTIFY_LOG,new Date().toISOString()+' notification send failed for card '+process.env.SIGN_OFF_NOTIFY_ID+'\\n')})();`;
 
 /** The cards waiting on the user before a write: a card waiting after the write but not before it has entered Waiting on you. */
 function waitingKeys(file: string) {
@@ -1416,7 +1443,7 @@ function waitingKeys(file: string) {
 function notifyEntered(file: string, named: string, before: Set<string> | undefined) {
   try {
     const so = dirname(named), notify = before ? readSetup(so).notify : undefined;
-    if (!before || !notify || (notify.token_env && !process.env[notify.token_env])) return;
+    if (!before || !notify || tokenMissing(notify)) return;
     const { items } = readItems(file), fresh = board(file, () => {}).filter((d) => waits(d) && !before.has(d.key) && !items.some((i) => i?.key === d.key && i.announced));
     if (!fresh.length) return;
     const at = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
@@ -1426,13 +1453,18 @@ function notifyEntered(file: string, named: string, before: Set<string> | undefi
   } catch {}
 }
 
-function sendNotice(so: string, notify: { url: string; token_env?: string; link_base: string }, d: Decision) {
-  const token = notify.token_env ? process.env[notify.token_env] : undefined;
+/** The JSON one card sends: sign-off's own shape, or muxr's {title (1-80 chars), body, url, id}. */
+function noticeBody(notify: Notify, d: Decision) {
   const kind = d.kind ?? ({ decision: 'ask', explainer: d.options.length ? 'ask' : 'report' } as Record<string, string>)[d.type] ?? d.type;
-  const body = JSON.stringify({ v: 1, source: 'sign-off', id: d.key, kind: ['ask', 'plan', 'design', 'evidence', 'report'].includes(kind) ? kind : 'ask',
-    title: [...d.title].slice(0, 120).join(''), text: [...(d.about ?? d.detail ?? d.why ?? d.title).replace(/[\r\n]+/g, ' ')].slice(0, 200).join(''),
-    url: `${notify.link_base.replace(/\/$/, '')}#waiting/${encodeURIComponent(d.key)}`, at: d.filed ?? new Date().toISOString() });
-  const child = spawn(process.execPath, ['-e', NOTIFY_SENDER], { detached: true, stdio: 'ignore', env: { ...process.env, SIGN_OFF_NOTIFY_URL: notify.url, SIGN_OFF_NOTIFY_BODY: body, SIGN_OFF_NOTIFY_TOKEN: token ?? '', SIGN_OFF_NOTIFY_ID: d.key, SIGN_OFF_NOTIFY_LOG: join(so, 'notify.log') } });
+  const text = [...(d.about ?? d.detail ?? d.why ?? d.title).replace(/[\r\n]+/g, ' ')].slice(0, 200).join(''), url = `${notify.link_base.replace(/\/$/, '')}#waiting/${encodeURIComponent(d.key)}`;
+  if (notify.muxr) return { title: [...d.title].slice(0, 80).join('') || d.key, body: text, url, id: d.key };
+  return { v: 1, source: 'sign-off', id: d.key, kind: ['ask', 'plan', 'design', 'evidence', 'report'].includes(kind) ? kind : 'ask',
+    title: [...d.title].slice(0, 120).join(''), text, url, at: d.filed ?? new Date().toISOString() };
+}
+
+function sendNotice(so: string, notify: Notify, d: Decision) {
+  const token = notify.token_env ? process.env[notify.token_env] : undefined;
+  const child = spawn(process.execPath, ['-e', NOTIFY_SENDER], { detached: true, stdio: 'ignore', env: { ...process.env, SIGN_OFF_NOTIFY_URL: notify.url, SIGN_OFF_NOTIFY_BODY: JSON.stringify(noticeBody(notify, d)), SIGN_OFF_NOTIFY_TOKEN: notify.muxr ? '' : token ?? '', SIGN_OFF_NOTIFY_TOKEN_FILE: notify.muxr ? muxrTokenFile() : '', SIGN_OFF_NOTIFY_ID: d.key, SIGN_OFF_NOTIFY_LOG: join(so, 'notify.log') } });
   child.on('error', () => warn(`notification sender could not start for card ${d.key}`));
   child.unref();
 }
@@ -1512,6 +1544,31 @@ function report(args: string[]) {
   ]);
 }
 
+/** `notify check|test`: whether device notifications can work from this setup, and one real test notice. Never prints the token. */
+async function notify(args: string[]) {
+  const mode = ['check', 'test'].includes(args[0]) ? args.shift() : 'check';
+  const { dir: folder, given } = repoDir('notify', args), dir = given ? folder : setupFolderHere() ?? folder, so = join(dir, '.sign-off');
+  let setup;
+  try { setup = readSetup(so); } catch { throw fail(`no readable config.yaml in ${tilde(so)}`, 'NOT_FOUND', `Run \`sign-off-axi init ${shellPath(dir)}\``); }
+  const config = shellPath(join(so, 'config.yaml'));
+  if (setup.problems.some((p) => p.startsWith('notify')))
+    throw fail(`the notify: block in ${tilde(join(so, 'config.yaml'))} cannot be used: ${setup.problems.filter((p) => p.startsWith('notify')).join('; ')}`, 'VALIDATION_ERROR', `Edit ${config}, then run \`sign-off-axi notify\` again`);
+  const n = setup.notify;
+  if (!n) return toon({ notifications: 'off' }, [`Ask the user once whether they want device notifications; if yes, add \`notify:\`, \`  receiver: muxr\` and \`  link_base: <the board's https or tailnet address>\` lines to ${config}`]);
+  const why = tokenMissing(n);
+  if (why) throw fail(`notifications are on but cannot send: ${why}`, 'NOT_FOUND', n.muxr ? 'Update the muxr host so it writes its notify-token file, then run `sign-off-axi notify test`' : `Export ${n.token_env} with the receiver's token`);
+  if (mode === 'check') return toon({ notifications: 'on', receiver: n.muxr ? 'muxr' : 'webhook', url: n.url, link_base: n.link_base, token: n.muxr ? tilde(muxrTokenFile()) : `$${n.token_env ?? '(none)'}` }, ['Run `sign-off-axi notify test` to send one real test notice']);
+  const probe = { key: 'sign-off-test', title: 'sign-off test', about: 'Device notifications from sign-off work.', type: 'decision', options: [] } as unknown as Decision;
+  let status: number;
+  try {
+    const token = n.muxr ? readFileSync(muxrTokenFile(), 'utf8').trim() : n.token_env ? process.env[n.token_env] : undefined;
+    status = (await fetch(n.url, { method: 'POST', headers: { 'content-type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) }, body: JSON.stringify(noticeBody(n, probe)), signal: AbortSignal.timeout(10000) })).status;
+  } catch { throw fail(`nothing answered at ${n.url}`, 'NOT_FOUND', n.muxr ? 'Start the muxr host on this machine, then run `sign-off-axi notify test` again' : 'Check the url: line, then run `sign-off-axi notify test` again'); }
+  if ([401, 403].includes(status)) throw fail(`the receiver refused the token (HTTP ${status})`, 'VALIDATION_ERROR', n.muxr ? `Check that ${tilde(muxrTokenFile())} holds the token the muxr host expects` : `Check ${n.token_env}`);
+  if (status >= 300) throw fail(`the receiver answered HTTP ${status}, so the test notice was not accepted`, 'VALIDATION_ERROR', 'Check the receiver is the notification endpoint');
+  return toon({ notifications: 'on', test: 'sent', http: status }, ['Check the device for the "sign-off test" notice']);
+}
+
 async function doctor(args: string[]) {
   const { dir: folder, given } = repoDir('doctor', args), dir = given ? folder : setupFolderHere() ?? folder, so = join(dir, '.sign-off'), rerun = `sign-off-axi init ${shellPath(dir)}`;
   const checks: { name: string; ok: string; fix?: string }[] = [];
@@ -1554,7 +1611,8 @@ async function doctor(args: string[]) {
         ({ board, port } = setup);
         if (!setup.problems.length) check('config', `board ${basename(board)}, port ${port}`);
         else check('config', `${basename(config)}: ${setup.problems.join('; ')}`, `Edit ${shellPath(config)} to hold "board: <name>.json", "port: <0-65535>" and "bind: <127.0.0.1 or a private address>" lines, such as board: decisions.json, port: 4410 and bind: 127.0.0.1, and hosts: only DNS names${setup.goodBoard ? '' : `, or delete it and run \`${rerun}\``}`);
-        if (setup.notify?.token_env && !process.env[setup.notify.token_env]) check('notify', `${setup.notify.token_env} is not set, so no notice is sent`, `Export ${setup.notify.token_env} with the receiver's token`);
+        const why = setup.notify && tokenMissing(setup.notify);
+        if (setup.notify && why) check('notify', `${why}, so no notice is sent`, setup.notify.muxr ? 'Update the muxr host so it writes its notify-token file, then run `sign-off-axi notify test`' : `Export ${setup.notify.token_env} with the receiver's token`);
         // A hosts: name is only of use when it leads to the bind address.
         const astray: string[] = [];
         for (const h of setup.hosts) {
@@ -2238,7 +2296,7 @@ await runAxiCli({
   topLevelHelp: TOP_HELP,
   getCommandHelp: (cmd) => HELP[cmd],
   home: axi('list', list),
-  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), report: axi('report', report), signin: axi('signin', signin), doctor: axi('doctor', doctor), validate, help: ([name, ...rest]) => {
+  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), report: axi('report', report), signin: axi('signin', signin), doctor: axi('doctor', doctor), notify: axi('notify', notify), validate, help: ([name, ...rest]) => {
     if (rest.length || (name && !HELP[name])) throw fail(`unknown command or argument: ${[name, ...rest].join(' ')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi --help` to see the commands');
     return name ? HELP[name] : TOP_HELP;
   } },

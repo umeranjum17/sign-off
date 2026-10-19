@@ -23,3 +23,13 @@ A card is announced once; the card keeps the record (`announced` on its item in 
 3. Post one more new card and check its POST does arrive, so the run proves silence, not a stopped sender.
 
 Keep the receiver capture and CLI transcript outside the repository; never capture a token or full URL query.
+
+## muxr receiver
+
+`receiver: muxr` in the `notify:` block sends muxr's contract: POST `{title (1-80), body, url, id}` with `Authorization: Bearer <token>` read at send time from `<MUXR_HOME>/notify-token`.
+
+1. Point `MUXR_HOME` at a temp folder with no token file, add `receiver: muxr`, `url: http://127.0.0.1:<fake port>/v1/notify` and `link_base: https://<name>.ts.net/` to the config, then run `sign-off-axi notify` and `notify test`: each says the token file is not there yet, in plain words, and the receiver gets nothing.
+2. Write a throwaway token to `$MUXR_HOME/notify-token`, run `notify test`, post a card: the receiver gets the exact four keys and the Bearer header; nothing prints the token.
+3. A `link_base` of `http://127.0.0.1:...` is refused by `notify` (it will not open on the iPad). A config with no `notify:` makes `notify` print `notifications: off`.
+
+Never touch the real `~/.muxr`; use a fake receiver and a temp token.
