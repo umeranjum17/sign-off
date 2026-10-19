@@ -814,7 +814,7 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   assert.match(home, /<h2>Needs you first<\/h2><p class="meta since">Waiting since 09:15<\/p><article class="row design" id="item-look">/);
   // Summary has the person's mark beside its title, then the glance lines with the oldest ask's time (the design ask has none), and the Waiting on you tile's count.
   assert.match(home, /<h1 tabindex="-1">Summary<\/h1><span class="icon i-you" aria-hidden="true">/);
-  assert.match(home, /<p class="card glance"><b>2 asks need you\. <\/b><span>Oldest since 09:15\. <\/span>/);
+  assert.match(home, /<p class="card glance">(?:<span class="seen">[^<]*<\/span>)?<b>2 asks need you\. <\/b><span>Oldest since 09:15\. <\/span>/);
   assert.match(home, /<a class="tile i-waiting" href="#waiting" aria-label="Waiting on you, 2">.*?<span class="n">2<\/span>/s);
   // An ask dismissed from Waiting on you sits under Dismissed (1) at the end of Needs you first and of Waiting on you, with Restore.
   const gone = file.replace(/\.json$/, '.dismissed.jsonl');
@@ -878,7 +878,7 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   writeFileSync(file.replace(/\.json$/, '.answers.jsonl'), ['ship', 'look'].map((key) => JSON.stringify({ key, answer: 'a', label: 'A', close: 'done', at: new Date().toISOString() })).join('\n') + '\n');
   // Once both are answered, the Answered tile counts both, Waiting on you none, and the glance says so.
   const after = await dump('');
-  assert.match(after, /<p class="card glance"><b>Nothing is waiting on you\. <\/b>(?:(?!<\/p>).)*<span>2 answered today\. <\/span><\/p>/);
+  assert.match(after, /<p class="card glance">(?:<span class="seen">[^<]*<\/span>)?<b>Nothing is waiting on you\. <\/b>(?:(?!<\/p>).)*<span>2 answered today\. <\/span><\/p>/);
   assert.match(after, /aria-label="Answered, 2">.*?<span class="n">2<\/span>/s);
   const answered = await dump('#answered');
   assert.match(answered, /<p class="lede">2 answered today\.<\/p><\/header><div class="sec-head"><h2>Done today<\/h2><button class="clear">Clear all done<\/button><\/div>/);

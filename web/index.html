@@ -50,6 +50,19 @@
   /* Summary: a few lines at a glance, a tile per area (each opens its screen) with its count large, what needs you first, the day so far, then a short list per area. */
   .glance { margin: 0 0 0.75rem; padding: 1.25rem; color: var(--muted); font-size: 1.1875rem; line-height: 1.45; }
   .glance b { color: var(--text); font-weight: 500; }
+  .glance .seen { display: block; margin-bottom: 0.625rem; font-size: 0.9375rem; line-height: 1.3; }
+  /* Proven today swipes on a phone, a card a time; New report is one hero card, its picture above the words on a phone and beside them on a desk. */
+  .ev-scroll-row { display: flex; gap: 0.75rem; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -1.25rem; padding: 0 1.25rem 0.25rem; scrollbar-width: none; }
+  .ev-scroll-row::-webkit-scrollbar { display: none; }
+  .ev-scroll-row .ev-card { flex: none; width: 15.5rem; scroll-snap-align: start; }
+  .rp-card { display: flex; flex-direction: column; overflow: hidden; border-radius: 1rem; background: var(--surface); color: inherit; text-decoration: none; }
+  .rp-art { display: grid; place-items: center; aspect-ratio: 16 / 9; background: var(--sunk); overflow: hidden; }
+  .rp-art .thumb { width: 100%; height: 100%; object-fit: contain; }
+  .rp-art .icon { background: none; width: 3rem; height: 3rem; } .rp-art .icon svg { width: 2.5rem; height: 2.5rem; stroke: var(--muted); }
+  .rp-body { display: flex; flex-direction: column; gap: 0.375rem; padding: 1rem 1.125rem 1.25rem; }
+  .rp-eyebrow { color: var(--c-reports); font-size: 0.9375rem; font-weight: 600; }
+  .rp-title { font-size: 1.3125rem; line-height: 1.24; font-weight: 700; letter-spacing: 0.005em; }
+  .rp-about { color: var(--muted); font-size: 1.0625rem; line-height: 1.47; }
   .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
   .card, .tile { background: var(--surface); border-radius: 1rem; }
   .card { padding: 1rem; }
@@ -595,6 +608,13 @@
     .date { font-size: 1.1875rem; }
     .pair { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
     .areas { grid-template-columns: 1fr 1fr; align-items: start; }
+    .areas > .wide { grid-column: 1 / -1; }
+    .ev-scroll-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; margin: 0; padding: 0; overflow: visible; }
+    .ev-scroll-row .ev-card { width: auto; }
+    .rp-card { flex-direction: row; border-radius: 1.125rem; }
+    .rp-art { width: 46%; aspect-ratio: auto; min-height: 16rem; }
+    .rp-body { flex: 1; justify-content: center; padding: 2rem; }
+    .rp-title { font-size: 1.75rem; line-height: 1.15; }
     .plan-preview { height: 20rem; }
     .plan-preview .rung .frame, .plan-preview .rung iframe { min-height: 0; }
     .plan-copy { padding: 2rem; }
@@ -624,6 +644,12 @@
   // Typed notes not yet sent, kept across re-renders and reloads in this browser, per board file.
   const drafts = new Map(), stored = () => `sign-off-drafts ${state.file}`;
   const keep = () => { try { localStorage.setItem(stored(), JSON.stringify([...drafts])); } catch {} };
+  // When the viewer last left the board, kept in this browser per board file; read once, so the Summary says "since you last looked" for the whole visit.
+  const seenKey = () => `sign-off-seen ${state.file}`;
+  let lastSeen;
+  const leave = () => { try { if (state.file && !FROZEN) localStorage.setItem(seenKey(), new Date().toISOString()); } catch {} };
+  addEventListener('pagehide', leave);
+  addEventListener('visibilitychange', () => document.hidden && leave());
   let loaded = false;
   // Text goes in as text nodes, never as HTML, so a title from the file can't run code.
   const el = (tag, attrs = {}, ...kids) => {
@@ -1224,7 +1250,8 @@
     const lines = [[n ? `${n} ${n === 1 ? 'ask needs' : 'asks need'} you.` : 'Nothing is waiting on you.', 1], [oldest && `Oldest since ${when(oldest)}.`],
       [by.evidence.length && `${plural(by.evidence.length, 'evidence update')} to see.`, 1], [newest && `Newest: Update ${newest.number}.`], [by.designs.length && `${plural(by.designs.length, 'design')} to review.`],
       [by.reports.length && `${plural(by.reports.length, 'report')} to read.`], [`${fresh} answered today.`]];
-    return el('p', { class: 'card glance' }, ...lines.filter(([t]) => t).map(([t, strong]) => el(strong ? 'b' : 'span', {}, `${t} `)));
+    if (lastSeen === undefined) try { lastSeen = localStorage.getItem(seenKey()); } catch { lastSeen = null; }
+    return el('p', { class: 'card glance' }, lastSeen && !Number.isNaN(Date.parse(lastSeen)) ? el('span', { class: 'seen' }, `Since you last looked at ${when(lastSeen)}`) : '', ...lines.filter(([t]) => t).map(([t, strong]) => el(strong ? 'b' : 'span', {}, `${t} `)));
   }
 
   /** The day so far: a mark per answer on a line of hours, and the list of them. Only answers have a place on it; an item's `filed` time is not shown here.
@@ -1245,6 +1272,24 @@
       el('div', { class: 'hours', 'aria-hidden': 'true' }, ...hours.map((h) => el('span', {}, h))),
       el('ol', { class: 'events' }, ...fresh.slice(0, SHOWN).map((e) => el('li', { dir: 'auto' }, el('time', {}, hhmm(e.t)), `${title(e.d)} · ${state.answers[e.d.key].label}`))),
       done.length > SHOWN ? el('p', { class: 'meta' }, `and ${done.length - SHOWN} earlier`) : '');
+  }
+
+  /** Proven today on the Summary: a swipeable row of today's passed updates, each with its capture; a wide screen sets them three across. */
+  function proven(items) {
+    const fresh = items.filter((d) => d.type === 'evidence' && d.filed && isToday(d.filed));
+    return el('section', { class: 'i-evidence wide' }, el('div', { class: 'sec-head' }, el('h2', {}, 'Proven today'), items.length ? el('a', { href: '#evidence' }, 'See all') : ''),
+      fresh.length ? el('div', { class: 'ev-scroll-row' }, ...fresh.slice(0, 3).map(evCard)) : el('p', { class: 'empty' }, 'Nothing proven today yet.'));
+  }
+  /** New report on the Summary: the newest report as one hero card, its picture, who and when, its title and what it says. */
+  function newReport(items) {
+    const d = [...items].sort((x, y) => Date.parse(y.filed ?? 0) - Date.parse(x.filed ?? 0))[0];
+    if (!d) return section('reports', items);
+    const fresh = d.filed && isToday(d.filed), img = pic(d);
+    const link = el('a', { class: 'rp-card', href: reads(d) ? `#reports/${d.key}` : '#reports' }, el('span', { class: 'rp-art' }, img ? thumb('reports', img) : icon('reports')),
+      el('span', { class: 'rp-body' }, el('span', { class: 'rp-eyebrow' }, [fresh ? 'New' : 'Latest', d.filed ? (fresh ? hhmm(d.filed) : day(d.filed)) : ''].filter(Boolean).join(' · ')),
+        el('span', { class: 'rp-title', dir: 'auto' }, title(d)), d.about ? el('span', { class: 'rp-about', dir: 'auto' }, d.about) : ''));
+    link.onclick = () => (jump = d.key);
+    return el('section', { class: 'i-reports wide' }, el('div', { class: 'sec-head' }, el('h2', {}, fresh ? 'New report' : 'Latest report'), el('a', { href: '#reports' }, items.length > 1 ? `See all ${items.length}` : 'Open')), link);
   }
 
   /** A short row's second line: what changed, unless the headline already says it. */
@@ -1783,7 +1828,7 @@
         ...(by.reports.length ? reportGroups(by.reports) : [el('p', { class: 'empty' }, EMPTY.reports)]), notes(by.notes)] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [at === 'waiting' ? filters(by.waiting) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...(at === 'waiting' ? shown : by[at]).map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [glance(by), el('div', { class: 'tiles' }, ...Object.keys(AREAS).map((a) => tile(a, by[a]))),
       el('div', { class: 'pair' }, needs, today(by.answered)), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()]),
-      el('div', { class: 'areas' }, ...Object.keys(AREAS).map((a) => section(a, by[a])))]));
+      el('div', { class: 'areas' }, ...Object.keys(AREAS).map((a) => (a === 'evidence' ? proven(by[a]) : a === 'reports' ? newReport(by[a]) : section(a, by[a]))))]));
     readPage(key ? state.decisions.find((d) => d.key === key && !gone.has(d.key) && (at === 'reports' && reads(d) || at === 'designs' && d.kind === 'design' || at === 'evidence' && d.type === 'evidence' || d.type === 'plan' && area(d) === at)) : undefined, at);
     if (FROZEN) freeze();
   }
