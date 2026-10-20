@@ -174,8 +174,10 @@
   next to the mocks. A trailing `Open in first-draft: <label> <url> · <label> <url>`
   (what `first-draft-axi post` writes) is shown as real links under the text, outside the
   mock frames; the text before it stays the trade-off.
-- `mocks`: optional on design items, up to 6 entries of an option `value` and a
-  `path` to a mock file (`.html`, `.svg`, `.png`, `.jpg`, `.jpeg`, `.webp`, 5 MB or less), relative to the board file's folder. Each value must
+- `mocks`: optional on design items, up to 6 entries of an option `value`, a
+  `path` to a mock file (`.html`, `.svg`, `.png`, `.jpg`, `.jpeg`, `.webp`, 5 MB or less), relative to the board file's folder, and an optional `link` (http or
+  https, no spaces, 500 characters or fewer) drawn as an Open live link under that option's mock,
+  outside its sandboxed frame. Each value must
   name one of the item's own options. Served only from inside that folder. An
   `.html` path may end in `?variant=<name>` (1-64 of `A-Z a-z 0-9 . _ -`): the
   page is loaded with that query, so one page can show each variant. An `.html`

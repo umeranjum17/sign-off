@@ -558,6 +558,7 @@
   .choices.many button { flex: 1 1 auto; max-width: 100%; padding: 0.5rem 1rem; }
   .note label { display: block; color: var(--muted); font-size: 0.875rem; margin-top: 0.5rem; }
   .tradeoff { margin: 0; max-width: 70ch; }
+  .option-link { display: inline-flex; align-items: center; min-height: 2.75rem; font-size: 0.9375rem; color: var(--accent); }
   .fd-links { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0 1rem; font-size: 0.9375rem; color: var(--muted); } .fd-links a { min-height: 2.75rem; display: inline-flex; align-items: center; color: var(--accent); }
   /* Dismiss: a quiet round x at the corner of a card or the end of a row. */
   .x { flex: none; display: grid; place-items: center; width: 2.75rem; min-height: 2.75rem; padding: 0; margin: -0.5rem 0 -0.5rem auto; border: 0; border-radius: 50%;
@@ -642,7 +643,8 @@
     grid-auto-columns: min(85%, calc(var(--tall) * 9 / 19.5)); gap: 0.5rem 0.875rem; margin: -0.25rem; padding: 0.25rem 0.25rem 0.5rem;
     overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding: 0 0.25rem; }
   .mock { display: grid; grid-row: span 3; grid-template-rows: subgrid; margin: 0; min-width: 0; scroll-snap-align: start; }
-  .mock > button { grid-row: 3; }
+  .mock > button, .mock > .under { grid-row: 3; }
+  .mock .under { display: grid; align-content: start; justify-items: start; } .mock .under button { justify-self: stretch; }
   .mock:has([aria-pressed="true"]) .shot { border-color: var(--accent); }
   /* A frame draws the mock at about phone width (1.7 times the frame) at that fraction, cropped from the top. */
   .shot { position: relative; display: block; overflow: hidden; aspect-ratio: 9 / 19.5; background: #fff;
@@ -1290,7 +1292,9 @@
         el('figcaption', {}, el('span', { class: 'label', dir: 'auto' }, o.label), rec(i) ? el('span', { class: 'badge' }, 'Recommended') : ''),
         // A mock file that is gone has a null hash: the option says so in place of an empty frame.
         m && m.hash !== null ? el('a', { class: 'shot', href: url, target: '_blank', rel: 'noopener', 'aria-label': `Open mock ${o.label} full size` }, view)
-          : el('p', { class: 'shot none' }, 'No mock for this option'), buttons[i] ?? '');
+          : el('p', { class: 'shot none' }, 'No mock for this option'),
+        // The option's own link sits on the card, where a tap opens a tab: a link inside the sandboxed frame cannot.
+        m?.link ? el('div', { class: 'under' }, el('a', { class: 'option-link', href: m.link, target: '_blank', rel: 'noopener', 'aria-label': `Open ${o.label} live` }, 'Open live'), buttons[i] ?? '') : buttons[i] ?? '');
     }));
   }
 

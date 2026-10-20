@@ -178,7 +178,7 @@ Runs the board in the foreground until Ctrl-C; --port 0 picks a free port, and i
 examples:
   sign-off-axi serve --port 0
 `,
-  post: `usage: sign-off-axi post [board.json] [--type decision|design|diagram|interactive] --title "<question>" [--key <key>] [--about <text>] [--option <value>=<label>]... [--mock <value>=<path>]... [--view <path>] [--tradeoff <text>] [--recommend <value>] [--default <value>] [--close done|release] [--filer <id>]
+  post: `usage: sign-off-axi post [board.json] [--type decision|design|diagram|interactive] --title "<question>" [--key <key>] [--about <text>] [--option <value>=<label>]... [--mock <value>=<path>]... [--link <value>=<url>]... [--view <path>] [--tradeoff <text>] [--recommend <value>] [--default <value>] [--close done|release] [--filer <id>]
        sign-off-axi post [board.json] --type evidence --title "<what this shows>" --about "<short note>" --media <file>... [--link <commit or URL>] [--detail <text>] [--filer <id>]
        sign-off-axi post [board.json] --from <board file> --replace [--filer <id>]
        sign-off-axi post [board.json] --kind <kind> --from <message.json|-> [--filer <id>]
@@ -199,6 +199,7 @@ Listing --option needs --recommend <value>, on every type: the option you would 
 SIGN_OFF_FILER sets it for every command; with neither, the Claude Code session id is saved when there is one.
 --type design is a pick between up to 6 options shown side by side, each with an optional board-relative mock file
 (.html, .svg, .png, .jpg, .jpeg, .webp, 5 MB or less), a --tradeoff line and a --recommend badge.
+One --link <value>=<url> per option (http or https) draws an Open link under that option's mock, outside its sandboxed frame; the option needs a --mock.
 One .html page can hold every variant: --mock a=mocks/<key>/index.html?variant=a and so on; the page reads ?variant= to show one.
 An .html mock or view loads the css, scripts, images and fonts beside it by relative name, from its own folder only.
 After the user picks, answers --key <key> --json holds the pick and note; "rounds" holds an ask for another round.
@@ -729,11 +730,14 @@ const mockFile = (path: string) => path.split('?')[0];
 /** Posts an item. `raise` is the alias for `post --type decision`: same flags as before, same output. */
 function post(args: string[], cmd = 'post') {
   const typed: Flags = cmd === 'post' ? { replace: { type: 'boolean' }, kind: { type: 'string' }, type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
-    media: { type: 'string', multiple: true }, link: { type: 'string' }, view: { type: 'string' }, preview: { type: 'string' }, chapter: { type: 'string', multiple: true },
+    media: { type: 'string', multiple: true }, link: { type: 'string', multiple: true }, view: { type: 'string' }, preview: { type: 'string' }, chapter: { type: 'string', multiple: true },
     ...Object.fromEntries(SIGNIN_FIELDS.map((f) => [f, { type: 'string' as const }])) } : {};
   const { file, named, values, on } = parse(cmd, args, { from: { type: 'string' }, filer: { type: 'string' }, ...typed,
     ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: MANY.includes(f) }])) });
   const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'link', 'view', 'preview', 'chapter', ...SIGNIN_FIELDS].filter((f) => values[f] !== undefined);
+  // Only a design takes --link more than once (one per option); any other type keeps its one item link, the last given.
+  const optionLinks: string[] = values.link ?? [];
+  if (values.type !== 'design' && optionLinks.length) values.link = optionLinks.at(-1);
   if (values.kind !== undefined) {
     const odd = [...given, ...(values.replace ? ['replace'] : [])][0];
     if (odd) throw fail(`--kind cannot be combined with --${odd}`, 'VALIDATION_ERROR', 'Put every field in the message file: sign-off-axi post --kind ask --from ask.json');
@@ -755,7 +759,7 @@ function post(args: string[], cmd = 'post') {
   }
   if (!['decision', 'design', 'evidence', 'diagram', 'interactive', 'explainer'].includes(type)) throw fail(`--type must be decision, design, evidence, diagram, interactive, explainer, report or signin`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (type === 'evidence' || type === 'explainer') return postMedia(file, named, on, values, type, filer);
-  if (values.media !== undefined || values.link !== undefined || values.chapter !== undefined) throw fail('--media, --link and --chapter need --type evidence or explainer', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
+  if (values.media !== undefined || (type !== 'design' && values.link !== undefined) || values.chapter !== undefined) throw fail('--media, --link and --chapter need --type evidence or explainer (--link also goes on --type design, one per option)', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (type !== 'design' && (values.tradeoff !== undefined || values.mock !== undefined)) throw fail('--tradeoff and --mock need --type design', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   const view = type === 'diagram' || type === 'interactive';
   if (view !== (values.view !== undefined)) throw fail(view ? `--type ${type} needs --view <path>` : '--view needs --type diagram or interactive', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
@@ -786,8 +790,11 @@ function post(args: string[], cmd = 'post') {
     if (info && (!info.isFile() || info.size > MOCK_BYTES)) {
       throw fail(`--mock ${path} must be a file of 5 MB or less`, 'VALIDATION_ERROR', 'Shrink the mock, or point --mock at the screenshot of the variant');
     }
-    return { value: m.slice(0, at), path };
+    const value = m.slice(0, at), link = optionLinks.find((l) => l.startsWith(`${value}=`));
+    return { value, path, ...(link && { link: link.slice(value.length + 1) }) };
   });
+  const lost = optionLinks.find((l) => !mocks?.some((m: { value: string }) => l.startsWith(`${m.value}=`)));
+  if (type === 'design' && lost !== undefined) throw fail(`--link ${lost} must be <value>=<url> with a --mock for that value`, 'VALIDATION_ERROR', 'sign-off-axi post --type design --title "<question>" --option a=A --option b=B --mock a=mocks/a.html --link a=https://example.com/a --recommend a');
   return storeIncoming(file, named, on, buildIncoming(values, { type, tradeoff: values.tradeoff, mocks }, filer, file), filer);
 }
 

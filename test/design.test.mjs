@@ -564,7 +564,7 @@ test('an interactive page that posts its height gets a frame that fits it, each 
   const item = (key) => ({ key, type: 'interactive', title: key, view: `mocks/page/${key}.html` });
   const look = { key: 'look', type: 'design', title: 'look', options: ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l })), recommend_value: 'b',
     tradeoff: 'B reads best. Open in first-draft: Calm http://100.64.0.1:4430/#/o/1/play · Bold http://100.64.0.1:4430/#/o/2/play',
-    mocks: ['a', 'b', 'c'].map((value) => ({ value, path: 'mocks/page/quiet.html' })) };
+    mocks: ['a', 'b', 'c'].map((value) => ({ value, path: 'mocks/page/quiet.html', ...(value === 'b' && { link: 'https://example.com/b' }) })) };
   writeFileSync(file, JSON.stringify({ schema: 2, readonly: true, items: [...['short', 'huge', 'quiet'].map(item), look] }));
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
@@ -593,6 +593,10 @@ test('an interactive page that posts its height gets a frame that fits it, each 
     [['Calm', 'http://100.64.0.1:4430/#/o/1/play'], ['Bold', 'http://100.64.0.1:4430/#/o/2/play']]);
   assert.match(dom, /<p class="tradeoff"[^>]*><strong>Trade-off <\/strong>B reads best\.<\/p>/);
   assert.ok(figures.every((f) => !f.includes('first-draft')));
+  // An option's own link is a real anchor under its mock, outside the sandboxed frame; only B has one.
+  assert.match(figures[0], /<a class="option-link" href="https:\/\/example\.com\/b" target="_blank" rel="noopener"[^>]*>Open live<\/a>/);
+  assert.ok(figures[0].indexOf('</iframe>') < figures[0].indexOf('option-link'));
+  assert.equal(figures.filter((f) => f.includes('option-link')).length, 1);
   close();
   proc.kill();
 });

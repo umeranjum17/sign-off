@@ -3,7 +3,8 @@ import { basename, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 
 export type Option = { value: string; label: string; outcome?: string };
-export type MockRef = { value: string; path: string };
+/** An option's mock file, and an optional http(s) link to open that option live (drawn under the mock, outside its sandboxed frame). */
+export type MockRef = { value: string; path: string; link?: string };
 export type MediaRef = { path: string; sha256: string; bytes: number };
 export type Chapter = { at: number; title: string };
 export type Step = { title: string; marks?: string[]; text?: string };
@@ -76,6 +77,8 @@ const STORED: Record<string, [number, string, RegExp]> = {
 };
 export const CHAPTERS_MAX = 12;
 const isText = (v: unknown) => typeof v === 'string';
+/** An http(s) link of up to 500 characters with no spaces: an item's `link` (besides a commit hash) and a design option's. */
+const HTTP_LINK = /^https?:\/\/\S{1,500}$/u;
 export const isKey = (v: unknown) => isText(v) && /^[A-Za-z0-9._-]{1,128}$/.test(v as string);
 const ONE_OF: Record<string, unknown[]> = { close: ['done', 'release'], area: ['waiting', 'evidence', 'reports', 'answered'] };
 /** What a step uses or can stop on: an AI model, a store, a gate, a hard fail. */
@@ -165,7 +168,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     if (d.decided !== undefined && !(isText(d.decided) && d.decided.trim() && [...d.decided].length <= 200)) throw bad('decided', 'must be text of 200 characters or fewer');
     if (d.type === 'evidence' && !(Number.isInteger(d.number) && d.number >= 1)) throw bad('number', 'must be a whole number from 1');
     const signin = d.type === 'signin';
-    if (d.link !== undefined && !(isText(d.link) && /^(https?:\/\/\S{1,500}|[a-f0-9]{7,40})$/u.test(d.link)) && !signin) throw bad('link', 'must be an http(s) link or a commit hash');
+    if (d.link !== undefined && !(isText(d.link) && (HTTP_LINK.test(d.link) || /^[a-f0-9]{7,40}$/u.test(d.link))) && !signin) throw bad('link', 'must be an http(s) link or a commit hash');
     // A sign-in is a link to open, what it unlocks and who waits; its answer is the `signin done` its poster saves, so the user gets no buttons.
     if (signin) {
       // A start command makes a new link at each tap, so it needs no fixed link and never expires.
@@ -212,6 +215,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
         || !d.mocks.every((m: any) => isKey(m?.value) && isText(m?.path) && m.path.trim() && m.path.length <= 256 && /^[^?#]+(\.html\?variant=[A-Za-z0-9._-]{1,64})?$/i.test(m.path))) {
         throw bad('mocks', 'must list up to 6 items, each an option value and a board-relative mock path (an .html page may end in ?variant=<name>)');
       }
+      if (!d.mocks.every((m: any) => m.link === undefined || (isText(m.link) && HTTP_LINK.test(m.link)))) throw bad('mocks', 'a link must be an http(s) link with no spaces');
       const targets = d.mocks.map((m: MockRef) => m.value);
       if (new Set(targets).size < targets.length) throw bad('mocks', 'option values must be unique');
       for (const m of d.mocks) if (!values.includes(m.value)) throw bad('mocks', `value ${m.value} is not one of ${values.join(', ')}`);
@@ -220,7 +224,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       key: d.key, title: d.title, about: d.about, detail: d.detail, options: options.map((o: Option) => ({ value: o.value, label: o.label, ...(o.outcome && { outcome: o.outcome }) })),
       ...(d.why && { why: d.why }), ...(d.recommend_reason && { recommend_reason: d.recommend_reason }), ...(d.silent_by && { silent_by: d.silent_by }), ...(d.merges && { merges: [...d.merges] }), ...(d.proof && { proof: d.proof }),
       recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done', evidence: d.evidence,
-      type: plan ? 'plan' : d.type ?? 'decision', tradeoff: d.tradeoff, link: d.link, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path })),
+      type: plan ? 'plan' : d.type ?? 'decision', tradeoff: d.tradeoff, link: d.link, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path, ...(m.link !== undefined && { link: m.link }) })),
       ...(views && { view: d.view }), ...(report && views && { preview: d.preview }), ...(d.reply && { reply: true }), ...(d.filer && { filer: d.filer }), ...(d.area && { area: d.area }),
       ...(signin && { unlocks: d.unlocks, waits: d.waits, ...(d.expires && { expires: d.expires }), ...(d.start && { start: [...d.start] }) }),
       ...(d.group && { group: d.group }), ...(d.filed && { filed: d.filed }), ...(d.decided && { decided: d.decided }),
