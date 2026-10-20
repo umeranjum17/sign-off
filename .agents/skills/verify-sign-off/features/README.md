@@ -4,6 +4,7 @@ The repo's maintained verification map; a proof that drives one entry point is i
 
 - [Board shell](board-shell.md): the board's areas, tokens and shell at 390 and 1280, light and dark
 - [Plan review](plan-review.md): section verdicts, Change notes, decisions and structured Send back at both widths and themes
+- [Guided plan and report](guide.md): clean install and authoring, the one-scroll Guide view with read receipts and a real Go deeper, 390 and 1280, light and dark
 - [Evidence media guard](evidence-text-guard.md): a text, colour-bar or placeholder still is refused at post; a real capture is posted; a colour-bar or placeholder card is not shown
 - [Evidence](evidence.md): the list grouped by project and the update screen, light and dark at 390 and 1280
 - [Evidence attachment](evidence-attach.md): `post --attach` puts a downloadable file (an APK) on an update card; the file row at 390 and 1280, a real download whose bytes match, range, limits, token
