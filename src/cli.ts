@@ -325,8 +325,8 @@ Run one dispatcher per board, separately from the idle owner. Leave inaccessible
 Delivered means process handoff, not read. The resumed owner must --ack before answering once, without --more.
 Do not run an active wait listener for the same owner alongside the dispatcher. No substitute answers.`,
   deeper: `usage: sign-off-axi deeper [board.json] [--filer <id>] [--all] [--json]
-       sign-off-axi deeper [board.json] --id <id> --text "<answer>" [--more]
-Go deeper is the button on every guided plan or report. Plan 3 and report 4 also offer Simplify this. Engagement v1 replies require the owning --filer or registered owner session; stale targets are refused. The person taps it; wait --filer wakes with the ask, or this command lists the ones nobody finished.
+       sign-off-axi deeper [board.json] --filer <id> --id <id> --text "<answer>" [--more]
+Every part of a plan 3 or report 4 offers Ask a question, Go deeper, Simplify this, Show an example, Why?, and free text. Ask a question needs text and Send; Go deeper, Simplify this, Show an example and Why? send immediately. Free text and follow-ups use custom. Older guided schemas retain Go deeper. Engagement v1 replies require the owning --filer or registered owner session; stale targets are refused. The person taps it; wait --filer wakes with the ask, or this command lists the ones nobody finished.
 Answer in plain words about the part they tapped, a few lines at a time: each --more piece streams into that spot on the board while they watch, and a last call without --more ends it.
   --id     the ask to answer   --text  the answer, or - to read stdin (2000 characters or fewer per piece)
   --more   more pieces follow   --all  also the finished asks
