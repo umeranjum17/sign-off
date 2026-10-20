@@ -57,6 +57,8 @@ for (const [flag, kind] of [[[], 'report'], [['--plan'], 'plan']]) {
 // The authored result: the package's own fully filled examples, posted through the installed CLI.
 const planFile = join(pkg, 'fixtures/contract/plan.v2/valid-full.json'), reportFile = join(pkg, 'fixtures/contract/report.v3/valid-full.json');
 const plan = JSON.parse(readFileSync(planFile)), report = JSON.parse(readFileSync(reportFile));
+// The board archives a report a day after it was filed, so the fixture is dated now.
+writeFileSync(reportFile, JSON.stringify({ ...report, filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') }));
 cli('post', board, '--kind', 'plan', '--from', planFile);
 cli('post', board, '--kind', 'report', '--from', reportFile);
 assert.match(cli('list', board, '--full'), new RegExp(plan.key));
