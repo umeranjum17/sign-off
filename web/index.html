@@ -2147,7 +2147,7 @@
     const acts = (part, rows) => {
       const [db, dp] = rows?.length ? detailsBtn(part, rows) : [];
       const panel = live ? ansPanel(part) : null;
-      const form = el('form', { class: 'gd-fu' }), input = el('input', { 'aria-label': 'Ask about this part', placeholder: 'Ask anything about this part' }), send = el('button', { type: 'submit' }, 'Send');
+      const form = el('form', { class: 'gd-fu' }), input = el('input', { 'aria-label': 'Ask about this part', placeholder: 'Ask about this' }), send = el('button', { type: 'submit' }, 'Send');
       let action = 'custom';
       form.append(input, send);
       form.onsubmit = (e) => { e.preventDefault(); if (input.value.trim()) { engage(part, action, input.value); input.value = ''; action = 'custom'; input.placeholder = 'Ask a follow-up'; } };
