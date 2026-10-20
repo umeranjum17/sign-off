@@ -701,6 +701,40 @@ test('a guided plan and report: report init writes them to fill, post refuses FI
     assert.deepEqual([answer.event, answer.kind, answer.schema, answer.answer], ['answer', 'plan', 2, 'sent']);
     assert.deepEqual([answer.decisions, answer.notes], [{ rollout: 'all' }, [{ section: 'understood', verdict: 'change', note: 'Also the tablet flow.' }]]);
     assert.match((await state()).seen_at['faster-sign-in'], /^\d{4}-/);
+    // New schemas reuse the same real server/CLI journey, without modifying legacy answers.
+    for (const [kind, schema] of [['plan', 3], ['report', 4]]) {
+      const m = JSON.parse(readFileSync(join(fixtures, `${kind}.v${schema}/valid-full.json`)));
+      const key = `simplify-${kind}`; m.key = key;
+      const posted = spawnSync('node', [cli, 'post', board, '--kind', kind, '--from', '-'], { env, encoding: 'utf8', input: JSON.stringify(m) });
+      assert.equal(posted.status, 0, posted.stdout);
+      const d = (await state()).decisions.find(d => d.key === key), before = readFileSync(board, 'utf8');
+      const request = { version: 1, id: `request-${kind}`, key, ...d.engagement, part: 'understood', action: 'simplify' };
+      for (const bad of [{ ...request, revision: '0'.repeat(64) }, { ...request, filer: 'other' }, { ...request, part: 'found:0:extra' }, { ...request, surprise: true }, { ...request, selection: { field: 'understood.0.text', start: 0, end: 1, quote: 'wrong' } }]) {
+        assert.equal((await post('engagement', bad)).status, 409);
+        assert.ok(!(await state()).deeper.some(a => a.id === request.id));
+      }
+      assert.equal((await post('engagement', request)).status, 200);
+      assert.equal((await post('engagement', request)).status, 200);
+      assert.equal((await post('engagement', { ...request, action: 'why' })).status, 409);
+      assert.equal((await post('engagement', { ...request, id: request.id + '-second' })).status, 200);
+      const event = JSON.parse(run('wait', board, '--filer', m.filer, '--events', '--timeout', '0').stdout.split('\n')[0]);
+      assert.deepEqual([event.version, event.action, event.filer, event.revision], [1, 'simplify', m.filer, request.revision]);
+      assert.notEqual(run('deeper', board, '--id', request.id, '--filer', 'other', '--text', 'No').status, 0);
+      assert.notEqual(run('deeper', board, '--id', request.id, '--text', 'No').status, 0);
+      assert.equal(run('deeper', board, '--id', request.id, '--filer', m.filer, '--text', 'A simpler explanation.', '--more').status, 0);
+      assert.equal(run('deeper', board, '--id', request.id, '--filer', m.filer, '--text', 'The final line.').status, 0);
+      let a = (await state()).deeper.find(a => a.id === request.id);
+      assert.deepEqual([a.done, a.answerRevision, a.seen], [true, 2, undefined]);
+      assert.equal((await post('engagement/seen', { id: a.id, answerRevision: 1 })).status, 409);
+      assert.equal((await post('engagement/seen', { id: a.id, answerRevision: 2 })).status, 200);
+      a = JSON.parse(run('deeper', board, '--all', '--json').stdout).deeper.find(a => a.id === request.id);
+      assert.equal(a.seen, 2);
+      assert.equal(readFileSync(board, 'utf8'), before, 'explanations never rewrite plan decisions or the document');
+      const changed = JSON.parse(before); changed.items.find(i => i.key === key).title += ' revised'; writeFileSync(board, JSON.stringify(changed));
+      const stale = run('deeper', board, '--id', request.id + '-second', '--filer', m.filer, '--text', 'Stale');
+      assert.notEqual(stale.status, 0); assert.match(stale.stdout, /stale/);
+      writeFileSync(board, before);
+    }
   } finally {
     await new Promise((ok) => proc.once('exit', ok).kill());
   }

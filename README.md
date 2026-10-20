@@ -7,6 +7,8 @@
 
 <h1 align="center">sign-off</h1>
 
+Guided plans and reports now offer **Simplify this** under each part: the same owner explains it in place, with pending and persistent **New** states. New defaults require a filer; older documents still load. [Owner setup and engagement contract](docs/contract.md#report-schema-4-and-plan-schema-3-engagement-v1).
+
 <p align="center"><b>One calm page for every question the programs working for you need answered.</b><br>Agents ask; you answer with one tap on your own machine; the answer is saved for the asker to read. Proof of finished work lands on the same page, so you check it instead of taking anyone's word.</p>
 
 <p align="center"><b>▶ <a href="https://umeranjum17.github.io/sign-off/demo/">Try it live</a></b>: the real board on demo data. No install, nothing leaves your browser. · <a href="https://umeranjum17.github.io/sign-off/">Website</a></p>

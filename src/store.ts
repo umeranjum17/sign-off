@@ -1,6 +1,6 @@
 import { appendFileSync, existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 export type Option = { value: string; label: string; outcome?: string };
 /** An option's mock file, and an optional http(s) link to open that option live (drawn under the mock, outside its sandboxed frame). */
@@ -47,7 +47,7 @@ export type Decision = {
   /** Plans: the sections to approve or change and the decisions to answer, all sent back as one answer. */
   sections?: PlanSection[]; decisions?: PlanDecision[]; project?: string;
   /** A guided plan or report (plan 2, report 3): the board draws it as one page from these fields, with no page of the agent's own. */
-  guided?: boolean; understood?: { label: string; text: string }[]; visual?: GuideVisual; next?: { heading: string; lines: string[] };
+  engagement?: { kind: string; schema: number; filer: string; revision: string }; guided?: boolean; understood?: { label: string; text: string }[]; visual?: GuideVisual; next?: { heading: string; lines: string[] };
   /** Designs: project, date, review status, preview and screen views. */
   status?: 'draft' | 'in_review' | 'approved'; journeys?: DesignJourney[]; recommend?: string;
 };
@@ -204,7 +204,9 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     }
     // A ladder rung: a diagram image, or an interactive page the board frames in a sandbox.
     // A report is a page and its picture; one stored before reports had pages still loads, as a note with neither.
-    const report = d.kind === 'report', plan = d.kind === 'plan', design = d.kind === 'design', guided = (report && d.schema === 3) || (plan && d.schema === 2);
+    const report = d.kind === 'report', plan = d.kind === 'plan', design = d.kind === 'design', guided = (report && [3, 4].includes(d.schema)) || (plan && [2, 3].includes(d.schema));
+    const engagement = (report && d.schema === 4) || (plan && d.schema === 3);
+    if (engagement && !isKey(d.filer)) throw bad('filer', 'is required for engagement');
     if (d.type === 'plan' && !plan) throw bad('type', 'plan needs "kind": "plan": post it with sign-off-axi post --kind plan');
     const views = guided ? undefined : report ? (d.view !== undefined || d.preview !== undefined ? VIEWS.interactive : undefined) : plan ? VIEWS.interactive : Object.hasOwn(VIEWS, d.type ?? '') ? VIEWS[d.type] : undefined;
     const viewOk = (v: any, [, ends]: [string, RegExp]) => isText(v) && v.length <= 256 && /^[^?#]+$/.test(v) && ends.test(v);
@@ -254,6 +256,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       // So is a finding's proposal, with the counts and records behind it.
       ...(d.kind === 'finding' && { finding: { cause: d.cause, incidents: d.incidents, days: d.days, evidence_ids: d.evidence_ids, change_kind: d.change_kind, proposal: d.proposal } }),
       ...(plan && { sections: d.sections, decisions: d.decisions, ...(d.project && { project: d.project }) }),
+      ...(engagement && { engagement: { kind: d.kind, schema: d.schema, filer: d.filer, revision: documentRevision(d) } }),
       ...(guided && { guided: true, understood: d.understood, visual: d.visual, next: d.next, ...(report && { sections: d.sections }) }),
       ...(design && { kind: 'design', type: 'design', group: d.group, filed: d.filed, status: d.status, preview: d.preview, journeys: d.journeys, ...(d.options && { options: d.options, recommend_value: d.recommend }) }),
       ...(d.type === 'explainer' && d.chapters && { chapters: d.chapters.map(({ at, title }: Chapter) => ({ at, title })) }),
@@ -532,16 +535,18 @@ export const appendRead = (decisionsPath: string, key: string, part: string) => 
 
 /** Go deeper: the person asks the agent about one part of a guided page; the agent answers in pieces that the board streams into that spot.
  * One line each: an ask (id, key, part, what it is about, an optional question), the agent reading it, a piece of the answer (`more` while it goes on), and its end. */
-export type Deeper = { id: string; key: string; part: string; about: string; q?: string; at: string; read?: string; text: string; answered?: string; done?: boolean };
+export type Engagement = { version: 1; kind: string; schema: number; filer: string; revision: string; action: 'question' | 'deeper' | 'simplify' | 'example' | 'why' | 'custom'; selection?: { field: string; start: number; end: number; quote: string } };
+export type Deeper = Partial<Engagement> & { seen?: number; answerRevision?: number; id: string; key: string; part: string; about: string; q?: string; at: string; read?: string; text: string; answered?: string; done?: boolean };
 export const deeperPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.deeper.jsonl';
 export function readDeeper(decisionsPath: string): Deeper[] {
   const all = new Map<string, Deeper>();
   readRaw(deeperPath(decisionsPath)).split('\n').forEach((line) => {
     try {
       const x = line && JSON.parse(line), d = x && all.get(x.id);
-      if (x?.op === 'ask' && typeof x.id === 'string') all.set(x.id, { id: x.id, key: x.key, part: x.part, about: x.about, ...(x.q && { q: x.q }), at: x.at, text: '' });
+      if (x?.op === 'ask' && typeof x.id === 'string') all.set(x.id, { id: x.id, key: x.key, part: x.part, about: x.about, ...(x.q && { q: x.q }), at: x.at, text: '', ...(x.version === 1 && { version: 1, kind: x.kind, schema: x.schema, filer: x.filer, revision: x.revision, action: x.action, ...(x.selection && { selection: x.selection }) }) });
       else if (d && x.op === 'read') d.read ??= x.at;
-      else if (d && x.op === 'say') { d.text += (d.text ? '\n\n' : '') + x.text; d.answered = x.at; d.read ??= x.at; if (!x.more) d.done = true; }
+      else if (d && x.op === 'seen') d.seen = x.answerRevision;
+      else if (d && x.op === 'say') { if (d.version === 1) d.answerRevision = (d.answerRevision ?? 0) + 1; d.text += (d.text ? '\n\n' : '') + x.text; d.answered = x.at; d.read ??= x.at; if (!x.more) d.done = true; }
     } catch {}
   });
   return [...all.values()];
@@ -551,8 +556,57 @@ export const askDeeper = (decisionsPath: string, key: string, part: string, abou
   appendLine(deeperPath(decisionsPath), { op: 'ask', id, key, part, about, ...(q && { q }), at });
   return { id, key, part, about, ...(q && { q }), at, text: '' };
 };
-export const markDeeperRead = (decisionsPath: string, ids: string[]) => { for (const id of ids) appendLine(deeperPath(decisionsPath), { op: 'read', id, at: now() }); };
-export const answerDeeper = (decisionsPath: string, id: string, text: string, more: boolean) => appendLine(deeperPath(decisionsPath), { op: 'say', id, text, ...(more && { more: true }), at: now() });
+const engagementVersion = (file: string, id: string) => readDeeper(file).find(a => a.id === id)?.version === 1 ? { version: 1 } : {};
+export const markDeeperRead = (decisionsPath: string, ids: string[]) => { for (const id of ids) appendLine(deeperPath(decisionsPath), { op: 'read', ...engagementVersion(decisionsPath, id), id, at: now() }); };
+export const answerDeeper = (decisionsPath: string, id: string, text: string, more: boolean) => appendLine(deeperPath(decisionsPath), { op: 'say', ...engagementVersion(decisionsPath, id), id, text, ...(more && { more: true }), at: now() });
+
+/** Hash only authored fields, independent of JSON property order and board-added metadata. */
+const canonical = (v: any): any => Array.isArray(v) ? v.map(canonical) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canonical(v[k])])) : v;
+export function documentRevision(m: any): string {
+  const fields = ['contract', 'kind', 'schema', 'key', 'filer', 'title', 'link', 'about', 'filed', 'group', 'decided', 'asked_by', 'project', 'understood', 'visual', 'sections', 'decisions', 'next'];
+  return createHash('sha256').update(JSON.stringify(canonical(Object.fromEntries(fields.filter(k => m[k] !== undefined).map(k => [k, m[k]]))))).digest('hex');
+}
+/** Target field paths are relative to exactly one authored part, never UI/control text. */
+export function engagementField(d: Decision, part: string, field: string): string | undefined {
+  const [id, i, extra] = part.split(':'), section = d.sections?.find(s => s.id === id);
+  let target: any, allowed: string[] = [];
+  if (part === 'this') { target = d; allowed = ['title', 'about', 'visual.heading', 'visual.text']; }
+  else if (part === 'understood') { target = d; allowed = (d.understood ?? []).flatMap((_, n) => [`understood.${n}.label`, `understood.${n}.text`]); }
+  else if (part === 'next') { target = d.next; allowed = ['heading', ...(d.next?.lines ?? []).map((_, n) => `lines.${n}`)]; }
+  else if (id === 'd' && !extra) { target = d.decisions?.find(q => q.key === i); allowed = ['question', 'why', 'reason', 'after', 'quiet']; }
+  else if (section && !extra) { target = i === undefined ? section : /^\d+$/.test(i) ? section.items?.[+i] : undefined; allowed = i === undefined ? ['heading', 'body'] : ['title', 'text', 'more']; }
+  const value = allowed.includes(field) ? field.split('.').reduce((v, k) => v?.[k], target) : undefined;
+  return typeof value === 'string' ? value : undefined;
+}
+export function checkEngagement(file: string, ask: Deeper) {
+  if (ask.version !== 1) return;
+  const d = loadDecisions(file).find(d => d.key === ask.key);
+  if (!d?.engagement || d.engagement.revision !== ask.revision || d.filer !== ask.filer || !guidePart(d, ask.part)) throw new InputError('This request is stale; ask again on the current document');
+}
+export function askEngagement(file: string, input: any) {
+  if (!input || typeof input !== 'object' || Object.keys(input).some(k => !['version', 'id', 'key', 'kind', 'schema', 'filer', 'revision', 'part', 'action', 'q', 'selection'].includes(k))) throw new InputError('Unknown engagement field');
+  const d = loadDecisions(file).find(d => d.key === input.key), about = d && typeof input.part === 'string' && guidePart(d, input.part);
+  if (input.version !== 1 || !isKey(input.id) || input.part.split(':').length > 2 || !about || !d?.engagement || input.action !== 'simplify' || input.q !== undefined) throw new InputError('Send a version 1 Simplify request with an id and valid part');
+  for (const k of ['kind', 'schema', 'filer', 'revision'] as const) if (input[k] !== d.engagement[k]) throw new InputError('This target is stale; reload and ask again');
+  const s = input.selection;
+  if (s !== undefined) {
+    if (!s || typeof s !== 'object' || Object.keys(s).sort().join(',') !== 'end,field,quote,start') throw new InputError('Selection needs field, start, end and quote');
+    const value = typeof s.field === 'string' ? engagementField(d, input.part, s.field) : undefined;
+    if (value === undefined || !Number.isSafeInteger(s.start) || !Number.isSafeInteger(s.end) || s.start < 0 || s.end <= s.start || s.end > [...value].length || typeof s.quote !== 'string' || [...s.quote].length > 500 || [...value].slice(s.start, s.end).join('') !== s.quote) throw new InputError('Selection does not match this authored field');
+  }
+  const prior = readDeeper(file).find(a => a.id === input.id);
+  if (prior) {
+    if (JSON.stringify(canonical(input)) !== JSON.stringify(canonical(Object.fromEntries(Object.keys(input).map(k => [k, (prior as any)[k]]))))) throw new InputError('Request id already belongs to another ask');
+    return prior;
+  }
+  const ask = { ...input, about, at: now(), text: '' };
+  appendLine(deeperPath(file), { ...ask, op: 'ask' }); return ask;
+}
+export function markEngagementSeen(file: string, id: string, revision: number) {
+  const ask = readDeeper(file).find(a => a.id === id);
+  if (!ask || ask.version !== 1 || !Number.isSafeInteger(revision) || revision !== ask.answerRevision) throw new InputError('This answer changed; read it again');
+  appendLine(deeperPath(file), { op: 'seen', version: 1, id, answerRevision: revision, at: now() });
+}
 
 const now = () => new Date().toISOString().slice(0, 19) + 'Z';
 /** Appends one JSON line, starting a new line after a torn fragment. */

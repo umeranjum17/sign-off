@@ -8,11 +8,11 @@ export class ContractError extends Error {
   constructor(message: string, readonly help: string) { super(message); }
 }
 /** The kinds, with the schema number of each. */
-export const SCHEMAS: Record<string, number> = { ask: 1, report: 3, evidence: 1, gate: 1, finding: 1, plan: 2, design: 1 };
+export const SCHEMAS: Record<string, number> = { ask: 1, report: 4, evidence: 1, gate: 1, finding: 1, plan: 3, design: 1 };
 /** Older schemas this sign-off-axi still takes, so a board that holds them loads and re-posts: the page-based report 2 and plan 1. */
-const OLDER: Record<string, number[]> = { report: [2], plan: [1] };
+const OLDER: Record<string, number[]> = { report: [2, 3], plan: [1, 2] };
 /** The guided schemas: a report 3 and a plan 2 are fields the board draws as one guided page, not a page the agent draws. */
-export const guided = (m: any) => (m?.kind === 'report' && m.schema === 3) || (m?.kind === 'plan' && m.schema === 2);
+export const guided = (m: any) => (m?.kind === 'report' && [3, 4].includes(m.schema)) || (m?.kind === 'plan' && [2, 3].includes(m.schema));
 export const KINDS = Object.keys(SCHEMAS);
 const COMMON = ['contract', 'kind', 'schema', 'key', 'title', 'filer', 'link', 'about'];
 const FIELDS: Record<string, string[]> = {
@@ -238,6 +238,7 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
   if (!(m.kind === 'evidence' && !Object.hasOwn(m, 'key')) && !isKey(m.key)) throw bad('key', Object.hasOwn(m, 'key') ? `${show(m.key)} must be 1-128 of A-Z a-z 0-9 . _ -` : 'is required', 'Set "key" to a short id such as "ship-signin-2"');
   if (!Object.hasOwn(m, 'title')) throw bad('title', 'is required', 'Add "title": the question, in 160 characters or fewer');
   text('title', m.title, 160, 'the question, in 160 characters or fewer');
+  if (g && m.schema === SCHEMAS[m.kind] && !isKey(m.filer)) throw bad('filer', 'is required', 'Set "filer" to the owning agent id');
   if (Object.hasOwn(m, 'filer') && !isKey(m.filer)) throw bad('filer', 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "filer" to your agent session id or tool name, or leave it out');
   if (Object.hasOwn(m, 'link') && !(typeof m.link === 'string' && /^(https?:\/\/[^\s\p{Cc}\p{Cs}]{1,500}|[a-f0-9]{7,40})$/u.test(m.link))) {
     throw bad('link', 'must be an http(s) link with no spaces or control characters, or a 7-40 character commit hash',

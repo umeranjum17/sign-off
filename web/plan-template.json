@@ -1,7 +1,7 @@
 {
   "contract": 1,
   "kind": "plan",
-  "schema": 2,
+  "schema": 3,
   "key": "FILL: short-id",
   "title": "FILL: the plan's answer in one line",
   "project": "FILL: project",

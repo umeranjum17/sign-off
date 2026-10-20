@@ -1,7 +1,7 @@
 {
   "contract": 1,
   "kind": "report",
-  "schema": 3,
+  "schema": 4,
   "key": "FILL: short-id",
   "title": "FILL: the answer in one line",
   "filed": "FILL: UTC time",

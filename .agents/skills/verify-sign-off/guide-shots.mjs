@@ -4,11 +4,12 @@
 // With MINIMAX_API_KEY in the environment the Go deeper answer is a model's; without it a labelled stand-in answers.
 // Usage: node .agents/skills/verify-sign-off/guide-shots.mjs <output> [light|dark] [390|1280]
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { recordsDir } from './records.mjs';
 const out = resolve(process.argv[2] ?? process.env.DONE_DONE_EVIDENCE_ROOT);
 const theme = process.argv[3] ?? process.env.DONE_DONE_THEME ?? 'light', width = +(process.argv[4] ?? process.env.DONE_DONE_WIDTH ?? 390);
@@ -55,12 +56,20 @@ for (const [flag, kind] of [[[], 'report'], [['--plan'], 'plan']]) {
   assert.notEqual(refused.status, 0); assert.match(refused.stdout + refused.stderr, /FILL/);
 }
 // The authored result: the package's own fully filled examples, posted through the installed CLI.
-const planFile = join(pkg, 'fixtures/contract/plan.v2/valid-full.json'), reportFile = join(pkg, 'fixtures/contract/report.v3/valid-full.json');
+const simplify = process.env.GUIDE_SIMPLIFY === '1';
+const planFile = join(pkg, `fixtures/contract/plan.v${simplify ? 3 : 2}/valid-full.json`), reportFile = join(pkg, `fixtures/contract/report.v${simplify ? 4 : 3}/valid-full.json`);
 const plan = JSON.parse(readFileSync(planFile)), report = JSON.parse(readFileSync(reportFile));
 // The board archives a report a day after it was filed, so the fixture is dated now.
 writeFileSync(reportFile, JSON.stringify({ ...report, filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') }));
-cli('post', board, '--kind', 'plan', '--from', planFile);
-cli('post', board, '--kind', 'report', '--from', reportFile);
+if (simplify) {
+  const session = randomUUID();
+  const authored = JSON.parse(run('claude', ['--session-id', session, '-p', `You own two synthetic examples for Umer. Read ${planFile} and ${reportFile}, reword their about fields in plain words while preserving keys, sections, decisions, numbers and schemas. Post both through node ${cliJs} post ${board} --kind <kind> --from <file>. Register your actual Claude UUID ${session} through node ${cliJs} owner ${board} --filer ${plan.filer} --host claude --session ${session} --cwd ${app} --model claude-haiku-5-5. Do not start a listener or dispatcher. Remember the ordinary example fact that Umer chose green apples only in this conversation, not the documents. Include it if later asked to simplify. Then stop.`, '--model', 'claude-haiku-5-5', '--output-format', 'json', '--tools', 'Bash,Read,Write,Edit', '--allowedTools', 'Bash,Read,Write,Edit'], { cwd: app, env: process.env }));
+  assert.equal(authored.session_id, session); assert.equal(authored.is_error, false);
+  writeFileSync(join(records, 'owner-authored.json'), JSON.stringify(authored));
+} else {
+  cli('post', board, '--kind', 'plan', '--from', planFile);
+  cli('post', board, '--kind', 'report', '--from', reportFile);
+}
 assert.match(cli('list', board, '--full'), new RegExp(plan.key));
 
 // 4. Serve from the install and drive the browser.
@@ -76,6 +85,9 @@ const measure = () => {
 };
 const probe = () => JSON.parse(drive(`console.log(JSON.stringify(await page.eval(${measure.toString()})));`));
 const responders = [];
+let recorder;
+const recording = join(records, 'sampled-recording');
+if (simplify && theme === 'light' && width === 390) mkdirSync(recording, { recursive: true });
 const answerDeeper = (docFile) => {
   const child = spawn(process.execPath, [responder, board, plan.filer, docFile, '1'], { cwd: app, env: { ...env, SIGN_OFF_CLI: cliJs }, stdio: ['ignore', 'pipe', 'pipe'] });
   let log = ''; child.stdout.on('data', (b) => (log += b)); child.stderr.on('data', (b) => (log += b));
@@ -155,7 +167,45 @@ try {
   writeFileSync(join(records, 'report-deeper.responder.txt'), reportLog.log);
   show('limits', `document.querySelector('[data-part="limits"] > .gd-ans').scrollIntoView({ block: 'start' }); s.scrollTop -= ${width === 390 ? 250 : 90};`);
   capture('report-deeper', 'Go deeper on the report part shows the agent\'s answer in place with Agent answered and the time, beside Read by you.');
+  if (simplify && theme === 'light' && width === 390) {
+    // A timestamped sampled-frame recording through the same isolated browser CLI, not a synthetic animation.
+    recorder = spawn(process.execPath, ['--input-type=module', '-e', `import {spawnSync} from 'node:child_process'; import {existsSync} from 'node:fs'; const end=Date.now()+180000; while(Date.now()<end && !existsSync(${JSON.stringify(join(recording, 'stop'))})) { spawnSync('chrome-devtools-axi',['screenshot',${JSON.stringify(recording)}+'/'+Date.now()+'.png'],{stdio:'ignore',timeout:30000}); await new Promise(r=>setTimeout(r,500)); }`], { env: browserEnv, stdio: 'ignore' });
+  }
+  if (simplify) for (const [kind, item] of [['plan', plan], ['report', report]]) {
+    const url = `${base}#${kind === 'plan' ? 'waiting' : 'reports'}/${item.key}`;
+    browser('open', url); drive('await wait(".gd-sec");'); show('next');
+    capture(`${kind}-simplify-before`, 'The section offers Simplify this beside Go deeper.');
+    const original = readFileSync(board, 'utf8');
+    click('[data-part="next"] > .gd-acts .simplify');
+    drive('await wait(\'[data-part="next"] > .gd-ans .gask.live\');');
+    capture(`${kind}-simplify-pending`, 'The Simplify request is pending in its own section.');
+    const ask = (await state()).deeper.find(a => a.key === item.key && a.action === 'simplify');
+    assert.equal(ask.version, 1); assert.equal(ask.filer, plan.filer);
+    browser('open', base);
+    const delivered = tryRun(process.execPath, [cliJs, 'owner', board, '--dispatch', '--filer', plan.filer, '--verbose'], { cwd: app, env: process.env });
+    writeFileSync(join(records, `${kind}-owner-delivery.json`), JSON.stringify(delivered)); assert.equal(delivered.status, 0, delivered.stderr);
+    const answer = (await state()).deeper.find(a => a.id === ask.id);
+    assert.equal(answer.done, true); assert.match(answer.text, /green apples/i); assert.equal(answer.seen, undefined);
+    browser('open', url); drive('await wait(".gd-sec");'); browser('open', url); drive('await wait(".gd-sec");');
+    assert.equal((await state()).deeper.find(a => a.id === ask.id).seen, undefined, 'reload must not clear unseen answers');
+    drive('await page.eval(() => { document.querySelector(".gd-scroll").style.scrollBehavior = "auto"; document.querySelector(\'[data-part="next"] > .gd-ans\').scrollIntoView({block:"center"}); });');
+    capture(`${kind}-simplify-new`, 'The owning agent filled the answer in place; the fresh answer is marked New.');
+    drive('await nap(2400);');
+    assert.equal((await state()).deeper.find(a => a.id === ask.id).seen, answer.answerRevision);
+    assert.equal(readFileSync(board, 'utf8'), original, 'Simplify does not alter authored text or plan decisions');
+    writeFileSync(join(records, `${kind}-simplify.json`), JSON.stringify({ request: ask, answer, unreadAfterReload: true, documentUnchanged: true }));
+  }
 } finally {
+  if (recorder) {
+    writeFileSync(join(recording, 'stop'), 'stop');
+    if (recorder.exitCode === null) await new Promise(ok => recorder.once('close', ok));
+    const frames = readdirSync(recording).filter(f => /^\d+\.png$/.test(f)).sort();
+    if (frames.length > 1) {
+      const list = join(recording, 'frames.txt');
+      writeFileSync(list, frames.map((f, n) => `file '${join(recording, f)}'\nduration ${n + 1 < frames.length ? (+frames[n + 1].split('.')[0] - +f.split('.')[0]) / 1000 : 1}\n`).join(''));
+      run('ffmpeg', ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', list, '-vf', 'scale=390:-2', '-pix_fmt', 'yuv420p', '-c:v', 'libx264', '-movflags', '+faststart', join(out, 'simplify-sampled.mp4')]);
+    }
+  }
   browser('stop'); server.kill();
   for (const c of responders) c.kill();
   console.log(`Scratch for cleanup: ${dir}`);

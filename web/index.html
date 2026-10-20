@@ -2088,16 +2088,21 @@
     const asksOf = (part) => (state.deeper ?? []).filter((x) => x.key === key && x.part === part);
     const unfinished = () => (state.deeper ?? []).some((x) => x.key === key && !x.done);
     function paintAns(part) {
-      const panel = panels.get(part), asks = asksOf(part), sig = JSON.stringify(asks);
+      const panel = panels.get(part), asks = asksOf(part), sig = JSON.stringify([asks, asks.map(a => state.delivery?.[a.id])]);
       if (!panel || panel.dataset.sig === sig) return;
       panel.dataset.sig = sig;
       const blocks = asks.map((a) => {
+        const delivery = state.delivery?.[a.id];
         const waiting = !a.read, writing = !!a.text && !a.done, late = waiting && Date.now() - Date.parse(a.at) > 60_000;
-        const head = a.done ? [E('i', 'dot'), `Agent answered ${hhmm(a.answered)}`] : writing ? [E('i', 'dot'), 'Agent is answering'] : waiting ? [E('i', 'dot'), 'Waiting for the agent to read it'] : [E('i', 'dot'), `Agent read it ${hhmm(a.read)}, working on it`];
-        return E('div', `gask${a.done ? '' : ' live'}`, E('div', 'hd', ...head), E('p', 'q', a.q ? `You asked: ${a.q}` : `Go deeper: ${a.about}`),
+        const head = a.done ? [E('i', 'dot'), `Agent answered ${hhmm(a.answered)}`] : writing ? [E('i', 'dot'), 'Agent is answering'] : waiting ? [E('i', 'dot'), a.version === 1 ? delivery?.state === 'delivered' ? 'Delivered; waiting for the owner to read it' : 'Pending: waiting for the owner' : 'Waiting for the agent to read it'] : [E('i', 'dot'), `Agent read it ${hhmm(a.read)}, working on it`];
+        const block = E('div', `gask${a.done ? '' : ' live'}`, E('div', 'hd', ...head, ...(a.version === 1 && a.text && a.seen !== a.answerRevision ? [E('b', 'gd-chip', 'New')] : [])), E('p', 'q', a.q ? `You asked: ${a.q}` : `${a.action === 'simplify' ? 'Simplify this' : 'Go deeper'}: ${a.about}`),
+          ...(a.selection ? [E('blockquote', '', a.selection.quote)] : []),
+          ...(a.version === 1 && delivery?.error ? [E('p', 'gd-err', `Delivery pending: ${delivery.error}`)] : []),
           ...(a.text ? a.text.split(/\n+/).map((t, i, all) => E('p', '', t, ...(writing && i === all.length - 1 ? [E('span', 'caret')] : []))) : [E('div', 'shim', ''), E('div', 'shim', '')]),
           E('div', 'gd-rc s', E('span', '', rd(), E('b', '', 'You asked'), ` ${hhmm(a.at)}`), a.read ? E('span', '', rd('agent'), E('b', '', 'Agent read it'), ` ${hhmm(a.read)}`) : E('span', '', rd('hollow'), 'Agent has not read it yet')),
           ...(late ? [E('p', 'slow', 'The agent has not picked this up yet. It answers the next time it checks the board.')] : []));
+        if (a.version === 1 && a.text && a.seen !== a.answerRevision) { block.dataset.answerId = a.id; block.dataset.answerRevision = a.answerRevision; answerIO.observe(block); }
+        return block;
       });
       const done = asks.length && asks.every((a) => a.done);
       const form = el('form', { class: 'gd-fu' }), input = el('input', { 'aria-label': 'Ask a follow-up', placeholder: 'Ask a follow-up', maxlength: '500' }), go = el('button', { type: 'submit' }, 'Ask');
@@ -2127,7 +2132,17 @@
       b.onclick = () => { const open = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(open)); p.hidden = !open; };
       return [b, p];
     };
-    const acts = (part, rows) => { const [db, dp] = rows?.length ? detailsBtn(part, rows) : []; return [E('div', 'gd-acts', ...(db ? [db] : []), ...(live ? [deepBtn(part)] : [])), ...(dp ? [dp] : []), ...(live ? [ansPanel(part)] : [])]; };
+    const simplifyBtn = (part) => {
+      const b = el('button', { class: 'gd-lnk simplify', type: 'button' }, 'Simplify this');
+      b.onclick = async () => {
+        b.disabled = true;
+        try { await postJson('/api/engagement', { version: 1, id: crypto.randomUUID(), key, ...d.engagement, part, action: 'simplify' }); sync(); }
+        catch (e) { const p = panels.get(part); p.hidden = false; p.append(E('p', 'gd-err', `Could not ask: ${e.message}`)); }
+        finally { b.disabled = false; }
+      };
+      return b;
+    };
+    const acts = (part, rows) => { const [db, dp] = rows?.length ? detailsBtn(part, rows) : []; return [E('div', 'gd-acts', ...(db ? [db] : []), ...(live ? [deepBtn(part), ...(d.engagement ? [simplifyBtn(part)] : [])] : [])), ...(dp ? [dp] : []), ...(live ? [ansPanel(part)] : [])]; };
 
     // ---- the picture
     function visual(v) {
@@ -2273,6 +2288,15 @@
     const scroll = E('div', 'gd-scroll', E('div', 'gd', progress, E('div', 'gd-cols', rail, main)));
     const root = E('div', '', scroll, ...(plan ? [bar] : []));
     root.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
+    const answerTimers = new WeakMap();
+    const answerIO = new IntersectionObserver(es => es.forEach(en => {
+      clearTimeout(answerTimers.get(en.target));
+      if (en.isIntersecting) answerTimers.set(en.target, setTimeout(async () => {
+        if (!en.target.isConnected || document.visibilityState !== 'visible') return;
+        try { await postJson('/api/engagement/seen', { id: en.target.dataset.answerId, answerRevision: +en.target.dataset.answerRevision }); sync(); }
+        catch (e) { en.target.append(E('p', 'gd-err', `Could not mark read: ${e.message}`)); }
+      }, 1400));
+    }), { root: scroll, threshold: 0.35 });
 
     // ---- reading: a part on screen for a moment is read
     const mark = (part) => { if (!live || readAt(part) !== undefined) return; (state.reads ??= {})[`${key}/${part}`] = new Date().toISOString(); paintRc(); paintRail(); postJson('/api/reads', { key, part }).then(sync).catch(() => {}); };
