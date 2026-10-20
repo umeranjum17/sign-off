@@ -463,13 +463,13 @@
   .ev-intro { margin: 0; color: var(--muted); font-size: 1.1875rem; line-height: 1.47; }
   .ev-gl { margin: 1rem 0 0; color: var(--muted); font-size: 0.875rem; letter-spacing: 0.02em; text-transform: uppercase; }
   .ev-grp { overflow: hidden; border-radius: 0.75rem; background: var(--surface); }
-  .ev-grp .cell { display: flex; align-items: center; gap: 0.875rem; min-height: 3.5rem; padding: 0.625rem 1rem; color: inherit; font-size: 1.0625rem; text-decoration: none; }
+  .ev-grp .cell { display: flex; flex-wrap: wrap; align-items: center; gap: 0.875rem; min-height: 3.5rem; padding: 0.625rem 1rem; color: inherit; font-size: 1.0625rem; text-decoration: none; }
   /* The hairline between rows starts at the row's text, as in an iOS inset list. */
   .ev-grp .cell { position: relative; }
   .ev-grp .cell + .cell::before { content: ""; position: absolute; top: 0; left: 1rem; right: 0; border-top: 0.5px solid var(--line); }
   .ev-grp a.cell:hover { background: color-mix(in srgb, var(--surface) 94%, var(--text)); }
   .ev-grp .k { flex: none; min-width: 6.5rem; }
-  .ev-grp .v { min-width: 0; margin-left: auto; color: var(--muted); text-align: right; }
+  .ev-grp .v { min-width: 0; overflow-wrap: anywhere; margin-left: auto; color: var(--muted); text-align: right; }
   .ev-grp .v.ok { color: var(--ok); } .ev-grp .v.bad { color: var(--danger); font-weight: 600; } .ev-grp .v.warn { color: var(--warn); font-weight: 600; }
   .ev-grp .v svg { width: 1.15rem; height: 1.15rem; margin-right: 0.2rem; vertical-align: -0.2rem; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
   .ev-grp .v.go { color: var(--accent); }
