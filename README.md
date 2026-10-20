@@ -9,7 +9,7 @@
 
 <p align="center"><b>One calm page for every question the programs working for you need answered.</b><br>Agents ask; you answer with one tap on your own machine; the answer is saved for the asker to read. Proof of finished work lands on the same page, so you check it instead of taking anyone's word.</p>
 
-<p align="center"><b>▶ <a href="https://umeranjum17.github.io/sign-off/">Try it live</a></b>: the real board on demo data. No install, nothing leaves your browser.</p>
+<p align="center"><b>▶ <a href="https://umeranjum17.github.io/sign-off/demo/">Try it live</a></b>: the real board on demo data. No install, nothing leaves your browser. · <a href="https://umeranjum17.github.io/sign-off/">Website</a></p>
 
 <p align="center">
   <picture>
@@ -127,12 +127,12 @@ npm pack
 
 - `npm test`: full journeys
 - `npm run build:skill`: writes the skill from `src/skill.ts`
-- `npm run build:demo`: demo site (Try it live)
+- `npm run build:demo`: the website (`site/`) and the demo board at `/demo/`, built into `demo-dist/`
 - `npm pack`: tarball
 
 A release is a merged version-bump PR: CI publishes the new version to npm.
 
-Change what a user sees or runs, and update this README, the skill (`src/skill.ts`) and any screenshot it shows in the same PR.
+Change what a user sees or runs, and update this README, the skill (`src/skill.ts`), the website (`site/index.html`) and any screenshot they show in the same PR.
 
 ### Test runs never touch your board
 

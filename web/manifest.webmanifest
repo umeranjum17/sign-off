@@ -2,7 +2,7 @@
   "name": "sign-off",
   "short_name": "sign-off",
   "description": "One calm page for every question the programs working for you need answered.",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#F5F5F7",
   "theme_color": "#0071E3",
