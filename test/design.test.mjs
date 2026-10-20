@@ -1968,7 +1968,7 @@ test('a design-level inline Approve or Change stores its verdict with the note, 
   proc.kill();
 });
 
-test('Waiting on you: an update waiting for a verdict reads Evidence on its card, the name of its chip, not Update N', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Evidence: an update with no verdict is listed under Evidence, never waiting on you, and reads Evidence on its card', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'waiting-update'), file = join(dir, 'board.json');
   mkdirSync(dir);
   writeFileSync(file, JSON.stringify({ schema: 2, items: [
@@ -1980,10 +1980,11 @@ test('Waiting on you: an update waiting for a verdict reads Evidence on its card
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const { evaluate, close } = await browse(join(dir, 'b'), 390);
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
-  await until(async () => (await evaluate('document.querySelector("#item-upd .title")?.textContent')) !== undefined);
-  assert.equal(await evaluate('document.querySelector("#item-upd .kind")'), null);
-  assert.ok(await evaluate('[...document.querySelectorAll(".chips button")].some((b) => b.textContent.startsWith("Evidence 1"))'));
-  assert.match(await evaluate('document.querySelector("#item-upd .title").textContent'), /Login checked/);
+  await until(async () => (await evaluate('document.querySelector("#item-upd") === null && document.querySelector(".chips button") !== null')));
+  assert.equal(await evaluate('document.querySelector("#item-upd")'), null);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
+  await until(async () => (await evaluate('document.querySelector("#item-upd .t")?.textContent')) !== undefined);
+  assert.match(await evaluate('document.querySelector("#item-upd .t").textContent'), /Login checked/);
   close();
   proc.kill();
 });
@@ -2161,8 +2162,8 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   const [tall, wide] = [shot('tall.png', 300, 600), shot('wide.png', 600, 300)];
   const update = (...media) => run('post', file, '--type', 'evidence', '--title', 'Sign-in', '--about', 'Loads in 1 second.', ...media.flatMap((m) => ['--media', m])).code;
   assert.deepEqual([update(tall), update(wide, tall), update(wide)], [0, 0, 0]);
-  // Only passed proof is listed: the first update links a run that failed and the second one (no project named) links a run that passed;
-  // the two sign-off updates differ only in the case of their proof line, so they share one project head.
+  // Every update is listed under Evidence and none is an ask: the first links a failed run, so its result shows as failed.
+  // The two sign-off updates differ only in the case of their proof line, so they share one project head.
   const doc = JSON.parse(readFileSync(file, 'utf8')), old = new Date(Date.now() - 3 * 864e5), commit = 'c0ffee'.padEnd(40, '0');
   const outcome = 'You can read every card on a phone.', wideBytes = readFileSync(wide), hash = createHash('sha256').update(wideBytes).digest('hex');
   doc.items[0].filed = old.toISOString();
@@ -2182,10 +2183,10 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   const pr = 'https://github.com/umeranjum17/sign-off/pull/12';
   doc.items.push({ key: 'update-4', type: 'evidence', number: 4, title: 'sign-off board verify: pass', about: outcome, filed: new Date().toISOString(), link: pr,
     media: [{ path: 'evidence/4/1.png', sha256: hash, bytes: wideBytes.length }], evidence: link(runs[0]) });
-  // A plain update with its own capture and no linked run is not proof: it waits on you.
+  // A plain update with its own capture and no linked run is not proof, but it is still evidence and never an ask.
   doc.items.push({ key: 'update-5', type: 'evidence', number: 5, title: 'Sign-in, plain update', about: 'Umer checks the plain update.', filed: new Date(Date.now() + 1000).toISOString(),
     link: 'https://github.com/umeranjum17/sign-off/pull/13', media: [{ path: 'evidence/4/1.png', sha256: hash, bytes: wideBytes.length }] });
-  // A run whose capture changed after it ran cannot be checked, so its update waits on you instead of being listed.
+  // A run whose capture changed after it ran cannot be checked, so its update shows that instead of a pass.
   doc.items.push({ key: 'update-6', type: 'evidence', number: 6, title: 'A capture changed after the run', about: outcome, filed: new Date().toISOString(), evidence: link(runs[3]) });
   writeFileSync(file, JSON.stringify(doc));
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0', '--evidence-root', dir], { env, stdio: ['ignore', 'pipe', 'ignore'] });
