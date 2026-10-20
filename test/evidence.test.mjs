@@ -23,6 +23,8 @@ const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
 // A rendered log (text only) and a real capture of the running board, from the repo's fixtures.
 const fixtures = new URL('../fixtures/evidence/', import.meta.url).pathname;
 const textLog = join(fixtures, 'text-log.png'), colourBars = join(fixtures, 'colour-bars.png'), capture = join(fixtures, 'product-board.png');
+// A mostly empty but real chat screen (header, message, composer, tab bar) and a flat card with a label: generated shapes, no private data.
+const sparseScreen = join(fixtures, 'sparse-screen.png'), placeholderCard = join(fixtures, 'placeholder-card.png');
 const clip = Buffer.from('0123456789 a short recording stand-in');
 const procs = [];
 after(async () => {
@@ -47,12 +49,14 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
   assert.match(refused.out, /Post a real capture of the running product/);
   // A colour-bar test card is refused the same way, not posted as evidence.
   assert.match(evidence('--title', 'Test card', '--about', 'Note.', '--media', colourBars).out, /is a colour-bar test card, not evidence/);
+  // A flat placeholder card is refused; a real screen that is mostly empty is not.
+  assert.match(evidence('--title', 'Placeholder', '--about', 'Note.', '--media', placeholderCard).out, /is a placeholder card, not evidence/);
   assert.match(evidence('--title', 'Missing', '--about', 'Note.', '--media', join(scratch, 'gone.png')).out, /gone\.png is not there/);
   assert.equal(evidence('--title', 'Bad link', '--about', 'Note.', '--media', shot, '--link', 'javascript:alert(1)').code, 2);
   assert.equal(evidence('--title', 'Options', '--about', 'Note.', '--media', shot, '--option', 'a=A', '--option', 'b=B').code, 2);
   assert.deepEqual(readdirSync(join(so, 'evidence')), []);
 
-  assert.match(evidence('--title', 'Sign-in screen', '--about', 'The screen loads.', '--media', capture).out, /update-1,1,1/);
+  assert.match(evidence('--title', 'Sign-in screen', '--about', 'The screen loads.', '--media', capture, '--media', sparseScreen).out, /update-1,1,2/);
   assert.match(evidence('--title', 'Sign-in flow', '--about', 'Umer signs in on a phone.', '--media', capture, '--media', rec,
     '--link', 'https://github.com/acme/app/pull/12').out, /update-2,2,2/);
   assert.deepEqual(readdirSync(join(so, 'evidence', '2')).sort(), ['1.png', '2.webm']);
@@ -97,7 +101,7 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
     await new Promise((ok) => setTimeout(ok, 50));
   }
   assert.ok(first.decisions.some((d) => d.key === 'update-2'));
-  assert.deepEqual(api.decisions.map((d) => [d.key, d.number, d.media.length]), [['update-1', 1, 1], ['update-2', 2, 2]]);
+  assert.deepEqual(api.decisions.map((d) => [d.key, d.number, d.media.length]), [['update-1', 1, 2], ['update-2', 2, 2]]);
   assert.deepEqual(api.decisions[1].options.map((o) => o.value), ['pass', 'fail', 'needs-work']);
   assert.equal(api.decisions[1].link, 'https://github.com/acme/app/pull/12');
 
