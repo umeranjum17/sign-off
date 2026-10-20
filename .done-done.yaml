@@ -9,7 +9,7 @@ journeys:
   serve-stop:
     command: 'npm run build > /dev/null && node --test test/serve-stop.test.mjs > "$DONE_DONE_EVIDENCE_ROOT/serve-stop.log" 2>&1'
   document-scroll:
-    command: 'npm run build > /dev/null && node --test --test-name-pattern="report and plan documents use one page scroll" test/design.test.mjs > "$DONE_DONE_EVIDENCE_ROOT/document-scroll.log" 2>&1 && node .agents/skills/verify-sign-off/document-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
+    command: 'npm run build > /dev/null && node --test --test-name-pattern="report and plan documents use one page scroll" test/design.test.mjs > "$DONE_DONE_EVIDENCE_ROOT/document-scroll.log" 2>&1 && node .agents/skills/done-done-verify-sign-off/document-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   plan-review:
     command: 'node .agents/skills/done-done-verify-sign-off/plan-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${PLAN_REVIEW_THEME:-light}" "${PLAN_REVIEW_WIDTH:-390}"'
   # A clean install: npm pack, npm install in an empty folder, author with report init, then the guided plan and report in a real browser
