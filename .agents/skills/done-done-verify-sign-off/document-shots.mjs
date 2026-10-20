@@ -26,11 +26,11 @@ Object.assign(report, { key: 'release', title: 'Latest stable build: muxr 0.2.8'
 delete report.link; delete report.decided; delete report.video; delete report.asked_by;
 writeFileSync(join(dir, 'page/preview.svg'), readFileSync('fixtures/contract/report.v2/page/preview.svg'));
 writeFileSync(join(dir, 'page/index.html'), `<!doctype html><html lang="en"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Release notes</title>
-<style>:root{color-scheme:light dark}body{margin:0;font:18px/1.5 system-ui}h2,p,details{margin:0;padding:16px}svg{display:block;width:100%;height:auto;color:#1685e8}summary{cursor:pointer} @media(prefers-color-scheme:dark){body{color:#eee}}</style>
+<style>:root{color-scheme:light dark;overflow-y:scroll}body{margin:0;font:18px/1.5 system-ui}h2,p,details{margin:0;padding:16px}svg{display:block;width:100%;height:auto;color:#1685e8}summary{cursor:pointer} @media(prefers-color-scheme:dark){body{color:#eee}}</style>
 <h2>muxr 0.2.8 is the latest stable build</h2><p>The phone app and the computer package share a version. This is a public-text layout demonstration.</p>
 <svg viewBox="0 0 600 220" role="img" aria-label="Latest stable muxr 0.2.8"><rect width="600" height="220" rx="24" fill="currentColor" opacity=".18"/><text x="300" y="100" text-anchor="middle" fill="currentColor" font-size="28">Latest stable</text><text x="300" y="155" text-anchor="middle" fill="currentColor" font-size="42">muxr 0.2.8</text></svg>
 <button type="button" onclick="document.querySelector('details').open = !document.querySelector('details').open">Compare package versions</button><details><summary>Release details</summary><p>The release has matching package versions.</p></details>
-${Array.from({ length: 90 }, (_, i) => `<h2>Release note ${i + 1}</h2><p>Keep the phone app and computer package on the same version. Read the notes before updating. This example contains only non-private text.</p>`).join('')}<script>setInterval(() => parent.postMessage({documentGeometry:{height:document.documentElement.scrollHeight,width:document.documentElement.scrollWidth,inner:[...document.querySelectorAll('body *')].filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1).length}}, '*'), 200);</script></html>`);
+${Array.from({ length: 90 }, (_, i) => `<h2>Release note ${i + 1}</h2><p>Keep the phone app and computer package on the same version. Read the notes before updating. This example contains only non-private text.</p>`).join('')}<script>setInterval(() => parent.postMessage({documentGeometry:{height:document.documentElement.scrollHeight,width:document.documentElement.scrollWidth,scrollbar:innerWidth-document.documentElement.clientWidth,inner:[...document.querySelectorAll('body *')].filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1).length}}, '*'), 200);</script></html>`);
 writeFileSync(join(dir, 'report.json'), JSON.stringify(report));
 cli('post', board, '--kind', 'report', '--from', join(dir, 'report.json'));
 const plan = JSON.parse(readFileSync('fixtures/contract/plan.v1/valid-full.json', 'utf8').replaceAll('Umer', 'the reviewer'));
@@ -52,7 +52,7 @@ server = spawn(process.execPath, ['dist/cli.js', 'serve', board, '--port', '0'],
       })));`));
       if (!process.env.DOCUMENT_BEFORE) {
         assert.ok(geometry.fitted && geometry.width >= geometry.available - 1, JSON.stringify(geometry));
-        assert.ok(geometry.child && geometry.frame >= geometry.child.height - 1 && geometry.child.inner === 0 && geometry.child.width <= geometry.width + 1, JSON.stringify(geometry));
+        assert.ok(geometry.child && geometry.frame >= geometry.child.height - 1 && geometry.child.inner === 0 && geometry.child.scrollbar === 0 && geometry.child.width <= geometry.width + 1, JSON.stringify(geometry));
         assert.equal(geometry.overflow, false); assert.deepEqual(geometry.scrollers, [name === 'report' ? 'read' : 'plan-scroll']);
       }
       const stem = `${name}.${theme}.${width}w`;

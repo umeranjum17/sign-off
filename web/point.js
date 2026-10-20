@@ -42,6 +42,8 @@
   addEventListener('message', (m) => {
     if (m.source === parent && m.data?.['sign-off'] === 'point') on = m.data.on === true;
     if (m.source === parent && m.data?.['sign-off'] === 'size') {
+      // The document reader owns scrolling; its frame follows the entire content height.
+      document.documentElement.style.overflow = 'hidden';
       const size = () => parent.postMessage({ height: document.documentElement.scrollHeight }, '*');
       new ResizeObserver(size).observe(document.body); size();
     }
