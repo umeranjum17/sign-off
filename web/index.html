@@ -2084,7 +2084,8 @@
     const rc = (part, small) => { const box = E('div', `gd-rc${small ? ' s' : ''}`); rcs.set(part + (small ? '~s' : ''), box); return box; };
     const paintRc = () => rcs.forEach((box, k) => box.replaceChildren(...receipt(k.replace(/~s$/, ''))));
 
-    // ---- Go deeper: the person's ask, the agent's answer streaming in under the part
+    const actionLabels = { question: 'Ask a question', deeper: 'Go deeper', simplify: 'Simplify this', example: 'Show an example', why: 'Why?', custom: 'Your ask' };
+    // ---- The person's ask, the agent's answer streaming in under the part
     const asksOf = (part) => (state.deeper ?? []).filter((x) => x.key === key && x.part === part);
     const unfinished = () => (state.deeper ?? []).some((x) => x.key === key && !x.done);
     function paintAns(part) {
@@ -2095,7 +2096,7 @@
         const delivery = state.delivery?.[a.id];
         const waiting = !a.read, writing = !!a.text && !a.done, late = waiting && Date.now() - Date.parse(a.at) > 60_000;
         const head = a.done ? [E('i', 'dot'), `Agent answered ${hhmm(a.answered)}`] : writing ? [E('i', 'dot'), 'Agent is answering'] : waiting ? [E('i', 'dot'), a.version === 1 ? delivery?.state === 'delivered' ? 'Delivered; waiting for the owner to read it' : 'Pending: waiting for the owner' : 'Waiting for the agent to read it'] : [E('i', 'dot'), `Agent read it ${hhmm(a.read)}, working on it`];
-        const block = E('div', `gask${a.done ? '' : ' live'}`, E('div', 'hd', ...head, ...(a.version === 1 && a.text && a.seen !== a.answerRevision ? [E('b', 'gd-chip', 'New')] : [])), E('p', 'q', a.q ? `You asked: ${a.q}` : `${a.action === 'simplify' ? 'Simplify this' : 'Go deeper'}: ${a.about}`),
+        const block = E('div', `gask${a.done ? '' : ' live'}`, E('div', 'hd', ...head, ...(a.version === 1 && a.text && a.seen !== a.answerRevision ? [E('b', 'gd-chip', 'New')] : [])), E('p', 'q', `${actionLabels[a.action] ?? 'Go deeper'}: ${a.q ?? a.about}`),
           ...(a.selection ? [E('blockquote', '', a.selection.quote)] : []),
           ...(a.version === 1 && delivery?.error ? [E('p', 'gd-err', `Delivery pending: ${delivery.error}`)] : []),
           ...(a.text ? a.text.split(/\n+/).map((t, i, all) => E('p', '', t, ...(writing && i === all.length - 1 ? [E('span', 'caret')] : []))) : [E('div', 'shim', ''), E('div', 'shim', '')]),
@@ -2108,7 +2109,7 @@
       const form = el('form', { class: 'gd-fu' }), input = el('input', { 'aria-label': 'Ask a follow-up', placeholder: 'Ask a follow-up', maxlength: '500' }), go = el('button', { type: 'submit' }, 'Ask');
       form.append(input, go);
       form.onsubmit = (e) => { e.preventDefault(); const q = input.value.trim(); if (q) ask(part, q); };
-      panel.replaceChildren(...blocks, ...(done && live ? [form] : []));
+      panel.replaceChildren(...blocks, ...(done && live && !d.engagement ? [form] : []));
     }
     async function ask(part, q) {
       const panel = panels.get(part);
@@ -2132,17 +2133,31 @@
       b.onclick = () => { const open = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(open)); p.hidden = !open; };
       return [b, p];
     };
-    const simplifyBtn = (part) => {
-      const b = el('button', { class: 'gd-lnk simplify', type: 'button' }, 'Simplify this');
-      b.onclick = async () => {
-        b.disabled = true;
-        try { await postJson('/api/engagement', { version: 1, id: crypto.randomUUID(), key, ...d.engagement, part, action: 'simplify' }); sync(); }
-        catch (e) { const p = panels.get(part); p.hidden = false; p.append(E('p', 'gd-err', `Could not ask: ${e.message}`)); }
-        finally { b.disabled = false; }
-      };
-      return b;
+    async function engage(part, action, q, id = crypto.randomUUID()) {
+      const p = panels.get(part);
+      p.hidden = false;
+      try { await postJson('/api/engagement', { version: 1, id, key, ...d.engagement, part, action, ...(q !== undefined && { q }) }); sync(); }
+      catch (e) {
+        const retry = el('button', { type: 'button', class: 'gd-lnk' }, 'Retry');
+        const error = E('p', 'gd-err', `Could not ask: ${e.message} `, retry);
+        retry.onclick = () => { error.remove(); engage(part, action, q, id); };
+        p.append(error);
+      }
+    }
+    const acts = (part, rows) => {
+      const [db, dp] = rows?.length ? detailsBtn(part, rows) : [];
+      const panel = live ? ansPanel(part) : null;
+      const form = el('form', { class: 'gd-fu' }), input = el('input', { 'aria-label': 'Ask about this part', placeholder: 'Ask anything about this part' }), send = el('button', { type: 'submit' }, 'Send');
+      let action = 'custom';
+      form.append(input, send);
+      form.onsubmit = (e) => { e.preventDefault(); if (input.value.trim()) { engage(part, action, input.value); input.value = ''; action = 'custom'; input.placeholder = 'Ask a follow-up'; } };
+      const buttons = d.engagement ? Object.entries(actionLabels).filter(([a]) => a !== 'custom').map(([a, label]) => {
+        const b = el('button', { class: `gd-lnk ${a === 'deeper' ? 'deep' : a}`, type: 'button' }, label);
+        b.onclick = () => { if (a === 'question') { action = a; input.focus(); } else engage(part, a); };
+        return b;
+      }) : [deepBtn(part)];
+      return [E('div', 'gd-acts', ...(db ? [db] : []), ...(live ? buttons : [])), ...(dp ? [dp] : []), ...(live ? [...(d.engagement ? [form] : []), panel] : [])];
     };
-    const acts = (part, rows) => { const [db, dp] = rows?.length ? detailsBtn(part, rows) : []; return [E('div', 'gd-acts', ...(db ? [db] : []), ...(live ? [deepBtn(part), ...(d.engagement ? [simplifyBtn(part)] : [])] : [])), ...(dp ? [dp] : []), ...(live ? [ansPanel(part)] : [])]; };
 
     // ---- the picture
     function visual(v) {
@@ -2314,7 +2329,7 @@
     function sync() {
       if (!root.isConnected && timer) { clearInterval(timer); timer = undefined; return; }
       syncU(); paintOpts(); paintSummary(); paintRc(); paintRail();
-      panels.forEach((_, part) => { paintAns(part); if (asksOf(part).length && deeps.get(part).getAttribute('aria-expanded') === 'false' && !deeps.get(part).dataset.shut) { deeps.get(part).setAttribute('aria-expanded', 'true'); panels.get(part).hidden = false; } });
+      panels.forEach((_, part) => { paintAns(part); if (asksOf(part).length && (d.engagement || (deeps.get(part).getAttribute('aria-expanded') === 'false' && !deeps.get(part).dataset.shut))) { deeps.get(part)?.setAttribute('aria-expanded', 'true'); panels.get(part).hidden = false; } });
       const need = live && (unfinished() || (plan && sent() && !state.seen_at?.[key]) || (!plan && S.told && !(state.messages ?? []).some((m) => m.key === key && m.text.startsWith(NOTOFF) && m.delivered)));
       if (need && !timer) timer = setInterval(async () => {
         if (!root.isConnected) { clearInterval(timer); timer = undefined; return; }

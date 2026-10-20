@@ -586,7 +586,8 @@ export function checkEngagement(file: string, ask: Deeper) {
 export function askEngagement(file: string, input: any) {
   if (!input || typeof input !== 'object' || Object.keys(input).some(k => !['version', 'id', 'key', 'kind', 'schema', 'filer', 'revision', 'part', 'action', 'q', 'selection'].includes(k))) throw new InputError('Unknown engagement field');
   const d = loadDecisions(file).find(d => d.key === input.key), about = d && typeof input.part === 'string' && guidePart(d, input.part);
-  if (input.version !== 1 || !isKey(input.id) || !about || input.part.split(':').length > 2 || !d?.engagement || input.action !== 'simplify' || input.q !== undefined) throw new InputError('Send a version 1 Simplify request with an id and valid part');
+  if (input.version !== 1 || !isKey(input.id) || !about || input.part.split(':').length > 2 || !d?.engagement || !['question', 'deeper', 'simplify', 'example', 'why', 'custom'].includes(input.action)) throw new InputError('Send a version 1 engagement request with an id, action and valid part');
+  if ((['question', 'custom'].includes(input.action) || input.q !== undefined) && (typeof input.q !== 'string' || !input.q.trim() || [...input.q].length > 500)) throw new InputError('Question and custom asks need text, at most 500 code points');
   for (const k of ['kind', 'schema', 'filer', 'revision'] as const) if (input[k] !== d.engagement[k]) throw new InputError('This target is stale; reload and ask again');
   const s = input.selection;
   if (s !== undefined) {

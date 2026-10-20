@@ -709,6 +709,8 @@ test('a guided plan and report: report init writes them to fill, post refuses FI
       assert.equal(posted.status, 0, posted.stdout);
       const d = (await state()).decisions.find(d => d.key === key), before = readFileSync(board, 'utf8');
       const request = { version: 1, id: `request-${kind}`, key, ...d.engagement, part: 'understood', action: 'simplify' };
+      const cases = JSON.parse(readFileSync(new URL('../fixtures/engagement-v1.json', import.meta.url)));
+      for (const bad of [...cases.invalid, { action: 'custom', q: '🙂'.repeat(501) }]) assert.equal((await post('engagement', { ...request, ...bad })).status, 409);
       for (const bad of [{ ...request, revision: '0'.repeat(64) }, { ...request, filer: 'other' }, { ...request, part: 'found:0:extra' }, { ...request, part: 7 }, { ...request, surprise: true }, { ...request, selection: { field: 'understood.0.text', start: 0, end: 1, quote: 'wrong' } }]) {
         assert.equal((await post('engagement', bad)).status, 409);
         assert.ok(!(await state()).deeper.some(a => a.id === request.id));
@@ -729,6 +731,18 @@ test('a guided plan and report: report init writes them to fill, post refuses FI
       assert.equal((await post('engagement/seen', { id: a.id, answerRevision: 2 })).status, 200);
       a = JSON.parse(run('deeper', board, '--all', '--json').stdout).deeper.find(a => a.id === request.id);
       assert.equal(a.seen, 2);
+      for (const [i, intent] of [...cases.valid, { action: 'custom', q: '🙂'.repeat(500) }].entries()) {
+        const ask = { ...request, ...intent, id: `${request.id}-intent-${i}`, part: 'next' };
+        assert.equal((await post('engagement', ask)).status, 200);
+        assert.equal((await post('engagement', ask)).status, 200);
+        assert.equal((await post('engagement', { ...ask, q: 'Different text' })).status, 409);
+        const saved = (await state()).deeper.find(a => a.id === ask.id);
+        assert.deepEqual([saved.action, saved.part, saved.q], [intent.action, 'next', intent.q]);
+      }
+      assert.equal((await state()).deeper.filter(a => a.key === key).length, 9);
+      const intents = run('wait', board, '--filer', m.filer, '--events', '--timeout', '0').stdout.trim().split('\n').map(JSON.parse);
+      assert.equal(intents.length, 7);
+      for (const [i, intent] of [...cases.valid, { action: 'custom', q: '🙂'.repeat(500) }].entries()) assert.deepEqual([intents[i].action, intents[i].part, intents[i].q], [intent.action, 'next', intent.q]);
       assert.equal(readFileSync(board, 'utf8'), before, 'explanations never rewrite plan decisions or the document');
       const changed = JSON.parse(before); changed.items.find(i => i.key === key).title += ' revised'; writeFileSync(board, JSON.stringify(changed));
       const stale = run('deeper', board, '--id', request.id + '-second', '--filer', m.filer, '--text', 'Stale');
