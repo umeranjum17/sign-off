@@ -277,7 +277,7 @@ test('a merged card is hidden while its shown merger waits, and shown again once
 test('a merge cannot name a card that is already answered or dismissed', async () => {
   const store = await import(new URL('../dist/store.js', import.meta.url));
   const board = join(scratch, 'closed-merge.json');
-  for (const key of ['closed-c', 'closed-d']) assert.equal(run('raise', board, '--key', key, ...good.slice(2), '--title', 'Ship the sign-in screen?').status, 0);
+  for (const [key, title] of [['closed-c', 'Ship the sign-in screen?'], ['closed-d', 'Retire the sign-in screen?']]) assert.equal(run('raise', board, '--key', key, ...good.slice(2), '--title', title).status, 0);
   store.appendAnswer(board, store.loadDecisions(board).find((d) => d.key === 'closed-c'), { value: 'yes', label: 'Yes' });
   store.appendDismissed(board, ['closed-d'], true);
   for (const [key, state] of [['closed-c', 'answered'], ['closed-d', 'dismissed']]) {

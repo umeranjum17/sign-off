@@ -47,7 +47,9 @@ so post "$board" --kind evidence --from "$dir/evidence-run.json" >/dev/null
 so post "$board" --key ship --title "When should the new settings page ship?" --about "No new bug reports for three weeks." --why "No new bug reports for three weeks." \
   --option friday=Friday --option next-week="Next week" --outcome friday="The page ships Friday." --outcome next-week="The page ships next week." --recommend friday --recommend-reason "Three quiet weeks support shipping." --default next-week \
   --proof update-2
-so post "$board" --kind report --from "$f/report.v2/valid-full.json" || \
+# The fixture is dated 2026-10-13 and a board archives reports a day after they were filed, so the seed files it as of now.
+sed -E "s/\"filed\": *\"[^\"]*\"/\"filed\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"/" "$f/report.v2/valid-full.json" > "$dir/report-now.json"
+so post "$board" --kind report --from "$dir/report-now.json" || \
   so post "$board" --type report --title "Sign-in now takes 2 steps" --about "Why the code step moved first." --view page/index.html --preview page/preview.svg
 so post "$board" --key digest-old --title "Send the digest on Mondays?" --why "Choose the weekly digest schedule." --outcome yes="The digest goes out Mondays." --outcome no="The digest is paused." --recommend yes --recommend-reason "A weekly update stays useful." --default yes
 

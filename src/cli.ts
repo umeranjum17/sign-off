@@ -12,7 +12,7 @@ import { basename, delimiter, dirname, extname, isAbsolute, join, relative, reso
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, asks, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, sameDecision, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -80,6 +80,7 @@ Every question meets the question standard (docs/contract.md, "Asking a good que
   yes and no are labelled Yes and No; a question never takes Done, OK or Not now buttons.
 One decision is one card: look at the open cards first. --merge <key> (up to 10) names other cards on the board that ask the same thing and offer every option of this one:
 they are hidden while this one waits, and its answer closes them too, with the same value and a note naming this key. A merged card merges nothing itself, a card is named by one ask until that ask is answered, and an answered or dismissed card cannot be merged.
+A new ask that repeats an open ask on the same decision (the same answers, titles that share at least 80% of their words), from anyone, is not posted: the refusal names the card to wait on. When one is answered, every open ask on the same decision takes the answer and leaves Decide.
 --proof <key> names an evidence update already on the board that this ask rests on: Decide shows its capture and result at the top.
 The user answers with one tap and can undo it for a few seconds.
 --from adds every decision in a decisions file: ${FORMAT}
@@ -258,10 +259,14 @@ examples:
   sign-off-axi signin done --key npm-login
 `,
   dismiss: `usage: sign-off-axi dismiss <key> [board.json]
+       sign-off-axi dismiss --filer <id> [board.json]
 Hides a card from the board, like its Dismiss button. The agent is not told, and an ask it waits on keeps waiting.
+--filer <id> closes a finished task: every card that id still has waiting leaves the board. Run it when your work ends, so nothing of yours is left on Decide.
+Evidence and reports leave the main view by themselves a day after they were filed; they stay under Archived on their screen, and restore brings one back for good.
 restore <key> [board.json] brings it back. Find the key with \`sign-off-axi list --full\`.
 examples:
   sign-off-axi dismiss ship-the-new-sign-in-screen-this-week
+  sign-off-axi dismiss --filer agent-41
   sign-off-axi restore ship-the-new-sign-in-screen-this-week
 `,
   refile: `usage: sign-off-axi refile <key> [board.json] --media <file>... [--link <commit or URL>]
@@ -489,13 +494,15 @@ const waitFor = (on: string, filer?: string, key?: string) => (filer ? `Run \`si
   : `Run \`sign-off-axi wait${on}${key ? ` --key ${key}` : ''}\` to block until the user answers`);
 
 /** Still waiting on the user: not answered, not dismissed, and something to answer (an item with no options and no reply is only shown). */
-const waits = (d: Decision & { answer?: unknown; dismissed?: boolean }) => d.type !== 'evidence' && !d.dismissed && awaitsVerdict(d.type, d.answer as { answer?: string } | undefined) && (d.options.length > 0 || !!d.reply || d.type === 'signin' || d.type === 'plan' || d.type === 'design');
+const waits = (d: Decision & { answer?: unknown; dismissed?: boolean }) => asks(d) && !d.dismissed && awaitsVerdict(d.type, d.answer as { answer?: string } | undefined);
+/** The items that archive after a day: all of them, except on a board another program feeds, which owns what it shows. */
+const archivable = (file: string, decisions: Decision[]) => ((x) => (x.readonly === true || x.answers_only === true ? [] : decisions))(readItems(file).extra);
 /** The board's decisions with their latest answer; a missing board file is an empty board.
  *  A dismissal hides an item from the board and is not waiting here either, checked against the same dismissed log the board reads. */
 function board(file: string, say = warn) {
   if (!existsSync(file)) return [];
   const decisions = loadDecisions(file), answers = readAnswers(file, say);
-  const hidden = new Set(readDismissed(file, answers, readRounds(file), say));
+  const hidden = new Set(readDismissed(file, answers, readRounds(file), say, archivable(file, decisions)));
   for (const key of Object.keys(answers)) if (!decisions.some((d) => d.key === key)) say(`left out the answer for ${key}: that question is no longer in ${basename(file)}`);
   return decisions.map((d) => ({ ...d, answer: Object.hasOwn(answers, d.key) ? answers[d.key] : undefined, dismissed: hidden.has(d.key) }));
 }
@@ -869,10 +876,18 @@ function signin(args: string[]) {
 function dismiss(restoring: boolean) {
   const cmd = restoring ? 'restore' : 'dismiss';
   return (args: string[]) => {
-    const at = args.findIndex((a) => !a.startsWith('-') && !existsSync(a) && !a.endsWith('.json')), key = args[at];
-    if (at < 0) throw fail(`${cmd} needs a card key`, 'VALIDATION_ERROR', `sign-off-axi ${cmd} <key> [board.json]`);
-    const { file, on } = parse(cmd, args.filter((_, i) => i !== at), {});
+    // dismiss --filer <id> closes a finished task: every card that filer still has waiting leaves the board.
+    const f = restoring ? -1 : args.findIndex((a) => a === '--filer'), filer = f < 0 ? undefined : args[f + 1], rest = f < 0 ? args : args.filter((_, i) => i !== f && i !== f + 1);
+    if (f >= 0 && !isKey(filer)) throw fail('--filer needs an id of 1-128 of A-Z a-z 0-9 . _ -', 'VALIDATION_ERROR', 'Pass the id you posted with');
+    const at = rest.findIndex((a) => !a.startsWith('-') && !existsSync(a) && !a.endsWith('.json')), key = rest[at];
+    if (at < 0 && f < 0) throw fail(`${cmd} needs a card key`, 'VALIDATION_ERROR', `sign-off-axi ${cmd} <key> [board.json]`);
+    const { file, on } = parse(cmd, rest.filter((_, i) => i !== at), {});
     return locked(`${file}.lock`, () => {
+      if (filer) {
+        const keys = board(file).filter((d) => d.filer === filer && waits(d)).map((d) => d.key);
+        if (keys.length) appendDismissed(file, keys, true);
+        return toon({ board: tilde(file), dismissed: keys.length ? keys : `0 cards of ${filer} were waiting` }, keys.length ? [`Run \`sign-off-axi restore${on} <key>\` to bring one back`] : []);
+      }
       if (!isKey(key) || !board(file).some((x) => x.key === key)) throw fail(`no card with key ${key} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi list${on} --full\` to see the keys`);
       appendDismissed(file, [key], !restoring);
       return toon({ board: tilde(file), [restoring ? 'restored' : 'dismissed']: [key] }, [`Run \`sign-off-axi ${restoring ? 'dismiss' : 'restore'}${on} ${key}\` to undo`]);
@@ -1258,6 +1273,11 @@ function storeIncoming(file: string, named: string, on: string, { incoming, raw 
     // Proof is evidence: a new ask that offers Pass and Fail would sit in Waiting on you as an ask, so it is refused.
     const proof = incoming.find((d) => d.type === 'decision' && !d.kind && !current.some((c) => c.key === d.key) && ['pass', 'fail'].every((v) => d.options.some((o) => o.value === v)));
     if (proof) throw fail(`key ${proof.key} offers Pass and Fail: a proof is not an ask and would wait on you`, 'VALIDATION_ERROR', 'Post it with sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media <file>');
+    // One decision is one card: a new ask that repeats an open one, whoever filed it, is not posted. Merging it into that card is the way to ask it better.
+    for (const d of incoming) {
+      const open = current.some((c) => c.key === d.key) ? undefined : current.find((c) => waits(c) && !d.merges?.includes(c.key) && sameDecision(c, d));
+      if (open) throw fail(`key ${d.key} asks what ${open.key} already asks, and ${open.key} still waits`, 'CONFLICT', `Wait on it: \`sign-off-axi wait${on} --key ${open.key}\`; or post this ask with --merge ${open.key} to ask it better`);
+    }
     const raised = incoming.map((d, i) => {
       const had = current.find((c) => c.key === d.key);
       // A contract message refused for its key exits 2 like any other refusal (contract section 4); raise --title keeps exit 1.
@@ -2013,7 +2033,7 @@ const state = () => {
     rounds,
     messages: readMessages(file, warn),
     annotations: readOnly() || answersOnly() ? [] : ((sent) => readAnnotations(file, warn).map((a) => (sent.has(a.id) ? { ...a, sent: true } : a)))(sentIds(file)),
-    dismissed: readDismissed(file, answers, rounds, warn),
+    dismissed: readDismissed(file, answers, rounds, warn, archivable(file, loadDecisions(file))),
   };
 };
 /** A mock file's sha256 now, or null when it is gone: a comment shows only on the exact file it was made on.

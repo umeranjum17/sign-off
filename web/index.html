@@ -1917,16 +1917,16 @@
       }))]);
   }
 
-  /** The asks dismissed from Waiting on you, folded under one row; Restore puts one back on the board. */
-  function dismissed(items) {
+  /** The asks dismissed from Waiting on you, or the evidence and reports archived a day after they were filed, folded under one row; Restore puts one back on the board. */
+  function dismissed(items, name = 'Dismissed') {
     if (!canDismiss() || !items.length) return '';
-    const box = el('details', { class: 'other gone-asks', ...(opened.has('#dismissed') && { open: '' }) }, el('summary', {}, `Dismissed (${items.length})`),
+    const box = el('details', { class: 'other gone-asks', ...(opened.has(`#${name}`) && { open: '' }) }, el('summary', {}, `${name} (${items.length})`),
       el('ul', { class: 'rows' }, ...items.map((d) => {
         const b = el('button', { class: 'dis', 'aria-label': `Restore, ${d.title}` }, 'Restore');
         b.onclick = () => setDismissed([d.key], false).then(() => say('Back on the board', 3000), (e) => say(`Couldn't restore: ${e.message}`, 8000));
         return el('li', {}, el('strong', { dir: 'auto' }, title(d)), b);
       })));
-    box.ontoggle = () => (box.open ? opened.add('#dismissed') : opened.delete('#dismissed'));
+    box.ontoggle = () => (box.open ? opened.add(`#${name}`) : opened.delete(`#${name}`));
     return box;
   }
   // Waiting on you reads newest first; the viewer may choose oldest first, which stays in this browser (a failed read or write keeps the default).
@@ -2073,8 +2073,9 @@
     for (const d of [...state.decisions].reverse()) if (!gone.has(d.key) && !merged.has(d.key) && !lapsed(d)) by[area(d)].push(d);
     by.evidence.sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
     by.designs = [...state.decisions].reverse().filter((d) => d.kind === 'design' && !gone.has(d.key));
-    // Proven today counts every update filed today that is not dismissed, answered or not: a verdict moves it off Evidence, not out of today's count.
-    by.provenToday = filedToday(state.decisions.filter((d) => d.type === 'evidence' && !gone.has(d.key))).sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
+    // Proven today counts every update filed in the last 24 hours that is not dismissed, answered or not: a verdict moves it off Evidence, not out of the count.
+    // It is the window Evidence archives after, so an update Evidence shows from last evening is counted too (only a restored or read-only board's older updates differ).
+    by.provenToday = state.decisions.filter((d) => d.type === 'evidence' && !gone.has(d.key) && Date.now() - Date.parse(d.filed) <= 864e5).sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
     // Waiting on you reads newest first unless the viewer chose oldest first. A sign-in blocks someone now, so sign-ins come first either way.
     let latest = -Infinity;
     const inFileOrder = by.waiting.slice().reverse().map((d, i) => { const t = Date.parse(d.filed); if (!Number.isNaN(t)) latest = t; return { d, t: latest, i }; });
@@ -2120,8 +2121,8 @@
     document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [filters(by.waiting), waitingPage(shown, hidden)]
       : at === 'decide' ? [decideAt < 0 ? (key ? el('p', { class: 'empty' }, 'Nothing to decide for that question.') : el('div', { class: 'decide' }, decideLists(null, decideQueue)))
         : decidePage(decideQueue[decideAt], decideQueue.length > 1 ? decideQueue[(decideAt + 1) % decideQueue.length] : undefined, decideQueue)]
-      : at === 'designs' ? [...designGroups(by.designs)] : at === 'evidence' ? evidenceGroups(by.evidence) : at === 'reports' && !state.readonly ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
-        ...(by.reports.length ? reportGroups(by.reports) : [el('p', { class: 'empty' }, EMPTY.reports)]), notes(by.notes)] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [at === 'waiting' ? filters(by.waiting) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...(at === 'waiting' ? shown : by[at]).map(row))
+      : at === 'designs' ? [...designGroups(by.designs)] : at === 'evidence' ? [...evidenceGroups(by.evidence), dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived')] : at === 'reports' && !state.readonly ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
+        ...(by.reports.length ? reportGroups(by.reports) : [el('p', { class: 'empty' }, EMPTY.reports)]), notes(by.notes), dismissed(state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && ['reports', 'notes'].includes(area(d))), 'Archived')] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [at === 'waiting' ? filters(by.waiting) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...(at === 'waiting' ? shown : by[at]).map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [search(), glance(by),
       el('div', { class: 'tiles' }, tile('waiting', by.waiting.length, 'Need you'), tile('evidence', by.provenToday.length, 'Proven today'), tile('reports', filedToday(by.reports).length, 'New report')),
       el('div', { class: 'areas' }, waitingSection(by.waiting, by.answered, by.designs), proven(by.evidence, by.provenToday), newReport(by.reports)), ...(state.leash ? leash() : []),
