@@ -1428,7 +1428,7 @@
   }
   /** Today at a glance, in a few short sentences: what needs you and what was proven in full colour, when the soonest ask closes and the new reports quieter. */
   function glance(by) {
-    const n = by.waiting.length, proven = filedToday(by.evidence).length, fresh = filedToday(by.reports).length;
+    const n = by.waiting.length, proven = by.provenToday.length, fresh = filedToday(by.reports).length;
     const soonest = by.waiting.map((d) => d.silent_by).filter(Boolean).sort((x, y) => Date.parse(x) - Date.parse(y))[0];
     const lines = [[n ? `${n} ${n === 1 ? 'decision needs' : 'decisions need'} you.` : 'Nothing needs you.', 1], [soonest && `The soonest closes at ${when(soonest)}.`],
       [proven && `${proven} ${proven === 1 ? 'update' : 'updates'} filed.`, 1], [fresh && `${fresh} new ${fresh === 1 ? 'report is' : 'reports are'} waiting.`]];
@@ -1472,8 +1472,7 @@
   }
 
   /** Proven today on Today: a swipeable row of today's updates, each with its own result and capture; a wide screen sets them three across. */
-  function proven(items) {
-    const fresh = filedToday(items);
+  function proven(items, fresh) {
     return el('section', { class: 'i-evidence wide' }, el('div', { class: 'sec-head' }, el('h2', {}, 'Proven today'), items.length ? el('a', { href: '#evidence' }, 'See all') : ''),
       fresh.length ? el('div', { class: 'ev-scroll-row' }, ...fresh.slice(0, 3).map((d) => withX(d, evCard(d)))) : el('p', { class: 'empty' }, 'Nothing proven today yet.'));
   }
@@ -2038,6 +2037,8 @@
     for (const d of [...state.decisions].reverse()) if (!gone.has(d.key) && !merged.has(d.key)) by[area(d)].push(d);
     by.evidence.sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
     by.designs = [...state.decisions].reverse().filter((d) => d.kind === 'design' && !gone.has(d.key));
+    // Proven today counts every update filed today that is not dismissed, answered or not: a verdict moves it off Evidence, not out of today's count.
+    by.provenToday = filedToday(state.decisions.filter((d) => d.type === 'evidence' && !gone.has(d.key))).sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
     // Waiting on you reads newest first unless the viewer chose oldest first. A sign-in blocks someone now, so sign-ins come first either way.
     let latest = -Infinity;
     const inFileOrder = by.waiting.slice().reverse().map((d, i) => { const t = Date.parse(d.filed); if (!Number.isNaN(t)) latest = t; return { d, t: latest, i }; });
@@ -2086,8 +2087,8 @@
       : at === 'designs' ? [...designGroups(by.designs)] : at === 'evidence' ? evidenceGroups(by.evidence) : at === 'reports' && !state.readonly ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
         ...(by.reports.length ? reportGroups(by.reports) : [el('p', { class: 'empty' }, EMPTY.reports)]), notes(by.notes)] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [at === 'waiting' ? filters(by.waiting) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...(at === 'waiting' ? shown : by[at]).map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [search(), glance(by),
-      el('div', { class: 'tiles' }, tile('waiting', by.waiting.length, 'Need you'), tile('evidence', filedToday(by.evidence).length, 'Proven today'), tile('reports', filedToday(by.reports).length, 'New report')),
-      el('div', { class: 'areas' }, waitingSection(by.waiting, by.answered, by.designs), proven(by.evidence), newReport(by.reports)), ...(state.leash ? leash() : []),
+      el('div', { class: 'tiles' }, tile('waiting', by.waiting.length, 'Need you'), tile('evidence', by.provenToday.length, 'Proven today'), tile('reports', filedToday(by.reports).length, 'New report')),
+      el('div', { class: 'areas' }, waitingSection(by.waiting, by.answered, by.designs), proven(by.evidence, by.provenToday), newReport(by.reports)), ...(state.leash ? leash() : []),
       ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()])]));
     readPage(key ? state.decisions.find((d) => d.key === key && !gone.has(d.key) && (at === 'reports' && reads(d) || at === 'designs' && d.kind === 'design' || at === 'evidence' && d.type === 'evidence' || d.type === 'plan' && area(d) === at)) : undefined, at);
     if (at === 'decide') document.querySelector('#board .decide')?.prepend(bulkBar(bulk));

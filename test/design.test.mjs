@@ -2289,6 +2289,12 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   // Back on the list, that update is answered, so it leaves Evidence for Answered.
   await evaluate('location.hash = "#evidence"');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 5);
+  // Answering an update takes it off Evidence, not out of today's count: Proven today and the glance still count and show it.
+  await evaluate('location.hash = ""');
+  await until(async () => (await evaluate('document.querySelector(".glance")?.textContent.includes("5 updates filed.")')) === true);
+  assert.deepEqual(await evaluate('[document.querySelector(".tile.i-evidence .n").textContent, !!document.querySelector(".ev-scroll-row")]'), ['5', true]);
+  await evaluate('location.hash = "#evidence"');
+  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 5);
   close();
   // On a phone the card keeps the screen's width, the update's own screen never scrolls sideways and nothing squashes.
   ({ evaluate, close } = await browse(join(dir, 'p'), 390));
