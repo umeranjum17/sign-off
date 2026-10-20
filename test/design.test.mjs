@@ -521,7 +521,7 @@ const browserFor = async () => {
   return (shared = { proc, ws, call });
 };
 /** A page of its own in the shared browser: evaluate(js) returns the value, or undefined while a page is still loading. */
-async function browse(_dir, width = 800, height = 4000) {
+async function browse(_dir, width = 800, height = 4000, mobile = false) {
   const { call } = await browserFor();
   // A browser context of its own is a fresh profile per test: no localStorage, cookies or cache from an earlier board on the same port.
   const { browserContextId } = await call('Target.createBrowserContext', { disposeOnDetach: true });
@@ -539,7 +539,7 @@ async function browse(_dir, width = 800, height = 4000) {
   // On a busy host, input sent right after a redraw can miss the sandboxed frame it aims at, so each input waits for the page to paint first.
   const painted = () => send('Runtime.evaluate', { expression: 'new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)))', awaitPromise: true });
   // Headless Chrome keeps a window at least 500 px wide, so the page is set to the asked width as a phone would be.
-  await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
+  await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile });
   // A real mouse click at a point of the page, which reaches into a frame there as a person's would.
   const click = async ([x, y]) => { await painted(); for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 }); };
   // A real touch tap at a point of the page, as a phone's would.
@@ -598,6 +598,81 @@ test('an interactive page that posts its height gets a frame that fits it, each 
   assert.ok(figures[0].indexOf('</iframe>') < figures[0].indexOf('option-link'));
   assert.equal(figures.filter((f) => f.includes('option-link')).length, 1);
   close();
+  proc.kill();
+});
+
+test('report and plan documents use one page scroll and the available width at 390 and 1280', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'document-scroll'), file = join(dir, 'board.json');
+  mkdirSync(join(dir, 'page'), { recursive: true });
+  // A real sandboxed document reports its geometry; the board cannot inspect its opaque origin.
+  writeFileSync(join(dir, 'page', 'index.html'), readFileSync(new URL('../fixtures/contract/plan.v1/page/index.html', import.meta.url), 'utf8') + `<style>html{overflow-y:scroll}body{margin:0;font:18px sans-serif}p{margin:0;padding:20px}</style>
+    ${'<p>A long public release note, with enough text to wrap on a phone.</p>'.repeat(220)}
+    <script>
+    const measure = () => parent.postMessage({documentGeometry: {
+      height: document.documentElement.scrollHeight, width: document.documentElement.scrollWidth,
+      scrollbar: innerWidth - document.documentElement.clientWidth, viewport: innerHeight, childViewportWidth: innerWidth, inner: [...document.querySelectorAll('body *')].filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1).length
+    }}, '*');
+    new ResizeObserver(measure).observe(document.body); addEventListener('resize', measure);
+    addEventListener('message', e => { if(e.source === parent && e.data === 'grow') { document.body.insertAdjacentHTML('beforeend', '<p style="height:700px">Late content</p>'); measure(); } });
+    measure(); setInterval(measure, 200);</script>`);
+  const plan = JSON.parse(readFileSync(new URL('../fixtures/contract/plan.v1/valid-full.json', import.meta.url), 'utf8'));
+  writeFileSync(join(dir, 'plan.json'), JSON.stringify(plan));
+  assert.equal(run('post', file, '--kind', 'plan', '--from', join(dir, 'plan.json')).code, 0);
+  const stored = JSON.parse(readFileSync(file, 'utf8'));
+  stored.items.push({ contract: 1, kind: 'report', schema: 2, key: 'release', title: 'Latest stable build: muxr 0.2.8', view: 'page/index.html', preview: 'page/preview.svg', filed: new Date().toISOString() });
+  writeFileSync(file, JSON.stringify(stored));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const exported = join(dir, 'board.html');
+  assert.equal(run('export', file, '--out', exported).code, 0);
+  const copyServer = createHttpServer((_req, res) => { res.setHeader('content-type', 'text/html'); res.end(readFileSync(exported)); });
+  await new Promise(ok => copyServer.listen(0, '127.0.0.1', ok));
+  after(() => new Promise(ok => copyServer.close(ok)));
+  for (const base of [url, `http://127.0.0.1:${copyServer.address().port}/`]) for (const [width, mobile] of [[390, false], [390, true], [1280, false]]) {
+    const { evaluate, close } = await browse(dir, width, 844, mobile);
+    try {
+      await evaluate(`location.href = ${JSON.stringify(base)}`);
+      await until(() => evaluate('!!window.state || !!document.querySelector("#board h1")'));
+      await evaluate(`addEventListener('message', e => {
+        if(e.source !== document.querySelector('#reader iframe')?.contentWindow) return;
+        if(e.data?.documentGeometry) window.geometry = { source: e.source, value: e.data.documentGeometry };
+        if(Number.isFinite(e.data?.height)) window.sizedSource = e.source;
+      })`);
+      for (const hash of ['#reports/release', '#waiting/plan-kind-board']) {
+        await evaluate(`window.geometry = null; window.sizedSource = null; location.hash = ${JSON.stringify(hash)}`);
+        const selector = hash.includes('reports') ? '#reader .read iframe' : '#reader iframe.plan-view';
+        // Read the settled signal and ALL measured values atomically, bound to this route's actual frame.
+        const layout = () => evaluate(`(() => {
+          const frame = document.querySelector(${JSON.stringify(selector)}), signal = window.geometry, g = signal?.value;
+          if (!frame || signal?.source !== frame.contentWindow || window.sizedSource !== frame.contentWindow || frame.clientHeight <= 1
+            || g.viewport !== frame.clientHeight || g.childViewportWidth !== frame.clientWidth) return null;
+          const page = frame.closest('.read, .plan-main'), rect = frame.getBoundingClientRect(), s = getComputedStyle(page);
+          const scrollers = [...document.querySelectorAll('#reader *')].filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1);
+          return { ...g, frameHeight: frame.clientHeight, frameWidth: rect.width,
+            available: page.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight), scrollers: scrollers.map(e => e.className) };
+        })()`);
+        let got;
+        await until(async () => !!(got = await layout()));
+        assert.ok(got.frameHeight >= got.height - 1, `${width} ${hash}: nested document scroll ${JSON.stringify(got)}`);
+        assert.ok(got.frameWidth >= got.available - 1, `${width} ${hash}: narrow document frame ${JSON.stringify(got)}`);
+        assert.ok(got.width <= got.frameWidth + 1 && got.inner === 0, JSON.stringify(got));
+        // A forced document scrollbar must not paint a gutter even after its content fits.
+        assert.equal(got.scrollbar, 0, `painted inner scrollbar at ${width}px (mobile=${mobile}): ${JSON.stringify(got)}`);
+        assert.deepEqual(got.scrollers, [hash.includes('reports') ? 'read' : 'plan-scroll']);
+        const previous = got.frameHeight;
+        await evaluate(`document.querySelector('#reader iframe').contentWindow.postMessage('grow', '*')`);
+        await until(async () => { const next = await layout();
+          if (!next || next.frameHeight <= previous + 600) return false;
+          got = next; return true;
+        });
+        assert.ok(got.frameHeight >= got.height - 1, JSON.stringify(got));
+        console.log('document-layout', JSON.stringify({ surface: base === url ? 'live' : 'exported',
+          document: hash.includes('reports') ? 'report document' : 'plan document', viewportWidth: width, mobile,
+          growth: got.frameHeight - previous, outerScrollContainers: got.scrollers.length, ...got }));
+      }
+    } finally { close(); }
+  }
   proc.kill();
 });
 
