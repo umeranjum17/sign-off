@@ -1,7 +1,7 @@
 // One journey over every card kind (evidence, design, plan, signin, ask) on every tab: each action is found and clicked
 // in the real board, Dismiss and bulk Select included, at 390 and 1280, light and dark, with done-done's look step on every
 // capture. A missing or disabled action, or a look hit, fails the run.
-// Usage: node .agents/skills/verify-sign-off/board-actions.mjs <output> [light|dark] [390|1280]   (no theme or width: all four cells)
+// Usage: node .agents/skills/done-done-verify-sign-off/board-actions.mjs <output> [light|dark] [390|1280]   (no theme or width: all four cells)
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -227,7 +227,7 @@ try {
   for (const [theme, width] of cells) {
     const home = join(dir, `${theme}-${width}`);
     mkdirSync(home);
-    const base = run('bash', [resolve('.agents/skills/verify-sign-off/seed-board.sh'), home], { env: { ...process.env, SEED_SERVE_SECONDS: '900' } }).trim().split('\n').pop();
+    const base = run('bash', [resolve('.agents/skills/done-done-verify-sign-off/seed-board.sh'), home], { env: { ...process.env, SEED_SERVE_SECONDS: '900' } }).trim().split('\n').pop();
     assert.match(base, /^http:\/\/127\.0\.0\.1:\d+\/$/, base);
     try {
       if (first) { await cliLook(base); first = false; }

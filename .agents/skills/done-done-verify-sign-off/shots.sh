@@ -8,7 +8,7 @@
 set -euo pipefail
 url=$1 out=$2; shift 2
 screens=${*:-summary waiting decide designs design-review design-viewer evidence reports answered}
-export CHROME_DEVTOOLS_AXI_SESSION=${CHROME_DEVTOOLS_AXI_SESSION:-verify-sign-off}
+export CHROME_DEVTOOLS_AXI_SESSION=${CHROME_DEVTOOLS_AXI_SESSION:-done-done-verify-sign-off}
 mkdir -p "$out"
 chrome-devtools-axi open "$url" >/dev/null  # a page must be selected before emulate
 WIDTHS='() => { const p = document.querySelector(".design-viewer-panel"), m = (e) => e && Math.round(e.getBoundingClientRect().width); const note = p?.querySelector("textarea"), foot = p?.querySelector(".foot"); return { width: innerWidth, note: m(note), buttons: m(foot), aligned: !!note && !!foot && Math.abs(note.getBoundingClientRect().left - foot.getBoundingClientRect().left) <= 1 && Math.abs(note.getBoundingClientRect().right - foot.getBoundingClientRect().right) <= 1 } }'

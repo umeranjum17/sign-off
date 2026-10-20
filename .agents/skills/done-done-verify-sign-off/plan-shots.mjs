@@ -1,5 +1,5 @@
 // Real CLI post -> browser review -> CLI answers, in one isolated board per matrix cell.
-// Usage: node .agents/skills/verify-sign-off/plan-shots.mjs <output> [light|dark] [390|1280]
+// Usage: node .agents/skills/done-done-verify-sign-off/plan-shots.mjs <output> [light|dark] [390|1280]
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

@@ -1,9 +1,9 @@
 ---
-name: verify-sign-off
+name: done-done-verify-sign-off
 description: Drive the sign-off CLI the way a user does and capture proof it works. Use when proving a sign-off change, capturing evidence, or keeping the feature map honest.
 ---
 
-# verify-sign-off
+# done-done-verify-sign-off
 
 Scaffolded by `done-done init` from this repo's own files (surface: CLI). Where a step says to find something, the first drive finds it and records it there.
 
@@ -11,7 +11,7 @@ Scaffolded by `done-done init` from this repo's own files (surface: CLI). Where 
 
 npm run build, then seed a new board in an empty folder and serve it (one real posted item of each kind, one answered):
 
-d=$(mktemp -d); .agents/skills/verify-sign-off/seed-board.sh "$d"
+d=$(mktemp -d); .agents/skills/done-done-verify-sign-off/seed-board.sh "$d"
 
 It prints the board URL (BASE). It sets HOME and XDG_* to that folder, so your own board (~/.sign-off) is never read or written.
 Ready when the URL answers. Before finishing, run `node dist/cli.js stop <folder>/board.json` with the same isolated HOME/XDG settings as the seed script. Do not shell-kill the printed PID or leave it for the 30-minute safety timeout. Stop only your run's board and browser session.

@@ -6,7 +6,7 @@ import { accessSync, constants, copyFileSync, cpSync, existsSync, mkdirSync, mkd
 import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { recordsDir } from '../.agents/skills/verify-sign-off/records.mjs';
+import { recordsDir } from '../.agents/skills/done-done-verify-sign-off/records.mjs';
 
 const repo = resolve(import.meta.dirname, '..');
 const chrome = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'].find(onPath);
@@ -66,7 +66,7 @@ journeys:
     command: "node helper.mjs other \\"$DONE_DONE_EVIDENCE_ROOT\\""
 `);
     commit(dir);
-    const env = { DONE_DONE_HOME: home, SHOT: png, RECORDS: join(repo, '.agents/skills/verify-sign-off/records.mjs'), PLAN_REVIEW_DIAGNOSTICS: '' };
+    const env = { DONE_DONE_HOME: home, SHOT: png, RECORDS: join(repo, '.agents/skills/done-done-verify-sign-off/records.mjs'), PLAN_REVIEW_DIAGNOSTICS: '' };
 
     const ran = run(dir, ['run', 'plan-review', '--json'], env);
     assert.equal(ran.status, 0, ran.stdout + ran.stderr);
@@ -100,7 +100,7 @@ test('the real plan-review journey passes the real check with identical network 
   try {
     // A committed copy keeps the run clean even while the checkout under test has uncommitted changes.
     const work = join(dir, 'work'), home = join(dir, 'home');
-    for (const path of ['dist', 'web', 'fixtures', '.agents/skills/verify-sign-off']) cpSync(join(repo, path), join(work, path), { recursive: true });
+    for (const path of ['dist', 'web', 'fixtures', '.agents/skills/done-done-verify-sign-off']) cpSync(join(repo, path), join(work, path), { recursive: true });
     cpSync(join(repo, '.done-done.yaml'), join(work, '.done-done.yaml'));
     writeFileSync(join(work, '.gitignore'), 'node_modules\n');
     symlinkSync(join(repo, 'node_modules'), join(work, 'node_modules'), 'dir');
