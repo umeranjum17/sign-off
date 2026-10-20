@@ -777,6 +777,86 @@ test('engagement listeners survive report-only boards, sent plans, timeouts and 
   }
 });
 
+test('standalone owner registration preserves queued failures and separates delivery from owner acknowledgement', async () => {
+  const dir = join(scratch, 'owners'), board = join(dir, 'board.json'), bin = join(dir, 'bin');
+  mkdirSync(bin, { recursive: true }); symlinkSync(process.execPath, join(bin, 'node'));
+  const env = { ...process.env, SIGN_OFF_HOME: dir, HOME: join(dir, 'home'), PATH: bin };
+  delete env.SIGN_OFF_FILER; delete env.CLAUDE_CODE_SESSION_ID; delete env.SIGN_OFF_OWNER_SESSION;
+  const run = (...args) => spawnSync(process.execPath, [cli, ...args], { env, encoding: 'utf8' });
+  const item = { ...JSON.parse(readFileSync(join(fixtures, 'plan.v2/valid-full.json'))), filer: 'umer', key: 'owner-plan' };
+  assert.equal(spawnSync(process.execPath, [cli, 'post', board, '--kind', 'plan', '--from', '-'], { env, encoding: 'utf8', input: JSON.stringify(item) }).status, 0);
+  const session = '3e26877a-e588-4313-a26e-7543f9847910';
+  assert.equal(run('owner', board, '--filer', 'umer', '--host', 'shell', '--session', session, '--cwd', dir).status, 2);
+  assert.equal(run('owner', board, '--filer', 'umer', '--host', 'claude', '--session', session, '--cwd', dir).status, 0);
+  const server = spawn(process.execPath, [cli, 'serve', board, '--port', '0'], { env });
+  try {
+    const url = await new Promise(ok => server.stdout.once('data', b => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+    const response = await fetch(url + 'api/deeper', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: item.key, part: 'this' }) });
+    const id = (await response.json()).deeper[0].id;
+    assert.deepEqual(JSON.parse(run('owner', board, '--dispatch', '--filer', 'other').stdout).delivery, {});
+    for (let restart = 0; restart < 2; restart++) {
+      const state = JSON.parse(run('owner', board, '--dispatch').stdout).delivery[id];
+      assert.equal(state.state, 'queued'); assert.match(state.error, /ENOENT/);
+      assert.equal(JSON.parse(run('deeper', board, '--json').stdout).deeper[0].read, undefined);
+    }
+    assert.equal(run('owner', board, '--ack', id).status, 2);
+    assert.equal(run('deeper', board, '--filer', 'other', '--id', id, '--text', 'wrong').status, 2);
+    env.SIGN_OFF_OWNER_SESSION = session;
+    assert.equal(run('deeper', board, '--id', id, '--text', 'too early').status, 2);
+    assert.equal(run('owner', board, '--ack', id).status, 0);
+    assert.equal(JSON.parse(run('owner', board).stdout).delivery[id].state, 'owner-read');
+    for (let retry = 0; retry < 2; retry++) assert.equal(run('deeper', board, '--id', id, '--text', 'Umer gets one answer.').status, 0);
+    const ask = JSON.parse(run('deeper', board, '--json', '--all').stdout).deeper[0];
+    assert.equal(ask.text, 'Umer gets one answer.'); assert.equal(ask.done, true);
+    assert.equal(run('owner', board, '--dispatch').status, 0);
+  } finally { await new Promise(ok => server.once('close', ok).kill()); }
+});
+
+test('installed standalone Claude owner authors, idles and resumes to finish only its own Go deeper request', { skip: !process.env.SIGN_OFF_LIVE_OWNER, timeout: 240000 }, async () => {
+  const dir = join(scratch, 'installed-owner'); mkdirSync(dir);
+  const evidence = process.env.SIGN_OFF_LIVE_OWNER;
+  const env = { ...process.env, SIGN_OFF_HOME: dir, XDG_CONFIG_HOME: join(dir, 'config'), XDG_STATE_HOME: join(dir, 'state') };
+  delete env.SIGN_OFF_FILER; delete env.CLAUDE_CODE_SESSION_ID; delete env.SIGN_OFF_OWNER_SESSION;
+  const exec = (bin, args, extra = {}) => {
+    const r = spawnSync(bin, args, { cwd: dir, env, encoding: 'utf8', timeout: 120000, ...extra });
+    appendFileSync(join(evidence, 'installed-owner.log'), JSON.stringify({ bin, args, status: r.status, stdout: r.stdout, stderr: r.stderr }) + '\n');
+    assert.equal(r.status, 0, r.stdout + r.stderr); return r.stdout;
+  };
+  const tar = Object.values(JSON.parse(exec('npm', ['pack', new URL('..', import.meta.url).pathname, '--json'])))[0].filename;
+  exec('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', join(dir, tar)]);
+  const installed = join(dir, 'node_modules/sign-off-axi/dist/cli.js'), board = join(dir, 'board.json');
+  const session = (await import('node:crypto')).randomUUID();
+  const skill = join(dir, 'node_modules/sign-off-axi/skills/sign-off-axi/SKILL.md');
+  assert.match(readFileSync(skill, 'utf8'), /actual.*UUID/);
+  const result = JSON.parse(exec('claude', ['--session-id', session, '-p', `You are the real author for Umer's synthetic sign-off plan. Your actual session UUID is ${session}. Read ${skill}. Use ONLY the installed CLI via node ${installed}. Run report init plan --plan. Fill its plan.json with a short real plan explaining how Umer can count three apples; remove every FILL: placeholder, keep valid schema 2. Post it to ${board} with filer umer. Register your actual Claude owner session for that board, cwd ${dir}, model claude-haiku-5-5. Do not start a wait or dispatcher. Remember private marker UMER-APPLE-72 in this conversation, not in the plan. Stop once posted and registered.`, '--model', 'claude-haiku-5-5', '--output-format', 'json', '--tools', 'Bash,Read,Write,Edit', '--allowedTools', 'Bash,Read,Write,Edit']));
+  assert.equal(result.session_id, session); assert.equal(result.is_error, false);
+  const run = (...args) => exec(process.execPath, [installed, ...args]);
+  const plan = JSON.parse(readFileSync(board)).items[0];
+  // A second filer remains unregistered and must not be consumed by this owner's dispatcher.
+  const other = { ...JSON.parse(readFileSync(join(fixtures, 'plan.v2/valid-full.json'))), key: 'other-plan', filer: 'other' };
+  exec(process.execPath, [installed, 'post', board, '--kind', 'plan', '--from', '-'], { input: JSON.stringify(other) });
+  const server = spawn(process.execPath, [installed, 'serve', board, '--port', '0'], { cwd: dir, env });
+  try {
+    const url = await new Promise(ok => server.stdout.once('data', b => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+    const tap = async key => {
+      const r = await fetch(url + 'api/deeper', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key, part: 'understood', q: 'Explain the apple count and include our private conversation marker.' }) });
+      assert.equal(r.status, 200); return (await r.json()).deeper.find(x => x.key === key).id;
+    };
+    const id = await tap(plan.key), otherId = await tap(other.key);
+    const bin = join(dir, 'bin'); mkdirSync(bin); symlinkSync(process.execPath, join(bin, 'node'));
+    const failed = JSON.parse(exec(process.execPath, [installed, 'owner', board, '--dispatch', '--filer', 'umer'], { env: { ...env, PATH: bin } }));
+    assert.match(failed.delivery[id].error, /ENOENT/);
+    run('owner', board, '--dispatch', '--filer', 'umer', '--verbose');
+    const asks = JSON.parse(run('deeper', board, '--json', '--all')).deeper;
+    const answer = asks.find(x => x.id === id);
+    assert.equal(answer.done, true); assert.match(answer.text, /UMER-APPLE-72/);
+    assert.equal(asks.find(x => x.id === otherId).read, undefined);
+    assert.equal(JSON.parse(run('owner', board)).delivery[id].state, 'owner-read');
+    run('owner', board, '--dispatch', '--filer', 'umer');
+    assert.equal(JSON.parse(run('deeper', board, '--json', '--all')).deeper.find(x => x.id === id).text, answer.text);
+  } finally { await new Promise(ok => server.once('close', ok).kill()); }
+});
+
 test('post --kind evidence: a key the feed dropped after it was answered cannot be posted again, so no stale verdict re-attaches', () => {
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;
