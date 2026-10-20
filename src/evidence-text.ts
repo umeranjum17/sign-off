@@ -16,8 +16,11 @@ const SATURATED = 96;
 const BAND_MIN = 0.05;
 const BARS_MIN = 5;
 const BARS_SHARE_MIN = 0.6;
-/** A placeholder is one flat colour over this share of the picture; the real captures measured top out at 75%, the text renders are text. */
+/** A placeholder is one flat colour over this share of the picture, with almost nothing drawn on it. A real screen can be as empty (a chat
+ * with no messages is 90% paper) but its header, message, composer and tab bar draw 7% or more of the picture in other colours; a flat card
+ * with a label or icon draws under 1%. */
 const PLACEHOLDER_MIN = 0.9;
+const PLACEHOLDER_DETAIL_MAX = 0.05;
 /** A picture with no ink at all (a flat colour) is not text, so it passes. */
 const INK_MIN = 0.005;
 /** How close (0-255 RGB distance) a pixel must be to the paper or to the paper-ink line to count as text. */
@@ -86,7 +89,7 @@ function faultsOf(share: Share | undefined): Fault[] {
   return [
     ...(text ? ['text' as const] : []),
     ...(share.bars >= BARS_MIN && share.barShare >= BARS_SHARE_MIN ? ['colour bars' as const] : []),
-    ...(!text && share.top >= PLACEHOLDER_MIN ? ['placeholder' as const] : []),
+    ...(!text && share.top >= PLACEHOLDER_MIN && share.ink + share.off <= PLACEHOLDER_DETAIL_MAX ? ['placeholder' as const] : []),
   ];
 }
 

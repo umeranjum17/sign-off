@@ -13,6 +13,10 @@ Verify the exit is 2 and the error names the fault: `is mostly text: a picture o
 
 Accepted: post a real capture of the running product, such as a screenshot of the board's Evidence area (or `fixtures/evidence/product-board.png`), and verify the exit is 0 and `update-<number>` is posted with its copy under `evidence/<number>/`.
 
+Placeholder versus empty screen: `fixtures/evidence/placeholder-card.png` (one flat colour with a small label) is refused with `is a placeholder card, not evidence`; `fixtures/evidence/sparse-screen.png` (a real chat screen with header, message, composer and tab bar, 90% empty thread) is accepted.
+
+Journey: `done-done run evidence-guard` (`evidence-guard-journey.mjs`) posts the sparse screen on a throwaway board, screenshots its Evidence card at 390 and 1280 and saves the placeholder refusal output.
+
 Board: a card that already holds a colour-bar or placeholder picture (posted before the guard, so the board file holds it) does not appear on the Evidence page; the real cards around it still do.
 
 Recording: a card that also holds an `.mp4` or `.webm` is never handed to ImageMagick when the board loads. Serve a board with a recording on it and read `/api/decisions`: it answers at once (within half a second) on the first read, while any stills are measured in the background, and no `convert` or `ffmpeg` process runs. The same holds for a still whose measurement hangs: `/api/board`, `/api/decisions`, `/api/media` and a POST all still answer, and the still stays unmeasured.
