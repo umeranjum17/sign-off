@@ -74,7 +74,7 @@ A board that fills up with noise stops being read, so the rules sit at the door.
 
 - A question must say why it is asked, what each answer does, which one the agent recommends and what happens if you stay quiet; one that does not is refused with the fix ([the question standard](docs/contract.md#ask-schema-1)).
 - One decision is one card: raising the same question again changes nothing, and `--merge <key>` folds an older card into the better-asked one.
-- Proof that is mostly text, a placeholder or a test card is refused; a report must be a page to tap, not a wall of words.
+- Proof posted as a Pass/Fail question is refused, and proof that is mostly text, a placeholder or a test card is refused too: proof goes to Evidence, as a capture of the real product; a report must be a page to tap, not a wall of words.
 - **Dismiss** hides a card from the board, **Undo** brings it back (`sign-off-axi dismiss <key>` and `restore <key>` do the same from a shell).
 
 ## What you can ask
