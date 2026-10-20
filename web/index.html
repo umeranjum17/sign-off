@@ -553,6 +553,7 @@
   .choices.many button { flex: 1 1 auto; max-width: 100%; padding: 0.5rem 1rem; }
   .note label { display: block; color: var(--muted); font-size: 0.875rem; margin-top: 0.5rem; }
   .tradeoff { margin: 0; max-width: 70ch; }
+  .fd-links { margin: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.9375rem; color: var(--muted); } .fd-links a { min-height: 2rem; display: inline-flex; align-items: center; }
   /* Dismiss: a quiet round x at the corner of a card or the end of a row. */
   .x { flex: none; display: grid; place-items: center; width: 2.75rem; min-height: 2.75rem; padding: 0; margin: -0.5rem 0 -0.5rem auto; border: 0; border-radius: 50%;
     background: none; color: var(--muted); font-size: 1.5rem; line-height: 1.25; }
@@ -975,7 +976,7 @@
     const merged = !saved && !state.dismissed?.includes(d.key) ? (d.merges ?? []).filter((k) => state.decisions.some((x) => x.key === k) && !answerOf(k)).length : 0;
     if (design) {
       return el('article', { class: 'row design', id: `item-${d.key}` }, lead,
-        d.tradeoff ? el('p', { class: 'tradeoff', dir: 'auto' }, el('strong', {}, 'Trade-off '), d.tradeoff) : '',
+        firstDraft(d).text ? el('p', { class: 'tradeoff', dir: 'auto' }, el('strong', {}, 'Trade-off '), firstDraft(d).text) : '', firstDraftLinks(d),
         mockCards(d, ro ? [] : buttons), annotations(d), silent ? el('p', { class: 'silent' }, silent) : '', ro ? '' : other(d, saved, err), err);
     }
     // Yes/No rows keep the two fixed buttons they always had; any other choice set wraps; answers that say what they do stack.
@@ -1259,6 +1260,16 @@
     }
     return el('div', { class: 'rung' }, body, el('a', { class: 'meta', ...open, 'aria-label': `Open the ${name} full size, ${d.title}` }, 'Open full size'));
   }
+
+  /** first-draft's `post` ends a design's trade-off with `Open in first-draft: <label> <url> · <label> <url>`: those urls, and the text before them. */
+  const firstDraft = (d) => {
+    const at = (d.tradeoff ?? '').search(/(?:^|\s)Open in first-draft: /), tail = at < 0 ? '' : d.tradeoff.slice(at).replace(/^\s*Open in first-draft: /, '');
+    const links = tail.split(' · ').map((p) => /^(.*?)\s*(https?:\/\/\S+)$/.exec(p.trim())).filter(Boolean).map(([, label, href]) => ({ label: label || href, href }));
+    return links.length ? { text: d.tradeoff.slice(0, at).trim(), links } : { text: d.tradeoff, links: [] };
+  };
+  /** Real links on the card itself: a link inside a mock is blocked by the frame's sandbox. */
+  const firstDraftLinks = (d) => { const { links } = firstDraft(d);
+    return links.length ? el('p', { class: 'fd-links' }, 'Open in first-draft ', ...links.map((l) => el('a', { href: l.href, target: '_blank', rel: 'noopener' }, l.label))) : ''; };
 
   /** One phone frame per option, the recommended one first: its label and Recommended badge, the mock (tap opens it full size) and its Pick button. */
   function mockCards(d, buttons) {
