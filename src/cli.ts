@@ -3,15 +3,16 @@ import { createServer, type IncomingMessage } from 'node:http';
 import { type AddressInfo, isIP } from 'node:net';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
-import { accessSync, closeSync, constants, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, watch, writeFileSync, type Stats } from 'node:fs';
+import { accessSync, chmodSync, closeSync, constants, copyFileSync, createReadStream, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, realpathSync, rmSync, statSync, watch, writeFileSync, type Stats } from 'node:fs';
 import { lookup } from 'node:dns/promises';
 import { availableParallelism, homedir, networkInterfaces, tmpdir, userInfo } from 'node:os';
 import { Worker } from 'node:worker_threads';
+import { pipeline } from 'node:stream';
 import { basename, delimiter, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { type Answer, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -179,7 +180,7 @@ examples:
   sign-off-axi serve --port 0
 `,
   post: `usage: sign-off-axi post [board.json] [--type decision|design|diagram|interactive] --title "<question>" [--key <key>] [--about <text>] [--option <value>=<label>]... [--mock <value>=<path>]... [--link <value>=<url>]... [--view <path>] [--tradeoff <text>] [--recommend <value>] [--default <value>] [--close done|release] [--filer <id>]
-       sign-off-axi post [board.json] --type evidence --title "<what this shows>" --about "<short note>" --media <file>... [--link <commit or URL>] [--detail <text>] [--filer <id>]
+       sign-off-axi post [board.json] --type evidence --title "<what this shows>" --about "<short note>" --media <file>... [--attach <file>]... [--link <commit or URL>] [--detail <text>] [--filer <id>]
        sign-off-axi post [board.json] --from <board file> --replace [--filer <id>]
        sign-off-axi post [board.json] --kind <kind> --from <message.json|-> [--filer <id>]
        sign-off-axi post [board.json] --type explainer --title "<question>" --media <video> [--about <summary>] [--chapter <m:ss>=<title>]... [--key <key>] [--option <value>=<label>]... [--recommend <value>]
@@ -214,6 +215,7 @@ An empty items list removes that filer's items.
 an image (.svg, .png, .jpg, .jpeg, .webp, 5 MB or less) shown at card width for a diagram, or one self-contained .html page for interactive.
 The page runs in a sandboxed frame: no fetch, no remote files, no access to the dashboard or its tab. Answers work as for a decision.
 --type evidence posts the next numbered update (key update-<number>): 1 to ${MEDIA_MAX} screenshots or recordings (.png, .jpg, .jpeg, .webp, .mp4, .webm, 50 MB each), copied into evidence/<number>/ next to the board, with a short note and an optional commit or PR link. A still that is not a picture of the product is refused: mostly text (a log, receipt or summary), a colour-bar test card or a placeholder card. Post a real capture of the running product; a colour-bar or placeholder card already posted is not shown on the board.
+--attach <file> (up to ${ATTACH_MAX}, any file type, such as an Android .apk) adds a file the user downloads from the card, over the board link, on a phone or tablet. It is copied (never read into memory) into evidence/<number>/ and streamed on download. A file over ${ATTACH_DEFAULT_MB} MB is refused; raise the limit with SIGN_OFF_ATTACH_MAX_MB=<megabytes>. An update may have only --attach files and no --media.
 The user gives a verdict, pass, fail or needs-work, with an optional note; read it with answers or wait --key update-<number>.
 --type explainer is a decision shown with a narrated video you made: one --media .mp4 or .webm (50 MB or less), copied into evidence/<number>/ like evidence
 and played on the card. --about is its short summary; up to ${CHAPTERS_MAX} --chapter m:ss=<title> (in order) are buttons that jump the video there. Answers work as for a decision.
@@ -243,6 +245,7 @@ examples:
 A design message lists project journeys, per-screen image or HTML view variants, and a card preview; post checks every asset stays under the board folder.
   sign-off-axi post .sign-off/decisions.json --type interactive --title "Does the sign-in flow feel right?" --view mocks/sign-in/demo.html --option yes=Yes --option no="Needs work" --recommend yes
   sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media phone.png --media flow.mp4 --link https://github.com/acme/app/pull/12
+  sign-off-axi post --type evidence --title "Debug build for the phone" --about "The app installs and signs in." --media phone.png --attach app-debug.apk
   sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "The new sign-in has 2 steps." --media explainer.mp4 --chapter 0:00=Start --chapter 0:12="Step 2"
   sign-off-axi post .sign-off/decisions.json --type report --title "Sign-in now takes 2 steps" --about "Why the code step moved first." --view mocks/sign-in-flow/index.html --preview mocks/sign-in-flow/preview.svg
   sign-off-axi post --type signin --key npm-login --service npm --link https://example.com/login --unlocks "Publish the release" --waits "Main" --expires 15m
@@ -730,11 +733,11 @@ const mockFile = (path: string) => path.split('?')[0];
 /** Posts an item. `raise` is the alias for `post --type decision`: same flags as before, same output. */
 function post(args: string[], cmd = 'post') {
   const typed: Flags = cmd === 'post' ? { replace: { type: 'boolean' }, kind: { type: 'string' }, type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
-    media: { type: 'string', multiple: true }, link: { type: 'string', multiple: true }, view: { type: 'string' }, preview: { type: 'string' }, chapter: { type: 'string', multiple: true },
+    media: { type: 'string', multiple: true }, attach: { type: 'string', multiple: true }, link: { type: 'string', multiple: true }, view: { type: 'string' }, preview: { type: 'string' }, chapter: { type: 'string', multiple: true },
     ...Object.fromEntries(SIGNIN_FIELDS.map((f) => [f, { type: 'string' as const }])) } : {};
   const { file, named, values, on } = parse(cmd, args, { from: { type: 'string' }, filer: { type: 'string' }, ...typed,
     ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: MANY.includes(f) }])) });
-  const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'link', 'view', 'preview', 'chapter', ...SIGNIN_FIELDS].filter((f) => values[f] !== undefined);
+  const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'attach', 'link', 'view', 'preview', 'chapter', ...SIGNIN_FIELDS].filter((f) => values[f] !== undefined);
   // Only a design takes --link more than once (one per option); any other type keeps its one item link, the last given.
   const optionLinks: string[] = values.link ?? [];
   if (values.type !== 'design' && optionLinks.length) values.link = optionLinks.at(-1);
@@ -759,7 +762,7 @@ function post(args: string[], cmd = 'post') {
   }
   if (!['decision', 'design', 'evidence', 'diagram', 'interactive', 'explainer'].includes(type)) throw fail(`--type must be decision, design, evidence, diagram, interactive, explainer, report or signin`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (type === 'evidence' || type === 'explainer') return postMedia(file, named, on, values, type, filer);
-  if (values.media !== undefined || (type !== 'design' && values.link !== undefined) || values.chapter !== undefined) throw fail('--media, --link and --chapter need --type evidence or explainer (--link also goes on --type design, one per option)', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
+  if (values.media !== undefined || values.attach !== undefined || (type !== 'design' && values.link !== undefined) || values.chapter !== undefined) throw fail('--media, --attach, --link and --chapter need --type evidence or explainer (--link also goes on --type design, one per option)', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (type !== 'design' && (values.tradeoff !== undefined || values.mock !== undefined)) throw fail('--tradeoff and --mock need --type design', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   const view = type === 'diagram' || type === 'interactive';
   if (view !== (values.view !== undefined)) throw fail(view ? `--type ${type} needs --view <path>` : '--view needs --type diagram or interactive', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
@@ -956,16 +959,40 @@ const UNFIT: Record<Fault, (path: string) => string> = {
   'colour bars': (path) => `--media ${path} is a colour-bar test card, not evidence`,
   placeholder: (path) => `--media ${path} is a placeholder card, not evidence`,
 };
+/** The attachment size limit in bytes: SIGN_OFF_ATTACH_MAX_MB, else 1 GB. */
+function attachLimit(): number {
+  const raw = process.env.SIGN_OFF_ATTACH_MAX_MB, mb = raw === undefined || raw === '' ? ATTACH_DEFAULT_MB : Number(raw);
+  if (!(mb > 0)) throw fail(`SIGN_OFF_ATTACH_MAX_MB=${raw} must be a number of megabytes above 0`, 'VALIDATION_ERROR', 'Unset it, or set it to a size such as 1024');
+  return mb * 1024 * 1024;
+}
+/** One --attach file: it must be a real file within the limit. Its download name is made safe here (letters, digits and . _ ( ) + - only), and never names a place on disk. */
+function attachment(given: string) {
+  const path = resolve(given);
+  let info: Stats | undefined;
+  try { info = statSync(path, { throwIfNoEntry: false }); } catch (e: any) { throw fail(`--attach ${given} ${reasonOf(e.code)}`, 'NOT_FOUND', 'Name a file that is there'); }
+  if (!info?.isFile()) throw fail(`--attach ${given} ${info || existsSync(path) ? 'is not a file' : 'is not there'}`, 'NOT_FOUND', 'Name a file that is there');
+  const limit = attachLimit();
+  if (info.size > limit) throw fail(`--attach ${tilde(path)} is ${Math.ceil(info.size / 1048576)} MB, over the ${Math.floor(limit / 1048576)} MB limit`, 'VALIDATION_ERROR', 'Raise the limit with SIGN_OFF_ATTACH_MAX_MB=<megabytes>, or attach a smaller file');
+  const ext = extname(path).toLowerCase(), name = basename(path).replace(/[^\w.()+ -]/g, '_').replace(/^\.+/, '_').slice(-120);
+  return { src: path, ext: /^\.[a-z0-9]{1,10}$/.test(ext) ? ext : '.bin', name: ATTACH_NAME.test(name) ? name : 'file' };
+}
+/** The SHA-256 of a file, read in 1 MB chunks. */
+function hashFile(path: string): string {
+  const hash = createHash('sha256'), buf = Buffer.allocUnsafe(1 << 20), fd = openSync(path, 'r');
+  try { for (let n; (n = readSync(fd, buf, 0, buf.length, null)) > 0;) hash.update(buf.subarray(0, n)); } finally { closeSync(fd); }
+  return hash.digest('hex');
+}
 function postMedia(file: string, named: string, on: string, values: Record<string, any>, type: 'evidence' | 'explainer', filer?: string, message?: any) {
   fits(values.title);
   const explainer = type === 'explainer';
-  const extra = (explainer ? ['mock', 'tradeoff', 'view', 'link'] : ['key', 'option', 'recommend', 'default', 'mock', 'tradeoff', 'view', 'chapter']).find((f) => values[f] !== undefined);
+  const extra = (explainer ? ['mock', 'tradeoff', 'view', 'link', 'attach'] : ['key', 'option', 'recommend', 'default', 'mock', 'tradeoff', 'view', 'chapter']).find((f) => values[f] !== undefined);
   if (extra) throw fail(`--${extra} does not apply to --type ${type}`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   const example = explainer ? 'sign-off-axi post --type explainer --title "<question>" --about "<short summary>" --media explainer.mp4'
     : 'sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media shot.png';
   if (!explainer && !values.about?.trim()) throw fail('--about is required for --type evidence: the short note', 'VALIDATION_ERROR', example);
   if (explainer && values.media?.length !== 1) throw fail('--type explainer needs one --media video (.mp4 or .webm)', 'VALIDATION_ERROR', example);
-  if ((!message && !values.media?.length) || values.media.length > MEDIA_MAX) throw fail(`--type evidence needs 1 to ${MEDIA_MAX} --media files`, 'VALIDATION_ERROR', example);
+  if ((!message && !values.media?.length && !values.attach?.length) || (values.media?.length ?? 0) > MEDIA_MAX) throw fail(`--type evidence needs 1 to ${MEDIA_MAX} --media files, or an --attach file`, 'VALIDATION_ERROR', example);
+  if ((values.attach?.length ?? 0) > ATTACH_MAX) throw fail(`--attach takes up to ${ATTACH_MAX} files`, 'VALIDATION_ERROR', 'Zip the files together, or post a second update');
   const kinds = explainer ? ['.mp4', '.webm'] : Object.keys(mediaTypes), options = optionsOf(values);
   recommended([{ options, recommend_value: values.recommend }], true);
   const chapters = values.chapter?.map((c: string) => {
@@ -973,7 +1000,7 @@ function postMedia(file: string, named: string, on: string, values: Record<strin
     if (!m) throw fail(`--chapter ${c} must be <m:ss>=<title>`, 'VALIDATION_ERROR', 'sign-off-axi post --type explainer ... --chapter 0:00=Start --chapter 0:12="Step 2"');
     return { at: Number(m[1]) * 60 + Number(m[2]), title: m[3] };
   });
-  const sources: string[] = values.media.map((m: string) => {
+  const sources: string[] = (values.media ?? []).map((m: string) => {
     const path = resolve(m);
     let info: Stats | undefined;
     try { info = statSync(path, { throwIfNoEntry: false }); } catch (e: any) { throw fail(`--media ${m} ${reasonOf(e.code)}`, 'NOT_FOUND', 'Name a file that is there, such as the screenshot you just took'); }
@@ -982,6 +1009,7 @@ function postMedia(file: string, named: string, on: string, values: Record<strin
     if (info.size > MEDIA_BYTES) throw fail(`--media ${tilde(path)} is over 50 MB`, 'VALIDATION_ERROR', 'Trim or compress the recording');
     return path;
   });
+  const attached = (values.attach ?? []).map((a: string) => attachment(a));
   // A still that is not a picture of the product (text, colour bars or a placeholder) is measured before anything is copied.
   const [unfit] = explainer ? [] : sources.flatMap((src) => isStill(src) ? faults(src).map((f) => ({ src, f })) : []);
   if (unfit) throw fail(UNFIT[unfit.f](tilde(unfit.src)), 'VALIDATION_ERROR', 'Post a real capture of the running product instead: a screenshot or recording of the screen the user sees');
@@ -1008,12 +1036,19 @@ function postMedia(file: string, named: string, on: string, values: Record<strin
       try { mkdirSync(join(store, String(number)), { mode: 0o700 }); break; } catch (e: any) { if (e.code !== 'EEXIST') throw e; }
     }
     const key = own || `update-${number}`, dir = join(store, String(number));
-    let media;
+    let media, attachments: AttachRef[] = [];
     try {
       media = sources.map((src, i) => {
         const bytes = readFileSync(src), path = `evidence/${number}/${i + 1}${extname(src).toLowerCase()}`;
         writeFileSync(join(dir, `${i + 1}${extname(src).toLowerCase()}`), bytes, { mode: 0o600 });
         return { path, sha256: sha256(bytes), bytes: bytes.length };
+      });
+      // An attachment is copied by the kernel and hashed in chunks: the file is never held in memory.
+      attachments = attached.map(({ src, ext, name }: { src: string; ext: string; name: string }, i: number) => {
+        const stored = `attach-${i + 1}${ext}`, dest = join(dir, stored);
+        copyFileSync(src, dest, constants.COPYFILE_EXCL);
+        chmodSync(dest, 0o600);
+        return { path: `evidence/${number}/${stored}`, name, sha256: hashFile(dest), bytes: statSync(dest).size };
       });
     } catch (e) {
       // A file that cannot be read after all leaves no copies behind.
@@ -1024,7 +1059,7 @@ function postMedia(file: string, named: string, on: string, values: Record<strin
     const { run, media: _paths, ...fields } = message ?? {};
     items.push(explainer ? { key, type, title, about, detail, options, recommend_value, default_if_silent, close, chapters, media, filer, filed }
       : message ? { ...fields, key, type, number, ...(media.length ? { media } : {}), ...(run && { evidence: run }), filed }
-      : { key, type, number, title, about, detail, close, link, media, filer, filed });
+      : { key, type, number, title, about, detail, close, link, ...(media.length && { media }), ...(attachments.length && { attachments }), filer, filed });
     // The whole board is checked before it is written, so a bad post leaves the board and evidence/ as they were.
     const check = `${file}.${process.pid}.check`;
     writeFileSync(check, JSON.stringify({ ...extra, schema: 2, items }), { mode: 0o600 });
@@ -1038,7 +1073,7 @@ function postMedia(file: string, named: string, on: string, values: Record<strin
     writeItems(file, items);
     notifyEntered(file, named, before);
     if (explainer) return toon({ board: tilde(file), raised: [{ key, status: 'raised', title }] }, [`Run \`sign-off-axi open${on}\` so the user can watch and answer`, waitFor(on, filer, key)]);
-    return toon({ board: tilde(file), posted: [{ key, number, media: media.length, title, ...(message && { status: 'posted' }) }] });
+    return toon({ board: tilde(file), posted: [{ key, number, media: media.length, ...(attachments.length && { attached: attachments.length }), title, ...(message && { status: 'posted' }) }] });
   });
 }
 
@@ -1997,6 +2032,8 @@ const answersOnly = () => readItems(file).extra.answers_only === true;
 const mediaTypes: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.mp4': 'video/mp4', '.webm': 'video/webm' };
 const mockTypes: Record<string, string> = { '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
 /** What a mock's folder may serve beside it: pages, styles, scripts, images, fonts and clips; never the board, answers, token or config. */
+/** Download types for --attach files; any other extension downloads as application/octet-stream. */
+const attachTypes: Record<string, string> = { '.apk': 'application/vnd.android.package-archive', '.zip': 'application/zip', '.pdf': 'application/pdf', '.txt': 'text/plain; charset=utf-8', '.json': 'application/json', '.csv': 'text/csv', '.gz': 'application/gzip' };
 const assetTypes: Record<string, string> = { ...mediaTypes, ...mockTypes, '.css': 'text/css', '.js': 'text/javascript', '.mjs': 'text/javascript', '.gif': 'image/gif', '.woff2': 'font/woff2' };
 const MOCK_BYTES = 5_000_000;
 /** A sandboxed mock frame sends no cookie, so beyond loopback its URLs carry this pass in the path: made from the token, it opens mock folders only. */
@@ -2110,6 +2147,17 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
       if (sha256(bytes) !== m.sha256) return [404, { error: 'Evidence file changed since it was posted' }];
       return [200, { media: bytes, type }];
     } catch { return [404, { error: 'Evidence is unavailable' }]; }
+  }
+  if (req.method === 'GET' && req.url?.startsWith('/api/attachment?')) {
+    const q = new URL(req.url, 'http://localhost').searchParams;
+    const a = loadDecisions(file).find((d) => d.key === q.get('key'))?.attachments?.[Number(q.get('i') || NaN)];
+    if (!a) return [404, { error: 'Attachment is unavailable' }];
+    try {
+      // Only its size is checked per request: hashing a file of hundreds of MB on every download would block the board.
+      const actual = under(dirname(file), a.path);
+      if (statSync(actual).size !== a.bytes) return [404, { error: 'Attachment changed since it was posted' }];
+      return [200, { attachment: { path: actual, name: a.name, bytes: a.bytes, type: attachTypes[extname(a.path)] ?? 'application/octet-stream' } }];
+    } catch { return [404, { error: 'Attachment is unavailable' }]; }
   }
   if (req.method === 'GET' && req.url === '/api/board') return [200, { file, pid: process.pid }];
   if (req.method === 'GET' && req.url === '/api/decisions') {
@@ -2341,6 +2389,17 @@ const server = createServer(async (req, res) => {
   } catch (e: any) {
     status = e instanceof InputError ? (req.method === 'GET' ? 422 : 409) : e instanceof SyntaxError ? 400 : 500;
     body = { error: e.message };
+  }
+  if (body && typeof body === 'object' && 'attachment' in body) {
+    // Streamed from disk in the range asked for, so a file of hundreds of MB never sits in memory.
+    const { path, name, bytes, type } = (body as { attachment: { path: string; name: string; bytes: number; type: string } }).attachment;
+    const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? ''), ranged = !!range && !!(range[1] || range[2]);
+    const start = !ranged ? 0 : range![1] ? Number(range![1]) : Math.max(0, bytes - Number(range![2]));
+    const end = ranged && range![1] && range![2] ? Math.min(Number(range![2]), bytes - 1) : bytes - 1;
+    if (ranged && start > end) return res.writeHead(416, { 'content-range': `bytes */${bytes}` }).end();
+    res.writeHead(ranged ? 206 : 200, { 'content-type': type, 'content-disposition': `attachment; filename="${name}"`, 'x-content-type-options': 'nosniff', 'cache-control': 'private, no-store', 'accept-ranges': 'bytes',
+      'content-length': Math.max(0, end - start + 1), ...(ranged && { 'content-range': `bytes ${start}-${end}/${bytes}` }) });
+    return bytes ? pipeline(createReadStream(path, { start, end }), res, () => {}) : res.end();
   }
   if (body && typeof body === 'object' && 'media' in body) {
     const { media: bytes, type, point } = body as { media: Buffer; type: string; point?: boolean }, media = point ? Buffer.concat([bytes, pointer]) : bytes;

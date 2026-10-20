@@ -252,7 +252,8 @@ also copies each file into `evidence/<number>/` next to the board:
 - `number`: whole number from 1. `post` takes the next number whose `evidence/<number>/` folder and `update-<number>` key are both free (boards in one folder share `evidence/`) and sets `key` to `update-<number>`.
 - `about`: the short note. `link`: optional, as on any item.
 - `media`: 1 to 12 files, each under `evidence/<number>/` and ending in `.png`, `.jpg`, `.jpeg`, `.webp`, `.mp4` or `.webm` (any case), with the `sha256` and `bytes` recorded at post time. The board serves a file only while both still match.
-  An update that has an `evidence` run link may leave `media` out.
+  An update that has an `evidence` run link or `attachments` may leave `media` out.
+- `attachments`: optional, 1 to 5 files a user downloads from the card (`post --attach <file>`, any type, 1 GB each unless `SIGN_OFF_ATTACH_MAX_MB` says otherwise). Each is `{ path, name, sha256, bytes }`: `path` is `evidence/<number>/attach-<n>.<extension>` (named by the board, never by the poster), `name` is the download name (letters, digits and `. _ ( ) + -` only, 120 characters or fewer). `post` copies the file without reading it into memory and hashes it in chunks. The board streams it at `/api/attachment?key=<key>&i=<n>` with `Content-Disposition: attachment`, byte ranges, and its type (an `.apk` is `application/vnd.android.package-archive`, an unknown one `application/octet-stream`), only while its size still matches. A read-only export lists the file but does not carry it.
 - `post --kind evidence` ([contract.md](contract.md) section 5) writes the same item: it keeps `contract`, `kind` and `schema`, takes `key` from the message or `update-<number>`, and stores the message's `run` as `evidence`.
 - `options` defaults to **Pass** (`pass`), **Fail** (`fail`) and **Needs work** (`needs-work`); the verdict and its note are saved as an answer.
 
