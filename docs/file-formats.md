@@ -334,6 +334,8 @@ A read-only or answers-only board returns none of them from its state, so its pa
   A comment whose `id` is in an answer or ask line is sent: the state marks it `"sent": true`, an edit or delete of it answers 409 and writes nothing,
   and a new comment on the same element is a new one, sent with the next answer. An Undo sends none and leaves sent comments sent; after an Undo back to no answer, sent comments come with the next answer.
 
+**Read receipts and Go deeper** of a guided plan or report (`decisions.reads.jsonl` and `decisions.deeper.jsonl`, mode 600, oldest first). A read line is `{"key","part","by":"captain","at"}`: the person had that part on screen for a moment; the first line for a key and part is its read time. A Go deeper file holds one line per step of an ask, by `id`: `{"op":"ask","id","key","part","about","q"?,"at"}` when the person taps, `{"op":"read","id","at"}` when the agent takes it (`wait --filer` or `deeper`), and `{"op":"say","id","text","more"?,"at"}` for each piece of the answer; a `say` with no `more` ends it. Text is 1 to 2000 characters, a question 500 or fewer. `init` git-ignores both.
+
 **Access token** (`decisions.token`, mode 600): made the first time the board is served beyond `127.0.0.1`
 and reused after that. The board reads it on every request, so deleting it shuts old links out at once.
 Deleting it, then `stop` and `open` again, makes a new one (`stop` and `open` alone reuse it). `open` prints

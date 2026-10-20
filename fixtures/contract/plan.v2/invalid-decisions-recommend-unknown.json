@@ -1,0 +1,13 @@
+{
+  "contract": 1,
+  "kind": "plan",
+  "schema": 2,
+  "key": "rename-config",
+  "title": "Rename the config file",
+  "about": "One rename, one migration line. Umer loses nothing.",
+  "understood": [{"label": "You asked", "text": "Rename the config file to match the docs."}],
+  "visual": {"type": "steps", "heading": "Rename, migrate, remove the old name", "rows": [{"label": "Rename"}, {"label": "Migrate on first run"}]},
+  "sections": [],
+  "decisions": [{"key": "rollout", "question": "Ship to everyone, or to a tenth first?", "why": "A tenth first adds a week and shows any drop in sign-ins before it reaches everyone.", "options": [{"value": "tenth", "label": "A tenth first", "outcome": "A week of data, then everyone."}, {"value": "all", "label": "Everyone at once", "outcome": "Live this week; a rollback is a redeploy."}], "recommend": "neither", "reason": "A drop in sign-ins costs more than a week.", "quiet": "I ship to a tenth on Thursday."}],
+  "next": {"heading": "I make the change and post the diff", "lines": ["The diff lands under Evidence."]}
+}

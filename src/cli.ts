@@ -12,9 +12,9 @@ import { basename, delimiter, dirname, extname, isAbsolute, join, relative, reso
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, asks, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, sameDecision, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, asks, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, appendRead, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, sameDecision, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
-import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, mediaFiles, parseMessage, reportPage } from './contract.js';
+import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
 
@@ -31,8 +31,8 @@ const AGENTS: Record<string, { bin: string; dir: string; home: string }> = {
   'gemini-cli': { bin: 'gemini', dir: '.agents/skills', home: join(homedir(), '.gemini', 'skills') },
 };
 const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
-commands[21]:
-  (none)=list, raise, post, answers, wait, poll, open, status, stop, serve, export, init, report, signin, dismiss, restore, refile, doctor, notify, validate, help
+commands[22]:
+  (none)=list, raise, post, answers, wait, poll, deeper, open, status, stop, serve, export, init, report, signin, dismiss, restore, refile, doctor, notify, validate, help
 board: the nearest .sign-off/ board (the walk's bounds and SIGN_OFF_HOME: README, "Test runs never touch your board"), else ~/.sign-off/decisions.json; a board file given always wins
 flags: --full and --json on list, answers and wait, --events on wait, --json on status, --filer on post, raise and wait, --help on every command, -v/--version
 examples:
@@ -43,6 +43,7 @@ examples:
   sign-off-axi post .sign-off/decisions.json --type diagram --title "Is this the sign-in flow?" --view mocks/sign-in/flow.svg
   sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "The new sign-in has 2 steps." --media explainer.mp4 --chapter 0:00=Start
   sign-off-axi report init .sign-off/mocks/sign-in-flow
+  sign-off-axi deeper
   sign-off-axi post .sign-off/decisions.json --type report --title "Sign-in now takes 2 steps" --about "Why the code step moved first." --view mocks/sign-in-flow/index.html --preview mocks/sign-in-flow/preview.svg
   sign-off-axi post --type signin --key npm-login --service npm --link https://example.com/login --unlocks "Publish the release" --waits "Main" --expires 15m
   sign-off-axi signin done --key npm-login
@@ -94,7 +95,8 @@ examples:
 `,
   validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>] [--expect-invalid]
 Checks message files against the communication contract without posting them: ${CONTRACT}
-A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate, finding, plan and design at schema 1, and report at schema 2.
+A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate, finding and design at schema 1, report at schema 3 (schema 2 still passes) and plan at schema 2 (schema 1 still passes).
+A report 3 and a plan 2 are guided pages: fields the board draws as one scroll, no page of your own.
 An evidence message's media paths read from the message file's folder: each file must be there, inside it, and 50 MB or less.
 A report is a page to tap through: its "view" (.html) and "preview" (its picture, beside it) are checked for their shape here; the files themselves are checked at post, from the board file's folder, filled with no FILL: lines left (see report init).
 A plan's "view" (.html) is checked for its shape here; the file itself is checked at post, from the board file's folder.
@@ -299,6 +301,17 @@ examples:
   sign-off-axi init ./my-project --agent opencode
   sign-off-axi init --agent codex,gemini-cli
 `,
+  deeper: `usage: sign-off-axi deeper [board.json] [--filer <id>] [--all] [--json]
+       sign-off-axi deeper [board.json] --id <id> --text "<answer>" [--more]
+Go deeper is the button on every part of a plan 2 or report 3. The person taps it; wait --filer wakes with the ask, or this command lists the ones nobody finished.
+Answer in plain words about the part they tapped, a few lines at a time: each --more piece streams into that spot on the board while they watch, and a last call without --more ends it.
+  --id     the ask to answer   --text  the answer, or - to read stdin (2000 characters or fewer per piece)
+  --more   more pieces follow   --all  also the finished asks
+examples:
+  sign-off-axi deeper
+  sign-off-axi deeper --id 3fa9c1 --text "I timed all three paths on 12 Oct." --more
+  sign-off-axi deeper --id 3fa9c1 --text "The After bars are goals, not measurements."
+`,
   poll: `usage: sign-off-axi poll [board.json] [--timeout 600] [--json]
 Blocks until the user comments on an item or queues a prompt for the agent on the page, then prints every new one once and marks it read.
 Answers and another-round asks come back through answers and wait instead.
@@ -409,7 +422,7 @@ function contractItems(items: any[], from: string, file: string, replace = false
     }
     try {
       checkMessage(check);
-      if (check.kind === 'report' || check.kind === 'plan') reportPage(check, dirname(file));
+      if ((check.kind === 'report' || check.kind === 'plan') && !guided(check)) reportPage(check, dirname(file));
       if (check.kind === 'design') designFiles(check, dirname(file));
     } catch (e) {
       throw e instanceof ContractError ? fail(`${from}: items[${i}]: ${e.message}`, 'VALIDATION_ERROR', e.help) : e;
@@ -590,6 +603,40 @@ function eventLines(file: string, rows: Decision[], answers: Answer[], rounds: R
     .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0)).map(({ line }) => JSON.stringify(line)).join('\n');
 }
 
+/** Go deeper asks as the agent reads them: what part, what it is about, the question if the person typed one, and how to answer. */
+function deeperOut(file: string, asks: ReturnType<typeof readDeeper>, on: string, events?: boolean) {
+  if (events) {
+    const kind = kindOf(file), titles = new Map(board(file).map((d) => [d.key, d.title]));
+    return asks.map(({ id, key, part, about, q, at }) => JSON.stringify({ event: 'deeper', ...kind(key), key, title: titles.get(key), id, part, about, ...(q && { q }), at })).join('\n');
+  }
+  return toon({ board: tilde(file), deeper: asks.map(({ id, key, part, about, q = '', at }) => ({ id, key, part, about, q, at })) },
+    ['The person tapped Go deeper: answer in plain words, a few lines at a time, as the part they tapped',
+      `Run \`sign-off-axi deeper${on} --id <id> --text "<what you found>" --more\` for each piece, then once more without --more to finish`]);
+}
+/** `deeper`: the Go deeper asks nobody has finished, or with --id and --text one piece of the answer the board streams under the part the person tapped. */
+async function deeper(args: string[]) {
+  const { file, values, on } = parse('deeper', args, { filer: { type: 'string' }, id: { type: 'string' }, text: { type: 'string' }, more: { type: 'boolean' }, all: { type: 'boolean' }, json: { type: 'boolean' } });
+  ready(file, on);
+  const filer = filerOf(values);
+  if (values.id === undefined) {
+    if (values.text !== undefined || values.more) throw fail('--text and --more answer one ask, so they need --id', 'VALIDATION_ERROR', 'Run `sign-off-axi deeper` to see the ids');
+    const mine = new Set(board(file).filter((d) => filer === undefined || d.filer === filer).map((d) => d.key));
+    const open = readDeeper(file).filter((x) => mine.has(x.key) && (values.all || !x.done));
+    if (values.json) return JSON.stringify({ deeper: open });
+    if (!open.length) return toon({ board: tilde(file), deeper: '0 open' }, [`Run \`sign-off-axi wait${on}\` to be woken when the person taps Go deeper`]);
+    markDeeperRead(file, open.filter((x) => !x.read).map((x) => x.id));
+    return toon({ board: tilde(file), deeper: open.map(({ id, key, part, about, q = '', at, done }) => ({ id, key, part, about, q, at, done: !!done })) }, [`Run \`sign-off-axi deeper${on} --id <id> --text "<answer>"\` to answer one`]);
+  }
+  const ask = readDeeper(file).find((x) => x.id === values.id);
+  if (!ask) throw fail(`no Go deeper ask with id ${values.id}`, 'NOT_FOUND', `Run \`sign-off-axi deeper${on}\` to see the open ones`);
+  if (ask.done) throw fail(`ask ${values.id} is already answered`, 'CONFLICT', 'The person can tap Go deeper again for a follow-up');
+  let text = values.text;
+  if (text === '-') text = readFileSync(0, 'utf8');
+  if (typeof text !== 'string' || !text.trim() || [...text.trim()].length > 2000) throw fail('--text must be the answer, 2000 characters or fewer', 'VALIDATION_ERROR', 'Run `sign-off-axi deeper --help`');
+  answerDeeper(file, ask.id, text.trim(), !!values.more);
+  return toon({ id: ask.id, key: ask.key, part: ask.part, answered: values.more ? 'piece sent, more to come' : 'done' }, values.more ? [`Run \`sign-off-axi deeper${on} --id ${ask.id} --text "<next piece>" [--more]\``] : [`Run \`sign-off-axi wait${on}\` for the next answer or ask`]);
+}
+
 async function wait(args: string[]) {
   const { file, values, on: onBoard } = parse('wait', args, { ...TIERS, events: { type: 'boolean' }, filer: { type: 'string' }, key: { type: 'string' }, timeout: { type: 'string', default: '600' }, into: { type: 'string' } });
   if (!/^\d{1,7}$/.test(values.timeout)) throw fail('--timeout must be whole seconds, 0 or more', 'VALIDATION_ERROR', `Run \`sign-off-axi wait --help\``);
@@ -610,9 +657,9 @@ async function wait(args: string[]) {
   for (const r of readRounds(file)) seenRounds.set(r.key, (seenRounds.get(r.key) ?? 0) + 1);
   // A save wakes the loop at once; the 1 second timer is the fallback where file events are unavailable.
   let wake = () => {}, watcher, vaultWarned = false;
-  const name = basename(answersPath(file));
+  const name = basename(answersPath(file)), asking = basename(deeperPath(file));
   try {
-    try { watcher = watch(dirname(file), (_, changed) => changed === name && wake()).on('error', () => {}); } catch {}
+    try { watcher = watch(dirname(file), (_, changed) => (changed === name || changed === asking) && wake()).on('error', () => {}); } catch {}
     for (let first = true; ; first = false) {
       const rows = mine(open(board(file, first ? warn : () => {}))), waiting = rows.filter(waits).length, taken = filer === undefined ? undefined : seenBy(file);
       const hit = rows.filter((d) => (values.key !== undefined ? d.key === values.key : d.answer && (taken ? !taken(d.answer) : before.get(d.key) !== JSON.stringify(d.answer))));
@@ -641,6 +688,15 @@ async function wait(args: string[]) {
       if (found.length) {
         return printAnswers(file, found, waiting, values,
           [waiting ? `Run \`sign-off-axi wait${on}\` for the next of the ${waiting} waiting` : `Run \`sign-off-axi stop${onBoard}\` to close the board`]);
+      }
+      // A Go deeper ask on this filer's guided page wakes the wait once, and is marked read when it is handed over.
+      if (values.key === undefined) {
+        const asks = await locked(`${deeperPath(file)}.lock`, () => {
+          const got = readDeeper(file).filter((x) => !x.read && rows.some((d) => d.key === x.key));
+          markDeeperRead(file, got.map((x) => x.id));
+          return got;
+        }, 'another wait is still taking Go deeper asks');
+        if (asks.length) return deeperOut(file, asks, onBoard + (filer ? ` --filer ${filer}` : ''), values.events);
       }
       // Private vault expiries and refusals reach a filer wait only once its ordinary answers are out; each is taken once.
       let live = 0, unknown = false;
@@ -1127,7 +1183,7 @@ async function postKind(file: string, named: string, on: string, values: Record<
     // Media paths read from the message file's folder, or from the current folder for stdin.
     if (m.kind === 'evidence') sources = mediaFiles(m, from === '-' ? process.cwd() : dirname(resolve(from)));
     // A report's or plan's page is served from the board file's folder, as --view is.
-    if (m.kind === 'report' || m.kind === 'plan') reportPage(m, dirname(file));
+    if ((m.kind === 'report' || m.kind === 'plan') && !guided(m)) reportPage(m, dirname(file));
     if (m.kind === 'design') designFiles(m, dirname(file));
   } catch (e) { throw e instanceof ContractError ? fail(`${name}: ${e.message}`, 'VALIDATION_ERROR', e.help) : e; }
   if (m.filer !== undefined && values.filer !== undefined && m.filer !== values.filer) {
@@ -1481,7 +1537,7 @@ const skillInstalled = (dir: string, agent: string) => [join(dir, AGENTS[agent].
 const SKILL_ADD = ['-y', 'skills', 'add', 'umeranjum17/sign-off', '--skill', 'sign-off-axi', '-y', '-a'];
 const skillAdd = (agents: string[]) => `npx ${[...SKILL_ADD, ...agents].join(' ')}`;
 
-const GITIGNORE = 'mocks/\nevidence/\n*.answers.jsonl\n*.rounds.jsonl\n*.messages.jsonl\n*.annotations.jsonl\n*.seen.jsonl\n*.dismissed.jsonl\n*.board.pid\n*.board.log\nnotify.log\n*.token\n*.export.html\n';
+const GITIGNORE = 'mocks/\nevidence/\n*.answers.jsonl\n*.rounds.jsonl\n*.messages.jsonl\n*.annotations.jsonl\n*.seen.jsonl\n*.dismissed.jsonl\n*.reads.jsonl\n*.deeper.jsonl\n*.board.pid\n*.board.log\nnotify.log\n*.token\n*.export.html\n';
 /** The board, port, bind and hosts in <so>/config.yaml (the `key: value` lines init writes). A bad line falls back on its own default
  * (decisions.json, 4410) and `problems` says what is wrong; a file that cannot be read throws. */
 function readSetup(so: string) {
@@ -2030,6 +2086,9 @@ const state = () => {
     ...profile(),
     answers,
     seen: Object.values(answers).filter(taken).map((a) => a.key),
+    seen_at: Object.fromEntries(Object.values(answers).flatMap((a) => { const t = seenAt(file)(a); return t ? [[a.key, t]] : []; })),
+    reads: readReads(file),
+    deeper: readDeeper(file),
     rounds,
     messages: readMessages(file, warn),
     annotations: readOnly() || answersOnly() ? [] : ((sent) => readAnnotations(file, warn).map((a) => (sent.has(a.id) ? { ...a, sent: true } : a)))(sentIds(file)),
@@ -2186,10 +2245,10 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     clearTimeout(timer);
     return [200, state()];
   }
-  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/signin', '/api/leash'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
+  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/signin', '/api/leash', '/api/deeper', '/api/reads'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
   if (readOnly()) return [403, { error: 'This board is read-only' }];
   // Dismiss only hides an item on this page and sends nothing to the feeding program, so an answers-only board takes it too.
-  if (!['/api/answers', '/api/dismiss', '/api/signin'].includes(req.url!) && answersOnly()) return [403, { error: 'This board takes answers only' }];
+  if (!['/api/answers', '/api/dismiss', '/api/signin', '/api/reads'].includes(req.url!) && answersOnly()) return [403, { error: 'This board takes answers only' }];
   if (!req.headers['content-type']?.startsWith('application/json')) return [415, { error: 'Send JSON' }];
   let body = '';
   for await (const chunk of req) body += chunk;
@@ -2249,6 +2308,15 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     const have = new Map(board(file).map((x) => [x.key, x]));
     if (!keys.every((k) => isKey(k) && have.has(k))) return [404, { error: 'This item is no longer in the file' }];
     appendDismissed(file, [...new Set<string>(keys)], dismissed);
+    return [200, state()];
+  }
+  if (req.url === '/api/reads' || req.url === '/api/deeper') {
+    const { key, part, q } = JSON.parse(body) ?? {}, d = loadDecisions(file).find((x) => x.key === key), about = typeof part === 'string' && d ? guidePart(d, part) : undefined;
+    if (!about) return [404, { error: 'This part is no longer on the board' }];
+    if (req.url === '/api/reads') { appendRead(file, key, part); return [200, state()]; }
+    if (q !== undefined && (typeof q !== 'string' || [...q.trim()].length > NOTE_MAX)) return [400, { error: `The question must be text of ${NOTE_MAX} characters or fewer` }];
+    // One ask at a time per part: a second tap while the agent is answering keeps the first.
+    if (!readDeeper(file).some((x) => x.key === key && x.part === part && !x.done)) askDeeper(file, key, part, about.slice(0, 160), q?.trim() || undefined);
     return [200, state()];
   }
   if (req.url === '/api/rounds') {
@@ -2445,7 +2513,7 @@ await runAxiCli({
   topLevelHelp: TOP_HELP,
   getCommandHelp: (cmd) => HELP[cmd],
   home: axi('list', list),
-  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), report: axi('report', report), signin: axi('signin', signin), dismiss: axi('dismiss', dismiss(false)), restore: axi('restore', dismiss(true)), refile: axi('refile', refile), doctor: axi('doctor', doctor), notify: axi('notify', notify), validate, help: ([name, ...rest]) => {
+  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), report: axi('report', report), deeper: axi('deeper', deeper), signin: axi('signin', signin), dismiss: axi('dismiss', dismiss(false)), restore: axi('restore', dismiss(true)), refile: axi('refile', refile), doctor: axi('doctor', doctor), notify: axi('notify', notify), validate, help: ([name, ...rest]) => {
     if (rest.length || (name && !HELP[name])) throw fail(`unknown command or argument: ${[name, ...rest].join(' ')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi --help` to see the commands');
     return name ? HELP[name] : TOP_HELP;
   } },
