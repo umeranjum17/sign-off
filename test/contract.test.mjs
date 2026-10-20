@@ -688,6 +688,95 @@ test('a guided plan and report: report init writes them to fill, post refuses FI
   }
 });
 
+test('engagement listeners survive report-only boards, sent plans, timeouts and restarts without stealing requests', async () => {
+  const dir = join(scratch, 'listeners'), board = join(dir, 'board.json');
+  mkdirSync(dir);
+  const env = { ...process.env, HOME: join(dir, 'home'), SIGN_OFF_HOME: dir, XDG_CONFIG_HOME: dir, XDG_STATE_HOME: dir };
+  delete env.SIGN_OFF_FILER; delete env.CLAUDE_CODE_SESSION_ID;
+  const run = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const postItem = (kind, filer, key) => {
+    const item = { ...JSON.parse(readFileSync(join(fixtures, kind === 'plan' ? 'plan.v2/valid-full.json' : 'report.v3/valid-full.json'))), filer, key };
+    const p = spawnSync('node', [cli, 'post', board, '--kind', kind, '--from', '-'], { env, encoding: 'utf8', input: JSON.stringify(item) });
+    assert.equal(p.status, 0, p.stdout + p.stderr);
+  };
+  const children = new Set();
+  const startWait = (filer, timeout = '3') => {
+    const p = spawn('node', [cli, 'wait', board, ...(filer ? ['--filer', filer] : []), '--events', '--timeout', timeout], { env });
+    children.add(p);
+    let stdout = ''; p.stdout.on('data', b => { stdout += b; });
+    const result = new Promise(resolve => p.on('close', status => { children.delete(p); resolve({ status, stdout }); }));
+    return { p, result };
+  };
+  let server, url;
+  const serve = async () => {
+    server = spawn('node', [cli, 'serve', board, '--port', '0'], { env });
+    url = await new Promise(ok => server.stdout.once('data', b => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+  };
+  const stop = p => new Promise(ok => p.once('close', ok).kill());
+  const tap = async (key, part = 'this') => {
+    const response = await fetch(url + 'api/deeper', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key, part, q: 'Explain this for Umer.' }) });
+    assert.equal(response.status, 200);
+    const state = await response.json();
+    return state.deeper.find(x => x.key === key && x.part === part).id;
+  };
+  const take = filer => run('wait', board, '--filer', filer, '--events', '--timeout', '0');
+  const timedOut = result => { assert.equal(result.status, 1, result.stdout); assert.match(result.stdout, /TIMEOUT/); };
+  try {
+    postItem('report', 'umer', 'report-umer');
+    postItem('report', 'other', 'report-other');
+    await serve();
+    const listener = startWait('umer'), isolated = startWait('other');
+    await new Promise(ok => setTimeout(ok, 700));
+    assert.equal(listener.p.exitCode, null, 'report-only listener must remain active before the tap');
+    const id = await tap('report-umer');
+    const got = await listener.result;
+    assert.equal(got.status, 0, got.stdout);
+    assert.deepEqual(JSON.parse(got.stdout).id, id);
+    timedOut(await isolated.result);
+    timedOut(take('umer')); // Already delivered, even though not answered yet.
+    const queued = await tap('report-other');
+    // Legacy board-wide answer waits must not consume an owner's engagement.
+    const legacy = run('wait', board, '--json', '--timeout', '0');
+    assert.match(legacy.stdout, /NOT_FOUND/);
+    timedOut(run('wait', board, '--filer', 'umer', '--key', 'report-other', '--events', '--timeout', '0'));
+    assert.equal(JSON.parse(take('other').stdout).id, queued);
+    timedOut(take('other'));
+    const racing = [startWait('umer'), startWait('umer')];
+    await new Promise(ok => setTimeout(ok, 700));
+    const raced = await tap('report-umer', 'understood');
+    const results = await Promise.all(racing.map(x => x.result));
+    assert.equal(results.filter(x => x.status === 0).length, 1);
+    assert.equal(JSON.parse(results.find(x => x.status === 0).stdout).id, raced);
+    timedOut(results.find(x => x.status !== 0));
+    // A timed-out/restarted listener and a restarted server recover the durable queue.
+    const abandoned = startWait('umer');
+    await new Promise(ok => setTimeout(ok, 700));
+    await stop(abandoned.p);
+    const recovered = await tap('report-umer', 'next');
+    await stop(server); await serve();
+    assert.equal(JSON.parse(take('umer').stdout).id, recovered);
+    timedOut(take('umer'));
+    assert.ok(JSON.parse(run('deeper', board, '--filer', 'umer', '--json').stdout).deeper.some(x => x.id === recovered), 'unfinished delivered requests remain recoverable');
+    postItem('plan', 'planner', 'sent-plan');
+    const response = await fetch(url + 'api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: 'sent-plan', notes: [], decisions: { rollout: 'all' } }) });
+    assert.equal(response.status, 200);
+    assert.equal(JSON.parse(take('planner').stdout).event, 'answer');
+    const sent = startWait('planner');
+    await new Promise(ok => setTimeout(ok, 700));
+    assert.equal(sent.p.exitCode, null, 'sent plan listener must remain active');
+    const followup = await tap('sent-plan');
+    assert.equal(JSON.parse((await sent.result).stdout).id, followup);
+    timedOut(take('planner'));
+    const keyed = await tap('sent-plan', 'understood');
+    assert.equal(JSON.parse(run('wait', board, '--filer', 'planner', '--key', 'sent-plan', '--events', '--timeout', '0').stdout).event, 'answer');
+    // A keyed answer replay must not silently take a queued engagement.
+    assert.equal(JSON.parse(take('planner').stdout).id, keyed);
+  } finally {
+    for (const p of children) await stop(p);
+    if (server?.exitCode === null) await stop(server);
+  }
+});
+
 test('post --kind evidence: a key the feed dropped after it was answered cannot be posted again, so no stale verdict re-attaches', () => {
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;
