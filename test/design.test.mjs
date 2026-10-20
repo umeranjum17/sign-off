@@ -2231,7 +2231,10 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
     link: 'https://github.com/umeranjum17/sign-off/pull/13', media: [{ path: 'evidence/4/1.png', sha256: hash, bytes: wideBytes.length }] });
   // A run whose capture changed after it ran cannot be checked, so its update shows that instead of a pass.
   doc.items.push({ key: 'update-6', type: 'evidence', number: 6, title: 'A capture changed after the run', about: outcome, filed: new Date().toISOString(), evidence: link(runs[3]) });
+  // Evidence filed over a day ago archives by itself: update-1 was restored (a log line keeps it), update-7 was not.
+  doc.items.push({ key: 'update-7', type: 'evidence', number: 7, title: 'Sign-in, last week', about: 'Umer checked it last week.', filed: old.toISOString(), media: [{ path: 'evidence/4/1.png', sha256: hash, bytes: wideBytes.length }] });
   writeFileSync(file, JSON.stringify(doc));
+  writeFileSync(file.replace(/\.json$/, '.dismissed.jsonl'), JSON.stringify({ key: 'update-1', dismissed: false, at: new Date().toISOString() }) + '\n');
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0', '--evidence-root', dir], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
@@ -2240,6 +2243,7 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   // Per card: its id, what it proves, its result and the picture that leads it; every card is drawn.
   const cards = '[...document.querySelectorAll(".ev-card")].map((a) => [a.id, a.querySelector(".t").textContent, a.querySelector(".m span").textContent, a.querySelector(".m svg path")?.getAttribute("d") ?? "", a.querySelectorAll(".ev-media img").length])';
   await until(async () => (await evaluate(`${cards}.length === 6 && [...document.querySelectorAll(".ev-media img")].every((i) => i.complete && i.naturalWidth)`)));
+  assert.equal(await evaluate('document.querySelector(".gone-asks summary")?.textContent'), 'Archived (1)');
   const clock = (at) => at.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   const at = (i) => new Date(doc.items[i - 1].filed);
   // Evidence lists every update, newest first, each with its own honest result: only a passed run shows the tick, and an update with no run says so.
@@ -2354,6 +2358,12 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   assert.deepEqual(await evaluate(SQUASH), []);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'));
   assert.ok(await evaluate('[...document.querySelectorAll(".ev-hero img")].every((i) => i.getBoundingClientRect().width <= document.querySelector(".ev-item").getBoundingClientRect().width)'));
+  // The archive stays reachable: Archived (1) lists the week-old update, Restore puts it back on Evidence and writes the log line that keeps it.
+  await evaluate('location.hash = "#evidence"');
+  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length === 5 && !!document.querySelector(".gone-asks .dis")')));
+  await evaluate('document.querySelector(".gone-asks .dis").click()');
+  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length === 6 && !document.querySelector(".gone-asks")')));
+  assert.deepEqual(readFileSync(file.replace(/\.json$/, '.dismissed.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).key), ['update-1', 'update-7']);
   close();
   proc.kill();
 });

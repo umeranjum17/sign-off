@@ -282,9 +282,11 @@ export const CLEARED: Option = { value: '', label: '' };
  * One decision is one card: the answer also goes, as its own line, to each card on the board this ask merges, under that card's close mode. */
 export function appendAnswer(decisionsPath: string, d: Decision, option: Option, note = '', comments: Sent[] = []): Answer | undefined {
   const answer = saveAnswer(decisionsPath, d, option, note, comments);
-  if (!d.merges?.length) return answer;
   const on = loadDecisions(decisionsPath), answers = readAnswers(decisionsPath);
-  for (const key of d.merges) {
+  // An open ask on the same decision leaves Decide with this one: it takes the answer too (an answered or dismissed one is left alone).
+  const hidden = new Set(readDismissed(decisionsPath, answers, readRounds(decisionsPath)));
+  const twins = on.filter((x) => x.key !== d.key && !answers[x.key] && !hidden.has(x.key) && sameDecision(d, x)).map((x) => x.key);
+  for (const key of new Set([...(d.merges ?? []), ...twins, ...on.filter((x) => answers[x.key]?.merged_by === d.key).map((x) => x.key)])) {
     const merged = on.find((x) => x.key === key), own = answers[key];
     if (!merged) continue;
     const fanned = own?.merged_by === d.key;
@@ -297,6 +299,14 @@ export function appendAnswer(decisionsPath: string, d: Decision, option: Option,
     saveAnswer(decisionsPath, merged, same, `Answered with ${d.key}${note ? `: ${note}` : ''}`, [], d.key);
   }
   return answer;
+}
+/** Two asks put one decision: plain asks that offer the same answers and whose titles share at least 80% of their words. */
+export function sameDecision(a: Decision, b: Decision): boolean {
+  const plain = (d: Decision) => d.type === 'decision' && (!d.kind || d.kind === 'ask') && !!d.options?.length;
+  const values = (d: Decision) => d.options.map((o) => o.value).sort().join();
+  if (!plain(a) || !plain(b) || values(a) !== values(b)) return false;
+  const x = new Set(a.title.toLowerCase().match(/[a-z0-9]+/g)), y = new Set(b.title.toLowerCase().match(/[a-z0-9]+/g)), both = [...x].filter((w) => y.has(w)).length;
+  return both / (x.size + y.size - both) >= 0.8;
 }
 function saveAnswer(decisionsPath: string, d: Decision, option: Option, note: string, comments: Sent[] = [], by?: string): Answer | undefined {
   const current = readAnswers(decisionsPath)[d.key];
@@ -411,19 +421,26 @@ export function appendDismissed(decisionsPath: string, keys: string[], dismissed
   const at = now();
   for (const key of keys) appendLine(dismissedPath(decisionsPath), { key, dismissed, at });
 }
-/** Keys hidden now: the last line for each dismissed it, and no answer or round came after it. A torn line is skipped and reported through warn. */
-export function readDismissed(decisionsPath: string, answers: Record<string, Answer>, rounds: Round[], warn: (msg: string) => void = () => {}): string[] {
-  const hidden = new Map<string, string>();
+/** True while an item asks the user something: evidence is never an ask, and an item with no options, reply, sign-in, plan or design is only read. */
+export const asks = (d: Decision) => d.type !== 'evidence' && (d.options.length > 0 || !!d.reply || ['signin', 'plan', 'design'].includes(d.type));
+/** Evidence and reports (nothing to answer) archive on their own this long after they were filed: dismissed, never deleted. */
+export const ARCHIVE_MS = 24 * 3_600_000;
+/** Keys hidden now: the last line for each dismissed it, and no answer or round came after it. A torn line is skipped and reported through warn.
+ * `items`, when given, adds the archive: evidence and reports filed over a day ago that no log line ever named. Restore writes a line, so a restored item stays. */
+export function readDismissed(decisionsPath: string, answers: Record<string, Answer>, rounds: Round[], warn: (msg: string) => void = () => {}, items: Decision[] = []): string[] {
+  const hidden = new Map<string, string>(), named = new Set<string>();
   readRaw(dismissedPath(decisionsPath)).split('\n').forEach((line, n) => {
     try {
       const x = line && JSON.parse(line);
       if (x?.dismissed === true && typeof x.key === 'string' && typeof x.at === 'string') hidden.set(x.key, x.at);
       else if (x) hidden.delete(x.key);
+      if (x) named.add(x.key);
     } catch {
       warn(`skipped unreadable line ${n + 1} in ${dismissedPath(decisionsPath)}`);
     }
   });
-  return [...hidden].filter(([key, at]) => !(answers[key]?.at > at) && !rounds.some((r) => r.key === key && r.at > at)).map(([key]) => key);
+  const archived = items.filter((d) => !asks(d) && !named.has(d.key) && Date.now() - Date.parse(d.filed ?? '') > ARCHIVE_MS).map((d) => d.key);
+  return [...[...hidden].filter(([key, at]) => !(answers[key]?.at > at) && !rounds.some((r) => r.key === key && r.at > at)).map(([key]) => key), ...archived];
 }
 
 /** A comment on one item or a prompt queued for the agent; delivered is when poll handed it over. */

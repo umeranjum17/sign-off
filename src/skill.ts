@@ -71,7 +71,7 @@ The user often reads the board on a phone. Each card must make sense in 10 secon
 
 sign-off refuses a question that breaks these rules, naming the field and one fix; \`raise --help\` has the current flags.
 
-- One decision is one card. Before you post, run \`npx -y sign-off-axi list --full\` and look at the open cards. If the same decision is already there, do not ask it again: wait on that card, or, to ask it better, post one card with \`--merge <its key>\`: the old card must offer every option of the new one, and it is hidden and closed by the answer too. Never post a second card for one decision. A card is named by one ask until that ask is answered; a merged card merges nothing itself, and an answered or dismissed card is never merged.
+- One decision is one card. Before you post, run \`npx -y sign-off-axi list --full\` and look at the open cards. If the same decision is already there, do not ask it again: wait on that card, or, to ask it better, post one card with \`--merge <its key>\`: the old card must offer every option of the new one, and it is hidden and closed by the answer too. Never post a second card for one decision: an ask that repeats an open one (the same answers, titles that share at least 80% of their words) is not posted, and the refusal names the card to wait on. When one card is answered, every open ask on the same decision takes the answer too. A card is named by one ask until that ask is answered; a merged card merges nothing itself, and an answered or dismissed card is never merged.
 - Title: one plain question of 12 words or fewer, ending in "?", that the buttons answer. No "Say yes or no:", "Captain hold:" or "Captain:" prefix, no task names or ids.
 - \`--why\`: 1 or 2 short lines on what it is about and why it needs an answer now.
 - The buttons are the choices in the text: Yes and No for a yes/no question; for a pick, one \`--option\` per choice, each label starting with its letter (A, B, C). Never A/B/C in the text with Yes/No buttons, and never Done or Not now buttons on a question.
@@ -79,6 +79,7 @@ sign-off refuses a question that breaks these rules, naming the field and one fi
 - \`--recommend\` the answer you would pick, with \`--recommend-reason\` in one line.
 - \`--default\`: what happens if the user stays quiet, and \`--silent-by <ISO UTC time>\` when.
 - A card you posted by mistake: \`npx -y sign-off-axi dismiss <key>\` hides it, \`restore <key>\` brings it back. When the user dismisses a card, you are not told: \`answers\` still returns a dismissed answer.
+- When your task ends (merged, dropped, or answered some other way), run \`npx -y sign-off-axi dismiss --filer <id>\`: every card you posted that still waits leaves Decide. Evidence and reports leave the main view by themselves a day after they were filed; they wait under Archived on their screen and \`restore <key>\` brings one back. Nothing is deleted.
 
 A good yes/no question:
 

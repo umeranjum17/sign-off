@@ -211,3 +211,69 @@ sleep 10
   assert.equal(existsSync(marked), true, 'the hanging still was never measured');
   proc.kill();
 });
+
+test('evidence a day old archives on its own, stays in the file, and restore keeps it', () => {
+  const file = join(so, 'archive.json');
+  mkdirSync(so, { recursive: true });
+  const filed = (hours) => new Date(Date.now() - hours * 3_600_000).toISOString();
+  const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
+  const proof = (key, hours, n) => ({ key, type: 'evidence', title: key, about: 'Umer checked it.', filed: filed(hours), number: n, media: [{ path: `evidence/${n}/1.png`, sha256: 'a'.repeat(64), bytes: png.length }] });
+  const items = [proof('old-proof', 25, 1), proof('new-proof', 23, 2), { key: 'old-ask', type: 'decision', title: 'Keep the digest?', options: yesNo, filed: filed(48) }];
+  writeFileSync(file, JSON.stringify({ schema: 2, items }));
+  const status = () => Object.fromEntries(run('list', file, '--full').out.split('\n').map((l) => l.trim().split(',')).filter((c) => c.length > 2 && !c[0].startsWith('decisions')).map(([key, state]) => [key, state]));
+  assert.deepEqual(status(), { 'old-proof': 'dismissed', 'new-proof': 'shown', 'old-ask': 'waiting' });
+  assert.match(run('list', file).out, /waiting\[1\]\{key,title\}:\n  old-ask,/);
+  assert.equal(JSON.parse(readFileSync(file, 'utf8')).items.length, 3);
+  assert.equal(run('restore', 'old-proof', file).code, 0);
+  assert.equal(status()['old-proof'], 'shown');
+});
+
+test('a second ask on the same decision is not posted; merging it, or a dismissed first card, allows it', () => {
+  const file = join(so, 'repeat.json');
+  const ask = (key, title, ...more) => run('post', file, '--key', key, '--title', title, ...more);
+  assert.equal(ask('main-ship', 'Ship the new sign-in screen this week?', '--filer', 'main').code, 0);
+  const lead = ask('lead-ship', 'Should we ship the new sign-in screen this week?', '--filer', 'lead');
+  assert.notEqual(lead.code, 0);
+  assert.match(lead.out, /key lead-ship asks what main-ship already asks, and main-ship still waits/);
+  assert.match(lead.out, /wait .*--key main-ship/);
+  assert.match(run('list', file).out, /waiting\[1\]\{key,title\}:\n  main-ship,/);
+  assert.equal(ask('other', 'Which day should the release ship?').code, 0);
+  assert.equal(ask('lead-ship', 'Should we ship the new sign-in screen this week?', '--filer', 'lead', '--merge', 'main-ship').code, 0);
+  assert.equal(run('dismiss', 'other', file).code, 0);
+  assert.equal(ask('other-again', 'Which day should the release ship?').code, 0);
+});
+
+test('answering a decision takes every open ask on it off Decide, and its undo puts them back', async () => {
+  const file = join(so, 'twins.json');
+  const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
+  const twin = (key, title, filer) => ({ key, type: 'decision', title, options: yesNo, close: 'done', filer, filed: new Date().toISOString() });
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [twin('main-ship', 'Ship the new sign-in screen this week?', 'main'), twin('lead-ship', 'Should we ship the new sign-in screen this week?', 'lead'), twin('other', 'Which day should the release ship?', 'main')] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { cwd: scratch });
+  procs.push(proc);
+  const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+  const answer = (key, value) => fetch(`${url}api/answers`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key, answer: value }) });
+  assert.equal((await answer('main-ship', 'yes')).status, 200);
+  const saved = JSON.parse(run('answers', file, '--json').out);
+  assert.equal(saved['lead-ship'].answer, 'yes');
+  assert.equal(saved['lead-ship'].note, 'Answered with main-ship');
+  assert.equal(saved.other, undefined);
+  assert.match(run('list', file).out, /waiting\[1\]\{key,title\}:\n  other,/);
+  assert.equal((await answer('main-ship', '')).status, 200);
+  assert.equal(JSON.parse(run('answers', file, '--json').out)['lead-ship'], undefined);
+  assert.match(run('list', file).out, /waiting\[3\]/);
+});
+
+test('dismiss --filer closes a finished task: only that filer\'s waiting cards leave', () => {
+  const file = join(so, 'task.json');
+  const ask = (key, title, filer) => run('post', file, '--key', key, '--title', title, '--filer', filer);
+  assert.equal(ask('lead-a', 'Ship the sign-in screen?', 'lead-9').code, 0);
+  assert.equal(ask('lead-b', 'Which day should the release ship?', 'lead-9').code, 0);
+  assert.equal(ask('main-a', 'Keep the weekly digest?', 'main').code, 0);
+  const closed = run('dismiss', '--filer', 'lead-9', file);
+  assert.equal(closed.code, 0);
+  assert.match(closed.out, /lead-a/);
+  assert.match(run('list', file).out, /waiting\[1\]\{key,title\}:\n  main-a,/);
+  assert.match(run('dismiss', '--filer', 'lead-9', file).out, /0 cards of lead-9 were waiting/);
+  assert.equal(run('restore', 'lead-a', file).code, 0);
+  assert.match(run('list', file).out, /waiting\[2\]/);
+});
