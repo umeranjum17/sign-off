@@ -141,6 +141,14 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
   proc.kill();
 });
 
+test('an evidence post tells the agent no wait or open hint: it is not an ask the user answers', () => {
+  const file = join(so, 'hints.json');
+  const posted = run('post', file, '--type', 'evidence', '--title', 'Sign-in screen', '--about', 'The screen loads.', '--media', capture);
+  assert.equal(posted.code, 0);
+  assert.match(posted.out, /update-\d+,\d+,1/);
+  assert.doesNotMatch(posted.out, /help\[/);
+});
+
 test('a still whose measurement hangs never holds the board', async () => {
   // A convert that never returns: the worker measuring this still is stuck for the whole request, so every answer below must come from
   // what is already known, never from waiting on a measurement or running one on the server's thread.

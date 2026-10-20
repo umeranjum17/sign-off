@@ -438,8 +438,9 @@
   .ev-card .t { font-size: 1.1875rem; font-weight: 600; line-height: 1.32; letter-spacing: -0.012em; }
   .ev-group h2 { font-size: 1.375rem; line-height: 1.27; font-weight: 700; letter-spacing: -0.012em; }
   .ev-card .m { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; color: var(--muted); font-size: 0.9375rem; }
-  .ev-ok { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--ok); }
-  .ev-ok svg { width: 0.9375rem; height: 0.9375rem; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .ev-ok, .ev-bad, .ev-warn { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--ok); }
+  .ev-bad { color: var(--danger); } .ev-warn { color: var(--warn); } .ev-none { color: var(--muted); }
+  .ev-ok svg, .ev-bad svg, .ev-warn svg { width: 0.9375rem; height: 0.9375rem; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
   /* One update: the whole capture on its tile, what it proves in a line, what the check recorded, then its verdict. */
   #reader .ev-scroll { flex: 1; min-height: 0; overflow: auto; padding: 1rem 1.25rem 3rem; }
   .ev-item { display: grid; gap: 1rem; max-width: 42.5rem; margin: 0 auto; }
@@ -1181,9 +1182,10 @@
   }
   /** One update on the Evidence screen: its capture as the hero, what it proves and how it went; the whole card opens the update. */
   function evCard(d) {
+    const result = RESULT[d.evidenceCard?.result];
     return el('a', { class: 'ev-card', href: `#evidence/${d.key}`, id: `item-${d.key}` }, el('span', { class: 'ev-media' }, ...hero(d)),
       el('span', { class: 't', dir: 'auto' }, headline(d)),
-      el('span', { class: 'm' }, el('span', { class: 'ev-ok' }, mark('ok'), 'Passed'), d.filed ? el('span', {}, stamp(d.filed)) : ''));
+      el('span', { class: 'm' }, result ? el('span', { class: `ev-${result[0]}` }, mark(result[0]), result[2]) : el('span', { class: 'ev-none' }, 'Not run'), d.filed ? el('span', {}, stamp(d.filed)) : ''));
   }
   /** Evidence as its own screen: a card per passed update, grouped under the project its check names, in the order each project first shows;
    * proof that names no project goes under Other, last. An item put in this area that is not an update (a page, a diagram) keeps the card it always had. */
@@ -1369,13 +1371,10 @@
   const icon = (a) => { const s = el('span', { class: `icon i-${a}`, 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[a]}"/></svg>`; return s; };
   // A design with only screen notes (answer 'screens') still waits for its design-wide verdict.
   const isAnswered = (d) => Object.hasOwn(state.answers, d.key) && !(d.type === 'design' && state.answers[d.key].answer === 'screens');
-  /** Each item lives in one area: answered items, then an evidence update that is not passed proof (it waits on you with its honest result), then the area the item names, then evidence updates, then what is only to read (explainers, pages with nothing to answer), then the open asks.
+  /** Each item lives in one area: answered items, then the area the item names, then evidence updates (never an ask, whatever their result), then what is only to read (explainers, pages with nothing to answer), then the open asks.
    *  A plan has no options but waits for its send-back. */
-  /** An update the Evidence list shows: passed proof only; every other update (no run, a failed or unfinished check) waits on you. */
-  const listed = (d) => d.evidenceCard?.result === 'RUN PASS';
   const area = (d) => {
-    const a = isAnswered(d) ? 'answered' : d.type === 'evidence' && !listed(d) ? 'waiting' : d.area ?? (d.type === 'evidence' ? 'evidence'
-      : state.readonly || d.type === 'explainer' || !(d.options.length || d.reply || d.type === 'signin' || d.type === 'plan' || d.kind === 'design') ? 'reports' : 'waiting');
+    const a = isAnswered(d) ? 'answered' : d.type === 'evidence' ? 'evidence' : d.area ?? (state.readonly || d.type === 'explainer' || !(d.options.length || d.reply || d.type === 'signin' || d.type === 'plan' || d.kind === 'design') ? 'reports' : 'waiting');
     // Reports lists only what explains: a page to tap through, or a narrated video. Text alone (a receipt, a status line) is a note, folded under it.
     return a === 'reports' && !state.readonly && d.type !== 'explainer' && !reads(d) ? 'notes' : a;
   };
@@ -1432,7 +1431,7 @@
     const n = by.waiting.length, proven = filedToday(by.evidence).length, fresh = filedToday(by.reports).length;
     const soonest = by.waiting.map((d) => d.silent_by).filter(Boolean).sort((x, y) => Date.parse(x) - Date.parse(y))[0];
     const lines = [[n ? `${n} ${n === 1 ? 'decision needs' : 'decisions need'} you.` : 'Nothing needs you.', 1], [soonest && `The soonest closes at ${when(soonest)}.`],
-      [proven && `${proven} ${proven === 1 ? 'change' : 'changes'} shipped with proof.`, 1], [fresh && `${fresh} new ${fresh === 1 ? 'report is' : 'reports are'} waiting.`]];
+      [proven && `${proven} ${proven === 1 ? 'update' : 'updates'} filed.`, 1], [fresh && `${fresh} new ${fresh === 1 ? 'report is' : 'reports are'} waiting.`]];
     if (lastSeen === undefined) try { lastSeen = localStorage.getItem(seenKey()); } catch { lastSeen = null; }
     return el('p', { class: 'card glance' }, lastSeen && !Number.isNaN(Date.parse(lastSeen)) ? el('span', { class: 'seen' }, `Since you last looked at ${when(lastSeen)}`) : '', ...lines.filter(([t]) => t).map(([t, strong]) => el(strong ? 'b' : 'span', {}, `${t} `)));
   }
@@ -1472,9 +1471,9 @@
     return el('div', { class: 'search', role: 'search', ...(query === null && { hidden: '' }) }, box, out);
   }
 
-  /** Proven today on Today: a swipeable row of today's passed updates, each with its capture; a wide screen sets them three across. */
+  /** Proven today on Today: a swipeable row of today's updates, each with its own result and capture; a wide screen sets them three across. */
   function proven(items) {
-    const fresh = items.filter((d) => d.type === 'evidence' && d.filed && isToday(d.filed));
+    const fresh = filedToday(items);
     return el('section', { class: 'i-evidence wide' }, el('div', { class: 'sec-head' }, el('h2', {}, 'Proven today'), items.length ? el('a', { href: '#evidence' }, 'See all') : ''),
       fresh.length ? el('div', { class: 'ev-scroll-row' }, ...fresh.slice(0, 3).map((d) => withX(d, evCard(d)))) : el('p', { class: 'empty' }, 'Nothing proven today yet.'));
   }
@@ -2080,7 +2079,7 @@
       ? 'How the tools work, step by step. Tap one to open it.' : 'Explainers you asked for, or that a decision needs.')
       : at === 'answered' && by.answered.length ? el('p', { class: 'lede' }, (() => { const n = by.answered.filter((d) => isToday(state.answers[d.key].at)).length; return `${n} ${n === 1 ? 'answer' : 'answers'} today. Each one has gone back to its agent.`; })())
       : at === 'designs' && by.designs.length ? el('p', { class: 'lede' }, 'Designs to look over. Approve one, or say what should change.')
-      : at === 'evidence' && by.evidence.length ? el('p', { class: 'lede' }, 'Passed proof that a change works, newest first.') : '', at === 'decide' ? '' : bulkBar(bulk));
+      : at === 'evidence' && by.evidence.length ? el('p', { class: 'lede' }, 'Updates that show a change works, newest first.') : '', at === 'decide' ? '' : bulkBar(bulk));
     document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [filters(by.waiting), waitingPage(shown, hidden)]
       : at === 'decide' ? [decideAt < 0 ? (key ? el('p', { class: 'empty' }, 'Nothing to decide for that question.') : el('div', { class: 'decide' }, decideLists(null, decideQueue)))
         : decidePage(decideQueue[decideAt], decideQueue.length > 1 ? decideQueue[(decideAt + 1) % decideQueue.length] : undefined, decideQueue)]

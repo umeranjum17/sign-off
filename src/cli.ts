@@ -479,7 +479,7 @@ const waitFor = (on: string, filer?: string, key?: string) => (filer ? `Run \`si
   : `Run \`sign-off-axi wait${on}${key ? ` --key ${key}` : ''}\` to block until the user answers`);
 
 /** Still waiting on the user: not answered, not dismissed, and something to answer (an item with no options and no reply is only shown). */
-const waits = (d: Decision & { answer?: unknown; dismissed?: boolean }) => !d.dismissed && awaitsVerdict(d.type, d.answer as { answer?: string } | undefined) && (d.options.length > 0 || !!d.reply || d.type === 'signin' || d.type === 'plan' || d.type === 'design');
+const waits = (d: Decision & { answer?: unknown; dismissed?: boolean }) => d.type !== 'evidence' && !d.dismissed && awaitsVerdict(d.type, d.answer as { answer?: string } | undefined) && (d.options.length > 0 || !!d.reply || d.type === 'signin' || d.type === 'plan' || d.type === 'design');
 /** The board's decisions with their latest answer; a missing board file is an empty board.
  *  A dismissal hides an item from the board and is not waiting here either, checked against the same dismissed log the board reads. */
 function board(file: string, say = warn) {
@@ -510,7 +510,7 @@ function list(args: string[]) {
   ];
   const where = tilde(file) + (existsSync(file) ? '' : ' (no file yet; raise creates it)');
   if (values.full) {
-    return toon({ board: where, decisions: rows.map((d) => ({ key: d.key, status: awaitsVerdict(d.type, d.answer) ? (d.dismissed ? 'dismissed' : 'waiting') : d.answer!.answer, title: d.title, about: d.about ?? '', detail: d.detail ?? '',
+    return toon({ board: where, decisions: rows.map((d) => ({ key: d.key, status: awaitsVerdict(d.type, d.answer) ? (d.dismissed ? 'dismissed' : d.type === 'evidence' ? 'shown' : 'waiting') : d.answer!.answer, title: d.title, about: d.about ?? '', detail: d.detail ?? '',
       recommend: d.recommend_value ?? '', default_if_silent: d.default_if_silent ?? '', close: d.close })) }, help);
   }
   return toon({
@@ -971,7 +971,7 @@ function postMedia(file: string, named: string, on: string, values: Record<strin
       if (asMessage(had) !== canon({ ...message, media: sources.length ? sources.map((src) => sha256(readFileSync(src))) : undefined })) {
         throw fail(`key ${own} already holds a different message on ${tilde(file)}`, 'CONFLICT', 'Post it under a new key');
       }
-      return toon({ board: tilde(file), posted: [{ key: own, number: had.number, media: sources.length, title: had.title, status: 'already posted' }] }, [`Run \`sign-off-axi open${on}\` so the user can give a verdict`]);
+      return toon({ board: tilde(file), posted: [{ key: own, number: had.number, media: sources.length, title: had.title, status: 'already posted' }] }, explainer ? [`Run \`sign-off-axi open${on}\` so the user can give a verdict`] : []);
     }
     const answers = readAnswers(file);
     if (message && own && Object.hasOwn(answers, own) && !awaitsVerdict(message.kind, answers[own])) throw fail(`key ${own} was answered on ${tilde(file)} and is no longer there`, 'CONFLICT', 'Post it under a new key');
@@ -1012,8 +1012,7 @@ function postMedia(file: string, named: string, on: string, values: Record<strin
     writeItems(file, items);
     notifyEntered(file, named, before);
     if (explainer) return toon({ board: tilde(file), raised: [{ key, status: 'raised', title }] }, [`Run \`sign-off-axi open${on}\` so the user can watch and answer`, waitFor(on, filer, key)]);
-    return toon({ board: tilde(file), posted: [{ key, number, media: media.length, title, ...(message && { status: 'posted' }) }] },
-      [`Run \`sign-off-axi open${on}\` so the user can give a verdict`, waitFor(on, filer, key)]);
+    return toon({ board: tilde(file), posted: [{ key, number, media: media.length, title, ...(message && { status: 'posted' }) }] });
   });
 }
 
@@ -1458,9 +1457,12 @@ const tokenMissing = (n: Notify) => n.muxr
   : n.token_env && !process.env[n.token_env] ? `${n.token_env} is not set` : undefined;
 const NOTIFY_SENDER = `void (async()=>{const delays=[2000,10000,60000],f=process.env.SIGN_OFF_NOTIFY_TOKEN_FILE;for(let i=0;i<4;i++){try{const t=f?require('node:fs').readFileSync(f,'utf8').trim():process.env.SIGN_OFF_NOTIFY_TOKEN;if((await fetch(process.env.SIGN_OFF_NOTIFY_URL,{method:'POST',headers:{'content-type':'application/json',...(t&&{authorization:'Bearer '+t})},body:process.env.SIGN_OFF_NOTIFY_BODY,signal:AbortSignal.timeout(10000)})).ok)return}catch{}if(i<3)await new Promise(r=>setTimeout(r,delays[i]))}require('node:fs').appendFileSync(process.env.SIGN_OFF_NOTIFY_LOG,new Date().toISOString()+' notification send failed for card '+process.env.SIGN_OFF_NOTIFY_ID+'\\n')})();`;
 
-/** The cards waiting on the user before a write: a card waiting after the write but not before it has entered Waiting on you. */
+/** Cards worth a notice: those waiting on the user, and a new evidence update (shown, never waiting). */
+const notifies = (d: Parameters<typeof waits>[0]) => waits(d) || (d.type === 'evidence' && !d.dismissed);
+
+/** The cards that would notify before a write: one that notifies after the write but not before it is new to the user. */
 function waitingKeys(file: string) {
-  try { return new Set(board(file, () => {}).filter(waits).map((d) => d.key)); } catch { return undefined; }
+  try { return new Set(board(file, () => {}).filter(notifies).map((d) => d.key)); } catch { return undefined; }
 }
 
 /** Announces each card that entered Waiting on you with a write. The card is already stored, so nothing here fails the command.
@@ -1470,7 +1472,7 @@ function notifyEntered(file: string, named: string, before: Set<string> | undefi
   try {
     const so = dirname(named), notify = before ? readSetup(so).notify : undefined;
     if (!before || !notify || tokenMissing(notify)) return;
-    const { items } = readItems(file), fresh = board(file, () => {}).filter((d) => waits(d) && !before.has(d.key) && !items.some((i) => i?.key === d.key && i.announced));
+    const { items } = readItems(file), fresh = board(file, () => {}).filter((d) => notifies(d) && !before.has(d.key) && !items.some((i) => i?.key === d.key && i.announced));
     if (!fresh.length) return;
     const at = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
     for (const i of items) if (fresh.some((d) => d.key === i?.key)) i.announced = at;

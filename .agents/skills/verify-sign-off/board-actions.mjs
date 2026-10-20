@@ -94,11 +94,12 @@ function helpers(home, readySel) {
 
 // Every card kind on every tab, with the actions it must offer. A stage with `shot` is captured and looked at before the next one.
 const KEYS = { plan: 'plan-kind-board', signin: 'npm', ask: 'ship', ask2: 'keep-the-weekly-digest', evidence: 'update-1', design: 'look', review: 'chat-journeys', passed: 'update-2', report: 'new-sign-in', answered: 'digest-old' };
-const WAITING = Object.values(KEYS).slice(0, 7);
+// An evidence update is never an ask: it waits under Evidence, not on Waiting or Decide.
+const WAITING = Object.entries(KEYS).filter(([name]) => !['evidence', 'passed', 'report', 'answered'].includes(name)).map(([, key]) => key);
 const PAGES = [
   { name: 'today', hash: '', ready: '[id="item-update-2"]', stages: [{ run: async (h) => {
-    await h.nav('Today row: Need you', h.find(/^Need you, 7$/, h.board(), 'a'), /^#waiting$/);
-    for (const [what, href] of [['sign-in', '#decide/npm'], ['ask', '#decide/ship'], ['evidence', '#decide/update-1'], ['plan', '#waiting/plan-kind-board'], ['Answered', '#answered'], ['Designs', '#designs'], ['report', '#reports/new-sign-in']]) {
+    await h.nav('Today row: Need you', h.find(/^Need you, 6$/, h.board(), 'a'), /^#waiting$/);
+    for (const [what, href] of [['sign-in', '#decide/npm'], ['ask', '#decide/ship'], ['plan', '#waiting/plan-kind-board'], ['Answered', '#answered'], ['Designs', '#designs'], ['report', '#reports/new-sign-in']]) {
       await h.nav(`Today ${what} link`, h.board().querySelector(`a[href="${href}"]`), new RegExp(`^${href}$`));
     }
     await h.nav('Today passed update', h.card('update-2'), /^#evidence\/update-2$/);
@@ -106,13 +107,13 @@ const PAGES = [
   } }] },
   { name: 'waiting', hash: '#waiting', ready: '[id="item-npm"]', stages: [
     { run: async (h) => {
-      const links = { 'plan-kind-board': '#waiting/plan-kind-board', npm: '#decide/npm', ship: '#decide/ship', 'keep-the-weekly-digest': '#decide/keep-the-weekly-digest', 'update-1': '#decide/update-1', look: '#decide/look', 'chat-journeys': '#designs/chat-journeys' };
+      const links = { 'plan-kind-board': '#waiting/plan-kind-board', npm: '#decide/npm', ship: '#decide/ship', 'keep-the-weekly-digest': '#decide/keep-the-weekly-digest', look: '#decide/look', 'chat-journeys': '#designs/chat-journeys' };
       for (const [key, href] of Object.entries(links)) {
         const c = h.card(key);
         await h.nav(`open ${key}`, c && (key === 'plan-kind-board' ? h.find(/^Open plan$/, h.box(c)) : c), new RegExp(`^${href}$`));
         await h.dismissCard(key);
       }
-      for (const chip of ['Design pick', 'Evidence', 'Sign-in', 'Plan', 'Yes/No', 'Pick one', 'All']) {
+      for (const chip of ['Design pick', 'Sign-in', 'Plan', 'Yes/No', 'Pick one', 'All']) {
         await h.press(`type chip ${chip}`, h.find(new RegExp(`^${chip} \\d+$`), h.board().querySelector('.chips')), () => h.find(new RegExp(`^${chip} \\d+$`), h.board().querySelector('.chips'))?.getAttribute('aria-pressed') === 'true');
       }
     } },
@@ -121,7 +122,7 @@ const PAGES = [
     { run: async (h) => { await h.need('Select', h.find(/^Select$/)).click(); await h.until('Cancel', () => h.find(/^Cancel$/)); h.card('npm').click(); h.card('ship').click(); await h.until('picked', () => h.box(h.card('ship')).classList.contains('picked')); } },
     { shot: 'waiting-select', run: async (h) => { await h.press('Cancel', h.find(/^Cancel$/), () => h.find(/^Select$/)); await h.bulk('npm'); } },
   ] },
-  ...[['npm', 'signin', []], ['ship', 'ask', ['^Friday', '^Next week']], ['look', 'design', ['^A: one column', '^B: two columns']], ['update-1', 'evidence', ['^Pass$', '^Fail$', '^Needs work$']]].map(([key, kind, options]) => ({
+  ...[['npm', 'signin', []], ['ship', 'ask', ['^Friday', '^Next week']], ['look', 'design', ['^A: one column', '^B: two columns']]].map(([key, kind, options]) => ({
     name: `decide-${key}`, hash: `#decide/${key}`, ready: '.decide', stages: [{ data: { options, key, kind, waiting: WAITING }, run: async (h, { options, key, kind, waiting }) => {
       const bar = () => h.board().querySelector('.decide-bar');
       if (kind === 'signin') await h.need('Open the npm sign-in', h.find(/^Open the npm sign-in$/, h.board()));
