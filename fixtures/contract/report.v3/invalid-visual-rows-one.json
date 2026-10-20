@@ -1,0 +1,86 @@
+{
+  "contract": 1,
+  "kind": "report",
+  "schema": 3,
+  "key": "sign-in-faster",
+  "title": "Sign-in now takes 2.8 minutes",
+  "group": "Beacon",
+  "filer": "agent-41",
+  "asked_by": "Release agent",
+  "filed": "2026-10-19T09:30:00Z",
+  "about": "The code step moved first and the second password screen is gone. A returning user is in under three minutes.",
+  "understood": [
+    {
+      "label": "You asked",
+      "text": "Make sign-in on a phone quicker."
+    },
+    {
+      "label": "Done when",
+      "text": "Median under three minutes on the real flow."
+    }
+  ],
+  "visual": {
+    "type": "bars",
+    "heading": "Median sign-in fell from 4.5 to 2.8 minutes",
+    "text": "Minutes from the first screen to the home screen, 200 phone sign-ins before and after.",
+    "unit": "min",
+    "rows": [
+      {
+        "label": "Before the change",
+        "value": 4.5,
+        "note": "200 sign-ins",
+        "tone": "bad"
+      }
+    ],
+    "details": [
+      {
+        "label": "Before",
+        "value": "4.5 min median, 1 to 14 October"
+      },
+      {
+        "label": "After",
+        "value": "2.8 min median, 15 to 19 October"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "found",
+      "stage": "found",
+      "heading": "What changed for people",
+      "body": "Two screens did most of the waiting. Both are gone.",
+      "items": [
+        {
+          "title": "Code arrives with the password",
+          "text": "The text is sent on the first tap.",
+          "more": "People no longer wait for the message after typing a password.",
+          "tone": "ok"
+        },
+        {
+          "title": "One password entry",
+          "text": "The second screen was removed.",
+          "tone": "ok"
+        }
+      ]
+    },
+    {
+      "id": "limits",
+      "stage": "found",
+      "heading": "What I did not check",
+      "body": "Tablets and the desktop flow were not measured.",
+      "items": [
+        {
+          "title": "Slow connections",
+          "text": "No data yet below 1 Mbps.",
+          "tone": "warn"
+        }
+      ]
+    }
+  ],
+  "next": {
+    "heading": "Nothing needs you",
+    "lines": [
+      "I watch sign-ins for a week and file a note if they drop."
+    ]
+  }
+}

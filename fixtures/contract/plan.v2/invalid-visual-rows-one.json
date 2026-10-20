@@ -1,0 +1,124 @@
+{
+  "contract": 1,
+  "kind": "plan",
+  "schema": 2,
+  "key": "faster-sign-in",
+  "title": "Cut sign-in from 4.5 to 2.8 minutes",
+  "project": "Beacon",
+  "filer": "agent-41",
+  "about": "Move the code step first and drop the second password screen. Umer signs in on a phone in under three minutes, with no new screens.",
+  "understood": [
+    {
+      "label": "You asked",
+      "text": "Make sign-in on a phone quicker for returning users."
+    },
+    {
+      "label": "Done when",
+      "text": "A returning user is in the app within three minutes, measured on the real flow."
+    },
+    {
+      "label": "Not in scope",
+      "text": "New sign-in methods and the desktop flow."
+    }
+  ],
+  "visual": {
+    "type": "bars",
+    "heading": "Sign-in takes 4.5 minutes today. The plan gets it to 2.8.",
+    "text": "Median minutes from the first screen to the home screen, over the last 200 phone sign-ins.",
+    "unit": "min",
+    "rows": [
+      {
+        "label": "Enter the code first",
+        "before": 4.5,
+        "value": 3.4,
+        "note": "step 1",
+        "tone": "ok"
+      }
+    ],
+    "details": [
+      {
+        "label": "Sample",
+        "value": "200 phone sign-ins, 1 to 14 October"
+      },
+      {
+        "label": "Slowest screen today",
+        "value": "Second password screen, 1.4 min median"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "found",
+      "stage": "found",
+      "heading": "Two screens cost most of the time",
+      "body": "The code step sits behind a password screen that most users have saved in the keychain anyway.",
+      "items": [
+        {
+          "title": "Second password screen",
+          "text": "1.4 min median, and 31% of people leave here.",
+          "more": "The screen asks again for what the keychain already filled in. It is the single slowest screen in the flow.",
+          "tone": "bad"
+        },
+        {
+          "title": "Code arrives late",
+          "text": "The text message is sent after the password, so people wait for it.",
+          "tone": "warn"
+        }
+      ],
+      "details": [
+        {
+          "label": "Drop-off at the second screen",
+          "value": "31% of 200 sign-ins"
+        }
+      ]
+    },
+    {
+      "id": "plan",
+      "stage": "recommend",
+      "heading": "Send the code first, then ask for the password once",
+      "body": "Two small changes, each shipped on its own, so either can be rolled back.",
+      "items": [
+        {
+          "title": "Send the code on the first tap",
+          "text": "The text arrives while the password is typed.",
+          "more": "No new screen. The code field moves above the password field and the message goes out when the email is entered.",
+          "tone": "ok"
+        },
+        {
+          "title": "Remove the second password screen",
+          "text": "One password entry, kept by the keychain.",
+          "tone": "ok"
+        }
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "key": "rollout",
+      "question": "Ship to everyone, or to a tenth first?",
+      "why": "A tenth first adds a week and shows any drop in sign-ins before it reaches everyone.",
+      "options": [
+        {
+          "value": "tenth",
+          "label": "A tenth first",
+          "outcome": "A week of data, then everyone."
+        },
+        {
+          "value": "all",
+          "label": "Everyone at once",
+          "outcome": "Live this week; a rollback is a redeploy."
+        }
+      ],
+      "recommend": "tenth",
+      "reason": "A drop in sign-ins costs more than a week.",
+      "quiet": "I ship to a tenth on Thursday."
+    }
+  ],
+  "next": {
+    "heading": "I start with the code step as soon as you answer",
+    "lines": [
+      "I post a before and after of the phone flow when the first step is live.",
+      "The proof lands under Evidence on this board."
+    ]
+  }
+}

@@ -799,7 +799,7 @@ test('each card has one place to type: Other answer holds the reply, Another rou
   const abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l }));
   const nine = new Date(new Date().setHours(9, 15, 0, 0)).toISOString();
   // A report is the page report init writes, filled in; a text-only report stored before reports had pages is a note, never a report card.
-  assert.equal(run('report', 'init', join(dir, 'mocks', 'how')).code, 0);
+  assert.equal(run('report', 'init', join(dir, 'mocks', 'how'), '--page').code, 0);
   for (const f of ['index.html', 'preview.svg']) writeFileSync(join(dir, 'mocks', 'how', f), readFileSync(join(dir, 'mocks', 'how', f), 'utf8').replace(/FILL: [^<"']*/g, 'Umer taps through it'));
   writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key: 'ship', title: 'When should it ship?', options: abc, recommend_value: 'b', filed: nine },
     { key: 'look', type: 'design', title: 'Pick the look', options: abc, recommend_value: 'b', filed: nine },
