@@ -501,7 +501,8 @@ function ready(file: string, on: string, root?: string) {
 
 function list(args: string[]) {
   const { file, values, on } = parse('list', args, TIERS);
-  const rows = board(file), waiting = rows.filter(waits), answered = rows.filter((d) => d.answer && !awaitsVerdict(d.type, d.answer) && !d.dismissed).length;
+  // An evidence update is shown, never an ask: list counts it as waiting on no one.
+  const rows = board(file), waiting = rows.filter((d) => d.type !== 'evidence' && waits(d)), answered = rows.filter((d) => d.answer && !awaitsVerdict(d.type, d.answer) && !d.dismissed).length;
   if (values.json) return JSON.stringify({ board: file, decisions: rows.map(({ dismissed, ...d }) => ({ ...d, ...(d.type === 'signin' && { link: undefined }), ...(dismissed && { dismissed }) })) });
   const help = [
     ...(waiting.length ? [`Run \`sign-off-axi open${on}\` to show the board to the user`] : []),
