@@ -11,8 +11,11 @@ export type AttachRef = MediaRef & { name: string };
 export type Chapter = { at: number; title: string };
 export type Step = { title: string; marks?: string[]; text?: string };
 /** A plan's section to approve or change, and a decision it asks: one question, options that each say where they lead, and the pick it recommends. */
-export type PlanSection = { id: string; heading: string; body: string };
-export type PlanDecision = { key: string; question: string; why: string; options: (Option & { outcome: string })[]; recommend: string; reason?: string; after?: string };
+export type PlanSection = { id: string; heading: string; body: string } & Partial<GuideSection>;
+/** A guided page's section (plan 2, report 3): a stage, a lead, expandable items and the numbers behind a Details tap. */
+export type GuideSection = { stage: 'found' | 'recommend'; items: { title: string; text: string; more?: string; tone?: string }[]; details: { label: string; value: string }[] };
+export type GuideVisual = { type: 'bars' | 'steps' | 'tiles'; heading: string; text?: string; unit?: string; rows: { label: string; text?: string; note?: string; tone?: string; value?: number; before?: number }[]; details?: { label: string; value: string }[] };
+export type PlanDecision = { key: string; question: string; why: string; options: (Option & { outcome: string })[]; recommend: string; reason?: string; after?: string; quiet?: string };
 export type DesignNote = { journey?: string; screen?: string; verdict?: 'approve' | 'change'; note?: string };
 export type DesignJourney = { id: string; title: string; screens: { id: string; title: string; views: Record<string, string> }[] };
 /** One section in a plan's send-back: approved, or changed with a note on what to change. */
@@ -43,6 +46,8 @@ export type Decision = {
   start?: string[];
   /** Plans: the sections to approve or change and the decisions to answer, all sent back as one answer. */
   sections?: PlanSection[]; decisions?: PlanDecision[]; project?: string;
+  /** A guided plan or report (plan 2, report 3): the board draws it as one page from these fields, with no page of the agent's own. */
+  guided?: boolean; understood?: { label: string; text: string }[]; visual?: GuideVisual; next?: { heading: string; lines: string[] };
   /** Designs: project, date, review status, preview and screen views. */
   status?: 'draft' | 'in_review' | 'approved'; journeys?: DesignJourney[]; recommend?: string;
 };
@@ -199,9 +204,9 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     }
     // A ladder rung: a diagram image, or an interactive page the board frames in a sandbox.
     // A report is a page and its picture; one stored before reports had pages still loads, as a note with neither.
-    const report = d.kind === 'report', plan = d.kind === 'plan', design = d.kind === 'design';
+    const report = d.kind === 'report', plan = d.kind === 'plan', design = d.kind === 'design', guided = (report && d.schema === 3) || (plan && d.schema === 2);
     if (d.type === 'plan' && !plan) throw bad('type', 'plan needs "kind": "plan": post it with sign-off-axi post --kind plan');
-    const views = report ? (d.view !== undefined || d.preview !== undefined ? VIEWS.interactive : undefined) : plan ? VIEWS.interactive : Object.hasOwn(VIEWS, d.type ?? '') ? VIEWS[d.type] : undefined;
+    const views = guided ? undefined : report ? (d.view !== undefined || d.preview !== undefined ? VIEWS.interactive : undefined) : plan ? VIEWS.interactive : Object.hasOwn(VIEWS, d.type ?? '') ? VIEWS[d.type] : undefined;
     const viewOk = (v: any, [, ends]: [string, RegExp]) => isText(v) && v.length <= 256 && /^[^?#]+$/.test(v) && ends.test(v);
     if (views && !viewOk(d.view, views)) throw bad('view', `must be a board-relative ${views[0]} file`);
     if (report && views && !viewOk(d.preview, VIEWS.diagram)) throw bad('preview', `must be a board-relative ${VIEWS.diagram[0]} file`);
@@ -249,6 +254,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       // So is a finding's proposal, with the counts and records behind it.
       ...(d.kind === 'finding' && { finding: { cause: d.cause, incidents: d.incidents, days: d.days, evidence_ids: d.evidence_ids, change_kind: d.change_kind, proposal: d.proposal } }),
       ...(plan && { sections: d.sections, decisions: d.decisions, ...(d.project && { project: d.project }) }),
+      ...(guided && { guided: true, understood: d.understood, visual: d.visual, next: d.next, ...(report && { sections: d.sections }) }),
       ...(design && { kind: 'design', type: 'design', group: d.group, filed: d.filed, status: d.status, preview: d.preview, journeys: d.journeys, ...(d.options && { options: d.options, recommend_value: d.recommend }) }),
       ...(d.type === 'explainer' && d.chapters && { chapters: d.chapters.map(({ at, title }: Chapter) => ({ at, title })) }),
     };
@@ -356,7 +362,10 @@ export function appendDesignAnswer(decisionsPath: string, d: Decision, verdict: 
  * An identical send-back again saves nothing. */
 export function appendSendBack(decisionsPath: string, d: Decision, notes: unknown, picks: unknown = {}, comment: unknown = ''): Answer | undefined {
   const bad = (rule: string) => new InputError(`key ${d.key}: ${rule}`), ids = d.sections!.map((s) => s.id), keys = d.decisions!.map((q) => q.key);
-  if (!Array.isArray(notes) || notes.length !== ids.length || !ids.every((id) => notes.filter((n) => n?.section === id).length === 1)) throw bad(`notes must list each section once: ${ids.join(', ')}`);
+  // A guided plan asks for no verdict on every section: "understood" and any section the person marked are listed, once each.
+  const named = d.guided ? ['understood', ...ids] : ids;
+  if (!Array.isArray(notes) || (d.guided ? notes.length > named.length : notes.length !== ids.length) || !(d.guided ? notes.every((n) => named.includes(n?.section)) : ids.every((id) => notes.filter((n) => n?.section === id).length === 1))
+    || new Set(notes.map((n) => n?.section)).size !== notes.length) throw bad(`notes must list ${d.guided ? 'only' : 'each'} section${d.guided ? '' : ' once'}: ${named.join(', ')}`);
   for (const { section, verdict, note } of notes) {
     if (verdict !== 'approve' && verdict !== 'change') throw bad(`section ${section} must be approve or change`);
     if (note !== undefined && (!isText(note) || [...note.trim()].length > NOTE_MAX)) throw bad(`section ${section} note must be text of ${NOTE_MAX} characters or fewer`);
@@ -370,7 +379,7 @@ export function appendSendBack(decisionsPath: string, d: Decision, notes: unknow
   if (comment !== '' && comment !== undefined && (!isText(comment) || [...(comment as string).trim()].length > NOTE_MAX)) throw bad(`comment must be text of ${NOTE_MAX} characters or fewer`);
   const note = typeof comment === 'string' ? comment.trim() : '';
   const answer: Answer = { key: d.key, answer: 'sent', label: 'Sent back', close: d.close, at: now(), ...(note && { note }),
-    notes: ids.map((id) => notes.find((n) => n.section === id)).map(({ section, verdict, note }) => ({ section, verdict, ...(note?.trim() && { note: note.trim() }) })), decisions: Object.fromEntries(keys.map((k) => [k, (p[k] as string).trim()])) };
+    notes: named.flatMap((id) => notes.filter((n) => n.section === id)).map(({ section, verdict, note }) => ({ section, verdict, ...(note?.trim() && { note: note.trim() }) })), decisions: Object.fromEntries(keys.map((k) => [k, (p[k] as string).trim()])) };
   const current = readAnswers(decisionsPath)[d.key];
   if (current?.answer === answer.answer && JSON.stringify([current.note ?? '', current.notes, current.decisions]) === JSON.stringify([answer.note ?? '', answer.notes, answer.decisions])) return;
   appendLine(answersPath(decisionsPath), answer);
@@ -382,10 +391,15 @@ export const seenPath = (decisionsPath: string) => decisionsPath.replace(/\.json
 const taken = (a: Pick<Answer, 'key' | 'answer' | 'at' | 'note'>) => JSON.stringify([a.key, a.answer, a.at, a.note ?? '']);
 /** Is this answer, as saved now, one the filer already took? A changed answer is new again. */
 export function seenBy(decisionsPath: string): (a: Answer) => boolean {
-  const seen = new Set(readRaw(seenPath(decisionsPath)).split('\n').flatMap((line) => {
-    try { const s = line && JSON.parse(line); return s?.key ? [taken(s)] : []; } catch { return []; }
+  const at = seenAt(decisionsPath);
+  return (a) => at(a) !== undefined;
+}
+/** When the filer took this answer, as saved now: the "agent read your answers" time of a read receipt. */
+export function seenAt(decisionsPath: string): (a: Answer) => string | undefined {
+  const seen = new Map(readRaw(seenPath(decisionsPath)).split('\n').flatMap((line) => {
+    try { const s = line && JSON.parse(line); return s?.key ? [[taken(s), s.seen] as const] : []; } catch { return []; }
   }));
-  return (a) => seen.has(taken(a));
+  return (a) => (seen.has(taken(a)) ? seen.get(taken(a)) ?? '' : undefined);
 }
 export const markSeen = (decisionsPath: string, answers: Answer[]) => {
   for (const { key, answer, at, note } of answers) appendLine(seenPath(decisionsPath), { key, answer, at, ...(note && { note }), seen: now() });
@@ -486,6 +500,55 @@ export function readAnnotations(decisionsPath: string, warn: (msg: string) => vo
 /** Saves a comment (a new id unless it edits one) or, with only an id, deletes it. */
 export const appendAnnotation = (decisionsPath: string, a: Omit<Annotation, 'id' | 'at'> & { id?: string } | { id: string; deleted: true }) =>
   appendLine(annotationsPath(decisionsPath), { ...a, id: a.id ?? randomBytes(6).toString('hex'), at: now() });
+
+/** The parts of a guided page that can be read and asked about, with the name the agent hears: this, understood, each section and item, each decision, next. Undefined for a part it has not got. */
+export function guidePart(d: Decision, part: string): string | undefined {
+  if (!d.guided) return undefined;
+  if (part === 'this') return d.visual?.heading;
+  if (part === 'understood') return 'What I understood';
+  if (part === 'next') return d.next?.heading;
+  const dec = /^d:(.+)$/.exec(part)?.[1];
+  if (dec) return d.decisions?.find((q) => q.key === dec)?.question;
+  const [id, i] = part.split(':'), sec = d.sections?.find((x) => x.id === id);
+  if (!sec) return undefined;
+  return i === undefined ? sec.heading : /^\d+$/.test(i) ? sec.items?.[+i]?.title : undefined;
+}
+/** Read receipts: the first time the person had a part of a guided page on screen, one line per key and part. */
+export const readsPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.reads.jsonl';
+export function readReads(decisionsPath: string): Record<string, string> {
+  const first: Record<string, string> = {};
+  readRaw(readsPath(decisionsPath)).split('\n').forEach((line) => {
+    try { const r = line && JSON.parse(line); if (r && typeof r.key === 'string' && typeof r.part === 'string' && typeof r.at === 'string') first[`${r.key}/${r.part}`] ??= r.at; } catch {}
+  });
+  return first;
+}
+export const appendRead = (decisionsPath: string, key: string, part: string) => {
+  if (readReads(decisionsPath)[`${key}/${part}`] === undefined) appendLine(readsPath(decisionsPath), { key, part, by: 'captain', at: now() });
+};
+
+/** Go deeper: the person asks the agent about one part of a guided page; the agent answers in pieces that the board streams into that spot.
+ * One line each: an ask (id, key, part, what it is about, an optional question), the agent reading it, a piece of the answer (`more` while it goes on), and its end. */
+export type Deeper = { id: string; key: string; part: string; about: string; q?: string; at: string; read?: string; text: string; answered?: string; done?: boolean };
+export const deeperPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.deeper.jsonl';
+export function readDeeper(decisionsPath: string): Deeper[] {
+  const all = new Map<string, Deeper>();
+  readRaw(deeperPath(decisionsPath)).split('\n').forEach((line) => {
+    try {
+      const x = line && JSON.parse(line), d = x && all.get(x.id);
+      if (x?.op === 'ask' && typeof x.id === 'string') all.set(x.id, { id: x.id, key: x.key, part: x.part, about: x.about, ...(x.q && { q: x.q }), at: x.at, text: '' });
+      else if (d && x.op === 'read') d.read ??= x.at;
+      else if (d && x.op === 'say') { d.text += (d.text ? '\n\n' : '') + x.text; d.answered = x.at; d.read ??= x.at; if (!x.more) d.done = true; }
+    } catch {}
+  });
+  return [...all.values()];
+}
+export const askDeeper = (decisionsPath: string, key: string, part: string, about: string, q?: string): Deeper => {
+  const id = randomBytes(6).toString('hex'), at = now();
+  appendLine(deeperPath(decisionsPath), { op: 'ask', id, key, part, about, ...(q && { q }), at });
+  return { id, key, part, about, ...(q && { q }), at, text: '' };
+};
+export const markDeeperRead = (decisionsPath: string, ids: string[]) => { for (const id of ids) appendLine(deeperPath(decisionsPath), { op: 'read', id, at: now() }); };
+export const answerDeeper = (decisionsPath: string, id: string, text: string, more: boolean) => appendLine(deeperPath(decisionsPath), { op: 'say', id, text, ...(more && { more: true }), at: now() });
 
 const now = () => new Date().toISOString().slice(0, 19) + 'Z';
 /** Appends one JSON line, starting a new line after a torn fragment. */
