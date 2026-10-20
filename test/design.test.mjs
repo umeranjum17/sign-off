@@ -1972,7 +1972,7 @@ test('Waiting on you: an update waiting for a verdict reads Evidence on its card
   const dir = join(scratch, 'waiting-update'), file = join(dir, 'board.json');
   mkdirSync(dir);
   writeFileSync(file, JSON.stringify({ schema: 2, items: [
-    { key: 'upd', type: 'evidence', number: 5, title: 'Login checked', area: 'waiting', media: [{ path: 'evidence/5/shot.png', sha256: 'a'.repeat(64), bytes: 0 }] },
+    { key: 'upd', type: 'evidence', number: 5, title: 'Login checked', media: [{ path: 'evidence/5/shot.png', sha256: 'a'.repeat(64), bytes: 0 }] },
     { key: 'ship', type: 'ask', title: 'Ship it?' },
   ] }));
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
@@ -2184,7 +2184,7 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
     media: [{ path: 'evidence/4/1.png', sha256: hash, bytes: wideBytes.length }], evidence: link(runs[0]) });
   // A plain update with its own capture and no linked run is not proof: it waits on you.
   doc.items.push({ key: 'update-5', type: 'evidence', number: 5, title: 'Sign-in, plain update', about: 'Umer checks the plain update.', filed: new Date(Date.now() + 1000).toISOString(),
-    area: 'waiting', link: 'https://github.com/umeranjum17/sign-off/pull/13', media: [{ path: 'evidence/4/1.png', sha256: hash, bytes: wideBytes.length }] });
+    link: 'https://github.com/umeranjum17/sign-off/pull/13', media: [{ path: 'evidence/4/1.png', sha256: hash, bytes: wideBytes.length }] });
   // A run whose capture changed after it ran cannot be checked, so its update waits on you instead of being listed.
   doc.items.push({ key: 'update-6', type: 'evidence', number: 6, title: 'A capture changed after the run', about: outcome, filed: new Date().toISOString(), evidence: link(runs[3]) });
   writeFileSync(file, JSON.stringify(doc));
