@@ -2188,7 +2188,7 @@
 
     const secCard = (s) => {
       const items = (s.items ?? []).map((it, i) => {
-        if (!it.more) return E('li', '', E('div', 'rowstat', E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), it.title), E('span', 'sm', it.text))));
+        if (!it.more) return E('li', '', E('div', 'rowstat', E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), it.title), E('span', 'sm', it.text))), ...(d.engagement ? acts(`${s.id}:${i}`) : []));
         const part = `${s.id}:${i}`, body = E('div', 'body', E('p', '', it.more), ...acts(part), ...[]);
         body.hidden = true;
         const b = el('button', { class: 'rowbtn', type: 'button', 'aria-expanded': 'false' }, E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), it.title), E('span', 'sm', it.text)), gic('chev', 'gchev'));
@@ -2218,7 +2218,7 @@
     // ---- next step and Go ahead
     const sendSlot = E('div', ''), err = E('p', 'gd-err');
     err.setAttribute('role', 'alert');
-    const nextCard = card('next', 'next', head(d.next.heading), E('ul', 'gd-checks', ...d.next.lines.map((l) => E('li', '', E('span', 'tk', gic('check')), E('span', '', l)))), ...(plan ? [sendSlot, err] : []), rc('next'));
+    const nextCard = card('next', 'next', head(d.next.heading), E('ul', 'gd-checks', ...d.next.lines.map((l) => E('li', '', E('span', 'tk', gic('check')), E('span', '', l)))), ...(plan ? [sendSlot, err] : []), ...(d.engagement ? acts('next') : []), rc('next'));
     async function go(b) {
       if (S.understood === 'no' && !S.note.trim()) { noteBox.focus(); noteBox.scrollIntoView({ block: 'center' }); err.textContent = 'Say what is off first, or choose That is right.'; return; }
       err.textContent = ''; b.disabled = true;
