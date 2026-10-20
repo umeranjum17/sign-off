@@ -1016,6 +1016,28 @@ test('a sign-in card: posted on top of what waits with its link and time left, t
   proc.kill();
 });
 
+test('Decide on the page: a guided plan with no decisions is read under Reports, one with a decision waits', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'reading'), file = join(dir, 'board.json'), fixture = new URL('../fixtures/contract/plan.v2/valid-full.json', import.meta.url).pathname;
+  mkdirSync(dir);
+  const plan = JSON.parse(readFileSync(fixture));
+  writeFileSync(join(dir, 'open.json'), JSON.stringify(plan));
+  writeFileSync(join(dir, 'reading.json'), JSON.stringify({ ...plan, key: 'for-reading', title: 'A plan to read', decisions: [] }));
+  for (const f of ['open', 'reading']) assert.equal(run('post', file, '--kind', 'plan', '--from', join(dir, `${f}.json`)).code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+  const count = (tab) => evaluate(`[...document.querySelectorAll("#nav a")].find((a) => a.textContent.startsWith("${tab}"))?.querySelector(".n")?.textContent`);
+  await until(async () => (await count('Decide')) === '1');
+  assert.equal(await evaluate('document.querySelectorAll(".plan-hero").length'), 1);
+  assert.equal(run('list', file).out.includes('for-reading'), false);
+  await evaluate('location.hash = "#reports"');
+  await until(async () => (await count('Reports')) === '1' && (await evaluate('document.getElementById("board").textContent')).includes('A plan to read'));
+  close();
+  proc.kill();
+});
+
 // Waiting and Decide cards retain the existing filters and answer/undo API path.
 test('Waiting and Decide: Spacious ask cards, decision options, answer and undo, with plan card navigation', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'types'), file = join(dir, 'board.json');

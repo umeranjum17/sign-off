@@ -436,7 +436,11 @@ export function appendDismissed(decisionsPath: string, keys: string[], dismissed
   for (const key of keys) appendLine(dismissedPath(decisionsPath), { key, dismissed, at });
 }
 /** True while an item asks the user something: evidence is never an ask, and an item with no options, reply, sign-in, plan or design is only read. */
-export const asks = (d: Decision) => d.type !== 'evidence' && (d.options.length > 0 || !!d.reply || ['signin', 'plan', 'design'].includes(d.type));
+export const asks = (d: Decision) => d.type !== 'evidence' && !reading(d) && (d.options.length > 0 || !!d.reply || ['signin', 'plan', 'design'].includes(d.type));
+/** A guided plan with no decisions is for reading: it shows under Reports, still openable with Go ahead and Go deeper, and never waits in Decide (web/index.html area() says the same). */
+export const reading = (d: Decision) => d.type === 'plan' && !!d.guided && !d.decisions?.length;
+/** A sign-in whose fixed link has expired has nothing left to open: it is not waiting, here or on the board's page (web/index.html lapsed() says the same). A start command makes a new link per tap and never lapses. */
+export const lapsed = (d: Decision) => d.type === 'signin' && !d.start && !!d.expires && Date.parse(d.expires) <= Date.now();
 /** Evidence and reports (nothing to answer) archive on their own this long after they were filed: dismissed, never deleted. */
 export const ARCHIVE_MS = 24 * 3_600_000;
 /** Keys hidden now: the last line for each dismissed it, and no answer or round came after it. A torn line is skipped and reported through warn.

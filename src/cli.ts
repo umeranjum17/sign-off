@@ -13,7 +13,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, asks, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, appendRead, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, sameDecision, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, asks, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, lapsed, appendRead, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, sameDecision, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -529,8 +529,8 @@ function filerOf(values: Record<string, any>, session = false): string | undefin
 const waitFor = (on: string, filer?: string, key?: string) => (filer ? `Run \`sign-off-axi wait${on} --filer ${filer}\` to block until the user answers`
   : `Run \`sign-off-axi wait${on}${key ? ` --key ${key}` : ''}\` to block until the user answers`);
 
-/** Still waiting on the user: not answered, not dismissed, and something to answer (an item with no options and no reply is only shown). */
-const waits = (d: Decision & { answer?: unknown; dismissed?: boolean }) => asks(d) && !d.dismissed && awaitsVerdict(d.type, d.answer as { answer?: string } | undefined);
+/** Still waiting on the user: not answered, not dismissed, not an expired sign-in, and something to answer (an item with no options and no reply is only shown). */
+const waits = (d: Decision & { answer?: unknown; dismissed?: boolean }) => asks(d) && !lapsed(d) && !d.dismissed && awaitsVerdict(d.type, d.answer as { answer?: string } | undefined);
 /** The items that archive after a day: all of them, except on a board another program feeds, which owns what it shows. */
 const archivable = (file: string, decisions: Decision[]) => ((x) => (x.readonly === true || x.answers_only === true ? [] : decisions))(readItems(file).extra);
 /** The board's decisions with their latest answer; a missing board file is an empty board.

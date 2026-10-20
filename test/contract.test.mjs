@@ -370,6 +370,24 @@ test('the 160 title limit applies to new items only: a re-post of an item alread
   assert.equal(existsSync(evidence), false, 'refused before anything is written');
 });
 
+test('Decide holds only what waits on the reader: not an expired sign-in, not a guided plan with no decisions to answer', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const board = join(scratch, 'lapsed.json'), cli2 = (...args) => spawnSync('node', [cli, ...asked(args)], { encoding: 'utf8', env });
+  const signin = { key: 'tailscale', title: 'Tailscale', type: 'signin', link: 'https://example.com/login', unlocks: 'Pairing', waits: 'Main', filed: '2026-10-20T06:49:08Z' };
+  writeFileSync(board, JSON.stringify({ schema: 2, items: [{ ...signin, expires: '2026-10-20T06:54:08Z' }, { ...signin, key: 'npm', title: 'npm', expires: '2999-01-01T00:00:00Z' }] }));
+  const listed = decode(cli2('list', board).stdout.split('\nhelp[')[0]);
+  assert.deepEqual(listed.waiting.map((d) => d.key), ['npm'], 'only the live link waits');
+  // A guided plan is read in Reports; it waits only while it carries a decision to answer.
+  const plan = JSON.parse(readFileSync(join(fixtures, 'plan.v2', 'valid-full.json')));
+  assert.ok(plan.decisions.length > 0);
+  const post = (m) => cli2('post', board, '--kind', 'plan', '--from', message('plan-reading.json', JSON.stringify(m)));
+  assert.equal(post(plan).status, 0);
+  assert.equal(post({ ...plan, key: 'for-reading', decisions: [] }).status, 0);
+  assert.deepEqual(decode(cli2('list', board).stdout.split('\nhelp[')[0]).waiting.map((d) => d.key), ['npm', plan.key]);
+});
+
 test('a stored report with reply, area or type is refused: it can never wait, be answered, or leave Reports', () => {
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;
