@@ -705,6 +705,7 @@ test('a guided plan and report: report init writes them to fill, post refuses FI
     for (const [kind, schema] of [['plan', 3], ['report', 4]]) {
       const m = JSON.parse(readFileSync(join(fixtures, `${kind}.v${schema}/valid-full.json`)));
       const key = `simplify-${kind}`; m.key = key;
+      m.understood[0].text = 'Ask 🙂 once, then ask 🙂 again, and ask 🙂 a third time.';
       const posted = spawnSync('node', [cli, 'post', board, '--kind', kind, '--from', '-'], { env, encoding: 'utf8', input: JSON.stringify(m) });
       assert.equal(posted.status, 0, posted.stdout);
       const d = (await state()).decisions.find(d => d.key === key), before = readFileSync(board, 'utf8');
@@ -744,9 +745,22 @@ test('a guided plan and report: report init writes them to fill, post refuses FI
       assert.equal(intents.length, 7);
       for (const [i, intent] of [...cases.valid, { action: 'custom', q: '🙂'.repeat(500) }].entries()) assert.deepEqual([intents[i].action, intents[i].part, intents[i].q], [intent.action, 'next', intent.q]);
       assert.equal(readFileSync(board, 'utf8'), before, 'explanations never rewrite plan decisions or the document');
+      // Selected text: offsets pick one repeat of a phrase, counted in Unicode code points; any other target fails without a write.
+      const text = m.understood[0].text, quoted = (n) => { let i = -1; for (let k = 0; k <= n; k++) i = text.indexOf('ask 🙂', i + 1); const start = [...text.slice(0, i)].length; return { field: 'understood.0.text', start, end: start + 5, quote: 'ask 🙂' }; };
+      const sel = (n, over = {}) => ({ ...request, id: `${request.id}-sel-${n}`, selection: { ...quoted(n), ...over } }), saved = async () => (await state()).deeper.filter(a => a.key === key).length;
+      const count = await saved();
+      for (const bad of [sel(0, { start: quoted(0).start + 1, end: quoted(0).end + 1 }), sel(0, { end: quoted(1).end }), sel(0, { quote: '' }), sel(0, { end: quoted(0).start }), sel(0, { extra: 1 }), { ...sel(0), part: 'this' }, { ...sel(0), part: 'next' },
+        { ...sel(0), revision: '0'.repeat(64) }, { ...sel(0), selection: { ...quoted(0), field: 'understood.0.label' } }, { ...sel(0), selection: { ...quoted(0), field: 'title' } }]) assert.equal((await post('engagement', bad)).status, 409);
+      assert.equal(await saved(), count, 'a refused selection saves nothing');
+      for (const n of [0, 1]) { assert.equal((await post('engagement', sel(n))).status, 200); assert.equal((await post('engagement', sel(n))).status, 200); }
+      assert.equal((await post('engagement', sel(0, quoted(1)))).status, 409);
+      assert.equal(await saved(), count + 2);
+      const picked = run('wait', board, '--filer', m.filer, '--events', '--timeout', '0').stdout.trim().split('\n').map(JSON.parse);
+      assert.deepEqual(picked.map(e => e.selection), [quoted(0), quoted(1)]);
       const changed = JSON.parse(before); changed.items.find(i => i.key === key).title += ' revised'; writeFileSync(board, JSON.stringify(changed));
       const stale = run('deeper', board, '--id', request.id + '-second', '--filer', m.filer, '--text', 'Stale');
       assert.notEqual(stale.status, 0); assert.match(stale.stdout, /stale/);
+      assert.equal((await post('engagement', { ...sel(1), id: `${request.id}-late` })).status, 409);
       writeFileSync(board, before);
     }
   } finally {
