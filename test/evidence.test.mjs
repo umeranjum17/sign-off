@@ -149,6 +149,32 @@ test('an evidence post tells the agent no wait or open hint: it is not an ask th
   assert.doesNotMatch(posted.out, /help\[/);
 });
 
+test('a proof posted as a Pass/Fail ask is refused and pointed to evidence', () => {
+  const file = join(so, 'guard.json');
+  const asks = run('post', file, '--title', 'Does the sign-in screen pass?', '--option', 'pass=Pass', '--option', 'fail=Fail', '--recommend', 'pass');
+  assert.equal(asks.code, 2);
+  assert.match(asks.out, /offers Pass and Fail[^]*post --type evidence/);
+  assert.equal(existsSync(file), false);
+  assert.equal(run('post', file, '--title', 'Ship it?', '--option', 'yes=Yes', '--option', 'no=No').code, 0);
+});
+
+test('refile turns an old Pass/Fail proof ask into an evidence update that never waits', () => {
+  const file = join(so, 'refile.json');
+  mkdirSync(so, { recursive: true });
+  const old = { key: 'sign-in-proof', type: 'decision', title: 'Sign-in screen proof', about: 'The screen loads in a second.', options: [{ value: 'pass', label: 'Pass' }, { value: 'fail', label: 'Fail' }], filed: new Date().toISOString() };
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [old] }));
+  assert.match(run('list', file).out, /waiting\[1\]\{key,title\}:\n  sign-in-proof,/);
+  assert.equal(run('refile', 'sign-in-proof', file).code, 2);
+  const done = run('refile', 'sign-in-proof', file, '--media', capture);
+  assert.equal(done.code, 0);
+  assert.match(done.out, /update-\d+,\d+,1,Sign-in screen proof/);
+  const after = run('list', file, '--full').out;
+  assert.match(after, /update-\d+,shown,Sign-in screen proof,The screen loads in a second\./);
+  assert.match(after, /sign-in-proof,dismissed,/);
+  assert.match(run('list', file).out, /nothing is waiting/);
+  assert.equal(run('refile', 'sign-in-proof', file, '--media', capture).code, 2);
+});
+
 test('a still whose measurement hangs never holds the board', async () => {
   // A convert that never returns: the worker measuring this still is stuck for the whole request, so every answer below must come from
   // what is already known, never from waiting on a measurement or running one on the server's thread.
