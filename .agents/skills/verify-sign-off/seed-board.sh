@@ -2,7 +2,8 @@
 # Fills a new board with one real posted item of each kind, then serves it.
 # Usage, from the repo root after `npm run build`: seed-board.sh <empty folder>
 # It sets HOME and XDG_* to that folder, so your own board (~/.sign-off) is never read or written.
-# Prints the board URL. The server stops on its own after SEED_SERVE_SECONDS (default 1800); its pid is in <folder>/serve.pid.
+# Prints the board URL. Finish with node dist/cli.js stop <folder>/board.json, not kill <folder>/serve.pid.
+# SEED_SERVE_SECONDS (default 1800) is only a safety timeout; serve.pid names the timeout wrapper, not the server.
 set -euo pipefail
 dir=$(cd "$1" && pwd) repo=$(pwd) board="$1/board.json"
 export HOME=$dir XDG_CONFIG_HOME=$dir/.config XDG_DATA_HOME=$dir/.local/share XDG_STATE_HOME=$dir/.local/state XDG_CACHE_HOME=$dir/.cache SIGN_OFF_FILER=verify

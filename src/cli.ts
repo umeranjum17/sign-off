@@ -1996,7 +1996,7 @@ async function serve(args: string[]) {
   const url = `http://${urlHost(bind)}:${bound}/`;
   process.on('exit', () => { if (existsSync(record(file)) && readFileSync(record(file), 'utf8').split(' ')[0] === String(process.pid)) rmSync(record(file), { force: true }); });
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(0));
-  return toon({ board: tilde(file), url, pid: process.pid }, [linkHelp(file, url), `Run \`sign-off-axi answers${parsed.on}\` to read their answers`]);
+  return toon({ board: tilde(file), url, pid: process.pid }, [linkHelp(file, url), `Run \`sign-off-axi answers${parsed.on}\` to read their answers`, `Run \`sign-off-axi stop${parsed.on}\` to close the board (no shell kill needed)`]);
 }
 
 /** Every new comment and queued prompt, each handed over once. */

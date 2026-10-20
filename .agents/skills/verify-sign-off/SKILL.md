@@ -14,7 +14,7 @@ npm run build, then seed a new board in an empty folder and serve it (one real p
 d=$(mktemp -d); .agents/skills/verify-sign-off/seed-board.sh "$d"
 
 It prints the board URL (BASE). It sets HOME and XDG_* to that folder, so your own board (~/.sign-off) is never read or written.
-Ready when the URL answers. Do not kill the server: it stops on its own after 30 minutes (SEED_SERVE_SECONDS), and a server left to stop itself is a finished teardown. Tear down only the browser session you started.
+Ready when the URL answers. Before finishing, run `node dist/cli.js stop <folder>/board.json` with the same isolated HOME/XDG settings as the seed script. Do not shell-kill the printed PID or leave it for the 30-minute safety timeout. Stop only your run's board and browser session.
 When the repo's .done-done.yaml has an instance block, done-done already runs the app at $DONE_DONE_BASE_URL (its own port and HOME): BASE is then that URL, never a hard-coded port.
 
 ## Doctor
@@ -25,6 +25,7 @@ Read-only: is this instance worth driving? The URL answers with the page titled 
 
 Harness: a browser (chrome-devtools-axi, one CHROME_DEVTOOLS_AXI_SESSION per run) for the board, a terminal for the CLI. Prefer the repo's real handles (hash routes, button labels) over coordinates:
 
+- Server lifecycle (CLI only, screen: none): `npm run build && node --test test/serve-stop.test.mjs` starts two isolated foreground boards, follows the printed `stop <board>` guidance, checks exit/PID/port/record removal and repeated-stop no-op, and proves the other board stays reachable. See `docs/commands.md` for background `open` versus foreground `serve`.
 - [Board shell](features/board-shell.md): the areas, the sidebar on a desk, the tab bar on a phone, light and dark
 - [Plan review](features/plan-review.md): open a plan, approve or change sections, answer decisions and send back structured answers
 - [Guided plan and report](features/guide.md): clean-install authoring, the one-scroll Guide view, read receipts, legacy Go deeper and native-owner Simplify with persistent New at both widths and themes

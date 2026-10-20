@@ -35,6 +35,7 @@ Every question is an item: post it, wait, read the answer back.
 The board has four places: Today (what needs the user and what was proven today), Decide (every ask that waits), Evidence (proof, never an ask) and Reports (explainers).
 
 With no board file named, a command uses the nearest \`.sign-off/\` board that \`npx -y sign-off-axi init\` set up in the project (looking up to the repo root), else \`~/.sign-off/decisions.json\`. Name a board file after the command only to use another one. Tests and scratch runs must never reach the user's own board: set \`SIGN_OFF_HOME\` to a temporary folder.
+When you start a throwaway server with \`open <board>\` or foreground \`serve <board>\`, stop it before finishing with \`npx -y sign-off-axi stop <board>\` (the same board file). Do not shell-kill the printed PID or leave the server running for a timeout: stop checks that the recorded server serves that board and leaves other boards alone.
 
 ## Current guidance lives in the CLI
 

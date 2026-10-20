@@ -1,5 +1,7 @@
 # Commands: reference
 
+For a throwaway board, finish with `sign-off-axi stop <board.json>`, using the same board file you started. No shell `kill` is needed. `serve` stays in the foreground; `open` detaches a background child. Both record their PID, port and bind address beside the board in `<board>.board.pid`. `stop` verifies that the recorded server serves that board before signalling it, removes the record, and is a no-op if it has already stopped. Never stop a shared board just to clean up a scratch run.
+
 Every command takes `--help`. Output is compact, with next-step hints.
 The CLI is driven from a shell with no setup. Ordinary commands call no model;
 the opt-in `owner --dispatch` resumes an installed Claude Code author session.
@@ -15,7 +17,7 @@ Guided plan 3 / report 4 add **Simplify this**. Inspect version-1 action/target 
 | `poll` | block until a comment or prompt arrives |
 | `open` | start the board in the background |
 | `status` | is this board's server running? |
-| `stop` | stop this board's server |
+| `stop` | stop this board's server (background `open` or foreground `serve`) |
 | `serve` | run the board in the foreground |
 | `export` | freeze the board as one HTML file |
 | `init` | set up a repo and install agent skills |
