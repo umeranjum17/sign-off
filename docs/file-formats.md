@@ -283,7 +283,7 @@ also copies each file into `evidence/<number>/` next to the board:
 
 **Dismissed items**, written by sign-off next to the questions (`decisions.dismissed.jsonl`, mode 600, one line
 per item per tap, the latest line per key wins). **Dismiss** (the × or the Dismiss button on an item) (on every card, a plan included), **Select** (tap cards, then Dismiss N) and **Clear all** (both in one row under every tab title, over what that tab lists) hide
-items from the page; **Undo**, or **Restore** under **Dismissed (N)**, saves `"dismissed": false`. `list` does not count a dismissed item as waiting or answered, and `answers` does not count it as waiting either (`list --full` says `dismissed` for an unanswered one and still its answer for an answered one, `list --json` adds `"dismissed": true`); the agent is not told, so an ask it waits on keeps waiting, and `answers` still returns a dismissed answer.
+items from the page; **Undo**, or **Restore** under **Dismissed (N)**, saves `"dismissed": false`. `list` does not count a dismissed item as waiting or answered, and `answers` does not count it as waiting either (`list --full` says `dismissed` for an unanswered one and still its answer for an answered one, `list --json` adds `"dismissed": true`; an evidence update, which is never waiting, says `shown`); the agent is not told, so an ask it waits on keeps waiting, and `answers` still returns a dismissed answer.
 A new answer or another round after the line brings the item back. Read-only boards refuse it; answers-only boards take it. The `sign-off-axi dismiss` and `restore` commands write the same line without checking read-only, as other CLI writes such as `signin done` do.
 `*.dismissed.jsonl` is git-ignored here like `*.answers.jsonl`.
 
