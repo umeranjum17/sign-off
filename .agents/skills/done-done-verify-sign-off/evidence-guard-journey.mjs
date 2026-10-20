@@ -21,14 +21,14 @@ const fixtures = join(repo, 'fixtures/evidence'), screen = process.env.EVIDENCE_
 let server;
 try {
   assert.equal(so('init', work).status, 0);
-  const refused = so('post', board, '--type', 'evidence', '--title', 'Placeholder', '--about', 'A flat card.', '--media', join(fixtures, 'placeholder-card.png'));
-  writeFileSync(join(out, 'placeholder-refused.txt'), `WHAT THIS SHOWS: posting a flat placeholder card as evidence is refused.\nexit ${refused.status}\n${refused.stdout}${refused.stderr}`);
-  assert.equal(refused.status, 2);
-  assert.match(refused.stdout, /is a placeholder card, not evidence/);
   const posted = so('post', board, '--type', 'evidence', '--title', 'Empty chat on a phone', '--about', 'An app chat screen with a header and a message; the thread is mostly empty.', '--media', screen);
   writeFileSync(join(out, 'sparse-posted.txt'), `WHAT THIS SHOWS: posting a mostly empty app screen (${screen.split('/').pop()}) as evidence succeeds.\nexit ${posted.status}\n${posted.stdout}${posted.stderr}`);
   assert.equal(posted.status, 0);
   assert.match(posted.stdout, /update-1,1,1/);
+  const refused = so('post', board, '--type', 'evidence', '--title', 'Placeholder', '--about', 'A flat card.', '--media', join(fixtures, 'placeholder-card.png'));
+  writeFileSync(join(out, 'placeholder-refused.txt'), `WHAT THIS SHOWS: posting a flat placeholder card (one grey colour with a small label) as evidence is refused, on the same board where the empty app screen posted with exit ${posted.status}.\nexit ${refused.status}\n${refused.stdout}${refused.stderr}`);
+  assert.equal(refused.status, 2);
+  assert.match(refused.stdout, /is a placeholder card, not evidence/);
   assert.deepEqual(readdirSync(join(work, 'evidence')), ['1']);
   server = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'serve', board, '--port', '0'], { env });
   const link = await new Promise((ok) => server.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
