@@ -2228,7 +2228,7 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   const update = (...media) => run('post', file, '--type', 'evidence', '--title', 'Sign-in', '--about', 'Loads in 1 second.', ...media.flatMap((m) => ['--media', m])).code;
   assert.deepEqual([update(tall), update(wide, tall), update(wide)], [0, 0, 0]);
   // Every update is listed under Evidence and none is an ask: the first links a failed run, so its result shows as failed.
-  // The two sign-off updates differ only in the case of their proof line, so they share one project head.
+  // Legacy and done-done-prefixed proof lines share one project head, regardless of case.
   const doc = JSON.parse(readFileSync(file, 'utf8')), old = new Date(Date.now() - 3 * 864e5), commit = 'c0ffee'.padEnd(40, '0');
   const outcome = 'You can read every card on a phone.', wideBytes = readFileSync(wide), hash = createHash('sha256').update(wideBytes).digest('hex');
   doc.items[0].filed = old.toISOString();
@@ -2273,7 +2273,7 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   assert.deepEqual(await evaluate(cards), [['item-update-5', 'Sign-in, plain update', 'Not run', '', 1],
     ['item-update-4', outcome, 'Passed', ...passed], ['item-update-3', outcome, 'Passed', ...passed], ['item-update-6', outcome, 'Could not check', 'M12 7v6', 0], ['item-update-1', outcome, 'Failed', ...failed], ['item-update-2', outcome, 'Passed', ...passed]]);
   for (const n of [4, 3, 2]) assert.equal(await evaluate(`document.getElementById("item-update-${n}").querySelector(".m > span:last-child").textContent`), `Today, ${clock(at(n))}`, `update ${n}`);
-  // The two sign-off proof lines differ only in case and share one head; a capture with no run takes the project of the repository it links, and the passed update that names none goes under Other, last.
+  // Both proof-prefix forms share one head; a capture with no run takes the linked repository, and an unnamed project goes under Other.
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".sec-head h2")].map((h) => h.textContent)'), ['sign-off', 'Other']);
   assert.equal(await evaluate('document.querySelector(\'#nav a[href="#evidence"] .n\').textContent'), '6');
   // Today's glance and Proven today tile count every update filed in the last 24 hours (update 6 was filed 23 hours ago, maybe yesterday), including update 5 with no run.

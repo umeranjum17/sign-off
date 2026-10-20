@@ -1358,7 +1358,7 @@
   /** The board's reason a run could not be checked, with the next step the docs promise. */
   const unchecked = (d) => (d.evidenceCard?.status === 'unverified' && d.evidenceCard.reason ? `${d.evidenceCard.reason} Ask the agent to run the check again.` : '');
   /** The project an update proves something for, read from the check line its run recorded: "verify-margin: …" names margin. */
-  const projectOf = (d) => /^verify-([\w-]{1,40}):/i.exec((d.evidence?.proof ?? '').trim())?.[1]?.toLowerCase()
+  const projectOf = (d) => /^(?:done-done-)?verify-([\w-]{1,40}):/i.exec((d.evidence?.proof ?? '').trim())?.[1]?.toLowerCase()
     // A capture with no run names its project by the repository of the change it links, such as github.com/owner/sign-off/pull/9.
     ?? /\/([\w.-]{1,40})\/(?:-\/)?(?:pull|pulls|merge_requests)\/\d+/.exec(d.link ?? '')?.[1]?.toLowerCase() ?? '';
   /** A link to a change names its number; any other link names the site it opens, as it always has. */
