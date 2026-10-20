@@ -45,4 +45,5 @@ const built = page.replace(marker, () => [
 ].join('\n'));
 writeFileSync(join(out, 'index.html'), built);
 copyFileSync(join(demo, 'shim.js'), join(out, 'demo-shim.js'));
+for (const f of ['icon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'manifest.webmanifest']) copyFileSync(join(web, f), join(out, f));
 console.log(`demo: ${seed.decisions.length} items, ${Object.keys(files).length} files -> ${out}`);

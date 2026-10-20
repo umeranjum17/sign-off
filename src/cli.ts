@@ -1879,6 +1879,10 @@ async function exportBoard(args: string[]) {
 
 
 const page = readFileSync(new URL('../web/index.html', import.meta.url));
+/** The board's favicon, home-screen icon and install manifest, served beside the page; see web/icon.svg. */
+const ICONS: Record<string, { type: string; bytes: Buffer }> = Object.fromEntries(
+  [['icon.svg', 'image/svg+xml'], ['apple-touch-icon.png', 'image/png'], ['icon-192.png', 'image/png'], ['icon-512.png', 'image/png'], ['icon-maskable-512.png', 'image/png'], ['manifest.webmanifest', 'application/manifest+json']]
+    .map(([name, type]) => [`/${name}`, { type, bytes: readFileSync(new URL(`../web/${name}`, import.meta.url)) }]));
 /** Added to each design mock page and plan page so the person can point at a part of it; see web/point.js. */
 const pointer = Buffer.from(`<script>${readFileSync(new URL('../web/point.js', import.meta.url), 'utf8')}</script>`);
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
@@ -2318,6 +2322,8 @@ const server = createServer(async (req, res) => {
     }
     if (given !== null) return res.writeHead(303, { location: '/', 'set-cookie': `${cookie}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000` }).end();
   }
+  const icon = req.method === 'GET' ? ICONS[req.url ?? ''] : undefined;
+  if (icon) return res.writeHead(200, { 'content-type': icon.type, 'cache-control': 'public, max-age=86400' }).end(icon.bytes);
   if (req.method === 'GET' && req.url === '/favicon.ico') return res.writeHead(204).end();
   if (req.method === 'GET' && req.url === '/') {
     return res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'self' 'unsafe-inline'" }).end(page);
