@@ -971,7 +971,7 @@ function postMedia(file: string, named: string, on: string, values: Record<strin
       if (asMessage(had) !== canon({ ...message, media: sources.length ? sources.map((src) => sha256(readFileSync(src))) : undefined })) {
         throw fail(`key ${own} already holds a different message on ${tilde(file)}`, 'CONFLICT', 'Post it under a new key');
       }
-      return toon({ board: tilde(file), posted: [{ key: own, number: had.number, media: sources.length, title: had.title, status: 'already posted' }] }, [`Run \`sign-off-axi open${on}\` so the user can give a verdict`]);
+      return toon({ board: tilde(file), posted: [{ key: own, number: had.number, media: sources.length, title: had.title, status: 'already posted' }] }, explainer ? [`Run \`sign-off-axi open${on}\` so the user can give a verdict`] : []);
     }
     const answers = readAnswers(file);
     if (message && own && Object.hasOwn(answers, own) && !awaitsVerdict(message.kind, answers[own])) throw fail(`key ${own} was answered on ${tilde(file)} and is no longer there`, 'CONFLICT', 'Post it under a new key');
@@ -1012,8 +1012,7 @@ function postMedia(file: string, named: string, on: string, values: Record<strin
     writeItems(file, items);
     notifyEntered(file, named, before);
     if (explainer) return toon({ board: tilde(file), raised: [{ key, status: 'raised', title }] }, [`Run \`sign-off-axi open${on}\` so the user can watch and answer`, waitFor(on, filer, key)]);
-    return toon({ board: tilde(file), posted: [{ key, number, media: media.length, title, ...(message && { status: 'posted' }) }] },
-      [`Run \`sign-off-axi open${on}\` so the user can give a verdict`, waitFor(on, filer, key)]);
+    return toon({ board: tilde(file), posted: [{ key, number, media: media.length, title, ...(message && { status: 'posted' }) }] });
   });
 }
 
