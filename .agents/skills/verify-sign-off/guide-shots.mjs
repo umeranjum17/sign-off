@@ -57,13 +57,14 @@ for (const [flag, kind] of [[[], 'report'], [['--plan'], 'plan']]) {
   assert.notEqual(refused.status, 0); assert.match(refused.stdout + refused.stderr, /FILL/);
 }
 // The authored result: the package's own fully filled examples, posted through the installed CLI.
-const simplify = process.env.GUIDE_SIMPLIFY === '1';
+const before = process.env.GUIDE_BEFORE === '1', presets = process.env.GUIDE_PRESETS === '1';
+const simplify = process.env.GUIDE_SIMPLIFY === '1' || presets || before;
 const planFile = join(pkg, `fixtures/contract/plan.v${simplify ? 3 : 2}/valid-full.json`), reportFile = join(pkg, `fixtures/contract/report.v${simplify ? 4 : 3}/valid-full.json`);
 const plan = JSON.parse(readFileSync(planFile)), report = JSON.parse(readFileSync(reportFile));
 // The board archives a report a day after it was filed, so the fixture is dated now.
 writeFileSync(reportFile, JSON.stringify({ ...report, filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') }));
 let ownerSession;
-if (simplify) {
+if (simplify && !before) {
   writeFileSync(board, '{"schema":2,"items":[]}\n');
   const session = ownerSession = randomUUID();
   const authored = JSON.parse(run('claude', ['--session-id', session, '-p', `You own two synthetic examples for Umer. Read ${planFile} and ${reportFile}, reword their about fields in plain words while preserving keys, sections, decisions, numbers and schemas. Post both through node ${cliJs} post ${board} --kind <kind> --from <file>. Register your actual Claude UUID ${session} through node ${cliJs} owner ${board} --filer ${plan.filer} --host claude --session ${session} --cwd ${app} --model claude-haiku-5-5. Do not start a listener or dispatcher. Remember the ordinary example fact that Umer chose green apples only in this conversation, not the documents. Include it if later asked to simplify. Then stop.`, '--model', 'claude-haiku-5-5', '--output-format', 'json', '--tools', 'Bash,Read,Write,Edit', '--allowedTools', 'Bash,Read,Write,Edit'], { cwd: app, env: process.env }));
@@ -124,6 +125,14 @@ try {
   const show = (part, extra = '') => drive(`await page.eval(() => { const s = document.querySelector('.gd-scroll'); s.style.scrollBehavior = 'auto'; document.querySelector('[data-part="${part}"]').scrollIntoView({ block: 'start' }); ${extra} }); await nap(2400);`);
   const click = (sel) => drive(`await page.eval(() => document.querySelector(${JSON.stringify(sel)}).click());`);
 
+  if (before) {
+    for (const [kind, item] of [['plan', plan], ['report', report]]) {
+      browser('open', `${base}#${kind === 'plan' ? 'waiting' : 'reports'}/${item.key}`);
+      drive('await wait(".gd-sec");'); show('next');
+      capture(`${kind}-presets`, 'The original section actions before adding the other presets and first-ask composer.');
+    }
+  } else {
+  if (!presets) {
   // The plan: it opens as one guided page, a part read for a moment is a real receipt on the board.
   browser('open', `${base}#waiting/${plan.key}`);
   drive('await wait(".gd-sec"); await nap(600);');
@@ -178,6 +187,7 @@ try {
   writeFileSync(join(records, 'report-deeper.responder.txt'), reportLog.log);
   show('limits', `document.querySelector('[data-part="limits"] > .gd-ans').scrollIntoView({ block: 'start' }); s.scrollTop -= ${width === 390 ? 250 : 90};`);
   capture('report-deeper', 'Go deeper on the report part shows the agent\'s answer in place with Agent answered and the time, beside Read by you.');
+  }
   if (simplify && theme === 'light' && width === 390) {
     // A timestamped sampled-frame recording through the same isolated browser CLI, not a synthetic animation.
     recorder = spawn(process.execPath, ['--input-type=module', '-e', `import {spawnSync} from 'node:child_process'; import {existsSync} from 'node:fs'; const end=Date.now()+180000; while(Date.now()<end && !existsSync(${JSON.stringify(join(recording, 'stop'))})) { spawnSync('chrome-devtools-axi',['screenshot',${JSON.stringify(recording)}+'/'+Date.now()+'.png'],{stdio:'ignore',timeout:30000}); await new Promise(r=>setTimeout(r,500)); }`], { env: browserEnv, stdio: 'ignore' });
@@ -208,6 +218,56 @@ try {
     assert.equal((await state()).deeper.find(a => a.id === ask.id).seen, answer.answerRevision);
     assert.equal(readFileSync(board, 'utf8'), original, 'Simplify does not alter authored text or plan decisions');
     writeFileSync(join(records, `${kind}-simplify.${theme}.${width}w.json`), JSON.stringify({ request: ask, answer, ownerSession, resumedSession: resumed.session_id, conversationFactIncluded: /green apples/i.test(answer.text), unreadAfterReload: true, documentUnchanged: true }));
+    if (presets) {
+      const custom = 'Which number matters most to Umer here?';
+      const followup = 'Explain that number without jargon.';
+      const question = 'What would change your recommendation?';
+      // Every rendered part, including expanded items and decisions, has the same controls.
+      const controls = JSON.parse(drive(`console.log(JSON.stringify(await page.eval(() => [...document.querySelectorAll('.gd-acts')].map(e => [...e.querySelectorAll('button')].map(b => b.textContent)))));`));
+      for (const labels of controls) for (const label of ['Ask a question', 'Go deeper', 'Simplify this', 'Show an example', 'Why?']) assert.ok(labels.includes(label));
+      const sendText = (part, text, isQuestion = false) => drive(`await page.eval(() => { const p = document.querySelector('[data-part="${part}"]'); ${isQuestion ? "p.querySelector(':scope > .gd-acts .question').click();" : ''} const input = p.querySelector(':scope > .gd-fu input'); ${isQuestion ? 'if (document.activeElement !== input) throw Error("Composer did not focus");' : ''} input.value = ${JSON.stringify(text)}; p.querySelector(':scope > .gd-fu').requestSubmit(); }); await nap(600);`);
+      sendText('this', custom);
+      for (const action of ['deeper', 'example', 'why']) click(`[data-part="next"] > .gd-acts .${action === 'deeper' ? 'deep' : action}`);
+      sendText('next', question, true);
+      // Two rapid taps on the same part are two asks, not a per-part lock.
+      drive(`await page.eval(() => { const b = document.querySelector('[data-part="next"] > .gd-acts .why'); b.click(); b.click(); }); await nap(600);`);
+      const pending = (await state()).deeper.filter(a => a.key === item.key && !a.done);
+      assert.equal(pending.length, 7); assert.equal(new Set(pending.map(a => a.id)).size, 7);
+      assert.deepEqual(pending.map(a => a.action).sort(), ['custom', 'deeper', 'example', 'question', 'why', 'why', 'why']);
+      for (const a of pending) { assert.equal(a.part, a.action === 'custom' ? 'this' : 'next'); assert.equal(a.q, a.action === 'custom' ? custom : a.action === 'question' ? question : undefined); }
+      const retry = pending.find(a => a.action === 'why');
+      const body = Object.fromEntries(['version', 'id', 'key', 'kind', 'schema', 'filer', 'revision', 'part', 'action'].map(k => [k, retry[k]]));
+      drive(`console.log(await page.eval(async () => { const r = await fetch('/api/engagement', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(${JSON.stringify(body)})}); if (!r.ok) throw Error(await r.text()); return r.status; }));`);
+      assert.equal((await state()).deeper.filter(a => a.key === item.key && !a.done).length, 7, 'exact submission retry is idempotent');
+      show('next'); capture(`${kind}-presets`, 'All section presets and free-text Send are available, with distinct pending asks under this section.');
+      const deliver = async (requests, label) => {
+        browser('open', base);
+        const result = tryRun(process.execPath, [cliJs, 'owner', board, '--dispatch', '--filer', plan.filer, '--verbose'], { cwd: app, env: process.env, timeout: 900000 });
+        writeFileSync(join(records, `${kind}-${label}-native.json`), JSON.stringify(result)); assert.equal(result.status, 0, result.stderr);
+        const native = result.stderr.split('\n').filter(l => l.startsWith('{"host":')).map(l => JSON.parse(l));
+        assert.equal(native.length, requests.length);
+        for (const h of native) { const r = JSON.parse(h.output); assert.equal(h.resume, ownerSession); assert.equal(r.session_id, ownerSession); assert.equal(r.is_error, false); assert.equal(h.code, 0); }
+        const s = await state();
+        for (const request of requests) { const a = s.deeper.find(a => a.id === request.id); assert.equal(s.delivery[a.id].state, 'owner-read'); assert.ok(a.read); assert.equal(a.done, true); assert.ok(a.text.trim()); assert.equal(a.action, request.action); assert.equal(a.part, request.part); assert.equal(a.q, request.q); }
+        writeFileSync(join(records, `${kind}-${label}-events.json`), JSON.stringify({ requests, answers: s.deeper.filter(a => requests.some(r => r.id === a.id)), ownerSession, nativeSessions: native.map(h => JSON.parse(h.output).session_id) }));
+      };
+      await deliver(pending, 'presets');
+      browser('open', url); drive('await wait(".gd-sec");');
+      sendText('this', followup);
+      const follow = (await state()).deeper.find(a => a.key === item.key && a.q === followup);
+      assert.equal(follow.action, 'custom'); assert.equal(follow.part, 'this');
+      await deliver([follow], 'followup');
+      assert.equal(readFileSync(board, 'utf8'), original, 'all presets preserve authored content and decisions');
+      browser('open', url); drive('await wait(".gd-sec");'); show('next');
+      if (kind === 'plan') {
+        click('[data-part="understood"] [data-u="no"]');
+        drive(`await page.eval(() => { const n = document.querySelector('.gd-note'); n.value = 'Also include the tablet flow.'; n.dispatchEvent(new Event('input')); document.querySelector('.gd-bar .gd-btn, .gd-rail .gd-btn').click(); }); await nap(800);`);
+        const sent = JSON.parse(cli('answers', board, '--json'))[item.key];
+        assert.deepEqual(sent.notes, [{section:'understood', verdict:'change', note:'Also include the tablet flow.'}]);
+        writeFileSync(join(records, 'plan-send-back.json'), JSON.stringify(sent));
+      }
+    }
+  }
   }
 } finally {
   if (recorder) {

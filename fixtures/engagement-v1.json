@@ -1,0 +1,17 @@
+{
+  "valid": [
+    {"action":"question","q":"Which number matters most to Umer?"},
+    {"action":"deeper"},
+    {"action":"simplify"},
+    {"action":"example"},
+    {"action":"why"},
+    {"action":"custom","q":"Explain the trade-off without jargon."}
+  ],
+  "invalid": [
+    {"action":"question"},
+    {"action":"custom"},
+    {"action":"question","q":"  "},
+    {"action":"custom","q":7},
+    {"action":"unknown"}
+  ]
+}
