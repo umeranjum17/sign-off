@@ -1374,7 +1374,7 @@
   /** Each item lives in one area: answered items, then the area the item names, then evidence updates (never an ask, whatever their result), then what is only to read (explainers, pages with nothing to answer), then the open asks.
    *  A plan has no options but waits for its send-back. */
   const area = (d) => {
-    const a = isAnswered(d) ? 'answered' : d.area ?? (d.type === 'evidence' ? 'evidence'
+    const a = isAnswered(d) ? 'answered' : d.type === 'evidence' ? 'evidence' : d.area ?? (d.type === 'evidence' ? 'evidence'
       : state.readonly || d.type === 'explainer' || !(d.options.length || d.reply || d.type === 'signin' || d.type === 'plan' || d.kind === 'design') ? 'reports' : 'waiting');
     // Reports lists only what explains: a page to tap through, or a narrated video. Text alone (a receipt, a status line) is a note, folded under it.
     return a === 'reports' && !state.readonly && d.type !== 'explainer' && !reads(d) ? 'notes' : a;
