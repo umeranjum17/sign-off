@@ -1996,7 +1996,7 @@ test('Summary on a phone: Proven today swipes inside its row and a long title wr
   writeFileSync(join(dir, 'page', 'index.html'), readFileSync(join(fixture, 'page', 'index.html')));
   writeFileSync(file, JSON.stringify({ schema: 2, items: [
     { key: 'a', type: 'ask', title: 'Keep the whole-fleet nightly reconciliation of the cross-repository dependency graph running at three in the morning?', about: `https://example.com/${'very-long-path/'.repeat(12)}end` },
-    // Proven today lists passed proof only, so each update links a run that passed.
+    // Each update links a run so its card has a result.
     ...[1, 2, 3].map((n) => ({ key: `u${n}`, type: 'evidence', number: n, title: `Update ${n} proves it`, filed: new Date().toISOString(), media: [{ path: `evidence/${n}/shot.png`, sha256: 'a'.repeat(64), bytes: 0 }],
       evidence: { run_id: `2026101${n}T120000Z-a1b2c3d4`, commit: 'c0ffee'.padEnd(40, '0'), outcome: 'It works.', repro: 'repro: npm test', proof: 'verify-sign-off: npm test, passed', evidence: 'shot.png' } })),
   ] }));
@@ -2207,9 +2207,10 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   // The two sign-off proof lines differ only in case and share one head; a capture with no run takes the project of the repository it links, and the passed update that names none goes under Other, last.
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".sec-head h2")].map((h) => h.textContent)'), ['sign-off', 'Other']);
   assert.equal(await evaluate('document.querySelector(\'#nav a[href="#evidence"] .n\').textContent'), '6');
-  // Today's glance counts the updates shipped with proof today.
+  // Today's glance and Proven today tile count every update filed today, including update 5 with no run.
   await evaluate('location.hash = ""');
-  await until(async () => (await evaluate('document.querySelector(".glance")?.textContent.includes("3 changes shipped with proof.")')) === true);
+  await until(async () => (await evaluate('document.querySelector(".glance")?.textContent.includes("5 updates filed.")')) === true);
+  assert.equal(await evaluate('document.querySelector(".tile.i-evidence .n").textContent'), '5');
   await evaluate('location.hash = "#evidence"');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
   // Cards sit two across: the sign-off pair first (update 5, then update 6), then Other with update 2 under its own head.
@@ -2226,7 +2227,7 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   assert.deepEqual(await evaluate('[document.querySelector(\'#nav a[href="#waiting"] .n\').textContent, document.querySelectorAll("[id^=item-update-]").length]'), ['0', 0]);
   await evaluate('location.hash = ""');
   await until(async () => (await evaluate('!!document.querySelector(".tile.i-waiting")')));
-  assert.deepEqual(await evaluate('[".i-waiting", ".i-evidence"].map((t) => document.querySelector(`.tile${t} .n`).textContent)'), ['0', '3']);
+  assert.deepEqual(await evaluate('[".i-waiting", ".i-evidence"].map((t) => document.querySelector(`.tile${t} .n`).textContent)'), ['0', '5']);
   for (const [k, result, why] of [['update-1', 'Failed', ''], ['update-6', 'Could not check', 'A picture or recording changed after the run. Ask the agent to run the check again.']]) {
     await evaluate(`location.hash = "#evidence/${k}"`);
     await until(async () => (await evaluate('!!document.querySelector(".ev-item")')));
