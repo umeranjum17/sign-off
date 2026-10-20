@@ -16,7 +16,7 @@ export const guided = (m: any) => (m?.kind === 'report' && [3, 4].includes(m.sch
 export const KINDS = Object.keys(SCHEMAS);
 const COMMON = ['contract', 'kind', 'schema', 'key', 'title', 'filer', 'link', 'about'];
 const FIELDS: Record<string, string[]> = {
-  ask: [...COMMON, 'detail', 'why', 'options', 'recommend_value', 'recommend_reason', 'default_if_silent', 'silent_by', 'close', 'merges', 'proof'],
+  ask: [...COMMON, 'ask_ref', 'detail', 'why', 'options', 'recommend_value', 'recommend_reason', 'default_if_silent', 'silent_by', 'close', 'merges', 'proof'],
   report: [...COMMON, 'filed', 'group', 'decided', 'form', 'video', 'asked_by', 'view', 'preview'],
   evidence: [...COMMON, 'media', 'run'],
   gate: [...COMMON, 'run', 'options', 'recommend_value', 'close'],

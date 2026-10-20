@@ -1,6 +1,7 @@
 {
   "contract": 1,
   "kind": "ask",
+  "ask_ref": "message-example",
   "schema": 1,
   "key": "release-day",
   "title": "Which day should the sign-in screen ship?",

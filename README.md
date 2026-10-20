@@ -31,7 +31,7 @@ sign-off-axi open                    # 3. start the board and open the printed l
 Then ask your first question, the way an agent would, and answer it on the board:
 
 ```sh
-sign-off-axi raise \
+sign-off-axi raise --ask-ref message-example \
   --title "Keep the weekly digest?" \
   --why "The paid plan renews Monday." \
   --outcome yes="It keeps going out." --outcome no="It stops this week." \
@@ -85,7 +85,7 @@ One line on what the agent runs per kind; the full reference is [docs/question-k
 
 | Kind | The agent runs | You see |
 |---|---|---|
-| Yes or no, pick one | `raise --title ... --recommend ...` | buttons, the recommended one first |
+| Yes or no, pick one | `raise --ask-ref <captain-message-id-or-hold-id> --title ... --recommend ...` | buttons, the recommended one first |
 | Design pick (mocks A/B/C) | `post --type design --mock a=... --mock b=... --link a=<url>` | mocks side by side, an Open live link under each option that has a `--link`, a note on any part |
 | Proof update | `post --type evidence --media shot.png` | the capture, its result, Pass / Fail / Needs work |
 | Proof with a file to install | `post --type evidence --media shot.png --attach app.apk` | the capture, and the file with its size and a Download button (any type, up to 1 GB, `SIGN_OFF_ATTACH_MAX_MB` to change) |
@@ -154,7 +154,7 @@ always wins.
 tmp=$(mktemp -d)
 export SIGN_OFF_HOME="$tmp"
 (cd "$tmp" &&
-  sign-off-axi raise \
+  sign-off-axi raise --ask-ref message-example \
   --title "Probe?")
 ```
 
