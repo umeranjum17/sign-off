@@ -11,6 +11,7 @@ import { pipeline } from 'node:stream';
 import { basename, delimiter, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
+import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
 import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, asks, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, appendRead, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, sameDecision, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
@@ -31,8 +32,8 @@ const AGENTS: Record<string, { bin: string; dir: string; home: string }> = {
   'gemini-cli': { bin: 'gemini', dir: '.agents/skills', home: join(homedir(), '.gemini', 'skills') },
 };
 const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
-commands[22]:
-  (none)=list, raise, post, answers, wait, poll, deeper, open, status, stop, serve, export, init, report, signin, dismiss, restore, refile, doctor, notify, validate, help
+commands[23]:
+  (none)=list, raise, post, answers, wait, poll, deeper, owner, open, status, stop, serve, export, init, report, signin, dismiss, restore, refile, doctor, notify, validate, help
 board: the nearest .sign-off/ board (the walk's bounds and SIGN_OFF_HOME: README, "Test runs never touch your board"), else ~/.sign-off/decisions.json; a board file given always wins
 flags: --full and --json on list, answers and wait, --events on wait, --json on status, --filer on post, raise and wait, --help on every command, -v/--version
 examples:
@@ -312,6 +313,17 @@ examples:
   sign-off-axi init ./my-project --agent opencode
   sign-off-axi init --agent codex,gemini-cli
 `,
+  owner: `usage: sign-off-axi owner [board.json] --filer <id> --host claude --session <UUID> --cwd <absolute folder> [--model <id>]
+       sign-off-axi owner [board.json] --dispatch [--filer <id>] [--timeout <seconds>] [--verbose]
+       sign-off-axi owner [board.json] --ack <request id>
+       sign-off-axi owner [board.json]
+Register the actual author session locally, never in document JSON. Only Claude Code is supported.
+--dispatch retries unfinished Go deeper requests, once by default; --timeout keeps polling for that many seconds.
+--verbose writes the real host result to stderr for local diagnostics.
+The dispatcher uses the normal installed claude and its credentials, argv only, and resumes the exact session.
+Run one dispatcher per board, separately from the idle owner. Leave inaccessible owners queued; inspect delivery errors with owner.
+Delivered means process handoff, not read. The resumed owner must --ack before answering once, without --more.
+Do not run an active wait listener for the same owner alongside the dispatcher. No substitute answers.`,
   deeper: `usage: sign-off-axi deeper [board.json] [--filer <id>] [--all] [--json]
        sign-off-axi deeper [board.json] --id <id> --text "<answer>" [--more]
 Go deeper is the button on every part of a plan 2 or report 3. The person taps it; wait --filer wakes with the ask, or this command lists the ones nobody finished.
@@ -625,6 +637,27 @@ function deeperOut(file: string, asks: ReturnType<typeof readDeeper>, on: string
       `Run \`sign-off-axi deeper${on} --id <id> --text "<what you found>" --more\` for each piece, then once more without --more to finish`]);
 }
 /** `deeper`: the Go deeper asks nobody has finished, or with --id and --text one piece of the answer the board streams under the part the person tapped. */
+async function owner(args: string[]) {
+  const { file, values } = parse('owner', args, { filer: { type: 'string' }, host: { type: 'string' }, session: { type: 'string' }, cwd: { type: 'string' }, model: { type: 'string' }, dispatch: { type: 'boolean' }, verbose: { type: 'boolean' }, ack: { type: 'string' }, timeout: { type: 'string' } });
+  ready(file, '');
+  if (values.ack !== undefined) { acknowledgeOwner(file, values.ack); markDeeperRead(file, [values.ack]); }
+  else if (values.session !== undefined) {
+    const filer = filerOf(values);
+    if (!filer) throw new InputError('Registration needs --filer');
+    await locked(`${file}.owners.lock`, () => registerOwner(file, filer, { host: values.host, session: values.session, cwd: values.cwd, ...(values.model && { model: values.model }) }));
+  } else if (values.dispatch) {
+    if (values.timeout !== undefined && !/^\d{1,7}$/.test(values.timeout)) throw new InputError('--timeout must be whole seconds');
+    const until = Date.now() + Number(values.timeout ?? 0) * 1000;
+    await locked(`${file}.dispatch.lock`, async () => {
+      do {
+        await dispatchOwners(file, process.argv[1], filerOf(values), values.verbose);
+        if (Date.now() >= until) break;
+        await new Promise(ok => setTimeout(ok, 1000));
+      } while (Date.now() < until);
+    }, 'another owner dispatcher is active', 0);
+  }
+  return JSON.stringify({ delivery: deliveries(file) });
+}
 async function deeper(args: string[]) {
   const { file, values, on } = parse('deeper', args, { filer: { type: 'string' }, id: { type: 'string' }, text: { type: 'string' }, more: { type: 'boolean' }, all: { type: 'boolean' }, json: { type: 'boolean' } });
   ready(file, on);
@@ -640,11 +673,19 @@ async function deeper(args: string[]) {
   }
   const ask = readDeeper(file).find((x) => x.id === values.id);
   if (!ask) throw fail(`no Go deeper ask with id ${values.id}`, 'NOT_FOUND', `Run \`sign-off-axi deeper${on}\` to see the open ones`);
+  if (filer !== undefined && !board(file).some(d => d.key === ask.key && d.filer === filer)) throw new InputError('Request does not belong to this filer');
+  if (process.env.SIGN_OFF_OWNER_SESSION) {
+    checkOwner(file, ask);
+    if (ask.done) return toon({ id: ask.id, answered: 'already done' }, []);
+    if (values.more || deliveries(file)[ask.id]?.state !== 'owner-read') throw new InputError('Owner must acknowledge first and send one final answer without --more');
+  }
   if (ask.done) throw fail(`ask ${values.id} is already answered`, 'CONFLICT', 'The person can tap Go deeper again for a follow-up');
   let text = values.text;
   if (text === '-') text = readFileSync(0, 'utf8');
   if (typeof text !== 'string' || !text.trim() || [...text.trim()].length > 2000) throw fail('--text must be the answer, 2000 characters or fewer', 'VALIDATION_ERROR', 'Run `sign-off-axi deeper --help`');
-  answerDeeper(file, ask.id, text.trim(), !!values.more);
+  await locked(`${deeperPath(file)}.lock`, () => {
+    if (!process.env.SIGN_OFF_OWNER_SESSION || !readDeeper(file).find(x => x.id === ask.id)?.done) answerDeeper(file, ask.id, text.trim(), !!values.more);
+  });
   return toon({ id: ask.id, key: ask.key, part: ask.part, answered: values.more ? 'piece sent, more to come' : 'done' }, values.more ? [`Run \`sign-off-axi deeper${on} --id ${ask.id} --text "<next piece>" [--more]\``] : [`Run \`sign-off-axi wait${on}\` for the next answer or ask`]);
 }
 
@@ -1548,7 +1589,7 @@ const skillInstalled = (dir: string, agent: string) => [join(dir, AGENTS[agent].
 const SKILL_ADD = ['-y', 'skills', 'add', 'umeranjum17/sign-off', '--skill', 'sign-off-axi', '-y', '-a'];
 const skillAdd = (agents: string[]) => `npx ${[...SKILL_ADD, ...agents].join(' ')}`;
 
-const GITIGNORE = 'mocks/\nevidence/\n*.answers.jsonl\n*.rounds.jsonl\n*.messages.jsonl\n*.annotations.jsonl\n*.seen.jsonl\n*.dismissed.jsonl\n*.reads.jsonl\n*.deeper.jsonl\n*.board.pid\n*.board.log\nnotify.log\n*.token\n*.export.html\n';
+const GITIGNORE = 'mocks/\nevidence/\n*.answers.jsonl\n*.rounds.jsonl\n*.messages.jsonl\n*.annotations.jsonl\n*.seen.jsonl\n*.dismissed.jsonl\n*.reads.jsonl\n*.deeper.jsonl\n*.owners.json\n*.delivery.jsonl\n*.board.pid\n*.board.log\nnotify.log\n*.token\n*.export.html\n';
 /** The board, port, bind and hosts in <so>/config.yaml (the `key: value` lines init writes). A bad line falls back on its own default
  * (decisions.json, 4410) and `problems` says what is wrong; a file that cannot be read throws. */
 function readSetup(so: string) {
@@ -2538,7 +2579,7 @@ await runAxiCli({
   topLevelHelp: TOP_HELP,
   getCommandHelp: (cmd) => HELP[cmd],
   home: axi('list', list),
-  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), report: axi('report', report), deeper: axi('deeper', deeper), signin: axi('signin', signin), dismiss: axi('dismiss', dismiss(false)), restore: axi('restore', dismiss(true)), refile: axi('refile', refile), doctor: axi('doctor', doctor), notify: axi('notify', notify), validate, help: ([name, ...rest]) => {
+  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), report: axi('report', report), owner: axi('owner', owner), deeper: axi('deeper', deeper), signin: axi('signin', signin), dismiss: axi('dismiss', dismiss(false)), restore: axi('restore', dismiss(true)), refile: axi('refile', refile), doctor: axi('doctor', doctor), notify: axi('notify', notify), validate, help: ([name, ...rest]) => {
     if (rest.length || (name && !HELP[name])) throw fail(`unknown command or argument: ${[name, ...rest].join(' ')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi --help` to see the commands');
     return name ? HELP[name] : TOP_HELP;
   } },

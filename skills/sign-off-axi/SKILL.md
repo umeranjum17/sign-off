@@ -36,7 +36,7 @@ Do not trust this file for commands, flags or output - installed copies go stale
 
 You do not need sign-off-axi installed globally - invoke it with `npx -y sign-off-axi`.
 If sign-off-axi output shows a follow-up command starting with `sign-off-axi`, run it as `npx -y sign-off-axi ...` instead.
-sign-off itself calls no model and inherits the calling agent's model routing.
+Each ordinary sign-off command calls no model. The opt-in standalone owner dispatcher resumes the registered installed Claude Code session with its normal credentials and optional registered model.
 
 ## Get the answer back as an event
 
@@ -45,7 +45,8 @@ The answer comes to you; nobody has to notice it for you.
 1. Pick one filer id for yourself: your agent session id, or any short name (1-128 of `A-Z a-z 0-9 . _ -`). With none given, a post saves the Claude Code session id when there is one.
 2. Post every item with `--filer <id>`, or export `SIGN_OFF_FILER=<id>` once for every command.
 3. Right after posting an ask, a plan or a guided report (an evidence post never waits), run `npx -y sign-off-axi wait --filer <id>` (same board file as the post). It returns every answer to your items you have not taken yet, even one given before you started waiting, and the board then shows **Seen by agent** on that card. It also returns a **Go deeper** tap on your guided plan or report (answer it as the report section below says). Run it again after each reply and after a plan is sent back; guided pages keep listening even when nothing needs an answer. `TIMEOUT` means run it again, `NOT_FOUND` means none of your items wait or supports Go deeper. Only a filer-bound wait takes Go deeper; a board-wide answer wait leaves it queued. This needs a running listener: it does not wake a dormant agent session.
-4. If you cannot block, the board owner can set `on_answer: <command>` in the `config.yaml` beside the board: it runs for each answer with the answer as JSON on its stdin, with no shell (so `|` and `>` do nothing; name a script instead), and `npx -y sign-off-axi doctor` checks it can run.
+4. For standalone Go deeper while your Claude Code session is idle, register its **actual** UUID when authoring: run `npx -y sign-off-axi owner <board> --filer <id> --host claude --session <actual UUID> --cwd <absolute project folder>` (optional `--model <model id>`). Use the host-provided session identity, never invent an id or register another session. If the host has not supplied your UUID, say registration is unavailable. A separate local process runs `npx -y sign-off-axi owner <board> --dispatch --timeout 3600`; restart it when it exits. Do not also consume that owner's requests with wait. Only Claude Code is supported; no Firstmate is needed. On wake, inspect the request and original document, acknowledge the exact id with `owner <board> --ack <id>`, then send one final `deeper <board> --id <id> --text "<answer>"` without --more. Retries preserve the request and never append to a completed answer. `owner <board>` shows queued failures separately from delivered and owner-read; never supply a substitute answer. Existing active listeners still support streamed pieces.
+5. If you cannot block, the board owner can set `on_answer: <command>` in the `config.yaml` beside the board: it runs for each answer with the answer as JSON on its stdin, with no shell (so `|` and `>` do nothing; name a script instead), and `npx -y sign-off-axi doctor` checks it can run.
 
 ## Write each card for a 10-second read on a phone
 

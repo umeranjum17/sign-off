@@ -97,7 +97,9 @@ One line on what the agent runs per kind; the full reference is [docs/question-k
 
 Every item records who filed it. The agent raises with `--filer my-agent`, then blocks on `sign-off-axi wait --filer my-agent`, which returns that filer's answers, each once, and the card shows **Seen by agent**. An agent that cannot block can be woken instead: an `on_answer:` line in the `config.yaml` beside the board names a command the board runs for every answer, and a `notify:` block can send an HTTP POST when a card enters Decide. The worked examples are in [docs/commands.md](docs/commands.md).
 
-sign-off itself calls no model and inherits the calling agent's model routing. The shipped skill is deliberately thin: it tells the agent how to write a good card and defers to `sign-off-axi --help` for every flag, so an installed copy never goes stale.
+For Go deeper on a guided plan or report, an idle **Claude Code** author can opt in to native session resumption: register its actual UUID with `owner --filer <id> --host claude --session <UUID> --cwd <absolute project folder>`, then run a separate `owner --dispatch --timeout 3600` process for the same board. `owner` shows queued delivery failures and distinguishes delivered from owner-read. No Firstmate is needed; other hosts are not supported for this wake path. See the [standalone owner recipe](docs/commands.md#standalone-go-deeper-owner).
+
+Each ordinary sign-off command calls no model; the opt-in dispatcher invokes the installed Claude Code with its normal credentials and optional registered model. The shipped skill is deliberately thin: it tells the agent how to write a good card and defers to `sign-off-axi --help` for every flag, so an installed copy never goes stale.
 
 ## Works alone, or with its siblings
 

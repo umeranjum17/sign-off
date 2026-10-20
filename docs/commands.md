@@ -1,8 +1,8 @@
 # Commands: reference
 
 Every command takes `--help`. Output is compact, with next-step hints.
-The CLI is driven from a shell with no setup; sign-off itself calls no model
-and inherits the calling agent's model routing.
+The CLI is driven from a shell with no setup. Ordinary commands call no model;
+the opt-in `owner --dispatch` resumes an installed Claude Code author session.
 
 | Command | In a few words |
 |---|---|
@@ -20,6 +20,7 @@ and inherits the calling agent's model routing.
 | `init` | set up a repo and install agent skills |
 | `report` | write a plan or report to fill and post |
 | `deeper` | answer a Go deeper tap on a plan or report |
+| `owner` | register a Claude author session, dispatch Go deeper or inspect delivery |
 | `signin` | close a sign-in card as done |
 | `dismiss` | hide a card, like its Dismiss button; `--filer <id>` hides every card of a finished task |
 | `restore` | bring a dismissed card back |
@@ -83,3 +84,45 @@ an HTTP POST when a card enters Waiting on you; `receiver: muxr` there sends
 it to the muxr host, and `sign-off-axi notify [check|test]` checks the setup
 or sends a test notice. Detail is in
 [question-kinds.md](question-kinds.md).
+
+## Standalone Go deeper owner
+
+Only Claude Code session resumption is supported. The author registers its **actual**
+session UUID at authoring time; a filer alone is not a connected session. Use the
+same explicit board file on every command:
+
+```sh
+sign-off-axi owner <board.json> --filer <author-id> --host claude \
+  --session <actual-session-UUID> --cwd <absolute-project-folder>
+sign-off-axi owner <board.json> --dispatch --filer <author-id> --timeout 3600
+sign-off-axi owner <board.json>   # queued failures, delivered or owner-read by request id
+```
+
+`--model <model-id>` on registration optionally selects the model for resume.
+The separate dispatcher polls for that many seconds (once without `--timeout`),
+so start it before leaving the author idle and restart it after it exits. Do not
+run an active `wait` consumer for that owner at the same time. It uses installed
+`claude --resume <UUID> -p`, normal HOME/credentials, and argv without a shell.
+There is no Firstmate dependency, callback script or substitute answering session.
+
+The dispatcher records process handoff as `delivered`, not read. The resumed
+owner inspects `deeper <board.json> --json --all` and the original document with
+`list <board.json> --full`, then acknowledges the exact request using
+`owner <board.json> --ack <request-id>`. Only this explicit acknowledgement marks
+owner-read. The dispatcher supplies its registered identity to that child process.
+Then it answers via `deeper <board.json> --id <request-id> --text "<explanation>"`.
+This wake path sends **one final answer**, without `--more`: completed replies are
+idempotent on retry. Ordinary active listeners can still stream pieces.
+
+A failed launch or an owner that exits without answering remains queued with its
+real failure in `owner` output. Fix the local registration or host availability,
+then rerun the dispatcher; unfinished requests survive its restart. `--verbose`
+retains the native host result on stderr for local proof. Delivery status is a CLI
+surface in this slice, not a new board status control. A dispatcher killed while
+holding `<board.json>.dispatch.lock` leaves that PID lock; remove that exact file
+only after confirming the dispatcher and its child have stopped. Never reassign a
+request silently or put executable routes in posted JSON.
+
+The npm package includes `skills/sign-off-axi/SKILL.md` with the matching recipe.
+An installed author can read that copy directly; `init` still uses its existing
+GitHub skill installer (a follow-up, not changed here).
