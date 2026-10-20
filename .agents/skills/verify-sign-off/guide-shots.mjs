@@ -62,12 +62,13 @@ const planFile = join(pkg, `fixtures/contract/plan.v${simplify ? 3 : 2}/valid-fu
 const plan = JSON.parse(readFileSync(planFile)), report = JSON.parse(readFileSync(reportFile));
 // The board archives a report a day after it was filed, so the fixture is dated now.
 writeFileSync(reportFile, JSON.stringify({ ...report, filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') }));
+let ownerSession;
 if (simplify) {
   writeFileSync(board, '{"schema":2,"items":[]}\n');
-  const session = randomUUID();
+  const session = ownerSession = randomUUID();
   const authored = JSON.parse(run('claude', ['--session-id', session, '-p', `You own two synthetic examples for Umer. Read ${planFile} and ${reportFile}, reword their about fields in plain words while preserving keys, sections, decisions, numbers and schemas. Post both through node ${cliJs} post ${board} --kind <kind> --from <file>. Register your actual Claude UUID ${session} through node ${cliJs} owner ${board} --filer ${plan.filer} --host claude --session ${session} --cwd ${app} --model claude-haiku-5-5. Do not start a listener or dispatcher. Remember the ordinary example fact that Umer chose green apples only in this conversation, not the documents. Include it if later asked to simplify. Then stop.`, '--model', 'claude-haiku-5-5', '--output-format', 'json', '--tools', 'Bash,Read,Write,Edit', '--allowedTools', 'Bash,Read,Write,Edit'], { cwd: app, env: process.env }));
   assert.equal(authored.session_id, session); assert.equal(authored.is_error, false);
-  writeFileSync(join(records, 'owner-authored.json'), JSON.stringify(authored));
+  writeFileSync(join(records, `owner-authored.${theme}.${width}w.json`), JSON.stringify(authored));
 } else {
   cli('post', board, '--kind', 'plan', '--from', planFile);
   cli('post', board, '--kind', 'report', '--from', reportFile);
@@ -193,9 +194,12 @@ try {
     assert.equal(ask.version, 1); assert.equal(ask.filer, plan.filer);
     browser('open', base);
     const delivered = tryRun(process.execPath, [cliJs, 'owner', board, '--dispatch', '--filer', plan.filer, '--verbose'], { cwd: app, env: process.env });
-    writeFileSync(join(records, `${kind}-owner-delivery.json`), JSON.stringify(delivered)); assert.equal(delivered.status, 0, delivered.stderr);
-    const answer = (await state()).deeper.find(a => a.id === ask.id);
-    assert.equal(answer.done, true); assert.match(answer.text, /green apples/i); assert.equal(answer.seen, undefined);
+    writeFileSync(join(records, `${kind}-owner-delivery.${theme}.${width}w.json`), JSON.stringify(delivered)); assert.equal(delivered.status, 0, delivered.stderr);
+    const handoff = JSON.parse(delivered.stderr.split('\n').find(line => line.startsWith('{"host":'))), resumed = JSON.parse(handoff.output);
+    assert.equal(handoff.resume, ownerSession); assert.equal(resumed.session_id, ownerSession); assert.equal(resumed.is_error, false);
+    const current = await state(), answer = current.deeper.find(a => a.id === ask.id);
+    assert.equal(current.delivery[ask.id].state, 'owner-read'); assert.ok(answer.read);
+    assert.equal(answer.filer, plan.filer); assert.equal(answer.done, true); assert.ok(answer.text.trim()); assert.equal(answer.seen, undefined);
     browser('open', url); drive('await wait(".gd-sec");'); browser('open', url); drive('await wait(".gd-sec");');
     assert.equal((await state()).deeper.find(a => a.id === ask.id).seen, undefined, 'reload must not clear unseen answers');
     drive('await page.eval(() => { document.querySelector(".gd-scroll").style.scrollBehavior = "auto"; document.querySelector(\'[data-part="next"] > .gd-ans\').scrollIntoView({block:"center"}); });');
@@ -203,7 +207,7 @@ try {
     drive('await nap(2400);');
     assert.equal((await state()).deeper.find(a => a.id === ask.id).seen, answer.answerRevision);
     assert.equal(readFileSync(board, 'utf8'), original, 'Simplify does not alter authored text or plan decisions');
-    writeFileSync(join(records, `${kind}-simplify.json`), JSON.stringify({ request: ask, answer, unreadAfterReload: true, documentUnchanged: true }));
+    writeFileSync(join(records, `${kind}-simplify.${theme}.${width}w.json`), JSON.stringify({ request: ask, answer, ownerSession, resumedSession: resumed.session_id, conversationFactIncluded: /green apples/i.test(answer.text), unreadAfterReload: true, documentUnchanged: true }));
   }
 } finally {
   if (recorder) {
