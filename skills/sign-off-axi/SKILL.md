@@ -1,6 +1,6 @@
 ---
 name: sign-off-axi
-description: "Ask the user yes/no, pick-one or A/B/C design questions on a local review board and read back their answers, using the sign-off-axi CLI. Use when you need a yes/no decision, a choice between a few options, a design pick between mocks, or approval from the user before going on, want the user to review or sign off on something, need to read back the answers the user already gave, must explain a concept, design or trade-off to the user as an interactive report, or need the user to sign in to a service."
+description: "Ask the user yes/no, pick-one or A/B/C design questions on a local review board and read back their answers, using the sign-off-axi CLI. Use when you need a yes/no decision, a choice between a few options, a design pick between mocks, or approval from the user before going on, want the user to review or sign off on a plan or on proof of finished work (screenshots or a recording), need to read back the answers the user already gave, must explain a concept, design or trade-off to the user as an interactive report, or need the user to sign in to a service."
 license: MIT
 metadata:
   author: umeranjum17
@@ -23,6 +23,9 @@ metadata:
 
 sign-off-axi puts your questions on one local page (127.0.0.1) where the user answers each with one click, and saves the answers for you to read back.
 Every question is an item: post it, wait, read the answer back.
+The board has four places: Today (what needs the user and what was proven today), Decide (every ask that waits), Evidence (proof, never an ask) and Reports (explainers).
+
+With no board file named, a command uses the nearest `.sign-off/` board that `npx -y sign-off-axi init` set up in the project (looking up to the repo root), else `~/.sign-off/decisions.json`. Name a board file after the command only to use another one. Tests and scratch runs must never reach the user's own board: set `SIGN_OFF_HOME` to a temporary folder.
 
 ## Current guidance lives in the CLI
 
@@ -39,7 +42,7 @@ sign-off itself calls no model and inherits the calling agent's model routing.
 
 The answer comes to you; nobody has to notice it for you.
 
-1. Pick one filer id for yourself: your agent session id, or any short name (1-128 of `A-Z a-z 0-9 . _ -`).
+1. Pick one filer id for yourself: your agent session id, or any short name (1-128 of `A-Z a-z 0-9 . _ -`). With none given, a post saves the Claude Code session id when there is one.
 2. Post every item with `--filer <id>`, or export `SIGN_OFF_FILER=<id>` once for every command.
 3. Right after posting an ask or a plan (an evidence post never waits), run `npx -y sign-off-axi wait --filer <id>` (same board file as the post). It returns every answer to your items you have not taken yet, even one given before you started waiting, and the board then shows **Seen by agent** on that card. Run it again for the next one; `TIMEOUT` means keep waiting, `NOT_FOUND` means none of your items wait.
 4. If you cannot block, the board owner can set `on_answer: <command>` in the `config.yaml` beside the board: it runs for each answer with the answer as JSON on its stdin, with no shell (so `|` and `>` do nothing; name a script instead), and `npx -y sign-off-axi doctor` checks it can run.
@@ -65,6 +68,7 @@ sign-off refuses a question that breaks these rules, naming the field and one fi
 - `--outcome <value>=<text>`: what happens next if that answer is picked, one line each, on every option.
 - `--recommend` the answer you would pick, with `--recommend-reason` in one line.
 - `--default`: what happens if the user stays quiet, and `--silent-by <ISO UTC time>` when.
+- A card you posted by mistake: `npx -y sign-off-axi dismiss <key>` hides it, `restore <key>` brings it back. When the user dismisses a card, you are not told: `answers` still returns a dismissed answer.
 
 A good yes/no question:
 
@@ -86,9 +90,10 @@ npx -y sign-off-axi raise --title "Which day should the release ship?" \
   --recommend b --recommend-reason "Both fixes land by Thursday." --default b
 ```
 
-## Evidence proves; a report explains
+## Evidence proves; a plan or a report explains
 
-- Evidence: proof that a thing works, screens or a clip of the real product (`--type evidence`).
+- Evidence: proof that a thing works, screens or a clip of the real product (`--type evidence`). It lives in Evidence and is never an ask, so never post proof as a question; a text-only or placeholder picture is refused.
+- Plan: what you mean to do, for the user to approve before you start (`post --kind plan --from plan.json`; `post --help` and the contract in the package docs give the shape). The user approves or changes each section, answers each decision and sends it all back once: wait for it like an ask and read it with `answers --json` (a note per section, a value per decision).
 - Report: an in-depth explainer, only when the user asked for an explanation, or a concept, design or trade-off must be understood. A merge, a PR outcome, a receipt, a verdict or a status note is never a report.
 - A report is a page to tap through, never a text card; text alone is refused. Run `npx -y sign-off-axi report init .sign-off/mocks/<key>`, fill every `FILL:` line, then post with the command it prints.
 - Build it for the reader:
@@ -123,7 +128,7 @@ When the user must choose how something looks or works, do this:
 7. Read the answer with `npx -y sign-off-axi answers .sign-off/decisions.json --key <key> --json`. A pick holds `answer` and maybe a `note`; `"answer": "text"` is the user's own answer (Other answer), in its `note`. A `rounds` entry with no `answer`, or newer than the `answer`'s `at`, means the user wants another round: read its note, build 3 new variants and post them under a new key. A `comments` list on the answer or the round holds the user's comments on parts of a mock: `mock` is the option, `ref`, `tag` and `words` name the element, `text` is the comment; apply them to that variant.
 8. Build the winner into the real code, then delete `.sign-off/mocks/<key>/`.
 
-Build mocks with a cheap model, for example Go Muse, haiku or luna. A mock is throwaway work.
+Build mocks with a fast, cheap model: a mock is throwaway work. If first-draft is installed, it can build the mocks and write its `Open in first-draft: <label> <url>` links at the end of `--tradeoff`; the board shows them as real links.
 
 ## Show it when words are not enough
 

@@ -1,4 +1,4 @@
-// The static demo build: one source (web/index.html) plus the demo shim and
+// The static site build: the landing page, and the demo: one source (web/index.html) plus the demo shim and
 // seed data only in the demo build; the server's own page is unchanged.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,8 +13,14 @@ const scratch = mkdtempSync(join(tmpdir(), 'sign-off-demo-'));
 
 test('demo build carries the shim and seed; the server page does not', { timeout: 60_000 }, async (t) => {
   t.after(() => rmSync(scratch, { recursive: true, force: true }));
-  const out = join(scratch, 'demo');
-  execFileSync('node', [join(root, 'scripts/build-demo.mjs'), '--out', out], { cwd: root, stdio: 'pipe' });
+  const site = join(scratch, 'site'), out = join(site, 'demo');
+  execFileSync('node', [join(root, 'scripts/build-demo.mjs'), '--out', site], { cwd: root, stdio: 'pipe' });
+
+  // The landing page sits at the root, links the demo and carries its pictures and icon.
+  const landing = readFileSync(join(site, 'index.html'), 'utf8');
+  assert.match(landing, /<title>sign-off/);
+  assert.ok(landing.includes('href="demo/"'));
+  for (const link of landing.match(/(?:src|srcset|href)="(?:media\/|icon|apple|manifest)[^"]*"/g)) assert.ok(existsSync(join(site, link.split('"')[1])), `${link} is in the build`);
 
   // The demo page is the real page plus the seed and the shim.
   const demo = readFileSync(join(out, 'index.html'), 'utf8');

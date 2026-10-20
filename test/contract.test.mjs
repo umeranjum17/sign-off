@@ -246,6 +246,10 @@ test('a plan: validate checks each rule with one fix line; post stores it, it wa
   try {
     const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
     assert.equal((await fetch(`${url}favicon.ico`)).status, 204);
+    for (const [name, type] of [['icon.svg', 'image/svg+xml'], ['apple-touch-icon.png', 'image/png'], ['manifest.webmanifest', 'application/manifest+json']]) {
+      const icon = await fetch(`${url}${name}`);
+      assert.deepEqual([icon.status, icon.headers.get('content-type')], [200, type], name);
+    }
     const send = (body) => fetch(`${url}api/answers`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: plan.key, ...body }) });
     for (const [body, error] of [[{ notes: approve.slice(1), decisions }, /notes must list each section once: goals, architecture/], [{ notes: [{ section: 'goals', verdict: 'change' }, ...approve.slice(1)], decisions }, /section goals needs a note/],
       [{ notes, decisions: { 'send-back': 'one' } }, /decisions must answer each of: send-back, where/], [{ notes, decisions: { ...decisions, where: '' } }, /decisions must answer/]]) {

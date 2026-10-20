@@ -1,382 +1,111 @@
-<p align="center"><b>▶ <a href="https://umeranjum17.github.io/sign-off/">Try it live</a></b> — the real board on demo data: tap an answer and watch it save. No install, nothing leaves your browser.</p>
-
 <p align="center">
-  <img src="docs/media/demo-tap.gif" width="300" alt="Tap Yes on a demo question, see it saved, and read the saved answer back">
-</p>
-
-<p align="center">
-  <img src="docs/logo.svg" width="72" height="72" alt="sign-off logo">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.svg">
+    <img src="docs/logo.svg" width="96" height="96" alt="sign-off logo: a white check mark on a blue tile">
+  </picture>
 </p>
 
 <h1 align="center">sign-off</h1>
 
-<p align="center"><b>One calm page for every question the programs working for you need answered.</b><br>Yes or no, pick-one, mock-ups, proof photos, short videos, sign-in links: each lands on a board on your own machine, you answer with one tap, and the answer is saved for the asker to read.</p>
+<p align="center"><b>One calm page for every question the programs working for you need answered.</b><br>Agents ask; you answer with one tap on your own machine; the answer is saved for the asker to read. Proof of finished work lands on the same page, so you check it instead of taking anyone's word.</p>
+
+<p align="center"><b>▶ <a href="https://umeranjum17.github.io/sign-off/demo/">Try it live</a></b>: the real board on demo data. No install, nothing leaves your browser. · <a href="https://umeranjum17.github.io/sign-off/">Website</a></p>
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/media/hero-dark.gif">
-    <img src="docs/media/hero.gif" width="420" alt="Ask, tap, answer: an agent raises a yes/no question, you tap Yes on your phone, the agent reads the saved answer">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/media/desk-today-dark.webp">
+    <img src="docs/media/desk-today.webp" alt="The board at desk width: Today with what needs you, what was proven and a list of waiting asks">
   </picture>
 </p>
 
-## One-minute quick start
+## Install in 3 steps
 
 ```sh
-npm install -g sign-off-axi
+npm install -g sign-off-axi          # 1. install from npm
+npx -y sign-off-axi init             # 2. in your project: set up .sign-off/ and the agent skill
+sign-off-axi open                    # 3. start the board and open the printed link
+```
+
+Then ask your first question, the way an agent would, and answer it on the board:
+
+```sh
 sign-off-axi raise \
-  --title "Keep the weekly \
-digest?" \
-  --why "The paid plan \
-renews Monday." \
-  --outcome yes="It keeps \
-going out." \
-  --outcome no="It stops \
-this week." \
-  --recommend yes \
-  --recommend-reason "Readers \
-still open it." \
-  --default yes
-sign-off-axi open
+  --title "Keep the weekly digest?" \
+  --why "The paid plan renews Monday." \
+  --outcome yes="It keeps going out." --outcome no="It stops this week." \
+  --recommend yes --recommend-reason "Readers still open it." --default yes
+sign-off-axi answers --key keep-the-weekly-digest   # read the tap back
 ```
 
-Open the printed URL, click **Yes**, then read the answer back the way an
-agent would:
+You need Node 22.5 or newer. `init` installs the skill for each coding agent it finds on your `PATH`; `sign-off-axi --help` lists every command, and every command takes `--help`.
 
-```sh
-sign-off-axi answers \
-  --key keep-the-weekly-digest
-```
+## The board
 
-That is the whole loop: the agent raises, you tap, the agent reads.
-Every question says why it is asked, what each answer does, which one the
-agent recommends and why, and what happens if you stay quiet; a question
-that does not is refused before it reaches you (see
-[the question standard](docs/contract.md#ask-schema-1)). The
-board is the default one (`~/.sign-off/decisions.json`); name a file after
-any command to use another board.
+Four places, in the bar at the bottom of a phone and the sidebar on a desk.
+
+<table>
+  <tr>
+    <td align="center" width="25%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-today-dark.webp"><img src="docs/media/phone-today.webp" alt="Today: counts of what needs you, what was proven and new reports, then the waiting asks"></picture><br><b>Today</b><br>What needs you, what was proven, what is new.</td>
+    <td align="center" width="25%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-decide-dark.webp"><img src="docs/media/phone-decide.webp" alt="Decide: one card per ask that waits on you, filtered by type"></picture><br><b>Decide</b><br>Every ask that waits on you, one tap each.</td>
+    <td align="center" width="25%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-evidence-dark.webp"><img src="docs/media/phone-evidence.webp" alt="Evidence: a capture of the finished work with its result, grouped by project"></picture><br><b>Evidence</b><br>Proof that a change works, with its honest result.</td>
+    <td align="center" width="25%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-reports-dark.webp"><img src="docs/media/phone-reports.webp" alt="Reports: explainer pages you asked for"></picture><br><b>Reports</b><br>Explainers you asked for, to read.</td>
+  </tr>
+</table>
+
+### Evidence is not a decision
+
+**Decide** holds only real asks: things an agent cannot do without your answer. **Evidence** holds proof (screenshots or a short recording of the running product) with the result of the check that made it: Passed, Not run, Failed, Did not finish or Could not check. A proof update is never counted as something that needs you; you can give it a verdict (Pass, Fail or Needs work) or dismiss it. **Today** counts the two separately: what needs you, and what was proven today.
+
+### Plans and reports, on their own pages
+
+<table>
+  <tr>
+    <td align="center" width="33%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-plan-dark.webp"><img src="docs/media/phone-plan.webp" alt="A plan page: the idea in one picture, then each section to approve or change"></picture><br><b>Plan</b><br>Approve or change each section, answer each decision, send it all back at once.</td>
+    <td align="center" width="33%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-report-dark.webp"><img src="docs/media/phone-report.webp" alt="A report page: the answer first, then a diagram to tap through"></picture><br><b>Report</b><br>An explainer page: the answer first, then a diagram and steps to tap through.</td>
+    <td align="center" width="33%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-signin-dark.webp"><img src="docs/media/phone-signin.webp" alt="A sign-in card: the service, what it unlocks, who waits and the time left"></picture><br><b>Sign-in</b><br>An agent needs you to log in: tap Open, then it carries on.</td>
+  </tr>
+</table>
+
+A plan is what an agent wants to do before it starts. A report is an explanation you asked for. Both open over the board, and the board, not the agent's page, owns the answer buttons. A **sign-in card** goes to the top of Decide with the service, what it unlocks, who is waiting and the time left on the link; the agent closes it with `sign-off-axi signin done`.
+
+### It keeps only what matters
+
+A board that fills up with noise stops being read, so the rules sit at the door.
+
+- A question must say why it is asked, what each answer does, which one the agent recommends and what happens if you stay quiet; one that does not is refused with the fix ([the question standard](docs/contract.md#ask-schema-1)).
+- One decision is one card: raising the same question again changes nothing, and `--merge <key>` folds an older card into the better-asked one.
+- Proof posted as a Pass/Fail question is refused, and proof that is mostly text, a placeholder or a test card is refused too: proof goes to Evidence, as a capture of the real product; a report must be a page to tap, not a wall of words.
+- **Dismiss** hides a card from the board, **Undo** brings it back (`sign-off-axi dismiss <key>` and `restore <key>` do the same from a shell).
 
 ## What you can ask
 
-One line on what the agent runs, one screenshot of what you see. The full
-reference for each kind lives in [docs/question-kinds.md](docs/question-kinds.md);
-the message rules are in [docs/contract.md](docs/contract.md).
+One line on what the agent runs per kind; the full reference is [docs/question-kinds.md](docs/question-kinds.md) and the message rules are in [docs/contract.md](docs/contract.md).
 
-### Yes or no
-
-```sh
-sign-off-axi raise \
-  --title "Keep the weekly \
-digest?" \
-  --about "Open rate held \
-steady at about a third \
-for two months." \
-  --why "The paid plan \
-renews Monday." \
-  --outcome yes="It keeps \
-going out each Monday." \
-  --outcome no="It stops \
-after this week." \
-  --recommend yes \
-  --recommend-reason "Readers \
-still open it." \
-  --default yes \
-  --silent-by 2026-10-19T09:00Z
-```
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-yes-no-dark.webp">
-  <img src="docs/media/kind-yes-no.webp" alt="A yes/no question with the recommended Yes marked">
-</picture>
-
-*A yes/no ask. The recommended answer is marked.*
-
-### Pick one, with a recommendation
-
-```sh
-sign-off-axi raise \
-  --title "When should \
-the new settings \
-page go out?" \
-  --about "No new \
-bug reports for three \
-weeks." \
-  --why "Support is fully \
-staffed on Friday." \
-  --option today=Today \
-  --option friday=Friday \
-  --option next-week="Next \
-week" \
-  --outcome today="It goes \
-out now." \
-  --outcome friday="It goes \
-out with support on hand." \
-  --outcome next-week="It \
-waits a week." \
-  --recommend friday \
-  --recommend-reason "Support \
-can answer questions." \
-  --default next-week
-```
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-pick-one-dark.webp">
-  <img src="docs/media/kind-pick-one.webp" alt="A pick-one question with three options and Friday recommended">
-</picture>
-
-*Pick one of three. Friday is recommended; silence means next week.*
-
-### Design pick, with mocks A/B/C
-
-```sh
-sign-off-axi post \
-  --type design \
-  --title "Pick the settings \
-layout" \
-  --option a="Layout A" \
-  --option b="Layout B" \
-  --option c="Layout C" \
-  --mock a=mocks/a.html \
-  --mock b=mocks/b.html \
-  --mock c=mocks/c.html \
-  --tradeoff "A is fastest \
-to tap; B shows both \
-choices; C fits small \
-screens." \
-  --recommend b
-```
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-design-dark.webp">
-  <img src="docs/media/kind-design.webp" alt="Three mock-ups side by side in phone frames with Pick buttons, Layout B recommended">
-</picture>
-
-*Three layouts side by side. Layout B is recommended.*
-
-### Proof update, with Pass / Fail / Needs work
-
-```sh
-sign-off-axi post \
-  --type evidence \
-  --title "Settings page \
-loads in a second" \
-  --about "Umer opens \
-the new page on a phone." \
-  --media shot-light.png \
-  --media shot-dark.png
-```
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-evidence-dark.webp">
-  <img src="docs/media/kind-evidence.webp" alt="Evidence update 1 with two captures and Pass, Fail, Needs work buttons">
-</picture>
-
-*Proof of a fix, with two captures. Pass, Fail, or Needs work.*
-
-Evidence lists every update, never in **Waiting on you**: a passed run shows a tick, and a plain update that links no run, a failed run or an unchecked run says its honest result, each with its verdicts and Dismiss on the update's own screen. **Proven today** counts every update filed today, each with its own result. Updates are grouped by the project named in the run's proof line, `verify-<project>: ...` (trimmed, compared without case); a proof line with no such prefix goes under **Other**.
-
-### Explainer video, with chapters
-
-```sh
-sign-off-axi post \
-  --type explainer \
-  --title "Is the new \
-sign-in clear?" \
-  --about "Two steps: \
-password, then a code." \
-  --media explainer.mp4 \
-  --chapter 0:00=Start \
-  --chapter 0:02="The tap"
-```
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-explainer-dark.webp">
-  <img src="docs/media/kind-explainer.webp" alt="An explainer card with a video player, chapter buttons and Yes/No">
-</picture>
-
-*A short video with chapters, then Yes or No.*
-
-### Explainer page, to read
-
-```sh
-sign-off-axi report init \
-  .sign-off/mocks/sign-in
-d=mocks/sign-in
-sign-off-axi post \
-  --type report \
-  --title "Sign-in now \
-takes 2 steps" \
-  --about "Why the code \
-step moved first." \
-  --view $d/index.html \
-  --preview $d/preview.svg
-```
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-report-dark.webp">
-  <img src="docs/media/kind-report.webp" alt="An explainer page: the answer in one sentence, a diagram, steps to tap through, folded details">
-</picture>
-
-*An explainer page to tap through and read.*
-
-### Diagram
-
-```sh
-sign-off-axi post \
-  --type diagram \
-  --title "Is this the \
-sign-in flow?" \
-  --about "Password first, \
-then a code, then in." \
-  --view flow.svg \
-  --recommend yes
-```
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-diagram-dark.webp">
-  <img src="docs/media/kind-diagram.webp" alt="A question shown with a three-box flow diagram at card width">
-</picture>
-
-*A question drawn as a three-box flow.*
-
-### Interactive page
-
-```sh
-sign-off-axi post \
-  --type interactive \
-  --title "How many \
-testers approved?" \
-  --about "Tap the counter \
-to add yourself." \
-  --view counter.html \
-  --option yes=Yes \
-  --option no="Needs \
-work" \
-  --recommend yes
-```
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-interactive-dark.webp">
-  <img src="docs/media/kind-interactive.webp" alt="A question with a sandboxed counter page to tap">
-</picture>
-
-*A live counter to tap, in a sandboxed page.*
-
-### Sign-in link
-
-```sh
-sign-off-axi post \
-  --type signin \
-  --service "npm" \
-  --link \
-https://example.com/abc123 \
-  --unlocks "Publish \
-the release" \
-  --waits "Umer" \
-  --expires 15m \
-  --key npm-login
-```
-
-Later, when it worked:
-
-```sh
-sign-off-axi signin done \
-  --key npm-login
-```
-
-To hide a card as the Dismiss button does, or bring it back: `sign-off-axi dismiss <key>` and `sign-off-axi restore <key>`.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-signin-dark.webp">
-  <img src="docs/media/kind-signin.webp" alt="A sign-in card on top with an Open button, what it unlocks, who waits and the time left">
-</picture>
-
-*A sign-in card: what it unlocks, who waits, the time left.*
-
-### Release gate
-
-```sh
-sign-off-axi post \
-  --kind gate \
-  --from gate.json
-```
-
-A `gate.json` holds a run for the user: Approve or Fix first.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-gate-dark.webp">
-  <img src="docs/media/kind-gate.webp" alt="A gate question with Approve recommended and Fix first">
-</picture>
-
-*A held run: Approve it or Fix first.*
-
-### Retro finding
-
-```sh
-sign-off-axi post \
-  --kind finding \
-  --from finding.json
-```
-
-A `finding.json` asks the user to Apply or Skip a proposed fix.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/media/kind-finding-dark.webp">
-  <img src="docs/media/kind-finding.webp" alt="A finding question with Apply recommended and Skip">
-</picture>
-
-*A retro fix to Apply or Skip.*
-
-## On your phone
-
-The same board on a phone, light and dark.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-dark.webp">
-  <img src="docs/media/phone-light.webp" width="320" alt="Board summary on a phone in light mode">
-</picture>
-
-*The summary, the waiting list, and the answers, in a phone frame.*
-
-## On your screen
-
-The waiting list and the summary at desk width, light and dark.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/media/desktop-dark.webp">
-  <img src="docs/media/desktop-light.webp" alt="Board summary at desk width in light mode">
-</picture>
-
-*Everything in one glance: waiting, evidence, explainers, answered.*
+| Kind | The agent runs | You see |
+|---|---|---|
+| Yes or no, pick one | `raise --title ... --recommend ...` | buttons, the recommended one first |
+| Design pick (mocks A/B/C) | `post --type design --mock a=... --mock b=...` | mocks side by side, a note on any part |
+| Proof update | `post --type evidence --media shot.png` | the capture, its result, Pass / Fail / Needs work |
+| Explainer video | `post --type explainer --media clip.mp4 --chapter 0:00=Start` | a player with chapter buttons, then Yes or No |
+| Report page | `report init <folder>`, then `post --type report --view ...` | a page to tap through |
+| Diagram, interactive page | `post --type diagram --view flow.svg` | the picture on the card; interactive pages run sandboxed |
+| Plan | `post --kind plan --from plan.json` | sections to approve or change, decisions to answer |
+| Sign-in link | `post --type signin --service npm --link <url> --unlocks ...` | an Open button and the time left |
 
 ## How agents use it
 
-Every item records who filed it, and that agent gets the answer as an
-event, by itself: the agent raises with `--filer my-agent` and blocks on
-`sign-off-axi wait --filer my-agent`, which returns only that filer's
-answers, each once, and the card shows **Seen by agent**. An agent that
-cannot block can be woken instead: an `on_answer:` line in the
-`config.yaml` beside the board names a command the board runs for every
-answer. A `notify:` block in that config can send an HTTP POST when a card
-enters Waiting on you, with its bearer token read from a named environment
-variable, or, with `receiver: muxr`, from the muxr host's `notify-token`
-file; `sign-off-axi notify test` sends a test notice. The full reference, with the worked example, is in
-[docs/commands.md](docs/commands.md).
+Every item records who filed it. The agent raises with `--filer my-agent`, then blocks on `sign-off-axi wait --filer my-agent`, which returns that filer's answers, each once, and the card shows **Seen by agent**. An agent that cannot block can be woken instead: an `on_answer:` line in the `config.yaml` beside the board names a command the board runs for every answer, and a `notify:` block can send an HTTP POST when a card enters Decide. The worked examples are in [docs/commands.md](docs/commands.md).
 
-Every command takes `--help` and prints compact output with next-step hints.
-sign-off itself calls no model and inherits the calling agent's model routing.
+sign-off itself calls no model and inherits the calling agent's model routing. The shipped skill is deliberately thin: it tells the agent how to write a good card and defers to `sign-off-axi --help` for every flag, so an installed copy never goes stale.
 
-## Install
+## Works alone, or with its siblings
 
-```sh
-npm install -g sign-off-axi
-```
+sign-off stands alone: the CLI and the skill need no other tool and no supervisor. They connect through one small written contract ([docs/contract.md](docs/contract.md)):
 
-In a project folder, one command sets up `.sign-off/` and installs the
-skill for each coding agent on your `PATH`:
-
-```sh
-npx -y sign-off-axi init
-```
+- **done-done** (verification) posts its proof as Evidence and holds a run for your Approve or Fix first as a gate.
+- **learn-from-mistakes** (retros) posts each proposed change as a finding for you to Apply or Skip.
+- **first-draft** (design) writes its review links into a design card, shown as real links to open the mock-up.
+- **An agent supervisor**, such as Firstmate, or a lone agent in a terminal: both post the same asks, plans and reports and read the same answers.
 
 ## Docs and reference
 
@@ -397,11 +126,13 @@ npm pack
 ```
 
 - `npm test`: full journeys
-- `npm run build:skill`: skill stub
-- `npm run build:demo`: demo site (Try it live)
+- `npm run build:skill`: writes the skill from `src/skill.ts`
+- `npm run build:demo`: the website (`site/`) and the demo board at `/demo/`, built into `demo-dist/`
 - `npm pack`: tarball
 
 A release is a merged version-bump PR: CI publishes the new version to npm.
+
+Change what a user sees or runs, and update this README, the skill (`src/skill.ts`), the website (`site/index.html`) and any screenshot they show in the same PR.
 
 ### Test runs never touch your board
 

@@ -7,6 +7,7 @@
   "files": ["dist", "!dist/skill.js", "web", "fixtures/contract"],
   "engines": { "node": ">=22.5" },
   "license": "MIT",
+  "homepage": "https://umeranjum17.github.io/sign-off/",
   "repository": { "type": "git", "url": "git+https://github.com/umeranjum17/sign-off.git" },
   "keywords": ["axi", "agent", "cli", "toon", "decisions", "review"],
   "scripts": {

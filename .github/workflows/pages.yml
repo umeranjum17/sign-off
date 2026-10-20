@@ -1,5 +1,6 @@
-# Static demo site for the README's Try-it-live link. Builds web/ plus the
-# demo shim into demo-dist/ and publishes it to the repo's github.io URL.
+# The sign-off site: the landing page at the repo's github.io URL and the
+# static demo board under /demo/. Builds site/ and web/ plus the demo shim
+# into demo-dist/ and publishes it.
 # No secrets, no tokens, no analytics; the demo keeps answers in the
 # visitor's own browser.
 name: pages
