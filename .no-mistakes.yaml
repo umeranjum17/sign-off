@@ -1,6 +1,5 @@
 test:
   instructions: |
-    Run only the tests for the parts this change touches (`npm run build`, then
-    `node --test --test-global-setup=test/temp-folder.mjs test/<name>.test.mjs`),
-    plus one user journey: `done-done verify <journey> --outcome "<claim>"` with a
-    journey from .done-done.yaml. Never run the full suite twice: CI runs it on every PR.
+    Run `npm test` (it builds, then runs the whole suite) and nothing else. Do not
+    start a done-done journey or any command that asks a judge model: the journey
+    proof is a separate step run after release.
