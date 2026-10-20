@@ -220,7 +220,7 @@ and played on the card. --about is its short summary; up to ${CHAPTERS_MAX} --ch
 --view is the page and --preview its picture on the card, beside it, both from the board file's folder; \`sign-off-axi report init <folder>\` makes them.
 The page must be filled (no FILL: line left), with a viewport tag, dark mode, a picture, something to tap, its detail folded, nothing from the web, and no block over about five lines on a phone.
 Merges, PR outcomes, receipts and status notes are not reports: post proof of a change as evidence.
-A proof is never an ask: a new ask that offers Pass and Fail is refused. `sign-off-axi refile <key> --media <file>` re-files an old one as evidence.
+A proof is never an ask: a new ask that offers Pass and Fail is refused. sign-off-axi refile <key> --media <file> re-files an old one as evidence.
 --type signin asks the user to sign in, at the top of what waits: the service, one Open button for the http(s) --link, what it unlocks,
 who waits, and the time left until --expires (an ISO date-time, or 90s, 15m, 2h, 1d from now). After that time the card says the link expired.
 No output prints the link. Post again with the same --key and a new --link or --expires to put a new link on the same card; it waits again.
