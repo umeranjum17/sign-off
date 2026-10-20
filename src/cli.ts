@@ -2054,11 +2054,11 @@ async function exportBoard(args: string[]) {
   const { file: _, messages: _messages, annotations: _annotations, ...frozen } = state(), files: Record<string, string> = {}, q = encodeURIComponent;
   let missing = 0;
   // The same URLs the page asks the server for, read through the same hash and path checks.
-  const inline = async (url: string, query?: string) => {
+  const inline = async (url: string, query?: string, document = false) => {
     const [code, body] = await route({ method: 'GET', url } as IncomingMessage).catch((): [number, unknown] => [404, null]);
     if (code !== 200) { missing++; return; }
-    const { media: bytes, type, point } = body as { media: Buffer; type: string; point?: boolean };
-    const media = point ? Buffer.concat([bytes, pointer]) : bytes;
+    const { media: bytes, type } = body as { media: Buffer; type: string };
+    const media = document && type === 'text/html' ? Buffer.concat([bytes, pointer]) : bytes;
     // A data: URL keeps a one-page mock's query where the mock page reads it, but also appends it to the page text: a trailing comment hides it.
     files[url] = query && type === 'text/html' ? `data:text/html;charset=utf-8,${q(media.toString())}%3C!--?${query}` : `data:${type};base64,${media.toString('base64')}`;
   };
@@ -2070,7 +2070,7 @@ async function exportBoard(args: string[]) {
       await inline(`${at(d.key, m.value, m.path)}${query ? `?${query}` : ''}`, query);
     }
     // A diagram or an interactive page is the item's own view, inlined the same way.
-    if (d.view) await inline(at(d.key, '', d.view));
+    if (d.view) await inline(at(d.key, '', d.view), undefined, true);
     if (d.preview) await inline(at(d.key, '', d.preview));
     for (const i of (d.media ?? []).keys()) await inline(`/api/media?key=${q(d.key)}&i=${i}`);
     for (const m of d.evidenceCard?.media ?? []) await inline(m.url);
