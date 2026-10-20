@@ -813,9 +813,9 @@ test('standalone owner registration preserves queued failures and separates deli
 });
 
 test('installed standalone Claude owner authors, idles and resumes to finish only its own Go deeper request', { skip: !process.env.SIGN_OFF_LIVE_OWNER, timeout: 240000 }, async () => {
-  const dir = join(scratch, 'installed-owner'); mkdirSync(dir);
+  const dir = join(scratch, 'installed-owner'); mkdirSync(dir); mkdirSync(join(dir, 'tmp'));
   const evidence = process.env.SIGN_OFF_LIVE_OWNER;
-  const env = { ...process.env, SIGN_OFF_HOME: dir, XDG_CONFIG_HOME: join(dir, 'config'), XDG_STATE_HOME: join(dir, 'state') };
+  const env = { ...process.env, TMPDIR: join(dir, 'tmp'), SIGN_OFF_HOME: dir, XDG_CONFIG_HOME: join(dir, 'config'), XDG_STATE_HOME: join(dir, 'state') };
   delete env.SIGN_OFF_FILER; delete env.CLAUDE_CODE_SESSION_ID; delete env.SIGN_OFF_OWNER_SESSION;
   const exec = (bin, args, extra = {}) => {
     const r = spawnSync(bin, args, { cwd: dir, env, encoding: 'utf8', timeout: 120000, ...extra });
