@@ -1382,6 +1382,8 @@
   const icon = (a) => { const s = el('span', { class: `icon i-${a}`, 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[a]}"/></svg>`; return s; };
   // A design with only screen notes (answer 'screens') still waits for its design-wide verdict.
   const isAnswered = (d) => Object.hasOwn(state.answers, d.key) && !(d.type === 'design' && state.answers[d.key].answer === 'screens');
+  /** A sign-in whose link has expired has nothing left to open: it leaves the board until its poster posts a new link on the same key. */
+  const lapsed = (d) => d.type === 'signin' && !d.start && !!d.expires && Date.parse(d.expires) <= Date.now() && !isAnswered(d);
   /** Each item lives in one area: answered items, then the area the item names, then evidence updates (never an ask, whatever their result), then what is only to read (explainers, pages with nothing to answer), then the open asks.
    *  A plan has no options but waits for its send-back. */
   const area = (d) => {
@@ -2046,7 +2048,7 @@
     const gone = new Set(state.dismissed ?? []), open = state.decisions.filter((d) => !gone.has(d.key) && !isAnswered(d));
     const openKeys = new Set(open.map((d) => d.key));
     const merged = new Set(open.flatMap((d) => d.merges ?? []).filter((k) => openKeys.has(k)));
-    for (const d of [...state.decisions].reverse()) if (!gone.has(d.key) && !merged.has(d.key)) by[area(d)].push(d);
+    for (const d of [...state.decisions].reverse()) if (!gone.has(d.key) && !merged.has(d.key) && !lapsed(d)) by[area(d)].push(d);
     by.evidence.sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
     by.designs = [...state.decisions].reverse().filter((d) => d.kind === 'design' && !gone.has(d.key));
     // Waiting on you reads newest first unless the viewer chose oldest first. A sign-in blocks someone now, so sign-ins come first either way.

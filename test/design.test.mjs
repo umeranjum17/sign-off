@@ -954,14 +954,16 @@ test('a sign-in card: posted on top of what waits with its link and time left, t
   await evaluate('document.querySelector(".decide-bar .dis").click()');
   await until(async () => /^#decide\/(?!tmp-login)/.test(await evaluate('location.hash')));
   assert.equal(await evaluate('document.querySelector("#board .empty")?.textContent'), undefined);
-  // Past its time the link expires on the page: it says so plainly and Open is off.
+  // Past its time the link has nothing left to open: its card leaves what waits and Decide on its own, counted nowhere, and the page is not reloaded.
   await evaluate('location.hash = "#waiting"');
-  await evaluate('document.querySelector("#item-gh-login").click()');
-  await until(async () => (await evaluate('location.hash')) === '#decide/gh-login' && /^GitHub/.test(await card('gh-login') ?? ''));
-  await until(async () => (await card('gh-login')) === 'GitHub|Unlocks: Publish GitHub|Waits: Main|Link expired. Ask for a new link.|BUTTON    true');
-  // The same key with a new link puts it on the same card, open again.
+  await until(async () => !(await queue()).includes('GitHub'));
+  assert.equal(await evaluate('document.getElementById("item-gh-login")'), null);
+  assert.equal(await evaluate('[...document.querySelectorAll(".chips button")].some((c) => c.textContent === "Sign-in 1")'), true);
+  // The same key with a new link brings it back on the same card, open again.
   assert.match(signin('gh-login', 'GitHub', 'https://example.com/device?code=one-time-3', '10m').out, /gh-login,new link,GitHub,/);
-  await until(async () => (await card('gh-login')) === 'GitHub|Unlocks: Publish GitHub|Waits: Main|Expires in 10 min|A https://example.com/device?code=one-time-3 _blank noopener noreferrer ');
+  await until(async () => (await queue()).includes('GitHub'));
+  await evaluate('document.querySelector("#item-gh-login").click()');
+  await until(async () => (await evaluate('location.hash')) === '#decide/gh-login' && (await card('gh-login')) === 'GitHub|Unlocks: Publish GitHub|Waits: Main|Expires in 10 min|A https://example.com/device?code=one-time-3 _blank noopener noreferrer ');
   // signin done closes a card: it leaves what waits and shows as done.
   assert.match(run('signin', 'done', file, '--key', 'npm-login').out, /npm-login,done,npm/);
   assert.match(run('signin', 'done', file, '--key', 'npm-login').out, /npm-login,already done,npm/);
@@ -1993,6 +1995,35 @@ test('Evidence: an update with no verdict is listed under Evidence, never waitin
   await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
   await until(async () => (await evaluate('document.querySelector("#item-upd .t")?.textContent')) !== undefined);
   assert.match(await evaluate('document.querySelector("#item-upd .t").textContent'), /Login checked/);
+  close();
+  proc.kill();
+});
+
+test('Evidence: with no --evidence-root a linked run is found in done-done\'s own folder for its app, so a passed run says Passed, and a run found nowhere says nothing it cannot know', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'store'), file = join(dir, 'board.json'), home = join(dir, 'home'), app = join(home, '.done-done', 'evidence', 'sign-off');
+  const shot = readFileSync(new URL('../fixtures/evidence/product-small.png', import.meta.url)), commit = 'c0ffee'.padEnd(40, '0'), runId = '20261011T120000Z-a1b2c3d4';
+  mkdirSync(join(app, '.done-done', 'runs'), { recursive: true });
+  mkdirSync(join(app, runId));
+  writeFileSync(join(app, runId, 'after.png'), shot);
+  writeFileSync(join(app, '.done-done', 'runs', `${runId}.json`), JSON.stringify({ schema: 1, run_id: runId, commit, tree: 'a'.repeat(40), dirty: false, exit: 0,
+    files: [{ path: `${runId}/after.png`, sha256: createHash('sha256').update(shot).digest('hex'), bytes: shot.length }] }));
+  const link = (run_id) => ({ run_id, commit, outcome: 'You can read every card on a phone.', repro: 'repro: npm test', proof: 'verify-sign-off: npm test, phone, 390, passed', evidence: 'after.png' });
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    { key: 'found', type: 'evidence', number: 1, title: 'Run in the store', filed: new Date().toISOString(), evidence: link(runId) },
+    { key: 'lost', type: 'evidence', number: 2, title: 'Run nowhere', filed: new Date().toISOString(), evidence: link('20261011T130000Z-b2c3d4e5') },
+  ] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env: { ...env, HOME: home }, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const api = await (await fetch(`${url}api/decisions`)).json();
+  assert.deepEqual(api.decisions.map((d) => [d.key, d.evidenceCard?.result ?? null]), [['found', 'RUN PASS'], ['lost', null]]);
+  // The run's own capture is served from the folder the record was found in.
+  assert.equal((await fetch(`${url}${api.decisions[0].evidenceCard.media[0].url.slice(1)}`)).status, 200);
+  const { evaluate, close } = await browse(join(dir, 'b'), 390);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
+  const result = (key) => evaluate(`document.querySelector("#item-${key} .m span")?.textContent`);
+  await until(async () => (await result('found')) === 'Passed');
+  assert.equal(await result('lost'), 'Not run');
   close();
   proc.kill();
 });
