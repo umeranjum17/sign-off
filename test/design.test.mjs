@@ -2209,7 +2209,7 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   assert.equal(await evaluate('document.querySelector(\'#nav a[href="#evidence"] .n\').textContent'), '6');
   // Today's glance counts the updates shipped with proof today.
   await evaluate('location.hash = ""');
-  await until(async () => (await evaluate('document.querySelector(".glance")?.textContent.includes("5 changes shipped with proof.")')) === true);
+  await until(async () => (await evaluate('document.querySelector(".glance")?.textContent.includes("3 changes shipped with proof.")')) === true);
   await evaluate('location.hash = "#evidence"');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
   // Cards sit two across: the sign-off pair first (update 5, then update 6), then Other with update 2 under its own head.
@@ -2226,7 +2226,7 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   assert.deepEqual(await evaluate('[document.querySelector(\'#nav a[href="#waiting"] .n\').textContent, document.querySelectorAll("[id^=item-update-]").length]'), ['0', 0]);
   await evaluate('location.hash = ""');
   await until(async () => (await evaluate('!!document.querySelector(".tile.i-waiting")')));
-  assert.deepEqual(await evaluate('[".i-waiting", ".i-evidence"].map((t) => document.querySelector(`.tile${t} .n`).textContent)'), ['0', '5']);
+  assert.deepEqual(await evaluate('[".i-waiting", ".i-evidence"].map((t) => document.querySelector(`.tile${t} .n`).textContent)'), ['0', '3']);
   for (const [k, result, why] of [['update-1', 'Failed', ''], ['update-6', 'Could not check', 'A picture or recording changed after the run. Ask the agent to run the check again.']]) {
     await evaluate(`location.hash = "#evidence/${k}"`);
     await until(async () => (await evaluate('!!document.querySelector(".ev-item")')));

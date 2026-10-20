@@ -479,7 +479,7 @@ const waitFor = (on: string, filer?: string, key?: string) => (filer ? `Run \`si
   : `Run \`sign-off-axi wait${on}${key ? ` --key ${key}` : ''}\` to block until the user answers`);
 
 /** Still waiting on the user: not answered, not dismissed, and something to answer (an item with no options and no reply is only shown). */
-const waits = (d: Decision & { answer?: unknown; dismissed?: boolean }) => !d.dismissed && awaitsVerdict(d.type, d.answer as { answer?: string } | undefined) && (d.options.length > 0 || !!d.reply || d.type === 'signin' || d.type === 'plan' || d.type === 'design');
+const waits = (d: Decision & { answer?: unknown; dismissed?: boolean }) => d.type !== 'evidence' && !d.dismissed && awaitsVerdict(d.type, d.answer as { answer?: string } | undefined) && (d.options.length > 0 || !!d.reply || d.type === 'signin' || d.type === 'plan' || d.type === 'design');
 /** The board's decisions with their latest answer; a missing board file is an empty board.
  *  A dismissal hides an item from the board and is not waiting here either, checked against the same dismissed log the board reads. */
 function board(file: string, say = warn) {
@@ -501,8 +501,7 @@ function ready(file: string, on: string, root?: string) {
 
 function list(args: string[]) {
   const { file, values, on } = parse('list', args, TIERS);
-  // An evidence update is shown, never an ask: list counts it as waiting on no one.
-  const rows = board(file), waiting = rows.filter((d) => d.type !== 'evidence' && waits(d)), answered = rows.filter((d) => d.answer && !awaitsVerdict(d.type, d.answer) && !d.dismissed).length;
+  const rows = board(file), waiting = rows.filter(waits), answered = rows.filter((d) => d.answer && !awaitsVerdict(d.type, d.answer) && !d.dismissed).length;
   if (values.json) return JSON.stringify({ board: file, decisions: rows.map(({ dismissed, ...d }) => ({ ...d, ...(d.type === 'signin' && { link: undefined }), ...(dismissed && { dismissed }) })) });
   const help = [
     ...(waiting.length ? [`Run \`sign-off-axi open${on}\` to show the board to the user`] : []),
@@ -511,7 +510,7 @@ function list(args: string[]) {
   ];
   const where = tilde(file) + (existsSync(file) ? '' : ' (no file yet; raise creates it)');
   if (values.full) {
-    return toon({ board: where, decisions: rows.map((d) => ({ key: d.key, status: awaitsVerdict(d.type, d.answer) ? (d.dismissed ? 'dismissed' : 'waiting') : d.answer!.answer, title: d.title, about: d.about ?? '', detail: d.detail ?? '',
+    return toon({ board: where, decisions: rows.map((d) => ({ key: d.key, status: awaitsVerdict(d.type, d.answer) ? (d.dismissed ? 'dismissed' : d.type === 'evidence' ? 'shown' : 'waiting') : d.answer!.answer, title: d.title, about: d.about ?? '', detail: d.detail ?? '',
       recommend: d.recommend_value ?? '', default_if_silent: d.default_if_silent ?? '', close: d.close })) }, help);
   }
   return toon({

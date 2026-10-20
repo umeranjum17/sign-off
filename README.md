@@ -172,7 +172,7 @@ the new page on a phone." \
 
 *Proof of a fix, with two captures. Pass, Fail, or Needs work.*
 
-Evidence lists every update, never in **Waiting on you**: a passed run shows a tick, and a plain update that links no run, a failed run or an unchecked run says its honest result, each with its verdicts and Dismiss on the update's own screen. Updates are grouped by the project named in the run's proof line, `verify-<project>: ...` (trimmed, compared without case); a proof line with no such prefix goes under **Other**.
+Evidence lists every update, never in **Waiting on you**: a passed run shows a tick, and a plain update that links no run, a failed run or an unchecked run says its honest result, each with its verdicts and Dismiss on the update's own screen. **Proven today** counts passed updates only. Updates are grouped by the project named in the run's proof line, `verify-<project>: ...` (trimmed, compared without case); a proof line with no such prefix goes under **Other**.
 
 ### Explainer video, with chapters
 

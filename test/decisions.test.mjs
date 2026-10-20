@@ -198,6 +198,7 @@ test('three dismissed updates are not waiting on the CLI either: list and answer
   for (const t of ['Sign-in flow', 'Weekly digest', 'Reports page']) assert.equal(run('post', '--type', 'evidence', '--title', t, '--about', 'Loads in 1 second.', '--media', shot).code, 0);
   // An evidence update, with or without a run receipt, is shown and never an ask: list counts none of the three as waiting.
   assert.match(run('list', board).out, /waiting: 0 of 3 decisions/);
+  assert.match(run('wait', board, '--timeout', '1').out, /nothing is waiting on/);
   // The board dismisses them through its own dismiss call and then shows none of them.
   const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: home, env });
   procs.push(proc);
