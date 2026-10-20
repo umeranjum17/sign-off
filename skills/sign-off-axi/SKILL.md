@@ -44,7 +44,7 @@ The answer comes to you; nobody has to notice it for you.
 
 1. Pick one filer id for yourself: your agent session id, or any short name (1-128 of `A-Z a-z 0-9 . _ -`). With none given, a post saves the Claude Code session id when there is one.
 2. Post every item with `--filer <id>`, or export `SIGN_OFF_FILER=<id>` once for every command.
-3. Right after posting an ask or a plan (an evidence post never waits), run `npx -y sign-off-axi wait --filer <id>` (same board file as the post). It returns every answer to your items you have not taken yet, even one given before you started waiting, and the board then shows **Seen by agent** on that card. Run it again for the next one; `TIMEOUT` means keep waiting, `NOT_FOUND` means none of your items wait.
+3. Right after posting an ask or a plan (an evidence post never waits), run `npx -y sign-off-axi wait --filer <id>` (same board file as the post). It returns every answer to your items you have not taken yet, even one given before you started waiting, and the board then shows **Seen by agent** on that card. It also returns a **Go deeper** tap on your plan or report (answer it as the report section below says). Run it again for the next one; `TIMEOUT` means keep waiting, `NOT_FOUND` means none of your items wait.
 4. If you cannot block, the board owner can set `on_answer: <command>` in the `config.yaml` beside the board: it runs for each answer with the answer as JSON on its stdin, with no shell (so `|` and `>` do nothing; name a script instead), and `npx -y sign-off-axi doctor` checks it can run.
 
 ## Write each card for a 10-second read on a phone
@@ -92,21 +92,22 @@ npx -y sign-off-axi raise --title "Which day should the release ship?" \
   --recommend b --recommend-reason "Both fixes land by Thursday." --default b
 ```
 
-## Evidence proves; a plan or a report explains
+## Evidence proves; a report explains; a plan asks for a go-ahead
 
 - Evidence: proof that a thing works, screens or a clip of the real product (`--type evidence`). It lives in Evidence and is never an ask, so never post proof as a question; a text-only or placeholder picture is refused.
 - Plan: what you mean to do, for the user to approve before you start (`post --kind plan --from plan.json`; `post --help` and the contract in the package docs give the shape). The user approves or changes each section, answers each decision and sends it all back once: wait for it like an ask and read it with `answers --json` (a note per section, a value per decision).
 - Report: an in-depth explainer, only when the user asked for an explanation, or a concept, design or trade-off must be understood. A merge, a PR outcome, a receipt, a verdict or a status note is never a report.
-- A report is a page to tap through, never a text card; text alone is refused. Run `npx -y sign-off-axi report init .sign-off/mocks/<key>`, fill every `FILL:` line, then post with the command it prints.
-- Build it for the reader:
-  - Answer first: the first screen gives the answer in 1 to 3 short plain lines and one picture.
-  - Date it: name the date the facts were true (for example "As of 15 Oct"); never "today", "now" or "this week".
-  - One idea per screen: the answer, then a diagram, then a demo to tap (steps, a slider, before and after, real data), then the detail.
-  - Visual first: draw the idea; words only label the picture.
-  - Progressive disclosure: the detail comes last, folded.
-  - Recognition over recall: keep the steps and terms on screen; never make the reader remember one from earlier.
-  - Phone first: 390 px wide, light and dark, big tap targets, at most 5 lines of text per block, plain words, no internal labels or ids.
-- Open it in a browser 390 px wide and look before posting: mostly text means it is not ready.
+- A report is fields the board draws as one scroll, never a text card and never a page you build. Run `npx -y sign-off-axi report init .sign-off/reports/<key>`, replace every `FILL:` line in `report.json`, then `npx -y sign-off-axi post --kind report --from .sign-off/reports/<key>/report.json --filer <id>`. Text you leave as `FILL:` is refused.
+- A plan is the same, with the questions the person decides: `report init .sign-off/plans/<key> --plan`, fill `plan.json`, `post --kind plan --from <file> --filer <id>`, then `wait --filer <id>`. The person can press **Go ahead** and accept every pick you recommended, so recommend what you would do and say in `quiet` what happens if they stay quiet.
+- Write each part for the reader, in the order the board shows it: *What this is* (the answer and one picture: bars, steps or tiles), *What I understood* (the request in your words, so they can say it is off), *What I found*, *What I recommend* (plans), *What you decide* (plans, at most five questions, each with your pick and why), *Next step*.
+  - Answer first: the heading of the picture is the answer, one plain sentence.
+  - One picture per point; the numbers go in `details`, behind a tap, never in the sentence.
+  - Short lines: `text` one line, `more` the part that opens in place; never a paragraph the reader must scroll.
+  - Plain words for a person who does not write code; no ids, no file paths, no tool names.
+  - Name the date the facts were true if they will go stale.
+- The board shows who read each part and when, and a **Go deeper** control under every part. When the person taps it, `wait --filer <id>` returns the ask (the part, and a question if they typed one), or run `npx -y sign-off-axi deeper <board> --filer <id>` to list the open ones. Answer in plain words, a few lines at a time: `npx -y sign-off-axi deeper <board> --id <id> --text "<what you found>" --more` for each piece, then once without `--more` to finish. The board streams each piece into the spot they tapped. Never answer with a long essay: say less, they can ask a follow-up.
+- Open the board at 390 px wide and look before you tell the person it is there: the first screen must give the answer and the picture.
+- Only if you must keep an HTML page of your own (a demo to tap), run `report init <folder> --page` and post it with `--type report --view --preview`.
 
 ## Ask the user to sign in
 
