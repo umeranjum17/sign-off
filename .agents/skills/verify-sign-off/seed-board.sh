@@ -51,9 +51,6 @@ so post "$board" --key ship --title "When should the new settings page ship?" --
 sed -E "s/\"filed\": *\"[^\"]*\"/\"filed\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"/" "$f/report.v2/valid-full.json" > "$dir/report-now.json"
 so post "$board" --kind report --from "$dir/report-now.json" || \
   so post "$board" --type report --title "Sign-in now takes 2 steps" --about "Why the code step moved first." --view page/index.html --preview page/preview.svg
-# The guided plan and report: one scroll with a picture, a Go deeper under each part and a read receipt per part.
-so post "$board" --kind plan --from "$f/plan.v2/valid-full.json"
-so post "$board" --kind report --from "$f/report.v3/valid-full.json"
 so post "$board" --key digest-old --title "Send the digest on Mondays?" --why "Choose the weekly digest schedule." --outcome yes="The digest goes out Mondays." --outcome no="The digest is paused." --recommend yes --recommend-reason "A weekly update stays useful." --default yes
 
 timeout "${SEED_SERVE_SECONDS:-1800}" node "$repo/dist/cli.js" serve "$board" --port 0 --evidence-root "$dir" > "$dir/serve.log" 2>&1 &
