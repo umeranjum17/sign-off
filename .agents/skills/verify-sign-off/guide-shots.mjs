@@ -41,10 +41,16 @@ const cli = (...args) => run(join(app, 'node_modules/.bin/sign-off-axi'), args, 
 writeFileSync(join(records, 'install.txt'), `${tarball}\n${cli('--version')}`);
 
 // 2. The skill and the installed CLI agree: every command the skill teaches for plans and reports exists in the package.
-const skill = readFileSync(join(repo, 'skills/sign-off-axi/SKILL.md'), 'utf8');
-for (const cmd of ['report init', 'deeper', 'wait --filer']) assert.ok(skill.includes(cmd), `the skill teaches ${cmd}`);
-assert.match(cli('--help'), /deeper/);
-assert.match(cli('deeper', '--help'), /Go deeper/);
+const skill = readFileSync(join(pkg, 'skills/sign-off-axi/SKILL.md'), 'utf8');
+for (const cmd of ['report init', 'deeper', 'wait --filer', 'owner <board> --ack <id>']) assert.ok(skill.includes(cmd), `the packaged skill teaches ${cmd}`);
+const deeperHelp = cli('deeper', '--help'), ownerHelp = cli('owner', '--help');
+for (const label of ['Ask a question', 'Go deeper', 'Simplify this', 'Show an example', 'Why?']) {
+  assert.ok(skill.includes(label), `the packaged skill teaches ${label}`);
+  assert.ok(deeperHelp.includes(label), `installed help teaches ${label}`);
+}
+assert.ok(skill.includes('deeper <board> --filer <id> --id <id> --text'), 'active reply example carries its required filer');
+for (const flag of ['--filer', '--host', '--session', '--cwd', '--model', '--dispatch', '--ack']) assert.ok(ownerHelp.includes(flag), `installed owner help supports ${flag}`);
+writeFileSync(join(records, 'package-agreement.txt'), 'PASS: packaged skill and installed CLI agree on all presets, owner registration/acknowledgement and active replies.\n');
 
 // 3. Author with report init: the scaffolds are for filling, and posting one unfilled is refused.
 const draft = join(app, 'drafts');
