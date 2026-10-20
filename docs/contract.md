@@ -93,7 +93,7 @@ An explainer the person reads: made when they asked for an explanation, or when 
 
 - Required: the common fields, `about`, `filed` (a real UTC date and time, exactly `YYYY-MM-DDTHH:MM:SSZ` with seconds 00-59, such as `2026-10-13T07:19:00Z`), `view` and `preview`.
 - `view`: the page, a relative `.html` path of 1-256 characters with no `..`, `?`, `#` or `\`. `preview`: its picture on the card, `.svg`, `.png`, `.jpg`, `.jpeg` or `.webp`, in the same folder. `post` reads both from the board file's folder (as `--view` does), where symlinks are followed and the real path must stay inside it, each a file of 5,000,000 bytes or fewer; `validate` checks only their shape, as it does a plan's `view`.
-- The page is filled in the shape `sign-off-axi report init <folder>` writes: no `FILL:` line left (in the picture either), a viewport tag, a dark mode (`prefers-color-scheme`), a picture or diagram, something to tap or slide (a button, input or select), its detail folded in `<details>`, nothing loaded from the web, and no paragraph or list item over 240 characters (about five lines on a phone). The first rule a page breaks refuses it with one fix line.
+- The page is filled in the shape `sign-off-axi report init <folder> --page` writes: no `FILL:` line left (in the picture either), a viewport tag, a dark mode (`prefers-color-scheme`), a picture or diagram, something to tap or slide (a button, input or select), its detail folded in `<details>`, nothing loaded from the web, and no paragraph or list item over 240 characters (about five lines on a phone). The first rule a page breaks refuses it with one fix line.
 - Optional: `group` (text, 1-40), `decided` (text, 1-200), `form` (`diagram`, `chart` or `before-after`: the line icon on its Reports row), `video` (text, 1-10, the length of its narrated video such as `0:28`) and `asked_by` (text, 1-40, such as `You asked` or `Docs agent`). With any of these the row's line reads `Diagram · Interactive · Video 0:28 · You asked, 11:58`; with none it reads `Report · 11:58`.
 - Schema 1, a report of text only, is refused with the fix line naming `sign-off-axi report init <folder>`. A schema 1 report already on a board still loads and is not checked again; the board folds it under Notes, never as a report card.
 - `post --type report --title --about --view --preview` posts the same message from flags, with `filed` set to the time of the first post.
@@ -101,7 +101,7 @@ An explainer the person reads: made when they asked for an explanation, or when 
 
 ### report, schema 3
 
-The default report: the board draws it, so the agent writes no page. One scroll, in the order *What this is* (one picture), *What I understood*, *What I found*, *Next step*; the numbers and the longer answers open in place. `post --kind report --from <file>` posts it. Shows in Reports and explainers, and opens over the whole board. It takes no answer; if the person says the understanding is off, that reaches the agent as a comment.
+The default report: the board draws it, so the agent writes no page. One scroll, in the order *What this is* (one picture), *What I understood*, *What I found*, *Next step*; the numbers and the longer answers open in place. `sign-off-axi report init <folder>` writes `report.json` to fill; `post --kind report --from <folder>/report.json` posts it. Shows in Reports and explainers, and opens over the whole board. It takes no answer; if the person says the understanding is off, that reaches the agent as a comment.
 
 - Required: the common fields, `about`, `filed` (as schema 2), `understood`, `visual`, `sections` (1 to 6) and `next`. Optional: `group` (text, 1-40), `decided` (text, 1-200) and `asked_by` (text, 1-40).
 - `understood`: 1 to 6 objects of exactly `label` (text, 1-40) and `text` (text, 1-240): the request in the agent's words, so the person can see it was understood.
@@ -124,7 +124,7 @@ An agent's plan the person reviews before the work starts: each section approved
 
 ### plan, schema 2
 
-The default plan: the board draws it, in the shape of a schema 3 report with the plan's own questions. One scroll: *What this is*, *What I understood*, *What I found*, *What I recommend*, *What you decide*, *Next step*. On a desk a rail beside it holds the parts and **Your answers** with **Go ahead**; on a phone a progress bar and a **Go ahead** bar stay in reach. **Go ahead** accepts the agent's picks: nothing is required.
+The default plan: the board draws it, in the shape of a schema 3 report with the plan's own questions; `sign-off-axi report init <folder> --plan` writes `plan.json` to fill. One scroll: *What this is*, *What I understood*, *What I found*, *What I recommend*, *What you decide*, *Next step*. On a desk a rail beside it holds the parts and **Your answers** with **Go ahead**; on a phone a progress bar and a **Go ahead** bar stay in reach. **Go ahead** accepts the agent's picks: nothing is required.
 
 - Required: the common fields, `about`, `understood`, `visual`, `sections` (0 to 6), `decisions` (0 to 5) and `next`, each as in report schema 3. Optional: `project` (text, 1-40).
 - `decisions`: as in schema 1 (`key`, `question`, `why`, `options` with `outcome`, `recommend`, `reason`), without `after`, and with `quiet` (text, 1-160): what the agent does when the person stays quiet.
