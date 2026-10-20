@@ -2230,7 +2230,7 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   doc.items.push({ key: 'update-5', type: 'evidence', number: 5, title: 'Sign-in, plain update', about: 'Umer checks the plain update.', filed: new Date(Date.now() + 1000).toISOString(),
     link: 'https://github.com/umeranjum17/sign-off/pull/13', media: [{ path: 'evidence/4/1.png', sha256: hash, bytes: wideBytes.length }] });
   // A run whose capture changed after it ran cannot be checked, so its update shows that instead of a pass.
-  doc.items.push({ key: 'update-6', type: 'evidence', number: 6, title: 'A capture changed after the run', about: outcome, filed: new Date().toISOString(), evidence: link(runs[3]) });
+  doc.items.push({ key: 'update-6', type: 'evidence', number: 6, title: 'A capture changed after the run', about: outcome, filed: new Date(Date.now() - 23 * 3_600_000).toISOString(), evidence: link(runs[3]) });
   // Evidence filed over a day ago archives by itself: update-1 was restored (a log line keeps it), update-7 was not.
   doc.items.push({ key: 'update-7', type: 'evidence', number: 7, title: 'Sign-in, last week', about: 'Umer checked it last week.', filed: old.toISOString(), media: [{ path: 'evidence/4/1.png', sha256: hash, bytes: wideBytes.length }] });
   writeFileSync(file, JSON.stringify(doc));
@@ -2248,20 +2248,20 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   const at = (i) => new Date(doc.items[i - 1].filed);
   // Evidence lists every update, newest first, each with its own honest result: only a passed run shows the tick, and an update with no run says so.
   const passed = ['m9 12 2 2 4-4', 1], failed = ['m9 9 6 6m0-6-6 6', 1];
-  assert.deepEqual(await evaluate(cards), [['item-update-5', 'Sign-in, plain update', 'Not run', '', 1], ['item-update-6', outcome, 'Could not check', 'M12 7v6', 0],
-    ['item-update-4', outcome, 'Passed', ...passed], ['item-update-3', outcome, 'Passed', ...passed], ['item-update-1', outcome, 'Failed', ...failed], ['item-update-2', outcome, 'Passed', ...passed]]);
+  assert.deepEqual(await evaluate(cards), [['item-update-5', 'Sign-in, plain update', 'Not run', '', 1],
+    ['item-update-4', outcome, 'Passed', ...passed], ['item-update-3', outcome, 'Passed', ...passed], ['item-update-6', outcome, 'Could not check', 'M12 7v6', 0], ['item-update-1', outcome, 'Failed', ...failed], ['item-update-2', outcome, 'Passed', ...passed]]);
   for (const n of [4, 3, 2]) assert.equal(await evaluate(`document.getElementById("item-update-${n}").querySelector(".m > span:last-child").textContent`), `Today, ${clock(at(n))}`, `update ${n}`);
   // The two sign-off proof lines differ only in case and share one head; a capture with no run takes the project of the repository it links, and the passed update that names none goes under Other, last.
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".sec-head h2")].map((h) => h.textContent)'), ['sign-off', 'Other']);
   assert.equal(await evaluate('document.querySelector(\'#nav a[href="#evidence"] .n\').textContent'), '6');
-  // Today's glance and Proven today tile count every update filed today, including update 5 with no run.
+  // Today's glance and Proven today tile count every update filed in the last 24 hours (update 6 was filed 23 hours ago, maybe yesterday), including update 5 with no run.
   await evaluate('location.hash = ""');
   await until(async () => (await evaluate('document.querySelector(".glance")?.textContent.includes("5 updates filed.")')) === true);
   assert.equal(await evaluate('document.querySelector(".tile.i-evidence .n").textContent'), '5');
   await evaluate('location.hash = "#evidence"');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
-  // Cards sit two across: the sign-off pair first (update 5, then update 6), then Other with update 2 under its own head.
-  const boxes = `[5, 6, 2].map((n) => { const r = document.getElementById(\`item-update-\${n}\`).getBoundingClientRect(); return { n, top: r.top, left: r.left, right: r.right, bottom: r.bottom }; })`;
+  // Cards sit two across: the sign-off pair first (update 5, then update 4), then Other with update 2 under its own head.
+  const boxes = `[5, 4, 2].map((n) => { const r = document.getElementById(\`item-update-\${n}\`).getBoundingClientRect(); return { n, top: r.top, left: r.left, right: r.right, bottom: r.bottom }; })`;
   const [five, six, two] = await evaluate(boxes);
   assert.ok(five.top === six.top && six.left > five.right, 'the sign-off pair shares the first row, newest on the left');
   assert.ok(two.top > five.bottom && two.left === five.left, 'Other comes last, under its own head');

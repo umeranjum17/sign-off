@@ -2073,8 +2073,9 @@
     for (const d of [...state.decisions].reverse()) if (!gone.has(d.key) && !merged.has(d.key) && !lapsed(d)) by[area(d)].push(d);
     by.evidence.sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
     by.designs = [...state.decisions].reverse().filter((d) => d.kind === 'design' && !gone.has(d.key));
-    // Proven today counts every update filed today that is not dismissed, answered or not: a verdict moves it off Evidence, not out of today's count.
-    by.provenToday = filedToday(state.decisions.filter((d) => d.type === 'evidence' && !gone.has(d.key))).sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
+    // Proven today counts every update filed in the last 24 hours that is not dismissed, answered or not: a verdict moves it off Evidence, not out of the count.
+    // It is the window Evidence archives after, so an update Evidence shows from last evening is counted too (only a restored or read-only board's older updates differ).
+    by.provenToday = state.decisions.filter((d) => d.type === 'evidence' && !gone.has(d.key) && Date.now() - Date.parse(d.filed) <= 864e5).sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
     // Waiting on you reads newest first unless the viewer chose oldest first. A sign-in blocks someone now, so sign-ins come first either way.
     let latest = -Infinity;
     const inFileOrder = by.waiting.slice().reverse().map((d, i) => { const t = Date.parse(d.filed); if (!Number.isNaN(t)) latest = t; return { d, t: latest, i }; });
