@@ -577,7 +577,6 @@ test('an interactive page that posts its height gets a frame that fits it, each 
   const sized = `[...document.querySelectorAll("iframe[title^='Interactive page']")].map((f) => f.style.height ? f.title : void f.scrollIntoView()).filter(Boolean).sort().join()`;
   await until(async () => (await evaluate(sized)) === 'Interactive page: huge,Interactive page: short');
   const dom = await evaluate('document.documentElement.outerHTML');
-  close();
   const frame = (key) => new RegExp(`<iframe[^>]*title="Interactive page: ${key}"[^>]*>`).exec(dom)?.[0];
   assert.match(frame('short'), /style="height: 240px;"/);
   assert.match(frame('huge'), /style="height: 10000px;"/);
@@ -594,6 +593,7 @@ test('an interactive page that posts its height gets a frame that fits it, each 
     [['Calm', 'http://100.64.0.1:4430/#/o/1/play'], ['Bold', 'http://100.64.0.1:4430/#/o/2/play']]);
   assert.match(dom, /<p class="tradeoff"[^>]*><strong>Trade-off <\/strong>B reads best\.<\/p>/);
   assert.ok(figures.every((f) => !f.includes('first-draft')));
+  close();
   proc.kill();
 });
 

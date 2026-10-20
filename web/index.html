@@ -2013,12 +2013,12 @@
     const quiet = opts.find((o) => o.value === d.default_if_silent);
     const silent = quiet ? [icon('clock'), el('span', {}, el('b', {}, 'If you stay quiet:'), ` ${quiet.outcome ?? quiet.label}${d.silent_by ? ` At ${when(d.silent_by)}. ${left(d.silent_by)}.` : ''}`)] : '';
     const head = el('div', { class: 'lead' }, badge(d), el('h2', { dir: 'auto' }, headline(d)));
-    const why = unchecked(d) || d.why || d.tradeoff || d.about;
+    const why = unchecked(d) || d.why || (d.tradeoff && firstDraft(d).text) || d.about;
     const back = el('a', { class: 'later', href: '#waiting' }, 'Later'), gone = xBtn(d, 'Dismiss');
     if (gone) gone.addEventListener('click', () => (location.hash = to));
     const page = el('section', { class: 'decide' }, hero || (preview ? el('div', { class: 'decide-preview' }, preview) : ''),
       ...(d.mocks?.length ? [annotations(d)] : []), head,
-      why ? el('p', { class: 'why', dir: 'auto' }, why) : '',
+      why ? el('p', { class: 'why', dir: 'auto' }, why) : '', firstDraftLinks(d),
       ...(live && opts.length ? [el('p', { class: 'pick-label' }, typeOf(d) === 'yes-no' ? 'YES OR NO' : 'PICK ONE'),
         el('ul', { class: 'pick-list', 'aria-label': d.title }, ...optionButtons.map((b) => el('li', {}, b)))] : []),
       err,
