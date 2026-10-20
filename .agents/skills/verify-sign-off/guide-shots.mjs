@@ -202,7 +202,7 @@ try {
     assert.equal(answer.filer, plan.filer); assert.equal(answer.done, true); assert.ok(answer.text.trim()); assert.equal(answer.seen, undefined);
     browser('open', url); drive('await wait(".gd-sec");'); browser('open', url); drive('await wait(".gd-sec");');
     assert.equal((await state()).deeper.find(a => a.id === ask.id).seen, undefined, 'reload must not clear unseen answers');
-    drive('await page.eval(() => { document.querySelector(".gd-scroll").style.scrollBehavior = "auto"; document.querySelector(\'[data-part="next"] > .gd-ans\').scrollIntoView({block:"center"}); });');
+    drive('await wait(\'[data-part="next"] .gask:not(.live)\'); await page.eval(() => { const s = document.querySelector(".gd-scroll"), p = document.querySelector(\'[data-part="next"] > .gd-ans\'), bar = document.querySelector(".gd-bar"); s.style.scrollBehavior = "auto"; p.scrollIntoView({block:"center"}); const floor = bar?.getClientRects().length ? bar.getBoundingClientRect().top : s.getBoundingClientRect().bottom; s.scrollTop += Math.max(0, p.getBoundingClientRect().bottom - floor + 16); });');
     capture(`${kind}-simplify-new`, 'The owning agent filled the answer in place; the fresh answer is marked New.');
     drive('await nap(2400);');
     assert.equal((await state()).deeper.find(a => a.id === ask.id).seen, answer.answerRevision);

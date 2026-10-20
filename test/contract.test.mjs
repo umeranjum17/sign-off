@@ -709,7 +709,7 @@ test('a guided plan and report: report init writes them to fill, post refuses FI
       assert.equal(posted.status, 0, posted.stdout);
       const d = (await state()).decisions.find(d => d.key === key), before = readFileSync(board, 'utf8');
       const request = { version: 1, id: `request-${kind}`, key, ...d.engagement, part: 'understood', action: 'simplify' };
-      for (const bad of [{ ...request, revision: '0'.repeat(64) }, { ...request, filer: 'other' }, { ...request, part: 'found:0:extra' }, { ...request, surprise: true }, { ...request, selection: { field: 'understood.0.text', start: 0, end: 1, quote: 'wrong' } }]) {
+      for (const bad of [{ ...request, revision: '0'.repeat(64) }, { ...request, filer: 'other' }, { ...request, part: 'found:0:extra' }, { ...request, part: 7 }, { ...request, surprise: true }, { ...request, selection: { field: 'understood.0.text', start: 0, end: 1, quote: 'wrong' } }]) {
         assert.equal((await post('engagement', bad)).status, 409);
         assert.ok(!(await state()).deeper.some(a => a.id === request.id));
       }
