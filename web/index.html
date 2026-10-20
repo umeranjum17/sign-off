@@ -184,8 +184,9 @@
   #reader header .change-link svg { width: 1.5rem; height: 1.5rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   #reader header h1 { margin: 0; min-width: 0; overflow: hidden; font-size: 1rem; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
   #reader iframe { flex: 1; width: 100%; border: 0; background: var(--bg); }
-  #reader h1:not(:focus-visible) { outline: none; }
-  #reader h1:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* A title takes the focus from script when a screen opens; it shows a ring only when the last input was a key. */
+  h1[tabindex="-1"] { outline: none; }
+  html[data-kbd] h1[tabindex="-1"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   /* A report reads as a page of its own: what it is and when, its title in large type, what it says, then its page in a tile. */
   #reader .design-review h1 { margin: 0.75rem auto; font-size: 2.125rem; line-height: 1.1765; font-weight: 700; letter-spacing: 0.011em; white-space: normal; overflow: visible; }
   #reader .read { flex: 1; min-height: 0; overflow: auto; padding: 0 1.25rem 2rem; }
@@ -2137,6 +2138,8 @@
     // A browser will not open a data: link in a new tab; the inline preview is the copy.
     document.querySelectorAll('#board a[href^="data:"]').forEach((a) => a.removeAttribute('href'));
   }
+  addEventListener('keydown', () => (document.documentElement.dataset.kbd = ''), true);
+  addEventListener('pointerdown', () => delete document.documentElement.dataset.kbd, true);
   // A new screen starts at its top, or at the item tapped on the Summary, with the focus on its title.
   // Closing a report or plan goes back to its card, with the focus on its link; an open report takes the focus on its title.
   addEventListener('hashchange', () => {
