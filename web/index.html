@@ -195,7 +195,7 @@
   #reader .read h1 { margin-top: 0.75rem; margin-bottom: 0.75rem; font-size: 2.125rem; line-height: 1.1765; font-weight: 700; letter-spacing: 0.011em; white-space: normal; overflow: visible; }
   #reader .read .about { margin-bottom: 1rem; font-size: 1.25rem; line-height: 1.4; }
   #reader .read .decided { margin-bottom: 1.25rem; }
-  #reader .read iframe { display: block; width: 100%; height: max(30rem, calc(100dvh - 8rem)); border-radius: 1rem; background: var(--surface); }
+  #reader .read iframe { display: block; width: 100%; max-width: none; height: 1px; flex: none; border-radius: 1rem; background: var(--surface); }
   .i-plan { --area: var(--c-waiting); }
   #reader .plan-scroll { flex: 1; min-height: 0; overflow: auto; padding: 1.25rem 1.25rem 9rem; }
   .plan-layout { max-width: 72rem; margin: auto; display: grid; gap: 2rem; }
@@ -235,7 +235,7 @@
   .plan-decision .tag { display: block; color: var(--accent); font-size: 0.875rem; }
   .plan-explain .foot { justify-content: space-between; }
   /* The plan page as designed: the diagram alone in a tile, the explainer inside its section, each decision under the section it follows. */
-  .plan-diagram { margin: 1.25rem 0; padding: 1rem; border-radius: 1.125rem; background: var(--surface); }
+  .plan-diagram { margin: 1.25rem 0; padding: 0; border-radius: 1.125rem; background: var(--surface); }
   #reader .plan-view { height: 9.5rem; border-radius: 0; background: none; } @media (min-width: 60rem) { #reader .plan-view { height: 11rem; } }
   .plan-h { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 0.75rem; }
   .plan-h small { color: var(--muted); font-size: 0.9375rem; font-weight: 400; }
@@ -2641,11 +2641,12 @@
     ((back && item?.querySelector('h3 a, .open-link, a.compact')) || document.querySelector('#board h1')).focus({ preventScroll: true });
   });
   // An interactive page may post its own height, `{ height: <px> }`, and its frame then fits it with no blank below.
-  // Only a frame's own message sizes that frame, and never past 10000px.
+  // Only a frame's own message sizes it. Document readers must fit even long pages; previews stay capped.
   addEventListener('message', (e) => {
     const frame = [...document.querySelectorAll('.rung iframe, iframe.plan-view, #reader .read iframe')].find((f) => f.contentWindow === e.source), h = e.data?.height;
-    if (frame?.classList.contains('plan-view') && e.data?.['sign-off'] === 'ready') frame.contentWindow.postMessage({ 'sign-off': 'size' }, '*');
-    if (frame && Number.isFinite(h) && h > 0) frame.style.height = `${Math.ceil(Math.min(h, 10_000))}px`;
+    const documentFrame = frame?.matches('iframe.plan-view, #reader .read iframe');
+    if (documentFrame && e.data?.['sign-off'] === 'ready') frame.contentWindow.postMessage({ 'sign-off': 'size' }, '*');
+    if (frame && Number.isFinite(h) && h > 0) frame.style.height = `${Math.ceil(documentFrame ? h : Math.min(h, 10_000))}px`;
   });
   // A design mock page may point (web/point.js): the board keeps the last element named per mock, and turns pointing on for one mock frame.
   const pointing = new Map(), pointed = new Map();

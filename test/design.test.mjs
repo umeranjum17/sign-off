@@ -601,6 +601,67 @@ test('an interactive page that posts its height gets a frame that fits it, each 
   proc.kill();
 });
 
+test('report and plan documents use one page scroll and the available width at 390 and 1280', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'document-scroll'), file = join(dir, 'board.json');
+  mkdirSync(join(dir, 'page'), { recursive: true });
+  // A real sandboxed document reports its geometry; the board cannot inspect its opaque origin.
+  writeFileSync(join(dir, 'page', 'index.html'), readFileSync(new URL('../fixtures/contract/plan.v1/page/index.html', import.meta.url), 'utf8') + `<style>body{margin:0;font:18px sans-serif}p{margin:0;padding:20px}</style>
+    ${'<p>A long public release note, with enough text to wrap on a phone.</p>'.repeat(220)}
+    <script>
+    const measure = () => parent.postMessage({documentGeometry: {
+      height: document.documentElement.scrollHeight, width: document.documentElement.scrollWidth,
+      viewport: innerHeight, inner: [...document.querySelectorAll('body *')].filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1).length
+    }}, '*');
+    new ResizeObserver(measure).observe(document.body); addEventListener('resize', measure);
+    addEventListener('message', e => { if(e.source === parent && e.data === 'grow') { document.body.insertAdjacentHTML('beforeend', '<p style="height:700px">Late content</p>'); measure(); } });
+    measure(); setInterval(measure, 200);</script>`);
+  const plan = JSON.parse(readFileSync(new URL('../fixtures/contract/plan.v1/valid-full.json', import.meta.url), 'utf8'));
+  writeFileSync(join(dir, 'plan.json'), JSON.stringify(plan));
+  assert.equal(run('post', file, '--kind', 'plan', '--from', join(dir, 'plan.json')).code, 0);
+  const stored = JSON.parse(readFileSync(file, 'utf8'));
+  stored.items.push({ contract: 1, kind: 'report', schema: 2, key: 'release', title: 'Latest stable build: muxr 0.2.8', view: 'page/index.html', preview: 'page/preview.svg', filed: new Date().toISOString() });
+  writeFileSync(file, JSON.stringify(stored));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const exported = join(dir, 'board.html');
+  assert.equal(run('export', file, '--out', exported).code, 0);
+  const copyServer = createHttpServer((_req, res) => { res.setHeader('content-type', 'text/html'); res.end(readFileSync(exported)); });
+  await new Promise(ok => copyServer.listen(0, '127.0.0.1', ok));
+  after(() => new Promise(ok => copyServer.close(ok)));
+  for (const base of [url, `http://127.0.0.1:${copyServer.address().port}/`]) for (const width of [390, 1280]) {
+    const { evaluate, close } = await browse(dir, width, 844);
+    try {
+      await evaluate(`location.href = ${JSON.stringify(base)}`);
+      await until(() => evaluate('!!window.state || !!document.querySelector("#board h1")'));
+      await evaluate(`addEventListener('message', e => { if(e.source === document.querySelector('#reader iframe')?.contentWindow && e.data?.documentGeometry) window.geometry = e.data.documentGeometry; })`);
+      for (const hash of ['#reports/release', '#waiting/plan-kind-board']) {
+        await evaluate(`window.geometry = null; location.hash = ${JSON.stringify(hash)}`);
+        await until(() => evaluate('!!window.geometry'));
+        // Wait for the two-way size handshake, then assert rather than hide failure in a polling timeout.
+        await evaluate('new Promise(r => setTimeout(r, 300))');
+        const layout = () => evaluate(`(() => {
+          const frame = document.querySelector('#reader iframe'), page = frame.closest('.read, .plan-main'), rect = frame.getBoundingClientRect(), s = getComputedStyle(page);
+          const scrollers = [...document.querySelectorAll('#reader *')].filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1);
+          return { ...window.geometry, frameHeight: frame.clientHeight, frameWidth: rect.width,
+            available: page.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight), scrollers: scrollers.map(e => e.className) };
+        })()`);
+        let got = await layout();
+        assert.ok(got.frameHeight >= got.height - 1, `${width} ${hash}: nested document scroll ${JSON.stringify(got)}`);
+        assert.ok(got.frameWidth >= got.available - 1, `${width} ${hash}: narrow document frame ${JSON.stringify(got)}`);
+        assert.ok(got.width <= got.frameWidth + 1 && got.inner === 0, JSON.stringify(got));
+        assert.deepEqual(got.scrollers, [hash.includes('reports') ? 'read' : 'plan-scroll']);
+        const previous = got.frameHeight;
+        await evaluate(`document.querySelector('#reader iframe').contentWindow.postMessage('grow', '*')`);
+        await until(async () => (await layout())?.frameHeight > previous + 600);
+        got = await layout();
+        assert.ok(got.frameHeight >= got.height - 1, JSON.stringify(got));
+      }
+    } finally { close(); }
+  }
+  proc.kill();
+});
+
 test('pointing at a design mock: the board turns it on for a frame, a tap comes back as a reference that finds the element again, and a message from another frame is ignored', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'point'), file = join(dir, 'board.json');
   mkdirSync(join(dir, 'mocks'), { recursive: true });

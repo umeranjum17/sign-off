@@ -2057,7 +2057,8 @@ async function exportBoard(args: string[]) {
   const inline = async (url: string, query?: string) => {
     const [code, body] = await route({ method: 'GET', url } as IncomingMessage).catch((): [number, unknown] => [404, null]);
     if (code !== 200) { missing++; return; }
-    const { media, type } = body as { media: Buffer; type: string };
+    const { media: bytes, type, point } = body as { media: Buffer; type: string; point?: boolean };
+    const media = point ? Buffer.concat([bytes, pointer]) : bytes;
     // A data: URL keeps a one-page mock's query where the mock page reads it, but also appends it to the page text: a trailing comment hides it.
     files[url] = query && type === 'text/html' ? `data:text/html;charset=utf-8,${q(media.toString())}%3C!--?${query}` : `data:${type};base64,${media.toString('base64')}`;
   };
@@ -2291,8 +2292,8 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
       if (!mock || !type) return [404, { error: 'Mock is unavailable' }];
       const actual = under(dirname(under(dirname(file), mockFile(mock))), path);
       if (statSync(actual).size > MOCK_BYTES) return [404, { error: 'Mock is unavailable' }];
-      // A design mock page, and a plan's page, get the pointing bridge when served; export inlines the page as written.
-      return [200, { media: readFileSync(actual), type, point: (Boolean(value) || d!.type === 'plan') && type === 'text/html' }];
+      // Every HTML view gets the bridge: document readers need its size handshake too.
+      return [200, { media: readFileSync(actual), type, point: type === 'text/html' }];
     } catch { return [404, { error: 'Mock is unavailable' }]; }
   }
   if (req.method === 'GET' && req.url?.startsWith('/api/evidence?')) {
