@@ -218,12 +218,14 @@ test('evidence a day old archives on its own, stays in the file, and restore kee
   const filed = (hours) => new Date(Date.now() - hours * 3_600_000).toISOString();
   const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
   const proof = (key, hours, n) => ({ key, type: 'evidence', title: key, about: 'Umer checked it.', filed: filed(hours), number: n, media: [{ path: `evidence/${n}/1.png`, sha256: 'a'.repeat(64), bytes: png.length }] });
-  const items = [proof('old-proof', 25, 1), proof('new-proof', 23, 2), { key: 'old-ask', type: 'decision', title: 'Keep the digest?', options: yesNo, filed: filed(48) }];
+  const items = [proof('old-proof', 25, 1), proof('new-proof', 23, 2), { key: 'old-ask', type: 'decision', title: 'Keep the digest?', options: yesNo, filed: filed(48) },
+    // A report archives like an update: the one dated a day back leaves, the one filed now stays (the CLI lists a report as open, though it asks nothing); a seeded board must date its reports now.
+    ...[['old-report', 25], ['new-report', 1]].map(([key, hours]) => ({ contract: 1, kind: 'report', schema: 2, key, title: key, about: 'Umer read it.', filed: filed(hours), view: 'page/index.html', preview: 'page/preview.svg' }))];
   writeFileSync(file, JSON.stringify({ schema: 2, items }));
   const status = () => Object.fromEntries(run('list', file, '--full').out.split('\n').map((l) => l.trim().split(',')).filter((c) => c.length > 2 && !c[0].startsWith('decisions')).map(([key, state]) => [key, state]));
-  assert.deepEqual(status(), { 'old-proof': 'dismissed', 'new-proof': 'shown', 'old-ask': 'waiting' });
+  assert.deepEqual(status(), { 'old-proof': 'dismissed', 'new-proof': 'shown', 'old-ask': 'waiting', 'old-report': 'dismissed', 'new-report': 'waiting' });
   assert.match(run('list', file).out, /waiting\[1\]\{key,title\}:\n  old-ask,/);
-  assert.equal(JSON.parse(readFileSync(file, 'utf8')).items.length, 3);
+  assert.equal(JSON.parse(readFileSync(file, 'utf8')).items.length, 5);
   assert.equal(run('restore', 'old-proof', file).code, 0);
   assert.equal(status()['old-proof'], 'shown');
 });
