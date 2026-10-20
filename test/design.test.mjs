@@ -610,7 +610,7 @@ test('report and plan documents use one page scroll and the available width at 3
     <script>
     const measure = () => parent.postMessage({documentGeometry: {
       height: document.documentElement.scrollHeight, width: document.documentElement.scrollWidth,
-      scrollbar: innerWidth - document.documentElement.clientWidth, viewport: innerHeight, inner: [...document.querySelectorAll('body *')].filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1).length
+      scrollbar: innerWidth - document.documentElement.clientWidth, viewport: innerHeight, childViewportWidth: innerWidth, inner: [...document.querySelectorAll('body *')].filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1).length
     }}, '*');
     new ResizeObserver(measure).observe(document.body); addEventListener('resize', measure);
     addEventListener('message', e => { if(e.source === parent && e.data === 'grow') { document.body.insertAdjacentHTML('beforeend', '<p style="height:700px">Late content</p>'); measure(); } });
@@ -638,8 +638,10 @@ test('report and plan documents use one page scroll and the available width at 3
       for (const hash of ['#reports/release', '#waiting/plan-kind-board']) {
         await evaluate(`window.geometry = null; location.hash = ${JSON.stringify(hash)}`);
         await until(() => evaluate('!!window.geometry'));
-        // Wait for the two-way size handshake, then assert rather than hide failure in a polling timeout.
-        await evaluate('new Promise(r => setTimeout(r, 300))');
+        // Observe the child's current viewport, not a message queued before the parent resized its frame.
+        const settled = () => evaluate(`(() => { const f = document.querySelector('#reader iframe');
+          return f?.clientHeight > 1 && window.geometry?.viewport === f.clientHeight && window.geometry?.childViewportWidth === f.clientWidth; })()`);
+        await until(settled);
         const layout = () => evaluate(`(() => {
           const frame = document.querySelector('#reader iframe'), page = frame.closest('.read, .plan-main'), rect = frame.getBoundingClientRect(), s = getComputedStyle(page);
           const scrollers = [...document.querySelectorAll('#reader *')].filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1);
@@ -656,8 +658,12 @@ test('report and plan documents use one page scroll and the available width at 3
         const previous = got.frameHeight;
         await evaluate(`document.querySelector('#reader iframe').contentWindow.postMessage('grow', '*')`);
         await until(async () => (await layout())?.frameHeight > previous + 600);
+        await until(settled);
         got = await layout();
         assert.ok(got.frameHeight >= got.height - 1, JSON.stringify(got));
+        console.log('document-layout', JSON.stringify({ surface: base === url ? 'live' : 'exported',
+          document: hash.includes('reports') ? 'report document' : 'plan document', viewportWidth: width, mobile,
+          growth: got.frameHeight - previous, outerScrollContainers: got.scrollers.length, ...got }));
       }
     } finally { close(); }
   }
