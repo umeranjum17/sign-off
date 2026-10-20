@@ -634,21 +634,26 @@ test('report and plan documents use one page scroll and the available width at 3
     try {
       await evaluate(`location.href = ${JSON.stringify(base)}`);
       await until(() => evaluate('!!window.state || !!document.querySelector("#board h1")'));
-      await evaluate(`addEventListener('message', e => { if(e.source === document.querySelector('#reader iframe')?.contentWindow && e.data?.documentGeometry) window.geometry = e.data.documentGeometry; })`);
+      await evaluate(`addEventListener('message', e => {
+        if(e.source !== document.querySelector('#reader iframe')?.contentWindow) return;
+        if(e.data?.documentGeometry) window.geometry = { source: e.source, value: e.data.documentGeometry };
+        if(Number.isFinite(e.data?.height)) window.sizedSource = e.source;
+      })`);
       for (const hash of ['#reports/release', '#waiting/plan-kind-board']) {
-        await evaluate(`window.geometry = null; location.hash = ${JSON.stringify(hash)}`);
-        await until(() => evaluate('!!window.geometry'));
-        // Observe the child's current viewport, not a message queued before the parent resized its frame.
-        const settled = () => evaluate(`(() => { const f = document.querySelector('#reader iframe');
-          return f?.clientHeight > 1 && window.geometry?.viewport === f.clientHeight && window.geometry?.childViewportWidth === f.clientWidth; })()`);
-        await until(settled);
+        await evaluate(`window.geometry = null; window.sizedSource = null; location.hash = ${JSON.stringify(hash)}`);
+        const selector = hash.includes('reports') ? '#reader .read iframe' : '#reader iframe.plan-view';
+        // Read the settled signal and ALL measured values atomically, bound to this route's actual frame.
         const layout = () => evaluate(`(() => {
-          const frame = document.querySelector('#reader iframe'), page = frame.closest('.read, .plan-main'), rect = frame.getBoundingClientRect(), s = getComputedStyle(page);
+          const frame = document.querySelector(${JSON.stringify(selector)}), signal = window.geometry, g = signal?.value;
+          if (!frame || signal?.source !== frame.contentWindow || window.sizedSource !== frame.contentWindow || frame.clientHeight <= 1
+            || g.viewport !== frame.clientHeight || g.childViewportWidth !== frame.clientWidth) return null;
+          const page = frame.closest('.read, .plan-main'), rect = frame.getBoundingClientRect(), s = getComputedStyle(page);
           const scrollers = [...document.querySelectorAll('#reader *')].filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1);
-          return { ...window.geometry, frameHeight: frame.clientHeight, frameWidth: rect.width,
+          return { ...g, frameHeight: frame.clientHeight, frameWidth: rect.width,
             available: page.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight), scrollers: scrollers.map(e => e.className) };
         })()`);
-        let got = await layout();
+        let got;
+        await until(async () => !!(got = await layout()));
         assert.ok(got.frameHeight >= got.height - 1, `${width} ${hash}: nested document scroll ${JSON.stringify(got)}`);
         assert.ok(got.frameWidth >= got.available - 1, `${width} ${hash}: narrow document frame ${JSON.stringify(got)}`);
         assert.ok(got.width <= got.frameWidth + 1 && got.inner === 0, JSON.stringify(got));
@@ -657,9 +662,10 @@ test('report and plan documents use one page scroll and the available width at 3
         assert.deepEqual(got.scrollers, [hash.includes('reports') ? 'read' : 'plan-scroll']);
         const previous = got.frameHeight;
         await evaluate(`document.querySelector('#reader iframe').contentWindow.postMessage('grow', '*')`);
-        await until(async () => (await layout())?.frameHeight > previous + 600);
-        await until(settled);
-        got = await layout();
+        await until(async () => { const next = await layout();
+          if (!next || next.frameHeight <= previous + 600) return false;
+          got = next; return true;
+        });
         assert.ok(got.frameHeight >= got.height - 1, JSON.stringify(got));
         console.log('document-layout', JSON.stringify({ surface: base === url ? 'live' : 'exported',
           document: hash.includes('reports') ? 'report document' : 'plan document', viewportWidth: width, mobile,
