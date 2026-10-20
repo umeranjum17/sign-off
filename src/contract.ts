@@ -39,7 +39,8 @@ const ACTIONS: Record<string, Record<string, string>> = {
 export const MEDIA_BYTES = 50_000_000;
 /** The command that makes a report's page, named in every refusal of a report without one. */
 export const REPORT_INIT = 'sign-off-axi report init <folder>';
-const PAGE_HELP = `Run \`${REPORT_INIT}\` to make the page, fill it, then post it with "view" and "preview"`;
+const PAGE_HELP = `Run \`${REPORT_INIT} --page\` to make the page, fill it, then post it with "view" and "preview"`;
+const GUIDE_HELP = `Run \`${REPORT_INIT}\` to write report.json, fill every FILL: line, then post it with \`post --kind report --from <folder>/report.json\``;
 
 /** Parses one message; a field written twice in any object refuses it, since plain JSON.parse keeps the last one quietly. */
 export function parseMessage(bytes: Uint8Array): unknown {
@@ -227,7 +228,7 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
   if (want !== undefined && m.kind !== want) throw bad('kind', `is ${m.kind}, not --kind ${want}`, `Pass --kind ${m.kind}, or name the ${want} message file`);
   need('schema');
   if (!whole(m.schema)) throw bad('schema', `must be a whole number, not ${show(m.schema)}`, `Set "schema": ${SCHEMAS[m.kind]}`);
-  if (m.kind === 'report' && m.schema === 1) throw bad('schema', '1 of report is text only: a report must be a page to tap through, with "view" and "preview"', PAGE_HELP);
+  if (m.kind === 'report' && m.schema === 1) throw bad('schema', '1 of report is text only: a report must be a page to tap through, with "view" and "preview"', GUIDE_HELP);
   if (m.schema !== SCHEMAS[m.kind] && !OLDER[m.kind]?.includes(m.schema)) throw bad('schema', `${m.schema} of ${m.kind} is not in this sign-off-axi`, `Upgrade sign-off-axi, or post ${m.kind} schema ${SCHEMAS[m.kind]}`);
   if (g && /FILL:/.test(JSON.stringify(m))) throw bad('message', 'still has FILL: lines from the template', 'Replace every FILL: line with your own words, then post again');
   const fields = guided(m) ? GUIDE_FIELDS[m.kind] : FIELDS[m.kind], extra = Object.keys(m).find((f) => !fields.includes(f));

@@ -1,0 +1,98 @@
+{
+  "contract": 1,
+  "kind": "report",
+  "schema": 3,
+  "key": "FILL: short-id",
+  "title": "FILL: the answer in one line",
+  "filed": "FILL: UTC time",
+  "about": "FILL: why it matters, in 2 sentences",
+  "group": "FILL: section name",
+  "understood": [
+    {
+      "label": "You asked",
+      "text": "FILL: the request in your own words"
+    },
+    {
+      "label": "Done when",
+      "text": "FILL: how the person will know it is finished"
+    }
+  ],
+  "visual": {
+    "type": "bars",
+    "heading": "FILL: the one point the picture makes, in one line",
+    "text": "FILL: what the bars measure and where the number comes from",
+    "unit": "min",
+    "rows": [
+      {
+        "label": "FILL: first thing",
+        "value": 4.5,
+        "note": "FILL: tag",
+        "tone": "bad"
+      },
+      {
+        "label": "FILL: second thing",
+        "value": 2.8,
+        "note": "FILL: tag",
+        "tone": "ok"
+      }
+    ],
+    "details": [
+      {
+        "label": "FILL: a number",
+        "value": "FILL: its value, unit and when it was measured"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "found",
+      "stage": "found",
+      "heading": "FILL: what you found, as a statement",
+      "body": "FILL: one or two lines of lead",
+      "items": [
+        {
+          "title": "FILL: one finding",
+          "text": "FILL: one line",
+          "more": "FILL: the detail that opens when it is tapped",
+          "tone": "bad"
+        },
+        {
+          "title": "FILL: another finding",
+          "text": "FILL: one line",
+          "more": "FILL: the detail",
+          "tone": "ok"
+        }
+      ]
+    },
+    {
+      "id": "steps",
+      "stage": "recommend",
+      "heading": "FILL: what you recommend, as a statement",
+      "body": "FILL: one or two lines of lead",
+      "items": [
+        {
+          "title": "FILL: step or fix",
+          "text": "FILL: one line",
+          "more": "FILL: why, and what it costs"
+        },
+        {
+          "title": "FILL: step or fix",
+          "text": "FILL: one line"
+        }
+      ],
+      "details": [
+        {
+          "label": "FILL: a number",
+          "value": "FILL: value"
+        }
+      ]
+    }
+  ],
+  "next": {
+    "heading": "FILL: the next step, in one line",
+    "lines": [
+      "FILL: what happens after the person reads or answers",
+      "FILL: where the proof will land"
+    ]
+  }
+}

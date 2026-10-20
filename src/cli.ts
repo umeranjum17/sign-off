@@ -41,7 +41,10 @@ examples:
   sign-off-axi post .sign-off/decisions.json --type design --title "Pick the sign-in layout" --option a=A --option b=B --mock a=mocks/a.html --mock b=mocks/b.html --recommend b
   sign-off-axi post .sign-off/decisions.json --type diagram --title "Is this the sign-in flow?" --view mocks/sign-in/flow.svg
   sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "The new sign-in has 2 steps." --media explainer.mp4 --chapter 0:00=Start
-  sign-off-axi report init .sign-off/mocks/sign-in-flow
+  sign-off-axi report init .sign-off/reports/sign-in-flow
+  sign-off-axi post --kind report --from .sign-off/reports/sign-in-flow/report.json
+  sign-off-axi report init .sign-off/plans/sign-in --plan
+  sign-off-axi post --kind plan --from .sign-off/plans/sign-in/plan.json --filer my-session-id
   sign-off-axi deeper
   sign-off-axi post .sign-off/decisions.json --type report --title "Sign-in now takes 2 steps" --about "Why the code step moved first." --view mocks/sign-in-flow/index.html --preview mocks/sign-in-flow/preview.svg
   sign-off-axi post --type signin --key npm-login --service npm --link https://example.com/login --unlocks "Publish the release" --waits "Main" --expires 15m
@@ -94,7 +97,7 @@ examples:
   validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>] [--expect-invalid]
 Checks message files against the communication contract without posting them: ${CONTRACT}
 A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate, finding and design at schema 1, report at schema 3 (schema 2 still passes) and plan at schema 2 (schema 1 still passes).
-A report 3 and a plan 2 are guided pages: fields the board draws as one scroll, no page of your own.
+A report 3 and a plan 2 are guided pages: fields the board draws as one scroll, no page of your own (see report init).
 An evidence message's media paths read from the message file's folder: each file must be there, inside it, and 50 MB or less.
 A report is a page to tap through: its "view" (.html) and "preview" (its picture, beside it) are checked for their shape here; the files themselves are checked at post, from the board file's folder, filled with no FILL: lines left (see report init).
 A plan's "view" (.html) is checked for its shape here; the file itself is checked at post, from the board file's folder.
@@ -271,7 +274,13 @@ examples:
   restore: `usage: sign-off-axi restore <key> [board.json]
 Brings back a card that dismiss hid. See \`sign-off-axi dismiss --help\`.
 `,
-  report: `usage: sign-off-axi report init <folder>
+  report: `usage: sign-off-axi report init <folder> [--plan] [--page]
+Writes the guided template to fill: <folder>/report.json, or <folder>/plan.json with --plan. A file already there is kept.
+The board draws it as one scroll: what this is (the answer and one picture), what I understood, what I found and recommend, what you decide (plans), and the next step.
+Numbers sit behind a Details tap; every part has a Go deeper button that asks you (see \`sign-off-axi deeper --help\`) and a read receipt that shows when the person read it.
+Replace every FILL: line, then post it: post --kind report --from <folder>/report.json, or post --kind plan --from <folder>/plan.json --filer <your id>.
+A report is for an explanation the user asked for, or a concept, design or trade-off they must understand. Proof that something works is evidence.
+--page writes the older scaffold page instead, for a report that needs a page of its own (report schema 2). It is:
 Writes a report page to fill: <folder>/index.html and its card picture <folder>/preview.svg. A file already there is kept.
 The page is one self-contained file, phone first, light and dark, in four parts, each one idea:
   1. the answer in one plain sentence and a picture of it   2. a diagram of how it works
@@ -1105,7 +1114,7 @@ function postReport(file: string, named: string, on: string, values: Record<stri
   const missing = ['title', 'about', 'view', 'preview'].filter((f) => values[f] === undefined).map((f) => `--${f}`);
   if (missing.length) {
     throw fail(`a report is a page to tap through, not text: ${missing.join(' and ').replace(/ and (?=.* and )/g, ', ')} ${missing.length > 1 ? 'are' : 'is'} missing`, 'VALIDATION_ERROR',
-      `Run \`${REPORT_INIT}\` to make the page and its picture, fill them, then post --type report --title "<the answer>" --about "<why it matters>" --view <folder>/index.html --preview <folder>/preview.svg`);
+      `Run \`${REPORT_INIT} --page\` to make the page and its picture, fill them, then post --type report --title "<the answer>" --about "<why it matters>" --view <folder>/index.html --preview <folder>/preview.svg`);
   }
   const key = values.key ?? slug(values.title), had = existsSync(file) ? readItems(file).items.find((i) => i?.key === key) : undefined;
   // Posting the same report again is a no-op, so it keeps the time it was first filed.
@@ -1629,16 +1638,32 @@ function init(args: string[]) {
       `Run \`sign-off-axi doctor ${shellPath(dir)}\` to check the setup`, `Run \`sign-off-axi open ${shellPath(board)}\` to show the board to the user`]);
 }
 
-/** report init <folder>: the scaffold page and its picture, kept when already there, with the post command that names them. */
+/** report init <folder>: the guided template (report.json, or plan.json with --plan) to fill in, or with --page the older scaffold page and its picture. */
 function report(args: string[]) {
   let parsed;
-  try { parsed = parseArgs({ args, allowPositionals: true, strict: true, options: {} }); } catch (e: any) { throw fail(e.message, 'VALIDATION_ERROR', 'Run `sign-off-axi report --help`'); }
-  const [sub, dir, extra] = parsed.positionals;
-  if (sub !== 'init' || dir === undefined || extra !== undefined) {
-    throw fail(sub !== 'init' ? `unknown report command ${sub ?? '(none)'}` : extra !== undefined ? `unexpected argument ${extra}: report init takes one folder` : 'report init needs the folder to write the page in', 'VALIDATION_ERROR', 'sign-off-axi report init .sign-off/mocks/<key>');
+  try { parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { plan: { type: 'boolean' }, page: { type: 'boolean' } } }); } catch (e: any) { throw fail(e.message, 'VALIDATION_ERROR', 'Run `sign-off-axi report --help`'); }
+  const [sub, dir, extra] = parsed.positionals, { plan, page } = parsed.values;
+  if (sub !== 'init' || dir === undefined || extra !== undefined || (plan && page)) {
+    throw fail(sub !== 'init' ? `unknown report command ${sub ?? '(none)'}` : extra !== undefined ? `unexpected argument ${extra}: report init takes one folder` : plan && page ? '--plan and --page do not go together' : 'report init needs the folder to write the template in', 'VALIDATION_ERROR', 'sign-off-axi report init <folder> [--plan]');
   }
   const out = resolve(dir), created: string[] = [], kept: string[] = [];
   mkdirSync(out, { recursive: true });
+  // The board serves a page from its own folder, so the post command names it from there.
+  const board = boardHere(), rel = relative(dirname(board), out).split(sep).join('/'), served = rel && !rel.startsWith('../') && rel !== '..' && !isAbsolute(rel);
+  if (!page) {
+    const kind = plan ? 'plan' : 'report', path = join(out, `${kind}.json`);
+    if (existsSync(path)) kept.push(shellPath(path));
+    else {
+      const filed = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+      writeFileSync(path, readFileSync(new URL(`../web/${kind}-template.json`, import.meta.url), 'utf8').replace('"FILL: UTC time"', JSON.stringify(filed)), { flag: 'wx' });
+      created.push(shellPath(path));
+    }
+    return toon({ folder: shellPath(out), created: created.length ? created : 'nothing new (re-run is a no-op)', kept }, [
+      `Replace every FILL: line in ${kind}.json with your own words: the answer first, one picture (bars, steps or tiles), what you understood, then the sections${plan ? ' and the decisions' : ''}`,
+      'Keep each line short: the board shows it in one scroll, the numbers behind a Details tap and the long answer behind Go deeper',
+      `Run \`sign-off-axi post --kind ${kind} --from ${shellPath(path)}\` to put it on the board`,
+    ]);
+  }
   for (const [name, from] of [['index.html', 'report.html'], ['preview.svg', 'report-preview.svg']]) {
     const path = join(out, name);
     if (existsSync(path)) kept.push(shellPath(path));
@@ -1647,8 +1672,6 @@ function report(args: string[]) {
       created.push(shellPath(path));
     }
   }
-  // The board serves a report's page from its own folder, so the post command names the page from there.
-  const board = boardHere(), rel = relative(dirname(board), out).split(sep).join('/'), served = rel && !rel.startsWith('../') && rel !== '..' && !isAbsolute(rel);
   return toon({ folder: shellPath(out), created: created.length ? created : 'nothing new (re-run is a no-op)', kept }, [
     'Replace every FILL: line: the answer and its picture first, then the diagram, the steps to tap, and the folded detail',
     'Open index.html in a browser 390 px wide and look before posting: mostly text means it is not ready',

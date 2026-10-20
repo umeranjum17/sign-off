@@ -18,7 +18,7 @@ and inherits the calling agent's model routing.
 | `serve` | run the board in the foreground |
 | `export` | freeze the board as one HTML file |
 | `init` | set up a repo and install agent skills |
-| `report` | build an explainer page to post |
+| `report` | write a plan or report to fill and post |
 | `deeper` | answer a Go deeper tap on a plan or report |
 | `signin` | close a sign-in card as done |
 | `dismiss` | hide a card, like its Dismiss button |
