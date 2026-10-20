@@ -10,6 +10,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { get } from 'node:http';
 import { recordsDir } from './records.mjs';
 const out = resolve(process.argv[2] ?? process.env.DONE_DONE_EVIDENCE_ROOT);
 const theme = process.argv[3] ?? process.env.DONE_DONE_THEME ?? 'light', width = +(process.argv[4] ?? process.env.DONE_DONE_WIDTH ?? 390);
@@ -97,7 +98,15 @@ const answerDeeper = (docFile) => {
 };
 try {
   const base = await new Promise((ok, no) => { let log = ''; server.stdout.on('data', (b) => { log += b; const m = /http:\/\/127\.0\.0\.1:\d+\//.exec(log); if (m) ok(m[0]); }); server.once('exit', (code) => no(new Error(`Server exited ${code}`))); });
-  const state = async () => (await fetch(`${base}api/decisions`)).json();
+  // Blocking browser/model children can outlive an undici keep-alive socket. Each probe owns a fresh socket.
+  const state = () => new Promise((ok, no) => {
+    const req = get(`${base}api/decisions`, { agent: false }, res => {
+      let body = ''; res.on('data', b => { body += b; }); res.on('error', no);
+      res.on('end', () => { try { assert.equal(res.statusCode, 200); ok(JSON.parse(body)); } catch (e) { no(e); } });
+    });
+    req.on('error', no); req.setTimeout(10000, () => req.destroy(new Error('Private board readiness probe timed out')));
+  });
+  assert.ok((await state()).decisions.length, 'private board is ready before browser interaction');
   browser('open', base); browser('emulate', '--viewport', width === 390 ? '390x844x2,mobile,touch' : '1280x860x1', '--color-scheme', theme);
   const capture = (name, claim) => {
     const stem = `${name}.${theme}.${width}w`;
