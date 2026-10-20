@@ -1,5 +1,2 @@
-test:
-  instructions: |
-    Run `npm test` (it builds, then runs the whole suite) and nothing else. Do not
-    start a done-done journey or any command that asks a judge model: the journey
-    proof is a separate step run after release.
+commands:
+  test: "npm run build && npm test"
