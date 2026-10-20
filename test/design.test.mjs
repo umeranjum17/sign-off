@@ -563,6 +563,7 @@ test('an interactive page that posts its height gets a frame that fits it, each 
   writeFileSync(join(pages, 'quiet.html'), '<p>no height</p>');
   const item = (key) => ({ key, type: 'interactive', title: key, view: `mocks/page/${key}.html` });
   const look = { key: 'look', type: 'design', title: 'look', options: ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l })), recommend_value: 'b',
+    tradeoff: 'B reads best. Open in first-draft: Calm http://100.64.0.1:4430/#/o/1/play · Bold http://100.64.0.1:4430/#/o/2/play',
     mocks: ['a', 'b', 'c'].map((value) => ({ value, path: 'mocks/page/quiet.html' })) };
   writeFileSync(file, JSON.stringify({ schema: 2, readonly: true, items: [...['short', 'huge', 'quiet'].map(item), look] }));
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
@@ -576,7 +577,6 @@ test('an interactive page that posts its height gets a frame that fits it, each 
   const sized = `[...document.querySelectorAll("iframe[title^='Interactive page']")].map((f) => f.style.height ? f.title : void f.scrollIntoView()).filter(Boolean).sort().join()`;
   await until(async () => (await evaluate(sized)) === 'Interactive page: huge,Interactive page: short');
   const dom = await evaluate('document.documentElement.outerHTML');
-  close();
   const frame = (key) => new RegExp(`<iframe[^>]*title="Interactive page: ${key}"[^>]*>`).exec(dom)?.[0];
   assert.match(frame('short'), /style="height: 240px;"/);
   assert.match(frame('huge'), /style="height: 10000px;"/);
@@ -586,6 +586,14 @@ test('an interactive page that posts its height gets a frame that fits it, each 
   assert.deepEqual(figures.map((f) => /class="label"[^>]*>(\w)</.exec(f)[1]), ['B', 'A', 'C']);
   assert.ok(figures.every((f) => f.indexOf('<figcaption') < f.indexOf('class="shot"')), figures[0]);
   assert.match(figures[0], /Recommended/);
+  // first-draft's urls in the trade-off become real links on the card, outside the sandboxed frames, and leave the text.
+  const links = [...dom.matchAll(/<p class="fd-links"[^>]*>(.*?)<\/p>/g)].map((m) => m[1]);
+  assert.equal(links.length, 1);
+  assert.deepEqual([...links[0].matchAll(/<a href="([^"]+)" target="_blank" rel="noopener">([^<]+)<\/a>/g)].map((m) => [m[2], m[1]]),
+    [['Calm', 'http://100.64.0.1:4430/#/o/1/play'], ['Bold', 'http://100.64.0.1:4430/#/o/2/play']]);
+  assert.match(dom, /<p class="tradeoff"[^>]*><strong>Trade-off <\/strong>B reads best\.<\/p>/);
+  assert.ok(figures.every((f) => !f.includes('first-draft')));
+  close();
   proc.kill();
 });
 

@@ -171,7 +171,9 @@
     "unlocks": "Publish the release", "waits": "Main", "expires": "2026-10-16T17:10:00Z" }
   ```
 - `tradeoff`: optional on design items, plain text up to 1000 characters, shown
-  next to the mocks.
+  next to the mocks. A trailing `Open in first-draft: <label> <url> · <label> <url>`
+  (what `first-draft-axi post` writes) is shown as real links under the text, outside the
+  mock frames; the text before it stays the trade-off.
 - `mocks`: optional on design items, up to 6 entries of an option `value` and a
   `path` to a mock file (`.html`, `.svg`, `.png`, `.jpg`, `.jpeg`, `.webp`, 5 MB or less), relative to the board file's folder. Each value must
   name one of the item's own options. Served only from inside that folder. An

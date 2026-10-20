@@ -20,7 +20,7 @@ sed 's#"page/index.html"#"page/plan.html"#' "$f/plan.v1/valid-full.json" > "$dir
 so post "$board" --title "Keep the weekly digest?" --about "Open rate held steady at about a third for two months." --why "Open rate held steady for two months." --outcome yes="It keeps going out each week." --outcome no="It stops after this week." --recommend yes --recommend-reason "Readers still open it." --default yes
 # A design pick takes mocks and a tradeoff; the question standard (--why, --outcome) is for --type decision only.
 so post "$board" --type design --key look --title "Which settings layout should ship?" --option a="A: one column" --option b="B: two columns" \
-  --mock a=mocks/a.webp --mock b=mocks/b.webp --tradeoff "B scans faster; A is simpler." --recommend b
+  --mock a=mocks/a.webp --mock b=mocks/b.webp --tradeoff "B scans faster; A is simpler. Open in first-draft: One column http://100.64.0.1:4430/#/o/1/play · Two columns http://100.64.0.1:4430/#/o/2/play" --recommend b
 mkdir -p "$dir/design"; cp "$f/design.v1/design/"* "$dir/design/"; cp "$repo/docs/media/phone-light.webp" "$dir/design/preview.webp"
 sed 's#design/preview.png#design/preview.webp#' "$f/design.v1/valid-basic.json" > "$dir/design-message.json"
 so post "$board" --kind design --from "$dir/design-message.json"
