@@ -27,6 +27,7 @@ Harness: a browser (chrome-devtools-axi, one CHROME_DEVTOOLS_AXI_SESSION per run
 
 - [Board shell](features/board-shell.md): the areas, the sidebar on a desk, the tab bar on a phone, light and dark
 - [Plan review](features/plan-review.md): open a plan, approve or change sections, answer decisions and send back structured answers
+- [Guided plan and report](features/guide.md): clean-install authoring, the one-scroll Guide view, read receipts and a real Go deeper at both widths and themes
 - [Evidence](features/evidence.md): the Evidence list grouped by project with the capture as the card's hero, and the update's own screen with the whole capture, the proof rows and the verdicts
 - [Notification sender](features/notifications.md): configure a local receiver, post a new ask and verify the exact received JSON, once per card
 - [Board actions](features/board-actions.md): every card kind on every tab, every action clicked, both widths and themes, with done-done's look step
