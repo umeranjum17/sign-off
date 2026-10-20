@@ -30,8 +30,8 @@ const AGENTS: Record<string, { bin: string; dir: string; home: string }> = {
   'gemini-cli': { bin: 'gemini', dir: '.agents/skills', home: join(homedir(), '.gemini', 'skills') },
 };
 const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
-commands[20]:
-  (none)=list, raise, post, answers, wait, poll, open, status, stop, serve, export, init, report, signin, dismiss, restore, doctor, notify, validate, help
+commands[21]:
+  (none)=list, raise, post, answers, wait, poll, open, status, stop, serve, export, init, report, signin, dismiss, restore, refile, doctor, notify, validate, help
 board: the nearest .sign-off/ board (the walk's bounds and SIGN_OFF_HOME: README, "Test runs never touch your board"), else ~/.sign-off/decisions.json; a board file given always wins
 flags: --full and --json on list, answers and wait, --events on wait, --json on status, --filer on post, raise and wait, --help on every command, -v/--version
 examples:
@@ -220,6 +220,7 @@ and played on the card. --about is its short summary; up to ${CHAPTERS_MAX} --ch
 --view is the page and --preview its picture on the card, beside it, both from the board file's folder; \`sign-off-axi report init <folder>\` makes them.
 The page must be filled (no FILL: line left), with a viewport tag, dark mode, a picture, something to tap, its detail folded, nothing from the web, and no block over about five lines on a phone.
 Merges, PR outcomes, receipts and status notes are not reports: post proof of a change as evidence.
+A proof is never an ask: a new ask that offers Pass and Fail is refused. sign-off-axi refile <key> --media <file> re-files an old one as evidence.
 --type signin asks the user to sign in, at the top of what waits: the service, one Open button for the http(s) --link, what it unlocks,
 who waits, and the time left until --expires (an ISO date-time, or 90s, 15m, 2h, 1d from now). After that time the card says the link expired.
 No output prints the link. Post again with the same --key and a new --link or --expires to put a new link on the same card; it waits again.
@@ -258,6 +259,11 @@ restore <key> [board.json] brings it back. Find the key with \`sign-off-axi list
 examples:
   sign-off-axi dismiss ship-the-new-sign-in-screen-this-week
   sign-off-axi restore ship-the-new-sign-in-screen-this-week
+`,
+  refile: `usage: sign-off-axi refile <key> [board.json] --media <file>... [--link <commit or URL>]
+Re-files a proof that was posted as a Pass/Fail ask as an evidence update, which never waits on the user: posts --type evidence with the ask's title and note and your capture, then dismisses the ask.
+examples:
+  sign-off-axi refile sign-in-looks-right --media sign-in.png --link https://github.com/acme/app/pull/12
 `,
   restore: `usage: sign-off-axi restore <key> [board.json]
 Brings back a card that dismiss hid. See \`sign-off-axi dismiss --help\`.
@@ -864,6 +870,19 @@ function dismiss(restoring: boolean) {
   };
 }
 
+/** refile <key> [board.json] --media <file>...: an old proof posted as a Pass/Fail ask becomes an evidence update (title and note kept), and the ask is dismissed. */
+async function refile(args: string[]) {
+  const at = args.findIndex((a) => !a.startsWith('-') && !existsSync(a) && !a.endsWith('.json')), key = args[at];
+  if (at < 0) throw fail('refile needs a card key', 'VALIDATION_ERROR', 'sign-off-axi refile <key> --media shot.png');
+  const { file, named, on, values } = parse('refile', args.filter((_, i) => i !== at), { media: { type: 'string', multiple: true }, link: { type: 'string' }, filer: { type: 'string' } });
+  const old = board(file).find((x) => x.key === key);
+  if (!old) throw fail(`no card with key ${key} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi list${on} --full\` to see the keys`);
+  if (!waits(old) || !['pass', 'fail'].every((v) => old.options.some((o) => o.value === v))) throw fail(`${key} is not a waiting Pass/Fail ask`, 'VALIDATION_ERROR', 'refile takes a proof still waiting on the user as a Pass/Fail ask');
+  const posted = await postMedia(file, named, on, { title: old.title, about: old.about?.trim() || old.title, media: values.media, link: values.link ?? old.link }, 'evidence', filerOf(values, true));
+  locked(`${file}.lock`, () => appendDismissed(file, [key], true));
+  return posted;
+}
+
 /** For a program that feeds the board: the --from file, checked like any post, becomes the whole board, items and top-level fields. Answers stay.
  * With a filer it replaces only that filer's items (and items with no filer it names by key); every other item and top-level field stays. */
 function replace(file: string, named: string, on: string, from?: string, filer?: string) {
@@ -1194,6 +1213,9 @@ function storeIncoming(file: string, named: string, on: string, { incoming, raw 
   return locked(`${file}.lock`, () => {
     const current = board(file), items = existsSync(file) ? readItems(file).items : [], saved = readAnswers(file), now = new Date().toISOString();
     checkMerges(incoming, [...current.filter((c) => !incoming.some((d) => d.key === c.key)), ...incoming], current);
+    // Proof is evidence: a new ask that offers Pass and Fail would sit in Waiting on you as an ask, so it is refused.
+    const proof = incoming.find((d) => d.type === 'decision' && !d.kind && !current.some((c) => c.key === d.key) && ['pass', 'fail'].every((v) => d.options.some((o) => o.value === v)));
+    if (proof) throw fail(`key ${proof.key} offers Pass and Fail: a proof is not an ask and would wait on you`, 'VALIDATION_ERROR', 'Post it with sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media <file>');
     const raised = incoming.map((d, i) => {
       const had = current.find((c) => c.key === d.key);
       // A contract message refused for its key exits 2 like any other refusal (contract section 4); raise --title keeps exit 1.
@@ -2324,7 +2346,7 @@ await runAxiCli({
   topLevelHelp: TOP_HELP,
   getCommandHelp: (cmd) => HELP[cmd],
   home: axi('list', list),
-  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), report: axi('report', report), signin: axi('signin', signin), dismiss: axi('dismiss', dismiss(false)), restore: axi('restore', dismiss(true)), doctor: axi('doctor', doctor), notify: axi('notify', notify), validate, help: ([name, ...rest]) => {
+  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), report: axi('report', report), signin: axi('signin', signin), dismiss: axi('dismiss', dismiss(false)), restore: axi('restore', dismiss(true)), refile: axi('refile', refile), doctor: axi('doctor', doctor), notify: axi('notify', notify), validate, help: ([name, ...rest]) => {
     if (rest.length || (name && !HELP[name])) throw fail(`unknown command or argument: ${[name, ...rest].join(' ')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi --help` to see the commands');
     return name ? HELP[name] : TOP_HELP;
   } },
