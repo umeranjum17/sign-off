@@ -231,6 +231,13 @@ try {
       // Every rendered part, including expanded items and decisions, has the same controls.
       const controls = JSON.parse(drive(`console.log(JSON.stringify(await page.eval(() => [...document.querySelectorAll('.gd-acts')].map(e => [...e.querySelectorAll('button')].map(b => b.textContent)))));`));
       for (const labels of controls) for (const label of ['Ask a question', 'Go deeper', 'Simplify this', 'Show an example', 'Why?']) assert.ok(labels.includes(label));
+      // Every free-text box shows its whole placeholder: measured with the box's own font against the room inside it, leaving a fifth spare because a phone's font is wider than this browser's (the old text fit here by 4px and clipped on the phone).
+      show('next');
+      const boxes = JSON.parse(drive(`console.log(JSON.stringify(await page.eval(() => [...document.querySelectorAll('.gd-fu input')].filter(i => i.clientWidth).map(i => { const cs = getComputedStyle(i), c = document.createElement('canvas').getContext('2d'); c.font = cs.font; return { placeholder: i.placeholder, text: c.measureText(i.placeholder).width, room: i.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) }; }))));`));
+      writeFileSync(join(records, `${kind}-freetext-boxes.${theme}.${width}w.json`), JSON.stringify(boxes));
+      capture(`${kind}-freetext`, 'The free-text box shows its whole placeholder, not cut off.');
+      assert.ok(boxes.length, 'free-text boxes are rendered');
+      for (const b of boxes) assert.ok(b.text <= b.room * 0.8, `placeholder "${b.placeholder}" is ${Math.round(b.text)}px wide in ${Math.round(b.room)}px: it can clip on a phone`);
       const sendText = (part, text, isQuestion = false) => drive(`await page.eval(() => { const p = document.querySelector('[data-part="${part}"]'); ${isQuestion ? "p.querySelector(':scope > .gd-acts .question').click();" : ''} const input = p.querySelector(':scope > .gd-fu input'); ${isQuestion ? 'if (document.activeElement !== input) throw Error("Composer did not focus");' : ''} input.value = ${JSON.stringify(text)}; p.querySelector(':scope > .gd-fu').requestSubmit(); }); await nap(600);`);
       sendText('this', custom);
       for (const action of ['deeper', 'example', 'why']) click(`[data-part="next"] > .gd-acts .${action === 'deeper' ? 'deep' : action}`);
