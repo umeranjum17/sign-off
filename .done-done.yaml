@@ -8,6 +8,10 @@ app: "sign-off"
 journeys:
   plan-review:
     command: 'node .agents/skills/verify-sign-off/plan-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${PLAN_REVIEW_THEME:-light}" "${PLAN_REVIEW_WIDTH:-390}"'
+  # A clean install: npm pack, npm install in an empty folder, author with report init, then the guided plan and report in a real browser
+  # with real read receipts and a real Go deeper answered through the installed CLI (a model's when MINIMAX_API_KEY is set, else a labelled stand-in).
+  guide:
+    command: 'npm run build > /dev/null && node .agents/skills/verify-sign-off/guide-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${GUIDE_THEME:-light}" "${GUIDE_WIDTH:-390}"'
   board-actions:
     command: 'npm run build > /dev/null && node .agents/skills/verify-sign-off/board-actions.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   attach:
