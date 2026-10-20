@@ -120,8 +120,8 @@ works is evidence, and a merge or a status note is neither.
 waits on it now: the service, one big **Open** for the link (a new tab),
 what it unlocks, who waits, and the time left until `--expires` (an ISO
 date-time, or `90s`, `15m`, `2h`, `1d` from now), counting down on the open
-page. When the time is past, the card says "Link expired. Ask for a new
-link." and **Open** is off. Post again with the same `--key` and a new
+page. When the time is past, the card leaves Waiting on you and Decide on
+its own, as it has nothing left to open. Post again with the same `--key` and a new
 `--link` or `--expires` to put a new link on the same card; it waits again,
 also after it was done. The poster runs `signin done --key <key>` once it
 sees the sign-in worked: the card leaves Waiting on you and shows as

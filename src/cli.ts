@@ -221,7 +221,7 @@ and played on the card. --about is its short summary; up to ${CHAPTERS_MAX} --ch
 The page must be filled (no FILL: line left), with a viewport tag, dark mode, a picture, something to tap, its detail folded, nothing from the web, and no block over about five lines on a phone.
 Merges, PR outcomes, receipts and status notes are not reports: post proof of a change as evidence.
 --type signin asks the user to sign in, at the top of what waits: the service, one Open button for the http(s) --link, what it unlocks,
-who waits, and the time left until --expires (an ISO date-time, or 90s, 15m, 2h, 1d from now). After that time the card says the link expired.
+who waits, and the time left until --expires (an ISO date-time, or 90s, 15m, 2h, 1d from now). After that time the card leaves the board on its own.
 No output prints the link. Post again with the same --key and a new --link or --expires to put a new link on the same card; it waits again.
 When the sign-in is done, run \`sign-off-axi signin done [board.json] --key <key>\`: the card leaves the open list and shows as done.
 For a link that expires fast, give --start, the command that prints a new sign-in link, as a JSON list such as '["npm", "login", "--auth-type=web"]'.
