@@ -13,7 +13,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, asks, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, lapsed, appendRead, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, sameDecision, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, asks, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, sameDecision, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -326,7 +326,7 @@ Delivered means process handoff, not read. The resumed owner must --ack before a
 Do not run an active wait listener for the same owner alongside the dispatcher. No substitute answers.`,
   deeper: `usage: sign-off-axi deeper [board.json] [--filer <id>] [--all] [--json]
        sign-off-axi deeper [board.json] --id <id> --text "<answer>" [--more]
-Go deeper is the button on every part of a plan 2 or report 3. The person taps it; wait --filer wakes with the ask, or this command lists the ones nobody finished.
+Go deeper is the button on every guided plan or report. Plan 3 and report 4 also offer Simplify this. Engagement v1 replies require the owning --filer or registered owner session; stale targets are refused. The person taps it; wait --filer wakes with the ask, or this command lists the ones nobody finished.
 Answer in plain words about the part they tapped, a few lines at a time: each --more piece streams into that spot on the board while they watch, and a last call without --more ends it.
   --id     the ask to answer   --text  the answer, or - to read stdin (2000 characters or fewer per piece)
   --more   more pieces follow   --all  also the finished asks
@@ -630,9 +630,9 @@ function eventLines(file: string, rows: Decision[], answers: Answer[], rounds: R
 function deeperOut(file: string, asks: ReturnType<typeof readDeeper>, on: string, events?: boolean) {
   if (events) {
     const kind = kindOf(file), titles = new Map(board(file).map((d) => [d.key, d.title]));
-    return asks.map(({ id, key, part, about, q, at }) => JSON.stringify({ event: 'deeper', ...kind(key), key, title: titles.get(key), id, part, about, ...(q && { q }), at })).join('\n');
+    return asks.map(({ id, key, part, about, q, at, ...rest }) => JSON.stringify({ event: 'deeper', ...kind(key), key, title: titles.get(key), id, part, about, ...(q && { q }), at, ...(rest.version === 1 && rest) })).join('\n');
   }
-  return toon({ board: tilde(file), deeper: asks.map(({ id, key, part, about, q = '', at }) => ({ id, key, part, about, q, at })) },
+  return toon({ board: tilde(file), deeper: asks.map(({ id, key, part, about, q = '', at, action }) => ({ id, key, part, about, q, at, ...(action && { action }) })) },
     ['The person tapped Go deeper: answer in plain words, a few lines at a time, as the part they tapped',
       `Run \`sign-off-axi deeper${on} --id <id> --text "<what you found>" --more\` for each piece, then once more without --more to finish`]);
 }
@@ -669,10 +669,12 @@ async function deeper(args: string[]) {
     if (values.json) return JSON.stringify({ deeper: open });
     if (!open.length) return toon({ board: tilde(file), deeper: '0 open' }, [`Run \`sign-off-axi wait${on}\` to be woken when the person taps Go deeper`]);
     markDeeperRead(file, open.filter((x) => !x.read).map((x) => x.id));
-    return toon({ board: tilde(file), deeper: open.map(({ id, key, part, about, q = '', at, done }) => ({ id, key, part, about, q, at, done: !!done })) }, [`Run \`sign-off-axi deeper${on} --id <id> --text "<answer>"\` to answer one`]);
+    return toon({ board: tilde(file), deeper: open.map(({ id, key, part, about, q = '', at, done, action }) => ({ id, key, part, about, q, at, done: !!done, ...(action && { action }) })) }, [`Run \`sign-off-axi deeper${on} --id <id> --text "<answer>"\` to answer one`]);
   }
   const ask = readDeeper(file).find((x) => x.id === values.id);
   if (!ask) throw fail(`no Go deeper ask with id ${values.id}`, 'NOT_FOUND', `Run \`sign-off-axi deeper${on}\` to see the open ones`);
+  checkEngagement(file, ask);
+  if (ask.version === 1 && !process.env.SIGN_OFF_OWNER_SESSION && filer !== ask.filer) throw new InputError('Engagement reply requires its owning --filer');
   if (filer !== undefined && !board(file).some(d => d.key === ask.key && d.filer === filer)) throw new InputError('Request does not belong to this filer');
   if (process.env.SIGN_OFF_OWNER_SESSION) {
     checkOwner(file, ask);
@@ -684,6 +686,7 @@ async function deeper(args: string[]) {
   if (text === '-') text = readFileSync(0, 'utf8');
   if (typeof text !== 'string' || !text.trim() || [...text.trim()].length > 2000) throw fail('--text must be the answer, 2000 characters or fewer', 'VALIDATION_ERROR', 'Run `sign-off-axi deeper --help`');
   await locked(`${deeperPath(file)}.lock`, () => {
+    checkEngagement(file, ask);
     if (!process.env.SIGN_OFF_OWNER_SESSION || !readDeeper(file).find(x => x.id === ask.id)?.done) answerDeeper(file, ask.id, text.trim(), !!values.more);
   });
   return toon({ id: ask.id, key: ask.key, part: ask.part, answered: values.more ? 'piece sent, more to come' : 'done' }, values.more ? [`Run \`sign-off-axi deeper${on} --id ${ask.id} --text "<next piece>" [--more]\``] : [`Run \`sign-off-axi wait${on}\` for the next answer or ask`]);
@@ -2155,6 +2158,7 @@ const state = () => {
     seen_at: Object.fromEntries(Object.values(answers).flatMap((a) => { const t = seenAt(file)(a); return t ? [[a.key, t]] : []; })),
     reads: readReads(file),
     deeper: readDeeper(file),
+    delivery: deliveries(file),
     rounds,
     messages: readMessages(file, warn),
     annotations: readOnly() || answersOnly() ? [] : ((sent) => readAnnotations(file, warn).map((a) => (sent.has(a.id) ? { ...a, sent: true } : a)))(sentIds(file)),
@@ -2311,7 +2315,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     clearTimeout(timer);
     return [200, state()];
   }
-  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/signin', '/api/leash', '/api/deeper', '/api/reads'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
+  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/signin', '/api/leash', '/api/deeper', '/api/reads', '/api/engagement', '/api/engagement/seen'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
   if (readOnly()) return [403, { error: 'This board is read-only' }];
   // Dismiss only hides an item on this page and sends nothing to the feeding program, so an answers-only board takes it too.
   if (!['/api/answers', '/api/dismiss', '/api/signin', '/api/reads'].includes(req.url!) && answersOnly()) return [403, { error: 'This board takes answers only' }];
@@ -2374,6 +2378,12 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     const have = new Map(board(file).map((x) => [x.key, x]));
     if (!keys.every((k) => isKey(k) && have.has(k))) return [404, { error: 'This item is no longer in the file' }];
     appendDismissed(file, [...new Set<string>(keys)], dismissed);
+    return [200, state()];
+  }
+  if (req.url === '/api/engagement' || req.url === '/api/engagement/seen') {
+    const input = JSON.parse(body);
+    if (req.url.endsWith('/seen')) markEngagementSeen(file, input.id, input.answerRevision);
+    else askEngagement(file, input);
     return [200, state()];
   }
   if (req.url === '/api/reads' || req.url === '/api/deeper') {

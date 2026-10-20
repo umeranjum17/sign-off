@@ -3,6 +3,7 @@
 Every command takes `--help`. Output is compact, with next-step hints.
 The CLI is driven from a shell with no setup. Ordinary commands call no model;
 the opt-in `owner --dispatch` resumes an installed Claude Code author session.
+Guided plan 3 / report 4 add **Simplify this**. Inspect version-1 action/target fields with `deeper --json --all`; active replies require the matching `--filer`, while registered owners acknowledge before answering. Keep listening after reports and sent plans. See [the engagement contract](contract.md#report-schema-4-and-plan-schema-3-engagement-v1).
 
 | Command | In a few words |
 |---|---|
