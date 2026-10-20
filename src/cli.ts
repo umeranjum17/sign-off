@@ -137,14 +137,16 @@ examples:
 Blocks until the user answers, then prints the answer the way answers does. Use it instead of a polling loop.
   --filer    only the items posted with this --filer (or SIGN_OFF_FILER): returns every answer to them this filer has not taken yet,
              even one saved before wait started, and marks it taken, so the board shows "Seen by agent" on that card;
-             NOT_FOUND when none of them still needs an answer. Without --filer or SIGN_OFF_FILER, wait takes no filer
+             guided plans and reports keep listening for Go deeper, even after send-back; otherwise NOT_FOUND when none needs an answer.
+             Without --filer or SIGN_OFF_FILER, wait takes no filer and never consumes Go deeper
   --key      wait for that decision; an answer saved before wait starts returns at once
              and a key not raised yet is waited for too
              without --key, wait for the next answer to any decision that still needs an answer; NOT_FOUND when nothing needs one
   --timeout  seconds to wait, 600 (10 minutes) by default; then exits 1 with code TIMEOUT
   --full     adds the button label, close and title
   --json     {"<key>":{"answer","label","close","at","note"?}} for the new answers; note only when the user wrote one
-  --events   needs --filer (or SIGN_OFF_FILER); one JSON line per new answer and per another-round ask, in the order they were saved (${CONTRACT}#7-answers):
+  --events   needs --filer (or SIGN_OFF_FILER); JSON lines for new answers, another-round asks and Go deeper (each wait returns one batch).
+             Answer and round lines come in the order they were saved (${CONTRACT}#7-answers):
              {"event":"answer","contract":1,"kind","schema","key","title","answer","label","close","at","note"?,"filer"?,"comments"?}
              {"event":"round","contract":1,"kind","schema","key","title","note","at","filer"?,"comments"?}; a board-format item reports as ask schema 1
 A note column appears when any shown answer has a note.
@@ -696,12 +698,12 @@ async function wait(args: string[]) {
       if (found.length && values.events) return eventLines(file, found, given, asked.filter((r) => fresh.some((d) => d.key === r.key)));
       if (found.length) {
         return printAnswers(file, found, waiting, values,
-          [waiting ? `Run \`sign-off-axi wait${on}\` for the next of the ${waiting} waiting` : `Run \`sign-off-axi stop${onBoard}\` to close the board`]);
+          [waiting ? `Run \`sign-off-axi wait${on}\` for the next of the ${waiting} waiting` : filer !== undefined && rows.some((d) => d.guided) ? `Run \`sign-off-axi wait${on}\` for the next Go deeper ask` : `Run \`sign-off-axi stop${onBoard}\` to close the board`]);
       }
       // A Go deeper ask on this filer's guided page wakes the wait once, and is marked read when it is handed over.
-      if (values.key === undefined) {
+      if (filer !== undefined) {
         const asks = await locked(`${deeperPath(file)}.lock`, () => {
-          const got = readDeeper(file).filter((x) => !x.read && rows.some((d) => d.key === x.key));
+          const got = readDeeper(file).filter((x) => !x.read && !x.done && (values.key === undefined || x.key === values.key) && rows.some((d) => d.key === x.key));
           markDeeperRead(file, got.map((x) => x.id));
           return got;
         }, 'another wait is still taking Go deeper asks');
@@ -725,7 +727,7 @@ async function wait(args: string[]) {
         if (event) return vaultEvent(file, [{ key: values.key, at: event.at, status: event.status }], values);
       }
       // A dismissed ask is hidden from the board, not withdrawn: it is not counted as waiting, but the agent still waits on it.
-      if (values.key === undefined && !rows.some((d) => waits({ ...d, dismissed: false })) && !live && !unknown) {
+      if (values.key === undefined && !rows.some((d) => waits({ ...d, dismissed: false }) || (filer !== undefined && d.guided)) && !live && !unknown) {
         throw fail(`nothing${filer ? ` posted by ${filer}` : ''} is waiting on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi answers${onBoard}\` to read the saved answers`, `Run \`sign-off-axi raise${on} --title "<question>"\` to ask a new one`);
       }
       const left = deadline - Date.now();
