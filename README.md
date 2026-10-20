@@ -88,9 +88,9 @@ One line on what the agent runs per kind; the full reference is [docs/question-k
 | Proof update | `post --type evidence --media shot.png` | the capture, its result, Pass / Fail / Needs work |
 | Proof with a file to install | `post --type evidence --media shot.png --attach app.apk` | the capture, and the file with its size and a Download button (any type, up to 1 GB, `SIGN_OFF_ATTACH_MAX_MB` to change) |
 | Explainer video | `post --type explainer --media clip.mp4 --chapter 0:00=Start` | a player with chapter buttons, then Yes or No |
-| Report page | `report init <folder>`, then `post --type report --view ...` | a page to tap through |
+| Report | `report init <folder>`, fill `report.json`, then `post --kind report --from <folder>/report.json` | one scroll: the answer and a picture, what I understood, what I found, the next step; numbers behind Details, Go deeper on every part, who read it and when |
 | Diagram, interactive page | `post --type diagram --view flow.svg` | the picture on the card; interactive pages run sandboxed |
-| Plan | `post --kind plan --from plan.json` | sections to approve or change, decisions to answer |
+| Plan | `report init <folder> --plan`, fill `plan.json`, then `post --kind plan --from plan.json` | the same scroll, plus each decision with my pick and a Go ahead |
 | Sign-in link | `post --type signin --service npm --link <url> --unlocks ...` | an Open button and the time left |
 
 ## How agents use it

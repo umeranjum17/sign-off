@@ -26,7 +26,7 @@ const gate = JSON.parse(readFileSync(join(fixtures, 'gate.v1', 'valid-three-acti
 const finding = JSON.parse(readFileSync(join(fixtures, 'finding.v1', 'valid-apply.json')));
 // A report is a page and its picture: the scaffold report init writes, filled in, beside the boards these tests write.
 const fill = (file) => writeFileSync(file, readFileSync(file, 'utf8').replace(/FILL: [^<"']*/g, 'Umer taps through it'));
-spawnSync('node', [cli, 'report', 'init', join(scratch, 'page')], { env: { ...process.env, HOME: join(scratch, 'home') } });
+spawnSync('node', [cli, 'report', 'init', join(scratch, 'page'), '--page'], { env: { ...process.env, HOME: join(scratch, 'home') } });
 for (const f of ['index.html', 'preview.svg']) fill(join(scratch, 'page', f));
 const report = { contract: 1, kind: 'report', schema: 2, key: 'slice-5-live', title: 'How the new cards work', about: 'Umer can see the new cards.', filed: '2026-10-13T07:19:00Z',
   view: 'page/index.html', preview: 'page/preview.svg' };
@@ -491,11 +491,11 @@ test('post --kind: one message from a file or stdin, checked against its kind, r
   const text = post('', '--type', 'report', '--title', 'Merged #12', '--about', 'Checks passed.');
   assert.equal(text.status, 2, text.stdout);
   assert.match(text.stdout, /a report is a page to tap through, not text: --view and --preview are missing/);
-  assert.match(text.stdout, /help\[1\]: "Run `sign-off-axi report init <folder>` to make the page and its picture/);
+  assert.match(text.stdout, /help\[1\]: "Run `sign-off-axi report init <folder> --page` to make the page and its picture/);
   assert.match(post(JSON.stringify({ ...report, schema: 1, view: undefined, preview: undefined }), '--kind', 'report', '--from', '-').stdout,
     /stdin: key slice-5-live: schema 1 of report is text only[^]*report init <folder>/);
   // report init writes the page; posted unfilled, or as text with nothing to tap, or with a block longer than a phone shows, it is refused.
-  const made = spawnSync('node', [cli, 'report', 'init', join(scratch, 'draft')], { encoding: 'utf8', env });
+  const made = spawnSync('node', [cli, 'report', 'init', join(scratch, 'draft'), '--page'], { encoding: 'utf8', env });
   assert.equal(made.status, 0, made.stdout);
   assert.match(made.stdout, /created\[2\]:.*draft\/index\.html,.*draft\/preview\.svg/);
   assert.match(made.stdout, /390 px wide and look before posting: mostly text means it is not ready/);
@@ -619,12 +619,21 @@ test('post --replace: an answer does not re-attach to a key the feed dropped and
   }
 });
 
-test('a guided plan and report: the contract refuses a template left unfilled, and Go deeper, read receipts and the one send-back round-trip with the agent', async () => {
+test('a guided plan and report: report init writes them to fill, post refuses FILL lines, and Go deeper, read receipts and the one send-back round-trip with the agent', async () => {
   const dir = join(scratch, 'guide'), board = join(dir, 'board.json'), env = { ...process.env, HOME: join(scratch, 'guide-home') };
   mkdirSync(dir, { recursive: true });
   const run = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env, cwd: dir });
+  // report init writes the guided template; posted as it is, it is refused for its FILL lines, and a view is not a field.
+  for (const [flag, kind] of [[[], 'report'], [['--plan'], 'plan']]) {
+    const made = run('report', 'init', join(dir, kind), ...flag);
+    assert.equal(made.status, 0, made.stdout);
+    assert.match(made.stdout, new RegExp('post --kind ' + kind + ' --from [^ ]*' + kind + '\\.json'));
+    const raw = run('post', board, '--kind', kind, '--from', join(dir, kind, kind + '.json'));
+    assert.equal(raw.status, 2);
+    assert.match(raw.stdout, /still has FILL: lines/);
+  }
   const plan = JSON.parse(readFileSync(join(fixtures, 'plan.v2', 'valid-full.json'))), guide = JSON.parse(readFileSync(join(fixtures, 'report.v3', 'valid-full.json')));
-  for (const [m, error] of [[{ ...plan, title: 'FILL: the answer' }, /still has FILL: lines/], [{ ...plan, view: 'page/index.html' }, /view is not a field of plan schema 2/], [{ ...guide, preview: 'p.svg' }, /preview is not a field of report schema 3/],
+  for (const [m, error] of [[{ ...plan, view: 'page/index.html' }, /view is not a field of plan schema 2/], [{ ...guide, preview: 'p.svg' }, /preview is not a field of report schema 3/],
     [{ ...plan, visual: { ...plan.visual, rows: [{ label: 'A' }, { label: 'B', value: 1 }] } }, /visual\.rows\[0\]\.value/], [{ ...plan, sections: [{ ...plan.sections[0], items: [] }] }, /items must list 1 to 8/]]) {
     const { out: { files: [row] } } = validate(message('guide-bad.json', JSON.stringify(m)));
     assert.equal(row.ok, false, JSON.stringify(m));

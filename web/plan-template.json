@@ -1,0 +1,99 @@
+{
+  "contract": 1,
+  "kind": "plan",
+  "schema": 2,
+  "key": "FILL: short-id",
+  "title": "FILL: the plan's answer in one line",
+  "project": "FILL: project",
+  "about": "FILL: the plan in 2 sentences, answer first",
+  "understood": [
+    {
+      "label": "You asked",
+      "text": "FILL: the request in your own words"
+    },
+    {
+      "label": "Done when",
+      "text": "FILL: how the person will know it is finished"
+    }
+  ],
+  "visual": {
+    "type": "bars",
+    "heading": "FILL: the one point the picture makes, in one line",
+    "text": "FILL: what the bars measure and where the number comes from",
+    "unit": "min",
+    "rows": [
+      {
+        "label": "FILL: first thing",
+        "value": 4.5,
+        "note": "FILL: tag",
+        "tone": "bad"
+      },
+      {
+        "label": "FILL: second thing",
+        "value": 2.8,
+        "note": "FILL: tag",
+        "tone": "ok"
+      }
+    ],
+    "details": [
+      {
+        "label": "FILL: a number",
+        "value": "FILL: its value, unit and when it was measured"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "steps",
+      "stage": "recommend",
+      "heading": "FILL: what you recommend, as a statement",
+      "body": "FILL: one or two lines of lead",
+      "items": [
+        {
+          "title": "FILL: step or fix",
+          "text": "FILL: one line",
+          "more": "FILL: why, and what it costs"
+        },
+        {
+          "title": "FILL: step or fix",
+          "text": "FILL: one line"
+        }
+      ],
+      "details": [
+        {
+          "label": "FILL: a number",
+          "value": "FILL: value"
+        }
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "key": "FILL: short-id",
+      "question": "FILL: one question, 12 words or fewer?",
+      "why": "FILL: why it needs an answer now",
+      "options": [
+        {
+          "value": "a",
+          "label": "FILL: first choice",
+          "outcome": "FILL: what happens if picked"
+        },
+        {
+          "value": "b",
+          "label": "FILL: second choice",
+          "outcome": "FILL: what happens if picked"
+        }
+      ],
+      "recommend": "a",
+      "reason": "FILL: why you would pick the first",
+      "quiet": "FILL: what you do if the person stays quiet"
+    }
+  ],
+  "next": {
+    "heading": "FILL: the next step, in one line",
+    "lines": [
+      "FILL: what happens after the person reads or answers",
+      "FILL: where the proof will land"
+    ]
+  }
+}
