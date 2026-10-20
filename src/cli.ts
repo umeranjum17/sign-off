@@ -222,7 +222,7 @@ The page must be filled (no FILL: line left), with a viewport tag, dark mode, a 
 Merges, PR outcomes, receipts and status notes are not reports: post proof of a change as evidence.
 A proof is never an ask: a new ask that offers Pass and Fail is refused. sign-off-axi refile <key> --media <file> re-files an old one as evidence.
 --type signin asks the user to sign in, at the top of what waits: the service, one Open button for the http(s) --link, what it unlocks,
-who waits, and the time left until --expires (an ISO date-time, or 90s, 15m, 2h, 1d from now). After that time the card says the link expired.
+who waits, and the time left until --expires (an ISO date-time, or 90s, 15m, 2h, 1d from now). After that time the card leaves the board on its own.
 No output prints the link. Post again with the same --key and a new --link or --expires to put a new link on the same card; it waits again.
 When the sign-in is done, run \`sign-off-axi signin done [board.json] --key <key>\`: the card leaves the open list and shows as done.
 For a link that expires fast, give --start, the command that prints a new sign-in link, as a JSON list such as '["npm", "login", "--auth-type=web"]'.
@@ -2002,21 +2002,28 @@ function under(root: string, rel: string): string {
   if (actual !== base && !actual.startsWith(base + sep)) throw new EvidenceError('mock path escapes the board folder');
   return actual;
 }
-function contained(path: string, missing = 'A picture or recording of the proof is missing.'): string {
+/** The folder holding a run's record: --evidence-root, else the app folder done-done keeps it in (~/.done-done/evidence/<app>); '' when no folder holds it. */
+function rootOf(runId: string): string {
+  if (evidenceRoot) return evidenceRoot;
+  const store = join(homedir(), '.done-done', 'evidence');
+  try { return readdirSync(store).map((app) => join(store, app)).find((dir) => existsSync(join(dir, '.done-done', 'runs', `${runId}.json`))) ?? ''; } catch { return ''; }
+}
+function contained(evidence: string, path: string, missing = 'A picture or recording of the proof is missing.'): string {
   let root: string, actual: string;
   try {
-    root = realpathSync(evidenceRoot);
+    root = realpathSync(evidence);
     actual = realpathSync(resolve(root, path));
   } catch { throw new EvidenceError(missing); }
   if (!actual.startsWith(root + sep)) throw new EvidenceError('A picture or recording is outside the proof folder.');
   return actual;
 }
 /** A linked run as the board checked it; the reason a check failed is a plain sentence for the card.
- * With no --evidence-root the board cannot check a run at all, so the card shows no result rather than one that blames the run. */
+ * With no --evidence-root the board looks in done-done's own folder for the app; a run it finds nowhere cannot be checked, so the card shows no result rather than one that blames the run. */
 function evidenceCard(link: NonNullable<Decision['evidence']>) {
-  if (!evidenceRoot) return null;
+  const root = rootOf(link.run_id);
+  if (!root) return null;
   try {
-    const recordPath = contained(`.done-done/runs/${link.run_id}.json`, 'The proof for this run is missing.');
+    const recordPath = contained(root, `.done-done/runs/${link.run_id}.json`, 'The proof for this run is missing.');
     if (statSync(recordPath).size > 1_000_000) throw new EvidenceError('The proof for this run is too large to read.');
     const run = JSON.parse(readFileSync(recordPath, 'utf8'));
     if (!run || typeof run !== 'object' || Array.isArray(run)) throw new EvidenceError('The proof for this run cannot be read.');
@@ -2028,7 +2035,7 @@ function evidenceCard(link: NonNullable<Decision['evidence']>) {
     const media: { path: string; url: string; type: string }[] = run.files.flatMap((f: any) => {
       const type = mediaTypes[extname(f.path ?? '').toLowerCase()];
       if (!type) return [];
-      const path = contained(f.path);
+      const path = contained(root, f.path);
       if (statSync(path).size > 20_000_000) throw new EvidenceError('A picture or recording of the proof is too large.');
       const bytes = readFileSync(path);
       if (bytes.length !== f.bytes || sha256(bytes) !== f.sha256) throw new EvidenceError('A picture or recording changed after the run.');
@@ -2077,7 +2084,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     if (!decision?.evidence || !path) return [404, { error: 'Evidence is unavailable' }];
     const card = evidenceCard(decision.evidence);
     if (card?.status !== 'verified' || !card.media.some((m) => m.path === path)) return [404, { error: 'Evidence is unavailable' }];
-    const actual = contained(path), type = mediaTypes[extname(path).toLowerCase()];
+    const actual = contained(rootOf(runId), path), type = mediaTypes[extname(path).toLowerCase()];
     return [200, { media: readFileSync(actual), type }];
   }
   if (req.method === 'GET' && req.url?.startsWith('/api/media?')) {
