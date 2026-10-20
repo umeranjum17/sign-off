@@ -36,7 +36,7 @@ Do not trust this file for commands, flags or output - installed copies go stale
 
 You do not need sign-off-axi installed globally - invoke it with `npx -y sign-off-axi`.
 If sign-off-axi output shows a follow-up command starting with `sign-off-axi`, run it as `npx -y sign-off-axi ...` instead.
-Ordinary sign-off commands call no model. The opt-in standalone owner dispatcher resumes the registered installed Claude Code session with its normal credentials and optional registered model.
+Each ordinary sign-off command calls no model. The opt-in standalone owner dispatcher resumes the registered installed Claude Code session with its normal credentials and optional registered model.
 
 ## Get the answer back as an event
 

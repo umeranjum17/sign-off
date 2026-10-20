@@ -32,8 +32,8 @@ const AGENTS: Record<string, { bin: string; dir: string; home: string }> = {
   'gemini-cli': { bin: 'gemini', dir: '.agents/skills', home: join(homedir(), '.gemini', 'skills') },
 };
 const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
-commands[22]:
-  (none)=list, raise, post, answers, wait, poll, deeper, open, status, stop, serve, export, init, report, signin, dismiss, restore, refile, doctor, notify, validate, help
+commands[23]:
+  (none)=list, raise, post, answers, wait, poll, deeper, owner, open, status, stop, serve, export, init, report, signin, dismiss, restore, refile, doctor, notify, validate, help
 board: the nearest .sign-off/ board (the walk's bounds and SIGN_OFF_HOME: README, "Test runs never touch your board"), else ~/.sign-off/decisions.json; a board file given always wins
 flags: --full and --json on list, answers and wait, --events on wait, --json on status, --filer on post, raise and wait, --help on every command, -v/--version
 examples:

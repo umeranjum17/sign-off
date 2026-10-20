@@ -828,7 +828,7 @@ test('installed standalone Claude owner authors, idles and resumes to finish onl
   const session = (await import('node:crypto')).randomUUID();
   const skill = join(dir, 'node_modules/sign-off-axi/skills/sign-off-axi/SKILL.md');
   assert.match(readFileSync(skill, 'utf8'), /actual.*UUID/);
-  const result = JSON.parse(exec('claude', ['--session-id', session, '-p', `You are the real author for Umer's synthetic sign-off plan. Your actual session UUID is ${session}. Read ${skill}. Use ONLY the installed CLI via node ${installed}. Run report init plan --plan. Fill its plan.json with a short real plan explaining how Umer can count three apples; remove every FILL: placeholder, keep valid schema 2. Post it to ${board} with filer umer. Register your actual Claude owner session for that board, cwd ${dir}, model claude-haiku-5-5. Do not start a wait or dispatcher. Remember private marker UMER-APPLE-72 in this conversation, not in the plan. Stop once posted and registered.`, '--model', 'claude-haiku-5-5', '--output-format', 'json', '--tools', 'Bash,Read,Write,Edit', '--allowedTools', 'Bash,Read,Write,Edit']));
+  const result = JSON.parse(exec('claude', ['--session-id', session, '-p', `You are the real author for Umer's synthetic sign-off plan. Your actual session UUID is ${session}. Read ${skill}. Use ONLY the installed CLI via node ${installed}. Run report init plan --plan. Fill its plan.json with a short real plan explaining how Umer can count three apples; remove every FILL: placeholder, keep valid schema 2. Post it to ${board} with filer umer. Register your actual Claude owner session for that board, cwd ${dir}, model claude-haiku-5-5. Do not start a wait or dispatcher. Remember the ordinary counting exercise fact UMER-APPLE-72 in this conversation, not in the plan; include it in the board answer if asked. Stop once posted and registered.`, '--model', 'claude-haiku-5-5', '--output-format', 'json', '--tools', 'Bash,Read,Write,Edit', '--allowedTools', 'Bash,Read,Write,Edit']));
   assert.equal(result.session_id, session); assert.equal(result.is_error, false);
   const run = (...args) => exec(process.execPath, [installed, ...args]);
   const plan = JSON.parse(readFileSync(board)).items[0];
@@ -839,7 +839,7 @@ test('installed standalone Claude owner authors, idles and resumes to finish onl
   try {
     const url = await new Promise(ok => server.stdout.once('data', b => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
     const tap = async key => {
-      const r = await fetch(url + 'api/deeper', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key, part: 'understood', q: 'Explain the apple count and include our private conversation marker.' }) });
+      const r = await fetch(url + 'api/deeper', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key, part: 'understood', q: 'Explain the apple count and include the counting exercise fact from our conversation.' }) });
       assert.equal(r.status, 200); return (await r.json()).deeper.find(x => x.key === key).id;
     };
     const id = await tap(plan.key), otherId = await tap(other.key);
