@@ -619,6 +619,66 @@ test('post --replace: an answer does not re-attach to a key the feed dropped and
   }
 });
 
+test('a guided plan and report: the contract refuses a template left unfilled, and Go deeper, read receipts and the one send-back round-trip with the agent', async () => {
+  const dir = join(scratch, 'guide'), board = join(dir, 'board.json'), env = { ...process.env, HOME: join(scratch, 'guide-home') };
+  mkdirSync(dir, { recursive: true });
+  const run = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env, cwd: dir });
+  const plan = JSON.parse(readFileSync(join(fixtures, 'plan.v2', 'valid-full.json'))), guide = JSON.parse(readFileSync(join(fixtures, 'report.v3', 'valid-full.json')));
+  for (const [m, error] of [[{ ...plan, title: 'FILL: the answer' }, /still has FILL: lines/], [{ ...plan, view: 'page/index.html' }, /view is not a field of plan schema 2/], [{ ...guide, preview: 'p.svg' }, /preview is not a field of report schema 3/],
+    [{ ...plan, visual: { ...plan.visual, rows: [{ label: 'A' }, { label: 'B', value: 1 }] } }, /visual\.rows\[0\]\.value/], [{ ...plan, sections: [{ ...plan.sections[0], items: [] }] }, /items must list 1 to 8/]]) {
+    const { out: { files: [row] } } = validate(message('guide-bad.json', JSON.stringify(m)));
+    assert.equal(row.ok, false, JSON.stringify(m));
+    assert.match(row.error, error);
+  }
+  for (const [kind, m] of [['plan', plan], ['report', guide]]) {
+    const posted = spawnSync('node', [cli, 'post', board, '--kind', kind, '--from', '-'], { encoding: 'utf8', env, input: JSON.stringify(m) });
+    assert.equal(posted.status, 0, posted.stdout);
+  }
+  const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: tmpdir(), env });
+  try {
+    const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+    const post = (path, body) => fetch(url + 'api/' + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const state = async () => (await fetch(url + 'api/decisions')).json();
+    const items = (await state()).decisions;
+    assert.deepEqual(items.map((d) => [d.key, d.guided]), [['faster-sign-in', true], ['sign-in-faster', true]]);
+    // A part read is kept once, at the first time; an unknown part is refused.
+    assert.equal((await post('reads', { key: 'faster-sign-in', part: 'understood' })).status, 200);
+    const first = (await state()).reads['faster-sign-in/understood'];
+    assert.match(first, /^\d{4}-\d\d-\d\dT/);
+    await post('reads', { key: 'faster-sign-in', part: 'understood' });
+    assert.equal((await state()).reads['faster-sign-in/understood'], first);
+    assert.equal((await post('reads', { key: 'faster-sign-in', part: 'nowhere' })).status, 404);
+    assert.equal((await post('deeper', { key: 'faster-sign-in', part: 'found:0', q: 'x'.repeat(600) })).status, 400);
+    // Go deeper: the ask waits, the agent's wait --filer returns it once, and its answer streams back piece by piece.
+    assert.equal((await post('deeper', { key: 'faster-sign-in', part: 'found:0', q: 'Why 31%?' })).status, 200);
+    assert.equal((await post('deeper', { key: 'faster-sign-in', part: 'found:0' })).status, 200);
+    const [ask] = (await state()).deeper;
+    assert.deepEqual([ask.part, ask.q, ask.read, ask.text], ['found:0', 'Why 31%?', undefined, '']);
+    const waited = spawnSync('node', [cli, 'wait', board, '--filer', 'agent-41', '--events', '--timeout', '5'], { encoding: 'utf8', env });
+    const event = JSON.parse(waited.stdout.split('\n')[0]);
+    assert.deepEqual([event.event, event.kind, event.key, event.part, event.q, event.id], ['deeper', 'plan', 'faster-sign-in', 'found:0', 'Why 31%?', ask.id]);
+    assert.ok((await state()).deeper[0].read);
+    assert.equal(run('deeper', board, '--id', ask.id, '--text', '62 of 200 left at that screen.', '--more').status, 0);
+    let [now] = (await state()).deeper;
+    assert.deepEqual([now.text, now.done], ['62 of 200 left at that screen.', undefined]);
+    assert.equal(run('deeper', board, '--id', ask.id, '--text', 'That is 31%.').status, 0);
+    [now] = (await state()).deeper;
+    assert.deepEqual([now.text, now.done], ['62 of 200 left at that screen.\n\nThat is 31%.', true]);
+    assert.equal(run('deeper', board, '--id', ask.id, '--text', 'more').status, 1);
+    // The send-back: only what is off, every decision, and the plan stays on the board, with its read time once the agent has it.
+    assert.equal((await post('answers', { key: 'faster-sign-in', decisions: {} })).status, 400);
+    assert.equal((await post('answers', { key: 'faster-sign-in', notes: [{ section: 'understood', verdict: 'change' }], decisions: { rollout: 'tenth' } })).status, 400);
+    assert.equal((await post('answers', { key: 'faster-sign-in', notes: [{ section: 'understood', verdict: 'change', note: 'Also the tablet flow.' }], decisions: { rollout: 'all' } })).status, 200);
+    const sent = spawnSync('node', [cli, 'wait', board, '--filer', 'agent-41', '--events', '--timeout', '5'], { encoding: 'utf8', env });
+    const answer = JSON.parse(sent.stdout.split('\n')[0]);
+    assert.deepEqual([answer.event, answer.kind, answer.schema, answer.answer], ['answer', 'plan', 2, 'sent']);
+    assert.deepEqual([answer.decisions, answer.notes], [{ rollout: 'all' }, [{ section: 'understood', verdict: 'change', note: 'Also the tablet flow.' }]]);
+    assert.match((await state()).seen_at['faster-sign-in'], /^\d{4}-/);
+  } finally {
+    await new Promise((ok) => proc.once('exit', ok).kill());
+  }
+});
+
 test('post --kind evidence: a key the feed dropped after it was answered cannot be posted again, so no stale verdict re-attaches', () => {
   const env = { ...process.env, HOME: join(scratch, 'home') };
   delete env.CLAUDE_CODE_SESSION_ID;

@@ -1,0 +1,13 @@
+{
+  "contract": 1,
+  "kind": "plan",
+  "schema": 2,
+  "key": "rename-config",
+  "title": "Rename the config file",
+  "about": "One rename, one migration line. Umer loses nothing.",
+  "understood": [{"label": "You asked", "text": "Rename the config file to match the docs."}],
+  "visual": {"type": "steps", "heading": "Rename, migrate, remove the old name", "rows": [{"label": "Rename"}]},
+  "sections": [],
+  "decisions": [],
+  "next": {"heading": "I make the change and post the diff", "lines": ["The diff lands under Evidence."]}
+}

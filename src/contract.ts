@@ -8,7 +8,11 @@ export class ContractError extends Error {
   constructor(message: string, readonly help: string) { super(message); }
 }
 /** The kinds, with the schema number of each. */
-export const SCHEMAS: Record<string, number> = { ask: 1, report: 2, evidence: 1, gate: 1, finding: 1, plan: 1, design: 1 };
+export const SCHEMAS: Record<string, number> = { ask: 1, report: 3, evidence: 1, gate: 1, finding: 1, plan: 2, design: 1 };
+/** Older schemas this sign-off-axi still takes, so a board that holds them loads and re-posts: the page-based report 2 and plan 1. */
+const OLDER: Record<string, number[]> = { report: [2], plan: [1] };
+/** The guided schemas: a report 3 and a plan 2 are fields the board draws as one guided page, not a page the agent draws. */
+export const guided = (m: any) => (m?.kind === 'report' && m.schema === 3) || (m?.kind === 'plan' && m.schema === 2);
 export const KINDS = Object.keys(SCHEMAS);
 const COMMON = ['contract', 'kind', 'schema', 'key', 'title', 'filer', 'link', 'about'];
 const FIELDS: Record<string, string[]> = {
@@ -19,6 +23,11 @@ const FIELDS: Record<string, string[]> = {
   finding: [...COMMON, 'cause', 'incidents', 'days', 'evidence_ids', 'change_kind', 'proposal', 'options', 'recommend_value'],
   plan: [...COMMON, 'project', 'sections', 'decisions', 'steps', 'view'],
   design: [...COMMON, 'group', 'filed', 'status', 'preview', 'journeys', 'options', 'recommend'],
+};
+const GUIDE = ['understood', 'visual', 'sections', 'next'];
+const GUIDE_FIELDS: Record<string, string[]> = {
+  report: [...COMMON, 'filed', 'group', 'decided', 'asked_by', ...GUIDE],
+  plan: [...COMMON, 'project', 'decisions', ...GUIDE],
 };
 /** A done-done run: its id, full commit and the four Checks lines. */
 const RUN = ['run_id', 'commit', 'outcome', 'repro', 'proof', 'evidence'];
@@ -103,10 +112,10 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
     if (!(typeof r.commit === 'string' && /^[a-f0-9]{40}$/.test(r.commit))) throw bad('run.commit', 'must be a full 40-character lowercase commit', 'Set "commit" to the full hash, such as the output of git rev-parse HEAD');
     for (const f of fields.slice(2)) text(`run.${f}`, r[f], 1000, `the run's ${f} Checks line, in 1000 characters or fewer`);
   };
-  /** A list of min to max objects, each with only `fields`: a plan's sections, decisions and steps. */
-  const list = (f: string, min: number, max: number, fields: string[], example: string): any[] => {
-    const v = m[f], one = f.slice(0, -1), set = `Set "${f}" to ${min}-${max} objects such as ${example}`;
-    if (!Array.isArray(v) || v.length < min || v.length > max) throw bad(f, Object.hasOwn(m, f) ? `must list ${min} to ${max} ${f}` : 'is required', set);
+  /** A list of min to max objects, each with only `fields`: a plan's sections, decisions and steps, or `v` for a list inside one. */
+  const list = (f: string, min: number, max: number, fields: string[], example: string, v: any = m[f]): any[] => {
+    const one = f.replace(/^.*[.\]]/, '').slice(0, -1), set = `Set "${f}" to ${min}-${max} objects such as ${example}`;
+    if (!Array.isArray(v) || v.length < min || v.length > max) throw bad(f, v !== undefined ? `must list ${min} to ${max} ${f.replace(/^.*[.\]]/, '')}` : 'is required', set);
     v.forEach((o: any, n: number) => {
       if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad(`${f}[${n}]`, 'must be an object', set);
       const odd = Object.keys(o).find((k) => !fields.includes(k));
@@ -143,6 +152,74 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
     if (/^([\\/]|[A-Za-z]:)/.test(m[f]) || m[f].split(/[\\/]/).includes('..') || /[?#\\]/.test(m[f])) throw bad(f, `${show(m[f])} must be a relative path with no .., ?, # or \\`, `Set "${f}" to ${example}, a path from the board file's folder`);
     if (!ends.test(m[f])) throw bad(f, `${show(m[f])} must end in ${kinds}`, help);
   };
+  const g = guided(m);
+  const TONES = ['ok', 'warn', 'bad'];
+  const one = (field: string, o: any, fields: string[], example: string) => {
+    if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad(field, 'must be an object', `Write it as ${example}`);
+    const odd = Object.keys(o).find((k) => !fields.includes(k));
+    if (odd !== undefined) throw bad(`${field}.${escaped(odd) || '""'}`, `is not a field there`, `Remove ${show(odd)}; it has only ${fields.join(', ')}`);
+  };
+  const tone = (field: string, o: any) => {
+    if (Object.hasOwn(o, 'tone') && !TONES.includes(o.tone)) throw bad(`${field}.tone`, `${show(o.tone)} is not one of ${TONES.join(', ')}`, `Set "tone" to ${TONES.join(', ')}, or leave it out`);
+  };
+  /** label and value pairs folded behind a Details tap: the numbers that back a point. */
+  const details = (field: string, v: any) => list(field, 1, 8, ['label', 'value'], '{"label":"Timed","value":"12 Oct, test phone"}', v).forEach((o, n) => {
+    text(`${field}[${n}].label`, o.label, 40, 'the number\'s name, in 40 characters or fewer');
+    text(`${field}[${n}].value`, o.value, 120, 'the number and its unit, in 120 characters or fewer');
+  });
+  /** The guided page every plan 2 and report 3 is: what I understood, one picture, sections with expandable items, and the next step. Returns the section ids. */
+  const guide = (minSections: number): string[] => {
+    list('understood', 1, 6, ['label', 'text'], '{"label":"You asked","text":"Make the first start smooth."}').forEach((o, n) => {
+      text(`understood[${n}].label`, o.label, 40, 'what this line is, such as "You asked" or "Done when", in 40 characters or fewer');
+      text(`understood[${n}].text`, o.text, 240, 'your reading of it, in 240 characters or fewer');
+    });
+    const v = m.visual;
+    if (!Object.hasOwn(m, 'visual')) throw bad('visual', 'is required: one picture for the answer', 'Add "visual": {"type":"bars","heading":"...","rows":[{"label":"Cloud box","value":4.5}]}');
+    one('visual', v, ['type', 'heading', 'text', 'unit', 'rows', 'details'], '{"type":"bars","heading":"...","rows":[...]}');
+    if (!['bars', 'steps', 'tiles'].includes(v.type)) throw bad('visual.type', `${show(v.type)} is not one of bars, steps, tiles`, 'Set "type" to "bars" for numbers, "steps" for a sequence, "tiles" for parallel points');
+    text('visual.heading', v.heading, 100, 'the point the picture makes, in 100 characters or fewer');
+    if (Object.hasOwn(v, 'text')) text('visual.text', v.text, 240, 'one line under the picture, in 240 characters or fewer, or leave it out');
+    if (Object.hasOwn(v, 'unit')) {
+      if (v.type !== 'bars') throw bad('visual.unit', 'is only for bars', 'Remove "unit"');
+      text('visual.unit', v.unit, 12, 'the unit shown after each number, such as "min", in 12 characters or fewer');
+    }
+    list('visual.rows', 2, 8, ['label', 'text', 'note', 'tone', 'value', 'before'], '{"label":"Cloud box","value":4.5,"note":"slow","tone":"bad"}', v.rows).forEach((o, n) => {
+      const at = `visual.rows[${n}]`;
+      text(`${at}.label`, o.label, 60, 'the row name, in 60 characters or fewer');
+      if (Object.hasOwn(o, 'text')) text(`${at}.text`, o.text, 160, 'one line, in 160 characters or fewer, or leave it out');
+      if (Object.hasOwn(o, 'note')) text(`${at}.note`, o.note, 40, 'a short tag, in 40 characters or fewer, or leave it out');
+      tone(at, o);
+      for (const f of ['value', 'before']) {
+        if (!Object.hasOwn(o, f)) { if (f === 'value' && v.type === 'bars') throw bad(`${at}.value`, 'is required on a bars row', 'Set "value" to the number the bar shows'); continue; }
+        if (v.type !== 'bars') throw bad(`${at}.${f}`, 'is only for bars', `Remove "${f}", or set "type" to "bars"`);
+        if (typeof o[f] !== 'number' || !Number.isFinite(o[f]) || o[f] < 0) throw bad(`${at}.${f}`, 'must be a number, 0 or more', `Set "${f}" to a number such as 4.5`);
+      }
+    });
+    if (Object.hasOwn(v, 'details')) details('visual.details', v.details);
+    const ids = list('sections', minSections, 6, ['id', 'stage', 'heading', 'body', 'items', 'details'], '{"id":"steps","stage":"recommend","heading":"Eight steps, 22 to 31 Oct","body":"..."}').map((o, n) => {
+      const at = `sections[${n}]`;
+      if (!(typeof o.id === 'string' && /^[a-z0-9-]{1,40}$/.test(o.id))) throw bad(`${at}.id`, 'must be 1-40 of a-z 0-9 -', 'Set "id" to a short slug such as "steps"');
+      if (!['found', 'recommend'].includes(o.stage)) throw bad(`${at}.stage`, `${show(o.stage)} is not found or recommend`, 'Set "stage" to "found" (what I found) or "recommend" (what I recommend)');
+      text(`${at}.heading`, o.heading, 80, 'the section heading, in 80 characters or fewer');
+      text(`${at}.body`, o.body, 300, 'the section\'s lead, in 300 characters or fewer');
+      if (Object.hasOwn(o, 'items')) list(`${at}.items`, 1, 8, ['title', 'text', 'more', 'tone'], '{"title":"Ship 0.2.5","text":"You test it.","more":"..."}', o.items).forEach((it, k) => {
+        text(`${at}.items[${k}].title`, it.title, 80, 'the item, in 80 characters or fewer');
+        text(`${at}.items[${k}].text`, it.text, 160, 'one line under it, in 160 characters or fewer');
+        if (Object.hasOwn(it, 'more')) text(`${at}.items[${k}].more`, it.more, 600, 'what opens when it is tapped, in 600 characters or fewer, or leave it out');
+        tone(`${at}.items[${k}]`, it);
+      });
+      if (Object.hasOwn(o, 'details')) details(`${at}.details`, o.details);
+      return o.id;
+    });
+    const twice = ids.findIndex((id, n) => ids.indexOf(id) < n);
+    if (twice >= 0) throw bad(`sections[${twice}].id`, `repeats ${ids[twice]}`, 'Give every section its own id');
+    if (!Object.hasOwn(m, 'next')) throw bad('next', 'is required', 'Add "next": {"heading":"Go ahead, and I start on 22 Oct","lines":["..."]}');
+    one('next', m.next, ['heading', 'lines'], '{"heading":"...","lines":["..."]}');
+    text('next.heading', m.next.heading, 80, 'the next step, in 80 characters or fewer');
+    if (!Array.isArray(m.next.lines) || m.next.lines.length < 1 || m.next.lines.length > 4) throw bad('next.lines', 'must list 1 to 4 lines', 'Set "lines" to 1-4 texts, what happens after the person answers');
+    m.next.lines.forEach((l: unknown, n: number) => text(`next.lines[${n}]`, l, 160, 'one line, in 160 characters or fewer'));
+    return ids;
+  };
   need('contract');
   if (m.contract !== 1) throw bad('contract', `must be 1, not ${show(m.contract)}`, whole(m.contract) ? 'Upgrade sign-off-axi: this one knows contract 1' : 'Set "contract": 1');
   need('kind');
@@ -151,8 +228,9 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
   need('schema');
   if (!whole(m.schema)) throw bad('schema', `must be a whole number, not ${show(m.schema)}`, `Set "schema": ${SCHEMAS[m.kind]}`);
   if (m.kind === 'report' && m.schema === 1) throw bad('schema', '1 of report is text only: a report must be a page to tap through, with "view" and "preview"', PAGE_HELP);
-  if (m.schema !== SCHEMAS[m.kind]) throw bad('schema', `${m.schema} of ${m.kind} is not in this sign-off-axi`, `Upgrade sign-off-axi, or post ${m.kind} schema ${SCHEMAS[m.kind]}`);
-  const fields = FIELDS[m.kind], extra = Object.keys(m).find((f) => !fields.includes(f));
+  if (m.schema !== SCHEMAS[m.kind] && !OLDER[m.kind]?.includes(m.schema)) throw bad('schema', `${m.schema} of ${m.kind} is not in this sign-off-axi`, `Upgrade sign-off-axi, or post ${m.kind} schema ${SCHEMAS[m.kind]}`);
+  if (g && /FILL:/.test(JSON.stringify(m))) throw bad('message', 'still has FILL: lines from the template', 'Replace every FILL: line with your own words, then post again');
+  const fields = guided(m) ? GUIDE_FIELDS[m.kind] : FIELDS[m.kind], extra = Object.keys(m).find((f) => !fields.includes(f));
   if (extra === 'options' && m.kind === 'report') throw bad('options', 'is not a field of report: a report takes no answer', 'Remove "options", or post an ask to get an answer');
   if (extra === 'options' && m.kind === 'plan') throw bad('options', 'is not a field of plan: its answers come from its sections and decisions', 'Remove "options"; put each question in "decisions", with its options and "recommend"');
   if (extra !== undefined) throw bad(escaped(extra) || '""', `is not a field of ${m.kind} schema ${m.schema}`, `Remove ${show(extra)}; ${m.kind} takes ${fields.slice(3).join(', ')}`);
@@ -194,6 +272,7 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
     if (Object.hasOwn(m, 'video')) text('video', m.video, 10, 'the video length such as "0:28", in 10 characters or fewer, or leave it out');
     if (Object.hasOwn(m, 'asked_by')) text('asked_by', m.asked_by, 40, 'who asked for it, such as "You asked" or "Docs agent", in 40 characters or fewer, or leave it out');
     // A report is a page to tap through and a picture of it for the card: text alone is a status note, not a report.
+    if (g) { guide(1); return { kind: m.kind, schema: m.schema }; }
     const need = 'a report is a page to tap through, not text';
     page('view', /\.html$/i, '.html', '"mocks/<key>/index.html"', need);
     page('preview', /\.(svg|png|jpe?g|webp)$/i, '.svg, .png, .jpg, .jpeg or .webp', '"mocks/<key>/preview.svg"', need);
@@ -238,7 +317,7 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
   // A plan is sections to approve or change, decisions with a recommended pick, steps to tap through, and where it goes as a diagram.
   if (m.kind === 'plan') {
     if (Object.hasOwn(m, 'project')) text('project', m.project, 40, 'the project name, in 40 characters or fewer, or leave it out');
-    const ids = list('sections', 1, 8, ['id', 'heading', 'body'], '{"id":"goals","heading":"Goals and non-goals","body":"<what it does and does not do>"}').map((o, n) => {
+    const ids = g ? guide(0) : list('sections', 1, 8, ['id', 'heading', 'body'], '{"id":"goals","heading":"Goals and non-goals","body":"<what it does and does not do>"}').map((o, n) => {
       if (!(typeof o.id === 'string' && /^[a-z0-9-]{1,40}$/.test(o.id))) throw bad(`sections[${n}].id`, 'must be 1-40 of a-z 0-9 -', 'Set "id" to a short slug such as "goals"');
       text(`sections[${n}].heading`, o.heading, 80, 'the section heading, in 80 characters or fewer');
       text(`sections[${n}].body`, o.body, 1000, 'the section, in 1000 characters or fewer');
@@ -246,7 +325,7 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
     });
     const twice = ids.findIndex((id, n) => ids.indexOf(id) < n);
     if (twice >= 0) throw bad(`sections[${twice}].id`, `repeats ${ids[twice]}`, 'Give every section its own id');
-    list('decisions', 0, 5, ['key', 'question', 'why', 'reason', 'after', 'options', 'recommend'], '{"key":"store","question":"Keep plans in the board file?","why":"...","options":[...],"recommend":"yes"}').forEach((o, n, all) => {
+    list('decisions', 0, 5, g ? ['key', 'question', 'why', 'reason', 'quiet', 'options', 'recommend'] : ['key', 'question', 'why', 'reason', 'after', 'options', 'recommend'], '{"key":"store","question":"Keep plans in the board file?","why":"...","options":[...],"recommend":"yes"}').forEach((o, n, all) => {
       const at = `decisions[${n}]`;
       if (!isKey(o.key)) throw bad(`${at}.key`, 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "key" to a short id such as "store"');
       if (all.slice(0, n).some((p) => p.key === o.key)) throw bad(`${at}.key`, `repeats ${o.key}`, 'Give every decision its own key');
@@ -257,11 +336,13 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
       if (!/[\p{L}\p{N}]/u.test(q) || q.split(/\s+/).length > 12) throw bad(`${at}.question`, 'must be one question of 12 words or fewer, ending in a question mark', 'Ask it in 12 words or fewer, ending in a question mark; put the rest in "why"');
       text(`${at}.why`, o.why, 500, 'why it matters, in 500 characters or fewer');
       if (Object.hasOwn(o, 'reason')) text(`${at}.reason`, o.reason, 300, 'why the recommended option, in 300 characters or fewer, or leave it out');
+      if (Object.hasOwn(o, 'quiet')) text(`${at}.quiet`, o.quiet, 160, 'what happens if the person stays quiet, in 160 characters or fewer, or leave it out');
       if (Object.hasOwn(o, 'after') && !ids.includes(o.after)) throw bad(`${at}.after`, `must be the id of one of the plan's sections`, `Set "after" to one of: ${ids.join(', ')}`);
       if (!Array.isArray(o.options) || o.options.length < 2 || o.options.length > 6) throw bad(`${at}.options`, Object.hasOwn(o, 'options') ? 'must list 2 to 6 options' : 'is required', 'Set "options" to 2-6 objects such as {"value":"yes","label":"Yes","outcome":"Plans live in the board file"}');
       checkOptions(`${at}.options`, o.options, 'plan');
       recommend(`${at}.recommend`, o, o.options);
     });
+    if (g) return { kind: m.kind, schema: m.schema };
     if (Object.hasOwn(m, 'steps')) list('steps', 2, 12, ['title', 'text'], '{"title":"The agent posts the plan"}').forEach((o, n) => {
       text(`steps[${n}].title`, o.title, 80, 'the step, in 80 characters or fewer');
       if (Object.hasOwn(o, 'text')) text(`steps[${n}].text`, o.text, 300, 'what happens in this step, in 300 characters or fewer, or leave it out');
