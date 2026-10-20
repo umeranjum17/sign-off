@@ -365,7 +365,9 @@ test('the skill and README command checklist runs as written on a fresh install'
   assert.match(ok(axi('post', '.sign-off/decisions.json', '--type', 'design', '--title', 'Pick the sign-in layout', '--key', 'pick-layout',
     '--option', 'a=A: single column', '--option', 'b=B: split screen', '--option', 'c=C: cards',
     '--mock', 'a=mocks/pick-layout/a.html', '--mock', 'b=mocks/pick-layout/b.html', '--mock', 'c=mocks/pick-layout/c.html',
-    '--tradeoff', 'B scans fastest; A is simplest.', '--recommend', 'b'), 'design post'), /pick-layout,raised/);
+    '--link', 'b=https://example.com/b?x=1&y=2', '--tradeoff', 'B scans fastest; A is simplest.', '--recommend', 'b'), 'design post'), /pick-layout,raised/);
+  // An option's --link is stored on that option's mock, and only there.
+  assert.deepEqual(JSON.parse(readFileSync(board, 'utf8')).items.find((i) => i.key === 'pick-layout').mocks.map((m) => m.link), [undefined, 'https://example.com/b?x=1&y=2', undefined]);
   // SKILL.md: one index.html shows the variant ?variant= names.
   wrote('mocks/one-page/index.html');
   assert.match(ok(axi('post', '.sign-off/decisions.json', '--type', 'design', '--title', 'Pick one page layout', '--key', 'one-page',

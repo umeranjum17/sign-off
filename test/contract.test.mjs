@@ -926,6 +926,8 @@ test('every guard refuses bad input with a reason and one fix line, and never fa
     [['post', board, '--type', 'diagram', '--title', 'T?', '--view', 'mocks/k/gone.svg'], 1, /is not a file/, /relative to the board file's folder/],
     [['post', board, '--type', 'design', '--title', 'T?', '--option', 'a=A', '--option', 'b=B', '--mock', 'a=mocks/k/a.txt', '--recommend', 'a'], 2, /--mock .* must end in/, /Name the mock file itself/],
     [['post', board, '--type', 'design', '--title', 'T?', '--option', 'a=A', '--option', 'b=B', '--mock', 'a=../escape.html', '--recommend', 'a'], 2, /escapes the board folder/, /next to the board file/],
+    [['post', board, '--type', 'design', '--title', 'T?', '--option', 'a=A', '--option', 'b=B', '--mock', 'a=mocks/k/a.html', '--link', 'b=https://example.com/b', '--recommend', 'a'], 2, /--link b=https:\/\/example\.com\/b must be <value>=<url> with a --mock/, /--link a=https/],
+    [['post', board, '--type', 'design', '--title', 'T?', '--option', 'a=A', '--option', 'b=B', '--mock', 'a=mocks/k/a.html', '--link', 'a=javascript:alert(1)', '--recommend', 'a'], 2, /a link must be an http\(s\) link/, /post --help/],
     [['post', board, '--type', 'evidence', '--title', 'T?', '--about', 'x', '--media', 'gone.png'], 1, /gone\.png is not there/, /Name a file that is there/],
     [['post', board, '--type', 'evidence', '--title', 'T?', '--about', 'x', '--media', 'notes.txt'], 2, /must end in \.png, \.jpg/, /media shot\.png/],
     [['post', board, '--type', 'evidence', '--title', 'T?', '--about', 'x'], 2, /needs 1 to 12 --media files/, /--media shot\.png/],
