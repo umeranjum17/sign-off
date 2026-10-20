@@ -10,7 +10,7 @@ Guided plan 3 / report 4 add **Simplify this**. Inspect version-1 action/target 
 | Command | In a few words |
 |---|---|
 | `list` | show what is waiting on you |
-| `raise` | ask a yes/no or pick-one question |
+| `raise` | ask a yes/no or pick-one question with `--ask-ref <captain-message-id-or-hold-id>` |
 | `post` | ask any kind, or post a contract message |
 | `answers` | read the saved answers |
 | `wait` | block until the user answers |
@@ -33,7 +33,7 @@ Guided plan 3 / report 4 add **Simplify this**. Inspect version-1 action/target 
 | `help` | show the commands and flags |
 
 ```
-$ sign-off-axi raise --title "Keep the weekly digest?" --why "Open rate held steady." --outcome yes="It keeps going out." --outcome no="It stops this week." --recommend yes --recommend-reason "Readers still open it." --default yes
+$ sign-off-axi raise --ask-ref message-example --title "Keep the weekly digest?" --why "Open rate held steady." --outcome yes="It keeps going out." --outcome no="It stops this week." --recommend yes --recommend-reason "Readers still open it." --default yes
 board: ~/.sign-off/decisions.json
 raised[1]{key,status,title}:
   keep-the-weekly-digest,raised,Keep the weekly digest?
@@ -72,7 +72,7 @@ Every item records who filed it, and that agent gets the answer as an event,
 by itself:
 
 ```sh
-sign-off-axi raise \
+sign-off-axi raise --ask-ref <captain-message-id-or-hold-id> \
   --title "Keep the weekly digest?" \
   --filer my-agent
 sign-off-axi wait \

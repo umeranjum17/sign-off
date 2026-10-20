@@ -14,7 +14,7 @@ after(async () => {
   await Promise.all(procs.map((p) => p.exitCode ?? p.signalCode ?? new Promise((ok) => p.once('exit', ok).kill())));
   rmSync(scratch, { recursive: true, force: true });
 });
-const run = (...args) => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8', env });
+const run = (...args) => spawnSync(process.execPath, [cli, ...args, ...((args[0] === 'raise' || args[0] === 'post') && !args.includes('--kind') ? ['--ask-ref', 'message-test'] : [])], { encoding: 'utf8', env });
 // A question that meets the standard; each refusal case changes one flag of it.
 const good = ['--title', 'Ship the new sign-in screen this week?', '--why', 'The screen is ready and the release goes out Friday.',
   '--outcome', 'yes=It ships to everyone on Friday.', '--outcome', 'no=It waits for next week.', '--recommend', 'yes',
@@ -22,6 +22,54 @@ const good = ['--title', 'Ship the new sign-in screen this week?', '--why', 'The
 const without = (...flags) => good.filter((a, i) => !flags.includes(a) && !flags.includes(good[i - 1]));
 const pick = (title) => ['--title', title, '--why', 'Two fixes are still in review.', '--option', 'a=A: Today', '--option', 'b=B: Friday',
   '--outcome', 'a=It ships now.', '--outcome', 'b=It ships with the fixes.', '--recommend', 'b', '--recommend-reason', 'The fixes land Thursday.', '--default', 'b'];
+
+test('new Decide cards require a captain message or hold; legacy cards still re-post', () => {
+  const direct = (...args) => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8', env });
+  const board = join(scratch, 'ask-reference.json'), file = join(scratch, 'unreferenced-ask.json');
+  const ask = JSON.parse(readFileSync(new URL('../fixtures/contract/ask.v1/valid-yes-no.json', import.meta.url)));
+  delete ask.ask_ref;
+  writeFileSync(file, JSON.stringify(ask));
+  for (const args of [
+    ['post', board, ...good], ['raise', board, ...good],
+    ['post', board, '--kind', 'ask', '--from', file],
+  ]) {
+    const refused = direct(...args);
+    assert.equal(refused.status, 2, refused.stdout);
+    assert.match(refused.stdout, /--ask-ref <captain-message-id-or-hold-id>/);
+    assert.match(refused.stdout, /Follow-ups belong in the backlog, not the board/);
+    assert.equal(existsSync(board), false);
+  }
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [ask] }));
+  for (const flags of [[], ['--replace']]) {
+    const refused = direct('post', board, '--from', file, ...flags);
+    assert.equal(refused.status, 2, refused.stdout);
+    assert.match(refused.stdout, /captain ask reference/);
+  }
+  for (const ref of ['', ' ', 'not an id', 'x'.repeat(257)]) {
+    assert.equal(direct('post', board, ...good, '--ask-ref', ref).status, 2);
+  }
+  assert.equal(direct('post', board, ...good, '--ask-ref', 'message-42').status, 0);
+  assert.equal(JSON.parse(readFileSync(board)).items[0].ask_ref, 'message-42');
+  assert.equal(direct('post', board, ...good).status, 0);
+  const holdBoard = join(scratch, 'hold-reference.json');
+  assert.equal(direct('post', holdBoard, '--from', file, '--ask-ref', 'hold-7').status, 0);
+  assert.equal(JSON.parse(readFileSync(holdBoard)).items[0].ask_ref, 'hold-7');
+  const replacedBoard = join(scratch, 'replace-reference.json');
+  assert.equal(direct('post', replacedBoard, '--from', file, '--replace', '--ask-ref', 'hold-9').status, 0);
+  assert.equal(JSON.parse(readFileSync(replacedBoard)).items[0].ask_ref, 'hold-9');
+  ask.ask_ref = 'hold-8';
+  writeFileSync(file, JSON.stringify(ask));
+  const kindBoard = join(scratch, 'kind-reference.json');
+  assert.equal(direct('post', kindBoard, '--kind', 'ask', '--from', file).status, 0);
+  assert.equal(JSON.parse(readFileSync(kindBoard)).items[0].ask_ref, 'hold-8');
+  // Old persisted asks have no provenance requirement, including a feed re-post.
+  delete ask.ask_ref;
+  const legacy = join(scratch, 'legacy-reference.json');
+  writeFileSync(legacy, JSON.stringify({ schema: 2, items: [ask] }));
+  assert.equal(direct('post', legacy, '--kind', 'ask', '--from', file).status, 2); // changed message is still refused
+  writeFileSync(file, JSON.stringify(ask));
+  assert.equal(direct('post', legacy, '--kind', 'ask', '--from', file).status, 0);
+});
 
 test('the question standard: every rule refuses a new question at post time, naming the field and one fix', () => {
   const board = join(scratch, 'refusals.json');

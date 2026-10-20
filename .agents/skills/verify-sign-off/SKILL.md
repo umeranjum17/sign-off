@@ -25,6 +25,7 @@ Read-only: is this instance worth driving? The URL answers with the page titled 
 
 Harness: a browser (chrome-devtools-axi, one CHROME_DEVTOOLS_AXI_SESSION per run) for the board, a terminal for the CLI. Prefer the repo's real handles (hash routes, button labels) over coordinates:
 
+- Decide ask reference (CLI only, screen: none): `npm run build && node --test --test-global-setup=./test/temp-folder.mjs --test-name-pattern='new Decide cards' test/question.test.mjs` drives the built CLI on isolated boards: new flag, contract-message and feed posts without a reference fail without writing a card; captain-message and hold references succeed and persist; malformed references fail; existing cards still re-post. Capture the TAP output as text. Plans, reports, evidence and engagement remain covered by their existing journeys.
 - Server lifecycle (CLI only, screen: none): `npm run build && node --test test/serve-stop.test.mjs` starts two isolated foreground boards, follows the printed `stop <board>` guidance, checks exit/PID/port/record removal and repeated-stop no-op, and proves the other board stays reachable. See `docs/commands.md` for background `open` versus foreground `serve`.
 - [Board shell](features/board-shell.md): the areas, the sidebar on a desk, the tab bar on a phone, light and dark
 - [Plan review](features/plan-review.md): open a plan, approve or change sections, answer decisions and send back structured answers

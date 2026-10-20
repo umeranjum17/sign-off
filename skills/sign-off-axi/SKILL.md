@@ -64,6 +64,7 @@ The user often reads the board on a phone. Each card must make sense in 10 secon
 
 sign-off refuses a question that breaks these rules, naming the field and one fix; `raise --help` has the current flags.
 
+- A new Decide question needs `--ask-ref <captain-message-id-or-hold-id>` (`ask_ref` in a message or feed): the captain message or real hold that needs this answer. Use the actual id, not a made-up reference. The CLI checks its shape, not its existence in another tool. Follow-ups belong in the backlog, not the board. Plans, reports, evidence, engagement records and already-posted cards keep working.
 - One decision is one card. Before you post, run `npx -y sign-off-axi list --full` and look at the open cards. If the same decision is already there, do not ask it again: wait on that card, or, to ask it better, post one card with `--merge <its key>`: the old card must offer every option of the new one, and it is hidden and closed by the answer too. Never post a second card for one decision: an ask that repeats an open one (the same answers, titles that share at least 80% of their words) is not posted, and the refusal names the card to wait on. When one card is answered, every open ask on the same decision takes the answer too. A card is named by one ask until that ask is answered; a merged card merges nothing itself, and an answered or dismissed card is never merged.
 - Title: one plain question of 12 words or fewer, ending in "?", that the buttons answer. No "Say yes or no:", "Captain hold:" or "Captain:" prefix, no task names or ids.
 - `--why`: 1 or 2 short lines on what it is about and why it needs an answer now.
@@ -77,7 +78,7 @@ sign-off refuses a question that breaks these rules, naming the field and one fi
 A good yes/no question:
 
 ```
-npx -y sign-off-axi raise --title "Ship the new sign-in screen this week?" \
+npx -y sign-off-axi raise --ask-ref <captain-message-id-or-hold-id> --title "Ship the new sign-in screen this week?" \
   --why "The screen is ready and the release goes out Friday." \
   --outcome yes="It ships to everyone on Friday." --outcome no="It waits for next week's release." \
   --recommend yes --recommend-reason "Every check passed on 3 phones." \
@@ -87,7 +88,7 @@ npx -y sign-off-axi raise --title "Ship the new sign-in screen this week?" \
 A good A/B/C pick:
 
 ```
-npx -y sign-off-axi raise --title "Which day should the release ship?" \
+npx -y sign-off-axi raise --ask-ref <captain-message-id-or-hold-id> --title "Which day should the release ship?" \
   --why "Two fixes are still in review." \
   --option a="A: Today" --option b="B: Friday" --option c="C: Next week" \
   --outcome a="It ships now, without the 2 fixes." --outcome b="It ships with both fixes." --outcome c="It waits for the redesign too." \

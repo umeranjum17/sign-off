@@ -18,7 +18,7 @@ cp "$f/report.v2/page/"* "$dir/page/"
 cp "$f/plan.v1/page/index.html" "$dir/page/plan.html"
 sed 's#"page/index.html"#"page/plan.html"#' "$f/plan.v1/valid-full.json" > "$dir/plan.json"
 
-so post "$board" --title "Keep the weekly digest?" --about "Open rate held steady at about a third for two months." --why "Open rate held steady for two months." --outcome yes="It keeps going out each week." --outcome no="It stops after this week." --recommend yes --recommend-reason "Readers still open it." --default yes
+so post "$board" --ask-ref message-demo --title "Keep the weekly digest?" --about "Open rate held steady at about a third for two months." --why "Open rate held steady for two months." --outcome yes="It keeps going out each week." --outcome no="It stops after this week." --recommend yes --recommend-reason "Readers still open it." --default yes
 # A design pick takes mocks and a tradeoff; the question standard (--why, --outcome) is for --type decision only.
 so post "$board" --type design --key look --title "Which settings layout should ship?" --option a="A: one column" --option b="B: two columns" \
   --mock a=mocks/a.webp --mock b=mocks/b.webp --link a=http://100.64.0.1:4430/#/o/1/play --link b=http://100.64.0.1:4430/#/o/2/play --tradeoff "B scans faster; A is simpler. Open in first-draft: One column http://100.64.0.1:4430/#/o/1/play · Two columns http://100.64.0.1:4430/#/o/2/play" --recommend b
@@ -45,14 +45,14 @@ cat > "$dir/evidence-run.json" <<JSON
 JSON
 so post "$board" --kind evidence --from "$dir/evidence-run.json" >/dev/null
 # The ship question rests on the passed update above, so Decide shows that capture and result at its top.
-so post "$board" --key ship --title "When should the new settings page ship?" --about "No new bug reports for three weeks." --why "No new bug reports for three weeks." \
+so post "$board" --ask-ref message-demo --key ship --title "When should the new settings page ship?" --about "No new bug reports for three weeks." --why "No new bug reports for three weeks." \
   --option friday=Friday --option next-week="Next week" --outcome friday="The page ships Friday." --outcome next-week="The page ships next week." --recommend friday --recommend-reason "Three quiet weeks support shipping." --default next-week \
   --proof update-2
 # The fixture is dated 2026-10-13 and a board archives reports a day after they were filed, so the seed files it as of now.
 sed -E "s/\"filed\": *\"[^\"]*\"/\"filed\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"/" "$f/report.v2/valid-full.json" > "$dir/report-now.json"
 so post "$board" --kind report --from "$dir/report-now.json" || \
   so post "$board" --type report --title "Sign-in now takes 2 steps" --about "Why the code step moved first." --view page/index.html --preview page/preview.svg
-so post "$board" --key digest-old --title "Send the digest on Mondays?" --why "Choose the weekly digest schedule." --outcome yes="The digest goes out Mondays." --outcome no="The digest is paused." --recommend yes --recommend-reason "A weekly update stays useful." --default yes
+so post "$board" --ask-ref message-demo --key digest-old --title "Send the digest on Mondays?" --why "Choose the weekly digest schedule." --outcome yes="The digest goes out Mondays." --outcome no="The digest is paused." --recommend yes --recommend-reason "A weekly update stays useful." --default yes
 
 timeout "${SEED_SERVE_SECONDS:-1800}" node "$repo/dist/cli.js" serve "$board" --port 0 --evidence-root "$dir" > "$dir/serve.log" 2>&1 &
 echo $! > "$dir/serve.pid"

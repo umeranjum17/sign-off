@@ -22,7 +22,7 @@ const cli = (dir, args, env = {}) => new Promise((resolve, reject) => {
   child.on('close', (code) => code ? reject(new Error(stderr || stdout)) : resolve(stdout));
 });
 const board = (dir) => join(dir, '.sign-off', 'board.json');
-const raise = (dir, env) => cli(dir, ['post', board(dir), '--title', 'Review this?', '--why', 'Umer: one line.', '--outcome', 'yes=Go', '--outcome', 'no=Stop', '--recommend', 'yes', '--recommend-reason', 'Safe.', '--default', 'no'], env);
+const raise = (dir, env) => cli(dir, ['post', board(dir), '--title', 'Review this?', '--ask-ref', 'message-test', '--why', 'Umer: one line.', '--outcome', 'yes=Go', '--outcome', 'no=Stop', '--recommend', 'yes', '--recommend-reason', 'Safe.', '--default', 'no'], env);
 const setup = (dir, notify = '') => {
   mkdirSync(join(dir, '.sign-off'), { recursive: true });
   writeFileSync(board(dir), '{"schema":2,"items":[]}');
@@ -109,7 +109,7 @@ test('an undone answer puts the card back in Waiting without another notice', { 
   assert.equal((await answer({ key: 'review-this', answer: 'yes' })).status, 200);
   assert.equal((await answer({ key: 'review-this', answer: '' })).status, 200);
   assert.deepEqual(JSON.parse(await cli(dir, ['answers', board(dir), '--json'])), {}, 'the undone card waits again');
-  await cli(dir, ['post', board(dir), '--key', 'second', '--title', 'Ship this too?', '--why', 'Umer: one line.', '--outcome', 'yes=Go', '--outcome', 'no=Stop', '--recommend', 'yes', '--recommend-reason', 'Safe.', '--default', 'no'], TOKEN);
+  await cli(dir, ['post', board(dir), '--key', 'second', '--title', 'Ship this too?', '--ask-ref', 'message-test', '--why', 'Umer: one line.', '--outcome', 'yes=Go', '--outcome', 'no=Stop', '--recommend', 'yes', '--recommend-reason', 'Safe.', '--default', 'no'], TOKEN);
   await until(() => hits.length === 2);
   await sleep(400);
   assert.deepEqual(hits.map((h) => h.body.id), ['review-this', 'second'], 'the undone card is not announced again');
@@ -197,7 +197,7 @@ test('muxr receiver: a raised card posts title, body, url and id with the bearer
   setup(dir, muxrBlock(url));
   const env = muxrHome('muxr', 'file-token-123');
   const long = 'Authentication infrastructure modernization recommendations considered thoroughly yesterday afternoon, regardless?';
-  const output = await cli(dir, ['post', board(dir), '--title', long, '--why', 'Umer: one line.', '--outcome', 'yes=Go', '--outcome', 'no=Stop', '--recommend', 'yes', '--recommend-reason', 'Safe.', '--default', 'no'], env);
+  const output = await cli(dir, ['post', board(dir), '--title', long, '--ask-ref', 'message-test', '--why', 'Umer: one line.', '--outcome', 'yes=Go', '--outcome', 'no=Stop', '--recommend', 'yes', '--recommend-reason', 'Safe.', '--default', 'no'], env);
   await until(() => hits.length === 1);
   assert.equal(hits[0].auth, 'Bearer file-token-123');
   assert.deepEqual(Object.keys(hits[0].body).sort(), ['body', 'id', 'title', 'url']);

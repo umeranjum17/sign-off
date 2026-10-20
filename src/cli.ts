@@ -38,7 +38,7 @@ board: the nearest .sign-off/ board (the walk's bounds and SIGN_OFF_HOME: README
 flags: --full and --json on list, answers and wait, --events on wait, --json on status, --filer on post, raise and wait, --help on every command, -v/--version
 examples:
   sign-off-axi
-  sign-off-axi raise --title "Ship the new sign-in screen this week?" --why "The screen is ready; the release goes out Friday." --outcome yes="It ships Friday." --outcome no="It waits a week." --recommend yes --recommend-reason "Tests pass on every phone." --default no
+  sign-off-axi raise --ask-ref message-example --title "Ship the new sign-in screen this week?" --why "The screen is ready; the release goes out Friday." --outcome yes="It ships Friday." --outcome no="It waits a week." --recommend yes --recommend-reason "Tests pass on every phone." --default no
   sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media shot.png
   sign-off-axi post .sign-off/decisions.json --type design --title "Pick the sign-in layout" --option a=A --option b=B --mock a=mocks/a.html --mock b=mocks/b.html --recommend b
   sign-off-axi post .sign-off/decisions.json --type diagram --title "Is this the sign-in flow?" --view mocks/sign-in/flow.svg
@@ -75,6 +75,9 @@ examples:
        sign-off-axi raise [board.json] --from <decisions.json> [--filer <id>]
 Adds questions to the board: yes/no, or 2 to 6 choices with one --option each. --key defaults to a slug of the title.
 raise is the alias for post --type decision: same flags, same output.
+New Decide questions require --ask-ref <captain-message-id-or-hold-id>, saved as ask_ref (1-256 characters, no whitespace or controls).
+For --kind ask or a feed, put ask_ref in the message, or pass --ask-ref. Existing cards need no new reference.
+Follow-ups belong in the backlog, not the board. Plans, reports, evidence and engagement records are unchanged.
 Every question meets the question standard (docs/contract.md, "Asking a good question"); a question that does not is refused with the field and one fix line:
   --title is one plain question the buttons answer: it ends in "?", has 12 words or fewer, no "Say yes or no:", "Captain hold:" or "Captain:" prefix and no key-like word.
   --why says what it is about and why it needs an answer now (200 characters or fewer).
@@ -93,8 +96,8 @@ Raising the same question again is a no-op that reports its status; a different 
 --filer names who asks (your agent session or any id of 1-128 of A-Z a-z 0-9 . _ -), saved on the item so \`wait --filer\` with the same id gets the answer.
 SIGN_OFF_FILER sets it for every command; with neither, the Claude Code session id is saved when there is one.
 examples:
-  sign-off-axi raise --title "Keep the weekly digest?" --why "Open rate held steady; the paid plan ends Monday." --outcome yes="It keeps going out each Monday." --outcome no="It stops after this week." --recommend yes --recommend-reason "Readers still open it." --default yes --silent-by 2026-10-19T09:00Z
-  sign-off-axi raise --title "Which day should the release ship?" --why "Two fixes are still in review." --option a="A: Today" --option b="B: Friday" --option c="C: Next week" --outcome a="Ships now without the fixes." --outcome b="Ships with both fixes." --outcome c="Ships with the redesign too." --recommend b --recommend-reason "Both fixes land by Thursday." --default b --merge release-day
+  sign-off-axi raise --ask-ref message-example --title "Keep the weekly digest?" --why "Open rate held steady; the paid plan ends Monday." --outcome yes="It keeps going out each Monday." --outcome no="It stops after this week." --recommend yes --recommend-reason "Readers still open it." --default yes --silent-by 2026-10-19T09:00Z
+  sign-off-axi raise --ask-ref message-example --title "Which day should the release ship?" --why "Two fixes are still in review." --option a="A: Today" --option b="B: Friday" --option c="C: Next week" --outcome a="Ships now without the fixes." --outcome b="Ships with both fixes." --outcome c="Ships with the redesign too." --recommend b --recommend-reason "Both fixes land by Thursday." --default b --merge release-day
   sign-off-axi raise --from ./decisions.json
 `,
   validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>] [--expect-invalid]
@@ -196,7 +199,8 @@ examples:
        sign-off-axi post [board.json] --type report --title "<the answer>" --about "<why it matters>" --view <page.html> --preview <picture> [--key <key>] [--link <commit or URL>] [--filer <id>]
        sign-off-axi post [board.json] --type signin --service "<name>" --link <sign-in URL> --unlocks "<what it unlocks>" --waits "<who waits>" [--expires <ISO time or 15m>] [--key <key>] [--filer <id>]
        sign-off-axi post [board.json] --type signin --service "<name>" --start '<command as a JSON list>' --unlocks "<what it unlocks>" --waits "<who waits>" [--key <key>] [--filer <id>]
-Posts an item for the user. --type decision (the default) is a yes/no or pick-one question, exactly like raise, with the same question standard and flags (--why, --outcome, --recommend-reason, --silent-by, --merge).
+Posts an item for the user. --type decision (the default) is a yes/no or pick-one question, exactly like raise, with the same question standard and flags (--ask-ref, --why, --outcome, --recommend-reason, --silent-by, --merge).
+A new Decide question requires --ask-ref <captain-message-id-or-hold-id> (ask_ref in a message or feed); follow-ups belong in the backlog, not the board. Existing cards, plans, reports, evidence and engagement records are unchanged.
 --kind posts one contract message (${CONTRACT}), read from a file or from stdin with --from -: it must be that kind and pass every rule,
 else it is refused with one fix line and nothing is written. A key already on the board takes only the same message again; anything else exits 2.
 --kind evidence copies its media, read from the message file's folder (the current folder for stdin), into evidence/<number>/ like --type evidence;
@@ -244,7 +248,7 @@ within 20 seconds, shows on the card and Open can try again. It is stopped after
 examples:
   sign-off-axi post --type design --title "Pick the sign-in layout" --option a="A: single column" --option b="B: split screen" --mock a=mocks/a.html --mock b=mocks/b.html --tradeoff "B scans fastest; A is simplest." --recommend b
   sign-off-axi post .sign-off/decisions.json --type design --key sign-in --title "Pick the sign-in layout" --option a=A --option b=B --option c=C --mock a=mocks/sign-in/index.html?variant=a --mock b=mocks/sign-in/index.html?variant=b --mock c=mocks/sign-in/index.html?variant=c --tradeoff "..." --recommend b
-  sign-off-axi post --type decision --title "Keep the weekly digest?" --why "Open rate held steady." --outcome yes="It keeps going out." --outcome no="It stops this week." --recommend yes --recommend-reason "Readers still open it." --default yes
+  sign-off-axi post --type decision --ask-ref message-example --title "Keep the weekly digest?" --why "Open rate held steady." --outcome yes="It keeps going out." --outcome no="It stops this week." --recommend yes --recommend-reason "Readers still open it." --default yes
   sign-off-axi post --kind ask --from ask.json --filer agent-41
   sign-off-axi post --kind evidence --from proof/evidence.json --filer done-done
   sign-off-axi post --kind gate --from gate.json --filer done-done
@@ -853,7 +857,7 @@ function post(args: string[], cmd = 'post') {
   const typed: Flags = cmd === 'post' ? { replace: { type: 'boolean' }, kind: { type: 'string' }, type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
     media: { type: 'string', multiple: true }, attach: { type: 'string', multiple: true }, link: { type: 'string', multiple: true }, view: { type: 'string' }, preview: { type: 'string' }, chapter: { type: 'string', multiple: true },
     ...Object.fromEntries(SIGNIN_FIELDS.map((f) => [f, { type: 'string' as const }])) } : {};
-  const { file, named, values, on } = parse(cmd, args, { from: { type: 'string' }, filer: { type: 'string' }, ...typed,
+  const { file, named, values, on } = parse(cmd, args, { from: { type: 'string' }, filer: { type: 'string' }, 'ask-ref': { type: 'string' }, ...typed,
     ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: MANY.includes(f) }])) });
   const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'attach', 'link', 'view', 'preview', 'chapter', ...SIGNIN_FIELDS].filter((f) => values[f] !== undefined);
   // Only a design takes --link more than once (one per option); any other type keeps its one item link, the last given.
@@ -865,7 +869,7 @@ function post(args: string[], cmd = 'post') {
     return postKind(file, named, on, values);
   }
   if (values.from !== undefined && given.length) throw fail(`--from cannot be combined with --${given[0]}`, 'VALIDATION_ERROR', `Put every field in the --from file, or ${cmd} with flags only`);
-  if (values.replace) return replace(file, named, on, values.from, filerOf(values));
+  if (values.replace) return replace(file, named, on, values.from, filerOf(values), values['ask-ref']);
   const filer = filerOf(values, true);
   const type = values.type ?? 'decision', told = ASK_FLAGS.find((f) => values[f] !== undefined);
   if (told && type !== 'decision') throw fail(`--${told} needs --type decision`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
@@ -1021,7 +1025,7 @@ async function refile(args: string[]) {
 
 /** For a program that feeds the board: the --from file, checked like any post, becomes the whole board, items and top-level fields. Answers stay.
  * With a filer it replaces only that filer's items (and items with no filer it names by key); every other item and top-level field stays. */
-function replace(file: string, named: string, on: string, from?: string, filer?: string) {
+function replace(file: string, named: string, on: string, from?: string, filer?: string, askRef?: string) {
   if (from === undefined) throw fail('--replace needs --from <board file>', 'VALIDATION_ERROR', 'sign-off-axi post board.json --from feed.json --replace');
   const source = resolve(from), fed = readItems(source);
   contractItems(fed.items, from, file, true);
@@ -1031,7 +1035,7 @@ function replace(file: string, named: string, on: string, from?: string, filer?:
     // An item the feed sends without a time keeps the one it was first posted with, so a feeder that runs every few seconds never resets it.
     const first = new Map((existsSync(file) ? readItems(file).items : []).map((i) => [i?.key, i])), now = new Date().toISOString();
     for (const i of fed.items) if (first.get(i?.key)?.title !== i?.title) fits(i?.title, i?.key);
-    const feed = fed.items.map((i) => ({ filed: first.get(i?.key)?.filed ?? now, ...i, ...(filer && { filer }) }));
+    const feed: any[] = fed.items.map((i) => ({ filed: first.get(i?.key)?.filed ?? now, ...i, ...(filer && { filer }) }));
     // An answer belongs to its question: an answered key may not come back asking something else.
     // Evidence is answered for the media and run it shows, so those are part of its question too, as a gate's run and a finding's proposal are.
     const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply, d.run, d.finding, d.evidence, d.media, d.sections, d.decisions, d.type === 'signin' ? [d.link, d.start] : '', d.type === 'plan' ? [d.about, d.view, d.steps] : '']);
@@ -1041,6 +1045,8 @@ function replace(file: string, named: string, on: string, from?: string, filer?:
       throw fail(`key ${i.key} was answered on ${tilde(file)} and is no longer there`, 'CONFLICT', 'Post it under a new key');
     }
     const current = board(file);
+    if (askRef !== undefined) for (const [i, d] of incoming.entries()) if (['decision', 'ask'].includes(feed[i]?.kind ?? feed[i]?.type ?? 'decision') && !current.some((c) => c.key === d.key)) feed[i].ask_ref = askRef;
+    checkAskRefs(incoming, feed, current);
     for (const had of current) {
       const d = incoming.find((x) => x.key === had.key);
       if (filer && d && had.filer && had.filer !== filer) throw fail(`key ${d.key} on ${tilde(file)} was posted by another filer`, 'CONFLICT', 'Feed it under a new key');
@@ -1244,6 +1250,7 @@ async function postKind(file: string, named: string, on: string, values: Record<
   if (m.filer !== undefined && values.filer !== undefined && m.filer !== values.filer) {
     throw fail(`${name}: key ${m.key}: filer ${m.filer} is not --filer ${values.filer}`, 'VALIDATION_ERROR', 'Leave "filer" out of the message, or pass the same --filer');
   }
+  if (m.kind === 'ask' && values['ask-ref'] !== undefined) m.ask_ref = values['ask-ref'];
   const filer = m.filer ?? filerOf(values, true), scratch = mkdtempSync(join(tmpdir(), 'sign-off-')), source = join(scratch, basename(name));
   try {
     if (m.kind === 'evidence') return await postMedia(file, named, on, { title: m.title, about: m.about, media: sources }, 'evidence', filer, { ...m, ...(filer && { filer }) });
@@ -1324,16 +1331,17 @@ function buildIncoming(values: Record<string, any>, extra: object, filer: string
     // An item that names its own filer keeps it.
     const source = resolve(values.from), raw = readItems(source).items;
     contractItems(raw, values.from, file);
+    if (values['ask-ref'] !== undefined) for (const item of raw) if ((item.kind ?? item.type ?? 'decision') === 'ask' || (item.type ?? 'decision') === 'decision' && !item.kind) item.ask_ref = values['ask-ref'];
     const incoming = loadDecisions(source, board);
     recommended(raw, false);
-    return { incoming: incoming.map((d) => ({ filer, ...d })), raw: raw.map((i) => ({ filer, ...i })) };
+    return { incoming: incoming.map((d, i) => ({ filer, ...d, ...(raw[i].ask_ref !== undefined && { ask_ref: raw[i].ask_ref }) })), raw: raw.map((i) => ({ filer, ...i })) };
   }
   const scratch = mkdtempSync(join(tmpdir(), 'sign-off-'));
   const source = join(scratch, 'flags');
   try {
     const { title, key = slug(title), about, detail, why, recommend: recommend_value, default: default_if_silent, close } = values;
     const ask = !Object.hasOwn(extra, 'type'), options = ask ? outcomesOf(values) : optionsOf(values);
-    const told = ask && { why, recommend_reason: values['recommend-reason'], silent_by: values['silent-by'], merges: values.merge, proof: values.proof };
+    const told = ask && { why, recommend_reason: values['recommend-reason'], silent_by: values['silent-by'], merges: values.merge, proof: values.proof, ask_ref: values['ask-ref'] };
     writeFileSync(source, JSON.stringify({ schema: 2, items: [{ key, title, about, detail, ...told, options, recommend_value, default_if_silent, close, ...extra, filer }] }));
     const incoming = loadDecisions(source, board), raw = readItems(source).items;
     if (!ask) recommended(raw, true);
@@ -1375,11 +1383,23 @@ function checkMerges(incoming: Decision[], resulting: Decision[], current: Retur
     }
   }
 }
+/** New decision cards need the captain message or hold that prompted them; old cards still re-post. */
+function checkAskRefs(incoming: Decision[], raw: any[], current: Decision[]) {
+  for (const [i, d] of incoming.entries()) {
+    if (!['decision', 'ask'].includes(raw[i]?.kind ?? raw[i]?.type ?? 'decision') || current.some((c) => c.key === d.key)) continue;
+    const ref = raw[i]?.ask_ref;
+    if (typeof ref !== 'string' || !ref.trim() || ref.length > 256 || /[\s\x00-\x1f\x7f]/.test(ref)) {
+      throw fail(`key ${d.key}: a new Decide card needs a captain ask reference`, 'VALIDATION_ERROR', 'Pass --ask-ref <captain-message-id-or-hold-id> (ask_ref in a message or feed). Follow-ups belong in the backlog, not the board');
+    }
+  }
+}
+
 /** exact: a contract post, where a key takes only the same message again, filer and filed included (contract section 4). */
 function storeIncoming(file: string, named: string, on: string, { incoming, raw }: { incoming: Decision[]; raw: any[] }, filer?: string, exact = false) {
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
     const current = board(file), items = existsSync(file) ? readItems(file).items : [], saved = readAnswers(file), now = new Date().toISOString();
+    checkAskRefs(incoming, raw, current);
     checkMerges(incoming, [...current.filter((c) => !incoming.some((d) => d.key === c.key)), ...incoming], current);
     // Proof is evidence: a new ask that offers Pass and Fail would sit in Waiting on you as an ask, so it is refused.
     const proof = incoming.find((d) => d.type === 'decision' && !d.kind && !current.some((c) => c.key === d.key) && ['pass', 'fail'].every((v) => d.options.some((o) => o.value === v)));
@@ -1400,7 +1420,7 @@ function storeIncoming(file: string, named: string, on: string, { incoming, raw 
       // An answer outlives its item: a new question under that key would inherit it.
       if (!had && Object.hasOwn(saved, d.key) && !awaitsVerdict(d.type, saved[d.key])) throw refuse(`already has a saved answer on ${tilde(file)} from an item no longer there`);
       // The same question from another filer, or at another time, is the same question: it keeps its first filer and time.
-      const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, dismissed: undefined, filer: undefined, filed: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
+      const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, dismissed: undefined, filer: undefined, filed: undefined, ask_ref: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
       // A message that names no filed time matches the one the board stamped.
       const differs = () => exact ? canon({ ...items.find((x) => x?.key === d.key), ...(raw[i].filed === undefined && { filed: undefined }), announced: undefined }) !== canon(raw[i]) : same(had!) !== same(d);
       if (had && differs()) throw refuse(`already holds a different ${contract ? 'message' : 'question'} on ${tilde(file)}`);

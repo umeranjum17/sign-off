@@ -22,7 +22,7 @@ export type DesignJourney = { id: string; title: string; screens: { id: string; 
 export type PlanNote = { section: string; verdict: 'approve' | 'change'; note?: string };
 export type EvidenceLink = { run_id: string; commit: string; outcome: string; repro: string; proof: string; evidence: string };
 export type Decision = {
-  key: string; title: string; about?: string; detail?: string; options: Option[];
+  key: string; title: string; about?: string; detail?: string; ask_ref?: string; options: Option[];
   recommend_value?: string; default_if_silent?: string; close: string;
   /** An ask's question standard: why it is asked, why one option is recommended, when the silent default happens (ISO UTC),
    * and the other cards on the board this ask replaces, which its answer closes too. */
@@ -240,7 +240,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     }
     return {
       key: d.key, title: d.title, about: d.about, detail: d.detail, options: options.map((o: Option) => ({ value: o.value, label: o.label, ...(o.outcome && { outcome: o.outcome }) })),
-      ...(d.why && { why: d.why }), ...(d.recommend_reason && { recommend_reason: d.recommend_reason }), ...(d.silent_by && { silent_by: d.silent_by }), ...(d.merges && { merges: [...d.merges] }), ...(d.proof && { proof: d.proof }),
+      ...(d.ask_ref !== undefined && { ask_ref: d.ask_ref }), ...(d.why && { why: d.why }), ...(d.recommend_reason && { recommend_reason: d.recommend_reason }), ...(d.silent_by && { silent_by: d.silent_by }), ...(d.merges && { merges: [...d.merges] }), ...(d.proof && { proof: d.proof }),
       recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done', evidence: d.evidence,
       type: plan ? 'plan' : d.type ?? 'decision', tradeoff: d.tradeoff, link: d.link, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path, ...(m.link !== undefined && { link: m.link }) })),
       ...(views && { view: d.view }), ...(report && views && { preview: d.preview }), ...(d.reply && { reply: true }), ...(d.filer && { filer: d.filer }), ...(d.area && { area: d.area }),
