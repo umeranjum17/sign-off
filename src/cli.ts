@@ -1458,9 +1458,12 @@ const tokenMissing = (n: Notify) => n.muxr
   : n.token_env && !process.env[n.token_env] ? `${n.token_env} is not set` : undefined;
 const NOTIFY_SENDER = `void (async()=>{const delays=[2000,10000,60000],f=process.env.SIGN_OFF_NOTIFY_TOKEN_FILE;for(let i=0;i<4;i++){try{const t=f?require('node:fs').readFileSync(f,'utf8').trim():process.env.SIGN_OFF_NOTIFY_TOKEN;if((await fetch(process.env.SIGN_OFF_NOTIFY_URL,{method:'POST',headers:{'content-type':'application/json',...(t&&{authorization:'Bearer '+t})},body:process.env.SIGN_OFF_NOTIFY_BODY,signal:AbortSignal.timeout(10000)})).ok)return}catch{}if(i<3)await new Promise(r=>setTimeout(r,delays[i]))}require('node:fs').appendFileSync(process.env.SIGN_OFF_NOTIFY_LOG,new Date().toISOString()+' notification send failed for card '+process.env.SIGN_OFF_NOTIFY_ID+'\\n')})();`;
 
-/** The cards waiting on the user before a write: a card waiting after the write but not before it has entered Waiting on you. */
+/** Cards worth a notice: those waiting on the user, and a new evidence update (shown, never waiting). */
+const notifies = (d: Parameters<typeof waits>[0]) => waits(d) || (d.type === 'evidence' && !d.dismissed);
+
+/** The cards that would notify before a write: one that notifies after the write but not before it is new to the user. */
 function waitingKeys(file: string) {
-  try { return new Set(board(file, () => {}).filter(waits).map((d) => d.key)); } catch { return undefined; }
+  try { return new Set(board(file, () => {}).filter(notifies).map((d) => d.key)); } catch { return undefined; }
 }
 
 /** Announces each card that entered Waiting on you with a write. The card is already stored, so nothing here fails the command.
@@ -1470,7 +1473,7 @@ function notifyEntered(file: string, named: string, before: Set<string> | undefi
   try {
     const so = dirname(named), notify = before ? readSetup(so).notify : undefined;
     if (!before || !notify || tokenMissing(notify)) return;
-    const { items } = readItems(file), fresh = board(file, () => {}).filter((d) => waits(d) && !before.has(d.key) && !items.some((i) => i?.key === d.key && i.announced));
+    const { items } = readItems(file), fresh = board(file, () => {}).filter((d) => notifies(d) && !before.has(d.key) && !items.some((i) => i?.key === d.key && i.announced));
     if (!fresh.length) return;
     const at = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
     for (const i of items) if (fresh.some((d) => d.key === i?.key)) i.announced = at;
