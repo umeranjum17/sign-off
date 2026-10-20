@@ -12,8 +12,7 @@ const repo = resolve(import.meta.dirname, '..');
 const chrome = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'].find(onPath);
 const app = 'sign-off';
 const png = join(repo, 'fixtures', 'evidence', 'product-board.png');
-// done-done check asks a judge model, so these journeys run only when asked for with a judge set.
-const noCheck = (!onPath('done-done') && 'done-done is not on the PATH') || (!process.env.SIGN_OFF_LIVE_JUDGE && 'set SIGN_OFF_LIVE_JUDGE=1 to ask a live judge model');
+const noCheck = !onPath('done-done') && 'done-done is not on the PATH';
 
 function onPath(bin) {
   return (process.env.PATH ?? '').split(':').some((dir) => {
