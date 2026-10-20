@@ -16,16 +16,17 @@ const so = (...args) => spawnSync(process.execPath, [join(repo, 'dist/cli.js'), 
 const browserEnv = { ...process.env, CHROME_DEVTOOLS_AXI_SESSION: `so-guard-${process.pid}` };
 const browser = (...args) => { const r = spawnSync('chrome-devtools-axi', args, { encoding: 'utf8', env: browserEnv }); assert.equal(r.status, 0, `${args.join(' ')}\n${r.stdout}${r.stderr}`); return r.stdout; };
 const evalIn = (fn) => JSON.parse(spawnSync('chrome-devtools-axi', ['run'], { encoding: 'utf8', env: browserEnv, input: `console.log(JSON.stringify(await page.eval(${fn})));` }).stdout.trim().split('\n').pop());
-const fixtures = join(repo, 'fixtures/evidence'), board = join(work, 'board.json');
+// EVIDENCE_GUARD_SCREEN: a real app screen to post instead of the synthetic fixture (never committed).
+const fixtures = join(repo, 'fixtures/evidence'), screen = process.env.EVIDENCE_GUARD_SCREEN ?? join(fixtures, 'sparse-screen.png'), board = join(work, 'board.json');
 let server;
 try {
   assert.equal(so('init', work).status, 0);
   const refused = so('post', board, '--type', 'evidence', '--title', 'Placeholder', '--about', 'A flat card.', '--media', join(fixtures, 'placeholder-card.png'));
-  writeFileSync(join(out, 'placeholder-refused.txt'), `exit ${refused.status}\n${refused.stdout}${refused.stderr}`);
+  writeFileSync(join(out, 'placeholder-refused.txt'), `WHAT THIS SHOWS: posting a flat placeholder card as evidence is refused.\nexit ${refused.status}\n${refused.stdout}${refused.stderr}`);
   assert.equal(refused.status, 2);
   assert.match(refused.stdout, /is a placeholder card, not evidence/);
-  const posted = so('post', board, '--type', 'evidence', '--title', 'Empty chat on a phone', '--about', 'A new chat has no messages yet.', '--media', join(fixtures, 'sparse-screen.png'));
-  writeFileSync(join(out, 'sparse-posted.txt'), `exit ${posted.status}\n${posted.stdout}${posted.stderr}`);
+  const posted = so('post', board, '--type', 'evidence', '--title', 'Empty chat on a phone', '--about', 'An app chat screen with a header and a message; the thread is mostly empty.', '--media', screen);
+  writeFileSync(join(out, 'sparse-posted.txt'), `WHAT THIS SHOWS: posting a mostly empty app screen (${screen.split('/').pop()}) as evidence succeeds.\nexit ${posted.status}\n${posted.stdout}${posted.stderr}`);
   assert.equal(posted.status, 0);
   assert.match(posted.stdout, /update-1,1,1/);
   assert.deepEqual(readdirSync(join(work, 'evidence')), ['1']);
@@ -38,7 +39,7 @@ try {
     browser('open', `${link}#evidence/update-1`);
     evalIn(`async () => { for (let i = 0; i < 100 && !document.querySelector('img'); i++) await new Promise((r) => setTimeout(r, 50)); return 1; }`);
     const img = evalIn(`async () => { const i = document.querySelector('img'); await i.decode(); return { w: i.naturalWidth, h: i.naturalHeight }; }`);
-    assert.deepEqual(img, { w: 1170, h: 2532 }, `${width}w shows the posted screen`);
+    assert.ok(img.w > 0 && img.h > 0, `${width}w shows the posted screen`);
     browser('screenshot', join(out, `evidence-card.${width}w.png`));
     const look = evalIn(`async () => ({ url: location.href, ...(${LOOK})(), squashed_text: (${SQUASHED_TEXT})() })`);
     failures.push(...lookIssues(look).map((m) => `${width}w look: ${m}`));
