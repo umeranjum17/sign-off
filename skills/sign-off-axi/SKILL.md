@@ -54,6 +54,7 @@ The user often reads the board on a phone. Each card must make sense in 10 secon
 - Title: the result or the question, in one short sentence: "You can now sign in with a passkey", "Ship the new sign-in this week?". Never a tool name, run id, version label, file path or error code.
 - `--about`: what changed for the user, in 1 or 2 short sentences. Write in ASD-STE100 Simplified Technical English: short sentences, active voice, common words.
 - Show the proof on the card: post a result to check as `--type evidence` with a screenshot or recording (`--media`); the user picks Pass, Fail or Needs work. When a picture explains more than words, add a diagram or an interactive page (see below).
+- Give the user a file to download from the card, such as an Android build to install: add `--attach <file>` (up to 5 files, any type, 1 GB each by default; `SIGN_OFF_ATTACH_MAX_MB` changes the limit). The user taps Download on the card, on a phone or tablet. The file is copied beside the board and streamed, never read into memory; the card needs a `--media` capture or only the file.
 - Ask for one decision per card, and recommend the answer you would pick (see the question standard below).
 - Put the pull request or page in `--link`. In a contract evidence message with a `run`, the `outcome` line heads the card: write it as the result the user can see.
 

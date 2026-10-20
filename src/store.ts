@@ -6,6 +6,8 @@ export type Option = { value: string; label: string; outcome?: string };
 /** An option's mock file, and an optional http(s) link to open that option live (drawn under the mock, outside its sandboxed frame). */
 export type MockRef = { value: string; path: string; link?: string };
 export type MediaRef = { path: string; sha256: string; bytes: number };
+/** A file attached to an evidence update for download: stored as evidence/<number>/attach-<n>.<ext>, offered under `name`. */
+export type AttachRef = MediaRef & { name: string };
 export type Chapter = { at: number; title: string };
 export type Step = { title: string; marks?: string[]; text?: string };
 /** A plan's section to approve or change, and a decision it asks: one question, options that each say where they lead, and the pick it recommends. */
@@ -24,7 +26,7 @@ export type Decision = {
   why?: string; recommend_reason?: string; silent_by?: string; merges?: string[]; /** The evidence update on the board this ask rests on: Decide shows its capture and result at the top. */ proof?: string; evidence?: EvidenceLink; run?: { run_id: string; commit: string };
   finding?: { cause: string; incidents: number; days: number; evidence_ids: string[]; change_kind: string; proposal: string };
   kind?: string;
-  type: string; tradeoff?: string; mocks?: MockRef[]; number?: number; media?: MediaRef[]; link?: string; view?: string; preview?: string; chapters?: Chapter[]; reply?: boolean;
+  type: string; tradeoff?: string; mocks?: MockRef[]; number?: number; media?: MediaRef[]; attachments?: AttachRef[]; link?: string; view?: string; preview?: string; chapters?: Chapter[]; reply?: boolean;
   /** Who posted it: an agent session or caller id, so that caller's `wait --filer` gets the answer. */
   filer?: string;
   /** The board area it shows in while it waits for no answer, in place of the one its type gives it. */
@@ -70,6 +72,10 @@ export const SIGNED_IN: Option = { value: 'done', label: 'Signed in' };
 export const REPLY: Option = { value: 'text', label: 'Reply' };
 const VERDICTS: Option[] = [{ value: 'pass', label: 'Pass' }, { value: 'fail', label: 'Fail' }, { value: 'needs-work', label: 'Needs work' }];
 export const MEDIA_MAX = 12;
+export const ATTACH_MAX = 5;
+export const ATTACH_DEFAULT_MB = 1024;
+/** A download name: letters, digits and . _ ( ) + - or a space, never a path. */
+export const ATTACH_NAME = /^[\w.()+ -]{1,120}$/;
 /** Item types whose files post copies into evidence/<number>/: how many, and which kinds. An explainer is one narrated video. */
 const STORED: Record<string, [number, string, RegExp]> = {
   evidence: [MEDIA_MAX, 'files', /\.(png|jpe?g|webp|mp4|webm)$/i],
@@ -144,7 +150,12 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     for (const [f, allowed] of Object.entries(ONE_OF)) if (d[f] !== undefined && !allowed.includes(d[f])) throw bad(f, `must be ${allowed.join(' or ')}`);
     const stored = Object.hasOwn(STORED, d.type ?? '') ? STORED[d.type] : undefined;
     // An evidence update that links a done-done run may have no files of its own (contract evidence with run only).
-    if (stored && !(d.type === 'evidence' && d.media === undefined && d.evidence)) {
+    if (d.attachments !== undefined && (d.type !== 'evidence' || !Array.isArray(d.attachments) || !d.attachments.length || d.attachments.length > ATTACH_MAX
+      || !d.attachments.every((a: any) => isText(a?.path) && /^evidence\/\d+\/attach-\d+\.[a-z0-9]{1,10}$/.test(a.path) && isText(a.name) && ATTACH_NAME.test(a.name)
+        && /^[a-f0-9]{64}$/.test(a.sha256 ?? '') && Number.isInteger(a.bytes) && a.bytes >= 0))) {
+      throw bad('attachments', `must list 1 to ${ATTACH_MAX} files on an evidence update, each under evidence/<number>/ with its name, sha256 and bytes`);
+    }
+    if (stored && !(d.type === 'evidence' && d.media === undefined && (d.evidence || d.attachments))) {
       const [max, kinds, ext] = stored;
       if (!Array.isArray(d.media) || !d.media.length || d.media.length > max || !d.media.every((m: any) => isText(m?.path)
         && /^evidence\/\d+\/\w[\w-]*\.\w+$/.test(m.path) && ext.test(m.path) && /^[a-f0-9]{64}$/.test(m.sha256 ?? '') && Number.isInteger(m.bytes) && m.bytes >= 0)) {
@@ -231,6 +242,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       ...(d.form && { form: d.form }), ...(d.video && { video: d.video }), ...(d.asked_by && { asked_by: d.asked_by }),
       ...(d.steps && { steps: d.steps.map(({ title, marks, text }: Step) => ({ title, ...(text && { text }), ...(marks?.length && { marks }) })) }),
       ...(stored && d.media && { media: d.media.map(({ path, sha256, bytes }: MediaRef) => ({ path, sha256, bytes })) }),
+      ...(d.attachments && { attachments: d.attachments.map(({ path, name, sha256, bytes }: AttachRef) => ({ path, name, sha256, bytes })) }),
       ...(d.type === 'evidence' && { number: d.number }),
       // A gate's run is part of its question: the same key with another run is a different question.
       ...(d.kind === 'gate' && d.run && { run: { run_id: d.run.run_id, commit: d.run.commit } }),
