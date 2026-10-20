@@ -41,7 +41,7 @@ cat > "$dir/evidence-run.json" <<JSON
 {"contract": 1, "kind": "evidence", "schema": 1, "title": "The sign-in screen fits a phone", "filer": "verify",
  "about": "Umer sees the whole screen without scrolling sideways.", "media": ["shot.webp"], "link": "https://example.com/pr/4",
  "run": {"run_id": "$run", "commit": "$commit", "outcome": "Umer sees the whole screen without scrolling sideways.",
-  "repro": "repro: npm test", "proof": "verify-sign-off: npm test, phone, 390, passed", "evidence": "shot.webp"}}
+  "repro": "repro: npm test", "proof": "done-done-verify-sign-off: npm test, phone, 390, passed", "evidence": "shot.webp"}}
 JSON
 so post "$board" --kind evidence --from "$dir/evidence-run.json" >/dev/null
 # The ship question rests on the passed update above, so Decide shows that capture and result at its top.

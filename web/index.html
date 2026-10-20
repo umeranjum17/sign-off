@@ -1407,7 +1407,7 @@
   /** One update as its own screen: the whole capture, what it proves in a line, then what the check recorded and the verdict. */
   function evidenceItem(d) {
     const run = d.evidence ?? {}, result = RESULT[d.evidenceCard?.result], name = headline(d), proofLine = (run.proof ?? '').trim(),
-      // Checked by is the checker's name before the line's first colon ("verify-sign-off: …"); a sentence with a colon names no checker.
+      // Checked by is the checker's name before the line's first colon ("done-done-verify-sign-off: …"); a sentence with a colon names no checker.
       [, checker = '', ran = proofLine] = /^([\w.-]{1,40}):\s*(.*)$/s.exec(proofLine) ?? [];
     const short = (label, value) => (value ? el('div', { class: 'cell' }, el('span', { class: 'k' }, label), el('span', { class: 'v', dir: 'auto' }, value)) : '');
     const long = (label, text) => (text ? el('div', { class: 'cell long' }, el('span', { class: 'k' }, label), el('p', { class: 'x', dir: 'auto' }, text)) : '');

@@ -10,7 +10,7 @@
 
 ## Drive
 
-Build with `npm run build`. Run `node .agents/skills/verify-sign-off/plan-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" light 390`.
+Build with `npm run build`. Run `node .agents/skills/done-done-verify-sign-off/plan-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" light 390`.
 Repeat with dark/390, light/1280 and dark/1280, each in its own output folder (9 shots per cell, below the 10-capture judge limit).
 The script posts a real two-section, one-decision plan through the CLI into a fresh throwaway HOME and drives its real browser controls through chrome-devtools-axi.
 It captures home, plan on load, section approved with its comment, Change note, decision answered with Other words, the whole-plan comment, step 2, sent and Answered. The evidence folder holds only those screenshots; the per-shot claims, DOM and network records, answers.json, wait.json and list.txt go to a sibling diagnostics folder, printed when the run starts. By default it is `<evidence-root>/../<evidence-root-name>-diagnostics`, so the records that repeat between states by design never reach the check; `PLAN_REVIEW_DIAGNOSTICS` overrides that folder.

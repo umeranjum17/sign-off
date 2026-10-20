@@ -13,7 +13,7 @@
 
 ## Drive
 
-`done-done run board-actions` (needs chrome-devtools-axi and Chrome). Or `node .agents/skills/verify-sign-off/board-actions.mjs <folder> [light|dark] [390|1280]` for one cell; no theme or width runs all four, about a minute each.
+`done-done run board-actions` (needs chrome-devtools-axi and Chrome). Or `node .agents/skills/done-done-verify-sign-off/board-actions.mjs <folder> [light|dark] [390|1280]` for one cell; no theme or width runs all four, about a minute each.
 It seeds a fresh board per cell with seed-board.sh, so no new content. Shots are `<page>.<theme>.<width>w.png` in the folder; look records go to `<folder>-diagnostics`.
 Look at every shot: no toast over content, nothing cut.
 

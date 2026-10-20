@@ -2033,7 +2033,7 @@ test('Evidence: with no --evidence-root a linked run is found in done-done\'s ow
   writeFileSync(join(app, runId, 'after.png'), shot);
   writeFileSync(join(app, '.done-done', 'runs', `${runId}.json`), JSON.stringify({ schema: 1, run_id: runId, commit, tree: 'a'.repeat(40), dirty: false, exit: 0,
     files: [{ path: `${runId}/after.png`, sha256: createHash('sha256').update(shot).digest('hex'), bytes: shot.length }] }));
-  const link = (run_id) => ({ run_id, commit, outcome: 'You can read every card on a phone.', repro: 'repro: npm test', proof: 'verify-sign-off: npm test, phone, 390, passed', evidence: 'after.png' });
+  const link = (run_id) => ({ run_id, commit, outcome: 'You can read every card on a phone.', repro: 'repro: npm test', proof: 'done-done-verify-sign-off: npm test, phone, 390, passed', evidence: 'after.png' });
   writeFileSync(file, JSON.stringify({ schema: 2, items: [
     { key: 'found', type: 'evidence', number: 1, title: 'Run in the store', filed: new Date().toISOString(), evidence: link(runId) },
     { key: 'lost', type: 'evidence', number: 2, title: 'Run nowhere', filed: new Date().toISOString(), evidence: link('20261011T130000Z-b2c3d4e5') },
@@ -2063,7 +2063,7 @@ test('Summary on a phone: Proven today swipes inside its row and a long title wr
     { key: 'a', type: 'ask', title: 'Keep the whole-fleet nightly reconciliation of the cross-repository dependency graph running at three in the morning?', about: `https://example.com/${'very-long-path/'.repeat(12)}end` },
     // Each update links a run so its card has a result.
     ...[1, 2, 3].map((n) => ({ key: `u${n}`, type: 'evidence', number: n, title: `Update ${n} proves it`, filed: new Date().toISOString(), media: [{ path: `evidence/${n}/shot.png`, sha256: 'a'.repeat(64), bytes: 0 }],
-      evidence: { run_id: `2026101${n}T120000Z-a1b2c3d4`, commit: 'c0ffee'.padEnd(40, '0'), outcome: 'It works.', repro: 'repro: npm test', proof: 'verify-sign-off: npm test, passed', evidence: 'shot.png' } })),
+      evidence: { run_id: `2026101${n}T120000Z-a1b2c3d4`, commit: 'c0ffee'.padEnd(40, '0'), outcome: 'It works.', repro: 'repro: npm test', proof: 'done-done-verify-sign-off: npm test, passed', evidence: 'shot.png' } })),
   ] }));
   const bytes = Buffer.from('shot'), sha = createHash('sha256').update(bytes).digest('hex');
   writeFileSync(join(dir, 'shot.png'), bytes);
@@ -2234,7 +2234,7 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   doc.items[0].filed = old.toISOString();
   // The run records the board verifies under --evidence-root list their file, hashed; the third one exited 1 and the fourth's hash no longer matches the file.
   const runs = ['20261011T120000Z-a1b2c3d4', '20261011T130000Z-b2c3d4e5', '20261011T140000Z-c3d4e5f6', '20261011T150000Z-d4e5f6a7'];
-  const link = (run_id, proof = 'verify-sign-off: npm test, phone, 390, passed') => ({ run_id, commit, outcome, repro: 'repro: npm test', proof, evidence: 'wide.png' });
+  const link = (run_id, proof = 'done-done-verify-sign-off: npm test, phone, 390, passed') => ({ run_id, commit, outcome, repro: 'repro: npm test', proof, evidence: 'wide.png' });
   mkdirSync(join(dir, '.done-done', 'runs'), { recursive: true });
   for (const [runId, exit, sha] of [[runs[0], 0, hash], [runs[1], 0, hash], [runs[2], 1, hash], [runs[3], 0, 'b'.repeat(64)]]) writeFileSync(join(dir, '.done-done', 'runs', `${runId}.json`), JSON.stringify({ schema: 1, run_id: runId, commit, tree: 'a'.repeat(40), dirty: false, exit,
     files: [{ path: 'wide.png', sha256: sha, bytes: wideBytes.length }] }));
@@ -2327,7 +2327,7 @@ test('Evidence: a card per passed update with its capture as the hero, its resul
   const rows = '[...document.querySelectorAll(".ev-grp .cell")].map((c) => [c.querySelector(".k").textContent, (c.querySelector(".v") ?? c.querySelector(".x")).textContent.trim()])';
   // Checked by is the checker before the proof line's first colon; What ran is the rest of that line.
   assert.deepEqual(await evaluate(rows), [['Result', 'Passed'], ['What ran', 'npm test, phone, 390, passed'], ['Change', 'Pull request 12'],
-    ['Project', 'sign-off'], ['Checked by', 'verify-sign-off'], ['When', `Today, ${clock(at(4))}`]]);
+    ['Project', 'sign-off'], ['Checked by', 'done-done-verify-sign-off'], ['When', `Today, ${clock(at(4))}`]]);
   assert.deepEqual(await evaluate('[document.querySelector(".ev-grp a.cell[href]").getAttribute("href"), document.querySelector("header .change-link").getAttribute("href")]'), [pr, pr]);
   assert.deepEqual(await evaluate('[document.querySelector(".ev-title").textContent, document.querySelectorAll(".ev-hero img").length, document.querySelectorAll(".ev-verdict .choices button").length]'),
     [outcome, 1, 3]);

@@ -2,7 +2,7 @@
 // `npm pack` of this checkout is installed with npm into an empty folder; only that installed package posts, serves and answers.
 // Real read receipts (POST /api/reads) and real Go deeper (POST /api/deeper answered by deeper-agent.mjs through the installed CLI).
 // With MINIMAX_API_KEY in the environment the Go deeper answer is a model's; without it a labelled stand-in answers.
-// Usage: node .agents/skills/verify-sign-off/guide-shots.mjs <output> [light|dark] [390|1280]
+// Usage: node .agents/skills/done-done-verify-sign-off/guide-shots.mjs <output> [light|dark] [390|1280]
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

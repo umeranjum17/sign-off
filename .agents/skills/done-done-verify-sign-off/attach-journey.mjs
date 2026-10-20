@@ -1,6 +1,6 @@
 // One journey for `post --attach`: a 176 MB file is posted on an update, its file row is read on the card at 390 and 1280, and the
 // download is done for real, over the board link with its token when this machine has a private address: the bytes saved match the source.
-// Usage: node .agents/skills/verify-sign-off/attach-journey.mjs <output>
+// Usage: node .agents/skills/done-done-verify-sign-off/attach-journey.mjs <output>
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createReadStream, createWriteStream, mkdirSync, mkdtempSync, realpathSync, rmSync, statSync } from 'node:fs';
