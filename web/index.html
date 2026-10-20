@@ -850,6 +850,13 @@
   .gd-fu { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
   .gd-fu input { flex: 1; min-width: 0; min-height: 2.75rem; border-radius: 0.75rem; border: 1px solid var(--hair); background: var(--tile); padding: 0 0.75rem; }
   .gd-fu button { min-height: 2.75rem; padding: 0 1rem; border-radius: 0.75rem; background: var(--action); color: var(--on-accent); font-weight: 600; }
+  /* The selection tray sits in the page flow, under the selected paragraph with room for the native handles; nothing floats over the text. */
+  .gd-selq { margin: 1.75rem 0 0.75rem; padding: 0.75rem 0.875rem; border-radius: 1rem; background: var(--tint); }
+  .gd-selq[hidden] { display: none; }
+  .gd-sec .gd-selq div { padding: 0; border: 0; }
+  .gd-selt { margin: 0 0 0.5rem; font-size: 0.9375rem; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .gd-selt q { font-style: italic; }
+  .gd-ans blockquote { margin: 0 0 0.625rem; padding: 0.125rem 0 0.125rem 0.75rem; border-left: 3px solid var(--action); color: var(--muted); font-style: italic; }
   .gd-chip { display: inline-flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem; line-height: 1.25; padding: 0.375rem 0.625rem; border-radius: 0.75rem; background: var(--sunk); color: var(--muted); max-width: 100%; text-align: left; }
   .gd-chip.ok { background: var(--ok-bg); color: var(--ok); } .gd-chip.bad { background: var(--bad-bg); color: var(--bad); } .gd-chip.warn { background: var(--warn-bg); color: var(--warn); } .gd-chip.acc { background: var(--tint); color: var(--accent); }
   .gd-rc { display: flex; flex-wrap: wrap; gap: 0.125rem 1rem; margin: 0.625rem -0.125rem 0; padding: 0.625rem 0.125rem 0.125rem; border-top: 1px solid var(--hair2); font-size: 0.875rem; line-height: 1.35; color: var(--muted); }
@@ -2133,31 +2140,90 @@
       b.onclick = () => { const open = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(open)); p.hidden = !open; };
       return [b, p];
     };
-    async function engage(part, action, q, id = crypto.randomUUID()) {
+    async function engage(part, action, q, id = crypto.randomUUID(), selection) {
       const p = panels.get(part);
       p.hidden = false;
-      try { await postJson('/api/engagement', { version: 1, id, key, ...d.engagement, part, action, ...(q !== undefined && { q }) }); sync(); }
+      try { await postJson('/api/engagement', { version: 1, id, key, ...d.engagement, part, action, ...(q !== undefined && { q }), ...(selection && { selection }) }); sync(); }
       catch (e) {
         const retry = el('button', { type: 'button', class: 'gd-lnk' }, 'Retry');
         const error = E('p', 'gd-err', `Could not ask: ${e.message} `, retry);
-        retry.onclick = () => { error.remove(); engage(part, action, q, id); };
+        retry.onclick = () => { error.remove(); engage(part, action, q, id, selection); };
         p.append(error);
       }
     }
+    // The presets and the composer for one part. With a selection they ask about those words, through this same engage().
+    const controls = (part, selection) => {
+      const form = el('form', { class: 'gd-fu' }), input = el('input', { 'aria-label': selection ? 'Ask about the selected text' : 'Ask about this part', placeholder: selection ? 'Ask about these words' : 'Ask about this' }), send = el('button', { type: 'submit' }, 'Send');
+      let action = 'custom';
+      form.append(input, send); form.hidden = !!selection;
+      form.onsubmit = (e) => { e.preventDefault(); if (input.value.trim()) { engage(part, action, input.value, undefined, selection); input.value = ''; action = 'custom'; input.placeholder = 'Ask a follow-up'; if (selection) asked(part); } };
+      const buttons = Object.entries(actionLabels).filter(([a]) => a !== 'custom').map(([a, label]) => {
+        const b = el('button', { class: `gd-lnk ${a === 'deeper' ? 'deep' : a}`, type: 'button' }, label);
+        b.onclick = () => { if (a === 'question') { action = a; form.hidden = false; input.focus(); } else { engage(part, a, undefined, undefined, selection); if (selection) asked(part); } };
+        return b;
+      });
+      return [E('div', 'gd-acts', ...buttons), form];
+    };
     const acts = (part, rows) => {
       const [db, dp] = rows?.length ? detailsBtn(part, rows) : [];
       const panel = live ? ansPanel(part) : null;
-      const form = el('form', { class: 'gd-fu' }), input = el('input', { 'aria-label': 'Ask about this part', placeholder: 'Ask about this' }), send = el('button', { type: 'submit' }, 'Send');
-      let action = 'custom';
-      form.append(input, send);
-      form.onsubmit = (e) => { e.preventDefault(); if (input.value.trim()) { engage(part, action, input.value); input.value = ''; action = 'custom'; input.placeholder = 'Ask a follow-up'; } };
-      const buttons = d.engagement ? Object.entries(actionLabels).filter(([a]) => a !== 'custom').map(([a, label]) => {
-        const b = el('button', { class: `gd-lnk ${a === 'deeper' ? 'deep' : a}`, type: 'button' }, label);
-        b.onclick = () => { if (a === 'question') { action = a; input.focus(); } else engage(part, a); };
-        return b;
-      }) : [deepBtn(part)];
-      return [E('div', 'gd-acts', ...(db ? [db] : []), ...(live ? buttons : [])), ...(dp ? [dp] : []), ...(live ? [...(d.engagement ? [form] : []), panel] : [])];
+      if (!d.engagement) return [E('div', 'gd-acts', ...(db ? [db] : []), ...(live ? [deepBtn(part)] : [])), ...(dp ? [dp] : []), ...(live ? [panel] : [])];
+      const [row, form] = live ? controls(part) : [E('div', 'gd-acts')];
+      if (db) row.prepend(db);
+      return [row, ...(dp ? [dp] : []), ...(live ? [form, panel] : [])];
     };
+
+    // ---- selected words: native selection of one authored field, offered the same presets right under that field
+    const fld = (part, field, node) => { if (part && d.engagement) { node.dataset.sp = part; node.dataset.sf = field; } return node; };
+    const tray = el('aside', { class: 'gd-selq', role: 'group', 'aria-label': 'Ask about the selected text', hidden: '' });
+    let pressing = false;
+    const fieldOf = (n) => (n?.nodeType === 1 ? n : n?.parentElement)?.closest('[data-sf]');
+    // One authored field, counted in Unicode code points. null: nothing usable is selected. cross: it runs over more than one field.
+    function selected() {
+      const s = getSelection();
+      if (!live || !s?.rangeCount || s.isCollapsed) return null;
+      const r = s.getRangeAt(0), f = fieldOf(r.startContainer) ?? fieldOf(r.endContainer);
+      if (!f || !root.contains(f)) return null;
+      const whole = document.createRange(), inside = r.cloneRange();
+      whole.selectNodeContents(f);
+      if (r.compareBoundaryPoints(Range.START_TO_START, whole) < 0) inside.setStart(whole.startContainer, whole.startOffset);
+      if (r.compareBoundaryPoints(Range.END_TO_END, whole) > 0) inside.setEnd(whole.endContainer, whole.endOffset);
+      if (inside.toString().length !== r.toString().length) return { f, cross: true };
+      const quote = inside.toString(), head = whole.cloneRange();
+      head.setEnd(inside.startContainer, inside.startOffset);
+      const start = [...head.toString()].length;
+      return quote.trim() ? { f, part: f.dataset.sp, selection: { field: f.dataset.sf, start, end: start + [...quote].length, quote } } : null;
+    }
+    function drop(clear) {
+      tray.hidden = true; tray.replaceChildren(); delete tray.dataset.sig;
+      if (clear) getSelection().removeAllRanges();
+    }
+    // After a send from the tray the answer lands at the end of the part; say so, and offer to go there.
+    function asked(part) {
+      const show = el('button', { type: 'button', class: 'gd-lnk' }, 'Show');
+      show.onclick = () => { panels.get(part).scrollIntoView({ block: 'center' }); drop(); };
+      getSelection().removeAllRanges();
+      tray.replaceChildren(E('p', 'gd-selt', 'Asked. The answer appears under this part. ', show)); tray.dataset.sig = 'asked';
+      setTimeout(() => tray.dataset.sig === 'asked' && drop(), 8000);
+    }
+    function follow() {
+      if (!root.isConnected) { document.removeEventListener('selectionchange', follow); return; }
+      if (pressing || tray.contains(document.activeElement)) return;
+      const now = selected();
+      if (!now) { if (tray.dataset.sig !== 'asked') drop(); return; }
+      const sig = JSON.stringify(now.selection ?? 'cross');
+      if (tray.dataset.sig === sig) return;
+      let at = now.f.closest('.rowstat') ?? now.f;
+      while (!at.matches('.rowstat') && !['DIV', 'SECTION'].includes(at.parentElement.tagName)) at = at.parentElement;
+      at.after(tray);
+      tray.hidden = false; tray.dataset.sig = sig;
+      tray.replaceChildren(...(!now.selection || [...now.selection.quote].length > 500 ? [E('p', 'gd-selt', 'Select up to 500 characters inside one paragraph to ask about them.')]
+        : [E('p', 'gd-selt', 'Ask about ', E('q', '', now.selection.quote)), ...controls(now.part, now.selection)]));
+    }
+    document.addEventListener('selectionchange', follow);
+    // A tap on a preset can clear the browser's selection first on a phone; keep the tray until that tap has landed.
+    tray.addEventListener('pointerdown', () => { pressing = true; setTimeout(() => { pressing = false; follow(); }, 600); });
+    tray.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); drop(true); } });
 
     // ---- the picture
     function visual(v) {
@@ -2175,8 +2241,8 @@
 
     // ---- cards
     const card = (part, stage, ...kids) => { const c = el('section', { class: 'gd-sec', 'data-part': part, id: `gd-${part.replace(/\W/g, '-')}` }, ...kids); parts.set(part, c); stageOf.set(part, stage); return c; };
-    const head = (h, lead, kicker) => el('div', { class: 'gh' }, ...(kicker ? [E('span', 'gk', kicker)] : []), E('h2', '', h), ...(lead ? [E('p', 'gd-lead', lead)] : []));
-    const hero = card('this', 'this', head(d.visual.heading, d.visual.text), visual(d.visual), ...acts('this', d.visual.details), rc('this'));
+    const head = (h, lead, kicker, part, hf, lf) => el('div', { class: 'gh' }, ...(kicker ? [E('span', 'gk', kicker)] : []), fld(part, hf, E('h2', '', h)), ...(lead ? [fld(part, lf, E('p', 'gd-lead', lead))] : []));
+    const hero = card('this', 'this', head(d.visual.heading, d.visual.text, undefined, 'this', 'visual.heading', 'visual.text'), visual(d.visual), ...acts('this', d.visual.details), rc('this'));
 
     const noteBox = el('textarea', { class: 'gd-note', 'aria-label': plan ? 'What is off' : 'What is off, for the agent', placeholder: 'What is off? One line is enough.', maxlength: '500', hidden: '' });
     noteBox.value = S.note;
@@ -2198,19 +2264,20 @@
       tell.hidden = plan || S.understood !== 'no' || !S.note.trim() || S.told || !live; tell.disabled = false;
     }
     const understood = card('understood', 'understood', head('Check that I have this right', 'This is your ask in my words. If it is off, say what is off. That is the only correction that matters.'),
-      el('dl', { class: 'gd-uq' }, ...d.understood.map((u) => E('div', '', el('dt', {}, u.label), el('dd', {}, u.text)))),
+      el('dl', { class: 'gd-uq' }, ...d.understood.map((u, n) => E('div', '', fld('understood', `understood.${n}.label`, el('dt', {}, u.label)), fld('understood', `understood.${n}.text`, el('dd', {}, u.text))))),
       E('div', 'gd-seg', ...choices), noteBox, tell, ...(live ? acts('understood') : []), rc('understood'));
 
     const secCard = (s) => {
       const items = (s.items ?? []).map((it, i) => {
-        if (!it.more) return E('li', '', E('div', 'rowstat', E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), it.title), E('span', 'sm', it.text))), ...(d.engagement ? acts(`${s.id}:${i}`) : []));
-        const part = `${s.id}:${i}`, body = E('div', 'body', E('p', '', it.more), ...acts(part), ...[]);
+        const part = `${s.id}:${i}`;
+        if (!it.more) return E('li', '', E('div', 'rowstat', E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), fld(part, 'title', E('span', '', it.title))), fld(part, 'text', E('span', 'sm', it.text)))), ...(d.engagement ? acts(part) : []));
+        const body = E('div', 'body', fld(part, 'more', E('p', '', it.more)), ...acts(part));
         body.hidden = true;
         const b = el('button', { class: 'rowbtn', type: 'button', 'aria-expanded': 'false' }, E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), it.title), E('span', 'sm', it.text)), gic('chev', 'gchev'));
         b.onclick = () => { const open = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(open)); body.hidden = !open; };
         return E('li', '', b, body);
       });
-      return card(s.id, s.stage, head(s.heading, s.body), ...(items.length ? [E('ul', 'gd-rows', ...items)] : []), ...acts(s.id, s.details), rc(s.id));
+      return card(s.id, s.stage, head(s.heading, s.body, undefined, s.id, 'heading', 'body'), ...(items.length ? [E('ul', 'gd-rows', ...items)] : []), ...acts(s.id, s.details), rc(s.id));
     };
 
     const optBtns = new Map();
@@ -2222,8 +2289,8 @@
         (optBtns.get(q.key) ?? optBtns.set(q.key, []).get(q.key)).push([o.value, b]);
         return b;
       });
-      return card(`d:${q.key}`, 'decide', head(q.question, q.why, `Decision ${n + 1} of ${decisions.length}`), E('div', 'gd-opts', ...opts),
-        ...(q.reason ? [E('div', 'gd-why', E('b', '', 'Why my pick: '), q.reason)] : []), ...(q.quiet ? [E('p', 'gd-quiet', gic('clock'), E('span', '', `If you stay quiet: ${q.quiet}`))] : []), ...acts(`d:${q.key}`), rc(`d:${q.key}`));
+      return card(`d:${q.key}`, 'decide', head(q.question, q.why, `Decision ${n + 1} of ${decisions.length}`, `d:${q.key}`, 'question', 'why'), E('div', 'gd-opts', ...opts),
+        ...(q.reason ? [E('div', 'gd-why', E('b', '', 'Why my pick: '), fld(`d:${q.key}`, 'reason', E('span', '', q.reason)))] : []), ...(q.quiet ? [E('p', 'gd-quiet', gic('clock'), E('span', '', 'If you stay quiet: ', fld(`d:${q.key}`, 'quiet', E('span', '', q.quiet))))] : []), ...acts(`d:${q.key}`), rc(`d:${q.key}`));
     };
     const paintOpts = () => {
       const lock = sent() || !live;
@@ -2233,7 +2300,7 @@
     // ---- next step and Go ahead
     const sendSlot = E('div', ''), err = E('p', 'gd-err');
     err.setAttribute('role', 'alert');
-    const nextCard = card('next', 'next', head(d.next.heading), E('ul', 'gd-checks', ...d.next.lines.map((l) => E('li', '', E('span', 'tk', gic('check')), E('span', '', l)))), ...(plan ? [sendSlot, err] : []), ...(d.engagement ? acts('next') : []), rc('next'));
+    const nextCard = card('next', 'next', head(d.next.heading, undefined, undefined, 'next', 'heading'), E('ul', 'gd-checks', ...d.next.lines.map((l, n) => E('li', '', E('span', 'tk', gic('check')), fld('next', `lines.${n}`, E('span', '', l))))), ...(plan ? [sendSlot, err] : []), ...(d.engagement ? acts('next') : []), rc('next'));
     async function go(b) {
       if (S.understood === 'no' && !S.note.trim()) { noteBox.focus(); noteBox.scrollIntoView({ block: 'center' }); err.textContent = 'Say what is off first, or choose That is right.'; return; }
       err.textContent = ''; b.disabled = true;
@@ -2295,7 +2362,7 @@
       stageBlocks.push(c);
     }
     const word = plan ? 'Plan' : 'Report', who = plan ? 'Planning agent' : d.asked_by ?? 'Reporting agent';
-    const top = E('div', 'gd-top', E('p', 'geye', [word, plan ? d.project : d.group, [who, d.filed && when(d.filed)].filter(Boolean).join(', ')].filter(Boolean).join(' · ')), E('h1', '', d.title), E('p', 'sub', d.about),
+    const top = E('div', 'gd-top', E('p', 'geye', [word, plan ? d.project : d.group, [who, d.filed && when(d.filed)].filter(Boolean).join(', ')].filter(Boolean).join(' · ')), fld('this', 'title', E('h1', '', d.title)), fld('this', 'about', E('p', 'sub', d.about)),
       E('div', 'howto', gic('info'), E('span', '', `A few short parts, in order. Tap Details for the numbers and Go deeper to ask me more.${plan ? ' Nothing is required: Go ahead accepts my picks.' : ''}`)));
     const rail = el('aside', { class: 'gd-rail' }, E('h4', '', plan ? 'This plan' : 'This report'), nav, ...(plan ? [sumHost] : []));
     const progress = E('div', 'gd-progress', now, segs);
