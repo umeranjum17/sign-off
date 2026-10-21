@@ -84,6 +84,16 @@ console.log(JSON.stringify(await page.eval(${`() => (${frameInPage})(${JSON.stri
     }
   }
   writeFileSync(join(out, 'shots.txt'), `${lines.join('\n')}\n`);
+  writeFileSync(join(out, 'steps.json'), JSON.stringify({
+    target: { version: cli('--version').trim() },
+    start: 'An empty board in a clean home, with the sign-off CLI installed from this checkout.',
+    steps: [
+      'The agent posts the sample research report and the sample plan, written from the packaged skill, with the installed CLI.',
+      'The person opens the report and sees its short-listed options compared on the same axes, then its pick and runner-up.',
+      'The person opens the plan and sees its scope (what is in and out), then its risks, each with a counter.',
+    ],
+    result: 'Each part shows under a label naming the sample (report or plan), the part, the theme and the width, at 390 and 1280 px in light and dark, with no overflow and no console error.',
+  }));
 } finally {
   try { browser('stop'); } finally { server.kill(); }
   console.log(`Scratch for cleanup: ${dir}`);
