@@ -820,6 +820,15 @@
   @media (min-width: 43.75rem) { #reader .gd-sec h2 { font-size: 1.75rem; } }
   .gd-sec > .gh:not(:has(.gd-lead)) h2 { margin-bottom: 0.875rem; }
   .gd-lead { margin: 0 0 1rem; line-height: 1.5; }
+  /* A diagram: a framed picture, its views as tabs, and Show me opening the interactive viewer in place. On a phone the open viewer's toolbar is wider than the card, so Full size is the way in there. */
+  .gd-dg { padding: 0.5rem; }
+  .gd-dgbox { border-radius: 0.75rem; overflow: hidden; border: 1px solid var(--hair2); background: var(--tile); }
+  .gd-dgbox iframe { display: block; width: 100%; height: 6rem; border: 0; }
+  .gd-dgbox.full iframe { height: min(36rem, 78vh); }
+  .gd-dgbar { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin: 0.625rem 0.25rem 0.125rem; }
+  .gd-dg .gd-seg { margin: 0 0.25rem 0.625rem; }
+  .gd-dg a.gd-lnk { text-decoration: none; }
+  @media (max-width: 43.6875rem) { .gd-dg .gd-show { display: none; } }
   .gd-fig { margin: 0.25rem 0 1rem; border-radius: 1rem; background: var(--well); padding: 1rem; }
   .gd-cap { margin: 0.625rem 0 0; font-size: 0.875rem; color: var(--muted); line-height: 1.4; }
   .gd-acts { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.125rem 0 0.25rem; }
@@ -2226,6 +2235,38 @@
     tray.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); drop(true); } });
 
     // ---- the picture
+    // ---- diagrams. dgAll counts the views in the order the server's ~diagram.<n> route does.
+    const dgAll = [d.visual?.diagram, ...sections.flatMap((s) => [s.diagram, ...(s.items ?? []).map((i) => i.diagram)])].filter(Boolean).flat();
+    const night = matchMedia('(prefers-color-scheme: dark)'), phone = matchMedia('(max-width: 43.6875rem)');
+    /** The picture in a sandboxed frame, its views as tabs; Show me opens the interactive viewer in place, Full size in a tab. */
+    function diagramFig(views, list) {
+      let cur = 0, full = false, listOpen = false;
+      const frame = el('iframe', { sandbox: 'allow-scripts', loading: 'lazy' }), box = E('div', 'gd-dgbox', frame);
+      const panel = list ? E('div', 'gd-panel', list) : null;
+      const paint = () => {
+        const v = views[cur], url = `${mockUrl(d.key, `diagram.${dgAll.indexOf(v)}`, v.src)}?theme=${night.matches ? 'dark' : 'light'}`;
+        box.classList.toggle('full', full);
+        frame.style.height = ''; // a height the picture's own size handshake set must not outlive its mode
+        frame.title = `${full ? 'Interactive diagram' : 'Diagram'}: ${v.label}`;
+        frame.src = full ? url : `${url}&embed=1`;
+        wide.href = src(phone.matches ? `${url}&embed=1` : url); // a phone's Full size is the drawing alone, at the screen's width
+        tabs.forEach((b, i) => b.setAttribute('aria-pressed', String(i === cur)));
+        showLabel.nodeValue = full ? 'Back to the picture' : 'Show me';
+        show.setAttribute('aria-expanded', String(full));
+        if (panel) { panel.hidden = !listOpen; listBtn.setAttribute('aria-expanded', String(listOpen)); }
+      };
+      const tabs = views.length > 1 ? views.map((v, i) => { const b = el('button', { class: 'gd-choice', type: 'button', 'aria-pressed': 'false' }, v.label); b.onclick = () => { cur = i; paint(); }; return b; }) : [];
+      const showLabel = document.createTextNode('Show me');
+      const show = el('button', { class: 'gd-lnk deep gd-show', type: 'button', 'aria-expanded': 'false' }, showLabel, gic('chev', 'gchev'));
+      show.onclick = () => { full = !full; paint(); };
+      const wide = el('a', { class: 'gd-lnk', target: '_blank', rel: 'noopener' }, 'Full size');
+      const listBtn = el('button', { class: 'gd-lnk', type: 'button', 'aria-expanded': 'false' }, 'As a list', gic('chev', 'gchev'));
+      listBtn.onclick = () => { listOpen = !listOpen; paint(); };
+      const fig = E('figure', 'gd-fig gd-dg', ...(tabs.length ? [E('div', 'gd-seg', ...tabs)] : []), box, E('div', 'gd-dgbar', show, wide, ...(list ? [listBtn] : [])), ...(panel ? [panel] : []));
+      for (const q of [night, phone]) q.addEventListener('change', () => { if (fig.isConnected) paint(); });
+      paint();
+      return fig;
+    }
     function visual(v) {
       let body;
       if (v.type === 'bars') {
@@ -2236,6 +2277,10 @@
       } else if (v.type === 'steps') {
         body = E('ol', 'gd-chain', ...v.rows.map((r, i) => E('li', '', E('span', `nd ${r.tone ?? ''}`, String(i + 1)), E('div', 'tx', ...(r.note ? [E('small', '', r.note)] : []), r.label, ...(r.text ? [E('small', '', r.text)] : [])))));
       } else body = E('div', 'gd-tiles', ...v.rows.map((r) => E('div', 'gd-tile', ...(r.note ? [E('span', `gd-chip ${r.tone ?? ''}`, r.note)] : []), E('b', '', r.label), ...(r.text ? [E('span', 'gt', r.text)] : []))));
+      if (v.diagram) {
+        // The picture is the diagram; the rows stay the same answer in plain steps (open on a phone, one tap away on a desk).
+        return diagramFig(v.diagram, body);
+      }
       return E('figure', 'gd-fig', body);
     }
 
@@ -2270,14 +2315,14 @@
     const secCard = (s) => {
       const items = (s.items ?? []).map((it, i) => {
         const part = `${s.id}:${i}`;
-        if (!it.more) return E('li', '', E('div', 'rowstat', E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), fld(part, 'title', E('span', '', it.title))), fld(part, 'text', E('span', 'sm', it.text)))), ...(d.engagement ? acts(part) : []));
-        const body = E('div', 'body', fld(part, 'more', E('p', '', it.more)), ...acts(part));
+        if (!it.more && !it.diagram) return E('li', '', E('div', 'rowstat', E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), fld(part, 'title', E('span', '', it.title))), fld(part, 'text', E('span', 'sm', it.text)))), ...(d.engagement ? acts(part) : []));
+        const body = E('div', 'body', ...(it.more ? [fld(part, 'more', E('p', '', it.more))] : []), ...(it.diagram ? [diagramFig(it.diagram)] : []), ...acts(part));
         body.hidden = true;
         const b = el('button', { class: 'rowbtn', type: 'button', 'aria-expanded': 'false' }, E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), it.title), E('span', 'sm', it.text)), gic('chev', 'gchev'));
         b.onclick = () => { const open = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(open)); body.hidden = !open; };
         return E('li', '', b, body);
       });
-      return card(s.id, s.stage, head(s.heading, s.body, undefined, s.id, 'heading', 'body'), ...(items.length ? [E('ul', 'gd-rows', ...items)] : []), ...acts(s.id, s.details), rc(s.id));
+      return card(s.id, s.stage, head(s.heading, s.body, undefined, s.id, 'heading', 'body'), ...(s.diagram ? [diagramFig(s.diagram)] : []), ...(items.length ? [E('ul', 'gd-rows', ...items)] : []), ...acts(s.id, s.details), rc(s.id));
     };
 
     const optBtns = new Map();
@@ -2710,8 +2755,8 @@
   // An interactive page may post its own height, `{ height: <px> }`, and its frame then fits it with no blank below.
   // Only a frame's own message sizes it. Document readers must fit even long pages; previews stay capped.
   addEventListener('message', (e) => {
-    const frame = [...document.querySelectorAll('.rung iframe, iframe.plan-view, #reader .read iframe')].find((f) => f.contentWindow === e.source), h = e.data?.height;
-    const documentFrame = frame?.matches('iframe.plan-view, #reader .read iframe');
+    const frame = [...document.querySelectorAll('.rung iframe, iframe.plan-view, #reader .read iframe, .gd-dgbox:not(.full) iframe')].find((f) => f.contentWindow === e.source), h = e.data?.height;
+    const documentFrame = frame?.matches('iframe.plan-view, #reader .read iframe, .gd-dgbox iframe');
     if (documentFrame && e.data?.['sign-off'] === 'ready') {
       frame.scrolling = 'no';
       frame.contentWindow.postMessage({ 'sign-off': 'size' }, '*');
