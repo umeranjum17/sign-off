@@ -118,10 +118,10 @@ npx -y sign-off-axi raise --ask-ref <captain-message-id-or-hold-id> --title "Whi
 Only where structure, order or dependency is the point: how a change flows, what depends on what, a today and after. When the point is a number, keep the bars or tiles; a diagram that hides the numbers is the wrong picture. Archify is a separate skill you install yourself (`npx skills add tt-a1i/archify -g`); sign-off ships none of it. Then:
 
 - Add `"diagram": [{"label": "Today", "src": "diagrams/flow.html"}]` (1 to 3 views, shown as tabs) to the `visual`, a section or an item, beside the rows, which stay as the list. `src` is a page next to the plan or report file, as `view` is.
-- Draw an `architecture` diagram with a `viewBox` 320 wide, Archify's smallest (its 10 px legend text needs it): two columns, labels under about 16 characters, no sublabels. Sequence, workflow and `compare` pages are too wide for a phone; show the same flow as a numbered column instead, and draw Today and After as two pages, one per tab.
-- Post refuses a diagram whose smallest text is under 12 px at 390 wide, one with brand marks (never set `brand`), or one that is not there.
+- Draw an `architecture` diagram with a `viewBox` 320 to 340 wide (320 is Archify's smallest): two columns, labels under about 16 characters, no sublabels, `"legend": {"mode": "hidden"}` in `meta`. Sequence, workflow and `compare` pages are too wide for a phone; show the same flow as a numbered column instead, and draw Today and After as two pages, one per tab.
+- Post refuses a diagram whose smallest text is under 12 px on a 390 px phone, one with brand marks (never set `brand`), or one that is not there.
 - Run `ARCHIFY_UPDATE_CHECK_DISABLED=1 archify finalize` with `--quality showcase`, so it makes no network call. Archify draws in its own mono type; sign-off cannot change it.
-- On a phone the board shows the picture and **Full size**; on a desk **Show me** opens the interactive page in place. Look at both at 390 before you say it is posted.
+- On a phone the board shows the picture and **Full size**, which opens the drawing alone at the full width of the screen; on a desk **Show me** opens the interactive page in place. Look at both at 390 before you say it is posted.
 
 ## Ask the user to sign in
 
