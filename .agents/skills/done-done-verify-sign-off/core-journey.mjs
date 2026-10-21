@@ -41,35 +41,44 @@ const { LOOK, SQUASHED_TEXT, lookIssues } = await import(pathToFileURL(join(dd, 
 
 const log = [];
 const note = (text) => { log.push(text); console.log(text); };
+// What the run was doing when it failed, so a failure names its stage.
+let stage = 'start';
+const at = (what) => { stage = what; };
 
 let server, browserSession;
 try {
   // 1. The package under test: this checkout, packed and installed the way a user installs it.
+  at('packing this checkout');
   const tarball = run('npm', ['pack', '--silent', '--pack-destination', dir], { cwd: repo, env: process.env }).trim().split('\n').pop();
   run('npm', ['init', '-y'], { cwd: app, env });
   const installed = join(app, 'node_modules', 'sign-off-axi');
   let before = '';
   if (upgrade) {
     // The release path: the previous published version first, then this build over it, in place.
+    at('finding the previous published version');
     const published = JSON.parse(run('npm', ['view', 'sign-off-axi', 'versions', '--json'], { cwd: app, env }));
     const order = (a, b) => a.split('.').map(Number).reduce((x, n, i) => x || n - (b.split('.')[i] ?? 0), 0);
     const previous = published.filter((v) => order(v, current) < 0).at(-1);
     assert.ok(previous, `no published sign-off-axi version older than ${current}`);
+    at(`installing sign-off-axi ${previous} from npm`);
     run('npm', ['install', '--no-audit', '--no-fund', `sign-off-axi@${previous}`], { cwd: app, env });
     before = cli('--version').trim();
-    assert.equal(before, previous, `the installed package is ${previous}`);
+    assert.equal(before, previous, `the installed package is ${before}, not ${previous}`);
+    at(`upgrading over it with this build`);
     run('npm', ['install', '--no-audit', '--no-fund', join(dir, tarball)], { cwd: app, env });
     const after = cli('--version').trim();
     assert.equal(after, current, `the upgraded package is ${after}, not ${current}`);
     assert.notEqual(before, after);
     note(`upgrade: sign-off-axi ${before} installed, then ${after} installed over it in place`);
   } else {
+    at('installing this build');
     run('npm', ['install', '--no-audit', '--no-fund', join(dir, tarball)], { cwd: app, env });
   }
   assert.ok(readFileSync(join(installed, 'package.json'), 'utf8').includes(`"version": "${current}"`), 'the installed package is this checkout');
   note(`installed: sign-off-axi ${cli('--version').trim()} (${upgrade ? 'upgraded in place' : 'from this checkout'})`);
 
   // 2. File the card: the agent posts the plan the person then answers.
+  at('filing the card');
   // A config.yaml beside the board names the user, so the board shows a person and not a blank.
   writeFileSync(join(dir, 'config.yaml'), 'board: board.json\nname: Umer\n');
   const planFile = join(installed, 'fixtures/contract/plan.v3/valid-full.json');
@@ -82,6 +91,7 @@ try {
   assert.ok(other, 'the plan offers a second choice');
 
   // 3. The real board server, on a free port, from the installed CLI.
+  at('serving the board');
   server = spawn(process.execPath, [join(installed, 'dist', 'cli.js'), 'serve', board, '--port', '0'], { cwd: app, env, stdio: ['ignore', 'pipe', 'inherit'] });
   const base = await new Promise((ok, no) => {
     let said = '';
@@ -91,6 +101,7 @@ try {
   note(`serving: ${base}`);
 
   // 4. Answer the card in the board, the way a person does.
+  at('answering the card in the board');
   browserSession = `so-core-${process.pid}-${Date.now()}`;
   const browserEnv = { ...process.env, CHROME_DEVTOOLS_AXI_SESSION: browserSession };
   const browser = (...args) => run('chrome-devtools-axi', args, { env: browserEnv });
@@ -128,7 +139,8 @@ try {
   capture('sent', 'The plan on the board after the person sent it: Sent. I am on it, and the board says the agent has not read it yet.');
 
   // 5. The agent reads the answer: its own wait takes it, and the board shows the read receipt.
-  const read = cli('wait', board, '--filer', plan.filer, '--json', '--timeout', '0');
+  at('the agent reading the answer');
+  const read = cli('wait', board, '--filer', plan.filer, '--json', '--timeout', '10');
   const answers = JSON.parse(read);
   assert.equal(answers[plan.key]?.decisions?.[decision.key], other.value, `the agent read the answer:\n${read}`);
   note(`the agent read the answer:\n${read.trim()}`);
@@ -162,6 +174,10 @@ try {
     result: 'The card the agent filed shows the answer the person gave and that the agent read it.',
   }, null, 2) + '\n');
   note(`core journey: filed, answered in the board and read by the agent (${plan.key})`);
+} catch (e) {
+  // A failure names the stage it happened in.
+  e.message = `${stage}: ${e.message}`;
+  throw e;
 } finally {
   if (browserSession) { try { run('chrome-devtools-axi', ['stop'], { env: { ...process.env, CHROME_DEVTOOLS_AXI_SESSION: browserSession } }); } catch {} }
   if (server) { try { spawnSync(cliBin, ['stop', board], { cwd: app, env, encoding: 'utf8', timeout: 30000 }); } catch {} server.kill(); }
