@@ -13,7 +13,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, asks, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, sameDecision, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, asks, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, sameDecision, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -2096,6 +2096,8 @@ const ICONS: Record<string, { type: string; bytes: Buffer }> = Object.fromEntrie
 /** Added to each design mock page and plan page so the person can point at a part of it; see web/point.js. */
 const pointer = Buffer.from(`<script>${readFileSync(new URL('../web/point.js', import.meta.url), 'utf8')}</script>`);
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
+/** Added to each diagram page: on the page opened by itself, a way back to its plan or report, and a phone's drawing-alone page sized to the drawing; see web/diagram-page.js. */
+const diagramPage = (back: string, label: string) => Buffer.from(`<script data-back="${back}" data-label="${label}">${readFileSync(new URL('../web/diagram-page.js', import.meta.url), 'utf8')}</script>`);
 /** A card whose picture is a colour-bar test card or a placeholder is not shown: a card posted before the guard can hold one. Read by the
  * stored hash, so each picture is measured once. */
 const unfitMedia = new Map<string, boolean>();
@@ -2290,14 +2292,18 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     const d = loadDecisions(file).find((x) => x.key === key);
     // A guided document's diagram views: ~diagram.<n>, n counting them in the order visual, then each section and its items.
     const dgs = d?.guided ? diagramViews(d) : [];
-    const mock = value?.startsWith('diagram.') ? dgs[Number(value.slice(8))]?.src : value ? d?.mocks?.find((m) => m.value === value)?.path : value === '' && d?.view;
+    const diagram = value?.startsWith('diagram.') ? dgs[Number(value.slice(8))] : undefined;
+    const mock = diagram ? diagram.src : value ? d?.mocks?.find((m) => m.value === value)?.path : value === '' && d?.view;
     try {
       const path = rest.map(decodeURIComponent).join('/'), type = assetTypes[extname(path).toLowerCase()];
       if (!mock || !type) return [404, { error: 'Mock is unavailable' }];
       const actual = under(dirname(under(dirname(file), mockFile(mock))), path);
       if (statSync(actual).size > MOCK_BYTES) return [404, { error: 'Mock is unavailable' }];
-      // Every HTML view gets the bridge: document readers need its size handshake too.
-      return [200, { media: readFileSync(actual), type, point: type === 'text/html' }];
+      const bytes = readFileSync(actual);
+      // A diagram is its one pinned page: the file the plan posted, or nothing. A plan posted before the pin carries none and is served as it was.
+      if (diagram?.sha256 && (actual !== under(dirname(file), mockFile(mock)) || bytes.length !== diagram.bytes || sha256(bytes) !== diagram.sha256)) return [404, { error: 'Diagram file changed since it was posted' }];
+      // Every HTML view gets the bridge: document readers need its size handshake too. A diagram also gets its way back.
+      return [200, { media: bytes, type, point: type === 'text/html', ...(diagram && type === 'text/html' && d && { page: diagramPage(`/#${d.type === 'plan' && !reading(d) ? 'waiting' : 'reports'}/${d.key}`, `Back to the ${d.type === 'plan' ? 'plan' : 'report'}`) }) }];
     } catch { return [404, { error: 'Mock is unavailable' }]; }
   }
   if (req.method === 'GET' && req.url?.startsWith('/api/evidence?')) {
@@ -2591,7 +2597,7 @@ const server = createServer(async (req, res) => {
     return bytes ? pipeline(createReadStream(path, { start, end }), res, () => {}) : res.end();
   }
   if (body && typeof body === 'object' && 'media' in body) {
-    const { media: bytes, type, point } = body as { media: Buffer; type: string; point?: boolean }, media = point ? Buffer.concat([bytes, pointer]) : bytes;
+    const { media: bytes, type, point, page } = body as { media: Buffer; type: string; point?: boolean; page?: Buffer }, media = point ? Buffer.concat([bytes, pointer, ...(page ? [page] : [])]) : bytes;
     const headers = { 'content-type': type, 'x-content-type-options': 'nosniff', 'content-security-policy': FRAME_CSP, 'accept-ranges': 'bytes', 'content-length': media.length };
     // One byte range, so phone browsers can play and seek a recording.
     const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? '');

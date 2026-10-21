@@ -97,7 +97,19 @@ try {
     const sizes = ask(() => [...document.querySelectorAll('svg[viewBox] text')].filter((t) => t.getBoundingClientRect().width).map((t) => t.getScreenCTM().a * parseFloat(t.getAttribute('font-size') || getComputedStyle(t).fontSize)));
     writeFileSync(join(records, `fullsize.${theme}.${width}w.txt`), `${sizes.length} texts, smallest ${Math.min(...sizes).toFixed(1)} px at ${width}\n`);
     if (width === 390) assert.ok(Math.min(...sizes) >= 12, `smallest text ${Math.min(...sizes)} px`);
-    capture('fullsize', 'Full size opens the diagram page itself at the board theme.');
+    // Sized to the drawing at 390 (nothing but the way back and the drawing, so no empty area below it), and a visible way back to the plan.
+    const page = ask(() => { const b = document.querySelector('.so-back'), s = document.querySelector('svg[viewBox]').getBoundingClientRect(), r = b?.getBoundingClientRect(); return { back: b ? b.textContent : null, backHref: b ? b.href : null, backH: r ? Math.round(r.height) : 0, backTop: r ? Math.round(r.top) : 0, svgBottom: Math.round(s.bottom + scrollY), page: Math.round(document.body.getBoundingClientRect().bottom + scrollY), viewport: innerHeight }; });
+    writeFileSync(join(records, `fullsize.${theme}.${width}w.page.json`), JSON.stringify(page));
+    if (!before) {
+      assert.equal(page.back, '\u2190 Back to the plan'); assert.ok(page.backH >= 44 && page.backTop >= 0, `the way back is ${page.backH} px tall at ${page.backTop}`);
+      if (width === 390) assert.ok(page.page - page.svgBottom <= 24, `${page.page - page.svgBottom} px of page below the drawing`);
+    }
+    capture('fullsize', 'Full size opens the diagram page itself at the board theme.' + (before ? ' It has no way back and, on a phone, a grey area below the drawing.' : ' It has a Back to the plan link and, on a phone, ends at the drawing.'));
+    if (!before) {
+      // The way back is a real link: it returns this tab to the plan.
+      drive('await page.eval(() => document.querySelector(".so-back").click()); await wait(".gd-sec");');
+      assert.equal(ask(() => location.hash), `#waiting/${plan.key}`);
+    }
   }
   writeFileSync(join(out, 'steps.json'), JSON.stringify({
     target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
