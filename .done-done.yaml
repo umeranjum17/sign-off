@@ -27,6 +27,9 @@ journeys:
   # Archify diagrams on a plan, per theme and width: needs DIAGRAM_DIR, a folder of pages the archify skill drew (slices.html, today.html, after.html). DIAGRAM_BEFORE=1 SIGN_OFF_REPO=<base checkout> records the no-diagram before.
   diagram:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/diagram-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${DIAGRAM_THEME:-light}" "${DIAGRAM_WIDTH:-390}"'
+  # Go deeper on an answers-only (fed) board: accepted at 390 and 1280, one ask saved, no error shown.
+  fed-deeper:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/fed-deeper-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${GUIDE_THEME:-light}"'
   board-actions:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/board-actions.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   attach:

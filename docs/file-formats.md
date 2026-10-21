@@ -52,7 +52,8 @@ New guided defaults use plan schema 3 / report schema 4, contract 1, with a requ
   another program: the same Summary and area screens, checked every 20 seconds, but the items
   that ask something take answers and replies. There is no Ask box, and
   **Other answer** has no Another round or comment button; the server refuses rounds, comments
-  and prompts with 403. An answer or reply to an item the program dropped
+  and prompts with 403. Go deeper on a guided plan or report is an ask for an
+  explanation, so it works here. An answer or reply to an item the program dropped
   while the person answered it is still saved. A feeding program writes the
   board with `sign-off-axi post <board> --from <file> --replace`, which checks
   the whole file the way the board reads it and refuses a bad item before
