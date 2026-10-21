@@ -857,6 +857,22 @@ test('engagement listeners survive report-only boards, sent plans, timeouts and 
   }
 });
 
+test('an answers-only board takes Go deeper on a report part and still refuses rounds', async () => {
+  const dir = join(scratch, 'fed-deeper'), board = join(dir, 'board.json'), env = { ...process.env, SIGN_OFF_HOME: dir, HOME: join(dir, 'home') };
+  const report = { ...JSON.parse(readFileSync(join(fixtures, 'report.v4/valid-full.json'))), key: 'fed-report' };
+  assert.equal(spawnSync(process.execPath, [cli, 'post', board, '--kind', 'report', '--from', '-'], { env, encoding: 'utf8', input: JSON.stringify(report) }).status, 0);
+  writeFileSync(board, JSON.stringify({ ...JSON.parse(readFileSync(board, 'utf8')), answers_only: true }));
+  const server = spawn(process.execPath, [cli, 'serve', board, '--port', '0'], { env });
+  try {
+    const url = await new Promise(ok => server.stdout.once('data', b => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+    const send = (path, body) => fetch(url + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const deeper = await send('api/deeper', { key: 'fed-report', part: 'found:0' });
+    assert.equal(deeper.status, 200);
+    assert.deepEqual((await deeper.json()).deeper.map(a => [a.key, a.part]), [['fed-report', 'found:0']]);
+    assert.equal((await send('api/rounds', { key: 'fed-report', note: 'again' })).status, 403);
+  } finally { server.kill(); }
+});
+
 test('standalone owner registration preserves queued failures and separates delivery from owner acknowledgement', async () => {
   const dir = join(scratch, 'owners'), board = join(dir, 'board.json'), bin = join(dir, 'bin');
   mkdirSync(bin, { recursive: true }); symlinkSync(process.execPath, join(bin, 'node'));

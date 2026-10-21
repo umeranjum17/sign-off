@@ -2348,8 +2348,8 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   }
   if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/signin', '/api/leash', '/api/deeper', '/api/reads', '/api/engagement', '/api/engagement/seen'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
   if (readOnly()) return [403, { error: 'This board is read-only' }];
-  // Dismiss only hides an item on this page and sends nothing to the feeding program, so an answers-only board takes it too.
-  if (!['/api/answers', '/api/dismiss', '/api/signin', '/api/reads'].includes(req.url!) && answersOnly()) return [403, { error: 'This board takes answers only' }];
+  // Dismiss only hides an item on this page and sends nothing to the feeding program, and Go deeper only asks for an explanation, so an answers-only board takes both.
+  if (!['/api/answers', '/api/dismiss', '/api/signin', '/api/reads', '/api/deeper', '/api/engagement', '/api/engagement/seen'].includes(req.url!) && answersOnly()) return [403, { error: 'This board takes answers only' }];
   if (!req.headers['content-type']?.startsWith('application/json')) return [415, { error: 'Send JSON' }];
   let body = '';
   for await (const chunk of req) body += chunk;
