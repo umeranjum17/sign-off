@@ -115,6 +115,11 @@ try {
       assert.equal((await fetch(full)).status, 200);
       writeFileSync(file, Buffer.concat([posted, Buffer.from('<!-- changed after posting -->')]));
       const refused = await fetch(full);
+      // What the person sees when they open Full size on the changed file: the refusal, in the browser.
+      browser('open', full.href); emulate(width, width === 390 ? 844 : 800);
+      const stem = `pinrefused.${theme}.${width}w`;
+      browser('screenshot', join(out, `${stem}.png`));
+      writeFileSync(join(records, `${stem}.claim.txt`), `${width}px ${theme}: the Full size page of a diagram file changed after posting shows the refusal, Diagram file changed since it was posted, not the drawing.\n`);
       writeFileSync(file, posted);
       const reason = (await refused.json()).error;
       assert.equal(refused.status, 404); assert.match(reason, /changed since it was posted/);
@@ -132,7 +137,7 @@ try {
         width > 700 ? 'They tap Show me to open the interactive viewer in place and tap Back to the picture.' : 'Show me is hidden on a phone; they open Full size, the drawing alone at the screen width.',
         ours ? `On the Full size page the page height fits the diagram (nothing but the drawing and a Back to the plan link, ${width === 390 ? 'no grey area below the drawing' : 'the interactive viewer'}), they tap Back to the plan and land on the plan.`
           : 'On the Full size page they see the drawing' + (legacy ? ' with a grey area below it on a phone and no way back to the plan.' : '.'),
-        ...(ours ? ['The diagram file is changed after posting: the board refuses it with "Diagram file changed since it was posted", and serves it again once restored.'] : [])],
+        ...(ours ? ['The diagram file is changed after posting and they open Full size again: the page shows the refusal "Diagram file changed since it was posted" (pinrefused capture) instead of the drawing, and the file is served again once restored.'] : [])],
     result: before ? 'The section is a list of items with no picture of their order.'
       : ours ? 'The order is a two-column picture, the item switches between two views, the Full size page fits the diagram with a Back to the plan link that returns to the plan, the smallest drawn text at 390 is at least 12 px, and a diagram file changed after posting is refused.'
         : 'The order is a two-column picture and the item switches between two views; the Full size page has a grey area below the drawing on a phone and no way back to the plan.',
