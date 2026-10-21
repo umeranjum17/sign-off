@@ -2624,11 +2624,12 @@
     const openKeys = new Set(open.map((d) => d.key));
     const merged = new Set(open.flatMap((d) => d.merges ?? []).filter((k) => openKeys.has(k)));
     for (const d of [...state.decisions].reverse()) if (!gone.has(d.key) && !merged.has(d.key) && !lapsed(d)) by[area(d)].push(d);
-    by.evidence.sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
+    // Today and Evidence read one list: the passed updates filed in the last 24 hours (the window Evidence archives after) that are not dismissed, answered or not, newest first.
+    // A capture with no run, a failed run or one that could not be checked is no proof, so it is on neither; its own screen still opens, and a verdict moves it to Answered.
+    by.provenToday = state.decisions.filter((d) => d.type === 'evidence' && d.evidenceCard?.result === 'RUN PASS' && !gone.has(d.key) && Date.now() - Date.parse(d.filed) <= 864e5);
+    by.evidence = [...by.evidence.filter((d) => d.type !== 'evidence'), ...by.provenToday].sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
+    by.provenToday = by.evidence.filter((d) => d.type === 'evidence');
     by.designs = [...state.decisions].reverse().filter((d) => d.kind === 'design' && !gone.has(d.key));
-    // Proven today counts every update filed in the last 24 hours that is not dismissed, answered or not: a verdict moves it off Evidence, not out of the count.
-    // It is the window Evidence archives after, so an update Evidence shows from last evening is counted too (only a restored or read-only board's older updates differ).
-    by.provenToday = state.decisions.filter((d) => d.type === 'evidence' && !gone.has(d.key) && Date.now() - Date.parse(d.filed) <= 864e5).sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
     // Waiting on you reads newest first unless the viewer chose oldest first. A sign-in blocks someone now, so sign-ins come first either way.
     let latest = -Infinity;
     const inFileOrder = by.waiting.slice().reverse().map((d, i) => { const t = Date.parse(d.filed); if (!Number.isNaN(t)) latest = t; return { d, t: latest, i }; });
@@ -2678,7 +2679,7 @@
         ...(by.reports.length ? reportGroups(by.reports) : [el('p', { class: 'empty' }, EMPTY.reports)]), notes(by.notes), dismissed(state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && ['reports', 'notes'].includes(area(d))), 'Archived')] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [at === 'waiting' ? filters(by.waiting) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...(at === 'waiting' ? shown : by[at]).map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [search(), glance(by),
       el('div', { class: 'tiles' }, tile('waiting', by.waiting.length, 'Need you'), tile('evidence', by.provenToday.length, 'Proven today'), tile('reports', filedToday(by.reports).length, 'New report')),
-      el('div', { class: 'areas' }, waitingSection(by.waiting, by.answered, by.designs), proven(by.evidence, by.provenToday), newReport(by.reports)), ...(state.leash ? leash() : []),
+      el('div', { class: 'areas' }, waitingSection(by.waiting, by.answered, by.designs), proven(by.provenToday, by.provenToday), newReport(by.reports)), ...(state.leash ? leash() : []),
       ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()])]));
     readPage(key ? state.decisions.find((d) => d.key === key && !gone.has(d.key) && (at === 'reports' && reads(d) || at === 'designs' && d.kind === 'design' || at === 'evidence' && d.type === 'evidence' || d.type === 'plan' && (area(d) === at || (d.guided && (at === 'waiting' || at === 'answered'))))) : undefined, at);
     if (at === 'decide') document.querySelector('#board .decide')?.prepend(bulkBar(bulk));

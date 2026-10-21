@@ -5,6 +5,7 @@
 # Files: <screen>.<theme>.<width>w.png; the design viewer also writes <screen>.<theme>.<width>w.widths.json,
 # the note box against the buttons under it, which must share both edges.
 # SHOTS_WIDTHS="390" or "1280" keeps the widths named (all three by default).
+# SHOTS_FULL=1 captures the whole scrollable page, not just the first screen.
 set -euo pipefail
 url=$1 out=$2; shift 2
 screens=${*:-summary waiting decide designs design-review design-viewer evidence reports answered}
@@ -30,7 +31,7 @@ for theme in light dark; do
         chrome-devtools-axi eval "() => { document.querySelector('button[data-design]').click(); return 'ok' }" >/dev/null
         chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 600))" >/dev/null
       fi
-      chrome-devtools-axi screenshot "$out/$s.$theme.${w}w.png" >/dev/null
+      chrome-devtools-axi screenshot "$out/$s.$theme.${w}w.png" ${SHOTS_FULL:+--full-page} >/dev/null
       echo "$out/$s.$theme.${w}w.png"
       if [ "$s" = design-viewer ]; then
         chrome-devtools-axi eval "$WIDTHS" | sed -n 's/^result: "\(.*\)"$/\1/p' | sed 's/\\"/"/g' > "$out/$s.$theme.${w}w.widths.json"
