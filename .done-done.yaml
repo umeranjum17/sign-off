@@ -18,6 +18,9 @@ journeys:
   # with real read receipts and a real Go deeper answered through the installed CLI (a model's when MINIMAX_API_KEY is set, else a labelled stand-in).
   guide:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/guide-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${GUIDE_THEME:-light}" "${GUIDE_WIDTH:-390}"'
+  # The research bar: a sample research report and plan from the packaged skill on a throwaway board, one labelled shot per part the bar names, per theme and width.
+  research-bar:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/research-bar-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   # Selected text on a guided plan and report: the tray, offsets, cancellation, refusals and the quote in the pending request, per theme and width.
   selection:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/selection-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${GUIDE_THEME:-light}" "${GUIDE_WIDTH:-390}"'
