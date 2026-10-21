@@ -1,5 +1,6 @@
 // Real CLI -> answers-only board -> Go deeper on a report item in the browser, one theme per run.
 // Usage: node .agents/skills/done-done-verify-sign-off/fed-deeper-shots.mjs <output> [light|dark]
+// FED_WIDTH=390 or 1280 runs one width, so a run's steps.json holds one claim.
 // Saves deeper-ask.<width>w.png and deeper-ask.<width>w.txt (numbers: asks saved before and after, errors shown) at 390 and 1280.
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -18,7 +19,8 @@ const run = (bin, args, options = {}) => {
 const browser = (...args) => run('chrome-devtools-axi', args, { env: browserEnv });
 let server;
 try {
-  for (const width of [390, 1280]) {
+  const widths = process.env.FED_WIDTH ? [+process.env.FED_WIDTH] : [390, 1280];
+  for (const width of widths) {
     rmSync(board, { force: true }); rmSync(join(dir, 'board.deeper.jsonl'), { force: true });
     const report = JSON.parse(readFileSync('fixtures/contract/report.v4/valid-full.json'));
     Object.assign(report, { key: 'fed-report', filed: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z') });
@@ -48,6 +50,9 @@ try {
     assert.deepEqual([result.before, result.asks, result.errors, result.overflow], [0, 1, 0, false], JSON.stringify(result));
     server.kill(); server = undefined;
   }
+  writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync('package.json', 'utf8')).version }, start: 'A throwaway board, fed by another program (answers only), holding one guided report.',
+    steps: [`The board is opened at ${widths.join(' and ')} px wide on the report.`, 'The person taps Go deeper on the first part.'],
+    result: `Go deeper is accepted at ${widths.join(' and ')} px: one ask is saved, no error shows under the part, and nothing runs off the screen.` }, null, 2) + '\n');
 } finally {
   server?.kill();
   try { browser('stop'); } catch {}
