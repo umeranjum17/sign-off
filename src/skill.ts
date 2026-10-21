@@ -135,7 +135,7 @@ Only where structure, order or dependency is the point: how a change flows, what
 
 - Add \`"diagram": [{"label": "Today", "src": "diagrams/flow.html"}]\` (1 to 3 views, shown as tabs) to the \`visual\`, a section or an item, beside the rows, which stay as the list. \`src\` is a page next to the plan or report file, as \`view\` is.
 - Draw an \`architecture\` diagram with a \`viewBox\` 320 to 340 wide (320 is Archify's smallest): two columns, labels under about 16 characters, no sublabels, \`"legend": {"mode": "hidden"}\` in \`meta\`. Sequence, workflow and \`compare\` pages are too wide for a phone; show the same flow as a numbered column instead, and draw Today and After as two pages, one per tab.
-- Post refuses a diagram whose smallest text is under 12 px on a 390 px phone, one with brand marks (never set \`brand\`), or one that is not there.
+- Post refuses a diagram whose smallest text is under 12 px on a 390 px phone, one with brand marks (never set \`brand\`), or one that is not there. Post pins each page (its \`sha256\` and \`bytes\`, written for you): a page changed after posting is not shown, so draw a changed page again and post the plan again.
 - Run \`ARCHIFY_UPDATE_CHECK_DISABLED=1 archify finalize\` with \`--quality showcase\`, so it makes no network call. Archify draws in its own mono type; sign-off cannot change it.
 - On a phone the board shows the picture and **Full size**, which opens the drawing alone at the full width of the screen; on a desk **Show me** opens the interactive page in place. Look at both at 390 before you say it is posted.
 

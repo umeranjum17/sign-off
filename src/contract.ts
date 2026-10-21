@@ -1,4 +1,5 @@
 // The v1 communication contract (docs/contract.md): one strict, versioned shape per kind of message.
+import { createHash } from 'node:crypto';
 import { accessSync, constants, readFileSync, realpathSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { isKey, MEDIA_MAX, REPORT_FORMS } from './store.js';
@@ -168,8 +169,10 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
     text(`${field}[${n}].label`, o.label, 40, 'the number\'s name, in 40 characters or fewer');
     text(`${field}[${n}].value`, o.value, 120, 'the number and its unit, in 120 characters or fewer');
   });
-  /** A diagram: 1 to 3 views of one picture (Today, After), each a board-relative .html file the board frames. */
-  const diagrams = (field: string, v: any) => list(field, 1, 3, ['label', 'src'], '{"label":"Today","src":"diagrams/flow.html"}', v).forEach((o, n) => {
+  /** A diagram: 1 to 3 views of one picture (Today, After), each a board-relative .html file the board frames. Post adds each file's `sha256` and `bytes`, as it does for media. */
+  const diagrams = (field: string, v: any) => list(field, 1, 3, ['label', 'src', 'sha256', 'bytes'], '{"label":"Today","src":"diagrams/flow.html"}', v).forEach((o, n) => {
+    if (Object.hasOwn(o, 'sha256') && !/^[a-f0-9]{64}$/.test(o.sha256)) throw bad(`${field}[${n}].sha256`, 'must be 64 lowercase hex digits', 'Leave "sha256" and "bytes" out; post pins the file');
+    if (Object.hasOwn(o, 'bytes') && !(Number.isInteger(o.bytes) && o.bytes >= 0)) throw bad(`${field}[${n}].bytes`, 'must be a whole number of bytes', 'Leave "sha256" and "bytes" out; post pins the file');
     text(`${field}[${n}].label`, o.label, 40, 'the view name, such as "Today", in 40 characters or fewer');
     text(`${field}[${n}].src`, o.src, 256, 'a page path from the board file\'s folder, such as "diagrams/flow.html"');
     if (/^([\\/]|[A-Za-z]:)/.test(o.src) || o.src.split(/[\\/]/).includes('..') || /[?#\\]/.test(o.src) || !/\.html?$/i.test(o.src)) throw bad(`${field}[${n}].src`, `${show(o.src)} must be a relative .html path with no .., ?, # or \\`, 'Draw the diagram with the archify skill, then set "src" to its .html file next to the message');
@@ -486,12 +489,13 @@ export function mediaFiles(m: any, base: string): string[] {
 }
 
 /** The diagram views of a guided plan or report, in the order the board counts them for `diagram.<n>`: the picture's, then each section's and its items'. */
-export const diagramViews = (m: any): { label: string; src: string }[] => [m?.visual?.diagram, ...(m?.sections ?? []).flatMap((s: any) => [s.diagram, ...(s.items ?? []).map((i: any) => i.diagram)])].filter(Boolean).flat();
+export const diagramViews = (m: any): { label: string; src: string; sha256?: string; bytes?: number }[] => [m?.visual?.diagram, ...(m?.sections ?? []).flatMap((s: any) => [s.diagram, ...(s.items ?? []).map((i: any) => i.diagram)])].filter(Boolean).flat();
 /** The text size a diagram must keep on a phone: its smallest text, drawn as wide as Full size draws it on a 390 px screen (the chrome-free page, 8 px of margin each side). */
 const DIAGRAM_MIN_PX = 12;
 const PHONE_PX = 390, PHONE_DRAW_PX = PHONE_PX - 16;
 /** A guided plan's or report's diagram pages, from `base`, the board file's folder: each a file of 5 MB or less whose real path stays inside it,
- * with a drawing whose smallest text is at least 12 px at 390 and no brand marks (their licenses differ). The first broken rule throws. */
+ * with a drawing whose smallest text is at least 12 px at 390 and no brand marks (their licenses differ). The first broken rule throws.
+ * Each view that passes is pinned with the file's `sha256` and `bytes`, so the board serves only the file that was posted and the revision covers its content. */
 export function diagramPages(m: any, base: string): void {
   const at = isKey(m.key) ? `key ${m.key}: ` : '';
   let root = resolve(base);
@@ -505,12 +509,14 @@ export function diagramPages(m: any, base: string): void {
     const info = statSync(real);
     if (!info.isFile() || info.size > 5_000_000) throw bad('must be a file of 5 MB or less', 'Render it again as a narrow architecture diagram');
     try { accessSync(real, constants.R_OK); } catch { throw bad('cannot be read', 'Make the file readable, then post again'); }
-    const html = readFileSync(real, 'utf8'), svg = html.match(/<svg\b[^>]*\bviewBox\s*=\s*["']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+[\d.]+[^>]*>([\s\S]*?)<\/svg>/i);
+    const file = readFileSync(real), html = file.toString('utf8'), svg = html.match(/<svg\b[^>]*\bviewBox\s*=\s*["']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+[\d.]+[^>]*>([\s\S]*?)<\/svg>/i);
     if (!svg) throw bad('has no <svg> drawing with a viewBox', 'Render it with the archify skill: an architecture diagram with a viewBox 320 to 340 wide and its legend hidden');
     if (/data-brand-mark/i.test(html)) throw bad('uses brand marks, whose licenses differ', 'Draw it again without "brand" on any component');
     const sizes = [...svg[2].matchAll(/<text\b[^>]*?\bfont-size\s*=\s*["']([\d.]+)/gi)].map((t) => Number(t[1]));
     const small = Math.min(...sizes), real12 = small * PHONE_DRAW_PX / Number(svg[1]);
     if (sizes.length && real12 < DIAGRAM_MIN_PX) throw bad(`has text of ${Math.round(real12 * 10) / 10} px at ${PHONE_PX} (${small} in a ${svg[1]} wide drawing), under ${DIAGRAM_MIN_PX}`, `Draw it narrower, an architecture viewBox 320 to 340 wide with no sublabels and the legend hidden ("legend": {"mode": "hidden"} in "meta"), so every text is ${DIAGRAM_MIN_PX} px or more on a phone`);
+    v.sha256 = createHash('sha256').update(file).digest('hex');
+    v.bytes = file.length;
   }
 }
 

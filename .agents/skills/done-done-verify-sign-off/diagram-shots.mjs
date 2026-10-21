@@ -1,6 +1,7 @@
 // A plan whose sections carry Archify diagrams, posted with the real CLI and read in a real browser, one isolated board per cell.
 // Usage: DIAGRAM_DIR=<folder of rendered pages: slices.html, today.html, after.html> node .agents/skills/done-done-verify-sign-off/diagram-shots.mjs <output> [light|dark] [390|1280]
 // DIAGRAM_BEFORE=1 posts the same plan with no diagram fields (the list alone); SIGN_OFF_REPO names another built checkout to run, such as the base for a before.
+// DIAGRAM_BASE=1 with SIGN_OFF_REPO drives a base checkout that has diagrams but not the Full size way back, so it takes the captures and skips the checks of the way back.
 import { spawn, spawnSync } from 'node:child_process';
 import { copyFileSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -10,7 +11,7 @@ import { recordsDir } from './records.mjs';
 const out = resolve(process.argv[2] ?? process.env.DONE_DONE_EVIDENCE_ROOT);
 const theme = process.argv[3] ?? process.env.DONE_DONE_THEME ?? 'light', width = +(process.argv[4] ?? process.env.DONE_DONE_WIDTH ?? 390);
 assert.ok(['light', 'dark'].includes(theme) && [390, 1280].includes(width));
-const before = !!process.env.DIAGRAM_BEFORE, repo = resolve(process.env.SIGN_OFF_REPO ?? '.'), pages = resolve(process.env.DIAGRAM_DIR ?? '');
+const before = !!process.env.DIAGRAM_BEFORE, legacy = !!process.env.DIAGRAM_BASE, repo = resolve(process.env.SIGN_OFF_REPO ?? '.'), pages = resolve(process.env.DIAGRAM_DIR ?? '');
 mkdirSync(out, { recursive: true });
 const records = recordsDir(out);
 mkdirSync(records, { recursive: true });
@@ -97,15 +98,49 @@ try {
     const sizes = ask(() => [...document.querySelectorAll('svg[viewBox] text')].filter((t) => t.getBoundingClientRect().width).map((t) => t.getScreenCTM().a * parseFloat(t.getAttribute('font-size') || getComputedStyle(t).fontSize)));
     writeFileSync(join(records, `fullsize.${theme}.${width}w.txt`), `${sizes.length} texts, smallest ${Math.min(...sizes).toFixed(1)} px at ${width}\n`);
     if (width === 390) assert.ok(Math.min(...sizes) >= 12, `smallest text ${Math.min(...sizes)} px`);
-    capture('fullsize', 'Full size opens the diagram page itself at the board theme.');
+    // Sized to the drawing at 390 (nothing but the way back and the drawing, so no empty area below it), and a visible way back to the plan.
+    const page = ask(() => { const b = document.querySelector('.so-back'), s = document.querySelector('svg[viewBox]').getBoundingClientRect(), r = b?.getBoundingClientRect(); return { back: b ? b.textContent : null, backHref: b ? b.href : null, backH: r ? Math.round(r.height) : 0, backTop: r ? Math.round(r.top) : 0, svgBottom: Math.round(s.bottom + scrollY), page: Math.round(document.body.getBoundingClientRect().bottom + scrollY), viewport: innerHeight }; });
+    writeFileSync(join(records, `fullsize.${theme}.${width}w.page.json`), JSON.stringify(page));
+    if (!before && !legacy) {
+      assert.equal(page.back, '\u2190 Back to the plan'); assert.ok(page.backH >= 44 && page.backTop >= 0, `the way back is ${page.backH} px tall at ${page.backTop}`);
+      if (width === 390) assert.ok(page.page - page.svgBottom <= 24, `${page.page - page.svgBottom} px of page below the drawing`);
+    }
+    capture('fullsize', 'Full size opens the diagram page itself at the board theme.' + (before || legacy ? ' It has no way back and, on a phone, a grey area below the drawing.' : ' It has a Back to the plan link and, on a phone, ends at the drawing.'));
+    if (!before && !legacy) {
+      // The way back is a real link: it returns this tab to the plan.
+      drive('await page.eval(() => document.querySelector(".so-back").click()); await wait(".gd-sec");');
+      assert.equal(ask(() => location.hash), `#waiting/${plan.key}`);
+      // The pin: the posted file is served, the same page changed after posting is refused, and the posted file is served again.
+      const file = join(dir, 'diagrams', 'slices.html'), posted = readFileSync(file);
+      assert.equal((await fetch(full)).status, 200);
+      writeFileSync(file, Buffer.concat([posted, Buffer.from('<!-- changed after posting -->')]));
+      const refused = await fetch(full);
+      // What the person sees when they open Full size on the changed file: the refusal, in the browser.
+      browser('open', full.href); emulate(width, width === 390 ? 844 : 800);
+      const stem = `pinrefused.${theme}.${width}w`;
+      browser('screenshot', join(out, `${stem}.png`));
+      writeFileSync(join(records, `${stem}.claim.txt`), `${width}px ${theme}: the Full size page of a diagram file changed after posting shows the refusal, Diagram file changed since it was posted, not the drawing.\n`);
+      writeFileSync(file, posted);
+      const reason = (await refused.json()).error;
+      assert.equal(refused.status, 404); assert.match(reason, /changed since it was posted/);
+      assert.equal((await fetch(full)).status, 200);
+      writeFileSync(join(records, `pin.${theme}.${width}w.txt`), `posted file served 200; the same page with one comment added answered ${refused.status} "${reason}"; restored, served 200\n`);
+    }
   }
+  const head = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: repo, encoding: 'utf8' }).stdout.trim();
+  const pkg = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version, ours = !before && !legacy;
   writeFileSync(join(out, 'steps.json'), JSON.stringify({
-    target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
+    target: { version: `${pkg} at ${head}` },
     start: 'A clean board holding one plan whose section lists two items.' + (before ? '' : ' The section carries an order diagram and one item carries two views, all drawn by the archify skill.'),
     steps: before ? ['The person opens the plan and scrolls to its found section.']
       : ['The person opens the plan and scrolls to the found section: its order diagram sits under the heading.', 'They open the first item and switch its diagram from Today to With an adapter.',
-        width > 700 ? 'They tap Show me to open the interactive viewer in place and tap Back to the picture.' : 'Show me is hidden on a phone; they open Full size, the drawing alone at the screen width.'],
-    result: before ? 'The section is a list of items with no picture of their order.' : 'The order is a two-column picture, the item switches between two views, and the smallest drawn text in Full size at 390 is at least 12 px.',
+        width > 700 ? 'They tap Show me to open the interactive viewer in place and tap Back to the picture.' : 'Show me is hidden on a phone; they open Full size, the drawing alone at the screen width.',
+        ours ? `On the Full size page the page height fits the diagram (nothing but the drawing and a Back to the plan link, ${width === 390 ? 'no grey area below the drawing' : 'the interactive viewer'}), they tap Back to the plan and land on the plan.`
+          : 'On the Full size page they see the drawing' + (legacy ? ' with a grey area below it on a phone and no way back to the plan.' : '.'),
+        ...(ours ? ['The diagram file is changed after posting and they open Full size again: the page shows the refusal "Diagram file changed since it was posted" (pinrefused capture) instead of the drawing, and the file is served again once restored.'] : [])],
+    result: before ? 'The section is a list of items with no picture of their order.'
+      : ours ? 'The order is a two-column picture, the item switches between two views, the Full size page fits the diagram with a Back to the plan link that returns to the plan, the smallest drawn text at 390 is at least 12 px, and a diagram file changed after posting is refused.'
+        : 'The order is a two-column picture and the item switches between two views; the Full size page has a grey area below the drawing on a phone and no way back to the plan.',
   }));
 } finally {
   browser('stop'); server.kill();
