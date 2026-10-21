@@ -17,6 +17,7 @@ Open the URL seed-board.sh prints, then tap Evidence in the sidebar or the tab b
 ## Driving it
 
 1. Launch as SKILL.md says and keep BASE.
+`done-done run today-evidence` seeds passed, expired and no-run updates and captures Today and Evidence at 390 in both themes: both show the same passed cards.
 2. Capture the list at both widths and themes: `shots.sh BASE "$DONE_DONE_EVIDENCE_ROOT" evidence`.
 3. The seed links one update to a passing done-done run and leaves another plain, so the list shows the `sign-off` project head with the `Passed` card only; the plain update (`Not run`) is on neither Evidence nor Proven today, and the Need you tile and Decide badge count neither. Today's Proven today row and Evidence name the same cards in the same order. Open the passed update, `BASE#evidence/update-2`, and capture it at both widths and themes as `evidence-item.<theme>.<width>w.png`; it shows the Result, What ran, Checked by, Project, When and Change rows.
 4. On a phone, check the card fills the content width and the item never scrolls sideways; long values such as `done-done-verify-sign-off` must fit, moving below their label when needed. On a desk, check cards sit two across. `done-done run board-actions` checks the seeded long checker value at 390 and 1280 in both themes.
