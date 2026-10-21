@@ -1,6 +1,6 @@
 // Clean install -> post a research report and a plan -> the comparison table, item line breaks and item button padding in a real browser.
 // `npm pack` of this checkout is installed into an empty folder with a throwaway HOME and XDG_*; only that installed package posts and serves.
-// Usage: node .agents/skills/done-done-verify-sign-off/table-shots.mjs <output> <report.json> <plan.json>
+// Usage: node .agents/skills/done-done-verify-sign-off/table-shots.mjs <report.json> <plan.json> [output, default $DONE_DONE_EVIDENCE_ROOT]
 // The report needs a section whose items all carry the same "Axis: value" lines in `more` (the table); the plan needs an item whose
 // `more` is several lines that are not a table, and an item with no `more` (its buttons). TABLE_SECTION, LINES_ITEM and BARE_ITEM name them.
 import assert from 'node:assert/strict';
@@ -8,8 +8,8 @@ import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-const [out, reportFile, planFile] = process.argv.slice(2).map((p) => resolve(p));
-assert.ok(out && reportFile && planFile, 'usage: table-shots.mjs <output> <report.json> <plan.json>');
+const [reportFile, planFile, out] = [...process.argv.slice(2, 4), process.argv[4] ?? process.env.DONE_DONE_EVIDENCE_ROOT].map((p) => p && resolve(p));
+assert.ok(out && reportFile && planFile, 'usage: table-shots.mjs <report.json> <plan.json> [output]');
 const tableSection = process.env.TABLE_SECTION ?? 'compare', linesItem = process.env.LINES_ITEM ?? 'research:0', bareItem = process.env.BARE_ITEM ?? 'risks:1';
 mkdirSync(out, { recursive: true });
 const repo = process.cwd(), dir = mkdtempSync(join(tmpdir(), 'so-table-')), app = join(dir, 'app'), board = join(dir, 'board.json');
