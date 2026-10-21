@@ -168,6 +168,12 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
     text(`${field}[${n}].label`, o.label, 40, 'the number\'s name, in 40 characters or fewer');
     text(`${field}[${n}].value`, o.value, 120, 'the number and its unit, in 120 characters or fewer');
   });
+  /** A diagram: 1 to 3 views of one picture (Today, After), each a board-relative .html file the board frames. */
+  const diagrams = (field: string, v: any) => list(field, 1, 3, ['label', 'src'], '{"label":"Today","src":"diagrams/flow.html"}', v).forEach((o, n) => {
+    text(`${field}[${n}].label`, o.label, 40, 'the view name, such as "Today", in 40 characters or fewer');
+    text(`${field}[${n}].src`, o.src, 256, 'a page path from the board file\'s folder, such as "diagrams/flow.html"');
+    if (/^([\\/]|[A-Za-z]:)/.test(o.src) || o.src.split(/[\\/]/).includes('..') || /[?#\\]/.test(o.src) || !/\.html?$/i.test(o.src)) throw bad(`${field}[${n}].src`, `${show(o.src)} must be a relative .html path with no .., ?, # or \\`, 'Draw the diagram with the archify skill, then set "src" to its .html file next to the message');
+  });
   /** The guided page every plan 2 and report 3 is: what I understood, one picture, sections with expandable items, and the next step. Returns the section ids. */
   const guide = (minSections: number): string[] => {
     list('understood', 1, 6, ['label', 'text'], '{"label":"You asked","text":"Make the first start smooth."}').forEach((o, n) => {
@@ -176,7 +182,7 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
     });
     const v = m.visual;
     if (!Object.hasOwn(m, 'visual')) throw bad('visual', 'is required: one picture for the answer', 'Add "visual": {"type":"bars","heading":"...","rows":[{"label":"Cloud box","value":4.5}]}');
-    one('visual', v, ['type', 'heading', 'text', 'unit', 'rows', 'details'], '{"type":"bars","heading":"...","rows":[...]}');
+    one('visual', v, ['type', 'heading', 'text', 'unit', 'rows', 'details', 'diagram'], '{"type":"bars","heading":"...","rows":[...]}');
     if (!['bars', 'steps', 'tiles'].includes(v.type)) throw bad('visual.type', `${show(v.type)} is not one of bars, steps, tiles`, 'Set "type" to "bars" for numbers, "steps" for a sequence, "tiles" for parallel points');
     text('visual.heading', v.heading, 100, 'the point the picture makes, in 100 characters or fewer');
     if (Object.hasOwn(v, 'text')) text('visual.text', v.text, 240, 'one line under the picture, in 240 characters or fewer, or leave it out');
@@ -197,19 +203,22 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
       }
     });
     if (Object.hasOwn(v, 'details')) details('visual.details', v.details);
-    const ids = list('sections', minSections, 6, ['id', 'stage', 'heading', 'body', 'items', 'details'], '{"id":"steps","stage":"recommend","heading":"Eight steps, 22 to 31 Oct","body":"..."}').map((o, n) => {
+    if (Object.hasOwn(v, 'diagram')) diagrams('visual.diagram', v.diagram);
+    const ids = list('sections', minSections, 6, ['id', 'stage', 'heading', 'body', 'items', 'details', 'diagram'], '{"id":"steps","stage":"recommend","heading":"Eight steps, 22 to 31 Oct","body":"..."}').map((o, n) => {
       const at = `sections[${n}]`;
       if (!(typeof o.id === 'string' && /^[a-z0-9-]{1,40}$/.test(o.id))) throw bad(`${at}.id`, 'must be 1-40 of a-z 0-9 -', 'Set "id" to a short slug such as "steps"');
       if (!['found', 'recommend'].includes(o.stage)) throw bad(`${at}.stage`, `${show(o.stage)} is not found or recommend`, 'Set "stage" to "found" (what I found) or "recommend" (what I recommend)');
       text(`${at}.heading`, o.heading, 80, 'the section heading, in 80 characters or fewer');
       text(`${at}.body`, o.body, 300, 'the section\'s lead, in 300 characters or fewer');
-      if (Object.hasOwn(o, 'items')) list(`${at}.items`, 1, 8, ['title', 'text', 'more', 'tone'], '{"title":"Ship 0.2.5","text":"You test it.","more":"..."}', o.items).forEach((it, k) => {
+      if (Object.hasOwn(o, 'items')) list(`${at}.items`, 1, 8, ['title', 'text', 'more', 'tone', 'diagram'], '{"title":"Ship 0.2.5","text":"You test it.","more":"..."}', o.items).forEach((it, k) => {
         text(`${at}.items[${k}].title`, it.title, 80, 'the item, in 80 characters or fewer');
         text(`${at}.items[${k}].text`, it.text, 160, 'one line under it, in 160 characters or fewer');
         if (Object.hasOwn(it, 'more')) text(`${at}.items[${k}].more`, it.more, 600, 'what opens when it is tapped, in 600 characters or fewer, or leave it out');
         tone(`${at}.items[${k}]`, it);
+        if (Object.hasOwn(it, 'diagram')) diagrams(`${at}.items[${k}].diagram`, it.diagram);
       });
       if (Object.hasOwn(o, 'details')) details(`${at}.details`, o.details);
+      if (Object.hasOwn(o, 'diagram')) diagrams(`${at}.diagram`, o.diagram);
       return o.id;
     });
     const twice = ids.findIndex((id, n) => ids.indexOf(id) < n);
@@ -474,6 +483,35 @@ export function mediaFiles(m: any, base: string): string[] {
     if (info.size > MEDIA_BYTES) throw bad(`is over ${MEDIA_BYTES} bytes`, 'Trim or compress the recording');
     return real;
   });
+}
+
+/** The diagram views of a guided plan or report, in the order the board counts them for `diagram.<n>`: the picture's, then each section's and its items'. */
+export const diagramViews = (m: any): { label: string; src: string }[] => [m?.visual?.diagram, ...(m?.sections ?? []).flatMap((s: any) => [s.diagram, ...(s.items ?? []).map((i: any) => i.diagram)])].filter(Boolean).flat();
+/** The text size a diagram must keep on a phone: its smallest text, drawn as wide as Full size draws it on a 390 px screen (the chrome-free page, 8 px of margin each side). */
+const DIAGRAM_MIN_PX = 12;
+const PHONE_PX = 390, PHONE_DRAW_PX = PHONE_PX - 16;
+/** A guided plan's or report's diagram pages, from `base`, the board file's folder: each a file of 5 MB or less whose real path stays inside it,
+ * with a drawing whose smallest text is at least 12 px at 390 and no brand marks (their licenses differ). The first broken rule throws. */
+export function diagramPages(m: any, base: string): void {
+  const at = isKey(m.key) ? `key ${m.key}: ` : '';
+  let root = resolve(base);
+  try { root = realpathSync(base); } catch {}
+  for (const v of diagramViews(m)) {
+    const name = `diagram ${show(v.src)}`, bad = (rule: string, help: string) => new ContractError(`${at}${name} ${rule}`, help);
+    let real;
+    try { real = realpathSync(resolve(root, v.src)); } catch { throw bad('is not there', `Put the file at ${v.src} from the board file's folder, or fix the path`); }
+    const rel = relative(root, real);
+    if (!rel || rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel)) throw bad('leads outside the board file\'s folder', 'Copy the page into the board file\'s folder, such as under diagrams/');
+    const info = statSync(real);
+    if (!info.isFile() || info.size > 5_000_000) throw bad('must be a file of 5 MB or less', 'Render it again as a narrow architecture diagram');
+    try { accessSync(real, constants.R_OK); } catch { throw bad('cannot be read', 'Make the file readable, then post again'); }
+    const html = readFileSync(real, 'utf8'), svg = html.match(/<svg\b[^>]*\bviewBox\s*=\s*["']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+[\d.]+[^>]*>([\s\S]*?)<\/svg>/i);
+    if (!svg) throw bad('has no <svg> drawing with a viewBox', 'Render it with the archify skill: an architecture diagram with a viewBox 320 to 340 wide and its legend hidden');
+    if (/data-brand-mark/i.test(html)) throw bad('uses brand marks, whose licenses differ', 'Draw it again without "brand" on any component');
+    const sizes = [...svg[2].matchAll(/<text\b[^>]*?\bfont-size\s*=\s*["']([\d.]+)/gi)].map((t) => Number(t[1]));
+    const small = Math.min(...sizes), real12 = small * PHONE_DRAW_PX / Number(svg[1]);
+    if (sizes.length && real12 < DIAGRAM_MIN_PX) throw bad(`has text of ${Math.round(real12 * 10) / 10} px at ${PHONE_PX} (${small} in a ${svg[1]} wide drawing), under ${DIAGRAM_MIN_PX}`, `Draw it narrower, an architecture viewBox 320 to 340 wide with no sublabels and the legend hidden ("legend": {"mode": "hidden"} in "meta"), so every text is ${DIAGRAM_MIN_PX} px or more on a phone`);
+  }
 }
 
 /** The longest a block of plain text on a report page may run: about five lines on a phone. */

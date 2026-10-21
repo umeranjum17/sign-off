@@ -15,7 +15,7 @@ import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner
 import { AxiError, runAxiCli } from 'axi-sdk-js';
 import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, asks, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, readDismissed, readItems, sameDecision, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
-import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
+import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
 
@@ -450,6 +450,7 @@ function contractItems(items: any[], from: string, file: string, replace = false
     try {
       checkMessage(check);
       if ((check.kind === 'report' || check.kind === 'plan') && !guided(check)) reportPage(check, dirname(file));
+      if (guided(check)) diagramPages(check, dirname(file));
       if (check.kind === 'design') designFiles(check, dirname(file));
     } catch (e) {
       throw e instanceof ContractError ? fail(`${from}: items[${i}]: ${e.message}`, 'VALIDATION_ERROR', e.help) : e;
@@ -1245,6 +1246,7 @@ async function postKind(file: string, named: string, on: string, values: Record<
     if (m.kind === 'evidence') sources = mediaFiles(m, from === '-' ? process.cwd() : dirname(resolve(from)));
     // A report's or plan's page is served from the board file's folder, as --view is.
     if ((m.kind === 'report' || m.kind === 'plan') && !guided(m)) reportPage(m, dirname(file));
+    if (guided(m)) diagramPages(m, dirname(file));
     if (m.kind === 'design') designFiles(m, dirname(file));
   } catch (e) { throw e instanceof ContractError ? fail(`${name}: ${e.message}`, 'VALIDATION_ERROR', e.help) : e; }
   if (m.filer !== undefined && values.filer !== undefined && m.filer !== values.filer) {
@@ -2286,7 +2288,9 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     // and the files beside it in its own folder, so a mock page's relative css, scripts and images load.
     const [item, ...rest] = new URL(req.url, 'http://localhost').pathname.split('/').slice(3), [key, value] = item?.split('~') ?? [];
     const d = loadDecisions(file).find((x) => x.key === key);
-    const mock = value ? d?.mocks?.find((m) => m.value === value)?.path : value === '' && d?.view;
+    // A guided document's diagram views: ~diagram.<n>, n counting them in the order visual, then each section and its items.
+    const dgs = d?.guided ? diagramViews(d) : [];
+    const mock = value?.startsWith('diagram.') ? dgs[Number(value.slice(8))]?.src : value ? d?.mocks?.find((m) => m.value === value)?.path : value === '' && d?.view;
     try {
       const path = rest.map(decodeURIComponent).join('/'), type = assetTypes[extname(path).toLowerCase()];
       if (!mock || !type) return [404, { error: 'Mock is unavailable' }];
