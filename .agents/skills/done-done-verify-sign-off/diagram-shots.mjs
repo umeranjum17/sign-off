@@ -110,15 +110,32 @@ try {
       // The way back is a real link: it returns this tab to the plan.
       drive('await page.eval(() => document.querySelector(".so-back").click()); await wait(".gd-sec");');
       assert.equal(ask(() => location.hash), `#waiting/${plan.key}`);
+      // The pin: the posted file is served, the same page changed after posting is refused, and the posted file is served again.
+      const file = join(dir, 'diagrams', 'slices.html'), posted = readFileSync(file);
+      assert.equal((await fetch(full)).status, 200);
+      writeFileSync(file, Buffer.concat([posted, Buffer.from('<!-- changed after posting -->')]));
+      const refused = await fetch(full);
+      writeFileSync(file, posted);
+      const reason = (await refused.json()).error;
+      assert.equal(refused.status, 404); assert.match(reason, /changed since it was posted/);
+      assert.equal((await fetch(full)).status, 200);
+      writeFileSync(join(records, `pin.${theme}.${width}w.txt`), `posted file served 200; the same page with one comment added answered ${refused.status} "${reason}"; restored, served 200\n`);
     }
   }
+  const head = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: repo, encoding: 'utf8' }).stdout.trim();
+  const pkg = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version, ours = !before && !legacy;
   writeFileSync(join(out, 'steps.json'), JSON.stringify({
-    target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
+    target: { version: `${pkg} at ${head}` },
     start: 'A clean board holding one plan whose section lists two items.' + (before ? '' : ' The section carries an order diagram and one item carries two views, all drawn by the archify skill.'),
     steps: before ? ['The person opens the plan and scrolls to its found section.']
       : ['The person opens the plan and scrolls to the found section: its order diagram sits under the heading.', 'They open the first item and switch its diagram from Today to With an adapter.',
-        width > 700 ? 'They tap Show me to open the interactive viewer in place and tap Back to the picture.' : 'Show me is hidden on a phone; they open Full size, the drawing alone at the screen width.'],
-    result: before ? 'The section is a list of items with no picture of their order.' : 'The order is a two-column picture, the item switches between two views, and the smallest drawn text in Full size at 390 is at least 12 px.',
+        width > 700 ? 'They tap Show me to open the interactive viewer in place and tap Back to the picture.' : 'Show me is hidden on a phone; they open Full size, the drawing alone at the screen width.',
+        ours ? `On the Full size page the page height fits the diagram (nothing but the drawing and a Back to the plan link, ${width === 390 ? 'no grey area below the drawing' : 'the interactive viewer'}), they tap Back to the plan and land on the plan.`
+          : 'On the Full size page they see the drawing' + (legacy ? ' with a grey area below it on a phone and no way back to the plan.' : '.'),
+        ...(ours ? ['The diagram file is changed after posting: the board refuses it with "Diagram file changed since it was posted", and serves it again once restored.'] : [])],
+    result: before ? 'The section is a list of items with no picture of their order.'
+      : ours ? 'The order is a two-column picture, the item switches between two views, the Full size page fits the diagram with a Back to the plan link that returns to the plan, the smallest drawn text at 390 is at least 12 px, and a diagram file changed after posting is refused.'
+        : 'The order is a two-column picture and the item switches between two views; the Full size page has a grey area below the drawing on a phone and no way back to the plan.',
   }));
 } finally {
   browser('stop'); server.kill();
