@@ -1,6 +1,7 @@
 // A plan whose sections carry Archify diagrams, posted with the real CLI and read in a real browser, one isolated board per cell.
 // Usage: DIAGRAM_DIR=<folder of rendered pages: slices.html, today.html, after.html> node .agents/skills/done-done-verify-sign-off/diagram-shots.mjs <output> [light|dark] [390|1280]
 // DIAGRAM_BEFORE=1 posts the same plan with no diagram fields (the list alone); SIGN_OFF_REPO names another built checkout to run, such as the base for a before.
+// DIAGRAM_BASE=1 with SIGN_OFF_REPO drives a base checkout that has diagrams but not the Full size way back, so it takes the captures and skips the checks of the way back.
 import { spawn, spawnSync } from 'node:child_process';
 import { copyFileSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -10,7 +11,7 @@ import { recordsDir } from './records.mjs';
 const out = resolve(process.argv[2] ?? process.env.DONE_DONE_EVIDENCE_ROOT);
 const theme = process.argv[3] ?? process.env.DONE_DONE_THEME ?? 'light', width = +(process.argv[4] ?? process.env.DONE_DONE_WIDTH ?? 390);
 assert.ok(['light', 'dark'].includes(theme) && [390, 1280].includes(width));
-const before = !!process.env.DIAGRAM_BEFORE, repo = resolve(process.env.SIGN_OFF_REPO ?? '.'), pages = resolve(process.env.DIAGRAM_DIR ?? '');
+const before = !!process.env.DIAGRAM_BEFORE, legacy = !!process.env.DIAGRAM_BASE, repo = resolve(process.env.SIGN_OFF_REPO ?? '.'), pages = resolve(process.env.DIAGRAM_DIR ?? '');
 mkdirSync(out, { recursive: true });
 const records = recordsDir(out);
 mkdirSync(records, { recursive: true });
@@ -100,12 +101,12 @@ try {
     // Sized to the drawing at 390 (nothing but the way back and the drawing, so no empty area below it), and a visible way back to the plan.
     const page = ask(() => { const b = document.querySelector('.so-back'), s = document.querySelector('svg[viewBox]').getBoundingClientRect(), r = b?.getBoundingClientRect(); return { back: b ? b.textContent : null, backHref: b ? b.href : null, backH: r ? Math.round(r.height) : 0, backTop: r ? Math.round(r.top) : 0, svgBottom: Math.round(s.bottom + scrollY), page: Math.round(document.body.getBoundingClientRect().bottom + scrollY), viewport: innerHeight }; });
     writeFileSync(join(records, `fullsize.${theme}.${width}w.page.json`), JSON.stringify(page));
-    if (!before) {
+    if (!before && !legacy) {
       assert.equal(page.back, '\u2190 Back to the plan'); assert.ok(page.backH >= 44 && page.backTop >= 0, `the way back is ${page.backH} px tall at ${page.backTop}`);
       if (width === 390) assert.ok(page.page - page.svgBottom <= 24, `${page.page - page.svgBottom} px of page below the drawing`);
     }
-    capture('fullsize', 'Full size opens the diagram page itself at the board theme.' + (before ? ' It has no way back and, on a phone, a grey area below the drawing.' : ' It has a Back to the plan link and, on a phone, ends at the drawing.'));
-    if (!before) {
+    capture('fullsize', 'Full size opens the diagram page itself at the board theme.' + (before || legacy ? ' It has no way back and, on a phone, a grey area below the drawing.' : ' It has a Back to the plan link and, on a phone, ends at the drawing.'));
+    if (!before && !legacy) {
       // The way back is a real link: it returns this tab to the plan.
       drive('await page.eval(() => document.querySelector(".so-back").click()); await wait(".gd-sec");');
       assert.equal(ask(() => location.hash), `#waiting/${plan.key}`);
