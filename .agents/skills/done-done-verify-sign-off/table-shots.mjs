@@ -54,7 +54,10 @@ function measure(section, item) {
   }
   return res;
 }
-const checks = [];
+const checks = [], measures = { compare: [], lines: [], padding: [] };
+// TABLE_PART=compare|lines|padding drives one part alone, so a run and its step record name that one thing.
+const part = process.env.TABLE_PART ?? 'all', want = (p) => part === 'all' || part === p;
+assert.ok(['all', 'compare', 'lines', 'padding'].includes(part), 'TABLE_PART is compare, lines or padding');
 try {
   const base = await new Promise((ok, no) => { let s = ''; server.stdout.on('data', (b) => { s += b; const m = /http:\/\/127\.0\.0\.1:\d+\//.exec(s); if (m) ok(m[0]); }); server.once('exit', (code) => no(new Error(`Server exited ${code}`))); });
   browser('open', base);
@@ -71,14 +74,23 @@ try {
       checks.push(`${stem}: ${JSON.stringify(got)}`);
       return got;
     };
-    const t = shot('report-compare', `${base}#reports/${report.key}`, tableSection);
-    const items = report.sections.find((s) => s.id === tableSection).items;
-    assert.deepEqual([t.layout, t.options, t.axes.length], [width === 1280 ? 'table' : 'block', items.map((i) => i.title), items[0].more.split('\n').length + 1], JSON.stringify(t));
     const [ls, li] = linesItem.split(':'), [bs, bi] = bareItem.split(':');
-    const l = shot('plan-lines', `${base}#waiting/${plan.key}`, ls, true, +li);
-    assert.ok(l.lines === plan.sections.find((s) => s.id === ls).items[+li].more.split('\n').length && l.tops >= l.lines, JSON.stringify(l));
-    const b = shot('plan-risks', `${base}#waiting/${plan.key}`, bs, false, +bi);
-    assert.ok(b.controls >= 6 && b.gap >= 8, `buttons of an item with no detail sit inside its padding: ${JSON.stringify(b)}`);
+    if (want('compare')) {
+      const t = shot('report-compare', `${base}#reports/${report.key}`, tableSection);
+      const items = report.sections.find((s) => s.id === tableSection).items;
+      assert.deepEqual([t.layout, t.options, t.axes.length], [width === 1280 ? 'table' : 'block', items.map((i) => i.title), items[0].more.split('\n').length + 1], JSON.stringify(t));
+      measures.compare.push(`report-compare.${theme}.${width}w: layout=${t.layout === 'table' ? 'columns' : 'stacked'} option_columns=${t.options.length} point_rows=${t.axes.length} overflow=${+t.overflow} cells_past_card=${t.outside}`);
+    }
+    if (want('lines')) {
+      const l = shot('plan-lines', `${base}#waiting/${plan.key}`, ls, true, +li);
+      assert.ok(l.lines === plan.sections.find((s) => s.id === ls).items[+li].more.split('\n').length && l.tops >= l.lines, JSON.stringify(l));
+      measures.lines.push(`plan-lines.${theme}.${width}w: detail_lines=${l.lines} text_rows=${l.tops} overflow=${+l.overflow}`);
+    }
+    if (want('padding')) {
+      const b = shot('plan-risks', `${base}#waiting/${plan.key}`, bs, false, +bi);
+      assert.ok(b.controls >= 6 && b.gap >= 8, `buttons of an item with no detail sit inside its padding: ${JSON.stringify(b)}`);
+      measures.padding.push(`plan-risks.${theme}.${width}w: buttons_and_box=${b.controls} smallest_inner_gap_px=${b.gap} overflow=${+b.overflow}`);
+    }
   }
 } finally {
   try { browser('stop'); } finally {
@@ -89,12 +101,18 @@ try {
   }
   writeFileSync(join(out, 'post.txt'), log.join('\n') + '\n');
   writeFileSync(join(out, 'layout-checks.txt'), checks.join('\n') + '\n');
-  const version = log[1].replace('version: ', '');
-  writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version }, start: 'An empty folder with a throwaway home, the sign-off-axi package packed from this checkout and installed there, and a new board.',
-    steps: [`The installed sign-off-axi posts the research report "${report.title}" and the plan "${plan.title}".`,
-      'The board is served and opened at 390 and 1280 px wide, in light and dark.',
-      `On the report, the section "${report.sections.find((s) => s.id === tableSection).heading}" is shown: every option on the same points.`,
-      `On the plan, the item "${plan.sections.find((s) => s.id === linesItem.split(':')[0]).items[+linesItem.split(':')[1]].title}" is opened, and the section "${plan.sections.find((s) => s.id === bareItem.split(':')[0]).heading}" is shown with its item that has no detail.`],
-    result: 'At 1280 the report shows a comparison table with the options across and the points down; at 390 each point lists every option under it. The opened plan item shows one line per point. The buttons of the item with no detail sit inside its own padding. Nothing runs off the screen in either theme.' }, null, 2) + '\n');
+  for (const [p, rows] of Object.entries(measures)) if (rows.length) writeFileSync(join(out, `${p}-measures.txt`), rows.join('\n') + '\n');
+  const linesTitle = plan.sections.find((s) => s.id === linesItem.split(':')[0]).items[+linesItem.split(':')[1]].title;
+  const bare = plan.sections.find((s) => s.id === bareItem.split(':')[0]);
+  const parts = {
+    compare: [`On the report "${report.title}", the section "${report.sections.find((s) => s.id === tableSection).heading}" is shown.`,
+      'At 1280 the report shows its options compared in one table, options as columns and points as rows; at 390 each point is a box listing every option under it.'],
+    lines: [`On the plan "${plan.title}", the item "${linesTitle}" is opened.`, `The opened item "${linesTitle}" shows its detail as one line per point.`],
+    padding: [`On the plan "${plan.title}", the section "${bare.heading}" is shown with its item "${bare.items[+bareItem.split(':')[1]].title}", which has no detail.`,
+      `The item "${bare.items[+bareItem.split(':')[1]].title}" shows its question buttons and ask box inside its own box.`] };
+  const shown = Object.keys(parts).filter(want);
+  writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: log[1].replace('version: ', '') }, start: 'An empty folder with a throwaway home, the sign-off-axi package packed from this checkout and installed there, and a new board.',
+    steps: ['The installed sign-off-axi posts a research report and a plan to the board.', 'The board is served and opened at 390 and 1280 px wide, in light and dark.', ...shown.map((p) => parts[p][0])],
+    result: shown.map((p) => parts[p][1]).join(' ') + ' Nothing runs off the screen in either theme.' }, null, 2) + '\n');
   rmSync(dir, { recursive: true, force: true });
 }
