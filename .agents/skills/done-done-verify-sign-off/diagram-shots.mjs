@@ -99,6 +99,14 @@ try {
     if (width === 390) assert.ok(Math.min(...sizes) >= 12, `smallest text ${Math.min(...sizes)} px`);
     capture('fullsize', 'Full size opens the diagram page itself at the board theme.');
   }
+  writeFileSync(join(out, 'steps.json'), JSON.stringify({
+    target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
+    start: 'A clean board holding one plan whose section lists two items.' + (before ? '' : ' The section carries an order diagram and one item carries two views, all drawn by the archify skill.'),
+    steps: before ? ['The person opens the plan and scrolls to its found section.']
+      : ['The person opens the plan and scrolls to the found section: its order diagram sits under the heading.', 'They open the first item and switch its diagram from Today to With an adapter.',
+        width > 700 ? 'They tap Show me to open the interactive viewer in place and tap Back to the picture.' : 'Show me is hidden on a phone; they open Full size, the drawing alone at the screen width.'],
+    result: before ? 'The section is a list of items with no picture of their order.' : 'The order is a two-column picture, the item switches between two views, and the smallest drawn text in Full size at 390 is at least 12 px.',
+  }));
 } finally {
   browser('stop'); server.kill();
   console.log(`Scratch for cleanup: ${dir}`);
