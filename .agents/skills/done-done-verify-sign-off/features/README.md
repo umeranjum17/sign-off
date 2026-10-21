@@ -2,6 +2,7 @@
 
 The repo's maintained verification map; a proof that drives one entry point is incomplete when this lists others.
 
+- [Core journey](core-journey.md): the agent files a card, the person answers it in the board, the agent reads the answer, and the same journey over the previous published version upgraded in place (`done-done run core`, `done-done run upgrade`)
 - [Board shell](board-shell.md): the board's areas, tokens and shell at 390 and 1280, light and dark
 - [Plan review](plan-review.md): section verdicts, Change notes, decisions and structured Send back at both widths and themes
 - [Guided plan and report](guide.md): clean install and authoring, the one-scroll Guide view with read receipts and a real Go deeper, 390 and 1280, light and dark

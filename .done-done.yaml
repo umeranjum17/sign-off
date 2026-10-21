@@ -6,6 +6,8 @@ app: "sign-off"
 # Every check the CI gate enforces, as a re-runnable journey. Each command
 # proves itself by writing its log under $DONE_DONE_EVIDENCE_ROOT and exiting 0.
 journeys:
+  # Supporting checks, not proof: a test, typecheck or build run shows the code checks pass, never that the product works, so the
+  # proof is the core and upgrade journeys below. CI and release call install, test and skill by name, so those stay.
   serve-stop:
     command: 'npm run build > /dev/null && node --test test/serve-stop.test.mjs > "$DONE_DONE_EVIDENCE_ROOT/serve-stop.log" 2>&1'
   document-scroll:
@@ -31,3 +33,9 @@ journeys:
     command: "npm test > $DONE_DONE_EVIDENCE_ROOT/test.log 2>&1"
   skill:
     command: "printf 'run=%s head=%s\\n' \"$DONE_DONE_RUN_ID\" \"$(git rev-parse HEAD)\" > $DONE_DONE_EVIDENCE_ROOT/skill.log && npm run build:skill -- --check >> $DONE_DONE_EVIDENCE_ROOT/skill.log 2>&1"
+  core:
+    command: node .agents/skills/done-done-verify-sign-off/core-journey.mjs "$DONE_DONE_EVIDENCE_ROOT"
+    core: true
+  upgrade:
+    command: node .agents/skills/done-done-verify-sign-off/core-journey.mjs "$DONE_DONE_EVIDENCE_ROOT" --upgrade
+    upgrade: true
