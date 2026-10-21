@@ -1113,6 +1113,57 @@ test('Decide on the page: a guided plan with no decisions is read under Reports,
   proc.kill();
 });
 
+test('a guided report: item detail keeps its line breaks, same-axis options read as one comparison table at 390 and 1280, and an item with no detail keeps its buttons inside its padding', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'compare'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  const report = JSON.parse(readFileSync(new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url)));
+  const option = (title, tone, text, models, safety) => ({ title, tone, text, more: `Models: ${models}.\nScripted: yes, with JSON output (github.com/example-org/example-agent/issues/10415).\nSafety: ${safety}.` });
+  report.sections.push({ id: 'compare', stage: 'found', heading: 'Three engines on the same 3 points', body: 'Each option on the same points.', items: [
+    option('pi: the pick', 'ok', 'Pros: any model. Cons: one open hang.', 'any, through providers', 'no leak reported'),
+    option('Codex CLI: the backup', 'warn', 'Pros: mature. Cons: adds a daemon.', 'OpenAI first', 'a background service'),
+    option('OpenCode: not now', 'bad', 'Pros: many features. Cons: key leak.', 'any', 'keys may have leaked on 17 Oct')] },
+  { id: 'lines', stage: 'found', heading: 'Three steps', body: 'One per line.', items: [{ title: 'The steps', text: 'Tap for all three.', more: 'Close the input.\nPin the version.\nReady the backup.' }] });
+  // Filed now, so it is listed under Reports rather than archived as old.
+  report.filed = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  writeFileSync(join(dir, 'report.json'), JSON.stringify(report));
+  const posted = run('post', file, '--kind', 'report', '--from', join(dir, 'report.json'));
+  assert.equal(posted.code, 0, posted.out);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  for (const width of [390, 1280]) {
+    const { evaluate, close } = await browse(join(dir, `b${width}`), width, 2400);
+    try {
+      await evaluate(`location.href = ${JSON.stringify(`${url}#reports/${report.key}`)}`);
+      await until(() => evaluate('!!document.querySelector("#gd-compare .gd-ct")'));
+      const table = await evaluate(`(() => {
+        const t = document.querySelector('#gd-compare .gd-ct'), shown = (e) => e.getClientRects().length > 0 && getComputedStyle(e).display !== 'none';
+        const cell = (r, c) => t.tBodies[0].rows[r].cells[c];
+        return { tableLayout: getComputedStyle(t).display, list: !!document.querySelector('#gd-compare .gd-rows'),
+          heads: [...t.tHead.rows[0].cells].slice(1).map((c) => c.textContent), axes: [...t.tBodies[0].rows].map((r) => r.cells[0].textContent),
+          safety: cell(3, 3).textContent, optionInCell: shown(cell(1, 1).querySelector('.ol')), headShown: t.tHead.getBoundingClientRect().height > 1,
+          wide: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+          outside: [...t.querySelectorAll('th, td')].filter((c) => c.getBoundingClientRect().right > t.closest('.gd-sec').getBoundingClientRect().right).length };
+      })()`);
+      assert.deepEqual([table.list, table.heads, table.axes, table.safety], [false, ['pi: the pick', 'Codex CLI: the backup', 'OpenCode: not now'], ['In short', 'Models', 'Scripted', 'Safety'], 'OpenCode: not nowkeys may have leaked on 17 Oct.'], JSON.stringify(table));
+      // Options run across on a desk; on a phone each point lists every option under it, named in its cell.
+      assert.deepEqual([table.tableLayout, table.headShown, table.optionInCell], width === 1280 ? ['table', true, false] : ['block', false, true], `${width}: ${JSON.stringify(table)}`);
+      assert.deepEqual([table.wide, table.outside], [false, 0], `${width}: ${JSON.stringify(table)}`);
+      // Detail that is not a table keeps one line per point.
+      await evaluate(`document.querySelector('#gd-lines .rowbtn').click()`);
+      const lines = await evaluate(`(() => { const p = document.querySelector('#gd-lines .body p'), r = document.createRange(), tops = new Set(), walk = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+        for (let n; (n = walk.nextNode());) if (n.data.trim()) { r.selectNodeContents(n); for (const b of r.getClientRects()) tops.add(Math.round(b.top)); }
+        return { text: p.innerText, tops: tops.size }; })()`);
+      assert.deepEqual(lines, { text: 'Close the input.\nPin the version.\nReady the backup.', tops: 3 }, `${width}`);
+      // An item with no detail draws its buttons inside the item's own padding, as an opened item does.
+      const pad = await evaluate(`(() => { const li = [...document.querySelectorAll('#gd-found .gd-rows > li')].find((l) => l.textContent.startsWith('One password entry')), box = li.getBoundingClientRect(), text = li.querySelector('.rowstat .sm').getBoundingClientRect();
+        return { buttons: li.querySelectorAll('button').length, outside: [...li.querySelectorAll('button, input')].filter((b) => { const r = b.getBoundingClientRect(); return r.left < text.left - 0.5 || r.right > box.right - 8; }).length }; })()`);
+      assert.ok(pad.buttons >= 5 && pad.outside === 0, `${width}: ${JSON.stringify(pad)}`);
+    } finally { close(); }
+  }
+  proc.kill();
+});
+
 // Waiting and Decide cards retain the existing filters and answer/undo API path.
 test('Waiting and Decide: Spacious ask cards, decision options, answer and undo, with plan card navigation', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'types'), file = join(dir, 'board.json');

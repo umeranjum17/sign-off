@@ -917,11 +917,32 @@
   .gd-rows .sm { display: block; font-weight: 400; color: var(--muted); font-size: 0.9375rem; line-height: 1.35; }
   .gd-rows .ic.gchev { transition: transform 0.2s; color: var(--faint); }
   .gd-rows .rowbtn[aria-expanded=true] .ic.gchev { transform: rotate(180deg); }
-  .gd-rows .dotk { width: 0.625rem; height: 0.625rem; border-radius: 50%; background: var(--faint); flex: none; }
-  .gd-rows .dotk.bad { background: var(--bad); } .gd-rows .dotk.ok { background: var(--ok); } .gd-rows .dotk.warn { background: var(--warn); }
+  .gd-rows .dotk, .gd-ct .dotk { width: 0.625rem; height: 0.625rem; border-radius: 50%; background: var(--faint); flex: none; }
+  :is(.gd-rows, .gd-ct) .dotk.bad { background: var(--bad); } :is(.gd-rows, .gd-ct) .dotk.ok { background: var(--ok); } :is(.gd-rows, .gd-ct) .dotk.warn { background: var(--warn); }
   .gd-rows .body { padding: 0 0.875rem 0.5rem; }
   .gd-rows .body[hidden] { display: none; }
   .gd-rows .body p { margin: 0 0 0.625rem; }
+  .gd-rows .body .ln { display: block; } .gd-rows .body .ln + .ln { margin-top: 0.375rem; }
+  /* A comparison table: on a phone (and past 4 options) each point lists every option under it; with room, options run across. */
+  .gd-cmp { container-type: inline-size; margin: 0 0 0.375rem; }
+  .gd-ct { display: block; font-size: 0.9375rem; line-height: 1.4; }
+  .gd-ct thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .gd-ct tbody, .gd-ct tr, .gd-ct th, .gd-ct td { display: block; text-align: left; overflow-wrap: anywhere; }
+  .gd-ct tbody tr { border: 1px solid var(--hair2); border-radius: 1rem; padding: 0.125rem 0.875rem; margin: 0 0 0.625rem; }
+  .gd-ct tbody th { padding: 0.625rem 0 0.125rem; font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+  .gd-ct td { padding: 0.5rem 0; border-top: 1px solid var(--hair2); }
+  .gd-ct th + td { border-top: 0; }
+  .gd-ct .ol { display: flex; align-items: baseline; gap: 0.5rem; font-weight: 600; }
+  @container (min-width: 34rem) {
+    .gd-cmp:not(.many) .gd-ct { display: table; width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; border: 1px solid var(--hair2); border-radius: 1rem; }
+    .gd-cmp:not(.many) .gd-ct thead { position: static; width: auto; height: auto; overflow: visible; clip-path: none; display: table-header-group; }
+    .gd-cmp:not(.many) .gd-ct tbody { display: table-row-group; }
+    .gd-cmp:not(.many) .gd-ct tr { display: table-row; }
+    .gd-cmp:not(.many) .gd-ct th, .gd-cmp:not(.many) .gd-ct td { display: table-cell; vertical-align: top; padding: 0.625rem 0.75rem; border-top: 0; border-bottom: 1px solid var(--hair2); }
+    .gd-cmp:not(.many) .gd-ct tbody tr:last-child > * { border-bottom: 0; }
+    .gd-cmp:not(.many) .gd-ct thead td { width: 7rem; }
+    .gd-cmp:not(.many) .gd-ct td .ol { display: none; }
+  }
   .gd-opts { display: grid; gap: 0.625rem; margin: 0 0 0.75rem; }
   .gd-opt { display: grid; grid-template-columns: 1.5rem 1fr; gap: 0.75rem; align-items: start; text-align: left; padding: 0.875rem; border-radius: 1rem; border: 1.5px solid var(--hair) !important; background: var(--tile) !important; width: 100%; }
   .gd-opt .rdo { width: 1.375rem; height: 1.375rem; border-radius: 50%; border: 2px solid var(--hair); margin-top: 1px; display: grid; place-items: center; }
@@ -2312,17 +2333,38 @@
       el('dl', { class: 'gd-uq' }, ...d.understood.map((u, n) => E('div', '', fld('understood', `understood.${n}.label`, el('dt', {}, u.label)), fld('understood', `understood.${n}.text`, el('dd', {}, u.text))))),
       E('div', 'gd-seg', ...choices), noteBox, tell, ...(live ? acts('understood') : []), rc('understood'));
 
+    // A comparison: every item's detail is the same "Axis: value" lines in the same order, so the section is one table.
+    // The detail stays plain lines, so a board that predates the table still reads it as text.
+    const compared = (items) => {
+      if (items.length < 2 || items.some((it) => !it.more || it.diagram)) return null;
+      const rows = items.map((it) => it.more.split('\n').filter((l) => l.trim()).map((l) => /^([^:]{1,40}):\s+(\S.*)$/.exec(l.trim())));
+      const axes = rows[0].map((m) => m?.[1]);
+      if (axes.length < 2 || rows.some((r) => r.length !== axes.length || r.some((m, k) => !m || m[1] !== axes[k]))) return null;
+      return { axes, values: rows.map((r) => r.map((m) => m[2])) };
+    };
+    const cmpTable = (items, { axes, values }) => {
+      const opt = (it) => E('span', 'ol', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), it.title);
+      // A link in a narrow cell breaks after a slash, not inside a word.
+      const value = (t) => E('span', '', ...t.split(/(?<=\/)(?=\S)/).flatMap((part, i) => (i ? [el('wbr'), part] : [part])));
+      const row = (label, cells) => el('tr', {}, el('th', { scope: 'row' }, label), ...cells.map((c, i) => el('td', {}, opt(items[i]), value(c))));
+      return E('div', `gd-cmp${items.length > 4 ? ' many' : ''}`, el('table', { class: 'gd-ct' },
+        el('thead', {}, el('tr', {}, el('td', {}), ...items.map((it) => el('th', { scope: 'col' }, opt(it))))),
+        el('tbody', {}, row('In short', items.map((it) => it.text)), ...axes.map((a, k) => row(a, values.map((v) => v[k]))))));
+    };
+    // One block per line of detail; the newline stays in the text, so a selection's offsets still count it.
+    const lines = (t) => t.split('\n').flatMap((l, i) => (i ? ['\n', E('span', 'ln', l)] : [E('span', 'ln', l)]));
     const secCard = (s) => {
-      const items = (s.items ?? []).map((it, i) => {
+      const cmp = compared(s.items ?? []);
+      const items = cmp ? [] : (s.items ?? []).map((it, i) => {
         const part = `${s.id}:${i}`;
-        if (!it.more && !it.diagram) return E('li', '', E('div', 'rowstat', E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), fld(part, 'title', E('span', '', it.title))), fld(part, 'text', E('span', 'sm', it.text)))), ...(d.engagement ? acts(part) : []));
-        const body = E('div', 'body', ...(it.more ? [fld(part, 'more', E('p', '', it.more))] : []), ...(it.diagram ? [diagramFig(it.diagram)] : []), ...acts(part));
+        if (!it.more && !it.diagram) return E('li', '', E('div', 'rowstat', E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), fld(part, 'title', E('span', '', it.title))), fld(part, 'text', E('span', 'sm', it.text)))), ...(d.engagement ? [E('div', 'body', ...acts(part))] : []));
+        const body = E('div', 'body', ...(it.more ? [fld(part, 'more', E('p', '', ...lines(it.more)))] : []), ...(it.diagram ? [diagramFig(it.diagram)] : []), ...acts(part));
         body.hidden = true;
         const b = el('button', { class: 'rowbtn', type: 'button', 'aria-expanded': 'false' }, E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), it.title), E('span', 'sm', it.text)), gic('chev', 'gchev'));
         b.onclick = () => { const open = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(open)); body.hidden = !open; };
         return E('li', '', b, body);
       });
-      return card(s.id, s.stage, head(s.heading, s.body, undefined, s.id, 'heading', 'body'), ...(s.diagram ? [diagramFig(s.diagram)] : []), ...(items.length ? [E('ul', 'gd-rows', ...items)] : []), ...acts(s.id, s.details), rc(s.id));
+      return card(s.id, s.stage, head(s.heading, s.body, undefined, s.id, 'heading', 'body'), ...(s.diagram ? [diagramFig(s.diagram)] : []), ...(cmp ? [cmpTable(s.items, cmp)] : items.length ? [E('ul', 'gd-rows', ...items)] : []), ...acts(s.id, s.details), rc(s.id));
     };
 
     const optBtns = new Map();
