@@ -118,8 +118,8 @@ npx -y sign-off-axi raise --ask-ref <captain-message-id-or-hold-id> --title "Whi
   - Plain words for a person who does not write code; no ids, no file paths, no tool names.
   - Name the date the facts were true if they will go stale.
 - A research report (a comparison, an option study, a "should we use X?" question) must clear a higher bar than an explainer. A few options backed only by your own numbers is rejected.
-  - Survey the whole real field first, then short-list. Say in one line why each option was cut.
-  - Give every short-listed option the same axes and its full pros and cons, as one comparable table: one \`found\` item per option, the axes in the same order in each \`more\`.
+  - Name the must-haves first. Survey the whole real field, then short-list against them. Say in one line why each option was cut.
+  - Give every short-listed option the same axes and its full pros and cons, as one comparable table: one \`found\` item per option, pros and cons in \`text\`, and each axis as "Axis: value." in the same order in \`more\`.
   - Back each claim with outside proof and its link: GitHub issues (open bugs, regressions, upgrade breaks, how the maintainers answered), Reddit, Hacker News, X, forums and blogs. If a site blocks fetching, say what you could not read. Vendor marketing, star counts and your own team's work-log numbers are not proof.
   - Keep what you checked yourself apart from what others claim: a separate section, or each line starting "Checked:" or "Reported:".
   - End with one clear recommendation and a runner-up, each with its reasons.
