@@ -79,17 +79,17 @@ try {
       const t = shot('report-compare', `${base}#reports/${report.key}`, tableSection);
       const items = report.sections.find((s) => s.id === tableSection).items;
       assert.deepEqual([t.layout, t.options, t.axes.length], [width === 1280 ? 'table' : 'block', items.map((i) => i.title), items[0].more.split('\n').length + 1], JSON.stringify(t));
-      measures.compare.push(`report-compare.${theme}.${width}w: layout=${t.layout === 'table' ? 'columns' : 'stacked'} option_columns=${t.options.length} point_rows=${t.axes.length} overflow=${+t.overflow} cells_past_card=${t.outside}`);
+      measures.compare.push(`report-compare.${theme}.${width}w: section "${report.sections.find((s) => s.id === tableSection).heading}" drawn as one comparison table: layout=${t.layout === 'table' ? 'options as columns' : 'one box per point'}, options=${t.options.length} of ${items.length}, point rows=${t.axes.length} (In short + ${t.axes.length - 1} axes), page overflow=${+t.overflow}, cells past the card=${t.outside}`);
     }
     if (want('lines')) {
       const l = shot('plan-lines', `${base}#waiting/${plan.key}`, ls, true, +li);
       assert.ok(l.lines === plan.sections.find((s) => s.id === ls).items[+li].more.split('\n').length && l.tops >= l.lines, JSON.stringify(l));
-      measures.lines.push(`plan-lines.${theme}.${width}w: detail_lines=${l.lines} text_rows=${l.tops} overflow=${+l.overflow}`);
+      measures.lines.push(`plan-lines.${theme}.${width}w: opened item "${plan.sections.find((s) => s.id === ls).items[+li].title}" shows its detail as ${l.lines} separate lines, one per point (${l.lines} of ${l.lines}), over ${l.tops} wrapped text rows; page overflow=${+l.overflow}`);
     }
     if (want('padding')) {
       const b = shot('plan-risks', `${base}#waiting/${plan.key}`, bs, false, +bi);
       assert.ok(b.controls >= 6 && b.gap >= 8, `buttons of an item with no detail sit inside its padding: ${JSON.stringify(b)}`);
-      measures.padding.push(`plan-risks.${theme}.${width}w: buttons_and_box=${b.controls} smallest_inner_gap_px=${b.gap} overflow=${+b.overflow}`);
+      measures.padding.push(`plan-risks.${theme}.${width}w: item with no detail "${plan.sections.find((s) => s.id === bs).items[+bi].title}": ${b.controls} of ${b.controls} question buttons and ask box inside its box, smallest gap to its edge ${b.gap} px; page overflow=${+b.overflow}`);
     }
   }
 } finally {
