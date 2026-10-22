@@ -413,16 +413,19 @@
   .ev-find select.on { color: var(--text); }
   .ev-grid { display: grid; gap: 1.75rem; grid-template-columns: minmax(0, 1fr); }
   .ev-card { display: flex; flex-direction: column; gap: 0.75rem; color: inherit; text-align: left; text-decoration: none; }
-  .ev-media { position: relative; display: grid; place-items: end center; aspect-ratio: 16 / 11; padding: 1.5rem 1.5rem 0.75rem; overflow: hidden;
+  .ev-media { position: relative; display: grid; place-items: center; aspect-ratio: 2 / 1; overflow: hidden;
     border-radius: 1.125rem; background: var(--surface); }
   .ev-card:hover .ev-media { background: color-mix(in srgb, var(--surface) 94%, var(--text)); }
-  .ev-media img, .ev-media video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; padding: 1.5rem 1.5rem 0.75rem; box-sizing: border-box; object-fit: contain; object-position: center bottom; border-radius: 1.125rem; }
-  .ev-media .no-shot { display: grid; place-items: center; width: 4rem; height: 4rem; margin-bottom: 1.5rem; border-radius: 1rem; background: var(--sunk); }
+  .ev-media img, .ev-media video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; object-position: center top; border-radius: 1.125rem;
+    transition: transform 260ms var(--spring); }
+  .ev-card:active .ev-media img, .ev-card:active .ev-media video { transform: scale(0.985); }
+  .ev-media .no-shot { display: grid; place-items: center; width: 4rem; height: 4rem; border-radius: 1rem; background: var(--sunk); }
   .ev-media .no-shot svg { width: 2rem; height: 2rem; }
   .ev-badge { position: absolute; z-index: 1; top: 0.75rem; left: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 1rem;
     background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.8125rem; font-weight: 600; }
   .ev-missing { margin: 0 0 1rem; color: var(--muted); font-size: 0.9375rem; }
   .ev-card .t { font-size: 1.1875rem; font-weight: 600; line-height: 1.32; letter-spacing: -0.012em; }
+  .ev-card .also { display: block; margin-top: 0.125rem; color: var(--muted); font-size: 0.9375rem; font-weight: 400; line-height: 1.3; letter-spacing: 0; }
   .ev-card .m { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; color: var(--muted); font-size: 0.9375rem; }
   .ev-ok, .ev-bad, .ev-warn { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--ok); }
   .ev-bad { color: var(--danger); } .ev-warn { color: var(--warn); } .ev-none { color: var(--muted); }
@@ -435,7 +438,16 @@
   .phone.full { width: min(250px, 64%); padding: 9px; border-radius: 40px; }
   .phone.full img { border-radius: 31px; } .phone.full.wide { width: min(100%, 36rem); padding: 7px; border-radius: 18px; } .phone.full.wide img { border-radius: 11px; }
   .ev-hero:has(.phone.full) { padding: 2rem 1.5rem; } .ev-hero a { display: contents; } .ev-hero .phone img { max-height: none; aspect-ratio: 10 / 17; object-fit: cover; object-position: top; } .ev-hero .phone.wide img { aspect-ratio: 16 / 10; }
-  @media (min-width: 64rem) { .phone.full { width: 210px; } }
+  /* On a desk the capture fills the preview's width, cropped to the top of the shot; a tap opens it full size. */
+  @media (min-width: 64rem) {
+    .ev-hero:has(.phone.full) { padding: 0; gap: 0.75rem; background: none; }
+    .ev-hero .phone.full { position: relative; width: 100%; padding: 0; overflow: hidden; border-radius: 1.125rem; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); cursor: zoom-in; }
+    .ev-hero .phone.full img { aspect-ratio: 4 / 3; border-radius: 0; transition: transform 260ms var(--spring); }
+    .ev-hero .phone.full.wide img { aspect-ratio: auto; }
+    .ev-hero .phone.full::after { content: "Open full size" / ""; position: absolute; right: 0.75rem; bottom: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 1rem;
+      background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 0.8125rem; font-weight: 600; }
+    .ev-hero a:active .phone.full img { transform: scale(0.99); }
+  }
   .ev-hero img, .ev-hero video { display: block; max-width: 100%; max-height: min(26rem, 55vh); border-radius: 0.75rem; }
   .ev-hero .gone { margin: 0; color: var(--danger); font-size: 0.9375rem; }
   .ev-say { text-align: center; }
@@ -458,6 +470,9 @@
   .ev-grp .x { display: block; width: auto; min-height: 0; margin: 0; padding: 0; border: 0; background: none; color: var(--muted); font-size: 0.9375rem; line-height: 1.4; }
   .ev-grp .chev { margin-left: 0.25rem; color: var(--muted); }
   .ev-verdict { display: grid; gap: 0.5rem; }
+  .ev-verdict .choices:not(:has(> :nth-child(4))) { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+  .ev-verdict .choices button, .ev-verdict .choices button[aria-pressed="true"] { grid-auto-flow: column; justify-content: center; align-items: center; padding-inline: 0.5rem; text-align: center; }
+  .ev-verdict .choices button[aria-pressed="true"]::before { position: static; translate: none; margin-right: 0.375rem; }
   .ev-ask { margin: 1rem 0 0.25rem; font-weight: 650; }
   .in-answered .row { background: transparent; box-shadow: none; }
   .in-answered .row h3 { color: var(--muted); font-weight: 500; }
@@ -673,7 +688,10 @@
   .round { margin-top: 0.5rem; }
   .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
   .ask { margin: 1rem 0 0; padding: 0 1rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); }
-  /* Closed, Ask the agent is one row: its label centred in a 44px line with a chevron, nothing under it until it is opened. */
+  /* Closed, Ask the agent is one line of text with a chevron, in a 44px row with no box; opened, it is the box with the prompt in it. */
+  .ask:not([open]) { padding: 0; border: 0; background: none; }
+  .ask:not([open]) > summary { width: fit-content; }
+  .ask:not([open]) > summary::after { margin-left: 0.625rem; }
   .ask[open] { padding-bottom: 0.75rem; }
   .ask > summary { display: flex; align-items: center; width: auto; min-height: 2.75rem; margin: 0; list-style: none; font-size: 0.9375rem; -webkit-tap-highlight-color: transparent; transition: opacity 0.15s; }
   .ask > summary::-webkit-details-marker { display: none; }
@@ -1822,11 +1840,23 @@
     img.onerror = () => img.replaceWith(el('p', { class: 'ev-missing' }, 'The capture is missing or changed.'));
     return [img];
   }
-  /** One update on the Evidence screen: its capture as the hero, what it proves and how it went; the whole card opens the update. */
-  function evCard(d) {
+  /** What the run's proof line says ran: the line after the checker's name ("done-done-verify-sign-off: npm test, phone" says "npm test, phone"). */
+  const whatRan = (d) => { const line = (d.evidence?.proof ?? '').trim(); return /^[\w.-]{1,40}:\s*(.*)$/s.exec(line)?.[1] ?? line; };
+  /** Updates listed together under one headline would read as one proof twice; each such card names what tells them apart best: its project, its own title or what ran. */
+  function twins(items) {
+    const by = new Map(), out = new Map();
+    for (const d of items) by.set(headline(d), [...(by.get(headline(d)) ?? []), d]);
+    for (const same of by.values()) {
+      const [tell] = [projectOf, (d) => (d.title !== headline(d) ? d.title : ''), whatRan].map((f) => [f, new Set(same.map(f)).size]).reduce((x, y) => (y[1] > x[1] ? y : x));
+      if (same.length > 1 && new Set(same.map(tell)).size > 1) for (const d of same) out.set(d.key, tell(d));
+    }
+    return out;
+  }
+  /** One update on the Evidence screen: its capture as the hero, what it proves and how it went; the whole card opens the update. `also` names what tells it from a card with the same headline. */
+  function evCard(d, also = '') {
     const result = RESULT[d.evidenceCard?.result];
     return el('a', { class: 'ev-card', href: `#evidence/${d.key}`, id: `item-${d.key}`, 'data-row': '' }, el('span', { class: 'ev-media' }, ...hero(d)),
-      el('span', { class: 't', dir: 'auto' }, headline(d)),
+      el('span', { class: 't', dir: 'auto' }, headline(d), also ? el('span', { class: 'also', dir: 'auto' }, also) : ''),
       el('span', { class: 'm' }, result ? el('span', { class: `ev-${result[0]}` }, mark(result[0]), result[2]) : el('span', { class: 'ev-none' }, 'Not run'), d.attachments?.length ? el('span', {}, d.attachments.length === 1 ? '1 file' : `${d.attachments.length} files`) : '', d.filed ? el('span', {}, stamp(d.filed)) : ''));
   }
   /** Evidence as its own screen: one list of every proof ever filed, newest first, each card carrying its own day and time. The search box narrows it by what
@@ -1835,7 +1865,7 @@
   let evFind = '', evProject = '';
   function evidenceList(items) {
     if (!items.length) return [el('p', { class: 'empty' }, EMPTY.evidence)];
-    const box = el('input', { type: 'search', id: 'ev-find', 'aria-label': 'Search evidence', placeholder: 'Search evidence', autocomplete: 'off' }), out = el('div', { class: 'ev-grid' }), node = (d) => (d.type === 'evidence' ? withX(d, evCard(d)) : row(d));
+    const box = el('input', { type: 'search', id: 'ev-find', 'aria-label': 'Search evidence', placeholder: 'Search evidence', autocomplete: 'off' }), out = el('div', { class: 'ev-grid' }), node = (d, also) => (d.type === 'evidence' ? withX(d, evCard(d, also.get(d.key))) : row(d));
     const projects = [...new Set(items.map(projectOf))].sort((x, y) => (x === '') - (y === '') || x.localeCompare(y));
     if (!projects.includes(evProject)) evProject = '';
     const pick = projects.length > 1 ? el('select', { id: 'ev-project', 'aria-label': 'Show one project' }, el('option', { value: '' }, 'All projects'),
@@ -1843,7 +1873,8 @@
     const show = () => {
       const q = evFind.trim().toLowerCase(), of = evProject ? items.filter((d) => (projectOf(d) || '-') === evProject) : items;
       const hits = q ? of.filter((d) => `${headline(d)} ${d.title} ${d.about ?? ''} ${projectOf(d)} ${d.evidence?.proof ?? ''}`.toLowerCase().includes(q)) : of;
-      out.replaceChildren(...(hits.length ? hits.map(node) : [el('p', { class: 'empty' }, 'Nothing matches.')]));
+      const also = twins(hits.filter((d) => d.type === 'evidence'));
+      out.replaceChildren(...(hits.length ? hits.map((d) => node(d, also)) : [el('p', { class: 'empty' }, 'Nothing matches.')]));
     };
     box.value = evFind;
     box.oninput = () => { evFind = box.value; show(); };
@@ -2143,8 +2174,9 @@
 
   /** Proven today on Today: a swipeable row of today's updates, each with its own result and capture; a wide screen sets them three across. */
   function proven(items, fresh) {
+    const shown = fresh.slice(0, 3), also = twins(shown);
     return el('section', { class: 'i-evidence wide' }, el('div', { class: 'sec-head' }, el('h2', {}, 'Proven today'), items.length ? el('a', { href: '#evidence' }, 'See all') : ''),
-      fresh.length ? el('div', { class: 'ev-scroll-row' }, ...fresh.slice(0, 3).map((d) => withX(d, evCard(d)))) : el('p', { class: 'empty' }, 'Nothing proven today yet.'));
+      fresh.length ? el('div', { class: 'ev-scroll-row' }, ...shown.map((d) => withX(d, evCard(d, also.get(d.key))))) : el('p', { class: 'empty' }, 'Nothing proven today yet.'));
   }
   /** New report on Today: the newest report as one hero card, its picture, who and when, its title and what it says. */
   function newReport(items) {
