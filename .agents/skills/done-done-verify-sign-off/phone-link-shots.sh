@@ -41,22 +41,22 @@ for w in ${PHONE_WIDTH:-390 1280}; do
     br open "$base#reports/$key" >/dev/null; sleep 1.5
     ev "() => { const s = document.querySelector('.gd-scroll'); if (s) s.style.scrollBehavior = 'auto'; document.getElementById('gd-compare').scrollIntoView({block:'start'}); return 1 }" >/dev/null; sleep 1
     t=$(ev "() => { const t = document.querySelector('#gd-compare .gd-ct'), cs = getComputedStyle(t.querySelector('td')); return JSON.stringify({width: innerWidth, layout: getComputedStyle(t).display, cellFontPx: parseFloat(cs.fontSize), columnsAcross: t.tHead.getBoundingClientRect().height > 1 ? t.tHead.rows[0].cells.length : 0, optionsListedPerPoint: t.tBodies[0].rows[1].cells.length - 1, pageOverflowsSideways: document.documentElement.scrollWidth > document.documentElement.clientWidth}) }")
-    echo "table.$w: $t" >> "$out/measures.txt"
+    echo "table.$w: the comparison table measured on screen (cellFontPx is the table text size in px, optionsListedPerPoint the options each point lists): $t" >> "$out/measures.txt"
     br screenshot "$out/table.$w.png" >/dev/null
     "$node" -e 'const t=JSON.parse(process.argv[1]),w=+process.argv[2];if(t.pageOverflowsSideways||t.optionsListedPerPoint!==4||(w===390?t.cellFontPx!==16||t.layout!=="block":t.layout!=="table"||t.columnsAcross!==5))process.exit(1)' "$t" $w
   fi
   if want link; then
     br open "$base#evidence/update-1" >/dev/null; sleep 1.5
     l=$(ev "() => { const a = document.querySelector('.ev-hero a'); return JSON.stringify({width: innerWidth, href: a.getAttribute('href').split('?')[0], opensInNewTab: a.target === '_blank'}) }")
-    echo "link.$w: $l" >> "$out/measures.txt"
+    echo "link.$w: the capture link on the update screen, measured before the tap: $l" >> "$out/measures.txt"
     # Tap it as a person does, then capture where it led: the board's own screen on a phone, the raw file's tab on a desk.
     ev "() => { document.querySelector('.ev-hero a').click(); return 1 }" >/dev/null; sleep 1.5
     if [ $w = 1280 ]; then
       id=$(br pages | sed -n 's/^  \([0-9]*\),[^,]*api\/media[^,]*,.*$/\1/p' | tail -1)
       [ -n "$id" ] && br selectpage "$id" >/dev/null && sleep 1
-      echo "link.$w opened: $(br pages | sed -n 's/^  [0-9]*,\([^?,]*\).*/\1/p' | tr '\n' ' ')" | sed 's#http://127.0.0.1:[0-9]*##g' >> "$out/measures.txt"
+      echo "link.$w after the tap, the open tabs (the raw file is the one under /api/media): $(br pages | sed -n 's/^  [0-9]*,\([^?,]*\).*/\1/p' | tr '\n' ' ')" | sed 's#http://127.0.0.1:[0-9]*##g' >> "$out/measures.txt"
     else
-      echo "link.$w after tap: $(ev '() => JSON.stringify({staysOnBoard: location.pathname === "/", screen: location.hash.split("/")[0], backLink: [...document.querySelectorAll("a")].find((a) => /Evidence$/.test(a.textContent.trim()))?.textContent.trim() ?? ""})')" >> "$out/measures.txt"
+      echo "link.$w after the tap, the board page the person is on: $(ev '() => JSON.stringify({staysOnBoard: location.pathname === "/", screen: location.hash.split("/")[0], backLink: [...document.querySelectorAll("a")].find((a) => /Evidence$/.test(a.textContent.trim()))?.textContent.trim() ?? ""})')" >> "$out/measures.txt"
     fi
     br screenshot "$out/link.$w.png" >/dev/null
     "$node" -e 'const l=JSON.parse(process.argv[1]),w=+process.argv[2];if(w===390?(l.href!=="#evidence/update-1"||l.opensInNewTab):(l.href!=="/api/media"||!l.opensInNewTab))process.exit(1)' "$l" $w
