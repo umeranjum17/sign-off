@@ -2186,7 +2186,7 @@ test('a design-level inline Approve or Change stores its verdict with the note, 
   proc.kill();
 });
 
-test('Evidence: an update with no run is never waiting on you, and is listed under Evidence as not run', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Evidence: an update with no run is never waiting on you, and is listed under Evidence as not run, with no project picker for one project', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'waiting-update'), file = join(dir, 'board.json');
   mkdirSync(dir);
   writeFileSync(file, JSON.stringify({ schema: 2, items: [
@@ -2203,6 +2203,8 @@ test('Evidence: an update with no run is never waiting on you, and is listed und
   await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
   await until(async () => (await evaluate('document.querySelector("#item-upd") !== null')));
   assert.equal(await evaluate('document.querySelector("#item-upd .m span").textContent'), 'Not run');
+  // With proof for only one project there is nothing to pick: the search box stands alone.
+  assert.equal(await evaluate('document.getElementById("ev-project")'), null);
   close();
   proc.kill();
 });
@@ -2402,7 +2404,7 @@ test('a long answer at 390 px sits under its long title, which keeps most of the
   proc.kill();
 });
 
-test('Evidence: a card per proof ever filed, newest first, grouped by project then day, with its capture as the hero, its result, its time and what it proves; Proven today counts only the passed ones of the last day, and a failed run is on neither; the card opens the update, which shows the whole shot, what ran, who checked it, the change, when, and its verdict; two across at 1440 and nothing squashed at 390', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Evidence: a card per proof ever filed, in one list, newest first, with a project picker, with its capture as the hero, its result, its time and what it proves; Proven today counts only the passed ones of the last day, and a failed run is on neither; the card opens the update, which shows the whole shot, what ran, who checked it, the change, when, and its verdict; two across at 1440 and nothing squashed at 390', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'updates'), file = join(dir, '.sign-off', 'decisions.json');
   mkdirSync(dir);
   run('init', dir);
@@ -2411,7 +2413,7 @@ test('Evidence: a card per proof ever filed, newest first, grouped by project th
   const update = (...media) => run('post', file, '--type', 'evidence', '--title', 'Sign-in', '--about', 'Loads in 1 second.', ...media.flatMap((m) => ['--media', m])).code;
   assert.deepEqual([update(tall), update(wide, tall), update(wide)], [0, 0, 0]);
   // No update is an ask: the first links a failed run, so its result shows as failed and it is no proof.
-  // Legacy and done-done-prefixed proof lines share one project head, regardless of case.
+  // Legacy and done-done-prefixed proof lines name one project, regardless of case.
   const doc = JSON.parse(readFileSync(file, 'utf8')), old = new Date(Date.now() - 3 * 864e5), commit = 'c0ffee'.padEnd(40, '0');
   const outcome = 'You can read every card on a phone.', wideBytes = readFileSync(wide), hash = createHash('sha256').update(wideBytes).digest('hex');
   doc.items[0].filed = old.toISOString();
@@ -2452,17 +2454,21 @@ test('Evidence: a card per proof ever filed, newest first, grouped by project th
   assert.equal(await evaluate('document.querySelector(".gone-asks")'), null);
   const clock = (at) => at.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   const at = (i) => new Date(doc.items[i - 1].filed);
-  // Evidence lists every proof, newest first within its project, however old: the plain update (5), the passed ones (4, 3, 2), the unchecked one (6) and last week's (7); only the failed run (1) is left off.
+  // Evidence lists every proof in one list, newest first, however old: the plain update (5), the passed ones (4, 3, 2), the unchecked one (6) and last week's (7); only the failed run (1) is left off.
   const passed = ['m9 12 2 2 4-4', 1], none = ['', 1];
   assert.deepEqual(await evaluate(cards), [['item-update-5', 'Sign-in, plain update', 'Not run', ...none], ['item-update-4', outcome, 'Passed', ...passed], ['item-update-3', outcome, 'Passed', ...passed],
-    ['item-update-6', outcome, 'Could not check', 'M12 7v6', 0], ['item-update-2', outcome, 'Passed', ...passed], ['item-update-7', 'Sign-in, last week', 'Not run', ...none]]);
+    ['item-update-2', outcome, 'Passed', ...passed], ['item-update-6', outcome, 'Could not check', 'M12 7v6', 0], ['item-update-7', 'Sign-in, last week', 'Not run', ...none]]);
   for (const n of [4, 3, 2]) assert.equal(await evaluate(`document.getElementById("item-update-${n}").querySelector(".m > span:last-child").textContent`), `Today, ${clock(at(n))}`, `update ${n}`);
-  // Both proof-prefix forms share one head; a capture with no run takes the linked repository, and an unnamed project goes under Other.
-  assert.deepEqual(await evaluate('[...document.querySelectorAll(".sec-head h2")].map((h) => h.textContent)'), ['sign-off', 'Other']);
+  // No project or day headings break the list; a card filed on another day says that day itself.
+  assert.equal(await evaluate('document.querySelectorAll("#board h2, #board h3").length'), 0);
+  assert.match(await evaluate('document.getElementById("item-update-7").querySelector(".m > span:last-child").textContent'), new RegExp(`, ${clock(at(7))}$`));
   assert.equal(await evaluate('document.querySelector(\'#nav a[href="#evidence"] .n\').textContent'), '6');
-  // Within a project the cards sit under the day they were filed, newest day first.
-  assert.equal(await evaluate('[...document.querySelectorAll(".ev-day-h")].pop().textContent'), new Date(doc.items[6].filed).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }));
-  assert.equal(await evaluate('document.querySelector(".ev-day-h").textContent'), 'Today');
+  // The project picker: both proof-prefix forms are one project, a capture with no run takes the linked repository, and an unnamed project is Other, last.
+  assert.deepEqual(await evaluate('[...document.querySelectorAll("#ev-project option")].map((o) => o.textContent)'), ['All projects', 'sign-off', 'Other']);
+  const pick = async (v) => evaluate(`(() => { const p = document.getElementById("ev-project"); p.value = ${JSON.stringify(v)}; p.dispatchEvent(new Event("change")); return [...document.querySelectorAll(".ev-card")].map((a) => a.id); })()`);
+  assert.deepEqual(await pick('-'), ['item-update-2', 'item-update-7']);
+  assert.deepEqual(await pick('sign-off'), ['item-update-5', 'item-update-4', 'item-update-3', 'item-update-6']);
+  assert.equal((await pick('')).length, 6);
   // Today reads the same list: the glance, the tile and the Proven today row name the same passed updates, newest first.
   await evaluate('location.hash = ""');
   await until(async () => (await evaluate('document.querySelector(".glance")?.textContent.includes("3 updates filed.")')) === true);
@@ -2470,11 +2476,11 @@ test('Evidence: a card per proof ever filed, newest first, grouped by project th
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-scroll-row .ev-card")].map((a) => a.id)'), ['item-update-4', 'item-update-3', 'item-update-2']);
   await evaluate('location.hash = "#evidence"');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
-  // Cards sit two across: the sign-off pair first (update 5, then update 4), then Other with update 2 under its own head.
-  const boxes = `[5, 4, 2].map((n) => { const r = document.getElementById(\`item-update-\${n}\`).getBoundingClientRect(); return { n, top: r.top, left: r.left, right: r.right, bottom: r.bottom }; })`;
-  const [five, six, two] = await evaluate(boxes);
-  assert.ok(five.top === six.top && six.left > five.right, 'the sign-off pair shares the first row, newest on the left');
-  assert.ok(two.top > five.bottom && two.left === five.left, 'Other comes last, under its own head');
+  // Cards sit two across in one grid, newest on the left: update 5 and update 4 share the first row, update 3 and update 2 the second.
+  const boxes = `[5, 4, 3, 2].map((n) => { const r = document.getElementById(\`item-update-\${n}\`).getBoundingClientRect(); return { n, top: r.top, left: r.left, right: r.right, bottom: r.bottom }; })`;
+  const [five, four, three, two] = await evaluate(boxes);
+  assert.ok(five.top === four.top && four.left > five.right, 'the newest pair shares the first row, newest on the left');
+  assert.ok(three.top > five.bottom && three.top === two.top && three.left === five.left, 'the next pair follows directly, with no heading between');
   // Under the title: how many are listed, how many filed today and when the newest came.
   assert.equal(await evaluate('document.querySelector(".top .lede").textContent'), 'Every proof filed, newest first.');
   // No update is an ask, whatever its result: Decide counts none of them and Today says nothing needs you.
