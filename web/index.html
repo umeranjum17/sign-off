@@ -2238,7 +2238,9 @@
   }
   const archive = (d) => dismiss([d.key], `Archived: ${title(d)}`, () => returned(d.key), true);
   /** On a desk, the key of the report shown beside the list ('' for none); null on a phone, where a report opens over the list. */
-  let rpSel = null, rpVisit = '';
+  let rpSel = null, rpVisit = '', rpPicked = false;
+  // A report chosen in the desk's list (a click, or J and K) is shown beside it; one reached any other way is a link.
+  addEventListener('click', (e) => { if (e.target.closest?.('.split-list a[data-row]')) rpPicked = true; }, true);
   const readToggle = (d) => markRead([d.key], unread(d), `${unread(d) ? 'Marked read' : 'Marked unread'}: ${title(d)}`);
   /** Archive from a desk's key, bar or hover: the row folds away, and when it was the one shown, the next report is selected once the board has it. */
   async function archiveReport(d) {
@@ -2253,7 +2255,7 @@
       await pause(220);
     }
     await archive(d);
-    if (next && location.hash === `#reports/${d.key}`) location.hash = next;
+    if (next && location.hash === `#reports/${d.key}`) rpPicked = true, location.hash = next;
   }
   /** A report: a row with its picture, title, what it says, then its form, video, project and time, and a dot while it is not read. A tap opens its page over the board;
    *  an explainer with no page opens in place, to its numbered steps or its video card. */
@@ -3621,10 +3623,15 @@
     const newest = [...by.reports].filter(reads).sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0))[0];
     const shownReport = deskSplit && at === 'reports' ? (key && by.reports.find((d) => d.key === key && reads(d))) || newest : undefined;
     rpSel = deskSplit && at === 'reports' ? shownReport?.key ?? '' : null;
-    if (rpSel === null || rpFull !== shownReport?.key) rpFull = '';
     // It is read once per visit, so Mark unread on it holds through the redraws that follow.
-    if (shownReport?.key !== key) rpVisit = '';
-    else if (rpVisit !== key && (rpVisit = key) && unread(shownReport) && !FROZEN) { fading.add(key); setTimeout(() => { markRead([key], true); setTimeout(() => fading.delete(key), 400); }); }
+    if (!shownReport || shownReport.key !== key) rpVisit = '';
+    else if (rpVisit !== key) {
+      rpVisit = key;
+      // A guided report reached by a link rather than from the list (Today's card, the CLI's open) opens over the board, as on a phone.
+      if (shownReport.guided && !rpPicked) rpFull = key;
+      if (unread(shownReport) && !FROZEN) { fading.add(key); setTimeout(() => { markRead([key], true); setTimeout(() => fading.delete(key), 400); }); }
+    }
+    if (rpSel === null || rpFull !== shownReport?.key) rpFull = '';
     document.body.classList.toggle('split-view', deskSplit);
     const askAt = decideQueue.findIndex((d) => d.key === key), decideAt = key ? askAt : 0;
     // A design and a decision live under Decide; Answered is reached from Today.
@@ -3727,6 +3734,7 @@
     // On a desk the new detail slides in from the side the selection moved.
     const rowsOf = () => [...document.querySelectorAll('.split-list [data-row]')], order = rowsOf().map((r) => r.getAttribute('href')), was = rowsOf().findIndex((r) => r.matches('[aria-current]'));
     render();
+    rpPicked = false;
     if (!phone()) {
       const detail = document.querySelector('.split-detail'), now = document.querySelector('.split-list [data-row][aria-current]')?.getAttribute('href');
       if (detail && was >= 0 && now && now !== order[was] && !calm.matches) detail.dataset.dir = order.indexOf(now) >= 0 && order.indexOf(now) < was ? 'up' : 'down', detail.classList.add('in');
