@@ -194,7 +194,14 @@ const PAGES = [
     await h.press('Cancel', h.find(/^Cancel$/, bar()), () => more());
     await h.cycle('More: Archive all', item('archive-all'), () => !h.card('new-sign-in'), () => h.card('new-sign-in'), /archived/);
   } }] },
-  { name: 'report', hash: '#reports/new-sign-in', ready: '#reader iframe', stages: [{ run: async (h) => {
+  // On a phone a report opens over the board with ‹ Reports and Dismiss; on a desk it reads beside the list, with Mark read or unread and Archive in its bar.
+  { name: 'report', hash: '#reports/new-sign-in', ready: '#reader iframe, .split-detail .read iframe', stages: [{ run: async (h) => {
+    const bar = h.board().querySelector('.rp-bar'), dot = () => h.box(h.card('new-sign-in'))?.querySelector('.new:not(.out)');
+    if (bar) {
+      await h.cycle('Mark unread', h.find(/^Mark unread$/, bar), dot, () => !dot(), /Marked unread/);
+      await h.cycle('Archive report', h.find(/^Archive$/, bar), () => !h.card('new-sign-in'), () => h.card('new-sign-in'), /Archived/);
+      return;
+    }
     await h.nav('Back to Reports', h.find(/Reports$/, h.reader(), 'a'), /^#reports$/);
     await h.cycle('Dismiss report', h.find(/^Dismiss,/, h.reader()), () => location.hash === '#reports', () => h.reader().querySelector('iframe'), /Dismissed/);
   } }] },
