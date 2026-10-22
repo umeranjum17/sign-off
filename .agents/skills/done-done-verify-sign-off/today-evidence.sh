@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Evidence keeps every proof and Today's Proven today counts only the passed ones of the last day: seeds a board with two passed updates (one three days old),
-# a repost of one card under its key, a pull request proof with no run and a plain one, captures Today at 390 and Evidence at 390 and 1280 in light and dark,
-# Evidence narrowed to one project with its project filter, and writes counts.txt (the numbers, as text) and steps.json. Usage, from the repo root after `npm run build`: today-evidence.sh <evidence folder>
+# a repost of one card under its key, a pull request proof with no run and a plain one, captures Today and Evidence at 390 and 1280 in light and dark (a desk's Today sets the proof
+# beside the asks; its Evidence is a list beside the newest update, selected), Evidence narrowed to one project with its project filter, and writes counts.txt (the numbers, as text)
+# and steps.json. TODAY_EVIDENCE_RECORD=1 also records the desk's hover, press and selection at 1280 per theme (desk-evidence.<theme>.1280w.mp4).
+# Usage, from the repo root after `npm run build`: today-evidence.sh <evidence folder>
 set -euo pipefail
 out=$(cd "$1" && pwd) repo=$(pwd) d=$(mktemp -d)
 export CHROME_DEVTOOLS_AXI_SESSION=${CHROME_DEVTOOLS_AXI_SESSION:-today-evidence-$$}
@@ -51,6 +53,9 @@ for theme in light dark; do
   chrome-devtools-axi eval "() => { const b = document.getElementById('ev-find'); b.value = ''; b.dispatchEvent(new Event('input')); const p = document.getElementById('ev-project'); if (p) { p.value = 'muxr'; p.dispatchEvent(new Event('change')); } }" >/dev/null
   chrome-devtools-axi screenshot "$out/project-filter.$theme.390w.png" >/dev/null
 done
+if [ "${TODAY_EVIDENCE_RECORD:-}" = 1 ]; then
+  for theme in light dark; do node "$repo/.agents/skills/done-done-verify-sign-off/desk-evidence-record.mjs" "$url" $theme "$out/desk-evidence.$theme.1280w.mp4"; done
+fi
 num() { chrome-devtools-axi eval "$1" | grep -o '[0-9][0-9]*' | head -1; }
 # The search and the project pick stay while the page is open, so both are cleared before counting.
 chrome-devtools-axi open "$url#evidence" >/dev/null; chrome-devtools-axi eval "() => { const p = document.getElementById('ev-project'); if (p) { p.value = ''; p.dispatchEvent(new Event('change')); } const b = document.getElementById('ev-find'); b.value = ''; b.dispatchEvent(new Event('input')); return new Promise((ok) => setTimeout(ok, 800)); }" >/dev/null
@@ -62,7 +67,13 @@ projects=$(chrome-devtools-axi eval '() => [...document.querySelectorAll("#ev-pr
 chrome-devtools-axi eval "() => { const p = document.getElementById('ev-project'); if (p) { p.value = 'muxr'; p.dispatchEvent(new Event('change')); } }" >/dev/null
 muxr=$([ "$projects" = none ] && echo "no project filter" || num '() => document.querySelectorAll(".ev-card").length')
 chrome-devtools-axi eval "() => { const p = document.getElementById('ev-project'); if (p) { p.value = ''; p.dispatchEvent(new Event('change')); } }" >/dev/null
+# On a desk: Evidence is one column with the newest selected beside it, and Today's proof sits right of the asks.
+chrome-devtools-axi emulate --viewport 1280x800x1 --color-scheme light >/dev/null
+chrome-devtools-axi open "$url#evidence" >/dev/null; chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
+columns=$(num '() => new Set([...document.querySelectorAll(".ev-card")].map((a) => Math.round(a.getBoundingClientRect().left))).size')
+selected=$(chrome-devtools-axi eval '() => [...document.querySelectorAll(".ev-card[aria-current]")].map((a) => a.id).join() === document.querySelector(".ev-card").id && document.getElementById("reader").dataset.key === document.querySelector(".ev-card").id.slice(5)' | grep -o 'true\|false' | head -1)
 chrome-devtools-axi open "$url" >/dev/null; chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
+beside=$(chrome-devtools-axi eval '() => document.querySelector(".areas > .i-evidence").getBoundingClientRect().left > document.querySelector(".areas > .i-waiting").getBoundingClientRect().right' | grep -o 'true\|false' | head -1)
 tile=$(num '() => document.querySelector(".tile.i-evidence .n").textContent'); row=$(num '() => document.querySelectorAll(".ev-scroll-row .ev-card").length')
 glance=$(chrome-devtools-axi eval '() => document.querySelector(".glance")?.textContent' | grep -o '[0-9]* updates\? filed' || echo none)
 {
@@ -74,10 +85,13 @@ glance=$(chrome-devtools-axi eval '() => document.querySelector(".glance")?.text
   echo "project filter choices: $projects"
   echo "cards listed with the muxr project picked: $muxr"
   echo "Proven today tile: $tile"
+  echo "Evidence list columns at 1280: $columns"
+  echo "newest proof selected and open beside the list at 1280: $selected"
+  echo "Proven today right of Waiting on you at 1280: $beside"
   echo "dismissal log lines written: $(cat "$d/board.dismissed.jsonl" 2>/dev/null | wc -l)"
 } > "$out/counts.txt"
 cat > "$out/steps.json" <<JSON
 {"target": {"version": "$(node -p 'require("./package.json").version')"}, "start": "A new board with two passed updates (one filed 3 days ago) and two updates with no run, each with a capture",
- "steps": ["Open Today at 390 in light and dark", "Read the Proven today tile, the glance line and the Proven today row", "Open Evidence at 390 and 1280 in light and dark", "Pick muxr in the project filter", "Compare Evidence, which keeps every proof, with the Proven today row, which keeps the passed ones of the last day"],
- "result": "Today counts only the passed updates of the last day; Evidence lists every proof in one list, newest first, with no project or day headings, and its project filter narrows it to one project, including the 3-day-old one, the pull request proof and the plain one; the reposted card is listed once and no dismissal is written"}
+ "steps": ["Open Today at 390 and 1280 in light and dark", "Read the Proven today tile, the glance line and the Proven today row", "Open Evidence at 390 and 1280 in light and dark; at 1280 the list sits beside the newest update, selected", "Pick muxr in the project filter", "Compare Evidence, which keeps every proof, with the Proven today row, which keeps the passed ones of the last day"],
+ "result": "Today counts only the passed updates of the last day; Evidence lists every proof in one list, newest first, with no project or day headings, and its project filter narrows it to one project, including the 3-day-old one, the pull request proof and the plain one; the reposted card is listed once and no dismissal is written; at 1280 Today sets Proven today right of Waiting on you, and Evidence is one column beside the newest update, selected"}
 JSON
