@@ -553,6 +553,15 @@ export function readReads(decisionsPath: string): Record<string, string> {
 export const appendRead = (decisionsPath: string, key: string, part: string) => {
   if (readReads(decisionsPath)[`${key}/${part}`] === undefined) appendLine(readsPath(decisionsPath), { key, part, by: 'captain', at: now() });
 };
+/** Whole reports opened or marked unread, in the same file with no part: the last line for a key wins, so Reports' read and unread toggle (true read, false unread). */
+export function readOpened(decisionsPath: string): Record<string, boolean> {
+  const last: Record<string, boolean> = {};
+  readRaw(readsPath(decisionsPath)).split('\n').forEach((line) => {
+    try { const r = line && JSON.parse(line); if (r && typeof r.key === 'string' && r.part === undefined && typeof r.read === 'boolean') last[r.key] = r.read; } catch {}
+  });
+  return last;
+}
+export const appendOpened = (decisionsPath: string, keys: string[], read: boolean) => keys.forEach((key) => appendLine(readsPath(decisionsPath), { key, read, by: 'captain', at: now() }));
 
 /** Go deeper: the person asks the agent about one part of a guided page; the agent answers in pieces that the board streams into that spot.
  * One line each: an ask (id, key, part, what it is about, an optional question), the agent reading it, a piece of the answer (`more` while it goes on), and its end. */

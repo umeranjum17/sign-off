@@ -53,6 +53,9 @@ journeys:
     command: 'npm run build > /dev/null && for w in 390 1280; do for t in light dark; do COMMENT_WIDTH=$w node .agents/skills/done-done-verify-sign-off/comment-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t || exit 1; done; done'
   # Decide from the feel prototype: the grouped list, a press, swipes, More on the list and on an ask, an answer and its Undo toast, a swiped answer and all clear,
   # at 390 and 1280 (DECIDE_WIDTHS) in light and dark, and the motion recorded at 390 (DECIDE_RECORD=1).
+  # Reports at 390 and 1280, light and dark: the list, its end over the tab bar, a report's page, read state, press, both swipes, More, archive with Undo. SIGN_OFF_REPO=<built base checkout> records the before.
+  reports:
+    command: 'npm run build > /dev/null && REPORTS_RECORD=1 node .agents/skills/done-done-verify-sign-off/reports-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   decide:
     command: 'npm run build > /dev/null && DECIDE_RECORD=1 bash .agents/skills/done-done-verify-sign-off/decide-shots.sh "$DONE_DONE_EVIDENCE_ROOT"'
   # Agree, Disagree and Comment on a part and its Ask menu, per theme and width: the foot row at 44 px tap targets, Disagree's What is off? box, a sent comment taken by wait --filer and answered with deeper, and a short phone recording. PART_COMMENT_BEFORE=1 SIGN_OFF_REPO=<base checkout, built> records the same page without them.
