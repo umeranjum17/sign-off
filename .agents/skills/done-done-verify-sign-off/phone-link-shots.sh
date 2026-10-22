@@ -66,7 +66,7 @@ case "$part ${PHONE_WIDTH:-both}" in
   "link 390") steps='"The board is opened at 390 px wide, a phone.", "The update whose capture is a desktop image of a report is opened and its capture is tapped."'
     result="On a phone, tapping the capture keeps the person on the board's own Evidence screen, with its back link, instead of opening the raw desktop image." ;;
   "link 1280") steps='"The board is opened at 1280 px wide, a desk.", "The update whose capture is a desktop image of a report is opened and its capture is tapped."'
-    result="On a desk, tapping the capture opens the raw image file on its own, a plain picture with no board controls around it, in a new tab." ;;
+    result="On a desk, tapping a capture opens the capture own image file, a screenshot of the report shown on its own in a new tab." ;;
   "table 390") steps='"The board is opened at 390 px wide, a phone.", "The report is opened at its comparison table of 4 options on 5 points."'
     result="On a phone, the comparison table reads at 16 px, each point listing every option, with nothing off the screen." ;;
   "table 1280") steps='"The board is opened at 1280 px wide, a desk.", "The report is opened at its comparison table of 4 options on 5 points."'
