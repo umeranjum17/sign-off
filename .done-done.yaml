@@ -42,6 +42,9 @@ journeys:
   # Markdown in authored text, one part per run: MD_PART=heading|item|table|plan-code, per theme and width. SIGN_OFF_REPO=<built base checkout> records the before.
   markdown:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/markdown-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${GUIDE_THEME:-light}" "${GUIDE_WIDTH:-390}"'
+  # The Evidence screen (project label, card spacing, Select and Clear all in the title bar, 44px controls), one theme and width per run; EVIDENCE_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
+  evidence-screen:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/evidence-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${EVIDENCE_THEME:-light}" "${EVIDENCE_WIDTH:-390}"'
   # A capture's tap stays on the board on a phone, and the 4-option comparison table reads at 16 px at 390; PHONE_PART=link|table drives one part per run.
   phone-capture:
     command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/phone-link-shots.sh "$DONE_DONE_EVIDENCE_ROOT"'
