@@ -23,7 +23,7 @@ const drag = (key, dx, release) => ev(`() => new Promise(async (ok) => { const f
   for (let i = 1; i <= 8; i++) { await new Promise((w) => setTimeout(w, 16)); f.dispatchEvent(new PointerEvent('pointermove', o(x0 + ${dx} * i / 8))); } if (${release}) f.dispatchEvent(new PointerEvent('pointerup', o(x0 + ${dx}))); ok('ok'); })`);
 const probe = `() => {
   const vis = (e) => { const r = e.getBoundingClientRect(), c = getComputedStyle(e); return r.width > 0 && r.height > 0 && c.visibility !== 'hidden' && c.display !== 'none'; };
-  const under = [...document.querySelectorAll('#board button, #board a[href], #board summary, .tabs a, nav.side a')].filter(vis).map((e) => { const r = e.getBoundingClientRect(); return { text: (e.getAttribute('aria-label') || e.textContent || e.tagName).trim().slice(0, 30), w: Math.round(r.width), h: Math.round(r.height) }; }).filter((x) => x.h < 44);
+  const under = [...document.querySelectorAll('#board button, #board a[href], #board summary, .tabs a, nav.side a')].filter((e) => vis(e) && !e.closest('.dl-hover')).map((e) => { const r = e.getBoundingClientRect(); return { text: (e.getAttribute('aria-label') || e.textContent || e.tagName).trim().slice(0, 30), w: Math.round(r.width), h: Math.round(r.height) }; }).filter((x) => x.h < 44);
   const rows = [...document.querySelectorAll('#board li.report')], last = rows.at(-1), tabs = document.querySelector('.tabs');
   scrollTo(0, document.documentElement.scrollHeight);
   const gap = last && tabs && getComputedStyle(tabs).display !== 'none' ? Math.round(tabs.getBoundingClientRect().top - last.getBoundingClientRect().bottom) : null;
@@ -33,6 +33,12 @@ const probe = `() => {
     heads: [...document.querySelectorAll('#board .dl-head, #board .sec-h h2')].map((h) => h.textContent), lastRowAboveTabBar: gap, under, overflowX: document.documentElement.scrollWidth > innerWidth });
 }`;
 const errors = () => browser('console', '--type', 'error');
+// A key pressed where the focus is, as a keyboard would (Ctrl with mod).
+const key = (k, mod = false) => ev(`() => { (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, bubbles: true, ctrlKey: ${mod} })); return 1 }`);
+const desk = `() => JSON.stringify({ hash: location.hash, sel: document.querySelector('.split-list [data-row][aria-current]')?.getAttribute('href') ?? '', bar: document.querySelector('.rp-bar')?.innerText.replace(/\\s+/g, ' ').trim() ?? '',
+  title: document.querySelector('.split-detail .read h1')?.textContent ?? '', frame: !!document.querySelector('.split-detail .read iframe'), dots: document.querySelectorAll('#board .report .new:not(.out)').length,
+  rows: document.querySelectorAll('.split-list .dl-row[data-key]:not([style*="height: 0"])').length, toast: document.getElementById('toast').hidden ? '' : document.getElementById('toast').innerText.replace(/\\s+/g, ' ').trim(),
+  reader: !document.getElementById('reader').hidden, hints: document.querySelector('.split-hints')?.innerText.replace(/\\s+/g, ' ').trim() ?? '' })`;
 try {
   const url = sh('bash', [join(here, '.agents/skills/done-done-verify-sign-off/seed-board.sh'), dir], { cwd: repo, env: seedEnv }).trim().split('\n').pop();
   const so = (...args) => sh(process.execPath, [join(repo, 'dist/cli.js'), ...args], { env: seedEnv });
@@ -84,20 +90,49 @@ try {
       report.lines.push(`${theme} ${w}w: archive by swipe left ${archived ? 'yes' : 'no'}, Undo brings it back ${back ? 'yes' : 'no'}, swipe right marks read ${swipedRead ? 'yes' : 'no'}`);
       assert.ok(archived && back && swipedRead, `${theme} ${w}w swipes`);
     }
+    // On a desk the list sits beside the report shown: the newest until one is picked, J and K move, U reads or unreads, E archives and selects the next,
+    // Cmd/Ctrl+Z undoes, a row's hover shows Read and Archive, and a guided report opens over the board from Enter and closes back to the list with Escape.
+    if (feel && w >= 1024 && ev('() => !!document.querySelector(".split .rp-bar")')) {
+      reset(); go('#reports');
+      const first = ev(desk); shot('reports-desk');
+      key('j'); wait(900); const next = ev(desk); shot('reports-desk-next');
+      ev('() => { document.querySelector(".split-detail .read iframe").dataset.kept = "1"; return 1 }');
+      key('u'); wait(700); const unreadAgain = ev(desk); shot('reports-desk-unread');
+      const kept = ev('() => document.querySelector(".split-detail .read iframe")?.dataset.kept === "1"');
+      ev(`() => { document.querySelector('.dl-row[data-key="${guided.key}"] .dl-hover .read-q').focus(); return 1 }`); wait(300); shot('reports-hover');
+      const hover = ev(`() => [...document.querySelectorAll('.dl-row[data-key="${guided.key}"] .dl-hover button')].map((b) => b.textContent.trim()).join(', ')`);
+      ev(`() => { document.querySelector('.split-list [data-row][aria-current]').focus(); return 1 }`);
+      key('e'); wait(1200); const archivedKey = ev(desk); shot('reports-desk-archived');
+      key('z', true); wait(1200); const undone = ev(desk);
+      const guidedSel = ev(desk); shot('reports-guided');
+      key('Enter'); wait(900); const opened = ev(desk); shot('reports-guided-open');
+      key('Escape'); wait(700); const closed = ev(desk);
+      key('?'); wait(500); shot('reports-keys'); const sheet = ev('() => document.getElementById("keys").innerText.includes("Read or unread")'); ev('() => { document.getElementById("keys").close(); return 1 }');
+      report.lines.push(`${theme} ${w}w desk: shown first "${first.title}" (${first.hash}, row ${first.sel}), bar "${first.bar}", hints "${first.hints}"`,
+        `J: row ${next.sel}, "${next.title}", dots ${first.dots} -> ${next.dots}; U: "${unreadAgain.toast}", dots ${unreadAgain.dots}, frame kept across the redraw ${kept ? 'yes' : 'no'}`,
+        `hover on ${guided.key}: ${hover}`, `E: rows ${unreadAgain.rows} -> ${archivedKey.rows}, now ${archivedKey.sel}, "${archivedKey.toast}"; Ctrl+Z: rows ${undone.rows}`,
+        `guided "${guidedSel.title}": frame ${guidedSel.frame ? 'yes' : 'no'}; Enter opens it over the board ${opened.reader ? 'yes' : 'no'}; Escape closes back to ${closed.hash}, row ${closed.sel}, reader ${closed.reader ? 'open' : 'closed'}; ? sheet lists Reports keys ${sheet ? 'yes' : 'no'}`);
+      assert.deepEqual([first.hash, first.sel, first.frame, next.sel, next.dots, unreadAgain.dots, kept, hover, archivedKey.rows, archivedKey.sel, /^Archived: /.test(archivedKey.toast), undone.rows, guidedSel.frame, opened.reader, closed.reader, closed.sel, sheet],
+        ['#reports', `#reports/${base.key}`, true, '#reports/settings-speed', first.dots - 1, first.dots, true, 'Read, Archive', unreadAgain.rows - 1, `#reports/${guided.key}`, true, unreadAgain.rows, false, true, false, `#reports/${guided.key}`, true],
+        JSON.stringify({ first, next, unreadAgain, archivedKey, undone, opened, closed }));
+    }
     const errs = errors();
     writeFileSync(join(out, `reports.${theme}.${w}w.txt`), [`${theme} ${w}w Reports`, `rows ${m.rows}, unread dots ${m.dots}, lede "${m.lede}", Reports tab count "${m.tab}" (${m.tabLabel})`, `section heads ${m.heads.join(', ')}`,
       `last row above the tab bar by ${m.lastRowAboveTabBar ?? 'n/a (no tab bar)'} px`, read ? `after opening a report: dots ${read.dots}, lede "${read.lede}", tab "${read.tab}"` : 'read state: not drawn',
       `controls under 44px ${m.under.length}${m.under.length ? ': ' + m.under.map((x) => `${x.text} ${x.w}x${x.h}`).join(', ') : ''}`, `sideways overflow ${m.overflowX ? 'yes' : 'no'}`, `console errors: ${!/no console messages found/i.test(errs) ? errs.trim().split('\n').slice(0, 5).join(' | ') : 'none'}`, ...report.lines.splice(0)].join('\n') + '\n');
     if (feel) assert.deepEqual([m.dots, read.dots, m.overflowX, m.lastRowAboveTabBar === null || m.lastRowAboveTabBar >= 16], [3, 2, false, true], JSON.stringify({ m, read }));
   }
-  // REPORTS_RECORD=1 also records the motion at 390, light and dark, on the same board (reports.<theme>.390w.mp4), each from the same read state.
+  // REPORTS_RECORD=1 also records the motion at 390 and the desk by keys at 1280, light and dark, on the same board (reports.<theme>.<width>w.mp4), each from the same read state.
   if (process.env.REPORTS_RECORD) for (const theme of ['light', 'dark']) {
     reset();
     sh(process.execPath, [join(here, '.agents/skills/done-done-verify-sign-off/decide-record.mjs'), url, theme, join(out, `reports.${theme}.390w.mp4`), 'reports'], { timeout: 180000 });
+    reset();
+    sh(process.execPath, [join(here, '.agents/skills/done-done-verify-sign-off/decide-record.mjs'), url, theme, join(out, `reports.${theme}.1280w.mp4`), 'desk', 'reports'], { timeout: 180000 });
   }
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board with five reports: three filed today and not read, two from yesterday.',
-    steps: ['Open Reports at 390 and 1280 in light and dark.', 'Scroll to the end of the list.', 'Open a report, then go back to the list.', 'Press a row, swipe it right and left, open More.', 'Swipe a row left to archive it, then tap Undo.', 'Swipe a row right to mark it read.'],
-    result: 'Reports lists Today and Earlier with a picture per form and a blue dot on each report not read; opening one reads it and its dot and count go; a swipe left archives with Undo and a swipe right reads; the last row clears the tab bar.' }, null, 2) + '\n');
+    steps: ['Open Reports at 390 and 1280 in light and dark.', 'Scroll to the end of the list.', 'Open a report, then go back to the list.', 'Press a row, swipe it right and left, open More.', 'Swipe a row left to archive it, then tap Undo.', 'Swipe a row right to mark it read.',
+      'At 1280: J to the next report, U to mark it unread, focus a row for its hover actions, E to archive the report shown, Ctrl+Z, Enter on a guided report and Escape, ? for the keys.'],
+    result: 'Reports lists Today and Earlier with a picture per form and a blue dot on each report not read; opening one reads it and its dot and count go; a swipe left archives with Undo and a swipe right reads; the last row clears the tab bar. On a desk the list sits beside the report shown, J moves, U reads or unreads, E archives and selects the next, and a guided report opens over the board.' }, null, 2) + '\n');
 } finally {
   try { browser('stop'); } catch {}
   try { sh(process.execPath, [join(repo, 'dist/cli.js'), 'stop', join(dir, 'board.json')], { env: seedEnv }); } catch {}
