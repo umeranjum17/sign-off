@@ -749,6 +749,56 @@
     .ev-title { font-size: 2.5rem; line-height: 1.1; margin-top: 1.25rem; }
     .ev-intro { font-size: 1.3125rem; }
   }
+  /* The desk from 1024px: Today is a dashboard, the asks on the left and the latest proof and the new report on the right;
+     Evidence is a list beside the update it has selected, as in Mail. */
+  @media (min-width: 64rem) {
+    body.today main { max-width: 80rem; }
+    .areas { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); column-gap: 2.5rem; align-items: start; }
+    .areas > .i-waiting { grid-row: span 2; }
+    .areas > .i-evidence, .areas > .i-reports { grid-column: 2; }
+    .areas .ev-scroll-row { grid-template-columns: minmax(0, 1fr); gap: 0; overflow: hidden; border-radius: var(--r-card); background: var(--surface); }
+    .areas .ev-scroll-row > * + * { box-shadow: inset 0 0.5px var(--line); }
+    .areas .ev-scroll-row .ev-card, .ev-split .ev-card { display: grid; grid-template-columns: 3.5rem minmax(0, 1fr); align-items: center; gap: 0.25rem 0.875rem;
+      padding: 0.75rem 3rem 0.75rem 1rem; transition: background-color 120ms linear; -webkit-tap-highlight-color: transparent; }
+    .areas .ev-scroll-row .ev-card .ev-media, .ev-split .ev-card .ev-media { flex: none; width: 3.5rem; aspect-ratio: 3 / 4; padding: 0; border-radius: 0.5rem;
+      background: var(--sunk); transition: transform 260ms var(--spring); }
+    .areas .ev-scroll-row .ev-media :is(img, video), .ev-split .ev-media :is(img, video) { padding: 0; border-radius: 0.5rem; object-fit: cover; object-position: center top; }
+    .areas .ev-scroll-row .ev-media .no-shot, .ev-split .ev-media .no-shot { width: 2rem; height: 2rem; margin: auto; border-radius: 0.5rem; }
+    .areas .ev-scroll-row .ev-media .no-shot svg, .ev-split .ev-media .no-shot svg { width: 1.125rem; height: 1.125rem; }
+    .areas .ev-scroll-row .ev-badge, .ev-split .ev-badge { display: none; }
+    .areas .ev-scroll-row .ev-card .ev-media, .ev-split .ev-card .ev-media { grid-row: 1 / span 2; }
+    .areas .ev-scroll-row .ev-card .t, .ev-split .ev-card .t { align-self: end; font-size: 1.0625rem; line-height: 1.375rem; }
+    .areas .ev-scroll-row .ev-card .m, .ev-split .ev-card .m { align-self: start; gap: 0.375rem; font-size: 0.9375rem; line-height: 1.25rem; }
+    .areas .ev-scroll-row .ev-card:hover, .ev-split .ev-card:hover { background: color-mix(in srgb, var(--sunk) 45%, transparent); }
+    .areas .ev-scroll-row .ev-card:active, .ev-split .ev-card:active { background: var(--sunk); }
+    .areas .ev-scroll-row .ev-card:active .ev-media, .ev-split .ev-card:active .ev-media { transform: scale(0.96); }
+    .areas .ev-scroll-row .has-x > .x { top: 50%; right: 0.5rem; translate: 0 -50%; }
+    .areas .ev-scroll-row .has-x > .x, .ev-split .has-x > .x { opacity: 0; transition: opacity 120ms linear; }
+    .areas .ev-scroll-row .has-x:is(:hover, :has(:focus-visible)) > .x, .ev-split .has-x:is(:hover, :has(:focus-visible)) > .x { opacity: 1; }
+    .areas .rp-card { flex-direction: row; align-items: flex-start; gap: 1rem; padding: 1.25rem; }
+    .areas .rp-art { flex: none; width: 5.5rem; min-height: 0; aspect-ratio: 1; border-radius: 1rem; }
+    .areas .rp-body { justify-content: flex-start; padding: 0; }
+    .areas .rp-title { font-size: var(--t-m); }
+    .areas .rp-about { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+    /* Evidence: the list scrolls in its own column, the selected update fills the rest; the selection is tinted with an accent bar. */
+    body.ev-split { grid-template-columns: 16.25rem 25rem minmax(0, 1fr); padding-bottom: 0; }
+    body.ev-split main { display: block; position: sticky; top: 0; height: 100vh; overflow: auto; padding: 0 0 2rem; border-right: 1px solid var(--line); }
+    body.ev-split .top { padding: 2.5rem 1.5rem 1rem; }
+    body.ev-split .ev-find { margin: 0 1.5rem 0.75rem; }
+    body.ev-split .ev-find select { max-width: 50%; }
+    body.ev-split .ev-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+    body.ev-split .ev-grid > .row, body.ev-split .ev-grid > .empty { margin: 0 1.5rem; }
+    .ev-split .ev-card { position: relative; padding-left: 1.5rem; }
+    .ev-split .ev-card::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: var(--action); transform: scaleY(0); transition: transform 260ms var(--spring); }
+    .ev-split .ev-card[aria-current] { background: color-mix(in srgb, var(--action) 12%, transparent); }
+    .ev-split .ev-card[aria-current]::before { transform: scaleY(1); }
+    body.ev-split #reader { grid-column: 3; }
+    body.ev-split #reader > header .close { visibility: hidden; }
+    body.ev-split #reader .ev-scroll { animation: ev-in 320ms var(--spring); }
+    body.ev-split #reader .ev-item { max-width: 40rem; }
+  }
+  @keyframes ev-in { from { opacity: 0; transform: translateX(1.5rem); } }
+  @media (prefers-reduced-motion: reduce) { body.ev-split #reader .ev-scroll { animation: none; } }
   /* The guided plan and report: one scroll with a rail and Your answers on a desk, a progress bar and a Go ahead bar on a phone. */
   #reader .gd-scroll { flex: 1; min-height: 0; overflow: auto; padding: 0 1rem 7rem; scroll-behavior: smooth; }
   #reader .gd, #reader .gd-bar { --hair: color-mix(in srgb, var(--text) 12%, transparent); --hair2: color-mix(in srgb, var(--text) 7%, transparent); --tint: color-mix(in srgb, var(--action) 11%, transparent);
@@ -2885,7 +2935,8 @@
     queueMicrotask(sync);
     return root;
   }
-  const reader = document.getElementById('reader');
+  const reader = document.getElementById('reader'), deskSplit = matchMedia('(min-width: 64rem)');
+  deskSplit.addEventListener('change', () => render());
   function readPage(d, from = 'reports') {
     // A design or a report takes the board's place beside the sidebar on a desk; a plan, and anything on a phone, opens over the whole board.
     const pane = !!d && d.type !== 'plan' && !d.guided, inline = pane && matchMedia('(min-width: 60rem)').matches;
@@ -2893,7 +2944,7 @@
     document.body.classList.toggle('pane-reading', pane);
     reader.setAttribute('role', inline ? 'region' : 'dialog');
     if (inline) reader.removeAttribute('aria-modal'); else reader.setAttribute('aria-modal', 'true');
-    document.querySelector('main').inert = !!d;
+    document.querySelector('main').inert = !!d && !document.body.classList.contains('ev-split');
     document.getElementById('nav').inert = !!d && !inline;
     document.getElementById('tabs').inert = !!d;
     reader.hidden = !d;
@@ -3331,7 +3382,11 @@
       el('div', { class: 'tiles' }, tile('waiting', by.waiting.length, 'Need you'), tile('evidence', by.provenToday.length, 'Proven today'), tile('reports', filedToday(by.reports).length, 'New report')),
       el('div', { class: 'areas' }, waitingSection(by.waiting, by.answered, by.designs), proven(by.provenToday, by.provenToday), newReport(by.reports)), ...(state.leash ? leash() : []),
       ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()])]));
-    readPage(key ? state.decisions.find((d) => d.key === key && !gone.has(d.key) && (at === 'reports' && reads(d) || at === 'designs' && d.kind === 'design' || at === 'evidence' && d.type === 'evidence' || d.type === 'plan' && (area(d) === at || (d.guided && (at === 'waiting' || at === 'answered'))))) : undefined, at);
+    // On a desk Evidence is a list beside the selected update; with none in the address, the newest is selected.
+    const split = at === 'evidence' && deskSplit.matches, shown = key ?? (split ? by.evidence.find((d) => d.type === 'evidence')?.key : undefined);
+    document.body.classList.toggle('ev-split', split);
+    if (split && shown) document.getElementById(`item-${shown}`)?.setAttribute('aria-current', 'true');
+    readPage(shown ? state.decisions.find((d) => d.key === shown && !gone.has(d.key) && (at === 'reports' && reads(d) || at === 'designs' && d.kind === 'design' || at === 'evidence' && d.type === 'evidence' || d.type === 'plan' && (area(d) === at || (d.guided && (at === 'waiting' || at === 'answered'))))) : undefined, at);
     fold();
     applyPicks();
     if (FROZEN) freeze();
