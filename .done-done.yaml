@@ -55,6 +55,9 @@ journeys:
   # at 390 and 1280 (DECIDE_WIDTHS) in light and dark, and the motion recorded at 390 (DECIDE_RECORD=1).
   decide:
     command: 'npm run build > /dev/null && DECIDE_RECORD=1 bash .agents/skills/done-done-verify-sign-off/decide-shots.sh "$DONE_DONE_EVIDENCE_ROOT"'
+  # Agree, Disagree and Comment on a part and its Ask menu, per theme and width: the foot row at 44 px tap targets, Disagree's What is off? box, a sent comment taken by wait --filer and answered with deeper, and a short phone recording. PART_COMMENT_BEFORE=1 SIGN_OFF_REPO=<base checkout, built> records the same page without them.
+  part-comment:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/part-comment-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${PART_COMMENT_THEME:-light}" "${PART_COMMENT_WIDTH:-390}"'
   board-actions:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/board-actions.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   attach:

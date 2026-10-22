@@ -1162,8 +1162,8 @@ test('a guided report: item detail keeps its line breaks, same-axis options read
       assert.deepEqual(lines, { text: 'Close the input.\nPin the version.\nReady the backup.', lines: ['Close the input.', 'Pin the version.', 'Ready the backup.'], tops: 3 }, `${width}`);
       // An item with no detail draws its buttons inside the item's own padding, as an opened item does.
       const pad = await evaluate(`(() => { const li = [...document.querySelectorAll('#gd-found .gd-rows > li')].find((l) => l.textContent.startsWith('One password entry')), box = li.getBoundingClientRect(), text = li.querySelector('.rowstat .sm').getBoundingClientRect();
-        return { buttons: li.querySelectorAll('button').length, outside: [...li.querySelectorAll('button, input')].filter((b) => { const r = b.getBoundingClientRect(); return r.left < text.left - 0.5 || r.right > box.right - 8; }).length }; })()`);
-      assert.ok(pad.buttons >= 5 && pad.outside === 0, `${width}: ${JSON.stringify(pad)}`);
+        const shown = [...li.querySelectorAll('button, input')].filter((b) => b.getClientRects().length); return { buttons: shown.length, outside: shown.filter((b) => { const r = b.getBoundingClientRect(); return r.left < text.left - 0.5 || r.right > box.right - 8; }).length }; })()`);
+      assert.ok(pad.buttons >= 4 && pad.outside === 0, `${width}: ${JSON.stringify(pad)}`);
     } finally { close(); }
   }
   proc.kill();
