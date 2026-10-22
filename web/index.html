@@ -450,11 +450,16 @@
   .ev-missing { margin: 0 0 1rem; color: var(--muted); font-size: 0.9375rem; }
   .ev-card .t { font-size: 1.1875rem; font-weight: 600; line-height: 1.32; letter-spacing: -0.012em; }
   .ev-group h2 { margin: 0; color: var(--muted); font-size: var(--t-xxs); line-height: 1.3; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
-  .ev-group .ev-card { gap: 0.5rem; }
+  /* Each update reads as a row: a real 3:4 preview 72px wide, then what it proves and how it went. */
+  .ev-group .ev-card { display: grid; grid-template-columns: 4.5rem minmax(0, 1fr); gap: 0.25rem 0.75rem; align-items: start; }
+  .ev-group .has-x .ev-card { padding-right: 2.75rem; } .ev-group .has-x > .x { top: 50%; transform: translateY(-50%); }
+  .ev-group .ev-card .t { align-self: end; } .ev-group .ev-card .m { align-self: start; }
   .ev-group .ev-card .t { font-size: var(--t-m); line-height: 1.35; letter-spacing: -0.015em; }
   .ev-group .ev-card .m { font-size: var(--t-xs); }
-  .ev-group .ev-media { aspect-ratio: 16 / 10; padding: 1rem 1rem 0; border-radius: var(--r-card); }
-  .ev-group .ev-media img, .ev-group .ev-media video { padding: 1rem 1rem 0; border-radius: var(--r-card); }
+  .ev-group .ev-media { grid-row: 1 / span 2; aspect-ratio: 3 / 4; padding: 0; border-radius: var(--r-ctl); }
+  .ev-group .ev-media img, .ev-group .ev-media video { padding: 0; border-radius: var(--r-ctl); object-fit: cover; object-position: top; }
+  .ev-group .ev-media .no-shot { width: 2rem; height: 2rem; margin: 0; align-self: center; } .ev-group .ev-media .no-shot svg { width: 1.25rem; height: 1.25rem; }
+  .ev-group .ev-media .ev-badge { top: 0.25rem; left: 0.25rem; }
   .ev-card .m { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; color: var(--muted); font-size: 0.9375rem; }
   .ev-ok, .ev-bad, .ev-warn { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--ok); }
   .ev-bad { color: var(--danger); } .ev-warn { color: var(--warn); } .ev-none { color: var(--muted); }
@@ -1446,7 +1451,7 @@
     const result = RESULT[d.evidenceCard?.result];
     return el('a', { class: 'ev-card', href: `#evidence/${d.key}`, id: `item-${d.key}` }, el('span', { class: 'ev-media' }, ...hero(d)),
       el('span', { class: 't', dir: 'auto' }, headline(d)),
-      el('span', { class: 'm' }, result ? el('span', { class: `ev-${result[0]}` }, mark(result[0]), result[2]) : el('span', { class: 'ev-none' }, 'Not run'), d.attachments?.length ? el('span', {}, d.attachments.length === 1 ? '1 file' : `${d.attachments.length} files`) : '', d.filed ? el('span', {}, stamp(d.filed)) : ''));
+      el('span', { class: 'm' }, result ? el('span', { class: `ev-${result[0]}` }, mark(result[0]), result[2]) : el('span', { class: 'ev-none' }, 'No result yet'), d.attachments?.length ? el('span', {}, d.attachments.length === 1 ? '1 file' : `${d.attachments.length} files`) : '', d.filed ? el('span', {}, stamp(d.filed)) : ''));
   }
   /** Evidence as its own screen: a card per passed update, grouped under the project its check names, in the order each project first shows;
    * proof that names no project goes under Other, last. An item put in this area that is not an update (a page, a diagram) keeps the card it always had. */

@@ -23,7 +23,7 @@ const probe = `() => {
   const bulk = [...document.querySelectorAll('.top > .bulk button')].map((b) => ({ text: b.textContent, ...box(b) })), h1 = box(q('#board h1')), g = q('.ev-group h2');
   return JSON.stringify({ label: g && { text: g.textContent, size: getComputedStyle(g).fontSize, weight: getComputedStyle(g).fontWeight, transform: getComputedStyle(g).textTransform },
     bulk, h1Top: h1.top, bulkAboveTitle: bulk.length > 0 && bulk.every((b) => b.top + b.h <= h1.top + 4),
-    spacing: { cardGap: cs('.ev-group .ev-card', 'rowGap'), cardsGap: cs('.ev-grid', 'rowGap'), groupTop: cs('.ev-group', 'marginTop'), mediaPad: cs('.ev-group .ev-media', 'paddingTop'), mediaRadius: cs('.ev-group .ev-media', 'borderRadius'), cards: document.querySelectorAll('.ev-grid > *').length },
+    spacing: { cardGap: cs('.ev-group .ev-card', 'rowGap'), cardsGap: cs('.ev-grid', 'rowGap'), groupTop: cs('.ev-group', 'marginTop'), mediaRadius: cs('.ev-group .ev-media', 'borderRadius'), thumb: q('.ev-group .ev-media') && box(q('.ev-group .ev-media')), waiting: /Waiting on you/i.test(q('#board').innerText), cards: document.querySelectorAll('.ev-grid > *').length },
     tabs: [...document.querySelectorAll('.tabs a')].map((a) => a.textContent.trim().replace(/\\d+$/, '')), under, overflowX: document.documentElement.scrollWidth > document.documentElement.clientWidth });
 }`;
 const parse = (s) => { let m = JSON.parse(s.match(/result: (".*")/)[1]); while (typeof m === 'string' && /^["{\[]/.test(m)) m = JSON.parse(m); return m; };
@@ -38,12 +38,12 @@ try {
   const m = parse(browser('eval', probe));
   writeFileSync(join(out, `${name}.txt`), [`${side} ${theme} ${width}w Evidence`, `project label ${m.label?.text} ${m.label?.size} weight ${m.label?.weight} ${m.label?.transform}`,
     `Select and Clear all ${m.bulk.map((b) => `${b.text} ${b.w}x${b.h} at ${b.top}px`).join(', ')}; title at ${m.h1Top}px; above the title ${m.bulkAboveTitle}`,
-    `card gap ${m.spacing.cardGap}, between cards ${m.spacing.cardsGap}, group top ${m.spacing.groupTop}, capture padding ${m.spacing.mediaPad}, capture corner ${m.spacing.mediaRadius}, cards ${m.spacing.cards}`,
+    `card gap ${m.spacing.cardGap}, between cards ${m.spacing.cardsGap}, group top ${m.spacing.groupTop}, preview ${m.spacing.thumb.w}x${m.spacing.thumb.h} (3:4), preview corner ${m.spacing.mediaRadius}, cards ${m.spacing.cards}`, `Waiting on you shown ${m.spacing.waiting ? 1 : 0}`,
     `tab bar ${m.tabs.join(' | ')}`, `controls under 44px ${m.under.length}${m.under.length ? ': ' + m.under.map((x) => `${x.text} ${x.w}x${x.h}`).join(', ') : ''}`, `horizontal overflow ${m.overflowX ? 1 : 0}`].join('\n') + '\n');
-  if (side === 'after') assert.deepEqual([m.under.length, m.overflowX, m.bulkAboveTitle, m.label?.size], [0, false, true, '12px'], JSON.stringify(m));
+  if (side === 'after') assert.deepEqual([m.under.length, m.overflowX, m.bulkAboveTitle, m.label?.size, m.spacing.thumb.w, m.spacing.thumb.h, m.spacing.waiting], [0, false, true, '12px', 72, 96, false], JSON.stringify(m));
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board with a sign-in ask, asks, a plan, a report and a passed update.',
-    steps: [`Open the board at ${width} px in ${theme} mode on the Evidence tab.`, 'Read the project label, the card spacing and where Select and Clear all sit, and measure every control against 44px.'],
-    result: side === 'after' ? `At ${width} px ${width === 390 ? 'on a phone ' : ''}in ${theme} mode Evidence shows Select and Clear all at the top right above the large Evidence title, each 44px tall, then a small uppercase project label over the update's card, with no control under 44px and no sideways overflow.` : `At ${width} px in ${theme} mode Evidence is captured as it was for comparison, with Select and Clear all in a row under the title and a large project heading.` }, null, 2) + '\n');
+    steps: [`Open the board at ${width} px in ${theme} mode on the Evidence tab.`, 'Read the project label, the preview size, the spacing and where Select and Clear all sit, and measure every control against 44px.'],
+    result: side === 'after' ? `At ${width} px ${width === 390 ? 'on a phone ' : ''}in ${theme} mode Evidence shows Select and Clear all at the top right above the large Evidence title, each 44px tall, then a small uppercase project label over the update's row, which starts with a 3:4 preview of the capture 72px wide and 96px tall, with no 'Waiting on you' text, with no control under 44px and no sideways overflow.` : `At ${width} px in ${theme} mode Evidence is captured as it was for comparison, with Select and Clear all in a row under the title and a large project heading.` }, null, 2) + '\n');
 } finally {
   try { browser('stop'); } catch {}
   try { sh(process.execPath, [join(repo, 'dist/cli.js'), 'stop', join(dir, 'board.json')], { env: seedEnv }); } catch {}
