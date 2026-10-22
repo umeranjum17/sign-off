@@ -54,7 +54,7 @@ for w in ${PHONE_WIDTH:-390 1280}; do
       [ -n "$id" ] && br selectpage "$id" >/dev/null && sleep 1
       echo "link.$w opened: $(br pages | sed -n 's/^  [0-9]*,\([^?,]*\).*/\1/p' | tr '\n' ' ')" | sed 's#http://127.0.0.1:[0-9]*##g' >> "$out/measures.txt"
     else
-      echo "link.$w after tap: $(ev '() => JSON.stringify({staysOnBoard: location.pathname === "/", screen: location.hash.split("/")[0], backLink: document.querySelector("a.back, .top a")?.textContent ?? ""})')" >> "$out/measures.txt"
+      echo "link.$w after tap: $(ev '() => JSON.stringify({staysOnBoard: location.pathname === "/", screen: location.hash.split("/")[0], backLink: [...document.querySelectorAll("a")].find((a) => /Evidence$/.test(a.textContent.trim()))?.textContent.trim() ?? ""})')" >> "$out/measures.txt"
     fi
     br screenshot "$out/link.$w.png" >/dev/null
     "$node" -e 'const l=JSON.parse(process.argv[1]),w=+process.argv[2];if(w===390?(l.href!=="#evidence/update-1"||l.opensInNewTab):(l.href!=="/api/media"||!l.opensInNewTab))process.exit(1)' "$l" $w
