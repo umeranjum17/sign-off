@@ -157,13 +157,22 @@ without posting.
 
 ## The person can also
 
-- Filter **Waiting on you** by type with the chips: **All**, then each type with asks waiting, with its count. Each card's type label is its chip's name (Yes/No, Pick one, Reply, Info, Design pick, Approval, Evidence, Sign-in, Plan). The list reads **Newest first** by default, or **Oldest first** by each ask's `filed` time (an ask with no `filed` takes the time of the nearest earlier ask in the file that has one). The sort is kept in this browser; the type filter is not, so opening Waiting on you again shows All.
-- Tap an ask in **Waiting on you** to open it on **Decide**: one ask at a
-  time, its picture or page, what it is and why, its options in one list with
-  the recommended one marked, and a bar at the bottom with **Answer** (an ask
-  with options) and one **More…** that holds **Skip for now** (another ask
-  follows), **Later**, **Dismiss** and the other ways to send typed words.
-  **Answer** saves and opens the next ask, or the list after the last.
+- See every ask on **Decide**, grouped **Sign in**, **Answer**, **Review**
+  (plans and designs, looked over before they are answered) and **Later**.
+  Each row names the answer it recommends, or its type when it recommends
+  none (Yes/No, Pick one, Reply, Info, Design pick, Approval, Sign-in, Plan).
+  Swipe a row right to answer with the recommended pick, or left to move it
+  to **Later** (kept in this browser; the agent still waits). **More** (···)
+  holds **Answer all recommended**, **Move all to Later**, **Oldest first** /
+  **Newest first** (by each ask's `filed` time, kept in this browser) and
+  **Select**. Every change shows a toast with **Undo**.
+- Tap a row to open the ask: its picture or page, what it is and why, its
+  answers as cards with the recommended one marked, then one **Answer**
+  button that names the pick and **More** with **Skip for now** (another ask
+  follows), **Ask me later**, **Dismiss** and the other ways to send typed
+  words (under **Add a comment**, right under the answers). On a phone **Answer** turns
+  into a check and takes you back to the list, where the row folds away; on
+  a wider screen it opens the next ask, or the list after the last.
   **1**–**9** picks an option and answers it, **E** skips to the next ask,
   **Z** undoes the last answer, and a swipe right takes the recommended answer
   while a swipe left skips. A plan opens its own page instead, and a design
@@ -180,10 +189,10 @@ without posting.
   as read by the agent. Typed notes that are not sent yet stay in the
   browser across reloads; everything sent is saved next to the board and
   survives a restart.
-- **Dismiss** (the × on an ask or item in a list, **Dismiss** under Needs you
-  first, a plan included, **Select**, or **Clear all** on every tab, Decide included) hides items from the board, Today
+- **Dismiss** (the × on an item in a list, **Dismiss** in an ask's **More**,
+  **Select**, or **Clear all** on the other tabs) hides items from the board, Today
   included; **Undo** in the toast brings them back, and so does **Restore**
-  under **Dismissed (N)** at the end of Needs you first and Waiting on you.
+  under **Dismissed (N)** at the end of Decide.
   `list` counts a dismissed item as neither
   waiting nor answered, as the board does (`list --full` says `dismissed`
   for an unanswered one and still its answer for an answered one), and

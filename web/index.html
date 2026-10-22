@@ -125,7 +125,6 @@
     body:has(.decide) { padding-bottom: calc(9rem + env(safe-area-inset-bottom)); }
     /* The smaller Decide title lifts a short ask; the page still reaches the bar so a swipe anywhere above it skips. */
     .decide { min-height: calc(100dvh - 13rem - env(safe-area-inset-bottom)); }
-    .top:has(+ .decide) .back { display: none; }
   }
   /* Decide names itself in the bar, small and centred, and the question is the headline. */
   .top:has(+ .decide) { height: 3.25rem; padding: 0; }
@@ -334,21 +333,6 @@
     background: var(--surface); border-radius: 0.875rem; }
   /* Waiting and Decide use separate board cards; the R1 answer renderer remains the source of answer writes. */
   .waiting-lede { margin: 0; color: var(--muted); }
-  .plan-hero { display: grid; overflow: hidden; margin: 0 0 2rem; border-radius: 1.125rem; background: var(--surface); }
-  .plan-preview { width: 100%; height: 12rem; min-width: 0; overflow: hidden; background: var(--sunk); }
-  .plan-preview .rung { height: 100%; }
-  .plan-preview .rung .frame, .plan-preview .rung iframe { height: 100%; min-height: 0; border: 0; border-radius: 0; }
-  .plan-preview .rung > .meta { display: none; }
-  .plan-copy { display: grid; align-content: center; gap: .5rem; padding: 1.25rem; }
-  .plan-copy .eyebrow, .ask-card .kind { margin: 0; color: var(--warn); font-size: .875rem; font-weight: 600; }
-  .plan-copy h2 { margin: 0; font-size: 1.3125rem; line-height: 1.24; }
-  .plan-copy .about { display: block; margin: 0; color: var(--muted); overflow: visible; }
-  .plan-meta { display: flex; flex-wrap: wrap; gap: .35rem 1rem; color: var(--muted); font-size: .875rem; }
-  .plan-meta span { display: inline-flex; align-items: center; gap: .375rem; white-space: nowrap; }
-  .plan-copy .icon { width: auto; height: auto; border-radius: 0; background: none; } .plan-meta .icon svg { width: 1rem; height: 1rem; stroke: var(--muted); }
-  .plan-copy .eyebrow { display: flex; align-items: center; gap: .375rem; } .plan-copy .eyebrow .icon svg { width: 1.125rem; height: 1.125rem; stroke: var(--warn); }
-  .open-link.plan-open { display: inline-flex; justify-content: center; min-height: var(--ctl); padding: 0 1.25rem; font-size: var(--t-s); font-weight: 600; }
-  @media (min-width: 45rem) { .open-link.plan-open { width: fit-content; } }
   .ask-group { list-style: none; margin: .5rem 0 0; padding: 0 0 0 1rem; overflow: hidden; border-radius: 1rem; background: var(--surface); }
   .ask-group > li { position: relative; display: flex; align-items: center; gap: .75rem; min-height: 4.125rem; padding: .5rem .5rem .5rem 0; }
   .ask-group > li + li { border-top: .5px solid var(--line); }
@@ -413,27 +397,14 @@
   .pager .step[aria-disabled] { opacity: .3; }
   .pager .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.75; }
   @media (min-width: 60rem) { .pager { height: 3.75rem; } }
-  .decide-lists { margin-top: 2rem; }
   /* A comment with the answer, your own words, another round: one quiet line right under the choices. */
   .decide-other { margin-top: 0.5rem; } .decide-other .other > summary { padding-left: 1rem; color: var(--accent); font-size: 1.0625rem; font-weight: 400; }
-  .decide-lists .sec-head { margin: 1.75rem 0 .5rem; } .decide-lists .rows + .sec-head { margin-top: 1.75rem; }
-  .decide-lists .sec-head h2 { color: var(--muted); font-size: .8125rem; font-weight: 400; letter-spacing: .02em; text-transform: uppercase; }
-  .decide-lists .compact strong { font-weight: 400; line-height: 1.375rem; } .decide-lists .compact .meta { margin: .0625rem 0 0; font-size: .9375rem; line-height: 1.25rem; }
-  .decide-lists .rows { padding-left: 1rem; } .decide-lists .compact { min-height: 3.5rem; box-sizing: border-box; padding: .625rem 0; }
-  .decide-lists .compact .thumb { width: 2rem; height: 2rem; border-radius: .5rem; }
-  .decide-lists .compact .icon { width: 2rem; height: 2rem; border-radius: .5rem; }
-  .decide-lists a.compact::after { content: "" / ""; flex: none; width: .5rem; height: .5rem; margin-right: .5rem; border: solid var(--border); border-width: 2px 2px 0 0; transform: rotate(45deg); }
   .decide-bar { position: sticky; z-index: 1; bottom: calc(4.125rem + env(safe-area-inset-bottom)); display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
     margin-top: 1rem; padding: .75rem 0 .5rem; background: var(--bg); }
   /* Answer takes the row on one line; when a long label leaves no room, Skip and Later move under it rather than squeeze it. */
   .decide-bar > * { white-space: nowrap; }
   .decide-bar > .silent-line { white-space: normal; min-width: 0; } /* the stay-quiet line wraps; nowrap pushed it past a phone's edge in a wider font */
   .decide-bar .answer { flex: 1 1 auto; background: var(--action); color: var(--on-accent); font-weight: 400; }
-  .decide-bar .later { display: inline-flex; flex: none; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0 0.75rem; color: var(--accent); background: transparent; text-decoration: none; }
-  .decide-bar .skip { flex: none; padding: 0 0.75rem; color: var(--muted); background: transparent; }
-  .decide-bar .dis { flex: none; padding: 0 0.75rem; background: transparent; color: var(--muted); }
-  @media (max-width: 59.999rem) { .decide-bar .skip { display: none; } } /* a phone has Answer and Later; a swipe left still skips */
-  .ask-group + .gone-asks { margin-top: 1rem; }
   /* Evidence: one list of cards, newest first, each with its capture as the hero; the whole card opens the update.
      The project picker sits quietly beside the search box, as tall as it and in the same sunk fill. */
   .ev-find { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; } .ev-find input { flex: 1 1 auto; min-width: 0; }
@@ -560,8 +531,6 @@
   .more-menu .menu { display: grid; gap: 0.25rem; margin-top: 0.25rem; padding: 0.375rem; border: 1px solid var(--line); border-radius: 0.875rem; background: var(--surface); animation: comment-in 0.18s ease-out; }
   .more-menu .menu button, .more-menu .menu a { display: flex; align-items: center; justify-content: start; min-height: 2.75rem; padding: 0 0.75rem; color: var(--text); text-align: left; text-decoration: none; background: transparent; }
   /* On Decide it opens upward over the page, from the bar at the foot. */
-  .decide-bar .more-menu { position: relative; flex: none; }
-  .decide-bar .more-menu .menu { position: absolute; z-index: 2; right: 0; bottom: calc(100% + 0.25rem); min-width: 15rem; box-shadow: 0 8px 24px rgb(0 0 0 / 0.18); }
   /* In dark the menu sits a step above the page, with a clear rim, so it never reads as part of what it covers. */
   @media (prefers-color-scheme: dark) { .more-menu .menu { background: var(--tk-input); border-color: #4A4A4E; box-shadow: 0 12px 32px rgb(0 0 0 / 0.6); } }
   @media (prefers-reduced-motion: reduce) { .more-menu .menu { animation: none; } }
@@ -571,7 +540,7 @@
     display: flex; align-items: center; gap: 0.875rem; padding: 0.5rem 0.5rem 0.5rem 1.125rem; border-radius: 0.875rem;
     background: var(--text); color: var(--bg); font-size: 1rem; }
   #toast[hidden] { display: none; }
-  #toast span { flex: 1; min-width: 0; }
+  #toast #toast-text { flex: 1; min-width: 0; }
   #toast button { flex: none; min-height: var(--ctl); padding: 0 0.875rem; background: color-mix(in srgb, currentColor 16%, transparent); color: inherit; font-weight: 600; }
   #toast button:focus-visible { outline-color: var(--bg); }
   /* Buttons: grey for the plain ones, filled blue once picked, solid grey when off. 44px everywhere, 10px corners. */
@@ -660,18 +629,9 @@
   /* Select and Clear all sit in one row at the right, under every screen's title; a card that is a link keeps its dismiss x at its corner. */
   .bulk { display: flex; justify-content: flex-end; gap: 0.5rem; margin: 0.5rem -0.5rem -0.5rem; }
   .bulk button { padding: 0 0.5rem; }
-  .decide > .bulk { grid-column: 1 / -1; margin: 0; }
   .picked { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 1rem; }
   .has-x { position: relative; }
   .has-x > .x { position: absolute; top: 0.25rem; right: 0.25rem; margin: 0; background: color-mix(in srgb, var(--surface) 88%, transparent); }
-  .plan-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
-  .plan-actions .dis { min-height: 2.75rem; padding: 0 0.5rem; background: none; color: var(--muted); }
-  /* Waiting on you: one row of type chips, and the sort beside them (or below them on a phone). */
-  .filters { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 0.75rem; margin: 0 0 0.75rem; }
-  .chips { display: flex; flex-wrap: wrap; gap: 0.375rem; }
-  .chips button { min-height: 2.75rem; padding: 0 0.75rem; border-radius: 999px; font-size: 0.875rem; font-weight: 600; }
-  .sort { display: flex; align-items: center; gap: 0.5rem; color: var(--muted); font-size: 0.875rem; font-weight: 600; }
-  .sort select { min-height: 2.75rem; padding: 0 0.5rem; border: 1px solid var(--border); border-radius: 0.5rem; background: var(--surface); color: var(--text); font: inherit; }
   .chip { padding: 0 0.5rem; border: 1px solid currentColor; border-radius: 999px; color: var(--accent);
     font-size: 0.875rem; font-weight: 600; line-height: 1.25rem; letter-spacing: 0.04em; text-transform: uppercase; }
   /* Each option is a tall phone frame, side by side; on a phone the row swipes, one frame at a time, and the next one peeks in.
@@ -718,7 +678,6 @@
   button:focus-visible, summary:focus-visible, textarea:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .shot:focus-visible { outline-offset: -2px; }
   .empty { margin: 0; padding: 1.5rem 1rem; color: var(--muted); text-align: center; border: 1px dashed var(--line); border-radius: 0.875rem; }
-  @media (max-width: 44.999rem) { .plan-preview { display: none; } }
   @media (min-width: 45rem) {
     main { padding: 0 2rem; }
     .row { grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 0.875rem 2rem; padding: 1.125rem 1.25rem; }
@@ -726,7 +685,6 @@
     /* The frames share the card width down to 11rem each; only a list longer than that scrolls. */
     .mocks { grid-auto-columns: minmax(11rem, calc(var(--tall) * 9 / 19.5)); }
     .rung iframe { height: min(32rem, 75vh); }
-    .plan-hero { grid-template-columns: 46% minmax(0, 1fr); min-height: 20rem; }
     /* A picture card stacks like a design card: the picture, then its buttons at their own width. */
     .row:has(> .rung) { grid-template-columns: minmax(0, 1fr); gap: 0.875rem; }
     .row:has(> .rung) .choices { justify-content: start; }
@@ -770,10 +728,6 @@
     .rp-art { width: 46%; aspect-ratio: auto; min-height: 16rem; }
     .rp-body { flex: 1; justify-content: center; padding: 2rem; }
     .rp-title { font-size: 1.75rem; line-height: 1.15; }
-    .plan-preview { height: 20rem; }
-    .plan-preview .rung .frame, .plan-preview .rung iframe { min-height: 0; }
-    .plan-copy { padding: 2rem; }
-    .plan-copy h2 { font-size: 1.75rem; line-height: 1.1429; }
     .decide h2 { font-size: 2.5rem; line-height: 1.1; }
     .decide-bar { position: static; margin: 1rem 0 0; padding: 0; background: transparent; }
     .decide-bar .answer { flex: none; }
@@ -1012,14 +966,160 @@
   .gd-bar .txt b { display: block; color: var(--text); font-weight: 600; }
   .gd-bar .gd-btn { min-height: 3rem; padding: 0 1.25rem; white-space: nowrap; }
   @media (prefers-reduced-motion: reduce) { #reader .gd *, #reader .gd-scroll { animation: none !important; transition: none !important; scroll-behavior: auto; } }
+  /* ---- Decide, phone first: one plain page of rows grouped Sign in, Answer, Review and Later, as in Mail and Reminders.
+     Every tap answers at once: rows tint on press, buttons shrink a little, and pops settle on a spring (--spring, set by the script). ---- */
+  :root { --ease: cubic-bezier(0.22, 1, 0.36, 1); --spring: var(--ease); --c-indigo: #5E5CE6; --skel: rgba(118, 118, 128, 0.12); --skel-hi: rgba(118, 118, 128, 0.04); }
+  @media (prefers-color-scheme: dark) { :root { --c-indigo: #7D7AFF; --skel: rgba(255, 255, 255, 0.07); --skel-hi: rgba(255, 255, 255, 0.02); } }
+  body:has(.decide-list, .decide) { --bg: var(--tk-surface); --surface: var(--tk-grouped); }
+  @media (prefers-color-scheme: dark) { body:has(.decide-list, .decide) { --surface: var(--tk-surface-highest); } }
+  main { overflow-x: clip; }
+  .date-kicker { margin: 0 0 0.125rem; color: var(--muted); font-size: var(--t-xs); line-height: 1.125rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
+  .top:has(> .date-kicker) h1 { font-size: 2.125rem; line-height: 2.625rem; }
+  .top > .dl-more { position: absolute; top: 2.75rem; right: -0.5rem; }
+  .top > .bulk { margin-top: 0.25rem; }
+  /* More: a disc at the top right (or beside Answer) whose menu scales out of it. */
+  .dl-more { position: relative; flex: none; }
+  .dl-more > summary { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; list-style: none; cursor: pointer; color: var(--accent); -webkit-tap-highlight-color: transparent; }
+  .dl-more > summary::-webkit-details-marker { display: none; }
+  .dl-more > summary > span { display: grid !important; place-items: center; width: 2rem; height: 2rem; border-radius: 50%; background: var(--sunk); transition: transform 260ms var(--spring); }
+  .dl-more > summary:active > span { transform: scale(0.92); transition-duration: 90ms; }
+  .dl-more > summary .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 3; }
+  .dl-more:not([open]) > .dl-menu { display: none; }
+  .dl-menu { position: absolute; z-index: 4; top: calc(100% + 0.25rem); right: 0.25rem; min-width: 15rem; padding: 0.375rem 0; border-radius: 0.875rem; background: var(--tile);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.16), 0 0 0 0.5px var(--line); transform-origin: top right; animation: menu-in 260ms var(--spring); }
+  .decide-bar .dl-menu { top: auto; bottom: calc(100% + 0.25rem); transform-origin: bottom right; }
+  @keyframes menu-in { from { opacity: 0; transform: scale(0.6); } }
+  .dl-menu > button { display: flex; align-items: center; justify-content: space-between; gap: 1.125rem; width: 100%; min-height: 2.75rem; padding: 0 1rem; border-radius: 0;
+    background: none; color: var(--text); font-size: var(--t-m); font-weight: 400; text-align: left; white-space: nowrap; }
+  .dl-menu > button + button { border-top: 0.5px solid var(--line); }
+  .dl-menu > button:active { background: var(--sunk); }
+  .dl-menu > button.dis { color: var(--danger); }
+  /* Group heads with their count, then the rows: full width on a phone, a rounded block wider up. */
+  .decide-list .dl-head { display: flex; align-items: baseline; gap: 0.5rem; margin: 1.75rem 0 0.25rem; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; font-weight: 600; letter-spacing: -0.01em; }
+  .decide-list > .dl-head:first-child { margin-top: 0.5rem; }
+  .dl-head .n { color: var(--faint); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .dl-list { list-style: none; margin: 0 -1.25rem; padding: 0; }
+  @media (min-width: 45rem) { .dl-list { margin: 0; border-radius: 0.75rem; overflow: hidden; } }
+  .dl-row { position: relative; overflow: hidden; }
+  .dl-face { position: relative; z-index: 1; display: flex; align-items: center; gap: 0.875rem; min-height: 4.75rem; padding: 0.75rem 1.25rem; background: var(--bg); color: inherit; text-decoration: none;
+    touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; transition: background-color 120ms linear; }
+  .dl-face.down { background: color-mix(in srgb, var(--text) 6%, var(--bg)); transition: none; }
+  .dl-row:not(.leaving) ~ .dl-row .dl-face::before { content: ""; position: absolute; top: 0; right: 0; left: 4.125rem; border-top: 0.5px solid var(--line); }
+  .dl-face .icon { width: 2rem; height: 2rem; border-radius: 0.5625rem; background: var(--k, var(--action)); transition: transform 300ms var(--spring), background-color 120ms linear; }
+  .dl-face .icon svg { width: 1.1875rem; height: 1.1875rem; stroke: #FFFFFF; stroke-width: 2.1; }
+  .g-signin { --k: color-mix(in srgb, var(--tk-warning) 88%, #000); } .g-review { --k: var(--c-indigo); } .g-later { --k: var(--muted); }
+  .dl-face .copy { display: grid; flex: 1; min-width: 0; gap: 0.125rem; }
+  .dl-face .r1 { display: flex; align-items: baseline; gap: 0.625rem; }
+  .dl-face .title { flex: 1; min-width: 0; display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: var(--t-m); line-height: 1.375rem; font-weight: 600; letter-spacing: -0.022em; }
+  .dl-face .tm { flex: none; color: var(--faint); font-size: var(--t-s); line-height: 1.25rem; font-variant-numeric: tabular-nums; }
+  .dl-face .tm.hot { color: var(--warn); font-weight: 600; }
+  .dl-face .sub { overflow: hidden; margin: 0; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; white-space: nowrap; text-overflow: ellipsis; }
+  .dl-face .sub b { color: var(--text); font-weight: 500; }
+  /* The actions under a row show only while it is swiped, so a press tint never lets them through. */
+  .dl-act { position: absolute; inset: 0; display: none; flex-direction: column; justify-content: center; gap: 0.1875rem; padding: 0 1.625rem; color: #FFFFFF; font-size: var(--t-s); line-height: 1.25rem; font-weight: 600; }
+  .dl-act.yes { align-items: flex-start; background: color-mix(in srgb, var(--tk-success) 82%, #000); }
+  .dl-act.later { align-items: flex-end; background: var(--c-indigo); }
+  .dl-act > * { transition: transform 240ms var(--spring), opacity 120ms linear; opacity: 0.85; }
+  .dl-act .glyph { width: 1.5rem; height: 1.5rem; stroke-width: 2.2; }
+  .dl-row.armed .dl-act > * { transform: scale(1.18); opacity: 1; }
+  .dl-row.swiping[data-side="yes"] .yes, .dl-row.swiping[data-side="later"] .later, .leaving[data-side="yes"] .yes, .leaving[data-side="later"] .later { display: flex; }
+  .leaving[data-side="yes"] .dl-face { transform: translateX(100%); } .leaving[data-side="later"] .dl-face { transform: translateX(-100%); }
+  /* Answered: the row tints green and its icon pops green, then it folds away; a row taken back flashes blue. */
+  .leaving.answered:not([data-side]) .dl-face { background: color-mix(in srgb, var(--tk-success) 12%, var(--bg)); }
+  .leaving.later:not([data-side]) .dl-face { background: color-mix(in srgb, var(--c-indigo) 12%, var(--bg)); }
+  .leaving.answered .icon { background: color-mix(in srgb, var(--tk-success) 82%, #000); transform: scale(1.08); }
+  .dl-row.returned .dl-face { animation: row-back 600ms var(--ease); }
+  @keyframes row-back { from { background: color-mix(in srgb, var(--accent) 14%, var(--bg)); } }
+  .rise .dl-row, .rise .dl-head { animation: rise 280ms var(--ease) both; animation-delay: calc(min(var(--n, 0), 12) * 28ms); }
+  @keyframes rise { from { opacity: 0; transform: translateY(0.625rem); } }
+  .decide-list > .gone-asks { margin-top: 1.5rem; }
+  /* All clear: a green check pops in. */
+  .all-clear-big { padding: 4rem 1.5rem 1rem; text-align: center; }
+  .all-clear-big .big { display: grid !important; place-items: center; width: 4.5rem; height: 4.5rem; margin: 0 auto 1.125rem; border-radius: 50%; color: #FFFFFF;
+    background: color-mix(in srgb, var(--tk-success) 82%, #000); box-shadow: 0 10px 28px -8px color-mix(in srgb, var(--tk-success) 70%, transparent); animation: pop 520ms var(--spring); }
+  .all-clear-big .glyph { width: 2.125rem; height: 2.125rem; stroke-width: 2.6; }
+  .all-clear-big h2 { margin: 0 0 0.375rem; font-size: var(--t-l); line-height: 1.75rem; }
+  .all-clear-big p { margin: 0; color: var(--muted); font-size: var(--t-s); }
+  @keyframes pop { from { opacity: 0; transform: scale(0.4); } }
+  /* Shimmering rows hold the place while the board loads. */
+  .skel { padding: 1.5rem 0 0; }
+  .sk { display: block; border-radius: 0.375rem; background: linear-gradient(90deg, var(--skel) 0%, var(--skel-hi) 50%, var(--skel) 100%); background-size: 200% 100%; animation: shimmer 1.1s linear infinite; }
+  .sk-kicker { width: 9rem; height: 0.8125rem; } .sk-title { width: 8.5rem; height: 2.125rem; margin: 0.5rem 0; border-radius: 0.5rem; } .skel > .sk-line { margin-bottom: 1.75rem; }
+  .sk-row { display: flex; align-items: center; gap: 0.875rem; padding: 1rem 0; }
+  .sk-ic { flex: none; width: 2rem; height: 2rem; border-radius: 0.5625rem; }
+  .sk-lines { display: grid; flex: 1; gap: 0.5rem; }
+  .sk-line { height: 0.8125rem; border-radius: 0.4375rem; }
+  @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+  /* An ask pushes in from the right over Decide; going back slides the list in from the left. The dock stays put: a moving ancestor would carry it off the screen. */
+  #board.push > :not(.decide), #board.push > .decide > :not(.decide-bar) { animation: push-in 250ms var(--ease); }
+  #board.pop > * { animation: pop-in 250ms var(--ease); }
+  @keyframes push-in { from { opacity: 0.4; transform: translateX(32%); } }
+  @keyframes pop-in { from { opacity: 0.6; transform: translateX(-24%); } }
+  /* The ask: its kind, who asked and when over the question; the answers as cards with a radio; one Answer button that names the pick, and More. */
+  @media (max-width: 59.999rem) { .top:has(+ .decide) h1 { width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); } }
+  .decide .kicker { margin: 1.25rem 0 0; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; }
+  .decide .kicker .k { color: var(--accent); font-weight: 600; }
+  .decide .kicker + h2 { margin-top: 0.375rem; }
+  .decide .pick-label { margin: 1.75rem 0 0.625rem; padding: 0; color: var(--muted); font-size: var(--t-s); font-weight: 600; letter-spacing: -0.01em; }
+  .decide .pick-list { display: grid; gap: 0.625rem; padding: 0; overflow: visible; border-radius: 0; background: none; }
+  .decide .pick-list li + li { border-top: 0; }
+  .decide .pick-option { gap: 0.875rem; min-height: 4.5rem; padding: 0.875rem 1rem; border-radius: 1rem; background: var(--surface); box-shadow: inset 0 0 0 2px transparent;
+    -webkit-tap-highlight-color: transparent; transition: box-shadow 160ms linear, transform 260ms var(--spring), background-color 120ms linear; }
+  .decide .pick-option:active { transform: scale(0.98); transition-duration: 90ms; }
+  .decide .pick-option[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); box-shadow: inset 0 0 0 2px var(--accent); }
+  .decide .pick-option .label { font-weight: 600; }
+  .decide .pick-option .recommend { padding: 0 0.5rem; border-radius: 999px; background: color-mix(in srgb, var(--accent) 14%, transparent); font-size: var(--t-xs); line-height: 1.375rem; font-weight: 600; }
+  .decide .pick-option .check { display: grid; flex: none; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--border); color: transparent; visibility: visible; }
+  .decide .pick-option[aria-pressed="true"] .check { background: var(--action); box-shadow: none; color: #FFFFFF; animation: pop 300ms var(--spring); }
+  .decide .pick-option .check .glyph { width: 0.9375rem; height: 0.9375rem; stroke-width: 3; }
+  .decide-bar { flex-wrap: wrap; }
+  .decide > .silent-line { margin-top: 1.25rem; }
+  /* On a phone the bar is a dock over the tab bar, as the answer is always one tap away; the toast rises above it. */
+  @media (max-width: 44.999rem) { .decide-bar { position: fixed; left: 0; right: 0; margin: 0; padding: 0.75rem max(1.25rem, env(safe-area-inset-right)) 0.5rem max(1.25rem, env(safe-area-inset-left)); } }
+  .decide-bar .answer { position: relative; overflow: hidden; min-height: 3.25rem; border-radius: 1rem; font-size: var(--t-m); font-weight: 600;
+    box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--action) 70%, transparent); transition: background-color 160ms linear, transform 260ms var(--spring); }
+  .decide-bar .answer:active { transform: scale(0.97); transition-duration: 90ms; }
+  .decide-bar .dl-more:only-child { margin-left: auto; }
+  .answer .lbl { display: inline-block; } .answer .lbl.swap { animation: lbl-in 200ms var(--ease); }
+  @keyframes lbl-in { from { opacity: 0; transform: translateY(0.5rem); } }
+  .answer .okmark { position: absolute; inset: 0; display: none !important; place-items: center; }
+  .decide-bar .answer.done, .decide-bar .answer.done:disabled { background: color-mix(in srgb, var(--tk-success) 82%, #000); color: #FFFFFF; box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--tk-success) 70%, transparent); }
+  .answer.done .lbl { animation: lbl-out 140ms var(--ease) forwards; }
+  @keyframes lbl-out { to { opacity: 0; transform: translateY(-0.5rem); } }
+  .answer.done .okmark { display: grid !important; }
+  .answer .okmark .glyph { width: 1.75rem; height: 1.75rem; stroke-width: 2.6; stroke-dasharray: 24; stroke-dashoffset: 24; animation: draw 260ms 90ms var(--ease) forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  /* The toast rises on a spring with its mark, and a hairline counts down to when it goes. */
+  #toast { overflow: hidden; min-height: 3.375rem; padding-left: 0.875rem; border-radius: 1.125rem; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24); animation: toast-in 300ms var(--spring); }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(calc(100% + 2rem)); } }
+  #toast .tk { display: none; flex: none; place-items: center; width: 1.625rem; height: 1.625rem; border-radius: 50%; color: #FFFFFF; }
+  #toast[data-mark="ok"] .tk { display: grid; background: color-mix(in srgb, var(--tk-success) 82%, #000); } #toast[data-mark="later"] .tk { display: grid; background: var(--c-indigo); }
+  #toast .tk svg { display: none; width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+  #toast[data-mark="ok"] .tk .ok, #toast[data-mark="later"] .tk .later { display: block; }
+  #toast .bar { position: absolute; left: 0; bottom: 0; width: 100%; height: 2px; background: currentColor; opacity: 0.35; transform-origin: left; animation: countdown var(--tms, 5s) linear forwards; }
+  @keyframes countdown { to { transform: scaleX(0); } }
+  /* An approved screen in the viewer carries a green check stamp in its corner. */
+  .design-stage .stamp { position: absolute; z-index: 1; top: 1rem; right: 1rem; display: grid !important; place-items: center; width: 3.5rem; height: 3.5rem; border-radius: 50%; pointer-events: none;
+    background: color-mix(in srgb, var(--tk-success) 82%, #000); color: #FFFFFF; box-shadow: 0 10px 28px -8px rgba(0, 0, 0, 0.45); }
+  .design-stage .stamp .glyph { width: 1.875rem; height: 1.875rem; stroke-width: 2.6; }
+  .design-stage .stamp.pop { animation: stamp 520ms var(--spring); }
+  @keyframes stamp { from { opacity: 0; transform: scale(1.8) rotate(-12deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    #board.push *, #board.pop *, .rise .dl-row, .rise .dl-head, .sk, #toast, #toast .bar, .all-clear-big .big, .dl-menu, .answer .lbl, .answer .okmark .glyph, .design-stage .stamp, .decide .pick-option .check, .dl-row.returned .dl-face { animation: none !important; }
+    .answer .okmark .glyph { stroke-dashoffset: 0; }
+    .dl-face, .dl-act > *, .dl-face .icon, .decide .pick-option, .decide-bar .answer, .dl-more > summary > span { transition: none !important; }
+  }
 </style>
 </head>
 <body>
 <nav class="side" id="nav" aria-label="Board areas"></nav>
-<main><p class="banner" id="banner" role="alert" hidden></p><div id="board"></div></main>
+<main><p class="banner" id="banner" role="alert" hidden></p><div id="board" aria-busy="true">
+  <!-- Shimmering rows hold the place until the board file is read; the first render replaces them. -->
+  <div class="skel" aria-hidden="true"><span class="sk sk-kicker"></span><span class="sk sk-title"></span><span class="sk sk-line" style="width:55%"></span>
+    <div class="sk-row"><span class="sk sk-ic"></span><span class="sk-lines"><span class="sk sk-line" style="width:72%"></span><span class="sk sk-line" style="width:48%"></span></span></div><div class="sk-row"><span class="sk sk-ic"></span><span class="sk-lines"><span class="sk sk-line" style="width:72%"></span><span class="sk sk-line" style="width:48%"></span></span></div><div class="sk-row"><span class="sk sk-ic"></span><span class="sk-lines"><span class="sk sk-line" style="width:72%"></span><span class="sk sk-line" style="width:48%"></span></span></div><div class="sk-row"><span class="sk sk-ic"></span><span class="sk-lines"><span class="sk sk-line" style="width:72%"></span><span class="sk sk-line" style="width:48%"></span></span></div><div class="sk-row"><span class="sk sk-ic"></span><span class="sk-lines"><span class="sk sk-line" style="width:72%"></span><span class="sk sk-line" style="width:48%"></span></span></div></div></div></main>
 <nav class="tabs" id="tabs" aria-label="Board areas"></nav>
 <div id="reader" role="dialog" aria-modal="true" aria-labelledby="reader-title" hidden></div>
-<div id="toast" role="status" hidden><span id="toast-text"></span><button id="undo" hidden>Undo</button></div>
+<div id="toast" role="status" hidden><span class="tk" aria-hidden="true"><svg class="ok" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><svg class="later" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span id="toast-text"></span><button id="undo" hidden>Undo</button><span class="bar" aria-hidden="true"></span></div>
 <script>
   let state = { decisions: [], answers: {} };
   // An exported copy carries its state and files inline and is read-only.
@@ -1042,7 +1142,19 @@
     return e;
   };
 
-  /** sent runs only once the server saved the request, so a draft is dropped only then. */
+  // Motion and touch: reduced motion makes every wait instant; a haptic tick (Android only) marks a swipe's commit line, a saved answer and an Undo.
+  const calm = matchMedia('(prefers-reduced-motion: reduce)');
+  const pause = (ms) => new Promise((ok) => setTimeout(ok, calm.matches ? 0 : ms));
+  const HAPTIC = { tick: 10, success: [12, 70, 22], undo: [8, 40, 8] };
+  const buzz = (kind) => { try { navigator.vibrate?.(HAPTIC[kind]); } catch {} };
+  // A spring (stiffness 170, damping 17) sampled into a CSS linear() curve, so a pop or a row springing back settles like a physical thing.
+  document.documentElement.style.setProperty('--spring', (() => {
+    const at = [];
+    for (let i = 0, x = 0, v = 0; i <= 600; i++) { if (i % 15 === 0) at.push(+x.toFixed(4)); v += (170 * (1 - x) - 17 * v) / 600; x += v / 600; }
+    return `linear(${at.join(', ')})`;
+  })());
+
+  /** sent runs only once the server saved the request, so a draft is dropped only then; the redraw waits for it (an answer's check plays out before the list comes back). */
   async function call(path, init, sent) {
     const res = await fetch(path, init);
     const body = await res.json().catch(() => ({ error: `The server replied ${res.status}` }));
@@ -1052,7 +1164,7 @@
       loaded = true;
       try { for (const [k, v] of JSON.parse(localStorage.getItem(stored())) ?? []) drafts.set(k, v); } catch {}
     }
-    sent?.();
+    await sent?.();
     render();
   }
 
@@ -1064,7 +1176,7 @@
     return () => controls.forEach((b) => (b.disabled = false));
   }
 
-  async function save(d, o, buttons, err, after) {
+  async function save(d, o, buttons, err, after, land) {
     const unlock = lock(...buttons);
     // An answers-only board takes no comments, and words sent as the answer are the answer itself (a reply item's also go as a comment).
     const typed = state.answers_only || (o.value === 'text' && !d.reply) ? '' : (drafts.get(d.key) ?? '').trim();
@@ -1073,8 +1185,9 @@
     try {
       await call('/api/answers', {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
-      }, () => { forget(d.key); unfolded.delete(d.key); if (!typed) drop(); });
+      }, async () => { forget(d.key); unfolded.delete(d.key); if (!typed) drop(); await land?.(); });
     } catch (e) {
+      buttons.forEach((b) => b.classList.remove('done'));
       shown(err).textContent = `Couldn't save: ${e.message}`;
       return unlock();
     }
@@ -1103,11 +1216,16 @@
   // A redraw or a resize can move the bar under a toast that is already up.
   new ResizeObserver(() => toast.hidden || placeToast()).observe(document.documentElement);
   addEventListener('resize', () => toast.hidden || placeToast());
-  const say = (text, ms, undo) => {
+  // The toast rises on a spring, marked with what happened (ok: a check, later: a clock), and a hairline counts down to when it goes.
+  const say = (text, ms, undo, mark = '') => {
     toastText.textContent = text;
     undoBtn.hidden = !undo;
     undoBtn.disabled = false;
-    undoBtn.onclick = undo;
+    undoBtn.onclick = undo && (() => { buzz('undo'); undo(); });
+    toast.dataset.mark = mark;
+    toast.style.setProperty('--tms', `${ms}ms`);
+    toast.hidden = true;
+    void toast.offsetWidth;
     toast.hidden = false;
     placeToast();
     later(ms);
@@ -1117,15 +1235,19 @@
     const now = answerOf(d.key);
     if (!now) return;
     undoBtn.setAttribute('aria-label', `Undo, ${headline(d)}`);
+    buzz('success');
     say(`Saved: ${now.answer === 'text' ? 'your reply' : now.label}`, 5000, () => {
       undoBtn.disabled = true;
+      // On the Decide list the row comes back in place, with a flash; anywhere else the ask opens again.
+      const list = location.hash === '#waiting';
+      if (list && !before) returned(d.key);
       call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ key: d.key, answer: before?.answer ?? '', note: before?.note ?? '' }) })
         .then(() => {
-          if (!before) location.hash = askHref(d);
+          if (!before && !list) location.hash = askHref(d);
           say(before ? `Back to: ${before.answer === 'text' ? 'your reply' : before.label}` : 'Undone: not answered', 3000);
         }, (e) => say(`Couldn't undo: ${e.message}`, 8000));
-    });
+    }, 'ok');
     // The tap redrew its card and took the focus with it: put it on Undo so the keyboard can reach it in time.
     if (document.activeElement === document.body || !document.activeElement) undoBtn.focus();
   }
@@ -1340,6 +1462,10 @@
     for (const p of document.querySelectorAll('[data-expires]')) {
       if (Date.parse(p.dataset.expires) <= Date.now()) return render();
       p.textContent = expiry(p.dataset.expires);
+    }
+    for (const p of document.querySelectorAll('[data-left]')) {
+      if (Date.parse(p.dataset.left) <= Date.now()) return render();
+      p.textContent = left(p.dataset.left);
     }
   }, 5000);
 
@@ -1684,7 +1810,7 @@
     you: 'M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4.5 20.5c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5' };
   // The drawings are fixed strings from this page, never text from the board file.
   // Small stroke drawings the plan page puts beside a button label or in a section badge; fixed strings from this page.
-  const GLYPHS = { left: '<path d="m15 18-6-6 6-6"/>', right: '<path d="m9 18 6-6-6-6"/>', check: '<path d="M20 6 9 17l-5-5"/>', pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
+  const GLYPHS = { left: '<path d="m15 18-6-6 6-6"/>', more: '<path d="M5 12h.01M12 12h.01M19 12h.01"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', right: '<path d="m9 18 6-6-6-6"/>', check: '<path d="M20 6 9 17l-5-5"/>', pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
     send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.112z"/><path d="m21.854 2.147-10.94 10.939"/>' };
   const glyph = (a) => { const s = el('span', { 'aria-hidden': 'true', style: 'display:inline-flex' }); s.innerHTML = `<svg class="glyph" viewBox="0 0 24 24">${GLYPHS[a]}</svg>`; return s; };
   const icon = (a) => { const s = el('span', { class: `icon i-${a}`, 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[a]}"/></svg>`; return s; };
@@ -2072,7 +2198,7 @@
       saving = true; approve.disabled = change.disabled = true;
       return call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, ...(!screen && { verdict }), ...(screen && { requested: verdict === 'change' }),
         notes, ...(pick.value && { pick: pick.value }) }) }, () => session.drafts.delete(screenKey(selected)))
-        .finally(() => { saving = false; approve.disabled = change.disabled = state.readonly; if (session.open) screenStatus.textContent = screenLine(); });
+        .finally(() => { saving = false; approve.disabled = change.disabled = state.readonly; if (session.open) { screenStatus.textContent = screenLine(); stamp(true); } });
     };
     const approve = el('button', { class: 'open-link' }, 'Approve'), change = el('button', {}, 'Change');
     approve.disabled = change.disabled = state.readonly;
@@ -2093,12 +2219,19 @@
       el('div', { class: 'design-viewer-body' }, stage, el('section', { class: 'design-viewer-panel', 'aria-label': 'Screen review' },
         el('div', { class: 'foot' }, previous, next), screenStatus)));
     const panel = viewer.querySelector('.design-viewer-panel');
+    // An approved screen carries a green check stamp, which springs in as the approval is saved.
+    const stamp = (pop) => {
+      stage.querySelector('.stamp')?.remove();
+      if (currentNote()?.verdict !== 'approve') return;
+      stage.append(el('span', { class: `stamp${pop ? ' pop' : ''}`, 'aria-hidden': 'true' }, glyph('check')));
+      if (pop) buzz('success');
+    };
     const draw = () => {
       const i = screens.indexOf(target());
       heading.textContent = `${target().journey.title} — ${target().screen.title}`;
       count.textContent = `${i + 1} of ${screens.length}`;
       previous.disabled = i === 0; next.disabled = i === screens.length - 1;
-      stage.replaceChildren(previewElement(previewPath())); stage.scrollTop = 0;
+      stage.replaceChildren(previewElement(previewPath())); stage.scrollTop = 0; stamp();
       screenStatus.textContent = screenLine();
       approve.textContent = 'Approve screen'; change.textContent = 'Request change'; err.textContent = '';
     };
@@ -2111,7 +2244,7 @@
     };
     previous.onclick = () => step(-1); next.onclick = () => step(1);
     const key = (e) => {
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); viewer.close(); }
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); shut(); }
       else if (!e.target.closest?.('textarea, input, select') && !e.ctrlKey && !e.metaKey && !e.altKey && ['ArrowLeft', 'ArrowRight'].includes(e.key)) {
         e.preventDefault(); step(e.key === 'ArrowRight' ? 1 : -1);
       }
@@ -2128,7 +2261,9 @@
     open.onclick = () => {
       session.open = true; panel.append(controls); root.append(viewer); draw(); viewer.showModal();
     };
-    close.onclick = () => viewer.close();
+    // A stamp still springing in would hold back the dialog's close event (and the board's redraw), so it lands first.
+    const shut = () => { stage.querySelector('.stamp')?.getAnimations().forEach((a) => a.finish()); viewer.close(); };
+    close.onclick = shut;
     viewer.onclose = () => {
       session.open = false;
       if (boardStale) {
@@ -2696,34 +2831,10 @@
     box.ontoggle = () => (box.open ? opened.add(`#${name}`) : opened.delete(`#${name}`));
     return box;
   }
-  // Waiting on you reads newest first; the viewer may choose oldest first, which stays in this browser (a failed read or write keeps the default).
+  // Decide reads newest first; the viewer may choose oldest first, which stays in this browser (a failed read or write keeps the default).
   const SORT_KEY = 'sign-off-waiting-sort';
-  let waitSort = 'newest', waitType = 'all';
+  let waitSort = 'newest';
   try { if (localStorage.getItem(SORT_KEY) === 'oldest') waitSort = 'oldest'; } catch {}
-  /** The type chips (All, then each type present with its count) and the sort, above Waiting on you. Nothing when nothing waits. */
-  function filters(items) {
-    if (!items.length) return '';
-    const count = (id) => (id === 'all' ? items : items.filter((d) => typeOf(d) === id)).length;
-    const chip = (id, label) => el('button', { 'aria-pressed': String(waitType === id) }, `${label} ${count(id)}`);
-    const chips = ['all', ...Object.keys(TYPE_NAMES).filter((id) => count(id))].map((id) => {
-      const b = chip(id, id === 'all' ? 'All' : TYPE_NAMES[id]);
-      b.onclick = () => { waitType = id; reshow('.chips [aria-pressed="true"]'); };
-      return b;
-    });
-    const sel = el('select', { 'aria-label': 'Sort waiting questions' }, el('option', { value: 'newest' }, 'Newest first'), el('option', { value: 'oldest' }, 'Oldest first'));
-    sel.value = waitSort;
-    sel.onchange = () => { waitSort = sel.value; try { localStorage.setItem(SORT_KEY, waitSort); } catch {} reshow('.sort select'); };
-    return el('div', { class: 'filters' }, el('div', { class: 'chips', role: 'group', 'aria-label': 'Filter by type' }, ...chips), el('label', { class: 'sort' }, 'Sort', sel));
-  }
-  /** The plan is the lead card; the remaining asks are a grouped list linking to a focused decision. */
-  function planCard(d) {
-    const meta = [el('span', {}, icon('list'), plural(d.sections.length, 'section')), el('span', {}, icon('split'), plural(d.decisions.length, 'decision')),
-      el('span', {}, icon('clock'), `Planning agent${d.filed ? `, ${when(d.filed)}` : ''}`)];
-    return el('article', { class: 'plan-hero', id: `item-${d.key}` }, ...(d.guided ? [] : [el('div', { class: 'plan-preview' }, rung(d))]),
-      el('div', { class: 'plan-copy' }, el('p', { class: 'eyebrow' }, icon('plan'), `Plan${d.project ? ` · ${d.project}` : ''}`),
-        el('h2', { dir: 'auto' }, d.title), el('p', { class: 'about', dir: 'auto' }, d.about ?? ''),
-        el('div', { class: 'plan-meta' }, ...meta), el('div', { class: 'plan-actions' }, el('a', { class: 'open-link plan-open', href: `#waiting/${d.key}` }, 'Open plan'), xBtn(d, 'Dismiss'))));
-  }
   // A plain ask is marked by its options, as the design marks a question: a yes or no is a switch, a choice of days is a calendar.
   // ponytail: day names matched in English only; an icon field on the ask would let the agent choose.
   const WHEN = /^(today|tonight|tomorrow|(next|this) (week|month)|(mon|tues|wednes|thurs|fri|satur|sun)day|.*\d)/i;
@@ -2732,17 +2843,183 @@
   /** An update that waits on you says how its linked run went, in plain words. */
   const dateLine = (t = new Date()) => `${t.toLocaleDateString('en-GB', { weekday: 'long' })}, ${t.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}`;
   const badge = (d) => { const r = RESULT[d.evidenceCard?.result]; return r ? el('span', { class: `st ${r[0]}` }, r[1]) : ''; };
-  function waitingPage(items, hidden) {
-    const plans = items.filter((d) => d.type === 'plan'), asks = items.filter((d) => d.type !== 'plan');
-    const rows = asks.map((d) => {
-      const label = `${d.filer || 'Agent'}${d.silent_by ? ` · closes at ${when(d.silent_by)}` : d.filed ? ` · waiting since ${when(d.filed)}` : ''}`;
-      const link = el('a', { class: 'ask-card', id: `item-${d.key}`, href: askHref(d) }, icon(askIcon(d)),
-        el('span', { class: 'copy' }, el('strong', { class: 'title', dir: 'auto' }, title(d)), el('span', { class: 'meta' }, label, badge(d))));
-      return el('li', {}, link, xBtn(d));
+
+  /* Decide: every open ask in one list, grouped Sign in, Answer and Review, with Later at its foot. A row opens its ask.
+     A swipe right answers with the recommended pick, a swipe left moves the ask to Later; past a third of the row it commits, and a fast fling commits sooner. */
+  // Later is this browser's own shelf, kept per board file: the agent still waits, and an answered or gone ask simply drops off it.
+  let shelf;
+  const shelved = () => {
+    if (!shelf) try { shelf = new Set(JSON.parse(localStorage.getItem(`sign-off-later ${state.file}`)) ?? []); } catch { shelf = new Set(); }
+    return shelf;
+  };
+  const shelve = (keys, on) => {
+    keys.forEach((k) => (on ? shelved().add(k) : shelved().delete(k)));
+    try { localStorage.setItem(`sign-off-later ${state.file}`, JSON.stringify([...shelf])); } catch {}
+  };
+  const GROUPS = [['signin', 'Sign in'], ['answer', 'Answer'], ['review', 'Review'], ['later', 'Later']];
+  // A plan or a design is looked over before it is answered, so it is reviewed, never answered from its row.
+  const reviewed = (d) => d.type === 'plan' || d.kind === 'design' || typeOf(d) === 'design';
+  const groupOf = (d) => (shelved().has(d.key) ? 'later' : d.type === 'signin' ? 'signin' : reviewed(d) ? 'review' : 'answer');
+  const recOf = (d) => (d.type === 'signin' || reviewed(d) ? undefined : d.options?.find((o) => o.value === d.recommend_value));
+  const post = (body) => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  // Rows on their way out (answered, or moved to Later) stay drawn where they were while they tint and fold away; a row taken back flashes.
+  const leaving = new Map();
+  let flash = '', risen = false;
+  const returned = (key) => { flash = key; setTimeout(() => flash === key && (flash = ''), 700); };
+  function depart(keys, how, side) {
+    const t = performance.now(), order = decideCtx.all;
+    for (const k of keys) {
+      const d = state.decisions.find((x) => x.key === k), g = groupOf(d), at = order.findIndex((x) => x.key === k);
+      leaving.set(k, { d, how, side, t, group: g, before: order.slice(at + 1).find((x) => groupOf(x) === g && !keys.includes(x.key))?.key });
+    }
+    // Once folded, the rows leave the page for good (and a group left empty loses its head).
+    setTimeout(() => { keys.forEach((k) => leaving.get(k)?.t === t && leaving.delete(k)); if (document.querySelector('.dl-row.leaving')) render(); }, 500);
+  }
+  /** A row: its kind's icon, the question in up to two lines, its time, and the answer it recommends or what it is, with the swipe actions under it. */
+  function decideRow(d, i, gone) {
+    const g = gone?.group ?? groupOf(d), rec = recOf(d), who = d.filer || 'Agent';
+    const sub = d.type === 'signin' ? [`Unlocks: ${d.unlocks}`] : d.type === 'plan' ? [`${plural(d.sections.length, 'section')} · ${plural(d.decisions.length, 'decision')}`]
+      : rec ? ['Recommended ', el('b', {}, rec.label), ` · ${who}`] : [`${d.kind === 'design' ? 'Design' : TYPE_NAMES[typeOf(d)]} · ${who}`];
+    // A sign-in counts down its link; any other ask shows when it was filed.
+    const time = d.type === 'signin' && d.expires ? el('span', { class: 'tm hot', 'data-left': d.expires }, left(d.expires))
+      : d.filed ? el('span', { class: 'tm' }, isToday(d.filed) ? hhmm(d.filed) : day(d.filed)) : '';
+    const face = el('a', { class: 'ask-card dl-face', href: askHref(d), draggable: 'false', ...(!(gone && gone.how === 'later') && { id: `item-${d.key}` }) }, icon(askIcon(d)),
+      el('span', { class: 'copy' }, el('span', { class: 'r1' }, el('strong', { class: 'title', dir: 'auto' }, d.type === 'signin' ? `Sign in to ${d.title}` : title(d)), time), el('span', { class: 'meta sub', dir: 'auto' }, ...sub)));
+    const act = (cls, mark, words) => el('div', { class: `dl-act ${cls}`, 'aria-hidden': 'true' }, glyph(mark), el('span', {}, words));
+    return el('li', { class: `dl-row g-${g}${gone ? ` leaving ${gone.how}` : ''}${flash === d.key ? ' returned' : ''}`, 'data-key': d.key, style: `--n:${i}`, ...(gone?.side && { 'data-side': gone.side }) },
+      rec ? act('yes', 'check', rec.label) : '', act('later', 'clock', g === 'later' ? 'Now' : 'Later'), face);
+  }
+  function decideList(items, hidden) {
+    const rows = new Map(GROUPS.map(([g]) => [g, []]));
+    items.forEach((d, i) => !leaving.has(d.key) || leaving.get(d.key).how === 'later' ? rows.get(groupOf(d)).push(decideRow(d, i)) : '');
+    for (const [k, g] of leaving) {
+      const list = rows.get(g.group), at = list.findIndex((r) => r.dataset.key === g.before && !r.classList.contains('leaving'));
+      list.splice(at < 0 ? list.length : at, 0, decideRow(g.d, 0, g));
+    }
+    const groups = GROUPS.flatMap(([g, name]) => {
+      const list = rows.get(g), n = list.filter((r) => !r.classList.contains('leaving')).length;
+      return list.length ? [el('h2', { class: 'dl-head' }, name, el('span', { class: 'n' }, String(n))), el('ul', { class: 'dl-list', 'aria-label': name }, ...list)] : [];
     });
-    return el('div', { class: 'waiting-page' },
-      ...plans.map(planCard), ...(asks.length ? [el('p', { class: 'pick-label' }, 'ASKS'), el('ul', { class: 'ask-group' }, ...rows)] : []),
-      !items.length ? el('p', { class: 'empty' }, EMPTY.waiting) : '', dismissed(hidden));
+    const fresh = !risen;
+    risen = true;
+    return el('div', { class: `waiting-page decide-list${fresh ? ' rise' : ''}` }, ...groups,
+      items.length ? '' : el('div', { class: 'all-clear-big' }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, 'All clear'), el('p', {}, EMPTY.waiting)), dismissed(hidden));
+  }
+  /** After a redraw, a row on its way out keeps its height for a moment, then folds to nothing; a redraw midway picks up where it was. */
+  function fold() {
+    const now = performance.now();
+    for (const li of document.querySelectorAll('.dl-row.leaving')) {
+      const ago = now - leaving.get(li.dataset.key).t, hold = calm.matches ? 0 : Math.max(0, 200 - ago), run = calm.matches ? 0 : Math.max(0, 220 - Math.max(0, ago - 200));
+      li.style.height = `${li.offsetHeight}px`;
+      void li.offsetHeight;
+      li.style.transition = `height ${run}ms var(--ease) ${hold}ms, opacity ${run}ms linear ${hold}ms`;
+      li.style.height = '0px';
+      li.style.opacity = '0';
+    }
+  }
+  /** Answers each ask with its recommended pick, one after another so the last reply carries every answer; Undo puts back what each had. */
+  async function answerAll(items) {
+    const was = items.map((d) => [d, answerOf(d.key)]);
+    depart(items.map((d) => d.key), 'answered');
+    try {
+      for (const d of items) await call('/api/answers', post({ key: d.key, answer: recOf(d).value, note: drafts.get(d.key) ?? noteOf(d) }));
+    } catch (e) { leaving.clear(); render(); return say(`Couldn't save: ${e.message}`, 8000); }
+    buzz('success');
+    say(`${plural(items.length, 'ask')} answered with the recommended pick`, 6000, async () => {
+      undoBtn.disabled = true;
+      try {
+        for (const [d, before] of was) await call('/api/answers', post({ key: d.key, answer: before?.answer ?? '', note: before?.note ?? '' }));
+        say('Undone: not answered', 3000);
+      } catch (e) { say(`Couldn't undo: ${e.message}`, 8000); }
+    }, 'ok');
+  }
+  /** Moves asks to Later, or back from it, with an Undo. */
+  function toLater(keys, on, side) {
+    if (on) depart(keys, 'later', side);
+    shelve(keys, on);
+    render();
+    fold();
+    say(on ? `${keys.length > 1 ? plural(keys.length, 'ask') : 'Moved'} to Later` : 'Back from Later', 5000, () => { shelve(keys, !on); keys.forEach(returned); render(); say(on ? 'Back from Later' : 'Moved to Later', 3000); }, 'later');
+  }
+  /** One More control: a menu that scales out of its button and closes on a tap anywhere else. */
+  function moreSheet(label, items) {
+    const menu = el('details', { class: 'dl-more' }, el('summary', { 'aria-label': label }, glyph('more')), el('div', { class: 'dl-menu', role: 'menu' },
+      ...items.filter(Boolean).map((item) => {
+        if (item instanceof Node) return item;
+        const [words, fn, act, mark] = item, b = el('button', { role: 'menuitem', 'data-act': act }, el('span', {}, words), mark ? glyph(mark) : '');
+        b.onclick = () => { menu.open = false; fn(); };
+        return b;
+      })));
+    return menu;
+  }
+  addEventListener('click', (e) => document.querySelectorAll('.dl-more[open]').forEach((m) => !m.contains(e.target) && (m.open = false)));
+  function listMore(items) {
+    const answerable = items.filter((d) => groupOf(d) === 'answer' && recOf(d)), now = items.filter((d) => groupOf(d) !== 'later');
+    return moreSheet('More', [answerable.length && ['Answer all recommended', () => answerAll(answerable), 'answer-all'],
+      now.length && ['Move all to Later', () => toLater(now.map((d) => d.key), true), 'later-all', 'clock'],
+      [waitSort === 'newest' ? 'Oldest first' : 'Newest first', () => { waitSort = waitSort === 'newest' ? 'oldest' : 'newest'; try { localStorage.setItem(SORT_KEY, waitSort); } catch {} render(); }, 'sort'],
+      canDismiss() && items.length && ['Select', () => { selecting = true; render(); }, 'select']]);
+  }
+  // The swipe follows the finger; the action under the row grows once it would commit, with a tick on Android.
+  let sw = null, swiped = false;
+  addEventListener('pointerdown', (e) => {
+    const face = !selecting && !state.readonly && !FROZEN && e.isPrimary && e.target.closest?.('.dl-row:not(.leaving) > .dl-face');
+    if (!face) return;
+    face.classList.add('down');
+    sw = { face, row: face.parentElement, x: e.clientX, y: e.clientY, id: e.pointerId, dx: 0, on: false, armed: false, t: e.timeStamp, v: 0, lx: e.clientX };
+  });
+  addEventListener('pointermove', (e) => {
+    if (!sw || e.pointerId !== sw.id) return;
+    const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+    if (!sw.on) {
+      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.3) { sw.on = true; sw.face.classList.remove('down'); sw.row.classList.add('swiping'); }
+      else if (Math.abs(dy) > 10) { sw.face.classList.remove('down'); sw = null; }
+      if (!sw?.on) return;
+    }
+    sw.v = (e.clientX - sw.lx) / Math.max(1, e.timeStamp - sw.t); sw.t = e.timeStamp; sw.lx = e.clientX;
+    // A row with nothing to answer resists a right swipe; past 80% of the width every row rubber-bands.
+    const w = sw.face.clientWidth, can = dx < 0 || !!sw.row.querySelector('.yes');
+    let d = can ? dx : dx * 0.15;
+    if (Math.abs(d) > w * 0.8) d = Math.sign(d) * (w * 0.8 + (Math.abs(d) - w * 0.8) * 0.3);
+    sw.dx = d;
+    sw.face.style.transform = `translateX(${d}px)`;
+    sw.row.dataset.side = d > 0 ? 'yes' : 'later';
+    const armed = can && Math.abs(d) > w * 0.36;
+    if (armed !== sw.armed) { sw.armed = armed; sw.row.classList.toggle('armed', armed); if (armed) buzz('tick'); }
+  });
+  const endSwipe = (e) => {
+    if (!sw || e.pointerId !== sw.id) return;
+    const s = sw;
+    sw = null;
+    s.face.classList.remove('down');
+    if (!s.on) return;
+    swiped = true;
+    setTimeout(() => (swiped = false), 80);
+    const fling = Math.abs(s.v) > 0.6 && Math.sign(s.v) === Math.sign(s.dx) && Math.abs(s.dx) > 40, can = s.dx < 0 || !!s.row.querySelector('.yes');
+    if (e.type === 'pointerup' && can && (s.armed || fling)) return swipeDone(s);
+    // Short of the line, the row springs back.
+    s.face.style.transition = `transform ${calm.matches ? 0 : 420}ms var(--spring)`;
+    s.face.style.transform = '';
+    s.row.classList.remove('armed');
+    setTimeout(() => { s.face.style.transition = ''; s.row.classList.remove('swiping'); }, calm.matches ? 0 : 420);
+  };
+  addEventListener('pointerup', endSwipe);
+  addEventListener('pointercancel', endSwipe);
+  // The tap that ends a drag does not open the row.
+  addEventListener('click', (e) => swiped && e.target.closest?.('.dl-face') && e.preventDefault(), true);
+  /** Past the line the row flies off its side, then folds away; a right swipe saves the recommended pick, a left one shelves the ask. */
+  async function swipeDone(s) {
+    const key = s.row.dataset.key, d = state.decisions.find((x) => x.key === key), yes = s.dx > 0;
+    s.face.style.transition = `transform ${calm.matches ? 0 : 200}ms cubic-bezier(0.2, 0.7, 0.2, 1)`;
+    s.face.style.transform = `translateX(${yes ? '' : '-'}100%)`;
+    await pause(190);
+    if (!yes) return toLater([key], groupOf(d) !== 'later', 'later');
+    const before = answerOf(key);
+    depart([key], 'answered', 'yes');
+    render();
+    fold();
+    call('/api/answers', post({ key, answer: recOf(d).value, note: drafts.get(key) ?? noteOf(d) }), () => forget(key))
+      .then(() => offerUndo(d, before), (e) => { leaving.delete(key); render(); say(`Couldn't save: ${e.message}`, 8000); });
   }
   const selected = new Map();
   /** The bar's "‹ 1 of N ›": steps through the open asks; an end is a dimmed mark, not a link. */
@@ -2751,20 +3028,12 @@
       : el('a', { class: 'step', href: `#decide/${queue[to].key}`, 'aria-label': label }, mark);
     return el('nav', { class: 'pager', 'aria-label': 'Asks' }, step(i - 1, 'Previous ask', glyph('left')), el('span', { class: 'of' }, `${i + 1} of ${queue.length}`), step(i + 1, 'Next ask', glyph('right')));
   };
-  /** Under the actions: the other open asks, then what was answered today; the first opens on Decide, the second only reads. */
   let decideCtx = { all: [], shown: [], hidden: [] };
-  function decideLists(d, queue) {
-    const group = (name, rows) => rows.length ? [el('div', { class: 'sec-head' }, el('h2', {}, name)), el('ul', { class: 'card rows' }, ...rows)] : [];
-    const fresh = state.decisions.filter((x) => isAnswered(x) && isToday(state.answers[x.key].at)).sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at))
-      .map((x) => { const a = state.answers[x.key]; return el('li', {}, el('div', { class: 'compact' }, el('span', { class: 't' }, el('strong', { dir: 'auto' }, title(x)),
-        el('span', { class: 'meta', dir: 'auto' }, `${a.answer === 'text' ? 'Your reply' : a.label} · ${when(a.at)}`)))); });
-    // Everything the Waiting list has: its type chips and sort, plans, the other asks (a design pick opens Designs) with their ×, and Dismissed.
-    const rest = decideCtx.shown.filter((x) => x.key !== d?.key), waiting = state.readonly || !(rest.length || decideCtx.hidden.length) ? '' : [filters(decideCtx.all), waitingPage(rest, decideCtx.hidden)];
-    return el('div', { class: 'decide-lists' }, ...[waiting].flat(), ...group('Answered today', fresh));
-  }
-  function decidePage(d, next, queue = []) {
+  // A phone moves through Decide as a stack: an ask pushes in over the list, and answering it pops back to the list. A desk steps on to the next ask.
+  const phone = () => matchMedia('(max-width: 59.999rem)').matches;
+  function decidePage(d, next) {
     if (!d) return el('p', { class: 'empty' }, EMPTY.waiting);
-    const to = next ? `#decide/${next.key}` : '#waiting', skip = next && !state.readonly ? el('button', { class: 'skip' }, 'Skip for now') : null;
+    const to = next ? `#decide/${next.key}` : '#waiting', skip = next && !state.readonly ? el('button', { class: 'skip', role: 'menuitem' }, 'Skip for now') : null;
     if (skip) skip.onclick = () => (location.hash = to);
     const goNext = next && !state.readonly ? () => (location.hash = to) : null;
     const swipe = (page, right) => {
@@ -2776,10 +3045,12 @@
         if (dx > 0) right?.(); else goNext?.();
       });
     };
+    // One More control holds what is not the answer: the next ask, Ask me later (a swipe left on its row does the same), and Dismiss.
+    const gone = xBtn(d, 'Dismiss');
+    if (gone) { gone.setAttribute('role', 'menuitem'); gone.addEventListener('click', () => (location.hash = to)); }
+    const more = (sends) => (state.readonly ? '' : moreSheet('More', [skip, ['Ask me later', () => { location.hash = '#waiting'; toLater([d.key], true); }, 'later', 'clock'], gone, ...sends]));
     if (d.type === 'signin') {
-      const gone = xBtn(d, 'Dismiss');
-      if (gone) gone.addEventListener('click', () => (location.hash = to));
-      const signinPage = el('div', { class: 'decide' }, row(d, { x: false }), el('div', { class: 'decide-bar' }, moreMenu(headline(d), [skip, el('a', { class: 'later', href: '#waiting' }, 'Later'), gone].filter(Boolean))), decideLists(d, queue));
+      const signinPage = el('div', { class: 'decide' }, row(d, { x: false }), el('div', { class: 'decide-bar' }, more([])));
       if (!state.readonly) swipe(signinPage);
       return signinPage;
     }
@@ -2787,35 +3058,50 @@
     // A pick remembered from an earlier round only counts while the ask still offers it.
     if (!opts.some((o) => o.value === selected.get(d.key))) selected.delete(d.key);
     const initial = selected.get(d.key) ?? d.recommend_value ?? opts[0]?.value;
+    // The answers are cards; the one picked gets a ring and a check that springs in, and the button's label slides to it.
     const optionButtons = opts.map((o) => {
       const recommended = o.value === d.recommend_value, b = el('button', { class: 'pick-option', 'aria-pressed': String(o.value === initial) },
-        el('span', { class: 'words' }, el('span', { class: 'label-line' }, el('span', { class: 'label' }, o.label),
-          recommended ? el('span', { class: 'recommend' }, 'Recommended') : ''), o.outcome ? el('span', { class: 'reason', dir: 'auto' }, o.outcome) : ''), el('span', { class: 'check', 'aria-hidden': 'true' }, glyph('check')));
-      b.onclick = () => { selected.set(d.key, o.value); optionButtons.forEach((btn) => btn.setAttribute('aria-pressed', String(btn === b))); answer.textContent = `Answer ${o.label}`; };
+        el('span', { class: 'check', 'aria-hidden': 'true' }, glyph('check')), el('span', { class: 'words' }, el('span', { class: 'label-line' }, el('span', { class: 'label' }, o.label),
+          recommended ? el('span', { class: 'recommend' }, 'Recommended') : ''), o.outcome ? el('span', { class: 'reason', dir: 'auto' }, o.outcome) : ''));
+      b.onclick = () => {
+        selected.set(d.key, o.value);
+        optionButtons.forEach((btn) => btn.setAttribute('aria-pressed', String(btn === b)));
+        lbl.textContent = `Answer ${o.label}`;
+        lbl.classList.remove('swap');
+        void lbl.offsetWidth;
+        lbl.classList.add('swap');
+      };
       return b;
     });
     const selectedOption = () => opts.find((o) => o.value === (selected.get(d.key) ?? initial));
-    const answer = el('button', { class: 'answer' }, `Answer ${selectedOption()?.label ?? 'now'}`);
-    const answerWith = (o) => save(d, o, [...optionButtons, answer], err, () => (location.hash = to));
+    const lbl = el('span', { class: 'lbl' }, `Answer ${selectedOption()?.label ?? 'now'}`);
+    const answer = el('button', { class: 'answer' }, lbl, el('span', { class: 'okmark', 'aria-hidden': 'true' }, glyph('check')));
+    // On a phone the button turns green and draws a check, then the list comes back with this row folding away.
+    const answerWith = (o) => {
+      if (!phone()) return save(d, o, [...optionButtons, answer], err, () => (location.hash = to));
+      answer.classList.add('done');
+      const held = pause(380);
+      save(d, o, [...optionButtons, answer], err, null, async () => { await held; depart([d.key], 'answered'); location.hash = '#waiting'; });
+    };
     answer.onclick = () => { const o = selectedOption(); if (o) answerWith(o); };
     const recOpt = opts.find((o) => o.value === d.recommend_value);
     const cards = d.mocks?.length && d.options?.length ? mockCards(d, []) : null;
     const hero = cards || d.view ? '' : proofHero(d), preview = hero || (cards ?? (d.view ? rung(d) : proof(d)));
     const quiet = opts.find((o) => o.value === d.default_if_silent);
     const silent = quiet ? [icon('clock'), el('span', {}, el('b', {}, 'If you stay quiet:'), ` ${quiet.outcome ?? quiet.label}${d.silent_by ? ` At ${when(d.silent_by)}. ${left(d.silent_by)}.` : ''}`)] : '';
-    const head = el('div', { class: 'lead' }, badge(d), el('h2', { dir: 'auto' }, headline(d)));
+    const kicker = el('p', { class: 'kicker' }, el('span', { class: 'k' }, TYPE_NAMES[typeOf(d)]), ` · ${d.filer || 'Agent'}${d.filed ? ` · ${when(d.filed)}` : ''}`);
+    const head = el('div', { class: 'lead' }, badge(d), kicker, el('h2', { dir: 'auto' }, headline(d)));
     const why = unchecked(d) || d.why || (d.tradeoff && firstDraft(d).text) || d.about;
-    const back = el('a', { class: 'later', href: '#waiting' }, 'Later'), gone = xBtn(d, 'Dismiss'), sends = [];
-    if (gone) gone.addEventListener('click', () => (location.hash = to));
+    // The other ways to send typed words go into the same More, after the page's own actions.
+    const sends = [];
     const page = el('section', { class: 'decide' }, hero || (preview ? el('div', { class: 'decide-preview' }, preview) : ''),
       ...(d.mocks?.length ? [annotations(d)] : []), head,
       why ? el('p', { class: 'why', dir: 'auto' }, why) : '', firstDraftLinks(d),
-      ...(live && opts.length ? [el('p', { class: 'pick-label' }, typeOf(d) === 'yes-no' ? 'YES OR NO' : 'PICK ONE'),
+      ...(live && opts.length ? [el('p', { class: 'pick-label' }, 'Your answer'),
         el('ul', { class: 'pick-list', 'aria-label': d.title }, ...optionButtons.map((b) => el('li', {}, b)))] : []),
       ...(live ? [el('div', { class: 'decide-other' }, other(d, answerOf(d.key), err, () => (location.hash = to), sends))] : []),
-      err,
-      // The one answer button, and everything else in one More….
-      el('div', { class: 'decide-bar' }, silent ? el('p', { class: 'silent-line' }, ...silent) : '', live && opts.length ? answer : '', moreMenu(headline(d), [skip, back, gone, ...sends].filter(Boolean))), decideLists(d, queue));
+      silent ? el('p', { class: 'silent-line' }, ...silent) : '', err,
+      el('div', { class: 'decide-bar' }, live && opts.length ? answer : '', more(sends)));
     if (live) swipe(page, () => { if (recOpt && !answer.disabled) answerWith(recOpt); });
     return page;
   }
@@ -2852,11 +3138,8 @@
     const byTime = inFileOrder.sort((x, y) => (x.t === y.t ? x.i - y.i : x.t - y.t)).map((x) => x.d);
     const asked = waitSort === 'oldest' ? byTime : byTime.reverse();
     by.waiting = [...asked.filter((d) => d.type === 'signin'), ...asked.filter((d) => d.type !== 'signin')];
-    // A type chip whose asks are all answered or dismissed falls back to All.
-    if (waitType !== 'all' && !by.waiting.some((d) => typeOf(d) === waitType)) waitType = 'all';
-    const shown = waitType === 'all' ? by.waiting : by.waiting.filter((d) => typeOf(d) === waitType);
     const hidden = state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'waiting');
-    decideCtx = { all: by.waiting, shown, hidden };
+    decideCtx = { all: by.waiting, hidden };
     by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
     const [, at, key] = /^#(waiting|decide|designs|evidence|reports|answered)(?:\/([\w.-]+))?$/.exec(location.hash) ?? [];
     const decideQueue = by.waiting.filter((d) => d.type === 'signin' || (d.type !== 'plan' && d.kind !== 'design'));
@@ -2870,35 +3153,41 @@
     document.getElementById('tabs').replaceChildren(...TABS.map(([a, name]) => el('a', { href: `#${a}`, 'aria-label': a ? `${name}, ${count(a)}` : name,
       ...(a === active && { 'aria-current': 'page' }) }, icon(a || 'summary'), name, a === 'waiting' && count(a) ? el('span', { class: 'bd', 'aria-hidden': 'true' }, String(count(a))) : '')));
     const ro = state.readonly ? 'Read only' : FROZEN ? `Read-only copy, ${FROZEN.exported}` : '';
-    const pageTitle = at === 'decide' ? 'Decide' : at === 'reports' ? 'Reports' : AREAS[at];
+    const pageTitle = at === 'decide' || at === 'waiting' ? 'Decide' : at === 'reports' ? 'Reports' : AREAS[at];
     document.body.classList.toggle('today', !at);
     const find = at ? '' : el('button', { class: 'find', 'aria-label': 'Search', 'aria-expanded': String(query !== null) });
     if (find) {
       find.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>';
       find.onclick = () => { query = query === null ? '' : null; render(); document.getElementById('find')?.focus(); };
     }
-    const bulk = { waiting: shown, decide: shown, designs: by.designs, evidence: by.evidence, reports: [...by.reports, ...by.notes], answered: by.answered }[at] ?? [];
-    const top = el('header', { class: 'top' }, at && !TABS.some(([a]) => a === at) ? el('a', { class: 'back', href: at === 'decide' ? '#waiting' : '#' }, at === 'decide' ? '‹ Waiting on you' : '‹ Today') : '',
+    const bulk = { waiting: by.waiting, designs: by.designs, evidence: by.evidence, reports: [...by.reports, ...by.notes], answered: by.answered }[at] ?? [];
+    const top = el('header', { class: 'top' }, at && !TABS.some(([a]) => a === at) ? el('a', { class: 'back', href: at === 'decide' ? '#waiting' : '#' }, at === 'decide' ? '‹ Decide' : '‹ Today') : '',
+    // Decide leads with the date over a large title, and keeps its More at the top right.
+    at === 'waiting' && !state.readonly ? el('p', { class: 'kicker date-kicker' }, dateLine()) : '',
     el('h1', { tabindex: '-1' }, at ? pageTitle : 'Today'), find, at ? '' : el('p', { class: 'date' }, dateLine()),
     ro ? el('p', { class: 'meta' }, ro) : '',
     at === 'decide' && decideAt >= 0 ? pager(decideQueue, decideAt) : '',
-    at === 'waiting' && !state.readonly && by.waiting.length ? el('p', { class: 'lede waiting-lede' }, `${shown.length} ${shown.length === 1 ? 'item needs' : 'items need'} you · ${dateLine()}`)
+    at === 'waiting' && !state.readonly && by.waiting.length ? el('p', { class: 'lede waiting-lede' }, `${by.waiting.length} ${by.waiting.length === 1 ? 'item needs' : 'items need'} you`,
+      by.waiting.some((d) => shelved().has(d.key)) ? ` · ${by.waiting.filter((d) => shelved().has(d.key)).length} for later` : '')
       : at === 'reports' && !state.readonly && by.reports.length ? el('p', { class: 'lede' }, by.reports.some((d) => d.steps)
       ? 'How the tools work, step by step. Tap one to open it.' : 'Explainers you asked for, or that a decision needs.')
       : at === 'answered' && by.answered.length ? el('p', { class: 'lede' }, (() => { const n = by.answered.filter((d) => isToday(state.answers[d.key].at)).length; return `${n} ${n === 1 ? 'answer' : 'answers'} today. Each one has gone back to its agent.`; })())
       : at === 'designs' && by.designs.length ? el('p', { class: 'lede' }, 'Designs to look over. Approve one, or say what should change.')
-      : at === 'evidence' && by.evidence.length ? el('p', { class: 'lede' }, 'Every proof filed, newest first.') : '', at === 'decide' ? '' : bulkBar(bulk));
-    document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [filters(by.waiting), waitingPage(shown, hidden)]
-      : at === 'decide' ? [decideAt < 0 ? (key ? el('p', { class: 'empty' }, 'Nothing to decide for that question.') : el('div', { class: 'decide' }, decideLists(null, decideQueue)))
-        : decidePage(decideQueue[decideAt], decideQueue.length > 1 ? decideQueue[(decideAt + 1) % decideQueue.length] : undefined, decideQueue)]
+      : at === 'evidence' && by.evidence.length ? el('p', { class: 'lede' }, 'Every proof filed, newest first.') : '',
+    at === 'decide' ? '' : at === 'waiting' && !selecting && !state.readonly && !FROZEN ? (by.waiting.length ? listMore(by.waiting) : '') : bulkBar(bulk));
+    const board = document.getElementById('board');
+    board.removeAttribute('aria-busy');
+    board.replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [decideList(by.waiting, hidden)]
+      : at === 'decide' ? [decideAt < 0 ? el('p', { class: 'empty' }, 'Nothing to decide for that question.')
+        : decidePage(decideQueue[decideAt], decideQueue.length > 1 ? decideQueue[(decideAt + 1) % decideQueue.length] : undefined)]
       : at === 'designs' ? [...designGroups(by.designs)] : at === 'evidence' ? [...evidenceList(by.evidence), dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived')] : at === 'reports' && !state.readonly ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
-        ...(by.reports.length ? reportGroups(by.reports) : [el('p', { class: 'empty' }, EMPTY.reports)]), notes(by.notes), dismissed(state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && ['reports', 'notes'].includes(area(d))), 'Archived')] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [at === 'waiting' ? filters(by.waiting) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...(at === 'waiting' ? shown : by[at]).map(row))
+        ...(by.reports.length ? reportGroups(by.reports) : [el('p', { class: 'empty' }, EMPTY.reports)]), notes(by.notes), dismissed(state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && ['reports', 'notes'].includes(area(d))), 'Archived')] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [search(), glance(by),
       el('div', { class: 'tiles' }, tile('waiting', by.waiting.length, 'Need you'), tile('evidence', by.provenToday.length, 'Proven today'), tile('reports', filedToday(by.reports).length, 'New report')),
       el('div', { class: 'areas' }, waitingSection(by.waiting, by.answered, by.designs), proven(by.provenToday, by.provenToday), newReport(by.reports)), ...(state.leash ? leash() : []),
       ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()])]));
     readPage(key ? state.decisions.find((d) => d.key === key && !gone.has(d.key) && (at === 'reports' && reads(d) || at === 'designs' && d.kind === 'design' || at === 'evidence' && d.type === 'evidence' || d.type === 'plan' && (area(d) === at || (d.guided && (at === 'waiting' || at === 'answered'))))) : undefined, at);
-    if (at === 'decide') document.querySelector('#board .decide')?.prepend(bulkBar(bulk));
+    fold();
     applyPicks();
     if (FROZEN) freeze();
   }
@@ -2913,17 +3202,30 @@
   addEventListener('pointerdown', () => delete document.documentElement.dataset.kbd, true);
   // A new screen starts at its top, or at the item tapped on the Summary, with the focus on its title.
   // Closing a report or plan goes back to its card, with the focus on its link; an open report takes the focus on its title.
+  // On a phone an ask pushes in from the right over Decide, and going back (or answering) slides the list in from the left; the list's rows rise in when the tab opens.
+  let lastHash = location.hash;
+  const slide = (dir) => {
+    const b = document.getElementById('board');
+    b.classList.remove('push', 'pop');
+    if (!dir || calm.matches) return;
+    void b.offsetWidth;
+    b.classList.add(dir);
+  };
+  addEventListener('animationend', (e) => /^(push|pop)-in$/.test(e.animationName) && document.getElementById('board').classList.remove('push', 'pop'));
   addEventListener('hashchange', () => {
-    const back = !reader.hidden && reader.dataset.key;
+    const back = !reader.hidden && reader.dataset.key, from = lastHash, ask = /^#decide\//;
+    lastHash = location.hash;
     if (jump && location.hash === '#waiting') jump = null;
-    if (location.hash === '#waiting') waitType = 'all';
+    if (location.hash === '#waiting' && !ask.test(from)) risen = false;
     selecting = false, picked.clear();
     render();
+    slide(ask.test(location.hash) && from === '#waiting' ? 'push' : ask.test(from) && location.hash === '#waiting' ? 'pop' : '');
     if (!reader.hidden) { scrollTo(0, 0); return reader.querySelector('h1').focus({ preventScroll: true }); }
     const item = (jump || back) && document.getElementById(`item-${jump || back}`);
     jump = null;
     item ? item.scrollIntoView() : scrollTo(0, 0);
-    ((back && item?.querySelector('h3 a, .open-link, a.compact')) || document.querySelector('#board h1')).focus({ preventScroll: true });
+    // A Decide row is itself the link back to its page.
+    ((back && (item?.matches('a.dl-face') ? item : item?.querySelector('h3 a, .open-link, a.compact'))) || document.querySelector('#board h1')).focus({ preventScroll: true });
   });
   // An interactive page may post its own height, `{ height: <px> }`, and its frame then fits it with no blank below.
   // Only a frame's own message sizes it. Document readers must fit even long pages; previews stay capped.
