@@ -42,6 +42,7 @@ Open the URL seed-board.sh prints, in a browser; tap an area in the sidebar or t
 7. Icon: `curl -s -o /dev/null -w '%{http_code} %{content_type}\n' BASE{icon.svg,apple-touch-icon.png,manifest.webmanifest}` prints 200 with image/svg+xml, image/png and application/manifest+json; `chrome-devtools-axi eval "() => document.querySelector('link[rel=icon]').href"` ends in /icon.svg.
 8. Look at every capture: no text under the tab bar, nothing cut, the right area marked.
 9. Foundation (type, controls, tab bar): at 390 and 1280, light and dark, eval every visible button, link, summary and select and list any under 44px in either side (must be none); check dark and light give the same padding, margin and gap on `main`, `.top`, `button`, `.row` and `.tabs a`; at 390 scroll Decide until page text sits behind the tab bar and check the bar is 52px with no doubled label.
+   Journey: `FOUNDATION_THEME=dark FOUNDATION_WIDTH=1280 done-done run foundation` writes decide.after.<theme>.<width>w.png/.txt (tab bar, controls under 44px), today.after.* (type sizes) and spacing.*.json per cell; `FOUNDATION_SIDE=before SIGN_OFF_REPO=<built base checkout>` records the base the same way.
 9. Stop the browser session you started; leave the board server, which stops itself.
 
 ## Gotchas
