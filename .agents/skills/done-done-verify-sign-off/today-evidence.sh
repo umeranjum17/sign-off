@@ -51,6 +51,31 @@ for theme in light dark; do
     chrome-devtools-axi screenshot "$out/today-ask.$theme.${vp%%x*}w.png" >/dev/null
   done
 done
+# One claim per crop, each settled and cut to exactly what it shows: the update's capture filling its preview (preview-fill), the one-row verdicts (verdicts),
+# the closed Ask the agent line under the Leash (ask-line), one Evidence card's filled tile (ev-tile) and the two same-headline cards with their telling lines (twins).
+# crop <file> <page> <js list of elements>: open the page, scroll the elements' box to the middle of the screen, let it settle, shoot the viewport and cut out the box.
+crop() {
+  chrome-devtools-axi open "$url$2" >/dev/null
+  chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
+  box=$(chrome-devtools-axi eval "() => { const els = ($3).filter(Boolean), s = els[0].closest('.ev-scroll') ?? document.scrollingElement, top = () => Math.min(...els.map((e) => e.getBoundingClientRect().top)), bottom = () => Math.max(...els.map((e) => e.getBoundingClientRect().bottom));
+    s.scrollBy(0, (top() + bottom() - innerHeight) / 2);
+    return new Promise((ok) => setTimeout(() => { const rs = els.map((e) => e.getBoundingClientRect()), px = 16, py = 6, x = Math.max(0, Math.min(...rs.map((r) => r.left)) - px), y = Math.max(0, top() - py);
+      ok([Math.min(innerWidth, Math.max(...rs.map((r) => r.right)) + px) - x, Math.min(innerHeight, bottom() + py) - y, x, y].map(Math.round).join(' ')); }, 700)); }" | sed -n 's/^result: "\(.*\)"$/\1/p' | tr -d '\\"')
+  set -- "$1" $box
+  chrome-devtools-axi screenshot "$d/whole.png" >/dev/null
+  magick "$d/whole.png" -crop "$2x$3+$4+$5" +repage "$out/$1"
+}
+for theme in light dark; do
+  for vp in 390x844x1,mobile,touch 1280x800x1; do
+    w=${vp%%x*}
+    chrome-devtools-axi emulate --viewport "$vp" --color-scheme "$theme" >/dev/null
+    [ "$w" = 1280 ] && crop "preview-fill.$theme.${w}w.png" '#evidence/update-2' "[document.querySelector('#reader .ev-hero'), document.querySelector('#reader .ev-say')]"
+    crop "verdicts.$theme.${w}w.png" '#evidence/update-2' "[document.querySelector('#reader .ev-ask'), document.querySelector('#reader .ev-verdict .choices')]"
+    crop "ask-line.$theme.${w}w.png" '' "[document.querySelector('.leash'), document.querySelector('details.ask')]"
+    [ "$w" = 390 ] && crop "ev-tile.$theme.${w}w.png" '#evidence' "[document.querySelector('.ev-grid .ev-card')]"
+    crop "twins.$theme.${w}w.png" '#evidence' "[...document.querySelectorAll('.ev-grid .ev-card')].filter((a) => a.querySelector('.also'))"
+  done
+done
 # One claim per capture: the search box narrows Evidence to one card, the 3-day-old proof and then the reposted card, each alone on a phone screen.
 for theme in light dark; do
   chrome-devtools-axi emulate --viewport 390x844x1,mobile,touch --color-scheme "$theme" >/dev/null
@@ -119,6 +144,6 @@ glance=$(chrome-devtools-axi eval '() => document.querySelector(".glance")?.text
 rec=$([ "${TODAY_EVIDENCE_RECORD:-}" != 1 ] || echo ', "On the desk at 1280, point at a Proven today row on Today (its hover tint and quiet x show), click it: Evidence opens with that update selected beside the list", "Click three more rows in the Evidence list: each click changes the selection, its tint and accent bar move, and the selected update slides in from the right"')
 cat > "$out/steps.json" <<JSON
 {"target": {"version": "$(node -p 'require("./package.json").version')"}, "start": "A new board with two passed updates (one filed 3 days ago) and two updates with no run, each with a capture, and one new report",
- "steps": ["Open Today on a phone at 390 and on a desk at 1280 (1024px and wider is the desk layout) in light and dark", "Read the Proven today tile, the glance line and the Proven today row; on the desk, find the latest proof and the new report in a column beside Waiting on you, the asks that wait on you", "Open Evidence on a phone at 390 and on the desk at 1280 in light and dark; on the desk the list is one column, newest first, beside the selected update, the newest when none is picked", "Open the passed update at 390 and 1280: on the desk its capture fills the preview's width from the top of the shot and opens full size on a tap; Pass, Fail and Needs work sit on one row", "Scroll Today to Ask the agent, closed", "Pick muxr in the project filter", "Compare Evidence, which keeps every proof, with the Proven today row, which keeps the passed ones of the last day"$rec],
+ "steps": ["Open Today on a phone at 390 and on a desk at 1280 (1024px and wider is the desk layout) in light and dark", "Read the Proven today tile, the glance line and the Proven today row; on the desk, find the latest proof and the new report in a column beside Waiting on you, the asks that wait on you", "Open Evidence on a phone at 390 and on the desk at 1280 in light and dark; on the desk the list is one column, newest first, beside the selected update, the newest when none is picked", "Open the passed update at 390 and 1280: on the desk its capture fills the preview's width from the top of the shot and opens full size on a tap; Pass, Fail and Needs work sit on one row", "Scroll Today to Ask the agent, closed", "Crop one shot per claim, settled and fully open: the update's capture filling its preview with Open full size, the Pass, Fail and Needs work row, the closed Ask the agent line under the Leash, one Evidence card's tile filled by its capture, and the two Evidence cards with the same headline, each with its own title on a line under it", "Pick muxr in the project filter", "Compare Evidence, which keeps every proof, with the Proven today row, which keeps the passed ones of the last day"$rec],
  "result": "Today counts only the passed updates of the last day; Evidence lists every proof in one list, newest first, with no project or day headings, and its project filter narrows it to one project, including the 3-day-old one, the pull request proof and the plain one; the reposted card is listed once and no dismissal is written. Two cards with the same headline each name what tells them apart (here their own titles). Each Evidence card's capture fills a tile half as tall as it is wide; the update's verdicts take one row of equal buttons; closed, Ask the agent is one line of text with no box. On a desk (1024px and wider, shown at 1280) Today shows the latest proof and the new report beside what waits on you, and Evidence is one list beside the selected update, which a click changes and slides in; on a phone at 390 Today and Evidence keep one column of full-width cards"}
 JSON
