@@ -18,7 +18,7 @@ the arrow keys, or a swipe on the screen.
    `max-width` on the note box shows).
 3. Save one screen's change note through the viewer and check it reaches `answers --json` as a
    screen note; the design then still waits for a design-wide verdict.
-4. On an answers-only board (`"answers_only": true` in the board file, then restart `serve` and delete the board's `.answers.jsonl`), open the viewer at 390 and 1280, type a note with real key events (`type`), and check Approve screen and Request change are enabled, Request change saves the screen note and the status reads "Changes requested". Covered by the `answers-only board takes a screen review` test in `test/design.test.mjs`.
+4. On an answers-only board: `REQUEST_WIDTH=390 done-done run request-change` (and 1280) types a screen note with real key events, checks Request change is enabled, sends it and checks the saved note and the status "Changes requested". Also covered by the `answers-only board takes a screen review` test in `test/design.test.mjs`.
 5. Look at every capture: the screen shows whole with no crop and no inner scroll, the note box
    and the buttons line up, nothing overlaps and no text is cut.
 
