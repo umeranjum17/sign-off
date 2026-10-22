@@ -51,7 +51,7 @@ New guided defaults use plan schema 3 / report schema 4, contract 1, with a requ
 - `"answers_only": true` instead makes an **answers-only board**, also fed by
   another program: the same Summary and area screens, checked every 20 seconds, but the items
   that ask something take answers and replies. There is no Ask box, and
-  **Other answer** has no Another round or comment button; the server refuses rounds, comments
+  **Add a comment** has no Ask for another round or Send without answering; the server refuses rounds, comments
   and prompts with 403. Go deeper on a guided plan or report is an ask for an
   explanation, so it works here. An answer or reply to an item the program dropped
   while the person answered it is still saved. A feeding program writes the
@@ -201,15 +201,18 @@ New guided defaults use plan schema 3 / report schema 4, contract 1, with a requ
   key. The words are the element's text nodes joined with one space, at most 80
   characters. Tag and words are only a safety check, so empty words for a field are
   fine.
-- Every item that asks something has one place to type, folded behind
-  **Other answer** after its buttons (a design's Picks too; a sign-in has none,
+- Every item that asks something has one place to type, folded behind a quiet
+  **Add a comment** right after its buttons (a design's Picks too; a sign-in has none,
   it closes with `signin done`): a short text,
-  500 characters or fewer. **Send reply** saves it as the answer `text` with
-  the words as its `note`; typed before a button is picked, it goes with that
-  answer as its note. On a normal board the same box also asks for
-  **Another round** (not on an evidence update) and sends a comment
-  (**Send as a comment**). An item with an option valued `text` takes the
-  words only as a note: it has no **Send reply**.
+  500 characters or fewer, with the placeholder "Add a note (optional)". Typed
+  before a button is picked, it goes with that answer as its note (the comment),
+  and the card then shows it and reads **Edit comment**. The card keeps one
+  answer button; the box's **More…** (on Decide, the bar's one **More…**, beside Later and Dismiss) holds **Send as my own answer** (saves the
+  answer `text` with the words as its `note`) and, on a normal board,
+  **Ask for another round** (not on an evidence update) and
+  **Send without answering** (a comment). An item with an option valued `text`
+  takes the words only as a note: it has no **Send as my own answer**. A
+  `reply` item with no options sends its reply with **Send reply**.
 - `reply`: optional, `true` lets an item take a text reply with
   `"options": []`, where the reply is the only answer (**Write a reply**); on an
   item with options, the reply also goes to the agent as a comment and stays
@@ -267,7 +270,7 @@ also copies each file into `evidence/<number>/` next to the board:
 {"key":"release-window","answer":"friday","label":"Friday","close":"done","at":"2026-10-12T04:50:32Z","note":"After the Friday stand-up."}
 ```
 
-- `answer` is the picked option's `value`, `label` its label at the time of the click. An **Other answer** is saved as
+- `answer` is the picked option's `value`, `label` its label at the time of the click. An own answer (**Send as my own answer**, or **Send reply** on a reply item) is saved as
   `"answer":"text","label":"Reply"` with the typed words as its `note`.
 - An **Undo** (offered for a few seconds after each tap) is saved as one more line: the answer before the tap, or, when there
   was none, an empty `answer` and `label` (`{"key":"dark-default","answer":"","label":"","close":"done","at":"..."}`), which
