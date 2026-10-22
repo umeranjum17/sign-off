@@ -1,0 +1,181 @@
+{
+ "contract": 1,
+ "kind": "plan",
+ "schema": 3,
+ "key": "engine-harden",
+ "filer": "research-bar",
+ "title": "Keep helpers on pi and stop the open-input hang",
+ "project": "Fleet helpers",
+ "about": "Helpers stay on pi, always start with their input closed, and use a pinned version. Codex CLI is set up as a tested backup.",
+ "understood": [
+  {
+   "label": "You asked",
+   "text": "Apply the engine pick: keep helper jobs reliable on pi, with a backup ready."
+  },
+  {
+   "label": "Done when",
+   "text": "100 helper runs finish with no hang, and one backup run on Codex passes the same job."
+  },
+  {
+   "label": "Facts as of",
+   "text": "21 Oct 2026, from the engine report on this board."
+  }
+ ],
+ "visual": {
+  "type": "steps",
+  "heading": "Three steps make pi safe now and keep a way out",
+  "text": "Each step lands and is proven before the next one starts.",
+  "rows": [
+   {
+    "label": "Close the input",
+    "text": "Start every pi helper with its input closed.",
+    "tone": "ok"
+   },
+   {
+    "label": "Pin the version",
+    "text": "Use one tested pi version; update only on purpose.",
+    "tone": "ok"
+   },
+   {
+    "label": "Ready the backup",
+    "text": "Run the same helper job once on Codex CLI.",
+    "tone": "warn"
+   }
+  ]
+ },
+ "sections": [
+  {
+   "id": "research",
+   "stage": "found",
+   "heading": "The pick rests on 12 engines and outside proof",
+   "body": "The engine report surveyed 12 engines, short-listed 4 on the same 5 points and linked each claim.",
+   "items": [
+    {
+     "title": "Options weighed",
+     "text": "pi, Codex CLI, OpenCode and Goose.",
+     "more": "pi: any model and small, but hangs on an open input (github.com/earendil-works/pi/issues/10415). Codex: mature scripted mode, but other models are a side path (github.com/openai/codex/issues/26234). OpenCode: forced major upgrade and a key leak on 17 Oct (news.ycombinator.com/item?id=50133401). Goose: hooks skip scripted mode (github.com/aaif-goose/goose/issues/12746)."
+    },
+    {
+     "title": "Checked by me",
+     "tone": "bad",
+     "text": "pi 1.0.0 hung with its input open; closing it is the fix.",
+     "more": "Run on 21 Oct 2026 with a 6-second limit; the limit stopped it."
+    }
+   ]
+  },
+  {
+   "id": "scope",
+   "stage": "recommend",
+   "heading": "Scope: how helpers start, not what they do",
+   "body": "**In:** the helper launch command, the pinned version and one backup route. **Out:** main workers, models and prompts.",
+   "items": [
+    {
+     "title": "In scope",
+     "text": "Launch command, version pin, backup route, a 100-run check."
+    },
+    {
+     "title": "Out of scope",
+     "text": "Main workers on Claude Code, model choice, OpenCode 2 trials.",
+     "more": "OpenCode 2 is looked at again on 21 Nov 2026, with the same 5 points."
+    }
+   ]
+  },
+  {
+   "id": "steps",
+   "stage": "recommend",
+   "heading": "Three steps, each proven before the next",
+   "body": "Each step is small and can be undone by one change.",
+   "items": [
+    {
+     "title": "1. Close the input",
+     "text": "Start pi with nothing waiting on its input.",
+     "more": "Change the helper launch line to:\n```\npi -p \"$TASK\" < /dev/null\n```\nProof: the open-input test that hung now ends in under 1 second."
+    },
+    {
+     "title": "2. Pin the version",
+     "text": "Use one tested pi version for every helper.",
+     "more": "Proof: every helper log names the same version for one week.\n- Pin `pi@1.0.0` in the helper image.\n- Update only after reading the change notes."
+    },
+    {
+     "title": "3. Ready the backup",
+     "text": "Run one helper job on Codex CLI.",
+     "more": "Proof: the same job gives the same result; turn off its background service first."
+    }
+   ]
+  },
+  {
+   "id": "risks",
+   "stage": "recommend",
+   "heading": "Three risks, each with a counter",
+   "body": "None blocks the start.",
+   "items": [
+    {
+     "title": "pi changes model silently",
+     "tone": "warn",
+     "text": "Counter: name the model on every helper run.",
+     "more": "Reported in github.com/earendil-works/pi/issues/10623; a named model avoids the stale default."
+    },
+    {
+     "title": "A pinned version misses fixes",
+     "tone": "warn",
+     "text": "Counter: read pi change notes each week."
+    },
+    {
+     "title": "Codex adds a background service",
+     "tone": "warn",
+     "text": "Counter: turn it off for the backup run.",
+     "more": "Reported in news.ycombinator.com/item?id=50060694."
+    }
+   ]
+  }
+ ],
+ "decisions": [
+  {
+   "key": "pin",
+   "question": "Pin pi to one tested version?",
+   "why": "Updates arrive weekly and one changed the model in use.",
+   "options": [
+    {
+     "value": "a",
+     "label": "A: Pin and update on purpose",
+     "outcome": "Helpers stay stable; I read notes weekly."
+    },
+    {
+     "value": "b",
+     "label": "B: Follow each release",
+     "outcome": "Fixes land at once, with surprise changes."
+    }
+   ],
+   "recommend": "a",
+   "reason": "A surprise model change costs more than a week's delay on a fix.",
+   "quiet": "I pin the current tested version."
+  },
+  {
+   "key": "backup",
+   "question": "Set up Codex CLI as the backup now?",
+   "why": "If pi's hang returns, helpers stop with no way out.",
+   "options": [
+    {
+     "value": "a",
+     "label": "A: Yes, one tested run now",
+     "outcome": "A proven backup in about an hour."
+    },
+    {
+     "value": "b",
+     "label": "B: Only if pi fails",
+     "outcome": "No work now, but a slow switch later."
+    }
+   ],
+   "recommend": "a",
+   "reason": "One hour now buys a same-day switch later.",
+   "quiet": "I set up the backup with one run."
+  }
+ ],
+ "next": {
+  "heading": "Press Go ahead and I start step 1",
+  "lines": [
+   "Each step's proof lands on this board as evidence.",
+   "The 100-run check ends the plan."
+  ]
+ }
+}

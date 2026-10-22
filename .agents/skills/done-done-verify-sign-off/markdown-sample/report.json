@@ -1,0 +1,230 @@
+{
+ "contract": 1,
+ "kind": "report",
+ "schema": 4,
+ "key": "engine-pick",
+ "filer": "research-bar",
+ "title": "Keep pi for helper work; Codex is the backup",
+ "filed": "2026-10-21T13:55:03Z",
+ "about": "pi fits small helper jobs best of 12 engines, but it has an open hang you must work around. Codex is the backup if pi breaks.",
+ "group": "Research",
+ "understood": [
+  {
+   "label": "You asked",
+   "text": "Which coding-agent engine should run the fleet's small helper jobs?"
+  },
+  {
+   "label": "Done when",
+   "text": "One pick and one backup, each with reasons and outside proof you can open."
+  },
+  {
+   "label": "Facts as of",
+   "text": "21 Oct 2026. Engines ship weekly, so check again before a switch."
+  }
+ ],
+ "visual": {
+  "type": "tiles",
+  "heading": "Of 4 short-listed engines, pi fits helper jobs best",
+  "text": "Each tile is one short-listed engine and its verdict. The reasons are in the table below.",
+  "rows": [
+   {
+    "label": "pi",
+    "text": "Small, any model, scripted mode. One open hang.",
+    "note": "Pick",
+    "tone": "ok"
+   },
+   {
+    "label": "Codex CLI",
+    "text": "Strong scripted mode. Other models are rough.",
+    "note": "Backup",
+    "tone": "ok"
+   },
+   {
+    "label": "OpenCode",
+    "text": "Major upgrade now, and a key leak on 17 Oct.",
+    "note": "Not now",
+    "tone": "bad"
+   },
+   {
+    "label": "Goose",
+    "text": "Scripted mode misses hooks; smaller field use.",
+    "note": "Not now",
+    "tone": "warn"
+   }
+  ],
+  "details": [
+   {
+    "label": "Engines surveyed",
+    "value": "12, from 9 comparison posts, GitHub and Hacker News"
+   },
+   {
+    "label": "Short-listed",
+    "value": "4: pi, Codex CLI, OpenCode, Goose"
+   },
+   {
+    "label": "Facts true on",
+    "value": "21 Oct 2026"
+   }
+  ]
+ },
+ "sections": [
+  {
+   "id": "field",
+   "stage": "found",
+   "heading": "I looked at 12 engines and cut 8",
+   "body": "A helper job needs any model, a scripted mode with no screen, and an open licence. Each cut misses one of these.",
+   "items": [
+    {
+     "title": "Claude Code: cut",
+     "text": "Anthropic models only, and not open source.",
+     "more": "Checked: the GitHub repository states no licence (github.com/anthropics/claude-code). It stays the right engine for main workers, not for cheap helpers."
+    },
+    {
+     "title": "Gemini CLI: cut",
+     "text": "Built for Gemini models first.",
+     "more": "Reported: comparison posts rank it high for scripted output (kilo.ai/articles/best-cli-coding-agents), but other models are not its main path."
+    },
+    {
+     "title": "Qwen Code: cut",
+     "text": "A Gemini CLI fork tuned for Qwen models.",
+     "more": "Reported: it follows Gemini CLI and adds the Qwen route (github.com/QwenLM/qwen-code)."
+    },
+    {
+     "title": "Aider: cut",
+     "text": "No release since 9 Aug 2025.",
+     "more": "Checked: the last release is v0.86.0 on 9 Aug 2025 and the last push was 22 May 2026 (github.com/Aider-AI/aider/releases)."
+    },
+    {
+     "title": "Crush: cut",
+     "text": "Its licence is not marked open source.",
+     "more": "Checked: GitHub shows no recognised licence for github.com/charmbracelet/crush. I did not read the licence text in full."
+    },
+    {
+     "title": "Amp, Cursor CLI, Droid: cut",
+     "text": "Paid, closed services.",
+     "more": "Reported: each is a paid hosted product (ai.dosa.dev/best/ai-coding-agents-for-terminal). I did not test them."
+    },
+    {
+     "title": "Cline CLI and Kilo: cut",
+     "text": "Editor-first tools with a newer command line.",
+     "more": "Reported: both grew from editor add-ons (kilo.ai/articles/best-cli-coding-agents). I did not test them."
+    }
+   ]
+  },
+  {
+   "id": "compare",
+   "stage": "found",
+   "heading": "The 4 short-listed engines on the same 5 points",
+   "body": "Each option on the same 5 points: **models**, **scripted mode**, **known breaks**, **how the makers answer** and **safety**.",
+   "items": [
+    {
+     "title": "pi: the pick",
+     "tone": "ok",
+     "text": "Pros: any model, small, scripted mode. Cons: one open hang.",
+     "more": "Models: any, through providers.\nScripted: yes, with JSON output (bitdoze.com/opencode-vs-pi-agent).\nBreaks: hangs when its input pipe stays open (github.com/earendil-works/pi/issues/10415).\nMakers: auto-close new issues, then reopen real ones; both are reopened.\nSafety: no leak reported."
+    },
+    {
+     "title": "Codex CLI: the backup",
+     "tone": "ok",
+     "text": "Pros: mature scripted mode. Cons: other models are rough, adds a daemon.",
+     "more": "Models: OpenAI first; others with open gaps (github.com/openai/codex/issues/26234).\nScripted: yes, with JSON output.\nBreaks: exec can hang on a stalled stream (github.com/openai/codex/issues/50775).\nMakers: a maker replied the same day.\nSafety: installs a self-updating background service (news.ycombinator.com/item?id=50060694)."
+    },
+    {
+     "title": "OpenCode: not now",
+     "tone": "bad",
+     "text": "Pros: many features, any model. Cons: forced major upgrade, key leak.",
+     "more": "Models: any.\nScripted: yes.\nBreaks: version 1 now gets only critical fixes (github.com/anomalyco/opencode/issues/57661).\nMakers: a bot answers first.\nSafety: keys saved in its web workspace may have leaked on 17 Oct (news.ycombinator.com/item?id=50133401)."
+    },
+    {
+     "title": "Goose: not now",
+     "tone": "warn",
+     "text": "Pros: open, active. Cons: scripted mode misses hooks.",
+     "more": "Models: any.\nScripted: yes.\nBreaks: hooks do not run in scripted mode with some providers (github.com/aaif-goose/goose/issues/12746).\nMakers: a maintainer explained the cause.\nSafety: no leak reported."
+    }
+   ]
+  },
+  {
+   "id": "checked",
+   "stage": "found",
+   "heading": "What I checked myself",
+   "body": "These I ran or read at the source on 21 Oct 2026.",
+   "items": [
+    {
+     "title": "pi hangs on an open input pipe",
+     "tone": "bad",
+     "text": "`pi 1.0.0` in scripted mode did not finish while its input stayed open.",
+     "more": "I ran pi in scripted mode with its input left open, under a 6-second limit. The limit stopped it, as **issue 10415** says:\n```\ntimeout 6 pi -p \"say hi\"            # input open: stopped at 6 s\npi -p \"say hi\" < /dev/null          # input closed: the work-around\n```\nStarting pi with its input closed is the work-around."
+    },
+    {
+     "title": "Release dates and licences",
+     "text": "Read from GitHub for all 9 open repositories.",
+     "more": "Last releases: pi 15 Oct, Codex 15 Oct, OpenCode 16 Oct, Goose 16 Oct 2026; Aider 9 Aug 2025. Licences: MIT for pi and OpenCode, Apache 2.0 for Codex and Goose."
+    }
+   ]
+  },
+  {
+   "id": "reported",
+   "stage": "found",
+   "heading": "What others report, and what I could not read",
+   "body": "These are claims by others. I opened each link but did not repeat their tests.",
+   "items": [
+    {
+     "title": "pi is lean and saves tokens",
+     "text": "Its author and a 100-hour test say so.",
+     "more": "news.ycombinator.com/item?id=46844822 (173 comments) and composio.dev/blog/pi-vs-opencode. Both favour pi on speed and control and OpenCode on features."
+    },
+    {
+     "title": "OpenCode 2.0 is a big change",
+     "text": "Users like it, but it changes tool names.",
+     "more": "news.ycombinator.com/item?id=50094994 and the upgrade note in github.com/anomalyco/opencode/issues/57661."
+    },
+    {
+     "title": "Could not read Reddit or X",
+     "tone": "warn",
+     "text": "Reddit refused the fetch; X needs a browser login.",
+     "more": "Reddit answered 403 to search. The OpenCode post on X (x.com/opencode) did not load without JavaScript; I used the team's copy on Hacker News instead."
+    }
+   ]
+  },
+  {
+   "id": "pick",
+   "stage": "recommend",
+   "heading": "Keep pi, and fix how we start it",
+   "body": "pi is the pick. Codex CLI is the runner-up if pi's hang is not fixed soon.",
+   "items": [
+    {
+     "title": "Pick: pi",
+     "text": "Any model, the smallest engine, and its makers reopened both bugs.",
+     "more": "The hang has a simple work-around:\n- Always start pi with its input closed (`< /dev/null`).\n- Pin the version.\n- Read the change notes before each update."
+    },
+    {
+     "title": "Runner-up: Codex CLI",
+     "text": "The most mature scripted mode, with fast maker replies.",
+     "more": "It loses first place because other models are a side path with open gaps, and it adds a background service we would have to turn off."
+    },
+    {
+     "title": "Look again on 21 Nov 2026",
+     "text": "OpenCode 2 may settle, and pi may fix issue 10415.",
+     "more": "Re-check the 4 short-listed engines then, with the same 5 points."
+    }
+   ],
+   "details": [
+    {
+     "label": "Pick",
+     "value": "pi 1.x, input closed, version pinned"
+    },
+    {
+     "label": "Runner-up",
+     "value": "Codex CLI, scripted mode"
+    }
+   ]
+  }
+ ],
+ "next": {
+  "heading": "Say if you agree; the plan to apply it follows",
+  "lines": [
+   "If you agree, the plan card asks two small questions on how to apply it.",
+   "Tap any part to ask a question or go deeper."
+  ]
+ }
+}
