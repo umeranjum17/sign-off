@@ -11,7 +11,7 @@ trap stop EXIT
 url=$(grep -o 'http://127.0.0.1:[0-9]*/' "$d/seed.out" | head -1)
 so() { HOME=$d XDG_CONFIG_HOME=$d/.config XDG_DATA_HOME=$d/.local/share XDG_STATE_HOME=$d/.local/state XDG_CACHE_HOME=$d/.cache SIGN_OFF_FILER=verify node "$repo/dist/cli.js" "$@"; }
 sed 's/The sign-in screen fits a phone/Settings page fits a phone/' "$d/evidence-run.json" > "$d/ev2.json"
-sed 's/The sign-in screen fits a phone/Last week passed check/' "$d/evidence-run.json" > "$d/ev3.json"
+node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));j.title=j.run.outcome="Passed check filed 3 days ago";require("fs").writeFileSync(process.argv[2],JSON.stringify(j))' "$d/evidence-run.json" "$d/ev3.json"
 so post "$d/board.json" --kind evidence --from "$d/ev3.json" > /dev/null
 so post "$d/board.json" --kind evidence --from "$d/ev2.json" > /dev/null
 sleep 1; so post "$d/board.json" --type evidence --title "Plan to cap lanes, not run yet" --about "Not run." --media "$d/shot.webp" > /dev/null
@@ -31,33 +31,31 @@ for theme in light dark; do
     chrome-devtools-axi screenshot "$out/$s.$theme.390w.png" >/dev/null
   done
 done
-# One claim per capture: the 3-day-old proof under its own day heading, and the reposted card, each scrolled to the middle of a phone screen.
+# One claim per capture: the search box narrows Evidence to one card, the 3-day-old proof and then the reposted card, each alone on a phone screen.
 for theme in light dark; do
   chrome-devtools-axi emulate --viewport 390x844x1,mobile,touch --color-scheme "$theme" >/dev/null
-  chrome-devtools-axi open "$url#evidence" >/dev/null
-  for shot in "old-proof:update-3" "repost:repost-demo"; do
+  for shot in "old-proof:Passed check filed 3 days ago" "repost:Repost demo"; do
+    chrome-devtools-axi open "$url#evidence" >/dev/null
     chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 600))" >/dev/null
-    chrome-devtools-axi eval "() => { const a = document.querySelector('.ev-card[href=\"#evidence/${shot#*:}\"]'); (a?.closest('.ev-day') ?? document.body).scrollIntoView({ block: 'start' }); window.scrollBy(0, -12); }" >/dev/null
+    chrome-devtools-axi eval "() => { const b = document.getElementById('ev-find'); b.value = '${shot#*:}'; b.dispatchEvent(new Event('input')); }" >/dev/null
     chrome-devtools-axi screenshot "$out/${shot%%:*}.$theme.390w.png" >/dev/null
   done
 done
 num() { chrome-devtools-axi eval "$1" | grep -o '[0-9][0-9]*' | head -1; }
 chrome-devtools-axi open "$url#evidence" >/dev/null; chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
 evcards=$(num '() => document.querySelectorAll(".ev-card").length'); repostcards=$(num '() => [...document.querySelectorAll(".ev-card .t")].filter((t) => t.textContent.startsWith("Repost demo")).length')
+old=$(num '() => [...document.querySelectorAll(".ev-card .t")].filter((t) => t.textContent === "Passed check filed 3 days ago").length')
 muxr=$(num '() => [...document.querySelectorAll(".ev-group")].filter((g) => g.querySelector("h2").textContent === "muxr").reduce((n, g) => n + g.querySelectorAll(".ev-card").length, 0)')
 chrome-devtools-axi open "$url" >/dev/null; chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
 tile=$(num '() => document.querySelector(".tile.i-evidence .n").textContent'); row=$(num '() => document.querySelectorAll(".ev-scroll-row .ev-card").length')
 glance=$(chrome-devtools-axi eval '() => document.querySelector(".glance")?.textContent' | grep -o '[0-9]* updates\? filed' || echo none)
 {
-  echo "version $(node -p 'require("./package.json").version')"
-  echo "evidence_cards_listed=$evcards"
-  echo "repost_cards_listed=$repostcards (posts: 2, second post exit $repost)"
-  echo "muxr_group_cards=$muxr"
-  echo "proven_today_tile=$tile"
-  echo "proven_today_row=$row"
-  echo "glance=$glance"
-  echo "dismissed_log_lines=$(cat "$d/board.dismissed.jsonl" 2>/dev/null | wc -l)"
-  echo "list_full:"; so list "$d/board.json" --full | grep -E '^ *(update|repost|signin)[^,]*,(shown|dismissed)' || true
+  echo "proof cards listed on Evidence: $evcards"
+  echo "proof cards dated 3 days ago listed: $old"
+  echo "cards for the reposted proof listed: $repostcards"
+  echo "muxr pull request proof cards listed: $muxr"
+  echo "Proven today tile: $tile"
+  echo "dismissal log lines written: $(cat "$d/board.dismissed.jsonl" 2>/dev/null | wc -l)"
 } > "$out/counts.txt"
 cat > "$out/steps.json" <<JSON
 {"target": {"version": "$(node -p 'require("./package.json").version')"}, "start": "A new board with two passed updates (one filed 3 days ago) and two updates with no run, each with a capture",
