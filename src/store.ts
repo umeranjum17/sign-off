@@ -444,10 +444,10 @@ export const asks = (d: Decision) => d.type !== 'evidence' && !reading(d) && (d.
 export const reading = (d: Decision) => d.type === 'plan' && !!d.guided && !d.decisions?.length;
 /** A sign-in whose fixed link has expired has nothing left to open: it is not waiting, here or on the board's page (web/index.html lapsed() says the same). A start command makes a new link per tap and never lapses. */
 export const lapsed = (d: Decision) => d.type === 'signin' && !d.start && !!d.expires && Date.parse(d.expires) <= Date.now();
-/** Evidence and reports (nothing to answer) archive on their own this long after they were filed: dismissed, never deleted. */
+/** Reports (nothing to answer) archive on their own this long after they were filed: dismissed, never deleted. Evidence is kept for good: only a dismiss line hides a proof. */
 export const ARCHIVE_MS = 24 * 3_600_000;
 /** Keys hidden now: the last line for each dismissed it, and no answer or round came after it. A torn line is skipped and reported through warn.
- * `items`, when given, adds the archive: evidence and reports filed over a day ago that no log line ever named. Restore writes a line, so a restored item stays. */
+ * `items`, when given, adds the archive: reports filed over a day ago that no log line ever named. Restore writes a line, so a restored item stays. */
 export function readDismissed(decisionsPath: string, answers: Record<string, Answer>, rounds: Round[], warn: (msg: string) => void = () => {}, items: Decision[] = []): string[] {
   const hidden = new Map<string, string>(), named = new Set<string>();
   readRaw(dismissedPath(decisionsPath)).split('\n').forEach((line, n) => {
@@ -460,7 +460,7 @@ export function readDismissed(decisionsPath: string, answers: Record<string, Ans
       warn(`skipped unreadable line ${n + 1} in ${dismissedPath(decisionsPath)}`);
     }
   });
-  const archived = items.filter((d) => !asks(d) && !named.has(d.key) && Date.now() - Date.parse(d.filed ?? '') > ARCHIVE_MS).map((d) => d.key);
+  const archived = items.filter((d) => d.type !== 'evidence' && !asks(d) && !named.has(d.key) && Date.now() - Date.parse(d.filed ?? '') > ARCHIVE_MS).map((d) => d.key);
   return [...[...hidden].filter(([key, at]) => !(answers[key]?.at > at) && !rounds.some((r) => r.key === key && r.at > at)).map(([key]) => key), ...archived];
 }
 

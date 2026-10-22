@@ -185,7 +185,7 @@ without posting.
   `answers` does not count it as waiting; the agent is not told, so an ask it
   waits on keeps waiting, and `answers` still returns a dismissed answer.
   The storage is in [file-formats.md](file-formats.md).
-  Evidence and reports leave the main view by themselves a day after they were filed (nothing is deleted): they wait under **Archived (N)** at the end of Evidence and Reports, and **Restore** brings one back for good. `sign-off-axi dismiss --filer <id>` hides every card of a finished task that still waits.
+  Reports leave the main view by themselves a day after they were filed (nothing is deleted): they wait under **Archived (N)** at the end of Reports, and **Restore** brings one back for good. Evidence is never archived by age: every proof stays on Evidence, in one list, newest first, until it is dismissed. `sign-off-axi dismiss --filer <id>` hides every card of a finished task that still waits.
 
 ## Board, answers, and errors
 
