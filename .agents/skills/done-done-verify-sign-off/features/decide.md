@@ -19,10 +19,11 @@ The Decide tab (`#waiting`) and an ask (`#decide/<key>`) at phone size first, bu
 ## Driving it
 
 1. `npm run build`.
-2. Stills, 390 light and dark, on a fresh seeded board it serves and stops itself: `.agents/skills/done-done-verify-sign-off/decide-shots.sh <folder>` writes decide, decide-item, decide-answered and, on this build, decide-press, decide-swipe-right, decide-swipe-left, decide-menu, decide-item-more, decide-swiped-answer and decide-all-clear (`<state>.<theme>.390w.png`). Run the same script from a base checkout's build into before/: the shared names pair up.
+2. Stills, 390 and 1280 (`DECIDE_WIDTHS`), light and dark, on a fresh seeded board it serves and stops itself: `.agents/skills/done-done-verify-sign-off/decide-shots.sh <folder>` writes decide, decide-item, decide-answered, decide-undo-toast and, on this build, decide-press, decide-swipe-right, decide-swipe-left, decide-menu, decide-item-more, decide-swiped-answer and decide-all-clear (`<state>.<theme>.<width>w.png`) and steps.json. Run the same script from a base checkout's build into before/: the shared names pair up.
 3. Motion: seed a board (`d=$(mktemp -d); url=$(.agents/skills/done-done-verify-sign-off/seed-board.sh "$d" | tail -1)`), then `node .agents/skills/done-done-verify-sign-off/decide-record.mjs "$url" <light|dark> <out.mp4>` (its own headless Chromium; the first board read is held 1.2 s so the skeleton shows), then stop the board as SKILL.md says.
-4. Journeys: `npm run build && node --test --test-global-setup=./test/temp-folder.mjs --test-name-pattern='Decide on a phone|Waiting and Decide' test/design.test.mjs` drives a real finger swipe right (answer, Undo) and left (Later, kept across a reload, back), the push, the check and fold, Undo in place, More's sort and Select, and the plan row.
-5. Look at every still and at frames of each recording (for example `ffmpeg -i decide.light.390w.mp4 -vf fps=1.4,scale=260:-1,tile=9x4 -frames:v 1 sheet.png`).
+4. done-done: `done-done run decide` (in `.done-done.yaml`) runs the stills at 390 and 1280 and the recording into one run folder with its step record, for `done-done check` and the merge card.
+5. Journeys: `npm run build && node --test --test-global-setup=./test/temp-folder.mjs --test-name-pattern='Decide on a phone|Waiting and Decide' test/design.test.mjs` drives a real finger swipe right (answer, Undo) and left (Later, kept across a reload, back), the push, the check and fold, Undo in place, More's sort and Select, and the plan row.
+6. Look at every still and at frames of each recording (for example `ffmpeg -i decide.light.390w.mp4 -vf fps=1.4,scale=260:-1,tile=9x4 -frames:v 1 sheet.png`).
 
 ## Gotchas
 
