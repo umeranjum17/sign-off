@@ -2504,7 +2504,7 @@ test('a long answer at 390 px sits under its long title, which keeps most of the
   proc.kill();
 });
 
-test('Evidence: a card per proof ever filed, in one list, newest first, with a project picker, with its capture as the hero, its result, its time and what it proves; Proven today counts only the passed ones of the last day, and a failed run is on neither; the card opens the update, which shows the whole shot, what ran, who checked it, the change, when, and its verdict; two across at 1440 and nothing squashed at 390', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Evidence: a card per proof ever filed, in one list, newest first, with a project picker, with its capture as the hero, its result, its time and what it proves; Proven today counts only the passed ones of the last day, and a failed run is on neither; the card opens the update, which shows the whole shot, what ran, who checked it, the change, when, and its verdict; at 1440 Today sets the proof beside the asks and Evidence is a list beside the selected update, and nothing squashed at 390', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'updates'), file = join(dir, '.sign-off', 'decisions.json');
   mkdirSync(dir);
   run('init', dir);
@@ -2574,13 +2574,22 @@ test('Evidence: a card per proof ever filed, in one list, newest first, with a p
   await until(async () => (await evaluate('document.querySelector(".glance")?.textContent.includes("3 updates filed.")')) === true);
   assert.equal(await evaluate('document.querySelector(".tile.i-evidence .n").textContent'), '3');
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-scroll-row .ev-card")].map((a) => a.id)'), ['item-update-4', 'item-update-3', 'item-update-2']);
+  // A desk's Today is a dashboard: Proven today and the new report sit in a column right of Waiting on you, its proof stacked as rows.
+  const box = (sel) => `(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { top: r.top, left: r.left, right: r.right, bottom: r.bottom }; })()`;
+  const [asks, proof] = [await evaluate(box('.areas > .i-waiting')), await evaluate(box('.areas > .i-evidence'))];
+  assert.ok(proof.left > asks.right && proof.top === asks.top, 'Proven today sits right of Waiting on you, level with it');
+  const proofRows = await evaluate('[...document.querySelectorAll(".ev-scroll-row .ev-card")].map((a) => { const r = a.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.height)]; })');
+  assert.ok(proofRows.every(([l, t, h], i) => l === proofRows[0][0] && h < 120 && (!i || t > proofRows[i - 1][1])), 'the proof rows stack, each one short');
   await evaluate('location.hash = "#evidence"');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
-  // Cards sit two across in one grid, newest on the left: update 5 and update 4 share the first row, update 3 and update 2 the second.
+  // Evidence on a desk is one list beside the selected update: the cards stack in one column, newest first, and the newest is selected and open beside it.
   const boxes = `[5, 4, 3, 2].map((n) => { const r = document.getElementById(\`item-update-\${n}\`).getBoundingClientRect(); return { n, top: r.top, left: r.left, right: r.right, bottom: r.bottom }; })`;
   const [five, four, three, two] = await evaluate(boxes);
-  assert.ok(five.top === four.top && four.left > five.right, 'the newest pair shares the first row, newest on the left');
-  assert.ok(three.top > five.bottom && three.top === two.top && three.left === five.left, 'the next pair follows directly, with no heading between');
+  assert.ok(four.top >= five.bottom && three.top >= four.bottom && two.top >= three.bottom && [four, three, two].every((b) => b.left === five.left), 'one column, newest first, with no heading between');
+  await until(async () => (await evaluate('document.getElementById("reader").dataset.key')) === 'update-5');
+  assert.deepEqual(await evaluate('[document.body.classList.contains("ev-split"), document.querySelector("main").inert, [...document.querySelectorAll(".ev-card[aria-current]")].map((a) => a.id), document.querySelector(".ev-title").textContent]'),
+    [true, false, ['item-update-5'], 'Sign-in, plain update']);
+  assert.ok((await evaluate(box('#reader'))).left >= five.right, 'the update opens right of the list');
   // Under the title: how many are listed, how many filed today and when the newest came.
   assert.equal(await evaluate('document.querySelector(".top .lede").textContent'), 'Every proof filed, newest first.');
   // No update is an ask, whatever its result: Decide counts none of them and Today says nothing needs you.
@@ -2606,10 +2615,10 @@ test('Evidence: a card per proof ever filed, in one list, newest first, with a p
   writeFileSync(file, JSON.stringify(doc));
   await evaluate('refresh()');
   await evaluate('document.getElementById("item-update-2").click()');
-  await until(async () => (await evaluate('location.hash')) === '#evidence/update-2' && (await evaluate('!!document.querySelector(".ev-item")')));
+  await until(async () => (await evaluate('location.hash')) === '#evidence/update-2' && (await evaluate('document.getElementById("reader").dataset.key')) === 'update-2');
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-verdict")].map((v) => v.textContent)'), []);
   await evaluate('location.hash = "#evidence"');
-  await until(async () => (await evaluate('document.getElementById("reader").hidden')));
+  await until(async () => (await evaluate('document.getElementById("reader").dataset.key')) === 'update-5');
   delete doc.answers_only;
   doc.items[1].options = kept;
   writeFileSync(file, JSON.stringify(doc));
@@ -2617,7 +2626,9 @@ test('Evidence: a card per proof ever filed, in one list, newest first, with a p
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
   // The card opens the update itself: the whole capture, what it proves, then what the check recorded.
   await evaluate('document.getElementById("item-update-4").click()');
-  await until(async () => (await evaluate('location.hash')) === '#evidence/update-4' && (await evaluate('!!document.querySelector(".ev-item")')));
+  await until(async () => (await evaluate('location.hash')) === '#evidence/update-4' && (await evaluate('document.querySelector(".ev-title")?.textContent')) === outcome);
+  // The selection follows the click and the list stays beside the update.
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-card[aria-current]")].map((a) => a.id)'), ['item-update-4']);
   const rows = '[...document.querySelectorAll(".ev-grp .cell")].map((c) => [c.querySelector(".k").textContent, (c.querySelector(".v") ?? c.querySelector(".x")).textContent.trim()])';
   // Checked by is the checker before the proof line's first colon; What ran is the rest of that line.
   assert.deepEqual(await evaluate(rows), [['Result', 'Passed'], ['What ran', 'npm test, phone, 390, passed'], ['Change', 'Pull request 12'],

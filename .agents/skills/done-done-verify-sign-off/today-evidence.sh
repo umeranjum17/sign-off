@@ -27,7 +27,6 @@ for theme in light dark; do
   for vp in 390x1700x1,mobile,touch 1280x1400x1; do
     chrome-devtools-axi emulate --viewport "$vp" --color-scheme "$theme" >/dev/null
     for s in today evidence; do
-      [ "$s" = today ] && [ "${vp%%x*}" = 1280 ] && continue
       chrome-devtools-axi open "$url$([ $s = evidence ] && echo '#evidence')" >/dev/null
       chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
       chrome-devtools-axi screenshot "$out/$s.$theme.${vp%%x*}w.png" >/dev/null
