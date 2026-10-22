@@ -17,6 +17,9 @@
     --text: #1D1D1F; --muted: #6E6E73; --border: #8E8E93; --accent: #0066CC; --action: #0071E3; --on-accent: #FFFFFF; --danger: #C00011; --bezel: #1D1D1F;
     --c-waiting: #0071E3; --c-evidence: #17702F; --c-reports: #A34700; --c-answered: #6E6E73; --c-gate: #8A6100; --ok: #17702F; --warn: #A34700; --badge: #D70015; --faint: #86868B;
     --bg: var(--page); --surface: var(--tile); --seg-on: #FFFFFF; }
+  /* One type scale (28/20/17/16/15/13/12, 32 and 22 on a desk), one 4px spacing grid, one control size per role: 44px for a main action and every tap target, 10px corners. */
+  :root { --t-xl: 1.75rem; --t-l: 1.25rem; --t-m: 1.0625rem; --t-b: 1rem; --t-s: 0.9375rem; --t-xs: 0.8125rem; --t-xxs: 0.75rem; --r-ctl: 0.625rem; --ctl: 2.75rem; }
+  @media (min-width: 60rem) { :root { --t-xl: 2rem; --t-l: 1.375rem; } }
   @media (prefers-color-scheme: dark) { :root {
     --page: #000000; --tile: #161617; --desk: #000000; --desk-tile: #161617; --bar: #161617; --sunk: #2C2C2E; --line: #424245;
     --text: #F5F5F7; --muted: #86868B; --border: #636366; --accent: #2997FF; --danger: #FF6961; --bezel: #424245;
@@ -25,26 +28,26 @@
   /* A phone keeps room at the bottom for the tab bar. */
   /* A phone keeps the text size it was given on every screen, so the tab bar never grows or shrinks. */
   html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-  body { margin: 0; padding-bottom: calc(5rem + env(safe-area-inset-bottom)); background: var(--bg); color: var(--text); overflow-wrap: anywhere;
-    -webkit-font-smoothing: antialiased; font: 1.0625rem/1.4706 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif; letter-spacing: -0.022em; }
+  body { margin: 0; padding-bottom: calc(4.25rem + env(safe-area-inset-bottom)); background: var(--bg); color: var(--text); overflow-wrap: anywhere;
+    -webkit-font-smoothing: antialiased; font: var(--t-b)/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif; letter-spacing: -0.011em; }
   /* The board areas each have a colour, used on icons, dots and marks. */
   .i-waiting { --area: var(--c-waiting); } .i-evidence { --area: var(--c-evidence); } .i-reports { --area: var(--c-reports); } .i-answered { --area: var(--c-answered); }
   main { max-width: 72rem; margin: 0 auto; padding: 0 max(1.25rem, env(safe-area-inset-right)) 0 max(1.25rem, env(safe-area-inset-left)); }
   .side { display: none; }
-  /* A phone moves between areas with a tab bar, solid so no page text shows through it. */
+  /* A phone moves between areas with a tab bar, 52px tall and solid so no page text shows through it as a ghost behind a label. */
   .tabs { position: fixed; z-index: 2; left: 0; right: 0; bottom: 0; display: flex; padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     background: var(--bar); border-top: 0.5px solid var(--line); }
-  .tabs a { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.125rem; min-height: 4rem; color: var(--faint);
+  .tabs a { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.125rem; min-height: 3.25rem; color: var(--faint);
     min-width: 0; font-size: 0.75rem; line-height: 0.875rem; letter-spacing: 0; text-decoration: none; white-space: nowrap; }
   .tabs a[aria-current] { color: var(--accent); }
   /* Decide carries a red count of what waits on you, over its icon's corner. */
   .tabs a { position: relative; }
-  .tabs .bd { position: absolute; top: 0.3125rem; left: calc(50% + 0.4375rem); min-width: 1.125rem; height: 1.125rem; padding: 0 0.3125rem; border-radius: 0.5625rem;
+  .tabs .bd { position: absolute; top: 0.25rem; left: calc(50% + 0.4375rem); min-width: 1.125rem; height: 1.125rem; padding: 0 0.3125rem; border-radius: 0.5625rem;
     background: var(--badge); color: #FFFFFF; font-size: 0.75rem; line-height: 1.125rem; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; }
   .tabs a:focus-visible { outline-offset: -2px; border-radius: 0.75rem; }
   /* The areas' icons in the bar and the sidebar are bare outlines. */
-  .tabs .icon, .side .icon { width: 1.5625rem; height: 1.5625rem; background: none; }
-  .tabs .icon svg, .side .icon svg { width: 1.5625rem; height: 1.5625rem; stroke: currentColor; stroke-width: 1.6; }
+  .tabs .icon, .side .icon { width: 1.375rem; height: 1.375rem; background: none; }
+  .tabs .icon svg, .side .icon svg { width: 1.375rem; height: 1.375rem; stroke: currentColor; stroke-width: 1.6; }
   .side .icon { color: var(--accent); }
   .side .icon, .side .icon svg { width: 1.25rem; height: 1.25rem; } .side .icon svg { stroke-width: 1.75; }
   .banner { margin: 1rem 0 0; padding: 0.75rem 1rem; border: 1px solid var(--danger); border-radius: 0.5rem; color: var(--danger); }
@@ -55,9 +58,9 @@
   .search { margin: 0 0 1rem; } .search[hidden] { display: none; }
   .search input { width: 100%; min-height: 2.75rem; padding: 0 0.875rem; border: 0; border-radius: 0.625rem; background: var(--sunk); color: var(--text); font: inherit; }
   .search .rows { margin-top: 0.75rem; }
-  .top:has(> .find) { padding: 3.5rem 0 1.25rem; } .top:has(> .find) h1 { line-height: 2.5625rem; } .top:has(> .find) .date { margin-top: 0.25rem; line-height: 1.5625rem; }
-  .date { margin: 0.375rem 0 0; color: var(--muted); font-size: 1.0625rem; }
-  .top h1 { margin: 0; font-size: 2.125rem; line-height: 1.2059; font-weight: 700; letter-spacing: 0.011em; outline: none; }
+  .top:has(> .find) { padding: 3.5rem 0 1.25rem; } .top:has(> .find) h1 { line-height: 1.2; } .top:has(> .find) .date { margin-top: 0.25rem; line-height: 1.4; }
+  .date { margin: 0.375rem 0 0; color: var(--muted); font-size: var(--t-s); }
+  .top h1 { margin: 0; font-size: var(--t-xl); line-height: 1.2; font-weight: 700; letter-spacing: -0.022em; outline: none; }
   .lede { margin: 0.375rem 0 0; color: var(--muted); }
   .back, .sec-head a, .more { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--accent); font-weight: 400; text-decoration: none; }
   h2 { font-size: 1.375rem; line-height: 1.25; margin: 0 0 0.75rem; }
@@ -86,7 +89,7 @@
   /* The Leash: one control for how much agents may do without asking, and what the chosen one means below it. */
   .leash { display: flex; flex-direction: column; gap: 0.75rem; padding: 0.875rem 1rem 1rem; border-radius: 0.75rem; }
   .seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--sunk); border-radius: 0.5625rem; padding: 2px; }
-  .seg button { min-height: 2.5rem; border: 0; border-radius: 0.4375rem; background: none; color: var(--text); font: inherit; font-size: 0.9375rem; line-height: 1.2; padding: 0.25rem 0.375rem; }
+  .seg button { min-height: var(--ctl); border: 0; border-radius: 0.4375rem; background: none; color: var(--text); font: inherit; font-size: 0.9375rem; line-height: 1.2; padding: 0.25rem 0.375rem; }
   .seg button[aria-pressed="true"] { background: var(--seg-on); box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04); color: var(--text); font-weight: 600; }
   .seg button[aria-pressed="true"]::before { content: none; }
     .leash-line { margin: 0.5rem 1rem 0; color: var(--muted); font-size: 0.875rem; line-height: 1.1875rem; letter-spacing: -0.01em; }
@@ -103,7 +106,7 @@
   .areas { display: grid; grid-template-columns: minmax(0, 1fr); }
   /* Today's section heads sit 36px under what comes before them (56px on a desk); a head's link keeps a tall tap area without pushing the rows down. */
   .areas .sec-head, .sec-h.leash-h { margin: 2.25rem 0 0.75rem; } .areas h2, .sec-h.leash-h h2 { margin: 0; line-height: 1.75rem; letter-spacing: -0.012em; }
-  .areas .sec-head a { min-height: 0; padding: 0.5rem 0; margin: -0.5rem 0; }
+  .areas .sec-head a { margin: -0.625rem 0; }
   /* The Summary's short lists are grouped inset lists: a filled square in the area's colour, the title and a line under it, then a chevron on a row with no ×, so the title keeps the row. */
   .areas .compact .icon { width: 2rem; height: 2rem; border-radius: 0.5rem; background: var(--area, var(--muted)); } .areas .compact .icon svg { stroke: #FFFFFF; }
   .areas li:not(:has(.x)) .compact::after { content: "" / ""; flex: none; width: 0.5rem; height: 0.5rem; margin-right: 0.5rem; border: solid var(--border); border-width: 2px 2px 0 0; transform: rotate(45deg); }
@@ -340,8 +343,8 @@
   .plan-meta span { display: inline-flex; align-items: center; gap: .375rem; white-space: nowrap; }
   .plan-copy .icon { width: auto; height: auto; border-radius: 0; background: none; } .plan-meta .icon svg { width: 1rem; height: 1rem; stroke: var(--muted); }
   .plan-copy .eyebrow { display: flex; align-items: center; gap: .375rem; } .plan-copy .eyebrow .icon svg { width: 1.125rem; height: 1.125rem; stroke: var(--warn); }
-  .open-link.plan-open { display: inline-flex; justify-content: center; min-height: 3.125rem; padding: 0 1.25rem; font-size: 1.0625rem; font-weight: 400; }
-  @media (min-width: 45rem) { .open-link.plan-open { width: fit-content; min-height: 2.75rem; } }
+  .open-link.plan-open { display: inline-flex; justify-content: center; min-height: var(--ctl); padding: 0 1.25rem; font-size: var(--t-s); font-weight: 600; }
+  @media (min-width: 45rem) { .open-link.plan-open { width: fit-content; } }
   .ask-group { list-style: none; margin: .5rem 0 0; padding: 0 0 0 1rem; overflow: hidden; border-radius: 1rem; background: var(--surface); }
   .ask-group > li { position: relative; display: flex; align-items: center; gap: .75rem; min-height: 4.125rem; padding: .5rem .5rem .5rem 0; }
   .ask-group > li + li { border-top: .5px solid var(--line); }
@@ -482,8 +485,8 @@
   .in-answered .row { background: transparent; box-shadow: none; }
   .in-answered .row h3 { color: var(--muted); font-weight: 500; }
   /* A sign-in: one big Open for its link, off once the link expired. */
-  .open-link { display: grid; place-items: center; min-height: 3.5rem; border-radius: 980px; background: var(--action); color: var(--on-accent);
-    font-size: 1.125rem; font-weight: 700; text-decoration: none; }
+  .open-link { display: grid; place-items: center; min-height: var(--ctl); padding: 0 1rem; border-radius: var(--r-ctl); background: var(--action); color: var(--on-accent);
+    font-size: var(--t-b); font-weight: 600; text-decoration: none; }
   button.open-link:disabled { border: 1px solid var(--line); background: var(--sunk); color: var(--muted); cursor: not-allowed; }
   .signin .line { margin: 0.375rem 0 0; } .signin .expiry { margin: 0.5rem 0 0; font-weight: 700; } .signin .expiry.gone { color: var(--danger); }
   .row h3, .report h3 { font-size: 1.1875rem; font-weight: 650; line-height: 1.3; letter-spacing: -0.005em; margin: 0; }
@@ -542,11 +545,11 @@
     background: var(--text); color: var(--bg); font-size: 1rem; }
   #toast[hidden] { display: none; }
   #toast span { flex: 1; min-width: 0; }
-  #toast button { flex: none; min-height: 3.125rem; padding: 0 0.875rem; background: color-mix(in srgb, currentColor 16%, transparent); color: inherit; font-weight: 600; }
+  #toast button { flex: none; min-height: var(--ctl); padding: 0 0.875rem; background: color-mix(in srgb, currentColor 16%, transparent); color: inherit; font-weight: 600; }
   #toast button:focus-visible { outline-color: var(--bg); }
-  /* Buttons are pills: grey for the plain ones, filled blue once picked, solid grey when off. 50px on a phone, 44px on a desk. */
-  button { min-height: 3.125rem; padding: 0 1.25rem; border: 0; border-radius: 980px; cursor: pointer;
-    background: var(--sunk); color: var(--text); font: inherit; font-weight: 500; }
+  /* Buttons: grey for the plain ones, filled blue once picked, solid grey when off. 44px everywhere, 10px corners. */
+  button { min-height: var(--ctl); padding: 0 1rem; border: 0; border-radius: var(--r-ctl); cursor: pointer;
+    background: var(--sunk); color: var(--text); font: inherit; font-size: var(--t-s); font-weight: 500; }
   /* Recommended is a dashed accent outline and a tag; picked is filled with a check. They never look alike. */
   button.rec { border: 1.5px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
   .tag::before { content: "★ " / ""; }
@@ -714,18 +717,16 @@
     .tabs { display: none; }
     .side { display: flex; flex-direction: column; gap: 0.125rem; position: sticky; top: 0; height: 100vh; padding: 1.25rem 0.75rem;
       border-right: 1px solid var(--line); background: var(--surface); }
-    .side a { display: flex; align-items: center; gap: 0.75rem; min-height: 2.5rem; padding: 0 0.75rem; border-radius: 0.625rem; color: var(--text); text-decoration: none; }
+    .side a { display: flex; align-items: center; gap: 0.75rem; min-height: var(--ctl); padding: 0 0.75rem; border-radius: var(--r-ctl); color: var(--text); text-decoration: none; }
     .side a:hover { background: color-mix(in srgb, var(--sunk) 50%, transparent); }
     .side a[aria-current] { background: var(--sunk); }
     .side .n { margin-left: auto; color: var(--muted); font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
     .brand { display: flex; align-items: center; gap: 0.625rem; margin: 0.25rem 0.75rem 1.25rem; font-weight: 600; }
     .brand .av { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 50%; background: var(--action); color: #FFFFFF; font-size: 0.875rem; }
     .side .foot { margin: auto 0 0; padding: 0.75rem; color: var(--muted); font-size: 0.875rem; line-height: 1.43; }
-    .seg button { min-height: 2.25rem; }
     .top { padding: 3.5rem 0 1.5rem; }
-    .top h1 { font-size: 3rem; line-height: 1.0833; letter-spacing: -0.003em; }
-    button { min-height: 2.75rem; }
-    #toast button { min-height: 2.75rem; }
+    .top h1 { font-size: var(--t-xl); line-height: 1.15; letter-spacing: -0.026em; }
+    #toast button { min-height: var(--ctl); }
     #toast { bottom: 1.75rem; }
     main { width: 100%; padding: 0 3rem; }
     .back { display: none; }
@@ -733,7 +734,7 @@
     .tile { padding: 1.5rem; } .tile .n { font-size: 3rem; line-height: 3.25rem; } .tiles .tile, .glance, .areas .ask-group, .areas .all-clear, .leash { border-radius: 1.125rem; }
     /* Today on a desk: a 60px bar holds the search, the title starts 76px down, and the page keeps a 56px gutter within 1040px. */
     body.today main { max-width: 65rem; margin: 0 auto; padding: 0 3.5rem; }
-    .top:has(> .find) { padding: 4.75rem 0 1.25rem; } .top:has(> .find) h1 { line-height: 3.25rem; } .top:has(> .find) .date { margin-top: 0.5rem; }
+    .top:has(> .find) { padding: 4.75rem 0 1.25rem; } .top:has(> .find) h1 { line-height: 1.15; } .top:has(> .find) .date { margin-top: 0.5rem; }
     .top > .find { top: 0.5rem; right: -1rem; }
     .areas .sec-head, .sec-h.leash-h { margin: 3.5rem 0 1rem; } .areas h2, .sec-h.leash-h h2 { font-size: 1.75rem; line-height: 2rem; }
     .ev-scroll-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin: 0; padding: 0; overflow: visible; }
