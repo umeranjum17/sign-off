@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Evidence keeps every proof and Today's Proven today counts only the passed ones of the last day: seeds a board with two passed updates (one three days old),
-# a repost of one card under its key, a pull request proof with no run and a plain one, captures Today and Evidence at 390 in light and dark,
-# and writes counts.txt (the numbers, as text) and steps.json. Usage, from the repo root after `npm run build`: today-evidence.sh <evidence folder>
+# a repost of one card under its key, a pull request proof with no run and a plain one, captures Today at 390 and Evidence at 390 and 1280 in light and dark,
+# Evidence narrowed to one project with its project filter, and writes counts.txt (the numbers, as text) and steps.json. Usage, from the repo root after `npm run build`: today-evidence.sh <evidence folder>
 set -euo pipefail
 out=$(cd "$1" && pwd) repo=$(pwd) d=$(mktemp -d)
 export CHROME_DEVTOOLS_AXI_SESSION=${CHROME_DEVTOOLS_AXI_SESSION:-today-evidence-$$}
@@ -24,11 +24,14 @@ so post "$d/board.json" --type evidence --title "Chat proof for the muxr pull re
 node -e 'const f=process.argv[1],fs=require("fs"),j=JSON.parse(fs.readFileSync(f)),i=j.items.find((x)=>x.title==="Passed check filed 3 days ago");if(!i)throw new Error("no old item");i.filed=new Date(Date.now()-3*864e5).toISOString();fs.writeFileSync(f,JSON.stringify(j))' "$d/board.json"
 chrome-devtools-axi open "$url" >/dev/null
 for theme in light dark; do
-  chrome-devtools-axi emulate --viewport 390x1700x1,mobile,touch --color-scheme "$theme" >/dev/null
-  for s in today evidence; do
-    chrome-devtools-axi open "$url$([ $s = evidence ] && echo '#evidence')" >/dev/null
-    chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
-    chrome-devtools-axi screenshot "$out/$s.$theme.390w.png" >/dev/null
+  for vp in 390x1700x1,mobile,touch 1280x1400x1; do
+    chrome-devtools-axi emulate --viewport "$vp" --color-scheme "$theme" >/dev/null
+    for s in today evidence; do
+      [ "$s" = today ] && [ "${vp%%x*}" = 1280 ] && continue
+      chrome-devtools-axi open "$url$([ $s = evidence ] && echo '#evidence')" >/dev/null
+      chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
+      chrome-devtools-axi screenshot "$out/$s.$theme.${vp%%x*}w.png" >/dev/null
+    done
   done
 done
 # One claim per capture: the search box narrows Evidence to one card, the 3-day-old proof and then the reposted card, each alone on a phone screen.
@@ -41,11 +44,25 @@ for theme in light dark; do
     chrome-devtools-axi screenshot "$out/${shot%%:*}.$theme.390w.png" >/dev/null
   done
 done
+# The project filter narrows Evidence to the muxr pull request proof; a board with one project has no filter.
+for theme in light dark; do
+  chrome-devtools-axi emulate --viewport 390x844x1,mobile,touch --color-scheme "$theme" >/dev/null
+  chrome-devtools-axi open "$url#evidence" >/dev/null
+  chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 600))" >/dev/null
+  chrome-devtools-axi eval "() => { const b = document.getElementById('ev-find'); b.value = ''; b.dispatchEvent(new Event('input')); const p = document.getElementById('ev-project'); if (p) { p.value = 'muxr'; p.dispatchEvent(new Event('change')); } }" >/dev/null
+  chrome-devtools-axi screenshot "$out/project-filter.$theme.390w.png" >/dev/null
+done
 num() { chrome-devtools-axi eval "$1" | grep -o '[0-9][0-9]*' | head -1; }
-chrome-devtools-axi open "$url#evidence" >/dev/null; chrome-devtools-axi eval "() => { const b = document.getElementById('ev-find'); b.value = ''; b.dispatchEvent(new Event('input')); return new Promise((ok) => setTimeout(ok, 800)); }" >/dev/null
+# The search and the project pick stay while the page is open, so both are cleared before counting.
+chrome-devtools-axi open "$url#evidence" >/dev/null; chrome-devtools-axi eval "() => { const p = document.getElementById('ev-project'); if (p) { p.value = ''; p.dispatchEvent(new Event('change')); } const b = document.getElementById('ev-find'); b.value = ''; b.dispatchEvent(new Event('input')); return new Promise((ok) => setTimeout(ok, 800)); }" >/dev/null
 evcards=$(num '() => document.querySelectorAll(".ev-card").length'); repostcards=$(num '() => [...document.querySelectorAll(".ev-card .t")].filter((t) => t.textContent.startsWith("Repost demo")).length')
 old=$(num '() => [...document.querySelectorAll(".ev-card .t")].filter((t) => t.textContent === "Passed check filed 3 days ago").length')
-muxr=$(num '() => [...document.querySelectorAll(".ev-group")].filter((g) => g.querySelector("h2").textContent === "muxr").reduce((n, g) => n + g.querySelectorAll(".ev-card").length, 0)')
+heads=$(num '() => document.getElementById("ev-find").closest(".search").nextElementSibling.querySelectorAll("h2, h3").length')
+newest=$(chrome-devtools-axi eval '() => fetch("/api/decisions").then((r) => r.json()).then((s) => { const at = Object.fromEntries(s.decisions.map((d) => ["item-" + d.key, Date.parse(d.filed)])); return [...document.querySelectorAll(".ev-card")].every((a, i, all) => !i || at[all[i - 1].id] >= at[a.id]); })' | grep -o 'true\|false' | head -1)
+projects=$(chrome-devtools-axi eval '() => [...document.querySelectorAll("#ev-project option")].map((o) => o.textContent).join(", ") || "none"' | sed -n 's/^result: "\(.*\)"$/\1/p' | sed 's/\\"//g')
+chrome-devtools-axi eval "() => { const p = document.getElementById('ev-project'); if (p) { p.value = 'muxr'; p.dispatchEvent(new Event('change')); } }" >/dev/null
+muxr=$([ "$projects" = none ] && echo "no project filter" || num '() => document.querySelectorAll(".ev-card").length')
+chrome-devtools-axi eval "() => { const p = document.getElementById('ev-project'); if (p) { p.value = ''; p.dispatchEvent(new Event('change')); } }" >/dev/null
 chrome-devtools-axi open "$url" >/dev/null; chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
 tile=$(num '() => document.querySelector(".tile.i-evidence .n").textContent'); row=$(num '() => document.querySelectorAll(".ev-scroll-row .ev-card").length')
 glance=$(chrome-devtools-axi eval '() => document.querySelector(".glance")?.textContent' | grep -o '[0-9]* updates\? filed' || echo none)
@@ -53,12 +70,15 @@ glance=$(chrome-devtools-axi eval '() => document.querySelector(".glance")?.text
   echo "proof cards listed on Evidence: $evcards"
   echo "proof cards dated 3 days ago listed: $old"
   echo "cards for the reposted proof listed: $repostcards"
-  echo "muxr pull request proof cards listed: $muxr"
+  echo "headings inside the Evidence list: $heads"
+  echo "cards in newest-first order: $newest"
+  echo "project filter choices: $projects"
+  echo "cards listed with the muxr project picked: $muxr"
   echo "Proven today tile: $tile"
   echo "dismissal log lines written: $(cat "$d/board.dismissed.jsonl" 2>/dev/null | wc -l)"
 } > "$out/counts.txt"
 cat > "$out/steps.json" <<JSON
 {"target": {"version": "$(node -p 'require("./package.json").version')"}, "start": "A new board with two passed updates (one filed 3 days ago) and two updates with no run, each with a capture",
- "steps": ["Open Today at 390 in light and dark", "Read the Proven today tile, the glance line and the Proven today row", "Open Evidence at 390 in light and dark", "Compare Evidence, which keeps every proof, with the Proven today row, which keeps the passed ones of the last day"],
- "result": "Today counts only the passed updates of the last day; Evidence lists every proof, newest first by project and day, including the 3-day-old one, the pull request proof and the plain one; the reposted card is listed once and no dismissal is written"}
+ "steps": ["Open Today at 390 in light and dark", "Read the Proven today tile, the glance line and the Proven today row", "Open Evidence at 390 and 1280 in light and dark", "Pick muxr in the project filter", "Compare Evidence, which keeps every proof, with the Proven today row, which keeps the passed ones of the last day"],
+ "result": "Today counts only the passed updates of the last day; Evidence lists every proof in one list, newest first, with no project or day headings, and its project filter narrows it to one project, including the 3-day-old one, the pull request proof and the plain one; the reposted card is listed once and no dismissal is written"}
 JSON

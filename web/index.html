@@ -434,11 +434,11 @@
   .decide-bar .dis { flex: none; padding: 0 0.75rem; background: transparent; color: var(--muted); }
   @media (max-width: 59.999rem) { .decide-bar .skip { display: none; } } /* a phone has Answer and Later; a swipe left still skips */
   .ask-group + .gone-asks { margin-top: 1rem; }
-  /* Evidence: a card per update with its capture as the hero, grouped under the project its check names; the whole card opens the update. */
-  .ev-group { display: grid; gap: 0.75rem; margin-top: 1.5rem; }
-  .ev-group + .ev-group { margin-top: 2rem; }
-  .ev-day { display: grid; gap: 0.75rem; } .ev-group > .ev-day + .ev-day { margin-top: 0.75rem; }
-  .ev-day-h { margin: 0; font-size: 0.875rem; line-height: 1.25rem; font-weight: 400; letter-spacing: 0.02em; text-transform: uppercase; color: var(--muted); }
+  /* Evidence: one list of cards, newest first, each with its capture as the hero; the whole card opens the update.
+     The project picker sits quietly beside the search box, as tall as it and in the same sunk fill. */
+  .ev-find { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; } .ev-find input { flex: 1 1 auto; min-width: 0; }
+  .ev-find select { flex: none; max-width: 40%; min-height: 2.75rem; padding: 0 0.75rem; border: 0; border-radius: 0.625rem; background: var(--sunk); color: var(--muted); font: inherit; }
+  .ev-find select.on { color: var(--text); }
   .ev-grid { display: grid; gap: 1.75rem; grid-template-columns: minmax(0, 1fr); }
   .ev-card { display: flex; flex-direction: column; gap: 0.75rem; color: inherit; text-align: left; text-decoration: none; }
   .ev-media { position: relative; display: grid; place-items: end center; aspect-ratio: 16 / 11; padding: 1.5rem 1.5rem 0.75rem; overflow: hidden;
@@ -451,7 +451,6 @@
     background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.8125rem; font-weight: 600; }
   .ev-missing { margin: 0 0 1rem; color: var(--muted); font-size: 0.9375rem; }
   .ev-card .t { font-size: 1.1875rem; font-weight: 600; line-height: 1.32; letter-spacing: -0.012em; }
-  .ev-group h2 { font-size: 1.375rem; line-height: 1.27; font-weight: 700; letter-spacing: -0.012em; }
   .ev-card .m { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; color: var(--muted); font-size: 0.9375rem; }
   .ev-ok, .ev-bad, .ev-warn { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--ok); }
   .ev-bad { color: var(--danger); } .ev-warn { color: var(--warn); } .ev-none { color: var(--muted); }
@@ -759,8 +758,6 @@
     .rows.reports, .sec-h:has(+ .reports), .legend { max-width: 50rem; }
     /* Evidence sets its cards two across, the whole capture on each tile; a page that is not an update keeps the whole width. */
     .ev-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; }
-    .ev-group h2 { font-size: 1.75rem; line-height: 1.15; }
-    .ev-group { margin-top: 2.5rem; } .ev-group + .ev-group { margin-top: 3.5rem; }
     .ev-grid > .row { grid-column: 1 / -1; }
     #reader .ev-scroll { padding: 2rem 3rem 4rem; }
     .ev-grp { border-radius: 1.125rem; }
@@ -1443,27 +1440,27 @@
       el('span', { class: 't', dir: 'auto' }, headline(d)),
       el('span', { class: 'm' }, result ? el('span', { class: `ev-${result[0]}` }, mark(result[0]), result[2]) : el('span', { class: 'ev-none' }, 'Not run'), d.attachments?.length ? el('span', {}, d.attachments.length === 1 ? '1 file' : `${d.attachments.length} files`) : '', d.filed ? el('span', {}, stamp(d.filed)) : ''));
   }
-  /** Evidence as its own screen: every proof ever filed, newest first, grouped under the project its check names (in the order each project first shows;
-   * proof that names no project goes under Other, last) and then by the day it was filed. The search box narrows it by what the card says.
+  /** Evidence as its own screen: one list of every proof ever filed, newest first, each card carrying its own day and time. The search box narrows it by what
+   * the card says; when proof names more than one project, a quiet picker beside it narrows it to one (proof that names no project is Other).
    * An item put in this area that is not an update (a page, a diagram) keeps the card it always had. */
-  let evFind = '';
-  const dayHead = (at) => (isToday(at) ? 'Today' : new Date(at).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }));
-  function evidenceGroups(items) {
+  let evFind = '', evProject = '';
+  function evidenceList(items) {
     if (!items.length) return [el('p', { class: 'empty' }, EMPTY.evidence)];
-    const box = el('input', { type: 'search', id: 'ev-find', 'aria-label': 'Search evidence', placeholder: 'Search evidence', autocomplete: 'off' }), out = el('div', {}), node = (d) => (d.type === 'evidence' ? withX(d, evCard(d)) : row(d));
+    const box = el('input', { type: 'search', id: 'ev-find', 'aria-label': 'Search evidence', placeholder: 'Search evidence', autocomplete: 'off' }), out = el('div', { class: 'ev-grid' }), node = (d) => (d.type === 'evidence' ? withX(d, evCard(d)) : row(d));
+    const projects = [...new Set(items.map(projectOf))].sort((x, y) => (x === '') - (y === '') || x.localeCompare(y));
+    if (!projects.includes(evProject)) evProject = '';
+    const pick = projects.length > 1 ? el('select', { id: 'ev-project', 'aria-label': 'Show one project' }, el('option', { value: '' }, 'All projects'),
+      ...projects.map((g) => el('option', { value: g || '-' }, g || 'Other'))) : '';
     const show = () => {
-      const q = evFind.trim().toLowerCase(), hits = q ? items.filter((d) => `${headline(d)} ${d.title} ${d.about ?? ''} ${projectOf(d)} ${d.evidence?.proof ?? ''}`.toLowerCase().includes(q)) : items;
-      const groups = [...new Set(hits.map(projectOf))].sort((x, y) => (x === '') - (y === ''));
-      out.replaceChildren(...(hits.length ? groups.map((g) => el('section', { class: 'ev-group' }, el('div', { class: 'sec-head' }, el('h2', {}, g || 'Other')),
-        ...[...new Set(hits.filter((d) => projectOf(d) === g).map((d) => (d.filed ? new Date(d.filed).toDateString() : '')))].map((dayKey) => {
-          const of = hits.filter((d) => projectOf(d) === g && (d.filed ? new Date(d.filed).toDateString() : '') === dayKey);
-          return el('div', { class: 'ev-day' }, el('h3', { class: 'ev-day-h' }, of[0].filed ? dayHead(of[0].filed) : 'Undated'), el('div', { class: 'ev-grid' }, ...of.map(node)));
-        }))) : [el('p', { class: 'empty' }, 'Nothing matches.')]));
+      const q = evFind.trim().toLowerCase(), of = evProject ? items.filter((d) => (projectOf(d) || '-') === evProject) : items;
+      const hits = q ? of.filter((d) => `${headline(d)} ${d.title} ${d.about ?? ''} ${projectOf(d)} ${d.evidence?.proof ?? ''}`.toLowerCase().includes(q)) : of;
+      out.replaceChildren(...(hits.length ? hits.map(node) : [el('p', { class: 'empty' }, 'Nothing matches.')]));
     };
     box.value = evFind;
     box.oninput = () => { evFind = box.value; show(); };
+    if (pick) { pick.value = evProject; pick.classList.toggle('on', !!evProject); pick.onchange = () => { evProject = pick.value; pick.classList.toggle('on', !!evProject); show(); }; }
     show();
-    return [el('div', { class: 'search', role: 'search' }, box), out];
+    return [el('div', { class: 'search ev-find', role: 'search' }, box, pick), out];
   }
   /** An update's verdict: one tap per option, marked once it is saved. A read-only board takes none. */
   function verdicts(d) {
@@ -2851,7 +2848,7 @@
     document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [filters(by.waiting), waitingPage(shown, hidden)]
       : at === 'decide' ? [decideAt < 0 ? (key ? el('p', { class: 'empty' }, 'Nothing to decide for that question.') : el('div', { class: 'decide' }, decideLists(null, decideQueue)))
         : decidePage(decideQueue[decideAt], decideQueue.length > 1 ? decideQueue[(decideAt + 1) % decideQueue.length] : undefined, decideQueue)]
-      : at === 'designs' ? [...designGroups(by.designs)] : at === 'evidence' ? [...evidenceGroups(by.evidence), dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived')] : at === 'reports' && !state.readonly ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
+      : at === 'designs' ? [...designGroups(by.designs)] : at === 'evidence' ? [...evidenceList(by.evidence), dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived')] : at === 'reports' && !state.readonly ? [by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
         ...(by.reports.length ? reportGroups(by.reports) : [el('p', { class: 'empty' }, EMPTY.reports)]), notes(by.notes), dismissed(state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && ['reports', 'notes'].includes(area(d))), 'Archived')] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [at === 'waiting' ? filters(by.waiting) : '', by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...(at === 'waiting' ? shown : by[at]).map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [search(), glance(by),
       el('div', { class: 'tiles' }, tile('waiting', by.waiting.length, 'Need you'), tile('evidence', by.provenToday.length, 'Proven today'), tile('reports', filedToday(by.reports).length, 'New report')),

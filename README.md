@@ -49,7 +49,7 @@ Four places, in the bar at the bottom of a phone and the sidebar on a desk.
   <tr>
     <td align="center" width="25%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-today-dark.webp"><img src="docs/media/phone-today.webp" alt="Today: counts of what needs you, what was proven and new reports, then the waiting asks"></picture><br><b>Today</b><br>What needs you, what was proven, what is new.</td>
     <td align="center" width="25%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-decide-dark.webp"><img src="docs/media/phone-decide.webp" alt="Decide: one card per ask that waits on you, filtered by type"></picture><br><b>Decide</b><br>Every ask that waits on you, one tap each.</td>
-    <td align="center" width="25%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-evidence-dark.webp"><img src="docs/media/phone-evidence.webp" alt="Evidence: a capture of the finished work with its result, grouped by project"></picture><br><b>Evidence</b><br>Proof that a change works, with its honest result.</td>
+    <td align="center" width="25%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-evidence-dark.webp"><img src="docs/media/phone-evidence.webp" alt="Evidence: a capture of the finished work with its result, newest first"></picture><br><b>Evidence</b><br>Proof that a change works, with its honest result.</td>
     <td align="center" width="25%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-reports-dark.webp"><img src="docs/media/phone-reports.webp" alt="Reports: explainer pages you asked for"></picture><br><b>Reports</b><br>Explainers you asked for, to read.</td>
   </tr>
 </table>
