@@ -54,11 +54,12 @@ try {
   const same = JSON.stringify(m.spacing) === JSON.stringify(o.spacing);
   browser('emulate', '--viewport', `${width}x${height}x1${width === 390 ? ',mobile,touch' : ''}`, '--color-scheme', theme);
   browser('open', `${url}#evidence`); settle();
-  const evidenceCards = result(browser('eval', `() => JSON.stringify(document.querySelectorAll('.ev-card').length)`));
+  // Evidence lists every proof; the passed ones are what Proven today counts.
+  const [evidenceCards, evidenceAll] = result(browser('eval', `() => JSON.stringify([[...document.querySelectorAll('.ev-card')].filter((c) => /Passed/.test(c.textContent)).length, document.querySelectorAll('.ev-card').length])`));
   const proven = m.tiles.find((t) => t.name === 'Proven today').n;
   const lines = [`glance text ${m.glance}`, `tiles ${m.tiles.map((t) => `${t.name} ${t.n} (count ${t.nSize}, label ${t.nameSize}, ${t.h}px tall)`).join('; ')}`, `tile corner radius ${m.radius}`,
     `section heads ${m.heads.map((h) => `${h.name} ${h.h2} with ${h.above}px above`).join('; ')}`, `report card title ${m.rpTitle}, about ${m.rpAbout}`,
-    `Proven today tile ${proven}, cards in the Proven today row ${m.provenCards}, cards on Evidence ${evidenceCards}`,
+    `Proven today tile ${proven}, cards in the Proven today row ${m.provenCards}, passed cards on Evidence ${evidenceCards} of ${evidenceAll} listed`,
     `spacing in ${theme} equals spacing in ${other}: ${same ? 'yes' : 'no'} (${Object.keys(m.spacing).length} elements)`,
     `controls under 44px ${m.under.length}${m.under.length ? ': ' + m.under.map((x) => `${x.text} ${x.w}x${x.h}`).join(', ') : ''}`, `horizontal overflow ${m.overflowX ? 1 : 0}`];
   writeFileSync(join(out, `${name}.txt`), `${side} ${theme} ${width}w today\n${lines.join('\n')}\n`);
