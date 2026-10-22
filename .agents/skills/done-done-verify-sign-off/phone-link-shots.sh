@@ -71,8 +71,8 @@ case "$part ${PHONE_WIDTH:-both}" in
     result="On a phone, the comparison table reads at 16 px, each point listing every option, with nothing off the screen." ;;
   "table 1280") steps='"The board is opened at 1280 px wide, a desk.", "The report is opened at its comparison table of 4 options on 5 points."'
     result="On a desk, the comparison table is one table of 5 columns, each option across, at 13 px." ;;
-  *) steps='"The board is opened at 390 and 1280 px wide.", "The update capture is tapped and the comparison table read."'
-    result="On a phone the capture stays on the board and the table reads at 16 px; on a desk the capture opens the raw image in a new tab and the table is 5 columns." ;;
+  *) steps='"The board is opened at 390 px wide, a phone, and at 1280 px wide, a desk.", "The update whose capture is a desktop image of a report is opened and its capture is tapped; the report is opened at its comparison table."'
+    result="On a phone, tapping a capture keeps the person on the board's live view instead of opening the raw desktop image, and the comparison table reads at 16 px; on a desk the capture still opens its own image file and the table is 5 columns." ;;
 esac
 cat > "$out/steps.json" <<J
 {"target": {"version": "$("$node" -p 'require(process.argv[1]).version' "$repo/package.json")"},
