@@ -331,7 +331,7 @@ export const SCREENS_ONLY = 'screens';
 export const awaitsVerdict = (type: string | undefined, a?: { answer?: string }) => !a || (type === 'design' && a.answer === SCREENS_ONLY);
 const DESIGN_LABEL: Record<string, string> = { approve: 'Approved', change: 'Changes requested', [SCREENS_ONLY]: 'Screens reviewed' };
 
-/** Saves a design answer with screen-specific notes and an optional listed direction pick. A screen save omits the verdict: the design keeps its saved verdict, a change on a screen of an approved design sets it to change, and with none yet it waits as screens-only. */
+/** Saves a design answer with screen-specific notes and an optional listed direction pick. A screen save omits the verdict: the design keeps its saved verdict, a requested change on a screen sets it to change, and any other screen save with none yet waits as screens-only. */
 export function appendDesignAnswer(decisionsPath: string, d: Decision, verdict: unknown, notes: unknown, pick?: unknown, requested?: unknown): Answer | undefined {
   const bad = (rule: string) => new InputError(`key ${d.key}: ${rule}`);
   if (verdict !== undefined && verdict !== 'approve' && verdict !== 'change') throw bad('verdict must be approve or change, or omitted to save a screen');
@@ -352,7 +352,7 @@ export function appendDesignAnswer(decisionsPath: string, d: Decision, verdict: 
   if (pick !== undefined ? !options.some(o => o.value === pick) : verdict !== undefined && options.length > 0) throw bad('pick must be one listed option, and a design verdict needs one when options were offered');
   const current = readAnswers(decisionsPath)[d.key];
   const decided = current?.answer === 'approve' || current?.answer === 'change' ? current.answer : undefined;
-  const kept = (verdict ?? (decided === 'approve' && requested === true ? 'change' : decided ?? SCREENS_ONLY)) as string;
+  const kept = (verdict ?? (requested === true ? 'change' : decided ?? SCREENS_ONLY)) as string;
   const keptPick = (pick ?? (options.some(o => o.value === current?.pick) ? current?.pick : undefined)) as string | undefined;
   const answer: Answer = { key: d.key, answer: kept, label: DESIGN_LABEL[kept], close: d.close ?? 'done', at: now(), notes, ...(keptPick !== undefined && { pick: keptPick }) };
   if (current?.answer === answer.answer && JSON.stringify([current.notes, current.pick]) === JSON.stringify([answer.notes, answer.pick])) return;

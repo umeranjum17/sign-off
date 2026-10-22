@@ -1,6 +1,7 @@
 // A screen note typed in the full-screen design viewer on an answers-only (fed) board, then Request change sent: one width per run.
 // Usage: node .agents/skills/done-done-verify-sign-off/request-change-shots.mjs <output> [light|dark]
-// REQUEST_WIDTH=390 or 1280 (default 390). Saves note-typed.<width>w.png, change-sent.<width>w.png and request-change.<width>w.txt (numbers: note length, button disabled, notes saved).
+// REQUEST_WIDTH=390 or 1280 (default 390). Saves change-sent.<width>w.png, card-answered.<width>w.png (the design page after Close) and request-change.<width>w.txt (numbers: note length, button disabled, notes saved, the design's answer).
+// Only result captures go in the run folder: the typed-note step is checked by numbers, not shot.
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
@@ -24,7 +25,7 @@ let server;
 try {
   cpSync(join(repo, 'fixtures/contract/design.v1/design'), join(dir, 'design'), { recursive: true });
   cpSync(join(repo, 'docs/media/phone-light.webp'), join(dir, 'design/preview.webp'));
-  const message = readFileSync(join(repo, 'fixtures/contract/design.v1/valid-basic.json'), 'utf8').replace('design/preview.png', 'design/preview.webp');
+  const message = readFileSync(join(repo, 'fixtures/contract/design.v1/valid-basic.json'), 'utf8').replace('design/preview.png', 'design/preview.webp').replace('design/welcome.png', 'design/preview.webp'); // a real phone screen, not the blank fixture
   writeFileSync(join(dir, 'design-message.json'), message);
   run(process.execPath, [join(repo, 'dist/cli.js'), 'post', board, '--kind', 'design', '--from', join(dir, 'design-message.json')], { env });
   // The feeding program's board: it takes answers only, which is how the live board is fed.
@@ -39,17 +40,19 @@ try {
   const before = read(state);
   browser('type', 'Make the title clearer'); // real key events into the focused note
   const typed = read(state);
-  browser('screenshot', join(out, `note-typed.${width}w.png`));
   browser('eval', `() => { [...document.querySelectorAll('.design-viewer .foot button')].find((x) => x.textContent === 'Request change').click(); return 1; }`);
   browser('eval', `() => new Promise((r) => setTimeout(r, 1500))`);
   const sent = read(state);
   browser('screenshot', join(out, `change-sent.${width}w.png`));
-  const notes = JSON.parse(run(process.execPath, [join(repo, 'dist/cli.js'), 'answers', board, '--json'], { env }))[key].notes;
-  writeFileSync(join(out, `request-change.${width}w.txt`), `width ${width}\nRequest change disabled before typing ${+before.requestChangeDisabled}\nnote length typed ${typed.noteLength}\nRequest change disabled after typing ${+typed.requestChangeDisabled}\nstatus after Request change ${sent.status}\nnotes saved ${notes.length}\nsaved verdict ${notes[0]?.verdict}\n`);
-  assert.deepEqual([typed.requestChangeDisabled, typed.noteLength, sent.status, notes.length, notes[0].verdict], [false, 22, 'Changes requested', 1, 'change'], JSON.stringify({ before, typed, sent, notes }));
+  browser('eval', `() => { document.querySelector('[aria-label="Close viewer"]').click(); return new Promise((r) => setTimeout(() => r(1), 1000)); }`);
+  const card = read(`() => JSON.stringify(document.querySelector('.design-review [role=status]').textContent)`);
+  browser('screenshot', join(out, `card-answered.${width}w.png`));
+  const saved = JSON.parse(run(process.execPath, [join(repo, 'dist/cli.js'), 'answers', board, '--json'], { env }))[key], notes = saved.notes;
+  writeFileSync(join(out, `request-change.${width}w.txt`), `width ${width}\nRequest change disabled before typing ${+before.requestChangeDisabled}\nnote length typed ${typed.noteLength}\nRequest change disabled after typing ${+typed.requestChangeDisabled}\nstatus after Request change ${sent.status}\nnotes saved ${notes.length}\nsaved verdict ${notes[0]?.verdict}\ndesign answer ${saved.answer} (${saved.label})\ndesign page status after Close ${card}\n`);
+  assert.deepEqual([typed.requestChangeDisabled, typed.noteLength, sent.status, notes.length, notes[0].verdict, saved.answer, card], [false, 22, 'Changes requested', 1, 'change', 'change', 'Changes requested'], JSON.stringify({ before, typed, sent, saved, card }));
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board, fed by another program (answers only), holding one design with a screen to review.',
-    steps: [`The board is opened at ${width} px wide on the design.`, 'The person taps Review full screen, taps the screen note and types a note.', 'The person taps Request change.'],
-    result: `At ${width} px Request change is enabled after typing, one change note is saved, and the screen reads Changes requested.` }, null, 2) + '\n');
+    steps: [`The board is opened at ${width} px wide on the design.`, 'The person taps Review full screen, taps the screen note and types a note.', 'The person taps Request change.', 'The person taps Close.'],
+    result: `At ${width} px Request change is enabled after typing, one change note is saved, the screen reads Changes requested, and the design itself is answered Changes requested.` }, null, 2) + '\n');
 } finally {
   server?.kill();
   try { browser('stop'); } catch {}

@@ -16,9 +16,12 @@ the arrow keys, or a swipe on the screen.
    the screen note box and the buttons under it must have the same left and right edge
    (`aligned: true`), and all three widths are in the run (the pad width is where a fixed
    `max-width` on the note box shows).
-3. Save one screen's change note through the viewer and check it reaches `answers --json` as a
-   screen note; the design then still waits for a design-wide verdict.
-4. On an answers-only board: `REQUEST_WIDTH=390 done-done run request-change` (and 1280) types a screen note with real key events, checks Request change is enabled, sends it and checks the saved note and the status "Changes requested". Also covered by the `answers-only board takes a screen review` test in `test/design.test.mjs`.
+3. Approve one screen through the viewer: `answers --json` holds it as a screen note and the design
+   still waits ("Screens reviewed"). Then Request change on another screen: the design's answer is
+   `change` ("Changes requested"), it leaves waiting, and the review page reads Changes requested
+   after Close. Covered at 390 by the `viewer Request change answers it as Changes requested` test
+   in `test/design.test.mjs`.
+4. On an answers-only board: `REQUEST_WIDTH=390 done-done run request-change` (and 1280) types a screen note with real key events, checks Request change is enabled, sends it and checks the saved note, the status "Changes requested", and after Close the design answered Changes requested (card-answered.<width>w.png). Also covered by the `answers-only board takes a screen review` test in `test/design.test.mjs`.
 5. Look at every capture: the screen shows whole with no crop and no inner scroll, the note box
    and the buttons line up, nothing overlaps and no text is cut.
 
