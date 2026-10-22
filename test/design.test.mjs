@@ -551,7 +551,9 @@ async function browse(_dir, width = 800, height = 4000, mobile = false) {
     await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [to] });
     await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   };
-  return { evaluate, click, tap, swipe, close: () => call('Target.disposeBrowserContext', { browserContextId }).catch(() => {}) };
+  // Text typed as a phone's keyboard does: the browser fires beforeinput and input on the focused field, as an IME commit does.
+  const insertText = (text) => send('Input.insertText', { text });
+  return { evaluate, click, tap, swipe, insertText, close: () => call('Target.disposeBrowserContext', { browserContextId }).catch(() => {}) };
 }
 
 test('an interactive page that posts its height gets a frame that fits it, each frame only its own and never past 10000px; a design shows the recommended phone frame first', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
@@ -1779,6 +1781,36 @@ test('a design without journey screens accepts a design-level change note', { sk
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
   await until(async () => (await evaluate('document.querySelector(".designs .when")?.textContent')).startsWith('Changes requested'));
   assert.match(await evaluate('document.querySelector(".designs")?.textContent'), /Clarify the overall hierarchy/);
+  close();
+  proc.kill();
+});
+
+test('an answers-only board takes a screen review: typing a note in the viewer enables Request change, and a tap sends it', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'answers-only-viewer'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), png);
+  writeFileSync(join(dir, 'design', 'a.png'), png);
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd3-fed', title: 'Review the fed screen', about: 'A program feeds this board.', group: 'Sign-in',
+    filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
+    journeys: [{ id: 'flow', title: 'Flow', screens: [{ id: 'a', title: 'First', views: { phone_light: 'design/a.png' } }] }] };
+  writeFileSync(source, JSON.stringify(message));
+  assert.equal(run('post', file, '--kind', 'design', '--from', source).code, 0);
+  writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, 'utf8')), answers_only: true }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1], { evaluate, tap, insertText, close } = await browse(join(dir, 'browser'), 390, 844, true);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d3-fed`)}`);
+  await until(async () => (await evaluate('document.querySelector("[aria-haspopup=dialog]")?.textContent')) === 'Review full screen');
+  await evaluate('document.querySelector("[aria-haspopup=dialog]").click()');
+  await until(() => evaluate('!!document.querySelector(".design-viewer[open]")'));
+  const centre = (label) => evaluate(`(() => { const r = [...document.querySelectorAll(".design-viewer .foot button")].find((b) => b.textContent === ${JSON.stringify(label)}).getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`);
+  await evaluate('document.querySelector(".design-viewer textarea").focus()');
+  await insertText('Make the title clearer');
+  assert.equal(await evaluate('document.querySelector(".design-viewer textarea").value'), 'Make the title clearer');
+  assert.equal(await evaluate('[...document.querySelectorAll(".design-viewer .foot button")].find((b) => b.textContent === "Request change").disabled'), false);
+  await tap(await centre('Request change'));
+  await until(async () => (await evaluate('document.querySelector(".design-viewer [role=status]")?.textContent')) === 'Changes requested');
+  assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d3-fed'].notes, [{ journey: 'flow', screen: 'a', verdict: 'change', note: 'Make the title clearer' }]);
   close();
   proc.kill();
 });
