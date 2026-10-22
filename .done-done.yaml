@@ -30,6 +30,9 @@ journeys:
   # Go deeper on an answers-only (fed) board: accepted at 390 and 1280, one ask saved, no error shown.
   fed-deeper:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/fed-deeper-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${GUIDE_THEME:-light}"'
+  # A screen note typed in the design viewer on an answers-only (fed) board and Request change sent, one width per run: REQUEST_WIDTH=390|1280.
+  request-change:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/request-change-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${REQUEST_THEME:-light}"'
   # The board foundation (type scale, 44px controls, tab bar): Decide and Today, one theme and width per run; FOUNDATION_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
   foundation:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/foundation-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${FOUNDATION_THEME:-light}" "${FOUNDATION_WIDTH:-390}"'
