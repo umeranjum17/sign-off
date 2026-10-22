@@ -48,9 +48,8 @@ try {
   }
   if (side === 'after' && width === 390) assert.ok(cell.decide.tabBar.h >= 52 && cell.decide.tabBar.h <= 53, `tab bar ${cell.decide.tabBar.h}`);
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board with a sign-in ask, asks, a plan, a report and an update.',
-    steps: [`The board is opened at ${width} px wide in ${theme} mode on the sign-in ask in Decide, then on Today.`, 'Every button, link and select on both screens is measured, with the tab bar and the text sizes.'],
-    result: `At ${width} px in ${theme} mode ${side === 'after' ? 'nothing on Decide or Today is under 44px, the tab bar is 52px and solid, body text is 16px and nothing runs off the screen' : 'the board is captured as it was, for comparison'}.` }, null, 2) + '\n');
-} finally {
+    steps: [`Open the board at ${width} px in ${theme} mode on the sign-in ask in Decide, then on Today.`, 'Measure every control (button, link, select) against 44px, the tab bar height, the type scale sizes, and the spacing that dark and light share.'],
+    result: side === 'after' ? `At ${width} px in ${theme} mode every control on Decide and Today is at least 44px, the tab bar is a clean 52px, text reads on one type scale (16px body) and nothing runs off the screen.` : `At ${width} px in ${theme} mode the board is captured as it was for comparison: the controls, tab bar and type scale before the change.` }, null, 2) + '\n');} finally {
   try { browser('stop'); } catch {}
   try { sh(process.execPath, [join(repo, 'dist/cli.js'), 'stop', join(dir, 'board.json')], { env: seedEnv }); } catch {}
   rmSync(dir, { recursive: true, force: true });
