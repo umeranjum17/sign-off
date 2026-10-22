@@ -1,12 +1,12 @@
 # Board shell
 
-The board page (web/index.html) in the Spacious look: system font, large titles, pill buttons, grouped lists, no shadows, its own light and dark palettes.
+The board page (web/index.html) in the Spacious look: system font on one type scale (28/20/17/16/15/13/12 px, 32 and 22 on a desk) and a 4px grid, large titles, 44px buttons with 10px corners, grouped lists, no shadows, its own light and dark palettes.
 
 ## Sub-features
 
 - Four tabs: Today (`#`), Decide (`#waiting`, the Waiting on you list), Evidence (`#evidence`), Reports (`#reports`). Designs (`#designs`) and Answered (`#answered`) are not tabs: a design ask in Decide opens its review (‹ Today goes back), and Today's Waiting on you ends with Answered (N) and Designs (N) links.
 - Desk (60rem and wider): a sidebar with the four tabs, Decide, Evidence and Reports with their counts; the tab on show is marked (Decide also for a design or an ask, Today for Answered).
-- Phone: a solid tab bar at the bottom (Today, Decide, Evidence, Reports), 64px tall with 12px names and 25px icons; the tab on screen is blue; Decide carries a red count of what waits on you. Tab pages have no back link; Designs and Answered keep ‹ Today.
+- Phone: a solid tab bar at the bottom (Today, Decide, Evidence, Reports), 52px tall with 12px names and 22px icons, so no page text shows as a ghost label behind it; the tab on screen is blue; Decide carries a red count of what waits on you. Tab pages have no back link; Designs and Answered keep ‹ Today.
 - Designs groups contract design reviews by project, with preview, date, status and any saved pick or note. Open a design to approve it or request a change with a note; on multi-screen designs, a native selector targets the note and full-preview link, while designs with no screens accept a design-level note. The preview is readable and scrollable, with a link to open its full asset. At 1280 the board sidebar remains visible with Designs selected; on Today and on Waiting its ask opens the same review.
 - After an answer, a toast with Undo sits above the tab bar.
 - Today: a search glass at the top right (opens a field that lists matching asks, updates and reports), the title and date, a glance card (a "Since you last looked at HH:MM" line on top once this browser has seen the board before: set `localStorage['sign-off-seen <board file>']` to an ISO time and reload; what needs you and how many updates were filed today, when the soonest ask closes and the new reports quieter), three tiles (Need you, Proven today, New report) with icon, count large and name, then Waiting on you (up to four asks, a mark per kind, a yes/no ask a switch and a choice of days a calendar, its close time and recommendation, See all to Decide, Answered (N) and Designs (N) under it; nothing waiting reads "All clear. Nothing waits on you."), Proven today (today's passed updates, the same list as Evidence, each with its own result, square cards in a swipeable row on a phone, three across on a desk), New report (the newest report as one hero card), Leash, and the Ask the agent box.
@@ -41,6 +41,7 @@ Open the URL seed-board.sh prints, in a browser; tap an area in the sidebar or t
    or SHOTS_WIDTHS=390 (phone) for shots.sh, and the toast and focus captures at that width. A capture judged alone must show the whole claim.
 7. Icon: `curl -s -o /dev/null -w '%{http_code} %{content_type}\n' BASE{icon.svg,apple-touch-icon.png,manifest.webmanifest}` prints 200 with image/svg+xml, image/png and application/manifest+json; `chrome-devtools-axi eval "() => document.querySelector('link[rel=icon]').href"` ends in /icon.svg.
 8. Look at every capture: no text under the tab bar, nothing cut, the right area marked.
+9. Foundation (type, controls, tab bar): at 390 and 1280, light and dark, eval every visible button, link, summary and select and list any under 44px in either side (must be none); check dark and light give the same padding, margin and gap on `main`, `.top`, `button`, `.row` and `.tabs a`; at 390 scroll Decide until page text sits behind the tab bar and check the bar is 52px with no doubled label.
 9. Stop the browser session you started; leave the board server, which stops itself.
 
 ## Gotchas
