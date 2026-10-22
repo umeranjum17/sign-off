@@ -1304,9 +1304,8 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await evaluate("location.hash = '#decide/release'");
   await until(async () => (await evaluate('location.hash')) === '#decide/release' && (await evaluate('document.querySelectorAll(".pick-option").length')) === 3);
   await evaluate('document.dispatchEvent(new KeyboardEvent("keydown", { key: "1", bubbles: true }))');
-  await until(async () => /today/.test(run('answers', file, '--key', 'release').out));
-  await evaluate("location.hash = '#waiting'");
-  await until(async () => (await evaluate('location.hash')) === '#waiting');
+  // On a phone the answer pops back to the list once its check has played; waiting for that keeps the late pop from landing on Answered below.
+  await until(async () => /today/.test(run('answers', file, '--key', 'release').out) && (await evaluate('location.hash')) === '#waiting');
   // An undo of a changed answer from Answered puts it back and stays there; Decide says so when its key is not in its queue.
   await evaluate("location.hash = '#answered'");
   await until(async () => (await evaluate('document.querySelectorAll("#item-release .choices button").length')) === 3);
@@ -1653,6 +1652,68 @@ test('Decide on a phone: an answer pops back to the list with its Undo toast ove
   await swipe({ x: 360, y }, { x: 30, y });
   await until(async () => (await evaluate('[...document.querySelectorAll(".dl-head")].map((h) => h.textContent).join("|")')) === 'Answer1');
   close();
+  proc.kill();
+});
+
+test('Decide on a desk: the list beside its ask, J and K move the selection, Enter answers and selects the next while the row folds, Cmd+Z, L, C with Cmd+Enter, a row\'s hover answer, the ? sheet, G then a letter (Evidence on the same shell), and the phone layout under 1024px', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'decide-desk'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  const abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l }));
+  writeFileSync(file, JSON.stringify({ schema: 2, items: ['delta', 'gamma', 'beta', 'alpha'].map((k) => ({ key: k, title: `${k[0].toUpperCase()}${k.slice(1)} question?`, options: abc, recommend_value: 'b' })) }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 1280, 800);
+  const key = (k, mod = false) => evaluate(`(document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, bubbles: true, ctrlKey: ${mod}, metaKey: ${mod} }))`);
+  const seen = () => evaluate('[location.hash, document.querySelector(".split-list .sel")?.dataset.key, document.querySelector(".split-detail .decide h2")?.textContent, document.activeElement === document.querySelector(".split-list .sel .dl-face")].join("|")');
+  const rows = () => evaluate('[...document.querySelectorAll(".split-list .dl-row:not(.leaving)")].map((r) => r.dataset.key).join(",")');
+  await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+  // The list and the first ask share the screen, each column scrolling on its own; the strip under the list names its keys.
+  await until(async () => (await evaluate('document.querySelector(".split-detail .decide h2")?.textContent')) === 'Alpha question?');
+  assert.equal(await evaluate('document.querySelector(".split-list .sel").dataset.key + "|" + (document.scrollingElement.scrollHeight <= innerHeight) + "|" + document.querySelector(".split-hints").textContent'), 'alpha|true|JKMove↵Answer?All keys');
+  assert.equal(await evaluate('(() => { const l = document.querySelector(".split-list").getBoundingClientRect(), d = document.querySelector(".split-detail").getBoundingClientRect(), s = document.querySelector(".side").getBoundingClientRect(); return s.right <= l.left && l.right <= d.left && d.right === innerWidth && l.width >= 320; })()'), true);
+  await key('j');
+  await until(async () => (await seen()) === '#decide/beta|beta|Beta question?|true');
+  await key('j'), await key('k');
+  await until(async () => (await seen()) === '#decide/beta|beta|Beta question?|true');
+  // Enter answers with the pick: the button draws its check, the row folds away, the next ask is selected beside the list, and the toast sits over the ask's pane.
+  await key('Enter');
+  await until(() => evaluate('document.querySelector(".split-detail .answer.done") !== null'));
+  await until(async () => /beta,b,/.test(run('answers', file).out) && (await seen()) === '#decide/gamma|gamma|Gamma question?|true' && (await rows()) === 'alpha,gamma,delta');
+  await until(() => evaluate('!document.querySelector("#toast").hidden && document.querySelector("#toast").getBoundingClientRect().left >= document.querySelector(".split-detail").getBoundingClientRect().left'));
+  // Cmd+Z takes it back and the row returns.
+  await key('z', true);
+  await until(async () => !/beta,b,/.test(run('answers', file).out) && (await rows()) === 'alpha,beta,gamma,delta');
+  // L moves the selected ask to Later and selects the next.
+  await evaluate('location.hash = "#decide/gamma"');
+  await until(async () => (await seen()) === '#decide/gamma|gamma|Gamma question?|true');
+  await key('l');
+  await until(async () => (await seen()) === '#decide/delta|delta|Delta question?|true' && (await evaluate('[...document.querySelectorAll(".dl-head")].map((h) => h.textContent).join("|")')) === 'Answer3|Later1');
+  // C opens the comment under the answers, and Cmd+Enter answers from it with the comment.
+  await key('c');
+  assert.equal(await evaluate('document.activeElement.id'), 'note-delta');
+  await evaluate('(() => { const t = document.activeElement; t.value = "After the demo"; t.dispatchEvent(new Event("input")); })()');
+  await key('Enter', true);
+  await until(() => JSON.parse(run('answers', file, '--json').out).delta?.note === 'After the demo');
+  // Hovering a row shows its quick answer, which answers with the recommended pick.
+  await until(async () => (await rows()) === 'alpha,beta,gamma');
+  await evaluate('document.querySelector(\'.dl-row[data-key="alpha"] .dl-hover .yes\').click()');
+  await until(async () => /alpha,b,/.test(run('answers', file).out) && (await rows()) === 'beta,gamma');
+  // ? opens every key in one sheet; G then a letter goes to an area.
+  await key('?');
+  assert.equal(await evaluate('document.getElementById("keys").open + "|" + document.querySelector("#keys h2").textContent + "|" + document.querySelectorAll("#keys li").length'), 'true|Keyboard shortcuts|14');
+  await evaluate('document.querySelector("#keys header button").click()');
+  await key('g'), await key('e');
+  await until(async () => (await evaluate('location.hash + "|" + !!document.querySelector(".split-list") + "|" + document.querySelector(".split-detail")?.textContent')) === '#evidence|true|No evidence updates.');
+  await key('g'), await key('d');
+  await until(async () => (await evaluate('location.hash + "|" + !!document.querySelector(".split")')) === '#waiting|true');
+  close();
+  // Under 1024px the board keeps the phone's layout: the tab bar, and an ask on a page of its own.
+  const narrow = await browse(join(dir, 'n'), 1000, 800);
+  await narrow.evaluate(`location.href = ${JSON.stringify(`${url}#decide/gamma`)}`);
+  await until(async () => (await narrow.evaluate('document.querySelector(".decide h2")?.textContent')) === 'Gamma question?');
+  assert.equal(await narrow.evaluate('!!document.querySelector(".split") + "|" + getComputedStyle(document.querySelector(".tabs")).display + "|" + getComputedStyle(document.querySelector(".side")).display'), 'false|flex|none');
+  narrow.close();
   proc.kill();
 });
 
@@ -2613,10 +2674,10 @@ test('Evidence: a card per proof ever filed, in one list, newest first, with a p
   const boxes = `[5, 4, 3, 2].map((n) => { const r = document.getElementById(\`item-update-\${n}\`).getBoundingClientRect(); return { n, top: r.top, left: r.left, right: r.right, bottom: r.bottom }; })`;
   const [five, four, three, two] = await evaluate(boxes);
   assert.ok(four.top >= five.bottom && three.top >= four.bottom && two.top >= three.bottom && [four, three, two].every((b) => b.left === five.left), 'one column, newest first, with no heading between');
-  await until(async () => (await evaluate('document.getElementById("reader").dataset.key')) === 'update-5');
-  assert.deepEqual(await evaluate('[document.body.classList.contains("ev-split"), document.querySelector("main").inert, [...document.querySelectorAll(".ev-card[aria-current]")].map((a) => a.id), document.querySelector(".ev-title").textContent]'),
+  await until(async () => (await evaluate('(() => { const a = document.querySelector(".split-list .ev-card[aria-current]"); return a && document.querySelector(".split-detail .ev-title") ? a.id.slice(5) : ""; })()')) === 'update-5');
+  assert.deepEqual(await evaluate('[!!document.querySelector(".split-list .ev-grid"), document.querySelector("main").inert, [...document.querySelectorAll(".ev-card[aria-current]")].map((a) => a.id), document.querySelector(".ev-title").textContent]'),
     [true, false, ['item-update-5'], 'Sign-in, plain update']);
-  assert.ok((await evaluate(box('#reader'))).left >= five.right, 'the update opens right of the list');
+  assert.ok((await evaluate(box('.split-detail'))).left >= five.right, 'the update opens right of the list');
   // Under the title: how many are listed, how many filed today and when the newest came.
   assert.equal(await evaluate('document.querySelector(".top .lede").textContent'), 'Every proof filed, newest first.');
   // No update is an ask, whatever its result: Decide counts none of them and Today says nothing needs you.
@@ -2642,10 +2703,10 @@ test('Evidence: a card per proof ever filed, in one list, newest first, with a p
   writeFileSync(file, JSON.stringify(doc));
   await evaluate('refresh()');
   await evaluate('document.getElementById("item-update-2").click()');
-  await until(async () => (await evaluate('location.hash')) === '#evidence/update-2' && (await evaluate('document.getElementById("reader").dataset.key')) === 'update-2');
+  await until(async () => (await evaluate('location.hash')) === '#evidence/update-2' && (await evaluate('(() => { const a = document.querySelector(".split-list .ev-card[aria-current]"); return a && document.querySelector(".split-detail .ev-title") ? a.id.slice(5) : ""; })()')) === 'update-2');
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-verdict")].map((v) => v.textContent)'), []);
   await evaluate('location.hash = "#evidence"');
-  await until(async () => (await evaluate('document.getElementById("reader").dataset.key')) === 'update-5');
+  await until(async () => (await evaluate('(() => { const a = document.querySelector(".split-list .ev-card[aria-current]"); return a && document.querySelector(".split-detail .ev-title") ? a.id.slice(5) : ""; })()')) === 'update-5');
   delete doc.answers_only;
   doc.items[1].options = kept;
   writeFileSync(file, JSON.stringify(doc));
