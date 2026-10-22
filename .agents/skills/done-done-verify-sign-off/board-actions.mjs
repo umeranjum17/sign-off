@@ -178,8 +178,20 @@ const PAGES = [
     await h.cycle('Dismiss update 2', h.find(/^Dismiss,/, r), () => location.hash === '#evidence' || !h.reader().querySelector('[aria-label^="Pass"]'), () => h.find(/^Pass,/, h.reader()), /Dismissed/);
   } }] },
   { name: 'reports', hash: '#reports', ready: '[id="item-new-sign-in"]', stages: [{ run: async (h) => {
-    await h.nav('Open report', h.find(/How the new sign-in works/, h.card('new-sign-in'), 'a'), /^#reports\/new-sign-in$/);
-    await h.bulk('new-sign-in');
+    // More: Mark all as read while the report is new, then opening it (which reads it), Select (pick, Dismiss 1, Undo; Cancel) and Archive all, each taken back with Undo.
+    const more = () => h.board().querySelector('.top .dl-more'), item = (act) => more()?.querySelector(`[data-act="${act}"]`), bar = () => h.board().querySelector('.bulk');
+    // Opening it from Today read it: a finger's swipe right marks it unread again, and its dot comes back.
+    const swipe = async (key, dx) => { const f = h.card(key), r = f.getBoundingClientRect(), y = r.top + 30, o = (x) => ({ bubbles: true, pointerId: 7, isPrimary: true, pointerType: 'touch', clientX: x, clientY: y });
+      f.dispatchEvent(new PointerEvent('pointerdown', o(r.left + 40))); for (let i = 1; i <= 8; i++) { await h.sleep(16); f.dispatchEvent(new PointerEvent('pointermove', o(r.left + 40 + dx * i / 8))); } f.dispatchEvent(new PointerEvent('pointerup', o(r.left + 40 + dx))); };
+    if (!item('read-all')) { await swipe('new-sign-in', 300); await h.until('swipe right to mark it unread', () => h.box(h.card('new-sign-in'))?.querySelector('.new')); h.did.push('Swipe right: mark unread'); }
+    await h.cycle('More: Mark all as read', item('read-all'), () => !h.box(h.card('new-sign-in')).querySelector('.new'), () => h.box(h.card('new-sign-in'))?.querySelector('.new'), /marked read/);
+    await h.nav('Open report', h.card('new-sign-in'), /^#reports\/new-sign-in$/);
+    await h.press('More: Select', item('select'), () => h.find(/^Cancel$/, bar()));
+    await h.press('pick new-sign-in', h.card('new-sign-in'), () => h.box(h.card('new-sign-in')).classList.contains('picked'));
+    await h.cycle('Dismiss 1 selected', h.find(/^Dismiss 1$/, bar()), () => !h.card('new-sign-in'), () => h.card('new-sign-in'), /1 dismissed/);
+    await h.press('More: Select again', item('select'), () => h.find(/^Cancel$/, bar()));
+    await h.press('Cancel', h.find(/^Cancel$/, bar()), () => more());
+    await h.cycle('More: Archive all', item('archive-all'), () => !h.card('new-sign-in'), () => h.card('new-sign-in'), /archived/);
   } }] },
   { name: 'report', hash: '#reports/new-sign-in', ready: '#reader iframe', stages: [{ run: async (h) => {
     await h.nav('Back to Reports', h.find(/Reports$/, h.reader(), 'a'), /^#reports$/);

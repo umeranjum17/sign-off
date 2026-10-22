@@ -13,7 +13,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, sameDecision, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, sameDecision, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -2216,6 +2216,7 @@ const state = () => {
     seen: Object.values(answers).filter(taken).map((a) => a.key),
     seen_at: Object.fromEntries(Object.values(answers).flatMap((a) => { const t = seenAt(file)(a); return t ? [[a.key, t]] : []; })),
     reads: readReads(file),
+    opened: readOpened(file),
     deeper: readDeeper(file),
     delivery: deliveries(file),
     rounds,
@@ -2461,6 +2462,13 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     const input = JSON.parse(body);
     if (req.url.endsWith('/seen')) markEngagementSeen(file, input.id, input.answerRevision);
     else askEngagement(file, input);
+    return [200, state()];
+  }
+  if (req.url === '/api/reads' && Array.isArray(JSON.parse(body)?.keys)) {
+    // A whole report opened, or marked read or unread from Reports: keys and read, no part.
+    const { keys, read } = JSON.parse(body), have = new Set(board(file).map((x) => x.key));
+    if (!keys.length || keys.length > 200 || typeof read !== 'boolean' || !keys.every((k: unknown) => typeof k === 'string' && have.has(k))) return [400, { error: 'Send 1 to 200 keys on the board and read true or false' }];
+    appendOpened(file, [...new Set<string>(keys)], read);
     return [200, state()];
   }
   if (req.url === '/api/reads' || req.url === '/api/deeper') {

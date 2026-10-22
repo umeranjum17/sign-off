@@ -917,29 +917,31 @@ test('each card has one place to type: Add a comment holds the note sent with th
   await until(async () => (await evaluate('!document.querySelector(".gone-asks") && document.querySelectorAll(".ask-card").length')) === 2);
   close();
   assert.deepEqual(readFileSync(gone, 'utf8').trim().split('\n').map((l) => JSON.parse(l)).map(({ key, dismissed }) => [key, dismissed]), [['ship', true], ['ship', false]]);
-  // Reports and explainers says what the page is under its title, draws a report's steps as numbered nodes, each with only the marks it lists, and the legend once.
+  // Reports leads with the date over its title and how many are new, keeps its More at the top right, draws a report's steps as numbered nodes, each with only the marks it lists, and the legend once.
   const reports = await dump('#reports');
-  assert.match(reports, /<p class="lede">How the tools work, step by step\. Tap one to open it\.<\/p>/);
+  assert.match(reports, /<p class="kicker date-kicker">[^<]+<\/p><h1 tabindex="-1">Reports<\/h1>.*?<p class="lede waiting-lede">1 new · 1 in all<\/p><details class="dl-more"><summary aria-label="More">/s);
   assert.equal(reports.match(/class="card legend"/g).length, 1);
   // The list row has no ×: Dismiss lives on the report's page.
   assert.doesNotMatch(reports, /aria-label="Dismiss, How it ships"/);
   const flow = reports.match(/<ol class="flow"[^>]*>(.*?)<\/ol>/s)[1];
   assert.deepEqual([...flow.matchAll(/<li>(.*?)<\/li>/gs)].map((m) => [...m[1].matchAll(/mk mk-(\w+)/g)].map((x) => x[1])), [['store'], [], ['gate', 'fail']]);
-  // Its group heads a grouped list with the filed time; its row is a link that opens it, with its title, its kind, steps and time, and a dot for New today.
-  assert.match(reports, /<div class="sec-h"><h2>New<\/h2><\/div><ul class="card rows reports">/);
-  assert.match(reports, /<a class="compact" href="#reports\/how">.*?<strong dir="auto">How it ships<\/strong>.*?<span class="when">Diagram · Interactive · Video 0:28 · You asked, \d\d:\d\d<\/span>.*?<span class="new" role="img" aria-label="New today"><\/span><\/a>/s);
+  // Today heads the list with its count; the row is a link that opens it, with its picture, its title and a dot while it is not read, then its form, steps, video, project and time.
+  assert.match(reports, /<h2 class="dl-head" style="--n:0">Today<span class="n">1<\/span><\/h2><ul class="dl-list rp-list" aria-label="Today">/);
+  assert.match(reports, /<a class="dl-face" href="#reports\/how" draggable="false" id="item-how"><span class="rth" aria-hidden="true"><svg viewBox="0 0 48 48">.*?<strong class="title" dir="auto">How it ships<\/strong><span class="new" role="img" aria-label="Not read yet"><\/span>.*?<span class="when">Diagram · 3 steps · Video 0:28 · How it works · \d\d:\d\d<\/span>/s);
+  // Under the row, a swipe right marks it read and a swipe left archives it.
+  assert.match(reports, /<div class="dl-act yes" aria-hidden="true">.*?<span>Read<\/span><\/div><div class="dl-act later" aria-hidden="true">.*?<span>Archive<\/span><\/div>/s);
   // Only the report is a row and counted; the text-only one is folded under Notes, a short row with no page to open.
-  assert.deepEqual([...reports.matchAll(/<li class="report" id="item-(\w+)"/g)].map((m) => m[1]), ['how']);
-  // The sidebar counts it under its short name; the phone's tab bar marks Reports as the area on screen and reads its count.
+  assert.deepEqual([...reports.matchAll(/<li class="report dl-row" style="--n:\d+" data-key="(\w+)"/g)].map((m) => m[1]), ['how']);
+  // The sidebar counts what is new under its short name; the phone's tab bar marks Reports as the area on screen and carries a blue count.
   assert.match(reports, /<\/svg><\/span>Reports<span class="n">1<\/span>/);
-  assert.match(reports, /<a href="#reports" aria-label="Reports, 1" aria-current="page"><span class="icon i-reports" aria-hidden="true">.*?<\/span>Reports<\/a>/);
+  assert.match(reports, /<a href="#reports" aria-label="Reports, 1 new" aria-current="page"><span class="icon i-reports" aria-hidden="true">.*?<\/span>Reports<span class="bd blue" aria-hidden="true">1<\/span><\/a>/);
   assert.match(reports, /<details class="other notes"><summary>Notes \(1\)<\/summary>.*<strong dir="auto">Merged: the sign-in fix<\/strong>/s);
   // On a phone, a tap on the card opens the report over the whole board with the focus on its title; the board under it takes no taps.
   // ‹ Reports goes back to the card with the focus on its link, and Escape closes it too.
   {
-    const { evaluate, tap, close } = await browse(join(dir, 'reader'), 390);
+    const { evaluate, tap, swipe, close } = await browse(join(dir, 'reader'), 390);
     await evaluate(`location.href = ${JSON.stringify(`${url}#reports`)}`);
-    await until(async () => (await evaluate('document.querySelector("#item-how .thumb, #item-how .flow") && innerWidth')) === 390);
+    await until(async () => (await evaluate('document.querySelector("#item-how .flow") && innerWidth')) === 390);
     const at = (sel) => evaluate(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`);
     await tap(await at('#item-how strong'));
     await until(async () => (await evaluate('location.hash')) === '#reports/how');
@@ -960,6 +962,20 @@ test('each card has one place to type: Add a comment holds the note sent with th
     await until(async () => (await evaluate('reader.hidden')) === false);
     await evaluate('dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))');
     await until(async () => (await evaluate('location.hash + reader.hidden')) === '#reportstrue');
+    // Opening it read it, beside the board: back on the list its dot is gone, the lede says so and the tab bar's count is gone.
+    const reads = () => readFileSync(file.replace(/\.json$/, '.reads.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).map(({ key, read }) => [key, read]);
+    await until(async () => (await evaluate('[document.querySelector(".top .lede").textContent, !!document.querySelector(".tabs .bd.blue")].join()')) === '1 report · all read,false');
+    assert.deepEqual(reads(), [['how', true]]);
+    // A swipe right marks it unread again (the dot and the count come back); a swipe left archives it, and Undo puts it back.
+    const y = await evaluate('(() => { const r = document.querySelector("#item-how").getBoundingClientRect(); return r.y + 30; })()');
+    await swipe({ x: 40, y }, { x: 360, y });
+    await until(async () => (await evaluate('[!!document.querySelector("#item-how .new"), document.querySelector(".tabs .bd.blue")?.textContent, document.getElementById("toast-text").textContent].join()')) === 'true,1,Marked unread: How it ships');
+    assert.deepEqual(reads(), [['how', true], ['how', false]]);
+    await swipe({ x: 360, y }, { x: 30, y });
+    await until(async () => (await evaluate('[!document.querySelector("#item-how"), document.getElementById("toast-text").textContent].join()')) === 'true,Archived: How it ships');
+    await evaluate('document.getElementById("undo").click()');
+    await until(async () => (await evaluate('!!document.querySelector("#item-how")')));
+    assert.deepEqual(readFileSync(file.replace(/\.json$/, '.dismissed.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).filter((x) => x.key === 'how').map((x) => x.dismissed), [true, false]);
     close();
   }
   // Answered is Done today: a count under the title, Clear all beside it, and a short row per item with its answer and time under the title, beside its ×. Clear all sits at the right of the title.

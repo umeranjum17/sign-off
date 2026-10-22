@@ -3,13 +3,16 @@
 // springs back, a swipe right that answers (the toast and its countdown, then Undo and the row coming back), a swipe left to Later
 // and Undo, an ask pushed in, a pick whose label slides onto Answer, Answer turning into a check, the pop back with the row folding
 // away, More's menu, and Answer all recommended.
+// With `reports` last it records Reports instead, on a board reports-shots.mjs seeded: rows rising in, a press, a short drag that springs back,
+// a swipe right that reads a report (its dot goes, Undo brings it back), a swipe left that archives one (it folds away, Undo flashes it back),
+// a report opened and closed (its dot shrinks away), and More's Mark all as read with Undo.
 // Its own headless Chromium on a scratch profile, driven over the DevTools protocol; taps and drags are pointer events in the page.
-// Usage: node decide-record.mjs <board url> <light|dark> <out.mp4>
+// Usage: node decide-record.mjs <board url> <light|dark> <out.mp4> [reports]
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-const [url, theme, out] = process.argv.slice(2);
+const [url, theme, out, screen = 'decide'] = process.argv.slice(2);
 const dir = mkdtempSync(join(tmpdir(), 'decide-rec-'));
 const chrome = spawn('/usr/bin/chromium', ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(dir, 'profile')}`, '--window-size=390,844',
   '--hide-scrollbars', '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: 'ignore' });
@@ -53,8 +56,10 @@ try {
     const o = { bubbles: true, clientX: r.left + 120, clientY: r.top + 30, pointerId: 4, pointerType: 'touch', isPrimary: true };
     e.dispatchEvent(new PointerEvent('pointerdown', o)); await s(450); e.dispatchEvent(new PointerEvent('pointercancel', o)); return 'ok';`);
   await send('Page.startScreencast', { format: 'jpeg', quality: 90, everyNthFrame: 1 });
-  await send('Page.navigate', { url: `${url}#waiting` });
-  const steps = [[2600], [() => press('ship'), 700], [() => drag('ship', 80, 10, 45), 1000], [() => drag('keep-the-weekly-digest', 300), 1600], [() => tap('#undo'), 1400],
+  await send('Page.navigate', { url: `${url}${screen === 'reports' ? '#reports' : '#waiting'}` });
+  const steps = screen === 'reports' ? [[2600], [() => press('settings-speed'), 700], [() => drag('settings-speed', 80, 10, 45), 1000], [() => drag('settings-speed', 300), 1600], [() => tap('#undo'), 1400],
+    [() => drag('release-train', -280), 1600], [() => tap('#undo'), 1400], [() => tap('a.dl-face[href="#reports/new-sign-in"]'), 1600], [() => tap('#reader .close'), 1400],
+    [() => tap('.top .dl-more > summary'), 1200], [() => tap('[data-act="read-all"]'), 1600], [() => tap('#undo'), 1500]] : [[2600], [() => press('ship'), 700], [() => drag('ship', 80, 10, 45), 1000], [() => drag('keep-the-weekly-digest', 300), 1600], [() => tap('#undo'), 1400],
     [() => drag('ship', -280), 1600], [() => tap('#undo'), 1300], [() => tap('a.dl-face[href="#decide/ship"]'), 900],
     [() => tap('.pick-list li:nth-child(2) .pick-option'), 700], [() => tap('.pick-list li:nth-child(1) .pick-option'), 700],
     [() => tap('.decide-bar .answer'), 1800], [() => tap('#undo'), 1200], [() => tap('.top .dl-more > summary'), 1200], [() => tap('[data-act="answer-all"]'), 2000], [() => tap('#undo'), 1500]];
