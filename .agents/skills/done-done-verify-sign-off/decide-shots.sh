@@ -33,6 +33,7 @@ for theme in light dark; do
   vp=390x844x2,mobile,touch; [ "$w" = 1280 ] && vp=1280x800x1
   ax emulate --viewport $vp --color-scheme $theme
   go waiting; shot decide
+  go decide/npm; shot decide-signin
   go decide/ship; shot decide-item
   feel=$(chrome-devtools-axi eval '() => !!document.querySelector(".decide-bar .dl-more")' | grep -c true || true)
   ax eval "() => (${tap})('.decide-bar .answer')"
@@ -93,5 +94,5 @@ if [ -n "$(ls "$out"/decide-menu.* 2>/dev/null)" ]; then
 fi
 # The step record done-done checks a claim against.
 node -e 'const [out, v, w] = process.argv.slice(1); require("fs").writeFileSync(out + "/steps.json", JSON.stringify({ target: { version: v }, start: "A throwaway board seeded with a sign-in, two asks to answer, a design pick, a screen design, a plan and an answered ask, opened on Decide",
-  steps: [`At ${w} px, light then dark, the person opens Decide and sees the rows grouped Sign in, Answer and Review.`, "The person opens the ship ask and taps Answer Friday, then Undo in the toast.", "On the list the person presses a row, drags it right and left, and opens More.", "On the ask the person opens More beside Answer.", "The person swipes the digest row right to answer it.", "With the sign-in, plan and designs dismissed, the person taps More, Answer all recommended."],
+  steps: [`At ${w} px, light then dark, the person opens Decide and sees the rows grouped Sign in, Answer and Review.`, "The person opens the npm sign-in, then the ship ask, and taps Answer Friday, then Undo in the toast.", "On the list the person presses a row, drags it right and left, and opens More.", "On the ask the person opens More beside Answer.", "The person swipes the digest row right to answer it.", "With the sign-in, plan and designs dismissed, the person taps More, Answer all recommended."],
   result: "Decide shows grouped rows with icons, two-line titles, times and the recommended pick; a press tints a row, a right drag shows the green answer and a left drag the indigo Later; the ask has one Answer button naming the pick and one More holding Ask me later, Write my own answer, Ask for another round and Dismiss last; an answer and its Undo each show a toast in one style with its own mark; when nothing waits a green check says All clear." }, null, 2) + "\n")' "$out" "$(node -p 'require("./package.json").version')" "${DECIDE_WIDTHS:-390 1280}"

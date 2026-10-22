@@ -1656,7 +1656,7 @@ test('Decide on a phone: an answer pops back to the list with its Undo toast ove
   proc.kill();
 });
 
-test('Decide on a desk: the list beside its ask, J and K move the selection, Enter answers and selects the next while the row folds, Cmd+Z, L, C with Cmd+Enter, a row\'s hover answer, the ? sheet, G then a letter (Evidence on the same shell), and the phone layout under 1024px', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Decide on a desk: the list beside its ask, J and K move the selection, Enter answers and selects the next while the row folds, Cmd+Z, L, C with Cmd+Enter, a row\'s hover answer, the ? sheet, G then a letter (Evidence on the same shell), a sign-in laid out as an ask, a tall ask\'s bar after its last option, and the phone layout under 1024px', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'decide-desk'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l }));
@@ -1708,6 +1708,21 @@ test('Decide on a desk: the list beside its ask, J and K move the selection, Ent
   await until(async () => (await evaluate('location.hash + "|" + !!document.querySelector(".split-list") + "|" + document.querySelector(".split-detail")?.textContent')) === '#evidence|true|No evidence updates.');
   await key('g'), await key('d');
   await until(async () => (await evaluate('location.hash + "|" + !!document.querySelector(".split")')) === '#waiting|true');
+  // A sign-in reads like any ask beside the list: who waits, its headline, what it unlocks and Open as the bar's one button, with its time left only on its row.
+  const board = JSON.parse(readFileSync(file, 'utf8')), many = 'abcdef'.split('').map((l) => ({ value: l, label: `Option ${l}`, outcome: `What happens after option ${l}.` }));
+  board.items.push({ key: 'npm', title: 'npm', type: 'signin', link: 'https://example.com/login', unlocks: 'Publishing the release', waits: 'Release agent', expires: new Date(Date.now() + 2 * 3600_000).toISOString() },
+    { key: 'tall', title: 'Which of six?', options: many, recommend_value: 'a' });
+  writeFileSync(file, JSON.stringify(board));
+  await evaluate('location.hash = "#decide/npm"; location.reload()');
+  await until(async () => (await evaluate('document.querySelector(".split-detail .decide h2")?.textContent')) === 'Sign in to npm');
+  assert.equal(await evaluate(`(() => { const p = document.querySelector(".split-detail .decide"), o = p.querySelector(".decide-bar .open-link");
+    return [p.querySelector(".kicker").textContent, p.querySelector(".why").textContent, o.textContent, o.getAttribute("href"), !!p.querySelector(".row"), /Expires|left/.test(p.textContent), / left$/.test(document.querySelector('.dl-row[data-key="npm"] .tm').textContent)].join("|"); })()`),
+  'Sign-in · Release agent|Unlocks: Publishing the release|Open sign-in|https://example.com/login|false|false|true');
+  // An ask taller than the pane: its bar comes after the last option and never covers it.
+  await evaluate('location.hash = "#decide/tall"');
+  await until(async () => (await evaluate('document.querySelectorAll(".split-detail .pick-option").length')) === 6);
+  assert.equal(await evaluate(`(() => { const s = document.querySelector(".split-detail"), bar = () => document.querySelector(".split-detail .decide-bar").getBoundingClientRect().top, last = () => [...s.querySelectorAll(".pick-option")].at(-1).getBoundingClientRect().bottom;
+    const rest = bar() >= last(); s.scrollTop = 1e5; return [s.scrollHeight > s.clientHeight, rest, bar() >= last()].join("|"); })()`), 'true|true|true');
   close();
   // Under 1024px the board keeps the phone's layout: the tab bar, and an ask on a page of its own.
   const narrow = await browse(join(dir, 'n'), 1000, 800);

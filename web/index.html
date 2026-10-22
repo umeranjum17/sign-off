@@ -1274,12 +1274,13 @@
     .split-bar .later { display: inline-flex; align-items: center; gap: 0.5rem; margin-left: auto; min-height: var(--ctl); padding: 0 0.75rem; border-radius: var(--r-ctl); background: none; color: var(--text); font-weight: 400; }
     .split-bar .later:hover, .dl-hover button:hover { background: var(--sunk); }
     .split-bar .later .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.75; color: var(--muted); }
-    /* The ask fills the pane, so its answer bar stays at the pane's foot even under a short ask. */
+    /* The ask fills the pane, so its answer bar stays at the pane's foot even under a short ask; under a tall one it comes after the last option, so it never covers one. */
     .split-detail > .decide { display: flex; flex: 1; flex-direction: column; width: 100%; max-width: 46rem; margin: 0 auto; padding: 0.5rem 2.5rem 0; }
     .split-detail > .decide .dhero, .split-detail > .decide .decide-preview { margin-top: 1.5rem; }
     .split-detail .decide > * { flex: none; } .split-detail .decide > :not(.decide-bar):nth-last-child(2) { margin-bottom: 1.5rem; }
-    .split-detail .decide-bar { position: sticky; bottom: 0; margin: auto -2.5rem 0; padding: 1rem 2.5rem 1.25rem; border-top: 1px solid var(--line); background: var(--bg); }
+    .split-detail .decide-bar { margin: auto -2.5rem 0; padding: 1rem 2.5rem 1.25rem; border-top: 1px solid var(--line); background: var(--bg); }
     .split-detail .decide-bar .answer { min-width: 13rem; padding: 0 1.5rem; }
+    .split-detail .decide-bar .open-link { display: inline-flex; align-items: center; justify-content: center; min-width: 13rem; min-height: 3.25rem; padding: 0 1.5rem; border-radius: 1rem; font-size: var(--t-m); }
     .split-detail [data-kbd]::after { content: attr(data-kbd); display: inline-grid; place-items: center; min-width: 1.375rem; height: 1.375rem; margin-left: 0.625rem; padding: 0 0.3125rem; border-radius: 0.375rem;
       background: rgb(255 255 255 / 0.22); color: inherit; font-size: 0.75rem; font-weight: 600; line-height: 1; vertical-align: 0.0625rem; }
     .split-bar [data-kbd]::after { background: var(--sunk); color: var(--muted); }
@@ -1633,20 +1634,25 @@
   };
   /** A sign-in: the service, what it unlocks, who waits, the time left and one Open for its link. Its poster closes it with signin done. */
   function signin(d, lead, saved, err) {
-    if (d.start) return started(d, lead, saved, err);
+    const { open, line } = signinOpen(d, saved, err);
+    return el('article', { class: 'row signin', id: `item-${d.key}` }, el('div', {}, lead,
+      el('p', { class: 'line', dir: 'auto' }, `Unlocks: ${d.unlocks}`), el('p', { class: 'line', dir: 'auto' }, `Waits: ${d.waits}`), line), open, err);
+  }
+  /** A sign-in's one Open and the line under it, for its card and its desk page alike. */
+  function signinOpen(d, saved, err) {
+    if (d.start) return started(d, saved, err);
     const gone = !!d.expires && Date.parse(d.expires) <= Date.now();
     const open = saved ? '' : gone ? el('button', { class: 'open-link', disabled: '' }, 'Open')
       : el('a', { class: 'open-link', href: d.link, target: '_blank', rel: 'noopener noreferrer', 'aria-label': `Open the ${d.title} sign-in` }, 'Open');
     // The time left counts down on the page (data-expires); an expired link is drawn once more, with Open off.
-    const left = saved ? el('p', { class: 'meta' }, `Signed in at ${when(saved.at)}.`) : d.expires
+    const line = saved ? el('p', { class: 'meta' }, `Signed in at ${when(saved.at)}.`) : d.expires
       ? el('p', { class: gone ? 'expiry gone' : 'expiry', ...(!gone && { 'data-expires': d.expires }) }, expiry(d.expires)) : '';
-    return el('article', { class: 'row signin', id: `item-${d.key}` }, el('div', {}, lead,
-      el('p', { class: 'line', dir: 'auto' }, `Unlocks: ${d.unlocks}`), el('p', { class: 'line', dir: 'auto' }, `Waits: ${d.waits}`), left), open, err);
+    return { open, line };
   }
   /** What a tap-time sign-in did last, in plain words. */
   const RUNS = { none: 'Each tap gets a new link.', starting: 'Getting a new link…', live: 'The sign-in page is open. Finish it there.' };
   /** A sign-in whose link this host makes at each tap: Open starts it and sends a new tab to the new link, so its link never expires on the card. */
-  function started(d, lead, saved, err) {
+  function started(d, saved, err) {
     const failed = d.run?.startsWith('failed: ') && d.run.slice(8);
     const open = saved ? '' : FROZEN || state.readonly ? el('button', { class: 'open-link', disabled: '' }, 'Open')
       : el('button', { class: 'open-link', 'aria-label': `Open the ${d.title} sign-in` }, 'Open');
@@ -1672,9 +1678,7 @@
       }
     };
     const line = saved ? `Signed in at ${when(saved.at)}.` : failed ? `The last try failed: ${failed} Tap Open to try again.` : RUNS[d.run] ?? RUNS.none;
-    return el('article', { class: 'row signin', id: `item-${d.key}` }, el('div', {}, lead,
-      el('p', { class: 'line', dir: 'auto' }, `Unlocks: ${d.unlocks}`), el('p', { class: 'line', dir: 'auto' }, `Waits: ${d.waits}`),
-      el('p', { class: failed ? 'expiry gone' : saved ? 'meta' : 'expiry' }, line)), open, err);
+    return { open, line: el('p', { class: failed ? 'expiry gone' : saved ? 'meta' : 'expiry' }, line) };
   }
   setInterval(() => {
     // While a sign-in runs on this host, the page checks often, so the card closes soon after the sign-in is done.
@@ -3411,7 +3415,7 @@
   let skipTo = '';
   /** Asks the person chose to answer in their own words, kept across redraws. */
   const own = new Set();
-  function decidePage(d, next) {
+  function decidePage(d, next, desk = false) {
     if (!d) return el('p', { class: 'empty' }, EMPTY.waiting);
     const to = next ? `#decide/${next.key}` : '#waiting';
     skipTo = next && !state.readonly ? to : '';
@@ -3430,6 +3434,14 @@
     const gone = xBtn(d, 'Dismiss');
     if (gone) { gone.setAttribute('role', 'menuitem'); gone.addEventListener('click', () => (location.hash = to)); }
     const more = (...items) => (state.readonly ? '' : moreSheet('More', [['Ask me later', () => { location.hash = '#waiting'; toLater([d.key], true); }, 'later', 'clock'], ...items, gone]));
+    if (d.type === 'signin' && desk) {
+      // On a desk a sign-in reads like any ask: who waits, the headline, what it unlocks, and Open as the bar's one button. Its row beside it counts the link's time down, so only a line that is not that countdown shows here.
+      const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` }), { open, line } = signinOpen(d, undefined, err);
+      if (open) open.textContent = 'Open sign-in', open.dataset.kbd = '↵';
+      const kicker = el('p', { class: 'kicker' }, el('span', { class: 'k' }, TYPE_NAMES.signin), ` · ${d.waits}${d.filed ? ` · ${when(d.filed)}` : ''}`);
+      return el('section', { class: 'decide signin-ask' }, el('div', { class: 'lead' }, kicker, el('h2', { dir: 'auto' }, `Sign in to ${d.title}`)),
+        el('p', { class: 'why', dir: 'auto' }, `Unlocks: ${d.unlocks}`), line?.dataset?.expires ? '' : line, err, el('div', { class: 'decide-bar' }, open, more()));
+    }
     if (d.type === 'signin') {
       const signinPage = el('div', { class: 'decide' }, row(d, { x: false }), el('div', { class: 'decide-bar' }, more()));
       if (!state.readonly) swipe(signinPage);
@@ -3511,7 +3523,7 @@
     if (!d) return split([top, list], [items.length ? el('p', { class: 'empty' }, 'Open a review from the list.') : allClear()], [[['?'], 'All keys']]);
     const g = groupOf(d), later = el('button', { class: 'later', 'data-kbd': 'L', 'aria-keyshortcuts': 'L' }, glyph('clock'), g === 'later' ? 'Back from Later' : 'Later');
     later.onclick = () => { toLater([d.key], g !== 'later'); if (g !== 'later' && next) location.hash = `#decide/${next.key}`; };
-    return split([top, list], [el('div', { class: 'split-bar' }, queue.length > 1 ? pager(queue, i) : '', state.readonly ? '' : later), decidePage(d, next)],
+    return split([top, list], [el('div', { class: 'split-bar' }, queue.length > 1 ? pager(queue, i) : '', state.readonly ? '' : later), decidePage(d, next, true)],
       [[['J', 'K'], 'Move'], [['↵'], 'Answer'], [['?'], 'All keys']]);
   }
   /** Evidence on a desk: the list of updates beside the one selected. */
