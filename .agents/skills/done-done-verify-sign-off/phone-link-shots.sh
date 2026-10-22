@@ -9,7 +9,9 @@ export HOME=$d XDG_CONFIG_HOME=$d/c XDG_DATA_HOME=$d/d XDG_STATE_HOME=$d/s XDG_C
 export CHROME_DEVTOOLS_AXI_SESSION=phone-link-$$
 node=$(command -v node); so() { "$node" "$repo/dist/cli.js" "$@"; }
 br() { env -u XDG_CONFIG_HOME -u XDG_DATA_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME HOME=$real chrome-devtools-axi "$@"; }
-ev() { br eval "$1" | sed -n 's/^result: //p' | "$node" -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>{let v=JSON.parse(s);while(typeof v==="string")v=JSON.parse(v);console.log(JSON.stringify(v))})'; }
+ev() { # the page answers a moment late after a navigation or a new tab, so an empty answer is asked again
+  local r; for _ in 1 2 3 4 5; do r=$(br eval "$1" | sed -n 's/^result: //p'); [ -n "$r" ] && break; sleep 1; done
+  printf '%s' "$r" | "$node" -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>{let v=JSON.parse(s);while(typeof v==="string")v=JSON.parse(v);console.log(JSON.stringify(v))})'; }
 want() { [ "$part" = all ] || [ "$part" = "$1" ]; }
 cd "$d"; printf 'board: board.json\nname: Umer\n' > config.yaml
 "$node" -e '
