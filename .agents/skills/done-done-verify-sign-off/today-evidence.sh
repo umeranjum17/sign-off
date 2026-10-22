@@ -42,7 +42,7 @@ for theme in light dark; do
   done
 done
 num() { chrome-devtools-axi eval "$1" | grep -o '[0-9][0-9]*' | head -1; }
-chrome-devtools-axi open "$url#evidence" >/dev/null; chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
+chrome-devtools-axi open "$url#evidence" >/dev/null; chrome-devtools-axi eval "() => { const b = document.getElementById('ev-find'); b.value = ''; b.dispatchEvent(new Event('input')); return new Promise((ok) => setTimeout(ok, 800)); }" >/dev/null
 evcards=$(num '() => document.querySelectorAll(".ev-card").length'); repostcards=$(num '() => [...document.querySelectorAll(".ev-card .t")].filter((t) => t.textContent.startsWith("Repost demo")).length')
 old=$(num '() => [...document.querySelectorAll(".ev-card .t")].filter((t) => t.textContent === "Passed check filed 3 days ago").length')
 muxr=$(num '() => [...document.querySelectorAll(".ev-group")].filter((g) => g.querySelector("h2").textContent === "muxr").reduce((n, g) => n + g.querySelectorAll(".ev-card").length, 0)')
