@@ -1151,10 +1151,10 @@ test('a guided report: item detail keeps its line breaks, same-axis options read
       assert.deepEqual([table.wide, table.outside], [false, 0], `${width}: ${JSON.stringify(table)}`);
       // Detail that is not a table keeps one line per point.
       await evaluate(`document.querySelector('#gd-lines .rowbtn').click()`);
-      const lines = await evaluate(`(() => { const p = document.querySelector('#gd-lines .body p'), r = document.createRange(), tops = new Set(), walk = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+      const lines = await evaluate(`(() => { const f = document.querySelector('#gd-lines .body [data-sf="more"]') ?? document.querySelector('#gd-lines .body .gd-md'), r = document.createRange(), tops = new Set(), walk = document.createTreeWalker(f, NodeFilter.SHOW_TEXT);
         for (let n; (n = walk.nextNode());) if (n.data.trim()) { r.selectNodeContents(n); for (const b of r.getClientRects()) tops.add(Math.round(b.top)); }
-        return { text: p.innerText, tops: tops.size }; })()`);
-      assert.deepEqual(lines, { text: 'Close the input.\nPin the version.\nReady the backup.', tops: 3 }, `${width}`);
+        return { text: f.textContent, lines: [...f.querySelectorAll('p')].map((p) => p.textContent), tops: tops.size }; })()`);
+      assert.deepEqual(lines, { text: 'Close the input.\nPin the version.\nReady the backup.', lines: ['Close the input.', 'Pin the version.', 'Ready the backup.'], tops: 3 }, `${width}`);
       // An item with no detail draws its buttons inside the item's own padding, as an opened item does.
       const pad = await evaluate(`(() => { const li = [...document.querySelectorAll('#gd-found .gd-rows > li')].find((l) => l.textContent.startsWith('One password entry')), box = li.getBoundingClientRect(), text = li.querySelector('.rowstat .sm').getBoundingClientRect();
         return { buttons: li.querySelectorAll('button').length, outside: [...li.querySelectorAll('button, input')].filter((b) => { const r = b.getBoundingClientRect(); return r.left < text.left - 0.5 || r.right > box.right - 8; }).length }; })()`);

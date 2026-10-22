@@ -43,11 +43,11 @@ function measure(section, item) {
   const t = sec.querySelector('.gd-ct');
   if (t) Object.assign(res, { layout: getComputedStyle(t).display, options: [...t.tHead.rows[0].cells].slice(1).map((c) => c.textContent), axes: [...t.tBodies[0].rows].map((r) => r.cells[0].textContent) });
   if (item != null) {
-    const li = sec.querySelectorAll('.gd-rows > li')[item], lb = li.getBoundingClientRect(), p = li.querySelector('.body p');
+    const li = sec.querySelectorAll('.gd-rows > li')[item], lb = li.getBoundingClientRect(), p = li.querySelector('.body .gd-md');
     if (p) {
       const r = document.createRange(), tops = new Set(), walk = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
       for (let n; (n = walk.nextNode());) if (n.data.trim()) { r.selectNodeContents(n); for (const b of r.getClientRects()) tops.add(Math.round(b.top)); }
-      Object.assign(res, { lines: p.innerText.split('\n').length, tops: tops.size });
+      Object.assign(res, { lines: p.querySelectorAll('p').length, tops: tops.size });
     }
     const ctl = [...li.querySelectorAll('.body button, .body input')];
     Object.assign(res, { controls: ctl.length, gap: Math.round(Math.min(...ctl.map((b) => Math.min(b.getBoundingClientRect().left - lb.left, lb.right - b.getBoundingClientRect().right)))) });
