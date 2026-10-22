@@ -33,6 +33,8 @@ Harness: a browser (chrome-devtools-axi, one CHROME_DEVTOOLS_AXI_SESSION per run
 - [Plan review](features/plan-review.md): open a plan, approve or change sections, answer decisions and send back structured answers
 - [Guided plan and report](features/guide.md): clean-install authoring, the one-scroll Guide view, read receipts, legacy Go deeper and native-owner Simplify with persistent New at both widths and themes, selected-text asks (`done-done run selection`), Archify diagrams on a plan (`diagram-shots.mjs`, see the feature file), research-bar authoring from the packaged skill, item detail line breaks and the comparison table (`table-shots.mjs`)
 - [Evidence](features/evidence.md): the Evidence list (one list, newest first, with a project filter) with the capture as the card's hero, and the update's own screen with the whole capture, the proof rows and the verdicts
+- Agree, Disagree, Comment and Ask on a part (`done-done run part-comment`, `part-comment-shots.mjs`): see [Guided plan and report](features/guide.md)
+- [Evidence](features/evidence.md): the Evidence list grouped by project with the capture as the card's hero, and the update's own screen with the whole capture, the proof rows and the verdicts
 - [Evidence attachment](features/evidence-attach.md): a file (an APK) attached to an update card, its file row at both widths and a real download whose byte count matches
 - [Notification sender](features/notifications.md): configure a local receiver, post a new ask and verify the exact received JSON, once per card
 - [Board actions](features/board-actions.md): every card kind on every tab, every action clicked, both widths and themes, with done-done's look step

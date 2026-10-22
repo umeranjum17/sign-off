@@ -153,7 +153,7 @@ try {
 
   // Go deeper: the person taps, the agent (the installed CLI behind a responder) answers, and the answer streams into that spot.
   const planDeeper = answerDeeper(planFile);
-  click('[data-part="found"] > .gd-acts .gd-lnk.deep');
+  click('[data-part="found"] > .gd-acts .deep');
   drive(`await wait('[data-part="found"] > .gd-ans .gask', 50);`);
   assert.match(cli('deeper', board, '--filer', plan.filer, '--all', '--json'), /"part":"found"/);
   drive(`await wait('[data-part="found"] > .gd-ans .gask:not(.live)', 900);`);
@@ -187,7 +187,7 @@ try {
   const reportDeeper = answerDeeper(reportFile);
   show('limits');
   assert.ok((await state()).reads?.[`${report.key}/limits`], 'the report part on screen has a real read receipt');
-  click('[data-part="limits"] > .gd-acts .gd-lnk.deep');
+  click('[data-part="limits"] > .gd-acts .deep');
   drive(`await wait('[data-part="limits"] > .gd-ans .gask:not(.live)', 900);`);
   const reportLog = await reportDeeper; assert.equal(reportLog.code, 0, reportLog.log);
   writeFileSync(join(records, 'report-deeper.responder.txt'), reportLog.log);
@@ -230,15 +230,16 @@ try {
       const question = 'What would change your recommendation?';
       // Every rendered part, including expanded items and decisions, has the same controls.
       const controls = JSON.parse(drive(`console.log(JSON.stringify(await page.eval(() => [...document.querySelectorAll('.gd-acts')].map(e => [...e.querySelectorAll('button')].map(b => b.textContent)))));`));
-      for (const labels of controls) for (const label of ['Ask a question', 'Go deeper', 'Simplify this', 'Show an example', 'Why?']) assert.ok(labels.includes(label));
+      for (const labels of controls) for (const label of ['Ask a question', 'Go deeper', 'Simplify this', 'Show an example', 'Why?']) assert.ok(labels.some((l) => l.startsWith(label)), `${label} is on every part`);
       // Every free-text box shows its whole placeholder: measured with the box's own font against the room inside it, leaving a fifth spare because a phone's font is wider than this browser's (the old text fit here by 4px and clipped on the phone).
       show('next');
-      const boxes = JSON.parse(drive(`console.log(JSON.stringify(await page.eval(() => [...document.querySelectorAll('.gd-fu input')].filter(i => i.clientWidth).map(i => { const cs = getComputedStyle(i), c = document.createElement('canvas').getContext('2d'); c.font = cs.font; return { placeholder: i.placeholder, text: c.measureText(i.placeholder).width, room: i.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) }; }))));`));
+      click('[data-part="next"] > .gd-acts .question');
+      const boxes = JSON.parse(drive(`console.log(JSON.stringify(await page.eval(() => [...document.querySelectorAll('.gd-cbox textarea')].filter(i => i.clientWidth).map(i => { const cs = getComputedStyle(i), c = document.createElement('canvas').getContext('2d'); c.font = cs.font; return { placeholder: i.placeholder, text: c.measureText(i.placeholder).width, room: (i.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)) * i.rows }; }))));`));
       writeFileSync(join(records, `${kind}-freetext-boxes.${theme}.${width}w.json`), JSON.stringify(boxes));
       capture(`${kind}-freetext`, 'The free-text box shows its whole placeholder, not cut off.');
       assert.ok(boxes.length, 'free-text boxes are rendered');
       for (const b of boxes) assert.ok(b.text <= b.room * 0.8, `placeholder "${b.placeholder}" is ${Math.round(b.text)}px wide in ${Math.round(b.room)}px: it can clip on a phone`);
-      const sendText = (part, text, isQuestion = false) => drive(`await page.eval(() => { const p = document.querySelector('[data-part="${part}"]'); ${isQuestion ? "p.querySelector(':scope > .gd-acts .question').click();" : ''} const input = p.querySelector(':scope > .gd-fu input'); ${isQuestion ? 'if (document.activeElement !== input) throw Error("Composer did not focus");' : ''} input.value = ${JSON.stringify(text)}; p.querySelector(':scope > .gd-fu').requestSubmit(); }); await nap(600);`);
+      const sendText = (part, text, isQuestion = false) => drive(`await page.eval(() => { const p = document.querySelector('[data-part="${part}"]'); ${isQuestion ? "p.querySelector(':scope > .gd-acts .question').click();" : "p.querySelector(':scope > .gd-acts .question').click();"} const input = p.querySelector(':scope > .gd-cbox textarea'); if (document.activeElement !== input) throw Error("Composer did not focus"); input.value = ${JSON.stringify(text)}; input.dispatchEvent(new Event('input', { bubbles: true })); p.querySelector(':scope > .gd-cbox').requestSubmit(); }); await nap(600);`);
       sendText('this', custom);
       for (const action of ['deeper', 'example', 'why']) click(`[data-part="next"] > .gd-acts .${action === 'deeper' ? 'deep' : action}`);
       sendText('next', question, true);
@@ -246,8 +247,8 @@ try {
       drive(`await page.eval(() => { const b = document.querySelector('[data-part="next"] > .gd-acts .why'); b.click(); b.click(); }); await nap(600);`);
       const pending = (await state()).deeper.filter(a => a.key === item.key && !a.done);
       assert.equal(pending.length, 7); assert.equal(new Set(pending.map(a => a.id)).size, 7);
-      assert.deepEqual(pending.map(a => a.action).sort(), ['custom', 'deeper', 'example', 'question', 'why', 'why', 'why']);
-      for (const a of pending) { assert.equal(a.part, a.action === 'custom' ? 'this' : 'next'); assert.equal(a.q, a.action === 'custom' ? custom : a.action === 'question' ? question : undefined); }
+      assert.deepEqual(pending.map(a => a.action).sort(), ['deeper', 'example', 'question', 'question', 'why', 'why', 'why']);
+      for (const a of pending) { assert.equal(a.part, a.q === custom ? 'this' : 'next'); assert.equal(a.q, a.q === custom ? custom : a.action === 'question' ? question : undefined); }
       const retry = pending.find(a => a.action === 'why');
       const body = Object.fromEntries(['version', 'id', 'key', 'kind', 'schema', 'filer', 'revision', 'part', 'action'].map(k => [k, retry[k]]));
       drive(`console.log(await page.eval(async () => { const r = await fetch('/api/engagement', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(${JSON.stringify(body)})}); if (!r.ok) throw Error(await r.text()); return r.status; }));`);
@@ -268,7 +269,7 @@ try {
       browser('open', url); drive('await wait(".gd-sec");');
       sendText('this', followup);
       const follow = (await state()).deeper.find(a => a.key === item.key && a.q === followup);
-      assert.equal(follow.action, 'custom'); assert.equal(follow.part, 'this');
+      assert.equal(follow.action, 'question'); assert.equal(follow.part, 'this');
       await deliver([follow], 'followup');
       assert.equal(readFileSync(board, 'utf8'), original, 'all presets preserve authored content and decisions');
       browser('open', url); drive('await wait(".gd-sec");'); show('next');

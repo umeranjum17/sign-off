@@ -873,6 +873,45 @@ test('an answers-only board takes Go deeper on a report part and still refuses r
   } finally { server.kill(); }
 });
 
+test('a comment on a report part reaches the author agent through wait --filer, is taken once, and its reply shows on the board', async () => {
+  const dir = join(scratch, 'part-comment'), board = join(dir, 'board.json'), env = { ...process.env, SIGN_OFF_HOME: dir, HOME: join(dir, 'home') };
+  delete env.SIGN_OFF_FILER; delete env.CLAUDE_CODE_SESSION_ID;
+  const run = (...args) => spawnSync(process.execPath, [cli, ...args], { env, encoding: 'utf8' });
+  const report = { ...JSON.parse(readFileSync(join(fixtures, 'report.v4/valid-full.json'))), key: 'comment-report', filer: 'agent-41' };
+  assert.equal(spawnSync(process.execPath, [cli, 'post', board, '--kind', 'report', '--from', '-'], { env, encoding: 'utf8', input: JSON.stringify(report) }).status, 0);
+  const server = spawn(process.execPath, [cli, 'serve', board, '--port', '0'], { env });
+  try {
+    const url = await new Promise(ok => server.stdout.once('data', b => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+    const send = (body) => fetch(url + 'api/annotations', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const text = 'The 6-second limit is short for a cold start.';
+    assert.equal((await send({ key: 'comment-report', part: 'nope', text })).status, 404, 'a part the report has not got');
+    assert.equal((await send({ key: 'comment-report', part: 'found:0' })).status, 400, 'neither a verdict nor words');
+    assert.equal((await send({ key: 'comment-report', part: 'found:0', verdict: 'maybe' })).status, 400);
+    const sent = await send({ key: 'comment-report', part: 'found:0', verdict: 'disagree', text });
+    assert.equal(sent.status, 200);
+    const [saved] = (await sent.json()).comments;
+    assert.deepEqual([saved.part, saved.verdict, saved.text, saved.read], ['found:0', 'disagree', text, undefined], 'the board shows it sent, not read');
+    // Another filer's wait does not get it; the author's does, once, with the part it is about.
+    assert.notEqual(run('wait', board, '--filer', 'someone-else', '--events', '--timeout', '1').status, 0);
+    const first = run('wait', board, '--filer', 'agent-41', '--events', '--timeout', '10');
+    assert.equal(first.status, 0, first.stdout + first.stderr);
+    const [event, ...more] = first.stdout.trim().split('\n').map(l => JSON.parse(l));
+    assert.deepEqual(more, []);
+    assert.deepEqual([event.event, event.kind, event.key, event.part, event.about, event.verdict, event.text, event.id], ['comment', 'report', 'comment-report', 'found:0', report.sections[0].items[0].title, 'disagree', text, saved.id]);
+    assert.notEqual(run('wait', board, '--filer', 'agent-41', '--events', '--timeout', '1').status, 0, 'a taken comment does not wake the next wait');
+    const board1 = await (await fetch(url + 'api/decisions')).json();
+    assert.ok(board1.comments[0].read && !board1.comments[0].reply, 'the board shows Agent read it');
+    // The reply goes through deeper, only for the filer who owns the report.
+    assert.notEqual(run('deeper', board, '--filer', 'someone-else', '--id', saved.id, '--text', 'Not mine').status, 0);
+    assert.equal(run('deeper', board, '--filer', 'agent-41', '--id', saved.id, '--text', 'It still hung at 30 s.').status, 0);
+    assert.equal((await (await fetch(url + 'api/decisions')).json()).comments[0].reply, 'It still hung at 30 s.');
+    // A comment is not an answer: nothing went to answers or rounds, and an answers-only board takes none.
+    assert.deepEqual(JSON.parse(run('answers', board, '--json').stdout), {});
+    writeFileSync(board, JSON.stringify({ ...JSON.parse(readFileSync(board, 'utf8')), answers_only: true }));
+    assert.equal((await send({ key: 'comment-report', part: 'found:0', verdict: 'agree' })).status, 403);
+  } finally { server.kill(); }
+});
+
 test('standalone owner registration preserves queued failures and separates delivery from owner acknowledgement', async () => {
   const dir = join(scratch, 'owners'), board = join(dir, 'board.json'), bin = join(dir, 'bin');
   mkdirSync(bin, { recursive: true }); symlinkSync(process.execPath, join(bin, 'node'));

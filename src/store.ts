@@ -497,13 +497,34 @@ export function readAnnotations(decisionsPath: string, warn: (msg: string) => vo
       const a = line && JSON.parse(line);
       if (a?.deleted === true) all.delete(a.id);
       else if (a && ['id', 'key', 'mock', 'hash', 'ref', 'tag', 'words', 'text'].every((k) => typeof a[k] === 'string')) all.set(a.id, a);
-      else if (a) warn(`skipped unreadable line ${n + 1} in ${annotationsPath(decisionsPath)}`);
+      else if (a && a.part === undefined && a.op === undefined) warn(`skipped unreadable line ${n + 1} in ${annotationsPath(decisionsPath)}`);
     } catch {
       warn(`skipped unreadable line ${n + 1} in ${annotationsPath(decisionsPath)}`);
     }
   });
   return [...all.values()];
 }
+/** A comment on one part of a guided page, in the same file as mock comments: a line with a `part`, then the agent reading it (`op: read`) and its reply (`op: reply`). */
+export type PartComment = { id: string; key: string; part: string; about: string; verdict?: 'agree' | 'disagree'; text?: string; at: string; read?: string; reply?: string; replied?: string };
+export function readPartComments(decisionsPath: string): PartComment[] {
+  const all = new Map<string, PartComment>();
+  readRaw(annotationsPath(decisionsPath)).split('\n').forEach((line) => {
+    try {
+      const x = line && JSON.parse(line), c = x && all.get(x.id);
+      if (typeof x?.part === 'string' && typeof x.id === 'string') all.set(x.id, { id: x.id, key: x.key, part: x.part, about: x.about, ...(x.verdict && { verdict: x.verdict }), ...(x.text && { text: x.text }), at: x.at });
+      else if (c && x.op === 'read') c.read ??= x.at;
+      else if (c && x.op === 'reply') { c.reply = x.text; c.replied = x.at; c.read ??= x.at; }
+    } catch {}
+  });
+  return [...all.values()];
+}
+export function appendPartComment(decisionsPath: string, key: string, part: string, about: string, verdict?: 'agree' | 'disagree', text?: string): PartComment {
+  const id = randomBytes(6).toString('hex'), at = now();
+  appendLine(annotationsPath(decisionsPath), { id, key, part, about, ...(verdict && { verdict }), ...(text && { text }), at });
+  return { id, key, part, about, ...(verdict && { verdict }), ...(text && { text }), at };
+}
+export const markCommentsRead = (decisionsPath: string, ids: string[]) => { for (const id of ids) appendLine(annotationsPath(decisionsPath), { op: 'read', id, at: now() }); };
+export const replyComment = (decisionsPath: string, id: string, text: string) => appendLine(annotationsPath(decisionsPath), { op: 'reply', id, text, at: now() });
 /** Saves a comment (a new id unless it edits one) or, with only an id, deletes it. */
 export const appendAnnotation = (decisionsPath: string, a: Omit<Annotation, 'id' | 'at'> & { id?: string } | { id: string; deleted: true }) =>
   appendLine(annotationsPath(decisionsPath), { ...a, id: a.id ?? randomBytes(6).toString('hex'), at: now() });

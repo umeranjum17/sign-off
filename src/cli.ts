@@ -13,7 +13,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, asks, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, sameDecision, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, sameDecision, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -149,7 +149,7 @@ Blocks until the user answers, then prints the answer the way answers does. Use 
   --timeout  seconds to wait, 600 (10 minutes) by default; then exits 1 with code TIMEOUT
   --full     adds the button label, close and title
   --json     {"<key>":{"answer","label","close","at","note"?}} for the new answers; note only when the user wrote one
-  --events   needs --filer (or SIGN_OFF_FILER); JSON lines for new answers, another-round asks and Go deeper (each wait returns one batch).
+  --events   needs --filer (or SIGN_OFF_FILER); JSON lines for new answers, another-round asks, Go deeper and comments on a part (each wait returns one batch).
              Answer and round lines come in the order they were saved (${CONTRACT}#7-answers):
              {"event":"answer","contract":1,"kind","schema","key","title","answer","label","close","at","note"?,"filer"?,"comments"?}
              {"event":"round","contract":1,"kind","schema","key","title","note","at","filer"?,"comments"?}; a board-format item reports as ask schema 1
@@ -331,6 +331,7 @@ Do not run an active wait listener for the same owner alongside the dispatcher. 
   deeper: `usage: sign-off-axi deeper [board.json] [--filer <id>] [--all] [--json]
        sign-off-axi deeper [board.json] --filer <id> --id <id> --text "<answer>" [--more]
 Every part of a plan 3 or report 4 offers Ask a question, Go deeper, Simplify this, Show an example, Why?, and free text. Ask a question needs text and Send; Go deeper, Simplify this, Show an example and Why? send immediately. Free text and follow-ups use custom. Older guided schemas retain Go deeper. Engagement v1 replies require the owning --filer or registered owner session; stale targets are refused. The person taps it; wait --filer wakes with the ask, or this command lists the ones nobody finished.
+The same --id --text replies to a comment on a part (the id in wait's comment event).
 Answer in plain words about the part they tapped, a few lines at a time: each --more piece streams into that spot on the board while they watch, and a last call without --more ends it.
   --id     the ask to answer   --text  the answer, or - to read stdin (2000 characters or fewer per piece)
   --more   more pieces follow   --all  also the finished asks
@@ -641,6 +642,17 @@ function deeperOut(file: string, asks: ReturnType<typeof readDeeper>, on: string
     ['The person tapped Go deeper: answer in plain words, a few lines at a time, as the part they tapped',
       `Run \`sign-off-axi deeper${on} --id <id> --text "<what you found>" --more\` for each piece, then once more without --more to finish`]);
 }
+/** Comments on the parts of a guided page as the agent reads them; answer one with `deeper --id <id> --text`. */
+function commentOut(file: string, said: ReturnType<typeof readPartComments>, on: string, events?: boolean) {
+  const titles = new Map(board(file).map((d) => [d.key, d.title]));
+  if (events) {
+    const kind = kindOf(file);
+    return said.map(({ id, key, part, about, verdict, text, at }) => JSON.stringify({ event: 'comment', ...kind(key), key, title: titles.get(key), id, part, about, ...(verdict && { verdict }), ...(text && { text }), at })).join('\n');
+  }
+  return toon({ board: tilde(file), comments: said.map(({ id, key, part, about, verdict = '', text = '', at }) => ({ id, key, part, about, verdict, text, at })) },
+    ['The person commented on a part: read it, change the page if it is right, and reply in plain words',
+      `Run \`sign-off-axi deeper${on} --id <id> --text "<your reply>"\` to answer one`]);
+}
 /** `deeper`: the Go deeper asks nobody has finished, or with --id and --text one piece of the answer the board streams under the part the person tapped. */
 async function owner(args: string[]) {
   const { file, values } = parse('owner', args, { filer: { type: 'string' }, host: { type: 'string' }, session: { type: 'string' }, cwd: { type: 'string' }, model: { type: 'string' }, dispatch: { type: 'boolean' }, verbose: { type: 'boolean' }, ack: { type: 'string' }, timeout: { type: 'string' } });
@@ -675,6 +687,15 @@ async function deeper(args: string[]) {
     if (!open.length) return toon({ board: tilde(file), deeper: '0 open' }, [`Run \`sign-off-axi wait${on}\` to be woken when the person taps Go deeper`]);
     markDeeperRead(file, open.filter((x) => !x.read).map((x) => x.id));
     return toon({ board: tilde(file), deeper: open.map(({ id, key, part, about, q = '', at, done, action }) => ({ id, key, part, about, q, at, done: !!done, ...(action && { action }) })) }, [`Run \`sign-off-axi deeper${on} --id <id> --text "<answer>"\` to answer one`]);
+  }
+  const said = readPartComments(file).find((x) => x.id === values.id);
+  if (said) {
+    if (filer !== undefined && !board(file).some((d) => d.key === said.key && d.filer === filer)) throw new InputError('Request does not belong to this filer');
+    if (said.reply !== undefined) throw fail(`comment ${values.id} is already answered`, 'CONFLICT', 'The person can comment again');
+    const reply = values.text === '-' ? readFileSync(0, 'utf8') : values.text;
+    if (typeof reply !== 'string' || !reply.trim() || [...reply.trim()].length > 2000) throw fail('--text must be the reply, 2000 characters or fewer', 'VALIDATION_ERROR', 'Run `sign-off-axi deeper --help`');
+    replyComment(file, said.id, reply.trim());
+    return toon({ id: said.id, key: said.key, part: said.part, answered: 'done' }, [`Run \`sign-off-axi wait${on}\` for the next answer or ask`]);
   }
   const ask = readDeeper(file).find((x) => x.id === values.id);
   if (!ask) throw fail(`no Go deeper ask with id ${values.id}`, 'NOT_FOUND', `Run \`sign-off-axi deeper${on}\` to see the open ones`);
@@ -717,9 +738,9 @@ async function wait(args: string[]) {
   for (const r of readRounds(file)) seenRounds.set(r.key, (seenRounds.get(r.key) ?? 0) + 1);
   // A save wakes the loop at once; the 1 second timer is the fallback where file events are unavailable.
   let wake = () => {}, watcher, vaultWarned = false;
-  const name = basename(answersPath(file)), asking = basename(deeperPath(file));
+  const name = basename(answersPath(file)), asking = basename(deeperPath(file)), talking = basename(annotationsPath(file));
   try {
-    try { watcher = watch(dirname(file), (_, changed) => (changed === name || changed === asking) && wake()).on('error', () => {}); } catch {}
+    try { watcher = watch(dirname(file), (_, changed) => (changed === name || changed === asking || changed === talking) && wake()).on('error', () => {}); } catch {}
     for (let first = true; ; first = false) {
       const rows = mine(open(board(file, first ? warn : () => {}))), waiting = rows.filter(waits).length, taken = filer === undefined ? undefined : seenBy(file);
       const hit = rows.filter((d) => (values.key !== undefined ? d.key === values.key : d.answer && (taken ? !taken(d.answer) : before.get(d.key) !== JSON.stringify(d.answer))));
@@ -757,6 +778,13 @@ async function wait(args: string[]) {
           return got;
         }, 'another wait is still taking Go deeper asks');
         if (asks.length) return deeperOut(file, asks, onBoard + (filer ? ` --filer ${filer}` : ''), values.events);
+        // A comment on a part of this filer's page wakes the wait once, and is marked read when it is handed over.
+        const said = await locked(`${annotationsPath(file)}.lock`, () => {
+          const got = readPartComments(file).filter((x) => !x.read && (values.key === undefined || x.key === values.key) && rows.some((d) => d.key === x.key));
+          markCommentsRead(file, got.map((x) => x.id));
+          return got;
+        }, 'another wait is still taking comments');
+        if (said.length) return commentOut(file, said, on, values.events);
       }
       // Private vault expiries and refusals reach a filer wait only once its ordinary answers are out; each is taken once.
       let live = 0, unknown = false;
@@ -2059,7 +2087,7 @@ async function exportBoard(args: string[]) {
   config = join(dirname(parsed.named), 'config.yaml');
   guardReady = warmGuard();
   await guardReady;
-  const { file: _, messages: _messages, annotations: _annotations, ...frozen } = state(), files: Record<string, string> = {}, q = encodeURIComponent;
+  const { file: _, messages: _messages, annotations: _annotations, comments: _comments, ...frozen } = state(), files: Record<string, string> = {}, q = encodeURIComponent;
   let missing = 0;
   // The same URLs the page asks the server for, read through the same hash and path checks.
   const inline = async (url: string, query?: string, document = false) => {
@@ -2193,6 +2221,7 @@ const state = () => {
     rounds,
     messages: readMessages(file, warn),
     annotations: readOnly() || answersOnly() ? [] : ((sent) => readAnnotations(file, warn).map((a) => (sent.has(a.id) ? { ...a, sent: true } : a)))(sentIds(file)),
+    comments: readOnly() || answersOnly() ? [] : readPartComments(file),
     dismissed: readDismissed(file, answers, rounds, warn, archivable(file, loadDecisions(file))),
   };
 };
@@ -2368,7 +2397,18 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     return [200, state()];
   }
   if (req.url === '/api/annotations') {
-    const { id, deleted, key, mock, ref, tag, words, text, hash: shown } = JSON.parse(body) ?? {}, live = readAnnotations(file), sent = sentIds(file);
+    const c = JSON.parse(body) ?? {};
+    // A comment on a part of a guided page: Agree, Disagree or words, kept beside the design notes for the author agent's wait to take.
+    if (c.part !== undefined) {
+      const d = loadDecisions(file).find((x) => x.key === c.key), about = typeof c.part === 'string' && d && guidePart(d, c.part);
+      if (!about) return [404, { error: 'This part is no longer on the board' }];
+      if (c.verdict !== undefined && c.verdict !== 'agree' && c.verdict !== 'disagree') return [400, { error: 'Send agree or disagree' }];
+      if (c.text !== undefined && (typeof c.text !== 'string' || [...c.text.trim()].length > NOTE_MAX)) return [400, { error: `Write the comment in ${NOTE_MAX} characters or fewer` }];
+      if (!c.verdict && !c.text?.trim()) return [400, { error: 'Write the comment first' }];
+      appendPartComment(file, c.key, c.part, about, c.verdict, c.text?.trim());
+      return [200, state()];
+    }
+    const { id, deleted, key, mock, ref, tag, words, text, hash: shown } = c, live = readAnnotations(file), sent = sentIds(file);
     // A comment that went with an answer or a round is the agent's now: it stays as it was sent.
     if (id !== undefined && sent.has(id)) return [409, { error: 'This comment was sent' }];
     if (deleted === true) {
