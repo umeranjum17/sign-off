@@ -37,8 +37,8 @@ try {
   browser('screenshot', join(out, `${name}.png`));
   const m = parse(browser('eval', probe));
   writeFileSync(join(out, `${name}.txt`), [`${side} ${theme} ${width}w Evidence`, `project label ${m.label?.text} ${m.label?.size} weight ${m.label?.weight} ${m.label?.transform}`,
-    `Select and Clear all ${m.bulk.map((b) => `${b.text} ${b.w}x${b.h} at ${b.top}px`).join(', ')}; title at ${m.h1Top}px; above the title ${m.bulkAboveTitle}`,
-    `card gap ${m.spacing.cardGap}, between cards ${m.spacing.cardsGap}, group top ${m.spacing.groupTop}, preview ${m.spacing.thumb.w}x${m.spacing.thumb.h} (3:4), preview corner ${m.spacing.mediaRadius}, cards ${m.spacing.cards}`, `Waiting on you shown ${m.spacing.waiting ? 1 : 0}`,
+    `Select and Clear all ${m.bulk.map((b) => `${b.text} button ${b.w}px wide, ${b.h}px tall, top edge ${b.top}px from the page top`).join('; ')}; the large title's top edge is ${m.h1Top}px from the page top, so the buttons sit above the title: ${m.bulkAboveTitle ? 'yes' : 'no'}`,
+    `card gap ${m.spacing.cardGap}, between cards ${m.spacing.cardsGap}, group top ${m.spacing.groupTop}, preview ${m.spacing.thumb.w}x${m.spacing.thumb.h} (3:4), preview corner ${m.spacing.mediaRadius}, cards ${m.spacing.cards}`, `the words Waiting on you appear on the screen: ${m.spacing.waiting ? 'yes' : 'no'}`,
     `tab bar ${m.tabs.join(' | ')}`, `controls under 44px ${m.under.length}${m.under.length ? ': ' + m.under.map((x) => `${x.text} ${x.w}x${x.h}`).join(', ') : ''}`, `horizontal overflow ${m.overflowX ? 1 : 0}`].join('\n') + '\n');
   if (side === 'after') assert.deepEqual([m.under.length, m.overflowX, m.bulkAboveTitle, m.label?.size, m.spacing.thumb.w, m.spacing.thumb.h, m.spacing.waiting], [0, false, true, '12px', 72, 96, false], JSON.stringify(m));
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board with a sign-in ask, asks, a plan, a report and a passed update.',
