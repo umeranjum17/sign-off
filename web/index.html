@@ -766,7 +766,7 @@
   #reader .gd, #reader .gd-bar { --hair: color-mix(in srgb, var(--text) 12%, transparent); --hair2: color-mix(in srgb, var(--text) 7%, transparent); --tint: color-mix(in srgb, var(--action) 11%, transparent);
     --ok-bg: color-mix(in srgb, var(--ok) 13%, transparent); --warn-bg: color-mix(in srgb, var(--warn) 13%, transparent); --bad: var(--danger); --bad-bg: color-mix(in srgb, var(--danger) 11%, transparent); --well: var(--page); }
   @media (prefers-color-scheme: dark) { #reader .gd, #reader .gd-bar { --well: #0C0C0D; } }
-  #reader .gd { max-width: 72rem; margin: 0 auto; font-size: 1.0625rem; line-height: 1.47; }
+  #reader .gd { max-width: 72rem; margin: 0 auto; font-size: var(--t-b); line-height: 1.6; }
   :where(#reader .gd, #reader .gd-bar) :where(button, input, textarea) { font: inherit; color: inherit; letter-spacing: inherit; }
   :where(#reader .gd, #reader .gd-bar) button { cursor: pointer; border: 0; background: none; padding: 0; }
   #reader .gd [hidden] { display: none !important; }
@@ -817,10 +817,9 @@
   .gd-sec { background: var(--tile); border: 1px solid var(--hair2); border-radius: 1.375rem; padding: 1.25rem 1.125rem 0.875rem; margin: 0 0 0.875rem; scroll-margin-top: 5.5rem; }
   @media (min-width: 43.75rem) { .gd-sec { padding: 1.75rem 2rem 1.125rem; border-radius: 1.5rem; } }
   .gd-sec > .gh .gk { display: block; font-size: 0.875rem; font-weight: 600; color: var(--muted); margin-bottom: 0.375rem; }
-  #reader .gd-sec h2 { margin: 0 0 0.5rem; font-size: 1.5rem; line-height: 1.18; letter-spacing: -0.028em; font-weight: 700; }
-  @media (min-width: 43.75rem) { #reader .gd-sec h2 { font-size: 1.75rem; } }
+  #reader .gd-sec h2 { margin: 0 0 0.5rem; font-size: var(--t-l); line-height: 1.3; letter-spacing: -0.018em; font-weight: 650; }
   .gd-sec > .gh:not(:has(.gd-lead)) h2 { margin-bottom: 0.875rem; }
-  .gd-lead { margin: 0 0 1rem; line-height: 1.5; }
+  .gd-lead { margin: 0 0 1rem; }
   /* A diagram: a framed picture, its views as tabs, and Show me opening the interactive viewer in place. On a phone the open viewer's toolbar is wider than the card, so Full size is the way in there. */
   .gd-dg { padding: 0.5rem; }
   .gd-dgbox { border-radius: 0.75rem; overflow: hidden; border: 1px solid var(--hair2); background: var(--tile); }
@@ -922,16 +921,28 @@
   :is(.gd-rows, .gd-ct) .dotk.bad { background: var(--bad); } :is(.gd-rows, .gd-ct) .dotk.ok { background: var(--ok); } :is(.gd-rows, .gd-ct) .dotk.warn { background: var(--warn); }
   .gd-rows .body { padding: 0 0.875rem 0.5rem; }
   .gd-rows .body[hidden] { display: none; }
-  .gd-rows .body p { margin: 0 0 0.625rem; }
-  .gd-rows .body .ln { display: block; } .gd-rows .body .ln + .ln { margin-top: 0.375rem; }
+  /* Markdown in an authored field: the marks stay in the text for selection offsets and are not shown. */
+  .gd-mk { display: none; }
+  .gd-md > * { margin: 0 0 0.5rem; }
+  .gd-md > p + p { margin-top: 0.375rem; }
+  .gd-md ul, .gd-md ol { padding-left: 1.25rem; }
+  .gd-md li { padding-left: 0.125rem; margin: 0 0 0.25rem; }
+  .gd-md li::marker { color: var(--muted); }
+  #reader .gd code { font: 500 0.8125em/1.4 ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: 0; padding: 0.0625rem 0.3125rem; border-radius: 0.3125rem; background: var(--sunk); color: var(--text); overflow-wrap: anywhere; }
+  #reader .gd pre.gd-code { font-size: 0.8125rem; line-height: 1.6; padding: 0.75rem 0.875rem; border-radius: 0.625rem; background: var(--well); border: 1px solid var(--hair2); overflow-x: auto; white-space: pre; }
+  #reader .gd pre.gd-code code { padding: 0; background: none; font-size: 0.8125rem; line-height: 1.6; font-weight: 400; overflow-wrap: normal; }
+  #reader .gd strong { font-weight: 650; }
+  .gd-ref { color: var(--accent); text-decoration: none; white-space: nowrap; font-weight: 500; }
+  .gd-ref[data-short]::before { content: attr(data-short); }
+  .gd-ref::after { content: "\2197" / ""; font-size: 0.75em; margin-left: 0.0625rem; opacity: 0.7; }
   /* A comparison table: on a phone (and past 4 options) each point lists every option under it; with room, options run across. */
   .gd-cmp { container-type: inline-size; margin: 0 0 0.375rem; }
-  .gd-ct { display: block; font-size: 0.9375rem; line-height: 1.4; }
+  .gd-ct { display: block; font-size: var(--t-xs); line-height: 1.5; }
   .gd-ct thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .gd-ct tbody, .gd-ct tr, .gd-ct th, .gd-ct td { display: block; text-align: left; overflow-wrap: anywhere; }
-  .gd-ct tbody tr { border: 1px solid var(--hair2); border-radius: 1rem; padding: 0.125rem 0.875rem; margin: 0 0 0.625rem; }
-  .gd-ct tbody th { padding: 0.625rem 0 0.125rem; font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
-  .gd-ct td { padding: 0.5rem 0; border-top: 1px solid var(--hair2); }
+  .gd-ct tbody tr { border: 1px solid var(--hair2); border-radius: 1rem; overflow: hidden; margin: 0 0 0.625rem; }
+  .gd-ct tbody th { padding: 0.5rem 0.875rem; background: var(--well); font-weight: 600; color: var(--muted); }
+  .gd-ct td { padding: 0.5rem 0.875rem; border-top: 1px solid var(--hair2); }
   .gd-ct th + td { border-top: 0; }
   .gd-ct .ol { display: flex; align-items: baseline; gap: 0.5rem; font-weight: 600; }
   @container (min-width: 34rem) {
@@ -942,6 +953,8 @@
     .gd-cmp:not(.many) .gd-ct th, .gd-cmp:not(.many) .gd-ct td { display: table-cell; vertical-align: top; padding: 0.625rem 0.75rem; border-top: 0; border-bottom: 1px solid var(--hair2); }
     .gd-cmp:not(.many) .gd-ct tbody tr:last-child > * { border-bottom: 0; }
     .gd-cmp:not(.many) .gd-ct thead td { width: 7rem; }
+    .gd-cmp:not(.many) .gd-ct thead :is(th, td) { background: var(--well); }
+    .gd-cmp:not(.many) .gd-ct { overflow: hidden; }
     .gd-cmp:not(.many) .gd-ct td .ol { display: none; }
   }
   .gd-opts { display: grid; gap: 0.625rem; margin: 0 0 0.75rem; }
@@ -2089,6 +2102,63 @@
     state = out;
   }
 
+  // BEGIN markdown
+  // Authored text is escaped, then marked up. Every raw character stays in the page (the marks in hidden .mk spans, a link's address in its hidden text),
+  // so a selection's offsets, counted in the raw field, still match. Only http(s) links; the page is never given raw HTML.
+  const MD_ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  const mdEsc = (s) => s.replace(/[&<>"']/g, (c) => MD_ESC[c]);
+  const mdMark = (s) => `<span class="gd-mk">${mdEsc(s)}</span>`;
+  const MD_RE = /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(\*[^*\s][^*\n]*\*)|(\[[^\]\n]+\]\(https?:\/\/[^\s)]+\))|((?:https?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}\/[^\s),;]*[^\s),;.])/gi;
+  /** A short label for an address: `repo #12` for an issue or pull request, `HN 123` for Hacker News, else the domain. */
+  function mdShort(u) {
+    const s = u.replace(/^https?:\/\//, ''); let m;
+    if ((m = /^github\.com\/[^/]+\/([^/]+)\/(?:issues|pull)\/(\d+)/.exec(s))) return `${m[1]} #${m[2]}`;
+    if ((m = /^news\.ycombinator\.com\/item\?id=(\d+)/.exec(s))) return `HN ${m[1]}`;
+    if ((m = /^github\.com\/([^/]+\/[^/]+?)(?:\/releases)?\/?$/.exec(s))) return m[1];
+    return s.split('/')[0].replace(/^www\./, '');
+  }
+  /** One line of authored text as HTML. links: false inside a button, where a link cannot be pressed. */
+  function mdInline(t, { links = true } = {}) {
+    const re = new RegExp(MD_RE.source, 'gi'), ref = (url, inner, short) => {
+      const attrs = short ? ` data-short="${mdEsc(short)}"` : '';
+      return links ? `<a class="gd-ref"${attrs} href="${mdEsc(url)}" target="_blank" rel="noopener noreferrer" title="${mdEsc(url)}">${inner}</a>` : `<span class="gd-ref"${attrs}>${inner}</span>`;
+    };
+    let out = '', i = 0, m;
+    while ((m = re.exec(t))) {
+      const s = m[0];
+      out += mdEsc(t.slice(i, m.index)); i = m.index + s.length;
+      if (m[1]) out += `${mdMark('`')}<code>${mdEsc(s.slice(1, -1))}</code>${mdMark('`')}`;
+      else if (m[2]) out += `${mdMark('**')}<strong>${mdEsc(s.slice(2, -2))}</strong>${mdMark('**')}`;
+      else if (m[3]) out += `${mdMark('*')}<em>${mdEsc(s.slice(1, -1))}</em>${mdMark('*')}`;
+      else if (m[4]) { const [, label, url] = /^\[([^\]]+)\]\((.+)\)$/.exec(s); out += ref(url, `${mdMark('[')}${mdEsc(label)}${mdMark(`](${url})`)}`); }
+      else out += ref(/^https?:/i.test(s) ? s : `https://${s}`, mdMark(s), mdShort(s));
+    }
+    return out + mdEsc(t.slice(i));
+  }
+  /** A detail as HTML blocks: a paragraph per line, bullet and numbered lists, fenced code. The newlines stay in the text. */
+  function mdBlock(t) {
+    const ls = t.split('\n'), out = []; let k = 0;
+    const item = /^(\s*)([-*]|\d+\.)(\s+)(.*)$/;
+    while (k < ls.length) {
+      const l = ls[k];
+      if (/^\s*```/.test(l)) {
+        const code = []; k++;
+        while (k < ls.length && !/^\s*```/.test(ls[k])) code.push(ls[k++]);
+        const close = k < ls.length ? ls[k] : null; k++;
+        out.push(`<pre class="gd-code">${mdMark(`${l}\n`)}${code.length ? `<code>${mdEsc(code.join('\n'))}</code>` : ''}${close === null ? '' : mdMark(`${code.length ? '\n' : ''}${close}`)}</pre>`);
+      } else if (item.test(l)) {
+        const first = item.exec(l), tag = /\d/.test(first[2]) ? 'ol' : 'ul', lis = [];
+        while (k < ls.length && item.test(ls[k]) && /\d/.test(item.exec(ls[k])[2]) === (tag === 'ol')) { const [, lead, bullet, gap, rest] = item.exec(ls[k++]); lis.push(`<li>${mdMark(lead + bullet + gap)}${mdInline(rest)}</li>`); }
+        out.push(`<${tag}${tag === 'ol' && parseInt(first[2]) !== 1 ? ` start="${parseInt(first[2])}"` : ''}>${lis.join('\n')}</${tag}>`);
+      } else { out.push(l.trim() ? `<p>${mdInline(l)}</p>` : mdEsc(l)); k++; }
+    }
+    return out.join('\n');
+  }
+  const NOLINK = { links: false };
+  const mdSpan = (tag, cls, t, opts) => { const n = E(tag, cls); n.innerHTML = mdInline(t, opts); return n; };
+  const mdDiv = (t) => { const n = E('div', 'gd-md'); n.innerHTML = mdBlock(t); return n; };
+  // END markdown
+
   function guideView(d) {
     const plan = d.type === 'plan', key = d.key, sections = d.sections ?? [], decisions = plan ? d.decisions ?? [] : [], by = (stage) => sections.filter((s) => s.stage === stage);
     const live = !FROZEN && !state.readonly;
@@ -2297,8 +2367,8 @@
           pair ? E('div', 'pair', E('div', 'gd-track thin', el('i', { class: 'ghost', style: `width:${((r.before ?? 0) / max) * 100}%` })), E('div', 'gd-track', el('i', { class: r.tone ?? '', style: `width:${(r.value / max) * 100}%` })))
             : E('div', 'gd-track', el('i', { class: r.tone ?? '', style: `width:${(r.value / max) * 100}%` })))));
       } else if (v.type === 'steps') {
-        body = E('ol', 'gd-chain', ...v.rows.map((r, i) => E('li', '', E('span', `nd ${r.tone ?? ''}`, String(i + 1)), E('div', 'tx', ...(r.note ? [E('small', '', r.note)] : []), r.label, ...(r.text ? [E('small', '', r.text)] : [])))));
-      } else body = E('div', 'gd-tiles', ...v.rows.map((r) => E('div', 'gd-tile', ...(r.note ? [E('span', `gd-chip ${r.tone ?? ''}`, r.note)] : []), E('b', '', r.label), ...(r.text ? [E('span', 'gt', r.text)] : []))));
+        body = E('ol', 'gd-chain', ...v.rows.map((r, i) => E('li', '', E('span', `nd ${r.tone ?? ''}`, String(i + 1)), E('div', 'tx', ...(r.note ? [E('small', '', r.note)] : []), mdSpan('span', '', r.label), ...(r.text ? [mdSpan('small', '', r.text)] : [])))));
+      } else body = E('div', 'gd-tiles', ...v.rows.map((r) => E('div', 'gd-tile', ...(r.note ? [E('span', `gd-chip ${r.tone ?? ''}`, r.note)] : []), mdSpan('b', '', r.label), ...(r.text ? [mdSpan('span', 'gt', r.text)] : []))));
       if (v.diagram) {
         // The picture is the diagram; the rows stay the same answer in plain steps (open on a phone, one tap away on a desk).
         return diagramFig(v.diagram, body);
@@ -2308,7 +2378,7 @@
 
     // ---- cards
     const card = (part, stage, ...kids) => { const c = el('section', { class: 'gd-sec', 'data-part': part, id: `gd-${part.replace(/\W/g, '-')}` }, ...kids); parts.set(part, c); stageOf.set(part, stage); return c; };
-    const head = (h, lead, kicker, part, hf, lf) => el('div', { class: 'gh' }, ...(kicker ? [E('span', 'gk', kicker)] : []), fld(part, hf, E('h2', '', h)), ...(lead ? [fld(part, lf, E('p', 'gd-lead', lead))] : []));
+    const head = (h, lead, kicker, part, hf, lf) => el('div', { class: 'gh' }, ...(kicker ? [E('span', 'gk', kicker)] : []), fld(part, hf, mdSpan('h2', '', h)), ...(lead ? [fld(part, lf, mdSpan('p', 'gd-lead', lead))] : []));
     const hero = card('this', 'this', head(d.visual.heading, d.visual.text, undefined, 'this', 'visual.heading', 'visual.text'), visual(d.visual), ...acts('this', d.visual.details), rc('this'));
 
     const noteBox = el('textarea', { class: 'gd-note', 'aria-label': plan ? 'What is off' : 'What is off, for the agent', placeholder: 'What is off? One line is enough.', maxlength: '500', hidden: '' });
@@ -2331,7 +2401,7 @@
       tell.hidden = plan || S.understood !== 'no' || !S.note.trim() || S.told || !live; tell.disabled = false;
     }
     const understood = card('understood', 'understood', head('Check that I have this right', 'This is your ask in my words. If it is off, say what is off. That is the only correction that matters.'),
-      el('dl', { class: 'gd-uq' }, ...d.understood.map((u, n) => E('div', '', fld('understood', `understood.${n}.label`, el('dt', {}, u.label)), fld('understood', `understood.${n}.text`, el('dd', {}, u.text))))),
+      el('dl', { class: 'gd-uq' }, ...d.understood.map((u, n) => E('div', '', fld('understood', `understood.${n}.label`, el('dt', {}, u.label)), fld('understood', `understood.${n}.text`, mdSpan('dd', '', u.text))))),
       E('div', 'gd-seg', ...choices), noteBox, tell, ...(live ? acts('understood') : []), rc('understood'));
 
     // A comparison: every item's detail is the same "Axis: value" lines in the same order, so the section is one table.
@@ -2344,24 +2414,21 @@
       return { axes, values: rows.map((r) => r.map((m) => m[2])) };
     };
     const cmpTable = (items, { axes, values }) => {
-      const opt = (it) => E('span', 'ol', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), it.title);
-      // A link in a narrow cell breaks after a slash, not inside a word.
-      const value = (t) => E('span', '', ...t.split(/(?<=\/)(?=\S)/).flatMap((part, i) => (i ? [el('wbr'), part] : [part])));
+      const opt = (it) => E('span', 'ol', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), mdSpan('span', '', it.title));
+      const value = (t) => mdSpan('span', '', t);
       const row = (label, cells) => el('tr', {}, el('th', { scope: 'row' }, label), ...cells.map((c, i) => el('td', {}, opt(items[i]), value(c))));
       return E('div', `gd-cmp${items.length > 4 ? ' many' : ''}`, el('table', { class: 'gd-ct' },
         el('thead', {}, el('tr', {}, el('td', {}), ...items.map((it) => el('th', { scope: 'col' }, opt(it))))),
         el('tbody', {}, row('In short', items.map((it) => it.text)), ...axes.map((a, k) => row(a, values.map((v) => v[k]))))));
     };
-    // One block per line of detail; the newline stays in the text, so a selection's offsets still count it.
-    const lines = (t) => t.split('\n').flatMap((l, i) => (i ? ['\n', E('span', 'ln', l)] : [E('span', 'ln', l)]));
     const secCard = (s) => {
       const cmp = compared(s.items ?? []);
       const items = cmp ? [] : (s.items ?? []).map((it, i) => {
         const part = `${s.id}:${i}`;
-        if (!it.more && !it.diagram) return E('li', '', E('div', 'rowstat', E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), fld(part, 'title', E('span', '', it.title))), fld(part, 'text', E('span', 'sm', it.text)))), ...(d.engagement ? [E('div', 'body', ...acts(part))] : []));
-        const body = E('div', 'body', ...(it.more ? [fld(part, 'more', E('p', '', ...lines(it.more)))] : []), ...(it.diagram ? [diagramFig(it.diagram)] : []), ...acts(part));
+        if (!it.more && !it.diagram) return E('li', '', E('div', 'rowstat', E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), fld(part, 'title', mdSpan('span', '', it.title))), fld(part, 'text', mdSpan('span', 'sm', it.text)))), ...(d.engagement ? [E('div', 'body', ...acts(part))] : []));
+        const body = E('div', 'body', ...(it.more ? [fld(part, 'more', mdDiv(it.more))] : []), ...(it.diagram ? [diagramFig(it.diagram)] : []), ...acts(part));
         body.hidden = true;
-        const b = el('button', { class: 'rowbtn', type: 'button', 'aria-expanded': 'false' }, E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), it.title), E('span', 'sm', it.text)), gic('chev', 'gchev'));
+        const b = el('button', { class: 'rowbtn', type: 'button', 'aria-expanded': 'false' }, E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), mdSpan('span', '', it.title, NOLINK)), mdSpan('span', 'sm', it.text, NOLINK)), gic('chev', 'gchev'));
         b.onclick = () => { const open = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(open)); body.hidden = !open; };
         return E('li', '', b, body);
       });
@@ -2372,13 +2439,13 @@
     const decCard = (q, n) => {
       const opts = q.options.map((o) => {
         const b = el('button', { class: 'gd-opt', type: 'button', role: 'radio', 'aria-checked': 'false' }, E('span', 'rdo'),
-          E('span', '', E('span', 'ol', o.label, ...(o.value === q.recommend ? [E('span', 'gd-pick', 'My pick')] : [])), E('span', 'oo', o.outcome)));
+          E('span', '', E('span', 'ol', o.label, ...(o.value === q.recommend ? [E('span', 'gd-pick', 'My pick')] : [])), mdSpan('span', 'oo', o.outcome, NOLINK)));
         b.onclick = () => { S.picks[q.key] = o.value; paintOpts(); paintSummary(); };
         (optBtns.get(q.key) ?? optBtns.set(q.key, []).get(q.key)).push([o.value, b]);
         return b;
       });
       return card(`d:${q.key}`, 'decide', head(q.question, q.why, `Decision ${n + 1} of ${decisions.length}`, `d:${q.key}`, 'question', 'why'), E('div', 'gd-opts', ...opts),
-        ...(q.reason ? [E('div', 'gd-why', E('b', '', 'Why my pick: '), fld(`d:${q.key}`, 'reason', E('span', '', q.reason)))] : []), ...(q.quiet ? [E('p', 'gd-quiet', gic('clock'), E('span', '', 'If you stay quiet: ', fld(`d:${q.key}`, 'quiet', E('span', '', q.quiet))))] : []), ...acts(`d:${q.key}`), rc(`d:${q.key}`));
+        ...(q.reason ? [E('div', 'gd-why', E('b', '', 'Why my pick: '), fld(`d:${q.key}`, 'reason', mdSpan('span', '', q.reason)))] : []), ...(q.quiet ? [E('p', 'gd-quiet', gic('clock'), E('span', '', 'If you stay quiet: ', fld(`d:${q.key}`, 'quiet', mdSpan('span', '', q.quiet))))] : []), ...acts(`d:${q.key}`), rc(`d:${q.key}`));
     };
     const paintOpts = () => {
       const lock = sent() || !live;
@@ -2388,7 +2455,7 @@
     // ---- next step and Go ahead
     const sendSlot = E('div', ''), err = E('p', 'gd-err');
     err.setAttribute('role', 'alert');
-    const nextCard = card('next', 'next', head(d.next.heading, undefined, undefined, 'next', 'heading'), E('ul', 'gd-checks', ...d.next.lines.map((l, n) => E('li', '', E('span', 'tk', gic('check')), fld('next', `lines.${n}`, E('span', '', l))))), ...(plan ? [sendSlot, err] : []), ...(d.engagement ? acts('next') : []), rc('next'));
+    const nextCard = card('next', 'next', head(d.next.heading, undefined, undefined, 'next', 'heading'), E('ul', 'gd-checks', ...d.next.lines.map((l, n) => E('li', '', E('span', 'tk', gic('check')), fld('next', `lines.${n}`, mdSpan('span', '', l))))), ...(plan ? [sendSlot, err] : []), ...(d.engagement ? acts('next') : []), rc('next'));
     async function go(b) {
       if (S.understood === 'no' && !S.note.trim()) { noteBox.focus(); noteBox.scrollIntoView({ block: 'center' }); err.textContent = 'Say what is off first, or choose That is right.'; return; }
       err.textContent = ''; b.disabled = true;
@@ -2450,7 +2517,7 @@
       stageBlocks.push(c);
     }
     const word = plan ? 'Plan' : 'Report', who = plan ? 'Planning agent' : d.asked_by ?? 'Reporting agent';
-    const top = E('div', 'gd-top', E('p', 'geye', [word, plan ? d.project : d.group, [who, d.filed && when(d.filed)].filter(Boolean).join(', ')].filter(Boolean).join(' · ')), fld('this', 'title', E('h1', '', d.title)), fld('this', 'about', E('p', 'sub', d.about)),
+    const top = E('div', 'gd-top', E('p', 'geye', [word, plan ? d.project : d.group, [who, d.filed && when(d.filed)].filter(Boolean).join(', ')].filter(Boolean).join(' · ')), fld('this', 'title', E('h1', '', d.title)), fld('this', 'about', mdSpan('p', 'sub', d.about)),
       E('div', 'howto', gic('info'), E('span', '', `A few short parts, in order. Tap Details for the numbers and Go deeper to ask me more.${plan ? ' Nothing is required: Go ahead accepts my picks.' : ''}`)));
     const rail = el('aside', { class: 'gd-rail' }, E('h4', '', plan ? 'This plan' : 'This report'), nav, ...(plan ? [sumHost] : []));
     const progress = E('div', 'gd-progress', now, segs);
