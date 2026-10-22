@@ -1,0 +1,29 @@
+/* The board's design tokens: the raw palette, type scale, spacing, corners and elevation, copied from a house design system.
+   index.html maps its own names (--page, --tile, --text, ...) onto these; change a value here and every screen follows.
+   Light and dark differ in colour only: spacing, type, corners and elevation are one set. */
+:root {
+  color-scheme: light dark;
+  /* Ink and surfaces */
+  --tk-text: #000000; --tk-text-secondary: #666666; --tk-text-tertiary: #767577;
+  --tk-surface: #FFFFFF; --tk-surface-high: #F8F8F8; --tk-surface-highest: #F0F0F0; --tk-surface-selected: #EAEAEA; --tk-input: #F5F5F5;
+  --tk-grouped: #F2F2F7; --tk-rail: #D1D1D6;
+  /* Colour that carries meaning. Each is drawn in full, and the board mixes it toward black where it sets text on a light ground. */
+  --tk-link: #007AFF; --tk-success: #34C759; --tk-warning: #FF9500; --tk-critical: #FF3B30;
+  /* Type: a title, a body, a secondary line and a footnote, with their line heights. Weights are regular, semi-bold and bold. */
+  --tk-fs-title: 1.0625rem; --tk-lh-title: 1.375rem;
+  --tk-fs-body: 1rem; --tk-lh-body: 1.5rem;
+  --tk-fs-secondary: 0.9375rem; --tk-lh-secondary: 1.25rem;
+  --tk-fs-footnote: 0.8125rem; --tk-lh-footnote: 1.125rem;
+  --tk-fw-regular: 400; --tk-fw-semibold: 600; --tk-fw-bold: 700;
+  /* A 4px grid, and the corners of a grouped card and a control. */
+  --tk-sp-1: 0.25rem; --tk-sp-2: 0.5rem; --tk-sp-3: 0.75rem; --tk-sp-4: 1rem; --tk-sp-6: 1.5rem; --tk-sp-8: 2rem;
+  --tk-r-card: 1rem; --tk-r-ctl: 0.625rem;
+  /* Elevation: a raised control. */
+  --tk-elev-raised: 0 2px 3.84px rgba(0, 0, 0, 0.1);
+}
+@media (prefers-color-scheme: dark) { :root {
+  --tk-text: #ECECEC; --tk-text-secondary: #9A9A9F; --tk-text-tertiary: #77777D;
+  --tk-surface: #1A1A1A; --tk-surface-high: #212121; --tk-surface-highest: #2A2A2A; --tk-surface-selected: #2A2A2A; --tk-input: #303030;
+  --tk-grouped: #1E1E1E; --tk-rail: #38383A;
+  --tk-link: #0A84FF; --tk-success: #30D158; --tk-warning: #FF9F0A; --tk-critical: #FF453A;
+} }

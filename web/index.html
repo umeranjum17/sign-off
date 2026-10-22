@@ -7,23 +7,27 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="tokens.css">
 <meta name="theme-color" content="#F5F5F7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <style>
   /* Spacious, Apple grade. A phone reads white tiles on a grey grouped page; a desk reads grey tiles on a white page (the 60rem block swaps them).
-     Dark is its own scale: a black page with #161617 tiles. --accent is the blue for text, links and focus; --action is the blue a button is filled with. */
-  :root { color-scheme: light dark;
-    --page: #F5F5F7; --tile: #FFFFFF; --desk: #FFFFFF; --desk-tile: #F5F5F7; --bar: #FAFAFC; --sunk: #E8E8ED; --line: #D2D2D7;
-    --text: #1D1D1F; --muted: #6E6E73; --border: #8E8E93; --accent: #0066CC; --action: #0071E3; --on-accent: #FFFFFF; --danger: #C00011; --bezel: #1D1D1F;
-    --c-waiting: #0071E3; --c-evidence: #17702F; --c-reports: #A34700; --c-answered: #6E6E73; --c-gate: #8A6100; --ok: #17702F; --warn: #A34700; --badge: #D70015; --faint: #86868B;
-    --bg: var(--page); --surface: var(--tile); --seg-on: #FFFFFF; }
-  /* One type scale (28/20/17/16/15/13/12, 32 and 22 on a desk), one 4px spacing grid, one control size per role: 44px for a main action and every tap target, 10px corners. */
-  :root { --t-xl: 1.75rem; --t-l: 1.25rem; --t-m: 1.0625rem; --t-b: 1rem; --t-s: 0.9375rem; --t-xs: 0.8125rem; --t-xxs: 0.75rem; --r-ctl: 0.625rem; --ctl: 2.75rem; }
+     The board's own names below are all mapped onto tokens.css, where every raw value lives. --accent is the blue for text, links and focus; --action is the blue a button is filled with.
+     Meaning colours are the token mixed toward black where they set text on a light ground, so they keep 4.5:1. */
+  :root {
+    --page: var(--tk-grouped); --tile: var(--tk-surface); --desk: var(--tk-surface); --desk-tile: var(--tk-grouped); --bar: var(--tk-surface-high); --sunk: var(--tk-surface-selected); --line: var(--tk-rail);
+    --text: var(--tk-text); --muted: var(--tk-text-secondary); --border: var(--tk-text-tertiary); --accent: color-mix(in srgb, var(--tk-link) 80%, #000); --action: color-mix(in srgb, var(--tk-link) 90%, #000); --on-accent: #FFFFFF; --danger: color-mix(in srgb, var(--tk-critical) 75%, #000); --bezel: var(--tk-text);
+    --c-waiting: var(--action); --c-evidence: color-mix(in srgb, var(--tk-success) 55%, #000); --c-reports: color-mix(in srgb, var(--tk-warning) 62%, #000); --c-answered: var(--muted); --c-gate: #8A6100;
+    --ok: var(--c-evidence); --warn: var(--c-reports); --badge: color-mix(in srgb, var(--tk-critical) 80%, #000); --faint: var(--tk-text-tertiary);
+    --bg: var(--page); --surface: var(--tile); --seg-on: var(--tk-surface); }
+  /* One type scale (28/20/17/16/15/13/12, 32 and 22 on a desk), one 4px spacing grid, one control size per role: 44px for a main action and every tap target, 10px corners.
+     The sizes of a title, body, secondary line and footnote, the card corner and the raised shadow come from tokens.css; the display sizes are the board's own. */
+  :root { --t-xl: 1.75rem; --t-l: 1.25rem; --t-m: var(--tk-fs-title); --t-b: var(--tk-fs-body); --t-s: var(--tk-fs-secondary); --t-xs: var(--tk-fs-footnote); --t-xxs: 0.75rem; --r-ctl: var(--tk-r-ctl); --r-card: var(--tk-r-card); --ctl: 2.75rem; }
   @media (min-width: 60rem) { :root { --t-xl: 2rem; --t-l: 1.375rem; } }
   @media (prefers-color-scheme: dark) { :root {
-    --page: #000000; --tile: #161617; --desk: #000000; --desk-tile: #161617; --bar: #161617; --sunk: #2C2C2E; --line: #424245;
-    --text: #F5F5F7; --muted: #86868B; --border: #636366; --accent: #2997FF; --danger: #FF6961; --bezel: #424245;
-    --c-waiting: #0A84FF; --c-evidence: #30D158; --c-reports: #FF9F0A; --c-answered: #98989D; --c-gate: #FFD60A; --ok: #30D158; --warn: #FF9F0A; --badge: #FF453A; --faint: #6E6E73; --seg-on: #636366; } }
+    --page: var(--tk-grouped); --tile: var(--tk-surface-high); --desk: var(--tk-grouped); --desk-tile: var(--tk-surface-high); --bar: var(--tk-surface-high); --sunk: var(--tk-input); --line: var(--tk-rail);
+    --accent: var(--tk-link); --danger: var(--tk-critical); --bezel: var(--tk-rail);
+    --c-waiting: var(--tk-link); --c-evidence: var(--tk-success); --c-reports: var(--tk-warning); --c-gate: #FFD60A; --badge: var(--tk-critical); --seg-on: var(--tk-text-tertiary); } }
   * { box-sizing: border-box; }
   /* A phone keeps room at the bottom for the tab bar. */
   /* A phone keeps the text size it was given on every screen, so the tab bar never grows or shrinks. */
@@ -87,15 +91,15 @@
   .rp-title { font-size: 1.3125rem; line-height: 1.24; font-weight: 700; letter-spacing: 0.005em; }
   .rp-about { color: var(--muted); font-size: 1.0625rem; line-height: 1.47; }
   /* The Leash: one control for how much agents may do without asking, and what the chosen one means below it. */
-  .leash { display: flex; flex-direction: column; gap: 0.75rem; padding: 0.875rem 1rem 1rem; border-radius: 0.75rem; }
+  .leash { display: flex; flex-direction: column; gap: var(--tk-sp-3); padding: 0.875rem 1rem 1rem; border-radius: 0.75rem; }
   .seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--sunk); border-radius: 0.5625rem; padding: 2px; }
   .seg button { min-height: var(--ctl); border: 0; border-radius: 0.4375rem; background: none; color: var(--text); font: inherit; font-size: 0.9375rem; line-height: 1.2; padding: 0.25rem 0.375rem; }
-  .seg button[aria-pressed="true"] { background: var(--seg-on); box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04); color: var(--text); font-weight: 600; }
+  .seg button[aria-pressed="true"] { background: var(--seg-on); box-shadow: var(--tk-elev-raised); color: var(--text); font-weight: var(--tk-fw-semibold); }
   .seg button[aria-pressed="true"]::before { content: none; }
     .leash-line { margin: 0.5rem 1rem 0; color: var(--muted); font-size: 0.875rem; line-height: 1.1875rem; letter-spacing: -0.01em; }
   .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.625rem; }
-  .card, .tile { background: var(--surface); border-radius: 1rem; }
-  .card { padding: 1rem; }
+  .card, .tile { background: var(--surface); border-radius: var(--r-card); }
+  .card { padding: var(--tk-sp-4); }
   .tile { display: grid; align-content: start; gap: 0.25rem; padding: 0.875rem; color: var(--text); text-decoration: none; }
   .tile .icon { justify-self: start; width: auto; height: auto; background: none; }
   .tile .icon svg { width: 1.375rem; height: 1.375rem; stroke: var(--area, var(--muted)); stroke-width: 1.75; }

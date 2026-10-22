@@ -46,7 +46,7 @@ const built = page.replace(marker, () => [
 ].join('\n'));
 writeFileSync(join(out, 'index.html'), built);
 copyFileSync(join(demo, 'shim.js'), join(out, 'demo-shim.js'));
-for (const f of ['icon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'manifest.webmanifest']) copyFileSync(join(web, f), join(out, f));
+for (const f of ['tokens.css', 'icon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'manifest.webmanifest']) copyFileSync(join(web, f), join(out, f));
 // The landing page, with the pictures and icons it shows.
 mkdirSync(join(site, 'media'), { recursive: true });
 copyFileSync(join(root, 'site', 'index.html'), join(site, 'index.html'));
