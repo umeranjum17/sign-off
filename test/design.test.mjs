@@ -2340,19 +2340,21 @@ test('Evidence: with no --evidence-root a linked run is found in done-done\'s ow
   proc.kill();
 });
 
-test('Summary on a phone: Proven today swipes inside its row and a long title wraps, so the page never scrolls sideways', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Summary on a phone: Proven today swipes inside its row, its tall phone capture fills its frame, a long title wraps so the page never scrolls sideways, and Ask the agent is one row until opened', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'summary-wide'), file = join(dir, 'board.json');
   mkdirSync(join(dir, 'page'), { recursive: true });
+  // A capture as tall and thin as a phone screenshot (414 x 2262).
+  const bytes = sized(90, 492), sha = createHash('sha256').update(bytes).digest('hex');
   const fixture = new URL('../fixtures/contract/plan.v1/', import.meta.url).pathname;
   writeFileSync(join(dir, 'page', 'index.html'), readFileSync(join(fixture, 'page', 'index.html')));
   writeFileSync(file, JSON.stringify({ schema: 2, items: [
     { key: 'a', type: 'ask', title: 'Keep the whole-fleet nightly reconciliation of the cross-repository dependency graph running at three in the morning?', about: `https://example.com/${'very-long-path/'.repeat(12)}end` },
     // Each update links a run so its card has a result.
-    ...[1, 2, 3].map((n) => ({ key: `u${n}`, type: 'evidence', number: n, title: `Update ${n} proves it`, filed: new Date().toISOString(), media: [{ path: `evidence/${n}/shot.png`, sha256: 'a'.repeat(64), bytes: 0 }],
+    ...[1, 2, 3].map((n) => ({ key: `u${n}`, type: 'evidence', number: n, title: `Update ${n} proves it`, filed: new Date().toISOString(), media: [{ path: `evidence/${n}/shot.png`, sha256: sha, bytes: bytes.length }],
       evidence: { run_id: `2026101${n}T120000Z-a1b2c3d4`, commit: 'c0ffee'.padEnd(40, '0'), outcome: 'It works.', repro: 'repro: npm test', proof: 'done-done-verify-sign-off: npm test, passed', evidence: 'shot.png' } })),
   ] }));
-  const bytes = Buffer.from('shot'), sha = createHash('sha256').update(bytes).digest('hex');
   writeFileSync(join(dir, 'shot.png'), bytes);
+  for (const n of [1, 2, 3]) { mkdirSync(join(dir, 'evidence', `${n}`), { recursive: true }); writeFileSync(join(dir, 'evidence', `${n}`, 'shot.png'), bytes); }
   mkdirSync(join(dir, '.done-done', 'runs'), { recursive: true });
   for (const n of [1, 2, 3]) writeFileSync(join(dir, '.done-done', 'runs', `2026101${n}T120000Z-a1b2c3d4.json`), JSON.stringify({ schema: 1, run_id: `2026101${n}T120000Z-a1b2c3d4`, commit: 'c0ffee'.padEnd(40, '0'), tree: 'a'.repeat(40), dirty: false, exit: 0, files: [{ path: 'shot.png', sha256: sha, bytes: bytes.length }] }));
   assert.equal(run('post', file, '--kind', 'plan', '--from', join(fixture, 'valid-full.json')).code, 0);
@@ -2366,6 +2368,15 @@ test('Summary on a phone: Proven today swipes inside its row and a long title wr
   assert.ok(await evaluate('[...document.querySelectorAll(".tabs a")].every((a) => a.getBoundingClientRect().right <= 390)'));
   // Proven today starts at the page gutter, not flush at the screen edge.
   assert.ok(await evaluate('document.querySelector(".ev-scroll-row .ev-card").getBoundingClientRect().left >= 20'));
+  // The tall capture fills its square frame from the top instead of shrinking to a sliver in a grey box.
+  await until(() => evaluate('document.querySelector(".ev-scroll-row .ev-media img")?.naturalWidth > 0'));
+  const fill = await evaluate('(() => { const f = document.querySelector(".ev-scroll-row .ev-media"), i = f.querySelector("img"), a = f.getBoundingClientRect(), b = i.getBoundingClientRect(), c = getComputedStyle(i); return [Math.round(b.width - a.width), Math.round(b.height - a.height), c.objectFit, c.objectPosition, c.paddingTop]; })()');
+  assert.deepEqual(fill, [0, 0, 'cover', '50% 0%', '0px']);
+  // Closed, Ask the agent is one 44px row with its label centred in it; a tap opens the prompt box.
+  const ask = await evaluate('(() => { const a = document.querySelector("details.ask"), s = a.querySelector("summary"), r = document.createRange(); r.selectNodeContents(s); const box = a.getBoundingClientRect(), t = r.getBoundingClientRect(); return [a.open, Math.round(box.height), Math.abs(Math.round((t.top + t.bottom) / 2 - (box.top + box.bottom) / 2)) <= 2]; })()');
+  assert.deepEqual(ask, [false, 46, true]);
+  await evaluate('document.querySelector("details.ask summary").click()');
+  assert.ok(await evaluate('document.querySelector("details.ask").open && document.getElementById("prompt").getBoundingClientRect().height > 40'));
   // With no designs filed, the Designs screen still opens, under the lit Decide tab.
   await evaluate('location.hash = "#designs"');
   await until(async () => (await evaluate('document.querySelector("#board h1").textContent')) === 'Designs');
