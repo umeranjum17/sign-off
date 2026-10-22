@@ -48,6 +48,10 @@ journeys:
   # A comment sent with an answer: Add a comment under a yes/no on Decide, Answer and one More…, then the Answered card and `answers`, at 390 and 1280 in light and dark.
   answer-comment:
     command: 'npm run build > /dev/null && for w in 390 1280; do for t in light dark; do COMMENT_WIDTH=$w node .agents/skills/done-done-verify-sign-off/comment-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t || exit 1; done; done'
+  # Decide from the feel prototype: the grouped list, a press, swipes, More on the list and on an ask, an answer and its Undo toast, a swiped answer and all clear,
+  # at 390 and 1280 (DECIDE_WIDTHS) in light and dark, and the motion recorded at 390 (DECIDE_RECORD=1).
+  decide:
+    command: 'npm run build > /dev/null && DECIDE_RECORD=1 bash .agents/skills/done-done-verify-sign-off/decide-shots.sh "$DONE_DONE_EVIDENCE_ROOT"'
   board-actions:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/board-actions.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   attach:

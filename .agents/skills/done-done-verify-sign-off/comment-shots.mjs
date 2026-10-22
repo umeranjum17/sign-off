@@ -1,6 +1,6 @@
 // A comment sent with an answer: Add a comment under a yes/no on Decide, typed, answered, then read back on the Answered card and by `answers`.
 // Usage: node .agents/skills/done-done-verify-sign-off/comment-shots.mjs <output> [light|dark]
-// COMMENT_WIDTH=390 or 1280 (default 390). Saves decide.<theme>.<width>w.png (the ask as it opens), comment.<theme>.<width>w.png (the box open with the typed comment), more-open.<theme>.<width>w.png (the bar's More… open),
+// COMMENT_WIDTH=390 or 1280 (default 390). Saves decide.<theme>.<width>w.png (the ask as it opens), comment.<theme>.<width>w.png (the box open with the typed comment), more-open.<theme>.<width>w.png (the bar's More open),
 // answered-card.<theme>.<width>w.png (the Answered card showing the comment) and answers.<theme>.<width>w.txt (what the agent reads: `answers` and `answers --json`).
 // It only finds the box by its place under the choices, so the same run on an older board captures where its box was.
 import assert from 'node:assert/strict';
@@ -43,12 +43,12 @@ try {
   const place = read(`() => { const s = document.querySelector('.decide-other details > summary'), r = s.getBoundingClientRect(); return JSON.stringify({ label: s.textContent, top: Math.round(r.top), inFirstScreen: r.bottom <= innerHeight }); }`);
   settle();
   browser('screenshot', join(out, `decide.${cell}.png`));
-  // The bar's one More…, tapped open on its own: what the card keeps out of the way of Answer.
-  browser('eval', `() => { document.querySelector('.decide-bar .more-menu > summary').click(); document.activeElement?.blur(); return 1; }`);
+  // The bar's one More, tapped open on its own: what the card keeps out of the way of Answer.
+  browser('eval', `() => { document.querySelector('.decide-bar .dl-more > summary').click(); document.activeElement?.blur(); return 1; }`);
   settle();
-  const menu = read(`() => JSON.stringify([...document.querySelectorAll('.decide-bar .more-menu .menu > *')].filter((e) => e.getClientRects().length).map((e) => e.textContent))`);
+  const menu = read(`() => JSON.stringify([...document.querySelectorAll('.decide-bar .dl-more .dl-menu > *')].filter((e) => e.getClientRects().length).map((e) => e.textContent))`);
   browser('screenshot', join(out, `more-open.${cell}.png`));
-  browser('eval', `() => { document.querySelector('.decide-bar .more-menu > summary').click(); return 1; }`);
+  browser('eval', `() => { document.querySelector('.decide-bar .dl-more > summary').click(); return 1; }`);
   browser('eval', `() => { const s = document.querySelector('.decide-other details > summary'); s.click(); s.scrollIntoView({ block: 'center' }); document.querySelector('.decide-other textarea').focus(); return 1; }`);
   browser('type', text); // real key events into the focused box
   pause(400);
@@ -67,11 +67,11 @@ try {
   const card = read(`() => JSON.stringify({ saved: document.querySelector('#item-feel .saved-note')?.textContent ?? '', line: document.querySelector('#item-feel details > summary[aria-label]')?.textContent ?? '', overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth })`);
   browser('screenshot', join(out, `answered-card.${cell}.png`));
   const toon = run(process.execPath, [join(repo, 'dist/cli.js'), 'answers', board], { env }), json = run(process.execPath, [join(repo, 'dist/cli.js'), 'answers', board, '--json'], { env });
-  writeFileSync(join(out, `answers.${cell}.txt`), `box line on Decide: ${place.label} (top ${place.top}px, in the first screen: ${place.inFirstScreen})\nAnswered card: ${card.saved || '(no comment shown)'} | line: ${card.line} | sideways overflow: ${card.overflow}\nMore… holds: ${menu.join(', ')}\nmotion: press ${motion.press}, box ${motion.boxAnimation}, reduced motion ${motion.reducedMotion}\n\n$ sign-off-axi answers <board>\n${toon}\n$ sign-off-axi answers <board> --json\n${json}\n`);
+  writeFileSync(join(out, `answers.${cell}.txt`), `box line on Decide: ${place.label} (top ${place.top}px, in the first screen: ${place.inFirstScreen})\nAnswered card: ${card.saved || '(no comment shown)'} | line: ${card.line} | sideways overflow: ${card.overflow}\nMore holds: ${menu.join(', ')}\nmotion: press ${motion.press}, box ${motion.boxAnimation}, reduced motion ${motion.reducedMotion}\n\n$ sign-off-axi answers <board>\n${toon}\n$ sign-off-axi answers <board> --json\n${json}\n`);
   assert.equal(JSON.parse(json).feel.note, text);
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board holding one yes/no ask, Does the new feel look right?',
-    steps: [`The board is opened on the ask in Decide at ${width} px wide, ${theme}.`, 'The person taps More… beside Answer, sees what it holds, and taps it closed.', 'The person taps Add a comment under the choices and types a comment.', 'The person taps Answer Yes.', 'The person opens Answered.'],
-    result: 'The ask shows Answer Yes and one More… (holding Later, Dismiss and the other ways to send); the comment is saved as the answer\'s note and read back by sign-off-axi answers; the Answered card reads only Yes and shows "Your comment, sent with Yes: …" with Edit comment.' }, null, 2) + '\n');
+    steps: [`The board is opened on the ask in Decide at ${width} px wide, ${theme}.`, 'The person taps More beside Answer, sees what it holds, and taps it closed.', 'The person taps Add a comment under the choices and types a comment.', 'The person taps Answer Yes.', 'The person opens Answered.'],
+    result: 'The ask shows Answer Yes and one More (holding Ask me later, Write my own answer, Ask for another round, and Dismiss last); the comment is saved as the answer\'s note and read back by sign-off-axi answers; the Answered card reads only Yes and shows "Your comment, sent with Yes: …" with Edit comment.' }, null, 2) + '\n');
 } finally {
   server?.kill();
   try { browser('stop'); } catch {}

@@ -94,8 +94,6 @@ function helpers(home, readySel) {
 
 // Every card kind on every tab, with the actions it must offer. A stage with `shot` is captured and looked at before the next one.
 const KEYS = { plan: 'plan-kind-board', signin: 'npm', ask: 'ship', ask2: 'keep-the-weekly-digest', evidence: 'update-1', design: 'look', review: 'chat-journeys', passed: 'update-2', report: 'new-sign-in', answered: 'digest-old' };
-// An evidence update is never an ask: it waits under Evidence, not on Waiting or Decide.
-const WAITING = Object.entries(KEYS).filter(([name]) => !['evidence', 'passed', 'report', 'answered'].includes(name)).map(([, key]) => key);
 const PAGES = [
   { name: 'today', hash: '', ready: '[id="item-update-2"]', stages: [{ run: async (h) => {
     await h.nav('Today row: Need you', h.find(/^Need you, 6$/, h.board(), 'a'), /^#waiting$/);
@@ -108,22 +106,27 @@ const PAGES = [
   { name: 'waiting', hash: '#waiting', ready: '[id="item-npm"]', stages: [
     { run: async (h) => {
       const links = { 'plan-kind-board': '#waiting/plan-kind-board', npm: '#decide/npm', ship: '#decide/ship', 'keep-the-weekly-digest': '#decide/keep-the-weekly-digest', look: '#decide/look', 'chat-journeys': '#designs/chat-journeys' };
-      for (const [key, href] of Object.entries(links)) {
-        const c = h.card(key);
-        await h.nav(`open ${key}`, c && (key === 'plan-kind-board' ? h.find(/^Open plan$/, h.box(c)) : c), new RegExp(`^${href}$`));
-        await h.dismissCard(key);
-      }
-      for (const chip of ['Design pick', 'Sign-in', 'Plan', 'Yes/No', 'Pick one', 'All']) {
-        await h.press(`type chip ${chip}`, h.find(new RegExp(`^${chip} \\d+$`), h.board().querySelector('.chips')), () => h.find(new RegExp(`^${chip} \\d+$`), h.board().querySelector('.chips'))?.getAttribute('aria-pressed') === 'true');
-      }
+      // Every row is the link to its ask; Decide groups them Sign in, Answer and Review.
+      for (const [key, href] of Object.entries(links)) await h.nav(`open ${key}`, h.card(key), new RegExp(`^${href}$`));
+      const heads = () => [...h.board().querySelectorAll('.dl-head')].map((e) => e.firstChild.textContent).join('|');
+      h.has('groups Sign in, Answer, Review', heads() === 'Sign in|Answer|Review' && h.board().querySelector('.dl-head'));
+      // More: the sort both ways, then Answer all recommended and Move all to Later, each taken back with Undo.
+      const more = () => h.board().querySelector('.top .dl-more'), item = (act) => more()?.querySelector(`[data-act="${act}"]`);
+      for (const order of ['Newest first', 'Oldest first']) await h.press(`More: ${order === 'Newest first' ? 'Oldest' : 'Newest'} first`, item('sort'), () => item('sort')?.textContent === order);
+      await h.cycle('More: Answer all recommended', item('answer-all'), () => !h.card('ship') && !h.card('keep-the-weekly-digest'), () => h.card('ship') && h.card('keep-the-weekly-digest'), /answered with the recommended pick/);
+      await h.cycle('More: Move all to Later', item('later-all'), () => [...h.board().querySelectorAll('.dl-head')].every((e) => /^Later/.test(e.textContent)), () => !h.board().querySelector('.g-later'), /to Later/);
     } },
-    { run: async (h) => { await h.need('Dismiss toast', h.find(/^Dismiss, npm$/, h.box(h.card('npm')))).click(); await h.until('toast', () => /Dismissed/.test(h.toast())); } },
-    { shot: 'waiting-toast', run: async (h) => { await h.need('Undo', document.getElementById('undo')).click(); await h.until('npm back', () => h.card('npm')); } },
-    { run: async (h) => { await h.need('Select', h.find(/^Select$/)).click(); await h.until('Cancel', () => h.find(/^Cancel$/)); h.card('npm').click(); h.card('ship').click(); await h.until('picked', () => h.box(h.card('ship')).classList.contains('picked')); } },
-    { shot: 'waiting-select', run: async (h) => { await h.press('Cancel', h.find(/^Cancel$/), () => h.find(/^Select$/)); await h.bulk('npm'); } },
+    { run: async (h) => { const m = h.board().querySelector('.top .dl-more'); m.open = true; await h.until('menu', () => m.querySelector('.dl-menu')?.getBoundingClientRect().height); } },
+    { shot: 'waiting-menu', run: async (h) => { h.board().querySelector('.top .dl-more').open = false; await h.press('More: Select', h.board().querySelector('.top .dl-more [data-act="select"]'), () => h.find(/^Cancel$/)); h.card('npm').click(); h.card('ship').click(); await h.until('picked', () => h.box(h.card('ship')).classList.contains('picked')); } },
+    { shot: 'waiting-select', run: async (h) => {
+      await h.press('Cancel', h.find(/^Cancel$/), () => h.board().querySelector('.top .dl-more'));
+      await h.press('More: Select again', h.board().querySelector('.top .dl-more [data-act="select"]'), () => h.find(/^Cancel$/));
+      await h.press('pick npm', h.card('npm'), () => h.box(h.card('npm')).classList.contains('picked'));
+      await h.cycle('Dismiss 1 selected', h.find(/^Dismiss 1$/), () => !h.card('npm'), () => h.card('npm'), /1 dismissed/);
+    } },
   ] },
   ...[['npm', 'signin', []], ['ship', 'ask', ['^Friday', '^Next week']], ['look', 'design', ['^A: one column', '^B: two columns']]].map(([key, kind, options]) => ({
-    name: `decide-${key}`, hash: `#decide/${key}`, ready: '.decide', stages: [{ data: { options, key, kind, waiting: WAITING }, run: async (h, { options, key, kind, waiting }) => {
+    name: `decide-${key}`, hash: `#decide/${key}`, ready: '.decide', stages: [{ data: { options, key, kind }, run: async (h, { options, key, kind }) => {
       const bar = () => h.board().querySelector('.decide-bar');
       if (kind === 'signin') await h.need('Open the npm sign-in', h.find(/^Open the npm sign-in$/, h.board()));
       for (const o of options) await h.press(`option ${o}`, h.find(new RegExp(o), h.board().querySelector('.pick-list, .choices, .decide')), () => true);
@@ -133,18 +136,18 @@ const PAGES = [
         const step = h.find(new RegExp(`^${what}$`), h.board().querySelector('.pager'), 'a, span.step');
         if (end) h.has(`${what} (dimmed at the end)`, step?.getAttribute('aria-disabled') === 'true' && step); else await h.nav(what, step, /^#decide\//);
       }
-      await h.nav('Skip for now', h.find(/^Skip for now$/, bar()), /^#decide\//);
-      await h.nav('Later', h.find(/^Later$/, bar()), /^#waiting$/);
+      // One Answer button and one More beside it: More holds Ask me later, Write my own answer, Ask for another round and Dismiss.
+      h.has('More', bar()?.querySelector('.dl-more > summary'));
+      if (options.length) {
+        await h.press('Write my own answer', h.find(/^Write my own answer$/, bar()), () => /^Send your answer/.test(bar().querySelector('.answer').textContent));
+        await h.press(`option ${options[0]} again`, h.find(new RegExp(options[0]), h.board().querySelector('.pick-list')), () => /^Answer /.test(bar().querySelector('.answer').textContent));
+      }
+      await h.cycle('Ask me later', h.find(/^Ask me later$/, bar()), () => location.hash === '#waiting' && h.board().querySelector('.g-later'), () => h.board().querySelector('.decide'), /Moved to Later/);
       if (options.length) {
         await h.cycle(`Answer ${key}`, h.find(/^Answer /, bar()), () => location.hash !== `#decide/${key}` || !h.board().querySelector('.decide-bar .answer'), () => h.board().querySelector('.decide-bar .answer'), /Saved/);
       }
       // Another ask opens after a dismiss; the last sign-in leaves its page saying nothing is left to decide.
       await h.cycle(`Dismiss ${key}`, h.find(/^Dismiss,/, bar()), () => location.hash !== `#decide/${key}` || /Nothing to decide/.test(h.board().textContent), () => h.find(/^Dismiss,/, h.board().querySelector('.decide-bar')), /Dismissed/);
-      if (key === 'ship') {
-        // Everything Waiting on you has sits under the actions: each kind's card dismisses from here too.
-        for (const k of waiting.filter((k) => k !== 'ship')) await h.dismissCard(k);
-        await h.bulk('npm');
-      }
     } }] })),
   { name: 'plan', hash: '#waiting/plan-kind-board', ready: '.plan-section', stages: [{ run: async (h) => {
     const r = h.reader(), sections = [...r.querySelectorAll('.plan-section')].filter((s) => s.querySelector('.approve'));
@@ -190,14 +193,13 @@ const PAGES = [
   } }] },
   // Last, because these cannot be taken back: a comment, another round, a reply, and the design's own verdict.
   { name: 'messages', hash: '#decide/keep-the-weekly-digest', ready: '.decide', stages: [{ run: async (h) => {
-    const other = () => h.board().querySelector('.decide-other'), say = (text) => { const t = other().querySelector('textarea'); t.closest('details').open = true; h.board().querySelector('.decide-bar .more-menu').open = true; h.type(t, text); };
+    const other = () => h.board().querySelector('.decide-other'), say = (text) => { const t = other().querySelector('textarea'); t.closest('details').open = true; h.board().querySelector('.decide-bar .dl-more').open = true; h.type(t, text); };
     if (!h.need('Add a comment', other()?.querySelector('summary'))) return;
-    say('Keep it short.');
-    await h.press('Send without answering', h.find(/^Send without answering,/), () => /1 comment/.test(other().querySelector('summary').textContent));
     say('Keep it short.');
     await h.press('Ask for another round', h.find(/^Ask for another round,/), () => /1 round asked/.test(other().querySelector('summary').textContent));
     say('Keep it short.');
-    await h.cycle('Send as my own answer', h.find(/^Send as my own answer,/), () => location.hash !== '#decide/keep-the-weekly-digest', () => true, /Saved/);
+    await h.press('Write my own answer', h.find(/^Write my own answer$/), () => /^Send your answer/.test(h.board().querySelector('.decide-bar .answer').textContent));
+    await h.cycle('Send your answer', h.board().querySelector('.decide-bar .answer'), () => location.hash !== '#decide/keep-the-weekly-digest', () => true, /Saved/);
   } }] },
   { name: 'design-review', hash: '#designs/chat-journeys', ready: '#reader .design-review', stages: [
     { shot: 'design-approved', run: async (h) => {
