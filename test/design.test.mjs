@@ -2186,7 +2186,7 @@ test('a design-level inline Approve or Change stores its verdict with the note, 
   proc.kill();
 });
 
-test('Evidence: an update with no run is never waiting on you and is not listed under Evidence, which holds passed proof only', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Evidence: an update with no run is never waiting on you, and is listed under Evidence as not run', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'waiting-update'), file = join(dir, 'board.json');
   mkdirSync(dir);
   writeFileSync(file, JSON.stringify({ schema: 2, items: [
@@ -2201,13 +2201,13 @@ test('Evidence: an update with no run is never waiting on you and is not listed 
   await until(async () => (await evaluate('document.querySelector("#item-upd") === null && document.querySelector(".chips button") !== null')));
   assert.equal(await evaluate('document.querySelector("#item-upd")'), null);
   await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
-  await until(async () => (await evaluate('document.querySelector(".empty") !== null')));
-  assert.equal(await evaluate('document.querySelector("#item-upd")'), null);
+  await until(async () => (await evaluate('document.querySelector("#item-upd") !== null')));
+  assert.equal(await evaluate('document.querySelector("#item-upd .m span").textContent'), 'Not run');
   close();
   proc.kill();
 });
 
-test('Evidence: with no --evidence-root a linked run is found in done-done\'s own folder for its app, so a passed run says Passed, and a run found nowhere is left off rather than claimed', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Evidence: with no --evidence-root a linked run is found in done-done\'s own folder for its app, so a passed run says Passed, and a run found nowhere is listed as not run rather than claimed', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'store'), file = join(dir, 'board.json'), home = join(dir, 'home'), app = join(home, '.done-done', 'evidence', 'sign-off');
   const shot = readFileSync(new URL('../fixtures/evidence/product-small.png', import.meta.url)), commit = 'c0ffee'.padEnd(40, '0'), runId = '20261011T120000Z-a1b2c3d4';
   mkdirSync(join(app, '.done-done', 'runs'), { recursive: true });
@@ -2231,8 +2231,8 @@ test('Evidence: with no --evidence-root a linked run is found in done-done\'s ow
   await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
   const result = (key) => evaluate(`document.querySelector("#item-${key} .m span")?.textContent`);
   await until(async () => (await result('found')) === 'Passed');
-  // A run found nowhere is no proof, so its update is not on Evidence at all.
-  assert.equal(await result('lost'), undefined);
+  // A run found nowhere is claimed as nothing: its update is on Evidence, saying it was not run.
+  assert.equal(await result('lost'), 'Not run');
   close();
   proc.kill();
 });
@@ -2402,7 +2402,7 @@ test('a long answer at 390 px sits under its long title, which keeps most of the
   proc.kill();
 });
 
-test('Evidence: a card per passed update filed in the last day, the very ones Proven today shows and counts, with its capture as the hero, its result, its time and what it proves, grouped under the project its check names (else Other); a capture with no run, a failed or an unchecked one is on neither; the card opens the update, which shows the whole shot, what ran, who checked it, the change, when, and its verdict; two across at 1440 and nothing squashed at 390', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Evidence: a card per proof ever filed, newest first, grouped by project then day, with its capture as the hero, its result, its time and what it proves; Proven today counts only the passed ones of the last day, and a failed run is on neither; the card opens the update, which shows the whole shot, what ran, who checked it, the change, when, and its verdict; two across at 1440 and nothing squashed at 390', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'updates'), file = join(dir, '.sign-off', 'decisions.json');
   mkdirSync(dir);
   run('init', dir);
@@ -2447,31 +2447,36 @@ test('Evidence: a card per passed update filed in the last day, the very ones Pr
   await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
   // Per card: its id, what it proves, its result and the picture that leads it; every card is drawn.
   const cards = '[...document.querySelectorAll(".ev-card")].map((a) => [a.id, a.querySelector(".t").textContent, a.querySelector(".m span").textContent, a.querySelector(".m svg path")?.getAttribute("d") ?? "", a.querySelectorAll(".ev-media img").length])';
-  await until(async () => (await evaluate(`${cards}.length === 3 && [...document.querySelectorAll(".ev-media img")].every((i) => i.complete && i.naturalWidth)`)));
-  assert.equal(await evaluate('document.querySelector(".gone-asks summary")?.textContent'), 'Archived (1)');
+  await until(async () => (await evaluate(`${cards}.length === 6 && [...document.querySelectorAll(".ev-media img")].every((i) => i.complete && i.naturalWidth)`)));
+  // Nothing is archived on its own: the week-old update-7 is listed, and no Archived row exists.
+  assert.equal(await evaluate('document.querySelector(".gone-asks")'), null);
   const clock = (at) => at.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   const at = (i) => new Date(doc.items[i - 1].filed);
-  // Evidence lists only passed proof filed in the last day, newest first, each with the tick: no capture without a run (5), failed run (1) or unchecked one (6) leads or sits among them.
-  const passed = ['m9 12 2 2 4-4', 1];
-  assert.deepEqual(await evaluate(cards), [['item-update-4', outcome, 'Passed', ...passed], ['item-update-3', outcome, 'Passed', ...passed], ['item-update-2', outcome, 'Passed', ...passed]]);
+  // Evidence lists every proof, newest first within its project, however old: the plain update (5), the passed ones (4, 3, 2), the unchecked one (6) and last week's (7); only the failed run (1) is left off.
+  const passed = ['m9 12 2 2 4-4', 1], none = ['', 1];
+  assert.deepEqual(await evaluate(cards), [['item-update-5', 'Sign-in, plain update', 'Not run', ...none], ['item-update-4', outcome, 'Passed', ...passed], ['item-update-3', outcome, 'Passed', ...passed],
+    ['item-update-6', outcome, 'Could not check', 'M12 7v6', 0], ['item-update-2', outcome, 'Passed', ...passed], ['item-update-7', 'Sign-in, last week', 'Not run', ...none]]);
   for (const n of [4, 3, 2]) assert.equal(await evaluate(`document.getElementById("item-update-${n}").querySelector(".m > span:last-child").textContent`), `Today, ${clock(at(n))}`, `update ${n}`);
   // Both proof-prefix forms share one head; a capture with no run takes the linked repository, and an unnamed project goes under Other.
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".sec-head h2")].map((h) => h.textContent)'), ['sign-off', 'Other']);
-  assert.equal(await evaluate('document.querySelector(\'#nav a[href="#evidence"] .n\').textContent'), '3');
+  assert.equal(await evaluate('document.querySelector(\'#nav a[href="#evidence"] .n\').textContent'), '6');
+  // Within a project the cards sit under the day they were filed, newest day first.
+  assert.equal(await evaluate('[...document.querySelectorAll(".ev-day-h")].pop().textContent'), new Date(doc.items[6].filed).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }));
+  assert.equal(await evaluate('document.querySelector(".ev-day-h").textContent'), 'Today');
   // Today reads the same list: the glance, the tile and the Proven today row name the same passed updates, newest first.
   await evaluate('location.hash = ""');
   await until(async () => (await evaluate('document.querySelector(".glance")?.textContent.includes("3 updates filed.")')) === true);
   assert.equal(await evaluate('document.querySelector(".tile.i-evidence .n").textContent'), '3');
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-scroll-row .ev-card")].map((a) => a.id)'), ['item-update-4', 'item-update-3', 'item-update-2']);
   await evaluate('location.hash = "#evidence"');
-  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 3);
-  // Cards sit two across: the sign-off pair first (update 4, then update 3), then Other with update 2 under its own head.
-  const boxes = `[4, 3, 2].map((n) => { const r = document.getElementById(\`item-update-\${n}\`).getBoundingClientRect(); return { n, top: r.top, left: r.left, right: r.right, bottom: r.bottom }; })`;
+  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
+  // Cards sit two across: the sign-off pair first (update 5, then update 4), then Other with update 2 under its own head.
+  const boxes = `[5, 4, 2].map((n) => { const r = document.getElementById(\`item-update-\${n}\`).getBoundingClientRect(); return { n, top: r.top, left: r.left, right: r.right, bottom: r.bottom }; })`;
   const [five, six, two] = await evaluate(boxes);
   assert.ok(five.top === six.top && six.left > five.right, 'the sign-off pair shares the first row, newest on the left');
   assert.ok(two.top > five.bottom && two.left === five.left, 'Other comes last, under its own head');
   // Under the title: how many are listed, how many filed today and when the newest came.
-  assert.equal(await evaluate('document.querySelector(".top .lede").textContent'), 'Updates that show a change works, newest first.');
+  assert.equal(await evaluate('document.querySelector(".top .lede").textContent'), 'Every proof filed, newest first.');
   // No update is an ask, whatever its result: Decide counts none of them and Today says nothing needs you.
   // A failed or unchecked update still opens on Evidence with its result, the reason a run could not be checked, and the normal verdicts.
   await evaluate('location.hash = "#waiting"');
@@ -2487,7 +2492,7 @@ test('Evidence: a card per passed update filed in the last day, the very ones Pr
       [result, why, ['Pass', 'Fail', 'Needs work']]);
   }
   await evaluate('location.hash = "#evidence"');
-  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 3);
+  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
   // An update that waits on nothing is only shown, even on a board that takes answers: no verdict, note or comment controls.
   const kept = doc.items[1].options;
   doc.answers_only = true;
@@ -2503,7 +2508,7 @@ test('Evidence: a card per passed update filed in the last day, the very ones Pr
   doc.items[1].options = kept;
   writeFileSync(file, JSON.stringify(doc));
   await evaluate('refresh()');
-  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 3);
+  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
   // The card opens the update itself: the whole capture, what it proves, then what the check recorded.
   await evaluate('document.getElementById("item-update-4").click()');
   await until(async () => (await evaluate('location.hash')) === '#evidence/update-4' && (await evaluate('!!document.querySelector(".ev-item")')));
@@ -2540,17 +2545,17 @@ test('Evidence: a card per passed update filed in the last day, the very ones Pr
   assert.equal(await evaluate('location.hash'), '#evidence/update-4');
   // Back on the list, that update is answered: it stays on Evidence and in Proven today's count and row, since a verdict does not unprove it.
   await evaluate('location.hash = "#evidence"');
-  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 3);
+  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
   await evaluate('location.hash = ""');
   await until(async () => (await evaluate('document.querySelector(".glance")?.textContent.includes("3 updates filed.")')) === true);
   assert.deepEqual(await evaluate('[document.querySelector(".tile.i-evidence .n").textContent, document.querySelectorAll(".ev-scroll-row .ev-card").length]'), ['3', 3]);
   await evaluate('location.hash = "#evidence"');
-  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 3);
+  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
   close();
   // On a phone the card keeps the screen's width, the update's own screen never scrolls sideways and nothing squashes.
   ({ evaluate, close } = await browse(join(dir, 'p'), 390));
   await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
-  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length === 3')));
+  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length === 6')));
   assert.deepEqual(await evaluate(SQUASH), []);
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-card")].filter((a) => a.getBoundingClientRect().width < 0.95 * document.querySelector(".ev-grid").getBoundingClientRect().width).map((a) => a.id)'), []);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'));
@@ -2562,12 +2567,8 @@ test('Evidence: a card per passed update filed in the last day, the very ones Pr
   assert.deepEqual(await evaluate(SQUASH), []);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'));
   assert.ok(await evaluate('[...document.querySelectorAll(".ev-hero img")].every((i) => i.getBoundingClientRect().width <= document.querySelector(".ev-item").getBoundingClientRect().width)'));
-  // The archive stays reachable: Archived (1) lists the week-old update and Restore writes the log line that keeps it; a week-old capture with no run is not proof, so it does not come back onto Evidence.
-  await evaluate('location.hash = "#evidence"');
-  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length === 3 && !!document.querySelector(".gone-asks .dis")')));
-  await evaluate('document.querySelector(".gone-asks .dis").click()');
-  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length === 3 && !document.querySelector(".gone-asks")')));
-  assert.deepEqual(readFileSync(file.replace(/\.json$/, '.dismissed.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).key), ['update-1', 'update-7']);
+  // Nothing was dismissed, so no log line was written beyond the restore the test itself made.
+  assert.deepEqual(readFileSync(file.replace(/\.json$/, '.dismissed.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).key), ['update-1']);
   close();
   proc.kill();
 });

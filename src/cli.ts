@@ -1152,17 +1152,23 @@ function postMedia(file: string, named: string, on: string, values: Record<strin
     // Boards in one folder share evidence/, so a number is taken only by creating its folder; one in use is never written into.
     const current = board(file), store = join(dirname(file), 'evidence'), taken = current.map((d) => Number(/^update-(\d+)$/.exec(d.key)?.[1] ?? 0));
     const own = message ? message.key : explainer && (values.key ?? slug(values.title)), had = message && own && items.find((x) => x?.key === own);
+    // The same filer posting a key again with a changed proof replaces the card it posted, as a new update filed now; another filer's, or one already answered, is refused.
+    let replaced = false;
     if (had) {
       // The stored item, read back as the message it came from: its run, and each media file by hash. The notice record is the board's, not the message's.
       const asMessage = ({ type: _t, number: _n, filed: _f, announced: _a, evidence: run, media: kept, ...rest }: any) => canon({ ...rest, run, media: kept?.map((x: any) => x.sha256) });
       if (asMessage(had) !== canon({ ...message, media: sources.length ? sources.map((src) => sha256(readFileSync(src))) : undefined })) {
-        throw fail(`key ${own} already holds a different message on ${tilde(file)}`, 'CONFLICT', 'Post it under a new key');
+        if (had.filer === undefined || had.filer !== message.filer || Object.hasOwn(readAnswers(file), own)) throw fail(`key ${own} already holds a different message on ${tilde(file)}`, 'CONFLICT', 'Post it under a new key');
+        items.splice(items.indexOf(had), 1);
+        replaced = true;
       }
+    }
+    if (had && !replaced) {
       return toon({ board: tilde(file), posted: [{ key: own, number: had.number, media: sources.length, title: had.title, status: 'already posted' }] }, explainer ? [`Run \`sign-off-axi open${on}\` so the user can give a verdict`] : []);
     }
     const answers = readAnswers(file);
     if (message && own && Object.hasOwn(answers, own) && !awaitsVerdict(message.kind, answers[own])) throw fail(`key ${own} was answered on ${tilde(file)} and is no longer there`, 'CONFLICT', 'Post it under a new key');
-    if (own && current.some((d) => d.key === own)) throw fail(`key ${own} is already used on ${tilde(file)}`, 'CONFLICT', 'Post it under a new --key');
+    if (own && !replaced && current.some((d) => d.key === own)) throw fail(`key ${own} is already used on ${tilde(file)}`, 'CONFLICT', 'Post it under a new --key');
     mkdirSync(store, { recursive: true, mode: 0o700 });
     let number = Math.max(0, ...taken, ...readdirSync(store).map(Number).filter(Number.isInteger)) + 1;
     for (;; number++) {

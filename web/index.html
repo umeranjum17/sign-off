@@ -437,6 +437,8 @@
   /* Evidence: a card per update with its capture as the hero, grouped under the project its check names; the whole card opens the update. */
   .ev-group { display: grid; gap: 0.75rem; margin-top: 1.5rem; }
   .ev-group + .ev-group { margin-top: 2rem; }
+  .ev-day { display: grid; gap: 0.75rem; } .ev-group > .ev-day + .ev-day { margin-top: 0.75rem; }
+  .ev-day-h { margin: 0; font-size: 0.875rem; line-height: 1.25rem; font-weight: 400; letter-spacing: 0.02em; text-transform: uppercase; color: var(--muted); }
   .ev-grid { display: grid; gap: 1.75rem; grid-template-columns: minmax(0, 1fr); }
   .ev-card { display: flex; flex-direction: column; gap: 0.75rem; color: inherit; text-align: left; text-decoration: none; }
   .ev-media { position: relative; display: grid; place-items: end center; aspect-ratio: 16 / 11; padding: 1.5rem 1.5rem 0.75rem; overflow: hidden;
@@ -1441,15 +1443,27 @@
       el('span', { class: 't', dir: 'auto' }, headline(d)),
       el('span', { class: 'm' }, result ? el('span', { class: `ev-${result[0]}` }, mark(result[0]), result[2]) : el('span', { class: 'ev-none' }, 'Not run'), d.attachments?.length ? el('span', {}, d.attachments.length === 1 ? '1 file' : `${d.attachments.length} files`) : '', d.filed ? el('span', {}, stamp(d.filed)) : ''));
   }
-  /** Evidence as its own screen: a card per passed update, grouped under the project its check names, in the order each project first shows;
-   * proof that names no project goes under Other, last. An item put in this area that is not an update (a page, a diagram) keeps the card it always had. */
+  /** Evidence as its own screen: every proof ever filed, newest first, grouped under the project its check names (in the order each project first shows;
+   * proof that names no project goes under Other, last) and then by the day it was filed. The search box narrows it by what the card says.
+   * An item put in this area that is not an update (a page, a diagram) keeps the card it always had. */
+  let evFind = '';
+  const dayHead = (at) => (isToday(at) ? 'Today' : new Date(at).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }));
   function evidenceGroups(items) {
     if (!items.length) return [el('p', { class: 'empty' }, EMPTY.evidence)];
-    const groups = [...new Set(items.map(projectOf))].sort((x, y) => (x === '') - (y === '')), node = (d) => (d.type === 'evidence' ? withX(d, evCard(d)) : row(d));
-    return groups.map((g) => {
-      return el('section', { class: 'ev-group' }, el('div', { class: 'sec-head' }, el('h2', {}, g || 'Other')),
-        el('div', { class: 'ev-grid' }, ...items.filter((d) => projectOf(d) === g).map(node)));
-    });
+    const box = el('input', { type: 'search', id: 'ev-find', 'aria-label': 'Search evidence', placeholder: 'Search evidence', autocomplete: 'off' }), out = el('div', {}), node = (d) => (d.type === 'evidence' ? withX(d, evCard(d)) : row(d));
+    const show = () => {
+      const q = evFind.trim().toLowerCase(), hits = q ? items.filter((d) => `${headline(d)} ${d.title} ${d.about ?? ''} ${projectOf(d)} ${d.evidence?.proof ?? ''}`.toLowerCase().includes(q)) : items;
+      const groups = [...new Set(hits.map(projectOf))].sort((x, y) => (x === '') - (y === ''));
+      out.replaceChildren(...(hits.length ? groups.map((g) => el('section', { class: 'ev-group' }, el('div', { class: 'sec-head' }, el('h2', {}, g || 'Other')),
+        ...[...new Set(hits.filter((d) => projectOf(d) === g).map((d) => (d.filed ? new Date(d.filed).toDateString() : '')))].map((dayKey) => {
+          const of = hits.filter((d) => projectOf(d) === g && (d.filed ? new Date(d.filed).toDateString() : '') === dayKey);
+          return el('div', { class: 'ev-day' }, el('h3', { class: 'ev-day-h' }, of[0].filed ? dayHead(of[0].filed) : 'Undated'), el('div', { class: 'ev-grid' }, ...of.map(node)));
+        }))) : [el('p', { class: 'empty' }, 'Nothing matches.')]));
+    };
+    box.value = evFind;
+    box.oninput = () => { evFind = box.value; show(); };
+    show();
+    return [el('div', { class: 'search', role: 'search' }, box), out];
   }
   /** An update's verdict: one tap per option, marked once it is saved. A read-only board takes none. */
   function verdicts(d) {
@@ -2785,11 +2799,12 @@
     const openKeys = new Set(open.map((d) => d.key));
     const merged = new Set(open.flatMap((d) => d.merges ?? []).filter((k) => openKeys.has(k)));
     for (const d of [...state.decisions].reverse()) if (!gone.has(d.key) && !merged.has(d.key) && !lapsed(d)) by[area(d)].push(d);
-    // Today and Evidence read one list: the passed updates filed in the last 24 hours (the window Evidence archives after) that are not dismissed, answered or not, newest first.
-    // A capture with no run, a failed run or one that could not be checked is no proof, so it is on neither; its own screen still opens, and a verdict moves it to Answered.
-    by.provenToday = state.decisions.filter((d) => d.type === 'evidence' && d.evidenceCard?.result === 'RUN PASS' && !gone.has(d.key) && Date.now() - Date.parse(d.filed) <= 864e5);
-    by.evidence = [...by.evidence.filter((d) => d.type !== 'evidence'), ...by.provenToday].sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
-    by.provenToday = by.evidence.filter((d) => d.type === 'evidence');
+    // Evidence keeps every proof that is not dismissed, answered or not, newest first, however old: a passed check, a capture with no run to check (it says Not run) or one that could not be checked.
+    // A failed run or one that did not finish is no proof, so it is left off; its own screen still opens, and a verdict moves it to Answered.
+    // Only Today's Proven today tile, its count and the glance line are limited to the passed updates filed in the last 24 hours.
+    const shownProof = state.decisions.filter((d) => d.type === 'evidence' && !['RUN FAIL', 'INCONCLUSIVE'].includes(d.evidenceCard?.result) && !gone.has(d.key));
+    by.evidence = [...by.evidence.filter((d) => d.type !== 'evidence'), ...shownProof].sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
+    by.provenToday = shownProof.filter((d) => d.evidenceCard?.result === 'RUN PASS' && Date.now() - Date.parse(d.filed) <= 864e5).sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
     by.designs = [...state.decisions].reverse().filter((d) => d.kind === 'design' && !gone.has(d.key));
     // Waiting on you reads newest first unless the viewer chose oldest first. A sign-in blocks someone now, so sign-ins come first either way.
     let latest = -Infinity;
@@ -2832,7 +2847,7 @@
       ? 'How the tools work, step by step. Tap one to open it.' : 'Explainers you asked for, or that a decision needs.')
       : at === 'answered' && by.answered.length ? el('p', { class: 'lede' }, (() => { const n = by.answered.filter((d) => isToday(state.answers[d.key].at)).length; return `${n} ${n === 1 ? 'answer' : 'answers'} today. Each one has gone back to its agent.`; })())
       : at === 'designs' && by.designs.length ? el('p', { class: 'lede' }, 'Designs to look over. Approve one, or say what should change.')
-      : at === 'evidence' && by.evidence.length ? el('p', { class: 'lede' }, 'Updates that show a change works, newest first.') : '', at === 'decide' ? '' : bulkBar(bulk));
+      : at === 'evidence' && by.evidence.length ? el('p', { class: 'lede' }, 'Every proof filed, newest first.') : '', at === 'decide' ? '' : bulkBar(bulk));
     document.getElementById('board').replaceChildren(top, ...(at === 'waiting' && !state.readonly ? [filters(by.waiting), waitingPage(shown, hidden)]
       : at === 'decide' ? [decideAt < 0 ? (key ? el('p', { class: 'empty' }, 'Nothing to decide for that question.') : el('div', { class: 'decide' }, decideLists(null, decideQueue)))
         : decidePage(decideQueue[decideAt], decideQueue.length > 1 ? decideQueue[(decideAt + 1) % decideQueue.length] : undefined, decideQueue)]

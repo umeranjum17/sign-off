@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync, chmodSync } from 'node:fs';
+import { appendFileSync, copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { decode } from '@toon-format/toon';
@@ -1010,6 +1010,26 @@ test('post --replace: a board-shaped evidence item with malformed media is refus
   const bare = cli2('post', board, '--from', write('bare.json', { schema: 2, items: [{ contract: 1, kind: 'evidence', schema: 1, type: 'evidence', key: 'signin-phone-2', title: 'T', about: 'A' }] }), '--replace');
   assert.equal(bare.status, 2, bare.stdout + bare.stderr);
   assert.doesNotMatch(bare.stdout + bare.stderr, /TypeError|is not a function/);
+});
+
+test('post --kind evidence: the same filer posting a key again replaces the first card and writes no dismissal', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const dir = mkdtempSync(join(scratch, 'repost-')), board = join(dir, 'board.json'), msg = join(dir, 'msg.json');
+  copyFileSync(join(fixtures, 'evidence.v1', 'shot.png'), join(dir, 'shot.png'));
+  const valid = JSON.parse(readFileSync(join(fixtures, 'evidence.v1', 'valid-media.json'), 'utf8'));
+  const post = (title, filer) => (writeFileSync(msg, JSON.stringify({ ...valid, title })), spawnSync('node', [cli, 'post', board, '--kind', 'evidence', '--from', msg, '--filer', filer], { encoding: 'utf8', env }));
+  const items = () => JSON.parse(readFileSync(board, 'utf8')).items, key = valid.key;
+  assert.equal(post('First take', 'agent-41').status, 0);
+  const second = post('Second take', 'agent-41');
+  assert.equal(second.status, 0, second.stdout);
+  assert.deepEqual(items().filter((i) => i.key === key).map((i) => i.title), ['Second take']);
+  assert.equal(existsSync(join(dir, 'board.dismissed.jsonl')), false, 'a repost wrote a dismissal line');
+  const listed = spawnSync('node', [cli, 'list', board, '--full'], { encoding: 'utf8', env }).stdout;
+  assert.match(listed, new RegExp(`${key},shown,`));
+  assert.equal(post('Other take', 'agent-9').status, 2, 'another filer cannot replace the card');
+  assert.deepEqual(items().map((i) => i.title), ['Second take']);
 });
 
 test('post --kind evidence: media copied and hashed from the message folder, a run kept as the update\'s evidence, never in a --from file', () => {
