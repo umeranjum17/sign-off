@@ -51,9 +51,16 @@ for w in 390 1280; do
     "$node" -e 'const l=JSON.parse(process.argv[1]),w=+process.argv[2];if(w===390?(l.href!=="#evidence/update-1"||l.opensInNewTab):(l.href!=="/api/media"||!l.opensInNewTab))process.exit(1)' "$l" $w
   fi
 done
+if want link; then
+  steps='"The board is opened at 390 px wide, a phone, and at 1280 px wide, a desk.", "The update whose capture is a desktop image of the report is opened and the capture link is read, as a person tapping it would follow it."'
+  result='On a phone the capture link keeps the person on the board, on the live view of the update, instead of opening the raw desktop image file; on a desk, opening the image file in a new tab is unchanged.'
+else
+  steps='"The board is opened at 390 px wide, a phone, and at 1280 px wide, a desk.", "The report is opened at its comparison table of 4 options on 5 points."'
+  result='On a phone the comparison table reads at 16 px, each point listing every option, with nothing off the screen; on a desk it is one table of 5 columns at 13 px.'
+fi
 cat > "$out/steps.json" <<J
 {"target": {"version": "$("$node" -p 'require(process.argv[1]).version' "$repo/package.json")"},
- "start": "A throwaway board with one report that compares 4 options on the same 5 points, and one update whose capture is a 1280 wide desktop screenshot of that report.",
- "steps": ["The board is opened at 390 and 1280 px wide.", "$(want link && echo 'The update is opened and its capture link read.' || echo 'The report is opened at its comparison table.')"],
- "result": "$(want link && echo 'At 390 the capture link stays on the board, on the update own screen; at 1280 it opens the raw file in a new tab.' || echo 'At 390 the table is stacked, each point listing all 4 options, at 16 px with nothing off the screen; at 1280 it is one 5 column table.')"}
+ "start": "A throwaway board with one report that compares 4 options on the same 5 points, and one update whose capture is a 1280 wide desktop image of that report.",
+ "steps": [$steps],
+ "result": "$result"}
 J
