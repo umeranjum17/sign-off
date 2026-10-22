@@ -169,13 +169,14 @@ const PAGES = [
     await h.dismissCard('update-2');
     await h.bulk('update-2');
   } }] },
-  { name: 'evidence-update', hash: '#evidence/update-2', ready: '#reader .choices, #reader [aria-label^="Pass"]', stages: [{ run: async (h) => {
-    const r = h.reader();
+  // On a desk the update opens in the shell's pane beside the list, which needs no way back; on a phone it opens over the board with ‹ Evidence.
+  { name: 'evidence-update', hash: '#evidence/update-2', ready: ':is(#reader, .split-detail) :is(.choices, [aria-label^="Pass"])', stages: [{ run: async (h) => {
+    const pane = () => document.querySelector('.split-detail') ?? h.reader(), r = pane();
     for (const verdict of ['Pass', 'Fail', 'Needs work']) {
-      await h.cycle(`${verdict} verdict`, h.find(new RegExp(`^${verdict},`), r), () => h.find(new RegExp(`^${verdict},`), r)?.getAttribute('aria-pressed') === 'true', () => true, /Saved/);
+      await h.cycle(`${verdict} verdict`, h.find(new RegExp(`^${verdict},`), pane()), () => h.find(new RegExp(`^${verdict},`), pane())?.getAttribute('aria-pressed') === 'true', () => true, /Saved/);
     }
-    await h.nav('Back to Evidence', h.find(/Evidence$/, r, 'a'), /^#evidence$/);
-    await h.cycle('Dismiss update 2', h.find(/^Dismiss,/, r), () => location.hash === '#evidence' || !h.reader().querySelector('[aria-label^="Pass"]'), () => h.find(/^Pass,/, h.reader()), /Dismissed/);
+    if (r === h.reader()) await h.nav('Back to Evidence', h.find(/Evidence$/, r, 'a'), /^#evidence$/);
+    await h.cycle('Dismiss update 2', h.find(/^Dismiss,/, pane()), () => location.hash === '#evidence' || !document.getElementById('err-update-2'), () => h.find(/^Pass,/, pane()), /Dismissed/);
   } }] },
   { name: 'reports', hash: '#reports', ready: '[id="item-new-sign-in"]', stages: [{ run: async (h) => {
     // More: Mark all as read while the report is new, then opening it (which reads it), Select (pick, Dismiss 1, Undo; Cancel) and Archive all, each taken back with Undo.

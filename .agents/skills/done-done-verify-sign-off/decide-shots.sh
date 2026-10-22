@@ -60,11 +60,22 @@ for theme in light dark; do
   go waiting
   ax eval "() => (${drag})('keep-the-weekly-digest', 300, true)"; pause 1000; shot decide-swiped-answer
   unanswer keep-the-weekly-digest
+  # The desk's own states: the ? sheet of keys, and a row's hover actions (shown here by focusing them, as headless has no mouse).
+  if [ "$w" = 1280 ] && [ "$(chrome-devtools-axi eval '() => !!document.getElementById("keys")' | grep -c true)" = 1 ]; then
+    go decide/ship
+    ax eval "() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' })); return 1 }"; pause 500; shot decide-keys
+    go waiting
+    ax eval "() => { document.querySelector('.dl-row[data-key=keep-the-weekly-digest] .dl-hover .yes').focus(); return 1 }"; pause 300; shot decide-hover
+  fi
 done
 done
-# DECIDE_RECORD=1 also records the motion at 390, light and dark, on the same board (decide.<theme>.390w.mp4).
+# DECIDE_RECORD=1 also records the motion at 390, light and dark, on the same board (decide.<theme>.390w.mp4), and the desk by keys (decide.<theme>.1280w.mp4) where the board has one.
 if [ -n "${DECIDE_RECORD:-}" ] && [ -n "$(ls "$out"/decide-menu.* 2>/dev/null)" ]; then
   for theme in light dark; do node .agents/skills/done-done-verify-sign-off/decide-record.mjs "$url" $theme "$out/decide.$theme.390w.mp4"; done
+  if [ -n "$(ls "$out"/decide-keys.* 2>/dev/null)" ]; then
+    for theme in light dark; do unanswer ship; unanswer keep-the-weekly-digest; unanswer look; node .agents/skills/done-done-verify-sign-off/decide-record.mjs "$url" $theme "$out/decide.$theme.1280w.mp4" desk; done
+    unanswer ship; unanswer keep-the-weekly-digest; unanswer look
+  fi
 fi
 # All clear: the sign-in, plan and designs dismissed, then Answer all recommended answers the rest and the list empties.
 if [ -n "$(ls "$out"/decide-menu.* 2>/dev/null)" ]; then

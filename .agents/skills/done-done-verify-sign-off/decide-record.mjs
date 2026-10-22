@@ -3,18 +3,22 @@
 // springs back, a swipe right that answers (the toast and its countdown, then Undo and the row coming back), a swipe left to Later
 // and Undo, an ask pushed in, a pick whose label slides onto Answer, Answer turning into a check, the pop back with the row folding
 // away, More's menu, and Answer all recommended.
+// With desk, it records the desk (1280x800) by keys instead: J and K moving the selection, Enter answering (the check, the row folding, the next ask
+// sliding in), Cmd+Z, L to Later, the ? sheet, C and Cmd+Enter answering with a comment, a row's hover answer, and G then E and D; a pill names each key.
+// Its own headless Chromium on a scratch profile, driven over the DevTools protocol; taps, drags and keys are events in the page.
+// Usage: node decide-record.mjs <board url> <light|dark> <out.mp4> [desk]
 // With `reports` last it records Reports instead, on a board reports-shots.mjs seeded: rows rising in, a press, a short drag that springs back,
 // a swipe right that reads a report (its dot goes, Undo brings it back), a swipe left that archives one (it folds away, Undo flashes it back),
 // a report opened and closed (its dot shrinks away), and More's Mark all as read with Undo.
 // Its own headless Chromium on a scratch profile, driven over the DevTools protocol; taps and drags are pointer events in the page.
-// Usage: node decide-record.mjs <board url> <light|dark> <out.mp4> [reports]
+// Usage: node decide-record.mjs <board url> <light|dark> <out.mp4> [desk] [reports]
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-const [url, theme, out, screen = 'decide'] = process.argv.slice(2);
+const [url, theme, out, ...modes] = process.argv.slice(2), desk = modes.includes('desk'), screen = modes.includes('reports') ? 'reports' : 'decide', [W, H] = desk ? [1280, 800] : [390, 844];
 const dir = mkdtempSync(join(tmpdir(), 'decide-rec-'));
-const chrome = spawn('/usr/bin/chromium', ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(dir, 'profile')}`, '--window-size=390,844',
+const chrome = spawn('/usr/bin/chromium', ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(dir, 'profile')}`, `--window-size=${W},${H}`,
   '--hide-scrollbars', '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: 'ignore' });
 const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
 try {
@@ -39,7 +43,7 @@ try {
     // The first read of the board waits a moment, as on a slow phone network, so the skeleton shows.
     if (msg.method === 'Fetch.requestPaused') setTimeout(() => send('Fetch.continueRequest', { requestId: msg.params.requestId }), held++ ? 0 : 1200);
   };
-  await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+  await send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: desk ? 1 : 2, mobile: !desk });
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] });
   await send('Fetch.enable', { patterns: [{ urlPattern: '*/api/decisions' }] });
   await send('Page.enable');
@@ -55,11 +59,20 @@ try {
   const press = (key) => inPage(`const e = document.querySelector('.dl-row[data-key="${key}"] .dl-face'), r = e.getBoundingClientRect();
     const o = { bubbles: true, clientX: r.left + 120, clientY: r.top + 30, pointerId: 4, pointerType: 'touch', isPrimary: true };
     e.dispatchEvent(new PointerEvent('pointerdown', o)); await s(450); e.dispatchEvent(new PointerEvent('pointercancel', o)); return 'ok';`);
+  // A key pressed where the focus is, as a keyboard would, with a pill at the bottom right naming it for whoever watches (not part of the board).
+  const key = (k, mod = false) => inPage(`let p = document.getElementById('rec-key'); if (!p) { p = document.createElement('div'); p.id = 'rec-key';
+    p.style.cssText = 'position:fixed;z-index:9;right:20px;bottom:20px;padding:6px 14px;border-radius:10px;background:rgba(0,0,0,.72);color:#fff;font:600 15px system-ui'; document.body.append(p); }
+    p.textContent = ${JSON.stringify((mod ? 'Ctrl+' : '') + ({ Enter: '↵' }[k] ?? k.toUpperCase()))};
+    (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, bubbles: true, ctrlKey: ${mod} })); return 'ok';`);
+  const type = (words) => inPage(`const t = document.activeElement; if (t?.tagName !== 'TEXTAREA') return 'missing'; for (const c of ${JSON.stringify(words)}) { t.value += c; t.dispatchEvent(new Event('input')); await s(45); } return 'ok';`);
   await send('Page.startScreencast', { format: 'jpeg', quality: 90, everyNthFrame: 1 });
   await send('Page.navigate', { url: `${url}${screen === 'reports' ? '#reports' : '#waiting'}` });
   const steps = screen === 'reports' ? [[2600], [() => press('settings-speed'), 700], [() => drag('settings-speed', 80, 10, 45), 1000], [() => drag('settings-speed', 300), 1600], [() => tap('#undo'), 1400],
     [() => drag('release-train', -280), 1600], [() => tap('#undo'), 1400], [() => tap('a.dl-face[href="#reports/new-sign-in"]'), 1600], [() => tap('#reader .close'), 1400],
-    [() => tap('.top .dl-more > summary'), 1200], [() => tap('[data-act="read-all"]'), 1600], [() => tap('#undo'), 1500]] : [[2600], [() => press('ship'), 700], [() => drag('ship', 80, 10, 45), 1000], [() => drag('keep-the-weekly-digest', 300), 1600], [() => tap('#undo'), 1400],
+    [() => tap('.top .dl-more > summary'), 1200], [() => tap('[data-act="read-all"]'), 1600], [() => tap('#undo'), 1500]] : desk ? [[2600], [() => key('j'), 900], [() => key('j'), 900], [() => key('k'), 900], [() => key('Enter'), 1800], [() => key('z', true), 1500],
+    [() => key('l'), 1500], [() => key('?'), 1800], [() => tap('#keys header button'), 700], [() => key('j'), 800], [() => key('c'), 600], [() => type('After the demo'), 500], [() => key('Enter', true), 1800],
+    [() => inPage("const b = document.querySelector('.split-list .dl-row:not(.sel) .dl-hover .yes'); if (!b) return 'missing'; b.focus(); await s(700); b.click(); return 'ok';"), 1600],
+    [() => key('g'), 200], [() => key('e'), 1200], [() => key('g'), 200], [() => key('d'), 1500]] : [[2600], [() => press('ship'), 700], [() => drag('ship', 80, 10, 45), 1000], [() => drag('keep-the-weekly-digest', 300), 1600], [() => tap('#undo'), 1400],
     [() => drag('ship', -280), 1600], [() => tap('#undo'), 1300], [() => tap('a.dl-face[href="#decide/ship"]'), 900],
     [() => tap('.pick-list li:nth-child(2) .pick-option'), 700], [() => tap('.pick-list li:nth-child(1) .pick-option'), 700],
     [() => tap('.decide-bar .answer'), 1800], [() => tap('#undo'), 1200], [() => tap('.top .dl-more > summary'), 1200], [() => tap('[data-act="answer-all"]'), 2000], [() => tap('#undo'), 1500]];
@@ -74,7 +87,7 @@ try {
   // An ffmpeg concat list: each frame held until the next one arrived.
   const list = frames.map((f, i) => `file '${f.name}'\nduration ${((frames[i + 1]?.t ?? f.t + 1) - f.t).toFixed(4)}`);
   writeFileSync(join(dir, 'list.txt'), `${list.join('\n')}\nfile '${frames.at(-1).name}'\n`);
-  const r = spawnSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', join(dir, 'list.txt'), '-vf', 'fps=30,format=yuv420p,scale=780:1688', '-c:v', 'libx264', '-movflags', '+faststart', out], { stdio: 'inherit' });
+  const r = spawnSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', join(dir, 'list.txt'), '-vf', `fps=30,format=yuv420p,scale=${desk ? '1280:800' : '780:1688'}`, '-c:v', 'libx264', '-movflags', '+faststart', out], { stdio: 'inherit' });
   if (r.status !== 0) throw new Error('ffmpeg could not make the video');
   console.log(`${out}: ${frames.length} frames`);
 } finally {

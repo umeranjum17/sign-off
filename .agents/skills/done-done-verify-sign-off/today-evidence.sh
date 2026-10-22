@@ -71,7 +71,7 @@ chrome-devtools-axi eval "() => { const p = document.getElementById('ev-project'
 chrome-devtools-axi emulate --viewport 1280x800x1 --color-scheme light >/dev/null
 chrome-devtools-axi open "$url#evidence" >/dev/null; chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
 columns=$(num '() => new Set([...document.querySelectorAll(".ev-card")].map((a) => Math.round(a.getBoundingClientRect().left))).size')
-selected=$(chrome-devtools-axi eval '() => [...document.querySelectorAll(".ev-card[aria-current]")].map((a) => a.id).join() === document.querySelector(".ev-card").id && document.getElementById("reader").dataset.key === document.querySelector(".ev-card").id.slice(5)' | grep -o 'true\|false' | head -1)
+selected=$(chrome-devtools-axi eval '() => [...document.querySelectorAll(".ev-card[aria-current]")].map((a) => a.id).join() === document.querySelector(".ev-card").id && document.querySelector(".split-detail .ev-title")?.textContent === document.querySelector(".ev-card[aria-current] .t").textContent' | grep -o 'true\|false' | head -1)
 chrome-devtools-axi open "$url" >/dev/null; chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
 beside=$(chrome-devtools-axi eval '() => document.querySelector(".areas > .i-evidence").getBoundingClientRect().left > document.querySelector(".areas > .i-waiting").getBoundingClientRect().right' | grep -o 'true\|false' | head -1)
 tile=$(num '() => document.querySelector(".tile.i-evidence .n").textContent'); row=$(num '() => document.querySelectorAll(".ev-scroll-row .ev-card").length')
@@ -91,7 +91,7 @@ glance=$(chrome-devtools-axi eval '() => document.querySelector(".glance")?.text
   echo "dismissal log lines written: $(cat "$d/board.dismissed.jsonl" 2>/dev/null | wc -l)"
 } > "$out/counts.txt"
 # With the recording the desk steps include the clicks it makes.
-rec=$([ "${TODAY_EVIDENCE_RECORD:-}" = 1 ] && echo ', "On the desk at 1280, point at a Proven today row on Today (its hover tint and quiet x show), click it: Evidence opens with that update selected beside the list", "Click three more rows in the Evidence list: each click changes the selection, its tint and accent bar move, and the selected update slides in from the right"')
+rec=$([ "${TODAY_EVIDENCE_RECORD:-}" != 1 ] || echo ', "On the desk at 1280, point at a Proven today row on Today (its hover tint and quiet x show), click it: Evidence opens with that update selected beside the list", "Click three more rows in the Evidence list: each click changes the selection, its tint and accent bar move, and the selected update slides in from the right"')
 cat > "$out/steps.json" <<JSON
 {"target": {"version": "$(node -p 'require("./package.json").version')"}, "start": "A new board with two passed updates (one filed 3 days ago) and two updates with no run, each with a capture, and one new report",
  "steps": ["Open Today on a phone at 390 and on a desk at 1280 (1024px and wider is the desk layout) in light and dark", "Read the Proven today tile, the glance line and the Proven today row; on the desk, find the latest proof and the new report in a column beside Waiting on you, the asks that wait on you", "Open Evidence on a phone at 390 and on the desk at 1280 in light and dark; on the desk the list is one column, newest first, beside the selected update, the newest when none is picked", "Pick muxr in the project filter", "Compare Evidence, which keeps every proof, with the Proven today row, which keeps the passed ones of the last day"$rec],
