@@ -23,7 +23,7 @@ const probe = `() => {
   const sp = (s) => { const e = document.querySelector(s); if (!e || !vis(e)) return null; const c = getComputedStyle(e); return [c.paddingTop, c.paddingRight, c.paddingBottom, c.paddingLeft, c.marginTop, c.marginBottom, c.gap, c.fontSize, c.minHeight].join(' '); };
   const spacing = {}; for (const s of ['main', '.top', '.top h1', 'button', '.open-link', '.row', '.tabs a', '.tabs', '.glance', '.tile', '.decide-bar']) spacing[s] = sp(s);
   const css = (s, p) => { const e = document.querySelector(s); return e ? getComputedStyle(e)[p] : null; };
-  return JSON.stringify({ body: css('body', 'fontSize'), bodyLine: css('body', 'lineHeight'), h1: css('.top h1', 'fontSize'), tabBar: bar && { h: Math.round(bar.height * 10) / 10, link: Math.round(document.querySelector('.tabs a').getBoundingClientRect().height * 10) / 10, bg: css('.tabs', 'backgroundColor'), blur: css('.tabs', 'backdropFilter') }, tabLabel: css('.tabs a', 'fontSize'), overflowX: document.documentElement.scrollWidth > innerWidth, under, spacing });
+  return JSON.stringify({ body: css('body', 'fontSize'), bodyLine: css('body', 'lineHeight'), h1: css('.top h1', 'fontSize'), tabBar: bar && { h: Math.round(bar.height * 10) / 10, link: Math.round(document.querySelector('.tabs a').getBoundingClientRect().height * 10) / 10, bg: css('.tabs', 'backgroundColor'), blur: css('.tabs', 'backdropFilter') }, tabLabel: css('.tabs a', 'fontSize'), tabNames: [...document.querySelectorAll('.tabs a')].map((a) => a.textContent.trim().replace(/\d+$/, '')), overflowX: document.documentElement.scrollWidth > innerWidth, under, spacing });
 }`;
 let base;
 try {
@@ -35,12 +35,14 @@ try {
   for (const [stem, hash] of [['decide', '#decide/npm'], ['today', '#']]) {
     browser('open', `${base}${hash}`);
     browser('eval', '() => new Promise((ok) => setTimeout(ok, 700))');
+    // Decide is scrolled so page text sits behind the tab bar: a ghost label would show there.
+    if (stem === 'decide' && width === 390) browser('eval', '() => new Promise((ok) => { scrollTo(0, 320); setTimeout(ok, 400); })');
     const name = `${stem}.${side}.${theme}.${width}w`;
     browser('screenshot', join(out, `${name}.png`));
     let m = browser('eval', probe).match(/result: (".*")/)[1]; m = JSON.parse(m); while (typeof m === 'string') m = JSON.parse(m);
     cell[stem] = m;
     const lines = stem === 'decide'
-      ? [m.tabBar ? `tab bar content height ${m.tabBar.link}px (the bar box is ${m.tabBar.h}px with its 0.5px hairline)` : 'tab bar not shown at this width: the sidebar replaces it', `tab bar background ${m.tabBar ? m.tabBar.bg : '-'}`, `tab bar blur ${m.tabBar ? m.tabBar.blur : '-'}`, `tab label size ${m.tabLabel}`, `controls under 44px ${m.under.length}${m.under.length ? ': ' + m.under.map((x) => `${x.text} ${x.w}x${x.h}`).join(', ') : ''}`, `horizontal overflow ${m.overflowX ? 1 : 0}`]
+      ? [m.tabBar ? `tab bar content height ${m.tabBar.link}px (the bar box is ${m.tabBar.h}px with its 0.5px hairline)` : 'tab bar not shown at this width: the sidebar replaces it', `tab labels shown once each: ${m.tabNames.join(', ')}`, `page scrolled 320px so text sits behind the tab bar: it is solid ${m.tabBar ? m.tabBar.bg : '-'} with no blur, so no ghost label shows`, `tab bar blur ${m.tabBar ? m.tabBar.blur : '-'}`, `tab label size ${m.tabLabel}`, `controls under 44px ${m.under.length}${m.under.length ? ': ' + m.under.map((x) => `${x.text} ${x.w}x${x.h}`).join(', ') : ''}`, `horizontal overflow ${m.overflowX ? 1 : 0}`]
       : [`body text ${m.body} on ${m.bodyLine}`, `page title ${m.h1}`, `controls under 44px ${m.under.length}${m.under.length ? ': ' + m.under.map((x) => `${x.text} ${x.w}x${x.h}`).join(', ') : ''}`, `horizontal overflow ${m.overflowX ? 1 : 0}`];
     writeFileSync(join(out, `${name}.txt`), `${side} ${theme} ${width}w ${stem}\n${lines.join('\n')}\n`);
     writeFileSync(join(out, `spacing.${stem}.${side}.${theme}.${width}w.json`), JSON.stringify(m.spacing, null, 2) + '\n');
