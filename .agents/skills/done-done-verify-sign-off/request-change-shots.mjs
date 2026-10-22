@@ -25,7 +25,7 @@ let server;
 try {
   cpSync(join(repo, 'fixtures/contract/design.v1/design'), join(dir, 'design'), { recursive: true });
   cpSync(join(repo, 'docs/media/phone-light.webp'), join(dir, 'design/preview.webp'));
-  const message = readFileSync(join(repo, 'fixtures/contract/design.v1/valid-basic.json'), 'utf8').replace('design/preview.png', 'design/preview.webp');
+  const message = readFileSync(join(repo, 'fixtures/contract/design.v1/valid-basic.json'), 'utf8').replace('design/preview.png', 'design/preview.webp').replace('design/welcome.png', 'design/preview.webp'); // a real phone screen, not the blank fixture
   writeFileSync(join(dir, 'design-message.json'), message);
   run(process.execPath, [join(repo, 'dist/cli.js'), 'post', board, '--kind', 'design', '--from', join(dir, 'design-message.json')], { env });
   // The feeding program's board: it takes answers only, which is how the live board is fed.
