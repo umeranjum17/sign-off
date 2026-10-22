@@ -438,6 +438,7 @@
      The project picker sits quietly beside the search box, as tall as it and in the same sunk fill. */
   .ev-find { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; } .ev-find input { flex: 1 1 auto; min-width: 0; }
   .ev-find select { flex: none; max-width: 40%; min-height: 2.75rem; padding: 0 0.75rem; border: 0; border-radius: 0.625rem; background: var(--sunk); color: var(--muted); font: inherit; }
+  .ev-find select.on { color: var(--text); }
   .ev-grid { display: grid; gap: 1.75rem; grid-template-columns: minmax(0, 1fr); }
   .ev-card { display: flex; flex-direction: column; gap: 0.75rem; color: inherit; text-align: left; text-decoration: none; }
   .ev-media { position: relative; display: grid; place-items: end center; aspect-ratio: 16 / 11; padding: 1.5rem 1.5rem 0.75rem; overflow: hidden;
@@ -1457,7 +1458,7 @@
     };
     box.value = evFind;
     box.oninput = () => { evFind = box.value; show(); };
-    if (pick) { pick.value = evProject; pick.onchange = () => { evProject = pick.value; show(); }; }
+    if (pick) { pick.value = evProject; pick.classList.toggle('on', !!evProject); pick.onchange = () => { evProject = pick.value; pick.classList.toggle('on', !!evProject); show(); }; }
     show();
     return [el('div', { class: 'search ev-find', role: 'search' }, box, pick), out];
   }
