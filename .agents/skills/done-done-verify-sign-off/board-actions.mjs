@@ -190,14 +190,14 @@ const PAGES = [
   } }] },
   // Last, because these cannot be taken back: a comment, another round, a reply, and the design's own verdict.
   { name: 'messages', hash: '#decide/keep-the-weekly-digest', ready: '.decide', stages: [{ run: async (h) => {
-    const other = () => h.board().querySelector('.decide-other'), say = (text) => { const t = other().querySelector('textarea'); t.closest('details').open = true; h.type(t, text); };
-    if (!h.need('Other answer', other()?.querySelector('summary'))) return;
+    const other = () => h.board().querySelector('.decide-other'), say = (text) => { const t = other().querySelector('textarea'); t.closest('details').open = true; h.board().querySelector('.decide-bar .more-menu').open = true; h.type(t, text); };
+    if (!h.need('Add a comment', other()?.querySelector('summary'))) return;
     say('Keep it short.');
-    await h.press('Send as a comment', h.find(/^Send as a comment,/), () => /1 comment/.test(other().querySelector('summary').textContent));
+    await h.press('Send without answering', h.find(/^Send without answering,/), () => /1 comment/.test(other().querySelector('summary').textContent));
     say('Keep it short.');
-    await h.press('Another round', h.find(/^Another round,/), () => /1 round asked/.test(other().querySelector('summary').textContent));
+    await h.press('Ask for another round', h.find(/^Ask for another round,/), () => /1 round asked/.test(other().querySelector('summary').textContent));
     say('Keep it short.');
-    await h.cycle('Send reply', h.find(/^Send reply,/), () => location.hash !== '#decide/keep-the-weekly-digest', () => true, /Saved/);
+    await h.cycle('Send as my own answer', h.find(/^Send as my own answer,/), () => location.hash !== '#decide/keep-the-weekly-digest', () => true, /Saved/);
   } }] },
   { name: 'design-review', hash: '#designs/chat-journeys', ready: '#reader .design-review', stages: [
     { shot: 'design-approved', run: async (h) => {

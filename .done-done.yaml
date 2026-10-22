@@ -45,6 +45,9 @@ journeys:
   # A capture's tap stays on the board on a phone, and the 4-option comparison table reads at 16 px at 390; PHONE_PART=link|table drives one part per run.
   phone-capture:
     command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/phone-link-shots.sh "$DONE_DONE_EVIDENCE_ROOT"'
+  # A comment sent with an answer: Add a comment under a yes/no on Decide, Answer and one More…, then the Answered card and `answers`, at 390 and 1280 in light and dark.
+  answer-comment:
+    command: 'npm run build > /dev/null && for w in 390 1280; do for t in light dark; do COMMENT_WIDTH=$w node .agents/skills/done-done-verify-sign-off/comment-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t || exit 1; done; done'
   board-actions:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/board-actions.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   attach:

@@ -414,8 +414,8 @@
   .pager .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.75; }
   @media (min-width: 60rem) { .pager { height: 3.75rem; } }
   .decide-lists { margin-top: 2rem; }
-  /* Your own words, a note, another round: the design has no place for them, so they sit under the lists. */
-  .decide-other { margin-top: 1.75rem; } .decide-other .other > summary { padding-left: 1rem; color: var(--accent); font-size: 1.0625rem; font-weight: 400; }
+  /* A comment with the answer, your own words, another round: one quiet line right under the choices. */
+  .decide-other { margin-top: 0.5rem; } .decide-other .other > summary { padding-left: 1rem; color: var(--accent); font-size: 1.0625rem; font-weight: 400; }
   .decide-lists .sec-head { margin: 1.75rem 0 .5rem; } .decide-lists .rows + .sec-head { margin-top: 1.75rem; }
   .decide-lists .sec-head h2 { color: var(--muted); font-size: .8125rem; font-weight: 400; letter-spacing: .02em; text-transform: uppercase; }
   .decide-lists .compact strong { font-weight: 400; line-height: 1.375rem; } .decide-lists .compact .meta { margin: .0625rem 0 0; font-size: .9375rem; line-height: 1.25rem; }
@@ -534,7 +534,10 @@
   /* The quick answers come first and are big enough for a thumb; typing is last, behind Other answer. */
   /* Every card's answers read from the left, with the Recommended label above the answer and a picked answer's check on the right. */
   .choices button { position: relative; display: grid; justify-items: start; align-content: center; min-height: 3.125rem; padding: 0.625rem 1.25rem; text-align: left; }
-  .choices .tag { order: -1; margin: 0 0 0.125rem; font-size: 0.875rem; letter-spacing: 0; text-transform: none; }
+  /* The answer, then a small Recommended beside it, as on Decide; a picked one keeps room for its check. */
+  .choices .label-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 0.5rem; }
+  .choices .tag { margin: 0; font-size: 0.875rem; font-weight: 400; letter-spacing: 0; text-transform: none; } .choices .tag::before { content: none; }
+  .choices button[aria-pressed="true"] { padding-right: 2.75rem; }
   .choices button[aria-pressed="true"]::before { position: absolute; right: 1rem; top: 50%; translate: 0 -50%; margin: 0; }
   .row > .note, .row > .err { grid-column: 1 / -1; }
   /* Other answer is a plain row with a chevron. */
@@ -543,7 +546,26 @@
   .other:not([open]) > :not(summary), .done:not([open]) > :not(summary) { display: none; }
   .other > summary::after { content: ""; width: 0.4375rem; height: 0.4375rem; margin: -0.25rem 0 0 0.75rem; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(45deg); }
   .other[open] > summary::after { margin-top: 0.25rem; transform: rotate(-135deg); }
-  .actions .quick { border-radius: 999px; }
+  /* Add a comment: a press dims and settles the line, the chevron turns and the box eases in. */
+  .comment > summary { border-radius: 0.5rem; -webkit-tap-highlight-color: transparent; transition: opacity 0.15s, transform 0.15s; }
+  .comment > summary:active { opacity: 0.55; transform: scale(0.98); }
+  .comment > summary::after { transition: transform 0.22s ease, margin 0.22s ease; }
+  .comment[open] > :not(summary) { animation: comment-in 0.22s ease-out; }
+  @keyframes comment-in { from { opacity: 0; translate: 0 -0.375rem; } }
+  .comment > textarea { margin-top: 0.25rem; }
+  /* More: the other ways to send the words, folded so the card keeps one answer button. */
+  .more-menu > summary { display: inline-flex; align-items: center; min-width: 2.75rem; min-height: 2.75rem; margin: 0; padding: 0 0.75rem; cursor: pointer; border-radius: 0.5rem; list-style: none; color: var(--muted); font-size: 0.9375rem; transition: opacity 0.15s; }
+  .more-menu > summary::-webkit-details-marker { display: none; } .more-menu:not([open]) > :not(summary) { display: none; }
+  .more-menu > summary:active { opacity: 0.55; }
+  .more-menu .menu { display: grid; gap: 0.25rem; margin-top: 0.25rem; padding: 0.375rem; border: 1px solid var(--line); border-radius: 0.875rem; background: var(--surface); animation: comment-in 0.18s ease-out; }
+  .more-menu .menu button, .more-menu .menu a { display: flex; align-items: center; justify-content: start; min-height: 2.75rem; padding: 0 0.75rem; color: var(--text); text-align: left; text-decoration: none; background: transparent; }
+  /* On Decide it opens upward over the page, from the bar at the foot. */
+  .decide-bar .more-menu { position: relative; flex: none; }
+  .decide-bar .more-menu .menu { position: absolute; z-index: 2; right: 0; bottom: calc(100% + 0.25rem); min-width: 15rem; box-shadow: 0 8px 24px rgb(0 0 0 / 0.18); }
+  /* In dark the menu sits a step above the page, with a clear rim, so it never reads as part of what it covers. */
+  @media (prefers-color-scheme: dark) { .more-menu .menu { background: var(--tk-input); border-color: #4A4A4E; box-shadow: 0 12px 32px rgb(0 0 0 / 0.6); } }
+  @media (prefers-reduced-motion: reduce) { .more-menu .menu { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .comment > summary, .comment > summary::after { transition: none; } .comment[open] > :not(summary) { animation: none; } }
   /* After a tap: what was saved, and an Undo for a few seconds. */
   #toast { position: fixed; z-index: 3; left: 1rem; right: 1rem; bottom: calc(5rem + env(safe-area-inset-bottom)); max-width: 30rem; margin: 0 auto;
     display: flex; align-items: center; gap: 0.875rem; padding: 0.5rem 0.5rem 0.5rem 1.125rem; border-radius: 0.875rem;
@@ -1051,7 +1073,7 @@
     try {
       await call('/api/answers', {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
-      }, () => { forget(d.key); if (!typed) drop(); });
+      }, () => { forget(d.key); unfolded.delete(d.key); if (!typed) drop(); });
     } catch (e) {
       shown(err).textContent = `Couldn't save: ${e.message}`;
       return unlock();
@@ -1071,12 +1093,23 @@
   const noteOf = (d) => (answerOf(d.key)?.answer === 'text' && !d.reply ? '' : answerOf(d.key)?.note ?? '');
   // The toast stays while the pointer is on it or the keyboard is on Undo.
   const later = (ms) => { clearTimeout(hide); hide = setTimeout(() => (toast.matches(':hover') || undoBtn.matches(':focus-visible') ? later(1500) : (toast.hidden = true)), ms); };
+  /** The toast keeps its place unless that would cover Decide's bar: a bar not yet stuck can sit in the toast's band, and then the toast goes just above it. */
+  const placeToast = () => {
+    toast.style.bottom = '';
+    const bar = document.querySelector('.decide-bar')?.getBoundingClientRect(), t = toast.getBoundingClientRect();
+    if (!toast.hidden && bar?.height && t.bottom > bar.top && t.top < bar.bottom) toast.style.bottom = `${innerHeight - bar.top + 8}px`;
+  };
+  addEventListener('scroll', () => toast.hidden || placeToast(), { passive: true });
+  // A redraw or a resize can move the bar under a toast that is already up.
+  new ResizeObserver(() => toast.hidden || placeToast()).observe(document.documentElement);
+  addEventListener('resize', () => toast.hidden || placeToast());
   const say = (text, ms, undo) => {
     toastText.textContent = text;
     undoBtn.hidden = !undo;
     undoBtn.disabled = false;
     undoBtn.onclick = undo;
     toast.hidden = false;
+    placeToast();
     later(ms);
   };
   /** After a tap, a few seconds to take it back. Undo saves the answer from before the tap (or none) the usual way, so it is recorded too. */
@@ -1197,9 +1230,10 @@
     // A read-only board, or an item with nothing to answer, shows no answer, note or comment controls.
     const design = d.type === 'design', ro = state.readonly || !(d.options.length || d.reply), name = headline(d);
     const buttons = d.options.map((o) => {
-      const rec = o.value === d.recommend_value && !design;
+      // The picked answer reads as itself: Recommended stays on the ones not picked.
+      const rec = o.value === d.recommend_value && !design && o.value !== saved?.answer;
       return el('button', { class: rec ? 'rec' : '', 'aria-label': `${o.label}${o.outcome ? `: ${o.outcome}` : ''}, ${name}`, 'aria-pressed': o.value === saved?.answer, ...(rec && { 'aria-describedby': `rec-${d.key}` }) },
-        design ? (o.value === saved?.answer ? 'Picked' : 'Pick') : o.label, rec ? el('span', { class: 'tag', id: `rec-${d.key}` }, 'Recommended') : '',
+        el('span', { class: 'label-line' }, design ? (o.value === saved?.answer ? 'Picked' : 'Pick') : o.label, rec ? el('span', { class: 'tag', id: `rec-${d.key}` }, 'Recommended') : ''),
         // What happens next if this is picked, and why the recommended one is.
         o.outcome ? el('span', { class: 'out', dir: 'auto' }, o.outcome) : '', rec && d.recommend_reason ? el('span', { class: 'reason', dir: 'auto' }, `Why: ${d.recommend_reason}`) : '');
     });
@@ -1311,18 +1345,24 @@
 
   /** Boxes the person unfolded, kept open across redraws. */
   const unfolded = new Set();
-  /** The one place to type on a card, folded behind Other answer so the buttons come first and typing is the last resort.
-   * Sent on its own the words are the answer (`text`); typed before a button is picked they go with that answer as its note.
+  /** The one place to type on a card, folded behind a quiet Add a comment so the buttons come first and an answer still takes one tap.
+   * Typed before a button is picked the words go with that answer as its comment (the note the agent reads); Send reply makes them the answer (`text`).
    * On a normal board they can also ask for another round (not on an evidence update) or go as a comment. */
-  function other(d, saved, err, after) {
-    const box = el('textarea', { id: `note-${d.key}`, rows: 2, maxlength: 500, dir: 'auto' });
-    box.value = drafts.get(d.key) ?? (saved?.answer === 'text' ? '' : noteOf(d));
+  /** More…: the actions a card keeps out of the way of its one answer button, folded into one control. */
+  const moreMenu = (name, items) => (items.length ? el('details', { class: 'more-menu' }, el('summary', { 'aria-label': `More, ${name}` }, 'More…'), el('div', { class: 'menu' }, ...items)) : '');
+  /** With a sink (Decide), the other ways to send the words go there, into the page's one More…, instead of a More under the box. */
+  function other(d, saved, err, after, sink) {
+    const name = headline(d), reply = !d.options.length;
+    const box = el('textarea', { id: `note-${d.key}`, rows: 2, maxlength: 500, dir: 'auto', placeholder: reply ? 'Reply in a few words' : 'Add a note (optional)',
+      'aria-label': `${reply ? 'Reply' : 'Note'}, ${name}` });
+    const kept = saved?.answer === 'text' ? '' : noteOf(d);
+    box.value = drafts.get(d.key) ?? kept;
     box.oninput = () => { drafts.set(d.key, box.value); keep(); };
     // An option valued text would be the same answer, so that item takes words only as a note.
     const words = !d.options.some((o) => o.value === 'text'), talk = !state.answers_only, round = talk && d.type !== 'evidence';
-    const sendBtn = el('button', { 'aria-label': `Send reply, ${headline(d)}` }, 'Send reply');
+    const sendBtn = el('button', { 'aria-label': `${reply ? 'Send reply' : 'Send as my own answer'}, ${name}` }, reply ? 'Send reply' : 'Send as my own answer');
     sendBtn.onclick = () => (box.value.trim() ? save(d, { value: 'text' }, [sendBtn], err, after) : (shown(err).textContent = 'Write the reply first.'));
-    const roundBtn = el('button', { class: 'quick', 'aria-label': `Another round, ${headline(d)}` }, 'Another round');
+    const roundBtn = el('button', { 'aria-label': `Ask for another round, ${name}` }, 'Ask for another round');
     roundBtn.onclick = () => {
       const unlock = lock(roundBtn);
       const note = (drafts.get(d.key) ?? noteOf(d)).trim();
@@ -1334,24 +1374,26 @@
         unlock();
       });
     };
-    const commentBtn = el('button', { 'aria-label': `Send as a comment, ${headline(d)}` }, 'Send as a comment');
+    const commentBtn = el('button', { 'aria-label': `Send without answering, ${name}` }, 'Send without answering');
     commentBtn.onclick = () => send(commentBtn, err, { kind: 'comment', key: d.key }, d.key, box.value.trim());
+    // The card keeps one way to answer: the note goes with the answer button. Sending the words some other way is in More.
+    const extra = [!reply && words ? sendBtn : '', round ? roundBtn : '', talk && !FROZEN ? commentBtn : ''].filter(Boolean);
+    const more = sink ? (sink.push(...extra), '') : moreMenu(name, extra);
     const asked = (state.rounds ?? []).filter((r) => r.key === d.key);
-    const comments = (state.messages ?? []).filter((m) => m.kind === 'comment' && m.key === d.key);
-    const status = [saved?.note && saved.answer !== 'text' && 'note saved', asked.length && `${asked.length} ${asked.length > 1 ? 'rounds' : 'round'} asked`,
+    // A comment typed before a pick also went on its own to the agent: it shows once, as the comment sent with the answer.
+    const comments = (state.messages ?? []).filter((m) => m.kind === 'comment' && m.key === d.key && !(kept && m.text === kept));
+    const status = [asked.length && `${asked.length} ${asked.length > 1 ? 'rounds' : 'round'} asked`,
       comments.length && `${comments.length} ${comments.length > 1 ? 'comments' : 'comment'}`].filter(Boolean).join(' · ');
-    const label = d.options.length ? 'Other answer' : 'Write a reply';
-    const also = `with a button you pick${round ? ' or with Another round' : ''}`;
-    const hint = !d.options.length ? 'Reply in a few words' : words ? `Your own answer in a few words. It also goes, as a note, ${also}.` : `A note, sent ${also}.`;
-    const fold = el('details', { class: 'other', ...((unfolded.has(d.key) || drafts.get(d.key)) && { open: '' }) },
-      el('summary', { 'aria-label': `${label}, ${headline(d)}` }, `${label}${status && ` · ${status}`}`),
+    const label = reply ? 'Write a reply' : kept ? 'Edit comment' : 'Add a comment';
+    const fold = el('details', { class: 'other comment', ...((unfolded.has(d.key) || drafts.get(d.key)) && { open: '' }) },
+      el('summary', { 'aria-label': `${label}, ${name}` }, `${label}${status && ` · ${status}`}`),
       asked.length ? el('p', { class: 'meta saved-note', dir: 'auto' }, `You asked for another round: ${asked[asked.length - 1].note || 'with your comments on the mocks'}`) : '',
       ...comments.map((m) => el('p', { class: 'meta saved-note', dir: 'auto' }, `Your comment, ${m.delivered ? 'read by the agent' : 'not read yet'}: ${m.text}`)),
-      el('label', { for: box.id }, hint), box,
-      el('div', { class: 'actions' }, words ? sendBtn : '', round ? roundBtn : '', talk && !FROZEN ? commentBtn : ''));
+      box, reply || more ? el('div', { class: 'actions' }, reply ? sendBtn : '', more) : '');
     fold.ontoggle = () => (fold.open ? unfolded.add(d.key) : unfolded.delete(d.key));
     fold.firstChild.onclick = () => setTimeout(() => fold.open && box.focus());
-    return el('div', { class: 'note' }, saved?.answer === 'text' ? el('p', { class: 'meta saved-note', dir: 'auto' }, `Your reply: ${saved.note}`) : '', fold);
+    return el('div', { class: 'note' }, saved?.answer === 'text' ? el('p', { class: 'meta saved-note', dir: 'auto' }, `Your reply: ${saved.note}`) : '',
+      kept ? el('p', { class: 'meta saved-note', dir: 'auto' }, `Your comment, sent with ${saved.label}: ${kept}`) : '', fold);
   }
 
   /** Free-text prompts for the agent, which it reads with sign-off-axi poll. */
@@ -2737,7 +2779,7 @@
     if (d.type === 'signin') {
       const gone = xBtn(d, 'Dismiss');
       if (gone) gone.addEventListener('click', () => (location.hash = to));
-      const signinPage = el('div', { class: 'decide' }, row(d, { x: false }), el('div', { class: 'decide-bar' }, skip || '', el('a', { class: 'later', href: '#waiting' }, 'Later'), gone), decideLists(d, queue));
+      const signinPage = el('div', { class: 'decide' }, row(d, { x: false }), el('div', { class: 'decide-bar' }, moreMenu(headline(d), [skip, el('a', { class: 'later', href: '#waiting' }, 'Later'), gone].filter(Boolean))), decideLists(d, queue));
       if (!state.readonly) swipe(signinPage);
       return signinPage;
     }
@@ -2763,16 +2805,17 @@
     const silent = quiet ? [icon('clock'), el('span', {}, el('b', {}, 'If you stay quiet:'), ` ${quiet.outcome ?? quiet.label}${d.silent_by ? ` At ${when(d.silent_by)}. ${left(d.silent_by)}.` : ''}`)] : '';
     const head = el('div', { class: 'lead' }, badge(d), el('h2', { dir: 'auto' }, headline(d)));
     const why = unchecked(d) || d.why || (d.tradeoff && firstDraft(d).text) || d.about;
-    const back = el('a', { class: 'later', href: '#waiting' }, 'Later'), gone = xBtn(d, 'Dismiss');
+    const back = el('a', { class: 'later', href: '#waiting' }, 'Later'), gone = xBtn(d, 'Dismiss'), sends = [];
     if (gone) gone.addEventListener('click', () => (location.hash = to));
     const page = el('section', { class: 'decide' }, hero || (preview ? el('div', { class: 'decide-preview' }, preview) : ''),
       ...(d.mocks?.length ? [annotations(d)] : []), head,
       why ? el('p', { class: 'why', dir: 'auto' }, why) : '', firstDraftLinks(d),
       ...(live && opts.length ? [el('p', { class: 'pick-label' }, typeOf(d) === 'yes-no' ? 'YES OR NO' : 'PICK ONE'),
         el('ul', { class: 'pick-list', 'aria-label': d.title }, ...optionButtons.map((b) => el('li', {}, b)))] : []),
+      ...(live ? [el('div', { class: 'decide-other' }, other(d, answerOf(d.key), err, () => (location.hash = to), sends))] : []),
       err,
-      el('div', { class: 'decide-bar' }, silent ? el('p', { class: 'silent-line' }, ...silent) : '', live && opts.length ? answer : '', skip || '', back, gone), decideLists(d, queue),
-      ...(live ? [el('div', { class: 'decide-other' }, other(d, answerOf(d.key), err, () => (location.hash = to)))] : []));
+      // The one answer button, and everything else in one More….
+      el('div', { class: 'decide-bar' }, silent ? el('p', { class: 'silent-line' }, ...silent) : '', live && opts.length ? answer : '', moreMenu(headline(d), [skip, back, gone, ...sends].filter(Boolean))), decideLists(d, queue));
     if (live) swipe(page, () => { if (recOpt && !answer.disabled) answerWith(recOpt); });
     return page;
   }
@@ -2865,7 +2908,8 @@
     // A browser will not open a data: link in a new tab; the inline preview is the copy.
     document.querySelectorAll('#board a[href^="data:"]').forEach((a) => a.removeAttribute('href'));
   }
-  addEventListener('keydown', () => (document.documentElement.dataset.kbd = ''), true);
+  // Typing in a box is not moving around by keyboard (a phone's keyboard sends keys too); Tab out of it is.
+  addEventListener('keydown', (e) => { if (e.key === 'Tab' || !e.target.closest?.('textarea, input, select')) document.documentElement.dataset.kbd = ''; }, true);
   addEventListener('pointerdown', () => delete document.documentElement.dataset.kbd, true);
   // A new screen starts at its top, or at the item tapped on the Summary, with the focus on its title.
   // Closing a report or plan goes back to its card, with the focus on its link; an open report takes the focus on its title.

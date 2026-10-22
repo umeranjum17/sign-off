@@ -29,9 +29,13 @@ new question needs and when it is refused. Its flags:
   hidden while this one waits, and its answer closes them too.
 
 Each answer is one tap, with an Undo for a few seconds after it (an Undo is
-saved as an answer change). Typing is last: every question with options has
-a text box folded behind **Other answer** (none when an option is valued
-`text`); the words are saved as the answer `text`, with the same Undo.
+saved as an answer change). Typing is optional: every question with options has
+a text box folded behind a quiet **Add a comment** right under its choices.
+Words typed there go with the answer picked next as its `note` (the comment the
+agent reads in `answers` and `wait`), so the answer is still one tap and the
+card keeps one answer button. **More…** holds the other ways to send
+the words: **Send as my own answer** saves them as the answer `text` (not
+offered when an option is valued `text`), with the same Undo.
 `post --type decision` (the default) is exactly `raise`, and `raise` stays
 as its alias.
 
@@ -57,7 +61,7 @@ and Delete (words typed but not yet saved stay with their element while the
 page is open, so tapping another element and back keeps them; a reload drops
 them), kept on the board and shown, until it is sent, only on the exact mock
 file it was made on. The comments go to the agent with the next answer on
-that card (a pick, Other answer or **Another round**, which may then have no
+that card (a pick, an own answer or **Ask for another round**, which may then have no
 note), each with its element, in `wait` and `answers` (`comments`); once
 sent they are listed as sent and can no longer change. An option with no
 mock, or whose file is gone, says "No mock for this option".
@@ -157,17 +161,18 @@ without posting.
 - Tap an ask in **Waiting on you** to open it on **Decide**: one ask at a
   time, its picture or page, what it is and why, its options in one list with
   the recommended one marked, and a bar at the bottom with **Answer** (an ask
-  with options), **Skip for now** (another ask follows) and **Later**.
+  with options) and one **More…** that holds **Skip for now** (another ask
+  follows), **Later**, **Dismiss** and the other ways to send typed words.
   **Answer** saves and opens the next ask, or the list after the last.
   **1**–**9** picks an option and answers it, **E** skips to the next ask,
   **Z** undoes the last answer, and a swipe right takes the recommended answer
   while a swipe left skips. A plan opens its own page instead, and a design
   review its screens.
-- Tap **Another round** inside **Other answer** (with the typed note), which
+- Tap **Ask for another round** under **More…** (with the typed note), which
   wakes a waiting agent the same way an answer does; the agent reads it back
   in `answers --json` under `rounds`, with any comments on mock elements it
   carried.
-- Comment on any item (**Send as a comment**, also inside **Other answer**:
+- Comment on any item without answering it (**Send without answering**, also under **More…**:
   every card but a sign-in has that one place to type) and queue a free-text
   prompt for the agent (**Ask the agent**). `poll` blocks until one arrives
   and prints every new one once (`--json` prints
