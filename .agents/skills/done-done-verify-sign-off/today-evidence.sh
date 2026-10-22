@@ -59,7 +59,7 @@ crop() {
   file=$1
   chrome-devtools-axi open "$url$2" >/dev/null
   chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
-  box=$(chrome-devtools-axi eval "() => { const els = ($3).flat().filter(Boolean), s = els[0].closest('.ev-scroll') ?? document.scrollingElement, top = () => Math.min(...els.map((e) => e.getBoundingClientRect().top)), bottom = () => Math.max(...els.map((e) => e.getBoundingClientRect().bottom));
+  box=$(chrome-devtools-axi eval "() => { const els = ($3).flat().filter(Boolean), s = (function up(e) { return !e || e === document.body ? document.scrollingElement : /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight ? e : up(e.parentElement); })(els[0].parentElement), top = () => Math.min(...els.map((e) => e.getBoundingClientRect().top)), bottom = () => Math.max(...els.map((e) => e.getBoundingClientRect().bottom));
     s.scrollBy(0, (top() + bottom() - innerHeight) / 2);
     return new Promise((ok) => setTimeout(() => { const rs = els.map((e) => e.getBoundingClientRect()), px = 16, py = 6, x = Math.max(0, Math.min(...rs.map((r) => r.left)) - px), y = Math.max(0, top() - py);
       ok([Math.min(innerWidth, Math.max(...rs.map((r) => r.right)) + px) - x, Math.min(innerHeight, bottom() + py) - y, x, y].map(Math.round).join(' ')); }, 700)); }" | sed -n 's/^result: "\(.*\)"$/\1/p' | tr -d '\\"')
@@ -82,10 +82,10 @@ for theme in light dark; do
     # The capture with the Proof rows under it, which span the same column, on a desk tall enough to hold both.
     if [ "$w" = 1280 ]; then
       chrome-devtools-axi emulate --viewport 1280x1400x1 --color-scheme "$theme" >/dev/null
-      crop "preview-fill.$theme.${w}w.png" '#evidence/update-2' "[document.querySelector('#reader .ev-hero'), document.querySelector('#reader .ev-grp')]"
+      crop "preview-fill.$theme.${w}w.png" '#evidence/update-2' "[document.querySelector('.ev-hero'), document.querySelector('.ev-grp')]"
       chrome-devtools-axi emulate --viewport "$vp" --color-scheme "$theme" >/dev/null
     fi
-    crop "verdicts.$theme.${w}w.png" '#evidence/update-2' "[document.querySelector('#reader .ev-ask'), document.querySelector('#reader .ev-verdict .choices')]"
+    crop "verdicts.$theme.${w}w.png" '#evidence/update-2' "[document.querySelector('.ev-ask'), document.querySelector('.ev-verdict .choices')]"
     crop "ask-line.$theme.${w}w.png" '' "[document.querySelector('.leash'), document.querySelector('details.ask')]"
     [ "$w" = 390 ] && crop "ev-tile.$theme.${w}w.png" '#evidence' "[document.querySelector('.ev-grid .ev-card')]"
     # On a phone each twin's capture is a tall tile, so only the two titles and results are stacked.
