@@ -71,7 +71,7 @@ try {
   assert.equal(JSON.parse(json).feel.note, text);
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board holding one yes/no ask, Does the new feel look right?',
     steps: [`The board is opened on the ask in Decide at ${width} px wide, ${theme}.`, 'The person taps More beside Answer, sees what it holds, and taps it closed.', 'The person taps Add a comment under the choices and types a comment.', 'The person taps Answer Yes.', 'The person opens Answered.'],
-    result: 'The ask shows Answer Yes and one More (holding Skip for now, Ask me later, Dismiss and the other ways to send); the comment is saved as the answer\'s note and read back by sign-off-axi answers; the Answered card reads only Yes and shows "Your comment, sent with Yes: …" with Edit comment.' }, null, 2) + '\n');
+    result: 'The ask shows Answer Yes and one More (holding Ask me later, Write my own answer, Ask for another round, and Dismiss last); the comment is saved as the answer\'s note and read back by sign-off-axi answers; the Answered card reads only Yes and shows "Your comment, sent with Yes: …" with Edit comment.' }, null, 2) + '\n');
 } finally {
   server?.kill();
   try { browser('stop'); } catch {}

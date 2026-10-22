@@ -136,9 +136,12 @@ const PAGES = [
         const step = h.find(new RegExp(`^${what}$`), h.board().querySelector('.pager'), 'a, span.step');
         if (end) h.has(`${what} (dimmed at the end)`, step?.getAttribute('aria-disabled') === 'true' && step); else await h.nav(what, step, /^#decide\//);
       }
-      // One Answer button and one More beside it: More holds Skip for now, Ask me later and Dismiss.
+      // One Answer button and one More beside it: More holds Ask me later, Write my own answer, Ask for another round and Dismiss.
       h.has('More', bar()?.querySelector('.dl-more > summary'));
-      await h.nav('Skip for now', h.find(/^Skip for now$/, bar()), /^#decide\//);
+      if (options.length) {
+        await h.press('Write my own answer', h.find(/^Write my own answer$/, bar()), () => /^Send your answer/.test(bar().querySelector('.answer').textContent));
+        await h.press(`option ${options[0]} again`, h.find(new RegExp(options[0]), h.board().querySelector('.pick-list')), () => /^Answer /.test(bar().querySelector('.answer').textContent));
+      }
       await h.cycle('Ask me later', h.find(/^Ask me later$/, bar()), () => location.hash === '#waiting' && h.board().querySelector('.g-later'), () => h.board().querySelector('.decide'), /Moved to Later/);
       if (options.length) {
         await h.cycle(`Answer ${key}`, h.find(/^Answer /, bar()), () => location.hash !== `#decide/${key}` || !h.board().querySelector('.decide-bar .answer'), () => h.board().querySelector('.decide-bar .answer'), /Saved/);
@@ -193,11 +196,10 @@ const PAGES = [
     const other = () => h.board().querySelector('.decide-other'), say = (text) => { const t = other().querySelector('textarea'); t.closest('details').open = true; h.board().querySelector('.decide-bar .dl-more').open = true; h.type(t, text); };
     if (!h.need('Add a comment', other()?.querySelector('summary'))) return;
     say('Keep it short.');
-    await h.press('Send without answering', h.find(/^Send without answering,/), () => /1 comment/.test(other().querySelector('summary').textContent));
-    say('Keep it short.');
     await h.press('Ask for another round', h.find(/^Ask for another round,/), () => /1 round asked/.test(other().querySelector('summary').textContent));
     say('Keep it short.');
-    await h.cycle('Send as my own answer', h.find(/^Send as my own answer,/), () => location.hash !== '#decide/keep-the-weekly-digest', () => true, /Saved/);
+    await h.press('Write my own answer', h.find(/^Write my own answer$/), () => /^Send your answer/.test(h.board().querySelector('.decide-bar .answer').textContent));
+    await h.cycle('Send your answer', h.board().querySelector('.decide-bar .answer'), () => location.hash !== '#decide/keep-the-weekly-digest', () => true, /Saved/);
   } }] },
   { name: 'design-review', hash: '#designs/chat-journeys', ready: '#reader .design-review', stages: [
     { shot: 'design-approved', run: async (h) => {

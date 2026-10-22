@@ -1020,8 +1020,8 @@ test('a sign-in card: posted on top of what waits with its link and time left, t
   await evaluate('document.querySelector("#item-npm-login").click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/npm-login' && (await card('npm-login')) !== null);
   assert.equal(await card('npm-login'), `npm|Unlocks: Publish npm|Waits: Main|Expires in 15 min|A ${link} _blank noopener noreferrer `);
-  // A sign-in ask skips on to the next ask like any other, by its button, by a swipe left and with E as its key.
-  assert.equal(await evaluate('!!document.querySelector(".decide-bar .skip")'), true);
+  // A sign-in's More holds Ask me later and Dismiss; it skips on to the next ask like any other, by a swipe left and with E as its key.
+  assert.equal(await evaluate('[...document.querySelectorAll(".decide-bar .dl-menu > button")].map((b) => b.textContent).join("|")'), 'Ask me later|Dismiss');
   await swipe({ x: 340, y: 300 }, { x: 40, y: 300 });
   await until(async () => /^#decide\/(?!npm-login)/.test(await evaluate('location.hash')));
   const at = await evaluate('location.hash');
@@ -1458,7 +1458,7 @@ test('Waiting on you: a reply-only ask shows Reply, a type-ask yes/no shows Yes/
   proc.kill();
 });
 
-test('Decide on a pick-one ask: the reply box sits under the options, and Skip for now or E moves to the next ask', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Decide on a pick-one ask: the reply box sits under the options, More holds four items with Dismiss last, Write my own answer sends the words as the answer, and the pager or E moves to the next ask', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'decide-option-box'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l }));
@@ -1477,10 +1477,22 @@ test('Decide on a pick-one ask: the reply box sits under the options, and Skip f
   assert.equal(await evaluate('(() => { const rows = [...document.querySelectorAll(".decide .pick-list > li")]; return rows.length === 3 && rows.every((li) => li.firstElementChild?.classList.contains("pick-option") && li.firstElementChild.firstElementChild.classList.contains("check")) && getComputedStyle(rows[1].firstElementChild).borderTopLeftRadius !== "0px" && rows[1].getBoundingClientRect().top > rows[0].getBoundingClientRect().bottom; })()'), true);
   await evaluate('document.querySelector(".decide .other summary").click()');
   assert.equal(await evaluate('document.querySelector(".decide .other").open'), true);
-  await evaluate('document.querySelector(".decide .skip").click()');
+  // More holds four items, Dismiss last and in red.
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-bar .dl-menu > button")].map((b) => [b.textContent, getComputedStyle(b).color === getComputedStyle(document.documentElement).getPropertyValue("--danger") || b.classList.contains("dis")])'),
+    [['Ask me later', false], ['Write my own answer', false], ['Ask for another round', false], ['Dismiss', true]]);
+  await evaluate('document.querySelector(".pager .step:last-child").click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/alpha');
   await evaluate('window.dispatchEvent(new KeyboardEvent("keydown", { key: "e" }))');
   await until(async () => (await evaluate('location.hash')) === '#decide/beta');
+  // Write my own answer clears the pick and makes the button Send your answer; empty, it asks for the words; with them, they are the answer.
+  await evaluate('document.querySelector(\'.decide-bar [data-act="own"]\').click()');
+  assert.equal(await evaluate('document.querySelector(".decide-bar .answer").textContent + "|" + document.querySelectorAll(".pick-option[aria-pressed=true]").length + "|" + (document.activeElement === document.querySelector(".decide .other textarea"))'), 'Send your answer|0|true');
+  await evaluate('document.querySelector(".decide-bar .answer").click()');
+  assert.equal(await evaluate('document.querySelector(".decide .err").textContent'), 'Write your answer first.');
+  await evaluate('(() => { const t = document.querySelector(".decide .other textarea"); t.value = "Ship it Thursday"; t.dispatchEvent(new Event("input")); })()');
+  await evaluate('document.querySelector(".decide-bar .answer").click()');
+  await until(async () => /beta,text,/.test(run('answers', file).out));
+  assert.equal(JSON.parse(run('answers', file, '--json').out).beta.note, 'Ship it Thursday');
   close();
   proc.kill();
 });
@@ -1511,9 +1523,9 @@ test('Add a comment on every answer: a yes/no on a phone and a pick-one on a des
     assert.deepEqual(await evaluate(`(() => { const shown = (e) => e.getClientRects().length > 0, page = document.querySelector('.decide');
       return { controls: [...page.querySelectorAll('.decide-other button, .decide-other summary, .decide-bar button, .decide-bar a, .decide-bar summary')].filter(shown).map((b) => b.textContent || b.getAttribute('aria-label')),
         placeholder: page.querySelector('details.comment textarea').placeholder, help: [...page.querySelectorAll('details.comment label')].filter(shown).length,
-        folded: [...page.querySelectorAll('.decide-bar .dl-more .dl-menu > *')].map((b) => b.textContent).filter((t) => t !== 'Skip for now') }; })()`),
+        folded: [...page.querySelectorAll('.decide-bar .dl-more .dl-menu > *')].map((b) => b.textContent) }; })()`),
       { controls: ['Add a comment', `Answer ${key === 'layout' ? 'A' : 'Yes'}`, 'More'], placeholder: 'Add a note (optional)', help: 0,
-        folded: ['Ask me later', 'Dismiss', 'Send as my own answer', 'Ask for another round', 'Send without answering'] }, key);
+        folded: ['Ask me later', 'Write my own answer', 'Ask for another round', 'Dismiss'] }, key);
     // Keys typed into the box are not keyboard navigation, so the next page's title gets no focus ring; Tab out of the box is.
     await evaluate('document.querySelector(".decide details.comment textarea").dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }))');
     assert.equal(await evaluate('"kbd" in document.documentElement.dataset'), false, key);
@@ -1610,6 +1622,8 @@ test('Decide on a phone: an answer pops back to the list with its Undo toast ove
   await until(async () => !(await row('gamma')));
   await evaluate('document.querySelector("#undo").click()');
   await until(async () => !/gamma,c,/.test(run('answers', file).out) && !!(await row('gamma')));
+  // Every toast has the one style: the undo's toast has its own mark in the same disc.
+  await until(async () => (await evaluate('[document.querySelector("#toast").dataset.mark, document.querySelector("#toast-text").textContent, getComputedStyle(document.querySelector("#toast .tk")).display, getComputedStyle(document.querySelector("#toast .tk .undo")).display].join("|")')) === 'undo|Undone: not answered|grid|block');
   // A swipe left moves it to Later, kept in this browser across a reload; the agent still waits, so Decide still counts it; Undo brings it back.
   ({ y } = await row('gamma'));
   await swipe({ x: 360, y }, { x: 30, y });

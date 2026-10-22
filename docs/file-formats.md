@@ -207,7 +207,7 @@ New guided defaults use plan schema 3 / report schema 4, contract 1, with a requ
   500 characters or fewer, with the placeholder "Add a note (optional)". Typed
   before a button is picked, it goes with that answer as its note (the comment),
   and the card then shows it and reads **Edit comment**. The card keeps one
-  answer button; the box's **More…** (on Decide, the bar's one **More…**, beside Later and Dismiss) holds **Send as my own answer** (saves the
+  answer button; the box's **More…** (on Decide, the bar's one **More** holds **Write my own answer** and **Ask for another round** beside Ask me later and Dismiss) holds **Send as my own answer** (saves the
   answer `text` with the words as its `note`) and, on a normal board,
   **Ask for another round** (not on an evidence update) and
   **Send without answering** (a comment). An item with an option valued `text`

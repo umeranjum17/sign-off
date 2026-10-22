@@ -1093,9 +1093,11 @@
   #toast { overflow: hidden; min-height: 3.375rem; padding-left: 0.875rem; border-radius: 1.125rem; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24); animation: toast-in 300ms var(--spring); }
   @keyframes toast-in { from { opacity: 0; transform: translateY(calc(100% + 2rem)); } }
   #toast .tk { display: none; flex: none; place-items: center; width: 1.625rem; height: 1.625rem; border-radius: 50%; color: #FFFFFF; }
-  #toast[data-mark="ok"] .tk { display: grid; background: color-mix(in srgb, var(--tk-success) 82%, #000); } #toast[data-mark="later"] .tk { display: grid; background: var(--c-indigo); }
+  #toast[data-mark] .tk { display: grid; }
+  #toast[data-mark="ok"] .tk { background: color-mix(in srgb, var(--tk-success) 82%, #000); } #toast[data-mark="later"] .tk { background: var(--c-indigo); }
+  #toast[data-mark="undo"] .tk, #toast[data-mark="dismiss"] .tk { background: var(--action); } #toast[data-mark="error"] .tk { background: var(--danger); }
   #toast .tk svg { display: none; width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
-  #toast[data-mark="ok"] .tk .ok, #toast[data-mark="later"] .tk .later { display: block; }
+  #toast[data-mark="ok"] .tk .ok, #toast[data-mark="later"] .tk .later, #toast[data-mark="undo"] .tk .undo, #toast[data-mark="dismiss"] .tk .dismiss, #toast[data-mark="error"] .tk .error { display: block; }
   #toast .bar { position: absolute; left: 0; bottom: 0; width: 100%; height: 2px; background: currentColor; opacity: 0.35; transform-origin: left; animation: countdown var(--tms, 5s) linear forwards; }
   @keyframes countdown { to { transform: scaleX(0); } }
   /* An approved screen in the viewer carries a green check stamp in its corner. */
@@ -1119,7 +1121,7 @@
     <div class="sk-row"><span class="sk sk-ic"></span><span class="sk-lines"><span class="sk sk-line" style="width:72%"></span><span class="sk sk-line" style="width:48%"></span></span></div><div class="sk-row"><span class="sk sk-ic"></span><span class="sk-lines"><span class="sk sk-line" style="width:72%"></span><span class="sk sk-line" style="width:48%"></span></span></div><div class="sk-row"><span class="sk sk-ic"></span><span class="sk-lines"><span class="sk sk-line" style="width:72%"></span><span class="sk sk-line" style="width:48%"></span></span></div><div class="sk-row"><span class="sk sk-ic"></span><span class="sk-lines"><span class="sk sk-line" style="width:72%"></span><span class="sk sk-line" style="width:48%"></span></span></div><div class="sk-row"><span class="sk sk-ic"></span><span class="sk-lines"><span class="sk sk-line" style="width:72%"></span><span class="sk sk-line" style="width:48%"></span></span></div></div></div></main>
 <nav class="tabs" id="tabs" aria-label="Board areas"></nav>
 <div id="reader" role="dialog" aria-modal="true" aria-labelledby="reader-title" hidden></div>
-<div id="toast" role="status" hidden><span class="tk" aria-hidden="true"><svg class="ok" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><svg class="later" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span id="toast-text"></span><button id="undo" hidden>Undo</button><span class="bar" aria-hidden="true"></span></div>
+<div id="toast" role="status" hidden><span class="tk" aria-hidden="true"><svg class="ok" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><svg class="later" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><svg class="undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><svg class="dismiss" viewBox="0 0 24 24"><path d="M3 7h18M5 7l1 13h12l1-13M9 7V4h6v3"/></svg><svg class="error" viewBox="0 0 24 24"><path d="M12 7v6M12 17h.01"/></svg></span><span id="toast-text"></span><button id="undo" hidden>Undo</button><span class="bar" aria-hidden="true"></span></div>
 <script>
   let state = { decisions: [], answers: {} };
   // An exported copy carries its state and files inline and is read-only.
@@ -1216,8 +1218,10 @@
   // A redraw or a resize can move the bar under a toast that is already up.
   new ResizeObserver(() => toast.hidden || placeToast()).observe(document.documentElement);
   addEventListener('resize', () => toast.hidden || placeToast());
-  // The toast rises on a spring, marked with what happened (ok: a check, later: a clock), and a hairline counts down to when it goes.
-  const say = (text, ms, undo, mark = '') => {
+  // Every toast is one style: it rises on a spring, marked with what happened (a check, a clock for Later, an arrow for an undo,
+  // a tray for a dismiss, a stop for a failure), and a hairline counts down to when it goes.
+  const toastMark = (text) => (/^Could(n't| not)/.test(text) ? 'error' : /^(Undone|Back)/.test(text) ? 'undo' : /dismissed|cleared/i.test(text) ? 'dismiss' : 'ok');
+  const say = (text, ms, undo, mark = toastMark(text)) => {
     toastText.textContent = text;
     undoBtn.hidden = !undo;
     undoBtn.disabled = false;
@@ -1476,7 +1480,7 @@
    * On a normal board they can also ask for another round (not on an evidence update) or go as a comment. */
   /** More…: the actions a card keeps out of the way of its one answer button, folded into one control. */
   const moreMenu = (name, items) => (items.length ? el('details', { class: 'more-menu' }, el('summary', { 'aria-label': `More, ${name}` }, 'More…'), el('div', { class: 'menu' }, ...items)) : '');
-  /** With a sink (Decide), the other ways to send the words go there, into the page's one More…, instead of a More under the box. */
+  /** With a sink (Decide), the card keeps no More of its own: the page's one More takes Ask for another round, and the box itself (for Write my own answer). */
   function other(d, saved, err, after, sink) {
     const name = headline(d), reply = !d.options.length;
     const box = el('textarea', { id: `note-${d.key}`, rows: 2, maxlength: 500, dir: 'auto', placeholder: reply ? 'Reply in a few words' : 'Add a note (optional)',
@@ -1504,7 +1508,7 @@
     commentBtn.onclick = () => send(commentBtn, err, { kind: 'comment', key: d.key }, d.key, box.value.trim());
     // The card keeps one way to answer: the note goes with the answer button. Sending the words some other way is in More.
     const extra = [!reply && words ? sendBtn : '', round ? roundBtn : '', talk && !FROZEN ? commentBtn : ''].filter(Boolean);
-    const more = sink ? (sink.push(...extra), '') : moreMenu(name, extra);
+    const more = sink ? '' : moreMenu(name, extra);
     const asked = (state.rounds ?? []).filter((r) => r.key === d.key);
     // A comment typed before a pick also went on its own to the agent: it shows once, as the comment sent with the answer.
     const comments = (state.messages ?? []).filter((m) => m.kind === 'comment' && m.key === d.key && !(kept && m.text === kept));
@@ -1518,6 +1522,7 @@
       box, reply || more ? el('div', { class: 'actions' }, reply ? sendBtn : '', more) : '');
     fold.ontoggle = () => (fold.open ? unfolded.add(d.key) : unfolded.delete(d.key));
     fold.firstChild.onclick = () => setTimeout(() => fold.open && box.focus());
+    if (sink) Object.assign(sink, { round: round ? roundBtn : null, box, fold, words });
     return el('div', { class: 'note' }, saved?.answer === 'text' ? el('p', { class: 'meta saved-note', dir: 'auto' }, `Your reply: ${saved.note}`) : '',
       kept ? el('p', { class: 'meta saved-note', dir: 'auto' }, `Your comment, sent with ${saved.label}: ${kept}`) : '', fold);
   }
@@ -2939,7 +2944,7 @@
     shelve(keys, on);
     render();
     fold();
-    say(on ? `${keys.length > 1 ? plural(keys.length, 'ask') : 'Moved'} to Later` : 'Back from Later', 5000, () => { shelve(keys, !on); keys.forEach(returned); render(); say(on ? 'Back from Later' : 'Moved to Later', 3000); }, 'later');
+    say(on ? `${keys.length > 1 ? plural(keys.length, 'ask') : 'Moved'} to Later` : 'Back from Later', 5000, () => { shelve(keys, !on); keys.forEach(returned); render(); say(on ? 'Back from Later' : 'Moved to Later', 3000, null, on ? 'undo' : 'later'); }, 'later');
   }
   /** One More control: a menu that scales out of its button and closes on a tap anywhere else. */
   function moreSheet(label, items) {
@@ -3031,10 +3036,14 @@
   let decideCtx = { all: [], shown: [], hidden: [] };
   // A phone moves through Decide as a stack: an ask pushes in over the list, and answering it pops back to the list. A desk steps on to the next ask.
   const phone = () => matchMedia('(max-width: 59.999rem)').matches;
+  /** Where E (and a swipe left) goes from the ask on screen: the next ask, round to the first after the last. */
+  let skipTo = '';
+  /** Asks the person chose to answer in their own words, kept across redraws. */
+  const own = new Set();
   function decidePage(d, next) {
     if (!d) return el('p', { class: 'empty' }, EMPTY.waiting);
-    const to = next ? `#decide/${next.key}` : '#waiting', skip = next && !state.readonly ? el('button', { class: 'skip', role: 'menuitem' }, 'Skip for now') : null;
-    if (skip) skip.onclick = () => (location.hash = to);
+    const to = next ? `#decide/${next.key}` : '#waiting';
+    skipTo = next && !state.readonly ? to : '';
     const goNext = next && !state.readonly ? () => (location.hash = to) : null;
     const swipe = (page, right) => {
       let start;
@@ -3045,12 +3054,13 @@
         if (dx > 0) right?.(); else goNext?.();
       });
     };
-    // One More control holds what is not the answer: the next ask, Ask me later (a swipe left on its row does the same), and Dismiss.
+    // One More holds what is not the answer, at most four: Ask me later (a swipe left on its row does the same), Write my own answer,
+    // Ask for another round, and Dismiss last. The next ask is a swipe left, E or the pager.
     const gone = xBtn(d, 'Dismiss');
     if (gone) { gone.setAttribute('role', 'menuitem'); gone.addEventListener('click', () => (location.hash = to)); }
-    const more = (sends) => (state.readonly ? '' : moreSheet('More', [skip, ['Ask me later', () => { location.hash = '#waiting'; toLater([d.key], true); }, 'later', 'clock'], gone, ...sends]));
+    const more = (...items) => (state.readonly ? '' : moreSheet('More', [['Ask me later', () => { location.hash = '#waiting'; toLater([d.key], true); }, 'later', 'clock'], ...items, gone]));
     if (d.type === 'signin') {
-      const signinPage = el('div', { class: 'decide' }, row(d, { x: false }), el('div', { class: 'decide-bar' }, more([])));
+      const signinPage = el('div', { class: 'decide' }, row(d, { x: false }), el('div', { class: 'decide-bar' }, more()));
       if (!state.readonly) swipe(signinPage);
       return signinPage;
     }
@@ -3065,25 +3075,31 @@
           recommended ? el('span', { class: 'recommend' }, 'Recommended') : ''), o.outcome ? el('span', { class: 'reason', dir: 'auto' }, o.outcome) : ''));
       b.onclick = () => {
         selected.set(d.key, o.value);
+        own.delete(d.key);
         optionButtons.forEach((btn) => btn.setAttribute('aria-pressed', String(btn === b)));
-        lbl.textContent = `Answer ${o.label}`;
-        lbl.classList.remove('swap');
-        void lbl.offsetWidth;
-        lbl.classList.add('swap');
+        relabel(`Answer ${o.label}`);
       };
       return b;
     });
     const selectedOption = () => opts.find((o) => o.value === (selected.get(d.key) ?? initial));
-    const lbl = el('span', { class: 'lbl' }, `Answer ${selectedOption()?.label ?? 'now'}`);
+    // Writing my own answer clears the cards' pick, and the button then sends the words as the answer.
+    if (own.has(d.key)) optionButtons.forEach((b) => b.setAttribute('aria-pressed', 'false'));
+    const lbl = el('span', { class: 'lbl' }, own.has(d.key) ? 'Send your answer' : `Answer ${selectedOption()?.label ?? 'now'}`);
+    const relabel = (text) => { lbl.textContent = text; lbl.classList.remove('swap'); void lbl.offsetWidth; lbl.classList.add('swap'); };
     const answer = el('button', { class: 'answer' }, lbl, el('span', { class: 'okmark', 'aria-hidden': 'true' }, glyph('check')));
     // On a phone the button turns green and draws a check, then the list comes back with this row folding away.
     const answerWith = (o) => {
-      if (!phone()) return save(d, o, [...optionButtons, answer], err, () => (location.hash = to));
+      if (!phone()) return save(d, o, [...optionButtons, answer], err, () => { own.delete(d.key); location.hash = to; });
       answer.classList.add('done');
       const held = pause(380);
-      save(d, o, [...optionButtons, answer], err, null, async () => { await held; depart([d.key], 'answered'); location.hash = '#waiting'; });
+      save(d, o, [...optionButtons, answer], err, null, async () => { await held; own.delete(d.key); depart([d.key], 'answered'); location.hash = '#waiting'; });
     };
-    answer.onclick = () => { const o = selectedOption(); if (o) answerWith(o); };
+    answer.onclick = () => {
+      if (!own.has(d.key)) { const o = selectedOption(); if (o) answerWith(o); return; }
+      if (sink.box.value.trim()) return answerWith({ value: 'text' });
+      shown(err).textContent = 'Write your answer first.';
+      sink.box.focus();
+    };
     const recOpt = opts.find((o) => o.value === d.recommend_value);
     const cards = d.mocks?.length && d.options?.length ? mockCards(d, []) : null;
     const hero = cards || d.view ? '' : proofHero(d), preview = hero || (cards ?? (d.view ? rung(d) : proof(d)));
@@ -3092,16 +3108,23 @@
     const kicker = el('p', { class: 'kicker' }, el('span', { class: 'k' }, TYPE_NAMES[typeOf(d)]), ` · ${d.filer || 'Agent'}${d.filed ? ` · ${when(d.filed)}` : ''}`);
     const head = el('div', { class: 'lead' }, badge(d), kicker, el('h2', { dir: 'auto' }, headline(d)));
     const why = unchecked(d) || d.why || (d.tradeoff && firstDraft(d).text) || d.about;
-    // The other ways to send typed words go into the same More, after the page's own actions.
-    const sends = [];
+    const sink = {}, box = live ? el('div', { class: 'decide-other' }, other(d, answerOf(d.key), err, () => (location.hash = to), sink)) : '';
+    const write = live && opts.length && sink.words && ['Write my own answer', () => {
+      own.add(d.key);
+      optionButtons.forEach((b) => b.setAttribute('aria-pressed', 'false'));
+      relabel('Send your answer');
+      sink.fold.open = true;
+      sink.box.placeholder = 'Your answer';
+      sink.box.focus();
+    }, 'own'];
+    sink.round?.setAttribute('role', 'menuitem');
     const page = el('section', { class: 'decide' }, hero || (preview ? el('div', { class: 'decide-preview' }, preview) : ''),
       ...(d.mocks?.length ? [annotations(d)] : []), head,
       why ? el('p', { class: 'why', dir: 'auto' }, why) : '', firstDraftLinks(d),
       ...(live && opts.length ? [el('p', { class: 'pick-label' }, 'Your answer'),
         el('ul', { class: 'pick-list', 'aria-label': d.title }, ...optionButtons.map((b) => el('li', {}, b)))] : []),
-      ...(live ? [el('div', { class: 'decide-other' }, other(d, answerOf(d.key), err, () => (location.hash = to), sends))] : []),
-      silent ? el('p', { class: 'silent-line' }, ...silent) : '', err,
-      el('div', { class: 'decide-bar' }, live && opts.length ? answer : '', more(sends)));
+      box, silent ? el('p', { class: 'silent-line' }, ...silent) : '', err,
+      el('div', { class: 'decide-bar' }, live && opts.length ? answer : '', more(write, sink.round)));
     if (live) swipe(page, () => { if (recOpt && !answer.disabled) answerWith(recOpt); });
     return page;
   }
@@ -3112,7 +3135,8 @@
     const k = e.key.toLowerCase(), onDecide = /^#decide\//.test(location.hash), choices = [...document.querySelectorAll('.decide .pick-option')];
     const pick = onDecide && /^[1-9]$/.test(k) ? choices[Number(k) - 1] : null;
     if (pick) { e.preventDefault(); pick.click(); document.querySelector('.decide-bar .answer')?.click(); return; }
-    const act = k === 'e' && onDecide ? document.querySelector('.decide .skip, .pager .step:last-child:not([aria-disabled])') : k === 'z' && (location.hash === '#waiting' || onDecide) && !toast.hidden && !undoBtn.hidden ? undoBtn : null;
+    if (k === 'e' && onDecide && skipTo) { e.preventDefault(); location.hash = skipTo; return; }
+    const act = k === 'z' && (location.hash === '#waiting' || onDecide) && !toast.hidden && !undoBtn.hidden ? undoBtn : null;
     if (act && !act.disabled) e.preventDefault(), act.click();
   });
 

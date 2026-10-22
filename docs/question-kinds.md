@@ -168,9 +168,10 @@ without posting.
   **Select**. Every change shows a toast with **Undo**.
 - Tap a row to open the ask: its picture or page, what it is and why, its
   answers as cards with the recommended one marked, then one **Answer**
-  button that names the pick and **More** with **Skip for now** (another ask
-  follows), **Ask me later**, **Dismiss** and the other ways to send typed
-  words (under **Add a comment**, right under the answers). On a phone **Answer** turns
+  button that names the pick and **More** with **Ask me later**, **Write my
+  own answer** (the button becomes **Send your answer** and sends the words
+  in **Add a comment** as the answer), **Ask for another round** and
+  **Dismiss**. On a phone **Answer** turns
   into a check and takes you back to the list, where the row folds away; on
   a wider screen it opens the next ask, or the list after the last.
   **1**–**9** picks an option and answers it, **E** skips to the next ask,
@@ -181,8 +182,8 @@ without posting.
   wakes a waiting agent the same way an answer does; the agent reads it back
   in `answers --json` under `rounds`, with any comments on mock elements it
   carried.
-- Comment on any item without answering it (**Send without answering**, also under **More…**:
-  every card but a sign-in has that one place to type) and queue a free-text
+- Comment on any item without answering it (**Send without answering**, also under **More…**
+  on a card in a list: every card but a sign-in has that one place to type) and queue a free-text
   prompt for the agent (**Ask the agent**). `poll` blocks until one arrives
   and prints every new one once (`--json` prints
   `{"messages":[{"id","kind","key"?,"text","at"}]}`); the page then shows it
