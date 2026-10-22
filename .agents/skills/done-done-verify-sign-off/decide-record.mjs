@@ -11,6 +11,8 @@
 // a swipe right that reads a report (its dot goes, Undo brings it back), a swipe left that archives one (it folds away, Undo flashes it back),
 // a report opened and closed (its dot shrinks away), and More's Mark all as read with Undo.
 // Its own headless Chromium on a scratch profile, driven over the DevTools protocol; taps and drags are pointer events in the page.
+// With both, it records the desk's Reports by keys: J and K moving the selection (each report read as it is shown), U twice, a row's hover actions,
+// E archiving the report shown (the row folds, the next is selected), Cmd+Z, Enter opening a guided report over the board and Escape, and the ? sheet.
 // Usage: node decide-record.mjs <board url> <light|dark> <out.mp4> [desk] [reports]
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -67,7 +69,11 @@ try {
   const type = (words) => inPage(`const t = document.activeElement; if (t?.tagName !== 'TEXTAREA') return 'missing'; for (const c of ${JSON.stringify(words)}) { t.value += c; t.dispatchEvent(new Event('input')); await s(45); } return 'ok';`);
   await send('Page.startScreencast', { format: 'jpeg', quality: 90, everyNthFrame: 1 });
   await send('Page.navigate', { url: `${url}${screen === 'reports' ? '#reports' : '#waiting'}` });
-  const steps = screen === 'reports' ? [[2600], [() => press('settings-speed'), 700], [() => drag('settings-speed', 80, 10, 45), 1000], [() => drag('settings-speed', 300), 1600], [() => tap('#undo'), 1400],
+  const steps = screen === 'reports' && desk ? [[2600], [() => key('j'), 1100], [() => key('j'), 1100], [() => key('k'), 1100], [() => key('u'), 1600], [() => key('u'), 1400],
+    [() => inPage("const b = document.querySelector('.split-list .dl-row:not(.sel) .dl-hover .read-q'); if (!b) return 'missing'; b.focus(); return 'ok';"), 1400],
+    [() => inPage("document.querySelector('.split-list [data-row][aria-current]').focus(); return 'ok';"), 300], [() => key('e'), 1800], [() => key('z', true), 1600],
+    [() => key('j'), 1100], [() => key('Enter'), 1800], [() => key('Escape'), 1200], [() => key('?'), 1800], [() => tap('#keys header button'), 900]]
+    : screen === 'reports' ? [[2600], [() => press('settings-speed'), 700], [() => drag('settings-speed', 80, 10, 45), 1000], [() => drag('settings-speed', 300), 1600], [() => tap('#undo'), 1400],
     [() => drag('release-train', -280), 1600], [() => tap('#undo'), 1400], [() => tap('a.dl-face[href="#reports/new-sign-in"]'), 1600], [() => tap('#reader .close'), 1400],
     [() => tap('.top .dl-more > summary'), 1200], [() => tap('[data-act="read-all"]'), 1600], [() => tap('#undo'), 1500]] : desk ? [[2600], [() => key('j'), 900], [() => key('j'), 900], [() => key('k'), 900], [() => key('Enter'), 1800], [() => key('z', true), 1500],
     [() => key('l'), 1500], [() => key('?'), 1800], [() => tap('#keys header button'), 700], [() => key('j'), 800], [() => key('c'), 600], [() => type('After the demo'), 500], [() => key('Enter', true), 1800],

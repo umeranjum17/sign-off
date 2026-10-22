@@ -197,12 +197,12 @@
   /* A report reads as a page of its own: what it is and when, its title in large type, what it says, then its page in a tile. */
   #reader .design-review h1 { margin: 0.75rem auto; font-size: 2.125rem; line-height: 1.1765; font-weight: 700; letter-spacing: 0.011em; white-space: normal; overflow: visible; }
   #reader .read { flex: 1; min-height: 0; overflow: auto; padding: 0 1.25rem 2rem; }
-  #reader .read > * { max-width: 42.5rem; margin-left: auto; margin-right: auto; }
-  #reader .read .eyebrow { margin-top: 0.5rem; font-weight: 400; }
-  #reader .read h1 { margin-top: 0.75rem; margin-bottom: 0.75rem; font-size: 2.125rem; line-height: 1.1765; font-weight: 700; letter-spacing: 0.011em; white-space: normal; overflow: visible; }
-  #reader .read .about { margin-bottom: 1rem; font-size: 1.25rem; line-height: 1.4; }
-  #reader .read .decided { margin-bottom: 1.25rem; }
-  #reader .read iframe { display: block; width: 100%; max-width: none; height: 1px; flex: none; border-radius: 1rem; background: var(--surface); }
+  :is(#reader, .split-detail) .read > * { max-width: 42.5rem; margin-left: auto; margin-right: auto; }
+  :is(#reader, .split-detail) .read .eyebrow { margin-top: 0.5rem; font-weight: 400; }
+  :is(#reader, .split-detail) .read h1 { margin-top: 0.75rem; margin-bottom: 0.75rem; font-size: 2.125rem; line-height: 1.1765; font-weight: 700; letter-spacing: 0.011em; white-space: normal; overflow: visible; }
+  :is(#reader, .split-detail) .read .about { margin-bottom: 1rem; font-size: 1.25rem; line-height: 1.4; }
+  :is(#reader, .split-detail) .read .decided { margin-bottom: 1.25rem; }
+  :is(#reader, .split-detail) .read iframe { display: block; width: 100%; max-width: none; height: 1px; flex: none; border-radius: 1rem; background: var(--surface); }
   .i-plan { --area: var(--c-waiting); }
   #reader .plan-scroll { flex: 1; min-height: 0; overflow: auto; padding: 1.25rem 1.25rem 9rem; }
   .plan-layout { max-width: 72rem; margin: auto; display: grid; gap: 2rem; }
@@ -1160,7 +1160,7 @@
   .rp-page > .notes, .rp-page > .gone-asks { margin-top: 1.5rem; }
   .tabs .bd.blue { background: var(--action); }
   /* A phone keeps 140px under the list, so the last report scrolls fully clear of the tab bar. */
-  @media (max-width: 59.999rem) { body:has(.rp-page) { padding-bottom: calc(8.75rem + env(safe-area-inset-bottom)); } }
+  @media (max-width: 63.999rem) { body:has(.rp-page) { padding-bottom: calc(8.75rem + env(safe-area-inset-bottom)); } }
   /* All clear: a green check pops in. */
   .all-clear-big { padding: 4rem 1.5rem 1rem; text-align: center; }
   .all-clear-big .big { display: grid !important; place-items: center; width: 4.5rem; height: 4.5rem; margin: 0 auto 1.125rem; border-radius: 50%; color: #FFFFFF;
@@ -1296,6 +1296,22 @@
     .dl-hover button::after { content: ""; position: absolute; inset: -0.375rem 0; }
     .dl-hover button { position: relative; } .dl-hover .glyph { width: 1rem; height: 1rem; stroke-width: 2.2; }
     .dl-hover .yes .glyph { color: color-mix(in srgb, var(--tk-success) 82%, #000); } .dl-hover .later-q .glyph { color: var(--c-indigo); }
+    /* Reports: the bar says what the report is, who asked and when, beside Mark read and Archive; the page reads under it at the pane's width. */
+    .dl-hover .read-q .glyph { color: var(--action); }
+    .rp-bar .eyebrow { display: block; flex: 1; min-width: 0; margin: 0 0 0 0.5rem; overflow: hidden; color: var(--muted); font-size: var(--t-s); font-weight: 400; white-space: nowrap; text-overflow: ellipsis; }
+    .rp-bar .eyebrow b { color: var(--teal); font-weight: 600; }
+    .split-bar :is(.rp-read, .rp-archive) { display: inline-flex; flex: none; align-items: center; gap: 0.5rem; min-height: var(--ctl); padding: 0 0.75rem; border-radius: var(--r-ctl); background: none; color: var(--text); font-weight: 400;
+      transition: background-color 120ms linear, transform 120ms var(--ease); }
+    .split-bar :is(.rp-read, .rp-archive):hover { background: var(--sunk); }
+    .split-bar :is(.rp-read, .rp-archive, .later):active, .dl-hover button:active { background: var(--sunk); transform: scale(0.96); }
+    .split-bar :is(.rp-read, .rp-archive) .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.75; color: var(--muted); }
+    .split-bar .rp-read .glyph { color: var(--action); } .split-bar :is(.rp-read, .rp-archive)::after { margin-left: 0.125rem; }
+    #board .split-detail > .read { flex: none; overflow: visible; padding: 1.75rem 2.5rem 4rem; }
+    #board .split-detail > .read > * { max-width: 46rem; }
+    #board .split-detail > .read h1 { margin-top: 0; font-size: 2.125rem; line-height: 1.1765; letter-spacing: 0.011em; }
+    #board .split-detail > .read .about { color: var(--muted); }
+    #board .split-detail > .read iframe { border: 0; }
+    #board .split-detail > .read .rp-open { display: inline-flex; align-items: center; margin-left: 0; padding: 0 1.5rem; }
     .side .keys { display: flex; align-items: center; gap: 0.75rem; width: 100%; min-height: var(--ctl); padding: 0 0.75rem; border-radius: var(--r-ctl); background: none; color: var(--text); font-weight: 400; text-align: left; }
     .side .keys:hover { background: color-mix(in srgb, var(--sunk) 50%, transparent); }
     .side .keys .kc { margin-left: auto; }
@@ -1497,7 +1513,7 @@
     .reduce((sent, part) => sent.then(() => call('/api/dismiss', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keys: part, dismissed }) })), Promise.resolve());
   /** back runs before an Undo puts them back; a swipe leaves the focus where it was, as a finger has no use for a ring on Undo. */
   function dismiss(keys, text, back, swiped) {
-    setDismissed(keys, true).then(() => {
+    return setDismissed(keys, true).then(() => {
       undoBtn.setAttribute('aria-label', `Undo, ${text}`);
       say(text, 5000, () => {
         undoBtn.disabled = true;
@@ -2211,7 +2227,8 @@
   const fading = new Set();
   let rpRisen = false;
   function markRead(keys, read, text) {
-    keys.forEach((k) => ((state.opened ??= {})[k] = read));
+    // A report marked unread shows its dot at once, even one still shrinking away.
+    keys.forEach((k) => { (state.opened ??= {})[k] = read; if (!read) fading.delete(k); });
     render();
     return call('/api/reads', post({ keys, read })).then(() => {
       if (!text) return;
@@ -2220,6 +2237,26 @@
     }, (e) => { keys.forEach((k) => (state.opened[k] = !read)); render(); say(`Couldn't save: ${e.message}`, 8000); });
   }
   const archive = (d) => dismiss([d.key], `Archived: ${title(d)}`, () => returned(d.key), true);
+  /** On a desk, the key of the report shown beside the list ('' for none); null on a phone, where a report opens over the list. */
+  let rpSel = null, rpVisit = '', rpPicked = false;
+  // A report chosen in the desk's list (a click, or J and K) is shown beside it; one reached any other way is a link.
+  addEventListener('click', (e) => { if (e.target.closest?.('.split-list a[data-row]')) rpPicked = true; }, true);
+  const readToggle = (d) => markRead([d.key], unread(d), `${unread(d) ? 'Marked read' : 'Marked unread'}: ${title(d)}`);
+  /** Archive from a desk's key, bar or hover: the row folds away, and when it was the one shown, the next report is selected once the board has it. */
+  async function archiveReport(d) {
+    const li = document.querySelector(`.split-list .dl-row[data-key="${CSS.escape(d.key)}"]`), rows = [...document.querySelectorAll('.split-list [data-row]')].map((r) => r.getAttribute('href'));
+    const at = rows.indexOf(`#reports/${d.key}`), next = rpSel === d.key && location.hash !== '#reports' ? rows[at + 1] ?? rows[at - 1] ?? '#reports' : '';
+    if (li) {
+      li.style.height = `${li.offsetHeight}px`;
+      void li.offsetHeight;
+      li.style.transition = `height ${calm.matches ? 0 : 220}ms var(--ease), opacity ${calm.matches ? 0 : 220}ms linear`;
+      li.style.height = '0px';
+      li.style.opacity = '0';
+      await pause(220);
+    }
+    await archive(d);
+    if (next && location.hash === `#reports/${d.key}`) rpPicked = true, location.hash = next;
+  }
   /** A report: a row with its picture, title, what it says, then its form, video, project and time, and a dot while it is not read. A tap opens its page over the board;
    *  an explainer with no page opens in place, to its numbered steps or its video card. */
   function report(d, i = 0) {
@@ -2228,10 +2265,15 @@
       dot ? el('span', { class: `new${fading.has(d.key) ? ' out' : ''}`, role: 'img', 'aria-label': 'Not read yet' }) : ''),
       d.about ? el('span', { class: 'meta sub', dir: 'auto' }, d.about) : '', el('span', { class: 'when' }, reportLine(d)),
       n ? el('ol', { class: 'flow', style: `--n: ${n}`, 'aria-label': `${n} steps: ${d.steps.map((t) => t.title).join(', ')}` }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), marks(t)))) : '')];
-    const li = (...kids) => el('li', { class: `report dl-row${flash === d.key ? ' returned' : ''}`, style: `--n:${i}`, ...(reads(d) && { 'data-key': d.key, 'data-list': 'reports' }) }, ...kids);
+    const sel = rpSel === d.key;
+    const li = (...kids) => el('li', { class: `report dl-row${flash === d.key ? ' returned' : ''}${sel ? ' sel' : ''}`, style: `--n:${i}`, ...(reads(d) && { 'data-key': d.key, 'data-list': 'reports' }) }, ...kids);
     const act = (cls, mark, words) => el('div', { class: `dl-act ${cls}`, 'aria-hidden': 'true' }, glyph(mark), el('span', {}, words));
+    // On a desk, hovering a row shows the same two actions as its swipes.
+    const quick = (cls, mark, words, fn) => { const b = el('button', { class: cls, 'aria-label': `${words}, ${title(d)}` }, glyph(mark), words); b.onclick = fn; return b; };
+    const hover = rpSel === null || !canDismiss() ? '' : el('span', { class: 'dl-hover' }, quick('read-q', unread(d) ? 'check' : 'dot', unread(d) ? 'Read' : 'Unread', () => readToggle(d)),
+      quick('later-q', 'archive', 'Archive', () => archiveReport(d)));
     if (reads(d)) return li(act('yes', unread(d) ? 'check' : 'dot', unread(d) ? 'Read' : 'Unread'), canDismiss() ? act('later', 'archive', 'Archive') : '',
-      el('a', { class: 'dl-face', href: `#reports/${d.key}`, draggable: 'false', id: `item-${d.key}` }, ...face));
+      el('a', { class: 'dl-face', href: `#reports/${d.key}`, draggable: 'false', id: `item-${d.key}`, 'data-row': '', ...(sel && { 'aria-current': 'true' }) }, ...face), hover);
     const full = n ? el('ol', { class: 'steps' }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), el('span', { dir: 'auto' }, t.title), marks(t)))) : row(d, { x: false });
     full.removeAttribute('id');
     const box = el('details', { class: 'done', id: `item-${d.key}`, ...(opened.has(d.key) && { open: '' }) }, el('summary', { class: 'dl-face' }, ...face), full, decided(d), xBtn(d, 'Dismiss'));
@@ -3079,7 +3121,8 @@
     Object.assign(reader.dataset, { url, key: d?.key ?? '', from });
     if (!d) return reader.replaceChildren();
     if (from === 'reports' && unread(d) && !state.readonly && !FROZEN) { fading.add(d.key); setTimeout(() => markRead([d.key], true)); }
-    const back = el('a', { class: 'close', href: `#${from}` }, `‹ ${from === 'reports' ? 'Reports' : AREAS[from]}`), h1 = el('h1', { id: 'reader-title', tabindex: '-1', dir: 'auto' }, d.title);
+    const back = el('a', { class: 'close', href: `#${from}` }, `‹ ${from.startsWith('reports') ? 'Reports' : AREAS[from]}`), h1 = el('h1', { id: 'reader-title', tabindex: '-1', dir: 'auto' }, d.title);
+    back.onclick = (e) => { if (`#${from}` === location.hash) e.preventDefault(), shutFull(); };
     const out = d.type === 'evidence' ? changeLink(d) : '';
     // A report's page reads under its own head: what it is and when, its title, what it says and decided; a plan or a design keeps its title in the bar;
     // an update shows its own title on its screen, with the change link in the bar.
@@ -3095,7 +3138,14 @@
     if (b) b.addEventListener('click', () => { location.hash = '#reports'; });
     return b;
   }
-  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !reader.hidden) location.hash = `#${reader.dataset.from}`; });
+  // A guided report opened in full from a desk's Reports keeps the report's address, so closing it redraws the list beside it.
+  let rpFull = '';
+  function shutFull() {
+    rpFull = '';
+    render();
+    document.querySelector('.split-list [data-row][aria-current]')?.focus({ preventScroll: true });
+  }
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !reader.hidden) `#${reader.dataset.from}` === location.hash ? shutFull() : (location.hash = `#${reader.dataset.from}`); });
   addEventListener('resize', () => { if (!reader.hidden) readPage(state.decisions.find((d) => d.key === reader.dataset.key), reader.dataset.from); });
 
   /** Reports in two lists, Today (filed today) above Earlier, newest first inside each, under a head with its count; the rows rise in when the tab opens. */
@@ -3337,7 +3387,7 @@
   async function reportSwiped(s, d, yes) {
     s.face.style.transition = `transform ${calm.matches ? 0 : yes ? 420 : 200}ms ${yes ? 'var(--spring)' : 'cubic-bezier(0.2, 0.7, 0.2, 1)'}`;
     s.face.style.transform = yes ? '' : 'translateX(-100%)';
-    if (yes) { await pause(300); return markRead([d.key], unread(d), `${unread(d) ? 'Marked read' : 'Marked unread'}: ${title(d)}`); }
+    if (yes) { await pause(300); return readToggle(d); }
     await pause(190);
     s.row.style.height = `${s.row.offsetHeight}px`;
     void s.row.offsetHeight;
@@ -3470,11 +3520,32 @@
     if (d) view.querySelector(`#item-${CSS.escape(d.key)}`)?.setAttribute('aria-current', 'true');
     return view;
   }
+  /** Reports on a desk: the list beside the report selected (the newest until a row is picked). Its bar says what it is, who asked and when, and reads or archives it;
+   *  its page sits under the bar, and a guided report, which reads in stages, opens over the board from there. */
+  function reportsDesk(top, page, d, any) {
+    const hints = [[['J', 'K'], 'Move'], ...(FROZEN ? [] : [[['U'], 'Read']]), ...(canDismiss() ? [[['E'], 'Archive']] : []), [['?'], 'All keys']];
+    if (!d) return split([top, page], [any ? el('p', { class: 'empty' }, 'Open a report from the list.')
+      : el('div', { class: 'all-clear-big' }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, 'Nothing to read'), el('p', {}, EMPTY.reports))], hints);
+    // A read-only copy keeps no read marks.
+    const read = FROZEN ? '' : el('button', { class: 'rp-read', 'data-kbd': 'U', 'aria-keyshortcuts': 'U' }, glyph(unread(d) ? 'check' : 'dot'), unread(d) ? 'Mark read' : 'Mark unread');
+    if (read) read.onclick = () => readToggle(d);
+    const gone = canDismiss() ? el('button', { class: 'rp-archive', 'data-kbd': 'E', 'aria-keyshortcuts': 'E' }, glyph('archive'), 'Archive') : '';
+    if (gone) gone.onclick = () => archiveReport(d);
+    const url = d.guided ? '' : src(mockUrl(d.key, '', d.view)), h1 = el('h1', { id: 'report-title', dir: 'auto' }, d.title);
+    const full = d.guided ? el('button', { class: 'open-link rp-open', 'data-kbd': '↵', 'aria-keyshortcuts': 'Enter' }, 'Read the report') : '';
+    if (full) full.onclick = () => { rpFull = d.key; render(); reader.querySelector('h1')?.focus({ preventScroll: true }); };
+    return split([top, page], [el('div', { class: 'split-bar rp-bar' }, el('p', { class: 'eyebrow', dir: 'auto' }, el('b', {}, FORMS[d.form]?.[0] ?? (kind(d) || 'Report')),
+      ...[d.asked_by, d.filed ? when(d.filed) : ''].filter(Boolean).map((t) => ` · ${t}`)), read, gone),
+      // The page is kept across redraws while this signature holds, so marking it read or a change elsewhere on the board does not load its frame again.
+      el('div', { class: 'read', 'data-sig': JSON.stringify([d.key, url, d.title, d.about, d.decided]) }, h1, d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided(d),
+        full || el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }))], hints);
+  }
   /** Every key, in one sheet behind ?. A desk hints each where it works; they work at any width with a keyboard. */
   const MOD = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
   const KEYS = [['Anywhere', [['Go to Today', 'G', 'T'], ['Go to Decide', 'G', 'D'], ['Go to Evidence', 'G', 'E'], ['Go to Reports', 'G', 'R'], ['Undo', MOD, 'Z'], ['This list', '?']]],
     ['Lists', [['Next', 'J'], ['Previous', 'K']]],
-    ['Decide', [['Answer', '↵'], ['Answer with option 1 to 9', '1', '–', '9'], ['Comment', 'C'], ['Answer from the comment', MOD, '↵'], ['Later', 'L'], ['Next ask', 'E']]]];
+    ['Decide', [['Answer', '↵'], ['Answer with option 1 to 9', '1', '–', '9'], ['Comment', 'C'], ['Answer from the comment', MOD, '↵'], ['Later', 'L'], ['Next ask', 'E']]],
+    ['Reports', [['Read or unread', 'U'], ['Archive', 'E'], ['Open a guided report', '↵']]]];
   const shut = el('button', { 'aria-label': 'Close' }, '✕');
   const keysSheet = el('dialog', { id: 'keys', 'aria-labelledby': 'keys-title' }, el('div', {}, el('header', {}, el('h2', { id: 'keys-title' }, 'Keyboard shortcuts'), shut),
     ...KEYS.flatMap(([head, rows]) => [el('h3', {}, head), el('ul', {}, ...rows.map(([words, ...keys]) => el('li', {}, el('span', {}, words), ...keys.map(kc))))])));
@@ -3489,7 +3560,7 @@
     const typing = e.target.closest?.('textarea, input, select'), mod = e.metaKey || e.ctrlKey;
     // From the comment under an ask, Cmd+Enter answers with it.
     if (mod && e.key === 'Enter' && typing?.closest('.decide')) { e.preventDefault(); document.querySelector('.decide-bar .answer')?.click(); return; }
-    const undo = !toast.hidden && !undoBtn.hidden && !undoBtn.disabled && (location.hash === '#waiting' || /^#decide\//.test(location.hash)) ? undoBtn : null;
+    const undo = !toast.hidden && !undoBtn.hidden && !undoBtn.disabled && (location.hash === '#waiting' || /^#(decide|reports)\//.test(location.hash) || location.hash === '#reports') ? undoBtn : null;
     if (mod && !e.altKey && e.key.toLowerCase() === 'z' && !typing && undo) { e.preventDefault(); undo.click(); return; }
     if (mod || e.altKey || typing || keysSheet.open || designSession?.open || !reader.hidden) return;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key, g = gAt && e.timeStamp - gAt < 1500;
@@ -3505,6 +3576,9 @@
     if (pick) { e.preventDefault(); pick.click(); document.querySelector('.decide-bar .answer')?.click(); return; }
     if (k === 'e' && onDecide && skipTo) { e.preventDefault(); location.hash = skipTo; return; }
     if (k === 'z' && undo) { e.preventDefault(); undo.click(); return; }
+    // On a desk's Reports, U reads or unreads the report shown, E archives it, Enter opens a guided one.
+    const rp = document.querySelector('.split-bar.rp-bar')?.parentElement, rpKey = rp && { u: '.rp-read', e: '.rp-archive', Enter: '.rp-open' }[k];
+    if (rpKey && !(k === 'Enter' && e.target.closest?.('a:not([aria-current]), button, summary'))) { const b = rp.querySelector(rpKey); if (b) e.preventDefault(), b.click(); return; }
     if (!onDecide) return;
     // Enter answers (or opens a sign-in), C opens the comment, L moves the ask to Later.
     if (k === 'Enter' && !e.target.closest?.('a:not([aria-current]), button, summary')) { const go = document.querySelector('.decide-bar .answer:not(:disabled), .decide .open-link:not(:disabled)'); if (go) e.preventDefault(), go.click(); }
@@ -3542,9 +3616,22 @@
     // The asks Decide steps through, in the list's order: sign-ins, then answers, then Later.
     const groupAt = (d) => GROUPS.findIndex(([g]) => g === groupOf(d));
     const decideQueue = by.waiting.filter((d) => d.type === 'signin' || (d.type !== 'plan' && d.kind !== 'design')).sort((x, y) => groupAt(x) - groupAt(y));
-    // On a desk, Decide's list and its ask share the screen, and Evidence's list and its update.
-    const deskSplit = !phone() && ((at === 'waiting' || at === 'decide') && !state.readonly || at === 'evidence'), head = deskSplit && at !== 'evidence' ? 'waiting' : at;
+    // On a desk, Decide's list and its ask share the screen, Evidence's list and its update, and Reports' list and its report.
+    const deskSplit = !phone() && ((at === 'waiting' || at === 'decide' || at === 'reports') && !state.readonly || at === 'evidence'), head = deskSplit && at === 'decide' ? 'waiting' : at;
     deskSel = null;
+    // A report in the address is shown (and read) beside the list; with none, the newest is shown, not yet marked read.
+    const newest = [...by.reports].filter(reads).sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0))[0];
+    const shownReport = deskSplit && at === 'reports' ? (key && by.reports.find((d) => d.key === key && reads(d))) || newest : undefined;
+    rpSel = deskSplit && at === 'reports' ? shownReport?.key ?? '' : null;
+    // It is read once per visit, so Mark unread on it holds through the redraws that follow.
+    if (!shownReport || shownReport.key !== key) rpVisit = '';
+    else if (rpVisit !== key) {
+      rpVisit = key;
+      // A guided report reached by a link rather than from the list (Today's card, the CLI's open) opens over the board, as on a phone.
+      if (shownReport.guided && !rpPicked) rpFull = key;
+      if (unread(shownReport) && !FROZEN) { fading.add(key); setTimeout(() => { markRead([key], true); setTimeout(() => fading.delete(key), 400); }); }
+    }
+    if (rpSel === null || rpFull !== shownReport?.key) rpFull = '';
     document.body.classList.toggle('split-view', deskSplit);
     const askAt = decideQueue.findIndex((d) => d.key === key), decideAt = key ? askAt : 0;
     // A design and a decision live under Decide; Answered is reached from Today.
@@ -3582,24 +3669,34 @@
     board.removeAttribute('aria-busy');
     const listTop = document.querySelector('.split-list')?.scrollTop;
     // An update in the address opens even when the list leaves it off (a failed run); with none, the newest is selected.
+    // Reports' list: the legend, Today over Earlier, Notes and Archived; on a desk an empty board says so in the pane beside it.
+    const rpPage = () => el('div', { class: `rp-page${rpRisen ? '' : ' rise'}` }, by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
+      ...(by.reports.length ? reportGroups(by.reports) : rpSel !== null ? [] : [el('div', { class: 'all-clear-big' }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, 'Nothing to read'), el('p', {}, EMPTY.reports))]),
+      notes(by.notes), dismissed(state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && ['reports', 'notes'].includes(area(d))), 'Archived'));
     const update = at === 'evidence' && ((key && state.decisions.find((d) => d.key === key && !gone.has(d.key) && d.type === 'evidence')) || by.evidence.find((d) => d.type === 'evidence'));
-    board.replaceChildren(...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived'), update)
-      : decideDesk(top, by.waiting, hidden, decideQueue, key)] : [top]), ...(deskSplit ? [] : at === 'waiting' && !state.readonly ? [decideList(by.waiting, hidden)]
+    const content = [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived'), update)
+      : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0) : decideDesk(top, by.waiting, hidden, decideQueue, key)] : [top]), ...(deskSplit ? [] : at === 'waiting' && !state.readonly ? [decideList(by.waiting, hidden)]
       : at === 'decide' ? [decideAt < 0 ? el('p', { class: 'empty' }, 'Nothing to decide for that question.')
         : decidePage(decideQueue[decideAt], decideQueue.length > 1 ? decideQueue[(decideAt + 1) % decideQueue.length] : undefined)]
-      : at === 'designs' ? [...designGroups(by.designs)] : at === 'evidence' ? [...evidenceList(by.evidence), dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived')] : at === 'reports' && !state.readonly ? [el('div', { class: `rp-page${rpRisen ? '' : ' rise'}` }, by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
-        ...(by.reports.length ? reportGroups(by.reports) : [el('div', { class: 'all-clear-big' }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, 'Nothing to read'), el('p', {}, EMPTY.reports))]), notes(by.notes), dismissed(state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && ['reports', 'notes'].includes(area(d))), 'Archived'))] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
+      : at === 'designs' ? [...designGroups(by.designs)] : at === 'evidence' ? [...evidenceList(by.evidence), dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived')] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [search(), glance(by),
       el('div', { class: 'tiles' }, tile('waiting', by.waiting.length, 'Need you'), tile('evidence', by.provenToday.length, 'Proven today'), tile('reports', by.reports.filter(unread).length, 'New report')),
       el('div', { class: 'areas' }, waitingSection(by.waiting, by.answered, by.designs), proven(by.provenToday, by.provenToday), newReport(by.reports)), ...(state.leash ? leash() : []),
-      ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()])]));
+      ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()])])];
+    // The report shown on a desk stays in place under a new list and bar while it is the same report, so its frame is not loaded again.
+    const keptRead = document.querySelector('#board .split-detail > .read'), newRead = content[0]?.querySelector?.('.split-detail > .read');
+    if (keptRead && newRead && keptRead.dataset.sig === newRead.dataset.sig) {
+      keptRead.closest('.split').querySelector('.split-list').replaceWith(newRead.closest('.split').querySelector('.split-list'));
+      keptRead.parentElement.querySelector('.split-bar').replaceWith(newRead.parentElement.querySelector('.split-bar'));
+    } else board.replaceChildren(...content);
     // A redraw keeps the desk list where it was scrolled, with the selected row in view.
     const listEl = document.querySelector('.split-list');
     if (listEl && listTop) listEl.scrollTop = listTop;
     listEl?.querySelector('[data-row][aria-current]')?.scrollIntoView({ block: 'nearest' });
     if (!toast.hidden) placeToast();
     if (at === 'reports' && !key) { rpRisen = true; if (fading.size) setTimeout(() => fading.clear(), 400); }
-    readPage(key && !(deskSplit && at === 'evidence') ? state.decisions.find((d) => d.key === key && !gone.has(d.key) && (at === 'reports' && reads(d) || at === 'designs' && d.kind === 'design' || at === 'evidence' && d.type === 'evidence' || d.type === 'plan' && (area(d) === at || (d.guided && (at === 'waiting' || at === 'answered'))))) : undefined, at);
+    if (rpSel !== null) rpRisen = true;
+    readPage(rpFull ? shownReport : key && !(deskSplit && (at === 'evidence' || at === 'reports')) ? state.decisions.find((d) => d.key === key && !gone.has(d.key) && (at === 'reports' && reads(d) || at === 'designs' && d.kind === 'design' || at === 'evidence' && d.type === 'evidence' || d.type === 'plan' && (area(d) === at || (d.guided && (at === 'waiting' || at === 'answered'))))) : undefined, rpFull ? location.hash.slice(1) : at);
     fold();
     applyPicks();
     if (FROZEN) freeze();
@@ -3637,6 +3734,7 @@
     // On a desk the new detail slides in from the side the selection moved.
     const rowsOf = () => [...document.querySelectorAll('.split-list [data-row]')], order = rowsOf().map((r) => r.getAttribute('href')), was = rowsOf().findIndex((r) => r.matches('[aria-current]'));
     render();
+    rpPicked = false;
     if (!phone()) {
       const detail = document.querySelector('.split-detail'), now = document.querySelector('.split-list [data-row][aria-current]')?.getAttribute('href');
       if (detail && was >= 0 && now && now !== order[was] && !calm.matches) detail.dataset.dir = order.indexOf(now) >= 0 && order.indexOf(now) < was ? 'up' : 'down', detail.classList.add('in');
@@ -3652,8 +3750,8 @@
   // An interactive page may post its own height, `{ height: <px> }`, and its frame then fits it with no blank below.
   // Only a frame's own message sizes it. Document readers must fit even long pages; previews stay capped.
   addEventListener('message', (e) => {
-    const frame = [...document.querySelectorAll('.rung iframe, iframe.plan-view, #reader .read iframe, .gd-dgbox:not(.full) iframe')].find((f) => f.contentWindow === e.source), h = e.data?.height;
-    const documentFrame = frame?.matches('iframe.plan-view, #reader .read iframe, .gd-dgbox iframe');
+    const frame = [...document.querySelectorAll('.rung iframe, iframe.plan-view, :is(#reader, .split-detail) .read iframe, .gd-dgbox:not(.full) iframe')].find((f) => f.contentWindow === e.source), h = e.data?.height;
+    const documentFrame = frame?.matches('iframe.plan-view, :is(#reader, .split-detail) .read iframe, .gd-dgbox iframe');
     if (documentFrame && e.data?.['sign-off'] === 'ready') {
       frame.scrolling = 'no';
       frame.contentWindow.postMessage({ 'sign-off': 'size' }, '*');

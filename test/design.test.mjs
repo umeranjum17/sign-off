@@ -637,20 +637,21 @@ test('report and plan documents use one page scroll and the available width at 3
       await evaluate(`location.href = ${JSON.stringify(base)}`);
       await until(() => evaluate('!!window.state || !!document.querySelector("#board h1")'));
       await evaluate(`addEventListener('message', e => {
-        if(e.source !== document.querySelector('#reader iframe')?.contentWindow) return;
+        if(e.source !== document.querySelector(':is(#reader, .split-detail) iframe')?.contentWindow) return;
         if(e.data?.documentGeometry) window.geometry = { source: e.source, value: e.data.documentGeometry };
         if(Number.isFinite(e.data?.height)) window.sizedSource = e.source;
       })`);
       for (const hash of ['#reports/release', '#waiting/plan-kind-board']) {
         await evaluate(`window.geometry = null; window.sizedSource = null; location.hash = ${JSON.stringify(hash)}`);
-        const selector = hash.includes('reports') ? '#reader .read iframe' : '#reader iframe.plan-view';
+        // On a desk a report reads in the pane beside Reports' list; a plan, and anything on a phone, opens over the board.
+        const selector = hash.includes('reports') ? ':is(#reader, .split-detail) .read iframe' : '#reader iframe.plan-view';
         // Read the settled signal and ALL measured values atomically, bound to this route's actual frame.
         const layout = () => evaluate(`(() => {
           const frame = document.querySelector(${JSON.stringify(selector)}), signal = window.geometry, g = signal?.value;
           if (!frame || signal?.source !== frame.contentWindow || window.sizedSource !== frame.contentWindow || frame.clientHeight <= 1
             || g.viewport !== frame.clientHeight || g.childViewportWidth !== frame.clientWidth) return null;
           const page = frame.closest('.read, .plan-main'), rect = frame.getBoundingClientRect(), s = getComputedStyle(page);
-          const scrollers = [...document.querySelectorAll('#reader *')].filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1);
+          const scrollers = [...document.querySelectorAll('#reader *, .split-detail')].filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1);
           return { ...g, frameHeight: frame.clientHeight, frameWidth: rect.width,
             available: page.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight), scrollers: scrollers.map(e => e.className) };
         })()`);
@@ -661,9 +662,9 @@ test('report and plan documents use one page scroll and the available width at 3
         assert.ok(got.width <= got.frameWidth + 1 && got.inner === 0, JSON.stringify(got));
         // A forced document scrollbar must not paint a gutter even after its content fits.
         assert.equal(got.scrollbar, 0, `painted inner scrollbar at ${width}px (mobile=${mobile}): ${JSON.stringify(got)}`);
-        assert.deepEqual(got.scrollers, [hash.includes('reports') ? 'read' : 'plan-scroll']);
+        assert.deepEqual(got.scrollers, [hash.includes('reports') ? (width === 1280 ? 'split-detail' : 'read') : 'plan-scroll']);
         const previous = got.frameHeight;
-        await evaluate(`document.querySelector('#reader iframe').contentWindow.postMessage('grow', '*')`);
+        await evaluate(`document.querySelector(${JSON.stringify(selector)}).contentWindow.postMessage('grow', '*')`);
         await until(async () => { const next = await layout();
           if (!next || next.frameHeight <= previous + 600) return false;
           got = next; return true;
@@ -927,7 +928,7 @@ test('each card has one place to type: Add a comment holds the note sent with th
   assert.deepEqual([...flow.matchAll(/<li>(.*?)<\/li>/gs)].map((m) => [...m[1].matchAll(/mk mk-(\w+)/g)].map((x) => x[1])), [['store'], [], ['gate', 'fail']]);
   // Today heads the list with its count; the row is a link that opens it, with its picture, its title and a dot while it is not read, then its form, steps, video, project and time.
   assert.match(reports, /<h2 class="dl-head" style="--n:0">Today<span class="n">1<\/span><\/h2><ul class="dl-list rp-list" aria-label="Today">/);
-  assert.match(reports, /<a class="dl-face" href="#reports\/how" draggable="false" id="item-how"><span class="rth" aria-hidden="true"><svg viewBox="0 0 48 48">.*?<strong class="title" dir="auto">How it ships<\/strong><span class="new" role="img" aria-label="Not read yet"><\/span>.*?<span class="when">Diagram · 3 steps · Video 0:28 · How it works · \d\d:\d\d<\/span>/s);
+  assert.match(reports, /<a class="dl-face" href="#reports\/how" draggable="false" id="item-how" data-row=""><span class="rth" aria-hidden="true"><svg viewBox="0 0 48 48">.*?<strong class="title" dir="auto">How it ships<\/strong><span class="new" role="img" aria-label="Not read yet"><\/span>.*?<span class="when">Diagram · 3 steps · Video 0:28 · How it works · \d\d:\d\d<\/span>/s);
   // Under the row, a swipe right marks it read and a swipe left archives it.
   assert.match(reports, /<div class="dl-act yes" aria-hidden="true">.*?<span>Read<\/span><\/div><div class="dl-act later" aria-hidden="true">.*?<span>Archive<\/span><\/div>/s);
   // Only the report is a row and counted; the text-only one is folded under Notes, a short row with no page to open.
@@ -1701,7 +1702,7 @@ test('Decide on a desk: the list beside its ask, J and K move the selection, Ent
   await until(async () => /alpha,b,/.test(run('answers', file).out) && (await rows()) === 'beta,gamma');
   // ? opens every key in one sheet; G then a letter goes to an area.
   await key('?');
-  assert.equal(await evaluate('document.getElementById("keys").open + "|" + document.querySelector("#keys h2").textContent + "|" + document.querySelectorAll("#keys li").length'), 'true|Keyboard shortcuts|14');
+  assert.equal(await evaluate('document.getElementById("keys").open + "|" + document.querySelector("#keys h2").textContent + "|" + document.querySelectorAll("#keys li").length'), 'true|Keyboard shortcuts|17');
   await evaluate('document.querySelector("#keys header button").click()');
   await key('g'), await key('e');
   await until(async () => (await evaluate('location.hash + "|" + !!document.querySelector(".split-list") + "|" + document.querySelector(".split-detail")?.textContent')) === '#evidence|true|No evidence updates.');
@@ -1713,6 +1714,66 @@ test('Decide on a desk: the list beside its ask, J and K move the selection, Ent
   await narrow.evaluate(`location.href = ${JSON.stringify(`${url}#decide/gamma`)}`);
   await until(async () => (await narrow.evaluate('document.querySelector(".decide h2")?.textContent')) === 'Gamma question?');
   assert.equal(await narrow.evaluate('!!document.querySelector(".split") + "|" + getComputedStyle(document.querySelector(".tabs")).display + "|" + getComputedStyle(document.querySelector(".side")).display'), 'false|flex|none');
+  narrow.close();
+  proc.kill();
+});
+
+test('Reports on a desk: the list beside the newest report, J moves and reads, U marks unread and the page stays loaded, E archives and selects the next, Cmd+Z, a row\'s hover, a guided report opens over the board and Escape comes back, and the phone layout under 1024px', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'reports-desk'), file = join(dir, 'board.json');
+  mkdirSync(join(dir, 'page'), { recursive: true });
+  writeFileSync(join(dir, 'page', 'index.html'), '<!doctype html><p>A report page.</p>');
+  const at = (m) => new Date(Date.now() - m * 60e3).toISOString().replace(/\.\d+Z$/, 'Z');
+  const guided = { ...JSON.parse(readFileSync(new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url), 'utf8')), filed: at(3) };
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [] }));
+  writeFileSync(join(dir, 'guided.json'), JSON.stringify(guided));
+  assert.equal(run('post', file, '--kind', 'report', '--from', join(dir, 'guided.json')).code, 0);
+  const stored = JSON.parse(readFileSync(file, 'utf8'));
+  stored.items.push(...[['beta', 'Beta report', 2, { about: 'What beta says.', form: 'chart', asked_by: 'Release agent' }], ['gamma', 'Gamma report', 4, {}], ['alpha', 'Alpha report', 1, { form: 'before-after' }]]
+    .map(([key, title, ago, more]) => ({ contract: 1, kind: 'report', schema: 2, key, title, view: 'page/index.html', preview: 'page/preview.svg', filed: at(ago), ...more })));
+  writeFileSync(file, JSON.stringify(stored));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const reads = () => { try { return readFileSync(file.replace(/\.json$/, '.reads.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).map(({ key, read }) => `${key}:${read}`).join(','); } catch { return ''; } };
+  const { evaluate, close } = await browse(join(dir, 'b'), 1280, 800);
+  const key = (k, mod = false) => evaluate(`(document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, bubbles: true, ctrlKey: ${mod}, metaKey: ${mod} }))`);
+  const seen = () => evaluate('[location.hash, document.querySelector(".split-list .sel")?.dataset.key, document.querySelector(".split-detail .read h1")?.textContent, document.querySelectorAll("#board .report .new:not(.out)").length].join("|")');
+  const rows = () => evaluate('[...document.querySelectorAll(".split-list .dl-row[data-key]")].filter((r) => r.style.height !== "0px").map((r) => r.dataset.key).join(",")');
+  await evaluate(`location.href = ${JSON.stringify(`${url}#reports`)}`);
+  // The newest report is shown beside the list, not yet marked read; the bar says what it is, and the strip under the list names its keys.
+  await until(async () => (await seen()) === `#reports|alpha|Alpha report|4`);
+  assert.match(await evaluate('document.querySelector(".rp-bar .eyebrow").textContent'), /^Before and after · \d\d:\d\d$/);
+  assert.equal(await evaluate('[...document.querySelectorAll(".rp-bar button")].map((b) => b.textContent).join(",") + "|" + document.querySelector(".split-hints").textContent + "|" + !!document.querySelector(".split-detail .read iframe")'),
+    'Mark read,Archive|JKMoveUReadEArchive?All keys|true');
+  assert.equal(await rows(), `alpha,beta,${guided.key},gamma`);
+  assert.equal(reads(), '');
+  // J selects the next report and reads it: its dot goes and the read is saved beside the board.
+  await key('j');
+  await until(async () => (await seen()) === '#reports/beta|beta|Beta report|3' && reads() === 'beta:true');
+  // U marks it unread; the page beside the list is not loaded again, and the mark holds.
+  await evaluate('document.querySelector(".split-detail .read iframe").dataset.kept = "1"');
+  await key('u');
+  await until(async () => reads() === 'beta:true,beta:false' && (await seen()) === '#reports/beta|beta|Beta report|4');
+  assert.equal(await evaluate('document.querySelector(".split-detail .read iframe").dataset.kept + "|" + document.querySelector(".rp-read").textContent'), '1|Mark read');
+  // A row's hover holds Read and Archive, the same two actions as its swipes.
+  assert.equal(await evaluate(`[...document.querySelectorAll('.dl-row[data-key="gamma"] .dl-hover button')].map((b) => b.textContent).join(",")`), 'Read,Archive');
+  // E archives the report shown: its row folds away and the next one is selected; Cmd+Z brings it back.
+  await key('e');
+  await until(async () => (await rows()) === `alpha,${guided.key},gamma` && (await evaluate('location.hash')) === `#reports/${guided.key}` && /^Archived: Beta report/.test(await evaluate('document.getElementById("toast").textContent')));
+  await key('z', true);
+  await until(async () => (await rows()) === `alpha,beta,${guided.key},gamma`);
+  // A guided report reads in stages over the board: Enter opens it, Escape closes it back to the list with the same report selected.
+  assert.equal(await evaluate('!!document.querySelector(".split-detail .read iframe") + "|" + document.querySelector(".split-detail .rp-open").textContent'), 'false|Read the report');
+  await key('Enter');
+  await until(() => evaluate('!document.getElementById("reader").hidden && document.getElementById("reader").getAttribute("aria-modal") === "true"'));
+  await evaluate('document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))');
+  await until(async () => (await evaluate(`document.getElementById("reader").hidden + "|" + location.hash + "|" + document.querySelector(".split-list .sel")?.dataset.key`)) === `true|#reports/${guided.key}|${guided.key}`);
+  close();
+  // Under 1024px Reports keeps the phone's list, and a report opens over it.
+  const narrow = await browse(join(dir, 'n'), 1000, 800);
+  await narrow.evaluate(`location.href = ${JSON.stringify(`${url}#reports/gamma`)}`);
+  await until(() => narrow.evaluate('!document.getElementById("reader").hidden && document.querySelector("#reader h1")?.textContent === "Gamma report"'));
+  assert.equal(await narrow.evaluate('!!document.querySelector(".split") + "|" + getComputedStyle(document.querySelector(".tabs")).display'), 'false|flex');
   narrow.close();
   proc.kill();
 });
