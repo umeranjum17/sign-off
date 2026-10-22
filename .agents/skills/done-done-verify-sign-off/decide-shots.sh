@@ -54,6 +54,8 @@ for theme in light dark; do
   go waiting
   ax eval "() => (${tap})('.top .dl-more > summary')"; pause 400; shot decide-menu
   go decide/ship
+  # On a desk the bar sits under a tall ask: it is scrolled into view first, so Answer and its More show together.
+  ax eval "() => { document.querySelector('.decide-bar').scrollIntoView({ block: 'end' }); return 1 }"
   ax eval "() => (${tap})('.decide-bar .dl-more > summary')"; pause 400; shot decide-item-more
   go waiting
   ax eval "() => (${drag})('keep-the-weekly-digest', 300, true)"; pause 1000; shot decide-swiped-answer
