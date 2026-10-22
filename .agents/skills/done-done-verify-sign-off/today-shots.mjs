@@ -1,7 +1,7 @@
 // Today on the board (glance, three tiles, section heads, rows, report card, leash) at one theme and width per run, so a run's steps.json holds one claim.
 // Usage: node .agents/skills/done-done-verify-sign-off/today-shots.mjs <output> [light|dark] [390|1280]
 // SIGN_OFF_REPO names another built checkout to drive, such as the base for a before (TODAY_SIDE=before names its files).
-// Saves today.<side>.<theme>.<width>w.png/.txt (sizes, gaps, controls under 44px, Proven today against Evidence) and spacing.today.<side>.<theme>.<width>w.json;
+// Saves today.<side>.<theme>.<width>w.png/.txt (sizes, gaps, controls under 44px, Proven today against Evidence, the capture's share of its frame, the closed Ask box), today-ask-open.<side>.<theme>.<width>w.png and spacing.today.<side>.<theme>.<width>w.json;
 // the .txt also says whether the spacing is identical in the other theme. A light 390 after run adds today-scroll.mp4: scroll the page, swipe Proven today, tap a tile.
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -29,7 +29,12 @@ const probe = `() => {
   const top = (s) => { const e = document.querySelector(s); return e ? Math.round(e.getBoundingClientRect().top + scrollY) : null; };
   const heads = [...document.querySelectorAll('.areas .sec-head')].map((h) => ({ name: h.querySelector('h2').textContent, top: Math.round(h.getBoundingClientRect().top + scrollY), above: Math.round(h.getBoundingClientRect().top - (h.parentElement.previousElementSibling ?? document.querySelector('.tiles')).getBoundingClientRect().bottom), h2: getComputedStyle(h.querySelector('h2')).fontSize }));
   const tiles = [...document.querySelectorAll('.tile')].map((t) => ({ name: t.querySelector('.name').textContent.trim(), n: +t.querySelector('.n').textContent, h: Math.round(t.getBoundingClientRect().height), nSize: getComputedStyle(t.querySelector('.n')).fontSize, nameSize: getComputedStyle(t.querySelector('.name')).fontSize }));
-  return JSON.stringify({ glance: css('.glance', 'fontSize'), tiles, heads, provenCards: document.querySelectorAll('.i-evidence .ev-card').length, rpTitle: css('.rp-title', 'fontSize'), rpAbout: css('.rp-about', 'fontSize'), radius: css('.tile', 'borderRadius'), overflowX: document.documentElement.scrollWidth > innerWidth, under, spacing });
+  // How much of the first Proven today frame the capture paints, from its natural size, object-fit and padding; and the closed Ask the agent box's height.
+  const fill = (() => { const f = document.querySelector('.ev-scroll-row .ev-media'), i = f?.querySelector('img'); if (!i?.naturalWidth) return null; const c = getComputedStyle(i), b = i.getBoundingClientRect(), a = f.getBoundingClientRect();
+    const cw = b.width - parseFloat(c.paddingLeft) - parseFloat(c.paddingRight), ch = b.height - parseFloat(c.paddingTop) - parseFloat(c.paddingBottom), k = (c.objectFit === 'cover' ? Math.max : Math.min)(cw / i.naturalWidth, ch / i.naturalHeight);
+    return Math.round(100 * Math.min(i.naturalWidth * k, cw) * Math.min(i.naturalHeight * k, ch) / (a.width * a.height)); })();
+  const ask = document.querySelector('details.ask:not([open])');
+  return JSON.stringify({ fill, askClosed: ask ? Math.round(ask.getBoundingClientRect().height) : null, glance: css('.glance', 'fontSize'), tiles, heads, provenCards: document.querySelectorAll('.i-evidence .ev-card').length, rpTitle: css('.rp-title', 'fontSize'), rpAbout: css('.rp-about', 'fontSize'), radius: css('.tile', 'borderRadius'), overflowX: document.documentElement.scrollWidth > innerWidth, under, spacing });
 }`;
 const frames = join(dir, 'frames');
 let recorder;
@@ -46,6 +51,11 @@ try {
   const name = `today.${side}.${theme}.${width}w`;
   browser('screenshot', join(out, `${name}.png`));
   const m = result(browser('eval', probe));
+  // Ask the agent opened, in a window tall enough that its prompt box and button clear the tab bar.
+  browser('emulate', '--viewport', `${width}x${height + 400}x1${width === 390 ? ',mobile,touch' : ''}`, '--color-scheme', theme);
+  browser('open', url); settle();
+  browser('eval', `() => { document.querySelector('details.ask summary').click(); return 1; }`); settle();
+  browser('screenshot', join(out, `today-ask-open.${side}.${theme}.${width}w.png`));
   // The same page in the other theme: the spacing must be the same numbers.
   const other = theme === 'light' ? 'dark' : 'light';
   browser('emulate', '--viewport', `${width}x${height}x1${width === 390 ? ',mobile,touch' : ''}`, '--color-scheme', other);
@@ -61,10 +71,11 @@ try {
     `section heads ${m.heads.map((h) => `${h.name} ${h.h2} with ${h.above}px above`).join('; ')}`, `report card title ${m.rpTitle}, about ${m.rpAbout}`,
     `Proven today tile ${proven}, cards in the Proven today row ${m.provenCards}, passed cards on Evidence ${evidenceCards} of ${evidenceAll} listed`,
     `spacing in ${theme} equals spacing in ${other}: ${same ? 'yes' : 'no'} (${Object.keys(m.spacing).length} elements)`,
+    `Proven today capture paints ${m.fill}% of its frame`, `Ask the agent closed: ${m.askClosed}px tall`,
     `controls under 44px ${m.under.length}${m.under.length ? ': ' + m.under.map((x) => `${x.text} ${x.w}x${x.h}`).join(', ') : ''}`, `horizontal overflow ${m.overflowX ? 1 : 0}`];
   writeFileSync(join(out, `${name}.txt`), `${side} ${theme} ${width}w today\n${lines.join('\n')}\n`);
   writeFileSync(join(out, `spacing.today.${side}.${theme}.${width}w.json`), JSON.stringify(m.spacing, null, 2) + '\n');
-  if (side === 'after') assert.deepEqual([m.under.length, m.overflowX, same, proven === evidenceCards, proven], [0, false, true, true, 2], JSON.stringify(m));
+  if (side === 'after') assert.deepEqual([m.under.length, m.overflowX, same, proven === evidenceCards, proven, m.fill, m.askClosed <= 48], [0, false, true, true, 2, 100, true], JSON.stringify(m));
   if (side === 'after' && theme === 'light' && width === 390) {
     // A sampled-frame recording through the same isolated browser: scroll Today down and back, swipe Proven today, tap the Need you tile.
     mkdirSync(frames, { recursive: true });
@@ -81,8 +92,8 @@ try {
     sh('ffmpeg', ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', join(frames, 'frames.txt'), '-vf', 'scale=390:-2', '-pix_fmt', 'yuv420p', '-c:v', 'libx264', '-movflags', '+faststart', join(out, 'today-scroll.mp4')]);
   }
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board with a sign-in ask, asks, a plan, a report and two passed updates.',
-    steps: [`Open Today at ${width} px in ${theme} mode.`, 'Measure the glance, the three tiles, the section heads, the report card and every control against 44px.', 'Open Evidence and count its cards against the Proven today tile.', `Read the same spacing numbers in ${other} mode.`],
-    result: side === 'after' ? `At ${width} px in ${theme} mode Today uses the type scale (tile counts ${m.tiles[0].nSize}, section heads ${m.heads[0]?.h2}), every control is at least 44px, Proven today shows ${proven} and Evidence lists ${evidenceCards}, and the spacing is the same in ${other} mode.` : `At ${width} px in ${theme} mode Today is captured as it was for comparison.` }, null, 2) + '\n');
+    steps: [`Open Today at ${width} px in ${theme} mode.`, 'Measure the glance, the three tiles, the section heads, the report card and every control against 44px.', 'Measure how much of its frame the first Proven today capture paints and how tall the closed Ask the agent box is, then open it.', 'Open Evidence and count its cards against the Proven today tile.', `Read the same spacing numbers in ${other} mode.`],
+    result: side === 'after' ? `At ${width} px in ${theme} mode Today uses the type scale (tile counts ${m.tiles[0].nSize}, section heads ${m.heads[0]?.h2}), every control is at least 44px, the Proven today capture paints ${m.fill}% of its frame, Ask the agent is ${m.askClosed}px tall until opened, Proven today shows ${proven} and Evidence lists ${evidenceCards}, and the spacing is the same in ${other} mode.` : `At ${width} px in ${theme} mode Today is captured as it was for comparison.` }, null, 2) + '\n');
 } finally {
   try { browser('stop'); } catch {}
   try { sh(process.execPath, [join(repo, 'dist/cli.js'), 'stop', join(dir, 'board.json')], { env: seedEnv }); } catch {}
