@@ -2510,9 +2510,9 @@ test('Summary on a phone: Proven today swipes inside its row, its tall phone cap
   await until(() => evaluate('document.querySelector(".ev-scroll-row .ev-media img")?.naturalWidth > 0'));
   const fill = await evaluate('(() => { const f = document.querySelector(".ev-scroll-row .ev-media"), i = f.querySelector("img"), a = f.getBoundingClientRect(), b = i.getBoundingClientRect(), c = getComputedStyle(i); return [Math.round(b.width - a.width), Math.round(b.height - a.height), c.objectFit, c.objectPosition, c.paddingTop]; })()');
   assert.deepEqual(fill, [0, 0, 'cover', '50% 0%', '0px']);
-  // Closed, Ask the agent is one 44px row with its label centred in it; a tap opens the prompt box.
-  const ask = await evaluate('(() => { const a = document.querySelector("details.ask"), s = a.querySelector("summary"), r = document.createRange(); r.selectNodeContents(s); const box = a.getBoundingClientRect(), t = r.getBoundingClientRect(); return [a.open, Math.round(box.height), Math.abs(Math.round((t.top + t.bottom) / 2 - (box.top + box.bottom) / 2)) <= 2]; })()');
-  assert.deepEqual(ask, [false, 46, true]);
+  // Closed, Ask the agent is one line of text in a 44px row with no box around it, at the page's gutter; a tap opens the prompt box.
+  const ask = await evaluate('(() => { const a = document.querySelector("details.ask"), s = a.querySelector("summary"), r = document.createRange(); r.selectNodeContents(s); const box = a.getBoundingClientRect(), t = r.getBoundingClientRect(), c = getComputedStyle(a); return [a.open, Math.round(box.height), Math.abs(Math.round((t.top + t.bottom) / 2 - (box.top + box.bottom) / 2)) <= 2, c.borderTopWidth, c.backgroundColor, Math.round(t.left)]; })()');
+  assert.deepEqual(ask, [false, 44, true, '0px', 'rgba(0, 0, 0, 0)', 20]);
   await evaluate('document.querySelector("details.ask summary").click()');
   assert.ok(await evaluate('document.querySelector("details.ask").open && document.getElementById("prompt").getBoundingClientRect().height > 40'));
   // With no designs filed, the Designs screen still opens, under the lit Decide tab.
@@ -2697,7 +2697,7 @@ test('Evidence: a card per proof ever filed, in one list, newest first, with a p
   let { evaluate, close } = await browse(join(dir, 'b'), 1440);
   await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
   // Per card: its id, what it proves, its result and the picture that leads it; every card is drawn.
-  const cards = '[...document.querySelectorAll(".ev-card")].map((a) => [a.id, a.querySelector(".t").textContent, a.querySelector(".m span").textContent, a.querySelector(".m svg path")?.getAttribute("d") ?? "", a.querySelectorAll(".ev-media img").length])';
+  const cards = '[...document.querySelectorAll(".ev-card")].map((a) => [a.id, a.querySelector(".t").firstChild.textContent, a.querySelector(".m span").textContent, a.querySelector(".m svg path")?.getAttribute("d") ?? "", a.querySelectorAll(".ev-media img").length])';
   await until(async () => (await evaluate(`${cards}.length === 6 && [...document.querySelectorAll(".ev-media img")].every((i) => i.complete && i.naturalWidth)`)));
   // Nothing is archived on its own: the week-old update-7 is listed, and no Archived row exists.
   assert.equal(await evaluate('document.querySelector(".gone-asks")'), null);
@@ -2707,6 +2707,9 @@ test('Evidence: a card per proof ever filed, in one list, newest first, with a p
   const passed = ['m9 12 2 2 4-4', 1], none = ['', 1];
   assert.deepEqual(await evaluate(cards), [['item-update-5', 'Sign-in, plain update', 'Not run', ...none], ['item-update-4', outcome, 'Passed', ...passed], ['item-update-3', outcome, 'Passed', ...passed],
     ['item-update-2', outcome, 'Passed', ...passed], ['item-update-6', outcome, 'Could not check', 'M12 7v6', 0], ['item-update-7', 'Sign-in, last week', 'Not run', ...none]]);
+  // Four cards share one headline, so each names what tells them apart best, here its own title; a card with a headline of its own names nothing more.
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-card")].map((a) => a.querySelector(".t .also")?.textContent ?? "")'),
+    ['', 'sign-off board verify: pass', 'sign-off board verify: pass', 'Sign-in', 'A capture changed after the run', '']);
   for (const n of [4, 3, 2]) assert.equal(await evaluate(`document.getElementById("item-update-${n}").querySelector(".m > span:last-child").textContent`), `Today, ${clock(at(n))}`, `update ${n}`);
   // No project or day headings break the list; a card filed on another day says that day itself.
   assert.equal(await evaluate('document.querySelectorAll("#board h2, #board h3").length'), 0);
@@ -2786,6 +2789,12 @@ test('Evidence: a card per proof ever filed, in one list, newest first, with a p
   assert.deepEqual(await evaluate('[document.querySelector(".ev-title").textContent, document.querySelectorAll(".ev-hero img").length, document.querySelectorAll(".ev-verdict .choices button").length]'),
     [outcome, 1, 3]);
   assert.equal(await evaluate('document.querySelector(".ev-grp .v.ok svg path").getAttribute("d")'), 'm9 12 2 2 4-4');
+  // On a desk the capture fills the preview's width and a tap opens it full size; Pass, Fail and Needs work sit on one row, equally wide.
+  await until(() => evaluate('document.querySelector(".ev-hero img")?.naturalWidth > 0'));
+  assert.deepEqual(await evaluate('(() => { const i = document.querySelector(".ev-hero img").getBoundingClientRect(), w = document.querySelector(".ev-item").getBoundingClientRect().width, a = document.querySelector(".ev-hero a"); return [Math.round(i.width - w), a.getAttribute("href").startsWith("/api/media?key=update-4"), a.target]; })()'),
+    [0, true, '_blank']);
+  const verdictRow = 'new Set([...document.querySelectorAll(".ev-verdict .choices button")].map((b) => { const r = b.getBoundingClientRect(); return `${Math.round(r.top)} ${Math.round(r.width)}`; })).size';
+  assert.equal(await evaluate(verdictRow), 1);
   // A redraw of the same update keeps its headline, not the raw run title.
   await evaluate('dispatchEvent(new Event("resize"))');
   assert.equal(await evaluate('document.querySelector(".ev-title").textContent'), outcome);
@@ -2824,12 +2833,15 @@ test('Evidence: a card per proof ever filed, in one list, newest first, with a p
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length === 6')));
   assert.deepEqual(await evaluate(SQUASH), []);
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-card")].filter((a) => a.getBoundingClientRect().width < 0.95 * document.querySelector(".ev-grid").getBoundingClientRect().width).map((a) => a.id)'), []);
+  // Each capture fills its tile from the top of the shot, and the tile is half as tall as it is wide.
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-card .ev-media")].filter((m) => m.querySelector("img")).map((m) => { const a = m.getBoundingClientRect(), b = m.querySelector("img").getBoundingClientRect(), c = getComputedStyle(m.querySelector("img")); return [Math.round(b.width - a.width), Math.round(b.height - a.height), c.objectFit, c.objectPosition, Math.round(a.width / a.height)]; }).filter((x) => x.join() !== "0,0,cover,50% 0%,2")'), []);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'));
   await evaluate('document.getElementById("item-update-2").click()');
   await until(async () => (await evaluate('!!document.querySelector(".ev-item") && document.querySelectorAll(".ev-hero img").length === 2')));
   // A proof line without the checker prefix shows no Checked by row, and What ran is the whole line.
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-grp .cell")].map((c) => [c.querySelector(".k").textContent, (c.querySelector(".v") ?? c.querySelector(".x")).textContent.trim()])'),
     [['Result', 'Passed'], ['What ran', 'npm test, phone, passed'], ['When', `Today, ${clock(at(2))}`]]);
+  assert.equal(await evaluate('new Set([...document.querySelectorAll(".ev-verdict .choices button")].map((b) => { const r = b.getBoundingClientRect(); return `${Math.round(r.top)} ${Math.round(r.width)}`; })).size'), 1);
   assert.deepEqual(await evaluate(SQUASH), []);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'));
   assert.ok(await evaluate('[...document.querySelectorAll(".ev-hero img")].every((i) => i.getBoundingClientRect().width <= document.querySelector(".ev-item").getBoundingClientRect().width)'));

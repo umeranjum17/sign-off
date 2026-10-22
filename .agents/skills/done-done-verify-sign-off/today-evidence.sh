@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Evidence keeps every proof and Today's Proven today counts only the passed ones of the last day: seeds a board with two passed updates (one three days old),
 # a repost of one card under its key, a pull request proof with no run and a plain one, captures Today and Evidence at 390 and 1280 in light and dark (a desk's Today sets the proof
-# beside the asks; its Evidence is a list beside the newest update, selected), Evidence narrowed to one project with its project filter, and writes counts.txt (the numbers, as text)
+# beside the asks; its Evidence is a list beside the newest update, selected), the passed update's own screen (evidence-item) and Today's closed Ask the agent (today-ask) at both widths,
+# Evidence narrowed to one project with its project filter, and writes counts.txt (the numbers, as text)
 # and steps.json. TODAY_EVIDENCE_RECORD=1 also records the desk's hover, press and selection at 1280 per theme (desk-evidence.<theme>.1280w.mp4).
 # Usage, from the repo root after `npm run build`: today-evidence.sh <evidence folder>
 set -euo pipefail
@@ -33,6 +34,21 @@ for theme in light dark; do
       chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
       chrome-devtools-axi screenshot "$out/$s.$theme.${vp%%x*}w.png" >/dev/null
     done
+  done
+done
+# One claim per capture: the passed update's own screen (its capture across the preview on a desk, its verdicts on one row) and Today's closed Ask the agent, one line.
+for theme in light dark; do
+  for vp in 390x1700x1,mobile,touch 1280x1400x1; do
+    chrome-devtools-axi emulate --viewport "$vp" --color-scheme "$theme" >/dev/null
+    chrome-devtools-axi open "$url#evidence/update-2" >/dev/null
+    chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
+    chrome-devtools-axi screenshot "$out/evidence-item.$theme.${vp%%x*}w.png" >/dev/null
+  done
+  for vp in 390x844x1,mobile,touch 1280x800x1; do
+    chrome-devtools-axi emulate --viewport "$vp" --color-scheme "$theme" >/dev/null
+    chrome-devtools-axi open "$url" >/dev/null
+    chrome-devtools-axi eval "() => new Promise((ok) => { document.querySelector('details.ask').scrollIntoView({ block: 'center' }); setTimeout(ok, 600); })" >/dev/null
+    chrome-devtools-axi screenshot "$out/today-ask.$theme.${vp%%x*}w.png" >/dev/null
   done
 done
 # One claim per capture: the search box narrows Evidence to one card, the 3-day-old proof and then the reposted card, each alone on a phone screen.
@@ -72,7 +88,12 @@ chrome-devtools-axi emulate --viewport 1280x800x1 --color-scheme light >/dev/nul
 chrome-devtools-axi open "$url#evidence" >/dev/null; chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
 columns=$(num '() => new Set([...document.querySelectorAll(".ev-card")].map((a) => Math.round(a.getBoundingClientRect().left))).size')
 selected=$(chrome-devtools-axi eval '() => [...document.querySelectorAll(".ev-card[aria-current]")].map((a) => a.id).join() === document.querySelector(".ev-card").id && document.querySelector(".split-detail .ev-title")?.textContent === document.querySelector(".ev-card[aria-current] .t").textContent' | grep -o 'true\|false' | head -1)
+twinned=$(num '() => document.querySelectorAll(".ev-card .t .also").length')
+chrome-devtools-axi open "$url#evidence/update-2" >/dev/null; chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
+fills=$(chrome-devtools-axi eval '() => Math.round(document.querySelector(".ev-hero img").getBoundingClientRect().width) + " of " + Math.round(document.querySelector(".ev-item").getBoundingClientRect().width) + " px"' | sed -n 's/^result: "\(.*\)"$/\1/p' | sed 's/\\"//g')
+rows=$(num '() => new Set([...document.querySelectorAll(".ev-verdict .choices button")].map((b) => Math.round(b.getBoundingClientRect().top))).size')
 chrome-devtools-axi open "$url" >/dev/null; chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
+askbox=$(chrome-devtools-axi eval '() => { const a = document.querySelector("details.ask"); return Math.round(a.getBoundingClientRect().height) + " px tall, border " + getComputedStyle(a).borderTopWidth; }' | sed -n 's/^result: "\(.*\)"$/\1/p' | sed 's/\\"//g')
 beside=$(chrome-devtools-axi eval '() => document.querySelector(".areas > .i-evidence").getBoundingClientRect().left > document.querySelector(".areas > .i-waiting").getBoundingClientRect().right' | grep -o 'true\|false' | head -1)
 tile=$(num '() => document.querySelector(".tile.i-evidence .n").textContent'); row=$(num '() => document.querySelectorAll(".ev-scroll-row .ev-card").length')
 glance=$(chrome-devtools-axi eval '() => document.querySelector(".glance")?.textContent' | grep -o '[0-9]* updates\? filed' || echo none)
@@ -88,12 +109,16 @@ glance=$(chrome-devtools-axi eval '() => document.querySelector(".glance")?.text
   echo "Evidence list columns at 1280: $columns"
   echo "newest proof selected and open beside the list at 1280: $selected"
   echo "Proven today right of Waiting on you at 1280: $beside"
+  echo "cards sharing a headline that name what differs at 1280: $twinned"
+  echo "update capture width across the preview at 1280: $fills"
+  echo "rows the Pass, Fail and Needs work buttons take at 1280: $rows"
+  echo "closed Ask the agent at 1280: $askbox"
   echo "dismissal log lines written: $(cat "$d/board.dismissed.jsonl" 2>/dev/null | wc -l)"
 } > "$out/counts.txt"
 # With the recording the desk steps include the clicks it makes.
 rec=$([ "${TODAY_EVIDENCE_RECORD:-}" != 1 ] || echo ', "On the desk at 1280, point at a Proven today row on Today (its hover tint and quiet x show), click it: Evidence opens with that update selected beside the list", "Click three more rows in the Evidence list: each click changes the selection, its tint and accent bar move, and the selected update slides in from the right"')
 cat > "$out/steps.json" <<JSON
 {"target": {"version": "$(node -p 'require("./package.json").version')"}, "start": "A new board with two passed updates (one filed 3 days ago) and two updates with no run, each with a capture, and one new report",
- "steps": ["Open Today on a phone at 390 and on a desk at 1280 (1024px and wider is the desk layout) in light and dark", "Read the Proven today tile, the glance line and the Proven today row; on the desk, find the latest proof and the new report in a column beside Waiting on you, the asks that wait on you", "Open Evidence on a phone at 390 and on the desk at 1280 in light and dark; on the desk the list is one column, newest first, beside the selected update, the newest when none is picked", "Pick muxr in the project filter", "Compare Evidence, which keeps every proof, with the Proven today row, which keeps the passed ones of the last day"$rec],
- "result": "Today counts only the passed updates of the last day; Evidence lists every proof in one list, newest first, with no project or day headings, and its project filter narrows it to one project, including the 3-day-old one, the pull request proof and the plain one; the reposted card is listed once and no dismissal is written. On a desk (1024px and wider, shown at 1280) Today shows the latest proof and the new report beside what waits on you, and Evidence is one list beside the selected update, which a click changes and slides in; on a phone at 390 Today and Evidence keep one column of full-width cards"}
+ "steps": ["Open Today on a phone at 390 and on a desk at 1280 (1024px and wider is the desk layout) in light and dark", "Read the Proven today tile, the glance line and the Proven today row; on the desk, find the latest proof and the new report in a column beside Waiting on you, the asks that wait on you", "Open Evidence on a phone at 390 and on the desk at 1280 in light and dark; on the desk the list is one column, newest first, beside the selected update, the newest when none is picked", "Open the passed update at 390 and 1280: on the desk its capture fills the preview's width from the top of the shot and opens full size on a tap; Pass, Fail and Needs work sit on one row", "Scroll Today to Ask the agent, closed", "Pick muxr in the project filter", "Compare Evidence, which keeps every proof, with the Proven today row, which keeps the passed ones of the last day"$rec],
+ "result": "Today counts only the passed updates of the last day; Evidence lists every proof in one list, newest first, with no project or day headings, and its project filter narrows it to one project, including the 3-day-old one, the pull request proof and the plain one; the reposted card is listed once and no dismissal is written. Two cards with the same headline each name what tells them apart (here their own titles). Each Evidence card's capture fills a tile half as tall as it is wide; the update's verdicts take one row of equal buttons; closed, Ask the agent is one line of text with no box. On a desk (1024px and wider, shown at 1280) Today shows the latest proof and the new report beside what waits on you, and Evidence is one list beside the selected update, which a click changes and slides in; on a phone at 390 Today and Evidence keep one column of full-width cards"}
 JSON
