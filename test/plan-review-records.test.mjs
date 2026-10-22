@@ -41,6 +41,15 @@ function commit(cwd) {
   git(cwd, ['-c', 'user.name=records', '-c', 'user.email=records@example.com', 'commit', '-qm', 'init']);
 }
 
+// done-done 0.3.0 checks the records alone; later versions also ask a judge, which a host may not have set. The records rule runs first,
+// so a host with no judge still shows whether identical diagnostics were counted: the check then stops at "no judge is set", never at "byte-identical".
+function assertRecordsAccepted(r) {
+  const out = r.stdout + r.stderr;
+  if (r.status === 0) return;
+  assert.doesNotMatch(out, /byte-identical/, out);
+  assert.match(out, /no judge is set/, out);
+}
+
 const recordOf = (home, name, runId) => JSON.parse(readFileSync(join(home, 'evidence', name, '.done-done', 'runs', `${runId}.json`), 'utf8'));
 const evidenceOf = (home, name, record) => record.files.map((f) => join(home, 'evidence', name, f.path));
 
@@ -56,6 +65,7 @@ const dir = journey === 'plan-review' ? recordsDir(root) : root;
 mkdirSync(dir, { recursive: true });
 for (const name of ['approved.network.txt', 'note.network.txt']) writeFileSync(join(dir, name), 'reqid=1 GET / [200]\\n');
 copyFileSync(process.env.SHOT, join(root, journey + '.png'));
+writeFileSync(join(root, 'steps.json'), JSON.stringify({ target: { version: '1' }, start: 'A page that loads.', steps: ['The person opens the plan review page.', 'The person answers and the answer is saved.'], result: 'Plan review states load and the answer is saved. Another journey loads.' }));
 `);
     writeFileSync(join(dir, 'app.txt'), 'app\n');
     writeFileSync(join(dir, '.done-done.yaml'), `app: "plan-review-records"
@@ -72,7 +82,7 @@ journeys:
     assert.equal(ran.status, 0, ran.stdout + ran.stderr);
     const name = 'plan-review-records';
     const plan = recordOf(home, name, JSON.parse(ran.stdout).run_id), planFiles = evidenceOf(home, name, plan);
-    assert.ok(planFiles.length && planFiles.every((f) => f.endsWith('.png')), planFiles.join('\n'));
+    assert.ok(planFiles.length && planFiles.every((f) => f.endsWith('.png') || f.endsWith('/steps.json')), planFiles.join('\n'));
     const diagnostics = join(home, 'evidence', name, `${plan.run_id}-diagnostics`);
     const networks = readdirSync(diagnostics).filter((n) => n.endsWith('.network.txt')).map((n) => readFileSync(join(diagnostics, n), 'utf8'));
     assert.equal(networks.length, 2);
@@ -80,13 +90,14 @@ journeys:
     assert.ok(!readdirSync(join(home, 'evidence', name, plan.run_id)).some((n) => n.endsWith('.network.txt')));
 
     const passed = run(dir, ['check', '--outcome', 'Plan review states load and the answer is saved.', '--claim-id', 'plan-review-records', '--json', ...planFiles], env);
-    assert.equal(passed.status, 0, passed.stdout + passed.stderr);
+    assertRecordsAccepted(passed);
 
     const otherRan = run(dir, ['run', 'other', '--json'], env);
     assert.equal(otherRan.status, 0, otherRan.stdout + otherRan.stderr);
     const other = recordOf(home, name, JSON.parse(otherRan.stdout).run_id);
     const failed = run(dir, ['check', '--outcome', 'Another journey loads.', '--claim-id', 'other-journey', '--json', ...evidenceOf(home, name, other)], env);
-    assert.equal(failed.status, 1, failed.stdout + failed.stderr);
+    // done-done 0.3.0 exits 1 for a rejected capture; later versions exit 2 when the records rule stops the check before the judge.
+    assert.ok([1, 2].includes(failed.status), failed.stdout + failed.stderr);
     assert.match(failed.stdout, /byte-identical/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -111,14 +122,14 @@ test('the real plan-review journey passes the real check with identical network 
     assert.equal(ran.status, 0, ran.stdout + ran.stderr);
     const record = recordOf(home, app, JSON.parse(ran.stdout).run_id), files = evidenceOf(home, app, record);
     assert.ok(files.length > 2);
-    assert.ok(files.every((f) => f.endsWith('.png')), files.join('\n'));
+    assert.ok(files.every((f) => f.endsWith('.png') || f.endsWith('/steps.json')), files.join('\n'));
     const diagnostics = join(home, 'evidence', app, `${record.run_id}-diagnostics`);
     assert.ok(existsSync(join(diagnostics, 'answers.json')), `no diagnostics in ${diagnostics}`);
     const networks = readdirSync(diagnostics).filter((n) => n.endsWith('.network.txt')).map((n) => readFileSync(join(diagnostics, n), 'utf8'));
     assert.ok(networks.length > 1 && networks.some((n, i) => networks.indexOf(n) !== i), 'the journey should have repeated a network record by design');
 
     const checked = run(work, ['check', '--outcome', 'Plan review states load and the answer is sent back.', '--claim-id', 'plan-review-journey', '--json', ...files], env);
-    assert.equal(checked.status, 0, checked.stdout + checked.stderr);
+    assertRecordsAccepted(checked);
   } finally {
     const scratch = /Scratch for cleanup: (\S+)/.exec(`${ran?.stdout ?? ''}${ran?.stderr ?? ''}`)?.[1];
     if (scratch) rmSync(scratch, { recursive: true, force: true });

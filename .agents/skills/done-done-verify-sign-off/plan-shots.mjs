@@ -116,6 +116,9 @@ try {
   drive('await page.eval(() => document.querySelector(".plan-sent a").click()); await wait(".i-answered .compact");');
   capture('answered', 'The plan is in Answered with Sent back and no longer waits.');
   if (!process.env.PLAN_REVIEW_STAGE || process.env.PLAN_REVIEW_STAGE === 'answered') writeFileSync(join(records, 'list.txt'), cli('list', board));
+  writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync('package.json', 'utf8')).version }, start: 'A throwaway board holding one plan the agent filed, opened in a browser.',
+    steps: ['The person approves the first section with a comment.', 'The person marks the second section Change with a note.', 'The person answers the decision with their own words and adds a comment on the whole plan.', 'The person steps through the explainer and sends the answers back.'],
+    result: `Sent back confirms the answers were saved, the agent reads them with the CLI, and the plan is in Answered, at ${width} px in the ${theme} theme.` }, null, 2) + '\n');
 } finally {
   browser('stop'); server.kill();
   console.log(`Scratch for cleanup: ${dir}`);
