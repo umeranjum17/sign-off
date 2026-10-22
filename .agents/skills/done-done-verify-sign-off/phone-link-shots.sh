@@ -45,10 +45,10 @@ for w in 390 1280; do
   fi
   if want link; then
     br open "$base#evidence/update-1" >/dev/null; sleep 1.5
-    l=$(ev "() => { const a = document.querySelector('.ev-hero a'); return JSON.stringify({width: innerWidth, href: a.getAttribute('href'), opensInNewTab: a.target === '_blank'}) }")
+    l=$(ev "() => { const a = document.querySelector('.ev-hero a'); return JSON.stringify({width: innerWidth, href: a.getAttribute('href').split('?')[0], opensInNewTab: a.target === '_blank'}) }")
     echo "link.$w: $l" >> "$out/measures.txt"
     br screenshot "$out/link.$w.png" >/dev/null
-    "$node" -e 'const l=JSON.parse(process.argv[1]),w=+process.argv[2];if(w===390?(l.href!=="#evidence/update-1"||l.opensInNewTab):(!l.href.startsWith("/api/media")||!l.opensInNewTab))process.exit(1)' "$l" $w
+    "$node" -e 'const l=JSON.parse(process.argv[1]),w=+process.argv[2];if(w===390?(l.href!=="#evidence/update-1"||l.opensInNewTab):(!l.href==="/api/media"||!l.opensInNewTab))process.exit(1)' "$l" $w
   fi
 done
 cat > "$out/steps.json" <<J
