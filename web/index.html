@@ -330,20 +330,20 @@
     background: var(--surface); border-radius: 0.875rem; }
   /* Waiting and Decide use separate board cards; the R1 answer renderer remains the source of answer writes. */
   .waiting-lede { margin: 0; color: var(--muted); }
-  .plan-hero { display: grid; overflow: hidden; margin: 0 0 2rem; border-radius: 1.125rem; background: var(--surface); }
+  .plan-hero { display: grid; overflow: hidden; margin: 0 0 0.75rem; border-radius: 1.125rem; background: var(--surface); }
   .plan-preview { width: 100%; height: 12rem; min-width: 0; overflow: hidden; background: var(--sunk); }
   .plan-preview .rung { height: 100%; }
   .plan-preview .rung .frame, .plan-preview .rung iframe { height: 100%; min-height: 0; border: 0; border-radius: 0; }
   .plan-preview .rung > .meta { display: none; }
-  .plan-copy { display: grid; align-content: center; gap: .5rem; padding: 1.25rem; }
-  .plan-copy .eyebrow, .ask-card .kind { margin: 0; color: var(--warn); font-size: .875rem; font-weight: 600; }
-  .plan-copy h2 { margin: 0; font-size: 1.3125rem; line-height: 1.24; }
-  .plan-copy .about { display: block; margin: 0; color: var(--muted); overflow: visible; }
-  .plan-meta { display: flex; flex-wrap: wrap; gap: .35rem 1rem; color: var(--muted); font-size: .875rem; }
+  .plan-copy { display: grid; align-content: center; gap: 0.375rem; padding: 1rem; }
+  .plan-copy .eyebrow, .ask-card .kind { margin: 0; color: var(--warn); font-size: var(--t-xs); font-weight: 600; }
+  .plan-copy h2 { margin: 0; font-size: var(--t-m); line-height: 1.3; font-weight: 650; letter-spacing: -0.015em; }
+  .plan-copy .about { display: block; margin: 0; color: var(--muted); font-size: var(--t-s); line-height: 1.45; overflow: visible; }
+  .plan-meta { display: flex; flex-wrap: wrap; gap: 0.25rem 0.875rem; color: var(--muted); font-size: var(--t-xs); }
   .plan-meta span { display: inline-flex; align-items: center; gap: .375rem; white-space: nowrap; }
   .plan-copy .icon { width: auto; height: auto; border-radius: 0; background: none; } .plan-meta .icon svg { width: 1rem; height: 1rem; stroke: var(--muted); }
   .plan-copy .eyebrow { display: flex; align-items: center; gap: .375rem; } .plan-copy .eyebrow .icon svg { width: 1.125rem; height: 1.125rem; stroke: var(--warn); }
-  .open-link.plan-open { display: inline-flex; justify-content: center; min-height: var(--ctl); padding: 0 1.25rem; font-size: var(--t-s); font-weight: 600; }
+  .open-link.plan-open { display: inline-flex; justify-content: center; min-height: var(--ctl); padding: 0 0.875rem; font-size: var(--t-s); font-weight: 600; }
   @media (min-width: 45rem) { .open-link.plan-open { width: fit-content; } }
   .ask-group { list-style: none; margin: .5rem 0 0; padding: 0 0 0 1rem; overflow: hidden; border-radius: 1rem; background: var(--surface); }
   .ask-group > li { position: relative; display: flex; align-items: center; gap: .75rem; min-height: 4.125rem; padding: .5rem .5rem .5rem 0; }
@@ -412,6 +412,7 @@
   .decide-lists { margin-top: 2rem; }
   /* Your own words, a note, another round: the design has no place for them, so they sit under the lists. */
   .decide-other { margin-top: 1.75rem; } .decide-other .other > summary { padding-left: 1rem; color: var(--accent); font-size: 1.0625rem; font-weight: 400; }
+  .decide-lists .plan-copy h2 { margin: 0; font-size: var(--t-m); line-height: 1.3; } /* the ask's headline size is not the plan card's */
   .decide-lists .sec-head { margin: 1.75rem 0 .5rem; } .decide-lists .rows + .sec-head { margin-top: 1.75rem; }
   .decide-lists .sec-head h2 { color: var(--muted); font-size: .8125rem; font-weight: 400; letter-spacing: .02em; text-transform: uppercase; }
   .decide-lists .compact strong { font-weight: 400; line-height: 1.375rem; } .decide-lists .compact .meta { margin: .0625rem 0 0; font-size: .9375rem; line-height: 1.25rem; }
@@ -424,7 +425,7 @@
   /* Answer takes the row on one line; when a long label leaves no room, Skip and Later move under it rather than squeeze it. */
   .decide-bar > * { white-space: nowrap; }
   .decide-bar > .silent-line { white-space: normal; min-width: 0; } /* the stay-quiet line wraps; nowrap pushed it past a phone's edge in a wider font */
-  .decide-bar .answer { flex: 1 1 auto; background: var(--action); color: var(--on-accent); font-weight: 400; }
+  .decide-bar .answer { flex: 1 1 auto; background: var(--action); color: var(--on-accent); font-size: var(--t-b); font-weight: 600; }
   .decide-bar .later { display: inline-flex; flex: none; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0 0.75rem; color: var(--accent); background: transparent; text-decoration: none; }
   .decide-bar .skip { flex: none; padding: 0 0.75rem; color: var(--muted); background: transparent; }
   .decide-bar .dis { flex: none; padding: 0 0.75rem; background: transparent; color: var(--muted); }
@@ -488,7 +489,7 @@
   .open-link { display: grid; place-items: center; min-height: var(--ctl); padding: 0 1rem; border-radius: var(--r-ctl); background: var(--action); color: var(--on-accent);
     font-size: var(--t-b); font-weight: 600; text-decoration: none; }
   button.open-link:disabled { border: 1px solid var(--line); background: var(--sunk); color: var(--muted); cursor: not-allowed; }
-  .signin .line { margin: 0.375rem 0 0; } .signin .expiry { margin: 0.5rem 0 0; font-weight: 700; } .signin .expiry.gone { color: var(--danger); }
+  .signin .line { margin: 0.375rem 0 0; color: var(--muted); font-size: var(--t-s); } .signin .expiry { margin: 0.5rem 0 0; font-size: var(--t-s); font-weight: 600; } .signin .expiry.gone { color: var(--danger); }
   .row h3, .report h3 { font-size: 1.1875rem; font-weight: 650; line-height: 1.3; letter-spacing: -0.005em; margin: 0; }
   .about, details p { margin: 0.375rem 0 0; max-width: 70ch; }
   details p { color: var(--muted); }
@@ -637,14 +638,20 @@
   .picked { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 1rem; }
   .has-x { position: relative; }
   .has-x > .x { position: absolute; top: 0.25rem; right: 0.25rem; margin: 0; background: color-mix(in srgb, var(--surface) 88%, transparent); }
-  .plan-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
+  .plan-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; margin-top: 0.25rem; }
   .plan-actions .dis { min-height: 2.75rem; padding: 0 0.5rem; background: none; color: var(--muted); }
   /* Waiting on you: one row of type chips, and the sort beside them (or below them on a phone). */
-  .filters { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 0.75rem; margin: 0 0 0.75rem; }
-  .chips { display: flex; flex-wrap: wrap; gap: 0.375rem; }
-  .chips button { min-height: 2.75rem; padding: 0 0.75rem; border-radius: 999px; font-size: 0.875rem; font-weight: 600; }
-  .sort { display: flex; align-items: center; gap: 0.5rem; color: var(--muted); font-size: 0.875rem; font-weight: 600; }
-  .sort select { min-height: 2.75rem; padding: 0 0.5rem; border: 1px solid var(--border); border-radius: 0.5rem; background: var(--surface); color: var(--text); font: inherit; }
+  .filters { display: flex; align-items: center; gap: 0.5rem; margin: 0.25rem 0 0.875rem; }
+  .chips { display: flex; flex: 1 1 auto; min-width: 0; gap: 0.25rem; margin-left: -0.25rem; padding: 0 0.25rem; overflow-x: auto; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  /* A chip draws a 32px pill inside its 44px tap box, so the line stays quiet and the target stays whole. */
+  .chips button { position: relative; isolation: isolate; flex: none; padding: 0 0.75rem; background: none; color: var(--muted); font-size: var(--t-xs); font-weight: 500; }
+  .chips button::before, .chips button[aria-pressed="true"]::before { content: ""; position: absolute; inset: 0.375rem 0; z-index: -1; margin: 0; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--line); }
+  .chips button[aria-pressed="true"] { background: none; color: var(--bg); font-weight: 600; }
+  .chips button[aria-pressed="true"]::before { background: var(--text); box-shadow: none; }
+  .sort { position: relative; isolation: isolate; flex: none; font-size: 0; }
+  .sort::before { content: ""; position: absolute; inset: 0.375rem 0; z-index: -1; border-radius: 999px; background: var(--sunk); }
+  .sort select { min-height: var(--ctl); padding: 0 0.625rem; border: 0; background: transparent; color: var(--text); font: inherit; font-size: var(--t-xs); font-weight: 500; }
   .chip { padding: 0 0.5rem; border: 1px solid currentColor; border-radius: 999px; color: var(--accent);
     font-size: 0.875rem; font-weight: 600; line-height: 1.25rem; letter-spacing: 0.04em; text-transform: uppercase; }
   /* Each option is a tall phone frame, side by side; on a phone the row swipes, one frame at a time, and the next one peeks in.
@@ -747,6 +754,7 @@
     .plan-preview .rung .frame, .plan-preview .rung iframe { min-height: 0; }
     .plan-copy { padding: 2rem; }
     .plan-copy h2 { font-size: 1.75rem; line-height: 1.1429; }
+    .decide-lists .plan-copy h2 { font-size: 1.75rem; line-height: 1.1429; }
     .decide h2 { font-size: 2.5rem; line-height: 1.1; }
     .decide-bar { position: static; margin: 1rem 0 0; padding: 0; background: transparent; }
     .decide-bar .answer { flex: none; }
@@ -2699,8 +2707,8 @@
     const fresh = state.decisions.filter((x) => isAnswered(x) && isToday(state.answers[x.key].at)).sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at))
       .map((x) => { const a = state.answers[x.key]; return el('li', {}, el('div', { class: 'compact' }, el('span', { class: 't' }, el('strong', { dir: 'auto' }, title(x)),
         el('span', { class: 'meta', dir: 'auto' }, `${a.answer === 'text' ? 'Your reply' : a.label} · ${when(a.at)}`)))); });
-    // Everything the Waiting list has: its type chips and sort, plans, the other asks (a design pick opens Designs) with their ×, and Dismissed.
-    const rest = decideCtx.shown.filter((x) => x.key !== d?.key), waiting = state.readonly || !(rest.length || decideCtx.hidden.length) ? '' : [filters(decideCtx.all), waitingPage(rest, decideCtx.hidden)];
+    // Everything the Waiting list has, but its type chips and sort (those stay on Waiting): plans, the other asks (a design pick opens Designs) with their ×, and Dismissed.
+    const rest = decideCtx.shown.filter((x) => x.key !== d?.key), waiting = state.readonly || !(rest.length || decideCtx.hidden.length) ? '' : waitingPage(rest, decideCtx.hidden);
     return el('div', { class: 'decide-lists' }, ...[waiting].flat(), ...group('Answered today', fresh));
   }
   function decidePage(d, next, queue = []) {
