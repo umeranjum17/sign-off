@@ -1839,7 +1839,7 @@ test('an answers-only board takes a screen review: typing a note in the viewer e
   proc.kill();
 });
 
-test('a screen approval on a design with no design verdict saves the screen and keeps the design waiting', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('a screen approval on a design with no design verdict keeps the design waiting, and a viewer Request change answers it as Changes requested', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'screen-only'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
   mkdirSync(join(dir, 'design'), { recursive: true });
   writeFileSync(join(dir, 'design', 'preview.png'), png);
@@ -1867,6 +1867,16 @@ test('a screen approval on a design with no design verdict saves the screen and 
   assert.equal(saved.answer, 'screens');
   assert.match(run('list', file).out, /answered: 0/);
   assert.match(run('list', file, '--full').out, /waiting/);
+  // Request change on the next screen is the person's answer: the design reads Changes requested and leaves waiting.
+  await evaluate('document.querySelector("[aria-label=\\"Next screen\\"]").click()');
+  await evaluate('document.querySelector(".design-viewer textarea").value = "Make the title clearer"');
+  await evaluate('[...document.querySelectorAll(".design-viewer .foot button")].find((b) => b.textContent === "Request change").click()');
+  await until(async () => JSON.parse(run('answers', file, '--json').out)['d2-screens'].notes.length === 2);
+  const changed = JSON.parse(run('answers', file, '--json').out)['d2-screens'];
+  assert.deepEqual([changed.answer, changed.label], ['change', 'Changes requested']);
+  assert.match(run('list', file).out, /answered: 1/);
+  await evaluate('document.querySelector("[aria-label=\\"Close viewer\\"]").click()');
+  await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Changes requested');
   close();
   proc.kill();
 });
