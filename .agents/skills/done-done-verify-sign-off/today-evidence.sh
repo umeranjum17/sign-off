@@ -16,8 +16,8 @@ so post "$d/board.json" --kind evidence --from "$d/ev3.json" > /dev/null
 so post "$d/board.json" --kind evidence --from "$d/ev2.json" > /dev/null
 sleep 1; so post "$d/board.json" --type evidence --title "Plan to cap lanes, not run yet" --about "Not run." --media "$d/shot.webp" > /dev/null
 # One card posted twice under a key with a changed title: the second post replaces the first (the base refuses it, exit 2), and no dismissal line is written.
-node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));j.key="repost-demo";j.title="Repost demo, first take";require("fs").writeFileSync(process.argv[2],JSON.stringify(j))' "$d/evidence-run.json" "$d/ev4.json"
-node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));j.title="Repost demo, second take";require("fs").writeFileSync(process.argv[2],JSON.stringify(j))' "$d/ev4.json" "$d/ev5.json"
+node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));j.key="repost-demo";j.title=j.run.outcome="Repost demo, first take";require("fs").writeFileSync(process.argv[2],JSON.stringify(j))' "$d/evidence-run.json" "$d/ev4.json"
+node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));j.title=j.run.outcome="Repost demo, second take";require("fs").writeFileSync(process.argv[2],JSON.stringify(j))' "$d/ev4.json" "$d/ev5.json"
 so post "$d/board.json" --kind evidence --from "$d/ev4.json" > /dev/null
 set +e; so post "$d/board.json" --kind evidence --from "$d/ev5.json" > "$d/repost.out" 2>&1; repost=$?; set -e
 so post "$d/board.json" --type evidence --title "Chat proof for the muxr pull request" --about "Umer reads the chat on a phone." --media "$d/shot.webp" --link https://github.com/umeranjum17/muxr/pull/809 > /dev/null
@@ -31,13 +31,23 @@ for theme in light dark; do
     chrome-devtools-axi screenshot "$out/$s.$theme.390w.png" >/dev/null
   done
 done
+# One claim per capture: the 3-day-old proof under its own day heading, and the reposted card, each scrolled to the middle of a phone screen.
+for theme in light dark; do
+  chrome-devtools-axi emulate --viewport 390x844x1,mobile,touch --color-scheme "$theme" >/dev/null
+  chrome-devtools-axi open "$url#evidence" >/dev/null
+  for shot in "old-proof:update-3" "repost:repost-demo"; do
+    chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 600))" >/dev/null
+    chrome-devtools-axi eval "() => { const a = document.querySelector('.ev-card[href=\"#evidence/${shot#*:}\"]'); (a?.closest('.ev-day') ?? document.body).scrollIntoView({ block: 'start' }); window.scrollBy(0, -12); }" >/dev/null
+    chrome-devtools-axi screenshot "$out/${shot%%:*}.$theme.390w.png" >/dev/null
+  done
+done
 num() { chrome-devtools-axi eval "$1" | grep -o '[0-9][0-9]*' | head -1; }
 chrome-devtools-axi open "$url#evidence" >/dev/null; chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
 evcards=$(num '() => document.querySelectorAll(".ev-card").length'); repostcards=$(num '() => [...document.querySelectorAll(".ev-card .t")].filter((t) => t.textContent.startsWith("Repost demo")).length')
 muxr=$(num '() => [...document.querySelectorAll(".ev-group")].filter((g) => g.querySelector("h2").textContent === "muxr").reduce((n, g) => n + g.querySelectorAll(".ev-card").length, 0)')
 chrome-devtools-axi open "$url" >/dev/null; chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
 tile=$(num '() => document.querySelector(".tile.i-evidence .n").textContent'); row=$(num '() => document.querySelectorAll(".ev-scroll-row .ev-card").length')
-glance=$(chrome-devtools-axi eval '() => document.querySelector(".glance")?.textContent' | tr '\n' ' ')
+glance=$(chrome-devtools-axi eval '() => document.querySelector(".glance")?.textContent' | grep -o '[0-9]* updates\? filed' || echo none)
 {
   echo "version $(node -p 'require("./package.json").version')"
   echo "evidence_cards_listed=$evcards"
