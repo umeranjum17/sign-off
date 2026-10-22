@@ -766,7 +766,7 @@
   #reader .gd, #reader .gd-bar { --hair: color-mix(in srgb, var(--text) 12%, transparent); --hair2: color-mix(in srgb, var(--text) 7%, transparent); --tint: color-mix(in srgb, var(--action) 11%, transparent);
     --ok-bg: color-mix(in srgb, var(--ok) 13%, transparent); --warn-bg: color-mix(in srgb, var(--warn) 13%, transparent); --bad: var(--danger); --bad-bg: color-mix(in srgb, var(--danger) 11%, transparent); --well: var(--page); }
   @media (prefers-color-scheme: dark) { #reader .gd, #reader .gd-bar { --well: #0C0C0D; } }
-  #reader .gd { max-width: 72rem; margin: 0 auto; font-size: 1rem; line-height: 1.6; }
+  #reader .gd { max-width: 72rem; margin: 0 auto; font-size: var(--t-b); line-height: 1.6; }
   :where(#reader .gd, #reader .gd-bar) :where(button, input, textarea) { font: inherit; color: inherit; letter-spacing: inherit; }
   :where(#reader .gd, #reader .gd-bar) button { cursor: pointer; border: 0; background: none; padding: 0; }
   #reader .gd [hidden] { display: none !important; }
@@ -817,8 +817,7 @@
   .gd-sec { background: var(--tile); border: 1px solid var(--hair2); border-radius: 1.375rem; padding: 1.25rem 1.125rem 0.875rem; margin: 0 0 0.875rem; scroll-margin-top: 5.5rem; }
   @media (min-width: 43.75rem) { .gd-sec { padding: 1.75rem 2rem 1.125rem; border-radius: 1.5rem; } }
   .gd-sec > .gh .gk { display: block; font-size: 0.875rem; font-weight: 600; color: var(--muted); margin-bottom: 0.375rem; }
-  #reader .gd-sec h2 { margin: 0 0 0.5rem; font-size: 1.25rem; line-height: 1.3; letter-spacing: -0.018em; font-weight: 650; }
-  @media (min-width: 43.75rem) { #reader .gd-sec h2 { font-size: 1.375rem; } }
+  #reader .gd-sec h2 { margin: 0 0 0.5rem; font-size: var(--t-l); line-height: 1.3; letter-spacing: -0.018em; font-weight: 650; }
   .gd-sec > .gh:not(:has(.gd-lead)) h2 { margin-bottom: 0.875rem; }
   .gd-lead { margin: 0 0 1rem; }
   /* A diagram: a framed picture, its views as tabs, and Show me opening the interactive viewer in place. On a phone the open viewer's toolbar is wider than the card, so Full size is the way in there. */
@@ -938,7 +937,7 @@
   .gd-ref::after { content: "\2197" / ""; font-size: 0.75em; margin-left: 0.0625rem; opacity: 0.7; }
   /* A comparison table: on a phone (and past 4 options) each point lists every option under it; with room, options run across. */
   .gd-cmp { container-type: inline-size; margin: 0 0 0.375rem; }
-  .gd-ct { display: block; font-size: 0.8125rem; line-height: 1.5; }
+  .gd-ct { display: block; font-size: var(--t-xs); line-height: 1.5; }
   .gd-ct thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .gd-ct tbody, .gd-ct tr, .gd-ct th, .gd-ct td { display: block; text-align: left; overflow-wrap: anywhere; }
   .gd-ct tbody tr { border: 1px solid var(--hair2); border-radius: 1rem; overflow: hidden; margin: 0 0 0.625rem; }
