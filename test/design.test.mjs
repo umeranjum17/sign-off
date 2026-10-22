@@ -1149,6 +1149,8 @@ test('a guided report: item detail keeps its line breaks, same-axis options read
       // Options run across on a desk; on a phone each point lists every option under it, named in its cell.
       assert.deepEqual([table.tableLayout, table.headShown, table.optionInCell], width === 1280 ? ['table', true, false] : ['block', false, true], `${width}: ${JSON.stringify(table)}`);
       assert.deepEqual([table.wide, table.outside], [false, 0], `${width}: ${JSON.stringify(table)}`);
+      // The stacked table at 390 reads at the 16 px body size; with room for columns it is the 13 px table.
+      assert.equal(await evaluate(`getComputedStyle(document.querySelector('#gd-compare .gd-ct td')).fontSize`), width === 1280 ? '13px' : '16px', `${width}`);
       // Detail that is not a table keeps one line per point.
       await evaluate(`document.querySelector('#gd-lines .rowbtn').click()`);
       const lines = await evaluate(`(() => { const f = document.querySelector('#gd-lines .body [data-sf="more"]') ?? document.querySelector('#gd-lines .body .gd-md'), r = document.createRange(), tops = new Set(), walk = document.createTreeWalker(f, NodeFilter.SHOW_TEXT);
@@ -1159,6 +1161,28 @@ test('a guided report: item detail keeps its line breaks, same-axis options read
       const pad = await evaluate(`(() => { const li = [...document.querySelectorAll('#gd-found .gd-rows > li')].find((l) => l.textContent.startsWith('One password entry')), box = li.getBoundingClientRect(), text = li.querySelector('.rowstat .sm').getBoundingClientRect();
         return { buttons: li.querySelectorAll('button').length, outside: [...li.querySelectorAll('button, input')].filter((b) => { const r = b.getBoundingClientRect(); return r.left < text.left - 0.5 || r.right > box.right - 8; }).length }; })()`);
       assert.ok(pad.buttons >= 5 && pad.outside === 0, `${width}: ${JSON.stringify(pad)}`);
+    } finally { close(); }
+  }
+  proc.kill();
+});
+
+// A capture of a report is a desktop screenshot: on a phone its tap stays on the board's own live page, never the raw file shrunk in a tab.
+test('a capture opens the raw file on a desk and its own live screen on a phone', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'raw-capture'), file = join(dir, '.sign-off', 'decisions.json');
+  mkdirSync(dir);
+  run('init', dir);
+  writeFileSync(join(dir, 'wide.png'), sized(600, 300));
+  assert.equal(run('post', file, '--type', 'evidence', '--title', 'The engine report', '--about', 'Umer reads it.', '--media', join(dir, 'wide.png')).code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  for (const width of [390, 1280]) {
+    const { evaluate, close } = await browse(join(dir, `b${width}`), width, 2400);
+    try {
+      await evaluate(`location.href = ${JSON.stringify(`${url}#evidence/update-1`)}`);
+      await until(() => evaluate('!!document.querySelector(".ev-hero a")'));
+      const link = await evaluate('(() => { const a = document.querySelector(".ev-hero a"); return [a.getAttribute("href"), a.target]; })()');
+      assert.deepEqual(link, width === 390 ? ['#evidence/update-1', ''] : ['/api/media?key=update-1&i=0', '_blank'], `${width}: ${link}`);
     } finally { close(); }
   }
   proc.kill();

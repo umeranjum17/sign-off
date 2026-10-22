@@ -937,7 +937,7 @@
   .gd-ref::after { content: "\2197" / ""; font-size: 0.75em; margin-left: 0.0625rem; opacity: 0.7; }
   /* A comparison table: on a phone (and past 4 options) each point lists every option under it; with room, options run across. */
   .gd-cmp { container-type: inline-size; margin: 0 0 0.375rem; }
-  .gd-ct { display: block; font-size: var(--t-xs); line-height: 1.5; }
+  .gd-ct { display: block; font-size: 1rem; line-height: 1.5; }
   .gd-ct thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .gd-ct tbody, .gd-ct tr, .gd-ct th, .gd-ct td { display: block; text-align: left; overflow-wrap: anywhere; }
   .gd-ct tbody tr { border: 1px solid var(--hair2); border-radius: 1rem; overflow: hidden; margin: 0 0 0.625rem; }
@@ -946,7 +946,7 @@
   .gd-ct th + td { border-top: 0; }
   .gd-ct .ol { display: flex; align-items: baseline; gap: 0.5rem; font-weight: 600; }
   @container (min-width: 34rem) {
-    .gd-cmp:not(.many) .gd-ct { display: table; width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; border: 1px solid var(--hair2); border-radius: 1rem; }
+    .gd-cmp:not(.many) .gd-ct { font-size: var(--t-xs); display: table; width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; border: 1px solid var(--hair2); border-radius: 1rem; }
     .gd-cmp:not(.many) .gd-ct thead { position: static; width: auto; height: auto; overflow: visible; clip-path: none; display: table-header-group; }
     .gd-cmp:not(.many) .gd-ct tbody { display: table-row-group; }
     .gd-cmp:not(.many) .gd-ct tr { display: table-row; }
@@ -1376,7 +1376,7 @@
       const url = src(path);
       const name = d.type === 'explainer' ? `Explainer video, ${d.title}` : `${d.type === 'evidence' ? `Update ${d.number}` : 'Proof'}, capture ${i + 1} of ${files.length}`;
       const node = video ? el('video', { src: url, controls: '', playsinline: '', preload: 'metadata', 'aria-label': name })
-        : el('a', { href: url, target: '_blank', rel: 'noopener', 'aria-label': `Open ${name}` }, cls === 'ev-hero' ? framed(el('img', { src: url, alt: name }), 'full') : el('img', { src: url, alt: name }));
+        : el('a', { href: pageHref(d) || url, ...(!pageHref(d) && { target: '_blank', rel: 'noopener' }), 'aria-label': `Open ${name}` }, cls === 'ev-hero' ? framed(el('img', { src: url, alt: name }), 'full') : el('img', { src: url, alt: name }));
       (node.tagName === 'A' ? node.querySelector('img') : node).onerror = () => node.replaceWith(el('p', { class: 'gone' }, `${name} can't be shown: the file is missing, changed since it was posted, or in a format this browser can't play.`));
       return node;
     }));
@@ -1397,7 +1397,7 @@
     if (!url) return '';
     const img = el('img', { src: src(url), alt: '' }), result = RESULT[of.evidenceCard?.result], update = of.type === 'evidence';
     img.onerror = () => img.closest('.dhero')?.remove();
-    return el('a', { class: 'dhero', href: update ? `#evidence/${of.key}` : src(url), ...(!update && { target: '_blank', rel: 'noopener' }), 'aria-label': `View proof, ${headline(of)}` },
+    return el('a', { class: 'dhero', href: update ? `#evidence/${of.key}` : pageHref(of) || src(url), ...(!update && !pageHref(of) && { target: '_blank', rel: 'noopener' }), 'aria-label': `View proof, ${headline(of)}` },
       result ? el('span', { class: `pass ${result[0]}` }, mark(result[0]), result[2]) : '', el('span', { class: 'open' }, 'View proof'), framed(img));
   }
 
@@ -1644,6 +1644,8 @@
   };
   /** A page to open: an .html view, framed in a sandbox. */
   const reads = (d) => /\.html$/i.test(d.view ?? '') || !!d.guided;
+  /** Where a card's picture opens: a report or plan is its live page, and on a phone any card is its own screen, never the raw capture file (a desktop screenshot shrunk to nothing). Empty on a desk, where the file opens in a tab. */
+  const pageHref = (d) => (reads(d) ? (d.type === 'plan' ? `#waiting/${d.key}` : `#reports/${d.key}`) : matchMedia('(max-width: 43.6875rem)').matches ? (d.type === 'evidence' ? `#evidence/${d.key}` : askHref(d)) : '');
   const hhmm = (at) => new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   /** Where an item opens: its own area, and inside Waiting on you a plan or a design has its own screen; every other ask opens on Decide. */
   const askHref = (d) => {
