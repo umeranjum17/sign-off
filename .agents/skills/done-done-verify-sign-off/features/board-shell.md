@@ -1,6 +1,6 @@
 # Board shell
 
-The board page (web/index.html) in the Spacious look: system font on one type scale (28/20/17/16/15/13/12 px, 32 and 22 on a desk) and a 4px grid, large titles, 44px buttons with 10px corners, grouped lists, no shadows, its own light and dark palettes.
+The board page (web/index.html) in the Spacious look: system font on one type scale (28/20/17/16/15/13/12 px, 32 and 22 on a desk) and a 4px grid, large titles, 44px buttons with 10px corners, grouped lists, no shadows, its own light and dark palettes. Every raw colour, type size, spacing step, corner and shadow lives in `web/tokens.css` (`--tk-*`), served beside the page; index.html maps its own names onto them. `tokens-shots.mjs <folder> <light|dark> <390|1280>` (SIGN_OFF_REPO and TOKENS_SIDE=before for a base build) captures Today, Decide, Evidence and a report with the resolved token values and spacing as text; spacing must match between light and dark.
 
 ## Sub-features
 

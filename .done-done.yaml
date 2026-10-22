@@ -36,6 +36,9 @@ journeys:
   # The board foundation (type scale, 44px controls, tab bar): Decide and Today, one theme and width per run; FOUNDATION_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
   foundation:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/foundation-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${FOUNDATION_THEME:-light}" "${FOUNDATION_WIDTH:-390}"'
+  # The board's design tokens (web/tokens.css) in use on Today, Decide, Evidence and a report, one theme and width per run; TOKENS_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
+  tokens:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/tokens-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${TOKENS_THEME:-light}" "${TOKENS_WIDTH:-390}"'
   # Markdown in authored text, one part per run: MD_PART=heading|item|table|plan-code, per theme and width. SIGN_OFF_REPO=<built base checkout> records the before.
   markdown:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/markdown-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${GUIDE_THEME:-light}" "${GUIDE_WIDTH:-390}"'
