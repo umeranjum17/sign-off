@@ -23,7 +23,9 @@ node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));j.key="
 node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));j.title=j.run.outcome="Repost demo, second take";require("fs").writeFileSync(process.argv[2],JSON.stringify(j))' "$d/ev4.json" "$d/ev5.json"
 so post "$d/board.json" --kind evidence --from "$d/ev4.json" > /dev/null
 set +e; so post "$d/board.json" --kind evidence --from "$d/ev5.json" > "$d/repost.out" 2>&1; repost=$?; set -e
-so post "$d/board.json" --type evidence --title "Chat proof for the muxr pull request" --about "Umer reads the chat on a phone." --media "$d/shot.webp" --link https://github.com/umeranjum17/muxr/pull/809 > /dev/null
+# The newest card, which the ev-tile crop shows, carries a sign-in screen, so its picture is not itself a board's Evidence tile.
+cp "$repo/docs/media/phone-signin.webp" "$d/signin.webp"
+so post "$d/board.json" --type evidence --title "Chat proof for the muxr pull request" --about "Umer reads the chat on a phone." --media "$d/signin.webp" --link https://github.com/umeranjum17/muxr/pull/809 > /dev/null
 node -e 'const f=process.argv[1],fs=require("fs"),j=JSON.parse(fs.readFileSync(f)),i=j.items.find((x)=>x.title==="Passed check filed 3 days ago");if(!i)throw new Error("no old item");i.filed=new Date(Date.now()-3*864e5).toISOString();fs.writeFileSync(f,JSON.stringify(j))' "$d/board.json"
 chrome-devtools-axi open "$url" >/dev/null
 for theme in light dark; do
