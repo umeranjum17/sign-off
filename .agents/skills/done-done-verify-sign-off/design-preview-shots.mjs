@@ -85,7 +85,11 @@ try {
     assert.ok(v.frame.w <= v.box.w + 1 && v.frame.h <= v.box.h + 1, 'the viewer frame fits the stage'); near(v.blankRight, v.frame.x - v.box.x, 'the viewer frame is centred');
     writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
       start: 'A throwaway board holding a design review whose one screen has phone and computer views of a fleet dashboard prototype that fills its viewport and prints the viewport it sees.',
-      steps: ['The board is opened on the design review, once per cell: 390 px (a phone) and 1280 px (a desk), each in light and dark.', 'The window narrows (to 360 on the phone, 700 on the desk, where the column first narrows).', 'The person taps Review full screen.'],
+      steps: ['The board is opened on the design review, once per cell: 390 px (a phone) and 1280 px (a desk), each in light and dark.',
+        'On the desk (1280) the review page shows the screen\'s desktop preview: the prototype runs in a 1280 by 800 viewport, scaled to fit the review column (680 px wide), and the preview box ends where the scaled page ends, with no empty band under it.',
+        'On the phone (390) the review page shows the screen\'s phone preview: the prototype runs in a 390 by 844 viewport, scaled to fit, with no empty band under it.',
+        'The window narrows (to 360 on the phone, 700 on the desk, where the column first narrows): the same page scales down again without loading again.',
+        'The person taps Review full screen: the same viewport shows whole and centred in the stage.'],
       result: `The prototype runs in a ${vw} by ${vh} viewport scaled to the column, the preview box ends where the page ends, a narrower window scales the same page without loading it again, and Review full screen shows it whole and centred.` }, null, 2) + '\n');
   }
 } finally {
