@@ -7,7 +7,7 @@
 // loaded, and images.<side>.<theme>.txt totalling them.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -72,6 +72,10 @@ try {
     }
   }
   writeFileSync(join(out, `images.${side}.${theme}.txt`), `${side} ${theme}, posted: ${shots.map((s) => s.split('/').pop()).join(', ')}\n${totals.join('\n')}\n`);
+  writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board with no items.',
+    steps: [`The agent posts ${shots.length} real captures as evidence updates with sign-off-axi post --type evidence --media, and one Decide ask citing the first.`,
+      'The person opens Evidence, the first update and the ask in Decide, at 390 px (phone) and 1280 px (desk), in the light theme in one run and dark in the next.'],
+    result: 'Every capture on screen loads from its light or thumb copy (its URL ends v=light or v=thumb), is no blurrier than the original would be in its frame, none is missing, the page never scrolls sideways, and images.<side>.<theme>.txt totals the picture bytes each screen loaded.' }, null, 2) + '\n');
   console.log(totals.join('\n'));
 } finally {
   try { browser('stop'); } catch {}
