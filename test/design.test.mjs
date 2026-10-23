@@ -2721,6 +2721,7 @@ test('a design review shows its screen on a phone in light and dark: the page fi
     await evaluate('(() => { const s = document.querySelector("select[aria-label=\'Screen for note\']"); s.value = "fleet/gone"; s.dispatchEvent(new Event("change")); })()');
     await until(() => evaluate('document.querySelector(".design-preview-window .design-fallback img")?.naturalWidth > 0'));
     assert.equal(await evaluate('document.querySelector(".design-preview-window figcaption").textContent'), 'This screen could not be shown: this is the design’s preview picture.');
+    assert.match(await evaluate('document.querySelector(".design-preview-full").getAttribute("href")'), /design%2Fpreview\.png$/);
   }
   close();
   proc.kill();

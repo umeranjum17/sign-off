@@ -81,7 +81,7 @@ try {
   browser('eval', `() => { document.querySelector('[aria-label="Close viewer"]').click(); return 1; }`); settle();
   browser('open', 'about:blank'); browser('open', `${base}#designs/fleet-lanes`); ready(); settle(1200);
   browser('eval', `() => { document.querySelector('.design-preview-window').scrollIntoView({ block: 'start' }); return 1; }`); settle();
-  record.fallback = read(`() => JSON.stringify({ text: document.querySelector('.design-preview-window')?.innerText, picture: document.querySelector('.design-preview-window img')?.naturalWidth ?? 0 })`);
+  record.fallback = read(`() => JSON.stringify({ text: document.querySelector('.design-preview-window')?.innerText, picture: document.querySelector('.design-preview-window img')?.naturalWidth ?? 0, link: decodeURIComponent(document.querySelector('.design-preview-full')?.getAttribute('href') ?? '') })`);
   shot('fallback');
   record.answers = JSON.parse(so('answers', board, '--json'));
   writeFileSync(join(out, `design-round.${cell}.json`), JSON.stringify(record, null, 2) + '\n');
@@ -94,7 +94,7 @@ try {
     assert.ok(record.round2.frame[1] > 300, JSON.stringify(record.round2));
     assert.equal(record.opened, true);
     assert.deepEqual(record.viewer, { screen: 'Not reviewed yet', note: '' });
-    assert.ok(record.fallback.text.startsWith('This screen could not be shown') && record.fallback.picture > 0, JSON.stringify(record.fallback));
+    assert.ok(record.fallback.text.startsWith('This screen could not be shown') && record.fallback.picture > 0 && record.fallback.link.endsWith('preview.webp'), JSON.stringify(record.fallback));
   }
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board holding a fleet dashboard design with one screen, light and dark, and a second design whose screen page was moved away.',
     steps: [`The board is opened ${width === 390 ? 'on a phone' : `at ${width} px`} in ${theme} mode on the fleet dashboard design.`, 'The person types "Make the lane names bigger" in the screen note and taps Change.',

@@ -3078,11 +3078,12 @@
       return img;
     };
     const preview = previewPath() ? el('div', { class: 'design-preview-window' }, previewElement(previewPath())) : '';
-    const fullPreview = previewPath() ? el('a', { class: 'design-preview-full', href: src(designUrl(d, previewPath())), target: '_blank', rel: 'noopener noreferrer' }, 'Open full preview') : '';
+    const fullHref = (path) => src(designUrl(d, d.missing?.includes(path) ? d.preview : path));
+    const fullPreview = previewPath() ? el('a', { class: 'design-preview-full', href: fullHref(previewPath()), target: '_blank', rel: 'noopener noreferrer' }, 'Open full preview') : '';
     if (screenSelect) screenSelect.onchange = () => {
       const path = previewPath();
       if (preview) preview.replaceChildren(previewElement(path));
-      if (fullPreview) fullPreview.href = src(designUrl(d, path));
+      if (fullPreview) fullPreview.href = fullHref(path);
       session.selected = screenKey(target());
       note.value = session.drafts.get(session.selected) ?? currentNote()?.note ?? '';
       showEarlier();
