@@ -62,6 +62,10 @@ const MEASURE = `(async () => {
   rows.forEach((x, i) => { if (!(x.height === 68 || (innerWidth >= 1024 && x.height === 84)) || x.tile !== '40x40' || x.tileIn !== 12 || x.titleGap !== 12 || x.rightIn !== 12) fail.push('row ' + i + ' ' + JSON.stringify(x)); });
   const up = document.querySelector('main .t-up'), btns = up ? [...up.querySelectorAll('.t-btns > *')].map((b) => { const r = box(b), c = getComputedStyle(b); return { words: b.textContent.trim(), w: r2(r.width), h: r2(r.height), bg: c.backgroundColor, color: c.color }; }) : [];
   if (btns.some((b) => b.h !== 44)) fail.push('Up next buttons ' + JSON.stringify(btns));
+  // The title row's round button: a 40px circle, its icon centred, inside the title row and the page.
+  const rb = document.querySelector('main .today-top .ui-rb'), round = rb && (() => { const r = box(rb), g = box(rb.querySelector('svg')), row = box(rb.parentElement);
+    return { w: r2(r.width), h: r2(r.height), radius: getComputedStyle(rb).borderRadius, offX: r2((g.left + g.right - r.left - r.right) / 2), offY: r2((g.top + g.bottom - r.top - r.bottom) / 2), inside: r.left >= row.left && r.right <= row.right && r.right <= w - 16 + 0.5 }; })();
+  if (round && (round.w !== 40 || round.h !== 40 || round.radius !== '20px' || Math.abs(round.offX) > 0.5 || Math.abs(round.offY) > 0.5 || !round.inside)) fail.push('round button ' + JSON.stringify(round));
   const tabs = document.querySelector('.tabs'), find = document.querySelector('.dock-find'), dock = tabs && vis(tabs) ? (() => { const p = box(tabs), f = box(find);
     return { pill: r2(p.width) + 'x' + r2(p.height), bottom: r2(innerHeight - p.bottom), find: r2(f.width) + 'x' + r2(f.height), gap: r2(f.left - p.right), top: r2(p.top) }; })() : null;
   if (dock && (dock.pill.split('x')[1] !== '56' || dock.bottom !== 24 || dock.find !== '56x56' || dock.gap !== 12)) fail.push('dock ' + JSON.stringify(dock));
@@ -79,7 +83,7 @@ const MEASURE = `(async () => {
   const under = innerWidth < 1024 ? [...(sheet ?? document).querySelectorAll('button, a[href], summary, input')].filter(vis).filter((e) => !e.closest('.tabs, .dock-find') || true).filter((e) => { const r = hit(e); return r.top < innerHeight && r.bottom > 0 && (r.height < 43.5 || r.width < 43.5); })
     .map((e) => (e.getAttribute('aria-label') || e.textContent).trim().slice(0, 24) + ' ' + Math.round(box(e).width) + 'x' + Math.round(box(e).height)) : [];
   const overflowing = [...document.querySelectorAll('body *')].filter((e) => vis(e) && box(e).right > w + 1).slice(0, 10).map((e) => e.tagName.toLowerCase() + '.' + (e.classList[0] ?? ''));
-  return { viewport: innerWidth + 'x' + innerHeight, edges: [r2(edgeL), r2(edgeR)], blocks, rows, buttons: btns, dock, clear: atEnd ? clear : undefined, sheet: sh, under, fail,
+  return { viewport: innerWidth + 'x' + innerHeight, edges: [r2(edgeL), r2(edgeR)], blocks, rows, buttons: btns, round, dock, clear: atEnd ? clear : undefined, sheet: sh, under, fail,
     words: words.replace(/\\s+/g, ' ').trim().slice(0, 900), dom: { url: location.href, overflow: document.documentElement.scrollWidth > w, overflowing } };
 })()`;
 
@@ -129,7 +133,7 @@ try {
     writeFileSync(join(out, `${name(state)}.dom.json`), JSON.stringify({ ...m.dom, console_errors: [...errors], failed_requests: [...failed] }, null, 2) + '\n');
     delete m.dom;
     writeFileSync(join(out, `${name(state)}.measure.json`), JSON.stringify(m, null, 2) + '\n');
-    report.push(`${name(state)}: ${m.blocks.map((x) => `${x.el} ${x.top}+${x.height}`).join(', ')}; rows ${m.rows.map((r) => `${r.height}px ${r.icon}${r.chip ? ' ' + r.chip : ''}${r.bar ? ' bar' : ''}`).join(' | ')}; buttons ${m.buttons.map((x) => `${x.words} ${x.w}x${x.h} ${x.bg}`).join(' | ')}`
+    report.push(`${name(state)}: ${m.blocks.map((x) => `${x.el} ${x.top}+${x.height}`).join(', ')}; rows ${m.rows.map((r) => `${r.height}px ${r.icon}${r.chip ? ' ' + r.chip : ''}${r.bar ? ' bar' : ''}`).join(' | ')}; buttons ${m.buttons.map((x) => `${x.words} ${x.w}x${x.h} ${x.bg}`).join(' | ')}${m.round ? `; round button ${m.round.w}x${m.round.h} r${m.round.radius} icon off ${m.round.offX},${m.round.offY}` : ''}`
       + `${m.dock ? `; dock ${m.dock.pill} ${m.dock.bottom}px up` : ''}${m.clear !== undefined ? `; last block ${m.clear}px above the dock` : ''}${m.sheet ? `; sheet ${JSON.stringify(m.sheet)}` : ''}; under 44px ${m.under.length}; failures ${m.fail.length}${m.fail.length ? ': ' + m.fail.join('; ') : ''}`);
     if ([m.fail, m.under, errors, failed].some((x) => x.length)) problems.push(`${name(state)}: ${JSON.stringify({ fail: m.fail, under: m.under, errors, failed })}`);
     errors.length = 0; failed.length = 0;

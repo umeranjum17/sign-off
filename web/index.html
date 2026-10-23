@@ -119,6 +119,8 @@
   .t-sheet .ask .actions button { background: var(--tk-inset); }
   /* A row's second line sits 4px under its title, as ui.css spaces it, not at the board's older line spacing. */
   :is(.t-wait, .t-sheet) .ui-row .meta { margin: 0; }
+  /* The round light-or-dark button stays a 40px circle with its icon centred: the board's older button rule would make it 44px tall and pad it. */
+  .today-top .ui-rb { min-height: 0; padding: 0; }
   .today-top .ui-rb .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.6; }
   /* Under the tiles, one quiet line opens More. */
   .t-more-line { display: flex; align-items: center; justify-content: center; gap: 0.25rem; width: 100%; min-height: 2.75rem; margin-top: 1rem; padding: 0 1rem; border: 0; border-radius: 1.375rem;
