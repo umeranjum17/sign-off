@@ -26,13 +26,13 @@ const MEASURE = `(async () => {
   const r4 = (n) => Math.round(n * 100) / 100, grid = (n) => Math.abs(n / 4 - Math.round(n / 4)) < 0.02;
   const fail = [], blocks = [];
   const scrollY = window.scrollY;
-  for (const e of document.querySelectorAll('main .top h1, main .ui-top, main .ui-seg, main .ui-sec, main .ui-card, main .ui-props')) if (vis(e)) {
+  for (const e of document.querySelectorAll('main .top h1, main .ui-top, main .ui-seg, main .ui-sec, main .ui-card:not(.ui-stat), main .ui-tiles, main .ui-props')) if (vis(e)) {
     const r = box(e); blocks.push({ el: e.className || e.tagName, left: r4(r.left), right: r4(r.right), top: r4(r.top + scrollY), height: r4(r.height) });
   }
   const main = document.querySelector('.split-list') ?? document.querySelector('main'), edgeL = box(main).left + main.clientLeft + parseFloat(getComputedStyle(main).paddingLeft), edgeR = box(main).left + main.clientLeft + main.clientWidth - parseFloat(getComputedStyle(main).paddingRight);
   for (const b of blocks) {
     if (Math.abs(b.left - edgeL) > 0.5) fail.push('left edge ' + b.el + ' ' + b.left + ' not ' + edgeL);
-    if (b.el.includes('ui-card') && Math.abs(b.right - edgeR) > 0.5) fail.push('right edge ' + b.el + ' ' + b.right + ' not ' + edgeR);
+    if (/ui-(card|tiles|seg|props)/.test(b.el) && Math.abs(b.right - edgeR) > 0.5) fail.push('right edge ' + b.el + ' ' + b.right + ' not ' + edgeR);
     if (b.el.includes('ui-') && !(grid(b.top) && grid(b.height))) fail.push('off the 4px grid ' + b.el + ' top ' + b.top + ' height ' + b.height);
   }
   const rows = [...document.querySelectorAll('.ui-row')].filter(vis).map((e) => { const r = box(e), t = box(e.querySelector('.ui-icon')), title = box(e.querySelector('.t')), card = box(e.closest('.ui-card'));
@@ -51,7 +51,7 @@ const MEASURE = `(async () => {
     if (new Set(lefts).size > 1 || new Set(words).size > 1 || sidebar.mark !== sidebar.icon + 'x' + sidebar.icon || Math.abs(sidebar.markCentre) > 0.5) fail.push('sidebar edges ' + JSON.stringify(sidebar));
   }
   if (!phone && sidebar?.width !== 240) fail.push('sidebar ' + JSON.stringify(sidebar));
-  const h1 = document.querySelector('main .top h1'), type = { inter: document.fonts.check('14px Inter'), body: getComputedStyle(document.body).fontFamily.split(',')[0], h1: h1 && getComputedStyle(h1).fontSize + '/' + getComputedStyle(h1).lineHeight + ' ' + getComputedStyle(h1).fontWeight };
+  const h1 = document.querySelector('main :is(.top, .ui-top) h1'), type = { inter: document.fonts.check('14px Inter'), body: getComputedStyle(document.body).fontFamily.split(',')[0], h1: h1 && getComputedStyle(h1).fontSize + '/' + getComputedStyle(h1).lineHeight + ' ' + getComputedStyle(h1).fontWeight };
   if (!type.inter) fail.push('Inter not loaded');
   // A control's hit area counts a ::after that widens it, as the prototype's 32px segments and 24px links have.
   const hit = (e) => { const r = box(e), a = getComputedStyle(e, '::after'), out = (v) => Math.max(0, -parseFloat(v) || 0), wide = a.content !== 'none' && a.position === 'absolute';
@@ -72,7 +72,7 @@ const PARTS = `(() => {
   const svg = (d) => { const s = h('span', ''); s.innerHTML = '<svg viewBox="0 0 24 24"><path d="' + d + '"/></svg>'; return s.firstChild; };
   const bar = (p) => { const b = h('span', 'ui-bar', h('i', '')); b.firstChild.style.width = p + '%'; return b; };
   const row = (title, pct, pc) => h('li', '', h('a', 'ui-row', h('span', 'ui-icon', svg('M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7zM14 2v6h6M8 13h8M8 17h8M8 9h2')),
-    h('span', 'rm', h('span', 'l1', h('span', 't', title), pc ? h('span', 'ui-pc ' + pc.toLowerCase(), pc) : ''), pct === undefined ? h('span', 'l2 meta', 'Settings · 07:19') : h('span', 'l2', bar(pct), h('span', 'pct', pct + '%'))))));
+    h('span', 'rm', h('span', 'l1', h('span', 't', title), pc ? h('span', 'ui-pc ' + pc.toLowerCase(), pc) : ''), pct === undefined ? h('span', 'l2 meta', 'Settings · 07:19') : h('span', 'l2', bar(pct), h('span', 'pct', pct + '%')))));
   const seg = h('div', 'ui-seg', ...['Newest', 'By project'].map((t, i) => { const b = h('button', '', t); b.setAttribute('aria-pressed', String(!i)); return b; }));
   const hero = h('section', 'ui-card ui-hero', h('div', 'hl', h('span', 'lab', 'Still to read')), h('div', 'hv', h('span', 'big', '4 ', h('small', '', 'of 15')), h('span', 'vs', '30 filed this week')));
   const sec = h('h2', 'ui-sec', 'Newest', h('a', 'see', 'See all'));
@@ -122,7 +122,7 @@ try {
         const name = `${state}.${theme}.${wd}`;
         errors.length = 0; failed.length = 0;
         await go(`${url}${hash}`);
-        if (draw) { await cdp('Runtime.evaluate', { expression: draw }); await wait(300); }
+        if (draw) { const d = await cdp('Runtime.evaluate', { expression: draw }); assert.ok(!d.exceptionDetails, `${name}: the parts drew: ${d.exceptionDetails?.exception?.description}`); await wait(300); }
         await shot(join(dest, `${name}.png`));
         const ev = await cdp('Runtime.evaluate', { expression: MEASURE, awaitPromise: true, returnByValue: true }), m = ev.result.value;
         assert.ok(m && !ev.exceptionDetails, `${name}: the measure ran: ${ev.exceptionDetails?.exception?.description}`);
