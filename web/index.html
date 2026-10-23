@@ -2583,12 +2583,12 @@
   /** A card's 40px tile: its project's picture, else the line drawing of what it is. */
   const cardTile = (d) => { const name = projectName(d), a = area(d); if (!name) return uiIcon({ draw: a === 'waiting' ? askIcon(d) : { evidence: 'evidence', answered: 'done', designs: 'phone' }[a] ?? 'plan' });
     const t = el('span', { class: 'ui-icon', 'aria-hidden': 'true' }, projectPic(name)); return t; };
-  /** A card as the new look's row, a link to where it opens: its tile, its title and priority, then its ticket's progress while it is partly done, or else its project (or what it is) and when. */
-  const partly = (n) => (n > 0 && n < 100 ? n : undefined);
+  /** A card as the new look's row, a link to where it opens: its tile, its title and priority, then its ticket's progress once it has some (a full bar when done), or else its project (or what it is) and when. */
+  const progressOf = (n) => (n > 0 ? Math.min(n, 100) : undefined);
   function cardRow(d) {
     const t = ticketOf(d), what = projectName(d) ?? (area(d) === 'waiting' ? kind(d) : NAMES[d.type] ?? 'Report');
     const link = el('a', { class: 'ui-row', href: hrefOf(d), ...(t && { 'aria-label': `${title(d)}, ticket ${t.title}, ${t.progress}% done` }) }, ...uiRow({ tile: cardTile(d), title: d.type === 'signin' ? `Sign in to ${d.title}` : d.type === 'evidence' ? headline(d) : title(d), priority: d.priority,
-      meta: [what, d.type === 'signin' && d.expires ? left(d.expires) : d.filed && filedAt(d.filed)].filter(Boolean).join(' · '), progress: partly(t?.progress) }));
+      meta: [what, d.type === 'signin' && d.expires ? left(d.expires) : d.filed && filedAt(d.filed)].filter(Boolean).join(' · '), progress: progressOf(t?.progress) }));
     link.onclick = () => (jump = d.key);
     return el('li', {}, link);
   }
@@ -2669,7 +2669,7 @@
       const q = query.trim().toLowerCase(), gone = new Set(state.dismissed ?? []), hit = (...s) => s.join(' ').toLowerCase().includes(q);
       const cards = q ? state.decisions.filter((d) => !gone.has(d.key) && hit(title(d), d.about ?? '', projectName(d) ?? '')).reverse() : [];
       const group = (name, ...as) => [name, cards.filter((d) => as.includes(area(d))).slice(0, 4).map(cardRow)];
-      const tickets = q ? (state.tickets ?? []).filter((t) => hit(t.title, t.id)).slice(0, 4).map((t) => el('li', {}, el('a', { class: 'ui-row', href: `#ticket/${t.id}` }, ...uiRow({ tile: uiIcon({ draw: 'pick' }), title: t.title, progress: partly(t.progress), meta: t.progress >= 100 ? 'Done' : 'Not started' })))) : [];
+      const tickets = q ? (state.tickets ?? []).filter((t) => hit(t.title, t.id)).slice(0, 4).map((t) => el('li', {}, el('a', { class: 'ui-row', href: `#ticket/${t.id}` }, ...uiRow({ tile: uiIcon({ draw: 'pick' }), title: t.title, progress: progressOf(t.progress), meta: 'Not started' })))) : [];
       const groups = [group('Asks', 'waiting'), group('Proof', 'evidence'), group('Reports', 'reports', 'notes'), group('Answered', 'answered'), group('Designs', 'designs'), ['Tickets', tickets]].filter(([, rows]) => rows.length);
       out.replaceChildren(...(!q ? [el('p', { class: 't-grp' }, 'Type to search the whole board.')] : groups.length ? groups.flatMap(([name, rows]) => [el('p', { class: 't-grp' }, name), el('ul', { class: 'ui-card ui-list' }, ...rows)])
         : [el('p', { class: 't-grp' }, `Nothing matches “${query.trim()}”.`)]));

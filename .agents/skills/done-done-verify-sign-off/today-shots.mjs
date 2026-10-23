@@ -1,7 +1,7 @@
 // Today in the new look, as the approved prototype draws it, at one theme and width per run (so a run's steps.json holds one claim), driven and measured in a headless
 // Chromium of its own over the DevTools protocol with exact device metrics (390x844 or 1280x800, 2x).
 // The board is feel-board.sh's (a sign-in, three asks with a pick, a six-screen design to review, five updates, two reports), then: a P0 on the ship ask and a P2 on the
-// digest ask, the ship ask resting on the settings proof (so it takes that proof's project), and the settings and Chat app projects given their own icons with
+// digest ask, the export ask and the design on tickets (60% and 100%), the ship ask resting on the settings proof (so it takes that proof's project), and the settings and Chat app projects given their own icons with
 // sign-off-axi project --icon, so Up next and the rows show a priority chip, a project's name and its icon where they exist.
 // States: today-signin (the sign-in up next, as seeded), today (after signin done: the ship ask up next), today-answered (its Answer tapped), theme (the round
 // light-or-dark button tapped: the other theme), more (the More sheet from the line under the tiles), search (the dock's Search with "settings" typed) and today-end
@@ -97,7 +97,11 @@ try {
   // A priority on two asks (the board takes P0-P3 on any card) and the design's project given its own icon.
   const b = JSON.parse(readFileSync(board, 'utf8'));
   for (const d of b.items) if (d.key === 'ship') Object.assign(d, { priority: 'P0', proof: 'ev1' }); else if (d.key === 'digest') d.priority = 'P2';
+    else if (d.key === 'export') d.ticket = 'export-label'; else if (d.key === 'onboarding') d.ticket = 'onboarding';
   writeFileSync(board, JSON.stringify(b, null, 2) + '\n');
+  // Two tickets, so a row on one shows its bar: the export label half done, the onboarding finished (a full bar).
+  cli('ticket', board, '--id', 'export-label', '--title', 'Export button label', '--progress', '60');
+  cli('ticket', board, '--id', 'onboarding', '--title', 'Chat app onboarding', '--progress', '100');
   copyFileSync(join(repo, 'web/icon-192.png'), join(dir, 'chat-app.png'));
   cli('project', board, '--name', 'Chat app', '--icon', 'chat-app.png');
   writeFileSync(join(dir, 'settings.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#E8590C"/><circle cx="12" cy="12" r="3" fill="none" stroke="#fff" stroke-width="2"/><path d="M12 4.5v3M12 16.5v3M4.5 12h3M16.5 12h3" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>');
