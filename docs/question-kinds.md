@@ -176,9 +176,13 @@ without posting.
   last card is **Your own answer**: it opens one box, and the button becomes
   **Send answer**, which sends the words as the answer. One **Note**, open
   under the cards, goes with any pick. **More** over the ask holds **Ask me
-  later** and **Dismiss**. On a phone the button turns
-  into a check and takes you back to the list, where the row folds away; on
-  a wider screen it opens the next ask, or the list after the last.
+  later** and **Dismiss**. The button turns into a check and opens the next
+  ask, or the list after the last; on a phone that ask's bar reads **Back**,
+  which (as a swipe right does) returns to the ask just answered. An answered
+  ask opens with its answer, its note and when, and **Change answer**: a new
+  pick goes to the agent as an answer that `replaces` the earlier one, with
+  **Undo**. Decide lists every answer under **Answered**, and the arrows in a
+  phone ask's bar step through answered asks and open ones.
   **1**–**9** picks an option and answers it, **E** skips to the next ask,
   **Z** undoes the last answer, and a swipe right takes the recommended answer
   while a swipe left skips. A plan opens its own page instead, and a design
