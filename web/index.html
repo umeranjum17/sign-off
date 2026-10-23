@@ -3625,7 +3625,7 @@
   /** An answered row: a green check, the question, when it was answered, and the answer with its note; it opens the ask, to see the answer or change it. */
   function doneRow(d, i) {
     const s = state.answers[d.key], sel = deskSel === d.key;
-    return el('li', { class: `dl-row g-done${sel ? ' sel' : ''}`, 'data-key': d.key, style: `--n:${i}` }, el('a', { class: 'dl-face', href: `#decide/${d.key}`, draggable: 'false', id: `item-${d.key}`, 'data-row': '', ...(sel && { 'aria-current': 'true' }) },
+    return el('li', { class: `dl-row g-done${sel ? ' sel' : ''}`, 'data-key': d.key, style: `--n:${i}` }, el('a', { class: 'dl-face', href: `#decide/${d.key}`, draggable: 'false', 'data-row': '', ...(sel && { 'aria-current': 'true' }) },
       icon('done'), el('span', { class: 'copy' }, el('span', { class: 'r1' }, el('strong', { class: 'title', dir: 'auto' }, title(d)), el('span', { class: 'tm' }, filedAt(s.at))),
         el('span', { class: 'meta sub', dir: 'auto' }, s.replaces ? 'Changed to ' : '', saidOf(d, s)))));
   }
