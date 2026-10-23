@@ -2354,10 +2354,11 @@
     const shown = items.filter((d) => d.type === 'evidence').slice(0, 3), also = twins(shown);
     if (!shown.length) return '';
     return tSec('t-proof', 'Latest proof', '#evidence', el('ul', { class: 't-list' }, ...shown.map((d) => {
-      const r = RESULT[d.evidenceCard?.result], [shot] = filesOf(d).find(([, clip]) => !clip) ?? [];
+      // A row is a list, so it loads the capture's thumb, lazily.
+      const r = RESULT[d.evidenceCard?.result], [, , , small] = filesOf(d).find(([, clip]) => !clip) ?? [];
       const mark = () => el('span', { class: `donek ${r?.[0] ?? 'none'}`, 'aria-hidden': 'true' }, glyph(r?.[0] === 'ok' ? 'check' : 'dot'));
-      const frame = shot ? el('span', { class: 'mini' }, el('img', { src: src(shot), alt: '' })) : mark();
-      if (shot) frame.firstChild.onerror = () => frame.replaceWith(mark());
+      const frame = small ? el('span', { class: 'mini' }, shot(small, '')) : mark();
+      if (small) frame.firstChild.onerror = () => frame.replaceWith(mark());
       const link = el('a', { class: 'lrow', href: `#evidence/${d.key}` }, frame,
         el('span', { class: 'lt' }, el('b', { dir: 'auto' }, [headline(d), also.get(d.key)].filter(Boolean).join(' · ')),
           el('span', {}, el('span', { class: `res ${r?.[0] ?? 'none'}` }, r?.[2] ?? 'Not run'), ...[projectOf(d), d.filed && (isToday(d.filed) ? hhmm(d.filed) : day(d.filed))].filter(Boolean).map((t) => ` · ${t}`))), chev());
