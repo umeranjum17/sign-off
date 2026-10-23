@@ -33,6 +33,7 @@ for theme in light dark; do
   vp=390x844x2,mobile,touch; [ "$w" = 1280 ] && vp=1280x800x1
   ax emulate --viewport $vp --color-scheme $theme
   go waiting; shot decide
+  go decide/npm; shot decide-signin
   go decide/ship; shot decide-item
   feel=$(chrome-devtools-axi eval '() => !!document.querySelector(".decide-bar .dl-more")' | grep -c true || true)
   ax eval "() => (${tap})('.decide-bar .answer')"
@@ -56,6 +57,7 @@ for theme in light dark; do
   go decide/ship
   # On a desk the bar sits under a tall ask: it is scrolled into view first, so Answer and its More show together.
   ax eval "() => { document.querySelector('.decide-bar').scrollIntoView({ block: 'end' }); return 1 }"
+  pause 300; shot decide-item-end
   ax eval "() => (${tap})('.decide-bar .dl-more > summary')"; pause 400; shot decide-item-more
   go waiting
   ax eval "() => (${drag})('keep-the-weekly-digest', 300, true)"; pause 1000; shot decide-swiped-answer
@@ -93,5 +95,5 @@ if [ -n "$(ls "$out"/decide-menu.* 2>/dev/null)" ]; then
 fi
 # The step record done-done checks a claim against.
 node -e 'const [out, v, w] = process.argv.slice(1); require("fs").writeFileSync(out + "/steps.json", JSON.stringify({ target: { version: v }, start: "A throwaway board seeded with a sign-in, two asks to answer, a design pick, a screen design, a plan and an answered ask, opened on Decide",
-  steps: [`At ${w} px, light then dark, the person opens Decide and sees the rows grouped Sign in, Answer and Review.`, "The person opens the ship ask and taps Answer Friday, then Undo in the toast.", "On the list the person presses a row, drags it right and left, and opens More.", "On the ask the person opens More beside Answer.", "The person swipes the digest row right to answer it.", "With the sign-in, plan and designs dismissed, the person taps More, Answer all recommended."],
-  result: "Decide shows grouped rows with icons, two-line titles, times and the recommended pick; a press tints a row, a right drag shows the green answer and a left drag the indigo Later; the ask has one Answer button naming the pick and one More holding Ask me later, Write my own answer, Ask for another round and Dismiss last; an answer and its Undo each show a toast in one style with its own mark; when nothing waits a green check says All clear." }, null, 2) + "\n")' "$out" "$(node -p 'require("./package.json").version')" "${DECIDE_WIDTHS:-390 1280}"
+  steps: [`At ${w} px, light then dark, the person opens Decide and sees the rows grouped Sign in, Answer and Review.`, "The person opens the npm sign-in: at 1280 wide (a desk) its detail sits beside the list, and at 390 (a phone) on a page of its own.", "The person opens the ship ask and looks at its options above the answer bar, then taps Answer Friday, then Undo in the toast.", "On the list the person presses a row, drags it right and left, and opens More.", "On the ask the person opens More beside Answer.", "The person swipes the digest row right to answer it.", "With the sign-in, plan and designs dismissed, the person taps More, Answer all recommended."],
+  result: "At 1280 wide, light and dark: the sign-in detail shows its title Sign in to npm, what it unlocks (Unlocks: Publishing the release) and one primary button, Open sign-in; the time left of the sign-in shows once, on its list row; on the ask When should the new settings page ship?, the answer bar sits after the last option, Next week, and covers no option. On a phone (390) the sign-in keeps its card with Open. Decide shows grouped rows with icons, two-line titles, times and the recommended pick; a press tints a row, a right drag shows the green answer and a left drag the indigo Later; the ask has one Answer button naming the pick and one More holding Ask me later, Write my own answer, Ask for another round and Dismiss last; an answer and its Undo each show a toast in one style with its own mark; when nothing waits a green check says All clear." }, null, 2) + "\n")' "$out" "$(node -p 'require("./package.json").version')" "${DECIDE_WIDTHS:-390 1280}"
