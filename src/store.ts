@@ -36,6 +36,8 @@ export type Decision = {
   filer?: string;
   /** The ticket this card belongs to, by id: a loose reference the board shows as a Ticket row while that ticket is on the board. */
   ticket?: string;
+  /** How urgent the card is, P0 (most) to P3 (least): the board shows it as a chip and can sort by it. A card without one shows no chip. */
+  priority?: string;
   /** The board area it shows in while it waits for no answer, in place of the one its type gives it. */
   area?: string;
   /** How it works, step by step: each step's title and the marks for what matters there. */
@@ -101,7 +103,9 @@ const isText = (v: unknown) => typeof v === 'string';
 /** An http(s) link of up to 500 characters with no spaces: an item's `link` (besides a commit hash) and a design option's. */
 const HTTP_LINK = /^https?:\/\/\S{1,500}$/u;
 export const isKey = (v: unknown) => isText(v) && /^[A-Za-z0-9._-]{1,128}$/.test(v as string);
-const ONE_OF: Record<string, unknown[]> = { close: ['done', 'release'], area: ['waiting', 'evidence', 'reports', 'answered'] };
+/** A card's priority, most urgent first. */
+export const PRIORITIES = ['P0', 'P1', 'P2', 'P3'];
+const ONE_OF: Record<string, unknown[]> = { close: ['done', 'release'], area: ['waiting', 'evidence', 'reports', 'answered'], priority: PRIORITIES };
 /** What a step uses or can stop on: an AI model, a store, a gate, a hard fail. */
 /** What a report explains with: the board draws one line icon per form. */
 export const REPORT_FORMS = ['diagram', 'chart', 'before-after'];
@@ -261,7 +265,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       ...(d.ask_ref !== undefined && { ask_ref: d.ask_ref }), ...(d.why && { why: d.why }), ...(d.recommend_reason && { recommend_reason: d.recommend_reason }), ...(d.silent_by && { silent_by: d.silent_by }), ...(d.merges && { merges: [...d.merges] }), ...(d.proof && { proof: d.proof }),
       recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done', evidence: d.evidence,
       type: plan ? 'plan' : d.type ?? 'decision', tradeoff: d.tradeoff, link: d.link, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path, ...(m.link !== undefined && { link: m.link }) })),
-      ...(views && { view: d.view }), ...(report && views && { preview: d.preview }), ...(d.reply && { reply: true }), ...(d.filer && { filer: d.filer }), ...(d.ticket && { ticket: d.ticket }), ...(d.area && { area: d.area }),
+      ...(views && { view: d.view }), ...(report && views && { preview: d.preview }), ...(d.reply && { reply: true }), ...(d.filer && { filer: d.filer }), ...(d.ticket && { ticket: d.ticket }), ...(d.priority && { priority: d.priority }), ...(d.area && { area: d.area }),
       ...(signin && { unlocks: d.unlocks, waits: d.waits, ...(d.expires && { expires: d.expires }), ...(d.start && { start: [...d.start] }) }),
       ...(d.group && { group: d.group }), ...(d.filed && { filed: d.filed }), ...(d.decided && { decided: d.decided }),
       ...(d.form && { form: d.form }), ...(d.video && { video: d.video }), ...(d.asked_by && { asked_by: d.asked_by }),
@@ -517,6 +521,52 @@ export function readTickets(decisionsPath: string, warn: (msg: string) => void =
     try { t = line && JSON.parse(line); } catch {}
     if (line && (!t || ticketFault(t))) return warn(`skipped unreadable line ${n + 1} in ${ticketsPath(decisionsPath)}`);
     if (t) latest.set(t.id, { id: t.id, title: t.title, progress: t.progress, ...(t.parent !== undefined && { parent: t.parent }), at: t.at });
+  });
+  return [...latest.values()];
+}
+/** A project's own icon: a picture in the board's folder, pinned by its hash so the board serves only the file that was set. */
+export type IconRef = { path: string; sha256: string; bytes: number };
+/** A project as the board draws it: its name and, optionally, its icon. A project with no icon shows a monogram tile. */
+export type Project = { name: string; icon?: IconRef; at: string };
+/** Projects, one line per write (`project --name`), the latest line per name wins, names matched without regard to case. A board without the file has none. */
+export const projectsPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.projects.jsonl';
+/** What an icon may be: a small picture of one of these types. */
+export const ICON_BYTES = 500_000;
+export const ICON_TYPES: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml' };
+const iconExt = (path: string) => /\.[A-Za-z]+$/.exec(path)?.[0].toLowerCase() ?? '';
+/** An icon path: relative to the board file's folder, with no .., ?, # or \, ending in an icon type. */
+export const iconPathFault = (p: unknown) => (!isText(p) || !(p as string).trim() || (p as string).length > 256 || /^([\\/]|[A-Za-z]:)/.test(p as string) || (p as string).split('/').includes('..') || /[?#\\\0-\x1f]/.test(p as string)
+  ? 'must be a path from the board file\'s folder with no .., ?, # or \\, in 256 characters or fewer'
+  : !Object.hasOwn(ICON_TYPES, iconExt(p as string)) ? `must end in ${Object.keys(ICON_TYPES).join(', ')}` : '');
+/** The project rules, shared by the writer and the reader: a line that breaks one is skipped, never shown half-valid. */
+export const projectFault = (p: any) => (!isText(p?.name) || !p.name.trim() || /[\0-\x1f\x7f-\x9f]/.test(p.name) || [...p.name].length > 40 ? 'name must be text of 40 characters or fewer'
+  : p.icon === undefined ? ''
+  : iconPathFault(p.icon?.path) ? `icon ${iconPathFault(p.icon?.path)}`
+  : !/^[a-f0-9]{64}$/.test(p.icon.sha256 ?? '') || !(Number.isInteger(p.icon.bytes) && p.icon.bytes > 0 && p.icon.bytes <= ICON_BYTES) ? `icon must carry its sha256 and bytes, ${ICON_BYTES} or fewer` : '');
+/** The magic bytes of each icon type, so a file named .png that is not one is refused: an SVG is text with an <svg> element and no script. */
+export function iconContentFault(path: string, bytes: Buffer): string {
+  const ext = iconExt(path);
+  if (ext === '.png') return bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) ? '' : 'is not a PNG picture';
+  if (ext === '.jpg' || ext === '.jpeg') return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff ? '' : 'is not a JPEG picture';
+  if (ext === '.webp') return bytes.toString('latin1', 0, 4) === 'RIFF' && bytes.toString('latin1', 8, 12) === 'WEBP' ? '' : 'is not a WebP picture';
+  let text;
+  try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { return 'is not an SVG picture'; }
+  if (!/<svg[\s>]/i.test(text)) return 'is not an SVG picture';
+  return /<script\b|<foreignObject\b|\son[a-z]+\s*=/i.test(text) ? 'holds a script, and an icon is only a picture' : '';
+}
+export function appendProject(decisionsPath: string, { name, icon }: Omit<Project, 'at'>): Project {
+  const p = { name, ...(icon && { icon }), at: now() };
+  appendLine(projectsPath(decisionsPath), p);
+  return p;
+}
+/** Every project as its latest line says, in the order each was first written. A torn or broken line is skipped and reported through warn. */
+export function readProjects(decisionsPath: string, warn: (msg: string) => void = () => {}): Project[] {
+  const latest = new Map<string, Project>();
+  readRaw(projectsPath(decisionsPath)).split('\n').forEach((line, n) => {
+    let p;
+    try { p = line && JSON.parse(line); } catch {}
+    if (line && (!p || projectFault(p))) return warn(`skipped unreadable line ${n + 1} in ${projectsPath(decisionsPath)}`);
+    if (p) latest.set(p.name.toLowerCase(), { name: p.name, ...(p.icon && { icon: { path: p.icon.path, sha256: p.icon.sha256, bytes: p.icon.bytes } }), at: p.at });
   });
   return [...latest.values()];
 }

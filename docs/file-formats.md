@@ -87,6 +87,8 @@ New guided defaults use plan schema 3 / report schema 4, contract 1, with a requ
 - `ticket`: optional, the id of the ticket the item belongs to (1-128 of `A-Z a-z 0-9 . _ -`), written by `raise` and `post` with `--ticket <id>` or carried in a message or `--from` item.
   It is only a reference: the ticket need not be on the board, and nothing checks or needs it. While a ticket with that id is on the board (**Tickets**, below),
   the item's screen shows a **Ticket** row, the ticket's title, id and progress, that opens the ticket's page; otherwise it shows none. It does not change what the item asks or how it is answered.
+- `priority`: optional, how urgent the item is: `P0` (most), `P1`, `P2` or `P3` (least), written by `raise` and `post` with `--priority` or carried in a message or `--from` item. Any other value refuses the board file.
+  The board shows it as a chip and can sort by it; an item without one shows no chip. It does not change what the item asks or how it is answered.
 - **Activity**: every card's screen (an ask, a sign-in, an update, a design review, a report and a plan) lists, oldest first, what the board keeps of it: when it was posted and by whom (its `filer`, with its `link` when that is a web link),
   the answer a change replaced, the answer and its note, when its filer took it with `wait --filer` (`*.seen.jsonl`), each another-round ask with its note (`*.rounds.jsonl`) and each comment on it (`*.messages.jsonl`).
   Steps are compared to the second (answers are stored to the second); within one second they keep that order. A card whose only step is its posting shows no Activity. A ticket's page shows its cards' steps after their postings together, each under the card's title. Nothing is written for it.
@@ -328,6 +330,21 @@ no item needs one, a board without the file has none, and every card and command
 - The board's state (`/api/state`) carries `tickets`, each id's latest line. A ticket's page, `#ticket/<id>`, shows the ticket it sits under, its progress,
   the items that name it (not dismissed) newest first by `filed`, each opening where it lives, and the tickets whose `parent` it is.
   `ticket --id <id> --json` prints the same: the ticket and its `cards` (`key`, `kind`, `status`, `title`, `filed`); `ticket --json` lists every ticket with its card keys.
+
+**Projects**, written only by `sign-off-axi project --name <name> ...` (`decisions.projects.jsonl`, mode 600, one line per write, the latest line per name wins, names matched without regard to case).
+A project here only carries its own icon: no item needs one, a board without the file has none, and every project then shows a monogram tile, its initials.
+
+```json
+{"name":"Beacon","icon":{"path":"icons/beacon.png","sha256":"9f2c…","bytes":4120},"at":"2026-10-23T09:10:00Z"}
+{"name":"Tern","at":"2026-10-23T09:12:00Z"}
+```
+
+- `name`: text of 40 characters or fewer, the project as items give it. `at`: when the line was written.
+- `icon`: optional. `path` is a file in the board file's folder, as a path from it with no `..`, `?`, `#` or `\`, ending in `.png`, `.jpg`, `.jpeg`, `.webp` or `.svg`; `sha256` and `bytes` (1 to 500,000) pin its content.
+  `project --icon` refuses a path whose real path leads outside the folder, a file over 500,000 bytes, one whose content is not the type its name gives, and an SVG with a script, `foreignObject` or event attribute. `--clear-icon` writes a line with no icon.
+- A line that breaks a rule, or a torn line, is skipped with a warning; the other projects still show.
+- The board's state (`/api/decisions`) carries `projects`, each name's latest line. `GET /api/project-icon?name=<name>` (any case) serves the pinned file with its picture type, `nosniff` and the sandbox policy of every served file; it answers 404 for a project with no icon, a name not on the board and a file that changed or moved out of the folder since it was set, and the page then draws the initials. With `&h=<the first 16 characters of sha256>` the browser keeps it for good.
+  `project --json` prints every project.
 
 **Taken answers**, written by `wait --filer` next to the questions (`decisions.seen.jsonl`, mode 600):
 one line per answer the item's filer took, so the card shows **Seen by agent**. A changed answer is new

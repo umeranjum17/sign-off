@@ -14,7 +14,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, appendPromoted, appendSendBack, appendTicket, readTickets, ticketFault, type Ticket, appendDesignAnswer, answerLines, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, appendPromoted, appendSendBack, appendTicket, readTickets, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, appendDesignAnswer, answerLines, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -34,10 +34,10 @@ const AGENTS: Record<string, { bin: string; dir: string; home: string }> = {
   'gemini-cli': { bin: 'gemini', dir: '.agents/skills', home: join(homedir(), '.gemini', 'skills') },
 };
 const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
-commands[25]:
-  (none)=list, raise, post, answers, wait, poll, deeper, owner, open, status, stop, serve, export, init, report, signin, dismiss, restore, promote, ticket, refile, doctor, notify, validate, help
+commands[26]:
+  (none)=list, raise, post, answers, wait, poll, deeper, owner, open, status, stop, serve, export, init, report, signin, dismiss, restore, promote, ticket, project, refile, doctor, notify, validate, help
 board: the nearest .sign-off/ board (the walk's bounds and SIGN_OFF_HOME: README, "Test runs never touch your board"), else ~/.sign-off/decisions.json; a board file given always wins
-flags: --full and --json on list, answers and wait, --events on wait, --json on status and ticket, --filer on post, raise and wait, --ticket on post and raise, --help on every command, -v/--version
+flags: --full and --json on list, answers and wait, --events on wait, --json on status, ticket and project, --filer on post, raise and wait, --ticket and --priority on post and raise, --help on every command, -v/--version
 examples:
   sign-off-axi
   sign-off-axi raise --ask-ref message-example --title "Ship the new sign-in screen this week?" --why "The screen is ready; the release goes out Friday." --outcome yes="It ships Friday." --outcome no="It waits a week." --recommend yes --recommend-reason "Tests pass on every phone." --default no
@@ -55,6 +55,7 @@ examples:
   sign-off-axi signin done --key npm-login
   sign-off-axi dismiss ship-the-new-sign-in-screen-this-week
   sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40
+  sign-off-axi project --name Beacon --icon icons/beacon.png
   sign-off-axi init
   sign-off-axi doctor
   sign-off-axi validate ask.json
@@ -74,8 +75,8 @@ examples:
   sign-off-axi
   sign-off-axi list ./decisions.json --full
 `,
-  raise: `usage: sign-off-axi raise [board.json] --title "<question>" [--key <key>] [--about <text>] [--detail <text>] --why <text> [--option <value>=<label>]... --outcome <value>=<text>... --recommend <value> --recommend-reason <text> --default <value> [--silent-by <ISO time>] [--merge <key>]... [--proof <key>] [--close done|release] [--filer <id>] [--ticket <id>]
-       sign-off-axi raise [board.json] --from <decisions.json> [--filer <id>] [--ticket <id>]
+  raise: `usage: sign-off-axi raise [board.json] --title "<question>" [--key <key>] [--about <text>] [--detail <text>] --why <text> [--option <value>=<label>]... --outcome <value>=<text>... --recommend <value> --recommend-reason <text> --default <value> [--silent-by <ISO time>] [--merge <key>]... [--proof <key>] [--close done|release] [--filer <id>] [--ticket <id>] [--priority P0-P3]
+       sign-off-axi raise [board.json] --from <decisions.json> [--filer <id>] [--ticket <id>] [--priority P0-P3]
 Adds questions to the board: yes/no, or 2 to 6 choices with one --option each. --key defaults to a slug of the title.
 raise is the alias for post --type decision: same flags, same output.
 New Decide questions require --ask-ref <captain-message-id-or-hold-id>, saved as ask_ref (1-256 characters, no whitespace or controls).
@@ -94,6 +95,7 @@ they are hidden while this one waits, and its answer closes them too, with the s
 A new ask that repeats an open ask on the same decision (the same answers, titles that share at least 80% of their words), from anyone, is not posted: the refusal names the card to wait on. When one is answered, every open ask on the same decision takes the answer and leaves Decide.
 --proof <key> names an evidence update already on the board that this ask rests on: Decide shows its capture and result at the top.
 --ticket <id> names the ticket this ask belongs to (see \`sign-off-axi ticket --help\`): the ask shows a Ticket row that opens it. Optional; a ticket not on the board shows no row.
+--priority P0-P3 says how urgent the ask is, P0 the most: the card shows it as a chip, and the board can sort by it. Optional; leave it out when you do not know.
 The user answers with one tap and can undo it for a few seconds.
 --from adds every decision in a decisions file: ${FORMAT}
 Raising the same question again is a no-op that reports its status; a different question under a used key is refused.
@@ -205,6 +207,7 @@ examples:
        sign-off-axi post [board.json] --type signin --service "<name>" --start '<command as a JSON list>' --unlocks "<what it unlocks>" --waits "<who waits>" [--key <key>] [--filer <id>]
 --ticket <id> works on every form above: the card names the ticket it belongs to (see \`sign-off-axi ticket --help\`) and shows a Ticket row, its title and progress, that opens the ticket.
 It is optional, and only a reference: the ticket need not exist yet, and one not on the board shows no row. With --kind or --from it fills "ticket" on each message or item that has none.
+--priority P0-P3 works on every form above too: how urgent the card is, P0 the most, shown as a chip. Optional; with --kind or --from it fills "priority" on each message or item that has none.
 Posts an item for the user. --type decision (the default) is a yes/no or pick-one question, exactly like raise, with the same question standard and flags (--ask-ref, --why, --outcome, --recommend-reason, --silent-by, --merge).
 A new Decide question requires --ask-ref <captain-message-id-or-hold-id> (ask_ref in a message or feed); follow-ups belong in the backlog, not the board. Existing cards, plans, reports, evidence and engagement records are unchanged.
 --kind posts one contract message (${CONTRACT}), read from a file or from stdin with --from -: it must be that kind and pass every rule,
@@ -311,6 +314,19 @@ examples:
   sign-off-axi ticket --id T-29 --progress 80
   sign-off-axi ticket --id T-29
   sign-off-axi ticket --json
+`,
+  project: `usage: sign-off-axi project [board.json] [--json]
+       sign-off-axi project [board.json] --name <name> --icon <path>
+       sign-off-axi project [board.json] --name <name> --clear-icon
+A project's own icon: the board draws it on the project's rows. A project with no icon shows a tile with its initials, so an icon is optional.
+--name is the project name as its cards give it (a report's or design's group, a plan's project, the app of a verify-<app> proof), 40 characters or fewer; case does not matter.
+--icon is a picture in the board file's folder, as a path from that folder: .png, .jpg, .jpeg, .webp or .svg (no script), ${ICON_BYTES} bytes or fewer.
+The board pins the file by its hash and serves only that file: change the picture and run project --icon again. With no --name, lists every project.
+It writes one line to <board>.projects.jsonl beside the board (${FORMAT}).
+examples:
+  sign-off-axi project --name Beacon --icon icons/beacon.png
+  sign-off-axi project --name Beacon --clear-icon
+  sign-off-axi project --json
 `,
   promote: `usage: sign-off-axi promote <key> [board.json] [--undo]
 For Main only, never a lead. A design review a lead posts (post --kind design) shows under Designs, where Main reviews it; it never waits in Decide or counts as the user's ask.
@@ -922,7 +938,7 @@ function post(args: string[], cmd = 'post') {
   const typed: Flags = cmd === 'post' ? { replace: { type: 'boolean' }, kind: { type: 'string' }, type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
     media: { type: 'string', multiple: true }, attach: { type: 'string', multiple: true }, link: { type: 'string', multiple: true }, view: { type: 'string' }, preview: { type: 'string' }, chapter: { type: 'string', multiple: true },
     ...Object.fromEntries(SIGNIN_FIELDS.map((f) => [f, { type: 'string' as const }])) } : {};
-  const { file, named, values, on } = parse(cmd, args, { from: { type: 'string' }, filer: { type: 'string' }, 'ask-ref': { type: 'string' }, ticket: { type: 'string' }, ...typed,
+  const { file, named, values, on } = parse(cmd, args, { from: { type: 'string' }, filer: { type: 'string' }, 'ask-ref': { type: 'string' }, ticket: { type: 'string' }, priority: { type: 'string' }, ...typed,
     ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: MANY.includes(f) }])) });
   const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'attach', 'link', 'view', 'preview', 'chapter', ...SIGNIN_FIELDS].filter((f) => values[f] !== undefined);
   // Only a design takes --link more than once (one per option); any other type keeps its one item link, the last given.
@@ -930,13 +946,14 @@ function post(args: string[], cmd = 'post') {
   if (values.type !== 'design' && optionLinks.length) values.link = optionLinks.at(-1);
   // A card names its ticket by id only: the ticket need not be on the board yet, and the card works the same without one.
   if (values.ticket !== undefined && !isKey(values.ticket)) throw fail(`--ticket ${values.ticket} must be 1-128 of A-Z a-z 0-9 . _ -`, 'VALIDATION_ERROR', 'Pass the id of the ticket this card belongs to, such as --ticket T-29');
+  if (values.priority !== undefined && !PRIORITIES.includes(values.priority)) throw fail(`--priority ${values.priority} must be one of ${PRIORITIES.join(', ')}`, 'VALIDATION_ERROR', 'Pass how urgent the card is, such as --priority P1 (P0 is the most urgent), or leave it out');
   if (values.kind !== undefined) {
     const odd = [...given, ...(values.replace ? ['replace'] : [])][0];
     if (odd) throw fail(`--kind cannot be combined with --${odd}`, 'VALIDATION_ERROR', 'Put every field in the message file: sign-off-axi post --kind ask --from ask.json');
     return postKind(file, named, on, values);
   }
   if (values.from !== undefined && given.length) throw fail(`--from cannot be combined with --${given[0]}`, 'VALIDATION_ERROR', `Put every field in the --from file, or ${cmd} with flags only`);
-  if (values.replace && values.ticket !== undefined) throw fail('--ticket does not apply to --replace', 'VALIDATION_ERROR', 'Put "ticket" on each item of the feed that belongs to a ticket');
+  for (const f of ['ticket', 'priority']) if (values.replace && values[f] !== undefined) throw fail(`--${f} does not apply to --replace`, 'VALIDATION_ERROR', `Put "${f}" on each item of the feed that has one`);
   if (values.replace) return replace(file, named, on, values.from, filerOf(values), values['ask-ref']);
   const filer = filerOf(values, true);
   const type = values.type ?? 'decision', told = ASK_FLAGS.find((f) => values[f] !== undefined);
@@ -1016,7 +1033,7 @@ function postSignin(file: string, named: string, on: string, values: Record<stri
     if (values.link !== undefined || values.expires !== undefined) throw fail(`--${values.link !== undefined ? 'link' : 'expires'} does not apply with --start: each tap makes a new link`, 'VALIDATION_ERROR', SIGNIN_START_EXAMPLE);
   }
   const expires = values.expires === undefined ? undefined : expiresAt(values.expires);
-  const { incoming: [d], raw: [item] } = buildIncoming({ title: service, key }, { type: 'signin', link, unlocks, waits: who, ...(expires && { expires }), ...(start && { start }), ticket: values.ticket }, filer, file);
+  const { incoming: [d], raw: [item] } = buildIncoming({ title: service, key }, { type: 'signin', link, unlocks, waits: who, ...(expires && { expires }), ...(start && { start }), ticket: values.ticket, priority: values.priority }, filer, file);
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
     const items = existsSync(file) ? readItems(file).items : [], at = items.findIndex((x) => x?.key === d.key), had = items[at];
@@ -1128,6 +1145,52 @@ function ticket(args: string[]) {
     const same = had && JSON.stringify(row(had)) === JSON.stringify(row(next as Ticket));
     if (!same) appendTicket(file, next);
     return toon({ board: tilde(file), ticket: row(next as Ticket), status: same ? 'unchanged' : had ? 'updated' : 'created' }, [`Pass --ticket ${id} to raise or post, so the card shows this ticket`, `Run \`sign-off-axi ticket${on} --id ${id} --progress <0-100>\` as the work moves`]);
+  });
+}
+
+/** project [board.json] [--name <name> --icon <path> | --clear-icon]: lists the projects, or sets or clears one project's icon.
+ * A project stands alone in <board>.projects.jsonl; its icon is a picture in the board's folder, pinned by its hash. */
+function project(args: string[]) {
+  const { file, values, on } = parse('project', args, { name: { type: 'string' }, icon: { type: 'string' }, 'clear-icon': { type: 'boolean' }, json: { type: 'boolean' } });
+  const { name, icon } = values, clear = values['clear-icon'] === true, EXAMPLE = 'sign-off-axi project --name Beacon --icon icons/beacon.png';
+  const row = (p: Project) => ({ name: p.name, icon: p.icon?.path ?? '' });
+  if (name === undefined) {
+    if (icon !== undefined || clear) throw fail(`--${clear ? 'clear-icon' : 'icon'} needs --name <project>`, 'VALIDATION_ERROR', EXAMPLE);
+    const all = readProjects(file, warn);
+    if (values.json) return JSON.stringify({ board: file, projects: all });
+    return toon({ board: tilde(file), projects: all.length ? all.map(row) : '0 projects' }, [`Run \`sign-off-axi project${on} --name <project> --icon <picture>\` to give a project its icon`]);
+  }
+  if ((icon === undefined) === !clear) throw fail(`project --name needs ${clear ? 'either --icon or --clear-icon, not both' : '--icon <path> or --clear-icon'}`, 'VALIDATION_ERROR', EXAMPLE);
+  let ref: Project['icon'];
+  if (icon !== undefined) {
+    const bad = (rule: string, help: string) => fail(`--icon ${icon} ${rule}`, 'VALIDATION_ERROR', help), fault = iconPathFault(icon);
+    if (fault) throw bad(fault, `Put the picture in the board file's folder and pass its path from there, such as --icon icons/beacon.png`);
+    // The same real-path check the board serves with: a link that leads out of the board's folder is refused here, not at the first view.
+    const root = dirname(file);
+    let actual;
+    try { actual = under(root, icon); } catch (e: any) {
+      throw e.message === 'no matching mock file' ? fail(`--icon ${icon} is not a file in ${tilde(root)}`, 'NOT_FOUND', 'Paths are relative to the board file\'s folder') : bad('leads outside the board file\'s folder', 'Copy the picture into the board file\'s folder instead of linking to it');
+    }
+    let bytes: Buffer;
+    try {
+      const info = statSync(actual);
+      if (!info.isFile()) throw bad('is not a file', 'Name the picture itself');
+      if (info.size > ICON_BYTES) throw bad(`is over ${ICON_BYTES} bytes`, 'Shrink the picture: an icon is drawn at most 64 px wide');
+      bytes = readFileSync(actual);
+    } catch (e: any) { throw e instanceof AxiError ? e : bad(reasonOf(e.code), 'Make the picture readable, then run project again'); }
+    const content = iconContentFault(icon, bytes);
+    if (content) throw bad(content, 'Save the picture again as the type its name gives');
+    ref = { path: icon, sha256: sha256(bytes), bytes: bytes.length };
+  }
+  const fault = projectFault({ name, ...(ref && { icon: ref }) });
+  if (fault) throw fail(`project ${name}: --${fault}`, 'VALIDATION_ERROR', 'Pass the project name as its cards give it, such as --name Beacon');
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+  return locked(`${file}.lock`, () => {
+    const had = readProjects(file, warn).find((p) => p.name.toLowerCase() === name.toLowerCase());
+    const same = !!had && had.name === name && JSON.stringify(had.icon ?? null) === JSON.stringify(ref ?? null);
+    const next = same ? had! : appendProject(file, { name, ...(ref && { icon: ref }) });
+    return toon({ board: tilde(file), project: row(next), status: same ? 'unchanged' : had ? 'updated' : 'created' },
+      [ref ? 'The board shows this icon on the project\'s rows; run project --icon again after you change the picture' : 'The board shows the project\'s initials in place of an icon']);
   });
 }
 
@@ -1326,10 +1389,10 @@ function postMedia(file: string, named: string, on: string, values: Record<strin
     }
     const { title, about, detail, close, link, recommend: recommend_value, default: default_if_silent } = values, filed = new Date().toISOString();
     const { run, media: _paths, ...fields } = message ?? {};
-    const { ticket } = values;
-    items.push(explainer ? { key, type, title, about, detail, options, recommend_value, default_if_silent, close, chapters, media, filer, ticket, filed }
+    const { ticket, priority } = values;
+    items.push(explainer ? { key, type, title, about, detail, options, recommend_value, default_if_silent, close, chapters, media, filer, ticket, priority, filed }
       : message ? { ...fields, key, type, number, ...(media.length ? { media } : {}), ...(run && { evidence: run }), filed }
-      : { key, type, number, title, about, detail, close, link, ...(media.length && { media }), ...(attachments.length && { attachments }), filer, ticket, filed });
+      : { key, type, number, title, about, detail, close, link, ...(media.length && { media }), ...(attachments.length && { attachments }), filer, ticket, priority, filed });
     // The whole board is checked before it is written, so a bad post leaves the board and evidence/ as they were.
     const check = `${file}.${process.pid}.check`;
     writeFileSync(check, JSON.stringify({ ...extra, schema: 2, items }), { mode: 0o600 });
@@ -1377,9 +1440,9 @@ async function postKind(file: string, named: string, on: string, values: Record<
   let sources: string[] = [];
   try {
     m ??= parseMessage(bytes!);
-    if (values.ticket !== undefined && m && typeof m === 'object' && !Array.isArray(m)) {
-      if (m.ticket !== undefined && m.ticket !== values.ticket) throw new ContractError(`ticket ${typeof m.ticket === 'string' ? m.ticket : JSON.stringify(m.ticket)} is not --ticket ${values.ticket}`, 'Leave "ticket" out of the message, or pass the same --ticket');
-      m.ticket = values.ticket;
+    for (const f of ['ticket', 'priority']) if (values[f] !== undefined && m && typeof m === 'object' && !Array.isArray(m)) {
+      if (m[f] !== undefined && m[f] !== values[f]) throw new ContractError(`${f} ${typeof m[f] === 'string' ? m[f] : JSON.stringify(m[f])} is not --${f} ${values[f]}`, `Leave "${f}" out of the message, or pass the same --${f}`);
+      m[f] = values[f];
     }
     const existingAsk = !built && kind === 'ask' && existsSync(file) && readItems(file).items.some((i: any) => i?.key === m.key);
     checkMessage(m, built ? 'report' : kind, !built && kind === 'ask' && !existingAsk);
@@ -1475,8 +1538,8 @@ function buildIncoming(values: Record<string, any>, extra: object, filer: string
     const source = resolve(values.from), raw = readItems(source).items;
     contractItems(raw, values.from, file);
     if (values['ask-ref'] !== undefined) for (const item of raw) if ((item.kind ?? item.type ?? 'decision') === 'ask' || (item.type ?? 'decision') === 'decision' && !item.kind) item.ask_ref = values['ask-ref'];
-    // --ticket links every item of the file that names no ticket of its own.
-    if (values.ticket !== undefined) for (const item of raw) item.ticket ??= values.ticket;
+    // --ticket and --priority fill every item of the file that names none of its own.
+    for (const f of ['ticket', 'priority']) if (values[f] !== undefined) for (const item of raw) item[f] ??= values[f];
     const incoming = loadDecisions(source, board);
     recommended(raw, false);
     return { incoming: incoming.map((d, i) => ({ filer, ...d, ...(raw[i].ask_ref !== undefined && { ask_ref: raw[i].ask_ref }), ...(raw[i].ticket !== undefined && { ticket: raw[i].ticket }) })), raw: raw.map((i) => ({ filer, ...i })) };
@@ -1487,7 +1550,7 @@ function buildIncoming(values: Record<string, any>, extra: object, filer: string
     const { title, key = slug(title), about, detail, why, recommend: recommend_value, default: default_if_silent, close } = values;
     const ask = !Object.hasOwn(extra, 'type'), options = ask ? outcomesOf(values) : optionsOf(values);
     const told = ask && { why, recommend_reason: values['recommend-reason'], silent_by: values['silent-by'], merges: values.merge, proof: values.proof, ask_ref: values['ask-ref'] };
-    writeFileSync(source, JSON.stringify({ schema: 2, items: [{ key, title, about, detail, ...told, options, recommend_value, default_if_silent, close, ticket: values.ticket, ...extra, filer }] }));
+    writeFileSync(source, JSON.stringify({ schema: 2, items: [{ key, title, about, detail, ...told, options, recommend_value, default_if_silent, close, ticket: values.ticket, priority: values.priority, ...extra, filer }] }));
     const incoming = loadDecisions(source, board), raw = readItems(source).items;
     if (!ask) recommended(raw, true);
     // A decision is an ask: the same question standard as post --kind ask, its refusals naming the flags.
@@ -2356,6 +2419,7 @@ const state = () => {
     dismissed: readDismissed(file, answers, rounds, warn, fed ? [] : items),
     promoted: readPromoted(file, warn),
     tickets: readTickets(file, warn),
+    projects: readProjects(file, warn),
   };
 };
 /** A mock file's sha256 now, or null when it is gone: a comment shows only on the exact file it was made on.
@@ -2517,6 +2581,20 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
       if (sha256(bytes) !== m.sha256) return [404, { error: 'Evidence file changed since it was posted' }];
       return [200, { media: bytes, type, tag: m.sha256.slice(0, 32), forever }];
     } catch { return [404, { error: 'Evidence is unavailable' }]; }
+  }
+  if (req.method === 'GET' && req.url?.startsWith('/api/project-icon?')) {
+    // A project's icon: only the file its project line pinned, from inside the board's folder, unchanged since it was set.
+    const q = new URL(req.url, 'http://localhost').searchParams, name = q.get('name')?.toLowerCase();
+    const icon = readProjects(file).find((p) => p.name.toLowerCase() === name)?.icon, type = icon && ICON_TYPES[extname(icon.path).toLowerCase()];
+    if (!icon || !type) return [404, { error: 'Project icon is unavailable' }];
+    try {
+      const actual = under(dirname(file), icon.path);
+      if (statSync(actual).size !== icon.bytes) return [404, { error: 'Project icon changed since it was set' }];
+      if (unchanged(req, `"${icon.sha256.slice(0, 32)}"`)) return [200, { media: Buffer.alloc(0), type, tag: icon.sha256.slice(0, 32) }];
+      const bytes = readFileSync(actual);
+      if (sha256(bytes) !== icon.sha256) return [404, { error: 'Project icon changed since it was set' }];
+      return [200, { media: bytes, type, tag: icon.sha256.slice(0, 32), forever: q.get('h') === icon.sha256.slice(0, 16) }];
+    } catch { return [404, { error: 'Project icon is unavailable' }]; }
   }
   if (req.method === 'GET' && req.url?.startsWith('/api/attachment?')) {
     const q = new URL(req.url, 'http://localhost').searchParams;
@@ -2843,7 +2921,7 @@ await runAxiCli({
   topLevelHelp: TOP_HELP,
   getCommandHelp: (cmd) => HELP[cmd],
   home: axi('list', list),
-  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), report: axi('report', report), owner: axi('owner', owner), deeper: axi('deeper', deeper), signin: axi('signin', signin), dismiss: axi('dismiss', dismiss(false)), restore: axi('restore', dismiss(true)), promote: axi('promote', promote), ticket: axi('ticket', ticket), refile: axi('refile', refile), doctor: axi('doctor', doctor), notify: axi('notify', notify), validate, help: ([name, ...rest]) => {
+  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), report: axi('report', report), owner: axi('owner', owner), deeper: axi('deeper', deeper), signin: axi('signin', signin), dismiss: axi('dismiss', dismiss(false)), restore: axi('restore', dismiss(true)), promote: axi('promote', promote), ticket: axi('ticket', ticket), project: axi('project', project), refile: axi('refile', refile), doctor: axi('doctor', doctor), notify: axi('notify', notify), validate, help: ([name, ...rest]) => {
     if (rest.length || (name && !HELP[name])) throw fail(`unknown command or argument: ${[name, ...rest].join(' ')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi --help` to see the commands');
     return name ? HELP[name] : TOP_HELP;
   } },

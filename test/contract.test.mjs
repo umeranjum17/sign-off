@@ -161,7 +161,7 @@ test('refusals: strict at every level, in contract order, with one fix line each
 test('a field name holding a newline is refused on one help line, shown escaped', () => {
   const unknown = validate(message('newline-unknown.json', JSON.stringify({ ...ask, 'a\nb': 'x' })));
   assert.equal(unknown.status, 2, unknown.raw);
-  assert.equal(unknown.out.files[0].help, 'Remove "a\\nb"; ask takes key, title, filer, ticket, link, about, ask_ref, detail, why, options, recommend_value, recommend_reason, default_if_silent, silent_by, close, merges, proof');
+  assert.equal(unknown.out.files[0].help, 'Remove "a\\nb"; ask takes key, title, filer, ticket, priority, link, about, ask_ref, detail, why, options, recommend_value, recommend_reason, default_if_silent, silent_by, close, merges, proof');
   const repeated = validate(message('newline-twice.json', JSON.stringify(ask).slice(0, -1) + ',"a\\nb":1,"a\\nb":2}'));
   assert.equal(repeated.status, 2, repeated.raw);
   assert.equal(repeated.out.files[0].error, 'field "a\\nb" is written twice');
@@ -210,7 +210,7 @@ test('a plan: validate checks each rule with one fix line; post stores it, it wa
     [decision({ question: 'Keep A? Or B?' }), /decisions\[0\]\.question must be one question, with one question mark as its last character/, /split any other into its own decision/],
     [decision({ question: 'Keep A？ Or B?' }), /decisions\[0\]\.question must be one question, with one question mark as its last character/, /split any other into its own decision/],
     [{ ...plan, view: '../index.html' }, /view "..\/index.html" must be a relative path/, /Set "view"/],
-    [{ ...plan, filed: '2026-10-13T07:19:00Z' }, /filed is not a field of plan schema 1/, /plan takes key, title, filer, ticket, link, about, project, sections, decisions, steps, view$/],
+    [{ ...plan, filed: '2026-10-13T07:19:00Z' }, /filed is not a field of plan schema 1/, /plan takes key, title, filer, ticket, priority, link, about, project, sections, decisions, steps, view$/],
   ]) {
     const { status, out: { files: [row] } } = validate(message('plan-bad.json', JSON.stringify(m)));
     assert.equal(status, 2, JSON.stringify(m));
@@ -1419,4 +1419,90 @@ test('every guard refuses bad input with a reason and one fix line, and never fa
   const posted = cli2('post', board, '--type', 'evidence', '--title', 'Sign-in screen', '--about', 'Umer signs in.', '--media', at('shot.png'));
   assert.equal(posted.status, 0, posted.stdout);
   assert.match(posted.stdout, /update-1,1,1/);
+});
+
+test('a card carries a priority and a project its own icon: every post takes --priority, project --icon pins a picture inside the board folder, and the board serves only that file', async () => {
+  const dir = join(scratch, 'priority-icon'), board = join(dir, 'board.json'), env = { ...process.env, HOME: join(scratch, 'priority-home'), SIGN_OFF_FILER: 'umer-agent' };
+  const run = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  mkdirSync(join(dir, 'icons'), { recursive: true });
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+  writeFileSync(join(dir, 'icons', 'beacon.png'), png);
+  copyFileSync(join(fixtures, 'evidence.v1', 'shot.png'), join(dir, 'shot.png'));
+  const asked = ['--why', 'It is ready.', '--outcome', 'yes=It ships.', '--outcome', 'no=It waits.', '--recommend', 'yes', '--recommend-reason', 'Tests pass.', '--default', 'no', '--ask-ref', 'message-example'];
+
+  // Every way a card gets in takes --priority, or "priority" in its message or --from item; a card with none has none.
+  for (const args of [['raise', board, '--priority', 'P0', '--key', 'urgent', '--title', 'Ship the settings page on Friday?', ...asked],
+    ['raise', board, '--key', 'plain', '--title', 'Move the theme switch to the top?', ...asked],
+    ['post', board, '--type', 'evidence', '--priority', 'P2', '--title', 'Settings on a phone', '--about', 'Umer changes the theme in one tap.', '--media', join(dir, 'shot.png')],
+    ['post', board, '--kind', 'ask', '--from', message('priority-ask.json', JSON.stringify({ ...ask, key: 'from-message', title: 'Keep the weekly digest going?', priority: 'P3' }))],
+    ['post', board, '--kind', 'ask', '--from', message('flag-ask.json', JSON.stringify({ ...ask, key: 'from-flag', title: 'Send the digest on Mondays?' })), '--priority', 'P1']]) {
+    const r = run(...args);
+    assert.equal(r.status, 0, args.join(' ') + r.stdout);
+  }
+  const stored = Object.fromEntries(JSON.parse(readFileSync(board, 'utf8')).items.map((i) => [i.key, i.priority]));
+  assert.deepEqual(stored, { urgent: 'P0', plain: undefined, 'update-1': 'P2', 'from-message': 'P3', 'from-flag': 'P1' });
+  // A priority outside P0-P3, or a message naming another than --priority, is refused with one fix line, and nothing is written.
+  for (const [args, error] of [[['raise', board, '--priority', 'P4', '--key', 'p4', '--title', 'Ship the help page this week?', ...asked], /--priority P4 must be one of P0, P1, P2, P3/],
+    [['raise', board, '--priority', 'high', '--key', 'high', '--title', 'Ship the help page next week?', ...asked], /--priority high must be one of/],
+    [['post', board, '--kind', 'ask', '--from', message('other-priority.json', JSON.stringify({ ...ask, key: 'other', title: 'Ship the digest page now?', priority: 'P0' })), '--priority', 'P2'], /priority P0 is not --priority P2/],
+    [['post', board, '--from', message('feed.json', JSON.stringify({ schema: 2, items: [] })), '--replace', '--priority', 'P1'], /--priority does not apply to --replace/]]) {
+    const r = run(...args);
+    assert.equal(r.status, 2, args.join(' '));
+    assert.match(r.stdout, error);
+  }
+  assert.equal(JSON.parse(readFileSync(board, 'utf8')).items.length, 5);
+  // A board file edited by hand is held to the same rule when it loads.
+  const hand = join(dir, 'hand.json');
+  writeFileSync(hand, JSON.stringify({ schema: 2, items: [{ key: 'k', title: 'Ship it?', priority: 'urgent' }] }));
+  assert.match(run('list', hand).stdout, /priority must be P0 or P1 or P2 or P3/);
+
+  // No project has an icon until one is set: the board then draws its initials.
+  assert.match(run('project', board).stdout, /projects: 0 projects/);
+  assert.equal(existsSync(join(dir, 'board.projects.jsonl')), false);
+  // A picture in the board folder is pinned by its hash; the same write again changes nothing.
+  const set = run('project', board, '--name', 'Beacon', '--icon', 'icons/beacon.png');
+  assert.equal(set.status, 0, set.stdout);
+  assert.match(set.stdout, /status: created/);
+  assert.match(run('project', board, '--name', 'Beacon', '--icon', 'icons/beacon.png').stdout, /status: unchanged/);
+  // Invalid icons are refused, and nothing is written: a path out of the folder, a link that leads out, a file that is not its type, a script, too big, missing.
+  writeFileSync(join(scratch, 'outside.png'), png);
+  symlinkSync(join(scratch, 'outside.png'), join(dir, 'icons', 'link.png'));
+  writeFileSync(join(dir, 'icons', 'fake.png'), 'not a picture');
+  writeFileSync(join(dir, 'icons', 'script.svg'), '<svg xmlns="http://www.w3.org/2000/svg" onload="fetch(1)"><circle r="4"/></svg>');
+  writeFileSync(join(dir, 'icons', 'big.png'), Buffer.concat([png, Buffer.alloc(500_001)]));
+  for (const [icon, error] of [['../outside.png', /with no \.\./], [join(scratch, 'outside.png'), /from the board file's folder/], ['icons/link.png', /leads outside the board file's folder/],
+    ['icons/fake.png', /is not a PNG picture/], ['icons/script.svg', /holds a script/], ['icons/big.png', /is over 500000 bytes/], ['icons/none.png', /is not a file in/], ['icons/beacon.gif', /must end in \.png/]]) {
+    const r = run('project', board, '--name', 'Beacon', '--icon', icon);
+    assert.equal(r.status, icon === 'icons/none.png' ? 1 : 2, icon);
+    assert.match(r.stdout, error, icon);
+  }
+  assert.equal(readFileSync(join(dir, 'board.projects.jsonl'), 'utf8').trim().split('\n').length, 1);
+  // An SVG with no script is a picture too; --clear-icon takes the icon away again.
+  writeFileSync(join(dir, 'icons', 'tern.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4"/></svg>');
+  assert.equal(run('project', board, '--name', 'Tern', '--icon', 'icons/tern.svg').status, 0);
+  assert.equal(run('project', board, '--name', 'Old', '--icon', 'icons/tern.svg').status, 0);
+  assert.match(run('project', board, '--name', 'old', '--clear-icon').stdout, /status: updated/);
+  // A line another program wrote that breaks a rule, such as an icon path out of the folder, is skipped: the other projects still show.
+  appendFileSync(join(dir, 'board.projects.jsonl'), `${JSON.stringify({ name: 'Escape', icon: { path: '../../outside.png', sha256: 'a'.repeat(64), bytes: 10 }, at: '2026-10-23T09:00:00Z' })}\n`);
+  assert.deepEqual(JSON.parse(run('project', board, '--json').stdout).projects.map((p) => [p.name, p.icon?.path ?? '']), [['Beacon', 'icons/beacon.png'], ['Tern', 'icons/tern.svg'], ['old', '']]);
+
+  const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  try {
+    const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+    const state = await (await fetch(`${url}api/decisions`)).json();
+    assert.deepEqual(Object.fromEntries(state.decisions.map((d) => [d.key, d.priority])), stored);
+    assert.deepEqual(state.projects.map((p) => p.name), ['Beacon', 'Tern', 'old']);
+    // The board serves the pinned file, by project name in any case, as a picture that cannot run or sniff into anything else.
+    const got = await fetch(`${url}api/project-icon?name=beacon`);
+    assert.equal(got.status, 200);
+    assert.equal(got.headers.get('content-type'), 'image/png');
+    assert.equal(got.headers.get('x-content-type-options'), 'nosniff');
+    assert.match(got.headers.get('content-security-policy'), /sandbox/);
+    assert.deepEqual(Buffer.from(await got.arrayBuffer()), png);
+    assert.equal((await fetch(`${url}api/project-icon?name=Tern`)).headers.get('content-type'), 'image/svg+xml');
+    // No icon, no project, the skipped line, and a picture changed after it was set all answer 404: the page then draws the initials.
+    for (const name of ['old', 'Nobody', 'Escape']) assert.equal((await fetch(`${url}api/project-icon?name=${name}`)).status, 404, name);
+    writeFileSync(join(dir, 'icons', 'beacon.png'), Buffer.concat([png.subarray(0, -1), Buffer.from([0])]));
+    assert.equal((await fetch(`${url}api/project-icon?name=Beacon`)).status, 404);
+  } finally { proc.kill(); }
 });
