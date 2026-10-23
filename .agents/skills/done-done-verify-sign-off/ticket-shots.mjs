@@ -25,23 +25,25 @@ const probe = `() => {
   const vis = (e) => { const r = e.getBoundingClientRect(), c = getComputedStyle(e); return r.width > 0 && r.height > 0 && c.visibility !== 'hidden' && c.display !== 'none'; };
   const words = (e) => e.innerText.replace(/\\s+/g, ' ').trim(), w = document.documentElement.clientWidth;
   // A report or plan opened over the board covers the desk's pane under it: only what is on top counts.
-  const rows = [...(document.querySelector('#reader:not([hidden])') ?? document).querySelectorAll('.ticket-row')].filter(vis).map((r) => { const b = r.getBoundingClientRect(); return { text: words(r), href: r.getAttribute('href'), w: Math.round(b.width), h: Math.round(b.height), left: Math.round(b.left), right: Math.round(w - b.right) }; });
+  const rows = [...(document.querySelector('#reader:not([hidden])') ?? document).querySelectorAll('.ticket-row, .decide .ui-props a[href^="#ticket/"]')].filter(vis).map((r) => { const b = r.getBoundingClientRect(); return { text: words(r), href: r.getAttribute('href'), w: Math.round(b.width), h: Math.round(b.height), left: Math.round(b.left), right: Math.round(w - b.right) }; });
   const first = (...sels) => { for (const s of sels) { const e = [...document.querySelectorAll(s)].find(vis); if (e) return words(e); } return ''; };
-  const h1 = first('#reader:not([hidden]) h1', '.decide h2', '.ev-title', '#board h1');
-  const lists = [...document.querySelectorAll('#board .tk-h')].map((h) => ({ head: words(h), rows: [...(h.nextElementSibling?.querySelectorAll('li') ?? [])].map(words) }));
+  const h1 = first('.tk-sheet .tk-dt', '.tk-pane .tk-dt', '#reader:not([hidden]) h1', '.decide h2', '.ev-title', '#board h1');
+  // A ticket, over Tickets on a phone and in its third column on a desk: where it stands, its progress, and its lists (the tickets under it, Linked, Activity).
+  const tk = document.querySelector('.tk-sheet, .tk-pane'), lists = tk ? [...tk.querySelectorAll('.ui-dl')].map((h) => ({ head: words(h), rows: [...(h.nextElementSibling?.matches('ul, ol') ? h.nextElementSibling.children : [])].map(words) })) : [];
   const wide = [...document.querySelectorAll('body *')].filter((e) => vis(e) && e.getBoundingClientRect().right > w + 1 && !e.closest('.split-list, iframe')).slice(0, 5).map((e) => e.tagName.toLowerCase() + (e.className ? '.' + String(e.className).split(' ')[0] : ''));
-  const thread = [...(document.querySelector('#reader:not([hidden])') ?? document).querySelectorAll('.th-list li')].filter(vis).map(words);
-  return JSON.stringify({ hash: location.hash, h1, rows, thread, kicker: words(document.querySelector('.tk-kicker') ?? document.createElement('i')), done: words(document.querySelector('.tk-done') ?? document.createElement('i')), lists, overflow: document.documentElement.scrollWidth > w, wide });
+  const thread = tk ? [...tk.querySelectorAll('.tk-act li')].map((li) => words(li.querySelector('.tk-on')) + ' ' + words(li.querySelector('b'))) : [...(document.querySelector('#reader:not([hidden])') ?? document).querySelectorAll('.th-list li')].filter(vis).map(words);
+  const kicker = tk ? words(tk.querySelector('.tk-shd p')) : '', done = tk ? words([...tk.querySelectorAll('.ui-pr')].find((p) => p.textContent.startsWith('Progress'))) : '';
+  return JSON.stringify({ hash: location.hash, h1, rows, thread, kicker, done, lists, overflow: document.documentElement.scrollWidth > w, wide });
 }`;
 // Each state, and the element its Ticket row sits under (or would): the shot centres it, so linked and unlinked cards show the same part of the card.
 const STATES = [
-  ['ask-linked', '#decide/settings-friday', '.ticket-row'], ['ask-unlinked', '#decide/ship', '.decide .proof-block, .decide .why'], ['ask-unknown-ticket', '#decide/settings-copy', '.decide .why'],
+  ['ask-linked', '#decide/settings-friday', '.decide .ui-props'], ['ask-unlinked', '#decide/ship', '.decide .proof-block, .decide .why'], ['ask-unknown-ticket', '#decide/settings-copy', '.decide .why'],
   ['proof-linked', '#evidence/settings-proof', '.ticket-row'], ['proof-unlinked', '#evidence/update-2', '.ev-say'],
   ['design-linked', '#designs/settings-screens', '.ticket-row'], ['design-unlinked', '#designs/chat-journeys', '.design-review .about'],
   ['report-linked', '#reports/settings-saves', '.ticket-row'], ['report-unlinked', '#reports/digest-ran', '.gd-top .sub'],
   ['plan-linked', '#waiting/faster-sign-in', '.ticket-row'], ['plan-unlinked', '#waiting/plan-kind-board', '.plan-main h2'],
   ['ask-thread', '#decide/settings-search', '.thread'], ['proof-thread', '#evidence/settings-proof', '.thread'],
-  ['ticket', '#ticket/T-29', ''], ['ticket-activity', '#ticket/T-29', '#board .th-list li:last-child'], ['ticket-parent', '#ticket/T-9', ''],
+  ['ticket', '#ticket/T-29', ''], ['ticket-activity', '#ticket/T-29', '.tk-act'], ['ticket-parent', '#ticket/T-9', ''],
 ];
 try {
   const base = sh('bash', [join(repo, '.agents/skills/done-done-verify-sign-off/seed-board.sh'), dir], { cwd: repo, env: seedEnv }).trim().split('\n').pop();
@@ -86,39 +88,41 @@ try {
     const name = `${state}.${cell}`;
     browser('screenshot', join(out, `${name}.png`));
     const m = seen[state] = value(browser('eval', probe));
-    writeFileSync(join(out, `${name}.txt`), `${state} ${theme} ${width}w ${hash}\ntitle: ${m.h1}\n${m.thread.length ? `Activity, oldest first:\n${m.thread.map((t) => `  ${t}`).join('\n')}\n` : 'no Activity thread\n'}${m.rows.length ? m.rows.map((r) => `Ticket row: "${r.text}" -> ${r.href}, ${r.w}x${r.h}px, ${r.left}px from the left and ${r.right}px from the right`).join('\n') : 'no Ticket row'}\n`
+    writeFileSync(join(out, `${name}.txt`), `${state} ${theme} ${width}w ${hash}\ntitle: ${m.h1}\n${m.thread.length ? `Activity, ${state.startsWith('ticket') ? 'newest' : 'oldest'} first:\n${m.thread.map((t) => `  ${t}`).join('\n')}\n` : 'no Activity thread\n'}${m.rows.length ? m.rows.map((r) => `Ticket row: "${r.text}" -> ${r.href}, ${r.w}x${r.h}px, ${r.left}px from the left and ${r.right}px from the right`).join('\n') : 'no Ticket row'}\n`
       + (m.kicker ? `kicker: ${m.kicker}\nprogress: ${m.done}\n` : '') + m.lists.map((l) => `${l.head}:\n${l.rows.map((r) => `  ${r}`).join('\n')}`).join('\n') + `${m.lists.length ? '\n' : ''}horizontal overflow ${m.overflow ? 1 : 0}${m.wide.length ? ` (${m.wide.join(', ')})` : ''}\n`);
     assert.equal(m.overflow, false, `${state}: wider than the screen: ${m.wide.join(', ')}`);
     assert.equal(m.rows.length, state.endsWith('-linked') || state.endsWith('-thread') ? 1 : 0, `${state}: ${JSON.stringify(m.rows)}`);
-    if (m.rows.length) assert.deepEqual([m.rows[0].href, /Ship the new settings page T-29 60%/.test(m.rows[0].text)], ['#ticket/T-29', true], `${state}: ${m.rows[0].text}`);
+    // An ask names its ticket in its panel's Its ask row (title and progress); every other card in its Ticket row (title, id and progress).
+    if (m.rows.length) assert.deepEqual([m.rows[0].href, /Ship the new settings page (T-29 )?60%/.test(m.rows[0].text)], ['#ticket/T-29', true], `${state}: ${m.rows[0].text}`);
   }
-  // The ticket's page: under T-9, 60% done, its six cards, none of the unlinked or unknown-ticket cards; T-9 lists the two tickets under it.
-  assert.deepEqual([seen.ticket.kicker, seen.ticket.done, seen.ticket.lists[0].rows.length], ['The new settings page › T-29', '60% done', 6], JSON.stringify(seen.ticket));
+  // The ticket: in progress at 60%, its six cards, none of the unlinked or unknown-ticket cards; T-9 lists the two tickets under it and is as far along as they are on average.
+  assert.deepEqual([seen.ticket.kicker, seen.ticket.done, seen.ticket.lists[0].head, seen.ticket.lists[0].rows.length], ['In progress', 'Progress 60%', 'Linked', 6], JSON.stringify(seen.ticket));
   // The answered ask's thread in the order it happened, with its notes; the proof's verdict and comment; the ticket's page has its cards' steps together.
   const steps = (state) => seen[state].thread.map((t) => t.replace(/ (Today|\d+ \w+), \d\d:\d\d$/, ''));
   assert.deepEqual(steps('ask-thread'), ['Posted by verify', 'Your answer: No “Not this week.”', 'Changed to: Yes “After the Friday stand-up.”', 'verify picked it up', 'You asked for a new round “Show it on a phone first.”'], JSON.stringify(seen['ask-thread'].thread));
   assert.deepEqual(steps('proof-thread'), ['Posted by verify', 'Your answer: Pass “The theme switch works.”', 'Your comment “Add the dark theme next.”'], JSON.stringify(seen['proof-thread'].thread));
-  assert.deepEqual(seen['ticket-activity'].thread.map((t) => t.replace(/ “.*$| (Today|\d+ \w+), \d\d:\d\d$/, '')), ['Turn on search in the settings page? Your answer: No', 'Turn on search in the settings page? Changed to: Yes',
-    'Turn on search in the settings page? verify picked it up', 'Turn on search in the settings page? You asked for a new round', 'Update 3 · The settings page on a phone Your answer: Pass', 'Update 3 · The settings page on a phone Your comment'], JSON.stringify(seen['ticket-activity'].thread));
+  // The ticket's Activity: its cards' steps newest first, each naming its card.
+  assert.deepEqual(seen['ticket-activity'].thread, ['Turn on search in the settings page? Your answer: No', 'Turn on search in the settings page? Changed to: Yes',
+    'Turn on search in the settings page? verify picked it up', 'Turn on search in the settings page? You asked for a new round', 'Update 3 · The settings page on a phone Your answer: Pass', 'Update 3 · The settings page on a phone Your comment'].reverse(), JSON.stringify(seen['ticket-activity'].thread));
   for (const state of ['ask-unlinked', 'ask-linked', 'design-unlinked']) assert.equal(seen[state].thread.length, 0, `${state} has only its posting: no thread`);
-  assert.deepEqual(seen['ticket-parent'].lists.map((l) => l.rows.length), [0, 2], JSON.stringify(seen['ticket-parent']));
-  // A tap on the ask's Ticket row opens the ticket; Back returns to the ask.
+  assert.deepEqual([seen['ticket-parent'].done, ...seen['ticket-parent'].lists.map((l) => `${l.head} ${l.rows.length}`)], ['Progress 80%', 'Tickets in this epic · 1 of 2 done 2', 'Linked 0'], JSON.stringify(seen['ticket-parent']));
+  // A tap on the ask's Ticket row opens the ticket; Close (a phone) or the browser's Back (a desk) returns to the ask.
   browser('open', 'about:blank');
   browser('open', `${base}#decide/settings-friday`);
   wait(900);
   const walk = value(browser('eval', `async () => {
     const pause = (ms) => new Promise((ok) => setTimeout(ok, ms));
-    document.querySelector('.ticket-row').click(); await pause(600);
-    const at = location.hash, title = document.querySelector('#board h1')?.textContent;
-    document.querySelector('.top .back').click(); await pause(600);
+    document.querySelector('.decide .ui-props a[href^="#ticket/"]').click(); await pause(600);
+    const at = location.hash, title = document.querySelector('.tk-dt')?.textContent;
+    const x = document.querySelector('.tk-sheet .tk-shd .x'); x ? x.click() : history.back(); await pause(600);
     return JSON.stringify({ at, title, back: location.hash });
   }`));
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board seeded with one card of each kind and no tickets, then tickets T-9, T-29 (under T-9) and T-30, a card of each kind posted with --ticket T-29, and one ask naming T-404.',
     steps: ['Open each linked card (an ask, an update, a design review, a guided report, a guided plan), the same kind with no ticket, and the ask naming T-404, on a phone and at 1280 px, in light and dark.',
       'Answer an ask No with a note, change it to Yes with a note, let its agent take it, ask for a new round; give the update Pass with a note and a comment.',
-      'Open each card\'s Activity, tap the ask\'s Ticket row to open T-29, read its Linked list and Activity, tap Back, then open T-9.'],
-    result: 'Each linked card shows a Ticket row with the ticket title, T-29 and 60% that opens the ticket page; unlinked cards and the T-404 ask show none; the ticket page lists its six cards newest first under its parent with 60% done and the cards\' activity; each card lists its answers, notes, pickup and new round oldest first.' }, null, 2) + '\n');
-  writeFileSync(join(out, `walk.${cell}.txt`), `Tap the Ticket row on #decide/settings-friday: the page is ${walk.at}, titled "${walk.title}".\nTap Back: the page is ${walk.back} again.\n`);
+      'Open each card\'s Activity, tap the ask\'s Its ask row to open T-29, read its Linked list and Activity, close it, then open T-9.'],
+    result: 'Each linked card shows a Ticket row with the ticket title, T-29 and 60% that opens the ticket; unlinked cards and the T-404 ask show none; the ticket lists its six cards newest first, in progress at 60%, with its cards\' activity newest first; T-9 lists its two tickets at 80%; each card lists its answers, notes, pickup and new round oldest first.' }, null, 2) + '\n');
+  writeFileSync(join(out, `walk.${cell}.txt`), `Tap the ask's Its ask row on #decide/settings-friday: the page is ${walk.at}, the ticket "${walk.title}".\n${width < 1024 ? 'Tap Close' : 'Go back'}: the page is ${walk.back} again.\n`);
   assert.deepEqual(walk, { at: '#ticket/T-29', title: 'Ship the new settings page', back: '#decide/settings-friday' });
 } finally {
   try { browser('stop'); } catch {}

@@ -2855,10 +2855,10 @@ test('Today on a phone: the floating tab bar with its pill on Today, Up next wit
   await evaluate(`location.href = ${JSON.stringify(url)}`);
   await until(async () => (await evaluate('document.querySelectorAll(".t-wait .ui-row").length')) === 1);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= 390'));
-  // The dock floats 24px over the bottom edge: a 56px pill of four 48px tabs, then the round 56px Search 12px beside it, the two centred together; its pill sits on Today.
+  // The dock floats 24px over the bottom edge: a 56px pill of five 48px tabs, then the round 56px Search 12px beside it, the two centred together; its pill sits on Today.
   const rect = (sel) => `(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right), Math.round(r.top), Math.round(r.bottom)]; })()`;
   const bar = await evaluate(rect('.tabs')), find = await evaluate(rect('.dock-find')), tab = await evaluate(rect('.tabs a')), [vw, vh] = await evaluate('[document.documentElement.clientWidth, innerHeight]');
-  assert.deepEqual([bar[1] - bar[0], bar[3] - bar[2], vh - bar[3], tab[1] - tab[0], find[1] - find[0], find[3] - find[2], vh - find[3], find[0] - bar[1], Math.abs(bar[0] - (vw - find[1])) <= 1], [206, 56, 24, 48, 56, 56, 24, 12, true]);
+  assert.deepEqual([bar[1] - bar[0], bar[3] - bar[2], vh - bar[3], tab[1] - tab[0], find[1] - find[0], find[3] - find[2], vh - find[3], find[0] - bar[1], Math.abs(bar[0] - (vw - find[1])) <= 1], [256, 56, 24, 48, 56, 56, 24, 12, true]);
   await until(async () => (await evaluate(rect('.tabs .hl')))[0] === (await evaluate(rect('.tabs a[href="#"]')))[0]);
   // Up next is the plan, to review: one main action in ink that opens it, and no second.
   const plan = JSON.parse(readFileSync(join(fixture, 'valid-full.json'), 'utf8')).key;
@@ -3702,7 +3702,7 @@ test('load budget: a board of 60 updates opens Evidence on a phone with at most 
   proc.kill();
 });
 
-test('a card names its ticket: --ticket on every post, a Ticket row that opens the ticket, the ticket page lists its cards newest first, and each card shows its Activity', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('a card names its ticket: --ticket on every post, a Ticket row that opens the ticket, the ticket lists its cards newest first, each card shows its Activity, and the Tickets tab lists the tickets', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'ticket'), file = join(dir, 'board.json'), fx = new URL('../fixtures/contract/', import.meta.url).pathname, now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   mkdirSync(join(dir, 'design'), { recursive: true });
   for (const f of readdirSync(join(fx, 'design.v1/design'))) writeFileSync(join(dir, 'design', f), readFileSync(join(fx, 'design.v1/design', f)));
@@ -3714,6 +3714,17 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
   assert.equal(run('ticket', file, '--id', 'T-29', '--title', 'Ship the new settings page', '--progress', '20', '--parent', 'T-9').code, 0);
   assert.match(run('ticket', file, '--id', 'T-29', '--progress', '60').out, /status: updated/);
   for (const bad of [['--progress', '101'], ['--progress', '4.5'], ['--parent', 'T-29'], ['--title', ' '], ['--id', 'bad id']]) assert.equal(run('ticket', file, '--id', 'T-29', ...bad).code, 2, bad.join(' '));
+  // A ticket may carry a priority, a project, whether it is on hold and whether the user asked for it; an empty value takes one off, and a bad one is refused.
+  assert.equal(run('ticket', file, '--id', 'T-9', '--priority', 'P1', '--project', 'Settings', '--asked', 'yes').code, 0);
+  assert.equal(run('ticket', file, '--id', 'T-31', '--title', 'Write the release notes', '--priority', 'P2', '--hold', 'yes').code, 0);
+  assert.equal(run('ticket', file, '--id', 'T-31', '--priority', '').code, 0);
+  const lines = readFileSync(join(dir, 'board.tickets.jsonl'), 'utf8');
+  for (const bad of [['--priority', 'P7'], ['--hold', 'maybe'], ['--asked', '1'], ['--project', 'x'.repeat(41)]]) assert.equal(run('ticket', file, '--id', 'T-31', ...bad).code, 2, bad.join(' '));
+  assert.equal(readFileSync(join(dir, 'board.tickets.jsonl'), 'utf8'), lines);
+  // The roll-up: T-9 is as far along as the one ticket under it (60%), though its own line says 45; the file keeps what was written.
+  const tickets = Object.fromEntries(JSON.parse(run('ticket', file, '--json').out).tickets.map((t) => [t.id, t]));
+  assert.deepEqual([tickets['T-9'].progress, tickets['T-9'].priority, tickets['T-9'].project, tickets['T-9'].asked, tickets['T-31'].hold, tickets['T-31'].priority], [60, 'P1', 'Settings', true, true, undefined]);
+  assert.equal(lines.trim().split('\n').map((l) => JSON.parse(l)).filter((t) => t.id === 'T-9').at(-1).progress, 45);
   // Every way a card gets in takes --ticket, or "ticket" in its message or --from item: flags, an evidence update, contract messages, a feed file and a sign-in.
   const fileOf = (name, m) => (writeFileSync(join(dir, name), JSON.stringify(m)), join(dir, name)), session = '5f0c2b7e-9a41-4c3e-8d2a-6b7f1e0c9d34';
   const report = JSON.parse(readFileSync(join(fx, 'report.v4/valid-minimal.json'), 'utf8'));
@@ -3757,21 +3768,32 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
       await until(async () => (await evaluate(`document.querySelector('#board h1, #reader:not([hidden]) h1') !== null && location.hash === ${JSON.stringify(hash)}`)) === true && (await evaluate(row)) === (seen ? '1|#ticket/T-29 Ship the new settings page T-29 60%' : '0|'));
       assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true, hash);
     }
-    // The row opens the ticket's page: where it sits, its progress, then its seven cards newest first, each opening where it lives; Back returns to the card.
+    // The row opens the ticket over Tickets: its project (its epic's) and where it stands, its title, what it sits under, then its seven cards newest first, each opening where it lives; Close returns to the card.
     await evaluate(`location.href = ${JSON.stringify(`${url}#decide/ask-linked`)}`);
     await until(() => evaluate('!!document.querySelector(".decide .ui-props a[href^=\'#ticket/\']")'));
     await evaluate('document.querySelector(".decide .ui-props a[href^=\'#ticket/\']").click()');
-    await until(async () => (await evaluate('location.hash')) === '#ticket/T-29' && (await evaluate('document.querySelectorAll("#board .card.rows li").length')) === 7);
-    const page = JSON.parse(await evaluate(`JSON.stringify({ h1: document.querySelector('#board h1').textContent, kicker: document.querySelector('.tk-kicker').textContent, done: document.querySelector('.tk-done').textContent,
-      rows: [...document.querySelectorAll('#board .card.rows a')].map((a) => [a.querySelector('strong').textContent.replace(/^Update \\d+ · /, ''), a.getAttribute('href')]), wide: document.documentElement.scrollWidth > 390 })`));
-    assert.deepEqual({ ...page, rows: page.rows.map(([t]) => t) }, { h1: 'Ship the new settings page', kicker: 'The new settings page › T-29', done: '60% done', rows: shown.cards.map((c) => c.title), wide: false });
+    await until(async () => (await evaluate('location.hash')) === '#ticket/T-29' && (await evaluate('document.querySelectorAll(".tk-sheet .tk-in li").length')) === 7);
+    const page = JSON.parse(await evaluate(`JSON.stringify({ head: document.querySelector('.tk-sheet .tk-shd p > span:last-child').textContent, title: document.querySelector('.tk-sheet .tk-dt').textContent,
+      props: [...document.querySelectorAll('.tk-sheet .ui-props .ui-pr')].map((p) => p.innerText.replace(/\\s+/g, ' ').trim()).filter((p) => !p.startsWith('Last update')),
+      rows: [...document.querySelectorAll('.tk-sheet .tk-in a')].map((a) => [a.querySelector('.t').textContent.replace(/^Update \\d+ · /, ''), a.getAttribute('href')]),
+      tab: document.querySelector('#tabs a[aria-current]')?.getAttribute('href'), wide: document.documentElement.scrollWidth > 390 })`));
+    assert.deepEqual({ ...page, rows: page.rows.map(([t]) => t) }, { head: 'Settings · In progress', title: 'Ship the new settings page', props: ['Progress 60%', 'Part of The new settings page'], rows: shown.cards.map((c) => c.title), tab: '#tickets', wide: false });
     assert.deepEqual(['Ship the settings page on Friday?', 'Settings on a phone', 'Chat app journeys', 'The weekly digest ran'].map((t) => Object.fromEntries(page.rows)[t]), ['#decide/ask-linked', '#evidence/update-1', '#designs/chat-journeys', '#reports/digest-ran']);
-    await evaluate('document.querySelector(".top .back").click()');
+    await evaluate('document.querySelector(".tk-sheet .tk-shd .x").click()');
     await until(async () => (await evaluate('location.hash')) === '#decide/ask-linked');
     // The ticket above it lists the ticket under it, and no card names it.
     await evaluate(`location.href = ${JSON.stringify(`${url}#ticket/T-9`)}`);
-    await until(async () => (await evaluate('[...document.querySelectorAll(".tk-sub")].map((a) => a.getAttribute("href")).join()')) === '#ticket/T-29');
-    assert.equal(await evaluate('document.querySelector("#board .empty")?.textContent'), 'No card on the board names this ticket yet.');
+    await until(async () => (await evaluate('[...document.querySelectorAll(".tk-sheet a.tk-row")].map((a) => a.getAttribute("href")).join()')) === '#ticket/T-29');
+    assert.equal(await evaluate('[...document.querySelectorAll(".tk-sheet .ui-dl, .tk-sheet .tk-none")].map((p) => p.textContent).join(" | ")'), 'Tickets in this epic · 0 of 1 done | Linked | No card names this ticket yet.');
+    // The Tickets tab lists the tickets under no other: Your asks (T-9, which the user asked for, moving) or System (T-31, on hold). T-29 sits under T-9, so it is not listed on its own.
+    const tab = `JSON.stringify({ seg: [...document.querySelectorAll('.tk-seg button')].map((b) => b.textContent + (b.getAttribute('aria-pressed') === 'true' ? ' on' : '')), hero: document.querySelector('.tk-hero').innerText.replace(/\\s+/g, ' ').trim(),
+      lists: [...document.querySelectorAll('main section[aria-label]')].map((x) => x.getAttribute('aria-label') + ' ' + [...x.querySelectorAll('a.tk-row')].map((a) => a.getAttribute('href')).join()) })`;
+    await evaluate(`location.href = ${JSON.stringify(`${url}#tickets`)}`);
+    await until(() => evaluate('!!document.querySelector(".tk-hero")'));
+    assert.deepEqual(JSON.parse(await evaluate(tab)), { seg: ['Your asks1 on', 'System1'], hero: 'Your asks done 0 of 1 1 moving', lists: ['In progress #ticket/T-9'] });
+    await evaluate('document.querySelector(".tk-seg button:last-child").click()');
+    await until(async () => JSON.parse(await evaluate(tab)).lists.join() === 'On hold #ticket/T-31');
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
     // A card's Activity: nothing while its posting is all there is; then each answer with its note, the change, its agent taking it and a new round, oldest first.
     // The agent posted under a session id, which names nobody, so it reads Agent. The ticket's page shows those steps under the card's name.
     const thread = (hash) => `(async () => { location.hash = ${JSON.stringify(hash)}; await new Promise((ok) => setTimeout(ok, 50)); const top = document.querySelector('#reader:not([hidden])') ?? document;
@@ -3784,7 +3806,10 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     await until(() => evaluate('!window.old'));
     const steps = ['Your answer: No “Not this week.”', 'Changed to: Yes “After the Friday stand-up.”', 'Agent picked it up', 'You asked for a new round “Show it on a phone first.”'];
     await until(async () => (await evaluate(thread('#decide/ask-linked'))) === ['Posted by Agent', ...steps].join(' | '));
-    assert.equal(await evaluate(thread('#ticket/T-29')), steps.map((x) => `Ship the settings page on Friday? ${x}`).join(' | '));
+    // The ticket shows its cards' steps newest first, each naming its card.
+    const tkThread = `(async () => { location.hash = '#ticket/T-29'; await new Promise((ok) => setTimeout(ok, 50));
+      return [...document.querySelectorAll('.tk-act li')].map((li) => [li.querySelector('b').textContent, li.querySelector('.th-n')?.textContent, li.querySelector('.tk-on').textContent].filter(Boolean).join(' ')).join(' | '); })()`;
+    assert.equal(await evaluate(tkThread), [...steps].reverse().map((x) => `${x} Ship the settings page on Friday?`).join(' | '));
     assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
   } finally { close(); }
   proc.kill();

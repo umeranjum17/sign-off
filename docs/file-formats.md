@@ -86,12 +86,12 @@ New guided defaults use plan schema 3 / report schema 4, contract 1, with a requ
   no filer the file names by key); every other item, the board's other top-level fields and the answers stay.
 - `ticket`: optional, the id of the ticket the item belongs to (1-128 of `A-Z a-z 0-9 . _ -`), written by `raise` and `post` with `--ticket <id>` or carried in a message or `--from` item.
   It is only a reference: the ticket need not be on the board, and nothing checks or needs it. While a ticket with that id is on the board (**Tickets**, below),
-  the item's screen shows a **Ticket** row (on an ask, **Its ask** in the panel under the question), the ticket's title, id and progress, that opens the ticket's page; otherwise it shows none. It does not change what the item asks or how it is answered.
+  the item's screen shows a **Ticket** row (on an ask, **Its ask** in the panel under the question), the ticket's title, id and progress, that opens the ticket; otherwise it shows none. It does not change what the item asks or how it is answered.
 - `priority`: optional, how urgent the item is: `P0` (most), `P1`, `P2` or `P3` (least), written by `raise` and `post` with `--priority` or carried in a message or `--from` item. Any other value refuses the board file.
   The board shows it as a chip and can sort by it; an item without one shows no chip. It does not change what the item asks or how it is answered.
 - **Activity**: every card's screen (an ask, a sign-in, an update, a design review, a report and a plan) lists, oldest first, what the board keeps of it: when it was posted and by whom (its `filer`, with its `link` when that is a web link),
   the answer a change replaced, the answer and its note, when its filer took it with `wait --filer` (`*.seen.jsonl`), each another-round ask with its note (`*.rounds.jsonl`) and each comment on it (`*.messages.jsonl`).
-  Steps are compared to the second (answers are stored to the second); within one second they keep that order. A card whose only step is its posting shows no Activity. A ticket's page shows its cards' steps after their postings together, each under the card's title. Nothing is written for it.
+  Steps are compared to the second (answers are stored to the second); within one second they keep that order. A card whose only step is its posting shows no Activity. A ticket shows its cards' steps after their postings together, newest first, each naming its card. Nothing is written for it.
 - `area`: optional, the board area the item shows in: `waiting`, `evidence`, `reports` or `answered`
   (Waiting on you, Evidence, Reports and explainers, Answered). Without it an `evidence` item is in Evidence;
   an `explainer`, an item with nothing to answer, or any item on a read-only board is in Reports and
@@ -319,17 +319,26 @@ A new answer or another round after the line brings the item back. Reports and o
 no item needs one, a board without the file has none, and every card and command works the same. Another program may append lines in the same shape (one JSON object and a newline per write).
 
 ```json
-{"id":"T-9","title":"The new settings page","progress":45,"at":"2026-10-23T09:10:00Z"}
-{"id":"T-29","title":"Ship the new settings page","progress":60,"parent":"T-9","at":"2026-10-23T09:12:00Z"}
+{"id":"T-9","title":"The new settings page","progress":0,"priority":"P1","project":"Settings","asked":true,"at":"2026-10-23T09:10:00Z"}
+{"id":"T-29","title":"Ship the new settings page","progress":60,"parent":"T-9","priority":"P0","at":"2026-10-23T09:12:00Z"}
+{"id":"T-31","title":"Publish to npm","progress":0,"parent":"T-29","hold":true,"at":"2026-10-23T09:14:00Z"}
 ```
 
 - `id`: 1-128 of `A-Z a-z 0-9 . _ -`, what items name in `ticket`. `title`: text, 160 characters or fewer. `progress`: a whole number from 0 to 100, the percent done.
   `parent`: optional, the id of the ticket it sits under, never its own; that ticket need not be on the board. `at`: when the line was written.
-- A new ticket needs a title; its progress starts at 0. A later write with the same `id` changes only the fields it gives; a write that changes nothing adds no line.
+- Optional, each left out when not set: `priority`, one of `P0` to `P3`; `project`, a project name (text of 40 characters or fewer, as **Projects** below names one), whose icon its rows show;
+  `hold`, `true` while the work is on hold; `asked`, `true` when the board's owner asked for the work (the Tickets tab lists it under Your asks, the rest under System).
+- A new ticket needs a title; its progress starts at 0. A later write with the same `id` changes only the fields it gives (an empty value takes an optional one off); a write that changes nothing adds no line.
 - A line that breaks a rule, or a torn line, is skipped with a warning; the other tickets still show.
-- The board's state (`/api/state`) carries `tickets`, each id's latest line. A ticket's page, `#ticket/<id>`, shows the ticket it sits under, its progress,
-  the items that name it (not dismissed) newest first by `filed`, each opening where it lives, and the tickets whose `parent` it is.
-  `ticket --id <id> --json` prints the same: the ticket and its `cards` (`key`, `kind`, `status`, `title`, `filed`); `ticket --json` lists every ticket with its card keys.
+- **The tree and the roll-up.** An epic is a ticket with tickets under it, and those may have sub-tasks under them, each by its `parent`. A ticket with tickets under it on the board is as far along as
+  they are on average (each of them worked out the same way), so its own `progress` counts only while nothing is under it. The roll-up is worked out on reading, never written: `/api/state`
+  and `ticket --json` carry it as `progress`, and the file keeps what was written. A loop of parents stops where it would come back round.
+- Where a ticket stands follows from it: **Done** at 100%, else **On hold** while `hold` is set, else **To do** at 0% and **In progress** past it.
+- The board's state (`/api/state`) carries `tickets`, each id's latest line with its roll-up. The **Tickets** tab (`#tickets`) lists the tickets that sit under no ticket on the board, of the
+  board's owner (Your asks) or not (System), shown only while the board has both: how many are done of how many, one square each, then In progress, On hold and To do (and Done on a phone),
+  with a project filter. A ticket, `#ticket/<id>`, opens over the list on a phone and beside it on a desk: its project and where it stands, its title, priority, progress, the ticket it sits under
+  and when it last changed; the tickets or sub-tasks under it; the items that name it (not dismissed), newest first by `filed`, each opening where it lives; and their Activity, newest first.
+  `ticket --id <id> --json` prints the ticket and its `cards` (`key`, `kind`, `status`, `title`, `filed`); `ticket --json` lists every ticket with its card keys.
 
 **Projects**, written only by `sign-off-axi project --name <name> ...` (`decisions.projects.jsonl`, mode 600, one line per write, the latest line per name wins, names matched without regard to case).
 A project here only carries its own icon: no item needs one, a board without the file has none, and every project then shows a monogram tile, its initials.

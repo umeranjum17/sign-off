@@ -499,19 +499,27 @@ export function readPromoted(decisionsPath: string, warn: (msg: string) => void 
   });
   return [...promoted];
 }
-/** A ticket: a standalone record of work, its percent done and the ticket it sits under. Cards name one by id; nothing else reads or needs it. */
-export type Ticket = { id: string; title: string; progress: number; parent?: string; at: string };
+/** A ticket: a standalone record of work, its percent done and the ticket it sits under, and optionally its priority, its project, whether it is on hold and whether the board's owner asked for it.
+ * Cards name one by id; nothing else reads or needs it. */
+export type Ticket = { id: string; title: string; progress: number; parent?: string; priority?: string; project?: string; hold?: boolean; asked?: boolean; at: string };
 /** Tickets, one line per write (`ticket <id> --title`), the latest line per id wins. A board without the file has no tickets, and every card works as before. */
 export const ticketsPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.tickets.jsonl';
 /** The ticket rules, shared by the writer and the reader: a line that breaks one is skipped, never shown half-valid. */
 export const ticketFault = (t: any) => (!isKey(t?.id) ? 'id must be 1-128 of A-Z a-z 0-9 . _ -'
   : !isText(t.title) || !t.title.trim() || [...t.title].length > 160 ? 'title must be text of 160 characters or fewer'
   : !(Number.isInteger(t.progress) && t.progress >= 0 && t.progress <= 100) ? 'progress must be a whole number from 0 to 100'
-  : t.parent !== undefined && (!isKey(t.parent) || t.parent === t.id) ? 'parent must be the id of another ticket' : '');
-export function appendTicket(decisionsPath: string, { id, title, progress, parent }: Omit<Ticket, 'at'>): Ticket {
-  const t = { id, title, progress, ...(parent !== undefined && { parent }), at: now() };
-  appendLine(ticketsPath(decisionsPath), t);
-  return t;
+  : t.parent !== undefined && (!isKey(t.parent) || t.parent === t.id) ? 'parent must be the id of another ticket'
+  : t.priority !== undefined && !PRIORITIES.includes(t.priority) ? `priority must be one of ${PRIORITIES.join(', ')}`
+  : t.project !== undefined && projectFault({ name: t.project }) ? 'project must be a project name, text of 40 characters or fewer'
+  : t.hold !== undefined && typeof t.hold !== 'boolean' ? 'hold must be true or false'
+  : t.asked !== undefined && typeof t.asked !== 'boolean' ? 'asked must be true or false' : '');
+const TICKET_FIELDS = ['parent', 'priority', 'project', 'hold', 'asked'] as const;
+/** A ticket's fields in the file's order, leaving out each optional one it does not carry. */
+const ticketLine = (t: any): Ticket => ({ id: t.id, title: t.title, progress: t.progress, ...Object.fromEntries(TICKET_FIELDS.filter((k) => t[k] !== undefined).map((k) => [k, t[k]])), at: t.at });
+export function appendTicket(decisionsPath: string, t: Omit<Ticket, 'at'>): Ticket {
+  const line = ticketLine({ ...t, at: now() });
+  appendLine(ticketsPath(decisionsPath), line);
+  return line;
 }
 /** Every ticket as its latest line says, in the order each was first written. A torn or broken line is skipped and reported through warn. */
 export function readTickets(decisionsPath: string, warn: (msg: string) => void = () => {}): Ticket[] {
@@ -520,9 +528,20 @@ export function readTickets(decisionsPath: string, warn: (msg: string) => void =
     let t;
     try { t = line && JSON.parse(line); } catch {}
     if (line && (!t || ticketFault(t))) return warn(`skipped unreadable line ${n + 1} in ${ticketsPath(decisionsPath)}`);
-    if (t) latest.set(t.id, { id: t.id, title: t.title, progress: t.progress, ...(t.parent !== undefined && { parent: t.parent }), at: t.at });
+    if (t) latest.set(t.id, ticketLine(t));
   });
   return [...latest.values()];
+}
+/** The progress roll-up: a ticket with tickets under it on the board is as far along as they are on average (each of them rolled up the same way), and one with none keeps its own.
+ * A loop of parents stops where it would come back round. */
+export function rollUp(tickets: Ticket[]): Ticket[] {
+  const under = new Map<string, Ticket[]>();
+  for (const t of tickets) if (t.parent) under.set(t.parent, [...(under.get(t.parent) ?? []), t]);
+  const done = (t: Ticket, path: Set<string>): number => {
+    const kids = (under.get(t.id) ?? []).filter((k) => !path.has(k.id));
+    return kids.length ? Math.round(kids.reduce((n, k) => n + done(k, new Set([...path, k.id])), 0) / kids.length) : t.progress;
+  };
+  return tickets.map((t) => ({ ...t, progress: done(t, new Set([t.id])) }));
 }
 /** A project's own icon: a picture in the board's folder, pinned by its hash so the board serves only the file that was set. */
 export type IconRef = { path: string; sha256: string; bytes: number };

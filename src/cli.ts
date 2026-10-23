@@ -14,7 +14,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, appendPromoted, appendSendBack, appendTicket, readTickets, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, appendDesignAnswer, answerLines, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, appendPromoted, appendSendBack, appendTicket, readTickets, rollUp, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, appendDesignAnswer, answerLines, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -301,17 +301,21 @@ Brings back a card that dismiss hid. See \`sign-off-axi dismiss --help\`.
 `,
   ticket: `usage: sign-off-axi ticket [board.json] [--json]
        sign-off-axi ticket [board.json] --id <id> [--json]
-       sign-off-axi ticket [board.json] --id <id> [--title <text>] [--progress <0-100>] [--parent <id>]
-A ticket is one piece of work: its id, title, percent done and, optionally, the ticket it sits under. It stands alone: nothing else needs it.
+       sign-off-axi ticket [board.json] --id <id> [--title <text>] [--progress <0-100>] [--parent <id>] [--priority P0-P3] [--project <name>] [--hold yes|no] [--asked yes|no]
+A ticket is one piece of work: its id, title, percent done and, optionally, the ticket it sits under, its priority, its project (whose icon its rows show),
+whether it is on hold and whether you asked for it (the board's Tickets tab then lists it under Your asks). It stands alone: nothing else needs it.
+An epic is a ticket with tickets under it, and those may have sub-tasks under them (--parent): a ticket with tickets under it is as far along as they are on average.
 With no --id, lists every ticket with how many cards name it. With --id alone, shows that ticket and its cards, newest first.
-With --title, --progress or --parent, writes it: a new ticket needs --title (progress starts at 0); a later write changes only the fields given.
+With any other flag, writes it: a new ticket needs --title (progress starts at 0); a later write changes only the fields given, and an empty value ("") takes one off.
 A card names its ticket with --ticket <id> on raise and post (every --type and --kind), or "ticket" in a message or --from item:
-its screen then shows a Ticket row, the title and progress, that opens the ticket's page, which lists its asks, designs, proof and reports.
+its screen then shows a Ticket row, the title and progress, that opens the ticket, which lists its asks, designs, proof and reports.
 A card whose ticket is not on the board shows no row; a ticket with no cards shows an empty page.
 It writes one line to <board>.tickets.jsonl beside the board (${FORMAT}).
 examples:
-  sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40 --parent T-9
+  sign-off-axi ticket --id T-9 --title "The new settings page" --priority P1 --project Settings --asked yes
+  sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40 --parent T-9 --priority P0
   sign-off-axi ticket --id T-29 --progress 80
+  sign-off-axi ticket --id T-29 --hold yes
   sign-off-axi ticket --id T-29
   sign-off-axi ticket --json
 `,
@@ -1111,22 +1115,24 @@ function promote(args: string[]) {
   });
 }
 
-/** ticket [board.json] [--id <id> [--title <text>] [--progress <0-100>] [--parent <id>]]: lists the tickets, shows one with the cards that name it, or writes one.
- * A ticket stands alone in <board>.tickets.jsonl: cards name it with --ticket, and nothing else reads it. */
+/** ticket [board.json] [--id <id> [--title <text>] [--progress <0-100>] [--parent <id>] [--priority P0-P3] [--project <name>] [--hold yes|no] [--asked yes|no]]: lists the tickets,
+ * shows one with the cards that name it, or writes one. A ticket stands alone in <board>.tickets.jsonl: cards name it with --ticket, and nothing else reads it.
+ * What it prints carries the roll-up: a ticket with tickets under it is as far along as they are on average. */
 function ticket(args: string[]) {
-  const { file, values, on } = parse('ticket', args, { id: { type: 'string' }, title: { type: 'string' }, progress: { type: 'string' }, parent: { type: 'string' }, json: { type: 'boolean' } });
-  const { id, title, parent } = values, write = [title, values.progress, parent].some((v) => v !== undefined);
-  if (id === undefined && write) throw fail('--title, --progress and --parent need --id <ticket id>', 'VALIDATION_ERROR', 'sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40');
+  const { file, values, on } = parse('ticket', args, { id: { type: 'string' }, title: { type: 'string' }, progress: { type: 'string' }, parent: { type: 'string' }, priority: { type: 'string' },
+    project: { type: 'string' }, hold: { type: 'string' }, asked: { type: 'string' }, json: { type: 'boolean' } });
+  const { id, title, parent } = values, write = [title, values.progress, parent, values.priority, values.project, values.hold, values.asked].some((v) => v !== undefined);
+  if (id === undefined && write) throw fail('--title, --progress, --parent, --priority, --project, --hold and --asked need --id <ticket id>', 'VALIDATION_ERROR', 'sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40');
   const cardsOf = (t: Ticket) => board(file).filter((d) => d.ticket === t.id && !d.dismissed).reverse().sort((x, y) => (Date.parse(y.filed ?? '') || 0) - (Date.parse(x.filed ?? '') || 0));
-  const row = (t: Ticket) => ({ id: t.id, title: t.title, progress: t.progress, parent: t.parent ?? '' });
+  const row = (t: Ticket) => ({ id: t.id, title: t.title, progress: t.progress, parent: t.parent ?? '', priority: t.priority ?? '', project: t.project ?? '', hold: t.hold ? 'yes' : 'no', asked: t.asked ? 'yes' : 'no' });
   if (id === undefined) {
-    const all = readTickets(file, warn);
+    const all = rollUp(readTickets(file, warn));
     if (values.json) return JSON.stringify({ board: file, tickets: all.map((t) => ({ ...t, cards: cardsOf(t).map((d) => d.key) })) });
     return toon({ board: tilde(file), tickets: all.length ? all.map((t) => ({ ...row(t), cards: cardsOf(t).length })) : '0 tickets' }, [`Run \`sign-off-axi ticket${on} --id <id> --title "<what the work is>" --progress <0-100>\` to add one`, 'Pass --ticket <id> to raise or post, so the card shows its ticket']);
   }
   if (!isKey(id)) throw fail(`--id ${id} must be 1-128 of A-Z a-z 0-9 . _ -`, 'VALIDATION_ERROR', 'Pass a short id such as --id T-29');
   if (!write) {
-    const t = readTickets(file, warn).find((x) => x.id === id);
+    const t = rollUp(readTickets(file, warn)).find((x) => x.id === id);
     if (!t) throw fail(`no ticket ${id} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi ticket${on} --id ${id} --title "<what the work is>"\` to add it`);
     // Each card in the words its page uses: what it is, and its answer, waiting (a design Main has not promoted is in review) or shown when it asks nothing.
     const cards = cardsOf(t).map((d) => ({ key: d.key, kind: d.type === 'evidence' ? 'proof' : d.kind === 'design' || d.type === 'design' ? 'design' : d.type === 'plan' ? 'plan' : asks(d) ? 'ask' : 'report',
@@ -1135,16 +1141,20 @@ function ticket(args: string[]) {
     return toon({ board: tilde(file), ticket: row(t), cards: cards.length ? cards : '0 cards name this ticket' }, [`Pass --ticket ${id} to raise or post, so the card shows this ticket`]);
   }
   const progress = values.progress === undefined ? undefined : /^\d{1,3}$/.test(values.progress) ? Number(values.progress) : NaN;
+  // yes or no; anything else is kept as given, so the rule below refuses it by name.
+  const yesNo = (v: string | undefined) => (v === undefined ? undefined : ({ yes: true, no: false } as Record<string, boolean>)[v] ?? (v as unknown as boolean));
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
     const had = readTickets(file, warn).find((t) => t.id === id);
     if (!had && title === undefined) throw fail(`no ticket ${id} on ${tilde(file)} yet: a new ticket needs --title`, 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id ${id} --title "<what the work is>" --progress 0`);
-    const next = { id, title: title ?? had!.title, progress: progress ?? had?.progress ?? 0, ...((parent ?? had?.parent) !== undefined && { parent: parent ?? had!.parent }) };
+    // A later write changes only what it gives; an empty --parent, --priority, --project, --hold or --asked takes that field off.
+    const next: any = { ...had, id, title: title ?? had!.title, progress: progress ?? had?.progress ?? 0 };
+    for (const [k, v] of Object.entries({ parent, priority: values.priority, project: values.project, hold: yesNo(values.hold), asked: yesNo(values.asked) })) if (v === '') delete next[k]; else if (v !== undefined) next[k] = v;
     const fault = ticketFault(next);
-    if (fault) throw fail(`ticket ${id}: ${fault.replace(/^(title|progress|parent)/, '--$1')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi ticket --help`');
-    const same = had && JSON.stringify(row(had)) === JSON.stringify(row(next as Ticket));
+    if (fault) throw fail(`ticket ${id}: ${fault.replace(/^(title|progress|parent|priority|project|hold|asked)/, '--$1').replace('must be true or false', 'must be yes or no')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi ticket --help`');
+    const same = had && JSON.stringify(row(had)) === JSON.stringify(row(next));
     if (!same) appendTicket(file, next);
-    return toon({ board: tilde(file), ticket: row(next as Ticket), status: same ? 'unchanged' : had ? 'updated' : 'created' }, [`Pass --ticket ${id} to raise or post, so the card shows this ticket`, `Run \`sign-off-axi ticket${on} --id ${id} --progress <0-100>\` as the work moves`]);
+    return toon({ board: tilde(file), ticket: row(next), status: same ? 'unchanged' : had ? 'updated' : 'created' }, [`Pass --ticket ${id} to raise or post, so the card shows this ticket`, `Run \`sign-off-axi ticket${on} --id ${id} --progress <0-100>\` as the work moves`]);
   });
 }
 
@@ -2418,7 +2428,7 @@ const state = () => {
     comments: fed ? [] : readPartComments(file),
     dismissed: readDismissed(file, answers, rounds, warn, fed ? [] : items),
     promoted: readPromoted(file, warn),
-    tickets: readTickets(file, warn),
+    tickets: rollUp(readTickets(file, warn)),
     projects: readProjects(file, warn),
   };
 };

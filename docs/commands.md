@@ -28,7 +28,7 @@ Guided plan 3 / report 4 add **Simplify this**. Inspect version-1 action/target 
 | `dismiss` | hide a card, like its Dismiss button; `--filer <id>` hides every card of a finished task |
 | `restore` | bring a dismissed card back |
 | `promote` | Main only: put a design review it passed in Decide (`--undo` takes it back to Designs); a lead's design never counts as an ask without it |
-| `ticket` | list tickets, show one with its cards, or write one (`--id`, `--title`, `--progress`, `--parent`) |
+| `ticket` | list tickets, show one with its cards, or write one (`--id`, `--title`, `--progress`, `--parent`, `--priority`, `--project`, `--hold`, `--asked`) |
 | `project` | list projects, or set or clear a project's own icon (`--name`, `--icon`, `--clear-icon`) |
 | `doctor` | check the setup; each failure names its fix |
 | `notify` | check device notifications, or send a test notice |
@@ -94,12 +94,16 @@ or sends a test notice. Detail is in
 ## Tickets
 
 A ticket is one piece of work: an id, a title, how far along it is (0 to 100) and,
-optionally, the ticket it sits under. It stands alone: no card needs one, and a
-board with none works as before. A card names its ticket with `--ticket <id>` on
+optionally, the ticket it sits under, its priority, its project, whether it is on
+hold and whether you asked for it. An epic is a ticket with tickets under it, and
+those may have sub-tasks; a ticket with tickets under it is as far along as they
+are on average. It stands alone: no card needs one, and a board with none works as before. A card names its ticket with `--ticket <id>` on
 `raise` and `post` (every `--type` and `--kind`), or `"ticket"` in a message:
 
 ```sh
+sign-off-axi ticket --id T-9 --title "The new settings page" --priority P1 --project Settings --asked yes
 sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40 --parent T-9
+sign-off-axi ticket --id T-31 --title "Publish to npm" --parent T-29 --hold yes
 sign-off-axi raise --ask-ref <captain-message-id-or-hold-id> --ticket T-29 \
   --title "Ship the settings page on Friday?" ...
 sign-off-axi post --type evidence --ticket T-29 --title "Settings on a phone" ...
@@ -108,8 +112,10 @@ sign-off-axi ticket --id T-29          # the ticket and its cards, newest first
 ```
 
 The card then shows a **Ticket** row (on an ask, **Its ask**), the title and progress, that opens the
-ticket's page: its cards (asks, designs, proof, reports and plans), newest first,
-and the tickets under it. A card whose ticket is not on the board shows no row.
+ticket: the tickets under it, its cards (asks, designs, proof, reports and plans),
+newest first, and their Activity. A card whose ticket is not on the board shows no row.
+The board's **Tickets** tab lists the tickets that sit under none: Your asks or
+System, how many are done, then In progress, On hold and To do.
 The file format is in [file-formats.md](file-formats.md), under **Tickets**.
 
 ## Priority and project icons

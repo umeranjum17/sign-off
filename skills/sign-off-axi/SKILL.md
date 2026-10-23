@@ -62,10 +62,10 @@ The user often reads the board on a phone. Each card must make sense in 10 secon
 
 ## Link each card to its ticket
 
-When the work belongs to a ticket and you know its id, pass `--ticket <id>` on every `raise` and `post` for it (any `--type` or `--kind`, or `"ticket"` in the message or `--from` item). The card then shows a Ticket row, the ticket's title and progress, that opens the ticket's page with every card on it.
+When the work belongs to a ticket and you know its id, pass `--ticket <id>` on every `raise` and `post` for it (any `--type` or `--kind`, or `"ticket"` in the message or `--from` item). The card then shows a Ticket row, the ticket's title and progress, that opens the ticket with every card on it.
 
 - It is optional and only a reference: leave it out when you know no ticket, and never invent an id. A card whose ticket is not on the board shows no row, and works as before.
-- A ticket stands alone: `npx -y sign-off-axi ticket --id <id> --title "<the work>" --progress <0-100>` makes it (`--parent <id>` puts it under another), and `--progress` again as the work moves. Write only your own tickets. `ticket --id <id>` shows a ticket and its cards; `ticket` lists them all.
+- A ticket stands alone: `npx -y sign-off-axi ticket --id <id> --title "<the work>" --progress <0-100>` makes it (`--parent <id>` puts it under another: an epic's tickets, a ticket's sub-tasks), and `--progress` again as the work moves. A ticket with tickets under it takes their average, so move the progress of the ones with nothing under them. Add `--priority P0-P3` and `--project <name>` when you know them, `--hold yes` while the work waits (`--hold no` when it moves again), and `--asked yes` when the user asked for the work. Write only your own tickets. `ticket --id <id>` shows a ticket and its cards; `ticket` lists them all.
 
 ## Say how urgent a card is, and give your project its icon
 
