@@ -48,7 +48,8 @@ cli('post', board, '--kind', 'plan', '--from', join(dir, 'plan.json'));
 const server = spawn(process.execPath, ['dist/cli.js', 'serve', board, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'inherit'] });
 try {
   const base = await new Promise((ok, no) => { let log = ''; server.stdout.on('data', (b) => { log += b; const m = /http:\/\/127\.0\.0\.1:\d+\//.exec(log); if (m) ok(m[0]); }); server.once('exit', (code) => no(new Error(`Server exited ${code}`))); });
-  browser('open', base); browser('emulate', '--viewport', width === 390 ? '390x844x2,mobile,touch' : '1280x800x1', '--color-scheme', theme);
+  // The plan waits on Decide, a row under Review.
+  browser('open', `${base}#waiting`); browser('emulate', '--viewport', width === 390 ? '390x844x2,mobile,touch' : '1280x800x1', '--color-scheme', theme);
   const capture = (name, claim) => {
     if (process.env.PLAN_REVIEW_STAGE && process.env.PLAN_REVIEW_STAGE !== name) return;
     const stem = `${name}.${theme}.${width}w`;
@@ -67,7 +68,7 @@ try {
     writeFileSync(join(records, `${stem}.claim.txt`), `${width}px ${theme}: ${claim}\n`);
   };
   drive('await wait(".ask-card .i-plan"); await page.eval(() => scrollTo(0, 0));');
-  capture('home', 'Today lists the plan under Waiting on you with a document icon, its sections and decisions.');
+  capture('home', 'Decide lists the plan under Review with a document icon, its sections and decisions.');
   // The phone tab bar covers the bottom edge, so bring the link clear of it before the real click.
   drive('await page.eval(() => document.querySelector(".ask-card .i-plan").scrollIntoView({ block: "center" }));');
   const openRef = new RegExp(`uid=(\\S+) link "${plan.title}`).exec(browser('snapshot'))[1];

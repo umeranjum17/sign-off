@@ -95,13 +95,14 @@ function helpers(home, readySel) {
 // Every card kind on every tab, with the actions it must offer. A stage with `shot` is captured and looked at before the next one.
 const KEYS = { plan: 'plan-kind-board', signin: 'npm', ask: 'ship', ask2: 'keep-the-weekly-digest', evidence: 'update-1', design: 'look', review: 'chat-journeys', passed: 'update-2', report: 'new-sign-in', answered: 'digest-old' };
 const PAGES = [
-  { name: 'today', hash: '', ready: '[id="item-update-2"]', stages: [{ run: async (h) => {
-    await h.nav('Today row: Need you', h.find(/^Need you, 6$/, h.board(), 'a'), /^#waiting$/);
-    for (const [what, href] of [['sign-in', '#decide/npm'], ['ask', '#decide/ship'], ['plan', '#waiting/plan-kind-board'], ['Answered', '#answered'], ['Designs', '#designs'], ['report', '#reports/new-sign-in']]) {
+  { name: 'today', hash: '', ready: '.t-proof .lrow', stages: [{ run: async (h) => {
+    // Each tile opens what it counts; Up next's Details opens the sign-in ask; the foot links Answered and Designs; New report and a Latest proof row open theirs.
+    await h.nav('Today tile: Answer', h.find(/^Answer, \d+:/, h.board(), 'a'), /^#waiting$/);
+    await h.nav('Today tile: Proof', h.find(/^Proof, \d+:/, h.board(), 'a'), /^#evidence$/);
+    for (const [what, href] of [['Up next Details', '#decide/npm'], ['Answered', '#answered'], ['Designs', '#designs'], ['report', '#reports/new-sign-in']]) {
       await h.nav(`Today ${what} link`, h.board().querySelector(`a[href="${href}"]`), new RegExp(`^${href}$`));
     }
-    await h.nav('Today passed update', h.card('update-2'), /^#evidence\/update-2$/);
-    await h.dismissCard('update-2');
+    await h.nav('Today latest proof', h.board().querySelector('.t-proof .lrow'), /^#evidence\/[\w-]+$/);
   } }] },
   { name: 'waiting', hash: '#waiting', ready: '[id="item-npm"]', stages: [
     { run: async (h) => {

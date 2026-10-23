@@ -14,11 +14,15 @@
 // With both, it records the desk's Reports by keys: J and K moving the selection (each report read as it is shown), U twice, a row's hover actions,
 // E archiving the report shown (the row folds, the next is selected), Cmd+Z, Enter opening a guided report over the board and Escape, and the ? sheet.
 // Usage: node decide-record.mjs <board url> <light|dark> <out.mp4> [desk] [reports]
+// With `today` it records Today at phone size on a board feel-board.sh seeded: the page scrolled (the small title in its bar) and back, the Sign in tile opening Decide at its
+// group (the pill sliding), the sign-in swiped to Later, the Today tab (Up next is now the next ask), a comment typed under it, Answer turning into a check (the ring closing a step,
+// Decide's badge counting down, the next ask sliding in), Undo, the Review tile, the Evidence tab and a Latest proof row opening its update.
+// Usage: node decide-record.mjs <board url> <light|dark> <out.mp4> today
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-const [url, theme, out, ...modes] = process.argv.slice(2), desk = modes.includes('desk'), screen = modes.includes('reports') ? 'reports' : 'decide', [W, H] = desk ? [1280, 800] : [390, 844];
+const [url, theme, out, ...modes] = process.argv.slice(2), desk = modes.includes('desk'), screen = modes.includes('today') ? 'today' : modes.includes('reports') ? 'reports' : 'decide', [W, H] = desk ? [1280, 800] : [390, 844];
 const dir = mkdtempSync(join(tmpdir(), 'decide-rec-'));
 const chrome = spawn('/usr/bin/chromium', ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(dir, 'profile')}`, `--window-size=${W},${H}`,
   '--hide-scrollbars', '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: 'ignore' });
@@ -68,7 +72,7 @@ try {
     (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, bubbles: true, ctrlKey: ${mod} })); return 'ok';`);
   const type = (words) => inPage(`const t = document.activeElement; if (t?.tagName !== 'TEXTAREA') return 'missing'; for (const c of ${JSON.stringify(words)}) { t.value += c; t.dispatchEvent(new Event('input')); await s(45); } return 'ok';`);
   await send('Page.startScreencast', { format: 'jpeg', quality: 90, everyNthFrame: 1 });
-  await send('Page.navigate', { url: `${url}${screen === 'reports' ? '#reports' : '#waiting'}` });
+  await send('Page.navigate', { url: `${url}${{ reports: '#reports', decide: '#waiting', today: '' }[screen]}` });
   const steps = screen === 'reports' && desk ? [[2600], [() => key('j'), 1100], [() => key('j'), 1100], [() => key('k'), 1100], [() => key('u'), 1600], [() => key('u'), 1400],
     [() => inPage("const b = document.querySelector('.split-list .dl-row:not(.sel) .dl-hover .read-q'); if (!b) return 'missing'; b.focus(); return 'ok';"), 1400],
     [() => inPage("document.querySelector('.split-list [data-row][aria-current]').focus(); return 'ok';"), 300], [() => key('e'), 1800], [() => key('z', true), 1600],
@@ -78,7 +82,12 @@ try {
     [() => tap('.top .dl-more > summary'), 1200], [() => tap('[data-act="read-all"]'), 1600], [() => tap('#undo'), 1500]] : desk ? [[2600], [() => key('j'), 900], [() => key('j'), 900], [() => key('k'), 900], [() => key('Enter'), 1800], [() => key('z', true), 1500],
     [() => key('l'), 1500], [() => key('?'), 1800], [() => tap('#keys header button'), 700], [() => key('j'), 800], [() => key('c'), 600], [() => type('After the demo'), 500], [() => key('Enter', true), 1800],
     [() => inPage("const b = document.querySelector('.split-list .dl-row:not(.sel) .dl-hover .yes'); if (!b) return 'missing'; b.focus(); await s(700); b.click(); return 'ok';"), 1600],
-    [() => key('g'), 200], [() => key('e'), 1200], [() => key('g'), 200], [() => key('d'), 1500]] : [[2600], [() => press('ship'), 700], [() => drag('ship', 80, 10, 45), 1000], [() => drag('keep-the-weekly-digest', 300), 1600], [() => tap('#undo'), 1400],
+    [() => key('g'), 200], [() => key('e'), 1200], [() => key('g'), 200], [() => key('d'), 1500]]
+    : screen === 'today' ? [[2600], [() => inPage("scrollTo({ top: 760, behavior: 'smooth' }); return 'ok';"), 1700], [() => inPage("scrollTo({ top: 0, behavior: 'smooth' }); return 'ok';"), 1500],
+    [() => tap('.tile.g-signin'), 1800], [() => drag('npm', -280), 1700], [() => tap('.tabs a[href="#"]'), 1600], [() => tap('.up-next .cmt > summary'), 800],
+    [() => type('Keep support on call until Monday.'), 700], [() => tap('.up-next .go'), 2400], [() => tap('#undo'), 1700], [() => tap('.tile.g-review'), 1800],
+    [() => tap('.tabs a[href="#evidence"]'), 1600], [() => tap('.tabs a[href="#"]'), 1400],
+    [() => inPage("document.querySelector('.t-proof .lrow').scrollIntoView({ block: 'center', behavior: 'smooth' }); return 'ok';"), 1300], [() => tap('.t-proof .lrow'), 2000], [() => tap('.tabs a[href="#"]'), 1600]] : [[2600], [() => press('ship'), 700], [() => drag('ship', 80, 10, 45), 1000], [() => drag('keep-the-weekly-digest', 300), 1600], [() => tap('#undo'), 1400],
     [() => drag('ship', -280), 1600], [() => tap('#undo'), 1300], [() => tap('a.dl-face[href="#decide/ship"]'), 900],
     [() => tap('.pick-list li:nth-child(2) .pick-option'), 700], [() => tap('.pick-list li:nth-child(1) .pick-option'), 700],
     [() => tap('.decide-bar .answer'), 1800], [() => tap('#undo'), 1200], [() => tap('.top .dl-more > summary'), 1200], [() => tap('[data-act="answer-all"]'), 2000], [() => tap('#undo'), 1500]];

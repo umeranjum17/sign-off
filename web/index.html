@@ -24,81 +24,177 @@
      The sizes of a title, body, secondary line and footnote, the card corner and the raised shadow come from tokens.css; the display sizes are the board's own. */
   :root { --t-xl: 1.75rem; --t-l: 1.25rem; --t-m: var(--tk-fs-title); --t-b: var(--tk-fs-body); --t-s: var(--tk-fs-secondary); --t-xs: var(--tk-fs-footnote); --t-xxs: 0.75rem; --r-ctl: var(--tk-r-ctl); --r-card: var(--tk-r-card); --ctl: 2.75rem; }
   @media (min-width: 64rem) { :root { --t-xl: 2rem; --t-l: 1.375rem; } }
+  /* The approved feel's surfaces: Today's ground and raised cards, the glass tab bar and its pill, an iOS hairline, a second fill, and the lift of a card and of a capture. */
+  :root { --ground: var(--tk-grouped); --card: var(--tk-surface); --side: #F5F5F7; --tabbar: rgba(255, 255, 255, 0.72); --tab-on: rgba(0, 0, 0, 0.06); --hairline: rgba(60, 60, 67, 0.29); --fill-2: rgba(118, 118, 128, 0.2);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.05); --shot-edge: 0 0 0 0.5px rgba(0, 0, 0, 0.14), 0 12px 32px rgba(0, 0, 0, 0.12); }
+  @media (prefers-color-scheme: dark) { :root { --ground: #0D0D0F; --side: #141416; --tabbar: rgba(36, 36, 40, 0.72); --tab-on: rgba(255, 255, 255, 0.1); --hairline: rgba(255, 255, 255, 0.1); --fill-2: rgba(118, 118, 128, 0.34);
+    --shadow-card: 0 0 0 0.5px rgba(255, 255, 255, 0.06); --shot-edge: 0 0 0 0.5px rgba(255, 255, 255, 0.16), 0 16px 40px rgba(0, 0, 0, 0.55); } }
   @media (prefers-color-scheme: dark) { :root {
     --page: var(--tk-grouped); --tile: var(--tk-surface-high); --desk: var(--tk-grouped); --desk-tile: var(--tk-surface-high); --bar: var(--tk-surface-high); --sunk: var(--tk-input); --line: var(--tk-rail);
     --accent: var(--tk-link); --danger: var(--tk-critical); --bezel: var(--tk-rail);
     --c-waiting: var(--tk-link); --c-evidence: var(--tk-success); --c-reports: var(--tk-warning); --c-gate: #FFD60A; --badge: var(--tk-critical); --seg-on: var(--tk-text-tertiary); } }
   * { box-sizing: border-box; }
-  /* A phone keeps room at the bottom for the tab bar. */
+  /* A phone keeps 140px at the bottom, so the last row scrolls fully clear of the floating tab bar. */
   /* A phone keeps the text size it was given on every screen, so the tab bar never grows or shrinks. */
   html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-  body { margin: 0; padding-bottom: calc(4.25rem + env(safe-area-inset-bottom)); background: var(--bg); color: var(--text); overflow-wrap: anywhere;
+  body { margin: 0; padding-bottom: calc(8.75rem + env(safe-area-inset-bottom)); background: var(--bg); color: var(--text); overflow-wrap: anywhere;
     -webkit-font-smoothing: antialiased; font: var(--t-b)/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif; letter-spacing: -0.011em; }
   /* The board areas each have a colour, used on icons, dots and marks. */
   .i-waiting { --area: var(--c-waiting); } .i-evidence { --area: var(--c-evidence); } .i-reports { --area: var(--c-reports); } .i-answered { --area: var(--c-answered); }
   main { max-width: 72rem; margin: 0 auto; padding: 0 max(1.25rem, env(safe-area-inset-right)) 0 max(1.25rem, env(safe-area-inset-left)); }
   .side { display: none; }
-  /* A phone moves between areas with a tab bar, 52px tall and solid so no page text shows through it as a ghost behind a label. */
-  .tabs { position: fixed; z-index: 2; left: 0; right: 0; bottom: 0; display: flex; padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-    background: var(--bar); border-top: 0.5px solid var(--line); }
-  .tabs a { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.125rem; min-height: 3.25rem; color: var(--faint);
-    min-width: 0; font-size: 0.75rem; line-height: 0.875rem; letter-spacing: 0; text-decoration: none; white-space: nowrap; }
+  /* A phone moves between areas with a floating glass pill, 62px tall and 12px over the bottom edge; the area on screen sits in a lighter pill that slides between tabs on a spring. */
+  .tabs { position: fixed; z-index: 2; left: max(1rem, env(safe-area-inset-left)); right: max(1rem, env(safe-area-inset-right)); bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    display: flex; height: 3.875rem; padding: 0.25rem; border-radius: 1.9375rem; background: var(--tabbar); -webkit-backdrop-filter: saturate(180%) blur(24px); backdrop-filter: saturate(180%) blur(24px);
+    box-shadow: 0 0 0 0.5px var(--hairline), 0 8px 30px rgba(0, 0, 0, 0.12); }
+  .tabs .hl { position: absolute; top: 0.25rem; bottom: 0.25rem; left: 0.25rem; width: calc((100% - 0.5rem) / 4); border-radius: 1.6875rem; background: var(--tab-on); transition: transform 300ms var(--spring); }
+  .tabs a { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 0; border-radius: 1.6875rem; color: var(--muted);
+    font-size: 0.6875rem; line-height: 0.8125rem; font-weight: 600; letter-spacing: 0; text-decoration: none; white-space: nowrap; -webkit-tap-highlight-color: transparent; }
   .tabs a[aria-current] { color: var(--accent); }
-  /* Decide carries a red count of what waits on you, over its icon's corner. */
-  .tabs a { position: relative; }
-  .tabs .bd { position: absolute; top: 0.25rem; left: calc(50% + 0.4375rem); min-width: 1.125rem; height: 1.125rem; padding: 0 0.3125rem; border-radius: 0.5625rem;
-    background: var(--badge); color: #FFFFFF; font-size: 0.75rem; line-height: 1.125rem; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; }
-  .tabs a:focus-visible { outline-offset: -2px; border-radius: 0.75rem; }
-  /* The areas' icons in the bar and the sidebar are bare outlines. */
-  .tabs .icon, .side .icon { width: 1.375rem; height: 1.375rem; background: none; }
-  .tabs .icon svg, .side .icon svg { width: 1.375rem; height: 1.375rem; stroke: currentColor; stroke-width: 1.6; }
-  .side .icon { color: var(--accent); }
-  .side .icon, .side .icon svg { width: 1.25rem; height: 1.25rem; } .side .icon svg { stroke-width: 1.75; }
+  .tabs a:active .icon { transform: scale(0.86); transition-duration: 90ms; }
+  /* Decide carries a red count of what waits on you over its icon's corner, Reports a blue count of what is new; a count that changes bumps. */
+  .tabs .bd { position: absolute; top: 0.3125rem; left: calc(50% + 0.375rem); min-width: 1.125rem; height: 1.125rem; padding: 0 0.3125rem; border-radius: 0.5625rem;
+    background: var(--badge); color: #FFFFFF; font-size: 0.75rem; line-height: 1.125rem; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--tabbar); }
+  .bd.bump, .side .n.bump { animation: bump 380ms var(--spring); }
+  @keyframes bump { 30% { transform: scale(1.25); } }
+  .tabs a:focus-visible { outline-offset: -2px; border-radius: 1.6875rem; }
+  .tabs .icon, .side .icon { width: 1.5rem; height: 1.5rem; background: none; transition: transform 300ms var(--spring); }
+  .tabs .icon svg, .side .icon svg { width: 1.5rem; height: 1.5rem; stroke: currentColor; stroke-width: 1.9; }
+  .side .icon { color: var(--muted); } .side [aria-current] .icon { color: var(--accent); }
+  .side .icon, .side .icon svg { width: 1.25rem; height: 1.25rem; }
   .banner { margin: 1rem 0 0; padding: 0.75rem 1rem; border: 1px solid var(--danger); border-radius: 0.5rem; color: var(--danger); }
   .top { position: relative; padding: 1.5rem 0 1.25rem; }
-  /* Today's search: a bare glass at the top right that opens a field; what matches lists under it. */
-  .top > .find { position: absolute; top: 0.25rem; right: -0.25rem; width: 2.75rem; min-height: 2.75rem; padding: 0; border-radius: 50%; background: none; color: var(--accent); }
-  .find svg { width: 1.25rem; height: 1.25rem; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; }
-  .search { margin: 0 0 1rem; } .search[hidden] { display: none; }
+  /* A search field; what matches lists under it. */
+  .search { margin: 0 0 1rem; }
   .search input { width: 100%; min-height: 2.75rem; padding: 0 0.875rem; border: 0; border-radius: 0.625rem; background: var(--sunk); color: var(--text); font: inherit; }
   .search .rows { margin-top: 0.75rem; }
-  .top:has(> .find) { padding: 3.5rem 0 1.25rem; } .top:has(> .find) h1 { line-height: 1.2; } .top:has(> .find) .date { margin-top: 0.25rem; line-height: 1.4; }
-  .date { margin: 0.375rem 0 0; color: var(--muted); font-size: var(--t-s); }
   .top h1 { margin: 0; font-size: var(--t-xl); line-height: 1.2; font-weight: 700; letter-spacing: -0.022em; outline: none; }
   .lede { margin: 0.375rem 0 0; color: var(--muted); }
   .back, .sec-head a, .more { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--accent); font-weight: 400; text-decoration: none; }
   h2 { font-size: 1.375rem; line-height: 1.25; margin: 0 0 0.75rem; }
   .icon { flex: none; display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 0.5rem; background: var(--area, var(--muted)); }
   .icon svg { width: 1.125rem; height: 1.125rem; fill: none; stroke: var(--surface); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  /* Today: a few lines at a glance, three tiles (each opens its screen) with the count large, what waits on you, what was proven, the new report, then the leash. */
-  .glance { margin: 0 0 0.75rem; padding: 0.875rem 1rem; border-radius: var(--r-card); color: var(--muted); font-size: var(--t-m); line-height: 1.45; }
-  .glance b { color: var(--text); font-weight: 400; }
-  .glance .seen { display: block; margin-bottom: 0.375rem; font-size: var(--t-xs); line-height: 1.25rem; letter-spacing: -0.016em; }
-  /* Proven today swipes on a phone, a card a time; New report is one hero card, its picture above the words on a phone and beside them on a desk. */
-  .ev-scroll-row { display: flex; gap: 0.75rem; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 1.25rem; margin: 0 -1.25rem; padding: 0 1.25rem 0.25rem; scrollbar-width: none; }
-  .ev-scroll-row::-webkit-scrollbar { display: none; }
-  .ev-scroll-row > .has-x { flex: none; width: 15.5rem; scroll-snap-align: start; }
-  .ev-scroll-row .ev-card { flex: none; width: 15.5rem; scroll-snap-align: start; }
-  /* On Today a proven card is square, its capture standing on the card's bottom edge, with a shorter title than on Evidence. */
-  .ev-scroll-row .ev-card { gap: 0.625rem; } .ev-scroll-row .ev-media { aspect-ratio: 1 / 1; padding: 0; border-radius: 1rem; }
-  /* A phone capture is tall and thin: in a square tile it fills the frame from its top, where the screen's title and first content sit, instead of shrinking to a sliver. */
-  .ev-scroll-row .ev-media img, .ev-scroll-row .ev-media video { padding: 0; object-fit: cover; object-position: center top; border-radius: 1rem; }
-  .ev-scroll-row .ev-card .t { font-size: 1.0625rem; line-height: 1.375rem; } .ev-scroll-row .ev-card .m { gap: 0.375rem; line-height: 1.25rem; }
-  /* Proof that kept only text: a compact row of its claim and its result's small check, in one card under the captures. */
-  .has-x > .ev-text { padding-right: 3rem; }
-  .ev-rows { overflow: hidden; border-radius: var(--r-card); background: var(--surface); }
-  .ev-scroll-row + .ev-rows { margin-top: 0.75rem; } .ev-rows > * + * { box-shadow: inset 0 0.5px var(--line); }
-  .ev-rows .ev-card { gap: 0.25rem; padding: 0.75rem 3rem 0.75rem 1rem; }
-  .ev-rows .ev-card .t { font-size: 1.0625rem; line-height: 1.375rem; } .ev-rows .ev-card .m { gap: 0.375rem; line-height: 1.25rem; }
-  .ev-rows .has-x > .x { top: 50%; right: 0.5rem; translate: 0 -50%; background: none; }
-  .rp-card { display: flex; flex-direction: column; overflow: hidden; border-radius: var(--r-card); background: var(--surface); color: inherit; text-decoration: none; }
-  .rp-art { display: grid; place-items: center; aspect-ratio: 16 / 9; background: var(--sunk); overflow: hidden; }
-  .rp-art .thumb { width: 100%; height: 100%; object-fit: contain; }
-  .rp-art .icon { background: none; width: 3rem; height: 3rem; } .rp-art .icon svg { width: 2.5rem; height: 2.5rem; stroke: var(--muted); }
-  .rp-body { display: flex; flex-direction: column; gap: 0.375rem; padding: 1rem 1.125rem 1.25rem; }
-  .rp-eyebrow { color: var(--c-reports); font-size: var(--t-xs); font-weight: 600; }
-  .rp-title { font-size: var(--t-m); line-height: 1.3; font-weight: 650; }
-  .rp-about { color: var(--muted); font-size: var(--t-s); line-height: 1.45; }
+  /* Today, as the approved feel draws it: the date over a large title and a ring that fills as asks are cleared, one Up next card with one main action,
+     four tiles in two rows (each opens what it counts), the latest proof with a capture each, the new report, and what was cleared today, on a grey ground. */
+  body.today { --bg: var(--ground); --surface: var(--card); }
+  body.today main { padding: 0 max(1rem, env(safe-area-inset-right)) 0 max(1rem, env(safe-area-inset-left)); }
+  .top.today-top { padding: 1.25rem 0.25rem 0; }
+  .today-top .date-kicker { height: 1.25rem; margin: 0; line-height: 1.25rem; letter-spacing: 0.01em; }
+  .head-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.75rem; }
+  body.today .today-top h1 { font-size: 2.125rem; line-height: 2.5625rem; letter-spacing: -0.026em; }
+  .today-top .sub { margin: 2px 0 0; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; }
+  /* Scrolled on a phone, the large title gives way to a small one in a glass bar at the top, as on iOS. */
+  .cbar { position: fixed; z-index: 2; top: 0; left: 0; right: 0; display: grid; place-items: center; height: calc(3.25rem + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top);
+    background: var(--tabbar); -webkit-backdrop-filter: saturate(180%) blur(24px); backdrop-filter: saturate(180%) blur(24px); box-shadow: 0 0.5px 0 var(--hairline);
+    font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.02em; opacity: 0; pointer-events: none; transition: opacity 160ms linear; }
+  body.scrolled .cbar { opacity: 1; }
+  .ring { position: relative; flex: none; width: 2.75rem; height: 2.75rem; margin-bottom: 2px; }
+  .ring svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke-width: 4.5; }
+  .ring .bg { stroke: var(--fill-2); } .ring .fg { stroke: var(--tk-success); stroke-linecap: round; transition: stroke-dashoffset 600ms var(--spring); }
+  .ring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: var(--t-xs); font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  /* Up next: the one ask that matters most, its kind in its colour, and one main action beside a quiet second one. */
+  .up-next { position: relative; margin: 1.25rem 0 0; padding: 1.125rem; border-radius: 1.375rem; background: var(--card); box-shadow: var(--shadow-card); overflow: hidden; }
+  .g-answer { --k: var(--action); } .up-next.clear { --k: var(--tk-success); }
+  .up-next .lk { display: flex; align-items: center; gap: 0.5rem; margin: 0; color: var(--k); font-size: var(--t-xs); line-height: 1.125rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; }
+  .up-next .lk .dot { flex: none; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--k); box-shadow: 0 0 0 4px color-mix(in srgb, var(--k) 18%, transparent); }
+  .up-next .lk .when { margin-left: auto; color: var(--muted); font-weight: 500; text-transform: none; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .up-next .lk .when.hot { color: var(--warn); font-weight: 600; }
+  .up-next h2 { margin: 0.625rem 0 0.375rem; font-size: 1.375rem; line-height: 1.75rem; letter-spacing: -0.022em; }
+  .up-next p { margin: 0; color: var(--muted); font-size: var(--t-s); line-height: 1.3125rem; }
+  .up-next .rec { display: flex; align-items: center; gap: 0.625rem; margin-top: 0.875rem; padding: 0.75rem 0.875rem; border-radius: 0.875rem; background: var(--sunk); color: var(--text); }
+  .up-next .rec .glyph { width: 1.25rem; height: 1.25rem; color: var(--k); }
+  .up-next .rec b { font-weight: 600; }
+  .up-next .acts { display: flex; gap: 0.625rem; margin-top: 1rem; }
+  .up-next .acts > * { display: flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 3.25rem; padding: 0 1.125rem; border-radius: 1rem; font-size: var(--t-m); font-weight: 600;
+    letter-spacing: -0.02em; text-decoration: none; white-space: nowrap; -webkit-tap-highlight-color: transparent; transition: transform 260ms var(--spring), filter 120ms linear; }
+  .up-next .acts > :active { transform: scale(0.965); transition-duration: 90ms; }
+  /* The main action names the pick, so a long one wraps inside the button rather than being cut. */
+  .up-next .go { position: relative; overflow: hidden; flex: 1; min-width: 0; padding-block: 0.5rem; white-space: normal; text-align: center; line-height: 1.25rem; background: var(--action); color: #FFFFFF; box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset, 0 6px 16px -6px color-mix(in srgb, var(--action) 70%, transparent); }
+  .up-next .go:active { filter: brightness(0.92); }
+  /* Answered from here, the button turns green and draws a check; then the next ask slides up into the card. */
+  .up-next .go.done, .up-next .go.done:disabled { background: color-mix(in srgb, var(--tk-success) 82%, #000); color: #FFFFFF; } .up-next .go.done .kc { visibility: hidden; }
+  .up-next.next > * { animation: lead-in 260ms var(--ease); }
+  @keyframes lead-in { from { opacity: 0; transform: translateY(0.875rem); } }
+  .up-next .soft { flex: none; background: var(--sunk); color: var(--text); }
+  .up-next .go .kc { display: none; background: rgba(255, 255, 255, 0.22); color: #FFFFFF; box-shadow: none; }
+  .up-next .strip { display: flex; gap: 0.5rem; margin-top: 0.875rem; }
+  .up-next .strip img { width: 4.125rem; height: 8.9375rem; border-radius: 0.5rem; object-fit: cover; object-position: top; box-shadow: var(--shot-edge); }
+  /* An optional comment under a pick, folded until asked for; what is typed goes with the answer. */
+  .up-next .cmt { margin: 0.625rem -0.875rem 0; }
+  .up-next .cmt > summary { display: flex; align-items: center; gap: 0.625rem; min-height: 3rem; padding: 0 0.875rem; border-radius: 0.875rem; color: var(--accent); font-weight: 500; list-style: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .up-next .cmt > summary::-webkit-details-marker { display: none; }
+  .up-next .cmt > summary:active { background: var(--sunk); }
+  .up-next .cmt[open] > summary { color: var(--muted); }
+  .up-next .cmt > summary .glyph { width: 1.25rem; height: 1.25rem; }
+  .up-next .cmt > summary small { margin-left: auto; color: var(--faint); font-size: var(--t-xs); font-weight: 500; }
+  .up-next .cmt textarea { display: block; width: calc(100% - 1.75rem); min-height: 4rem; margin: 0.25rem 0.875rem 0; padding: 0.75rem 0.875rem; border: 0; border-radius: 0.875rem; background: var(--sunk); color: var(--text); font: inherit; resize: none; }
+  .up-next.clear { padding: 1.75rem 1.125rem 1.875rem; text-align: center; }
+  .up-next.clear .big { display: grid !important; place-items: center; width: 4.5rem; height: 4.5rem; margin: 0 auto 1.125rem; border-radius: 50%; color: #FFFFFF; background: var(--tk-success);
+    box-shadow: 0 10px 28px -8px color-mix(in srgb, var(--tk-success) 70%, transparent); animation: pop 520ms var(--spring); }
+  .up-next.clear .big .glyph { width: 2.125rem; height: 2.125rem; stroke-width: 2.6; }
+  .up-next.clear h2 { margin: 0 0 0.375rem; }
+  /* Four tiles, two by two on a phone: a disc in the group's colour, the count large, the group and one line; a tile at zero greys and shakes when tapped. */
+  .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; margin: 0.75rem 0 0; }
+  .card, .tile { background: var(--surface); border-radius: var(--r-card); }
+  .card { padding: var(--tk-sp-4); }
+  .tile { display: flex; flex-direction: column; justify-content: space-between; min-height: 5.75rem; padding: 0.75rem 0.875rem; border-radius: 1.125rem; background: var(--card); box-shadow: var(--shadow-card);
+    color: var(--text); text-decoration: none; -webkit-tap-highlight-color: transparent; transition: transform 260ms var(--spring); }
+  .tile:active { transform: scale(0.975); transition-duration: 90ms; }
+  .tile .tt { display: flex; align-items: flex-start; justify-content: space-between; }
+  .tile .icon { width: 2rem; height: 2rem; border-radius: 50%; background: var(--k); }
+  .tile .icon svg { width: 1.125rem; height: 1.125rem; stroke: #FFFFFF; stroke-width: 2.2; }
+  .tile .n { font-size: 1.75rem; line-height: 2rem; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .tile .name { font-size: var(--t-s); line-height: 1.125rem; font-weight: 600; }
+  .tile .name small { display: block; margin-top: 1px; color: var(--muted); font-size: var(--t-xs); line-height: 1rem; font-weight: 500; }
+  .tile.zero .n { color: var(--faint); } .tile.zero .icon { background: var(--fill-2); } .tile.zero .icon svg { stroke: var(--muted); }
+  .tile.shake { animation: shake 360ms var(--ease); }
+  @keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+  .tile:focus-visible { outline-offset: 2px; }
+  .tile.g-answer { --k: var(--tk-link); } .tile.g-signin { --k: var(--tk-warning); } .g-proof { --k: var(--tk-success); } .g-proof.failed { --k: var(--tk-critical); }
+  /* A tile opens Decide at its group, whose head flashes. */
+  .dl-head { scroll-margin-top: 1rem; } .dl-head.flash { animation: head-flash 900ms var(--ease); }
+  @keyframes head-flash { from, 40% { color: var(--accent); } }
+  /* Section heads 32px under what comes before them, the link keeping a tall tap area without pushing the rows down. */
+  .t-sec .sec-head { align-items: baseline; margin: 2rem 0.25rem 0.625rem; }
+  .t-sec .sec-head h2 { margin: 0; font-size: 1.25rem; line-height: 1.5625rem; letter-spacing: -0.02em; }
+  .t-sec .sec-head a { min-height: 2.75rem; margin: -0.75rem -0.5rem -0.75rem 0; padding: 0 0.5rem; font-size: var(--t-s); font-weight: 500; }
+  /* A grouped list: a capture or a check, the title on one line, one quiet line under it, then a chevron. */
+  .t-list { list-style: none; margin: 0; padding: 0; overflow: hidden; border-radius: 1.125rem; background: var(--card); box-shadow: var(--shadow-card); }
+  .t-list li { position: relative; }
+  .t-list li + li::before { content: ""; position: absolute; z-index: 1; top: 0; right: 0; left: 3.875rem; border-top: 0.5px solid var(--hairline); }
+  .lrow { display: flex; align-items: center; gap: 0.75rem; min-height: 3.75rem; padding: 0.625rem 0.875rem; color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent; transition: background-color 120ms linear; }
+  .lrow:active { background: color-mix(in srgb, var(--text) 6%, var(--card)); transition: none; }
+  .lrow .lt { display: grid; flex: 1; min-width: 0; }
+  .lrow .lt b { font-size: 1rem; line-height: 1.3125rem; font-weight: 600; letter-spacing: -0.02em; }
+  .lrow .lt > span { color: var(--muted); font-size: 0.875rem; line-height: 1.1875rem; }
+  .lrow .chev { flex: none; } .lrow .chev .glyph { width: 1.125rem; height: 1.125rem; color: var(--tk-rail); }
+  .mini { flex: none; width: 2.25rem; height: 3rem; overflow: hidden; border-radius: 0.375rem; background: var(--sunk); box-shadow: var(--shot-edge); }
+  .mini img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+  .mini .icon { width: 100%; height: 100%; border-radius: 0; background: none; } .mini .icon svg { stroke: var(--muted); }
+  .res { display: inline-flex; align-items: center; gap: 0.3125rem; font-weight: 600; }
+  .res::before { content: ""; width: 0.4375rem; height: 0.4375rem; border-radius: 50%; background: currentColor; }
+  .res.ok { color: var(--ok); } .res.bad { color: var(--danger); } .res.warn { color: var(--warn); } .res.none::before { display: none; }
+  .donek { display: grid; flex: none; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 50%; background: color-mix(in srgb, var(--tk-success) 16%, transparent); color: var(--tk-success); }
+  .donek .glyph { width: 1.125rem; height: 1.125rem; stroke-width: 2.6; }
+  /* Proof that kept only text has its result's mark where a capture would be, never an empty frame. */
+  .donek.bad { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); } .donek:is(.warn, .none) { background: var(--sunk); color: var(--muted); }
+  /* The new report: its picture (teal, as on Reports), what it explains with, its title, two lines of what it says, and who filed it when. */
+  .rp-card { display: flex; align-items: flex-start; gap: 0.875rem; padding: 1rem; border-radius: 1.125rem; background: var(--card); box-shadow: var(--shadow-card); color: inherit; text-decoration: none;
+    -webkit-tap-highlight-color: transparent; transition: transform 260ms var(--spring); }
+  .rp-card:active { transform: scale(0.975); transition-duration: 90ms; }
+  .rp-card .rth { display: grid; flex: none; place-items: center; width: 4.5rem; height: 4.5rem; border-radius: 1.125rem; color: var(--teal);
+    background: color-mix(in srgb, var(--teal) 13%, var(--card)); box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--teal) 30%, transparent); }
+  .rp-card .rth svg { width: 3.25rem; height: 3.25rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .rp-card .t { display: block; flex: 1; min-width: 0; }
+  .rp-card .ey { display: block; color: var(--teal); font-size: var(--t-xs); line-height: 1.125rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; }
+  .rp-card .h { display: block; margin: 0.25rem 0; font-size: 1.125rem; line-height: 1.4375rem; font-weight: 700; letter-spacing: -0.02em; }
+  .rp-card .p { display: -webkit-box; overflow: hidden; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .rp-card .m { display: block; margin-top: 0.5rem; color: var(--faint); font-size: var(--t-xs); font-weight: 500; }
+  /* Under all that, the tools the approved feel has no place for: search, the way to everything answered, the Leash and Ask the agent. */
+  .t-foot { margin-top: 2rem; }
+  .t-foot > .search { margin: 0; } .t-foot > .more, .t-foot > .ask > summary { padding: 0 0.25rem; }
+  .t-foot .leash-h { margin: 2rem 0.25rem 0.625rem; } .t-foot .leash-h h2 { margin: 0; font-size: 1.25rem; line-height: 1.5625rem; letter-spacing: -0.02em; }
   /* The Leash: one control for how much agents may do without asking, and what the chosen one means below it. */
   .leash { display: flex; flex-direction: column; gap: var(--tk-sp-3); padding: 0.875rem 1rem 1rem; border-radius: var(--r-card); }
   .seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--sunk); border-radius: 0.5625rem; padding: 2px; }
@@ -106,33 +202,10 @@
   .seg button[aria-pressed="true"] { background: var(--seg-on); box-shadow: var(--tk-elev-raised); color: var(--text); font-weight: var(--tk-fw-semibold); }
   .seg button[aria-pressed="true"]::before { content: none; }
     .leash-line { margin: 0.5rem 1rem 0; color: var(--muted); font-size: var(--t-xs); line-height: 1.1875rem; letter-spacing: -0.01em; }
-  .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--tk-sp-2); }
-  .card, .tile { background: var(--surface); border-radius: var(--r-card); }
-  .card { padding: var(--tk-sp-4); }
-  .tile { display: grid; align-content: start; gap: 0.125rem; padding: 0.75rem 0.875rem; color: var(--text); text-decoration: none; }
-  .tile .icon { justify-self: start; width: auto; height: auto; background: none; }
-  .tile .icon svg { width: 1.375rem; height: 1.375rem; stroke: var(--area, var(--muted)); stroke-width: 1.75; }
-  .tile .n { margin-top: 0.25rem; font-size: var(--t-xl); font-weight: 650; line-height: 2rem; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-  .tile .name { color: var(--muted); font-size: var(--t-xs); line-height: 1.3; }
-  .tile:focus-visible { outline-offset: 2px; }
-  .areas { display: grid; grid-template-columns: minmax(0, 1fr); }
-  /* Today's section heads sit 36px under what comes before them (56px on a desk); a head's link keeps a tall tap area without pushing the rows down. */
-  .areas .sec-head, .sec-h.leash-h { margin: 1.75rem 0 0.5rem; } .areas h2, .sec-h.leash-h h2 { margin: 0; font-size: var(--t-l); line-height: 1.3; letter-spacing: -0.018em; }
-  .areas .sec-head a { margin: -0.625rem 0; }
-  /* The Summary's short lists are grouped inset lists: a filled square in the area's colour, the title and a line under it, then a chevron on a row with no ×, so the title keeps the row. */
-  .areas .compact .icon { width: 1.75rem; height: 1.75rem; border-radius: 0.4375rem; background: var(--area, var(--muted)); } .areas .compact .icon svg { stroke: #FFFFFF; }
-  .areas li:not(:has(.x)) .compact::after { content: "" / ""; flex: none; width: 0.5rem; height: 0.5rem; margin-right: 0.5rem; border: solid var(--border); border-width: 2px 2px 0 0; transform: rotate(45deg); }
-  /* Today's Waiting on you rows end in a chevron, and Answered is one quiet link under them. */
-  .areas .ask-group { margin: 0; padding: 0; border-radius: var(--r-card); } .areas .all-clear { margin: 0; border-radius: var(--r-card); }
-  .areas .ask-group > li { min-height: 3.25rem; padding: 0; } .areas .ask-group > li + li { border-top: 0; }
-  .areas .ask-group > li + li::before { content: ""; position: absolute; top: 0; right: 0; left: 3.375rem; border-top: 0.5px solid var(--line); }
-  .areas .ask-card { gap: 0.75rem; padding: 0.5rem 0.875rem; } .areas .ask-card .icon { width: 1.75rem; height: 1.75rem; border-radius: 0.4375rem; } .areas .ask-card .copy { gap: 1px; } .areas .ask-card .title { line-height: 1.375rem; } .areas .ask-card .meta { line-height: 1.25rem; letter-spacing: -0.016em; }
-  .areas .ask-card::after { content: "" / ""; flex: none; width: 0.4375rem; height: 0.4375rem; margin: 0 0.4375rem 0 0.75rem; border: solid var(--faint); border-width: 1.65px 1.65px 0 0; transform: rotate(45deg); }
-  .areas .more { margin-top: 0.25rem; padding: 0 1rem; }
   @media (max-width: 63.999rem) {
-    body:has(.decide) { padding-bottom: calc(9rem + env(safe-area-inset-bottom)); }
+    body:has(.decide) { padding-bottom: calc(9.5rem + env(safe-area-inset-bottom)); }
     /* The smaller Decide title lifts a short ask; the page still reaches the bar so a swipe anywhere above it skips. */
-    .decide { min-height: calc(100dvh - 13rem - env(safe-area-inset-bottom)); }
+    .decide { min-height: calc(100dvh - 13.5rem - env(safe-area-inset-bottom)); }
   }
   /* Decide names itself in the bar, small and centred, and the question is the headline. */
   .top:has(+ .decide) { height: 3.25rem; padding: 0; }
@@ -378,7 +451,7 @@
     .decide-preview .shot { aspect-ratio: 1; }
     .decide .lead h2 { margin: 1rem 0 .5rem; }
     .decide .pick-label { margin-top: 1rem; }
-    body:has(.decide) #toast { bottom: calc(9.5rem + env(safe-area-inset-bottom)); }
+    body:has(.decide) #toast { bottom: calc(10rem + env(safe-area-inset-bottom)); }
   }
   .decide h2 { margin: .5rem 0 .5rem; text-wrap: balance; font-size: 1.75rem; line-height: 1.15; letter-spacing: -.01em; }
   .decide .why { margin: 0; color: var(--muted); font-size: 1.0625rem; font-weight: 400; }
@@ -407,7 +480,7 @@
   @media (min-width: 64rem) { .pager { height: 3.75rem; } }
   /* A comment with the answer, your own words, another round: one quiet line right under the choices. */
   .decide-other { margin-top: 0.5rem; } .decide-other .other > summary { padding-left: 1rem; color: var(--accent); font-size: 1.0625rem; font-weight: 400; }
-  .decide-bar { position: sticky; z-index: 1; bottom: calc(4.125rem + env(safe-area-inset-bottom)); display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
+  .decide-bar { position: sticky; z-index: 1; bottom: calc(4.625rem + env(safe-area-inset-bottom)); display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
     margin-top: 1rem; padding: .75rem 0 .5rem; background: var(--bg); }
   /* Answer takes the row on one line; when a long label leaves no room, Skip and Later move under it rather than squeeze it. */
   .decide-bar > * { white-space: nowrap; }
@@ -426,6 +499,8 @@
   .ev-media img, .ev-media video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; object-position: center top; border-radius: 1.125rem;
     transition: transform 260ms var(--spring); }
   .ev-card:active .ev-media img, .ev-card:active .ev-media video { transform: scale(0.985); }
+  /* Proof that kept only text: a compact row of its claim and its result's small check. */
+  .has-x > .ev-text { padding-right: 3rem; }
   .ev-badge { position: absolute; z-index: 1; top: 0.75rem; left: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 1rem;
     background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.8125rem; font-weight: 600; }
   .ev-missing { margin: 0 0 1rem; color: var(--muted); font-size: 0.9375rem; }
@@ -557,7 +632,7 @@
   @media (prefers-reduced-motion: reduce) { .more-menu .menu { animation: none; } }
   @media (prefers-reduced-motion: reduce) { .comment > summary, .comment > summary::after { transition: none; } .comment[open] > :not(summary) { animation: none; } }
   /* After a tap: what was saved, and an Undo for a few seconds. */
-  #toast { position: fixed; z-index: 3; left: 1rem; right: 1rem; bottom: calc(5rem + env(safe-area-inset-bottom)); max-width: 30rem; margin: 0 auto;
+  #toast { position: fixed; z-index: 3; left: 1rem; right: 1rem; bottom: calc(5.375rem + env(safe-area-inset-bottom)); max-width: 30rem; margin: 0 auto;
     display: flex; align-items: center; gap: 0.875rem; padding: 0.5rem 0.5rem 0.5rem 1.125rem; border-radius: 0.875rem;
     background: var(--text); color: var(--bg); font-size: 1rem; }
   #toast[hidden] { display: none; }
@@ -730,36 +805,44 @@
   /* A wide screen keeps the tabs in a sidebar. */
   @media (min-width: 64rem) {
     :root { --bg: var(--desk); --surface: var(--desk-tile); }
-    body { display: grid; grid-template-columns: 16.25rem minmax(0, 1fr); padding-bottom: 3rem; }
+    body { display: grid; grid-template-columns: 15rem minmax(0, 1fr); padding-bottom: 3rem; }
     .tabs { display: none; }
-    .side { display: flex; flex-direction: column; gap: 0.125rem; position: sticky; top: 0; height: 100vh; padding: 1.25rem 0.75rem;
-      border-right: 1px solid var(--line); background: var(--surface); }
-    .side a { display: flex; align-items: center; gap: 0.75rem; min-height: var(--ctl); padding: 0 0.75rem; border-radius: var(--r-ctl); color: var(--text); text-decoration: none; }
-    .side a:hover { background: color-mix(in srgb, var(--sunk) 50%, transparent); }
-    .side a[aria-current] { background: var(--sunk); }
-    .side .n { margin-left: auto; color: var(--muted); font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
-    .brand { display: flex; align-items: center; gap: 0.625rem; margin: 0.25rem 0.75rem 1.25rem; font-weight: 600; }
-    .brand .av { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 50%; background: var(--action); color: #FFFFFF; font-size: 0.875rem; }
-    .side .foot { margin: auto 0 0; padding: 0.75rem; color: var(--muted); font-size: 0.875rem; line-height: 1.43; }
+    /* The sidebar: the board's mark and whose board it is, the four areas with a red count on Decide and a blue one on new Reports, then the keys. */
+    .side { display: flex; flex-direction: column; gap: 0.125rem; position: sticky; top: 0; height: 100vh; padding: 1.125rem 0.75rem 1rem; box-shadow: 0.5px 0 0 var(--hairline); background: var(--side); }
+    .side a { display: flex; align-items: center; gap: 0.75rem; min-height: var(--ctl); padding: 0 0.625rem; border-radius: 0.625rem; color: var(--text); font-size: var(--t-s); font-weight: 500; text-decoration: none; }
+    .side a:hover:not([aria-current]) { background: var(--tab-on); }
+    .side a[aria-current] { background: var(--tab-on); font-weight: 600; }
+    .side a:active .icon { transform: scale(0.86); transition-duration: 90ms; }
+    .side .n { display: grid; place-items: center; min-width: 1.375rem; height: 1.25rem; margin-left: auto; padding: 0 0.375rem; border-radius: 0.625rem; color: var(--muted);
+      font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .side .n.red { background: var(--badge); color: #FFFFFF; } .side .n.blue { background: var(--action); color: #FFFFFF; }
+    .brand { display: flex; align-items: center; gap: 0.625rem; margin: 0; padding: 0 0.625rem 1.125rem; font-size: var(--t-m); line-height: 1.375rem; font-weight: 700; }
+    .brand .logo { display: grid; flex: none; place-items: center; width: 1.875rem; height: 1.875rem; border-radius: 0.5625rem; background: var(--action); color: #FFFFFF; }
+    .brand .logo .glyph { width: 1.125rem; height: 1.125rem; stroke-width: 2.6; }
+    .brand small { display: block; color: var(--muted); font-size: var(--t-xs); line-height: 1.125rem; font-weight: 500; }
     .top { padding: 3.5rem 0 1.5rem; }
     .top h1 { font-size: var(--t-xl); line-height: 1.15; letter-spacing: -0.026em; }
     #toast button { min-height: var(--ctl); }
     #toast { bottom: 1.75rem; }
     main { width: 100%; padding: 0 3rem; }
     .back { display: none; }
-    .tiles { gap: 1rem; }
-    .tile { padding: 1rem 1.125rem; } .tile .n { font-size: 2.25rem; line-height: 2.5rem; } .tiles .tile, .glance, .areas .ask-group, .areas .all-clear, .leash { border-radius: var(--r-card); }
-    /* Today on a desk: a 60px bar holds the search, the title starts 76px down, and the page keeps a 56px gutter within 1040px. */
-    body.today main { max-width: 65rem; margin: 0 auto; padding: 0 3.5rem; }
-    .top:has(> .find) { padding: 4.75rem 0 1.25rem; } .top:has(> .find) h1 { line-height: 1.15; } .top:has(> .find) .date { margin-top: 0.5rem; }
-    .top > .find { top: 0.5rem; right: -1rem; }
-    .areas .sec-head, .sec-h.leash-h { margin: 2.5rem 0 0.75rem; }
-    .ev-scroll-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin: 0; padding: 0; overflow: visible; }
-    .ev-scroll-row > .has-x, .ev-scroll-row .ev-card { width: auto; }
-    .rp-card { flex-direction: row; border-radius: var(--r-card); }
-    .rp-art { width: 46%; aspect-ratio: auto; min-height: 16rem; }
-    .rp-body { flex: 1; justify-content: center; padding: 1.5rem; }
-    .rp-title { font-size: var(--t-l); }
+    /* Today on a desk is a dashboard within 1160px: the four tiles across, then Up next and what was cleared on the left, the latest proof and the new report on the right. */
+    body.today main { max-width: 72.5rem; margin: 0 auto; padding: 0.75rem 3rem 3.5rem; }
+    .top.today-top { padding: 1.25rem 0 0; }
+    body.today .today-top h1 { font-size: 2.5rem; line-height: 2.875rem; }
+    .cbar { display: none; }
+    .ring { width: 3.25rem; height: 3.25rem; }
+    .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.875rem; margin: 1.5rem 0 0; }
+    .tile { min-height: 6.5rem; padding: 0.875rem 1rem; }
+    .tile:hover { box-shadow: var(--shadow-card), 0 0 0 1px var(--tk-rail); }
+    .t-cols { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 2rem; align-items: start; }
+    .up-next { margin: 1.75rem 0 0; padding: 1.5rem 1.5rem 1.375rem; }
+    .up-next::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--k); opacity: 0.9; }
+    .up-next h2 { font-size: 1.625rem; line-height: 2rem; }
+    .up-next .go { flex: none; min-width: 13.75rem; }
+    .up-next .go .kc { display: inline-grid; }
+    .t-sec .sec-head { margin: 1.75rem 0 0.625rem; }
+    .lrow:hover, .rp-card:hover { background: color-mix(in srgb, var(--text) 4%, var(--card)); }
     .decide h2 { font-size: 2.5rem; line-height: 1.1; }
     .decide-bar { position: static; margin: 1rem 0 0; padding: 0; background: transparent; }
     .decide-bar .answer { flex: none; }
@@ -772,39 +855,23 @@
     .ev-title { font-size: 2.5rem; line-height: 1.1; margin-top: 1.25rem; }
     .ev-intro { font-size: 1.3125rem; }
   }
-  /* The desk from 1024px: Today is a dashboard, the asks on the left and the latest proof and the new report on the right;
-     Evidence is a list beside the update it has selected, as in Mail. */
+  /* The desk from 1024px: Evidence is a list beside the update it has selected, as in Mail. */
   @media (min-width: 64rem) {
-    body.today main { max-width: 80rem; }
-    .areas { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); column-gap: 2.5rem; align-items: start; }
-    .areas > .i-waiting { grid-row: span 2; }
-    .areas > .i-evidence, .areas > .i-reports { grid-column: 2; }
-    .areas .ev-scroll-row { grid-template-columns: minmax(0, 1fr); gap: 0; overflow: hidden; border-radius: var(--r-card); background: var(--surface); }
-    .areas .ev-scroll-row > * + * { box-shadow: inset 0 0.5px var(--line); }
-    .areas .ev-scroll-row .ev-card, .split-list .ev-card { display: grid; grid-template-columns: 3.5rem minmax(0, 1fr); align-items: center; gap: 0.25rem 0.875rem;
+    .split-list .ev-card { display: grid; grid-template-columns: 3.5rem minmax(0, 1fr); align-items: center; gap: 0.25rem 0.875rem;
       padding: 0.75rem 3rem 0.75rem 1rem; transition: background-color 120ms linear; -webkit-tap-highlight-color: transparent; }
-    .areas .ev-scroll-row .ev-card .ev-media, .split-list .ev-card .ev-media { flex: none; width: 3.5rem; aspect-ratio: 3 / 4; padding: 0; border-radius: 0.5rem;
+    .split-list .ev-card .ev-media { flex: none; width: 3.5rem; aspect-ratio: 3 / 4; padding: 0; border-radius: 0.5rem;
       background: var(--sunk); transition: transform 260ms var(--spring); }
-    .areas .ev-scroll-row .ev-media :is(img, video), .split-list .ev-media :is(img, video) { padding: 0; border-radius: 0.5rem; object-fit: cover; object-position: center top; }
+    .split-list .ev-media :is(img, video) { padding: 0; border-radius: 0.5rem; object-fit: cover; object-position: center top; }
     .split-list .ev-card.ev-text { grid-template-columns: minmax(0, 1fr); }
-    .areas .ev-scroll-row + .ev-rows { margin-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; box-shadow: inset 0 0.5px var(--line); }
-    .areas .ev-scroll-row:has(+ .ev-rows) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-    .areas .ev-scroll-row .ev-badge, .split-list .ev-badge { display: none; }
-    .areas .ev-scroll-row .ev-card .ev-media, .split-list .ev-card .ev-media { grid-row: 1 / span 2; }
-    .areas .ev-scroll-row .ev-card .t, .split-list .ev-card .t { align-self: end; font-size: 1.0625rem; line-height: 1.375rem; }
-    .areas .ev-scroll-row .ev-card .m, .split-list .ev-card .m { align-self: start; gap: 0.375rem; font-size: 0.9375rem; line-height: 1.25rem; }
-    .areas .ev-rows .ev-card { padding: 0.75rem 3rem 0.75rem 1rem; transition: background-color 120ms linear; }
-    .areas :is(.ev-scroll-row, .ev-rows) .ev-card:hover, .split-list .ev-card:hover { background: color-mix(in srgb, var(--sunk) 45%, transparent); }
-    .areas :is(.ev-scroll-row, .ev-rows) .ev-card:active, .split-list .ev-card:active { background: var(--sunk); }
-    .areas .ev-scroll-row .ev-card:active .ev-media, .split-list .ev-card:active .ev-media { transform: scale(0.96); }
-    .areas .ev-scroll-row .has-x > .x { top: 50%; right: 0.5rem; translate: 0 -50%; }
-    .areas :is(.ev-scroll-row, .ev-rows) .has-x > .x, .split-list .has-x > .x { opacity: 0; transition: opacity 120ms linear; }
-    .areas :is(.ev-scroll-row, .ev-rows) .has-x:is(:hover, :has(:focus-visible)) > .x, .split-list .has-x:is(:hover, :has(:focus-visible)) > .x { opacity: 1; }
-    .areas .rp-card { flex-direction: row; align-items: flex-start; gap: 1rem; padding: 1.25rem; }
-    .areas .rp-art { flex: none; width: 5.5rem; min-height: 0; aspect-ratio: 1; border-radius: 1rem; }
-    .areas .rp-body { justify-content: flex-start; padding: 0; }
-    .areas .rp-title { font-size: var(--t-m); }
-    .areas .rp-about { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+    .split-list .ev-badge { display: none; }
+    .split-list .ev-card .ev-media { grid-row: 1 / span 2; }
+    .split-list .ev-card .t { align-self: end; font-size: 1.0625rem; line-height: 1.375rem; }
+    .split-list .ev-card .m { align-self: start; gap: 0.375rem; font-size: 0.9375rem; line-height: 1.25rem; }
+    .split-list .ev-card:hover { background: color-mix(in srgb, var(--sunk) 45%, transparent); }
+    .split-list .ev-card:active { background: var(--sunk); }
+    .split-list .ev-card:active .ev-media { transform: scale(0.96); }
+    .split-list .has-x > .x { opacity: 0; transition: opacity 120ms linear; }
+    .split-list .has-x:is(:hover, :has(:focus-visible)) > .x { opacity: 1; }
     /* Evidence in the desk shell: one column of rows, the selected one tinted with an accent bar, the update beside it. */
     .split-list .ev-find { margin: 0 0 0.75rem; }
     .split-list .ev-find select { max-width: 50%; }
@@ -1184,8 +1251,6 @@
   .rp-list .dl-act.later { background: var(--c-indigo); }
   .rp-page > .notes, .rp-page > .gone-asks { margin-top: 1.5rem; }
   .tabs .bd.blue { background: var(--action); }
-  /* A phone keeps 140px under the list, so the last report scrolls fully clear of the tab bar. */
-  @media (max-width: 63.999rem) { body:has(.rp-page) { padding-bottom: calc(8.75rem + env(safe-area-inset-bottom)); } }
   /* All clear: a green check pops in. */
   .all-clear-big { padding: 4rem 1.5rem 1rem; text-align: center; }
   .all-clear-big .big { display: grid !important; place-items: center; width: 4.5rem; height: 4.5rem; margin: 0 auto 1.125rem; border-radius: 50%; color: #FFFFFF;
@@ -1288,7 +1353,7 @@
     .split-list .dl-face { min-height: 4.5rem; padding: 0.75rem 1.5rem; }
     .dl-row.sel .dl-face { background: color-mix(in srgb, var(--action) 11%, var(--bg)); box-shadow: inset 3px 0 0 var(--action); outline: none; }
     .dl-row.sel + .dl-row .dl-face::before, .dl-row.sel .dl-face::before { border-color: transparent; }
-    body.split-view #toast { left: calc(16.25rem + clamp(20rem, 32vw, 25rem) + 1.5rem); right: 1.5rem; }
+    body.split-view #toast { left: calc(15rem + clamp(20rem, 32vw, 25rem) + 1.5rem); right: 1.5rem; }
     .split-hints { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem 1rem; margin: auto -1.5rem 0; padding: 0.75rem 1.5rem;
       border-top: 1px solid var(--line); background: var(--bg); color: var(--faint); font-size: var(--t-xs); }
     .split-hints > span { display: inline-flex; align-items: center; gap: 0.25rem; }
@@ -1338,18 +1403,17 @@
     #board .split-detail > .read .about { color: var(--muted); }
     #board .split-detail > .read iframe { border: 0; }
     #board .split-detail > .read .rp-open { display: inline-flex; align-items: center; margin-left: 0; padding: 0 1.5rem; }
-    .side .keys { display: flex; align-items: center; gap: 0.75rem; width: 100%; min-height: var(--ctl); padding: 0 0.75rem; border-radius: var(--r-ctl); background: none; color: var(--text); font-weight: 400; text-align: left; }
+    .side .keys { display: flex; align-items: center; gap: 0.75rem; width: 100%; min-height: var(--ctl); padding: 0 0.625rem; border-radius: 0.625rem; background: none; color: var(--text); font-size: var(--t-s); font-weight: 500; text-align: left; white-space: nowrap; }
     .side .keys:hover { background: color-mix(in srgb, var(--sunk) 50%, transparent); }
     .side .keys .kc { margin-left: auto; }
-    .side .go { display: flex; align-items: center; gap: 0.5rem; margin: auto 0.75rem 0.25rem; color: var(--faint); font-size: var(--t-xs); }
-    .side .go ~ .foot { margin-top: 0; }
+    .side .go { display: flex; align-items: center; gap: 0.5rem; margin: auto 0.625rem 0.25rem; color: var(--faint); font-size: var(--t-xs); }
   }
   @media (prefers-reduced-motion: reduce) { #keys[open], .split-detail.in > * { animation: none; } }
   @media (prefers-reduced-motion: reduce) {
-    #board.push *, #board.pop *, .rise .dl-row, .rise .dl-head, .rp-list .new.out, .sk, #toast, #toast .bar, .all-clear-big .big, .dl-menu, .answer .lbl, .answer .okmark .glyph, .design-stage .stamp, .decide .pick-option .check, .dl-row.returned .dl-face { animation: none !important; }
+    #board.push *, #board.pop *, .rise .dl-row, .rise .dl-head, .rp-list .new.out, .sk, #toast, #toast .bar, .all-clear-big .big, .dl-menu, .answer .lbl, .answer .okmark .glyph, .design-stage .stamp, .decide .pick-option .check, .dl-row.returned .dl-face, .up-next > *, .up-next .big, .tile.shake, .dl-head.flash, .bd.bump { animation: none !important; }
     .answer .okmark .glyph { stroke-dashoffset: 0; }
     .rp-list .new.out { display: none; }
-    .dl-face, .dl-act > *, .dl-face .icon, .decide .pick-option, .decide-bar .answer, .dl-more > summary > span { transition: none !important; }
+    .dl-face, .dl-act > *, .dl-face .icon, .decide .pick-option, .decide-bar .answer, .dl-more > summary > span, .tabs .hl, .tabs .icon, .side .icon, .ring .fg, .tile, .up-next .acts > *, .rp-card, .cbar { transition: none !important; }
   }
 </style>
 </head>
@@ -1369,12 +1433,6 @@
   // Typed notes not yet sent, kept across re-renders and reloads in this browser, per board file.
   const drafts = new Map(), stored = () => `sign-off-drafts ${state.file}`;
   const keep = () => { try { localStorage.setItem(stored(), JSON.stringify([...drafts])); } catch {} };
-  // When the viewer last left the board, kept in this browser per board file; read once, so the Summary says "since you last looked" for the whole visit.
-  const seenKey = () => `sign-off-seen ${state.file}`;
-  let lastSeen;
-  const leave = () => { try { if (state.file && !FROZEN) localStorage.setItem(seenKey(), new Date().toISOString()); } catch {} };
-  addEventListener('pagehide', leave);
-  addEventListener('visibilitychange', () => document.hidden && leave());
   let loaded = false;
   // Text goes in as text nodes, never as HTML, so a title from the file can't run code.
   const el = (tag, attrs = {}, ...kids) => {
@@ -1483,12 +1541,13 @@
     say(`Saved: ${now.answer === 'text' ? 'your reply' : now.label}`, 5000, () => {
       undoBtn.disabled = true;
       // On the Decide list the row comes back in place, with a flash; anywhere else the ask opens again.
-      const list = location.hash === '#waiting';
+      // On Today it comes back as Up next.
+      const list = location.hash === '#waiting', home = !location.hash.slice(1);
       if ((list || !phone()) && !before) returned(d.key);
       call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ key: d.key, answer: before?.answer ?? '', note: before?.note ?? '' }) })
         .then(() => {
-          if (!before && !list) location.hash = askHref(d);
+          if (!before && !list && !home) location.hash = askHref(d);
           say(before ? `Back to: ${before.answer === 'text' ? 'your reply' : before.label}` : 'Undone: not answered', 3000);
         }, (e) => say(`Couldn't undo: ${e.message}`, 8000));
     }, 'ok');
@@ -1717,6 +1776,13 @@
       p.textContent = left(p.dataset.left);
     }
   }, 5000);
+  // Up next's sign-in counts down every second, as a timer does.
+  setInterval(() => {
+    for (const p of document.querySelectorAll('[data-clock]')) {
+      if (Date.parse(p.dataset.clock) <= Date.now()) return render();
+      p.textContent = clock(p.dataset.clock);
+    }
+  }, 1000);
 
   /** Boxes the person unfolded, kept open across redraws. */
   const unfolded = new Set();
@@ -2076,14 +2142,43 @@
     list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
     split: 'M16 3h5v5M8 3H3v5M12 22v-8.3a4 4 0 0 0-1.17-2.87L3 3M15 9l6-6',
     clock: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 6v6l4 2',
-    you: 'M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4.5 20.5c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5' };
+    you: 'M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4.5 20.5c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5',
+    pick: 'm3 17 2 2 4-4M3 7l2 2 4-4M13 6h8M13 12h8M13 18h8', phone: 'M7.5 2h9A2.5 2.5 0 0 1 19 4.5v15a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 19.5v-15A2.5 2.5 0 0 1 7.5 2zM11 18h2',
+    key: 'M2.6 17.4A2 2 0 0 0 2 18.8V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.2a2 2 0 0 0 1.4-.6l.8-.8a6.5 6.5 0 1 0-4-4zM16.5 7.5h.01',
+    keys: 'M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zM6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10' };
   // The drawings are fixed strings from this page, never text from the board file.
   // Small stroke drawings the plan page puts beside a button label or in a section badge; fixed strings from this page.
   const GLYPHS = { left: '<path d="m15 18-6-6 6-6"/>', more: '<path d="M5 12h.01M12 12h.01M19 12h.01"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', right: '<path d="m9 18 6-6-6-6"/>', check: '<path d="M20 6 9 17l-5-5"/>', pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
     archive: '<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/>', dot: '<circle cx="12" cy="12" r="4.5" fill="currentColor"/>',
-    send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.112z"/><path d="m21.854 2.147-10.94 10.939"/>' };
+    send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.112z"/><path d="m21.854 2.147-10.94 10.939"/>',
+    sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>', msg: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>' };
   const glyph = (a) => { const s = el('span', { 'aria-hidden': 'true', style: 'display:inline-flex' }); s.innerHTML = `<svg class="glyph" viewBox="0 0 24 24">${GLYPHS[a]}</svg>`; return s; };
   const icon = (a) => { const s = el('span', { class: `icon i-${a}`, 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[a]}"/></svg>`; return s; };
+  /** The phone's tab bar is drawn once, so its pill slides from the area left to the one opened; each redraw marks the area on screen and sets the badges, and a badge whose count changed bumps. */
+  const tabPill = el('span', { class: 'hl', 'aria-hidden': 'true' }), tabLinks = TABS.map(([a, name]) => el('a', { href: `#${a}` }, icon(a || 'summary'), name));
+  tabLinks.forEach((t) => t.addEventListener('click', () => buzz('tick')));
+  document.getElementById('tabs').append(tabPill, ...tabLinks);
+  function paintTabs(active, count, badged) {
+    TABS.forEach(([a, name], i) => {
+      const t = tabLinks[i];
+      t.setAttribute('aria-label', a ? `${name}, ${count(a)}${a === 'reports' && !state.readonly ? ' new' : ''}` : name);
+      if (a !== active) return t.removeAttribute('aria-current');
+      t.setAttribute('aria-current', 'page');
+      // The first drawing puts the pill in place; after that it slides.
+      const first = !tabPill.style.transform;
+      if (first) tabPill.style.transition = 'none';
+      tabPill.style.transform = `translateX(${i * 100}%)`;
+      if (first) void tabPill.offsetWidth, tabPill.style.transition = '';
+    });
+    tabLinks.forEach((t, i) => {
+      const n = badged(TABS[i][0]) ? count(TABS[i][0]) : 0;
+      let bd = t.querySelector('.bd');
+      if (!n) return bd?.remove();
+      if (!bd) t.append(bd = el('span', { class: `bd${TABS[i][0] === 'reports' ? ' blue' : ''}`, 'aria-hidden': 'true' }));
+      if (bd.textContent && bd.textContent !== String(n) && !calm.matches) { bd.classList.remove('bump'); void bd.offsetWidth; bd.classList.add('bump'); }
+      bd.textContent = String(n);
+    });
+  }
   // A design with only screen notes (answer 'screens') still waits for its design-wide verdict.
   const isAnswered = (d) => Object.hasOwn(state.answers, d.key) && !(d.type === 'design' && state.answers[d.key].answer === 'screens');
   /** A sign-in whose link has expired has nothing left to open: it leaves the board until its poster posts a new link on the same key. */
@@ -2107,6 +2202,8 @@
     return d.type === 'plan' ? `#waiting/${d.key}` : d.kind === 'design' ? `#designs/${d.key}` : `#decide/${d.key}`;
   };
   const left = (at) => { const m = Math.ceil((Date.parse(at) - Date.now()) / 60_000); return m <= 0 ? 'deadline passed' : `${mins(m)} left`; };
+  /** The time left to the second, as a timer reads (11:41 left), for the last hour; before that, as left says it. */
+  const clock = (at) => { const s = Math.ceil((Date.parse(at) - Date.now()) / 1000); return s <= 0 ? 'deadline passed' : s < 3600 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} left` : left(at); };
   const isToday = (at) => new Date(at).toDateString() === new Date().toDateString();
   const day = (at) => new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   const when = (at) => (isToday(at) ? hhmm(at) : `${day(at)} ${hhmm(at)}`);
@@ -2118,10 +2215,6 @@
       : m ? mockUrl(d.key, m.value, m.path) : d.evidenceCard?.media.find((x) => x.type.startsWith('image/'))?.url;
   };
   const thumb = (a, url) => { if (!url) return icon(a); const img = el('img', { class: 'thumb', src: src(url), alt: '', loading: 'lazy', decoding: 'async' }); img.onerror = () => img.replaceWith(icon(a)); return img; };
-
-  /** A tile on Today: its icon, the count large, and what it counts; it opens that area. */
-  const tile = (a, n, name) => el('a', { class: `tile i-${a}`, href: `#${a}`, 'aria-label': `${name}, ${n}` }, icon(a),
-    el('span', { class: 'n' }, String(n)), el('span', { class: 'name' }, name));
 
   const LEASH = { ask: ['Ask me first', 'Ask first', 'Agents wait for you on every ask.'], matters: ['Ask when it matters', 'When it matters', 'At the deadline, agents take the safe default.'],
     act: ['Act, then tell me', 'Act, then tell', 'Agents take their pick now and report back.'] };
@@ -2144,38 +2237,13 @@
     return [el('div', { class: 'sec-h leash-h' }, el('h2', {}, 'Leash')), el('div', { class: 'card leash' }, el('span', {}, 'How much may agents do without asking?'), seg, err),
       el('p', { class: 'leash-line' }, LEASH[state.leash][2])];
   }
-  /** Today at a glance, in a few short sentences: what needs you and what was proven in full colour, when the soonest ask closes and the new reports quieter. */
-  function glance(by) {
-    const n = by.waiting.length, proven = by.provenToday.length, fresh = by.reports.filter(unread).length;
-    const soonest = by.waiting.map((d) => d.silent_by).filter(Boolean).sort((x, y) => Date.parse(x) - Date.parse(y))[0];
-    const lines = [[n ? `${n} ${n === 1 ? 'decision needs' : 'decisions need'} you.` : 'Nothing needs you.', 1], [soonest && `The soonest closes at ${when(soonest)}.`],
-      [proven && `${proven} ${proven === 1 ? 'update' : 'updates'} filed.`, 1], [fresh && `${fresh} new ${fresh === 1 ? 'report is' : 'reports are'} waiting.`]];
-    if (lastSeen === undefined) try { lastSeen = localStorage.getItem(seenKey()); } catch { lastSeen = null; }
-    return el('p', { class: 'card glance' }, lastSeen && !Number.isNaN(Date.parse(lastSeen)) ? el('span', { class: 'seen' }, `Since you last looked at ${when(lastSeen)}`) : '', ...lines.filter(([t]) => t).map(([t, strong]) => el(strong ? 'b' : 'span', {}, `${t} `)));
-  }
-
-  /** Waiting on you on Today: a row per ask with its mark, its question, and when it closes and what is recommended; See all opens Decide, and Answered and Designs are links under it. */
-  function waitingSection(items, answered, designs) {
-    const SHOWN = 4, line = (d) => {
-      const rec = d.options?.find((o) => o.value === d.recommend_value);
-      const meta = d.type === 'signin' ? sub(d) : d.type === 'plan' ? `${plural(d.sections.length, 'section')} · ${plural(d.decisions.length, 'decision')}`
-        : [d.silent_by ? `Closes at ${when(d.silent_by)}` : 'No deadline', rec && `recommended: ${rec.label}`].filter(Boolean).join(' · ');
-      const link = el('a', { class: 'ask-card', href: askHref(d) }, icon(askIcon(d)), el('span', { class: 'copy' }, el('strong', { class: 'title', dir: 'auto' }, title(d)), el('span', { class: 'meta', dir: 'auto' }, meta)));
-      link.onclick = () => (jump = d.key);
-      return el('li', {}, link);
-    };
-    return el('section', { class: 'i-waiting' }, el('div', { class: 'sec-head' }, el('h2', {}, 'Waiting on you'), items.length ? el('a', { href: '#waiting' }, 'See all') : ''),
-      items.length ? el('ul', { class: 'ask-group' }, ...items.slice(0, SHOWN).map(line)) : el('p', { class: 'card all-clear' }, 'All clear. Nothing waits on you.'),
-      ...[['answered', 'Answered', answered], ['designs', 'Designs', designs]].filter(([, , l]) => l.length).map(([a, name, l]) => el('a', { class: 'more', href: `#${a}` }, `${name} (${l.length})`)));
-  }
-
   /** Search on Today: matches each item's title and what it says, and lists them as short rows that open where the item lives. */
-  let query = null;
+  let query = '';
   const hrefOf = (d) => (area(d) === 'reports' && reads(d) ? `#reports/${d.key}` : area(d) === 'evidence' ? `#evidence/${d.key}` : askHref(d));
   function search() {
     const box = el('input', { type: 'search', id: 'find', 'aria-label': 'Search the board', placeholder: 'Search', autocomplete: 'off' }), out = el('div', {});
     const show = () => {
-      const q = (query ?? '').trim().toLowerCase(), gone = new Set(state.dismissed ?? []);
+      const q = query.trim().toLowerCase(), gone = new Set(state.dismissed ?? []);
       const hits = q ? state.decisions.filter((d) => !gone.has(d.key) && `${title(d)} ${d.about ?? ''}`.toLowerCase().includes(q)).reverse() : [];
       out.replaceChildren(!q ? '' : hits.length ? el('ul', { class: 'card rows' }, ...hits.slice(0, 20).map((d) => {
         const link = el('a', { class: 'compact', href: hrefOf(d) }, ...compact(d, area(d) === 'notes' ? 'reports' : area(d)));
@@ -2183,29 +2251,150 @@
         return el('li', {}, link);
       })) : el('p', { class: 'meta' }, 'Nothing matches.'));
     };
-    box.value = query ?? '';
+    box.value = query;
     box.oninput = () => { query = box.value; show(); };
     show();
-    return el('div', { class: 'search', role: 'search', ...(query === null && { hidden: '' }) }, box, out);
+    return el('div', { class: 'search', role: 'search' }, box, out);
   }
 
-  /** Proven today on Today: a swipeable row of today's updates with a capture, each with its own result; proof with only text follows as compact rows. */
-  function proven(items, fresh) {
-    const shown = fresh.slice(0, 3), also = twins(shown), cards = shown.map((d) => withX(d, evCard(d, also.get(d.key))));
-    const shots = cards.filter((c) => c.querySelector('.ev-media')), text = cards.filter((c) => !c.querySelector('.ev-media'));
-    return el('section', { class: 'i-evidence wide' }, el('div', { class: 'sec-head' }, el('h2', {}, 'Proven today'), items.length ? el('a', { href: '#evidence' }, 'See all') : ''),
-      ...(fresh.length ? [shots.length ? el('div', { class: 'ev-scroll-row' }, ...shots) : '', text.length ? el('div', { class: 'ev-rows' }, ...text) : ''] : [el('p', { class: 'empty' }, 'Nothing proven today yet.')]));
+  /* Today, as the approved feel draws it: the date over a large title and a ring, Up next with one main action, four tiles, the latest proof, the new report and what was cleared today.
+     A phone stacks them; a desk sets the tiles across, then Up next and Cleared today beside the latest proof and the new report. */
+  /** The ring: what was cleared today out of that and what still waits. It fills from where it was last drawn, so an answer closes it a step; with nothing left it is closed. */
+  let ringAt = null;
+  function ring(done, all) {
+    const C = 2 * Math.PI * 17.5, to = all ? C * (1 - done / all) : 0, from = calm.matches || ringAt === null ? to : ringAt;
+    const r = el('span', { class: 'ring', role: 'img', 'aria-label': `${done} of ${all} cleared` }, el('b', { 'aria-hidden': 'true' }, `${done}/${all}`));
+    r.insertAdjacentHTML('afterbegin', `<svg viewBox="0 0 44 44" aria-hidden="true"><circle class="bg" cx="22" cy="22" r="17.5"/><circle class="fg" cx="22" cy="22" r="17.5" stroke-dasharray="${C}" stroke-dashoffset="${from}"/></svg>`);
+    ringAt = to;
+    if (from !== to) requestAnimationFrame(() => requestAnimationFrame(() => r.querySelector('.fg').setAttribute('stroke-dashoffset', to)));
+    return r;
   }
-  /** New report on Today: the newest report as one hero card, its picture, who and when, its title and what it says. */
+  /** Today's head: the date over a large title, how many asks wait and how many were cleared today, and the ring. */
+  const todayTop = (waiting, cleared) => [el('div', { class: 'cbar', 'aria-hidden': 'true' }, 'Today'), el('p', { class: 'kicker date-kicker' }, dateLine()), el('div', { class: 'head-row' }, el('h1', { tabindex: '-1' }, 'Today'), ring(cleared, waiting + cleared)),
+    el('p', { class: 'sub' }, waiting ? `${waiting} waiting on you · ${cleared} cleared` : 'Everything is answered')];
+
+  /** Up next leads with a sign-in (someone is blocked now), then an ask with a recommended answer, then one to review; Later comes last. */
+  const lead = (d) => (groupOf(d) === 'later' ? 3 : d.type === 'signin' ? 0 : recOf(d) ? 1 : 2);
+  let upKey;
+  /** Up next: the one ask that matters most, its kind in its colour, and one main action (open the sign-in, answer with the pick, or review) beside a quiet way into the ask. */
+  function upNext(items) {
+    const d = [...items].sort((x, y) => lead(x) - lead(y))[0];
+    if (!d) return el('section', { class: 'up-next clear', 'aria-label': 'Up next' }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, "You're all clear"), el('p', {}, 'Nothing is waiting on you. Agents will ask when they need you.'));
+    const g = groupOf(d) === 'later' ? (d.type === 'signin' ? 'signin' : reviewed(d) ? 'review' : 'answer') : groupOf(d), rec = recOf(d), err = el('div', { class: 'err', role: 'alert', id: 'up-err' });
+    const filed = d.filed ? (isToday(d.filed) ? hhmm(d.filed) : day(d.filed)) : '';
+    const when = d.type === 'signin' ? (d.expires ? el('span', { class: 'when hot', 'data-clock': d.expires }, clock(d.expires)) : '') : el('span', { class: 'when' }, [d.group, filed].filter(Boolean).join(' · '));
+    const details = (words) => el('a', { class: 'soft', href: askHref(d) }, words);
+    let go, soft = details('Details'), body = [el('p', { dir: 'auto' }, d.why || d.about || '')], cmt = '';
+    if (d.type === 'signin') {
+      body = [el('p', { dir: 'auto' }, `${d.waits} needs your ${d.title} sign-in. It unlocks: ${d.unlocks.replace(/\.$/, '')}.`)];
+      go = signinOpen(d, undefined, err).open;
+      go.className = 'go';
+      go.replaceChildren('Open sign-in', kc('↵'));
+    } else if (rec) {
+      body.push(el('p', { class: 'rec' }, glyph('sparkle'), el('span', {}, 'Recommended: ', el('b', { dir: 'auto' }, rec.label), `.${rec.outcome || d.recommend_reason ? ` ${rec.outcome || d.recommend_reason}` : ''}`)));
+      go = el('button', { class: 'go answer', 'aria-label': `Answer ${rec.label}, ${d.title}` }, el('span', { class: 'lbl' }, `Answer ${rec.label}`), kc('↵'), el('span', { class: 'okmark', 'aria-hidden': 'true' }, glyph('check')));
+      soft = details('Other answer');
+      go.onclick = () => { go.classList.add('done'); save(d, rec, [go], err); };
+      if (!state.answers_only && !FROZEN) {
+        const box = el('textarea', { id: 'up-note', rows: 2, dir: 'auto', placeholder: 'Add a note (optional)', 'aria-label': 'Comment, optional' });
+        box.value = drafts.get(d.key) ?? '';
+        box.oninput = () => { drafts.set(d.key, box.value); keep(); };
+        cmt = el('details', { class: 'cmt', ...((box.value || unfolded.has(`up ${d.key}`)) && { open: '' }) }, el('summary', {}, glyph('msg'), 'Add a comment', el('small', {}, 'Optional')), box);
+        cmt.ontoggle = () => { cmt.open ? unfolded.add(`up ${d.key}`) : unfolded.delete(`up ${d.key}`); if (cmt.open) box.focus(); };
+      }
+    } else {
+      const shots = [...(d.mocks ?? []).filter((m) => !/\.html?$/i.test(m.path)).map((m) => mockUrl(d.key, m.value, m.path)), ...(d.mocks?.length ? [] : [pic(d)])].filter(Boolean).slice(0, phone() ? 4 : 6);
+      if (shots.length) body.push(el('span', { class: 'strip', 'aria-hidden': 'true' }, ...shots.map((u) => el('img', { src: src(u), alt: '' }))));
+      go = el('a', { class: 'go', href: askHref(d) }, g === 'review' ? 'Review' : 'Answer', kc('↵'));
+      soft = '';
+    }
+    go.onclick ??= () => (jump = d.key);
+    const fresh = upKey !== undefined && upKey !== d.key;
+    upKey = d.key;
+    return el('section', { class: `up-next g-${g}${fresh ? ' next' : ''}`, 'aria-label': 'Up next' },
+      el('p', { class: 'lk' }, el('span', { class: 'dot', 'aria-hidden': 'true' }), `Up next · ${{ signin: 'Sign in', review: 'Review' }[g] ?? TYPE_NAMES[typeOf(d)]}`, when),
+      el('h2', { dir: 'auto' }, d.type === 'signin' ? `Sign in to ${d.title}` : title(d)), ...body.filter((p) => p.textContent || p.tagName !== 'P'), el('div', { class: 'acts' }, go, soft), cmt, err);
+  }
+
+  /** The group a Decide tile opens at; set by the tap, used once the list is drawn. */
+  let toGroup = '';
+  /** A tile on Today: a disc in its group's colour, the count large, the group and one line. It opens what it counts; at zero it greys, and a tap shakes it. */
+  function tile(g, n, name, line, href, mark, also = '') {
+    const t = el('a', { class: `tile g-${g}${n ? '' : ' zero'}${also}`, href, 'aria-label': `${name}, ${n}: ${line}` }, el('span', { class: 'tt' }, icon(mark), el('span', { class: 'n' }, String(n))),
+      el('span', { class: 'name' }, name, el('small', {}, line)));
+    t.onclick = (e) => {
+      if (n) return void (toGroup = href === '#waiting' ? g : '');
+      e.preventDefault();
+      t.classList.remove('shake');
+      void t.offsetWidth;
+      t.classList.add('shake');
+      buzz('tick');
+    };
+    return t;
+  }
+  function tiles(by) {
+    const of = (g) => by.waiting.filter((d) => groupOf(d) === g), [ans, rev, sig] = ['answer', 'review', 'signin'].map(of);
+    const screens = rev.reduce((n, d) => n + (d.journeys ?? []).reduce((m, j) => m + j.screens.length, 0), 0), soonest = sig.map((d) => d.expires).filter(Boolean).sort()[0];
+    const proofs = by.evidence.filter((d) => d.type === 'evidence'), passed = proofs.filter((d) => d.evidenceCard?.result === 'RUN PASS').length, failed = by.failedProof.length;
+    // A run that could not be checked is not fine either, so the line names it.
+    const unchecked = proofs.filter((d) => d.evidenceCard?.result === 'UNVERIFIED').length, fine = proofs.length - unchecked;
+    return el('div', { class: 'tiles' },
+      tile('answer', ans.length, 'Answer', !ans.length ? 'All answered' : ans.every(recOf) ? 'Each has a pick' : `${ans.filter(recOf).length} with a pick`, '#waiting', 'pick'),
+      tile('review', rev.length, 'Review', !rev.length ? 'Nothing to review' : screens ? `${plural(screens, 'screen')} to check` : `${plural(rev.length, 'item')} to look over`, '#waiting', 'phone'),
+      tile('signin', sig.length, 'Sign in', !sig.length ? 'Nothing waiting' : soonest ? left(soonest) : 'Waiting on you', '#waiting', 'key'),
+      tile('proof', proofs.length + failed, 'Proof', failed || unchecked ? [failed && `${failed} failed`, unchecked && `${unchecked} not checked`, `${fine} fine`].filter(Boolean).join(', ') : !proofs.length ? 'Nothing filed yet' : passed === proofs.length ? 'All passing' : `${passed} passed, ${proofs.length - passed} not run`,
+        '#evidence', 'evidence', failed ? ' failed' : ''));
+  }
+
+  /** A Today section: its head, with See all when there is more to see, over its list or card. */
+  const tSec = (cls, name, all, ...body) => el('section', { class: `t-sec ${cls}` }, el('div', { class: 'sec-head' }, el('h2', {}, name), all ? el('a', { href: all }, 'See all') : ''), ...body);
+  const chev = () => Object.assign(glyph('right'), { className: 'chev' });
+  /** Latest proof: the three newest updates, each with its capture, its result, its project and when. */
+  function latestProof(items) {
+    const shown = items.filter((d) => d.type === 'evidence').slice(0, 3), also = twins(shown);
+    if (!shown.length) return '';
+    return tSec('t-proof', 'Latest proof', '#evidence', el('ul', { class: 't-list' }, ...shown.map((d) => {
+      const r = RESULT[d.evidenceCard?.result], [shot] = filesOf(d).find(([, clip]) => !clip) ?? [];
+      const mark = () => el('span', { class: `donek ${r?.[0] ?? 'none'}`, 'aria-hidden': 'true' }, glyph(r?.[0] === 'ok' ? 'check' : 'dot'));
+      const frame = shot ? el('span', { class: 'mini' }, el('img', { src: src(shot), alt: '' })) : mark();
+      if (shot) frame.firstChild.onerror = () => frame.replaceWith(mark());
+      const link = el('a', { class: 'lrow', href: `#evidence/${d.key}` }, frame,
+        el('span', { class: 'lt' }, el('b', { dir: 'auto' }, [headline(d), also.get(d.key)].filter(Boolean).join(' · ')),
+          el('span', {}, el('span', { class: `res ${r?.[0] ?? 'none'}` }, r?.[2] ?? 'Not run'), ...[projectOf(d), d.filed && (isToday(d.filed) ? hhmm(d.filed) : day(d.filed))].filter(Boolean).map((t) => ` · ${t}`))), chev());
+      link.onclick = () => (jump = d.key);
+      return el('li', {}, link);
+    })));
+  }
+  /** The newest report not read yet (else the newest), as one card: its picture, what it explains with, its title, two lines of what it says, and who filed it when. */
   function newReport(items) {
-    const d = [...items].sort((x, y) => Date.parse(y.filed ?? 0) - Date.parse(x.filed ?? 0))[0];
-    if (!d) return section('reports', items);
-    const fresh = d.filed && isToday(d.filed), img = pic(d);
-    const link = el('a', { class: 'rp-card', href: reads(d) ? `#reports/${d.key}` : '#reports' }, el('span', { class: 'rp-art' }, img ? thumb('reports', img) : icon('reports')),
-      el('span', { class: 'rp-body' }, el('span', { class: 'rp-eyebrow' }, [fresh ? 'New' : 'Latest', d.filed ? (fresh ? hhmm(d.filed) : day(d.filed)) : ''].filter(Boolean).join(' · ')),
-        el('span', { class: 'rp-title', dir: 'auto' }, title(d)), d.about ? el('span', { class: 'rp-about', dir: 'auto' }, d.about) : ''));
+    const byNew = [...items].sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0)), d = byNew.find(unread) ?? byNew[0];
+    if (!d) return '';
+    const link = el('a', { class: 'rp-card', href: reads(d) ? `#reports/${d.key}` : '#reports' }, rth(d), el('span', { class: 't' },
+      el('span', { class: 'ey' }, [FORMS[d.form]?.[0] ?? (kind(d) || 'Report'), d.video && `Video ${d.video}`].filter(Boolean).join(' · ')), el('span', { class: 'h', dir: 'auto' }, title(d)),
+      d.about ? el('span', { class: 'p', dir: 'auto' }, d.about) : '', el('span', { class: 'm' }, [d.group, d.filed && stamp(d.filed)].filter(Boolean).join(' · '))));
     link.onclick = () => (jump = d.key);
-    return el('section', { class: 'i-reports wide' }, el('div', { class: 'sec-head' }, el('h2', {}, fresh ? 'New report' : 'Latest report')), link);
+    return tSec('t-report', unread(d) ? 'New report' : 'Latest report', '#reports', link);
+  }
+  /** Cleared today: each ask answered today with a green check, the answer and its comment and when; a tap opens it under Answered, to change it. */
+  function cleared(items, all) {
+    if (!items.length) return '';
+    const SHOWN = 5;
+    return tSec('t-cleared', 'Cleared today', all.length > SHOWN ? '#answered' : '', el('ul', { class: 't-list' }, ...items.slice(0, SHOWN).map((d) => {
+      const s = state.answers[d.key], said = s.answer === 'text' ? 'Your reply' : s.answer === 'sent' ? 'Sent back' : s.label ?? s.answer;
+      const link = el('a', { class: 'lrow', href: '#answered' }, el('span', { class: 'donek', 'aria-hidden': 'true' }, glyph('check')),
+        el('span', { class: 'lt' }, el('b', { dir: 'auto' }, title(d)), el('span', { dir: 'auto' }, [said, s.note && `“${s.note}”`, hhmm(s.at)].filter(Boolean).join(' · '))), chev());
+      link.onclick = () => (jump = d.key);
+      return el('li', {}, link);
+    })));
+  }
+  /** Today itself. Under what the approved feel draws come the tools it has no place for: search, the way to everything answered, the Leash and Ask the agent. */
+  function today(by) {
+    const done = by.answered.filter((d) => isToday(state.answers[d.key].at)), clearedList = cleared(done, by.answered);
+    const foot = el('div', { class: 't-foot' }, search(),
+      ...[['answered', 'Answered', by.answered], ['designs', 'Designs', by.designs]].filter(([, , l]) => l.length).map(([a, name, l]) => el('a', { class: 'more', href: `#${a}` }, `${name} (${l.length})`)),
+      ...(state.leash ? leash() : []), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()]));
+    return phone() ? [upNext(by.waiting), tiles(by), latestProof(by.evidence), newReport(by.reports), clearedList, foot]
+      : [tiles(by), el('div', { class: 't-cols' }, el('div', {}, upNext(by.waiting), clearedList), el('div', {}, latestProof(by.evidence), newReport(by.reports))), foot];
   }
 
   /** A short row's second line: what changed, unless the headline already says it. */
@@ -2223,17 +2412,6 @@
       : el('span', { class: 'meta', dir: 'auto' }, sub(d)))];
   };
   let jump = null; // The item a Summary row was tapped for, scrolled to on its area's screen.
-  /** A short list of an area on the Summary: a picture and the title; a tap opens the area at that item. */
-  function section(a, items) {
-    const SHOWN = 4, line = (d) => {
-      const link = el('a', { class: 'compact', href: a === 'reports' && reads(d) ? `#reports/${d.key}` : a === 'waiting' ? askHref(d) : `#${a}` }, ...compact(d, a));
-      link.onclick = () => (jump = d.key);
-      return el('li', {}, link, xBtn(d));
-    };
-    return el('section', { class: `i-${a}` }, el('div', { class: 'sec-head' }, el('h2', {}, AREAS[a]), a === 'answered' ? clearAll(items) : '',
-      items.length ? el('a', { href: `#${a}` }, items.length > SHOWN ? `See all ${items.length}` : 'Open') : ''),
-    items.length ? el('ul', { class: 'card rows' }, ...items.slice(0, SHOWN).map(line)) : el('p', { class: 'empty' }, EMPTY[a]));
-  }
 
   /** Answered: a short row per item, today's first; a tap opens the full card in place, to change the answer. */
   function done(items) {
@@ -3240,7 +3418,7 @@
   const markOf = (d) => { const o = d.options ?? []; return o.length === 2 && o.every((x) => /^(yes|no)$/i.test(x.value)) ? 'toggle' : o.length && o.every((x) => WHEN.test(x.label ?? x.value)) ? 'calendar' : 'waiting'; };
   const askIcon = (d) => { const a = { design: 'designs', signin: 'you', plan: 'plan' }[typeOf(d)] ?? markOf(d); return ICONS[a] ? a : 'waiting'; };
   /** An update that waits on you says how its linked run went, in plain words. */
-  const dateLine = (t = new Date()) => `${t.toLocaleDateString('en-GB', { weekday: 'long' })}, ${t.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}`;
+  const dateLine = (t = new Date()) => `${t.toLocaleDateString('en-GB', { weekday: 'long' })} ${t.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}`;
   const badge = (d) => { const r = RESULT[d.evidenceCard?.result]; return r ? el('span', { class: `st ${r[0]}` }, r[1]) : ''; };
 
   /* Decide: every open ask in one list, grouped Sign in, Answer and Review, with Later at its foot. A row opens its ask.
@@ -3602,13 +3780,14 @@
   const MOD = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
   const KEYS = [['Anywhere', [['Go to Today', 'G', 'T'], ['Go to Decide', 'G', 'D'], ['Go to Evidence', 'G', 'E'], ['Go to Reports', 'G', 'R'], ['Undo', MOD, 'Z'], ['This list', '?']]],
     ['Lists', [['Next', 'J'], ['Previous', 'K']]],
+    ['Today', [['Up next', '↵']]],
     ['Decide', [['Answer', '↵'], ['Answer with option 1 to 9', '1', '–', '9'], ['Comment', 'C'], ['Answer from the comment', MOD, '↵'], ['Later', 'L'], ['Next ask', 'E']]],
     ['Reports', [['Read or unread', 'U'], ['Archive', 'E'], ['Open a guided report', '↵']]]];
   const shut = el('button', { 'aria-label': 'Close' }, '✕');
   const keysSheet = el('dialog', { id: 'keys', 'aria-labelledby': 'keys-title' }, el('div', {}, el('header', {}, el('h2', { id: 'keys-title' }, 'Keyboard shortcuts'), shut),
     ...KEYS.flatMap(([head, rows]) => [el('h3', {}, head), el('ul', {}, ...rows.map(([words, ...keys]) => el('li', {}, el('span', {}, words), ...keys.map(kc))))])));
   shut.onclick = () => keysSheet.close();
-  const keysBtn = el('button', { class: 'keys', 'aria-keyshortcuts': '?' }, 'Keyboard shortcuts', kc('?'));
+  const keysBtn = el('button', { class: 'keys', 'aria-keyshortcuts': '?' }, icon('keys'), 'Keyboard shortcuts', kc('?'));
   keysBtn.onclick = () => keysSheet.showModal();
   keysSheet.onclick = (e) => e.target === keysSheet && keysSheet.close();
   document.body.append(keysSheet);
@@ -3618,7 +3797,7 @@
     const typing = e.target.closest?.('textarea, input, select'), mod = e.metaKey || e.ctrlKey;
     // From the comment under an ask, Cmd+Enter answers with it.
     if (mod && e.key === 'Enter' && typing?.closest('.decide')) { e.preventDefault(); document.querySelector('.decide-bar .answer')?.click(); return; }
-    const undo = !toast.hidden && !undoBtn.hidden && !undoBtn.disabled && (location.hash === '#waiting' || /^#(decide|reports)\//.test(location.hash) || location.hash === '#reports') ? undoBtn : null;
+    const undo = !toast.hidden && !undoBtn.hidden && !undoBtn.disabled && (!location.hash.slice(1) || location.hash === '#waiting' || /^#(decide|reports)\//.test(location.hash) || location.hash === '#reports') ? undoBtn : null;
     if (mod && !e.altKey && e.key.toLowerCase() === 'z' && !typing && undo) { e.preventDefault(); undo.click(); return; }
     if (mod || e.altKey || typing || keysSheet.open || designSession?.open || !reader.hidden) return;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key, g = gAt && e.timeStamp - gAt < 1500;
@@ -3637,6 +3816,8 @@
     // On a desk's Reports, U reads or unreads the report shown, E archives it, Enter opens a guided one.
     const rp = document.querySelector('.split-bar.rp-bar')?.parentElement, rpKey = rp && { u: '.rp-read', e: '.rp-archive', Enter: '.rp-open' }[k];
     if (rpKey && !(k === 'Enter' && e.target.closest?.('a:not([aria-current]), button, summary'))) { const b = rp.querySelector(rpKey); if (b) e.preventDefault(), b.click(); return; }
+    // On Today, Enter takes Up next's main action: open the sign-in, answer with the pick, or start the review.
+    if (k === 'Enter' && !location.hash.slice(1) && !e.target.closest?.('a, button, summary')) { const go = document.querySelector('.up-next .go:not(:disabled)'); if (go) e.preventDefault(), go.click(); return; }
     if (!onDecide) return;
     // Enter answers (or opens a sign-in), C opens the comment, L moves the ask to Later.
     if (k === 'Enter' && !e.target.closest?.('a:not([aria-current]), button, summary')) { const go = document.querySelector('.decide-bar .answer:not(:disabled), .decide .open-link:not(:disabled)'); if (go) e.preventDefault(), go.click(); }
@@ -3644,6 +3825,9 @@
     if (k === 'l') { const b = document.querySelector('.split-bar .later'); if (b) e.preventDefault(), b.click(); }
   });
   const reshow = (control) => { render(); document.querySelector(control)?.focus({ preventScroll: true }); };
+  /** Today's small title shows in its bar once the large one has scrolled under it. */
+  const titleBar = () => { const h = document.querySelector('.today-top h1'); document.body.classList.toggle('scrolled', !!h && h.getBoundingClientRect().bottom < 52); };
+  addEventListener('scroll', titleBar, { passive: true });
 
   function render() {
     if (designSession?.open) return (boardStale = true);
@@ -3656,10 +3840,10 @@
     for (const d of [...state.decisions].reverse()) if (!gone.has(d.key) && !merged.has(d.key) && !lapsed(d)) by[area(d)].push(d);
     // Evidence keeps every proof that is not dismissed, answered or not, newest first, however old: a passed check, a capture with no run to check (it says Not run) or one that could not be checked.
     // A failed run or one that did not finish is no proof, so it is left off; its own screen still opens, and a verdict moves it to Answered.
-    // Only Today's Proven today tile, its count and the glance line are limited to the passed updates filed in the last 24 hours.
+    // Today's Proof tile counts the same list, and says how many runs failed.
     const shownProof = state.decisions.filter((d) => d.type === 'evidence' && !['RUN FAIL', 'INCONCLUSIVE'].includes(d.evidenceCard?.result) && !gone.has(d.key));
     by.evidence = [...by.evidence.filter((d) => d.type !== 'evidence'), ...shownProof].sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
-    by.provenToday = shownProof.filter((d) => d.evidenceCard?.result === 'RUN PASS' && Date.now() - Date.parse(d.filed) <= 864e5).sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
+    by.failedProof = state.decisions.filter((d) => d.type === 'evidence' && d.evidenceCard?.result === 'RUN FAIL' && !gone.has(d.key));
     by.designs = [...state.decisions].reverse().filter((d) => d.kind === 'design' && !gone.has(d.key));
     // Waiting on you reads newest first unless the viewer chose oldest first. A sign-in blocks someone now, so sign-ins come first either way.
     let latest = -Infinity;
@@ -3695,24 +3879,21 @@
     // A design and a decision live under Decide; Answered is reached from Today.
     const active = at === 'decide' || at === 'designs' ? 'waiting' : at === 'answered' ? '' : at ?? '';
     const count = (a) => (a === 'reports' && !state.readonly ? by.reports.filter(unread).length : a ? by[a].length : undefined);
-    const link = ([a, name]) => el('a', { href: `#${a}`, ...(a === active && { 'aria-current': 'page' }) }, icon(a || 'summary'), name, count(a) === undefined ? '' : el('span', { class: 'n' }, String(count(a))));
-    document.getElementById('nav').replaceChildren(el('p', { class: 'brand' }, ...(state.name ? [el('span', { class: 'av', 'aria-hidden': 'true' }, [...state.name][0].toUpperCase()), state.name] : ['sign-off'])),
-      ...TABS.map(link), el('p', { class: 'go' }, kc('G'), 'then a letter jumps'), keysBtn, state.leash ? el('p', { class: 'foot' }, `Leash: ${LEASH[state.leash][0]}`) : '');
-    document.getElementById('tabs').replaceChildren(...TABS.map(([a, name]) => el('a', { href: `#${a}`, 'aria-label': a ? `${name}, ${count(a)}${a === 'reports' && !state.readonly ? ' new' : ''}` : name,
-      ...(a === active && { 'aria-current': 'page' }) }, icon(a || 'summary'), name, (a === 'waiting' || a === 'reports' && !state.readonly) && count(a) ? el('span', { class: `bd${a === 'reports' ? ' blue' : ''}`, 'aria-hidden': 'true' }, String(count(a))) : '')));
+    // Decide's count is a red badge and new Reports' a blue one, in the sidebar and the tab bar alike; Evidence's is a plain number.
+    const badge = (a) => (a === 'waiting' ? 'red' : a === 'reports' && !state.readonly ? 'blue' : '');
+    const link = ([a, name]) => el('a', { href: `#${a}`, ...(a === active && { 'aria-current': 'page' }) }, icon(a || 'summary'), name,
+      count(a) === undefined || (badge(a) && !count(a)) ? '' : el('span', { class: `n ${badge(a)}`.trim() }, String(count(a))));
+    document.getElementById('nav').replaceChildren(el('p', { class: 'brand' }, el('span', { class: 'logo', 'aria-hidden': 'true' }, glyph('check')), el('span', {}, 'Sign-off', state.name ? el('small', {}, state.name) : '')),
+      ...TABS.map(link), el('p', { class: 'go' }, kc('G'), 'then a letter jumps'), keysBtn);
+    paintTabs(active, count, badge);
     const ro = state.readonly ? 'Read only' : FROZEN ? `Read-only copy, ${FROZEN.exported}` : '';
     const pageTitle = head === 'decide' || head === 'waiting' ? 'Decide' : head === 'reports' ? 'Reports' : AREAS[head];
     document.body.classList.toggle('today', !at);
-    const find = at ? '' : el('button', { class: 'find', 'aria-label': 'Search', 'aria-expanded': String(query !== null) });
-    if (find) {
-      find.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>';
-      find.onclick = () => { query = query === null ? '' : null; render(); document.getElementById('find')?.focus(); };
-    }
     const bulk = { waiting: by.waiting, designs: by.designs, evidence: by.evidence, reports: [...by.reports, ...by.notes], answered: by.answered }[at] ?? [];
-    const top = el('header', { class: 'top' }, head && !TABS.some(([a]) => a === head) ? el('a', { class: 'back', href: head === 'decide' ? '#waiting' : '#' }, head === 'decide' ? '‹ Decide' : '‹ Today') : '',
+    const top = el('header', { class: head ? 'top' : 'top today-top' }, head && !TABS.some(([a]) => a === head) ? el('a', { class: 'back', href: head === 'decide' ? '#waiting' : '#' }, head === 'decide' ? '‹ Decide' : '‹ Today') : '',
     // Decide leads with the date over a large title, and keeps its More at the top right.
     (head === 'waiting' || at === 'reports') && !state.readonly ? el('p', { class: 'kicker date-kicker' }, dateLine()) : '',
-    el('h1', { tabindex: '-1' }, head ? pageTitle : 'Today'), find, head ? '' : el('p', { class: 'date' }, dateLine()),
+    ...(head ? [el('h1', { tabindex: '-1' }, pageTitle)] : todayTop(by.waiting.length, by.answered.filter((d) => isToday(state.answers[d.key].at)).length)),
     ro ? el('p', { class: 'meta' }, ro) : '',
     head === 'decide' && decideAt >= 0 ? pager(decideQueue, decideAt) : '',
     head === 'waiting' && !state.readonly && by.waiting.length ? el('p', { class: 'lede waiting-lede' }, `${by.waiting.length} ${by.waiting.length === 1 ? 'item needs' : 'items need'} you`,
@@ -3737,10 +3918,7 @@
       : at === 'decide' ? [decideAt < 0 ? el('p', { class: 'empty' }, 'Nothing to decide for that question.')
         : decidePage(decideQueue[decideAt], decideQueue.length > 1 ? decideQueue[(decideAt + 1) % decideQueue.length] : undefined)]
       : at === 'designs' ? [...designGroups(by.designs)] : at === 'evidence' ? [...evidenceList(by.evidence), dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived')] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
-      : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : [search(), glance(by),
-      el('div', { class: 'tiles' }, tile('waiting', by.waiting.length, 'Need you'), tile('evidence', by.provenToday.length, 'Proven today'), tile('reports', by.reports.filter(unread).length, 'New report')),
-      el('div', { class: 'areas' }, waitingSection(by.waiting, by.answered, by.designs), proven(by.provenToday, by.provenToday), newReport(by.reports)), ...(state.leash ? leash() : []),
-      ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()])])];
+      : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : today(by))];
     // The report shown on a desk stays in place under a new list and bar while it is the same report, so its frame is not loaded again.
     const keptRead = document.querySelector('#board .split-detail > .read'), newRead = content[0]?.querySelector?.('.split-detail > .read');
     if (keptRead && newRead && keptRead.dataset.sig === newRead.dataset.sig) {
@@ -3761,7 +3939,7 @@
   }
   function freeze() {
     // Answers stay as they are, but nothing in the copy can be sent.
-    document.querySelectorAll('#board .choices button, #board .pick-list button, #board .decide-bar .answer, #board .mock button, #board .note button, #board .note textarea').forEach((e) => (e.disabled = true));
+    document.querySelectorAll('#board .choices button, #board .pick-list button, #board .decide-bar .answer, #board .up-next button, #board .mock button, #board .note button, #board .note textarea').forEach((e) => (e.disabled = true));
     // A browser will not open a data: link in a new tab; the inline preview is the copy.
     document.querySelectorAll('#board a[href^="data:"]').forEach((a) => a.removeAttribute('href'));
   }
@@ -3801,6 +3979,11 @@
     const item = (jump || back) && document.getElementById(`item-${jump || back}`);
     jump = null;
     item ? item.scrollIntoView() : scrollTo(0, 0);
+    titleBar();
+    // A Today tile opens Decide at its group, whose head flashes.
+    const group = toGroup && location.hash === '#waiting' && [...document.querySelectorAll('.dl-head')].find((h) => h.firstChild.textContent === GROUPS.find(([g]) => g === toGroup)?.[1]);
+    toGroup = '';
+    if (group) { group.scrollIntoView({ block: 'start' }); group.classList.add('flash'); }
     // A Decide row is itself the link back to its page.
     // On a desk the focus stays on the selected row, so J, K and Enter carry on from it.
     ((back && (item?.matches('a.dl-face') ? item : item?.querySelector('h3 a, .open-link, a.compact'))) || document.querySelector('.split-list [data-row][aria-current]') || document.querySelector('#board h1')).focus({ preventScroll: true });
