@@ -34,6 +34,8 @@ export type Decision = {
   type: string; tradeoff?: string; mocks?: MockRef[]; number?: number; media?: MediaRef[]; attachments?: AttachRef[]; link?: string; view?: string; preview?: string; chapters?: Chapter[]; reply?: boolean;
   /** Who posted it: an agent session or caller id, so that caller's `wait --filer` gets the answer. */
   filer?: string;
+  /** The ticket this card belongs to, by id: a loose reference the board shows as a Ticket row while that ticket is on the board. */
+  ticket?: string;
   /** The board area it shows in while it waits for no answer, in place of the one its type gives it. */
   area?: string;
   /** How it works, step by step: each step's title and the marks for what matters there. */
@@ -151,6 +153,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     for (const f of ['about', 'detail', 'why', 'recommend_reason', 'silent_by']) if (d[f] !== undefined && !isText(d[f])) throw bad(f, 'must be text');
     if (d.merges !== undefined && !(Array.isArray(d.merges) && d.merges.every(isKey))) throw bad('merges', 'must list keys of 1-128 of A-Z a-z 0-9 . _ -');
     if (d.proof !== undefined && !isKey(d.proof)) throw bad('proof', 'must be a key of 1-128 of A-Z a-z 0-9 . _ -');
+    if (d.ticket !== undefined && !isKey(d.ticket)) throw bad('ticket', 'must be a ticket id of 1-128 of A-Z a-z 0-9 . _ -');
     if (d.evidence !== undefined && (!d.evidence || !/^[A-Za-z0-9._-]{1,128}$/.test(d.evidence.run_id ?? '')
       || !/^[a-f0-9]{40}$/.test(d.evidence.commit ?? '')
       || ['outcome', 'repro', 'proof', 'evidence'].some((f) => !isText(d.evidence[f]) || !d.evidence[f].trim() || [...d.evidence[f]].length > 1000))) {
@@ -256,7 +259,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       ...(d.ask_ref !== undefined && { ask_ref: d.ask_ref }), ...(d.why && { why: d.why }), ...(d.recommend_reason && { recommend_reason: d.recommend_reason }), ...(d.silent_by && { silent_by: d.silent_by }), ...(d.merges && { merges: [...d.merges] }), ...(d.proof && { proof: d.proof }),
       recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done', evidence: d.evidence,
       type: plan ? 'plan' : d.type ?? 'decision', tradeoff: d.tradeoff, link: d.link, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path, ...(m.link !== undefined && { link: m.link }) })),
-      ...(views && { view: d.view }), ...(report && views && { preview: d.preview }), ...(d.reply && { reply: true }), ...(d.filer && { filer: d.filer }), ...(d.area && { area: d.area }),
+      ...(views && { view: d.view }), ...(report && views && { preview: d.preview }), ...(d.reply && { reply: true }), ...(d.filer && { filer: d.filer }), ...(d.ticket && { ticket: d.ticket }), ...(d.area && { area: d.area }),
       ...(signin && { unlocks: d.unlocks, waits: d.waits, ...(d.expires && { expires: d.expires }), ...(d.start && { start: [...d.start] }) }),
       ...(d.group && { group: d.group }), ...(d.filed && { filed: d.filed }), ...(d.decided && { decided: d.decided }),
       ...(d.form && { form: d.form }), ...(d.video && { video: d.video }), ...(d.asked_by && { asked_by: d.asked_by }),
@@ -479,6 +482,31 @@ export function readPromoted(decisionsPath: string, warn: (msg: string) => void 
     }
   });
   return [...promoted];
+}
+/** A ticket: a standalone record of work, its percent done and the ticket it sits under. Cards name one by id; nothing else reads or needs it. */
+export type Ticket = { id: string; title: string; progress: number; parent?: string; at: string };
+/** Tickets, one line per write (`ticket <id> --title`), the latest line per id wins. A board without the file has no tickets, and every card works as before. */
+export const ticketsPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.tickets.jsonl';
+/** The ticket rules, shared by the writer and the reader: a line that breaks one is skipped, never shown half-valid. */
+export const ticketFault = (t: any) => (!isKey(t?.id) ? 'id must be 1-128 of A-Z a-z 0-9 . _ -'
+  : !isText(t.title) || !t.title.trim() || [...t.title].length > 160 ? 'title must be text of 160 characters or fewer'
+  : !(Number.isInteger(t.progress) && t.progress >= 0 && t.progress <= 100) ? 'progress must be a whole number from 0 to 100'
+  : t.parent !== undefined && (!isKey(t.parent) || t.parent === t.id) ? 'parent must be the id of another ticket' : '');
+export function appendTicket(decisionsPath: string, { id, title, progress, parent }: Omit<Ticket, 'at'>): Ticket {
+  const t = { id, title, progress, ...(parent !== undefined && { parent }), at: now() };
+  appendLine(ticketsPath(decisionsPath), t);
+  return t;
+}
+/** Every ticket as its latest line says, in the order each was first written. A torn or broken line is skipped and reported through warn. */
+export function readTickets(decisionsPath: string, warn: (msg: string) => void = () => {}): Ticket[] {
+  const latest = new Map<string, Ticket>();
+  readRaw(ticketsPath(decisionsPath)).split('\n').forEach((line, n) => {
+    let t;
+    try { t = line && JSON.parse(line); } catch {}
+    if (line && (!t || ticketFault(t))) return warn(`skipped unreadable line ${n + 1} in ${ticketsPath(decisionsPath)}`);
+    if (t) latest.set(t.id, { id: t.id, title: t.title, progress: t.progress, ...(t.parent !== undefined && { parent: t.parent }), at: t.at });
+  });
+  return [...latest.values()];
 }
 /** True while an item asks the user something: evidence is never an ask, and an item with no options, reply, sign-in, plan or design is only read. */
 export const asks = (d: Decision) => d.type !== 'evidence' && !reading(d) && (d.options.length > 0 || !!d.reply || ['signin', 'plan', 'design'].includes(d.type));

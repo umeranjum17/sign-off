@@ -28,6 +28,7 @@ Guided plan 3 / report 4 add **Simplify this**. Inspect version-1 action/target 
 | `dismiss` | hide a card, like its Dismiss button; `--filer <id>` hides every card of a finished task |
 | `restore` | bring a dismissed card back |
 | `promote` | Main only: put a design review it passed in Decide (`--undo` takes it back to Designs); a lead's design never counts as an ask without it |
+| `ticket` | list tickets, show one with its cards, or write one (`--id`, `--title`, `--progress`, `--parent`) |
 | `doctor` | check the setup; each failure names its fix |
 | `notify` | check device notifications, or send a test notice |
 | `validate` | check messages against the contract |
@@ -88,6 +89,27 @@ an HTTP POST when a card enters Waiting on you; `receiver: muxr` there sends
 it to the muxr host, and `sign-off-axi notify [check|test]` checks the setup
 or sends a test notice. Detail is in
 [question-kinds.md](question-kinds.md).
+
+## Tickets
+
+A ticket is one piece of work: an id, a title, how far along it is (0 to 100) and,
+optionally, the ticket it sits under. It stands alone: no card needs one, and a
+board with none works as before. A card names its ticket with `--ticket <id>` on
+`raise` and `post` (every `--type` and `--kind`), or `"ticket"` in a message:
+
+```sh
+sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40 --parent T-9
+sign-off-axi raise --ask-ref <captain-message-id-or-hold-id> --ticket T-29 \
+  --title "Ship the settings page on Friday?" ...
+sign-off-axi post --type evidence --ticket T-29 --title "Settings on a phone" ...
+sign-off-axi ticket --id T-29 --progress 80
+sign-off-axi ticket --id T-29          # the ticket and its cards, newest first
+```
+
+The card then shows a **Ticket** row, the title and progress, that opens the
+ticket's page: its cards (asks, designs, proof, reports and plans), newest first,
+and the tickets under it. A card whose ticket is not on the board shows no row.
+The file format is in [file-formats.md](file-formats.md), under **Tickets**.
 
 ## Standalone Go deeper owner
 

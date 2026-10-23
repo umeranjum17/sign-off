@@ -69,6 +69,13 @@ The user often reads the board on a phone. Each card must make sense in 10 secon
 - Ask for one decision per card, and recommend the answer you would pick (see the question standard below).
 - Put the pull request or page in \`--link\`. In a contract evidence message with a \`run\`, the \`outcome\` line heads the card: write it as the result the user can see.
 
+## Link each card to its ticket
+
+When the work belongs to a ticket and you know its id, pass \`--ticket <id>\` on every \`raise\` and \`post\` for it (any \`--type\` or \`--kind\`, or \`"ticket"\` in the message or \`--from\` item). The card then shows a Ticket row, the ticket's title and progress, that opens the ticket's page with every card on it.
+
+- It is optional and only a reference: leave it out when you know no ticket, and never invent an id. A card whose ticket is not on the board shows no row, and works as before.
+- A ticket stands alone: \`npx -y sign-off-axi ticket --id <id> --title "<the work>" --progress <0-100>\` makes it (\`--parent <id>\` puts it under another), and \`--progress\` again as the work moves. Write only your own tickets. \`ticket --id <id>\` shows a ticket and its cards; \`ticket\` lists them all.
+
 ## Ask a good question
 
 sign-off refuses a question that breaks these rules, naming the field and one fix; \`raise --help\` has the current flags.

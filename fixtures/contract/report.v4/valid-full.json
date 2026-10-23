@@ -6,6 +6,7 @@
   "title": "Sign-in now takes 2.8 minutes",
   "group": "Beacon",
   "filer": "agent-41",
+  "ticket": "T-29",
   "asked_by": "Release agent",
   "filed": "2026-10-19T09:30:00Z",
   "about": "The code step moved first and the second password screen is gone. A returning user is in under three minutes.",

@@ -3532,3 +3532,76 @@ test('load budget: a board of 60 updates opens Evidence on a phone with at most 
   } finally { close(); }
   proc.kill();
 });
+
+test('a card names its ticket: --ticket on every post, a Ticket row that opens the ticket, and the ticket page lists its cards newest first', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'ticket'), file = join(dir, 'board.json'), fx = new URL('../fixtures/contract/', import.meta.url).pathname, now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  for (const f of readdirSync(join(fx, 'design.v1/design'))) writeFileSync(join(dir, 'design', f), readFileSync(join(fx, 'design.v1/design', f)));
+  writeFileSync(join(dir, 'shot.png'), png);
+  // A ticket stands alone: a new one needs a title, a later write changes only what it gives, and a bad value is refused before anything is written.
+  assert.equal(run('ticket', file, '--id', 'T-29', '--progress', '20').code, 2);
+  assert.equal(existsSync(join(dir, 'board.tickets.jsonl')), false);
+  assert.equal(run('ticket', file, '--id', 'T-9', '--title', 'The new settings page', '--progress', '45').code, 0);
+  assert.equal(run('ticket', file, '--id', 'T-29', '--title', 'Ship the new settings page', '--progress', '20', '--parent', 'T-9').code, 0);
+  assert.match(run('ticket', file, '--id', 'T-29', '--progress', '60').out, /status: updated/);
+  for (const bad of [['--progress', '101'], ['--progress', '4.5'], ['--parent', 'T-29'], ['--title', ' '], ['--id', 'bad id']]) assert.equal(run('ticket', file, '--id', 'T-29', ...bad).code, 2, bad.join(' '));
+  // Every way a card gets in takes --ticket, or "ticket" in its message or --from item: flags, an evidence update, contract messages, a feed file and a sign-in.
+  const fileOf = (name, m) => (writeFileSync(join(dir, name), JSON.stringify(m)), join(dir, name));
+  const report = JSON.parse(readFileSync(join(fx, 'report.v4/valid-minimal.json'), 'utf8'));
+  const posts = [
+    ['raise', file, '--ticket', 'T-29', '--key', 'ask-linked', '--title', 'Ship the settings page on Friday?'],
+    ['raise', file, '--key', 'ask-plain', '--title', 'Keep the old settings link for a week?'],
+    ['raise', file, '--ticket', 'T-404', '--key', 'ask-unknown', '--title', 'Move the theme switch to the top?'],
+    ['post', file, '--type', 'evidence', '--ticket', 'T-29', '--title', 'Settings on a phone', '--about', 'Umer changes the theme in one tap.', '--media', join(dir, 'shot.png')],
+    ['post', file, '--kind', 'design', '--from', fileOf('design.json', { ...JSON.parse(readFileSync(join(fx, 'design.v1/valid-basic.json'), 'utf8')), filed: now }), '--ticket', 'T-29'],
+    ['post', file, '--kind', 'report', '--from', fileOf('report.json', { ...report, filed: now, ticket: 'T-29' })],
+    ['post', file, '--kind', 'plan', '--from', join(fx, 'plan.v3/valid-full.json'), '--ticket', 'T-29'],
+    ['post', file, '--from', fileOf('feed.json', { schema: 2, items: [{ contract: 1, kind: 'ask', schema: 1, key: 'from-linked', title: 'Turn on the settings search?', why: 'Umer asked for it twice this week.', recommend_value: 'yes', recommend_reason: 'It is small.', default_if_silent: 'no',
+      options: [{ value: 'yes', label: 'Yes', outcome: 'Search ships with the page.' }, { value: 'no', label: 'No', outcome: 'It waits.' }] }] }), '--ticket', 'T-29'],
+    ['post', file, '--type', 'signin', '--ticket', 'T-29', '--key', 'npm', '--service', 'npm', '--link', 'https://example.com/login', '--unlocks', 'Publishing the release', '--waits', 'Release agent'],
+  ];
+  for (const args of posts) assert.equal(run(...args).code, 0, args.join(' '));
+  const stored = Object.fromEntries(JSON.parse(readFileSync(file, 'utf8')).items.map((i) => [i.key, i.ticket]));
+  assert.deepEqual(stored, { 'ask-linked': 'T-29', 'ask-plain': undefined, 'ask-unknown': 'T-404', 'update-1': 'T-29', 'chat-journeys': 'T-29', 'digest-ran': 'T-29', 'faster-sign-in': 'T-29', 'from-linked': 'T-29', npm: 'T-29' });
+  // A bad id, a message naming another ticket than --ticket, and a --replace feed with --ticket are refused, and nothing is written.
+  const before = readFileSync(file, 'utf8');
+  for (const args of [['raise', file, '--ticket', 'T 29', '--key', 'bad-ticket', '--title', 'Ship the settings help page now?'],
+    ['post', file, '--kind', 'report', '--from', fileOf('other.json', { ...report, key: 'other', filed: now, ticket: 'T-1' }), '--ticket', 'T-29'],
+    ['post', file, '--from', join(dir, 'feed.json'), '--replace', '--ticket', 'T-29'], ['validate', fileOf('broken.json', { ...report, ticket: 5 })]]) assert.equal(run(...args).code, 2, args.join(' '));
+  assert.equal(readFileSync(file, 'utf8'), before);
+  // The CLI shows the ticket with its cards, newest first; the card naming no ticket and the one naming a ticket not on the board are not among them.
+  const shown = JSON.parse(run('ticket', file, '--id', 'T-29', '--json').out).ticket;
+  assert.deepEqual([shown.title, shown.progress, shown.parent, shown.cards.length], ['Ship the new settings page', 60, 'T-9', 7]);
+  const times = shown.cards.map((c) => Date.parse(c.filed));
+  assert.deepEqual(times, [...times].sort((x, y) => y - x));
+  assert.deepEqual(Object.fromEntries(shown.cards.map((c) => [c.key, `${c.kind} ${c.status}`])), { npm: 'ask waiting', 'from-linked': 'ask waiting', 'faster-sign-in': 'plan waiting', 'digest-ran': 'report shown', 'chat-journeys': 'design in review', 'update-1': 'proof shown', 'ask-linked': 'ask waiting' });
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(dir, 390, 844, true);
+  try {
+    // Each linked card's screen shows one Ticket row, the ticket's title, id and progress, opening its page; a card with no ticket, or one not on the board, shows none.
+    const row = `(() => { const top = document.querySelector('#reader:not([hidden])') ?? document; const r = [...top.querySelectorAll('.ticket-row')]; return r.length + '|' + r.map((x) => x.getAttribute('href') + ' ' + x.innerText.replace(/\\s+/g, ' ').trim()).join(); })()`;
+    for (const [hash, seen] of [['#decide/ask-linked', 1], ['#decide/ask-plain', 0], ['#decide/ask-unknown', 0], ['#decide/npm', 1], ['#decide/from-linked', 1], ['#evidence/update-1', 1], ['#designs/chat-journeys', 1], ['#reports/digest-ran', 1], ['#waiting/faster-sign-in', 1]]) {
+      await evaluate(`location.href = ${JSON.stringify(url + hash)}`);
+      await until(async () => (await evaluate(`document.querySelector('#board h1, #reader:not([hidden]) h1') !== null && location.hash === ${JSON.stringify(hash)}`)) === true && (await evaluate(row)) === (seen ? '1|#ticket/T-29 Ship the new settings page T-29 60%' : '0|'));
+      assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true, hash);
+    }
+    // The row opens the ticket's page: where it sits, its progress, then its seven cards newest first, each opening where it lives; Back returns to the card.
+    await evaluate(`location.href = ${JSON.stringify(`${url}#decide/ask-linked`)}`);
+    await until(() => evaluate('!!document.querySelector(".decide .ticket-row")'));
+    await evaluate('document.querySelector(".decide .ticket-row").click()');
+    await until(async () => (await evaluate('location.hash')) === '#ticket/T-29' && (await evaluate('document.querySelectorAll("#board .card.rows li").length')) === 7);
+    const page = JSON.parse(await evaluate(`JSON.stringify({ h1: document.querySelector('#board h1').textContent, kicker: document.querySelector('.tk-kicker').textContent, done: document.querySelector('.tk-done').textContent,
+      rows: [...document.querySelectorAll('#board .card.rows a')].map((a) => [a.querySelector('strong').textContent.replace(/^Update \\d+ · /, ''), a.getAttribute('href')]), wide: document.documentElement.scrollWidth > 390 })`));
+    assert.deepEqual({ ...page, rows: page.rows.map(([t]) => t) }, { h1: 'Ship the new settings page', kicker: 'The new settings page › T-29', done: '60% done', rows: shown.cards.map((c) => c.title), wide: false });
+    assert.deepEqual(['Ship the settings page on Friday?', 'Settings on a phone', 'Chat app journeys', 'The weekly digest ran'].map((t) => Object.fromEntries(page.rows)[t]), ['#decide/ask-linked', '#evidence/update-1', '#designs/chat-journeys', '#reports/digest-ran']);
+    await evaluate('document.querySelector(".top .back").click()');
+    await until(async () => (await evaluate('location.hash')) === '#decide/ask-linked');
+    // The ticket above it lists the ticket under it, and no card names it.
+    await evaluate(`location.href = ${JSON.stringify(`${url}#ticket/T-9`)}`);
+    await until(async () => (await evaluate('[...document.querySelectorAll(".tk-sub")].map((a) => a.getAttribute("href")).join()')) === '#ticket/T-29');
+    assert.equal(await evaluate('document.querySelector("#board .empty")?.textContent'), 'No card on the board names this ticket yet.');
+  } finally { close(); }
+  proc.kill();
+});

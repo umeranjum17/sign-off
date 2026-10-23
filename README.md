@@ -79,6 +79,17 @@ A board that fills up with noise stops being read, so the rules sit at the door.
 - Proof posted as a Pass/Fail question is refused, and proof that is mostly text, a placeholder or a test card is refused too: proof goes to Evidence, as a capture of the real product; a report must be a page to tap, not a wall of words.
 - **Dismiss** hides a card from the board, **Undo** brings it back (`sign-off-axi dismiss <key>` and `restore <key>` do the same from a shell). `sign-off-axi dismiss --filer <id>` closes a finished task: every card that id still waits on leaves the board. Reports leave the main view a day after they were filed and wait under **Archived**; nothing is deleted, and Restore brings one back. Evidence stays on its screen for good, newest first, until dismissed. Posting an evidence message again under its key, from the same filer, replaces the card. A new ask that repeats an open ask on the same decision is refused, and answering one closes its twins.
 
+### One ticket ties a task's cards together
+
+A ticket is one piece of work, with a title and how far along it is. Post any card with `--ticket <id>` (an ask, a design, proof, a report or a plan) and its screen shows a **Ticket** row with the ticket's title and progress; tap it for the ticket's page, which lists every card on that ticket, newest first, and the tickets under it. It is optional and only a link: a card without one, or naming a ticket the board has not got, works exactly as before.
+
+```sh
+sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40
+sign-off-axi post --type evidence --ticket T-29 --title "Settings on a phone" --about "Umer changes the theme in one tap." --media shot.png
+```
+
+Agents pass `--ticket` whenever they know the ticket their work belongs to, and move its `--progress` as the work goes; the shipped skill tells them so.
+
 ## What you can ask
 
 One line on what the agent runs per kind; the full reference is [docs/question-kinds.md](docs/question-kinds.md) and the message rules are in [docs/contract.md](docs/contract.md).
