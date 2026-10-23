@@ -29,6 +29,7 @@ Guided plan 3 / report 4 add **Simplify this**. Inspect version-1 action/target 
 | `restore` | bring a dismissed card back |
 | `promote` | Main only: put a design review it passed in Decide (`--undo` takes it back to Designs); a lead's design never counts as an ask without it |
 | `ticket` | list tickets, show one with its cards, or write one (`--id`, `--title`, `--progress`, `--parent`) |
+| `project` | list projects, or set or clear a project's own icon (`--name`, `--icon`, `--clear-icon`) |
 | `doctor` | check the setup; each failure names its fix |
 | `notify` | check device notifications, or send a test notice |
 | `validate` | check messages against the contract |
@@ -110,6 +111,23 @@ The card then shows a **Ticket** row, the title and progress, that opens the
 ticket's page: its cards (asks, designs, proof, reports and plans), newest first,
 and the tickets under it. A card whose ticket is not on the board shows no row.
 The file format is in [file-formats.md](file-formats.md), under **Tickets**.
+
+## Priority and project icons
+
+A card may say how urgent it is: `--priority P0` (most) to `P3` (least) on `raise`
+and `post` (every `--type` and `--kind`), or `"priority"` in a message. It shows as
+a chip; a card without one shows none. A project may have its own icon, a picture
+in the board file's folder; a project without one shows its initials:
+
+```sh
+sign-off-axi post --type evidence --priority P1 --title "Settings on a phone" ...
+sign-off-axi project --name Beacon --icon icons/beacon.png
+sign-off-axi project --name Beacon --clear-icon
+sign-off-axi project --json
+```
+
+The rules are in [contract.md](contract.md), section 14, and the file format in
+[file-formats.md](file-formats.md), under **Projects**.
 
 ## Standalone Go deeper owner
 

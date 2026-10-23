@@ -76,6 +76,11 @@ When the work belongs to a ticket and you know its id, pass \`--ticket <id>\` on
 - It is optional and only a reference: leave it out when you know no ticket, and never invent an id. A card whose ticket is not on the board shows no row, and works as before.
 - A ticket stands alone: \`npx -y sign-off-axi ticket --id <id> --title "<the work>" --progress <0-100>\` makes it (\`--parent <id>\` puts it under another), and \`--progress\` again as the work moves. Write only your own tickets. \`ticket --id <id>\` shows a ticket and its cards; \`ticket\` lists them all.
 
+## Say how urgent a card is, and give your project its icon
+
+- When you know how urgent a card is, pass \`--priority P0\` (most urgent) to \`P3\` (least) on \`raise\` and \`post\` (any \`--type\` or \`--kind\`, or \`"priority"\` in the message or \`--from\` item). The card shows it as a chip, and the board can sort by it. Leave it out when you do not know: a card without one shows no chip.
+- When your project has its own icon, put the picture in the board's folder and run \`npx -y sign-off-axi project --name <project> --icon <path from the board's folder>\` once (.png, .jpg, .webp or .svg with no script, 500 KB or less). The name is the project as your cards give it. A project with no icon shows its initials; never draw or invent an icon for it.
+
 ## Ask a good question
 
 sign-off refuses a question that breaks these rules, naming the field and one fix; \`raise --help\` has the current flags.

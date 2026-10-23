@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import { accessSync, constants, readFileSync, realpathSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
-import { isKey, MEDIA_MAX, REPORT_FORMS } from './store.js';
+import { isKey, MEDIA_MAX, PRIORITIES, REPORT_FORMS } from './store.js';
 
 /** A message that does not match: what is wrong, and the one line that says how to fix it. */
 export class ContractError extends Error {
@@ -15,7 +15,7 @@ const OLDER: Record<string, number[]> = { report: [2, 3], plan: [1, 2] };
 /** The guided schemas: a report 3 and a plan 2 are fields the board draws as one guided page, not a page the agent draws. */
 export const guided = (m: any) => (m?.kind === 'report' && [3, 4].includes(m.schema)) || (m?.kind === 'plan' && [2, 3].includes(m.schema));
 export const KINDS = Object.keys(SCHEMAS);
-const COMMON = ['contract', 'kind', 'schema', 'key', 'title', 'filer', 'ticket', 'link', 'about'];
+const COMMON = ['contract', 'kind', 'schema', 'key', 'title', 'filer', 'ticket', 'priority', 'link', 'about'];
 const FIELDS: Record<string, string[]> = {
   ask: [...COMMON, 'ask_ref', 'detail', 'why', 'options', 'recommend_value', 'recommend_reason', 'default_if_silent', 'silent_by', 'close', 'merges', 'proof'],
   report: [...COMMON, 'filed', 'group', 'decided', 'form', 'video', 'asked_by', 'view', 'preview'],
@@ -253,6 +253,7 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
   if (g && m.schema === SCHEMAS[m.kind] && !isKey(m.filer)) throw bad('filer', 'is required', 'Set "filer" to the owning agent id');
   if (Object.hasOwn(m, 'filer') && !isKey(m.filer)) throw bad('filer', 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "filer" to your agent session id or tool name, or leave it out');
   if (Object.hasOwn(m, 'ticket') && !isKey(m.ticket)) throw bad('ticket', 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "ticket" to the id of the ticket this card belongs to, or leave it out');
+  if (Object.hasOwn(m, 'priority') && !PRIORITIES.includes(m.priority)) throw bad('priority', `${show(m.priority)} is not one of ${PRIORITIES.join(', ')}`, `Set ${named('priority', flags)} to how urgent the card is, P0 (most) to P3 (least), or leave it out`);
   if (Object.hasOwn(m, 'link') && !(typeof m.link === 'string' && /^(https?:\/\/[^\s\p{Cc}\p{Cs}]{1,500}|[a-f0-9]{7,40})$/u.test(m.link))) {
     throw bad('link', 'must be an http(s) link with no spaces or control characters, or a 7-40 character commit hash',
       'Set "link" to a URL such as "https://example.com/pr/4" or a commit hash, or leave it out');

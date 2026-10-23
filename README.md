@@ -90,6 +90,17 @@ sign-off-axi post --type evidence --ticket T-29 --title "Settings on a phone" --
 
 Agents pass `--ticket` whenever they know the ticket their work belongs to, and move its `--progress` as the work goes; the shipped skill tells them so.
 
+### How urgent, and whose project
+
+A card may say how urgent it is with `--priority P0` (most urgent) to `P3` (least), on any `raise` or `post`; it shows as a chip, and a card without one shows none. A project may have its own icon: a picture in the board's folder (.png, .jpg, .webp or a script-free .svg, 500 KB or less), set once. The board serves only that exact file, and a project with no icon shows its initials.
+
+```sh
+sign-off-axi raise --priority P1 --title "Ship the new settings page this week?" ...
+sign-off-axi project --name Beacon --icon icons/beacon.png
+```
+
+Agents pass `--priority` when they know it, and set their project's icon when it ships one; the shipped skill tells them so.
+
 Every card's screen also keeps its **Activity**, oldest first, from what the board already saved: who posted it, your answer and note (and the one a change replaced), when the agent picked it up, a new round you asked for and your comments. A ticket's page shows its cards' activity together.
 
 ## What you can ask

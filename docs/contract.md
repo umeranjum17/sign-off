@@ -9,7 +9,7 @@ Status: v1 target, built in parts. Built: seven kinds, `ask`, `report` (schema 4
 - One contract, `"contract": 1`. Seven kinds: `ask`, `report`, `evidence`, `gate`, `finding`, `plan` and `design`.
 - Each kind has its own `"schema"` number, starting at `1`. Every message carries `contract`, `kind` and `schema`.
 - Strict: an unlisted field, a wrong type or a broken limit refuses the whole message, at every level (options, `run`, `media`). Nothing is dropped quietly, and nothing is stored or shown half-valid.
-- Inside one `contract`, `kind` and `schema`, no field is added, removed, renamed or retyped. Any such change is a new `schema`. Two optional fields are the exception, added inside schema 1: `ask_ref` on `ask` and `ticket` on every kind. A message without them means exactly what it did, and a sign-off-axi older than the field refuses a message that carries it, so a producer that also posts to older boards leaves it out.
+- Inside one `contract`, `kind` and `schema`, no field is added, removed, renamed or retyped. Any such change is a new `schema`. Three optional fields are the exception, added inside schema 1: `ask_ref` on `ask`, and `ticket` and `priority` on every kind. A message without them means exactly what it did, and a sign-off-axi older than the field refuses a message that carries it, so a producer that also posts to older boards leaves it out.
 - sign-off-axi accepts only the schemas it ships: the latest of each kind, and for `report` schemas 2/3 and for `plan` schemas 1/2, which older boards and agents still post. Any other `schema` number is refused with the fix "upgrade sign-off-axi".
 - The board file keeps its own `"schema": 2`. A posted message is stored as a board item that keeps its `kind` and `schema`.
 - Producers pin an exact version in CI, for example `npx -y sign-off-axi@0.3.0`.
@@ -52,6 +52,7 @@ A message file holds one JSON object, in any layout. The validator reads it with
 | `title` | all, required | text, 1-160 |
 | `filer` | all, optional | a key-set id: the agent session id or tool name |
 | `ticket` | all, optional | a key-set id: the ticket this card belongs to. Only a reference: the ticket need not be on the board, and nothing needs it (section 13) |
+| `priority` | all, optional | `P0`, `P1`, `P2` or `P3`: how urgent the card is, `P0` the most. The board shows it as a chip and can sort by it; a card without one shows no chip. It changes nothing about how the card is asked or answered |
 | `link` | all, optional | `http://` or `https://` followed by 1-500 characters with no whitespace, control character (C0, DEL or C1) or unpaired surrogate, or a 7-40 character lowercase hex commit |
 | `about` | all, required (optional on `ask`) | text, 1-500 |
 | `detail` | `ask`, optional | text, 1-1000 |
@@ -67,6 +68,7 @@ A message file holds one JSON object, in any layout. The validator reads it with
 
 When `filer` is missing, `post` takes it from `--filer`, else `SIGN_OFF_FILER` (empty means unset), else the agent session id. A `filer` in the message that differs from `--filer` is refused. Only `post` checks this; `validate` checks `filer` only when the message has one.
 When `ticket` is missing, `post` takes it from `--ticket`; a `ticket` in the message that differs from `--ticket` is refused. It is part of the message, so a key already on the board takes another `ticket` only as a new message (`CONFLICT`).
+`priority` works the same way with `--priority`: filled in when missing, refused when it differs, and part of the message.
 
 A key already on the board takes only the same message again (the same fields and values, in any order, with the same `filer`), which changes nothing. "In any order" refers to the order of fields; the order of options is part of the message, because it is the order the user sees, so the same options listed in another order are a different message. A message that names no `filed` matches the time the board stamped; a board-format item under that key is not the same message. Anything else under that key is refused with code `CONFLICT`, exit 2 and the help line "Post it under a new key". Today's CLI exits 1 on `CONFLICT`; this contract changes that, so every refusal exits 2.
 
@@ -306,3 +308,11 @@ A ticket is one piece of work: an `id` (a key-set id), a `title` (text, 1-160), 
 - A card links to a ticket only by naming its id in `ticket` (section 4). The link is loose on both sides: posting never checks that the ticket exists, a ticket's record never names its cards (its page finds them by their `ticket`), and removing either leaves the other as it was.
 - Where the card's ticket is on the board, the card's screen shows a **Ticket** row, the ticket's title, id and progress, that opens the ticket's page; where it is not, the card shows nothing more than before. The ticket's page lists the cards that name it (asks, designs, proof, reports and plans), newest first, and the tickets under it.
 - `ticket --id <id> --json` reads a ticket and its cards back (`key`, `kind`, `status`, `title`, `filed`); `ticket --json` lists every ticket. A ticket changes nothing about how a card is asked, answered or waited for.
+
+## 14. Project icons
+
+A project may have its own icon, which the board draws on the project's rows. Like a ticket it is not a message kind: it stands alone beside the board, in the open format of [file-formats.md](file-formats.md) (**Projects**), written by `sign-off-axi project --name <name> --icon <path>`.
+
+- The name is the project as cards give it (a report's or design's `group`, a plan's `project`, the app of a `verify-<app>` proof), text of 1-40, matched without regard to case.
+- The icon is a picture in the board file's folder, named by its path from that folder: no `..`, `?`, `#` or `\`, and its real path, links followed, stays inside the folder. It is a `.png`, `.jpg`, `.jpeg`, `.webp` or `.svg` file whose content is that type (an SVG holds no script, `foreignObject` or event attribute), 500,000 bytes or fewer. `project` pins it by its `sha256` and `bytes`; the board serves only that file, and a file changed since is not served.
+- Both are optional. A project with no icon, a project not on the board and an icon that cannot be served all show a monogram tile, the project's initials. No icon ships with sign-off: each board brings its own.
