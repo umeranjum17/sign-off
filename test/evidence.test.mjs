@@ -5,6 +5,8 @@ import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { crc32, deflateSync } from 'node:zlib';
+import jpeg from 'jpeg-js';
 import { asked } from './ask.mjs';
 
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
@@ -59,8 +61,19 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
   assert.match(evidence('--title', 'Sign-in screen', '--about', 'The screen loads.', '--media', capture, '--media', sparseScreen).out, /update-1,1,2/);
   assert.match(evidence('--title', 'Sign-in flow', '--about', 'Umer signs in on a phone.', '--media', capture, '--media', rec,
     '--link', 'https://github.com/acme/app/pull/12').out, /update-2,2,2/);
-  assert.deepEqual(readdirSync(join(so, 'evidence', '2')).sort(), ['1.png', '2.webm']);
+  // A still gets a light copy and a thumb beside its original; a recording is copied as it is.
+  assert.deepEqual(readdirSync(join(so, 'evidence', '2')).sort(), ['1-light.jpg', '1-thumb.jpg', '1.png', '2.webm']);
   assert.deepEqual(readFileSync(join(so, 'evidence', '2', '2.webm')), clip);
+  const [shrunk, tall] = JSON.parse(readFileSync(board, 'utf8')).items[0].media, sha = (p) => createHash('sha256').update(readFileSync(join(so, p))).digest('hex');
+  assert.deepEqual([shrunk.light.width, shrunk.light.height, shrunk.thumb.width, shrunk.thumb.height], [1280, 860, 720, 484]);
+  // A phone capture taller than twice its width keeps a thumb of its top at full width, and the light copy whole.
+  assert.deepEqual([tall.light.width, tall.light.height, tall.thumb.width, tall.thumb.height], [1170, 2532, 720, 1440]);
+  for (const c of [shrunk.light, shrunk.thumb, tall.light, tall.thumb]) assert.deepEqual([sha(c.path), readFileSync(join(so, c.path)).length], [c.sha256, c.bytes]);
+  assert.ok(shrunk.light.bytes < shrunk.bytes && shrunk.thumb.bytes < shrunk.light.bytes, 'each copy weighs less than what it stands in for');
+  // The same capture posted twice gives the same copies, byte for byte.
+  const again = JSON.parse(readFileSync(board, 'utf8')).items[1].media[0];
+  assert.deepEqual([again.light.sha256, again.thumb.sha256], [shrunk.light.sha256, shrunk.thumb.sha256]);
+  assert.equal(JSON.parse(readFileSync(board, 'utf8')).items[1].media[1].light, undefined);
   // Each post records when it was filed.
   for (const item of JSON.parse(readFileSync(board, 'utf8')).items) assert.ok(Date.now() - Date.parse(item.filed) < 60_000, item.key);
   // A second board in the same folder shares evidence/: it takes the next free number and never writes into a used one.
@@ -120,6 +133,17 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
   assert.equal(await part.text(), '2345');
   assert.equal((await fetch(`${url}api/media?key=update-2&i=9`)).status, 404);
   assert.equal((await fetch(`${url}api/media?key=update-2`)).status, 404);
+  // The light copy and the thumb are served as posted, hash-checked like the original; a clip has none, and no other size is served.
+  for (const [v, ref] of [['light', again.light], ['thumb', again.thumb]]) {
+    const copy = await fetch(`${url}api/media?key=update-2&i=0&v=${v}`);
+    assert.deepEqual([copy.status, copy.headers.get('content-type'), (await copy.arrayBuffer()).byteLength], [200, 'image/jpeg', ref.bytes]);
+  }
+  assert.deepEqual(Buffer.from(await (await fetch(`${url}api/media?key=update-2&i=0`)).arrayBuffer()), readFileSync(capture));
+  for (const q of ['i=1&v=light', 'i=0&v=full', 'i=0&v=']) assert.equal((await fetch(`${url}api/media?key=update-2&${q}`)).status, 404, q);
+  appendFileSync(join(so, again.thumb.path), 'x');
+  assert.equal((await fetch(`${url}api/media?key=update-2&i=0&v=thumb`)).status, 404);
+  // The export carries each copy under the URL the page asks for.
+  assert.ok(['', '&v=light', '&v=thumb'].every((v) => frozen.files[`/api/media?key=update-2&i=0${v}`]?.startsWith(v ? 'data:image/jpeg;base64,' : 'data:image/png;base64,')));
   // A file changed after posting is refused, never served as the posted proof.
   appendFileSync(join(so, 'evidence', '1', '1.png'), 'x');
   assert.equal((await fetch(`${url}api/media?key=update-1&i=0`)).status, 404);
@@ -151,6 +175,51 @@ test('an evidence post tells the agent no wait or open hint: it is not an ask th
   assert.equal(posted.code, 0);
   assert.match(posted.out, /update-\d+,\d+,1/);
   assert.doesNotMatch(posted.out, /help\[/);
+});
+
+test('a still is shown upright and lighter: a phone photo turned by its EXIF, a transparent capture kept clear, a colour-tagged one kept PNG, an unreadable one at full size', () => {
+  const file = join(so, 'stills.json'), dir = mkdtempSync(join(scratch, 'stills-')), stored = () => JSON.parse(readFileSync(file, 'utf8')).items.at(-1);
+  // A photo stored on its side: 3400 by 1000 with its left half blue-free and its right half blue, and EXIF orientation 6 (turn clockwise).
+  const [w, h] = [3400, 1000], rgba = Buffer.alloc(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) rgba.set([x % 256, y % 256, x < w / 2 ? 0 : 255, 255], (y * w + x) * 4);
+  const tiff = Buffer.from('4d4d002a000000080001011200030000000100060000000000000000', 'hex'), exif = Buffer.concat([Buffer.from('Exif\0\0', 'latin1'), tiff]);
+  const app1 = Buffer.concat([Buffer.from([0xff, 0xe1, (exif.length + 2) >> 8, (exif.length + 2) & 255]), exif]), photo = jpeg.encode({ data: rgba, width: w, height: h }, 95).data;
+  writeFileSync(join(dir, 'photo.jpg'), Buffer.concat([photo.subarray(0, 2), app1, photo.subarray(2)]));
+  assert.equal(run('post', file, '--type', 'evidence', '--title', 'Photo of the phone', '--about', 'Umer holds it sideways.', '--media', join(dir, 'photo.jpg')).code, 0);
+  const { light, thumb } = stored().media[0];
+  assert.deepEqual([light.width, light.height, thumb.width, thumb.height, light.path.endsWith('.jpg')], [1000, 3400, 720, 1440, true]);
+  // Turned clockwise, the photo's left half is the top: no blue there, all blue at the bottom.
+  const upright = jpeg.decode(readFileSync(join(so, light.path))), blue = (x, y) => upright.data[(y * upright.width + x) * 4 + 2];
+  assert.deepEqual([blue(500, 40) < 64, blue(500, 3360) > 192], [true, true]);
+
+  // A capture with transparency gets PNG copies with an alpha channel, never a JPEG on a black or white ground. A wide one keeps a thumb of
+  // its centre, twice as wide as tall, so it still fills a list card's height.
+  const [cw, ch] = [2000, 800], raw = Buffer.alloc((cw * 4 + 1) * ch);
+  for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) raw.set([(x * 255 / cw) | 0, (y * 255 / ch) | 0, 90, x < 200 ? 0 : 255], y * (cw * 4 + 1) + 1 + x * 4);
+  const chunk = (name, data) => { const b = Buffer.alloc(12 + data.length); b.writeUInt32BE(data.length); b.write(name, 4, 'latin1'); data.copy(b, 8); b.writeUInt32BE(crc32(b.subarray(4, 8 + data.length)), 8 + data.length); return b; };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(cw); ihdr.writeUInt32BE(ch, 4); ihdr.set([8, 6], 8);
+  writeFileSync(join(dir, 'clear.png'), Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]));
+  assert.equal(run('post', file, '--type', 'evidence', '--title', 'Floating panel', '--about', 'Its edge is clear.', '--media', join(dir, 'clear.png')).code, 0);
+  const { light: clear, thumb: centre } = stored().media[0], head = readFileSync(join(so, clear.path));
+  assert.deepEqual([clear.path.endsWith('-light.png'), clear.width, clear.height, head[25], centre.width, centre.height], [true, 1600, 640, 6, 720, 360]);
+
+  // An opaque capture tagged with cICP (here BT.709) keeps that tag on PNG copies: a JPEG cannot carry it, and without it a browser shows other tones.
+  const flat = Buffer.alloc((cw * 3 + 1) * ch);
+  for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) flat.set([(x * 255 / cw) | 0, (y * 255 / ch) | 0, (x * y) & 255], y * (cw * 3 + 1) + 1 + x * 3);
+  ihdr.set([8, 2], 8);
+  const cicp = chunk('cICP', Buffer.from([1, 1, 0, 1]));
+  writeFileSync(join(dir, 'tagged.png'), Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), chunk('IHDR', ihdr), cicp, chunk('IDAT', deflateSync(flat)), chunk('IEND', Buffer.alloc(0))]));
+  assert.equal(run('post', file, '--type', 'evidence', '--title', 'Tagged colours', '--about', 'Umer checks the tones.', '--media', join(dir, 'tagged.png')).code, 0);
+  for (const c of Object.values(stored().media[0]).filter((v) => v?.path)) assert.ok(c.path.endsWith('.png') && readFileSync(join(so, c.path)).includes(cicp), c.path);
+
+  // A still the board cannot read is posted and shown as it is, and the post says so.
+  writeFileSync(join(dir, 'odd.webp'), Buffer.concat([Buffer.from('RIFF\0\0\0\0WEBPVP8 ', 'latin1'), Buffer.alloc(64, 7)]));
+  const odd = run('post', file, '--type', 'evidence', '--title', 'Odd file', '--about', 'It is not a real WebP.', '--media', join(dir, 'odd.webp'));
+  assert.equal(odd.code, 0);
+  assert.match(odd.out, /Capture 1 shows at full size: reading a WebP needs ImageMagick \(convert\), which is not installed/);
+  assert.deepEqual(Object.keys(stored().media[0]).sort(), ['bytes', 'path', 'sha256']);
+  rmSync(dir, { recursive: true, force: true });
 });
 
 test('a proof posted as a Pass/Fail ask is refused and pointed to evidence', () => {

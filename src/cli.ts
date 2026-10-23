@@ -13,10 +13,11 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, sameDecision, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, sameDecision, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
+import { copiesOf } from './images.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
 
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
@@ -227,7 +228,7 @@ An empty items list removes that filer's items.
 --type diagram and --type interactive are a decision shown with a picture: --view names one board-relative file,
 an image (.svg, .png, .jpg, .jpeg, .webp, 5 MB or less) shown at card width for a diagram, or one self-contained .html page for interactive.
 The page runs in a sandboxed frame: no fetch, no remote files, no access to the dashboard or its tab. Answers work as for a decision.
---type evidence posts the next numbered update (key update-<number>): 1 to ${MEDIA_MAX} screenshots or recordings (.png, .jpg, .jpeg, .webp, .mp4, .webm, 50 MB each), copied into evidence/<number>/ next to the board, with a short note and an optional commit or PR link. A still that is not a picture of the product is refused: mostly text (a log, receipt or summary), a colour-bar test card or a placeholder card. Post a real capture of the running product; a colour-bar or placeholder card already posted is not shown on the board.
+--type evidence posts the next numbered update (key update-<number>): 1 to ${MEDIA_MAX} screenshots or recordings (.png, .jpg, .jpeg, .webp, .mp4, .webm, 50 MB each), copied into evidence/<number>/ next to the board (each still also gets a lighter copy and a thumbnail there, which the board shows; the original stays and opens full size), with a short note and an optional commit or PR link. A still that is not a picture of the product is refused: mostly text (a log, receipt or summary), a colour-bar test card or a placeholder card. Post a real capture of the running product; a colour-bar or placeholder card already posted is not shown on the board.
 --attach <file> (up to ${ATTACH_MAX}, any file type, such as an Android .apk) adds a file the user downloads from the card, over the board link, on a phone or tablet. It is copied (never read into memory) into evidence/<number>/ and streamed on download. A file over ${ATTACH_DEFAULT_MB} MB is refused; raise the limit with SIGN_OFF_ATTACH_MAX_MB=<megabytes>. An update may have only --attach files and no --media.
 The user gives a verdict, pass, fail or needs-work, with an optional note; read it with answers or wait --key update-<number>.
 --type explainer is a decision shown with a narrated video you made: one --media .mp4 or .webm (50 MB or less), copied into evidence/<number>/ like evidence
@@ -1204,11 +1205,21 @@ function postMedia(file: string, named: string, on: string, values: Record<strin
     }
     const key = own || `update-${number}`, dir = join(store, String(number));
     let media, attachments: AttachRef[] = [];
+    const full: string[] = [];
     try {
       media = sources.map((src, i) => {
         const bytes = readFileSync(src), path = `evidence/${number}/${i + 1}${extname(src).toLowerCase()}`;
         writeFileSync(join(dir, `${i + 1}${extname(src).toLowerCase()}`), bytes, { mode: 0o600 });
-        return { path, sha256: sha256(bytes), bytes: bytes.length };
+        // The original stays as it was posted; the board shows a lighter copy of a still where one weighs less.
+        const made = isStill(src) ? copiesOf(bytes, extname(src)) : {}, refs: Record<string, CopyRef> = {};
+        for (const size of ['light', 'thumb'] as const) {
+          const c = made[size];
+          if (!c) continue;
+          writeFileSync(join(dir, `${i + 1}-${size}${c.ext}`), c.bytes, { mode: 0o600 });
+          refs[size] = { path: `evidence/${number}/${i + 1}-${size}${c.ext}`, sha256: sha256(c.bytes), bytes: c.bytes.length, width: c.width, height: c.height };
+        }
+        if (made.reason) full.push(`Capture ${i + 1} shows at full size: ${made.reason}`);
+        return { path, sha256: sha256(bytes), bytes: bytes.length, ...refs };
       });
       // An attachment is copied by the kernel and hashed in chunks: the file is never held in memory.
       attachments = attached.map(({ src, ext, name }: { src: string; ext: string; name: string }, i: number) => {
@@ -1240,7 +1251,7 @@ function postMedia(file: string, named: string, on: string, values: Record<strin
     writeItems(file, items);
     notifyEntered(file, named, before);
     if (explainer) return toon({ board: tilde(file), raised: [{ key, status: 'raised', title }] }, [`Run \`sign-off-axi open${on}\` so the user can watch and answer`, waitFor(on, filer, key)]);
-    return toon({ board: tilde(file), posted: [{ key, number, media: media.length, ...(attachments.length && { attached: attachments.length }), title, ...(message && { status: 'posted' }) }] });
+    return toon({ board: tilde(file), posted: [{ key, number, media: media.length, ...(attachments.length && { attached: attachments.length }), title, ...(message && { status: 'posted' }) }] }, full);
   });
 }
 
@@ -2108,7 +2119,7 @@ async function exportBoard(args: string[]) {
     // A diagram or an interactive page is the item's own view, inlined the same way.
     if (d.view) await inline(at(d.key, '', d.view), undefined, true);
     if (d.preview) await inline(at(d.key, '', d.preview));
-    for (const i of (d.media ?? []).keys()) await inline(`/api/media?key=${q(d.key)}&i=${i}`);
+    for (const [i, m] of (d.media ?? []).entries()) for (const v of ['', ...['light', 'thumb'].filter((v) => m[v as 'light'])]) await inline(`/api/media?key=${q(d.key)}&i=${i}${v && `&v=${v}`}`);
     for (const m of d.evidenceCard?.media ?? []) await inline(m.url);
   }
   const out = resolve(parsed.values.out ?? `${parsed.file.replace(/\.json$/, '')}.export.html`);
@@ -2353,8 +2364,9 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   }
   if (req.method === 'GET' && req.url?.startsWith('/api/media?')) {
     const q = new URL(req.url, 'http://localhost').searchParams;
-    const m = loadDecisions(file).find((d) => d.key === q.get('key'))?.media?.[Number(q.get('i') || NaN)];
-    const type = m && mediaTypes[extname(m.path).toLowerCase()];
+    // v=light or v=thumb asks for the copy post made of a still; with no v, the file as it was posted.
+    const v = q.get('v'), posted = loadDecisions(file).find((d) => d.key === q.get('key'))?.media?.[Number(q.get('i') || NaN)];
+    const m = v === null ? posted : v === 'light' || v === 'thumb' ? posted?.[v] : undefined, type = m && mediaTypes[extname(m.path).toLowerCase()];
     if (!m || !type) return [404, { error: 'Evidence is unavailable' }];
     try {
       const actual = under(dirname(file), m.path);

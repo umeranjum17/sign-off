@@ -72,7 +72,10 @@ mock, or whose file is gone, says "No mock for this option".
 `update-2`, ...) with 1 to 12 screenshots or recordings (`.png`, `.jpg`,
 `.jpeg`, `.webp`, `.mp4`, `.webm`, up to 50 MB each), a short note and an
 optional commit or PR link. The files are copied into `evidence/<number>/`
-next to the board, so the board is the store: no hosted service. The page
+next to the board, so the board is the store: no hosted service. Each
+still also gets a lighter copy and a thumbnail beside it, which the page
+shows and loads as they near the screen; the original stays as posted and
+opens full size. The page
 shows the updates newest first; each file is served only while its size and
 SHA-256 still match what was posted, and recordings play inline on a phone.
 The person gives a verdict, **Pass**, **Fail** or **Needs work**, with an

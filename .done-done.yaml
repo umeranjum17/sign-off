@@ -61,6 +61,10 @@ journeys:
   # Agree, Disagree and Comment on a part and its Ask menu, per theme and width: the foot row at 44 px tap targets, Disagree's What is off? box, a sent comment taken by wait --filer and answered with deeper, and a short phone recording. PART_COMMENT_BEFORE=1 SIGN_OFF_REPO=<base checkout, built> records the same page without them.
   part-comment:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/part-comment-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${PART_COMMENT_THEME:-light}" "${PART_COMMENT_WIDTH:-390}"'
+  # Light pictures: real captures (IMAGES_DIR, else the repo's fixtures) posted as updates, shown from their light and thumb copies at 390 and 1280
+  # in light and dark, each picture's sharpness against its frame and the bytes loaded. IMAGES_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
+  images:
+    command: 'npm run build > /dev/null && for t in light dark; do node .agents/skills/done-done-verify-sign-off/image-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t || exit 1; done'
   board-actions:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/board-actions.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   attach:
