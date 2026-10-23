@@ -1,7 +1,7 @@
 // Real-clock performance run of a sign-off board in headless Chromium over CDP (no virtual time).
 //   node load-perf.mjs PROFILE URL WIDTH light|dark none|slow4g OUT_PREFIX   (PROFILE: an empty throwaway folder; remove it after)
 // The viewport, theme and throttling are set before the first navigation (the check-390 method). One JSON line per run:
-// cold load (cache off), cold load of the Evidence list, warm reload (cache on), then scroll and tap feel on the warm page. A shot of the loaded board is saved.
+// cold load (cache off), cold load of the Evidence list, warm reload (cache on), then scroll and tap feel on the warm page. Shots: the loaded board, Evidence, and the reloaded board with the measured bytes and requests drawn over it (-weight.png).
 //   slow4g = Lighthouse's mobile profile: 150 ms RTT, 1.6 Mbps down, 750 kbps up, CPU 4x slower.
 import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
@@ -134,6 +134,14 @@ try {
   const { data: shot } = await send('Page.captureScreenshot', { format: 'png' }, s);
   writeFileSync(`${out}-evidence.png`, Buffer.from(shot, 'base64'));
   const w = await load('warm');
+  // A shot that shows the numbers: the browser's own network record of the three loads, drawn over the reloaded board and then removed.
+  const lines = [`Measured by load-perf.mjs at ${W} px, ${throttle === 'none' ? 'no throttling' : 'slow 4G'}`, `First load: ${c.kb} KB in ${c.requests} requests, first paint ${c.fcp} ms`,
+    `Evidence: ${e.kb} KB in ${e.requests} requests (${e.by.image?.n ?? 0} pictures, ${e.by.image?.kb ?? 0} KB)`, `Reload: ${w.kb} KB transferred, ${w.cached} of ${w.requests} from the browser's copy`];
+  await ev(`(() => { const d = document.createElement('div'); d.id = '__weight'; d.style.cssText = 'position:fixed;left:12px;right:12px;top:12px;z-index:2147483647;padding:14px 16px;border-radius:12px;background:#111;color:#fff;font:600 15px/1.5 system-ui;white-space:pre-line';
+    d.textContent = ${JSON.stringify(lines.join('\n'))}; document.body.append(d); return new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok))); })()`);
+  const { data: weight } = await send('Page.captureScreenshot', { format: 'png' }, s);
+  writeFileSync(`${out}-weight.png`, Buffer.from(weight, 'base64'));
+  await ev(`document.getElementById('__weight').remove()`);
   const sc = [await scroll('#evidence'), await scroll('#reports')];
   const t = await taps();
   console.log(JSON.stringify({ run: out.split('/').pop(), width: W, theme, throttle, cold: c, evidence: e, warm: w, scroll: sc, taps: t, inp: Math.max(...t.map((x) => x.ms)) }));
