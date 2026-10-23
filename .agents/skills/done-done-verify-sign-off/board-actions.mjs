@@ -95,14 +95,17 @@ function helpers(home, readySel) {
 // Every card kind on every tab, with the actions it must offer. A stage with `shot` is captured and looked at before the next one.
 const KEYS = { plan: 'plan-kind-board', signin: 'npm', ask: 'ship', ask2: 'keep-the-weekly-digest', evidence: 'update-1', design: 'look', review: 'chat-journeys', passed: 'update-2', report: 'new-sign-in', answered: 'digest-old' };
 const PAGES = [
-  { name: 'today', hash: '', ready: '.t-proof .lrow', stages: [{ run: async (h) => {
-    // Each tile opens what it counts; Up next's Details opens the sign-in ask; the foot links Answered and Designs; New report and a Latest proof row open theirs.
-    await h.nav('Today tile: Answer', h.find(/^Answer, \d+:/, h.board(), 'a'), /^#waiting$/);
-    await h.nav('Today tile: Proof', h.find(/^Proof, \d+:/, h.board(), 'a'), /^#evidence$/);
-    for (const [what, href] of [['Up next Details', '#decide/npm'], ['Answered', '#answered'], ['Designs', '#designs'], ['report', '#reports/new-sign-in']]) {
-      await h.nav(`Today ${what} link`, h.board().querySelector(`a[href="${href}"]`), new RegExp(`^${href}$`));
+  { name: 'today', hash: '', ready: '.t-up', stages: [{ run: async (h) => {
+    // Each tile opens what it counts; Up next's Details opens the sign-in ask; See all opens Decide and a Waiting on you row its ask; More links Answered and Designs.
+    await h.nav('Today tile: Cleared today', h.board().querySelector('.t-tiles a[href="#answered"]'), /^#answered$/);
+    await h.nav('Today tile: Proofs today', h.board().querySelector('.t-tiles a[href="#evidence"]'), /^#evidence$/);
+    await h.nav('Today Up next Details', h.board().querySelector('.t-up a[href="#decide/npm"]'), /^#decide\/npm$/);
+    await h.nav('Today See all', h.board().querySelector('.t-wait .see'), /^#waiting$/);
+    await h.nav('Today Waiting on you row', h.board().querySelector('.t-wait .ui-row'), /^#(decide|waiting|designs)\/[\w.-]+$/);
+    for (const [what, href] of [['Answered', '#answered'], ['Designs', '#designs']]) {
+      h.board().querySelector('.t-more-line')?.click();
+      await h.nav(`Today More: ${what}`, document.querySelector(`#t-more a[href="${href}"]`), new RegExp(`^${href}$`));
     }
-    await h.nav('Today latest proof', h.board().querySelector('.t-proof .lrow'), /^#evidence\/[\w-]+$/);
   } }] },
   { name: 'waiting', hash: '#waiting', ready: '[id="item-npm"]', stages: [
     { run: async (h) => {
