@@ -1173,12 +1173,13 @@ function project(args: string[]) {
     }
     let bytes: Buffer;
     try {
-      if (!statSync(actual).isFile()) throw bad('is not a file', 'Name the picture itself');
-      if (statSync(actual).size > ICON_BYTES) throw bad(`is over ${ICON_BYTES} bytes`, 'Shrink the picture: an icon is drawn at most 64 px wide');
+      const info = statSync(actual);
+      if (!info.isFile()) throw bad('is not a file', 'Name the picture itself');
+      if (info.size > ICON_BYTES) throw bad(`is over ${ICON_BYTES} bytes`, 'Shrink the picture: an icon is drawn at most 64 px wide');
       bytes = readFileSync(actual);
     } catch (e: any) { throw e instanceof AxiError ? e : bad(reasonOf(e.code), 'Make the picture readable, then run project again'); }
     const content = iconContentFault(icon, bytes);
-    if (content || !bytes.length) throw bad(content || 'is empty', 'Save the picture again as the type its name gives');
+    if (content) throw bad(content, 'Save the picture again as the type its name gives');
     ref = { path: icon, sha256: sha256(bytes), bytes: bytes.length };
   }
   const fault = projectFault({ name, ...(ref && { icon: ref }) });
