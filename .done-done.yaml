@@ -30,6 +30,9 @@ journeys:
   # Go deeper on an answers-only (fed) board: accepted at 390 and 1280, one ask saved, no error shown.
   fed-deeper:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/fed-deeper-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${GUIDE_THEME:-light}"'
+  # Open full screen on a design pick and an interactive page, at 390 and 1280 in light and dark: the prototype's own tab and link, the other size, Reference, Close.
+  fullscreen:
+    command: 'npm run build > /dev/null && for w in 390 1280; do for t in light dark; do FULL_WIDTH=$w node .agents/skills/done-done-verify-sign-off/fullscreen-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t || exit 1; done; done'
   # A screen note typed in the design viewer on an answers-only (fed) board and Request change sent, one width per run: REQUEST_WIDTH=390|1280.
   request-change:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/request-change-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${REQUEST_THEME:-light}"'

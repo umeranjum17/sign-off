@@ -696,6 +696,54 @@
   .design-viewer-panel .open-link { background: var(--action); color: var(--on-accent); }
   @media (min-width: 64rem) { .design-viewer header h2 { font-size: 2.125rem; } .design-viewer-body { grid-template: minmax(0, 1fr) / minmax(0, 1fr) 22.5rem; } .design-viewer-panel { padding: 1.25rem; } }
   @media (max-height: 550px) { .design-viewer-body { overflow: auto; grid-template-rows: minmax(12rem, 1fr) auto; } }
+  /* Open full screen: a quiet link-like button under a design's mocks or an interactive page. */
+  .full-open { display: inline-flex; align-items: center; gap: 0.375rem; justify-self: start; min-height: var(--ctl); margin: 0 -0.5rem; padding: 0 0.5rem; background: none; color: var(--accent); font: inherit; font-size: var(--t-s); }
+  .full-open .glyph { width: 1rem; height: 1rem; }
+  /* Focus comes back to what opened the full screen; it shows a ring only when the last input was a key. */
+  html:not([data-kbd]) :is(.full-open, .shot):focus-visible { outline: none; }
+  .decide-preview .full-open { justify-self: center; margin: 0.25rem 0 -0.5rem; }
+  /* The prototype full screen: a bar (the way back and the title, then the option, Phone or Desktop and Reference), and the stage, where each frame is drawn at its chosen width and centred. */
+  .proto-full { position: fixed; inset: 0; width: 100%; max-width: none; height: 100dvh; max-height: none; margin: 0; padding: 0; border: 0; background: var(--ground); color: var(--text); }
+  .proto-full[open] { display: flex; flex-direction: column; }
+  .proto-full::backdrop { background: var(--ground); }
+  .pf-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; padding: 0.25rem max(1rem, env(safe-area-inset-right)) 0.5rem max(1rem, env(safe-area-inset-left)); padding-top: max(0.25rem, env(safe-area-inset-top));
+    background: var(--card); border-bottom: 0.5px solid var(--hairline); }
+  .pf-top { display: flex; flex: 1 1 100%; align-items: center; gap: 0.5rem; min-width: 0; }
+  .pf-top h2[tabindex="-1"]:focus-visible { outline: none; } html[data-kbd] .pf-top h2[tabindex="-1"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .pf-top h2 { flex: 1; min-width: 0; margin: 0; overflow: hidden; font-size: var(--t-m); font-weight: var(--tk-fw-semibold); text-overflow: ellipsis; white-space: nowrap; }
+  .pf-close, .pf-live { display: inline-flex; flex: none; align-items: center; gap: 0.25rem; min-height: var(--ctl); margin-left: -0.5rem; padding: 0 0.5rem; border-radius: var(--r-ctl); background: none; color: var(--accent); font: inherit; text-decoration: none; }
+  .pf-live { margin: 0 -0.5rem 0 0; } .pf-live[hidden] { display: none; }
+  .pf-tools { display: flex; flex: 1 1 100%; align-items: center; gap: 0.5rem; min-width: 0; }
+  .pf-pick, .pf-back select { min-width: 0; min-height: var(--ctl); padding: 0 0.625rem; border: 0; border-radius: var(--r-ctl); background: var(--sunk); color: var(--text); font: inherit; font-size: var(--t-xs); }
+  .pf-pick { flex: 1 1 auto; max-width: 16rem; }
+  .pf-size { display: flex; flex: none; padding: 2px; }
+  .pf-size button { display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem; min-width: var(--ctl); padding: 0 0.625rem; }
+  .pf-size .glyph { width: 1.125rem; height: 1.125rem; }
+  .pf-name { display: none; gap: 0.3125rem; } .pf-size .pf-w { color: var(--muted); font-size: var(--t-xxs); font-weight: var(--tk-fw-regular); font-variant-numeric: tabular-nums; }
+  .pf-ref { display: inline-flex; flex: none; align-items: center; gap: 0.375rem; margin-left: auto; padding: 0 0.75rem; border: 1px solid var(--line); background: none; color: var(--text); font-size: var(--t-xs); }
+  .pf-ref .glyph { width: 1rem; height: 1rem; }
+  .proto-full .pf-ref[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--card)); color: var(--accent); font-weight: var(--tk-fw-semibold); }
+  .proto-full .pf-ref[aria-pressed="true"]::before { content: none; }
+  .pf-stage { display: grid; flex: 1; min-height: 0; justify-content: center; align-content: start; gap: 1rem; padding: var(--pad, 0); overflow: hidden; }
+  .pf-stage[data-mode="beside"] { grid-template-columns: auto auto; }
+  .pf-stage[data-mode="over"] .pf-frame { grid-area: 1 / 1; }
+  .pf-frame { display: grid; justify-items: center; margin: 0; min-width: 0; }
+  .pf-frame[hidden] { display: none; }
+  .pf-frame figcaption { display: none; align-items: center; gap: 0.5rem; height: 2rem; max-width: var(--w); min-width: 0; font-size: var(--t-xs); color: var(--muted); }
+  .pf-frame figcaption b { overflow: hidden; color: var(--text); font-weight: var(--tk-fw-semibold); text-overflow: ellipsis; white-space: nowrap; }
+  .pf-stage:not([data-mode="one"]) figcaption { display: flex; }
+  .pf-stage[data-mode="over"] .pf-back { background: var(--ground); }
+  .pf-back select { min-height: 2rem; padding: 0 0.5rem; }
+  .pf-port { position: relative; width: var(--w); height: var(--h); overflow: hidden; background: #fff; }
+  .pf-frame.framed .pf-port { border-radius: var(--r-card); box-shadow: var(--shot-edge); }
+  .pf-port > iframe, .pf-port > .pf-img { position: absolute; top: 0; left: 0; width: var(--vw); height: var(--vh); border: 0; background: #fff; transform: scale(var(--s)); transform-origin: 0 0; }
+  .pf-img { overflow: auto; } .pf-img img { display: block; width: 100%; height: auto; }
+  @media (min-width: 64rem) {
+    .pf-bar { flex-wrap: nowrap; padding-top: 0.375rem; padding-bottom: 0.375rem; }
+    .pf-top { flex: 1 1 auto; } .pf-tools { flex: none; }
+    .pf-ref { margin-left: 0; }
+    .pf-name { display: inline-flex; } .pf-size .glyph { display: none; } .pf-size button { padding: 0 0.75rem; }
+  }
   /* The asks dismissed from Waiting on you: one muted row that opens to a list, each with Restore. */
   .gone-asks { margin-top: 0.5rem; } .gone-asks summary { color: var(--muted); }
   .gone-asks .rows { padding: 0; } .gone-asks li { justify-content: space-between; gap: 0.75rem; min-height: 2.75rem; }
@@ -1793,7 +1841,7 @@
     if (design) {
       return el('article', { class: 'row design', id: `item-${d.key}` }, lead,
         firstDraft(d).text ? el('p', { class: 'tradeoff', dir: 'auto' }, el('strong', {}, 'Trade-off '), firstDraft(d).text) : '', firstDraftLinks(d),
-        mockCards(d, ro ? [] : buttons), annotations(d), silent ? el('p', { class: 'silent' }, silent) : '', ro ? '' : other(d, saved, err), err);
+        mockCards(d, ro ? [] : buttons), fullButton(d), annotations(d), silent ? el('p', { class: 'silent' }, silent) : '', ro ? '' : other(d, saved, err), err);
     }
     // Yes/No rows keep the two fixed buttons they always had; any other choice set wraps; answers that say what they do stack.
     const many = d.options.some((o) => o.outcome) ? 'told' : d.options.map((o) => o.value).sort().join() !== 'no,yes' ? 'many' : '';
@@ -2162,7 +2210,7 @@
       body = el('a', { class: 'frame', ...open, tabindex: '-1' }, img);
       img.onerror = () => body.replaceWith(el('p', { class: 'gone' }, "The diagram can't be shown: its file is missing or in a format this browser can't draw."));
     }
-    return el('div', { class: 'rung' }, body, el('a', { class: 'meta', ...open, 'aria-label': `Open the ${name} full size, ${d.title}` }, 'Open full size'));
+    return el('div', { class: 'rung' }, body, page ? fullButton(d) : el('a', { class: 'meta', ...open, 'aria-label': `Open the ${name} full size, ${d.title}` }, 'Open full size'));
   }
 
   /** first-draft's `post` ends a design's trade-off with `Open in first-draft: <label> <url> · <label> <url>`: those urls, and the text before them. */
@@ -2188,11 +2236,97 @@
       return el('figure', { class: 'mock' },
         el('figcaption', {}, el('span', { class: 'label', dir: 'auto' }, o.label), rec(i) ? el('span', { class: 'badge' }, 'Recommended') : ''),
         // A mock file that is gone has a null hash: the option says so in place of an empty frame.
-        m && m.hash !== null ? el('a', { class: 'shot', href: url, target: '_blank', rel: 'noopener', 'aria-label': `Open mock ${o.label} full size` }, view)
+        m && m.hash !== null ? fullShot(d, m.value, el('a', { class: 'shot', href: url, target: '_blank', rel: 'noopener', 'aria-label': `Open mock ${o.label} full screen` }, view))
           : el('p', { class: 'shot none' }, 'No mock for this option'),
         // The option's own link sits on the card, where a tap opens a tab: a link inside the sandboxed frame cannot.
         m?.link ? el('div', { class: 'under' }, el('a', { class: 'option-link', href: m.link, target: '_blank', rel: 'noopener', 'aria-label': `Open ${o.label} live` }, 'Open live'), buttons[i] ?? '') : buttons[i] ?? '');
     }));
+  }
+
+  /** Open full screen: a design's mocks or an interactive page over the whole viewport, in the same sandboxed frame, which here takes every tap, so the prototype's own links and buttons work.
+   *  Its bar holds the way back, the option shown, Phone (390) or Desktop (1280) framed and centred, and Reference: another option's mock beside it, or over it where the two do not fit side by side. */
+  const SIZES = { phone: 390, desktop: 1280 };
+  let fullSize, protoFull;
+  const fullPages = (d) => d.view ? [{ value: '', label: d.title, page: true, url: src(mockUrl(d.key, '', d.view)) }]
+    : [...d.options].sort((a, b) => (b.value === d.recommend_value) - (a.value === d.recommend_value)).map((o) => {
+      const m = d.mocks?.find((x) => x.value === o.value), [path, query] = m?.path.split('?') ?? [];
+      return m && m.hash !== null && { value: m.value, label: o.label, link: m.link, page: /\.html?$/i.test(path), url: src(mockUrl(d.key, m.value, path) + (query ? `?${query}` : '')) };
+    }).filter(Boolean);
+  function fullButton(d) {
+    if (!fullPages(d).length) return '';
+    const b = el('button', { class: 'full-open', 'aria-haspopup': 'dialog', 'aria-label': `Open full screen, ${d.title}`, 'data-full': d.key }, glyph('expand'), 'Open full screen');
+    b.onclick = () => openFull(d, undefined, b.dataset.full);
+    return b;
+  }
+  /** A tap on a mock's frame opens it full screen; a click with a modifier still opens the file in a tab, and while pointing is on the tap names an element instead. */
+  function fullShot(d, value, shot) {
+    shot.dataset.full = `${d.key}~${value}`;
+    shot.onclick = (e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.button || (talks() && pointing.get(shot.dataset.full))) return; e.preventDefault(); openFull(d, value, shot.dataset.full); };
+    return shot;
+  }
+  function openFull(d, value, from) {
+    const pages = fullPages(d);
+    if (!pages.length) return;
+    fullSize ??= matchMedia('(min-width: 64rem)').matches ? 'desktop' : 'phone';
+    let shown = pages.find((p) => p.value === value) ?? pages[0], refOn = false, ref;
+    const others = () => pages.filter((p) => p !== shown);
+    const view = (p, title) => p.page ? el('iframe', { src: p.url, title, sandbox: 'allow-scripts' }) : el('div', { class: 'pf-img' }, el('img', { src: p.url, alt: title }));
+    const frame = (cls) => { const cap = el('figcaption', {}), port = el('div', { class: 'pf-port' }); return { fig: el('figure', { class: `pf-frame ${cls}` }, cap, port), cap, port }; };
+    const main = frame('pf-main'), back = frame('pf-back');
+    const title = el('h2', { id: 'pf-title', tabindex: '-1', autofocus: '', dir: 'auto' }, d.title);
+    const close = el('button', { class: 'pf-close', 'aria-label': 'Close full screen' }, glyph('x'), 'Close');
+    const pick = pages.length > 1 ? el('select', { class: 'pf-pick', 'aria-label': 'Option shown' }, ...pages.map((p) => el('option', { value: p.value }, p.label))) : '';
+    // On a phone each size is its picture; on a desk its name and width too.
+    const sizes = Object.entries(SIZES).map(([k, w]) => el('button', { 'aria-pressed': String(k === fullSize), 'aria-label': `${k === 'phone' ? 'Phone' : 'Desktop'}, ${w} wide`, title: `${w} px wide`, 'data-size': k },
+      glyph(k), el('span', { class: 'pf-name', 'aria-hidden': 'true' }, k === 'phone' ? 'Phone' : 'Desktop', el('span', { class: 'pf-w' }, String(w)))));
+    const refBtn = pages.length > 1 ? el('button', { class: 'pf-ref', 'aria-pressed': 'false' }, glyph('layers'), 'Reference') : '';
+    const live = el('a', { class: 'pf-live', target: '_blank', rel: 'noopener' }, 'Open live');
+    const stage = el('div', { class: 'pf-stage' }, main.fig, back.fig);
+    const dialog = el('dialog', { class: 'proto-full', 'aria-labelledby': title.id },
+      el('header', { class: 'pf-bar' }, el('div', { class: 'pf-top' }, close, title, live),
+        el('div', { class: 'pf-tools' }, pick, el('div', { class: 'seg pf-size', role: 'group', 'aria-label': 'Size' }, ...sizes), refBtn)), stage);
+    // The frame shown is made again only for another option, so a size change or the reference never resets the prototype halfway through.
+    const showMain = () => {
+      main.port.replaceChildren(view(shown, `Prototype: ${shown.label}`));
+      main.cap.replaceChildren(el('span', {}, 'Prototype'), el('b', { dir: 'auto' }, shown.label));
+      live.hidden = !shown.link; if (shown.link) { live.href = shown.link; live.setAttribute('aria-label', `Open ${shown.label} live`); }
+      if (pick) pick.value = shown.value;
+    };
+    const showRef = () => {
+      back.fig.hidden = !refOn;
+      if (!refOn) { back.port.replaceChildren(); return lay(); }
+      if (!others().includes(ref)) ref = others()[0];
+      const choose = others().length > 1 ? el('select', { 'aria-label': 'Reference option' }, ...others().map((p) => el('option', { value: p.value }, p.label))) : el('b', { dir: 'auto' }, ref.label);
+      if (choose.localName === 'select') { choose.value = ref.value; choose.onchange = () => { ref = others().find((p) => p.value === choose.value); showRef(); }; }
+      back.cap.replaceChildren(el('span', {}, 'Reference'), choose);
+      back.port.replaceChildren(view(ref, `Reference: ${ref.label}`));
+      lay();
+    };
+    // Each frame is the chosen width, scaled down only when the screen is narrower, and as tall as the stage; two side by side once each keeps half its size.
+    const lay = () => {
+      const w = SIZES[fullSize], box = stage.getBoundingClientRect(), gap = 16, beside = refOn && box.width >= 720 && (box.width - gap * 3) / 2 >= w / 2;
+      stage.dataset.mode = !refOn ? 'one' : beside ? 'beside' : 'over';
+      const room = beside ? (box.width - gap * 3) / 2 : box.width, pad = room >= w + gap * 2 ? gap : 0, width = Math.min(w, room - pad * 2), scale = width / w;
+      const height = box.height - (refOn ? 32 : 0) - pad * 2;
+      stage.style.setProperty('--pad', `${beside ? gap : pad}px`);
+      for (const f of [main, back]) {
+        f.fig.classList.toggle('framed', pad > 0);
+        Object.entries({ '--w': width, '--h': height, '--vw': w, '--vh': height / scale, '--s': scale }).forEach(([k, v]) => f.port.style.setProperty(k, k === '--s' ? v : `${v}px`));
+      }
+    };
+    sizes.forEach((b) => (b.onclick = () => { fullSize = b.dataset.size; sizes.forEach((x) => x.setAttribute('aria-pressed', String(x === b))); lay(); }));
+    if (pick) pick.onchange = () => { shown = pages.find((p) => p.value === pick.value); showMain(); showRef(); };
+    if (refBtn) refBtn.onclick = () => { refOn = !refOn; refBtn.setAttribute('aria-pressed', String(refOn)); showRef(); };
+    const fit = new ResizeObserver(lay);
+    // Closed by its button or Escape, it goes at once, and the focus goes back to what opened it; the close event comes a moment later.
+    const shut = () => {
+      if (!dialog.isConnected) return;
+      fit.disconnect(); dialog.close(); dialog.remove(); protoFull = null;
+      document.querySelector(`[data-full="${CSS.escape(from)}"]`)?.focus({ preventScroll: true });
+    };
+    close.onclick = shut; dialog.onclose = shut;
+    showMain(); showRef();
+    document.body.append(dialog); protoFull = dialog; dialog.showModal(); fit.observe(stage); lay();
   }
 
   /** Comments on mock elements: the open editor per item, then the unsent list, then the sent ones. An unsent comment shows only on the mock file it was made on. */
@@ -2290,7 +2424,9 @@
     archive: '<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/>', dot: '<circle cx="12" cy="12" r="4.5" fill="currentColor"/>',
     send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.112z"/><path d="m21.854 2.147-10.94 10.939"/>',
     sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>', msg: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
-    x: '<path d="M18 6 6 18M6 6l12 12"/>', bolt: '<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>', lock: '<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>', trash: '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>' };
+    x: '<path d="M18 6 6 18M6 6l12 12"/>', bolt: '<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>', lock: '<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>', trash: '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>',
+    phone: '<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M11 18.5h2"/>', desktop: '<rect x="2.5" y="4" width="19" height="12.5" rx="1.5"/><path d="M8.5 20.5h7M12 16.5v4"/>',
+    expand: '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>', layers: '<rect x="3" y="3" width="12" height="12" rx="2"/><path d="M9 21h10a2 2 0 0 0 2-2V9"/>' };
   const glyph = (a) => { const s = el('span', { 'aria-hidden': 'true', style: 'display:inline-flex' }); s.innerHTML = `<svg class="glyph" viewBox="0 0 24 24">${GLYPHS[a]}</svg>`; return s; };
   const icon = (a) => { const s = el('span', { class: `icon i-${a}`, 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[a]}"/></svg>`; return s; };
   /** The phone's tab bar is drawn once, so its pill slides from the area left to the one opened; each redraw marks the area on screen and sets the badges, and a badge whose count changed bumps. */
@@ -3918,7 +4054,7 @@
     const preview = cards ?? (d.view ? rung(d) : proofLine ? '' : proof(d));
     const quiet = opts.find((o) => o.value === d.default_if_silent);
     const why = unchecked(d) || d.why || (d.tradeoff && firstDraft(d).text) || d.about;
-    const page = el('section', { class: `decide g-${reviewed(d) ? 'review' : 'answer'}${isOwn() ? ' own' : ''}` }, preview ? el('div', { class: 'decide-preview' }, preview) : '',
+    const page = el('section', { class: `decide g-${reviewed(d) ? 'review' : 'answer'}${isOwn() ? ' own' : ''}` }, preview ? el('div', { class: 'decide-preview' }, preview, cards ? fullButton(d) : '') : '',
       ...(d.mocks?.length ? [annotations(d)] : []), el('div', { class: 'lead' }, badge(d), kicker, el('h2', { dir: 'auto' }, name)),
       why ? el('p', { class: 'why', dir: 'auto' }, why) : '', firstDraftLinks(d), proofLine,
       ...(done ? said : [...(live && opts.length ? [el('p', { class: 'pick-label' }, 'Your answer'), el('ul', { class: 'pick-list', 'aria-label': d.title }, ...pickers.map((b) => el('li', {}, b)),
@@ -3996,8 +4132,8 @@
     // From the note (or Your own answer) on an ask, Cmd+Enter answers with it.
     if (mod && e.key === 'Enter' && typing?.closest('.decide')) { e.preventDefault(); document.querySelector('.decide-bar .answer')?.click(); return; }
     const undo = !toast.hidden && !undoBtn.hidden && !undoBtn.disabled && (!location.hash.slice(1) || location.hash === '#waiting' || /^#(decide|reports)\//.test(location.hash) || location.hash === '#reports') ? undoBtn : null;
-    if (mod && !e.altKey && e.key.toLowerCase() === 'z' && !typing && undo) { e.preventDefault(); undo.click(); return; }
-    if (mod || e.altKey || typing || keysSheet.open || designSession?.open || !reader.hidden) return;
+    if (mod && !e.altKey && e.key.toLowerCase() === 'z' && !typing && undo && !protoFull) { e.preventDefault(); undo.click(); return; }
+    if (mod || e.altKey || typing || keysSheet.open || designSession?.open || protoFull || !reader.hidden) return;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key, g = gAt && e.timeStamp - gAt < 1500;
     gAt = k === 'g' ? e.timeStamp : 0;
     if (g && GO[k]) { e.preventDefault(); location.hash = GO[k]; return; }
