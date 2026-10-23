@@ -18,7 +18,7 @@ const QUALITY = 82;
 const PIXELS_MAX = 60_000_000;
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
-type Picture = { width: number; height: number; data: Buffer; opaque: boolean; icc?: Buffer; png: Buffer[]; gammaOnly: boolean };
+type Picture = { width: number; height: number; data: Buffer; opaque: boolean; icc?: Buffer; png: Buffer[]; pngOnly: boolean };
 
 /** The light and thumb copies of a still, each kept only when it weighs less than what the board would show without it (the light copy,
  * else the original). The same bytes always give the same copies. `reason` says why a still could not be read: the board then shows the original. */
@@ -43,7 +43,7 @@ function shrink(pic: Picture, size: Size, against: number): Copy | undefined {
   const data = scale < 1 ? resize(pic, width, height) : pic.data;
   // The lighter of a PNG and a JPEG; a JPEG only for a picture with no transparency and no colour rule a JPEG cannot carry.
   const png = encodePng(data, width, height, pic);
-  const jpg = pic.opaque && !pic.gammaOnly ? encodeJpeg(data, width, height, pic.icc) : undefined;
+  const jpg = pic.opaque && !pic.pngOnly ? encodeJpeg(data, width, height, pic.icc) : undefined;
   const best = jpg && jpg.length < png.length ? { ext: '.jpg' as const, bytes: jpg } : { ext: '.png' as const, bytes: png };
   return best.bytes.length < against ? { ...best, width, height } : undefined;
 }
@@ -61,8 +61,9 @@ function decode(bytes: Buffer, ext: string): Picture {
     const icc = iccp && at > 0 ? inflateSync(iccp.subarray(at + 2)) : undefined;
     const exif = chunks.find((c) => c.name === 'eXIf')?.data;
     turn = exif ? orientation(exif) : 1;
-    pic = { ...px, icc, png: chunks.filter((c) => ['iCCP', 'sRGB', 'gAMA', 'cHRM'].includes(c.name)).map((c) => c.raw),
-      gammaOnly: (names.has('gAMA') || names.has('cHRM')) && !names.has('sRGB') && !names.has('iCCP') };
+    // cICP (with its HDR mDCV and cLLI) outranks every other colour chunk in a browser, and a JPEG has no place for it.
+    pic = { ...px, icc, png: chunks.filter((c) => ['cICP', 'mDCV', 'cLLI', 'iCCP', 'sRGB', 'gAMA', 'cHRM'].includes(c.name)).map((c) => c.raw),
+      pngOnly: names.has('cICP') || ((names.has('gAMA') || names.has('cHRM')) && !names.has('sRGB') && !names.has('iCCP')) };
   } else if (bytes[0] === 0xff && bytes[1] === 0xd8) {
     const segments = jpegSegments(bytes);
     const app1 = segments.find((s) => s.marker === 0xe1 && s.data.subarray(0, 6).toString('latin1') === 'Exif\0\0');
@@ -73,7 +74,7 @@ function decode(bytes: Buffer, ext: string): Picture {
     let px;
     try { px = jpeg.decode(bytes, { formatAsRGBA: true, maxResolutionInMP: PIXELS_MAX / 1e6, maxMemoryUsageInMB: 1024 }); } catch { throw new Undecodable('its JPEG data could not be read'); }
     // A PNG copy carries the same profile, in its own iCCP chunk.
-    pic = { width: px.width, height: px.height, data: px.data, ...(icc.length && { icc }), gammaOnly: false,
+    pic = { width: px.width, height: px.height, data: px.data, ...(icc.length && { icc }), pngOnly: false,
       png: icc.length ? [chunk('iCCP', Buffer.concat([Buffer.from('ICC\0\0', 'latin1'), deflateSync(icc)]))] : [] };
   } else if (ext === '.webp' && bytes.subarray(8, 12).toString('latin1') === 'WEBP') {
     // WebP has no decoder in Node: ImageMagick reads it when it is installed, as the still guard does. A WebP is already compact, so without it the original is shown.

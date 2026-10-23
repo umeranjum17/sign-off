@@ -177,7 +177,7 @@ test('an evidence post tells the agent no wait or open hint: it is not an ask th
   assert.doesNotMatch(posted.out, /help\[/);
 });
 
-test('a still is shown upright and lighter: a phone photo turned by its EXIF, a transparent capture kept clear, an unreadable one at full size', () => {
+test('a still is shown upright and lighter: a phone photo turned by its EXIF, a transparent capture kept clear, a colour-tagged one kept PNG, an unreadable one at full size', () => {
   const file = join(so, 'stills.json'), dir = mkdtempSync(join(scratch, 'stills-')), stored = () => JSON.parse(readFileSync(file, 'utf8')).items.at(-1);
   // A photo stored on its side: 3400 by 1000 with its left half blue-free and its right half blue, and EXIF orientation 6 (turn clockwise).
   const [w, h] = [3400, 1000], rgba = Buffer.alloc(w * h * 4);
@@ -203,6 +203,15 @@ test('a still is shown upright and lighter: a phone photo turned by its EXIF, a 
   assert.equal(run('post', file, '--type', 'evidence', '--title', 'Floating panel', '--about', 'Its edge is clear.', '--media', join(dir, 'clear.png')).code, 0);
   const { light: clear, thumb: centre } = stored().media[0], head = readFileSync(join(so, clear.path));
   assert.deepEqual([clear.path.endsWith('-light.png'), clear.width, clear.height, head[25], centre.width, centre.height], [true, 1600, 640, 6, 720, 360]);
+
+  // An opaque capture tagged with cICP (here BT.709) keeps that tag on PNG copies: a JPEG cannot carry it, and without it a browser shows other tones.
+  const flat = Buffer.alloc((cw * 3 + 1) * ch);
+  for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) flat.set([(x * 255 / cw) | 0, (y * 255 / ch) | 0, (x * y) & 255], y * (cw * 3 + 1) + 1 + x * 3);
+  ihdr.set([8, 2], 8);
+  const cicp = chunk('cICP', Buffer.from([1, 1, 0, 1]));
+  writeFileSync(join(dir, 'tagged.png'), Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), chunk('IHDR', ihdr), cicp, chunk('IDAT', deflateSync(flat)), chunk('IEND', Buffer.alloc(0))]));
+  assert.equal(run('post', file, '--type', 'evidence', '--title', 'Tagged colours', '--about', 'Umer checks the tones.', '--media', join(dir, 'tagged.png')).code, 0);
+  for (const c of Object.values(stored().media[0]).filter((v) => v?.path)) assert.ok(c.path.endsWith('.png') && readFileSync(join(so, c.path)).includes(cicp), c.path);
 
   // A still the board cannot read is posted and shown as it is, and the post says so.
   writeFileSync(join(dir, 'odd.webp'), Buffer.concat([Buffer.from('RIFF\0\0\0\0WEBPVP8 ', 'latin1'), Buffer.alloc(64, 7)]));
