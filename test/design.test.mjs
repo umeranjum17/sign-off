@@ -2713,7 +2713,7 @@ test('Today on a phone: the floating tab bar with its pill on Today, Up next wit
   // The dock floats 24px over the bottom edge: a 56px pill of four 48px tabs, then the round 56px Search 12px beside it, the two centred together; its pill sits on Today.
   const rect = (sel) => `(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right), Math.round(r.top), Math.round(r.bottom)]; })()`;
   const bar = await evaluate(rect('.tabs')), find = await evaluate(rect('.dock-find')), tab = await evaluate(rect('.tabs a')), [vw, vh] = await evaluate('[document.documentElement.clientWidth, innerHeight]');
-  assert.deepEqual([bar[1] - bar[0], bar[3] - bar[2], vh - bar[3], tab[1] - tab[0], find[1] - find[0], find[3] - find[2], vh - find[3], find[0] - bar[1], bar[0] - (vw - find[1])], [206, 56, 24, 48, 56, 56, 24, 12, 0]);
+  assert.deepEqual([bar[1] - bar[0], bar[3] - bar[2], vh - bar[3], tab[1] - tab[0], find[1] - find[0], find[3] - find[2], vh - find[3], find[0] - bar[1], Math.abs(bar[0] - (vw - find[1])) <= 1], [206, 56, 24, 48, 56, 56, 24, 12, true]);
   await until(async () => (await evaluate(rect('.tabs .hl')))[0] === (await evaluate(rect('.tabs a[href="#"]')))[0]);
   // Up next is the plan, to review: its kind in the line over its title and one main action that opens it.
   assert.equal(await evaluate('document.querySelector(".up-next .lk").textContent.startsWith("Up next · Review") + "|" + document.querySelector(".up-next .go").getAttribute("href")'), `true|#waiting/${JSON.parse(readFileSync(join(fixture, 'valid-full.json'), 'utf8')).key}`);

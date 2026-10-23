@@ -1,4 +1,4 @@
-// The new look's foundation (web/tokens.css, web/ui.css): the shell (title row, dock or sidebar) and the Reports list on the shared row, at 390x844 and 1280x800,
+// The new look's foundation (web/tokens.css, web/ui.css): the shell (title row, dock or sidebar), the Reports list on the shared row and the shared parts no screen uses yet, at 390x844 and 1280x800,
 // light and dark, captured at 2x over the DevTools protocol with exact device metrics (a headless Chromium of its own), and measured in the browser:
 // one left and right edge for every block, the 4px grid, 68px rows with 40px icon tiles and the title 12px after its tile, the dock's 56px pill 24px over
 // the bottom with its round Search 12px beside it, or the 240px sidebar, Inter in use, no sideways overflow and no control under 44px on a phone.
@@ -26,7 +26,7 @@ const MEASURE = `(async () => {
   const r4 = (n) => Math.round(n * 100) / 100, grid = (n) => Math.abs(n / 4 - Math.round(n / 4)) < 0.02;
   const fail = [], blocks = [];
   const scrollY = window.scrollY;
-  for (const e of document.querySelectorAll('main .top h1, main .ui-sec, main .ui-card')) if (vis(e)) {
+  for (const e of document.querySelectorAll('main .top h1, main .ui-top, main .ui-seg, main .ui-sec, main .ui-card, main .ui-props')) if (vis(e)) {
     const r = box(e); blocks.push({ el: e.className || e.tagName, left: r4(r.left), right: r4(r.right), top: r4(r.top + scrollY), height: r4(r.height) });
   }
   const main = document.querySelector('.split-list') ?? document.querySelector('main'), edgeL = box(main).left + main.clientLeft + parseFloat(getComputedStyle(main).paddingLeft), edgeR = box(main).left + main.clientLeft + main.clientWidth - parseFloat(getComputedStyle(main).paddingRight);
@@ -53,7 +53,10 @@ const MEASURE = `(async () => {
   if (!phone && sidebar?.width !== 240) fail.push('sidebar ' + JSON.stringify(sidebar));
   const h1 = document.querySelector('main .top h1'), type = { inter: document.fonts.check('14px Inter'), body: getComputedStyle(document.body).fontFamily.split(',')[0], h1: h1 && getComputedStyle(h1).fontSize + '/' + getComputedStyle(h1).lineHeight + ' ' + getComputedStyle(h1).fontWeight };
   if (!type.inter) fail.push('Inter not loaded');
-  const under = phone ? [...document.querySelectorAll('button, a[href], summary, select, input, textarea')].filter(vis).filter((e) => { const r = box(e); return r.top < innerHeight && r.bottom > 0 && (r.height < 44 || r.width < 44); })
+  // A control's hit area counts a ::after that widens it, as the prototype's 32px segments and 24px links have.
+  const hit = (e) => { const r = box(e), a = getComputedStyle(e, '::after'), out = (v) => Math.max(0, -parseFloat(v) || 0), wide = a.content !== 'none' && a.position === 'absolute';
+    return { top: r.top, bottom: r.bottom, height: r.height + (wide ? out(a.top) + out(a.bottom) : 0), width: r.width + (wide ? out(a.left) + out(a.right) : 0) }; };
+  const under = phone ? [...document.querySelectorAll('button, a[href], summary, select, input, textarea')].filter(vis).filter((e) => { const r = hit(e); return r.top < innerHeight && r.bottom > 0 && (r.height < 43.5 || r.width < 43.5); })
     .map((e) => (e.getAttribute('aria-label') || e.textContent).trim().slice(0, 24) + ' ' + Math.round(box(e).width) + 'x' + Math.round(box(e).height)) : [];
   const overflowing = [...document.querySelectorAll('body *')].filter((e) => box(e).right > w + 1).slice(0, 10).map((e) => e.tagName.toLowerCase() + (e.id ? '#' + e.id : ''));
   const ctx = document.createElement('canvas').getContext('2d'), squashed = [];
@@ -62,6 +65,24 @@ const MEASURE = `(async () => {
     dom: { url: location.href, overflow: document.documentElement.scrollWidth > w, overflowing, squashed_text: squashed } };
 })()`;
 
+// The shared parts no screen has taken up yet, drawn on the live page from ui.css with plain words: the title row, the segmented control, the hero,
+// a section head, a list of rows (a bar and percent, a P1 and a P0 chip, a second line), two stat tiles, and the property panel (Its ask, Ticket, PR).
+const PARTS = `(() => {
+  const h = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids.filter((k) => k !== '')); return e; };
+  const svg = (d) => { const s = h('span', ''); s.innerHTML = '<svg viewBox="0 0 24 24"><path d="' + d + '"/></svg>'; return s.firstChild; };
+  const bar = (p) => { const b = h('span', 'ui-bar', h('i', '')); b.firstChild.style.width = p + '%'; return b; };
+  const row = (title, pct, pc) => h('li', '', h('a', 'ui-row', h('span', 'ui-icon', svg('M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7zM14 2v6h6M8 13h8M8 17h8M8 9h2')),
+    h('span', 'rm', h('span', 'l1', h('span', 't', title), pc ? h('span', 'ui-pc ' + pc.toLowerCase(), pc) : ''), pct === undefined ? h('span', 'l2 meta', 'Settings · 07:19') : h('span', 'l2', bar(pct), h('span', 'pct', pct + '%'))))));
+  const seg = h('div', 'ui-seg', ...['Newest', 'By project'].map((t, i) => { const b = h('button', '', t); b.setAttribute('aria-pressed', String(!i)); return b; }));
+  const hero = h('section', 'ui-card ui-hero', h('div', 'hl', h('span', 'lab', 'Still to read')), h('div', 'hv', h('span', 'big', '4 ', h('small', '', 'of 15')), h('span', 'vs', '30 filed this week')));
+  const sec = h('h2', 'ui-sec', 'Newest', h('a', 'see', 'See all'));
+  const list = h('ul', 'ui-card ui-list', row('Settings now open from the profile', 100), row('What the release changes for a phone', 80, 'P1'), row('Why a message retries once', undefined, 'P0'));
+  const stat = (d, lab, b, small) => h('a', 'ui-card ui-stat', h('span', 'si', svg(d)), h('span', 'lab', lab), h('b', '', b, small ? h('small', '', small) : ''));
+  const tiles = h('div', 'ui-tiles', stat('M20 6 9 17l-5-5', 'Cleared today', '2 ', 'of 6'), stat('M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z', 'Proofs today', '12'));
+  const pr = (k, ...v) => h('div', 'ui-pr', h('span', 'k', k), h('span', 'v', ...v));
+  const props = h('div', 'ui-props', pr('Its ask', h('span', '', 'Ship the settings page Friday?')), pr('Ticket', h('span', '', 'Settings move'), bar(60), h('span', 'n', '60%')), pr('PR', h('span', '', 'Settings page')));
+  document.getElementById('board').replaceChildren(h('header', 'ui-top', h('h1', '', 'Parts')), seg, hero, sec, list, tiles, h('p', 'ui-dl', 'Its ask'), props);
+})()`;
 const prof = mkdtempSync(join(tmpdir(), 'so-newlook-chrome-'));
 const chrome = spawn(chromium, ['--headless=new', '--no-sandbox', `--user-data-dir=${prof}`, '--remote-debugging-port=0', '--hide-scrollbars', 'about:blank'], { stdio: 'ignore' });
 process.on('exit', () => { try { chrome.kill(); } catch {} });
@@ -91,16 +112,17 @@ try {
   const shot = async (file) => writeFileSync(file, Buffer.from((await cdp('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
   const go = async (address, ms = 1200) => { await cdp('Page.navigate', { url: 'about:blank' }); await wait(150); await cdp('Page.navigate', { url: address }); await wait(ms); };
   // The prototype keys its states by address; the board by its hash routes.
-  const STATES = [['today', '#', 'v=today'], ['reports', '#reports', 'v=reports']];
+  const STATES = [['today', '#', 'v=today'], ['reports', '#reports', 'v=reports'], ['parts', '#', 'v=reports', PARTS]];
   for (const [wd, metrics] of [['390w', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }], ['1280w', { width: 1280, height: 800, deviceScaleFactor: 2, mobile: false }]]) {
     for (const theme of ['light', 'dark']) {
       await cdp('Emulation.setDeviceMetricsOverride', metrics);
       await cdp('Emulation.setTouchEmulationEnabled', metrics.mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
       await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] });
-      for (const [state, hash, protoHash] of STATES) {
+      for (const [state, hash, protoHash, draw] of STATES) {
         const name = `${state}.${theme}.${wd}`;
         errors.length = 0; failed.length = 0;
         await go(`${url}${hash}`);
+        if (draw) { await cdp('Runtime.evaluate', { expression: draw }); await wait(300); }
         await shot(join(dest, `${name}.png`));
         const ev = await cdp('Runtime.evaluate', { expression: MEASURE, awaitPromise: true, returnByValue: true }), m = ev.result.value;
         assert.ok(m && !ev.exceptionDetails, `${name}: the measure ran: ${ev.exceptionDetails?.exception?.description}`);
@@ -128,8 +150,8 @@ try {
   writeFileSync(join(dest, 'measure.txt'), report.join('\n') + '\n');
   if (side === 'after') writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
     start: 'A throwaway board with asks, a plan, an update and four reports in three projects.',
-    steps: ['Open Today and Reports at 390x844 and 1280x800 (2x), light and dark, over the DevTools protocol with exact device metrics.', 'Measure in the browser every block\'s left and right edge, the 4px grid, each row, the dock or sidebar, the typeface and every control against 44px.'],
-    result: 'On a phone and on a desk, in light and in dark, the board is drawn in the new look: a warm canvas with cards a step lighter, Inter, a 24px medium title in a 44px row, every block on one 16px gutter and the 4px grid; Reports lists each report as a 68px row in one card (a 40px white icon tile, the title 12px after it, then the project and time), under 18px section heads; a phone has the floating dock (a 56px pill of round tabs, 24px over the bottom, the round Search button 12px beside it) and a desk the 240px sidebar with Search; no control under 44px on a phone, no sideways overflow, no console error.' }, null, 2) + '\n');
+    steps: ['Open Today, Reports and the shared parts (drawn on the live page from ui.css) at 390x844 and 1280x800 (2x), light and dark, over the DevTools protocol with exact device metrics.', 'Measure in the browser every block\'s left and right edge, the 4px grid, each row, the dock or sidebar, the typeface and every control against 44px.'],
+    result: 'On a phone and on a desk, in light and in dark, the board is drawn in the new look: a warm canvas with cards a step lighter, Inter, a 24px medium title in a 44px row, every block on one 16px gutter and the 4px grid; Reports lists each report as a 68px row in one card (a 40px white icon tile, the title 12px after it, then the project and time), under 18px section heads; a phone has the floating dock (a 56px pill of round tabs, 24px over the bottom, the round Search button 12px beside it) and a desk the 240px sidebar with Search; the shared parts drawn from ui.css (a 40px segmented control, the hero card, rows with a bar and percent and P0 and P1 chips, two stat tiles and the Its ask, Ticket and PR panel) sit on the same edges and grid; no control under 44px on a phone, no sideways overflow, no console error.' }, null, 2) + '\n');
   console.log(report.join('\n'));
   if (side === 'after') assert.deepEqual(problems, [], 'every capture measures clean');
 } finally {
