@@ -1944,6 +1944,103 @@ test('Decide on a design pick with an HTML mock: Comment on the mocks is there b
   proc.kill();
 });
 
+test('Open full screen: a design pick\'s prototype over the whole screen takes real taps on its own links (scaled to Desktop too), loads the files beside it, switches option and size, shows the other option over it on a phone and beside it on a desk, and Close goes back; an interactive page has no Reference; while pointing, a tap on a mock does not open it', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'full'), file = join(dir, 'board.json'), a = join(dir, 'mocks', 'fleet', 'a'), b = join(dir, 'mocks', 'fleet', 'b');
+  mkdirSync(a, { recursive: true }); mkdirSync(b, { recursive: true });
+  // Each page is one link that fills its frame, to the other page beside it, and says which page it is and the colour its stylesheet gave it.
+  const page = (to) => `<link rel="stylesheet" href="style.css"><a href="${to}" style="display: block; height: 100vh">Go</a><script>parent.postMessage({ at: location.pathname.split('/').pop(), color: getComputedStyle(document.body).color }, '*')</script>`;
+  writeFileSync(join(a, 'index.html'), page('lanes.html'));
+  writeFileSync(join(a, 'lanes.html'), page('index.html'));
+  writeFileSync(join(a, 'style.css'), 'body { margin: 0; color: rgb(1, 2, 3) }');
+  writeFileSync(join(b, 'index.html'), '<p>B</p>');
+  writeFileSync(join(dir, 'mocks', 'tour.html'), '<p>Tour</p>');
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    { key: 'fleet', type: 'design', title: 'Pick the fleet dashboard', options: [{ value: 'a', label: 'A: Table' }, { value: 'b', label: 'B: Cards' }], recommend_value: 'a',
+      mocks: [{ value: 'a', path: 'mocks/fleet/a/index.html', link: 'https://example.com/a' }, { value: 'b', path: 'mocks/fleet/b/index.html' }] },
+    { key: 'tour', type: 'interactive', title: 'Does the tour feel right?', view: 'mocks/tour.html' }] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const full = "document.querySelector('dialog.proto-full[open]')", port = (n = 0) => `${full}.querySelectorAll('.pf-frame:not([hidden]) .pf-port')[${n}]`;
+  const centre = (e) => `(({ left, top, width, height }) => [left + width / 2, top + height / 2])(${e}.getBoundingClientRect())`;
+  const box = (e) => `(({ left, top, width, height }) => [left, top, width, height].map(Math.round))(${e}.getBoundingClientRect())`;
+  const pages = "got.filter((m) => m.full).map((m) => m.at)";
+  {
+    const { evaluate, tap, click, close } = await browse(join(dir, 'phone'), 390, 844, true);
+    await evaluate(`location.href = ${JSON.stringify(`${url}#decide/fleet`)}`);
+    await until(() => evaluate("!!document.querySelector('.decide .full-open')"));
+    assert.equal(await evaluate("document.querySelector('.decide .full-open').textContent"), 'Open full screen');
+    await evaluate("window.got = [], addEventListener('message', (e) => e.data?.at && got.push({ ...e.data, full: e.source === document.querySelector('.proto-full iframe')?.contentWindow }))");
+    await tap(await evaluate(centre("document.querySelector('.decide .full-open')")));
+    await until(() => evaluate(`${pages}.includes('index.html')`));
+    // The whole screen, the recommended option first, at phone size, its live link in the bar, and the files beside the page loaded.
+    assert.deepEqual(await evaluate(box(full)), [0, 0, 390, 844]);
+    assert.deepEqual(await evaluate(`[${full}.querySelector('.pf-pick').value, ${full}.querySelector('.pf-size [aria-pressed=true]').dataset.size, ${full}.querySelector('.pf-ref').getAttribute('aria-pressed'), ${full}.querySelector('.pf-live').href]`),
+      ['a', 'phone', 'false', 'https://example.com/a']);
+    assert.equal((await evaluate(box(port())))[2], 390);
+    assert.equal(await evaluate("got.find((m) => m.full).color"), 'rgb(1, 2, 3)');
+    // A real click on the prototype's own link goes to the page beside it: the board takes none of the prototype's input.
+    // (Headless Chrome puts the sandboxed frame in a process of its own and misplaces the click it makes from an emulated tap there; a phone keeps the frame in-process, and a mouse click lands.)
+    await click(await evaluate(centre(port())));
+    await until(() => evaluate(`${pages}.includes('lanes.html')`));
+    // Desktop draws the same page at 1280 scaled to the screen, without loading it again, and a tap there still reaches the prototype's link.
+    await tap(await evaluate(centre(`${full}.querySelector('[data-size=desktop]')`)));
+    await until(async () => (await evaluate(`getComputedStyle(${port()}.firstChild).width`)) === '1280px');
+    assert.deepEqual(await evaluate(`[${box(port())}[2], ${pages}.length]`), [390, 2]);
+    assert.ok(Math.abs((await evaluate(`+${port()}.style.getPropertyValue('--s')`)) - 390 / 1280) < 0.001);
+    await click(await evaluate(centre(port())));
+    await until(() => evaluate(`${pages}.length === 3 && ${pages}.at(-1) === 'index.html'`));
+    // Reference on a phone covers the prototype with the other option, labelled; off again, the prototype is as it was.
+    await tap(await evaluate(centre(`${full}.querySelector('.pf-ref')`)));
+    await until(() => evaluate(`${full}.querySelector('.pf-stage').dataset.mode === 'over'`));
+    assert.deepEqual(await evaluate(`[${full}.querySelector('.pf-back figcaption').textContent, ${full}.querySelector('.pf-back iframe').title, ${box(port(1))}.join() === ${box(port(0))}.join()]`), ['ReferenceB: Cards', 'Reference: B: Cards', true]);
+    await tap(await evaluate(centre(`${full}.querySelector('.pf-ref')`)));
+    await until(() => evaluate(`${full}.querySelector('.pf-stage').dataset.mode === 'one' && ${full}.querySelector('.pf-back').hidden`));
+    // Another option replaces the page shown; it has no live link.
+    await evaluate(`(s => { s.value = 'b'; s.dispatchEvent(new Event('change')); })(${full}.querySelector('.pf-pick'))`);
+    assert.deepEqual(await evaluate(`[${full}.querySelector('.pf-main iframe').title, ${full}.querySelector('.pf-live').hidden]`), ['Prototype: B: Cards', true]);
+    // Close goes back to the card, on what opened it, at the same address.
+    await tap(await evaluate(centre(`${full}.querySelector('.pf-close')`)));
+    await until(() => evaluate(`!${full} && !document.querySelector('.proto-full')`));
+    assert.deepEqual(await evaluate("[location.hash, document.activeElement.className]"), ['#decide/fleet', 'full-open']);
+    // A tap on a mock's frame opens that option full screen.
+    await evaluate("document.querySelectorAll('.decide .shot')[1].click()");
+    await until(() => evaluate(`${full}?.querySelector('.pf-pick').value === 'b'`));
+    await evaluate(`${full}.querySelector('.pf-close').click()`);
+    assert.equal(await evaluate("document.querySelectorAll('.proto-full').length"), 0);
+    // While Comment on the mocks is on, a tap on a mock names an element instead: no full screen.
+    await evaluate("document.querySelector('.decide .ann button[aria-label^=\"Comment on the mocks\"]').click()");
+    await until(() => evaluate("pointing.get('fleet~a') === true"));
+    await evaluate("document.querySelector('.decide .shot[data-full=\"fleet~a\"]').click()");
+    assert.equal(await evaluate("!!document.querySelector('.proto-full')"), false);
+    close();
+  }
+  {
+    // On a desk the reference stands beside the prototype at phone size, both centred; an interactive page has no option or Reference to pick.
+    const { evaluate, click, close } = await browse(join(dir, 'desk'), 1280, 800);
+    await evaluate(`location.href = ${JSON.stringify(`${url}#decide/fleet`)}`);
+    await until(() => evaluate("!!document.querySelector('.decide .full-open')"));
+    await click(await evaluate(centre("document.querySelector('.decide .full-open')")));
+    await until(() => evaluate(`!!${full}`));
+    assert.deepEqual(await evaluate(`[${full}.querySelector('.pf-size [aria-pressed=true]').dataset.size, ${box(port())}[2]]`), ['desktop', 1280]);
+    await click(await evaluate(centre(`${full}.querySelector('[data-size=phone]')`)));
+    await click(await evaluate(centre(`${full}.querySelector('.pf-ref')`)));
+    await until(() => evaluate(`${full}.querySelector('.pf-stage').dataset.mode === 'beside'`));
+    const [one, two] = [await evaluate(box(port(0))), await evaluate(box(port(1)))];
+    assert.deepEqual([one[2], two[2], one[1] === two[1]], [390, 390, true]);
+    assert.ok(Math.abs(one[0] + (two[0] + two[2]) - 1280) <= 2, `${one} ${two} centred`);
+    assert.ok(two[0] >= one[0] + one[2], 'side by side');
+    await evaluate(`${full}.querySelector('.pf-close').click()`);
+    await evaluate(`location.href = ${JSON.stringify(`${url}#decide/tour`)}`);
+    await until(() => evaluate("document.querySelector('.decide h2')?.textContent === 'Does the tour feel right?' && !!document.querySelector('.decide .full-open')"));
+    await click(await evaluate(centre("document.querySelector('.decide .full-open')")));
+    await until(() => evaluate(`!!${full}?.querySelector('iframe[title=\"Prototype: Does the tour feel right?\"]')`));
+    assert.deepEqual(await evaluate(`[!!${full}.querySelector('.pf-ref'), !!${full}.querySelector('.pf-pick'), ${full}.querySelector('.pf-live').hidden, ${full}.querySelector('iframe').getAttribute('sandbox')]`), [false, false, true, 'allow-scripts']);
+    close();
+  }
+  proc.kill();
+});
+
 test('Undo on a card outside Waiting takes the answer back and stays on that area instead of opening a Decide page without it', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'undo-area'), file = join(dir, 'board.json');
   mkdirSync(dir);

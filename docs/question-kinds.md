@@ -45,8 +45,17 @@ as its alias.
 an optional `--mock <value>=<path>` file (`.html`, `.svg`, `.png`, `.jpg`,
 `.jpeg`, `.webp`, 5 MB or less) shown as a tall phone frame above its button
 (the recommended one first; on a phone the frames swipe sideways, the next
-one peeking in, and a tap opens one full size), plus a `--tradeoff` line and
-a `--recommend` badge. Mock paths are relative to the board file's folder
+one peeking in, and a tap opens one full screen), plus a `--tradeoff` line and
+a `--recommend` badge. **Open full screen** (under the frames, and on an
+interactive page's card) shows the mock over the whole screen in the same
+sandboxed frame, taking every tap, so the prototype's own links, tabs and
+pages beside it work. Its bar holds Close, the option shown, **Phone** (390)
+or **Desktop** (1280), which draws the prototype at that width, centred and
+scaled down only when the screen is narrower, and **Reference**, which shows
+another option's mock beside it (over it where the two do not fit), with an
+Open live link for an option's `--link` (a live site opens in its own tab;
+the frame loads no remote files). An interactive page has no other option, so
+no Reference. A click with Cmd, Ctrl or Shift still opens the mock file in a tab. Mock paths are relative to the board file's folder
 and never escape it. One `.html` page can hold every variant:
 `--mock a=mocks/<key>/index.html?variant=a` loads the page with `?variant=a`.
 An `.html` mock or view loads the css, scripts, images and fonts beside it
