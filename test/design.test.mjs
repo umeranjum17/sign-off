@@ -2493,7 +2493,7 @@ test('Evidence: with no --evidence-root a linked run is found in done-done\'s ow
   proc.kill();
 });
 
-test('Summary on a phone: Proven today swipes inside its row, its tall phone capture fills its frame, a long title wraps so the page never scrolls sideways, and Ask the agent is one row until opened', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Summary on a phone: Proven today swipes inside its row, its tall phone capture fills its frame, proof with only text is a compact row with no empty frame, a long title wraps so the page never scrolls sideways, and Ask the agent is one row until opened', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'summary-wide'), file = join(dir, 'board.json');
   mkdirSync(join(dir, 'page'), { recursive: true });
   // A capture as tall and thin as a phone screenshot (414 x 2262).
@@ -2502,14 +2502,16 @@ test('Summary on a phone: Proven today swipes inside its row, its tall phone cap
   writeFileSync(join(dir, 'page', 'index.html'), readFileSync(join(fixture, 'page', 'index.html')));
   writeFileSync(file, JSON.stringify({ schema: 2, items: [
     { key: 'a', type: 'ask', title: 'Keep the whole-fleet nightly reconciliation of the cross-repository dependency graph running at three in the morning?', about: `https://example.com/${'very-long-path/'.repeat(12)}end` },
-    // Each update links a run so its card has a result.
-    ...[1, 2, 3].map((n) => ({ key: `u${n}`, type: 'evidence', number: n, title: `Update ${n} proves it`, filed: new Date().toISOString(), media: [{ path: `evidence/${n}/shot.png`, sha256: sha, bytes: bytes.length }],
+    // Each update links a run so its card has a result; the third, like a CLI journey, posts no capture and its run kept only text.
+    ...[1, 2, 3].map((n) => ({ key: `u${n}`, type: 'evidence', number: n, title: `Update ${n} proves it`, filed: new Date().toISOString(), ...(n < 3 && { media: [{ path: `evidence/${n}/shot.png`, sha256: sha, bytes: bytes.length }] }),
       evidence: { run_id: `2026101${n}T120000Z-a1b2c3d4`, commit: 'c0ffee'.padEnd(40, '0'), outcome: 'It works.', repro: 'repro: npm test', proof: 'done-done-verify-sign-off: npm test, passed', evidence: 'shot.png' } })),
   ] }));
   writeFileSync(join(dir, 'shot.png'), bytes);
   for (const n of [1, 2, 3]) { mkdirSync(join(dir, 'evidence', `${n}`), { recursive: true }); writeFileSync(join(dir, 'evidence', `${n}`, 'shot.png'), bytes); }
   mkdirSync(join(dir, '.done-done', 'runs'), { recursive: true });
-  for (const n of [1, 2, 3]) writeFileSync(join(dir, '.done-done', 'runs', `2026101${n}T120000Z-a1b2c3d4.json`), JSON.stringify({ schema: 1, run_id: `2026101${n}T120000Z-a1b2c3d4`, commit: 'c0ffee'.padEnd(40, '0'), tree: 'a'.repeat(40), dirty: false, exit: 0, files: [{ path: 'shot.png', sha256: sha, bytes: bytes.length }] }));
+  const tap = Buffer.from('ok 1 - stop leaves the other board running\n'), tapFile = { path: 'stop.txt', sha256: createHash('sha256').update(tap).digest('hex'), bytes: tap.length };
+  writeFileSync(join(dir, 'stop.txt'), tap);
+  for (const n of [1, 2, 3]) writeFileSync(join(dir, '.done-done', 'runs', `2026101${n}T120000Z-a1b2c3d4.json`), JSON.stringify({ schema: 1, run_id: `2026101${n}T120000Z-a1b2c3d4`, commit: 'c0ffee'.padEnd(40, '0'), tree: 'a'.repeat(40), dirty: false, exit: 0, files: [n < 3 ? { path: 'shot.png', sha256: sha, bytes: bytes.length } : tapFile] }));
   assert.equal(run('post', file, '--kind', 'plan', '--from', join(fixture, 'valid-full.json')).code, 0);
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0', '--evidence-root', dir], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
@@ -2525,6 +2527,9 @@ test('Summary on a phone: Proven today swipes inside its row, its tall phone cap
   await until(() => evaluate('document.querySelector(".ev-scroll-row .ev-media img")?.naturalWidth > 0'));
   const fill = await evaluate('(() => { const f = document.querySelector(".ev-scroll-row .ev-media"), i = f.querySelector("img"), a = f.getBoundingClientRect(), b = i.getBoundingClientRect(), c = getComputedStyle(i); return [Math.round(b.width - a.width), Math.round(b.height - a.height), c.objectFit, c.objectPosition, c.paddingTop]; })()');
   assert.deepEqual(fill, [0, 0, 'cover', '50% 0%', '0px']);
+  // The text-only proof is a compact row under the captures, its claim and Passed check, with no frame left empty.
+  const text = await evaluate('(() => { const c = document.getElementById("item-u3"); return [document.querySelectorAll(".ev-scroll-row .ev-card").length, !!c.closest(".ev-rows"), c.querySelectorAll(".ev-media").length, c.querySelector(".t").firstChild.textContent, c.querySelector(".m").textContent.startsWith("Passed"), !!c.querySelector(".ev-ok svg"), c.getBoundingClientRect().height <= 96]; })()');
+  assert.deepEqual(text, [2, true, 0, 'It works.', true, true, true]);
   // Closed, Ask the agent is one line of text in a 44px row with no box around it, at the page's gutter; a tap opens the prompt box.
   const ask = await evaluate('(() => { const a = document.querySelector("details.ask"), s = a.querySelector("summary"), r = document.createRange(); r.selectNodeContents(s); const box = a.getBoundingClientRect(), t = r.getBoundingClientRect(), c = getComputedStyle(a); return [a.open, Math.round(box.height), Math.abs(Math.round((t.top + t.bottom) / 2 - (box.top + box.bottom) / 2)) <= 2, c.borderTopWidth, c.backgroundColor, Math.round(t.left)]; })()');
   assert.deepEqual(ask, [false, 44, true, '0px', 'rgba(0, 0, 0, 0)', 20]);

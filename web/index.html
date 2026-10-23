@@ -84,6 +84,13 @@
   /* A phone capture is tall and thin: in a square tile it fills the frame from its top, where the screen's title and first content sit, instead of shrinking to a sliver. */
   .ev-scroll-row .ev-media img, .ev-scroll-row .ev-media video { padding: 0; object-fit: cover; object-position: center top; border-radius: 1rem; }
   .ev-scroll-row .ev-card .t { font-size: 1.0625rem; line-height: 1.375rem; } .ev-scroll-row .ev-card .m { gap: 0.375rem; line-height: 1.25rem; }
+  /* Proof that kept only text: a compact row of its claim and its result's small check, in one card under the captures. */
+  .has-x > .ev-text { padding-right: 3rem; }
+  .ev-rows { overflow: hidden; border-radius: var(--r-card); background: var(--surface); }
+  .ev-scroll-row + .ev-rows { margin-top: 0.75rem; } .ev-rows > * + * { box-shadow: inset 0 0.5px var(--line); }
+  .ev-rows .ev-card { gap: 0.25rem; padding: 0.75rem 3rem 0.75rem 1rem; }
+  .ev-rows .ev-card .t { font-size: 1.0625rem; line-height: 1.375rem; } .ev-rows .ev-card .m { gap: 0.375rem; line-height: 1.25rem; }
+  .ev-rows .has-x > .x { top: 50%; right: 0.5rem; translate: 0 -50%; background: none; }
   .rp-card { display: flex; flex-direction: column; overflow: hidden; border-radius: var(--r-card); background: var(--surface); color: inherit; text-decoration: none; }
   .rp-art { display: grid; place-items: center; aspect-ratio: 16 / 9; background: var(--sunk); overflow: hidden; }
   .rp-art .thumb { width: 100%; height: 100%; object-fit: contain; }
@@ -419,8 +426,6 @@
   .ev-media img, .ev-media video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; object-position: center top; border-radius: 1.125rem;
     transition: transform 260ms var(--spring); }
   .ev-card:active .ev-media img, .ev-card:active .ev-media video { transform: scale(0.985); }
-  .ev-media .no-shot { display: grid; place-items: center; width: 4rem; height: 4rem; border-radius: 1rem; background: var(--sunk); }
-  .ev-media .no-shot svg { width: 2rem; height: 2rem; }
   .ev-badge { position: absolute; z-index: 1; top: 0.75rem; left: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 1rem;
     background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.8125rem; font-weight: 600; }
   .ev-missing { margin: 0 0 1rem; color: var(--muted); font-size: 0.9375rem; }
@@ -781,18 +786,20 @@
     .areas .ev-scroll-row .ev-card .ev-media, .split-list .ev-card .ev-media { flex: none; width: 3.5rem; aspect-ratio: 3 / 4; padding: 0; border-radius: 0.5rem;
       background: var(--sunk); transition: transform 260ms var(--spring); }
     .areas .ev-scroll-row .ev-media :is(img, video), .split-list .ev-media :is(img, video) { padding: 0; border-radius: 0.5rem; object-fit: cover; object-position: center top; }
-    .areas .ev-scroll-row .ev-media .no-shot, .split-list .ev-media .no-shot { width: 2rem; height: 2rem; margin: auto; border-radius: 0.5rem; }
-    .areas .ev-scroll-row .ev-media .no-shot svg, .split-list .ev-media .no-shot svg { width: 1.125rem; height: 1.125rem; }
+    .split-list .ev-card.ev-text { grid-template-columns: minmax(0, 1fr); }
+    .areas .ev-scroll-row + .ev-rows { margin-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; box-shadow: inset 0 0.5px var(--line); }
+    .areas .ev-scroll-row:has(+ .ev-rows) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
     .areas .ev-scroll-row .ev-badge, .split-list .ev-badge { display: none; }
     .areas .ev-scroll-row .ev-card .ev-media, .split-list .ev-card .ev-media { grid-row: 1 / span 2; }
     .areas .ev-scroll-row .ev-card .t, .split-list .ev-card .t { align-self: end; font-size: 1.0625rem; line-height: 1.375rem; }
     .areas .ev-scroll-row .ev-card .m, .split-list .ev-card .m { align-self: start; gap: 0.375rem; font-size: 0.9375rem; line-height: 1.25rem; }
-    .areas .ev-scroll-row .ev-card:hover, .split-list .ev-card:hover { background: color-mix(in srgb, var(--sunk) 45%, transparent); }
-    .areas .ev-scroll-row .ev-card:active, .split-list .ev-card:active { background: var(--sunk); }
+    .areas .ev-rows .ev-card { padding: 0.75rem 3rem 0.75rem 1rem; transition: background-color 120ms linear; }
+    .areas :is(.ev-scroll-row, .ev-rows) .ev-card:hover, .split-list .ev-card:hover { background: color-mix(in srgb, var(--sunk) 45%, transparent); }
+    .areas :is(.ev-scroll-row, .ev-rows) .ev-card:active, .split-list .ev-card:active { background: var(--sunk); }
     .areas .ev-scroll-row .ev-card:active .ev-media, .split-list .ev-card:active .ev-media { transform: scale(0.96); }
     .areas .ev-scroll-row .has-x > .x { top: 50%; right: 0.5rem; translate: 0 -50%; }
-    .areas .ev-scroll-row .has-x > .x, .split-list .has-x > .x { opacity: 0; transition: opacity 120ms linear; }
-    .areas .ev-scroll-row .has-x:is(:hover, :has(:focus-visible)) > .x, .split-list .has-x:is(:hover, :has(:focus-visible)) > .x { opacity: 1; }
+    .areas :is(.ev-scroll-row, .ev-rows) .has-x > .x, .split-list .has-x > .x { opacity: 0; transition: opacity 120ms linear; }
+    .areas :is(.ev-scroll-row, .ev-rows) .has-x:is(:hover, :has(:focus-visible)) > .x, .split-list .has-x:is(:hover, :has(:focus-visible)) > .x { opacity: 1; }
     .areas .rp-card { flex-direction: row; align-items: flex-start; gap: 1rem; padding: 1.25rem; }
     .areas .rp-art { flex: none; width: 5.5rem; min-height: 0; aspect-ratio: 1; border-radius: 1rem; }
     .areas .rp-body { justify-content: flex-start; padding: 0; }
@@ -1830,10 +1837,10 @@
   const changeName = (url) => { const m = /\/(?:pull|pulls|merge_requests)\/(\d+)/.exec(url); return m ? `Pull request ${m[1]}` : `Open on ${new URL(url).host}`; };
   /** A link to a change, only when it is a full http(s) URL: a bare `http:` is text, not a place to open. */
   const changeHref = (d) => { try { const u = new URL(d.link ?? ''); return /^https?:$/.test(u.protocol) ? u.href : ''; } catch { return ''; } };
-  /** A card's hero: the first picture of its proof, else its first clip, else the area's mark. */
+  /** A card's hero: the first picture of its proof, else its first clip; proof with neither (a run that kept only text) has none. */
   function hero(d) {
     const files = filesOf(d), [path, video] = files.find(([, clip]) => !clip) ?? files[0] ?? [];
-    if (!path) return [el('span', { class: 'no-shot', 'aria-hidden': 'true' }, icon('evidence'))];
+    if (!path) return [];
     const url = src(path);
     if (video) {
       const clip = el('video', { src: url, muted: '', playsinline: '', preload: 'metadata', 'aria-label': `Clip, ${headline(d)}` });
@@ -1856,10 +1863,11 @@
     }
     return out;
   }
-  /** One update on the Evidence screen: its capture as the hero, what it proves and how it went; the whole card opens the update. `also` names what tells it from a card with the same headline. */
+  /** One update on the Evidence screen: its capture as the hero, what it proves and how it went; the whole card opens the update. `also` names what tells it from a card with the same headline.
+   * Proof with no picture or clip is a compact row of its claim and result, never an empty frame. */
   function evCard(d, also = '') {
-    const result = RESULT[d.evidenceCard?.result];
-    return el('a', { class: 'ev-card', href: `#evidence/${d.key}`, id: `item-${d.key}`, 'data-row': '' }, el('span', { class: 'ev-media' }, ...hero(d)),
+    const result = RESULT[d.evidenceCard?.result], shot = hero(d);
+    return el('a', { class: shot.length ? 'ev-card' : 'ev-card ev-text', href: `#evidence/${d.key}`, id: `item-${d.key}`, 'data-row': '' }, shot.length ? el('span', { class: 'ev-media' }, ...shot) : '',
       el('span', { class: 't', dir: 'auto' }, headline(d), also ? el('span', { class: 'also', dir: 'auto' }, also) : ''),
       el('span', { class: 'm' }, result ? el('span', { class: `ev-${result[0]}` }, mark(result[0]), result[2]) : el('span', { class: 'ev-none' }, 'Not run'), d.attachments?.length ? el('span', {}, d.attachments.length === 1 ? '1 file' : `${d.attachments.length} files`) : '', d.filed ? el('span', {}, stamp(d.filed)) : ''));
   }
@@ -2176,11 +2184,12 @@
     return el('div', { class: 'search', role: 'search', ...(query === null && { hidden: '' }) }, box, out);
   }
 
-  /** Proven today on Today: a swipeable row of today's updates, each with its own result and capture; a wide screen sets them three across. */
+  /** Proven today on Today: a swipeable row of today's updates with a capture, each with its own result; proof with only text follows as compact rows. */
   function proven(items, fresh) {
-    const shown = fresh.slice(0, 3), also = twins(shown);
+    const shown = fresh.slice(0, 3), also = twins(shown), cards = shown.map((d) => withX(d, evCard(d, also.get(d.key))));
+    const shots = cards.filter((c) => c.querySelector('.ev-media')), text = cards.filter((c) => !c.querySelector('.ev-media'));
     return el('section', { class: 'i-evidence wide' }, el('div', { class: 'sec-head' }, el('h2', {}, 'Proven today'), items.length ? el('a', { href: '#evidence' }, 'See all') : ''),
-      fresh.length ? el('div', { class: 'ev-scroll-row' }, ...shown.map((d) => withX(d, evCard(d, also.get(d.key))))) : el('p', { class: 'empty' }, 'Nothing proven today yet.'));
+      ...(fresh.length ? [shots.length ? el('div', { class: 'ev-scroll-row' }, ...shots) : '', text.length ? el('div', { class: 'ev-rows' }, ...text) : ''] : [el('p', { class: 'empty' }, 'Nothing proven today yet.')]));
   }
   /** New report on Today: the newest report as one hero card, its picture, who and when, its title and what it says. */
   function newReport(items) {
