@@ -1954,7 +1954,8 @@ test('Open full screen: a design pick\'s prototype over the whole screen takes r
   writeFileSync(join(a, 'index.html'), page('lanes.html'));
   writeFileSync(join(a, 'lanes.html'), page('index.html'));
   writeFileSync(join(a, 'style.css'), 'body { margin: 0; color: rgb(1, 2, 3) }');
-  writeFileSync(join(b, 'index.html'), '<p>B</p>');
+  // B has one small button near the far corner of a desk's 1280 by 800, which says when it is clicked.
+  writeFileSync(join(b, 'index.html'), '<p>B</p><button style="position: fixed; left: 1100px; top: 700px; width: 80px; height: 40px" onclick="parent.postMessage({ corner: true }, \'*\')">Corner</button>');
   writeFileSync(join(dir, 'mocks', 'tour.html'), '<p>Tour</p>');
   writeFileSync(file, JSON.stringify({ schema: 2, items: [
     { key: 'fleet', type: 'design', title: 'Pick the fleet dashboard', options: [{ value: 'a', label: 'A: Table' }, { value: 'b', label: 'B: Cards' }], recommend_value: 'a',
@@ -1967,6 +1968,9 @@ test('Open full screen: a design pick\'s prototype over the whole screen takes r
   const centre = (e) => `(({ left, top, width, height }) => [left + width / 2, top + height / 2])(${e}.getBoundingClientRect())`;
   const box = (e) => `(({ left, top, width, height }) => [left, top, width, height].map(Math.round))(${e}.getBoundingClientRect())`;
   const pages = "got.filter((m) => m.full).map((m) => m.at)";
+  // The viewport a frame gives its page, then its box on the screen and the stage's: a device's own size, scaled down to fit the stage.
+  const viewport = (n = 0) => `[getComputedStyle(${port(n)}.firstChild).width, getComputedStyle(${port(n)}.firstChild).height]`;
+  const fits = (n = 0) => `(({ width, height }, s) => width <= s.width + 0.5 && height <= s.height + 0.5)(${port(n)}.getBoundingClientRect(), ${full}.querySelector('.pf-stage').getBoundingClientRect())`;
   {
     const { evaluate, tap, click, close } = await browse(join(dir, 'phone'), 390, 844, true);
     await evaluate(`location.href = ${JSON.stringify(`${url}#decide/fleet`)}`);
@@ -1979,16 +1983,19 @@ test('Open full screen: a design pick\'s prototype over the whole screen takes r
     assert.deepEqual(await evaluate(box(full)), [0, 0, 390, 844]);
     assert.deepEqual(await evaluate(`[${full}.querySelector('.pf-pick').value, ${full}.querySelector('.pf-size [aria-pressed=true]').dataset.size, ${full}.querySelector('.pf-ref').getAttribute('aria-pressed'), ${full}.querySelector('.pf-live').href]`),
       ['a', 'phone', 'false', 'https://example.com/a']);
-    assert.equal((await evaluate(box(port())))[2], 390);
+    // Phone is a phone's own 390 by 844, scaled down to the stage under the bar.
+    assert.deepEqual(await evaluate(viewport()), ['390px', '844px']);
+    assert.equal(await evaluate(fits()), true);
     assert.equal(await evaluate("got.find((m) => m.full).color"), 'rgb(1, 2, 3)');
     // A real click on the prototype's own link goes to the page beside it: the board takes none of the prototype's input.
     // (Headless Chrome puts the sandboxed frame in a process of its own and misplaces the click it makes from an emulated tap there; a phone keeps the frame in-process, and a mouse click lands.)
     await click(await evaluate(centre(port())));
     await until(() => evaluate(`${pages}.includes('lanes.html')`));
-    // Desktop draws the same page at 1280 scaled to the screen, without loading it again, and a tap there still reaches the prototype's link.
+    // Desktop draws the same page in a desk's own 1280 by 800 scaled to the screen, without loading it again, and a tap there still reaches the prototype's link.
     await tap(await evaluate(centre(`${full}.querySelector('[data-size=desktop]')`)));
     await until(async () => (await evaluate(`getComputedStyle(${port()}.firstChild).width`)) === '1280px');
-    assert.deepEqual(await evaluate(`[${box(port())}[2], ${pages}.length]`), [390, 2]);
+    assert.deepEqual(await evaluate(viewport()), ['1280px', '800px']);
+    assert.deepEqual(await evaluate(`[${box(port())}.slice(2), ${pages}.length]`), [[390, 244], 2]);
     assert.ok(Math.abs((await evaluate(`+${port()}.style.getPropertyValue('--s')`)) - 390 / 1280) < 0.001);
     await click(await evaluate(centre(port())));
     await until(() => evaluate(`${pages}.length === 3 && ${pages}.at(-1) === 'index.html'`));
@@ -2024,12 +2031,18 @@ test('Open full screen: a design pick\'s prototype over the whole screen takes r
     await until(() => evaluate("!!document.querySelector('.decide .full-open')"));
     await click(await evaluate(centre("document.querySelector('.decide .full-open')")));
     await until(() => evaluate(`!!${full}`));
-    assert.deepEqual(await evaluate(`[${full}.querySelector('.pf-size [aria-pressed=true]').dataset.size, ${box(port())}[2]]`), ['desktop', 1280]);
+    assert.deepEqual(await evaluate(`[${full}.querySelector('.pf-size [aria-pressed=true]').dataset.size, ...${viewport()}, ${fits()}]`), ['desktop', '1280px', '800px', true]);
+    // A real click lands where the scaled page draws a control: B's small corner button, at its place times the scale.
+    await evaluate(`window.corner = 0, addEventListener('message', (e) => e.data?.corner && corner++), (s => { s.value = 'b'; s.dispatchEvent(new Event('change')); })(${full}.querySelector('.pf-pick'))`);
+    const corner = await evaluate(`(({ left, top }, s) => s < 1 && [left + 1140 * s, top + 720 * s])(${port()}.getBoundingClientRect(), +${port()}.style.getPropertyValue('--s'))`);
+    assert.ok(corner, 'the desk frame is scaled');
+    await until(async () => { await click(corner); return evaluate('corner > 0'); });
     await click(await evaluate(centre(`${full}.querySelector('[data-size=phone]')`)));
     await click(await evaluate(centre(`${full}.querySelector('.pf-ref')`)));
     await until(() => evaluate(`${full}.querySelector('.pf-stage').dataset.mode === 'beside'`));
     const [one, two] = [await evaluate(box(port(0))), await evaluate(box(port(1)))];
-    assert.deepEqual([one[2], two[2], one[1] === two[1]], [390, 390, true]);
+    assert.deepEqual([...await evaluate(viewport(0)), ...await evaluate(viewport(1)), await evaluate(fits(0)), await evaluate(fits(1))], ['390px', '844px', '390px', '844px', true, true]);
+    assert.deepEqual([one[2] === two[2], one[1] === two[1]], [true, true]);
     assert.ok(Math.abs(one[0] + (two[0] + two[2]) - 1280) <= 2, `${one} ${two} centred`);
     assert.ok(two[0] >= one[0] + one[2], 'side by side');
     await evaluate(`${full}.querySelector('.pf-close').click()`);
@@ -2097,14 +2110,18 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   mkdirSync(join(dir, 'design'), { recursive: true });
   writeFileSync(join(dir, 'design', 'preview.png'), png);
   writeFileSync(join(dir, 'design', 'welcome.png'), png);
-  writeFileSync(join(dir, 'design', 'security.html'), '<!doctype html><title>Security view</title><h1>Security preview</h1>');
+  // The security screen's views say the viewport they are drawn in, as a prototype's breakpoints see it, once loaded and on each resize
+  // (headless Chrome can give a sandboxed frame in a process of its own its size just after the page starts).
+  const says = '<script>const say = (load) => parent.postMessage({ vp: [innerWidth, innerHeight], load }, "*"); say(true); addEventListener("resize", () => say(false))</script>';
+  writeFileSync(join(dir, 'design', 'security.html'), `<!doctype html><title>Security view</title><h1>Security preview</h1>${says}`);
+  writeFileSync(join(dir, 'design', 'security-desk.html'), `<!doctype html><title>Security on a desk</title><h1>Security preview</h1>${says}`);
   const message = { contract: 1, kind: 'design', schema: 1, key: 'd1-design', title: 'Review the welcome screen',
     about: 'Check the welcome screen before release.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review',
     preview: 'design/preview.png', link: 'https://example.test/design/original',
     options: [{ value: 'quick', label: 'Quick' }, { value: 'guided', label: 'Guided' }], recommend: 'guided',
     journeys: [{ id: 'account-setup', title: 'Account setup', screens: [
       { id: 'welcome', title: 'Welcome', views: { phone_light: 'design/welcome.png' } },
-      { id: 'security', title: 'Security', views: { phone_light: 'design/security.html' } },
+      { id: 'security', title: 'Security', views: { phone_light: 'design/security.html', computer_light: 'design/security-desk.html' } },
       ...Array.from({ length: 15 }, (_, i) => ({ id: `screen-${i + 3}`, title: `Journey screen ${i + 3}`, views: { phone_light: 'design/welcome.png' } })),
     ] }] };
   writeFileSync(source, JSON.stringify(message));
@@ -2143,7 +2160,13 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   assert.equal(await evaluate('document.querySelector(".design-preview-full")?.getAttribute("target")'), '_blank');
   assert.equal(await evaluate('document.querySelector(".design-review-preview")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent('design/welcome.png')}`);
   assert.equal(await evaluate('document.querySelector("[aria-label=\\"Screen for note\\"]")?.options.length'), 17);
+  await evaluate('window.vp = [], window.loads = 0, addEventListener("message", (e) => { if (!e.data?.vp) return; loads += e.data.load; vp.push(e.data.vp.join("x")); })');
   await evaluate('(() => { const s = document.querySelector("[aria-label=\\"Screen for note\\"]"); s.value = "account-setup/security"; s.dispatchEvent(new Event("change")); })()');
+  // Below 960 wide a page view runs in a phone's own 390 by 844, its box the phone's shape with nothing blank under the page.
+  await until(async () => (await evaluate('vp.at(-1)')) === '390x844');
+  const preview = '(() => { const w = document.querySelector(".design-preview-window"), a = w.getBoundingClientRect(), b = w.querySelector("iframe").getBoundingClientRect(); return { box: [a.width, a.height].map(Math.round), frame: [b.width, b.height].map(Math.round), blankBelow: Math.round(a.bottom - b.bottom), column: Math.round(document.querySelector(".design-review textarea").getBoundingClientRect().width) }; })()';
+  const phone = await evaluate(preview);
+  assert.deepEqual([phone.box, phone.frame, phone.blankBelow], [[390, 844], [390, 844], 0]);
   assert.equal(await evaluate('document.querySelector(".design-preview-full")?.getAttribute("href")'), `/design/local/d1-design/${encodeURIComponent('design/security.html')}`);
   assert.equal(await evaluate('document.querySelector(".design-review-preview")?.tagName'), 'IFRAME');
   assert.equal(await evaluate('document.querySelector(".design-review-preview")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent('design/security.html')}`);
@@ -2169,6 +2192,18 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   assert.equal(await desktop.evaluate('document.querySelector("#nav a[href=\\"#waiting\\"][aria-current=page]")?.getClientRects().length > 0'), true);
   assert.equal(await desktop.evaluate('document.querySelector(".design-review")?.getBoundingClientRect().bottom <= innerHeight'), true);
   assert.equal(await desktop.evaluate('document.querySelector("#reader").getBoundingClientRect().left >= document.querySelector("#nav").getBoundingClientRect().right'), true);
+  // On a desk the security screen's computer view runs in a desk's own 1280 by 800, scaled down to the column's width, as tall as that scale makes it: no blank band under it.
+  await desktop.evaluate('window.vp = [], window.loads = 0, addEventListener("message", (e) => { if (!e.data?.vp) return; loads += e.data.load; vp.push(e.data.vp.join("x")); })');
+  await desktop.evaluate('(() => { const s = document.querySelector("[aria-label=\\"Screen for note\\"]"); s.value = "account-setup/security"; s.dispatchEvent(new Event("change")); })()');
+  await until(async () => (await desktop.evaluate('vp.at(-1)')) === '1280x800');
+  await until(async () => { const p = await desktop.evaluate(preview); return p.frame[0] === p.box[0]; });
+  const desk = await desktop.evaluate(preview);
+  assert.deepEqual([desk.box[0], desk.frame, desk.blankBelow], [desk.column, desk.box, 0]);
+  assert.ok(Math.abs(desk.box[1] - desk.column * 800 / 1280) <= 1, JSON.stringify(desk));
+  // A narrower box scales the same page again, without loading it again.
+  await desktop.evaluate('document.querySelector(".design-preview-window").style.width = "500px"');
+  await until(async () => (await desktop.evaluate(preview)).frame.join() === '500,313');
+  assert.deepEqual(await desktop.evaluate('[loads, vp.at(-1), document.querySelector(".design-preview-window").getBoundingClientRect().height]'), [1, '1280x800', 312.5]);
   desktop.close();
   // The inline Change saved a change note on this screen: the viewer must show it as a change, not an approval.
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
@@ -2706,7 +2741,10 @@ test('a design review shows its screen on a phone in light and dark: the page fi
     await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] });
     await evaluate(`(() => { const u = ${JSON.stringify(`${url}#designs/d7-preview`)}; if (location.href === u) location.reload(); else location.href = u; })()`);
     await until(() => evaluate('!!document.querySelector(".design-preview-window iframe")'));
-    const box = await evaluate('(() => { const w = document.querySelector(".design-preview-window"); w.scrollIntoView({ block: "start" }); const f = w.firstElementChild.getBoundingClientRect(), r = w.getBoundingClientRect(); return { src: w.firstElementChild.getAttribute("src"), frame: [f.width, f.height], window: [r.left, r.top, r.width, r.height] }; })()');
+    // The page is drawn scaled to the window, to a tenth of a pixel (the window's height is in layout units).
+    const read = '(() => { const w = document.querySelector(".design-preview-window"); w.scrollIntoView({ block: "start" }); const f = w.firstElementChild.getBoundingClientRect(), r = w.getBoundingClientRect(), px = (n) => Math.round(n * 10) / 10; return { src: w.firstElementChild.getAttribute("src"), frame: [f.width, f.height].map(px), window: [r.left, r.top, r.width, r.height].map(px) }; })()';
+    await until(async () => { const b = await evaluate(read); return b.frame.join() === b.window.slice(2).join(); });
+    const box = await evaluate(read);
     assert.ok(box.src.endsWith(`design%2F${theme}.html`), JSON.stringify(box));
     // The page fills the window it is drawn in: no 150px strip over an empty box.
     assert.deepEqual(box.frame, box.window.slice(2), JSON.stringify(box));

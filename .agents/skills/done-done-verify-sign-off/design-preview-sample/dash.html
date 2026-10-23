@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>Fleet dashboard</title>
+<!-- A prototype that fills its viewport: a top bar, cards in one column on a phone and three from 1024 wide, a bar at the bottom of the viewport that says the viewport it sees. -->
+<style>
+  html, body { margin: 0; height: 100%; font: 16px/1.4 system-ui, sans-serif; color: #0b1b33; }
+  body { display: flex; flex-direction: column; background: #dbe8ff; }
+  header, footer { display: flex; justify-content: space-between; padding: 16px 20px; color: #fff; }
+  header { background: #1d4ed8; font-weight: 700; }
+  footer { background: #0b1b33; }
+  main { flex: 1; display: grid; gap: 16px; align-content: start; padding: 20px; }
+  .card { min-height: 80px; padding: 16px; border-radius: 12px; background: #fff; }
+  .wide { display: none; }
+  @media (min-width: 1024px) { main { grid-template-columns: repeat(3, 1fr); } .wide { display: inline; } .narrow { display: none; } }
+</style>
+<header><span>Fleet dashboard</span><span class="wide">Desktop layout</span><span class="narrow">Phone layout</span></header>
+<main><div class="card">Lanes for Umer</div><div class="card">Runs today</div><div class="card">Done this week</div></main>
+<footer><span>Bottom of the viewport</span><b id="viewport"></b></footer>
+<script>
+  const show = () => { document.getElementById('viewport').textContent = `Viewport ${innerWidth} x ${innerHeight}`; };
+  addEventListener('resize', show); show();
+</script>

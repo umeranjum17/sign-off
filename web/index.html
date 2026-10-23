@@ -645,16 +645,19 @@
   .design-review { flex: 1; min-height: 0; overflow: auto; padding: 0 max(1.25rem, calc((100% - 42.5rem) / 2)) 2rem; }
   .design-review > .eyebrow { margin: 0.5rem 0 0; font-weight: 400; }
   .design-review > .about { margin: 0 0 1rem; font-size: 1.25rem; line-height: 1.4; }
-  .design-preview-window { width: 100%; height: min(65vh, 844px); margin: 1rem auto; overflow: auto; border-radius: 1rem; background: var(--surface); box-shadow: var(--shot-edge); }
+  /* A screen's preview: a page in its device's own viewport, as wide as the column allows and about two thirds of the screen tall at most; a picture at its width, scrolling past that height. */
+  .design-preview-window { width: 100%; max-height: min(65vh, 844px); margin: 1rem auto; overflow: auto; border-radius: 1rem; background: var(--surface); box-shadow: var(--shot-edge); }
+  .design-preview-window.device-fit { width: min(100%, calc(var(--vw) * 1px), calc(65svh * var(--vw) / var(--vh))); max-height: none; overflow: hidden; }
   .design-review-preview { display: block; width: 100%; height: auto; }
-  /* A screen's page fills the window from its top, on white as a browser draws a page with no background of its own (left at its default an iframe is 150px, and on a phone in dark the rest is an empty box). */
-  .design-preview-window > iframe.design-review-preview { height: 100%; border: 0; background: #fff; }
   .design-fallback { display: grid; gap: 0.5rem; margin: 0; padding: 0.75rem; align-content: start; }
   .design-fallback img { display: block; width: 100%; height: auto; border-radius: 0.75rem; }
   .design-fallback figcaption { color: var(--muted); font-size: var(--t-s); }
   .design-stage .design-fallback { position: absolute; inset: 0; overflow: auto; } .design-stage .design-fallback img { position: static; height: auto; }
   .design-preview-full { display: block; margin: 0 0 1rem; color: var(--accent); text-decoration: none; }
-  @media (min-width: 64rem) { .design-preview-window { max-width: 24.375rem; } }
+  @media (min-width: 64rem) { .design-preview-window[data-form="phone"]:not(.device-fit) { max-width: 24.375rem; } }
+  /* A prototype page in a device's own viewport (--vw by --vh CSS pixels), scaled down to the box's width by --s, so the page's breakpoints see that device; the box keeps the device's shape, so nothing is left blank under it. */
+  .device-fit { position: relative; overflow: hidden; aspect-ratio: var(--vw) / var(--vh); }
+  .device-fit > iframe { position: absolute; top: 0; left: 0; border: 0; background: #fff; transform: scale(var(--s, 1)); transform-origin: 0 0; }
   .design-review label { display: grid; gap: 0.5rem; margin: 1rem 0; color: var(--muted); }
   /* The design note fills its column, so it lines up with the buttons under it at every width (the 70ch prose cap would narrow it at tablet width). */
   .design-review textarea { max-width: none; min-height: 6rem; padding: 0.75rem; background: var(--surface); }
@@ -674,9 +677,9 @@
   .design-viewer-panel button { padding: 0 0.75rem; font-size: 1rem; white-space: nowrap; }
   .design-viewer button, .design-viewer select { min-height: 2.75rem; }
   .design-viewer-body { display: grid; grid-template-rows: minmax(0, 1fr) auto; flex: 1; min-height: 0; }
-  .design-stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: var(--sunk); touch-action: pan-y; }
+  .design-stage { position: relative; display: grid; place-items: center; min-width: 0; min-height: 0; overflow: hidden; background: var(--sunk); touch-action: pan-y; container-type: size; }
   .design-stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
-  .design-stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: var(--surface); }
+  .design-stage > .device-fit { width: min(100cqw, 100cqh * var(--vw) / var(--vh)); }
   .design-viewer-panel { overflow: auto; padding: 0.75rem max(1rem, env(safe-area-inset-right)) max(0.75rem, env(safe-area-inset-bottom)); background: var(--surface); }
   .design-viewer-panel .foot { display: flex; gap: 0.75rem; margin: 0.5rem 0; }
   .design-viewer-panel .foot > * { flex: 1; }
@@ -713,7 +716,7 @@
   .pf-ref .glyph { width: 1rem; height: 1rem; }
   .proto-full .pf-ref[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--card)); color: var(--accent); font-weight: var(--tk-fw-semibold); }
   .proto-full .pf-ref[aria-pressed="true"]::before { content: none; }
-  .pf-stage { display: grid; flex: 1; min-height: 0; justify-content: center; align-content: start; gap: 1rem; padding: var(--pad, 0); overflow: hidden; }
+  .pf-stage { display: grid; flex: 1; min-height: 0; justify-content: center; align-content: center; gap: 1rem; padding: var(--pad, 0); overflow: hidden; }
   .pf-stage[data-mode="beside"] { grid-template-columns: auto auto; }
   .pf-stage[data-mode="over"] .pf-frame { grid-area: 1 / 1; }
   .pf-frame { display: grid; justify-items: center; margin: 0; min-width: 0; }
@@ -2261,6 +2264,18 @@
     }));
   }
 
+  /** A prototype page in a device's own viewport, a phone's 390 by 844 or a desk's 1280 by 800, scaled down to the width its box gets; the scale follows the box, so a resize never reloads the page. */
+  const VIEWPORTS = { phone: [390, 844], computer: [1280, 800] };
+  const fitting = new ResizeObserver((boxes) => boxes.forEach(({ target, contentRect }) => contentRect.width && target.style.setProperty('--s', contentRect.width / target.dataset.vw)));
+  function deviceFit(frame, form, cls = '') {
+    const [vw, vh] = VIEWPORTS[form], box = el('div', { class: `device-fit ${cls}`.trim(), 'data-form': form, 'data-vw': vw }, frame);
+    box.style.setProperty('--vw', vw); box.style.setProperty('--vh', vh);
+    // Its own size, so a page view's frame rules (100% of the reader) never stretch it.
+    Object.assign(frame.style, { width: `${vw}px`, height: `${vh}px` });
+    fitting.observe(box);
+    return box;
+  }
+
   /** A mock or view is served from inside its own folder, so the files beside it load by their relative names. */
   const mockUrl = (key, value, path) => `${state.mockBase}${key}~${value}/${encodeURIComponent(path.split('?')[0].split('/').pop())}`;
   const designUrl = (d, path) => `${state.mockBase.replace('/mock/', '/design/')}${d.key}/${encodeURIComponent(path)}`;
@@ -2312,7 +2327,7 @@
 
   /** Open full screen: a design's mocks or an interactive page over the whole viewport, in the same sandboxed frame, which here takes every tap, so the prototype's own links and buttons work.
    *  Its bar holds the way back, the option shown, Phone (390) or Desktop (1280) framed and centred, and Reference: another option's mock beside it, or over it where the two do not fit side by side. */
-  const SIZES = { phone: 390, desktop: 1280 };
+  const SIZES = { phone: VIEWPORTS.phone, desktop: VIEWPORTS.computer };
   let fullSize, protoFull;
   const fullPages = (d) => d.view ? [{ value: '', label: d.title, page: true, url: src(mockUrl(d.key, '', d.view)) }]
     : [...d.options].sort((a, b) => (b.value === d.recommend_value) - (a.value === d.recommend_value)).map((o) => {
@@ -2344,7 +2359,7 @@
     const close = el('button', { class: 'pf-close', 'aria-label': 'Close full screen' }, glyph('x'), 'Close');
     const pick = pages.length > 1 ? el('select', { class: 'pf-pick', 'aria-label': 'Option shown' }, ...pages.map((p) => el('option', { value: p.value }, p.label))) : '';
     // On a phone each size is its picture; on a desk its name and width too.
-    const sizes = Object.entries(SIZES).map(([k, w]) => el('button', { 'aria-pressed': String(k === fullSize), 'aria-label': `${k === 'phone' ? 'Phone' : 'Desktop'}, ${w} wide`, title: `${w} px wide`, 'data-size': k },
+    const sizes = Object.entries(SIZES).map(([k, [w]]) => el('button', { 'aria-pressed': String(k === fullSize), 'aria-label': `${k === 'phone' ? 'Phone' : 'Desktop'}, ${w} wide`, title: `${w} px wide`, 'data-size': k },
       glyph(k), el('span', { class: 'pf-name', 'aria-hidden': 'true' }, k === 'phone' ? 'Phone' : 'Desktop', el('span', { class: 'pf-w' }, String(w)))));
     const refBtn = pages.length > 1 ? el('button', { class: 'pf-ref', 'aria-pressed': 'false' }, glyph('layers'), 'Reference') : '';
     const live = el('a', { class: 'pf-live', target: '_blank', rel: 'noopener' }, 'Open live');
@@ -2369,16 +2384,17 @@
       back.port.replaceChildren(view(ref, `Reference: ${ref.label}`));
       lay();
     };
-    // Each frame is the chosen width, scaled down only when the screen is narrower, and as tall as the stage; two side by side once each keeps half its size.
+    // Each frame is the chosen device's own viewport, scaled down only where it does not fit the stage either way, framed where it leaves room at the sides; two side by side once each keeps half its width.
     const lay = () => {
-      const w = SIZES[fullSize], box = stage.getBoundingClientRect(), gap = 16, beside = refOn && box.width >= 720 && (box.width - gap * 3) / 2 >= w / 2;
+      const [w, h] = SIZES[fullSize], box = stage.getBoundingClientRect(), gap = 16, beside = refOn && box.width >= 720 && (box.width - gap * 3) / 2 >= w / 2;
       stage.dataset.mode = !refOn ? 'one' : beside ? 'beside' : 'over';
-      const room = beside ? (box.width - gap * 3) / 2 : box.width, pad = room >= w + gap * 2 ? gap : 0, width = Math.min(w, room - pad * 2), scale = width / w;
-      const height = box.height - (refOn ? 32 : 0) - pad * 2;
+      const room = beside ? (box.width - gap * 3) / 2 : box.width, tall = box.height - (refOn ? 32 : 0);
+      const fit = (pad) => Math.min(1, (room - pad * 2) / w, (tall - (beside ? gap : pad) * 2) / h);
+      const pad = w * fit(0) <= room - gap * 2 ? gap : 0, scale = fit(pad);
       stage.style.setProperty('--pad', `${beside ? gap : pad}px`);
       for (const f of [main, back]) {
         f.fig.classList.toggle('framed', pad > 0);
-        Object.entries({ '--w': width, '--h': height, '--vw': w, '--vh': height / scale, '--s': scale }).forEach(([k, v]) => f.port.style.setProperty(k, k === '--s' ? v : `${v}px`));
+        Object.entries({ '--w': w * scale, '--h': h * scale, '--vw': w, '--vh': h, '--s': scale }).forEach(([k, v]) => f.port.style.setProperty(k, k === '--s' ? v : `${v}px`));
       }
     };
     sizes.forEach((b) => (b.onclick = () => { fullSize = b.dataset.size; sizes.forEach((x) => x.setAttribute('aria-pressed', String(x === b))); lay(); }));
@@ -3032,25 +3048,30 @@
     const screenLine = () => (currentNote() ? (currentNote().verdict === 'approve' ? 'Screen approved' : 'Changes requested') : 'Not reviewed yet');
     note.value = session.drafts.get(screenKey(target())) ?? currentNote()?.note ?? '';
     note.oninput = () => session.drafts.set(screenKey(target()), note.value);
-    const previewPath = () => {
-      const views = target()?.screen.views, form = innerWidth < 960 ? 'phone' : 'computer', theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      return views?.[`${form}_${theme}`] || views?.[`${form}_${theme === 'dark' ? 'light' : 'dark'}`] || (views && Object.values(views)[0]) || d.preview;
+    // The screen's view for this screen's size and theme, and the device it was drawn for: a phone below 960 wide, else a computer.
+    const previewView = () => {
+      const views = target()?.screen.views ?? {}, form = innerWidth < 960 ? 'phone' : 'computer', theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      const view = [`${form}_${theme}`, `${form}_${theme === 'dark' ? 'light' : 'dark'}`, ...Object.keys(views)].find((k) => views[k]);
+      return view ? { path: views[view], form: view.split('_')[0] } : { path: d.preview, form };
     };
+    const previewPath = () => previewView().path;
     // A screen that cannot be drawn shows the design's preview picture, and says so.
     const fallback = () => el('figure', { class: 'design-fallback' }, el('figcaption', {}, 'This screen could not be shown: this is the design’s preview picture.'), el('img', { src: src(designUrl(d, d.preview)), alt: `Design preview: ${d.title}` }));
-    const previewElement = (path) => {
-      if (d.missing?.includes(path) && path !== d.preview) return fallback();
-      if (/\.html?$/i.test(path)) return el('iframe', { class: 'design-review-preview', src: src(designUrl(d, path)), title: `Design preview: ${d.title}`, sandbox: 'allow-scripts' });
+    // A page runs in its device's own viewport, scaled to fit; a picture shows as it is; either in the box when one is named.
+    const previewElement = ({ path, form }, cls = '') => {
+      const boxed = (e) => (cls ? el('div', { class: cls, 'data-form': form }, e) : e);
+      if (d.missing?.includes(path) && path !== d.preview) return boxed(fallback());
+      if (/\.html?$/i.test(path)) return deviceFit(el('iframe', { class: 'design-review-preview', src: src(designUrl(d, path)), title: `Design preview: ${d.title}`, sandbox: 'allow-scripts' }), form, cls);
       const img = el('img', { class: 'design-review-preview', src: src(designUrl(d, path)), alt: `Design preview: ${d.title}` });
       if (path !== d.preview) img.onerror = () => img.replaceWith(fallback());
-      return img;
+      return boxed(img);
     };
-    const preview = previewPath() ? el('div', { class: 'design-preview-window' }, previewElement(previewPath())) : '';
+    let preview = previewPath() ? previewElement(previewView(), 'design-preview-window') : '';
     const fullHref = (path) => src(designUrl(d, d.missing?.includes(path) ? d.preview : path));
     const fullPreview = previewPath() ? el('a', { class: 'design-preview-full', href: fullHref(previewPath()), target: '_blank', rel: 'noopener noreferrer' }, 'Open full preview') : '';
     if (screenSelect) screenSelect.onchange = () => {
       const path = previewPath();
-      if (preview) preview.replaceChildren(previewElement(path));
+      if (preview) { const next = previewElement(previewView(), 'design-preview-window'); preview.replaceWith(next); preview = next; }
       if (fullPreview) fullPreview.href = fullHref(path);
       session.selected = screenKey(target());
       note.value = session.drafts.get(session.selected) ?? currentNote()?.note ?? '';
@@ -3101,7 +3122,7 @@
       heading.textContent = `${target().journey.title} — ${target().screen.title}`;
       count.textContent = `${i + 1} of ${screens.length}`;
       previous.disabled = i === 0; next.disabled = i === screens.length - 1;
-      stage.replaceChildren(previewElement(previewPath())); stage.scrollTop = 0; stamp();
+      stage.replaceChildren(previewElement(previewView())); stage.scrollTop = 0; stamp();
       screenStatus.textContent = screenLine();
       approve.textContent = 'Approve screen'; change.textContent = 'Request change'; err.textContent = '';
     };
