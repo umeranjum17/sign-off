@@ -48,7 +48,7 @@ for theme in light dark; do
   done
 done
 # One claim per crop, each settled and cut to exactly what it shows: the update's capture filling its preview (preview-fill), the one-row verdicts (verdicts),
-# one Evidence card's filled tile (ev-tile) and the two same-headline cards with their telling lines (twins).
+# and one Evidence row (ev-row).
 # crop <file> <page> <js list of elements> [each]: open the page, scroll the elements' box to the middle of the screen, let it settle, shoot the viewport and cut out the box;
 # with each, every item (an element, or a list of elements cut as one box) is cut out on its own and the pieces are stacked, so what lies between them stays out of the shot.
 crop() {
@@ -78,23 +78,20 @@ for theme in light dark; do
     # The capture with the Proof rows under it, which span the same column, on a desk tall enough to hold both.
     if [ "$w" = 1280 ]; then
       chrome-devtools-axi emulate --viewport 1280x1400x1 --color-scheme "$theme" >/dev/null
-      crop "preview-fill.$theme.${w}w.png" '#evidence/update-2' "[document.querySelector('.ev-hero'), document.querySelector('.ev-grp')]"
+      crop "preview-fill.$theme.${w}w.png" '#evidence/update-2' "[document.querySelector('.ev-hero'), document.querySelector('.ev-props')]"
       chrome-devtools-axi emulate --viewport "$vp" --color-scheme "$theme" >/dev/null
     fi
-    crop "verdicts.$theme.${w}w.png" '#evidence/update-2' "[document.querySelector('.ev-ask'), document.querySelector('.ev-verdict .choices')]"
-    [ "$w" = 390 ] && crop "ev-tile.$theme.${w}w.png" '#evidence' "[document.querySelector('.ev-grid .ev-card')]"
-    # On a phone each twin's capture is a tall tile, so only the two titles and results are stacked.
-    if [ "$w" = 390 ]; then crop "twins.$theme.${w}w.png" '#evidence' "[...document.querySelectorAll('.ev-grid .ev-card .also')].map((a) => [a.closest('.t'), a.closest('.ev-card').querySelector('.m')])" each
-    else crop "twins.$theme.${w}w.png" '#evidence' "[...document.querySelectorAll('.ev-grid .ev-card')].filter((a) => a.querySelector('.also'))"; fi
+    crop "verdicts.$theme.${w}w.png" '#evidence/update-2' "[document.querySelector('.ev-verdict .choices')]"
+    [ "$w" = 390 ] && crop "ev-row.$theme.${w}w.png" '#evidence' "[document.querySelector('.ev-list .ev-card')]"
   done
 done
-# One claim per capture: the search box narrows Evidence to one card, the 3-day-old proof and then the reposted card, each alone on a phone screen.
+# One claim per capture: See all lists every proof, here scrolled to the 3-day-old proof and then to the reposted card, each in the middle of a phone screen.
 for theme in light dark; do
   chrome-devtools-axi emulate --viewport 390x844x1,mobile,touch --color-scheme "$theme" >/dev/null
   for shot in "old-proof:Passed check filed 3 days ago" "repost:Repost demo"; do
     chrome-devtools-axi open "$url#evidence" >/dev/null
     chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 600))" >/dev/null
-    chrome-devtools-axi eval "() => { const b = document.getElementById('ev-find'); b.value = '${shot#*:}'; b.dispatchEvent(new Event('input')); }" >/dev/null
+    chrome-devtools-axi eval "() => new Promise((ok) => { document.querySelector('.ev-sec .see')?.click(); setTimeout(() => { [...document.querySelectorAll('.ev-card')].find((a) => a.querySelector('.t').textContent.startsWith('${shot#*:}'))?.scrollIntoView({ block: 'center' }); setTimeout(ok, 400); }, 300); })" >/dev/null
     chrome-devtools-axi screenshot "$out/${shot%%:*}.$theme.390w.png" >/dev/null
   done
 done
@@ -103,29 +100,29 @@ for theme in light dark; do
   chrome-devtools-axi emulate --viewport 390x844x1,mobile,touch --color-scheme "$theme" >/dev/null
   chrome-devtools-axi open "$url#evidence" >/dev/null
   chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 600))" >/dev/null
-  chrome-devtools-axi eval "() => { const b = document.getElementById('ev-find'); b.value = ''; b.dispatchEvent(new Event('input')); const p = document.getElementById('ev-project'); if (p) { p.value = 'muxr'; p.dispatchEvent(new Event('change')); } }" >/dev/null
+  chrome-devtools-axi eval "() => new Promise((ok) => { document.querySelector('.ev-fb')?.click(); setTimeout(ok, 400); })" >/dev/null
+  chrome-devtools-axi eval "() => new Promise((ok) => { [...document.querySelectorAll('#sheet .ev-pick button')].find((b) => b.querySelector('.pn').textContent === 'muxr')?.click(); setTimeout(ok, 600); })" >/dev/null
   chrome-devtools-axi screenshot "$out/project-filter.$theme.390w.png" >/dev/null
 done
 if [ "${TODAY_EVIDENCE_RECORD:-}" = 1 ]; then
   for theme in light dark; do node "$repo/.agents/skills/done-done-verify-sign-off/desk-evidence-record.mjs" "$url" $theme "$out/desk-evidence.$theme.1280w.mp4"; done
 fi
 num() { chrome-devtools-axi eval "$1" | grep -o '[0-9][0-9]*' | head -1; }
-# The search and the project pick stay while the page is open, so both are cleared before counting.
-chrome-devtools-axi open "$url#evidence" >/dev/null; chrome-devtools-axi eval "() => { const p = document.getElementById('ev-project'); if (p) { p.value = ''; p.dispatchEvent(new Event('change')); } const b = document.getElementById('ev-find'); b.value = ''; b.dispatchEvent(new Event('input')); return new Promise((ok) => setTimeout(ok, 800)); }" >/dev/null
+# The project pick stays while the page is open, so it is cleared, and See all lists every proof, before counting.
+chrome-devtools-axi open "$url#evidence" >/dev/null; chrome-devtools-axi eval "() => new Promise((ok) => { document.querySelector('.ev-unpick')?.click(); setTimeout(() => { const s = document.querySelector('.ev-sec .see'); if (s?.textContent === 'See all') s.click(); setTimeout(ok, 600); }, 300); })" >/dev/null
 evcards=$(num '() => document.querySelectorAll(".ev-card").length'); repostcards=$(num '() => [...document.querySelectorAll(".ev-card .t")].filter((t) => t.textContent.startsWith("Repost demo")).length')
 old=$(num '() => [...document.querySelectorAll(".ev-card .t")].filter((t) => t.textContent === "Passed check filed 3 days ago").length')
-heads=$(num '() => document.getElementById("ev-find").closest(".search").nextElementSibling.querySelectorAll("h2, h3").length')
+heads=$(num '() => document.querySelector(".ev-list").querySelectorAll("h2, h3").length')
 newest=$(chrome-devtools-axi eval '() => fetch("/api/decisions").then((r) => r.json()).then((s) => { const at = Object.fromEntries(s.decisions.map((d) => ["item-" + d.key, Date.parse(d.filed)])); return [...document.querySelectorAll(".ev-card")].every((a, i, all) => !i || at[all[i - 1].id] >= at[a.id]); })' | grep -o 'true\|false' | head -1)
-projects=$(chrome-devtools-axi eval '() => [...document.querySelectorAll("#ev-project option")].map((o) => o.textContent).join(", ") || "none"' | sed -n 's/^result: "\(.*\)"$/\1/p' | sed 's/\\"//g')
-chrome-devtools-axi eval "() => { const p = document.getElementById('ev-project'); if (p) { p.value = 'muxr'; p.dispatchEvent(new Event('change')); } }" >/dev/null
+projects=$(chrome-devtools-axi eval '() => new Promise((ok) => { const f = document.querySelector(".ev-fb"); if (!f) return ok("none"); f.click(); setTimeout(() => ok([...document.querySelectorAll("#sheet .ev-pick .pn")].map((p) => p.textContent).join(", ")), 300); })' | sed -n 's/^result: "\(.*\)"$/\1/p' | sed 's/\\"//g')
+chrome-devtools-axi eval "() => new Promise((ok) => { [...document.querySelectorAll('#sheet .ev-pick button')].find((b) => b.querySelector('.pn').textContent === 'muxr')?.click(); setTimeout(ok, 400); })" >/dev/null
 muxr=$([ "$projects" = none ] && echo "no project filter" || num '() => document.querySelectorAll(".ev-card").length')
-chrome-devtools-axi eval "() => { const p = document.getElementById('ev-project'); if (p) { p.value = ''; p.dispatchEvent(new Event('change')); } }" >/dev/null
+chrome-devtools-axi eval "() => document.querySelector('.ev-unpick')?.click()" >/dev/null
 # On a desk: Evidence is one column with the newest selected beside it, and Today's tiles sit under Up next.
 chrome-devtools-axi emulate --viewport 1280x800x1 --color-scheme light >/dev/null
 chrome-devtools-axi open "$url#evidence" >/dev/null; chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
 columns=$(num '() => new Set([...document.querySelectorAll(".ev-card")].map((a) => Math.round(a.getBoundingClientRect().left))).size')
 selected=$(chrome-devtools-axi eval '() => [...document.querySelectorAll(".ev-card[aria-current]")].map((a) => a.id).join() === document.querySelector(".ev-card").id && document.querySelector(".split-detail .ev-title")?.textContent === document.querySelector(".ev-card[aria-current] .t").textContent' | grep -o 'true\|false' | head -1)
-twinned=$(num '() => document.querySelectorAll(".ev-card .t .also").length')
 chrome-devtools-axi open "$url#evidence/update-2" >/dev/null; chrome-devtools-axi eval "() => new Promise((ok) => setTimeout(ok, 800))" >/dev/null
 fills=$(chrome-devtools-axi eval '() => Math.round(document.querySelector(".ev-hero img").getBoundingClientRect().width) + " of " + Math.round(document.querySelector(".ev-item").getBoundingClientRect().width) + " px"' | sed -n 's/^result: "\(.*\)"$/\1/p' | sed 's/\\"//g')
 rows=$(num '() => new Set([...document.querySelectorAll(".ev-verdict .choices button")].map((b) => Math.round(b.getBoundingClientRect().top))).size')
@@ -144,7 +141,6 @@ tile=$(chrome-devtools-axi eval '() => document.querySelector(".t-tiles a[href=\
   echo "Evidence list columns at 1280: $columns"
   echo "newest proof selected and open beside the list at 1280: $selected"
   echo "Today's tiles under Up next at 1280: $beside"
-  echo "cards sharing a headline that name what differs at 1280: $twinned"
   echo "update capture width across the preview at 1280: $fills"
   echo "rows the Pass, Fail and Needs work buttons take at 1280: $rows"
   echo "dismissal log lines written: $(cat "$d/board.dismissed.jsonl" 2>/dev/null | wc -l)"
@@ -153,6 +149,6 @@ tile=$(chrome-devtools-axi eval '() => document.querySelector(".t-tiles a[href=\
 rec=$([ "${TODAY_EVIDENCE_RECORD:-}" != 1 ] || echo ', "On the desk at 1280, point at the Proofs today tile on Today, click it: Evidence opens with the newest update selected beside the list", "Click three more rows in the Evidence list: each click changes the selection, its tint and accent bar move, and the selected update slides in from the right"')
 cat > "$out/steps.json" <<JSON
 {"target": {"version": "$(node -p 'require("./package.json").version')"}, "start": "A new board with two passed updates (one filed 3 days ago) and two updates with no run, each with a capture, and one new report",
- "steps": ["Open Today on a phone at 390 and on a desk at 1280 (1024px and wider is the desk layout) in light and dark", "Read the Proofs today tile; on the desk, find the tiles under Up next, the ask that matters most", "Open Evidence on a phone at 390 and on the desk at 1280 in light and dark; on the desk the list is one column, newest first, beside the selected update, the newest when none is picked", "Open the passed update at 390 and 1280: on the desk its capture fills the preview's width from the top of the shot and opens full size on a tap; Pass, Fail and Needs work sit on one row", "Crop one shot per claim, settled and fully open: the update's capture filling its preview with Open full size, as wide as the Proof rows under it, the Pass, Fail and Needs work row, one Evidence card on a phone whose picture, a phone screenshot, fills its tile edge to edge from the top of the shot, and the two Evidence cards with the same headline, each with its own title on a line under it (on a phone, just their headlines, title lines and results, stacked)", "Pick muxr in the project filter", "Compare Evidence, which keeps every proof, with the Proofs today tile, which counts the updates filed today and the failed runs"$rec],
- "result": "Today's Proofs today tile counts every update filed today; Evidence lists every proof in one list, newest first, with no project or day headings, and its project filter narrows it to one project, including the 3-day-old one, the pull request proof and the plain one; the reposted card is listed once and no dismissal is written. Two cards with the same headline each name what tells them apart (here their own titles). Each Evidence card's capture fills a tile half as tall as it is wide; the update's verdicts take one row of equal buttons; On a desk (1024px and wider, shown at 1280) Today sets its tiles under Up next, and Evidence is one list beside the selected update, which a click changes and slides in; on a phone at 390 Today and Evidence keep one column of full-width cards"}
+ "steps": ["Open Today on a phone at 390 and on a desk at 1280 (1024px and wider is the desk layout) in light and dark", "Read the Proofs today tile; on the desk, find the tiles under Up next, the ask that matters most", "Open Evidence on a phone at 390 and on the desk at 1280 in light and dark; on the desk the list is one column, newest first, beside the selected update, the newest when none is picked", "Open the passed update at 390 and 1280: on the desk its capture fills the preview's width from the top of the shot and opens full size on a tap; Pass, Fail and Needs work sit on one row", "Crop one shot per claim, settled and fully open: the update's capture across its preview, as wide as the done-done and Pull request rows under it, the Fail, Needs work and Pass row, and one Evidence row on a phone: its project's tile with done-done's check, its title, and its project and time", "Pick muxr in the project filter", "Compare Evidence, which keeps every proof, with the Proofs today tile, which counts the updates filed today and the failed runs"$rec],
+ "result": "Today's Proofs today tile counts every update filed today; Evidence lists every proof in one list, newest first, with no project or day headings, and its project filter narrows it to one project, including the 3-day-old one, the pull request proof and the plain one; the reposted card is listed once and no dismissal is written. Each Evidence row is its project's tile with done-done's check, its title, and its project and time; the update's verdicts take one row of equal buttons; On a desk (1024px and wider, shown at 1280) Today sets its tiles under Up next, and Evidence is one list beside the selected update, which a click changes and slides in; on a phone at 390 Today and Evidence keep one column of full-width cards"}
 JSON
