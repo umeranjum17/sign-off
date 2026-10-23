@@ -23,7 +23,7 @@ It works on phone and desktop, by day and by night (light and dark), and at the 
 
 - **The best human-computer interaction on every surface.** Linear-grade and visual first. Every screen, message and command line respects the person's time and attention.
 - **Keeps only what matters.** Decide holds only live asks, and old stuff goes; one decision is one card.
-- **Self-sufficient.** The CLI and the skill work alone, with no other tool and no supervisor, and connect well with the sibling tools when installed together. They work the same inside or outside an agent supervisor such as Firstmate. A newcomer installs it from npm in under 5 minutes.
+- **Self-sufficient.** The CLI and the skill work alone, with no other tool and no supervisor, and connect well with the sibling tools when installed together. They work the same with or without an agent supervisor. A newcomer installs it from npm in under 5 minutes.
 - **Taste built in.** Every design and behaviour call lands in the published package and its shipped skill as the default, never in one person's setup.
 - **Strict, written contract.** One small contract covers asks, reports, evidence, gates, retro findings and plans ([docs/contract.md](docs/contract.md)). A message that does not match is refused with one fix line, never shown half-broken.
 - **Primitives, not forks.** Per-project behaviour becomes a reusable building block every project gets.
@@ -40,6 +40,6 @@ It works on phone and desktop, by day and by night (light and dark), and at the 
 
 Each ships in the next [npm release](https://www.npmjs.com/package/sign-off-axi?activeTab=versions) once it merges.
 
-1. **The approved design on every screen.** Today, Decide, Evidence and Reports, phone and desk, match the approved prototype, including the floating tab bar and the design review flow.
-2. **A fast, light board.** Performance tests with budgets, and built-in image compression and resizing for everything posted to the board.
-3. **Alerts when something needs you.** A card that enters Decide reaches the person's phone or tablet as an alert.
+1. **The approved design on every screen.** The live board matches the approved design on every screen: Today, Decide, Evidence and Reports, phone and desk, including the floating tab bar and the design review flow.
+2. **Speed budgets and image compression.** The board is held to measured speed budgets, and images are compressed and resized on the way in.
+3. **Tickets.** Tickets as a standalone sign-off feature, with an open API.
