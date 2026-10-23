@@ -77,7 +77,7 @@ try {
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board with no items.',
     steps: [`The agent posts ${shots.length} real captures as evidence updates with sign-off-axi post --type evidence --media.`,
       `The person opens the Evidence list and the first update's screen at ${theme === 'dark' ? 'both widths in the dark theme' : 'both widths in the light theme'}, and each screen's JSON records every capture shown.`],
-    result: 'Every capture on the Evidence list and the update\'s screen loads from its light or thumb copy (its address ends v=light or v=thumb) and is marked sharp: true.' }, null, 2) + '\n');
+    result: 'The Evidence list shows each posted capture as a clear picture in its card, with no broken or missing picture. Each screen\'s JSON records every capture loading from its light or thumb copy (its address ends v=light or v=thumb) and marked sharp: true.' }, null, 2) + '\n');
   console.log(totals.join('\n'));
 } finally {
   try { browser('stop'); } catch {}
