@@ -12,6 +12,7 @@ The repo's maintained verification map; a proof that drives one entry point is i
 - [Evidence](evidence.md): the one newest-first list with its project filter and the update screen, light and dark at 390 and 1280
 - [Evidence attachment](evidence-attach.md): `post --attach` puts a downloadable file (an APK) on an update card; the file row at 390 and 1280, a real download whose bytes match, range, limits, token
 - [Prototype full screen](full-screen.md): Open full screen on a design pick or an interactive page, the prototype's own navigation, Phone 390 and Desktop 1280, Reference beside or over, Close, 390 and 1280, light and dark
+- [Designs](designs.md): the list as rows on a phone with To review and More, a design's review with Approve in ink, on a desk the cards across the top and the open design beside where it stands, 390, 1280 and 1440, light and dark, each beside the approved prototype
 - [Design viewer](design-viewer.md): the full-screen screen-by-screen review, its note box and buttons at 390, 820 and 1280
 - [Notification sender](notifications.md): the notify POST a local receiver gets, once per card
 - [Board actions](board-actions.md): every card kind on every tab, each action clicked (Dismiss, bulk Select, answers), 390 and 1280, light and dark, with the look step

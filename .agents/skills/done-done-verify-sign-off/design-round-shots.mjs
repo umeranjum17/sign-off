@@ -70,7 +70,7 @@ try {
   const facts = `() => JSON.stringify((() => { const w = document.querySelector('.design-preview-window'), f = w?.firstElementChild, box = (e) => { const r = e?.getBoundingClientRect(); return r && [Math.round(r.width), Math.round(r.height)]; };
     const steps = [...document.querySelectorAll('.design-review .thread li')].map((li) => [li.querySelector('.th-t')?.textContent, li.querySelector('.th-n')?.textContent ?? '']);
     return { note: document.querySelector('.design-review textarea').value, activity: steps, status: document.querySelector('.design-review [role=status]')?.textContent,
-      preview: f?.tagName.toLowerCase(), src: decodeURIComponent(f?.getAttribute('src') ?? ''), frame: box(f), window: box(w) }; })())`;
+      preview: f?.tagName.toLowerCase(), src: decodeURIComponent(f?.getAttribute('src') ?? ''), frame: box(f), window: box(w), area: box(document.querySelector('.dz-fill')) }; })())`;
   record.round2 = read(facts);
   browser('eval', `() => { document.querySelector('.design-preview-window').scrollIntoView({ block: 'start' }); return 1; }`); settle(900);
   shot('preview');
@@ -98,7 +98,9 @@ try {
     assert.equal(record.round2.preview, 'iframe');
     assert.ok(record.round2.src.endsWith(theme === 'dark' ? 'overview-dark.html' : 'overview.html'), record.round2.src);
     assert.deepEqual(record.round2.frame, record.round2.window, 'the screen fills the preview window');
-    assert.ok(record.round2.frame[1] > 300, JSON.stringify(record.round2));
+    // On a phone the screen is a tall preview; on a desk it fits the open design's picture area, as wide or as tall as that area.
+    const [fw, fh] = record.round2.frame, area = record.round2.area;
+    assert.ok(area ? Math.abs(fw - area[0]) <= 1 || Math.abs(fh - area[1]) <= 1 : fh > 300, JSON.stringify(record.round2));
     assert.deepEqual(record.viewer, { screen: 'Not reviewed yet', note: '' });
     assert.ok(record.fallback.text.startsWith('This screen could not be shown') && record.fallback.picture > 0 && record.fallback.link.endsWith('preview.webp'), JSON.stringify(record.fallback));
   }

@@ -204,7 +204,6 @@
   h1[tabindex="-1"] { outline: none; }
   html[data-kbd] h1[tabindex="-1"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   /* A report reads as a page of its own: what it is and when, its title in large type, what it says, then its page in a tile. */
-  #reader .design-review h1 { margin: 0.75rem auto; font-size: 2.125rem; line-height: 1.1765; font-weight: 700; letter-spacing: 0.011em; white-space: normal; overflow: visible; }
   #reader .read { flex: 1; min-height: 0; overflow: auto; padding: 0 1.25rem 2rem; }
   :is(#reader, .split-detail) .read > * { max-width: 42.5rem; margin-left: auto; margin-right: auto; }
   :is(#reader, .split-detail) .read .eyebrow { margin-top: 0.5rem; font-weight: 400; }
@@ -301,7 +300,6 @@
   body.reading { overflow: hidden; }
   @media (min-width: 64rem) {
     #reader .read { padding: 0 3rem 3rem; }
-    #reader .design-review { padding-bottom: 3rem; } #reader .design-review h1 { font-size: 3rem; line-height: 1.0833; letter-spacing: -0.003em; }
     #reader .read h1 { font-size: 3rem; line-height: 1.0833; letter-spacing: -0.003em; }
     body.pane-reading main { display: none; }
     body.pane-reading #reader { position: static; inset: auto; z-index: auto; grid-column: 2; grid-row: 1; width: 100%; height: 100vh; min-width: 0; }
@@ -542,32 +540,62 @@
   .done > .row .eyebrow, .done > .row h3 { display: none; }
   .done[open] + .x { align-self: start; margin-top: 1rem; }
   .foot .dis { padding: 0 0.5rem; background: none; color: var(--muted); }
-  /* A design's review reads like a report's page: the way back in the bar, then what it is, its title and what it says in one centred column. */
-  .design-review { flex: 1; min-height: 0; overflow: auto; padding: 0 max(1.25rem, calc((100% - 42.5rem) / 2)) 2rem; }
-  .design-review > .eyebrow { margin: 0.5rem 0 0; font-weight: 400; }
-  .design-review > .about { margin: 0 0 1rem; font-size: 1.25rem; line-height: 1.4; }
+  /* Designs in the new look, built from ui.css's parts: on a phone the title row with More and the light-or-dark button, To review, and the designs as rows in one card;
+     a design's review over the board reads like the prototype's sheet: its project and day, the whole title, what it shows, the screen, where it stands, what you said, then the note
+     with Approve in ink beside Change. The desk's cards and open design are under the desk's rules further down. */
+  .dz-top .ui-rb, .dz-head .ui-rb { min-height: 0; padding: 0; }
+  :is(.dz-top, .dz-head) .ui-rb .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.6; }
+  :is(.dz-top, .dz-head) .dz-more .glyph { stroke-width: 3; }
+  .dz-list .ui-row .meta { margin: 0; }
+  :is(.dz-list li, .dz-card).picked { outline: 2px solid var(--tk-ink); outline-offset: -2px; border-radius: 0.875rem; }
+  .dz-bulk .bulk { margin: 0.5rem 0 0; } .dz-bulk .bulk button { min-height: 2.75rem; background: none; color: var(--tk-ink); }
+  #dz-sheet .ui-pr { width: 100%; padding: 0; border: 0; border-radius: 0; background: none; color: var(--tk-ink); font: inherit; font-size: var(--tk-fs-row); text-align: left; }
+  #dz-sheet .ui-pr .k { color: var(--tk-ink); } #dz-sheet .t-shd .x { min-height: 0; }
+  #reader:has(> .design-review) { background: var(--tk-card); }
+  #reader:has(> .design-review) header .close { color: var(--tk-ink); font-weight: 500; }
+  #reader .design-review { flex: 1; min-height: 0; overflow: auto; padding: 0 1rem 2rem; }
+  .dz-lab { display: flex; align-items: center; gap: 0.5rem; min-width: 0; height: 1.5rem; margin: 0.5rem 0 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: 1.5rem; }
+  .dz-lab > span:last-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .dz-pic { display: grid; flex: none; width: 1.25rem; height: 1.25rem; }
+  .dz-pic :is(img, .mono) { display: block; width: 1.25rem; height: 1.25rem; border-radius: 0.3125rem; object-fit: cover; }
+  .dz-pic .mono { background: var(--tk-ink); color: var(--tk-raised); font-size: 0.5rem; line-height: 1.25rem; font-weight: 600; text-align: center; }
+  #reader .design-review h1 { margin: 0.75rem 0 0; color: var(--tk-ink); font-size: 1.5rem; line-height: 2rem; font-weight: 500; letter-spacing: -0.017em; white-space: normal; overflow: visible; }
+  .dz-about { display: block; max-width: none; margin: 0.5rem 0 0; overflow: visible; color: var(--tk-text-secondary); font-size: 0.9375rem; line-height: 1.5rem; }
   /* A screen's preview: a page in its device's own viewport, as wide as the column allows and about two thirds of the screen tall at most; a picture at its width, scrolling past that height. */
-  .design-preview-window { width: 100%; max-height: min(65vh, 844px); margin: 1rem auto; overflow: auto; border-radius: 1rem; background: var(--surface); box-shadow: var(--shot-edge); }
+  .design-preview-window { width: 100%; max-height: min(65vh, 844px); margin: 1rem auto 0; overflow: auto; border-radius: 1rem; background: var(--tk-inset); }
   .design-preview-window.device-fit { width: min(100%, calc(var(--vw) * 1px), calc(65svh * var(--vw) / var(--vh))); max-height: none; overflow: hidden; }
   .design-review-preview { display: block; width: 100%; height: auto; }
   .design-fallback { display: grid; gap: 0.5rem; margin: 0; padding: 0.75rem; align-content: start; }
   .design-fallback img { display: block; width: 100%; height: auto; border-radius: 0.75rem; }
   .design-fallback figcaption { color: var(--muted); font-size: var(--t-s); }
   .design-stage .design-fallback { position: absolute; inset: 0; overflow: auto; } .design-stage .design-fallback img { position: static; height: auto; }
-  .design-preview-full { display: block; margin: 0 0 1rem; color: var(--accent); text-decoration: none; }
-  @media (min-width: 64rem) { .design-preview-window[data-form="phone"]:not(.device-fit) { max-width: 24.375rem; } }
+  .design-preview-full, .dz-link { display: flex; align-items: center; width: fit-content; min-height: 2.75rem; color: var(--tk-ink); font-size: var(--tk-fs-row); font-weight: 500; text-decoration: none; }
   /* A prototype page in a device's own viewport (--vw by --vh CSS pixels), scaled down to the box's width by --s, so the page's breakpoints see that device; the box keeps the device's shape, so nothing is left blank under it. */
   .device-fit { position: relative; overflow: hidden; aspect-ratio: var(--vw) / var(--vh); }
   .device-fit > iframe { position: absolute; top: 0; left: 0; border: 0; background: #fff; transform: scale(var(--s, 1)); transform-origin: 0 0; }
-  .design-review label { display: grid; gap: 0.5rem; margin: 1rem 0; color: var(--muted); }
-  /* The design note fills its column, so it lines up with the buttons under it at every width (the 70ch prose cap would narrow it at tablet width). */
-  .design-review textarea { max-width: none; min-height: 6rem; padding: 0.75rem; background: var(--surface); }
-  .design-review .foot { margin: 1rem 0; }
-  .design-review .foot > * { flex: 1; }
-  .design-review .foot button.open-link { background: var(--action); color: var(--on-accent); }
-  .design-review > button.open-link { width: 100%; min-height: 3.125rem; padding: 0 1.25rem; font-size: 1.0625rem; font-weight: 400; }
-  @media (min-width: 45rem) { .design-review > button.open-link { width: fit-content; min-height: 2.75rem; } }
-  .design-review > a { display: block; margin: 1rem 0; color: var(--accent); text-decoration: none; }
+  /* Review full screen and Change are white and raised, Approve is ink; each a 44px pill. */
+  :is(.design-review, .dz-info, .dz-open) :is(.dz-full, .foot > button) { min-height: 2.75rem; padding: 0 1rem; border-radius: 1.375rem; font-size: var(--tk-fs-row); font-weight: 500; }
+  :is(.dz-full, .dz-change) { background: var(--tk-raised); color: var(--tk-ink); box-shadow: var(--tk-elev-raised); }
+  button.dz-ink, button.dz-ink:disabled { background: var(--tk-ink); color: var(--tk-canvas); }
+  @media (prefers-color-scheme: dark) { :is(.dz-full, .dz-change) { background: var(--tk-on); } }
+  .design-review > .dz-full { display: block; width: 100%; margin-top: 0.5rem; }
+  .dz-mk { display: grid; flex: none; place-items: center; width: 1.125rem; height: 1.125rem; }
+  .dz-mk svg { width: 1.125rem; height: 1.125rem; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .dz-props .ui-pr .v > span { white-space: normal; }
+  .dz-said { margin: 0.5rem 0 0; padding: 1rem 1.25rem; border-radius: 1rem; background: var(--tk-inset); color: var(--tk-ink); font-size: 0.9375rem; line-height: 1.5rem; }
+  .dz-said cite { display: block; margin-bottom: 0.25rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: 1rem; font-style: normal; }
+  .dz-said .q::before { content: "“"; } .dz-said .q::after { content: "”"; }
+  :is(.design-review, .dz-ib) label { display: grid; gap: 0.5rem; margin: 0.75rem 0 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: 1.25rem; }
+  :is(.design-review, .dz-ib) .ui-dl + label { margin-top: 0.5rem; }
+  :is(.design-review, .dz-ib) :is(select, textarea) { width: 100%; max-width: none; min-height: 3rem; margin: 0; padding: 0.75rem 1rem; border: 0; border-radius: 1rem; background: var(--tk-inset); color: var(--tk-ink); font: inherit; font-size: 0.9375rem; line-height: 1.5rem; }
+  :is(.design-review, .dz-ib) textarea { min-height: 6rem; resize: vertical; }
+  :is(.design-review, .dz-ib) textarea::placeholder { color: var(--tk-text-tertiary); }
+  .design-review .foot { display: flex; gap: 0.5rem; margin: 1rem 0 0; }
+  :is(.design-review, .dz-info) .foot > * { flex: 1; }
+  :is(.design-review, .dz-ib) .err:empty { display: none; }
+  :is(.design-review, .dz-ib) > .dz-link { margin-top: 0.5rem; }
+  :is(.design-review, .dz-ib) > .dis { display: flex; align-items: center; min-height: 2.75rem; margin-top: 0.25rem; padding: 0; background: none; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); font-weight: 400; }
+  :is(.dz-top, .dz-head, .dz-bulk, #dz-sheet, .dz-list, .design-review, .dz-grid) :focus-visible { outline-color: var(--tk-ink); }
   .design-viewer { position: fixed; inset: 0; width: 100%; max-width: none; height: 100dvh; max-height: none; margin: 0; padding: 0; border: 0; background: var(--bg); color: var(--text); }
   .design-viewer[open] { display: flex; flex-direction: column; }
   .design-viewer header { display: flex; gap: 1rem; align-items: center; padding: 0.75rem max(1rem, env(safe-area-inset-right)) 0.75rem max(1rem, env(safe-area-inset-left)); border-bottom: 1px solid var(--line); }
@@ -586,7 +614,6 @@
   .design-viewer-panel .foot > * { flex: 1; }
   .design-viewer-panel label { display: grid; gap: 0.25rem; margin: 0.5rem 0; }
   .design-viewer-panel textarea { max-width: none; min-height: 3rem; max-height: 6rem; margin: 0; }
-  .design-viewer-panel .open-link { background: var(--action); color: var(--on-accent); }
   @media (min-width: 64rem) { .design-viewer header h2 { font-size: 2.125rem; } .design-viewer-body { grid-template: minmax(0, 1fr) / minmax(0, 1fr) 22.5rem; } .design-viewer-panel { padding: 1.25rem; } }
   @media (max-height: 550px) { .design-viewer-body { overflow: auto; grid-template-rows: minmax(12rem, 1fr) auto; } }
   /* Open full screen: a quiet link-like button under a design's mocks or an interactive page. */
@@ -743,6 +770,49 @@
     :is(.t-wait, .t-sheet) .ui-row .l1 { align-items: flex-start; height: auto; }
     :is(.t-wait, .t-sheet) .ui-row .l1 .t { display: -webkit-box; white-space: normal; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
     .decide-bar { position: static; margin: 1rem 0 0; padding: 0; background: transparent; }
+    /* Designs on a desk fill the window, as the approved prototype's desk draws it: 24px around, where it is over a 32px title and what is on the board, then a 12-column grid
+       to the foot: the designs as picture cards across the top (four columns each; more scroll sideways, a whole card at a time) and the open design (eight) beside where it stands (four). */
+    body:has(.dz-grid) { padding-bottom: 0; }
+    main:has(.dz-grid) { max-width: none; height: 100vh; margin: 0; padding: 1.5rem; overflow: hidden; }
+    main:has(.dz-grid) > #board { display: flex; flex-direction: column; gap: 1rem; height: 100%; }
+    .dz-head { display: flex; flex: none; align-items: flex-end; gap: 1rem; }
+    .dz-head .tx { flex: 1; min-width: 0; }
+    .dz-head .tx > p { margin: 0.25rem 0 0; color: var(--tk-text-secondary); font-size: 0.9375rem; line-height: 1.5rem; }
+    .dz-head .tx > .crumb { margin: 0; color: var(--tk-text-tertiary); font-size: 0.8125rem; line-height: 1.25rem; } .dz-head .crumb span { margin: 0 0.25rem; }
+    .dz-head h1 { margin: 0; color: var(--tk-ink); font-size: 2rem; line-height: 2.5rem; font-weight: 500; letter-spacing: -0.012em; }
+    .dz-head .acts { display: flex; gap: 0.5rem; padding-bottom: 0.25rem; }
+    .dz-bulk .bulk { margin: 0; }
+    .dz-grid { display: grid; flex: 1; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: auto minmax(0, 1fr); gap: 1rem; min-height: 0; }
+    .dz-strip { display: grid; grid-column: 1 / -1; grid-auto-flow: column; grid-auto-columns: calc((100% - 2rem) / 3); gap: 1rem; margin: -1.25rem; padding: 1.25rem;
+      overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding: 0 1.25rem; scrollbar-width: none; }
+    .dz-strip::-webkit-scrollbar { display: none; }
+    .dz-card, .dz-open, .dz-info { border-radius: var(--tk-r-card); background: var(--tk-card); box-shadow: var(--tk-elev-card), inset 0 1px 0 var(--tk-hl); }
+    .dz-card { display: flex; flex-direction: column; min-width: 0; padding: 0.75rem 0.75rem 1.25rem; color: inherit; text-decoration: none; scroll-snap-align: start; transition: transform 120ms var(--ease); }
+    .dz-card:hover { opacity: 0.92; } .dz-card:active { transform: scale(0.985); }
+    .dz-card[aria-current] { box-shadow: inset 0 0 0 2px var(--tk-ink), var(--tk-elev-card); }
+    .dz-shot { display: block; flex: none; height: 11rem; overflow: hidden; border-radius: 0.875rem; background: var(--tk-inset); }
+    .dz-shot img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+    .dz-ct { display: -webkit-box; margin: 1rem 0.75rem 0; overflow: hidden; color: var(--tk-ink); font-size: 0.9375rem; line-height: 1.25rem; font-weight: 500; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .dz-cm { margin: 0.25rem 0.75rem 0; overflow: hidden; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: 1rem; white-space: nowrap; text-overflow: ellipsis; }
+    .dz-tag { align-self: flex-start; height: 1.5rem; margin: 0.75rem 0.75rem 0; padding: 0 0.625rem; border-radius: 0.75rem; background: var(--tk-inset); color: var(--tk-text-secondary); font-size: var(--tk-fs-small); line-height: 1.5rem; font-weight: 500; white-space: nowrap; }
+    .dz-open { display: flex; grid-column: span 8; flex-direction: column; min-height: 0; padding: 1.25rem 1.5rem 1.5rem; }
+    .dz-oh { display: flex; flex: none; align-items: center; gap: 0.75rem; height: 2rem; }
+    .dz-oh .dz-lab { flex: 1; margin: 0; }
+    .dz-oh .design-preview-full { min-height: 2rem; }
+    .dz-open .dz-oh .dz-full { flex: none; min-height: 2rem; height: 2rem; padding: 0 0.875rem; border-radius: 1rem; }
+    .dz-t { flex: none; margin: 0.5rem 0 0; color: var(--tk-ink); font-size: 1.5rem; line-height: 2rem; font-weight: 500; letter-spacing: -0.017em; }
+    .dz-fill { display: grid; flex: 1; place-items: start center; min-height: 0; margin-top: 1rem; container-type: size; }
+    .dz-fill > .design-preview-window { width: 100%; height: 100%; max-height: none; margin: 0; overflow: hidden; }
+    .dz-fill > .design-preview-window > img { width: 100%; height: 100%; object-fit: contain; object-position: top center; }
+    .dz-fill > .design-preview-window.device-fit { width: min(100cqw, 100cqh * var(--vw) / var(--vh)); height: auto; }
+    .dz-info { display: flex; grid-column: span 4; flex-direction: column; min-height: 0; overflow: hidden; }
+    .dz-ib { flex: 1; min-height: 0; padding: 1.25rem 1.5rem 1rem; overflow: auto; scrollbar-width: none; }
+    .dz-ib::-webkit-scrollbar { display: none; }
+    .dz-ib.fades { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 4rem), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 4rem), transparent); }
+    .dz-ib > h2 { display: flex; align-items: center; height: 2rem; margin: 0; color: var(--tk-ink); font-size: var(--tk-fs-head); line-height: 1.5rem; font-weight: 500; letter-spacing: -0.014em; }
+    .dz-ib > .ui-props { margin-top: 0.25rem; }
+    .dz-ib textarea { min-height: 4.5rem; }
+    .dz-info > .foot { display: flex; flex: none; gap: 0.5rem; margin: 0; padding: 0.75rem 1.5rem 1.25rem; border-top: 1px solid var(--tk-line); }
     .decide-bar .answer { flex: none; }
     .rows.reports, .sec-h:has(+ .reports), .legend { max-width: 50rem; }
     /* Evidence sets its cards two across, the whole capture on each tile; a page that is not an update keeps the whole width. */
@@ -3025,7 +3095,9 @@
     const viewer = document.querySelector('.design-viewer[open]');
     if (viewer && e.source === viewer.querySelector('iframe')?.contentWindow && e.data?.['sign-off'] === 'viewer-nav') viewer.dispatchEvent(new KeyboardEvent('keydown', { key: e.data.key }));
   });
-  function designReview(d, h1) {
+  /** A design's review. On a phone (in the reader) one column: its project and day, the whole title, what it shows, the screen, Review full screen, where it stands and what you said,
+   *  then the note with Approve in ink beside Change. On a desk two cards: the open design (its picture filling the card) and Where it stands, the note in it and its buttons pinned at its foot. */
+  function designReview(d, h1, desk = false) {
     // Notes given on an earlier round of the design are history (the card's Activity shows them): the note box and each screen's state start from this round's.
     const now = () => state.decisions.find((x) => x.key === d.key) ?? d;
     const roundNotes = () => (now().earlier_answer ? [] : state.answers[d.key]?.notes ?? []);
@@ -3073,7 +3145,7 @@
       session.selected = screenKey(target());
       note.value = session.drafts.get(session.selected) ?? currentNote()?.note ?? '';
     };
-    const status = el('p', { class: 'eyebrow', role: 'status' }, saved ? saved.label : d.status === 'draft' ? 'Draft' : 'In review');
+    const status = el('span', { role: 'status' }, saved ? saved.label : d.status === 'draft' ? 'Draft' : 'In review');
     const err = el('p', { class: 'err', role: 'alert' });
     let saving = false;
     const save = (verdict) => {
@@ -3088,16 +3160,34 @@
         notes, ...(pick.value && { pick: pick.value }) }) }, () => session.drafts.delete(screenKey(selected)))
         .finally(() => { saving = false; approve.disabled = change.disabled = state.readonly; if (session.open) { screenStatus.textContent = screenLine(); stamp(true); } });
     };
-    const approve = el('button', { class: 'open-link' }, 'Approve'), change = el('button', {}, 'Change');
+    const approve = el('button', { class: 'open-link dz-ink' }, 'Approve'), change = el('button', { class: 'dz-change' }, 'Change');
     approve.disabled = change.disabled = state.readonly;
     approve.onclick = () => save('approve').catch((e) => { err.textContent = `Couldn't save: ${e.message}`; });
     change.onclick = () => { if (!note.value.trim()) { err.textContent = 'Add a note describing what should change.'; note.focus(); return; } save('change').catch((e) => { err.textContent = `Couldn't save: ${e.message}`; }); };
-    const controls = el('div', {}, d.options?.length ? el('label', {}, 'Pick a direction', pick) : '',
-      el('label', {}, screens.length ? 'Screen note' : 'Design note', note), el('div', { class: 'foot' }, approve, change), err);
-    const open = el('button', { class: 'open-link', 'aria-haspopup': 'dialog', 'data-design': d.key }, 'Review full screen');
-    const root = el('div', { class: 'design-review' }, status, h1, d.about ? el('p', { class: 'about' }, d.about) : '', ticketRow(d), preview, fullPreview,
-      screens.length ? open : '', screenSelect ? el('label', {}, 'Screen for note', screenSelect) : '', controls, thread(d),
-      d.link ? el('a', { href: d.link, target: '_blank', rel: 'noopener noreferrer' }, 'Open original design') : '');
+    const foot = el('div', { class: 'foot' }, approve, change);
+    const controls = el('div', { class: 'dz-ctl' }, d.options?.length ? el('label', {}, 'Pick a direction', pick) : '', el('label', {}, screens.length ? 'Screen note' : 'Design note', note));
+    const open = el('button', { class: 'open-link dz-full', 'aria-haspopup': 'dialog', 'data-design': d.key }, 'Review full screen');
+    // Where it stands: its state, the direction picked and when it was answered, then what was said on this round.
+    const mark = (path) => { const m = el('span', { class: 'dz-mk', 'aria-hidden': 'true' }); m.innerHTML = `<svg viewBox="0 0 20 20">${path}</svg>`; return m; };
+    const prop = (path, k, v) => el('div', { class: 'ui-pr' }, el('span', { class: 'k' }, mark(path), k), el('span', { class: 'v' }, v));
+    const option = d.options?.find((o) => o.value === saved?.pick)?.label ?? saved?.pick;
+    const stands = el('div', { class: 'ui-props dz-props' }, prop('<circle cx="10" cy="10" r="6.5"/><path d="M10 3.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/>', 'State', status),
+      option ? prop('<path d="M5 10.4l3.2 3.1L15 6.6"/>', 'Your pick', el('span', { dir: 'auto' }, option)) : '',
+      saved?.at && saved.answer !== 'screens' ? prop('<circle cx="10" cy="10" r="7"/><path d="M10 6.2V10l2.6 1.8"/>', 'Answered', el('span', {}, day(saved.at))) : '');
+    const said = roundNotes().filter((n) => n.note);
+    const screenName = (n) => screens.length > 1 && screenFor(`${n.journey}/${n.screen}`)?.screen.title;
+    const told = said.length ? [el('p', { class: 'ui-dl' }, 'What you said'), ...said.map((n) => el('blockquote', { class: 'dz-said', dir: 'auto' }, screenName(n) ? el('cite', {}, screenName(n)) : '', el('span', { class: 'q' }, n.note)))] : [];
+    const lab = el('p', { class: 'dz-lab' }, d.group ? el('span', { class: 'dz-pic' }, projectPic(d.group)) : '', el('span', {}, [d.group, d.filed && day(d.filed)].filter(Boolean).join(' · ')));
+    const about = d.about ? el('p', { class: 'about dz-about', dir: 'auto' }, d.about) : '', original = d.link ? el('a', { class: 'dz-link', href: d.link, target: '_blank', rel: 'noopener noreferrer' }, 'Open original design') : '';
+    const screenPick = screenSelect ? el('label', {}, 'Screen for note', screenSelect) : '';
+    let root;
+    if (desk) {
+      h1.id = 'dz-open-title';
+      root = [el('section', { class: 'dz-open', 'aria-labelledby': h1.id }, el('div', { class: 'dz-oh' }, lab, fullPreview, screens.length ? open : ''), h1, el('div', { class: 'dz-fill' }, preview || '')),
+        el('section', { class: 'dz-info', 'aria-label': 'Where it stands' }, el('div', { class: 'dz-ib' }, el('h2', {}, 'Where it stands'), stands, ticketRow(d), ...told,
+          el('p', { class: 'ui-dl' }, 'Your review'), screenPick, controls, err, about ? el('p', { class: 'ui-dl' }, 'What it shows') : '', about, thread(d), original, xBtn(d, 'Dismiss')), foot)];
+    } else root = el('div', { class: 'design-review' }, lab, h1, about, preview, fullPreview, screens.length ? open : '', el('p', { class: 'ui-dl' }, 'Where it stands'), stands, ticketRow(d), ...told,
+      el('p', { class: 'ui-dl' }, 'Your review'), screenPick, controls, foot, err, thread(d), original, xBtn(d, 'Dismiss'));
     if (!screens.length) return root;
     const heading = el('h2', { id: 'design-screen-title', dir: 'auto' }), count = el('p', { class: 'meta', 'aria-live': 'polite' });
     const stage = el('div', { class: 'design-stage' }), screenStatus = el('p', { class: 'meta', role: 'status' });
@@ -3145,22 +3235,26 @@
       if (touch && Math.abs(end.clientX - touch.clientX) > 60 && Math.abs(end.clientX - touch.clientX) > Math.abs(end.clientY - touch.clientY) * 1.5) step(end.clientX < touch.clientX ? 1 : -1);
       touch = null;
     });
-    const controlsNext = controls.nextSibling;
+    // The viewer takes the note and its buttons into its panel while it is open, and puts them back where they were.
+    let parked = [];
     open.onclick = () => {
-      session.open = true; panel.append(controls); root.append(viewer); draw(); viewer.showModal();
+      parked = [controls, foot, err].map((e) => [e, e.parentNode, e.nextSibling]);
+      session.open = true; panel.append(controls, foot, err); document.body.append(viewer); draw(); viewer.showModal();
     };
     // A stamp still springing in would hold back the dialog's close event (and the board's redraw), so it lands first.
     const shut = () => { stage.querySelector('.stamp')?.getAnimations().forEach((a) => a.finish()); viewer.close(); };
     close.onclick = shut;
     viewer.onclose = () => {
       session.open = false;
+      viewer.remove();
       if (boardStale) {
         boardStale = false;
         render();
         document.querySelector(`[data-design="${CSS.escape(d.key)}"]`)?.focus();
         return;
       }
-      root.insertBefore(controls, controlsNext); approve.textContent = 'Approve'; change.textContent = 'Change';
+      for (const [e, parent, next] of parked.reverse()) parent.insertBefore(e, next);
+      approve.textContent = 'Approve'; change.textContent = 'Change';
       open.focus();
     };
     return root;
@@ -3816,16 +3910,53 @@
     return [head('Newest', undefined, see), list('Newest', cut && !rpAll ? newest.slice(0, 6) : newest)];
   }
 
+  /* ---- Designs in the new look. A phone lists them as Reports does: the title row, To review, then the designs as rows in one card, each opening its review over the board.
+     A desk fills the window as the approved prototype's desk draws it: the designs as picture cards across the top, the open one large beside where it stands. ---- */
   const designStatus = (d) => { const a = state.answers[d.key]?.answer; return a === 'approve' ? 'Approved' : a === 'change' ? 'Changes requested' : d.status === 'draft' ? 'Draft' : 'In review'; };
-  function designGroups(items) {
-    if (!items.length) return [el('p', { class: 'empty' }, EMPTY.designs)];
-    const groups = [...new Set(items.map((d) => d.group || ''))];
-    return groups.flatMap((group) => [group ? el('div', { class: 'sec-h' }, el('h2', {}, group)) : '',
-      el('ul', { class: 'card rows reports designs' }, ...items.filter((d) => (d.group || '') === group).map((d) => {
-        const image = pic(d), line = [designStatus(d), d.filed ? day(d.filed) : '', state.answers[d.key]?.pick ? `Pick: ${state.answers[d.key].pick}` : '', state.answers[d.key]?.notes?.[0]?.note ?? ''].filter(Boolean).join(' · ');
-        return el('li', { class: 'report', id: `item-${d.key}` }, el('a', { class: 'compact', href: `#designs/${d.key}`, 'aria-label': `Open design, ${d.title}` },
-          el('span', { class: 'rth' }, thumb('designs', image)), el('span', { class: 't' }, el('strong', { dir: 'auto' }, d.title), d.about ? el('span', { class: 'meta', dir: 'auto' }, d.about) : '', el('span', { class: 'when' }, line))), xBtn(d));
-      }))]);
+  const dzSheet = sheetOf('dz-sheet');
+  /** The title row: the title with More (Select and Clear all) and the round light-or-dark button; on a desk where it is over a 32px title and what is on the board. */
+  function designsHead(items, top) {
+    const h1 = top.querySelector('h1'), ro = top.querySelector(':scope > .meta') ?? '', [, theme] = todayHead(), flip = theme.onclick;
+    theme.classList.add('dz-theme');
+    theme.onclick = () => { flip(); document.querySelector('.dz-theme')?.focus({ preventScroll: true }); };
+    let more = '';
+    if (canDismiss() && items.length) {
+      more = el('button', { class: 'ui-rb dz-more', 'aria-label': 'More', 'aria-haspopup': 'dialog' }, glyph('more'));
+      const act = (words, fn) => { const b = el('button', { class: 'ui-pr' }, el('span', { class: 'k' }, words)); b.onclick = () => { dzSheet.close(); fn(); }; return b; };
+      more.onclick = () => {
+        dzSheet.replaceChildren(el('div', {}, sheetHead('dz-sheet', 'More'), el('div', { class: 'ui-props' }, act('Select', () => { selecting = true; render(); }),
+          act('Clear all', () => dismiss(items.map((d) => d.key), `${plural(items.length, 'design')} cleared`)))));
+        dzSheet.showModal();
+        dzSheet.querySelector('h2').focus();
+      };
+    }
+    const changes = items.filter((d) => designStatus(d) === 'Changes requested').length;
+    if (phone()) top.className = 'ui-top dz-top', top.replaceChildren(h1, more, theme);
+    else top.className = 'dz-head', top.replaceChildren(el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Designs'), h1,
+      el('p', {}, items.length ? `${plural(items.length, 'design')} on your board${changes ? ` · changes requested on ${changes > 1 && changes === items.length ? `all ${changes}` : changes}` : ''}` : EMPTY.designs), ro), el('div', { class: 'acts' }, more, theme));
+    return [phone() ? ro : '', selecting ? el('div', { class: 'dz-bulk' }, bulkBar(items)) : ''];
+  }
+  /** Designs, newest first: on a phone To review and the rows; on a desk the cards and the open design (the one in the address, else the newest). */
+  function designGroups(items, top, key) {
+    const head = designsHead(items, top);
+    if (!items.length) return phone() ? [...head, el('p', { class: 'empty' }, EMPTY.designs)] : head;
+    if (!phone()) {
+      const cur = items.find((d) => d.key === key) ?? items[0], [open, info] = designReview(cur, el('h2', { class: 'dz-t', dir: 'auto' }, cur.title), true);
+      const card = (d) => el('a', { class: 'dz-card', id: `item-${d.key}`, href: `#designs/${d.key}`, 'aria-label': `Open design, ${d.title}`, ...(d === cur && { 'aria-current': 'true' }) },
+        el('span', { class: 'dz-shot' }, pic(d) ? el('img', { src: src(pic(d)), alt: '', loading: 'lazy' }) : ''), el('span', { class: 'dz-ct', dir: 'auto' }, d.title),
+        el('span', { class: 'dz-cm' }, [d.group, d.filed && day(d.filed)].filter(Boolean).join(' · ')), el('span', { class: 'dz-tag' }, designStatus(d)));
+      // Where it stands fades out at its foot while it holds more than it shows.
+      const ib = info.querySelector('.dz-ib'), fade = () => ib.classList.toggle('fades', ib.scrollHeight - ib.scrollTop - ib.clientHeight > 1);
+      ib.onscroll = fade; new ResizeObserver(fade).observe(ib);
+      return [...head, el('div', { class: 'dz-grid design-review' }, el('div', { class: 'dz-strip' }, ...items.map(card)), open, info)];
+    }
+    const toReview = items.filter((d) => ['In review', 'Draft'].includes(designStatus(d))).length, approved = items.filter((d) => designStatus(d) === 'Approved').length;
+    return [...head, el('section', { class: 'ui-card ui-hero dz-hero', 'aria-label': 'To review' }, el('div', { class: 'hl' }, el('span', { class: 'lab' }, 'To review')),
+      el('div', { class: 'hv' }, el('span', { class: 'big' }, String(toReview), el('small', {}, ` of ${items.length}`)), approved ? el('span', { class: 'vs' }, `${approved} approved`) : '')),
+      el('h2', { class: 'ui-sec' }, 'Newest', el('span', { class: 'n' }, String(items.length))),
+      el('ul', { class: 'ui-card ui-list dz-list' }, ...items.map((d) => { const t = ticketOf(d);
+        return el('li', { id: `item-${d.key}` }, el('a', { class: 'ui-row', href: `#designs/${d.key}`, 'aria-label': `Open design, ${d.title}${t?.progress > 0 ? `, ticket ${t.title}, ${t.progress}% done` : ''}` },
+          ...uiRow({ tile: cardTile(d), title: d.title, priority: d.priority, meta: [designStatus(d), d.filed && day(d.filed)].filter(Boolean).join(' · '), progress: progressOf(t?.progress) }))); }))];
   }
 
   /** The asks dismissed from Waiting on you, or the evidence and reports archived a day after they were filed, folded under one row; Restore puts one back on the board. */
@@ -4432,7 +4563,7 @@
     const update = at === 'evidence' && ((key && state.decisions.find((d) => d.key === key && !gone.has(d.key) && d.type === 'evidence')) || by.evidence.find((d) => d.type === 'evidence'));
     const content = [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived'), update)
       : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0) : decideDesk(top, by.waiting, hidden, decideQueue, key, decideDone, answeredToday)] : [top]), ...(deskSplit ? [] : (at === 'waiting' || at === 'decide') && !state.readonly ? [at === 'decide' && !shownAsk ? el('p', { class: 'empty' }, 'Nothing to decide for that question.') : '', decideList(by.waiting, hidden, decideDone, answeredToday), at === 'decide' && shownAsk ? askSheet(shownAsk) : '']
-      : at === 'designs' ? [...designGroups(by.designs)] : at === 'ticket' ? ticketPage(tk) : at === 'evidence' ? [...evidenceList(by.evidence), dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived')] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
+      : at === 'designs' ? designGroups(by.designs, top, key) : at === 'ticket' ? ticketPage(tk) : at === 'evidence' ? [...evidenceList(by.evidence), dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived')] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : today(by))];
     if (!(at === 'decide' && shownAsk && !deskSplit)) sheetUp = '';
     // The report shown on a desk stays in place under a new list and bar while it is the same report, so its frame is not loaded again.
@@ -4448,7 +4579,7 @@
     if (!toast.hidden) placeToast();
     if (at === 'reports' && !key) rpRisen = true;
     if (rpSel !== null) rpRisen = true;
-    readPage(rpFull ? shownReport : key && !(deskSplit && (at === 'evidence' || at === 'reports')) ? state.decisions.find((d) => d.key === key && !gone.has(d.key) && (at === 'reports' && reads(d) || at === 'designs' && d.kind === 'design' || at === 'evidence' && d.type === 'evidence' || d.type === 'plan' && (area(d) === at || (d.guided && (at === 'waiting' || at === 'answered'))))) : undefined, rpFull ? location.hash.slice(1) : at);
+    readPage(rpFull ? shownReport : key && !(deskSplit && (at === 'evidence' || at === 'reports')) && !(at === 'designs' && !phone()) ? state.decisions.find((d) => d.key === key && !gone.has(d.key) && (at === 'reports' && reads(d) || at === 'designs' && d.kind === 'design' || at === 'evidence' && d.type === 'evidence' || d.type === 'plan' && (area(d) === at || (d.guided && (at === 'waiting' || at === 'answered'))))) : undefined, rpFull ? location.hash.slice(1) : at);
     fold();
     applyPicks();
     if (FROZEN) freeze();
