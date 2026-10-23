@@ -1788,16 +1788,21 @@
 
   /** The proof on the card itself: its own captures, or else the media of its linked run.
    * Each file is hash-checked by the server; one that changed or went missing says so instead of a broken frame. */
-  const filesOf = (d) => d.media?.map((m, i) => [`/api/media?key=${encodeURIComponent(d.key)}&i=${i}`, /\.(mp4|webm)$/i.test(m.path)])
-    ?? d.evidenceCard?.media.map((m) => [m.url, m.type.startsWith('video/')]) ?? [];
+  const mediaUrl = (d, i, v = '') => `/api/media?key=${encodeURIComponent(d.key)}&i=${i}${v && `&v=${v}`}`;
+  /** Each capture as [original, clip?, light, thumb]: the board shows the lighter copies post made of a still, and opens the original full size.
+   * A capture with no copies (a clip, an older post, a run's media) shows the original everywhere. */
+  const filesOf = (d) => d.media?.map((m, i) => [mediaUrl(d, i), /\.(mp4|webm)$/i.test(m.path), mediaUrl(d, i, m.light ? 'light' : ''), mediaUrl(d, i, m.thumb ? 'thumb' : m.light ? 'light' : '')])
+    ?? d.evidenceCard?.media.map((m) => [m.url, m.type.startsWith('video/'), m.url, m.url]) ?? [];
+  /** A capture's picture, fetched only as it nears the screen and decoded off the main thread. */
+  const shot = (url, alt) => el('img', { src: src(url), alt, loading: 'lazy', decoding: 'async' });
   function captures(d, cls) {
     const files = filesOf(d);
     if (!files.length) return '';
-    return el('div', { class: cls }, ...files.map(([path, video], i) => {
+    return el('div', { class: cls }, ...files.map(([path, video, light], i) => {
       const url = src(path);
       const name = d.type === 'explainer' ? `Explainer video, ${d.title}` : `${d.type === 'evidence' ? `Update ${d.number}` : 'Proof'}, capture ${i + 1} of ${files.length}`;
       const node = video ? el('video', { src: url, controls: '', playsinline: '', preload: 'metadata', 'aria-label': name })
-        : el('a', { href: pageHref(d) || url, ...(!pageHref(d) && { target: '_blank', rel: 'noopener' }), 'aria-label': `Open ${name}` }, cls === 'ev-hero' ? framed(el('img', { src: url, alt: name }), 'full') : el('img', { src: url, alt: name }));
+        : el('a', { href: pageHref(d) || url, ...(!pageHref(d) && { target: '_blank', rel: 'noopener' }), 'aria-label': `Open ${name}` }, cls === 'ev-hero' ? framed(shot(light, name), 'full') : shot(light, name));
       (node.tagName === 'A' ? node.querySelector('img') : node).onerror = () => node.replaceWith(el('p', { class: 'gone' }, `${name} can't be shown: the file is missing, changed since it was posted, or in a format this browser can't play.`));
       return node;
     }));
@@ -1839,7 +1844,7 @@
   const changeHref = (d) => { try { const u = new URL(d.link ?? ''); return /^https?:$/.test(u.protocol) ? u.href : ''; } catch { return ''; } };
   /** A card's hero: the first picture of its proof, else its first clip; proof with neither (a run that kept only text) has none. */
   function hero(d) {
-    const files = filesOf(d), [path, video] = files.find(([, clip]) => !clip) ?? files[0] ?? [];
+    const files = filesOf(d), [path, video, , small] = files.find(([, clip]) => !clip) ?? files[0] ?? [];
     if (!path) return [];
     const url = src(path);
     if (video) {
@@ -1847,7 +1852,7 @@
       clip.onerror = () => clip.replaceWith(el('p', { class: 'ev-missing' }, 'The capture is missing or changed.'));
       return [el('span', { class: 'ev-badge' }, 'Clip'), clip];
     }
-    const img = el('img', { src: url, alt: '' });
+    const img = shot(small, '');
     img.onerror = () => img.replaceWith(el('p', { class: 'ev-missing' }, 'The capture is missing or changed.'));
     return [img];
   }
@@ -2109,10 +2114,10 @@
   const stamp = (at) => (isToday(at) ? `Today, ${hhmm(at)}` : `${day(at)}, ${hhmm(at)}`);
   const pic = (d) => {
     const i = d.media?.findIndex((m) => !/\.(mp4|webm)$/i.test(m.path)), m = d.mocks?.find((x) => !/\.html?$/i.test(x.path));
-    return d.kind === 'design' && d.preview ? designUrl(d, d.preview) : i >= 0 ? `/api/media?key=${encodeURIComponent(d.key)}&i=${i}` : d.preview ? mockUrl(d.key, '', d.preview) : d.type === 'diagram' ? mockUrl(d.key, '', d.view)
+    return d.kind === 'design' && d.preview ? designUrl(d, d.preview) : i >= 0 ? filesOf(d)[i][3] : d.preview ? mockUrl(d.key, '', d.preview) : d.type === 'diagram' ? mockUrl(d.key, '', d.view)
       : m ? mockUrl(d.key, m.value, m.path) : d.evidenceCard?.media.find((x) => x.type.startsWith('image/'))?.url;
   };
-  const thumb = (a, url) => { if (!url) return icon(a); const img = el('img', { class: 'thumb', src: src(url), alt: '' }); img.onerror = () => img.replaceWith(icon(a)); return img; };
+  const thumb = (a, url) => { if (!url) return icon(a); const img = el('img', { class: 'thumb', src: src(url), alt: '', loading: 'lazy', decoding: 'async' }); img.onerror = () => img.replaceWith(icon(a)); return img; };
 
   /** A tile on Today: its icon, the count large, and what it counts; it opens that area. */
   const tile = (a, n, name) => el('a', { class: `tile i-${a}`, href: `#${a}`, 'aria-label': `${name}, ${n}` }, icon(a),

@@ -94,7 +94,7 @@ test('attach refusals say why; a file name is made safe and never picks where th
   const item = JSON.parse(readFileSync(board, 'utf8')).items.at(-1);
   assert.equal(item.attachments[0].name, '_a_b__(x) _.tar.gz');
   assert.equal(item.attachments[0].path, 'evidence/2/attach-1.gz');
-  assert.deepEqual(readdirSync(join(so, 'evidence', '2')).sort(), ['1.png', 'attach-1.gz']);
+  assert.deepEqual(readdirSync(join(so, 'evidence', '2')).sort(), ['1-light.jpg', '1-thumb.jpg', '1.png', 'attach-1.gz']);
 });
 
 // Beyond loopback the download needs the board's token like every other route; the cookie the link sets carries it.

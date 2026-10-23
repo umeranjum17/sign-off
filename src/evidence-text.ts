@@ -149,14 +149,18 @@ function convert(file: string): Promise<Buffer | undefined> {
 }
 
 /** Packed 8-bit RGB of a PNG, every colour type and bit depth, interlaced or not. undefined for a PNG it does not read. */
-function pngRgb(buf: Buffer): Buffer | undefined {
+const pngRgb = (buf: Buffer) => pngPixels(buf, 3)?.data;
+
+/** A PNG's pixels as packed 8-bit RGB (3 channels) or RGBA (4, with its alpha channel or palette transparency), and its size. */
+export function pngPixels(buf: Buffer, out: 3 | 4): { width: number; height: number; data: Buffer } | undefined {
   try {
-    let width = 0, height = 0, type = 0, depth = 0, interlace = 0, palette: Buffer | undefined;
+    let width = 0, height = 0, type = 0, depth = 0, interlace = 0, palette: Buffer | undefined, trns: Buffer | undefined;
     const idat: Buffer[] = [];
     for (let at = 8; at + 8 <= buf.length;) {
       const len = buf.readUInt32BE(at), name = buf.toString('latin1', at + 4, at + 8), data = buf.subarray(at + 8, at + 8 + len);
       if (name === 'IHDR') [width, height, depth, type, interlace] = [data.readUInt32BE(0), data.readUInt32BE(4), data[8], data[9], data[12]];
       else if (name === 'PLTE') palette = data;
+      else if (name === 'tRNS') trns = data;
       else if (name === 'IDAT') idat.push(data);
       else if (name === 'IEND') break;
       at += 12 + len;
@@ -164,7 +168,7 @@ function pngRgb(buf: Buffer): Buffer | undefined {
     const channels = CHANNELS[type];
     if (!channels || ![1, 2, 4, 8, 16].includes(depth) || (type === 3 && (!palette || depth > 8))) return undefined;
     const bits = channels * depth, bpp = Math.max(1, bits >> 3), raw = inflateSync(Buffer.concat(idat));
-    const rgb = Buffer.alloc(width * height * 3);
+    const rgb = Buffer.alloc(width * height * out, 255);
     const to8 = (v: number) => (depth < 8 ? Math.round((v * 255) / ((1 << depth) - 1)) : v);
     let at = 0;
     for (const [x0, y0, dx, dy] of interlace ? ADAM7 : WHOLE) {
@@ -196,23 +200,26 @@ function pngRgb(buf: Buffer): Buffer | undefined {
       };
       for (let y = 0; y < ph; y++) {
         for (let x = 0; x < pw; x++) {
-          const n = x * channels, o = ((y0 + y * dy) * width + x0 + x * dx) * 3;
+          const n = x * channels, o = ((y0 + y * dy) * width + x0 + x * dx) * out;
           if (type === 3) {
-            const k = sample(y, n) * 3;
+            const v = sample(y, n), k = v * 3;
             rgb[o] = palette![k] ?? 0;
             rgb[o + 1] = palette![k + 1] ?? 0;
             rgb[o + 2] = palette![k + 2] ?? 0;
+            if (out === 4) rgb[o + 3] = trns?.[v] ?? 255;
           } else if (channels <= 2) {
             rgb[o] = rgb[o + 1] = rgb[o + 2] = to8(sample(y, n));
+            if (out === 4 && channels === 2) rgb[o + 3] = to8(sample(y, n + 1));
           } else {
             rgb[o] = to8(sample(y, n));
             rgb[o + 1] = to8(sample(y, n + 1));
             rgb[o + 2] = to8(sample(y, n + 2));
+            if (out === 4 && channels === 4) rgb[o + 3] = to8(sample(y, n + 3));
           }
         }
       }
     }
-    return rgb;
+    return { width, height, data: rgb };
   } catch {
     return undefined;
   }

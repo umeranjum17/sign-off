@@ -17,6 +17,6 @@
     "prepack": "tsc",
     "test": "tsc && node --test --test-global-setup=test/temp-folder.mjs"
   },
-  "dependencies": { "@toon-format/toon": "2.3.1", "axi-sdk-js": "0.1.13" },
+  "dependencies": { "@toon-format/toon": "2.3.1", "axi-sdk-js": "0.1.13", "jpeg-js": "0.4.4" },
   "devDependencies": { "@types/node": "^26.6.5", "typescript": "^7.0.2" }
 }
