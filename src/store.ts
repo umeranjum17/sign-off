@@ -59,7 +59,9 @@ export type Answer = { key: string; answer: string; label: string; close: string
   /** A plan's send-back: every section's verdict, and the option picked for each decision key. */
   notes?: PlanNote[] | DesignNote[]; decisions?: Record<string, string>; pick?: string;
   /** A changed answer: the one it replaces, or after an Undo back to no answer the one the filer took, which the agent may already have acted on. */
-  replaces?: Given };
+  replaces?: Given;
+  /** A design answer: the round of the design it was given on (see sameRound). */
+  round?: string };
 /** An earlier answer as a change names it. */
 export type Given = Pick<Answer, 'answer' | 'label' | 'at' | 'note'>;
 export type Round = { key: string; note: string; at: string; comments?: Sent[] };
@@ -301,6 +303,9 @@ export function readAnswers(decisionsPath: string, warn: (msg: string) => void =
   return Object.fromEntries([...latest].map(([key, a]) => [key, sent.has(key) ? { ...a, comments: sent.get(key) } : a]));
 }
 
+/** Every answer line as saved, oldest first; a torn line is left out (readAnswers reports it). */
+export const answerLines = (decisionsPath: string): Answer[] => readRaw(answersPath(decisionsPath)).split('\n').flatMap((line) => { try { const a = line && JSON.parse(line); return a?.key ? [a] : []; } catch { return []; } });
+
 /** The answer the filer last took for a key with `wait --filer`, as it was saved: after an Undo it is what the agent may still act on. */
 function lastTaken(decisionsPath: string, key: string): Answer | undefined {
   const lines = (path: string) => readRaw(path).split('\n').flatMap((line) => { try { const a = line && JSON.parse(line); return a?.key === key ? [a] : []; } catch { return []; } });
@@ -356,8 +361,15 @@ export const SCREENS_ONLY = 'screens';
 export const awaitsVerdict = (type: string | undefined, a?: { answer?: string }) => !a || (type === 'design' && a.answer === SCREENS_ONLY);
 const DESIGN_LABEL: Record<string, string> = { approve: 'Approved', change: 'Changes requested', [SCREENS_ONLY]: 'Screens reviewed' };
 
-/** Saves a design answer with screen-specific notes and an optional listed direction pick. A screen save omits the verdict: the design keeps its saved verdict, a requested change on a screen sets it to change, and any other screen save with none yet waits as screens-only. */
-export function appendDesignAnswer(decisionsPath: string, d: Decision, verdict: unknown, notes: unknown, pick?: unknown, requested?: unknown): Answer | undefined {
+/** Is a design answer one given on the design's current round? A design posted again under its key is a new round when its files or fields changed:
+ * the answer names the round it was given on, and an older answer that names none was given on this round only when it came after the design was filed
+ * (in whole seconds: an answer's time has no milliseconds, a post's may). */
+const second = (at: string) => Math.floor(Date.parse(at) / 1000);
+export const sameRound = (a: Answer, d: Decision, round: string) => (a.round ? a.round === round : !d.filed || second(a.at) >= second(d.filed));
+
+/** Saves a design answer with screen-specific notes and an optional listed direction pick. A screen save omits the verdict: the design keeps its saved verdict, a requested change on a screen sets it to change, and any other screen save with none yet waits as screens-only.
+ * An answer from an earlier round is history: its verdict and pick do not carry into this round's. */
+export function appendDesignAnswer(decisionsPath: string, d: Decision, round: string, verdict: unknown, notes: unknown, pick?: unknown, requested?: unknown): Answer | undefined {
   const bad = (rule: string) => new InputError(`key ${d.key}: ${rule}`);
   if (verdict !== undefined && verdict !== 'approve' && verdict !== 'change') throw bad('verdict must be approve or change, or omitted to save a screen');
   if (!Array.isArray(notes) || (verdict === 'change' && !notes.length)) throw bad('notes must be a list, with at least one note on change');
@@ -375,11 +387,11 @@ export function appendDesignAnswer(decisionsPath: string, d: Decision, verdict: 
   if (new Set(notes.map(n => n.journey === undefined ? '' : `${n.journey}/${n.screen}`)).size !== notes.length) throw bad('notes must name each screen once, or contain one design-level note');
   const options = d.options ?? [];
   if (pick !== undefined ? !options.some(o => o.value === pick) : verdict !== undefined && options.length > 0) throw bad('pick must be one listed option, and a design verdict needs one when options were offered');
-  const current = readAnswers(decisionsPath)[d.key];
+  const saved = readAnswers(decisionsPath)[d.key], current = saved && sameRound(saved, d, round) ? saved : undefined;
   const decided = current?.answer === 'approve' || current?.answer === 'change' ? current.answer : undefined;
   const kept = (verdict ?? (requested === true ? 'change' : decided ?? SCREENS_ONLY)) as string;
   const keptPick = (pick ?? (options.some(o => o.value === current?.pick) ? current?.pick : undefined)) as string | undefined;
-  const answer: Answer = { key: d.key, answer: kept, label: DESIGN_LABEL[kept], close: d.close ?? 'done', at: now(), notes, ...(keptPick !== undefined && { pick: keptPick }) };
+  const answer: Answer = { key: d.key, answer: kept, label: DESIGN_LABEL[kept], close: d.close ?? 'done', at: now(), notes, ...(keptPick !== undefined && { pick: keptPick }), round };
   if (current?.answer === answer.answer && JSON.stringify([current.notes, current.pick]) === JSON.stringify([answer.notes, answer.pick])) return;
   appendLine(answersPath(decisionsPath), answer);
   return answer;

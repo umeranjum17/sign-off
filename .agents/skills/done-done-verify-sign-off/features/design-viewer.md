@@ -31,6 +31,16 @@ the arrow keys, or a swipe on the screen.
 - Crop the screen, or scroll inside the stage.
 - Leave the board behind it in a different state than the review shows.
 
+## A new round and the preview
+
+A design the agent writes again under its key (a new `filed` time, other screens, or a screen file drawn again in place) is a new round. On its review page:
+
+- The note box starts empty. The card's **Activity** shows the last earlier round's answer once, "Your answer on the earlier round: <label>" with its note (its screen in brackets when the design has several), and keeps it after the first save on the new round, with this round's answer after it. The viewer reads the screen as Not reviewed yet.
+- The preview draws the selected screen (the first by default). An `.html` view fills the whole preview window from its top, on white where the page sets no background; before, the frame was 150 px tall and the rest of the window an empty box (all dark on a phone in dark).
+- A screen whose file is gone shows the design's preview picture with "This screen could not be shown: this is the design's preview picture." above it.
+
+Drive: `ROUND_WIDTH=390|1280 node .agents/skills/done-done-verify-sign-off/design-round-shots.mjs <folder> <light|dark>` (`done-done run design-round` runs all four cells). The person types a note with real key events and taps Change, the agent draws the screen again, and the run saves `preview`, `note` (the empty note box and the Activity under it), `round` (the whole review page on a taller screen of the same width) and `fallback` as `<state>.<theme>.<width>w.png`, with `design-round.<theme>.<width>w.json` (the note box, the Activity's steps and notes, the frame and window boxes, the viewer's screen line, the fallback). `ROUND_SIDE=before SIGN_OFF_REPO=<built base checkout>` takes the same shots from the base without the checks. Regressions: `test/design.test.mjs` ("a design posted again is a new round", "shows its screen on a phone in light and dark").
+
 ## Designs list and review page
 
 `shots.sh BASE <folder> designs design-review` captures them. The list is the Reports pattern (grey caps group label, one tile, a row per design with its picture, title, summary and "In review · date"); the review page opens with the way back, then the status, the title (34 px, 48 px at 1280) and the summary in one centred column, with the preview, Review full screen and the note under them. Look at both at 390 and 1280, light and dark: nothing cut, the button full width at 390.

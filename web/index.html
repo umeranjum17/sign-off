@@ -662,8 +662,14 @@
   .design-review { flex: 1; min-height: 0; overflow: auto; padding: 0 max(1.25rem, calc((100% - 42.5rem) / 2)) 2rem; }
   .design-review > .eyebrow { margin: 0.5rem 0 0; font-weight: 400; }
   .design-review > .about { margin: 0 0 1rem; font-size: 1.25rem; line-height: 1.4; }
-  .design-preview-window { width: 100%; height: min(65vh, 844px); margin: 1rem auto; overflow: auto; border-radius: 1rem; background: var(--surface); }
+  .design-preview-window { width: 100%; height: min(65vh, 844px); margin: 1rem auto; overflow: auto; border-radius: 1rem; background: var(--surface); box-shadow: var(--shot-edge); }
   .design-review-preview { display: block; width: 100%; height: auto; }
+  /* A screen's page fills the window from its top, on white as a browser draws a page with no background of its own (left at its default an iframe is 150px, and on a phone in dark the rest is an empty box). */
+  .design-preview-window > iframe.design-review-preview { height: 100%; border: 0; background: #fff; }
+  .design-fallback { display: grid; gap: 0.5rem; margin: 0; padding: 0.75rem; align-content: start; }
+  .design-fallback img { display: block; width: 100%; height: auto; border-radius: 0.75rem; }
+  .design-fallback figcaption { color: var(--muted); font-size: var(--t-s); }
+  .design-stage .design-fallback { position: absolute; inset: 0; overflow: auto; } .design-stage .design-fallback img { position: static; height: auto; }
   .design-preview-full { display: block; margin: 0 0 1rem; color: var(--accent); text-decoration: none; }
   @media (min-width: 64rem) { .design-preview-window { max-width: 24.375rem; } }
   .design-review label { display: grid; gap: 0.5rem; margin: 1rem 0; color: var(--muted); }
@@ -2134,9 +2140,14 @@
   const threadOf = (d) => {
     const a = state.answers[d.key], by = d.by ?? 'Agent', seen = state.seen_at?.[d.key], change = changeHref(d);
     const said = (x) => (x.answer === 'text' ? 'in your own words' : x.label);
+    // A design's answer on an earlier round with its notes, each named by its screen when the design has more than one: one note's screen goes in the step.
+    const screens = (d.journeys ?? []).flatMap((j) => j.screens.map((s) => ({ j: j.id, s: s.id, title: s.title }))), was = d.earlier, wrote = was?.notes.filter((n) => n.note) ?? [];
+    const on = (n) => (screens.length > 1 && n.journey ? screens.find((x) => x.j === n.journey && x.s === n.screen)?.title : '');
     return [d.filed && { at: d.filed, text: `Posted by ${by}`, link: change && [changeName(change), change], posted: true },
+      was && { at: was.at, text: `Your answer on the earlier round: ${was.label}${wrote.length === 1 && on(wrote[0]) ? ` (${on(wrote[0])})` : ''}`,
+        note: wrote.length === 1 ? wrote[0].note : wrote.map((n) => (on(n) ? `${on(n)}: ${n.note}` : n.note)).join(' · ') },
       a?.replaces?.at && { at: a.replaces.at, text: `Your answer: ${said(a.replaces)}`, note: a.replaces.note },
-      a && { at: a.at, text: `${a.replaces ? 'Changed to' : 'Your answer'}: ${said(a)}`, note: a.note },
+      a && !d.earlier_answer && { at: a.at, text: `${a.replaces ? 'Changed to' : 'Your answer'}: ${said(a)}`, note: a.note },
       seen && { at: seen, text: `${by} picked it up` },
       ...(state.rounds ?? []).filter((r) => r.key === d.key).map((r) => ({ at: r.at, text: 'You asked for a new round', note: r.note })),
       ...(state.messages ?? []).filter((m) => m.kind === 'comment' && m.key === d.key).map((m) => ({ at: m.at, text: 'Your comment', note: m.text }))]
@@ -3029,7 +3040,10 @@
     if (viewer && e.source === viewer.querySelector('iframe')?.contentWindow && e.data?.['sign-off'] === 'viewer-nav') viewer.dispatchEvent(new KeyboardEvent('keydown', { key: e.data.key }));
   });
   function designReview(d, h1) {
-    const saved = state.answers[d.key], screens = (d.journeys ?? []).flatMap((journey) => journey.screens.map((screen) => ({ journey, screen }))), savedNote = saved?.notes?.[0];
+    // Notes given on an earlier round of the design are history (the card's Activity shows them): the note box and each screen's state start from this round's.
+    const now = () => state.decisions.find((x) => x.key === d.key) ?? d;
+    const roundNotes = () => (now().earlier_answer ? [] : state.answers[d.key]?.notes ?? []);
+    const saved = state.answers[d.key], screens = (d.journeys ?? []).flatMap((journey) => journey.screens.map((screen) => ({ journey, screen }))), savedNote = roundNotes()[0];
     const screenKey = (target) => target && `${target.journey.id}/${target.screen.id}`, screenFor = (key) => screens.find((target) => screenKey(target) === key);
     const note = el('textarea', { maxlength: '500', placeholder: 'What should change? (optional for approval)' });
     const pick = el('select', { 'aria-label': 'Pick a direction' }, el('option', { value: '' }, 'Choose a direction'));
@@ -3041,7 +3055,7 @@
     const selectedKey = session.selected || (savedNote?.journey && savedNote?.screen ? `${savedNote.journey}/${savedNote.screen}` : screenKey(screens[0]));
     if (screenSelect) screenSelect.value = screenFor(selectedKey) ? selectedKey : screenKey(screens[0]);
     const target = () => screenSelect ? screenFor(screenSelect.value) : screens[0];
-    const currentNote = () => state.answers[d.key]?.notes?.find((n) => n.journey === target()?.journey.id && n.screen === target()?.screen.id);
+    const currentNote = () => roundNotes().find((n) => n.journey === target()?.journey.id && n.screen === target()?.screen.id);
     const screenLine = () => (currentNote() ? (currentNote().verdict === 'approve' ? 'Screen approved' : 'Changes requested') : 'Not reviewed yet');
     note.value = session.drafts.get(screenKey(target())) ?? currentNote()?.note ?? '';
     note.oninput = () => session.drafts.set(screenKey(target()), note.value);
@@ -3049,13 +3063,22 @@
       const views = target()?.screen.views, form = innerWidth < 960 ? 'phone' : 'computer', theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       return views?.[`${form}_${theme}`] || views?.[`${form}_${theme === 'dark' ? 'light' : 'dark'}`] || (views && Object.values(views)[0]) || d.preview;
     };
-    const previewElement = (path) => /\.html?$/i.test(path) ? el('iframe', { class: 'design-review-preview', src: src(designUrl(d, path)), title: `Design preview: ${d.title}`, sandbox: 'allow-scripts' }) : el('img', { class: 'design-review-preview', src: src(designUrl(d, path)), alt: `Design preview: ${d.title}` });
+    // A screen that cannot be drawn shows the design's preview picture, and says so.
+    const fallback = () => el('figure', { class: 'design-fallback' }, el('figcaption', {}, 'This screen could not be shown: this is the design’s preview picture.'), el('img', { src: src(designUrl(d, d.preview)), alt: `Design preview: ${d.title}` }));
+    const previewElement = (path) => {
+      if (d.missing?.includes(path) && path !== d.preview) return fallback();
+      if (/\.html?$/i.test(path)) return el('iframe', { class: 'design-review-preview', src: src(designUrl(d, path)), title: `Design preview: ${d.title}`, sandbox: 'allow-scripts' });
+      const img = el('img', { class: 'design-review-preview', src: src(designUrl(d, path)), alt: `Design preview: ${d.title}` });
+      if (path !== d.preview) img.onerror = () => img.replaceWith(fallback());
+      return img;
+    };
     const preview = previewPath() ? el('div', { class: 'design-preview-window' }, previewElement(previewPath())) : '';
-    const fullPreview = previewPath() ? el('a', { class: 'design-preview-full', href: src(designUrl(d, previewPath())), target: '_blank', rel: 'noopener noreferrer' }, 'Open full preview') : '';
+    const fullHref = (path) => src(designUrl(d, d.missing?.includes(path) ? d.preview : path));
+    const fullPreview = previewPath() ? el('a', { class: 'design-preview-full', href: fullHref(previewPath()), target: '_blank', rel: 'noopener noreferrer' }, 'Open full preview') : '';
     if (screenSelect) screenSelect.onchange = () => {
       const path = previewPath();
       if (preview) preview.replaceChildren(previewElement(path));
-      if (fullPreview) fullPreview.href = src(designUrl(d, path));
+      if (fullPreview) fullPreview.href = fullHref(path);
       session.selected = screenKey(target());
       note.value = session.drafts.get(session.selected) ?? currentNote()?.note ?? '';
     };
@@ -3067,7 +3090,7 @@
       if (!screen && d.options?.length && !pick.value) { err.textContent = 'Choose a direction before sending your review.'; pick.focus(); return Promise.resolve(); }
       // A screen save (the viewer) sends no design-wide verdict; a note carries the verdict of the button that saved it, on a screen or at design level.
       const selected = target(), text = note.value.trim(), writes = (selected && screen) || text, live = new Set(screens.map(screenKey));
-      const notes = (state.answers[d.key]?.notes ?? []).filter((n) => (!n.journey || live.has(`${n.journey}/${n.screen}`)) && (n.journey !== selected?.journey.id || n.screen !== selected?.screen.id));
+      const notes = roundNotes().filter((n) => (!n.journey || live.has(`${n.journey}/${n.screen}`)) && (n.journey !== selected?.journey.id || n.screen !== selected?.screen.id));
       if (writes) notes.push({ ...(selected && { journey: selected.journey.id, screen: selected.screen.id }), verdict, note: text });
       saving = true; approve.disabled = change.disabled = true;
       return call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, ...(!screen && { verdict }), ...(screen && { requested: verdict === 'change' }),
