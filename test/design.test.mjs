@@ -2886,6 +2886,7 @@ test('Today on a phone: the floating tab bar with its pill on Today, Up next wit
   await until(async () => (await evaluate('!!document.querySelector(".t-up")')) && (await look()) === picked);
   await evaluate('document.querySelector(".today-top .ui-rb").click()');
   await until(async () => (await look()) === first);
+  await evaluate('localStorage.removeItem("so-theme")');
   // On Evidence the same proof is a compact row of its claim and its Passed check, with no frame left empty.
   await evaluate('location.hash = "#evidence"');
   await until(async () => await evaluate('!!document.getElementById("item-u3")'));
@@ -3122,8 +3123,11 @@ test('Evidence: a card per proof ever filed, in one list, newest first, with a p
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
   // Evidence on a desk is one list beside the selected update: the cards stack in one column, newest first, and the newest is selected and open beside it.
   const boxes = `[5, 4, 3, 2].map((n) => { const r = document.getElementById(\`item-update-\${n}\`).getBoundingClientRect(); return { n, top: r.top, left: r.left, right: r.right, bottom: r.bottom }; })`;
-  const [five, four, three, two] = await evaluate(boxes);
-  assert.ok(four.top >= five.bottom && three.top >= four.bottom && two.top >= three.bottom && [four, three, two].every((b) => b.left === five.left), 'one column, newest first, with no heading between');
+  // Measured once the list has laid out its cards (a busy runner can still be drawing them when the sixth card arrives).
+  const stacked = ([five, four, three, two]) => four.top >= five.bottom && three.top >= four.bottom && two.top >= three.bottom && [four, three, two].every((b) => b.left === five.left);
+  let laid = [];
+  await until(async () => stacked(laid = await evaluate(boxes))).catch(() => assert.fail(`one column, newest first, with no heading between: ${JSON.stringify(laid)}`));
+  const [five] = laid;
   await until(async () => (await evaluate('(() => { const a = document.querySelector(".split-list .ev-card[aria-current]"); return a && document.querySelector(".split-detail .ev-title") ? a.id.slice(5) : ""; })()')) === 'update-5');
   assert.deepEqual(await evaluate('[!!document.querySelector(".split-list .ev-grid"), document.querySelector("main").inert, [...document.querySelectorAll(".ev-card[aria-current]")].map((a) => a.id), document.querySelector(".ev-title").textContent]'),
     [true, false, ['item-update-5'], 'Sign-in, plain update']);
