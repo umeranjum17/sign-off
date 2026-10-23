@@ -1381,6 +1381,16 @@
   .tk-done b { color: var(--text); font-weight: 600; }
   .tk-h { margin: 1.75rem 0 0.5rem; padding: 0 1rem; } .tk-h .meta { margin: 0; font-size: 0.875rem; font-weight: 400; } .tk-h h2 { margin: 0; color: var(--muted); font-size: 0.875rem; font-weight: 400; letter-spacing: 0.02em; text-transform: uppercase; }
   .tk-sub { min-height: 3.5rem; }
+  /* A card's thread: one grouped list, oldest first, a dot per step (the newest blue), its words, the note in quotes and the time. */
+  .thread { margin-top: 1.25rem; } .ev-item .thread { margin: 0; }
+  .th-list { margin: 0; padding: 0.125rem 1rem; list-style: none; border-radius: 1rem; background: var(--opt, var(--surface)); box-shadow: 0 0 0 0.5px var(--line); }
+  .ev-item .th-list { border-radius: 0.75rem; box-shadow: none; } @media (min-width: 64rem) { .ev-item .th-list { border-radius: 1.125rem; } }
+  .th-list li { display: flex; gap: 0.75rem; padding: 0.625rem 0; } .th-list li + li { border-top: 0.5px solid var(--line); }
+  .th-dot { flex: none; width: 0.5rem; height: 0.5rem; margin-top: 0.5rem; border-radius: 50%; background: var(--fill-2); } .th-list li:last-child .th-dot { background: var(--action); }
+  .th-b { display: grid; flex: 1; min-width: 0; gap: 0.125rem; font-size: 0.9375rem; line-height: 1.25rem; }
+  .th-t a, a.th-card { color: var(--accent); text-decoration: none; } a.th-card { overflow: hidden; font-size: 0.8125rem; white-space: nowrap; text-overflow: ellipsis; }
+  .th-n { color: var(--muted); }
+  .th-b time { color: var(--muted); font-size: 0.8125rem; line-height: 1.125rem; font-variant-numeric: tabular-nums; }
   @media (min-width: 64rem) { .top .back.tk-back { display: inline-flex; margin: -2.75rem 0 0; } }
   .pst { color: var(--muted); font-size: 0.875rem; line-height: 1.25rem; }
   .res { display: inline-flex; align-items: center; gap: 0.3125rem; font-weight: 600; } .res::before { content: ""; width: 0.4375rem; height: 0.4375rem; border-radius: 50%; background: currentColor; }
@@ -2117,6 +2127,27 @@
     if (isAnswered(d)) return `Answered: ${s.answer === 'text' ? 'your reply' : s.label}`;
     return { waiting: 'Waiting on you', designs: d.status === 'draft' ? 'Draft' : 'In review' }[area(d)] ?? '';
   };
+  /** Steps in time order to the second, as answers are stored: within one second they keep the order they happen in (posted, answered, taken). */
+  const bySecond = (x, y) => Math.floor(Date.parse(x.at) / 1000) - Math.floor(Date.parse(y.at) / 1000);
+  /** A card's thread, oldest first, from what the board keeps: when it was posted (and the change it links), the answer it replaced,
+   *  the answer and its note, when its agent took it, each new round asked for and each comment. Nothing is made up: a step the board has no record of is left out. */
+  const threadOf = (d) => {
+    const a = state.answers[d.key], by = d.by ?? 'Agent', seen = state.seen_at?.[d.key], change = changeHref(d);
+    const said = (x) => (x.answer === 'text' ? 'in your own words' : x.label);
+    return [d.filed && { at: d.filed, text: `Posted by ${by}`, link: change && [changeName(change), change], posted: true },
+      a?.replaces?.at && { at: a.replaces.at, text: `Your answer: ${said(a.replaces)}`, note: a.replaces.note },
+      a && { at: a.at, text: `${a.replaces ? 'Changed to' : 'Your answer'}: ${said(a)}`, note: a.note },
+      seen && { at: seen, text: `${by} picked it up` },
+      ...(state.rounds ?? []).filter((r) => r.key === d.key).map((r) => ({ at: r.at, text: 'You asked for a new round', note: r.note })),
+      ...(state.messages ?? []).filter((m) => m.kind === 'comment' && m.key === d.key).map((m) => ({ at: m.at, text: 'Your comment', note: m.text }))]
+      .filter((e) => e && !Number.isNaN(Date.parse(e.at))).sort(bySecond);
+  };
+  /** A thread drawn as a list, newest last; a card whose only step is its posting shows none (its time is already on it). */
+  const threadView = (steps, min = 2) => (steps.length < min ? '' : el('div', { class: 'thread' }, el('p', { class: 'tk-label' }, 'Activity'), el('ol', { class: 'th-list' }, ...steps.map((e) => el('li', {},
+    el('span', { class: 'th-dot', 'aria-hidden': 'true' }), el('span', { class: 'th-b' }, e.card ? el('a', { class: 'th-card', href: e.card[1], dir: 'auto' }, e.card[0]) : '',
+      el('span', { class: 'th-t', dir: 'auto' }, e.text, ...(e.link ? [' · ', el('a', { href: e.link[1], ...(/^https?:/.test(e.link[1]) && { target: '_blank', rel: 'noopener' }), dir: 'auto' }, e.link[0])] : [])),
+      e.note ? el('span', { class: 'th-n', dir: 'auto' }, `“${e.note}”`) : '', el('time', { datetime: e.at }, stamp(e.at))))))));
+  const thread = (d) => threadView(threadOf(d));
   /** A ticket's page: the ticket it sits under, its progress, then every card that names it, newest first, each opening where it lives, and the tickets under it. */
   function ticketPage(t) {
     if (!t) return [el('p', { class: 'empty' }, 'This ticket is not on the board.')];
@@ -2128,6 +2159,8 @@
     return [el('div', { class: 'tk-done' }, tkBar(t), el('span', {}, el('b', {}, `${t.progress}%`), ' done')),
       el('div', { class: 'sec-head tk-h' }, el('h2', {}, 'Linked'), el('span', { class: 'meta' }, plural(cards.length, 'card'))),
       cards.length ? el('ul', { class: 'card rows' }, ...cards.map(card)) : el('p', { class: 'empty' }, 'No card on the board names this ticket yet.'),
+      // Its cards' steps together, after their postings, which Linked already shows.
+      threadView([...cards].reverse().flatMap((d) => threadOf(d).filter((e) => !e.posted).map((e) => ({ ...e, card: [title(d), hrefOf(d)] }))).sort(bySecond), 1),
       ...(under.length ? [el('div', { class: 'sec-head tk-h' }, el('h2', {}, 'Tickets under it'), el('span', { class: 'meta' }, String(under.length))), el('ul', { class: 'card rows' }, ...under.map(sub))] : [])];
   }
 
@@ -2231,7 +2264,7 @@
         long('Why', unchecked(d)), long('What ran', ran),
         change ? el('a', { class: 'cell', href: change, target: '_blank', rel: 'noopener', 'aria-label': `Open the change for ${name}` },
           el('span', { class: 'k' }, 'Change'), el('span', { class: 'v go' }, changeName(change)), el('span', { class: 'chev', 'aria-hidden': 'true' }, '›')) : '',
-        short('Project', projectOf(d)), short('Checked by', checker), short('When', d.filed ? stamp(d.filed) : '')),
+        short('Project', projectOf(d)), short('Checked by', checker), short('When', d.filed ? stamp(d.filed) : '')), thread(d),
       state.readonly || FROZEN || !(d.options.length || d.reply) ? '' : verdicts(d), tech(d)));
   }
 
@@ -2903,7 +2936,7 @@
         el('a', { class: 'back', href: '#answered' }, 'See it in Answered'),
         saved.note ? el('p', { dir: 'auto' }, `Your whole-plan comment: ${saved.note}`) : ''));
     }
-    main.append(el('p', { class: 'eyebrow' }, icon('plan'), ['Plan', d.project, `Planning agent${d.filed ? `, ${when(d.filed)}` : ''}`].filter(Boolean).join(' · ')), el('h2', { dir: 'auto' }, d.title), el('p', { dir: 'auto' }, d.about ?? ''), ticketRow(d));
+    main.append(el('p', { class: 'eyebrow' }, icon('plan'), ['Plan', d.project, `Planning agent${d.filed ? `, ${when(d.filed)}` : ''}`].filter(Boolean).join(' · ')), el('h2', { dir: 'auto' }, d.title), el('p', { dir: 'auto' }, d.about ?? ''), ticketRow(d), thread(d));
     if (!saved) main.append(el('figure', { class: 'plan-diagram' }, el('iframe', { class: 'plan-view', src: url, title: `Plan: ${d.title}`, sandbox: 'allow-scripts' })),
       el('p', { class: 'plan-summary' }, icon('plan'), `${plural(d.sections.length, 'section')} to approve or change, and ${plural(d.decisions.length, 'decision')} to make. Nothing is built until you send back.`));
     main.append(el('h2', { class: 'plan-h' }, saved ? 'What you sent' : 'The plan', saved ? '' : el('small', {}, 'Approve or change each part')));
@@ -3049,7 +3082,7 @@
       el('label', {}, screens.length ? 'Screen note' : 'Design note', note), el('div', { class: 'foot' }, approve, change), err);
     const open = el('button', { class: 'open-link', 'aria-haspopup': 'dialog', 'data-design': d.key }, 'Review full screen');
     const root = el('div', { class: 'design-review' }, status, h1, d.about ? el('p', { class: 'about' }, d.about) : '', ticketRow(d), preview, fullPreview,
-      screens.length ? open : '', screenSelect ? el('label', {}, 'Screen for note', screenSelect) : '', controls,
+      screens.length ? open : '', screenSelect ? el('label', {}, 'Screen for note', screenSelect) : '', controls, thread(d),
       d.link ? el('a', { href: d.link, target: '_blank', rel: 'noopener noreferrer' }, 'Open original design') : '');
     if (!screens.length) return root;
     const heading = el('h2', { id: 'design-screen-title', dir: 'auto' }), count = el('p', { class: 'meta', 'aria-live': 'polite' });
@@ -3611,7 +3644,7 @@
       stageBlocks.push(c);
     }
     const word = plan ? 'Plan' : 'Report', who = plan ? 'Planning agent' : d.asked_by ?? 'Reporting agent';
-    const top = E('div', 'gd-top', E('p', 'geye', [word, plan ? d.project : d.group, [who, d.filed && when(d.filed)].filter(Boolean).join(', ')].filter(Boolean).join(' · ')), fld('this', 'title', E('h1', '', d.title)), fld('this', 'about', mdSpan('p', 'sub', d.about)), ticketRow(d),
+    const top = E('div', 'gd-top', E('p', 'geye', [word, plan ? d.project : d.group, [who, d.filed && when(d.filed)].filter(Boolean).join(', ')].filter(Boolean).join(' · ')), fld('this', 'title', E('h1', '', d.title)), fld('this', 'about', mdSpan('p', 'sub', d.about)), ticketRow(d), thread(d),
       E('div', 'howto', gic('info'), E('span', '', `A few short parts, in order. Tap Details for the numbers and Go deeper to ask me more.${plan ? ' Nothing is required: Go ahead accepts my picks.' : ''}`)));
     const rail = el('aside', { class: 'gd-rail' }, E('h4', '', plan ? 'This plan' : 'This report'), nav, ...(plan ? [sumHost] : []));
     const progress = E('div', 'gd-progress', now, segs);
@@ -3683,7 +3716,7 @@
     const url = d?.guided ? `guide:${d.key}` : d?.kind === 'design' ? `design:${d.key}` : d?.type === 'evidence' ? `evidence:${d.key}` : d ? src(mockUrl(d.key, '', d.view)) : '';
     const answer = d?.guided ? '' : d?.type === 'plan' || d?.kind === 'design' || d?.type === 'evidence' ? JSON.stringify(state.answers[d.key] ?? null) : '';
     const plan = d?.type === 'plan' || d?.guided ? JSON.stringify(d) : '';
-    const evidence = d?.type === 'evidence' ? JSON.stringify([d, (state.messages ?? []).filter((m) => m.key === d.key), (state.rounds ?? []).filter((r) => r.key === d.key)]) : '', ticket = JSON.stringify(ticketOf(d) ?? null);
+    const evidence = d?.type === 'evidence' ? JSON.stringify([d, (state.messages ?? []).filter((m) => m.key === d.key), (state.rounds ?? []).filter((r) => r.key === d.key)]) : '', ticket = JSON.stringify([ticketOf(d) ?? null, d ? threadOf(d) : null]);
     if (reader.dataset.url === url && reader.dataset.answer === answer && reader.dataset.plan === plan && reader.dataset.evidence === evidence && reader.dataset.ticket === ticket) return d && (reader._guide?.sync(), 1) && (reader.querySelector('h1').textContent = d.type === 'evidence' ? headline(d) : d.title);
     Object.assign(reader.dataset, { answer, plan, evidence, ticket });
     Object.assign(reader.dataset, { url, key: d?.key ?? '', from });
@@ -3698,7 +3731,7 @@
     reader.replaceChildren(...(d.guided ? [el('header', {}, back), (reader._guide = guideView(d))] : d.type === 'plan' ? [el('header', {}, back, Object.assign(h1, { className: 'plan-name' })), planReview(d, url)] : d.kind === 'design' ? [el('header', {}, back), designReview(d, h1)]
       : d.type === 'evidence' ? [el('header', {}, back, out), evidenceItem(d)]
       : [el('header', {}, back), el('div', { class: 'read' }, el('p', { class: 'eyebrow' }, [FORMS[d.form]?.[0] ?? (kind(d) || 'Report'), d.asked_by, d.filed ? when(d.filed) : ''].filter(Boolean).join(' · ')), h1,
-        d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided(d), ticketRow(d), el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }), dismissReport(d))]));
+        d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided(d), ticketRow(d), thread(d), el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }), dismissReport(d))]));
   }
   /** Dismiss moved from the list row to the report's own page; once it is dismissed the page closes back to the list. */
   function dismissReport(d) {
@@ -4012,7 +4045,7 @@
     return el('section', { class: 'decide signin-ask g-signin', ...(!desk && { id: `item-${d.key}` }) }, icon('key'), el('div', { class: 'lead' }, kicker, el('h2', { dir: 'auto' }, `Sign in to ${d.title}`)),
       d.about ? el('p', { class: 'why', dir: 'auto' }, d.about) : '',
       el('div', { class: 'facts' }, fact('bolt', 'Unlocks', el('b', { dir: 'auto' }, d.unlocks)), d.expires && !gone && !desk ? fact('clock', 'Expires in', el('b', { 'data-ends': d.expires }, countdown(d.expires))) : '',
-        host ? fact('lock', 'Where', el('b', {}, host)) : ''), ticketRow(d), err, el('div', { class: 'decide-bar' }, open, hint));
+        host ? fact('lock', 'Where', el('b', {}, host)) : ''), ticketRow(d), thread(d), err, el('div', { class: 'decide-bar' }, open, hint));
   }
   /** An ask, as the approved prototype lays it out: its kind, who asked and when over the question (on a desk that line is the bar's), why, the proof it rests on, the answers as cards
    *  ending in Your own answer, one optional note, what happens if you stay quiet, and one button. Nothing is picked until the person picks: Recommended is only a tag, and the button
@@ -4118,7 +4151,7 @@
         ownRow ? el('li', {}, ownRow, el('div', { class: 'own-field' }, el('div', {}, ownBox))) : '')] : []),
       reply ? el('label', { class: 'pick-label', for: ownBox.id }, 'Your reply') : '', reply ? ownBox : '',
       note ? el('div', { class: 'note-field' }, el('label', { class: 'pick-label', for: note.id }, 'Note', el('small', {}, 'Optional · goes with your answer')), note) : '',
-      quiet && !given ? el('p', { class: 'silent-line' }, `If you stay quiet, the agent goes with ${quiet.label}${d.silent_by ? ` at ${when(d.silent_by)}` : ''}.`) : '']), err,
+      quiet && !given ? el('p', { class: 'silent-line' }, `If you stay quiet, the agent goes with ${quiet.label}${d.silent_by ? ` at ${when(d.silent_by)}` : ''}.`) : '']), thread(d), err,
       done ? el('div', { class: 'decide-bar' }, change) : mine || (live && opts.length) ? el('div', { class: 'decide-bar' }, answer, desk && note ? el('span', { class: 'bar-hint' }, kc('C'), 'Note') : '') : '');
     // A swipe right on a phone goes back, as an edge swipe does: to the ask answered just before, else to the list; a swipe left goes on to the next ask.
     if (live) swipe(page, () => (location.hash = stepBack));
@@ -4164,7 +4197,7 @@
     return split([top, page], [el('div', { class: 'split-bar rp-bar' }, el('p', { class: 'eyebrow', dir: 'auto' }, el('b', {}, FORMS[d.form]?.[0] ?? (kind(d) || 'Report')),
       ...[d.asked_by, d.filed ? when(d.filed) : ''].filter(Boolean).map((t) => ` · ${t}`)), read, gone),
       // The page is kept across redraws while this signature holds, so marking it read or a change elsewhere on the board does not load its frame again.
-      el('div', { class: 'read', 'data-sig': JSON.stringify([d.key, url, d.title, d.about, d.decided, ticketOf(d)]) }, h1, d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided(d), ticketRow(d),
+      el('div', { class: 'read', 'data-sig': JSON.stringify([d.key, url, d.title, d.about, d.decided, ticketOf(d), threadOf(d)]) }, h1, d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided(d), ticketRow(d), thread(d),
         full || el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }))], hints);
   }
   /** Every key, in one sheet behind ?. A desk hints each where it works; they work at any width with a keyboard. */

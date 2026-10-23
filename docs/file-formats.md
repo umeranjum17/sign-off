@@ -81,12 +81,15 @@ New guided defaults use plan schema 3 / report schema 4, contract 1, with a requ
   `raise` and `post` refuse an item that lists `options` without one; a plain Yes/No may leave it out.
   In a `--from` file (a `--replace` feed too), a new item of a contract kind must be a contract message: see [contract.md](contract.md) section 2. An item already on the board is not checked again, except in a `--replace` feed, which replaces the stored item: a contract message that changed is checked against its kind's rules again, so one that no longer matches is refused and the board is left as it was.
 - `filer`: optional, who filed the item (1-128 of `A-Z a-z 0-9 . _ -`), written by `post --filer`.
-  `wait --filer` with the same id returns the answers to that filer's items. The page never shows it.
+  `wait --filer` with the same id returns the answers to that filer's items. The page shows it only in a card's **Activity** (below), as who posted the card and picked up its answer, and never a session UUID, which reads `Agent` there.
   `post --from <file> --replace --filer <id>` replaces only the items with that filer (and items with
   no filer the file names by key); every other item, the board's other top-level fields and the answers stay.
 - `ticket`: optional, the id of the ticket the item belongs to (1-128 of `A-Z a-z 0-9 . _ -`), written by `raise` and `post` with `--ticket <id>` or carried in a message or `--from` item.
   It is only a reference: the ticket need not be on the board, and nothing checks or needs it. While a ticket with that id is on the board (**Tickets**, below),
   the item's screen shows a **Ticket** row, the ticket's title, id and progress, that opens the ticket's page; otherwise it shows none. It does not change what the item asks or how it is answered.
+- **Activity**: every card's screen (an ask, a sign-in, an update, a design review, a report and a plan) lists, oldest first, what the board keeps of it: when it was posted and by whom (its `filer`, with its `link` when that is a web link),
+  the answer a change replaced, the answer and its note, when its filer took it with `wait --filer` (`*.seen.jsonl`), each another-round ask with its note (`*.rounds.jsonl`) and each comment on it (`*.messages.jsonl`).
+  Steps are compared to the second (answers are stored to the second); within one second they keep that order. A card whose only step is its posting shows no Activity. A ticket's page shows its cards' steps after their postings together, each under the card's title. Nothing is written for it.
 - `area`: optional, the board area the item shows in: `waiting`, `evidence`, `reports` or `answered`
   (Waiting on you, Evidence, Reports and explainers, Answered). Without it an `evidence` item is in Evidence;
   an `explainer`, an item with nothing to answer, or any item on a read-only board is in Reports and

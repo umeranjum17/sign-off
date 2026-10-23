@@ -2323,6 +2323,7 @@ function profile() {
   const leash = configLine(text, 'leash') ?? '';
   return { name: configLine(text, 'name')?.slice(0, 40), leash: LEASHES.includes(leash) ? leash : 'matters' };
 }
+const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const state = () => {
   reap();
   // The page marks sent comments in annotations, so answers and rounds go without theirs: a read-only board or an export carries none.
@@ -2333,9 +2334,9 @@ const state = () => {
   return {
     file,
     mockBase: `/mock/${loopback(bind) ? 'local' : mockPass(tokenOf(file))}/`,
-    // Who filed an item stays in the file: the page only learns that its filer took the answer.
+    // Who filed an item stays in the file, except as `by`, the name a card's thread says posted it and took its answer: never a bare session id, which names nobody.
     // A sign-in's start command stays on this host too: the page only learns that a tap makes a new link, and how the last run went.
-    decisions: items.filter((d) => !fakeEvidence(d)).map(({ filer: _, start, ...d }) => ({ ...d, ...(d.type === 'design' && answers[d.key]?.answer === 'approve' && { status: 'approved' }), ...(start && { start: true, run: signinState(d.key) }), evidenceCard: d.evidence ? evidenceCard(d.evidence) : null,
+    decisions: items.filter((d) => !fakeEvidence(d)).map(({ filer, start, ...d }) => ({ ...d, ...(filer && !SESSION_ID.test(filer) && { by: filer }), ...(d.type === 'design' && answers[d.key]?.answer === 'approve' && { status: 'approved' }), ...(start && { start: true, run: signinState(d.key) }), evidenceCard: d.evidence ? evidenceCard(d.evidence) : null,
       ...(d.mocks && { mocks: d.mocks.map((m) => ({ ...m, hash: mockHash(m.path) })) }) })),
     readonly: extra.readonly === true,
     answers_only: extra.answers_only === true,

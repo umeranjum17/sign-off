@@ -1,6 +1,7 @@
 // Tickets on the board, one theme and width per run: a card of each kind posted with --ticket shows a Ticket row (the ticket's title, id and progress) that opens
 // the ticket's page; the same kind posted without one, and a card naming a ticket the board has not got, show no row; the ticket's page lists its cards newest first
-// and the tickets under it, and its Back returns to the card.
+// and the tickets under it, and its Back returns to the card. A card's Activity thread lists, oldest first, what the board keeps of it: posted, each answer and note
+// (the one a change replaced too), when its agent took it, a new round asked for and a comment; the ticket's page shows its cards' activity together.
 // Usage: node .agents/skills/done-done-verify-sign-off/ticket-shots.mjs <output> [light|dark]   (TICKET_WIDTH=390|1280, default 390)
 // Saves <state>.<theme>.<width>w.png and .txt (the screen's Ticket rows, the ticket page's lists, overflow) and cli.<theme>.<width>w.txt (ticket list and show).
 import assert from 'node:assert/strict';
@@ -29,7 +30,8 @@ const probe = `() => {
   const h1 = first('#reader:not([hidden]) h1', '.decide h2', '.ev-title', '#board h1');
   const lists = [...document.querySelectorAll('#board .tk-h')].map((h) => ({ head: words(h), rows: [...(h.nextElementSibling?.querySelectorAll('li') ?? [])].map(words) }));
   const wide = [...document.querySelectorAll('body *')].filter((e) => vis(e) && e.getBoundingClientRect().right > w + 1 && !e.closest('.split-list, iframe')).slice(0, 5).map((e) => e.tagName.toLowerCase() + (e.className ? '.' + String(e.className).split(' ')[0] : ''));
-  return JSON.stringify({ hash: location.hash, h1, rows, kicker: words(document.querySelector('.tk-kicker') ?? document.createElement('i')), done: words(document.querySelector('.tk-done') ?? document.createElement('i')), lists, overflow: document.documentElement.scrollWidth > w, wide });
+  const thread = [...(document.querySelector('#reader:not([hidden])') ?? document).querySelectorAll('.th-list li')].filter(vis).map(words);
+  return JSON.stringify({ hash: location.hash, h1, rows, thread, kicker: words(document.querySelector('.tk-kicker') ?? document.createElement('i')), done: words(document.querySelector('.tk-done') ?? document.createElement('i')), lists, overflow: document.documentElement.scrollWidth > w, wide });
 }`;
 // Each state, and the element its Ticket row sits under (or would): the shot centres it, so linked and unlinked cards show the same part of the card.
 const STATES = [
@@ -38,7 +40,8 @@ const STATES = [
   ['design-linked', '#designs/settings-screens', '.ticket-row'], ['design-unlinked', '#designs/chat-journeys', '.design-review .about'],
   ['report-linked', '#reports/settings-saves', '.ticket-row'], ['report-unlinked', '#reports/digest-ran', '.gd-top .sub'],
   ['plan-linked', '#waiting/faster-sign-in', '.ticket-row'], ['plan-unlinked', '#waiting/plan-kind-board', '.plan-main h2'],
-  ['ticket', '#ticket/T-29', ''], ['ticket-parent', '#ticket/T-9', ''],
+  ['ask-thread', '#decide/settings-search', '.thread'], ['proof-thread', '#evidence/settings-proof', '.thread'],
+  ['ticket', '#ticket/T-29', ''], ['ticket-activity', '#ticket/T-29', '#board .th-list li:last-child'], ['ticket-parent', '#ticket/T-9', ''],
 ];
 try {
   const base = sh('bash', [join(repo, '.agents/skills/done-done-verify-sign-off/seed-board.sh'), dir], { cwd: repo, env: seedEnv }).trim().split('\n').pop();
@@ -60,6 +63,17 @@ try {
   writeFileSync(join(dir, 'report-digest.json'), JSON.stringify({ ...report, filed: now, filer: 'verify' }));
   so('post', board, '--kind', 'report', '--from', join(dir, 'report-digest.json'));
   so('post', board, '--kind', 'plan', '--from', join(repo, 'fixtures/contract/plan.v3/valid-full.json'), '--ticket', 'T-29');
+  // A thread to show: an ask answered No with a note, changed to Yes with a note, taken by its agent, then a new round asked for; the proof gets a verdict and a comment.
+  // Each goes through the board's own API, as a tap does, a second apart so the times read in order.
+  so('raise', board, '--ticket', 'T-29', '--key', 'settings-search', '--title', 'Turn on search in the settings page?', '--why', 'Umer asked for it twice this week.', ...ask);
+  const api = async (path, body) => { const r = await fetch(`${base}api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); assert.equal(r.status, 200, `${path} ${await r.text()}`); await new Promise((ok) => setTimeout(ok, 1100)); };
+  await api('answers', { key: 'settings-search', answer: 'no', note: 'Not this week.' });
+  await api('answers', { key: 'settings-search', answer: 'yes', note: 'After the Friday stand-up.' });
+  so('wait', board, '--filer', 'verify', '--key', 'settings-search', '--timeout', '5');
+  await new Promise((ok) => setTimeout(ok, 1100));
+  await api('rounds', { key: 'settings-search', note: 'Show it on a phone first.' });
+  await api('answers', { key: 'settings-proof', answer: 'pass', note: 'The theme switch works.' });
+  await api('messages', { kind: 'comment', key: 'settings-proof', text: 'Add the dark theme next.' });
   writeFileSync(join(out, `cli.${cell}.txt`), `$ sign-off-axi ticket\n${so('ticket', board)}\n$ sign-off-axi ticket --id T-29\n${so('ticket', board, '--id', 'T-29')}\n`);
   browser('open', base);
   browser('emulate', '--viewport', `${width}x844x${width === 390 ? '2,mobile,touch' : '1'}`, '--color-scheme', theme);
@@ -72,14 +86,21 @@ try {
     const name = `${state}.${cell}`;
     browser('screenshot', join(out, `${name}.png`));
     const m = seen[state] = value(browser('eval', probe));
-    writeFileSync(join(out, `${name}.txt`), `${state} ${theme} ${width}w ${hash}\ntitle: ${m.h1}\n${m.rows.length ? m.rows.map((r) => `Ticket row: "${r.text}" -> ${r.href}, ${r.w}x${r.h}px, ${r.left}px from the left and ${r.right}px from the right`).join('\n') : 'no Ticket row'}\n`
+    writeFileSync(join(out, `${name}.txt`), `${state} ${theme} ${width}w ${hash}\ntitle: ${m.h1}\n${m.thread.length ? `Activity, oldest first:\n${m.thread.map((t) => `  ${t}`).join('\n')}\n` : 'no Activity thread\n'}${m.rows.length ? m.rows.map((r) => `Ticket row: "${r.text}" -> ${r.href}, ${r.w}x${r.h}px, ${r.left}px from the left and ${r.right}px from the right`).join('\n') : 'no Ticket row'}\n`
       + (m.kicker ? `kicker: ${m.kicker}\nprogress: ${m.done}\n` : '') + m.lists.map((l) => `${l.head}:\n${l.rows.map((r) => `  ${r}`).join('\n')}`).join('\n') + `${m.lists.length ? '\n' : ''}horizontal overflow ${m.overflow ? 1 : 0}${m.wide.length ? ` (${m.wide.join(', ')})` : ''}\n`);
     assert.equal(m.overflow, false, `${state}: wider than the screen: ${m.wide.join(', ')}`);
-    assert.equal(m.rows.length, state.endsWith('-linked') ? 1 : 0, `${state}: ${JSON.stringify(m.rows)}`);
+    assert.equal(m.rows.length, state.endsWith('-linked') || state.endsWith('-thread') ? 1 : 0, `${state}: ${JSON.stringify(m.rows)}`);
     if (m.rows.length) assert.deepEqual([m.rows[0].href, /Ship the new settings page T-29 60%/.test(m.rows[0].text)], ['#ticket/T-29', true], `${state}: ${m.rows[0].text}`);
   }
-  // The ticket's page: under T-9, 60% done, its five cards newest first (the plan was posted last), none of the unlinked or unknown-ticket cards; T-9 lists the two tickets under it.
-  assert.deepEqual([seen.ticket.kicker, seen.ticket.done, seen.ticket.lists[0].rows.length], ['The new settings page › T-29', '60% done', 5], JSON.stringify(seen.ticket));
+  // The ticket's page: under T-9, 60% done, its six cards, none of the unlinked or unknown-ticket cards; T-9 lists the two tickets under it.
+  assert.deepEqual([seen.ticket.kicker, seen.ticket.done, seen.ticket.lists[0].rows.length], ['The new settings page › T-29', '60% done', 6], JSON.stringify(seen.ticket));
+  // The answered ask's thread in the order it happened, with its notes; the proof's verdict and comment; the ticket's page has its cards' steps together.
+  const steps = (state) => seen[state].thread.map((t) => t.replace(/ (Today|\d+ \w+), \d\d:\d\d$/, ''));
+  assert.deepEqual(steps('ask-thread'), ['Posted by verify', 'Your answer: No “Not this week.”', 'Changed to: Yes “After the Friday stand-up.”', 'verify picked it up', 'You asked for a new round “Show it on a phone first.”'], JSON.stringify(seen['ask-thread'].thread));
+  assert.deepEqual(steps('proof-thread'), ['Posted by verify', 'Your answer: Pass “The theme switch works.”', 'Your comment “Add the dark theme next.”'], JSON.stringify(seen['proof-thread'].thread));
+  assert.deepEqual(seen['ticket-activity'].thread.map((t) => t.replace(/ “.*$| (Today|\d+ \w+), \d\d:\d\d$/, '')), ['Turn on search in the settings page? Your answer: No', 'Turn on search in the settings page? Changed to: Yes',
+    'Turn on search in the settings page? verify picked it up', 'Turn on search in the settings page? You asked for a new round', 'Update 3 · The settings page on a phone Your answer: Pass', 'Update 3 · The settings page on a phone Your comment'], JSON.stringify(seen['ticket-activity'].thread));
+  for (const state of ['ask-unlinked', 'ask-linked', 'design-unlinked']) assert.equal(seen[state].thread.length, 0, `${state} has only its posting: no thread`);
   assert.deepEqual(seen['ticket-parent'].lists.map((l) => l.rows.length), [0, 2], JSON.stringify(seen['ticket-parent']));
   // A tap on the ask's Ticket row opens the ticket; Back returns to the ask.
   browser('open', 'about:blank');

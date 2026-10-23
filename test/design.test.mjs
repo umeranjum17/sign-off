@@ -3533,7 +3533,7 @@ test('load budget: a board of 60 updates opens Evidence on a phone with at most 
   proc.kill();
 });
 
-test('a card names its ticket: --ticket on every post, a Ticket row that opens the ticket, and the ticket page lists its cards newest first', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('a card names its ticket: --ticket on every post, a Ticket row that opens the ticket, the ticket page lists its cards newest first, and each card shows its Activity', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'ticket'), file = join(dir, 'board.json'), fx = new URL('../fixtures/contract/', import.meta.url).pathname, now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   mkdirSync(join(dir, 'design'), { recursive: true });
   for (const f of readdirSync(join(fx, 'design.v1/design'))) writeFileSync(join(dir, 'design', f), readFileSync(join(fx, 'design.v1/design', f)));
@@ -3546,10 +3546,10 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
   assert.match(run('ticket', file, '--id', 'T-29', '--progress', '60').out, /status: updated/);
   for (const bad of [['--progress', '101'], ['--progress', '4.5'], ['--parent', 'T-29'], ['--title', ' '], ['--id', 'bad id']]) assert.equal(run('ticket', file, '--id', 'T-29', ...bad).code, 2, bad.join(' '));
   // Every way a card gets in takes --ticket, or "ticket" in its message or --from item: flags, an evidence update, contract messages, a feed file and a sign-in.
-  const fileOf = (name, m) => (writeFileSync(join(dir, name), JSON.stringify(m)), join(dir, name));
+  const fileOf = (name, m) => (writeFileSync(join(dir, name), JSON.stringify(m)), join(dir, name)), session = '5f0c2b7e-9a41-4c3e-8d2a-6b7f1e0c9d34';
   const report = JSON.parse(readFileSync(join(fx, 'report.v4/valid-minimal.json'), 'utf8'));
   const posts = [
-    ['raise', file, '--ticket', 'T-29', '--key', 'ask-linked', '--title', 'Ship the settings page on Friday?'],
+    ['raise', file, '--ticket', 'T-29', '--key', 'ask-linked', '--title', 'Ship the settings page on Friday?', '--filer', session],
     ['raise', file, '--key', 'ask-plain', '--title', 'Keep the old settings link for a week?'],
     ['raise', file, '--ticket', 'T-404', '--key', 'ask-unknown', '--title', 'Move the theme switch to the top?'],
     ['post', file, '--type', 'evidence', '--ticket', 'T-29', '--title', 'Settings on a phone', '--about', 'Umer changes the theme in one tap.', '--media', join(dir, 'shot.png')],
@@ -3602,6 +3602,20 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     await evaluate(`location.href = ${JSON.stringify(`${url}#ticket/T-9`)}`);
     await until(async () => (await evaluate('[...document.querySelectorAll(".tk-sub")].map((a) => a.getAttribute("href")).join()')) === '#ticket/T-29');
     assert.equal(await evaluate('document.querySelector("#board .empty")?.textContent'), 'No card on the board names this ticket yet.');
+    // A card's Activity: nothing while its posting is all there is; then each answer with its note, the change, its agent taking it and a new round, oldest first.
+    // The agent posted under a session id, which names nobody, so it reads Agent. The ticket's page shows those steps under the card's name.
+    const thread = (hash) => `(async () => { location.hash = ${JSON.stringify(hash)}; await new Promise((ok) => setTimeout(ok, 50)); const top = document.querySelector('#reader:not([hidden])') ?? document;
+      return [...top.querySelectorAll('.th-list li')].map((li) => li.innerText.replace(/\\s+/g, ' ').replace(/ (Today|\\d+ \\w+), \\d\\d:\\d\\d$/, '').trim()).join(' | '); })()`;
+    assert.equal(await evaluate(thread('#decide/ask-linked')), '');
+    for (const [answer, note] of [['no', 'Not this week.'], ['yes', 'After the Friday stand-up.']]) assert.equal((await post(url, 'api/answers', { key: 'ask-linked', answer, note })).status, 200);
+    assert.equal(run('wait', file, '--filer', session, '--key', 'ask-linked', '--timeout', '5').code, 0);
+    assert.equal((await post(url, 'api/rounds', { key: 'ask-linked', note: 'Show it on a phone first.' })).status, 200);
+    await evaluate('window.old = true, location.reload()');
+    await until(() => evaluate('!window.old'));
+    const steps = ['Your answer: No “Not this week.”', 'Changed to: Yes “After the Friday stand-up.”', 'Agent picked it up', 'You asked for a new round “Show it on a phone first.”'];
+    await until(async () => (await evaluate(thread('#decide/ask-linked'))) === ['Posted by Agent', ...steps].join(' | '));
+    assert.equal(await evaluate(thread('#ticket/T-29')), steps.map((x) => `Ship the settings page on Friday? ${x}`).join(' | '));
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
   } finally { close(); }
   proc.kill();
 });
