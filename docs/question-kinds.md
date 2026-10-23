@@ -165,16 +165,18 @@ without posting.
   Each row names the answer it recommends, or its type when it recommends
   none (Yes/No, Pick one, Reply, Info, Design pick, Approval, Sign-in, Plan).
   Swipe a row right to answer with the recommended pick, or left to move it
-  to **Later** (kept in this browser; the agent still waits). **More** (···)
-  holds **Answer all recommended**, **Move all to Later**, **Oldest first** /
-  **Newest first** (by each ask's `filed` time, kept in this browser) and
-  **Select**. Every change shows a toast with **Undo**.
-- Tap a row to open the ask: its picture or page, what it is and why, its
-  answers as cards with the recommended one marked, then one **Answer**
-  button that names the pick and **More** with **Ask me later**, **Write my
-  own answer** (the button becomes **Send your answer** and sends the words
-  in **Add a comment** as the answer), **Ask for another round** and
-  **Dismiss**. On a phone **Answer** turns
+  to **Later** (kept in this browser; the agent still waits). Decide reads
+  newest first, a sign-in first. **More** (···) holds **Answer all
+  recommended** and **Move all to later**. Every change shows a toast with
+  **Undo**.
+- Tap a row to open the ask: its picture or page, what it is and why, the
+  proof it rests on, then its answers as cards. Nothing is picked until you
+  pick: **Recommended** is only a tag, and the one button stays off
+  (**Pick an answer**) until a pick, then names it (**Answer Friday**). The
+  last card is **Your own answer**: it opens one box, and the button becomes
+  **Send answer**, which sends the words as the answer. One **Note**, open
+  under the cards, goes with any pick. **More** over the ask holds **Ask me
+  later** and **Dismiss**. On a phone the button turns
   into a check and takes you back to the list, where the row folds away; on
   a wider screen it opens the next ask, or the list after the last.
   **1**–**9** picks an option and answers it, **E** skips to the next ask,
