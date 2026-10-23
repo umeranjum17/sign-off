@@ -17,7 +17,7 @@ export const guided = (m: any) => (m?.kind === 'report' && [3, 4].includes(m.sch
 export const KINDS = Object.keys(SCHEMAS);
 const COMMON = ['contract', 'kind', 'schema', 'key', 'title', 'filer', 'ticket', 'priority', 'link', 'about'];
 const FIELDS: Record<string, string[]> = {
-  ask: [...COMMON, 'ask_ref', 'detail', 'why', 'options', 'recommend_value', 'recommend_reason', 'default_if_silent', 'silent_by', 'close', 'merges', 'proof'],
+  ask: [...COMMON, 'ask_ref', 'detail', 'why', 'options', 'recommend_value', 'recommend_reason', 'default_if_silent', 'silent_by', 'close', 'merges', 'proof', 'report'],
   report: [...COMMON, 'filed', 'group', 'decided', 'form', 'video', 'asked_by', 'view', 'preview'],
   evidence: [...COMMON, 'media', 'run'],
   gate: [...COMMON, 'run', 'options', 'recommend_value', 'close'],
@@ -79,7 +79,7 @@ const show = (v: unknown) => JSON.stringify(v);
 /** A field name as it reads inside a sentence: escaped, so a newline or control character shows as \n or \u001b. */
 const escaped = (v: string) => show(v).slice(1, -1);
 /** The raise flag each question field fills: a refusal of a flag post names that flag, not the field. */
-const FLAG_OF: Record<string, string> = { why: 'why', about: 'about', detail: 'detail', title: 'title', default_if_silent: 'default', recommend_reason: 'recommend-reason', recommend_value: 'recommend', silent_by: 'silent-by', merges: 'merge', proof: 'proof', options: 'option', label: 'option', value: 'option', outcome: 'outcome' };
+const FLAG_OF: Record<string, string> = { why: 'why', about: 'about', detail: 'detail', title: 'title', default_if_silent: 'default', recommend_reason: 'recommend-reason', recommend_value: 'recommend', silent_by: 'silent-by', merges: 'merge', proof: 'proof', report: 'report', options: 'option', label: 'option', value: 'option', outcome: 'outcome' };
 /** The flag a field fills: options[1].outcome is --outcome, merges[0] is --merge. */
 const flagOf = (field: string) => { const f = field.replace(/^options\[\d+\]\./, '').replace(/\[\d+\]$/, ''); return `--${FLAG_OF[f] ?? f}`; };
 /** A field as a refusal names it: the JSON field, or the raise flag that fills it. */
@@ -404,6 +404,10 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
   if (Object.hasOwn(m, 'proof')) {
     if (!isKey(m.proof)) throw bad('proof', 'must be 1-128 of A-Z a-z 0-9 . _ -', `Set ${named('proof', flags)} to the key of an evidence update on the board that this ask rests on, such as ${flags ? '--proof update-3' : '"update-3"'}`);
     if (m.proof === m.key) throw bad('proof', 'is this ask\'s own key', 'Name the evidence update the ask rests on, not the ask');
+  }
+  if (Object.hasOwn(m, 'report')) {
+    if (!isKey(m.report)) throw bad('report', 'must be 1-128 of A-Z a-z 0-9 . _ -', `Set ${named('report', flags)} to the key of a report on the board that this ask is about, such as ${flags ? '--report audit-plan' : '"audit-plan"'}`);
+    if (m.report === m.key) throw bad('report', 'is this ask\'s own key', 'Name the report the ask is about, not the ask');
   }
   if (ask && flags) question(m, bad, flags);
   // A gate's run is its own rule (section 5), so it comes after the field rules of section 4.

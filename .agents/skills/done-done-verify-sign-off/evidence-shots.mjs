@@ -75,7 +75,8 @@ const MEASURE = `(async () => {
   const w = document.documentElement.clientWidth, phone = innerWidth < 1024, box = (e) => e.getBoundingClientRect(), vis = (e) => { const r = box(e), c = getComputedStyle(e); return r.width > 0 && r.height > 0 && c.visibility !== 'hidden' && c.display !== 'none'; };
   const r4 = (n) => Math.round(n * 100) / 100, grid = (n) => Math.abs(n / 4 - Math.round(n / 4)) < 0.02, fail = [], blocks = [], sy = scrollY;
   const main = document.querySelector('.split-list') ?? document.querySelector('main'), edgeL = box(main).left + main.clientLeft + parseFloat(getComputedStyle(main).paddingLeft), edgeR = box(main).left + main.clientLeft + main.clientWidth - parseFloat(getComputedStyle(main).paddingRight);
-  for (const e of document.querySelectorAll('main .ui-top, main .ui-seg, main .ui-sec, main .ui-card')) if (vis(e)) { const r = box(e); blocks.push({ el: e.className, left: r4(r.left), right: r4(r.right), top: r4(r.top + sy), height: r4(r.height) }); }
+  // On a desk the list's own column holds its blocks (the shell's head and the open proof beside it are detail-shots.mjs's to measure).
+  for (const e of main.querySelectorAll('.ui-top, .ui-seg, .ui-sec, .ui-card')) if (vis(e)) { const r = box(e); blocks.push({ el: e.className, left: r4(r.left), right: r4(r.right), top: r4(r.top + sy), height: r4(r.height) }); }
   for (const b of blocks) {
     if (Math.abs(b.left - edgeL) > 0.5) fail.push('left edge ' + b.el + ' ' + b.left + ' not ' + edgeL);
     if (/ui-(card|seg)/.test(b.el) && Math.abs(b.right - edgeR) > 0.5) fail.push('right edge ' + b.el + ' ' + b.right + ' not ' + edgeR);
@@ -105,7 +106,7 @@ const MEASURE = `(async () => {
   const reader = document.getElementById('reader'), sheet = reader && !reader.hidden && reader.querySelector('.ev-scroll') ? (() => { const r = box(reader), t = document.querySelector('.ev-title'), v = [...document.querySelectorAll('.ev-verdict .choices button')];
     return { top: r4(r.top), title: t.textContent, titleLines: Math.round(box(t).height / parseFloat(getComputedStyle(t).lineHeight)), titleWhole: t.scrollHeight <= t.clientHeight + 1 && getComputedStyle(t).webkitLineClamp === 'none',
       verdicts: v.map((b) => b.textContent), verdictRows: new Set(v.map((b) => Math.round(box(b).top))).size, props: [...document.querySelectorAll('.ev-props .ui-pr')].map((p) => p.innerText.replace(/\\s+/g, ' ').trim()),
-      activity: [...document.querySelectorAll('.ev-item .th-list li')].map((l) => l.innerText.replace(/\\s+/g, ' ').trim()), close: (() => { const x = reader.querySelector('.ev-x'), shots = [...reader.querySelectorAll('.ev-hero :is(img, video)')].map(box);
+      activity: [...document.querySelectorAll('.ev-item .ui-act li')].map((l) => l.innerText.replace(/\\s+/g, ' ').trim()), close: (() => { const x = reader.querySelector('.ev-x'), shots = [...reader.querySelectorAll('.ev-hero :is(img, video)')].map(box);
         if (!x || !vis(x)) return null; const c = box(x); return { bottom: r4(c.bottom), firstCapture: shots.length ? r4(Math.min(...shots.map((s) => s.top))) : null, over: shots.filter((s) => c.left < s.right && s.left < c.right && c.top < s.bottom && s.top < c.bottom).length }; })() }; })() : null;
   if (sheet?.close && (sheet.close.over || (sheet.close.firstCapture !== null && sheet.close.bottom > sheet.close.firstCapture))) fail.push('the close over a capture ' + JSON.stringify(sheet.close));
   if (sheet && phone && (sheet.top !== 48 || !sheet.titleWhole || (sheet.verdicts.length && sheet.verdictRows !== 1))) fail.push('sheet ' + JSON.stringify(sheet));
@@ -167,7 +168,7 @@ try {
   await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
   await go(`${url}#evidence/${takeone}`);
   await js(`(async () => { document.querySelector('.ev-verdict details.other summary').click(); const t = document.querySelector('#note-${takeone}'); t.value = 'The Learn more list reads well on my phone.'; t.dispatchEvent(new Event('input'));
-    [...document.querySelectorAll('.ev-verdict button')].find((b) => b.textContent === 'Send without answering').click(); for (let i = 0; i < 50 && !document.querySelector('.ev-item .th-list'); i++) await new Promise((r) => setTimeout(r, 100)); })()`);
+    [...document.querySelectorAll('.ev-verdict button')].find((b) => b.textContent === 'Send without answering').click(); for (let i = 0; i < 50 && !document.querySelector('.ev-item .ui-act'); i++) await new Promise((r) => setTimeout(r, 100)); })()`);
   for (const [wd, metrics] of [['390w', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }], ['1280w', { width: 1280, height: 800, deviceScaleFactor: 2, mobile: false }]]) {
     for (const theme of ['light', 'dark']) {
       for (const [state, what, hash, act, protoHash, homeBar = 0] of metrics.mobile ? STATES : [['evidence', 'Evidence on a desk, the newest proof beside the list', '#evidence', '', ''], ['evidence-priority', 'Evidence on a desk, by priority', '#evidence', "document.querySelector('.ev-seg button:nth-child(2)').click()", '']]) {

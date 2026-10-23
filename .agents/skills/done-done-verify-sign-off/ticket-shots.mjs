@@ -25,25 +25,25 @@ const probe = `() => {
   const vis = (e) => { const r = e.getBoundingClientRect(), c = getComputedStyle(e); return r.width > 0 && r.height > 0 && c.visibility !== 'hidden' && c.display !== 'none'; };
   const words = (e) => e.innerText.replace(/\\s+/g, ' ').trim(), w = document.documentElement.clientWidth;
   // A report or plan opened over the board covers the desk's pane under it: only what is on top counts.
-  const rows = [...(document.querySelector('#reader:not([hidden])') ?? document).querySelectorAll('.ticket-row, .decide .ui-props a[href^="#ticket/"]')].filter(vis).map((r) => { const b = r.getBoundingClientRect(); return { text: words(r), href: r.getAttribute('href'), w: Math.round(b.width), h: Math.round(b.height), left: Math.round(b.left), right: Math.round(w - b.right) }; });
+  const rows = [...(document.querySelector('#reader:not([hidden])') ?? document).querySelectorAll('.ui-props a.ui-pr[href^="#ticket/"]')].filter(vis).map((r) => { const b = r.getBoundingClientRect(); return { text: words(r), href: r.getAttribute('href'), w: Math.round(b.width), h: Math.round(b.height), left: Math.round(b.left), right: Math.round(w - b.right) }; });
   const first = (...sels) => { for (const s of sels) { const e = [...document.querySelectorAll(s)].find(vis); if (e) return words(e); } return ''; };
   const h1 = first('.tk-sheet .tk-dt', '.tk-pane .tk-dt', '#reader:not([hidden]) h1', '.decide h2', '.ev-title', '#board h1');
   // A ticket, over Tickets on a phone and in its third column on a desk: where it stands, its progress, and its lists (the tickets under it, Linked, Activity).
   const tk = document.querySelector('.tk-sheet, .tk-pane'), lists = tk ? [...tk.querySelectorAll('.ui-dl')].map((h) => ({ head: words(h), rows: [...(h.nextElementSibling?.matches('ul, ol') ? h.nextElementSibling.children : [])].map(words) })) : [];
   const wide = [...document.querySelectorAll('body *')].filter((e) => vis(e) && e.getBoundingClientRect().right > w + 1 && !e.closest('.split-list, iframe')).slice(0, 5).map((e) => e.tagName.toLowerCase() + (e.className ? '.' + String(e.className).split(' ')[0] : ''));
-  const thread = tk ? [...tk.querySelectorAll('.tk-act li')].map((li) => words(li.querySelector('.tk-on')) + ' ' + words(li.querySelector('b'))) : [...(document.querySelector('#reader:not([hidden])') ?? document).querySelectorAll('.th-list li')].filter(vis).map(words);
+  const thread = tk ? [...tk.querySelectorAll('.ui-act li')].map((li) => words(li.querySelector('.on')) + ' ' + words(li.querySelector('b'))) : [...(document.querySelector('#reader:not([hidden])') ?? document).querySelectorAll('.ui-act li')].filter(vis).map((li) => [li.querySelector('b'), li.querySelector('.th-n'), li.querySelector('time')].filter(Boolean).map(words).join(' '));
   const kicker = tk ? words(tk.querySelector('.tk-shd p')) : '', done = tk ? words([...tk.querySelectorAll('.ui-pr')].find((p) => p.textContent.startsWith('Progress'))) : '';
   return JSON.stringify({ hash: location.hash, h1, rows, thread, kicker, done, lists, overflow: document.documentElement.scrollWidth > w, wide });
 }`;
 // Each state, and the element its Ticket row sits under (or would): the shot centres it, so linked and unlinked cards show the same part of the card.
 const STATES = [
   ['ask-linked', '#decide/settings-friday', '.decide .ui-props'], ['ask-unlinked', '#decide/ship', '.decide .proof-block, .decide .why'], ['ask-unknown-ticket', '#decide/settings-copy', '.decide .why'],
-  ['proof-linked', '#evidence/settings-proof', '.ticket-row'], ['proof-unlinked', '#evidence/update-2', '.ev-say'],
-  ['design-linked', '#designs/settings-screens', '.ticket-row'], ['design-unlinked', '#designs/chat-journeys', '.design-review .about'],
-  ['report-linked', '#reports/settings-saves', '.ticket-row'], ['report-unlinked', '#reports/digest-ran', '.gd-top .sub'],
-  ['plan-linked', '#waiting/faster-sign-in', '.ticket-row'], ['plan-unlinked', '#waiting/plan-kind-board', '.plan-main h2'],
+  ['proof-linked', '#evidence/settings-proof', '.ui-props a.ui-pr[href^="#ticket/"]'], ['proof-unlinked', '#evidence/update-2', '.ev-say'],
+  ['design-linked', '#designs/settings-screens', '.ui-props a.ui-pr[href^="#ticket/"]'], ['design-unlinked', '#designs/chat-journeys', '.design-review .about'],
+  ['report-linked', '#reports/settings-saves', '.ui-props a.ui-pr[href^="#ticket/"]'], ['report-unlinked', '#reports/digest-ran', '.gd-top .sub'],
+  ['plan-linked', '#waiting/faster-sign-in', '.ui-props a.ui-pr[href^="#ticket/"]'], ['plan-unlinked', '#waiting/plan-kind-board', '.plan-main h2'],
   ['ask-thread', '#decide/settings-search', '.thread'], ['proof-thread', '#evidence/settings-proof', '.thread'],
-  ['ticket', '#ticket/T-29', ''], ['ticket-activity', '#ticket/T-29', '.tk-act'], ['ticket-parent', '#ticket/T-9', ''],
+  ['ticket', '#ticket/T-29', ''], ['ticket-activity', '#ticket/T-29', '.ui-act'], ['ticket-parent', '#ticket/T-9', ''],
 ];
 try {
   const base = sh('bash', [join(repo, '.agents/skills/done-done-verify-sign-off/seed-board.sh'), dir], { cwd: repo, env: seedEnv }).trim().split('\n').pop();

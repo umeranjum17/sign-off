@@ -28,7 +28,7 @@ export type Decision = {
   recommend_value?: string; default_if_silent?: string; close: string;
   /** An ask's question standard: why it is asked, why one option is recommended, when the silent default happens (ISO UTC),
    * and the other cards on the board this ask replaces, which its answer closes too. */
-  why?: string; recommend_reason?: string; silent_by?: string; merges?: string[]; /** The evidence update on the board this ask rests on: Decide shows its capture and result at the top. */ proof?: string; evidence?: EvidenceLink; run?: { run_id: string; commit: string };
+  why?: string; recommend_reason?: string; silent_by?: string; merges?: string[]; /** The evidence update on the board this ask rests on: Decide shows its capture and result at the top. */ proof?: string; /** The report on the board this ask is about: a desk shows it beside the ask. */ report?: string; evidence?: EvidenceLink; run?: { run_id: string; commit: string };
   finding?: { cause: string; incidents: number; days: number; evidence_ids: string[]; change_kind: string; proposal: string };
   kind?: string;
   type: string; tradeoff?: string; mocks?: MockRef[]; number?: number; media?: MediaRef[]; attachments?: AttachRef[]; link?: string; view?: string; preview?: string; chapters?: Chapter[]; reply?: boolean;
@@ -159,6 +159,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     for (const f of ['about', 'detail', 'why', 'recommend_reason', 'silent_by']) if (d[f] !== undefined && !isText(d[f])) throw bad(f, 'must be text');
     if (d.merges !== undefined && !(Array.isArray(d.merges) && d.merges.every(isKey))) throw bad('merges', 'must list keys of 1-128 of A-Z a-z 0-9 . _ -');
     if (d.proof !== undefined && !isKey(d.proof)) throw bad('proof', 'must be a key of 1-128 of A-Z a-z 0-9 . _ -');
+    if (d.report !== undefined && !isKey(d.report)) throw bad('report', 'must be a key of 1-128 of A-Z a-z 0-9 . _ -');
     if (d.ticket !== undefined && !isKey(d.ticket)) throw bad('ticket', 'must be a ticket id of 1-128 of A-Z a-z 0-9 . _ -');
     if (d.evidence !== undefined && (!d.evidence || !/^[A-Za-z0-9._-]{1,128}$/.test(d.evidence.run_id ?? '')
       || !/^[a-f0-9]{40}$/.test(d.evidence.commit ?? '')
@@ -262,7 +263,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     }
     return {
       key: d.key, title: d.title, about: d.about, detail: d.detail, options: options.map((o: Option) => ({ value: o.value, label: o.label, ...(o.outcome && { outcome: o.outcome }) })),
-      ...(d.ask_ref !== undefined && { ask_ref: d.ask_ref }), ...(d.why && { why: d.why }), ...(d.recommend_reason && { recommend_reason: d.recommend_reason }), ...(d.silent_by && { silent_by: d.silent_by }), ...(d.merges && { merges: [...d.merges] }), ...(d.proof && { proof: d.proof }),
+      ...(d.ask_ref !== undefined && { ask_ref: d.ask_ref }), ...(d.why && { why: d.why }), ...(d.recommend_reason && { recommend_reason: d.recommend_reason }), ...(d.silent_by && { silent_by: d.silent_by }), ...(d.merges && { merges: [...d.merges] }), ...(d.proof && { proof: d.proof }), ...(d.report && { report: d.report }),
       recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done', evidence: d.evidence,
       type: plan ? 'plan' : d.type ?? 'decision', tradeoff: d.tradeoff, link: d.link, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path, ...(m.link !== undefined && { link: m.link }) })),
       ...(views && { view: d.view }), ...(report && views && { preview: d.preview }), ...(d.reply && { reply: true }), ...(d.filer && { filer: d.filer }), ...(d.ticket && { ticket: d.ticket }), ...(d.priority && { priority: d.priority }), ...(d.area && { area: d.area }),
@@ -274,6 +275,8 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       ...(d.attachments && { attachments: d.attachments.map(({ path, name, sha256, bytes }: AttachRef) => ({ path, name, sha256, bytes })) }),
       ...(d.type === 'evidence' && { number: d.number }),
       // A gate's run is part of its question: the same key with another run is a different question.
+      // A report keeps its kind, so an ask can name it (--report) and the board can find it.
+      ...(report && { kind: 'report' }),
       ...(d.kind === 'gate' && d.run && { run: { run_id: d.run.run_id, commit: d.run.commit } }),
       // So is a finding's proposal, with the counts and records behind it.
       ...(d.kind === 'finding' && { finding: { cause: d.cause, incidents: d.incidents, days: d.days, evidence_ids: d.evidence_ids, change_kind: d.change_kind, proposal: d.proposal } }),

@@ -656,7 +656,7 @@ test('report and plan documents use one page scroll and the available width at 3
           const page = frame.closest('.read, .plan-main'), rect = frame.getBoundingClientRect(), s = getComputedStyle(page);
           const scrollers = [...document.querySelectorAll('#reader *, .split-detail')].filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1);
           return { ...g, frameHeight: frame.clientHeight, frameWidth: rect.width,
-            available: page.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight), scrollers: scrollers.map(e => e.className) };
+            available: page.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight), scrollers: scrollers.map(e => e.classList.contains('split-detail') ? 'split-detail' : e.className) };
         })()`);
         let got;
         await until(async () => !!(got = await layout()));
@@ -1629,14 +1629,14 @@ test('Decide on a pick-one ask: nothing is picked until you pick and the button 
   await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'Beta question?');
   const cards = () => evaluate('[...document.querySelectorAll(".decide .pick-option")].map((b) => b.querySelector(".label").textContent + (b.querySelector(".recommend") ? "*" : "") + ":" + b.getAttribute("aria-pressed")).join("|")');
   const button = () => evaluate('(() => { const a = document.querySelector(".decide-bar .answer"); return a.textContent + "|" + a.disabled; })()');
-  // The answers then Your own answer, rows of one inset group, each with its radio after its words; nothing is picked, Recommended is only a tag, and the button waits, off.
+  // The answers then Your own answer, as cards side by side in the answer area pinned at the ask's foot (each 160px or wider, radius 16); nothing is picked, Recommended is only a tag, and the button waits, off.
   assert.equal(await cards(), 'A:false|B*:false|C:false|Your own answer:false');
-  assert.equal(await evaluate('(() => { const rows = [...document.querySelectorAll(".decide .pick-list > li")]; return rows.length === 4 && rows.every((li) => li.firstElementChild?.classList.contains("pick-option") && li.firstElementChild.lastElementChild.classList.contains("check")) && getComputedStyle(document.querySelector(".decide .pick-list")).borderTopLeftRadius === "16px" && Math.abs(rows[1].getBoundingClientRect().top - rows[0].getBoundingClientRect().bottom) < 1; })()'), true);
+  assert.equal(await evaluate('(() => { const rows = [...document.querySelectorAll(".decide .ppin .pick-list > li")], b = (e) => e.getBoundingClientRect(); return rows.length === 4 && rows.every((li) => li.firstElementChild?.classList.contains("pick-option") && b(li).width >= 160) && getComputedStyle(rows[0].firstElementChild).borderTopLeftRadius === "16px" && b(rows[0]).top === b(rows[1]).top; })()'), true);
   assert.equal(await button(), 'Pick an answer|true');
   // One note, open under the cards with no toggle to find it, and no box for your own answer until you pick it.
-  assert.equal(await evaluate('[!!document.querySelector(".decide .note-field .note-box"), !!document.querySelector(".decide details"), document.querySelector(".decide .own-field").getBoundingClientRect().height].join("|")'), 'true|false|0');
-  // More, in the bar over the ask, holds only Ask me later and Dismiss, in red.
-  assert.deepEqual(await evaluate('[...document.querySelectorAll(".split-bar .dl-menu > button")].map((b) => [b.textContent, b.classList.contains("dis")])'), [['Ask me later', false], ['Dismiss', true]]);
+  assert.equal(await evaluate('[!!document.querySelector(".decide .note-field .note-box"), !!document.querySelector(".decide details:not(.dl-more)"), document.querySelector(".decide .own-field").getBoundingClientRect().height].join("|")'), 'true|false|0');
+  // More, on the ask's head line, holds only Dismiss, in red: Ask me later is the bar's, beside the answer.
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".split-bar .dl-menu > button")].map((b) => [b.textContent, b.classList.contains("dis")])'), [['Dismiss', true]]);
   await evaluate('window.dispatchEvent(new KeyboardEvent("keydown", { key: "e" }))');
   await until(async () => (await evaluate('location.hash')) === '#decide/alpha');
   await evaluate('window.dispatchEvent(new KeyboardEvent("keydown", { key: "e" }))');
@@ -1650,7 +1650,7 @@ test('Decide on a pick-one ask: nothing is picked until you pick and the button 
   await until(async () => JSON.parse(run('answers', file, '--json').out).beta?.answer === 'c');
   assert.equal(JSON.parse(run('answers', file, '--json').out).beta.note, 'Only after the release');
   // Answered, the desk moves on to the next ask. Your own answer opens its one box, the note steps aside, and the button reads Send answer, off until there are words.
-  await until(async () => (await evaluate('location.hash + "|" + document.querySelector(".split-detail .decide h2")?.textContent')) === '#decide/alpha|Alpha question?');
+  await until(async () => (await evaluate('location.hash + "|" + document.querySelector(".split-detail #ask-title")?.textContent')) === '#decide/alpha|Alpha question?');
   await evaluate('(() => { const t = document.querySelector(".decide .note-box"); t.value = "A note that stays behind"; t.dispatchEvent(new Event("input")); })()');
   await evaluate('document.querySelector(".decide .own-option").click()');
   assert.equal(await cards(), 'A*:false|B:false|C:false|Your own answer:true');
@@ -1678,21 +1678,19 @@ test('Add a comment on every answer: a yes/no on a phone and a pick-one on a des
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
-  // The note is one box between the cards and the bar, open with no toggle to find it; what is typed goes with the answer picked.
+  // The note is one box after the cards, before the bar's buttons (on a desk on the bar's own line), open with no toggle to find it; what is typed goes with the answer picked.
   const comment = async ({ evaluate, insertText }, key, text) => {
     await evaluate(`location.href = ${JSON.stringify(`${url}#decide/${key}`)}`);
     await until(async () => (await evaluate('document.querySelector(".decide .pick-option") && location.hash')) === `#decide/${key}`);
     assert.deepEqual(await evaluate(`(() => { const box = document.querySelector('.decide .note-box'), list = document.querySelector('.decide .pick-list'), bar = document.querySelector('.decide .decide-bar');
-      return { shown: box.getClientRects().length > 0, after: !!(list.compareDocumentPosition(box) & 4), before: !!(box.compareDocumentPosition(bar) & 4), name: box.getAttribute('aria-label').split(',')[0], placeholder: box.placeholder, toggles: document.querySelectorAll('.decide details').length }; })()`),
+      return { shown: box.getClientRects().length > 0, after: !!(list.compareDocumentPosition(box) & 4), before: !!(box.compareDocumentPosition(bar.querySelector('button')) & 4), name: box.getAttribute('aria-label').split(',')[0], placeholder: box.placeholder, toggles: document.querySelectorAll('.decide details:not(.dl-more)').length }; })()`),
       { shown: true, after: true, before: true, name: 'Note', placeholder: 'A note for the agent, optional', toggles: 0 }, key);
     await evaluate('document.querySelector(".decide .note-box").focus()');
     await insertText(text);
-    // The page keeps one way to answer, the bar's one button, off until a pick. On a phone Ask me later sits beside it and the sheet's More holds Dismiss;
-    // on a desk More, over the ask, holds Ask me later and Dismiss.
-    const sheet = await evaluate('!!document.querySelector(".ask-sheet")');
+    // The page keeps one way to answer, the bar's one button, off until a pick, with Ask me later beside it; More holds Dismiss.
     assert.deepEqual(await evaluate(`(() => ({ bar: [...document.querySelectorAll('.decide-bar button')].map((b) => b.textContent + (b.disabled ? ' (off)' : '')),
       folded: [...document.querySelectorAll('.sh-head .dl-menu > *, .split-bar .dl-menu > *')].map((b) => b.textContent) }))()`),
-      sheet ? { bar: ['Ask me later', 'Pick an answer (off)'], folded: ['Dismiss'] } : { bar: ['Pick an answer (off)'], folded: ['Ask me later', 'Dismiss'] }, key);
+      { bar: ['Ask me later', 'Pick an answer (off)'], folded: ['Dismiss'] }, key);
     // Keys typed into the box are not keyboard navigation, so the next page's title gets no focus ring; Tab out of the box is.
     await evaluate('document.querySelector(".decide .note-box").dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }))');
     assert.equal(await evaluate('"kbd" in document.documentElement.dataset'), false, key);
@@ -1853,14 +1851,14 @@ test('Decide on a desk: the list beside its ask, J and K move the selection, a n
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const { evaluate, close } = await browse(join(dir, 'b'), 1280, 800);
   const key = (k, mod = false) => evaluate(`(document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, bubbles: true, ctrlKey: ${mod}, metaKey: ${mod} }))`);
-  const seen = () => evaluate('[location.hash, document.querySelector(".split-list .sel")?.dataset.key, document.querySelector(".split-detail .decide h2")?.textContent, document.activeElement === document.querySelector(".split-list .sel .dl-face")].join("|")');
+  const seen = () => evaluate('[location.hash, document.querySelector(".split-list .sel")?.dataset.key, document.querySelector(".split-detail #ask-title")?.textContent, document.activeElement === document.querySelector(".split-list .sel .dl-face")].join("|")');
   const rows = () => evaluate('[...document.querySelectorAll(".split-list .dl-row:not(.leaving, .g-done)")].map((r) => r.dataset.key).join(",")');
   const done = () => evaluate('[...document.querySelectorAll(".split-list .g-done")].map((r) => r.dataset.key).join(",")');
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
-  // The list and the first ask share the screen, each column scrolling on its own; the strip under the list names its keys.
-  await until(async () => (await evaluate('document.querySelector(".split-detail .decide h2")?.textContent')) === 'Alpha question?');
-  assert.equal(await evaluate('document.querySelector(".split-list .sel").dataset.key + "|" + (document.scrollingElement.scrollHeight <= innerHeight) + "|" + document.querySelector(".split-hints").textContent'), 'alpha|true|JKMove↵Answer?All keys');
-  assert.equal(await evaluate('(() => { const l = document.querySelector(".split-list").getBoundingClientRect(), d = document.querySelector(".split-detail").getBoundingClientRect(), s = document.querySelector(".side").getBoundingClientRect(); return s.right <= l.left && l.right <= d.left && d.right === innerWidth && l.width >= 320; })()'), true);
+  // One screen as the prototype's desk: the head across, then the list in four of 12 columns beside the first ask in eight, 16px apart and 24px over the foot.
+  await until(async () => (await evaluate('document.querySelector(".split-detail #ask-title")?.textContent')) === 'Alpha question?');
+  assert.equal(await evaluate('document.querySelector(".split-list .sel").dataset.key + "|" + (document.scrollingElement.scrollHeight <= innerHeight) + "|" + document.querySelector(".ui-dhead h1").textContent'), 'alpha|true|Decide');
+  assert.equal(await evaluate('(() => { const l = document.querySelector(".split-list").getBoundingClientRect(), d = document.querySelector(".split-detail").getBoundingClientRect(), s = document.querySelector(".side").getBoundingClientRect(); return s.right <= l.left && Math.abs(d.left - l.right - 16) < 0.5 && Math.abs(innerWidth - 24 - d.right) < 0.5 && Math.abs(innerHeight - 24 - d.bottom) < 0.5 && l.width >= 320; })()'), true);
   await key('j');
   await until(async () => (await seen()) === '#decide/beta|beta|Beta question?|true');
   await key('j'), await key('k');
@@ -1911,16 +1909,20 @@ test('Decide on a desk: the list beside its ask, J and K move the selection, a n
     { key: 'tall', title: 'Which of six?', options: many, recommend_value: 'a' });
   writeFileSync(file, JSON.stringify(board));
   await evaluate('location.hash = "#decide/npm"; location.reload()');
-  await until(async () => (await evaluate('document.querySelector(".split-detail .decide h2")?.textContent')) === 'Sign in to npm');
-  assert.equal(await evaluate(`(() => { const p = document.querySelector(".split-detail .decide"), o = p.querySelector(".decide-bar .open-link");
+  await until(async () => (await evaluate('document.querySelector(".split-detail #ask-title")?.textContent')) === 'Sign in to npm');
+  assert.equal(await evaluate(`(() => { const p = document.querySelector(".split-detail.decide, .split-detail .decide"), o = p.querySelector(".decide-bar .open-link");
     return [document.querySelector(".split-bar .crumb").textContent, [...p.querySelectorAll(".fact")].map((f) => f.textContent).join(","), o.textContent, o.getAttribute("href"), !!p.querySelector(".row"),
       /Expires|left/.test(p.textContent), / left$/.test(document.querySelector('.dl-row[data-key="npm"] [data-left]').textContent), !!document.querySelector(".split-bar .dl-more")].join("|"); })()`),
   'Sign in · Release agent|UnlocksPublishing the release,Whereexample.com|Open sign-in|https://example.com/login|false|false|true|true');
-  // An ask taller than the pane: its bar comes after the last option and never covers it.
+  // An ask with six answers: they stay pinned in view at the pane's foot, its bar after the last one, never over it.
   await evaluate('location.hash = "#decide/tall"');
   await until(async () => (await evaluate('document.querySelectorAll(".split-detail .pick-option:not(.own-option)").length')) === 6);
-  assert.equal(await evaluate(`(() => { const s = document.querySelector(".split-detail"), bar = () => document.querySelector(".split-detail .decide-bar").getBoundingClientRect().top, last = () => [...s.querySelectorAll(".pick-option")].at(-1).getBoundingClientRect().bottom;
-    const rest = bar() >= last(); s.scrollTop = 1e5; return [s.scrollHeight > s.clientHeight, rest, bar() >= last()].join("|"); })()`), 'true|true|true');
+  // Measured once the ask has slid in (a new ask beside the list rises 16px over 260ms).
+  const measurePin = async () => JSON.parse(await evaluate(`(() => { const p = document.querySelector(".ask2 .ppin").getBoundingClientRect(), pane = document.querySelector(".ask2").getBoundingClientRect(), bar = document.querySelector(".ask2 .decide-bar").getBoundingClientRect(),
+    last = [...document.querySelectorAll(".ask2 .pick-option")].at(-1).getBoundingClientRect(); return JSON.stringify({ inPane: p.top >= pane.top && Math.abs(p.bottom - pane.bottom) < 0.5, inView: pane.bottom <= innerHeight + 0.5, barAfter: bar.top >= last.bottom, barIn: bar.bottom <= p.bottom + 0.5, p: [p.top, p.bottom], pane: [pane.top, pane.bottom], innerHeight }); })()`));
+  let pinned;
+  await until(async () => (pinned = await measurePin()).inPane).catch(() => {});
+  assert.ok(pinned.inPane && pinned.inView && pinned.barAfter && pinned.barIn, JSON.stringify(pinned));
   close();
   // Under 1024px the board keeps the phone's layout: the tab bar, and an ask as a sheet over the list.
   const narrow = await browse(join(dir, 'n'), 1000, 800);
@@ -1953,11 +1955,10 @@ test('Reports on a desk: the list beside the newest report, J moves and reads, U
   const seen = () => evaluate('[location.hash, document.querySelector(".split-list .sel")?.dataset.key, document.querySelector(".split-detail .read h1")?.textContent, [...document.querySelectorAll("#board .report .pct")].filter((m) => m.textContent === "0%").length].join("|")');
   const rows = () => evaluate('[...document.querySelectorAll(".split-list .dl-row[data-key]")].filter((r) => r.style.height !== "0px").map((r) => r.dataset.key).join(",")');
   await evaluate(`location.href = ${JSON.stringify(`${url}#reports`)}`);
-  // The newest report is shown beside the list, not yet marked read; the bar says what it is, and the strip under the list names its keys.
+  // The newest report is shown beside the list, not yet marked read; its head line says what it is and the day, beside Mark read and Archive.
   await until(async () => (await seen()) === `#reports|alpha|Alpha report|4`);
-  assert.match(await evaluate('document.querySelector(".rp-bar .eyebrow").textContent'), /^Before and after · \d\d:\d\d$/);
-  assert.equal(await evaluate('[...document.querySelectorAll(".rp-bar button")].map((b) => b.textContent).join(",") + "|" + document.querySelector(".split-hints").textContent + "|" + !!document.querySelector(".split-detail .read iframe")'),
-    'Mark read,Archive|JKMoveUReadEArchive?All keys|true');
+  assert.match(await evaluate('document.querySelector(".rp-bar > span[dir]").textContent'), /^Before and after · \d{1,2} [A-Z][a-z]{2}$/);
+  assert.equal(await evaluate('[...document.querySelectorAll(".rp-bar button")].map((b) => b.textContent).join(",") + "|" + !!document.querySelector(".split-detail .read iframe")'), 'Mark read,Archive|true');
   assert.equal(await rows(), `alpha,beta,${guided.key},gamma`);
   assert.equal(reads(), '');
   // J selects the next report and reads it: its row reads 100% and the read is saved beside the board.
@@ -2829,7 +2830,7 @@ test('a design posted again is a new round: the note box starts empty, the earli
     await evaluate(`(() => { const u = ${JSON.stringify(`${url}#designs/d6-round`)}; if (location.href === u) location.reload(); else location.href = u; })()`);
     await until(() => evaluate('!!document.querySelector(".design-review textarea")'));
     // The note box, and the card's Activity: each answer step and the notes it shows.
-    return evaluate('({ note: document.querySelector(".design-review textarea").value, steps: [...document.querySelectorAll(".design-review .thread .th-t")].map((e) => e.textContent).filter((t) => t.startsWith("Your answer")), notes: [...document.querySelectorAll(".design-review .thread .th-n")].map((e) => e.textContent) })');
+    return evaluate('({ note: document.querySelector(".design-review textarea").value, steps: [...document.querySelectorAll(".design-review .thread .aw b")].map((e) => e.textContent).filter((t) => t.startsWith("Your answer")), notes: [...document.querySelectorAll(".design-review .thread .th-n")].map((e) => e.textContent) })');
   };
   // The same round: the note is the one being written, nothing earlier.
   assert.deepEqual(await open(), { note: 'Round one: bigger title', steps: ['Your answer: Changes requested'], notes: [] });
@@ -3241,7 +3242,7 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   assert.equal(await evaluate('document.querySelector(\'#nav a[href="#evidence"] .n\').textContent'), '6');
   // The head: the title with the project filter, Newest and By priority, and Held up today over the proofs filed today, one square each, ink where the check passed.
   const today = doc.items.filter((d) => new Date(d.filed).toDateString() === new Date().toDateString()), held = today.filter((d) => ['update-2', 'update-3', 'update-4'].includes(d.key)).length;
-  assert.deepEqual(await evaluate('[document.querySelector(".ev-top h1").textContent, !!document.querySelector(".ev-top .ev-fb"), [...document.querySelectorAll(".ev-seg button")].map((b) => b.textContent + " " + b.getAttribute("aria-pressed")), document.querySelector(".ev-held").innerText.replace(/\\s+/g, " ").trim(), document.querySelectorAll(".ev-dots i").length, document.querySelectorAll(".ev-dots i.held").length]'),
+  assert.deepEqual(await evaluate('[document.querySelector(":is(.ev-top, .ui-dhead) h1").textContent, !!document.querySelector(":is(.ev-top, .ui-dhead) .ev-fb"), [...document.querySelectorAll(".ev-seg button")].map((b) => b.textContent + " " + b.getAttribute("aria-pressed")), document.querySelector(".ev-held").innerText.replace(/\\s+/g, " ").trim(), document.querySelectorAll(".ev-dots i").length, document.querySelectorAll(".ev-dots i.held").length]'),
     ['Evidence', true, ['Newest true', 'By priority false'], `Held up today ${held} of ${today.length} ${today.length - held} not checked`, today.length, held]);
   // The project filter: a sheet of each project with its count, then No project; a pick lists only its proof, newest first, under a pill that clears it.
   const pick = async (name) => evaluate(`(async () => { document.querySelector(".ev-fb").click(); await new Promise((r) => setTimeout(r, 200));
@@ -3275,9 +3276,11 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   assert.deepEqual(await evaluate('[!!document.querySelector(".split-list .ev-list"), document.querySelector("main").inert, [...document.querySelectorAll(".ev-card[aria-current]")].map((a) => a.id), document.querySelector(".ev-title").textContent]'),
     [true, false, ['item-update-5'], 'Sign-in, plain update']);
   assert.ok((await evaluate(box('.split-detail'))).left >= five.right, 'the update opens right of the list');
+  // Under the title: how many are listed, how many filed today and when the newest came.
+  assert.match(await evaluate('document.querySelector(".ui-dhead .tx > p:last-child").textContent'), /^\d+ proofs? on your board, newest first$/);
   // No update is an ask, whatever its result: Decide counts none of them and Today says nothing needs you.
   await evaluate('location.hash = "#waiting"');
-  await until(async () => (await evaluate('document.querySelector("#board :is(.top, .ui-top) h1")?.textContent')) === 'Waiting on you' || (await evaluate('document.querySelector("#board :is(.top, .ui-top) h1")?.textContent')) === 'Decide');
+  await until(async () => (await evaluate('document.querySelector("#board :is(.top, .ui-top, .ui-dhead) h1")?.textContent')) === 'Waiting on you' || (await evaluate('document.querySelector("#board :is(.top, .ui-top, .ui-dhead) h1")?.textContent')) === 'Decide');
   // Decide's red count goes away at zero, as the tab bar's does.
   assert.deepEqual(await evaluate('[!!document.querySelector(\'#nav a[href="#waiting"] .n\'), document.querySelectorAll("[id^=item-update-]").length]'), [false, 0]);
   await evaluate('location.hash = ""');
@@ -3286,7 +3289,7 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   // A failed or unchecked update still opens on Evidence with done-done's word, the reason a run could not be checked, and the verdicts, Pass last.
   for (const [k, result, why] of [['update-1', 'Failed', ''], ['update-6', 'Could not check', 'A picture or recording changed after the run. Ask the agent to run the check again.']]) {
     await evaluate(`location.hash = "#evidence/${k}"`);
-    await until(async () => (await evaluate('!!document.querySelector(".ev-item")')));
+    await until(async () => (await evaluate('!!document.querySelector(".split-detail .ev-title")')));
     assert.deepEqual(await evaluate('[document.querySelector(".ev-props .ev-word").textContent, document.querySelector(".ev-why")?.textContent ?? "", [...document.querySelectorAll(".ev-verdict .choices button")].map((b) => b.textContent)]'),
       [result, why, ['Fail', 'Needs work', 'Pass']]);
   }
@@ -3315,12 +3318,12 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-card[aria-current]")].map((a) => a.id)'), ['item-update-4']);
   const props = '[...document.querySelectorAll(".ev-props .ui-pr")].map((p) => [p.querySelector(".k").textContent, p.querySelector(".v").textContent])';
   assert.deepEqual(await evaluate(props), [['done-done', 'Holds up'], ['Pull request', '#12']]);
-  assert.deepEqual(await evaluate('[document.querySelector(".ev-shd .pt").textContent, document.querySelector(".ev-props a.ui-pr").getAttribute("href"), document.querySelector("header .change-link").getAttribute("href")]'), [`sign-off · ${clock(at(4))}`, pr, pr]);
+  assert.deepEqual(await evaluate('[document.querySelector(".split-detail .split-bar .pt").textContent, document.querySelector(".ev-props a.ui-pr").getAttribute("href")]'), [`sign-off · ${clock(at(4))}`, pr]);
   assert.deepEqual(await evaluate('[document.querySelector(".ev-title").textContent, document.querySelectorAll(".ev-hero img").length, document.querySelectorAll(".ev-verdict .choices button").length]'),
     [outcome, 1, 3]);
   // On a desk the capture fills the proof's width and a tap opens it full size; Fail, Needs work and Pass sit on one row, equally wide.
   await until(() => evaluate('document.querySelector(".ev-hero img")?.naturalWidth > 0'));
-  assert.deepEqual(await evaluate('(() => { const i = document.querySelector(".ev-hero img").getBoundingClientRect(), w = document.querySelector(".ev-item").getBoundingClientRect().width, a = document.querySelector(".ev-hero a"); return [Math.round(i.width - w), a.getAttribute("href").startsWith("/api/media?key=update-4"), a.target]; })()'),
+  assert.deepEqual(await evaluate('(() => { const i = document.querySelector(".ev-hero img").getBoundingClientRect(), w = document.querySelector(".split-detail .pmain").getBoundingClientRect().width, a = document.querySelector(".ev-hero a"); return [Math.round(i.width - w), a.getAttribute("href").startsWith("/api/media?key=update-4"), a.target]; })()'),
     [0, true, '_blank']);
   const verdictRow = 'new Set([...document.querySelectorAll(".ev-verdict .choices button")].map((b) => { const r = b.getBoundingClientRect(); return `${Math.round(r.top)} ${Math.round(r.width)}`; })).size';
   assert.equal(await evaluate(verdictRow), 1);
@@ -3340,7 +3343,7 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   await evaluate('[...document.querySelectorAll(".ev-verdict button")].find((b) => b.textContent === "Send without answering").click()');
   await until(async () => (await evaluate('[...document.querySelectorAll(".ev-verdict .saved-note")].some((p) => p.textContent.includes("Looks right on my phone."))')));
   assert.equal(await evaluate('document.querySelector("#note-update-4").value'), '');
-  await until(async () => (await evaluate('[...document.querySelectorAll(".ev-item .th-list li .th-t")].map((t) => t.textContent).at(-1)')) === 'Your comment');
+  await until(async () => (await evaluate('[...document.querySelectorAll(".split-detail .ui-act li .aw b")].map((t) => t.textContent).at(-1)')) === 'Your comment');
   // A verdict is saved from the update's own screen, which stays open.
   await evaluate('[...document.querySelectorAll(".ev-verdict .choices button")].find((b) => b.textContent === "Pass").click()');
   await until(async () => (await evaluate('!document.querySelector("#toast").hidden && document.querySelector(".ev-verdict [aria-pressed=true]")?.textContent === "Pass"')));
@@ -3930,22 +3933,22 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const { evaluate, close } = await browse(dir, 390, 844, true);
   try {
-    // Each linked card's screen shows one Ticket row (on an ask, the Its ask row of its panel), the ticket's title, id and progress, opening its page; a card with no ticket, or one not on the board, shows none.
-    const row = `(() => { const top = document.querySelector('#reader:not([hidden])') ?? document; const r = [...top.querySelectorAll('.ticket-row, .decide .ui-props a[href^="#ticket/"]')];
-      return r.length + '|' + r.map((x) => x.getAttribute('href') + ' ' + x.getAttribute('aria-label').replace(/^.*?ticket (\\S+): (.*), (\\d+)% done$/i, '$2 $1 $3%')).join(); })()`;
-    for (const [hash, seen] of [['#decide/ask-linked', 1], ['#decide/ask-plain', 0], ['#decide/ask-unknown', 0], ['#decide/npm', 1], ['#decide/from-linked', 1], ['#designs/chat-journeys', 1], ['#reports/digest-ran', 1], ['#waiting/faster-sign-in', 1]]) {
+    // Each linked card's screen shows one Ticket row of its panel (on an ask, Its ask), the ticket's title and progress, opening its page; a card with no ticket, or one not on the board, shows none.
+    const row = `(() => { const top = document.querySelector('#reader:not([hidden])') ?? document; const r = [...top.querySelectorAll('.ui-props a.ui-pr[href^="#ticket/"]')];
+      return r.length + '|' + r.map((x) => x.getAttribute('href') + ' ' + x.getAttribute('aria-label').replace(/^.*?: (.*), (\\d+)% done$/i, '$1 $2%')).join(); })()`;
+    for (const [hash, seen] of [['#decide/ask-linked', 1], ['#decide/ask-plain', 0], ['#decide/ask-unknown', 0], ['#decide/npm', 1], ['#decide/from-linked', 1], ['#evidence/update-1', 1], ['#designs/chat-journeys', 1], ['#reports/digest-ran', 1], ['#waiting/faster-sign-in', 1]]) {
       await evaluate(`location.href = ${JSON.stringify(url + hash)}`);
-      await until(async () => (await evaluate(`document.querySelector('#board h1, #reader:not([hidden]) h1') !== null && location.hash === ${JSON.stringify(hash)}`)) === true && (await evaluate(row)) === (seen ? '1|#ticket/T-29 Ship the new settings page T-29 60%' : '0|'));
+      await until(async () => (await evaluate(`document.querySelector('#board h1, #reader:not([hidden]) h1') !== null && location.hash === ${JSON.stringify(hash)}`)) === true && (await evaluate(row)) === (seen ? '1|#ticket/T-29 Ship the new settings page 60%' : '0|'));
       assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true, hash);
     }
-    // A proof's sheet shows its ticket as the Ticket row of its panel: the title, a bar once work on it has begun (full at 100%) and the percent, opening the ticket's page.
+    // A proof's sheet shows its ticket as the Its ask row of its panel, as the prototype names it: the title, a bar once work on it has begun (full at 100%) and the percent, opening the ticket's page.
     await evaluate(`location.href = ${JSON.stringify(`${url}#evidence/update-1`)}`);
-    await until(async () => (await evaluate('(() => { const r = [...document.querySelectorAll("#reader:not([hidden]) .ev-props a.ui-pr")].filter((a) => a.getAttribute("href").startsWith("#ticket/")); return r.length + "|" + r.map((x) => x.getAttribute("href") + " " + x.innerText.replace(/\\s+/g, " ").trim() + " " + !!x.querySelector(".ui-bar")).join(); })()')) === '1|#ticket/T-29 Ticket Ship the new settings page 60% true');
+    await until(async () => (await evaluate('(() => { const r = [...document.querySelectorAll("#reader:not([hidden]) .ev-props a.ui-pr")].filter((a) => a.getAttribute("href").startsWith("#ticket/")); return r.length + "|" + r.map((x) => x.getAttribute("href") + " " + x.innerText.replace(/\\s+/g, " ").trim() + " " + !!x.querySelector(".ui-bar")).join(); })()')) === '1|#ticket/T-29 Its ask Ship the new settings page 60% true');
     assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
-    // On Evidence the proof's row carries the same bar; a finished ticket shows a full bar at 100%, and one not begun shows no bar: its row shows the project and time.
+    // On Evidence the proof's row carries the same bar; a finished ticket shows a full bar at 100%, and one not begun shows no bar: its row shows the project and time, and its panel reads Not started.
     const bars = `(() => { const row = document.querySelector("#item-update-1 .l2"), sheet = [...document.querySelectorAll("#reader:not([hidden]) .ev-props a.ui-pr")].find((a) => a.getAttribute("href").startsWith("#ticket/"));
       return JSON.stringify([row?.querySelector(".ui-bar i")?.style.width ?? "none", row?.querySelector(".pct")?.textContent ?? "", sheet?.querySelector(".ui-bar i")?.style.width ?? "none", sheet?.querySelector(".n").textContent]); })()`;
-    for (const [progress, want] of [[100, ['100%', '100%', '100%', '100%']], [0, ['none', '', 'none', '0%']], [60, ['60%', '60%', '60%', '60%']]]) {
+    for (const [progress, want] of [[100, ['100%', '100%', '100%', '100%']], [0, ['none', '', 'none', 'Not started']], [60, ['60%', '60%', '60%', '60%']]]) {
       assert.equal(run('ticket', file, '--id', 'T-29', '--progress', String(progress)).code, 0);
       await evaluate('refresh()');
       await until(async () => (await evaluate(bars)) === JSON.stringify(want));
@@ -3979,7 +3982,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     // A card's Activity: nothing while its posting is all there is; then each answer with its note, the change, its agent taking it and a new round, oldest first.
     // The agent posted under a session id, which names nobody, so it reads Agent. The ticket's page shows those steps under the card's name.
     const thread = (hash) => `(async () => { location.hash = ${JSON.stringify(hash)}; await new Promise((ok) => setTimeout(ok, 50)); const top = document.querySelector('#reader:not([hidden])') ?? document;
-      return [...top.querySelectorAll('.th-list li')].map((li) => li.innerText.replace(/\\s+/g, ' ').replace(/ (Today|\\d+ \\w+), \\d\\d:\\d\\d$/, '').trim()).join(' | '); })()`;
+      return [...top.querySelectorAll('.ui-act li')].map((li) => [li.querySelector('b').textContent, li.querySelector('.th-n')?.textContent].filter(Boolean).join(' ')).join(' | '); })()`;
     assert.equal(await evaluate(thread('#decide/ask-linked')), '');
     for (const [answer, note] of [['no', 'Not this week.'], ['yes', 'After the Friday stand-up.']]) assert.equal((await post(url, 'api/answers', { key: 'ask-linked', answer, note })).status, 200);
     assert.equal(run('wait', file, '--filer', session, '--key', 'ask-linked', '--timeout', '5').code, 0);
@@ -3990,7 +3993,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     await until(async () => (await evaluate(thread('#decide/ask-linked'))) === ['Posted by Agent', ...steps].join(' | '));
     // The ticket shows its cards' steps newest first, each naming its card.
     const tkThread = `(async () => { location.hash = '#ticket/T-29'; await new Promise((ok) => setTimeout(ok, 50));
-      return [...document.querySelectorAll('.tk-act li')].map((li) => [li.querySelector('b').textContent, li.querySelector('.th-n')?.textContent, li.querySelector('.tk-on').textContent].filter(Boolean).join(' ')).join(' | '); })()`;
+      return [...document.querySelectorAll('.ui-act li')].map((li) => [li.querySelector('b').textContent, li.querySelector('.th-n')?.textContent, li.querySelector('.on').textContent].filter(Boolean).join(' ')).join(' | '); })()`;
     assert.equal(await evaluate(tkThread), [...steps].reverse().map((x) => `${x} Ship the settings page on Friday?`).join(' | '));
     assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
   } finally { close(); }
@@ -4053,7 +4056,7 @@ test('the feedback trail: what the person sends on a card goes Sent, Delivered, 
       [['Keep the weekly digest?', 'Sent', 1, false], ['Open the beta to every team?', 'Replied', 4, true], ['Turn on the CSV export?', 'Delivered', 2, false]]);
     // The card: the track's reached steps with their times, then the reply and its link; the Activity names each step.
     const card = async (key) => { await evaluate(`location.hash = "#decide/${key}"`); await until(() => evaluate(`!!document.querySelector(".decide .ui-trail") && location.hash === "#decide/${key}"`));
-      return JSON.parse(await evaluate('JSON.stringify({ track: [...document.querySelectorAll(".decide .ui-trail li")].map((l) => l.querySelector("b").textContent + (l.classList.contains("on") && /^\\d\\d:\\d\\d$/.test(l.querySelector("time").textContent) ? "+" : "")).join(" "), said: document.querySelector(".decide .tr-said")?.innerText.replace(/\\s+/g, " ") ?? "", link: document.querySelector(".decide .tr-said a")?.getAttribute("href") ?? "", act: [...document.querySelectorAll(".decide .th-list li .th-t")].map((b) => b.textContent).filter((t) => !/^(Posted|Your answer)/.test(t)) })')); };
+      return JSON.parse(await evaluate('JSON.stringify({ track: [...document.querySelectorAll(".decide .ui-trail li")].map((l) => l.querySelector("b").textContent + (l.classList.contains("on") && /^\\d\\d:\\d\\d$/.test(l.querySelector("time").textContent) ? "+" : "")).join(" "), said: document.querySelector(".decide .tr-said")?.innerText.replace(/\\s+/g, " ") ?? "", link: document.querySelector(".decide .tr-said a")?.getAttribute("href") ?? "", act: [...document.querySelectorAll(".decide .ui-act li .aw b")].map((b) => b.textContent).filter((t) => !/^(Posted|Your answer)/.test(t)) })')); };
     assert.deepEqual(await card('digest'), { track: 'Sent+ Delivered Read Replied', said: '', link: '', act: [] });
     assert.deepEqual(await card('export'), { track: 'Sent+ Delivered+ Read Replied', said: '', link: '', act: ['Delivered to release-agent'] });
     assert.deepEqual(await card('beta'), { track: 'Sent+ Delivered+ Read+ Replied+', said: 'Kept it to ten teams until the import fix lands. Pull request 245', link: 'https://github.com/example/settings/pull/245',
@@ -4155,20 +4158,24 @@ test('the new look draws only the approved prototype\'s colours: Today, Decide, 
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
-  // Each state: its address and what is tapped on it, on a phone and on a desk.
+  // A comment on the linked ask and the report, so a card's own screen draws its Activity beside its property panel.
+  for (const key of ['ask-linked', keys.report]) assert.equal((await post(url, 'api/messages', { kind: 'comment', key, text: 'Looks right on my phone.' })).status, 200);
+  // Each state: its address and what is tapped on it, on a phone and on a desk; a report tapped in its list opens its own screen (a sheet on a phone, beside the list on a desk).
   const states = {
     390: [['#', ''], ['#', '.t-more-line'], ['#find', ''], ['#answered', ''], ['#waiting', ''], ['#decide/release-day', '.decide [role="radio"], .decide input[type="radio"]'], ['#decide/npm', ''],
-      ['#reports', ''], [`#reports/${keys.report}`, ''], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#evidence', ''], ['#evidence', '.ev-more'], [`#evidence/${keys.evidence}`, ''], ['#tickets', ''], ['#ticket/T-29', ''],
+      ['#reports', ''], [`#reports/${keys.report}`, ''], ['#reports', `.rp-list a[data-row][href="#reports/${keys.report}"]`], ['#decide/ask-linked', ''], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#evidence', ''], ['#evidence', '.ev-more'], [`#evidence/${keys.evidence}`, ''], ['#tickets', ''], ['#ticket/T-29', ''],
       // Last, an answer and the toast it raises: a yes/no in light, the pick-one in dark.
       [(theme) => (theme === 'light' ? '#decide/ask-plain' : '#decide/release-day'), ['.decide .pick-option', '.decide-bar .answer']]],
-    1280: [['#', ''], ['#waiting', ''], ['#decide/ask-linked', ''], ['#reports', ''], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#evidence', ''], ['#tickets', ''], ['#ticket/T-29', '']],
+    1280: [['#', ''], ['#waiting', ''], ['#decide/ask-linked', ''], ['#reports', ''], ['#reports', `.rp-list a[data-row][href="#reports/${keys.report}"]`], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#evidence', ''], ['#tickets', ''], ['#ticket/T-29', '']],
   };
   const off = [];
   for (const width of [390, 1280]) for (const theme of ['light', 'dark']) {
     const { evaluate, send, close } = await browse(dir, width, width === 390 ? 844 : 800, width === 390);
     await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] });
     const allowed = PROTO[theme].map(channels);
-    const check = (list, at) => { for (const line of list) { const c = channels(line.split('  ')[0]); if (!c || !allowed.some((p) => p.every((x, i) => Math.abs(x - c[i]) <= (i < 3 ? 1 : 0.005)))) off.push(`${theme} ${width} ${at}: ${line}`); } };
+    // The board's mark keeps the prototype's blue check (web/icon.svg's gradient): those two blues count on the mark alone.
+    const near = (c) => (p) => p.every((x, i) => Math.abs(x - c[i]) <= (i < 3 ? 1 : 0.005)), logo = ['#6A93FF', '#2C48D3'].map(channels);
+    const check = (list, at) => { for (const line of list) { const c = channels(line.split('  ')[0]); if (!c || !(allowed.some(near(c)) || (/^span\.logo\b/.test(line.split('  ')[1] ?? '') && logo.some(near(c))))) off.push(`${theme} ${width} ${at}: ${line}`); } };
     try {
       for (const [hashOf, tap] of states[width]) {
         const hash = typeof hashOf === 'function' ? hashOf(theme) : hashOf;

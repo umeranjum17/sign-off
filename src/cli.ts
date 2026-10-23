@@ -473,7 +473,7 @@ function fits(title: unknown, key?: string) {
   if (n > TITLE_MAX) throw fail(`${key ? `key ${key}: ` : ''}title is ${n} characters, over ${TITLE_MAX}`, 'VALIDATION_ERROR', `Shorten the title to ${TITLE_MAX} characters and put the rest in about`);
 }
 /** The question standard's flags: a decision's why, each option's outcome, the reason for the recommendation, when silence decides, the cards it merges. */
-const ASK_FLAGS = ['why', 'outcome', 'recommend-reason', 'silent-by', 'merge', 'proof'];
+const ASK_FLAGS = ['why', 'outcome', 'recommend-reason', 'silent-by', 'merge', 'proof', 'report'];
 const MANY = ['option', 'outcome', 'merge'];
 /** Board types that are contract kinds: a decision (the default type) is an ask. */
 const CONTRACT_TYPES = ['decision', 'ask', 'evidence', 'report', 'plan', 'design'];
@@ -1617,7 +1617,7 @@ function buildIncoming(values: Record<string, any>, extra: object, filer: string
   try {
     const { title, key = slug(title), about, detail, why, recommend: recommend_value, default: default_if_silent, close } = values;
     const ask = !Object.hasOwn(extra, 'type'), options = ask ? outcomesOf(values) : optionsOf(values);
-    const told = ask && { why, recommend_reason: values['recommend-reason'], silent_by: values['silent-by'], merges: values.merge, proof: values.proof, ask_ref: values['ask-ref'] };
+    const told = ask && { why, recommend_reason: values['recommend-reason'], silent_by: values['silent-by'], merges: values.merge, proof: values.proof, report: values.report, ask_ref: values['ask-ref'] };
     writeFileSync(source, JSON.stringify({ schema: 2, items: [{ key, title, about, detail, ...told, options, recommend_value, default_if_silent, close, ticket: values.ticket, priority: values.priority, ...extra, filer }] }));
     const incoming = loadDecisions(source, board), raw = readItems(source).items;
     if (!ask) recommended(raw, true);
@@ -1640,6 +1640,7 @@ const canon = (v: unknown) => JSON.stringify(v, (_, x) => (x && typeof x === 'ob
  * A card is named by one ask until that ask is answered, dismissed or not. A merge new to the board also names a card still open. */
 function checkMerges(incoming: Decision[], resulting: Decision[], current: ReturnType<typeof board>) {
   for (const d of incoming) if (d.proof && resulting.find((x) => x.key === d.proof)?.type !== 'evidence') throw fail(`key ${d.key} rests on ${d.proof}, which is not an evidence update on the board`, 'VALIDATION_ERROR', `Post the evidence update first, or leave out --proof`);
+  for (const d of incoming) if (d.report && resulting.find((x) => x.key === d.report)?.kind !== 'report') throw fail(`key ${d.key} is about ${d.report}, which is not a report on the board`, 'VALIDATION_ERROR', 'Post the report first, or leave out --report');
   const byKey = new Map(resulting.map((d) => [d.key, d])), before = new Map(current.map((c) => [c.key, c]));
   const closed = (key: string) => !!(before.get(key)?.answer || before.get(key)?.dismissed);
   const holder = (key: string, self: string) => resulting.find((x) => x.key !== self && !before.get(x.key)?.answer && x.merges?.includes(key));
@@ -2357,7 +2358,9 @@ async function exportBoard(args: string[]) {
   if (!/\.html?$/i.test(out)) throw fail(`--out ${tilde(out)} does not end in .html`, 'VALIDATION_ERROR', 'Pass --out <file.html>');
   const data = JSON.stringify({ ...frozen, files, exported: `${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC` }).replace(/</g, '\\u003c');
   const csp = "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; media-src data:; frame-src data:";
-  writeFileSync(out, page.toString().replace('</head>', () => `<meta http-equiv="content-security-policy" content="${csp}">\n<script>window.FROZEN = ${data};</script>\n</head>`), { mode: 0o600 });
+  // The design tokens and shared parts go inside the one file, as nothing beside it is served.
+  const html = page.toString().replace(/<link rel="stylesheet" href="(tokens|ui)\.css">/g, (_, name) => `<style>${readFileSync(new URL(`../web/${name}.css`, import.meta.url), 'utf8')}</style>`);
+  writeFileSync(out, html.replace('</head>', () => `<meta http-equiv="content-security-policy" content="${csp}">\n<script>window.FROZEN = ${data};</script>\n</head>`), { mode: 0o600 });
   return toon({ board: tilde(parsed.file), exported: tilde(out), items: frozen.decisions.length, inlined: Object.keys(files).length, ...(missing && { missing }) },
     [`Open ${tilde(out)} in a browser: one read-only file, no server needed`]);
 }

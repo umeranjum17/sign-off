@@ -89,6 +89,10 @@ journeys:
   # A comment sent with an answer: Add a comment under a yes/no on Decide, Answer and one More…, then the Answered card and `answers`, at 390 and 1280 in light and dark.
   answer-comment:
     command: 'npm run build > /dev/null && for w in 390 1280; do for t in light dark; do COMMENT_WIDTH=$w node .agents/skills/done-done-verify-sign-off/comment-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t || exit 1; done; done'
+  # A card's own screen in the new look at 390x844, 1280x800 and 1440x900 (2x), light and dark, measured in the browser: one property panel and one Activity on every card, the open ask, proof
+  # and report, and on a desk the shell (12 columns, the list beside the open item, an ask's answers pinned in view); DETAIL_PROTO=<the approved prototype's index.html> pairs each state with it (vs-proto/).
+  detail:
+    command: 'npm run build > /dev/null && for w in 390 1280 1440; do node .agents/skills/done-done-verify-sign-off/detail-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" light,dark $w || exit 1; done'
   # Reports in the new look at 390x844 and 1280x800 (2x), light and dark, measured in the browser: the list (Newest, See all, By project), a guided report's sheet and a page report's,
   # Read the report, both swipes, archive with Undo and More; at 1280 the desk beside the report shown, J and U, a guided report by its link; the phone recorded (REPORTS_RECORD=1).
   # REPORTS_PROTO=<the approved prototype's index.html> pairs each phone state with the prototype's own (vs-proto/).

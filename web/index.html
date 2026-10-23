@@ -199,11 +199,11 @@
   html[data-kbd] h1[tabindex="-1"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   /* A report reads as a page of its own: what it is and when, its title in large type, what it says, then its page in a tile. */
   #reader .read { flex: 1; min-height: 0; overflow: auto; padding: 0 1.25rem 2rem; }
-  :is(#reader, .split-detail) .read > * { max-width: 42.5rem; margin-left: auto; margin-right: auto; }
-  :is(#reader, .split-detail) .read .eyebrow { margin-top: 0.5rem; font-weight: 400; }
-  :is(#reader, .split-detail) .read h1 { margin-top: 0.75rem; margin-bottom: 0.75rem; font-size: 2.125rem; line-height: 1.1765; font-weight: 700; letter-spacing: 0.011em; white-space: normal; overflow: visible; }
-  :is(#reader, .split-detail) .read .about { margin-bottom: 1rem; font-size: 1.25rem; line-height: 1.4; }
-  :is(#reader, .split-detail) .read .decided { margin-bottom: 1.25rem; }
+  #reader .read > * { max-width: 42.5rem; margin-left: auto; margin-right: auto; }
+  #reader .read .eyebrow { margin-top: 0.5rem; font-weight: 400; }
+  #reader .read h1 { margin-top: 0.75rem; margin-bottom: 0.75rem; font-size: 2.125rem; line-height: 1.1765; font-weight: 700; letter-spacing: 0.011em; white-space: normal; overflow: visible; }
+  #reader .read .about { margin-bottom: 1rem; font-size: 1.25rem; line-height: 1.4; }
+  #reader .read .decided { margin-bottom: 1.25rem; }
   :is(#reader, .split-detail) .read iframe { display: block; width: 100%; max-width: none; height: 1px; flex: none; border-radius: 1rem; background: var(--surface); }
   .i-plan { --area: var(--c-waiting); }
   #reader .plan-scroll { flex: 1; min-height: 0; overflow: auto; padding: 1.25rem 1.25rem 9rem; }
@@ -392,16 +392,9 @@
   .ev-hero.none { display: flex; align-items: center; justify-content: center; gap: 0.5rem; height: 6rem; border-radius: 1rem; background: var(--tk-inset); color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); }
   .ev-hero .gone { margin: 0; color: var(--tk-critical); font-size: var(--tk-fs-row); }
   .ev-item > .files { margin-top: 0.5rem; }
-  .ev-props { margin-top: 0.5rem; } .ev-props .k .ev-g { color: var(--tk-text-secondary); } .ev-props .v a, .ev-props a .v { font-weight: 500; }
-  .ev-props a.ui-pr .v > span:last-child:not(.n) { font-weight: 500; }
   .ev-word.not { color: var(--tk-critical); }
   .ev-about, .ev-why { margin: 0.5rem 0 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
-  .ev-item > .thread { margin-top: 1.5rem; }
-  /* Its Activity as the panel above it: a quiet label, ink not blue. */
-  .ev-item .thread .tk-label { margin: 0 0 0.5rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 400; letter-spacing: 0; text-transform: none; }
-  .ev-item .th-list { border-radius: 1rem; background: var(--tk-inset); box-shadow: none; } .ev-item .th-list li:last-child .th-dot { background: var(--tk-ink); } .ev-item .th-t a { color: var(--tk-ink); font-weight: 500; }
   .ev-verdict .other > summary { color: var(--tk-text-secondary); font-size: var(--tk-fs-row); font-weight: 500; }
-  .ev-item .th-t a { position: relative; } .ev-item .th-t a::after { content: ''; position: absolute; inset: -0.8125rem -0.25rem; }
   .ev-verdict { display: grid; gap: 0.5rem; margin-top: 1.5rem; }
   .ev-verdict .choices { display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0.5rem; }
   .ev-verdict .choices button { display: flex; align-items: center; justify-content: center; height: 3.25rem; min-height: 0; padding: 0 0.5rem; border: 0; border-radius: 1.625rem;
@@ -790,17 +783,8 @@
     .decide-bar { position: static; margin: 1rem 0 0; padding: 0; background: transparent; }
     /* Designs on a desk fill the window, as the approved prototype's desk draws it: 24px around, where it is over a 32px title and what is on the board, then a 12-column grid
        to the foot: the designs as picture cards across the top (four columns each; more scroll sideways, a whole card at a time) and the open design (eight) beside where it stands (four). */
-    body:has(.dz-grid) { padding-bottom: 0; }
-    main:has(.dz-grid) { max-width: none; height: 100vh; margin: 0; padding: 1.5rem; overflow: hidden; }
-    main:has(.dz-grid) > #board { display: flex; flex-direction: column; gap: 1rem; height: 100%; }
-    .dz-head { display: flex; flex: none; align-items: flex-end; gap: 1rem; }
-    .dz-head .tx { flex: 1; min-width: 0; }
-    .dz-head .tx > p { margin: 0.25rem 0 0; color: var(--tk-text-secondary); font-size: 0.9375rem; line-height: 1.5rem; }
-    .dz-head .tx > .crumb { margin: 0; color: var(--tk-text-tertiary); font-size: 0.8125rem; line-height: 1.25rem; } .dz-head .crumb span { margin: 0 0.25rem; }
-    .dz-head h1 { margin: 0; color: var(--tk-ink); font-size: 2rem; line-height: 2.5rem; font-weight: 500; letter-spacing: -0.012em; }
-    .dz-head .acts { display: flex; gap: 0.5rem; padding-bottom: 0.25rem; }
     .dz-bulk .bulk { margin: 0; }
-    .dz-grid { display: grid; flex: 1; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: auto minmax(0, 1fr); gap: 1rem; min-height: 0; }
+    .ui-dgrid.dz-grid { grid-template-rows: auto minmax(0, 1fr); }
     .dz-strip { display: grid; grid-column: 1 / -1; grid-auto-flow: column; grid-auto-columns: calc((100% - 2rem) / 3); gap: 1rem; margin: -1.25rem; padding: 1.25rem;
       overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding: 0 1.25rem; scrollbar-width: none; }
     .dz-strip::-webkit-scrollbar { display: none; }
@@ -1240,19 +1224,14 @@
   #reader.rp-sheet .rp-x .glyph { width: 1rem; height: 1rem; stroke-width: 2; }
   #reader.rp-sheet h1 { margin-top: 0.5rem; margin-bottom: 0; color: var(--tk-ink); font-size: 1.25rem; line-height: 1.75rem; font-weight: 500; letter-spacing: -0.017em; }
   #reader.rp-sheet .about { margin-top: 0.5rem; margin-bottom: 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
-  #reader.rp-sheet .rp-found { padding: 0.75rem 1rem; color: var(--tk-ink); }
-  #reader.rp-sheet .rp-part { width: 100%; min-height: 3rem; padding: 0; border-radius: 0; background: none; font: inherit; text-align: left; }
-  #reader.rp-sheet .rp-part .k { flex: 1; min-width: 0; color: var(--tk-ink); font-weight: 500; }
-  #reader.rp-sheet .rp-check { display: grid; flex: none; place-items: center; width: 1.25rem; height: 1.25rem; border-radius: 0.625rem; box-shadow: inset 0 0 0 1.5px var(--tk-mid); }
-  #reader.rp-sheet .rp-check.on { background: var(--tk-ink); box-shadow: none; color: var(--tk-canvas); }
-  #reader.rp-sheet .rp-check .glyph { width: 0.875rem; height: 0.875rem; stroke-width: 2.6; }
-  #reader.rp-sheet .rp-open-full { width: 100%; min-height: 3rem; margin-top: 1rem; border-radius: 1.5rem; background: var(--tk-ink); color: var(--tk-canvas); font: inherit; font-size: 0.9375rem; font-weight: 500; }
-  #reader.rp-sheet :is(.ticket-block, .thread, iframe) { margin-top: 1.5rem; }
-  /* The ticket row and Activity (#228's parts) take the sheet's own look here: the quiet label, a sunk panel, and ink for the bar, its mark and the newest step. */
-  #reader.rp-sheet .tk-label { margin: 0 0 0.5rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 400; }
-  #reader.rp-sheet :is(.ticket-row, .th-list) { background: var(--tk-inset); box-shadow: none; }
-  #reader.rp-sheet .tk-mark { background: var(--tk-raised); color: var(--tk-ink); }
-  #reader.rp-sheet .tk-bar { background: var(--tk-track); } #reader.rp-sheet .tk-bar i, #reader.rp-sheet .th-list li:last-child .th-dot { background: var(--tk-fill); }
+  .rp-found { padding: 0.75rem 1rem; color: var(--tk-ink); }
+  .rp-part { width: 100%; min-height: 3rem; padding: 0; border-radius: 0; background: none; font: inherit; text-align: left; }
+  .rp-part .k { flex: 1; min-width: 0; color: var(--tk-ink); font-weight: 500; }
+  .rp-check { display: grid; flex: none; place-items: center; width: 1.25rem; height: 1.25rem; border-radius: 0.625rem; box-shadow: inset 0 0 0 1.5px var(--tk-mid); }
+  .rp-check.on { background: var(--tk-ink); box-shadow: none; color: var(--tk-canvas); }
+  .rp-check .glyph { width: 0.875rem; height: 0.875rem; stroke-width: 2.6; }
+  .rp-open-full { width: 100%; min-height: 3rem; margin-top: 1rem; border-radius: 1.5rem; background: var(--tk-ink); color: var(--tk-canvas); font: inherit; font-size: 0.9375rem; font-weight: 500; }
+  #reader.rp-sheet iframe { margin-top: 1.5rem; }
   #reader.rp-sheet .read > .dis { display: block; min-height: 2.75rem; margin-top: 1rem; padding: 0; border: 0; background: none; color: var(--tk-text-tertiary); font: inherit; }
   /* On a desk the sheet sits in the middle of the window, with all four corners rounded. */
   @media (min-width: 64rem) { #reader.rp-sheet .rp-sheet-body { top: 50%; bottom: auto; max-height: calc(100% - 6rem); border-radius: 1.75rem; transform: translateY(-50%); }
@@ -1307,7 +1286,6 @@
   .decide .since, .decide .why { margin: 0.5rem 0 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 400; }
   .decide .lead .st { display: inline-block; margin-top: 0.5rem; }
   .decide .ui-props { margin-top: 0.5rem; }
-  .decide .ui-pr .k .glyph { width: 1.125rem; height: 1.125rem; stroke-width: 1.8; }
   .decide-preview { display: grid; place-items: center; min-height: 8rem; margin: 1rem 0 0; padding: 0.75rem; overflow: hidden; border-radius: 1rem; background: var(--tk-inset); }
   .decide-preview > img { display: block; max-width: 100%; max-height: 15rem; object-fit: contain; border-radius: 0.75rem; }
   .decide-preview .rung { width: 100%; }
@@ -1320,33 +1298,8 @@
     .decide-preview .mocks { grid-auto-columns: min(85%, 8rem); --tall: min(20svh, 10rem); }
     .decide-preview .shot { aspect-ratio: 1; }
   }
-  .decide .proof-block .ui-dl, .decide .thread .tk-label { margin: 1.5rem 0 0.5rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 400; letter-spacing: 0; text-transform: none; }
+  .decide .proof-block .ui-dl { margin: 1.5rem 0 0.5rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 400; letter-spacing: 0; text-transform: none; }
   .decide > .ui-dl, .decide > label.ui-dl { display: block; margin-top: 1.5rem; }
-  /* A card's ticket: one row, its title over its id and progress, that opens the ticket. */
-  .ticket-block { margin-top: 1.25rem; }
-  /* On an update's screen the row reads as one of its groups: the label as Proof's, the row as its cells. */
-  .tk-label { margin: 0 0 0.5rem; color: var(--muted); font-size: 0.875rem; line-height: 1.1875rem; font-weight: 600; letter-spacing: 0; text-transform: none; }
-  .ticket-row { display: flex; align-items: center; gap: 0.75rem; min-height: 3.75rem; padding: 0.625rem 0.875rem; border-radius: 1rem; background: var(--opt, var(--surface)); box-shadow: 0 0 0 0.5px var(--line);
-    color: var(--text); text-decoration: none; transition: background-color 120ms linear; }
-  .ticket-row:active { background: var(--tk-inset); }
-  .tk-mark { flex: none; display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 0.625rem; background: var(--tk-inset); color: var(--tk-ink); }
-  .tk-mark .glyph { width: 1.25rem; height: 1.25rem; }
-  .tk-t { display: grid; flex: 1; min-width: 0; gap: 0.125rem; }
-  .tk-t b { overflow: hidden; font-size: 1rem; line-height: 1.375rem; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
-  .tk-m { display: flex; align-items: center; gap: 0.5rem; min-width: 0; color: var(--muted); font-size: 0.875rem; line-height: 1.1875rem; }
-  .tk-bar { flex: none; width: 4rem; height: 0.25rem; overflow: hidden; border-radius: 0.125rem; background: var(--fill-2); }
-  .tk-bar i { display: block; height: 100%; border-radius: inherit; background: var(--action); }
-  .tk-n { font-variant-numeric: tabular-nums; }
-  .ticket-row > :last-child .glyph { width: 1.25rem; height: 1.25rem; color: var(--muted); }
-  /* A card's thread: one grouped list, oldest first, a dot per step (the newest in ink), its words, the note in quotes and the time. */
-  .thread { margin-top: 1.25rem; }
-  .th-list { margin: 0; padding: 0.125rem 1rem; list-style: none; border-radius: 1rem; background: var(--opt, var(--surface)); box-shadow: 0 0 0 0.5px var(--line); }
-  .th-list li { display: flex; gap: 0.75rem; padding: 0.625rem 0; } .th-list li + li { border-top: 0.5px solid var(--line); }
-  .th-dot { flex: none; width: 0.5rem; height: 0.5rem; margin-top: 0.5rem; border-radius: 50%; background: var(--fill-2); } .th-list li:last-child .th-dot { background: var(--action); }
-  .th-b { display: grid; flex: 1; min-width: 0; gap: 0.125rem; font-size: 0.9375rem; line-height: 1.25rem; }
-  .th-t a { color: var(--accent); text-decoration: none; }
-  .th-n { color: var(--muted); }
-  .th-b time { color: var(--muted); font-size: 0.8125rem; line-height: 1.125rem; font-variant-numeric: tabular-nums; }
   .pst { color: var(--muted); font-size: 0.875rem; line-height: 1.25rem; }
   .res { display: inline-flex; align-items: center; gap: 0.3125rem; font-weight: 600; } .res::before { content: ""; width: 0.4375rem; height: 0.4375rem; border-radius: 50%; background: currentColor; }
   .res.ok { color: var(--ok); } .res.bad { color: var(--danger); } .res.warn { color: var(--warn); }
@@ -1399,12 +1352,6 @@
   .proof-row .pthumb img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
   .proof-row .pt { display: grid; flex: 1; min-width: 0; gap: 0.125rem; } .proof-row .pt b { overflow: hidden; font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
   .proof-row > :last-child .glyph { width: 1.125rem; height: 1.125rem; stroke-width: 2; color: var(--tk-text-tertiary); }
-  /* The ask's Activity: the label as the panel's, the thread as one inset group. */
-  .decide .thread { margin: 0; }
-  .decide .th-list { padding: 0 1rem; border-radius: 1rem; background: var(--tk-inset); box-shadow: none; }
-  .decide .th-list li + li { border-top: 1px solid var(--tk-line); }
-  .decide .th-list li:last-child .th-dot { background: var(--tk-fill); }
-  .decide .th-b { font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); } .decide .th-t a { color: var(--tk-ink); text-decoration: underline; text-underline-offset: 2px; }
   /* A sign-in: its key in a tile, the facts as one inset group, and Open sign-in with what it does under it. */
   .signin-ask > .icon { width: 3rem; height: 3rem; margin: 0.5rem 0 0; border-radius: var(--tk-r-icon); background: var(--tk-raised); box-shadow: var(--tk-elev-raised); }
   .signin-ask > .icon svg { width: 1.5rem; height: 1.5rem; stroke: var(--tk-ink); stroke-width: 1.8; }
@@ -1468,12 +1415,11 @@
   .design-stage .stamp .glyph { width: 1.875rem; height: 1.875rem; stroke-width: 2.6; }
   .design-stage .stamp.pop { animation: stamp 520ms var(--spring); }
   @keyframes stamp { from { opacity: 0; transform: scale(1.8) rotate(-12deg); } }
-  /* ---- The desk shell (64rem and wider): an area can set its list beside a detail pane, each column scrolling on its own, like Mail.
-     The selected row is tinted with an accent bar; a new detail slides in from the side the selection moved. Keys are hinted where they work
-     (a chip on a button, a strip under the list) and all listed in one sheet behind ?. A phone keeps its own layout and shows no hints. ---- */
+  /* ---- The desk (64rem and wider) sets a list beside its open item in ui.css's shell; these are the parts that sit in it. Keys work where they are listed in one sheet
+     behind ? (the sidebar's Keyboard shortcuts); the prototype draws no key hints on its buttons. A phone keeps its own layout. ---- */
   .kc, kbd { display: inline-grid; place-items: center; min-width: 1.375rem; height: 1.375rem; padding: 0 0.3125rem; border-radius: 0.375rem; background: var(--sunk);
     box-shadow: inset 0 -1px 0 var(--line); color: var(--muted); font: 600 0.75rem/1 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; letter-spacing: 0; }
-  .split-hints, .split-bar, .dl-hover, .side .keys { display: none; }
+  .split-bar, .dl-hover { display: none; }
   #keys { width: min(44rem, calc(100vw - 2rem)); max-height: calc(100dvh - 3rem); padding: 0; border: 0; border-radius: 1.25rem; background: var(--tile); color: var(--text);
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2), 0 0 0 0.5px var(--line); }
   #keys[open] { animation: sheet-in 260ms var(--spring); }
@@ -1488,86 +1434,95 @@
   #keys li { display: flex; align-items: center; gap: 0.25rem; min-height: 2.75rem; border-bottom: 0.5px solid var(--line); font-size: var(--t-s); }
   #keys li > span:first-child { flex: 1; }
   @media (min-width: 64rem) {
-    body.split-view { padding-bottom: 0; }
-    body.split-view main { max-width: none; padding: 0; overflow: visible; }
-    .split { display: grid; grid-template-columns: clamp(20rem, 32vw, 25rem) minmax(0, 1fr); height: 100vh; }
-    .split-list { display: flex; flex-direction: column; min-height: 0; overflow: auto; padding: 0 1.5rem; border-right: 1px solid var(--line); overscroll-behavior: contain; }
-    .split-list > .top { padding: 2.75rem 0 0.5rem; }
-    .split-list .dl-list { margin: 0 -1.5rem; border-radius: 0; }
-    .split-list .rp-list.ui-list { margin: 0; border-radius: var(--tk-r-card); }
-    .split-list .dl-face { min-height: 4.5rem; padding: 0.75rem 1.5rem; }
-    .dl-row.sel .dl-face { background: var(--tk-inset); box-shadow: inset 3px 0 0 var(--action); outline: none; }
-    .dl-row.sel + .dl-row .dl-face::before, .dl-row.sel .dl-face::before { border-color: transparent; }
-    /* The report shown sits on the sunk fill, as the prototype marks the open item. */
-    .rp-list .dl-row.sel .dl-face.ui-row { background: var(--tk-inset); box-shadow: none; }
-    /* The toast, as the prototype sets it on a desk: 440px wide, centred over the list and its pane together. */
-    body.split-view #toast { left: calc(50% + 7.5rem - 13.75rem); right: auto; width: 27.5rem; }
-    .split-hints { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem 1rem; margin: auto -1.5rem 0; padding: 0.75rem 1.5rem;
-      border-top: 1px solid var(--line); background: var(--bg); color: var(--faint); font-size: var(--t-xs); }
-    .split-hints > span { display: inline-flex; align-items: center; gap: 0.25rem; }
-    .split-hints .kc { margin-right: 0.125rem; }
-    .split-detail { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; }
-    .split-bar { position: sticky; z-index: 2; top: 0; display: flex; align-items: center; gap: 0.5rem; min-height: 3.75rem; padding: 0 1.5rem 0 1rem; border-bottom: 1px solid var(--line); background: var(--bg); }
-    .split-bar .later { display: inline-flex; align-items: center; gap: 0.5rem; margin-left: auto; min-height: var(--ctl); padding: 0 0.75rem; border-radius: var(--r-ctl); background: none; color: var(--text); font-weight: 400; }
-    .split-bar .later:hover, .dl-hover button:hover { background: var(--sunk); }
-    .split-bar .later .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.75; color: var(--muted); }
-    /* Decide on a desk, at the prototype's measures: the list's head 22px down with a 28px title, rows 18px in, a 56px bar over the ask (its kind, Later and More),
-       the ask 44px in under a 30px question, and its answer bar right after it: never at the pane's foot, and under a tall ask after the last option, so it never covers one. */
-    .split-list:has(> .decide-list) { padding: 0 1rem; }
-    .split-list .decide-list .dl-row.sel .dl-face.ui-row { background: var(--tk-inset); box-shadow: none; }
-    /* A desk's column is narrow for a question: its title takes two lines before it is cut, and the row grows to hold them. */
+    /* The open row in a list sits on the sunk fill, as the prototype marks the open item; a narrow column lets a question take two lines before it is cut. */
+    .split-list .dl-row.sel .dl-face.ui-row { background: var(--tk-inset); box-shadow: none; }
     .split-list .decide-list .ui-row { height: auto; min-height: 4.25rem; padding-block: 0.75rem; }
     .split-list .decide-list .ui-row .l1 { align-items: flex-start; height: auto; }
     .split-list .decide-list .ui-row .l1 .t { display: -webkit-box; white-space: normal; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-    .split-list:has(> .decide-list) .split-hints { margin: auto -1rem 0; padding: 0.625rem 1rem 0.75rem; }
-    .split-bar:has(> .crumb) { min-height: 3.5rem; padding: 0 1rem 0 2rem; }
-    .split-bar .crumb { flex: 1; min-width: 0; margin: 0; overflow: hidden; color: var(--muted); font-size: 0.875rem; white-space: nowrap; text-overflow: ellipsis; }
-    .split-bar .crumb b { color: var(--text); font-weight: 600; }
-    .split-bar:has(> .crumb) .later { min-height: 2.25rem; margin-left: 0; padding: 0 0.625rem 0 0.75rem; border-radius: 0.625rem; font-size: 0.875rem; font-weight: 500; }
-    .split-bar:has(> .crumb) .later::after { min-width: 1.25rem; height: 1.25rem; margin-left: 0.5rem; font-size: 0.6875rem; }
-    .split-detail > .decide { width: 100%; max-width: 45rem; margin: 0 auto; padding: 1.75rem 2.75rem 0; }
-    .split-detail > .decide .decide-preview { margin-top: 1.5rem; }
-    .split-detail .decide .lead h2 { font-size: 1.5rem; line-height: 2rem; }
-    .split-detail .decide-bar { gap: 0.875rem; margin: 1.5rem -2.75rem 0; padding: 1rem 2.75rem 1.5rem; background: var(--tk-canvas); }
-    .split-detail .decide-bar :is(.answer, .open-link) { flex: 0 1 auto; min-width: 15rem; padding: 0 1.5rem; }
-    .split-detail .decide-bar .hint { flex: 1 1 12rem; max-width: 18.75rem; margin: 0; text-align: left; }
-    .split-detail .decide-bar .bar-hint { display: inline-flex; align-items: center; gap: 0.375rem; margin-left: auto; color: var(--faint); font-size: var(--t-xs); }
-    .split-detail [data-kbd]::after { content: attr(data-kbd); display: inline-grid; place-items: center; min-width: 1.375rem; height: 1.375rem; margin-left: 0.625rem; padding: 0 0.3125rem; border-radius: 0.375rem;
-      background: var(--tk-on-ink-press); color: inherit; font-size: 0.75rem; font-weight: 600; line-height: 1; vertical-align: 0.0625rem; }
-    .split-bar [data-kbd]::after { background: var(--sunk); color: var(--muted); }
-    .split-detail .answer.done::after { opacity: 0; }
-    .split-detail > .empty, .split-detail > .all-clear-big { margin: auto; padding: 2rem; color: var(--muted); }
+    .split-list > .rp-page > .ui-hero:first-child { margin-top: 0; }
+    /* Decide's count is the head's line on a desk, so its list goes straight to the asks. */
+    .split-list > .decide-list > .ui-hero { display: none; } .split-list > .decide-list > .ui-hero + .ui-sec { margin-top: 0; }
+    main .theme { display: none; }
+    /* The toast, as the prototype sets it on a desk: 440px wide, centred over the list and its open item together. */
+    body:has(.ui-desk) #toast { left: calc(50% + 7.5rem - 13.75rem); right: auto; width: 27.5rem; }
+    /* The open item's head line: what it is, whose and when, then its own controls (More, Mark read, Archive) at its right. */
+    .split-bar { display: flex; }
+    .ui-pane :is(.two, .pbody) > .split-bar, .ui-pane.two > .split-bar { grid-column: 1 / -1; }
+    .split-bar .dl-more > summary { width: 2rem; height: 2rem; color: var(--tk-ink); } .split-bar .dl-more > summary > span { background: var(--tk-inset); }
+    /* With nothing to set beside it, the open item takes its whole width. */
+    .ui-pane.two:not(:has(> .pside > *)), .ui-pane .pbody:not(:has(> .pside > *)) { grid-template-columns: minmax(0, 1fr); }
+    .split-bar .crumb { flex: 1; min-width: 0; margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; } .split-bar .crumb b { color: var(--tk-text-secondary); font-weight: 500; }
+    .split-bar :is(.rp-read, .rp-archive) { display: inline-flex; flex: none; align-items: center; gap: 0.375rem; height: 2rem; min-height: 0; padding: 0 0.75rem; border-radius: 1rem; background: var(--tk-inset);
+      color: var(--tk-ink); font: inherit; font-size: var(--tk-fs-meta); font-weight: 500; }
+    .split-bar :is(.rp-read, .rp-archive) .glyph { width: 1rem; height: 1rem; stroke-width: 2; }
+    .split-bar :is(.rp-read, .rp-archive):active { transform: scale(0.96); }
     .split-detail.in > * { animation: detail-in 260ms var(--ease); }
     .split-detail.in > .split-bar { animation: none; }
     @keyframes detail-in { from { opacity: 0; transform: translateY(var(--dy, 1rem)); } }
     .split-detail[data-dir="up"] { --dy: -1rem; }
+    .split-detail > :is(.empty, .all-clear-big) { margin: auto; padding: 2rem; color: var(--tk-text-tertiary); }
+    .ui-pane:has(> .empty, > .all-clear-big) { display: flex; flex-direction: column; }
+    /* An ask as the open item: its question at 24px, the answers as cards side by side (the picked one ringed in ink), then the note, Ask me later and Answer on one 48px line. */
+    .decide.ui-pane { max-width: none; margin: 0; }
+    .ask2 .lead h2 { font-size: 1.5rem; line-height: 2rem; }
+    .ask2 .ppin > .ui-dl:first-child { display: none; }
+    .ask2 .ppin .pick-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.75rem; margin: 0; padding: 0; background: none; }
+    .ask2 .ppin .pick-list > li + li::before { content: none; }
+    .ask2 .ppin .pick-option { height: 100%; min-height: 3.5rem; padding: 0.75rem 1rem; border-radius: 1rem; background: var(--tk-inset); box-shadow: inset 0 0 0 1.5px transparent; }
+    .ask2 .ppin .pick-option[aria-pressed="true"] { background: var(--tk-raised); box-shadow: inset 0 0 0 1.5px var(--tk-ink); }
+    .ask2 .ppin .pick-option .check { display: none; }
+    .ask2 .ppin .own-box { margin-top: 0.75rem; }
+    .ask2 .decide-bar { position: static; flex-wrap: nowrap; align-items: center; gap: 0.75rem; margin: 0.75rem 0 0; padding: 0; background: none; }
+    .ask2 .decide-bar .note-field { flex: 1; min-width: 0; }
+    .ask2 .decide-bar .note-box { height: 3rem; margin: 0; padding: 0.875rem 1rem; border-radius: 1.5rem; white-space: nowrap; overflow: hidden; }
+    .ask2 .decide-bar :is(.answer, .later-btn, .open-link) { flex: none; min-height: 3rem; padding: 0 1.5rem; border-radius: 1.5rem; }
+    .ask2 .decide-bar:not(:has(.note-field)) .answer { flex: 1; }
+    .ui-pane > .decide { max-width: none; margin: 0.5rem 0 0; }
+    /* The report an ask is about: what it says, its numbers as small tiles two across, and Open report in ink. */
+    .ask-rp { padding: 0.75rem 1rem; }
+    .ask-rp .cx { margin: 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: 1.25rem; }
+    .ask-rp .cxn { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.75rem; }
+    .ask-rp .cxn span { display: flex; flex-direction: column; min-width: 0; padding: 0.5rem 0.75rem; border-radius: 0.75rem; background: var(--tk-card); color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: 1rem; }
+    .ask-rp .cxn b { color: var(--tk-ink); font-size: 1.25rem; line-height: 1.75rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+    .ask-rp .see { position: relative; display: inline-block; margin-top: 0.75rem; color: var(--tk-ink); font-size: var(--tk-fs-row); line-height: 1.25rem; font-weight: 500; text-decoration: none; }
+    .ask-rp .see::after { content: ''; position: absolute; inset: -0.75rem -0.25rem; }
+    /* A proof as the open item: its capture fills its column, the whole picture shown from the top. */
+    .ui-pane .pv-cap { margin-top: 1rem; padding: 0; background: none; }
+    /* Its verdicts in the open item's narrower side column: the prototype's 48px pills at 14px, so Needs work keeps room inside its button. */
+    .ui-pane .ev-verdict .choices button { height: 3rem; font-size: var(--tk-fs-row); white-space: nowrap; }
+    .ui-pane .pv-cap .phone { width: 100%; padding: 0; }
+    .ui-pane .pv-cap :is(img, video) { display: block; width: 100%; max-height: 32rem; object-fit: contain; object-position: top center; border-radius: 1rem; background: var(--tk-inset); }
+    /* A report as the open item: its page in a tile under what it says, at the column's width. */
+    .ui-pane .read iframe { margin-top: 1.5rem; border: 0; }
+    .ui-pane .rp-open-full { min-height: 3rem; }
+    .ui-pane .rp-kv { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 1rem; }
+    .ui-pane .rp-kv > div { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.75rem 1rem; border-radius: 0.875rem; background: var(--tk-inset); }
+    .ui-pane .rp-kv small { color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); line-height: 1rem; } .ui-pane .rp-kv span { color: var(--tk-text); font-size: var(--tk-fs-row); line-height: 1.25rem; }
+    .ui-pane .rp-chart { margin-top: 1rem; padding: 0.75rem 1rem; border-radius: 1rem; background: var(--tk-inset); }
+    .ui-pane .rp-chart .vt { margin: 0 0 0.25rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: 1.125rem; }
+    .ui-pane .vrow { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto; align-items: center; gap: 0.75rem; min-height: 2.5rem; padding: 0.375rem 0; }
+    .ui-pane .vrow + .vrow { border-top: 1px solid var(--tk-line); }
+    .ui-pane .vl { display: flex; flex-direction: column; min-width: 0; } .ui-pane .vl b { color: var(--tk-text); font-size: var(--tk-fs-meta); line-height: 1.125rem; font-weight: 500; }
+    .ui-pane .vl small { color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); line-height: 1rem; }
+    .ui-pane .vb { height: 0.5rem; overflow: hidden; border-radius: 0.25rem; background: var(--tk-track); } .ui-pane .vb i { display: block; height: 100%; border-radius: 0.25rem; background: var(--tk-fill); }
+    .ui-pane .vb i.bad { background: var(--tk-critical); } .ui-pane .vb i.warn { background: var(--tk-warning); }
+    .ui-pane .vn { color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); line-height: 1.125rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .ui-pane .rp-kp { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.5rem 0 0; padding: 0; list-style: none; }
+    .ui-pane .rp-kp li { position: relative; display: flex; flex-direction: column; gap: 0.125rem; padding: 0.625rem 0.875rem 0.625rem 1.75rem; border-radius: 0.875rem; background: var(--tk-inset); }
+    .ui-pane .rp-kp li::before { content: ''; position: absolute; top: 1.0625rem; left: 0.75rem; width: 0.375rem; height: 0.375rem; border-radius: 50%; background: var(--tk-fill); }
+    .ui-pane .rp-kp li.bad::before { background: var(--tk-critical); } .ui-pane .rp-kp li.warn::before { background: var(--tk-warning); }
+    .ui-pane .rp-kp b { color: var(--tk-ink); font-size: var(--tk-fs-row); line-height: 1.25rem; font-weight: 500; } .ui-pane .rp-kp span { color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); line-height: 1.125rem; }
+    .ui-pane .rp-next { padding: 0.75rem 1rem; } .ui-pane .rp-next b { display: block; color: var(--tk-ink); font-weight: 500; } .ui-pane .rp-next p { margin: 0.25rem 0 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); line-height: 1.125rem; }
     /* Hovering a row shows its quick actions over its time: answer with the recommended pick, or Later. */
     .split-list .dl-hover { position: absolute; z-index: 2; top: 50%; right: 1rem; transform: translateY(-50%); display: flex; gap: 0.25rem; opacity: 0; pointer-events: none; transition: opacity 120ms linear; padding: 0.125rem; border-radius: 0.75rem; background: var(--tile); box-shadow: var(--tk-elev-raised), 0 0 0 0.5px var(--line); }
-    .split-list .dl-row:not(.leaving):hover .dl-hover, .split-list .dl-row:focus-within .dl-hover { opacity: 1; pointer-events: auto; }
+    /* A row whose focus came from a click or from the board opening it keeps its words clear; a key's focus shows the actions as a hover does. */
+    .split-list .dl-row:not(.leaving):hover .dl-hover, .split-list .dl-row:has(:focus-visible) .dl-hover { opacity: 1; pointer-events: auto; }
     .dl-hover button { display: inline-flex; align-items: center; gap: 0.375rem; min-height: 2rem; padding: 0 0.625rem; border-radius: 0.5rem; background: none; color: var(--text); font-size: var(--t-xs); font-weight: 600; }
     .dl-hover button::after { content: ""; position: absolute; inset: -0.375rem 0; }
     .dl-hover button { position: relative; } .dl-hover .glyph { width: 1rem; height: 1rem; stroke-width: 2.2; }
     .dl-hover .yes .glyph { color: var(--tk-ink); } .dl-hover .later-q .glyph { color: var(--tk-text-secondary); }
-    /* Reports: the bar says what the report is, who asked and when, beside Mark read and Archive; the page reads under it at the pane's width. */
+    .dl-hover button:hover, .dl-hover button:active { background: var(--sunk); } .dl-hover button:active { transform: scale(0.96); }
     .dl-hover .read-q .glyph { color: var(--tk-ink); }
-    .rp-bar .eyebrow { display: block; flex: 1; min-width: 0; margin: 0 0 0 0.5rem; overflow: hidden; color: var(--muted); font-size: var(--t-s); font-weight: 400; white-space: nowrap; text-overflow: ellipsis; }
-    .rp-bar .eyebrow b { color: var(--tk-ink); font-weight: 600; }
-    .split-bar :is(.rp-read, .rp-archive) { display: inline-flex; flex: none; align-items: center; gap: 0.5rem; min-height: var(--ctl); padding: 0 0.75rem; border-radius: var(--r-ctl); background: none; color: var(--text); font-weight: 400;
-      transition: background-color 120ms linear, transform 120ms var(--ease); }
-    .split-bar :is(.rp-read, .rp-archive):hover { background: var(--sunk); }
-    .split-bar :is(.rp-read, .rp-archive, .later):active, .dl-hover button:active { background: var(--sunk); transform: scale(0.96); }
-    .split-bar :is(.rp-read, .rp-archive) .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.75; color: var(--muted); }
-    .split-bar .rp-read .glyph { color: var(--tk-ink); } .split-bar :is(.rp-read, .rp-archive)::after { margin-left: 0.125rem; }
-    #board .split-detail > .read { flex: none; overflow: visible; padding: 1.75rem 2.5rem 4rem; }
-    #board .split-detail > .read > * { max-width: 46rem; }
-    #board .split-detail > .read h1 { margin-top: 0; font-size: 2.125rem; line-height: 1.1765; letter-spacing: 0.011em; }
-    #board .split-detail > .read .about { color: var(--muted); }
-    #board .split-detail > .read iframe { border: 0; }
-    #board .split-detail > .read .rp-open { display: inline-flex; align-items: center; margin-left: 0; padding: 0 1.5rem; }
-    .side .keys { display: flex; align-items: center; gap: 0.75rem; width: 100%; min-height: var(--ctl); padding: 0 0.625rem; border-radius: 0.625rem; background: none; color: var(--text); font-size: var(--t-s); font-weight: 500; text-align: left; white-space: nowrap; }
-    .side .keys:hover { background: var(--tk-card); }
-    .side .keys .kc { margin-left: auto; }
-    .side .go { display: flex; align-items: center; gap: 0.5rem; margin: auto 0.625rem 0.25rem; color: var(--faint); font-size: var(--t-xs); }
   }
   @media (prefers-reduced-motion: reduce) { #keys[open], .split-detail.in > * { animation: none; } }
   @media (prefers-reduced-motion: reduce) {
@@ -1627,33 +1582,13 @@
   .tk-dt { margin: 0.5rem 0 0; color: var(--tk-ink); font-size: 1.25rem; line-height: 1.75rem; font-weight: 500; letter-spacing: -0.017em; outline: none; }
   .tk-k { display: inline-grid; flex: none; place-items: center; width: 1.125rem; height: 1.125rem; }
   .tk-k svg { width: 1.125rem; height: 1.125rem; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-  :is(.tk-sheet, .tk-pane) .ui-pr .v a { position: relative; color: var(--tk-ink); text-decoration: underline; text-decoration-color: var(--tk-line); text-underline-offset: 3px; }
-  :is(.tk-sheet, .tk-pane) .ui-pr .v a::after { content: ""; position: absolute; inset: -0.75rem 0; }
   :is(.tk-sheet, .tk-pane) .ui-props { margin-top: 0.5rem; }
   :is(.tk-sheet, .tk-pane) .ui-pr .v > span:not(.ui-bar) { white-space: normal; }
   .tk-in { margin-top: 0.5rem; border-radius: 1rem; background: var(--tk-inset); } .tk-in .ui-icon { box-shadow: none; }
-  .tk-act { margin-bottom: 0; list-style: none; }
-  .tk-act .ui-pr { flex-direction: column; align-items: flex-start; gap: 0.125rem; padding: 0.75rem 0; }
-  .tk-act .aw { display: flex; align-items: baseline; gap: 0.5rem; width: 100%; } .tk-act .aw b { color: var(--tk-ink); font-weight: 500; }
-  .tk-act time { flex: none; margin-left: auto; color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .tk-act .th-n { color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); line-height: 1.25rem; }
-  .tk-act .tk-on { max-width: 100%; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: 1.25rem; text-decoration: none; }
   /* A desk: one filled screen with no page scroll. The head across (where you are, the 32px title, one line of what it holds, the controls at its right), then three columns:
      the hero over In progress, On hold over To do, and the open ticket. A list scrolls inside its card with no scrollbar and comes to rest on whole rows; 88px rows, titles on two lines. */
   @media (min-width: 64rem) {
-    body.tickets { height: 100vh; padding-bottom: 0; overflow: hidden; }
-    body.tickets main { max-width: none; margin: 0; padding: 1.5rem; }
-    .tk-desk { display: flex; flex-direction: column; gap: 1rem; height: calc(100vh - 3rem); }
-    .tk-dhead { display: flex; flex: none; align-items: flex-end; gap: 1rem; }
-    .tk-dhead .tx { flex: 1; min-width: 0; }
-    .tk-dhead .crumb { margin: 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: 1.25rem; } .tk-dhead .crumb span { margin: 0 0.25rem; }
-    .tk-dhead h1 { margin: 0; color: var(--tk-ink); font-size: 2rem; line-height: 2.5rem; font-weight: 500; letter-spacing: -0.012em; outline: none; }
-    .tk-dhead .tx > p:last-child { margin: 0.25rem 0 0; color: var(--tk-text-secondary); font-size: 0.9375rem; line-height: 1.5rem; }
-    .tk-dhead .acts { display: flex; align-items: center; gap: 0.5rem; padding-bottom: 0.25rem; }
-    .tk-dhead .acts .ui-seg { min-width: 17.5rem; margin: 0; } .tk-dhead .tk-fpill { margin: 0; }
-    .tk-grid { display: grid; flex: 1; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; min-height: 0; }
-    .tk-col { display: flex; flex-direction: column; gap: 1rem; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: none; }
-    .tk-col > * { flex: none; margin: 0; } .tk-col > .grow { flex: 1 1 0; min-height: 14.5rem; } .tk-col > .half { flex: 0 1 auto; min-height: 0; max-height: calc(50% - 0.5rem); }
+    .tk-dhead .tk-fpill { margin: 0; }
     .tk-desk .tk-hero { margin: 0; padding: 1.25rem 1.5rem 1.5rem; }
     .tk-card { display: flex; flex-direction: column; min-height: 0; padding: 1.25rem 1.5rem; }
     .tk-ch { display: flex; flex: none; align-items: center; gap: 0.5rem; height: 2rem; margin: 0; color: var(--tk-ink); font-size: var(--tk-fs-head); line-height: 1.5rem; font-weight: 500; letter-spacing: -0.014em; white-space: nowrap; }
@@ -1661,15 +1596,13 @@
     .tk-rows { flex: 1 1 auto; min-height: 0; margin: 0.25rem 0 0; padding: 0; overflow: auto; overflow-x: hidden; scrollbar-width: none; scroll-snap-type: y mandatory; overscroll-behavior: contain; }
     .tk-rows > li { scroll-snap-align: start; }
     .tk-rows.fades:not(.at-end) { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fz)), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fz)), transparent); }
-    :is(.tk-col, .tk-rows, .tk-pane)::-webkit-scrollbar { display: none; }
+    .tk-rows::-webkit-scrollbar { display: none; }
     .tk-desk .ui-row { z-index: 0; height: 5.5rem; }
     .tk-desk .ui-row .rm { gap: 0.375rem; }
     .tk-desk .ui-row .l1 { align-items: flex-start; height: auto; }
     .tk-desk .ui-row .l1 .t { display: -webkit-box; font-size: 0.9375rem; line-height: 1.25rem; white-space: normal; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
     .tk-desk .ui-row:hover:not([aria-current]) { opacity: 0.85; }
     .tk-row[aria-current]::after { content: ""; position: absolute; z-index: -1; inset: 0.25rem -0.5rem; border-radius: 0.875rem; background: var(--tk-inset); }
-    .tk-pane { min-height: 0; padding: 1.25rem 1.5rem 1.5rem; overflow: auto; overflow-x: hidden; scrollbar-width: none; overscroll-behavior: contain; }
-    .tk-pane.fades:not(.at-end) { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 4rem), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 4rem), transparent); }
     .tk-pane .tk-dt { font-size: 1.5rem; line-height: 2rem; }
     .tk-desk .tk-in .ui-row { height: auto; min-height: 4.25rem; padding: 0.75rem 0; }
     .tk-desk .tk-empty { width: 25rem; margin: 0; }
@@ -2180,13 +2113,8 @@
   }
   /** The ticket a card names, when it is on the board: tickets stand alone, so a card without one, or naming one the board has not got, shows nothing. */
   const ticketOf = (d) => (d?.ticket ? (state.tickets ?? []).find((t) => t.id === d.ticket) : undefined);
-  const tkBar = (t) => el('span', { class: 'tk-bar', 'aria-hidden': 'true' }, el('i', { style: `width:${t.progress}%` }));
-  /** A card's ticket as one row under what the card says: the ticket's title, id and progress. The row opens the ticket's page. */
-  function ticketRow(d) {
-    const t = ticketOf(d);
-    return t ? el('div', { class: 'ticket-block' }, el('p', { class: 'tk-label' }, 'Ticket'), el('a', { class: 'ticket-row', href: `#ticket/${t.id}`, 'aria-label': `Ticket ${t.id}: ${t.title}, ${t.progress}% done` },
-      el('span', { class: 'tk-mark' }, glyph('layers')), el('span', { class: 'tk-t' }, el('b', { dir: 'auto' }, t.title), el('span', { class: 'tk-m' }, el('span', {}, t.id), tkBar(t), el('span', { class: 'tk-n' }, `${t.progress}%`))), glyph('right'))) : '';
-  }
+  /** A card's ticket as one panel row under what the card says (ui.css): the ticket's title and progress. The row opens the ticket's page. */
+  const ticketRow = (d) => { const p = uiProps(ticketProp(ticketOf(d))); if (p) p.classList.add('ui-tk'); return p; };
   let ticketBack = '';
   /** What a card on a ticket's page is, in a word, and where it stands: waiting, answered, its proof's result or its review. */
   const tkKind = (d) => (d.type === 'evidence' ? 'Proof' : d.kind === 'design' || d.type === 'design' ? 'Design' : d.type === 'plan' ? 'Plan' : ['reports', 'notes'].includes(area(d)) ? 'Report' : 'Ask');
@@ -2218,11 +2146,12 @@
       ...(state.messages ?? []).filter((m) => m.kind === 'comment' && m.key === d.key).map((m) => ({ at: m.at, text: 'Your comment', note: m.text }))]
       .filter((e, i, all) => e && !Number.isNaN(Date.parse(e.at)) && all.findIndex((x) => x && x.text === e.text && bySecond(x, e) === 0) === i).sort(bySecond);
   };
-  /** A card's thread drawn as a list, newest last; a card whose only step is its posting shows none (its time is already on it). */
-  const thread = (d, steps = threadOf(d)) => (steps.length < 2 ? '' : el('div', { class: 'thread' }, el('p', { class: 'tk-label' }, 'Activity'), el('ol', { class: 'th-list' }, ...steps.map((e) => el('li', {},
-    el('span', { class: 'th-dot', 'aria-hidden': 'true' }), el('span', { class: 'th-b' },
-      el('span', { class: 'th-t', dir: 'auto' }, e.text, ...(e.link ? [' · ', el('a', { href: e.link[1], ...(/^https?:/.test(e.link[1]) && { target: '_blank', rel: 'noopener' }), dir: 'auto' }, e.link[0])] : [])),
-      e.note ? el('span', { class: 'th-n', dir: 'auto' }, `“${e.note}”`) : '', el('time', { datetime: e.at }, stamp(e.at))))))));
+  /** A card's Activity (ui.css): its steps as one sunk group, each in plain words with its time, the note that went with it, and the card it is on where the steps
+   *  are a ticket's. A card whose only step is its posting shows none (its time is already on it). */
+  const thread = (d, steps = threadOf(d), min = 2) => (steps.length < min ? '' : el('div', { class: 'thread' }, el('p', { class: 'ui-dl' }, 'Activity'), el('ol', { class: 'ui-props ui-act' },
+    ...steps.map((e) => el('li', { class: 'ui-pr' }, el('span', { class: 'aw' }, el('b', { dir: 'auto' }, e.text,
+      ...(e.link ? [' · ', el('a', { href: e.link[1], ...(/^https?:/.test(e.link[1]) && { target: '_blank', rel: 'noopener' }), dir: 'auto' }, e.link[0])] : [])), el('time', { datetime: e.at }, stamp(e.at))),
+    e.note ? el('span', { class: 'th-n', dir: 'auto' }, `“${e.note}”`) : '', e.card ? el('a', { class: 'on', href: hrefOf(e.card), dir: 'auto' }, title(e.card)) : '')))));
   /* ---- The feedback trail: each answer, note, new round and comment the person sent on a card, and how far it got with its agent (src/store.ts readTrail). ---- */
   const TRAIL = ['Sent', 'Delivered', 'Read', 'Replied'];
   const trailOf = (key, kind) => (state.trail ?? []).filter((t) => t.key === key && (kind ? t.kind === kind : t.kind !== 'ticket')).sort(bySecond);
@@ -2381,24 +2310,31 @@
     buttons.forEach((b, i) => (b.onclick = () => save(d, opts[i], buttons, err)));
     return el('div', { class: 'ev-verdict' }, el('div', { class: 'choices', role: 'group', 'aria-label': `Your verdict, ${headline(d)}` }, ...buttons), err, other(d, saved, err), xBtn(d, 'Dismiss'));
   }
-  /** One update as a sheet over the list on a phone, and beside it on a desk: its project and time, its whole title, the capture, then done-done's word,
-   *  its priority, its ticket's progress and its pull request, what it says, its Activity and the verdict. */
+  /** A proof's panel (ui.css): done-done's word, its priority, the ask it serves with its progress, and its pull request. */
+  const evProps = (d) => { const p = uiProps(uiProp({ mark: 'shield', name: 'done-done', value: el('span', { class: `ev-word ${judged(d)}` }, judgedWord(d)) }), priorityProp(prio(d)), ticketProp(ticketOf(d), 'Its ask'), changeProp(d)); p.classList.add('ev-props'); return p; };
+  /** One update as a sheet over the list on a phone: its project and time, its whole title, the capture, then its panel, what it says, its Activity and the verdict. */
   function evidenceItem(d) {
-    const t = ticketOf(d), change = changeHref(d), pr = /\/(?:pull|pulls|merge_requests)\/(\d+)/.exec(change)?.[1], project = projectOf(d);
-    const said = plain((d.about ?? '').replace(HELD, '').replace(UNCONFIRMED, '')), name = plain(headline(d)), why = plain(unchecked(d));
-    const prop = (tag, attrs, icon, k, ...v) => el(tag, { class: 'ui-pr', ...attrs }, el('span', { class: 'k' }, evGlyph(icon), k), el('span', { class: 'v' }, ...v));
+    const project = projectOf(d), said = plain((d.about ?? '').replace(HELD, '').replace(UNCONFIRMED, '')), name = plain(headline(d)), why = plain(unchecked(d));
     return el('div', { class: 'ev-scroll' }, el('div', { class: 'ev-item' },
       el('div', { class: 'ev-shd' }, el('span', { class: 'lab' }, projectTile(project), el('span', { class: 'pt', dir: 'auto' }, [project || 'No project', d.filed && (isToday(d.filed) ? hhmm(d.filed) : stamp(d.filed))].filter(Boolean).join(' · '))),
         el('a', { class: 'ev-x', href: '#evidence', 'aria-label': 'Close' }, glyph('x'))),
       el('h1', { class: 'ev-title', id: 'reader-title', tabindex: '-1', dir: 'auto' }, name),
       captures(d, 'ev-hero') || el('div', { class: 'ev-hero none' }, evGlyph('image'), 'Text only: no capture was filed'), attachments(d),
-      el('div', { class: 'ui-props ev-props' }, prop('div', {}, 'shield', 'done-done', el('span', { class: `ev-word ${judged(d)}` }, judgedWord(d))),
-        prio(d) ? prop('div', {}, 'flag', 'Priority', el('span', { class: `ui-pc ${prio(d).toLowerCase()}` }, prio(d))) : '',
-        t ? prop('a', { href: `#ticket/${t.id}`, 'aria-label': `Ticket: ${t.title}, ${t.progress}% done` }, 'layers', 'Ticket', el('span', { dir: 'auto' }, t.title),
-          begun(t) ? el('span', { class: 'ui-bar' }, el('i', { style: `width:${t.progress}%` })) : '', el('span', { class: 'n' }, `${t.progress}%`)) : '',
-        change ? prop('a', { href: change, target: '_blank', rel: 'noopener', 'aria-label': `Open the change for ${name}` }, 'pr', pr ? 'Pull request' : 'Change', el('span', {}, pr ? `#${pr}` : new URL(change).host)) : ''),
+      evProps(d),
       said && said !== name ? el('p', { class: 'ev-about', dir: 'auto' }, said) : '', why ? el('p', { class: 'ev-why', dir: 'auto' }, why) : '', thread(d),
       state.readonly || FROZEN || !(d.options.length || d.reply) ? '' : verdicts(d)));
+  }
+
+  /** One proof on a desk, as the prototype's open proof: its project and time across, then its title in full and its capture on the left; beside them its panel
+   *  (done-done's word, its priority, the ask it serves, its pull request), what it says, the verdict and its Activity. */
+  function proofPane(d) {
+    const project = projectOf(d), said = plain((d.about ?? '').replace(HELD, '').replace(UNCONFIRMED, '')), name = plain(headline(d)), why = plain(unchecked(d));
+    return el('section', { class: 'ui-card ui-pane two s8 split-detail', 'aria-labelledby': 'reader-title' },
+      el('div', { class: 'ui-shd split-bar' }, projectTile(project), el('span', { class: 'pt', dir: 'auto' }, [project || 'No project', d.filed && (isToday(d.filed) ? hhmm(d.filed) : stamp(d.filed))].filter(Boolean).join(' · '))),
+      el('div', { class: 'pmain' }, el('h1', { class: `dt ev-title${name.length > 160 ? ' long' : ''}`, id: 'reader-title', tabindex: '-1', dir: 'auto' }, name),
+        captures(d, 'ev-hero pv-cap') || el('div', { class: 'ev-hero none' }, evGlyph('image'), 'Text only: no capture was filed'), attachments(d)),
+      el('div', { class: 'pside' }, evProps(d), said && said !== name ? el('p', { class: 'dp ev-about', dir: 'auto' }, said) : '', why ? el('p', { class: 'dp ev-why', dir: 'auto' }, why) : '',
+        state.readonly || FROZEN || !(d.options.length || d.reply) ? '' : verdicts(d), thread(d)));
   }
 
   /** An explainer's chapter list: each button starts the video at that chapter. */
@@ -2669,7 +2605,8 @@
     sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>', msg: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
     x: '<path d="M18 6 6 18M6 6l12 12"/>', bolt: '<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>', lock: '<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>', trash: '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>',
     phone: '<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M11 18.5h2"/>', desktop: '<rect x="2.5" y="4" width="19" height="12.5" rx="1.5"/><path d="M8.5 20.5h7M12 16.5v4"/>',
-    flag: '<path d="M5 21V4M5 4h12l-2.5 4.5L17 13H5"/>', expand: '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>', layers: '<rect x="3" y="3" width="12" height="12" rx="2"/><path d="M9 21h10a2 2 0 0 0 2-2V9"/>' };
+    flag: '<path d="M5 21V4M5 4h12l-2.5 4.5L17 13H5"/>', expand: '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>', layers: '<rect x="3" y="3" width="12" height="12" rx="2"/><path d="M9 21h10a2 2 0 0 0 2-2V9"/>',
+    pr: '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M6 8.5V21M13 6h3a2 2 0 0 1 2 2v7.5"/><path d="m15 3.5-2.5 2.5L15 8.5"/>', shield: '<path d="M12 21s7.5-3.5 7.5-9.5V5.5L12 3 4.5 5.5v6C4.5 17.5 12 21 12 21z"/><path d="m9 12 2 2 4-4"/>' };
   const glyph = (a) => { const s = el('span', { 'aria-hidden': 'true', style: 'display:inline-flex' }); s.innerHTML = `<svg class="glyph" viewBox="0 0 24 24">${GLYPHS[a]}</svg>`; return s; };
   const icon = (a) => { const s = el('span', { class: `icon i-${a}`, 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[a]}"/></svg>`; return s; };
   /** The new look's icon tile (ui.css): a project's own picture when the board holds one, else one of this page's line drawings. */
@@ -2679,6 +2616,20 @@
   const uiRow = ({ tile, title, after = '', priority, meta, progress, badge = '' }) => [tile, el('span', { class: 'rm' },
     el('span', { class: 'l1' }, el('span', { class: 't', dir: 'auto' }, title), after, progress === undefined ? '' : badge, priority ? el('span', { class: `ui-pc ${priority.toLowerCase()}` }, priority) : ''),
     progress === undefined ? (badge ? el('span', { class: 'l2' }, el('span', { class: 'meta', dir: 'auto' }, meta), badge) : el('span', { class: 'l2 meta', dir: 'auto' }, meta)) : el('span', { class: 'l2' }, el('span', { class: 'ui-bar' }, el('i', { style: `width: ${progress}%` })), el('span', { class: 'pct' }, `${progress}%`)))];
+  /** The property panel (ui.css): one sunk group whose rows are each a mark and a name at the left and a value at the right; a row with an address opens it.
+   *  A panel with no row is left out, as a card with no priority, ticket or change shows nothing more. */
+  const uiProps = (...rows) => ((rows = rows.filter(Boolean)).length ? el('div', { class: 'ui-props' }, ...rows) : '');
+  const uiProp = ({ mark, name, value, href, label, cls = '' }) => el(href ? 'a' : 'div', { class: `ui-pr ${cls}`.trim(), ...(href && { href, ...(/^https?:/.test(href) && { target: '_blank', rel: 'noopener' }) }),
+    ...(label && { 'aria-label': label }) }, el('span', { class: 'k' }, glyph(mark), name), el('span', { class: 'v' }, ...[value].flat()));
+  /** A card's priority as its chip, only where one is set. */
+  const priorityProp = (p) => p && uiProp({ mark: 'flag', name: 'Priority', value: el('span', { class: `ui-pc ${p.toLowerCase()}` }, p) });
+  /** The ticket a card belongs to: its title in full, then a bar with its percent once work on it has begun (full at 100%). The row opens the ticket's page. */
+  const ticketProp = (t, name = 'Ticket') => t && uiProp({ mark: 'layers', name, cls: 'tall', href: `#ticket/${t.id}`, label: `${name}: ${t.title}, ${t.progress}% done`,
+    value: [el('span', { class: 'wt', dir: 'auto' }, t.title), el('span', { class: 'bp' }, ...(t.progress > 0 ? [el('span', { class: 'ui-bar', 'aria-hidden': 'true' }, el('i', { style: `width: ${t.progress}%` })),
+      el('span', { class: 'n' }, `${t.progress}%`)] : [el('span', { class: 'n' }, 'Not started')]))] });
+  /** The change a card links: a pull request by its number, any other link by the site it opens. */
+  const changeProp = (d) => { const c = changeHref(d), pr = /\/(?:pull|pulls|merge_requests)\/(\d+)/.exec(c)?.[1];
+    return c && uiProp({ mark: 'pr', name: pr ? 'Pull request' : 'Change', href: c, label: `Open the change for ${headline(d)}`, value: el('span', {}, pr ? `#${pr}` : new URL(c).host) }); };
   /** The phone's tab bar is drawn once, so its pill slides from the area left to the one opened; each redraw marks the area on screen and sets the badges, and a badge whose count changed bumps. */
   const tabPill = el('span', { class: 'hl', 'aria-hidden': 'true' }), tabLinks = TABS.map(([a, name]) => el('a', { href: `#${a}`, 'aria-label': name }, icon(`tab-${a || 'today'}`)));
   document.documentElement.style.setProperty('--dock-n', TABS.length);
@@ -2991,12 +2942,12 @@
     if (pick) pick.onclick = () => { tkProj = ''; render(); }, pick.setAttribute('aria-label', `Show every project, not only ${tkProj}`);
     const none = el('section', { class: 'ui-card tk-empty' }, el('h2', {}, 'No tickets yet'), el('p', {}, 'Agents add tickets as they plan work. Each one shows here with how far along it is.'));
     if (desk) {
-      const head = el('header', { class: 'tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets'), el('p', {}, empty ? 'Nothing tracked yet' : say)),
+      const head = el('header', { class: 'ui-dhead tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets'), el('p', {}, empty ? 'Nothing tracked yet' : say)),
         el('div', { class: 'acts' }, pick, tkSeg(L), tkFilter(L), themeButton()));
-      if (empty) return [el('div', { class: 'tk-desk' }, head, none)];
-      return [el('div', { class: 'tk-desk' }, head, el('div', { class: 'tk-grid' }, el('div', { class: 'tk-col' }, tkHero(L), tkGroup('mv', 'In progress', L.moving, true, 'grow')),
-        el('div', { class: 'tk-col' }, tkGroup('hold', 'On hold', L.hold, true, 'half'), tkGroup('todo', 'To do', L.todo, true, 'grow')),
-        open ? el('section', { class: 'ui-card tk-pane', 'aria-label': open.title }, ...ticketPage(open)) : el('section', { class: 'ui-card tk-pane' }, el('p', { class: 'tk-none' }, 'No ticket here.'))))];
+      if (empty) return [el('div', { class: 'ui-desk tk-desk' }, head, none)];
+      return [el('div', { class: 'ui-desk tk-desk' }, head, el('div', { class: 'ui-dgrid' }, el('div', { class: 'ui-col s4' }, tkHero(L), tkGroup('mv', 'In progress', L.moving, true, 'grow')),
+        el('div', { class: 'ui-col s4' }, tkGroup('hold', 'On hold', L.hold, true, 'half'), tkGroup('todo', 'To do', L.todo, true, 'grow')),
+        open ? el('section', { class: 'ui-card ui-pane s4 tk-pane', 'aria-label': open.title }, ...ticketPage(open)) : el('section', { class: 'ui-card ui-pane s4 tk-pane' }, el('p', { class: 'tk-none' }, 'No ticket here.'))))];
     }
     const stat = (href, mark, lab, n) => el(href ? 'a' : 'div', { class: 'ui-card ui-stat', ...(href && { href }), 'aria-label': `${lab}: ${n}` }, fill(mark), el('span', { class: 'lab' }, lab), el('b', {}, String(n)));
     const p0 = L.shown.filter((t) => t.priority === 'P0' && tkStateOf(t) !== 'done').length;
@@ -3036,9 +2987,7 @@
       el('p', { class: 'ui-dl' }, 'Linked'), cards.length ? el('ul', { class: 'ui-list tk-in' }, ...cards.map(linked)) : el('p', { class: 'tk-none' }, 'No card names this ticket yet.'),
       // The person's comments on it (made in the fleet dashboard), oldest first, each with how far it got and the lead's reply.
       ...(said.length ? [el('p', { class: 'ui-dl' }, 'Your comments'), ...said.map((c) => el('div', { class: 'tk-said' }, el('p', { dir: 'auto' }, c.said), trailTrack(c)))] : []),
-      ...(steps.length ? [el('p', { class: 'ui-dl' }, 'Activity'), el('ol', { class: 'ui-props tk-act' }, ...steps.map((e) => el('li', { class: 'ui-pr' },
-        el('span', { class: 'aw' }, el('b', { dir: 'auto' }, e.text), el('time', { datetime: e.at }, stamp(e.at))), e.note ? el('span', { class: 'th-n', dir: 'auto' }, `“${e.note}”`) : '',
-        el('a', { class: 'tk-on', href: hrefOf(e.card), dir: 'auto' }, title(e.card)))))] : [])];
+      thread(t, steps, 1)];
   }
   /** On a desk every list ends on a whole row: with 40px or more left under its whole rows, the next row fades out there (and the list's end is padded the same, so scrolled
    * to its end it shows whole rows); with less, the list ends on its last whole row. The open ticket fades at its foot while it holds more than it shows. */
@@ -3053,10 +3002,19 @@
       l.style.setProperty('--fz', `${room}px`); l.style.paddingBottom = `${room}px`; l.classList.add('fades');
       l.onscroll = () => l.classList.toggle('at-end', l.scrollTop + l.clientHeight >= l.scrollHeight - 2);
     }
-    const p = document.querySelector('.tk-pane');
-    if (p) { p.classList.toggle('fades', p.scrollHeight > p.clientHeight + 1); p.onscroll = () => p.classList.toggle('at-end', p.scrollTop + p.clientHeight >= p.scrollHeight - 2); }
   }
   addEventListener('resize', () => document.querySelector('.tk-desk') && tkSettle());
+  /** On a desk a list's column and the open item scroll inside themselves; while one holds more than it shows it fades out over its last 64px, and the fade goes at its end. */
+  // What is in them can grow after they are drawn (a report's page loads), so each is looked at again when a part of it changes size.
+  const settled = 'ResizeObserver' in window && new ResizeObserver(() => uiSettle());
+  function uiSettle() {
+    for (const a of document.querySelectorAll('.ui-desk :is(.ui-col, .ui-pane:not(.ask2), .ask2 > .pbody)')) {
+      a.onscroll = () => a.classList.toggle('at-end', a.scrollTop + a.clientHeight >= a.scrollHeight - 2);
+      a.classList.toggle('fades', a.scrollHeight > a.clientHeight + 1); a.onscroll();
+      if (settled) for (const part of a.children) settled.observe(part);
+    }
+  }
+  addEventListener('resize', () => document.querySelector('.ui-desk') && uiSettle());
 
   /** Light or dark: the system's, unless one is picked here. A pick turns each dark-scheme media rule of the page's own sheets on or off (the board draws dark only there),
    * sets the colour scheme and the browser's bar colour, and is kept in this browser. */
@@ -4176,14 +4134,20 @@
     seeReply(d.key);
     const x = el('a', { class: 'rp-x', href: '#reports', 'aria-label': 'Close' }, glyph('x')), scrim = el('a', { class: 'rp-scrim', href: '#reports', tabindex: '-1', 'aria-hidden': 'true' });
     const what = [d.guided ? 'Guided report' : FORMS[d.form]?.[0] ?? 'Report', d.group, d.filed ? day(d.filed) : ''].filter(Boolean).join(' · ');
-    const found = d.guided ? d.visual?.heading : d.decided, ps = rpParts(d), n = ps.filter(([p]) => partRead(d, p)).length;
+    const found = d.guided ? d.visual?.heading : d.decided;
     const full = (part) => { rpGuide = d.key; readPage(d, 'reports'); const at = part && document.getElementById(`gd-${part.replace(/\W/g, '-')}`); at ? at.scrollIntoView({ block: 'start' }) : reader.querySelector('h1')?.focus({ preventScroll: true }); };
-    const parts = ps.map(([p, name]) => { const b = el('button', { class: 'ui-pr rp-part', 'aria-label': `${name}, ${partRead(d, p) ? 'read' : 'not read yet'}` }, el('span', { class: 'k', dir: 'auto' }, name), el('span', { class: `rp-check${partRead(d, p) ? ' on' : ''}`, 'aria-hidden': 'true' }, partRead(d, p) ? glyph('check') : '')); b.onclick = () => full(p); return b; });
-    const open = d.guided ? el('button', { class: 'rp-open-full' }, 'Read the report') : '';
-    if (open) open.onclick = () => full();
     return [scrim, el('div', { class: 'read rp-sheet-body' }, el('span', { class: 'rp-grab', 'aria-hidden': 'true' }), el('div', { class: 'rp-shd' }, el('p', { class: 'rp-what', dir: 'auto' }, projectMark(d.group), el('span', {}, what)), x),
       h1, d.about ? el('p', { class: 'about', dir: 'auto' }, plain(d.about)) : '', found ? el('p', { class: 'ui-dl' }, d.guided ? 'What it found' : 'What it decided') : '', found ? el('div', { class: 'ui-props rp-found', dir: 'auto' }, plain(found)) : '',
-      ...(ps.length ? [el('p', { class: 'ui-dl' }, `Read ${n} of ${plural(ps.length, 'part')}`), el('div', { class: 'ui-props rp-parts' }, ...parts), open] : []), ticketRow(d), thread(d), page ?? '', dismissReport(d))];
+      ...reportParts(d, full), ticketRow(d), thread(d), page ?? '', dismissReport(d))];
+  }
+  /** A report's parts as one panel, each with a check once read, then for a guided report Read the report: a part or the button opens it in full (at that part). */
+  function reportParts(d, full) {
+    const ps = rpParts(d), n = ps.filter(([p]) => partRead(d, p)).length;
+    const parts = ps.map(([p, name]) => { const b = el('button', { class: 'ui-pr rp-part', 'aria-label': `${name}, ${partRead(d, p) ? 'read' : 'not read yet'}` }, el('span', { class: 'k', dir: 'auto' }, name),
+      el('span', { class: `rp-check${partRead(d, p) ? ' on' : ''}`, 'aria-hidden': 'true' }, partRead(d, p) ? glyph('check') : '')); b.onclick = () => full(p); return b; });
+    const open = d.guided ? el('button', { class: 'rp-open-full rp-open', 'data-kbd': '↵', 'aria-keyshortcuts': 'Enter' }, 'Read the report') : '';
+    if (open) open.onclick = () => full();
+    return ps.length ? [el('p', { class: 'ui-dl' }, `Read ${n} of ${plural(ps.length, 'part')}`), el('div', { class: 'ui-props rp-parts' }, ...parts), open] : [];
   }
   /** Dismiss moved from the list row to the report's own page; once it is dismissed the page closes back to the list. */
   function dismissReport(d) {
@@ -4252,7 +4216,7 @@
     }
     const changes = items.filter((d) => designStatus(d) === 'Changes requested').length;
     if (phone()) top.className = 'ui-top dz-top', top.replaceChildren(h1, more, theme);
-    else top.className = 'dz-head', top.replaceChildren(el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Designs'), h1,
+    else top.className = 'ui-dhead dz-head', top.replaceChildren(el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Designs'), h1,
       el('p', {}, items.length ? `${plural(items.length, 'design')} on your board${changes ? ` · changes requested on ${changes > 1 && changes === items.length ? `all ${changes}` : changes}` : ''}` : EMPTY.designs), ro), el('div', { class: 'acts' }, more, theme));
     return [phone() ? ro : '', selecting ? el('div', { class: 'dz-bulk' }, bulkBar(items)) : ''];
   }
@@ -4268,7 +4232,7 @@
       // Where it stands fades out at its foot while it holds more than it shows.
       const ib = info.querySelector('.dz-ib'), fade = () => ib.classList.toggle('fades', ib.scrollHeight - ib.scrollTop - ib.clientHeight > 1);
       ib.onscroll = fade; new ResizeObserver(fade).observe(ib);
-      return [...head, el('div', { class: 'dz-grid design-review' }, el('div', { class: 'dz-strip' }, ...items.map(card)), open, info)];
+      return [el('div', { class: 'ui-desk' }, top, ...head, el('div', { class: 'ui-dgrid dz-grid design-review' }, el('div', { class: 'dz-strip' }, ...items.map(card)), open, info))];
     }
     const toReview = items.filter((d) => ['In review', 'Draft'].includes(designStatus(d))).length, approved = items.filter((d) => designStatus(d) === 'Approved').length;
     return [...head, el('section', { class: 'ui-card ui-hero dz-hero', 'aria-label': 'To review' }, el('div', { class: 'hl' }, el('span', { class: 'lab' }, 'To review')),
@@ -4327,13 +4291,8 @@
   const whoOf = (d) => projectName(d) || (d.type === 'signin' ? d.waits : d.by) || 'Agent';
   /** What an ask carries, as one panel under its question (ui.css): its priority, and the ticket it belongs to (Its ask) with its progress, which opens the ticket's page.
    *  An ask with neither shows no panel: a ticket is only a reference, and a card without one shows nothing more. */
-  function askProps(d) {
-    const t = ticketOf(d), p = priOf(d), k = (mark, name) => el('span', { class: 'k' }, glyph(mark), name);
-    const rows = [p && el('div', { class: 'ui-pr' }, k('flag', 'Priority'), el('span', { class: 'v' }, el('span', { class: `ui-pc ${p.toLowerCase()}` }, p))),
-      t && el('a', { class: 'ui-pr', href: `#ticket/${t.id}`, 'aria-label': `Its ask, ticket ${t.id}: ${t.title}, ${t.progress}% done` }, k('layers', 'Its ask'),
-        el('span', { class: 'v' }, el('span', { dir: 'auto' }, t.title), ...(t.progress > 0 ? [el('span', { class: 'ui-bar', 'aria-hidden': 'true' }, el('i', { style: `width: ${t.progress}%` })), el('span', { class: 'n' }, `${t.progress}%`)] : [el('span', { class: 'n' }, 'Not started')])))].filter(Boolean);
-    return rows.length ? el('div', { class: 'ui-props' }, ...rows) : '';
-  }
+  const askProps = (d) => uiProps(priorityProp(priOf(d)), ticketProp(ticketOf(d), 'Its ask'));
+
   /** An answered ask Decide opens again, to see the answer or change it: one the person picked or wrote, not a sign-in, a review, a verdict or a card answered with another. */
   const redo = (d) => !state.readonly && d.type !== 'signin' && d.type !== 'evidence' && d.type !== 'plan' && d.kind !== 'design' && !state.answers[d.key]?.merged_by && !!(d.options?.length || d.reply);
   /** What an answer says in a row: the pick (or the person's own words), and the note that went with it. */
@@ -4610,9 +4569,10 @@
     sink.crumb = el('p', { class: 'crumb', dir: 'auto' }, el('b', {}, askKind(d)), ` · ${who}${at}`);
     const gone = xBtn(d, 'Dismiss');
     if (gone) { gone.setAttribute('role', 'menuitem'); gone.append(glyph('trash')); gone.addEventListener('click', () => (location.hash = to)); }
-    const later = () => { location.hash = '#waiting'; toLater([d.key], true); };
-    // On a phone Ask me later is a button beside the answer, so More keeps only Dismiss; a sign-in's one button opens its link, so its More keeps both.
-    const more = () => { const items = state.readonly ? [] : [(desk || d.type === 'signin') && ['Ask me later', later, 'later', 'clock'], gone].filter(Boolean); return items.length ? moreSheet('More', items) : ''; };
+    // Ask me later moves it to Later: a phone goes back to the list, a desk steps on to the next ask.
+    const later = () => { location.hash = desk ? to : '#waiting'; toLater([d.key], true); };
+    // Ask me later is a button beside the answer, so More keeps only Dismiss; a sign-in's one button opens its link, so its More keeps both.
+    const more = () => { const items = state.readonly ? [] : [d.type === 'signin' && ['Ask me later', later, 'later', 'clock'], gone].filter(Boolean); return items.length ? moreSheet('More', items) : ''; };
     // A sign-in keeps More too: one started on this host has no expiry, and Dismiss is the way to clear it.
     if (d.type === 'signin') {
       sink.more = more();
@@ -4629,11 +4589,11 @@
     const ownBox = mine ? el('textarea', { class: 'own-box', id: `own-${d.key}`, rows: 3, maxlength: 500, dir: 'auto', placeholder: reply ? 'Your reply' : 'Your answer', 'aria-label': `Your own answer, ${name}` }) : null;
     // One note for any pick, always open: it goes with the answer as its comment.
     const note = live && opts.length ? el('textarea', { class: 'note-box', id: `note-${d.key}`, rows: 1, maxlength: 500, dir: 'auto', placeholder: 'A note for the agent, optional', 'aria-label': `Note, goes with your answer, ${name}` }) : null;
-    // The answers are cards, numbered on a desk for their keys; the one picked gets a ring and a check that springs in, and the button's label slides to it.
-    const card = (label, line, chip, n, now) => [el('span', { class: 'words' }, el('span', { class: 'label-line' }, el('span', { class: 'label' }, label), chip ? el('span', { class: 'recommend' }, 'Recommended') : '', now ? el('span', { class: 'recommend now' }, 'Your answer') : ''),
-        line ? el('span', { class: 'reason', dir: 'auto' }, line) : ''), desk && n <= 9 ? kc(String(n)) : '', el('span', { class: 'check', 'aria-hidden': 'true' }, glyph('check'))];
-    const pickers = opts.map((o, i) => el('button', { class: 'pick-option', 'aria-pressed': String(o.value === selected.get(d.key) && !own.has(d.key)) }, ...card(o.label, o.outcome, o.value === d.recommend_value, i + 1, given?.answer === o.value)));
-    const ownRow = mine && !reply ? el('button', { class: 'pick-option own-option', 'aria-pressed': String(own.has(d.key)), 'aria-controls': ownBox.id }, ...card('Your own answer', 'Write it in your words', false, opts.length + 1, given?.answer === 'text')) : null;
+    // The answers are cards (1 to 9 pick one on a desk); the one picked gets a ring and a check that springs in, and the button's label slides to it.
+    const card = (label, line, chip, now) => [el('span', { class: 'words' }, el('span', { class: 'label-line' }, el('span', { class: 'label' }, label), chip ? el('span', { class: 'recommend' }, 'Recommended') : '', now ? el('span', { class: 'recommend now' }, 'Your answer') : ''),
+        line ? el('span', { class: 'reason', dir: 'auto' }, line) : ''), el('span', { class: 'check', 'aria-hidden': 'true' }, glyph('check'))];
+    const pickers = opts.map((o) => el('button', { class: 'pick-option', 'aria-pressed': String(o.value === selected.get(d.key) && !own.has(d.key)) }, ...card(o.label, o.outcome, o.value === d.recommend_value, given?.answer === o.value)));
+    const ownRow = mine && !reply ? el('button', { class: 'pick-option own-option', 'aria-pressed': String(own.has(d.key)), 'aria-controls': ownBox.id }, ...card('Your own answer', 'Write it in your words', false, given?.answer === 'text')) : null;
     const lbl = el('span', { class: 'lbl' });
     const answer = el('button', { class: 'answer', 'data-kbd': '↵', 'aria-keyshortcuts': 'Enter' }, lbl, el('span', { class: 'okmark', 'aria-hidden': 'true' }, glyph('check')));
     // The button reads the choice, and is off until there is one: a card picked, or words in Your own answer. A change is off while it would send the answer already given.
@@ -4683,64 +4643,100 @@
     const preview = cards ?? (d.view ? rung(d) : proofLine ? '' : proof(d));
     const quiet = opts.find((o) => o.value === d.default_if_silent);
     const why = unchecked(d) || d.why || (d.tradeoff && firstDraft(d).text) || d.about;
-    // On a phone the bar holds Ask me later beside the answer, as the prototype's sheet does; a desk keeps Later in the bar over the ask.
-    const askLater = !desk && live && !given ? el('button', { class: 'later-btn', type: 'button' }, 'Ask me later') : '';
+    // Ask me later sits beside the answer, as the prototype draws it on a phone and on a desk.
+    const askLater = live && !given ? el('button', { class: 'later-btn', type: 'button', 'data-kbd': 'L', 'aria-keyshortcuts': 'L' }, 'Ask me later') : '';
     if (askLater) askLater.onclick = later;
-    const page = el('section', { class: `decide g-${reviewed(d) ? 'review' : 'answer'}${isOwn() ? ' own' : ''}` },
-      el('div', { class: 'lead' }, badge(d), el('h2', { id: 'ask-title', tabindex: '-1', dir: 'auto' }, name), d.filed && !given ? el('p', { class: 'since' }, `Waiting on you since ${day(d.filed)} ${hhmm(d.filed)}`) : ''),
-      // What it carries (Priority, Its ask) sits right under when it was asked, as the prototype's sheet has it; then why, its preview and its proof.
-      askProps(d), why ? el('p', { class: 'why', dir: 'auto' }, why) : '', firstDraftLinks(d), preview ? el('div', { class: 'decide-preview' }, preview, cards ? fullButton(d) : '') : '',
-      ...(d.mocks?.length ? [annotations(d)] : []), proofLine,
-      ...(done ? said : [...(live && opts.length ? [el('p', { class: 'ui-dl' }, 'Your answer'), el('ul', { class: 'pick-list', 'aria-label': d.title }, ...pickers.map((b) => el('li', {}, b)),
-        ownRow ? el('li', {}, ownRow) : ''), ownRow ? el('div', { class: 'own-field' }, el('div', {}, ownBox)) : ''] : []),
-      reply ? el('label', { class: 'ui-dl', for: ownBox.id }, 'Your reply') : '', reply ? ownBox : '',
-      note ? el('div', { class: 'note-field' }, note) : '',
-      quiet && !given ? el('p', { class: 'silent-line' }, `If you stay quiet, the agent goes with ${quiet.label}${d.silent_by ? ` at ${when(d.silent_by)}` : ''}.`) : '']), thread(d), err,
-      done ? el('div', { class: 'decide-bar' }, change) : mine || (live && opts.length) ? el('div', { class: 'decide-bar' }, askLater, answer, desk && note ? el('span', { class: 'bar-hint' }, kc('C'), 'Note') : '') : '');
+    const lead = el('div', { class: 'lead' }, badge(d), el('h2', { id: 'ask-title', class: 'dt', tabindex: '-1', dir: 'auto' }, name), d.filed && !given ? el('p', { class: 'since' }, `Waiting on you since ${day(d.filed)} ${hhmm(d.filed)}`) : '');
+    // What it carries (Priority, Its ask) sits right under when it was asked, as the prototype's sheet has it; then why, its preview and its proof.
+    const about = [askProps(d), why ? el('p', { class: 'why', dir: 'auto' }, why) : '', firstDraftLinks(d), preview ? el('div', { class: 'decide-preview' }, preview, cards ? fullButton(d) : '') : '',
+      ...(d.mocks?.length ? [annotations(d)] : []), proofLine];
+    const picks = done || !(live && opts.length) ? [] : [el('p', { class: 'ui-dl' }, 'Your answer'), el('ul', { class: 'pick-list', 'aria-label': d.title }, ...pickers.map((b) => el('li', {}, b)),
+      ownRow ? el('li', {}, ownRow) : ''), ownRow ? el('div', { class: 'own-field' }, el('div', {}, ownBox)) : ''];
+    const words = done ? [] : [reply ? el('label', { class: 'ui-dl', for: ownBox.id }, 'Your reply') : '', reply ? ownBox : ''];
+    const noteField = !done && note ? el('div', { class: 'note-field' }, note) : '';
+    const quietLine = quiet && !given ? el('p', { class: 'silent-line' }, `If you stay quiet, the agent goes with ${quiet.label}${d.silent_by ? ` at ${when(d.silent_by)}` : ''}.`) : '';
+    const bar = (...lead) => (done ? el('div', { class: 'decide-bar' }, change) : mine || (live && opts.length) ? el('div', { class: 'decide-bar' }, ...lead, askLater, answer) : '');
+    const kind = `decide g-${reviewed(d) ? 'review' : 'answer'}${isOwn() ? ' own' : ''}`;
+    // A desk sets the ask out as the prototype's open item: its head and the ask with what it carries scroll on the left, its Activity beside them, and the answers
+    // pinned under a hairline at the foot, as cards side by side over one line of the note, Ask me later and Answer.
+    const page = desk ? el('section', { class: `${kind} ui-card ui-pane ask2 s8 split-detail`, 'aria-labelledby': 'ask-title' },
+      el('div', { class: 'pbody' }, askHead(d, sink), el('div', { class: 'pmain' }, lead, ...about, ...said, quietLine), el('div', { class: 'pside' }, ...askReport(d), thread(d))),
+      el('div', { class: 'ppin' }, ...picks, ...words, err, bar(noteField)))
+      : el('section', { class: kind }, lead, ...about, ...said, ...picks, ...words, noteField, quietLine, thread(d), err, bar());
     return page;
   }
-  /** The desk shell: a list (with its header) beside a detail pane, and a strip under the list naming the list's keys. Any area can set itself out this way. */
   const kc = (k) => el('kbd', { class: 'kc' }, k);
-  const split = (list, detail, hints) => el('div', { class: 'split' },
-    el('div', { class: 'split-list' }, ...list, el('p', { class: 'split-hints' }, ...hints.map(([keys, words]) => el('span', {}, ...keys.map(kc), words)))),
-    el('div', { class: 'split-detail' }, ...detail));
-  /** Decide on a desk: the list beside the ask it has selected (the first until a row is picked), under a bar with its kind, Later and More. Answering folds the row away and selects the next. */
+  /** The desk (ui.css), as the approved prototype draws it: the head across, where you are, the title, one line of what it holds and the screen's controls at its right
+   *  (the order and light or dark, taken from its phone title row and list so each is drawn once), then the list in four columns beside the open item in eight. */
+  function split(top, sub, list, pane) {
+    const segs = list.flatMap((n) => (n?.matches?.('.ui-seg') ? [n] : n?.querySelectorAll ? [...n.querySelectorAll(':scope > .ui-seg')] : []));
+    const acts = [...segs, ...[...top.children].filter((e) => !e.matches('h1, .lede, .back'))];
+    list = list.filter((n) => !segs.includes(n));
+    if (!acts.some((e) => e.matches?.('.ui-rb'))) acts.push(themeButton());
+    return el('div', { class: 'ui-desk' }, el('header', { class: 'ui-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), top.querySelector('h1')?.textContent),
+      el('h1', { tabindex: '-1' }, top.querySelector('h1')?.textContent), el('p', {}, sub)), el('div', { class: 'acts' }, ...acts)),
+      el('div', { class: 'ui-dgrid split' }, el('div', { class: 'ui-col s4 split-list' }, ...list), pane));
+  }
+  /** The report an ask is about (its --report), beside the ask on a desk as the prototype draws it: what the report says, up to four of the numbers its picture
+   *  shows (each with its label), and Open report. An ask about no report on the board shows none. */
+  const askReport = (d) => {
+    const r = d.report && state.decisions.find((x) => x.key === d.report);
+    if (!r) return [];
+    const unit = r.visual?.unit ? ` ${r.visual.unit}` : '', tiles = (r.visual?.rows ?? []).filter((x) => x.value !== undefined || x.note).slice(0, 4);
+    return [el('p', { class: 'ui-dl' }, 'Its report'), el('div', { class: 'ui-props ask-rp' }, el('p', { class: 'cx', dir: 'auto' }, plain(r.about ?? r.title)),
+      tiles.length ? el('div', { class: 'cxn' }, ...tiles.map((x) => el('span', {}, el('b', {}, x.value !== undefined ? `${x.value}${unit}` : x.note), el('small', { dir: 'auto' }, x.label)))) : '',
+      el('a', { class: 'see', href: `#reports/${r.key}` }, 'Open report'))];
+  };
+  /** The open item's head line on a desk: its tile, what it is, whose and when, and its More. */
+  const askHead = (d, sink) => el('div', { class: 'ui-shd split-bar' }, cardTile(d), sink.crumb, sink.more ?? '');
+  /** An open item on a desk that is not an ask's own pane: one card with its head line over it. */
+  const pane = (head, ...body) => el('section', { class: 'ui-card ui-pane s8 split-detail' }, head, ...body);
+  /** Decide on a desk: the list beside the ask it has selected (the first until a row is picked). Answering folds the row away and selects the next. */
   function decideDesk(top, items, hidden, queue, key, done, today) {
     const old = done.find((x) => x.key === key), i = Math.max(0, queue.findIndex((d) => d.key === key)), d = old ?? queue[i], next = !old && queue.length > 1 ? queue[(i + 1) % queue.length] : undefined;
     deskSel = d?.key ?? '';
-    const list = decideList(items, hidden, done, today);
-    if (!d) return split([top, list], [items.length ? el('p', { class: 'empty' }, 'Open a review from the list.') : allClear(true)], [[['?'], 'All keys']]);
-    const g = groupOf(d), later = el('button', { class: 'later', 'data-kbd': 'L', 'aria-keyshortcuts': 'L' }, glyph('clock'), g === 'later' ? 'Back from Later' : 'Later');
-    later.onclick = () => { toLater([d.key], g !== 'later'); if (g !== 'later' && next) location.hash = `#decide/${next.key}`; };
+    const list = [decideList(items, hidden, done, today)], sub = `${plural(queue.length, 'ask')} ${queue.length === 1 ? 'waits' : 'wait'} on you · ${today} answered today`;
+    if (!d) return split(top, sub, list, pane('', items.length ? el('p', { class: 'empty' }, 'Open a review from the list.') : allClear(true)));
     const bar = {}, page = decidePage(d, next, true, bar);
-    return split([top, list], [el('div', { class: 'split-bar' }, bar.crumb, state.readonly || old ? '' : later, bar.more), page],
-      [[['J', 'K'], 'Move'], [['↵'], 'Answer'], [['?'], 'All keys']]);
+    return split(top, sub, list, page.matches('.ui-pane') ? page : pane(askHead(d, bar), page));
   }
   /** Evidence on a desk: the list of updates beside the one selected. */
   function evidenceDesk(top, items, archived, d) {
-    const view = split([top, ...evidenceList(items, top, d?.key), archived], d ? [el('header', { class: 'split-bar' }, changeLink(d)), evidenceItem(d)] : [el('p', { class: 'empty' }, EMPTY.evidence)], [[['J', 'K'], 'Move'], [['?'], 'All keys']]);
+    const view = split(top, `${plural(items.length, 'proof')} on your board, newest first`, [...evidenceList(items, top, d?.key), archived], d ? proofPane(d) : pane('', el('p', { class: 'empty' }, EMPTY.evidence)));
     if (d) view.querySelector(`#item-${CSS.escape(d.key)}`)?.setAttribute('aria-current', 'true');
     return view;
   }
-  /** Reports on a desk: the list beside the report selected (the newest until a row is picked). Its bar says what it is, who asked and when, and reads or archives it;
-   *  its page sits under the bar, and a guided report, which reads in stages, opens over the board from there. */
-  function reportsDesk(top, page, d, any) {
-    const hints = [[['J', 'K'], 'Move'], ...(FROZEN ? [] : [[['U'], 'Read']]), ...(canDismiss() ? [[['E'], 'Archive']] : []), [['?'], 'All keys']];
-    if (!d) return split([top, page], [any ? el('p', { class: 'empty' }, 'Open a report from the list.')
-      : el('div', { class: 'all-clear-big' }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, 'Nothing to read'), el('p', {}, EMPTY.reports))], hints);
+  /** Reports on a desk: the list beside the report selected (the newest until a row is picked), as the prototype's open report: its head line (what it is, its group and day,
+   *  Mark read and Archive), then its title in full, what it says, what it found and its page on the left, and its parts, ticket and Activity beside them.
+   *  A guided report, which reads in stages, opens over the board from Read the report or a part. */
+  function reportsDesk(top, page, d, any, items) {
+    const sub = `${items.filter(unread).length} of ${items.length} still to read`;
+    if (!d) return split(top, sub, [page], pane('', any ? el('p', { class: 'empty' }, 'Open a report from the list.')
+      : el('div', { class: 'all-clear-big' }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, 'Nothing to read'), el('p', {}, EMPTY.reports))));
     // A read-only copy keeps no read marks.
     const read = FROZEN ? '' : el('button', { class: 'rp-read', 'data-kbd': 'U', 'aria-keyshortcuts': 'U' }, glyph(unread(d) ? 'check' : 'dot'), unread(d) ? 'Mark read' : 'Mark unread');
     if (read) read.onclick = () => readToggle(d);
     const gone = canDismiss() ? el('button', { class: 'rp-archive', 'data-kbd': 'E', 'aria-keyshortcuts': 'E' }, glyph('archive'), 'Archive') : '';
     if (gone) gone.onclick = () => archiveReport(d);
-    const url = d.guided ? '' : src(mockUrl(d.key, '', d.view)), h1 = el('h1', { id: 'report-title', dir: 'auto' }, d.title);
-    const full = d.guided ? el('button', { class: 'open-link rp-open', 'data-kbd': '↵', 'aria-keyshortcuts': 'Enter' }, 'Read the report') : '';
-    if (full) full.onclick = () => { rpFull = d.key; render(); reader.querySelector('h1')?.focus({ preventScroll: true }); };
-    return split([top, page], [el('div', { class: 'split-bar rp-bar' }, el('p', { class: 'eyebrow', dir: 'auto' }, el('b', {}, FORMS[d.form]?.[0] ?? (kind(d) || 'Report')),
-      ...[d.asked_by, d.filed ? when(d.filed) : ''].filter(Boolean).map((t) => ` · ${t}`)), read, gone),
+    const url = d.guided ? '' : src(mockUrl(d.key, '', d.view)), found = d.guided ? d.visual?.heading : d.decided;
+    const what = [d.guided ? 'Guided report' : FORMS[d.form]?.[0] ?? (kind(d) || 'Report'), d.group, d.filed ? day(d.filed) : ''].filter(Boolean).join(' · ');
+    const full = (part) => { rpFull = d.key; render(); const at = part && document.getElementById(`gd-${part.replace(/\W/g, '-')}`); at ? at.scrollIntoView({ block: 'start' }) : reader.querySelector('h1')?.focus({ preventScroll: true }); };
+    // A guided report's key points, as the prototype's open report shows them: what you asked and when it is done, its own chart (a bar per row, longest full), and what it found
+    // item by item, each with a dot by its tone; its next step sits beside its parts.
+    const v = d.visual, top1 = v?.type === 'bars' ? Math.max(...v.rows.map((x) => x.value ?? 0)) : 0;
+    const keys = !d.guided ? [] : [d.understood?.length ? el('div', { class: 'rp-kv' }, ...d.understood.map((u) => el('div', {}, el('small', { dir: 'auto' }, u.label), el('span', { dir: 'auto' }, plain(u.text))))) : '',
+      top1 ? el('div', { class: 'rp-chart' }, v.text ? el('p', { class: 'vt', dir: 'auto' }, plain(v.text)) : '', ...v.rows.map((x) => el('div', { class: 'vrow' }, el('span', { class: 'vl' }, el('b', { dir: 'auto' }, x.label), x.note ? el('small', { dir: 'auto' }, x.note) : ''),
+        el('span', { class: 'vb', 'aria-hidden': 'true' }, el('i', { class: x.tone ?? '', style: `width: ${Math.max(2, (100 * (x.value ?? 0)) / top1)}%` })), el('span', { class: 'vn' }, `${x.value}${v.unit ? ` ${v.unit}` : ''}`)))) : '',
+      ...(d.sections ?? []).flatMap((x) => [el('p', { class: 'ui-dl', dir: 'auto' }, plain(x.heading)), el('p', { class: 'dp', dir: 'auto' }, plain(x.body)),
+        x.items?.length ? el('ul', { class: 'rp-kp' }, ...x.items.map((i) => el('li', { class: i.tone ?? '' }, el('b', { dir: 'auto' }, plain(i.title)), i.text ? el('span', { dir: 'auto' }, plain(i.text)) : ''))) : ''])];
+    const next = d.guided && d.next ? [el('p', { class: 'ui-dl' }, 'Next step'), el('div', { class: 'ui-props rp-next' }, el('b', { dir: 'auto' }, plain(d.next.heading)), ...(d.next.lines ?? []).map((l) => el('p', { dir: 'auto' }, plain(l))))] : [];
+    return split(top, sub, [page], el('section', { class: `ui-card ui-pane s8 split-detail${d.guided ? ' two' : ''}`, 'aria-labelledby': 'report-title' },
+      el('div', { class: 'ui-shd split-bar rp-bar' }, cardTile(d), el('span', { dir: 'auto' }, what), read, gone),
       // The page is kept across redraws while this signature holds, so marking it read or a change elsewhere on the board does not load its frame again.
-      el('div', { class: 'read', 'data-sig': JSON.stringify([d.key, url, d.title, d.about, d.decided, ticketOf(d), threadOf(d)]) }, h1, d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided(d), ticketRow(d), thread(d),
-        full || el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }))], hints);
+      el('div', { class: 'pmain read', 'data-sig': JSON.stringify([d.key, url, d.title, d.about, found]) }, el('h1', { id: 'report-title', class: 'dt', dir: 'auto' }, plain(d.title)),
+        d.about ? el('p', { class: 'dp', dir: 'auto' }, plain(d.about)) : '', found ? el('p', { class: 'ui-dl' }, d.guided ? 'What it found' : 'What it decided') : '', found ? el('div', { class: 'ui-props rp-found', dir: 'auto' }, plain(found)) : '',
+        ...keys, url ? el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }) : ''),
+      el('div', { class: 'pside' }, ...reportParts(d, full), ...next, ticketRow(d), thread(d))));
   }
   /** Every key, in one sheet behind ?. A desk hints each where it works; they work at any width with a keyboard. */
   const MOD = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
@@ -4753,8 +4749,6 @@
   const keysSheet = el('dialog', { id: 'keys', 'aria-labelledby': 'keys-title' }, el('div', {}, el('header', {}, el('h2', { id: 'keys-title' }, 'Keyboard shortcuts'), shut),
     ...KEYS.flatMap(([head, rows]) => [el('h3', {}, head), el('ul', {}, ...rows.map(([words, ...keys]) => el('li', {}, el('span', {}, words), ...keys.map(kc))))])));
   shut.onclick = () => keysSheet.close();
-  const keysBtn = el('button', { class: 'keys', 'aria-keyshortcuts': '?' }, icon('keys'), 'Keyboard shortcuts', kc('?'));
-  keysBtn.onclick = () => keysSheet.showModal();
   keysSheet.onclick = (e) => e.target === keysSheet && keysSheet.close();
   document.body.append(keysSheet);
   const GO = { t: '#', d: '#waiting', e: '#evidence', r: '#reports' };
@@ -4774,7 +4768,7 @@
     const rows = [...document.querySelectorAll('.split-list [data-row]')], step = { j: 1, ArrowDown: 1, k: -1, ArrowUp: -1 }[k];
     if (step && rows.length) { e.preventDefault(); const at = rows.findIndex((r) => r.matches('[aria-current]')); rows[Math.min(rows.length - 1, Math.max(0, at + step))].click(); return; }
     // On Decide, a number picks that answer (Enter then sends it); E skips to the next ask, Z undoes the last answer.
-    const onDecide = /^#decide\//.test(location.hash) || !!document.querySelector('.split-detail .decide'), choices = [...document.querySelectorAll('.decide .pick-option')];
+    const onDecide = /^#decide\//.test(location.hash) || !!document.querySelector('.split-detail.decide, .split-detail .decide'), choices = [...document.querySelectorAll('.decide .pick-option')];
     const pick = onDecide && /^[1-9]$/.test(k) ? choices[Number(k) - 1] : null;
     if (pick) { e.preventDefault(); pick.click(); return; }
     if (k === 'e' && onDecide && skipTo) { e.preventDefault(); location.hash = skipTo; return; }
@@ -4788,7 +4782,7 @@
     // Enter answers (or opens a sign-in), C goes to the note, L moves the ask to Later.
     if (k === 'Enter' && !e.target.closest?.('a:not([aria-current]), button, summary')) { const go = document.querySelector('.decide-bar .answer:not(:disabled), .decide .open-link:not(:disabled)'); if (go) e.preventDefault(), go.click(); }
     if (k === 'c') { const box = document.querySelector('.decide .note-box'); if (box) { e.preventDefault(); box.focus({ preventScroll: true }); box.scrollIntoView({ block: 'center' }); } }
-    if (k === 'l') { const b = document.querySelector('.split-bar .later'); if (b) e.preventDefault(), b.click(); }
+    if (k === 'l') { const b = document.querySelector('.decide .later-btn'); if (b) e.preventDefault(), b.click(); }
   });
   const reshow = (control) => { render(); document.querySelector(control)?.focus({ preventScroll: true }); };
   /** Today's small title shows in its bar once the large one has scrolled under it. */
@@ -4851,8 +4845,12 @@
     const badge = (a) => (a === 'waiting' ? 'red' : a === 'reports' && !state.readonly ? 'ink' : '');
     const link = ([a, name]) => el('a', { href: `#${a}`, ...(a === active && { 'aria-current': 'page' }) }, icon(`tab-${a || 'today'}`), name,
       count(a) === undefined || (badge(a) && !count(a)) ? '' : el('span', { class: `n ${badge(a)}`.trim() }, String(count(a))));
-    document.getElementById('nav').replaceChildren(el('p', { class: 'brand' }, el('span', { class: 'logo', 'aria-hidden': 'true' }, glyph('check')), el('span', {}, 'Sign-off', state.name ? el('small', {}, state.name) : '')),
-      el('a', { class: 'sfind', href: '#find' }, document.getElementById('dock-find').firstChild.cloneNode(true), 'Search'), ...SIDE.map(link), el('p', { class: 'go' }, kc('G'), 'then a letter jumps'), keysBtn);
+    // The sidebar as the prototype draws it: the board's mark and name, Search, the areas, and at its foot whose board it is with the light-or-dark button
+    // (on a desk the one place it sits). Every key stays in the ? sheet.
+    const who = state.name || 'You';
+    document.getElementById('nav').replaceChildren(el('p', { class: 'brand' }, el('span', { class: 'logo', 'aria-hidden': 'true' }, glyph('check')), el('span', {}, 'Sign-off')),
+      el('a', { class: 'sfind', href: '#find' }, document.getElementById('dock-find').firstChild.cloneNode(true), 'Search'), ...SIDE.map(link),
+      el('div', { class: 'me' }, el('i', { 'aria-hidden': 'true' }, [...who][0].toUpperCase()), el('span', { dir: 'auto' }, who), themeButton()));
     paintTabs(active === 'designs' ? '' : active, count, badge);
     const ro = state.readonly ? 'Read only' : FROZEN ? `Read-only copy, ${FROZEN.exported}` : '';
     const pageTitle = head === 'decide' || head === 'waiting' ? 'Decide' : head === 'reports' ? 'Reports' : AREAS[head];
@@ -4881,15 +4879,15 @@
       !selecting && !state.readonly && !FROZEN && bulk.length ? reportsMore(by.reports, bulk) : '');
     const update = at === 'evidence' && ((key && state.decisions.find((d) => d.key === key && !gone.has(d.key) && d.type === 'evidence')) || by.evidence.find((d) => d.type === 'evidence'));
     const content = at === 'tickets' || at === 'ticket' ? tickets(by, at === 'ticket' ? key : '') : [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived'), update)
-      : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0) : decideDesk(top, by.waiting, hidden, decideQueue, key, decideDone, answeredToday)] : [top]), ...(deskSplit ? [] : (at === 'waiting' || at === 'decide') && !state.readonly ? [at === 'decide' && !shownAsk ? el('p', { class: 'empty' }, 'Nothing to decide for that question.') : '', decideList(by.waiting, hidden, decideDone, answeredToday), at === 'decide' && shownAsk ? askSheet(shownAsk) : '']
+      : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0, by.reports) : decideDesk(top, by.waiting, hidden, decideQueue, key, decideDone, answeredToday)] : at === 'designs' && !phone() && by.designs.length ? [] : [top]), ...(deskSplit ? [] : (at === 'waiting' || at === 'decide') && !state.readonly ? [at === 'decide' && !shownAsk ? el('p', { class: 'empty' }, 'Nothing to decide for that question.') : '', decideList(by.waiting, hidden, decideDone, answeredToday), at === 'decide' && shownAsk ? askSheet(shownAsk) : '']
       : at === 'designs' ? designGroups(by.designs, top, key) : at === 'evidence' ? [...evidenceList(by.evidence, top), dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived')] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : today(by))];
     if (!(at === 'decide' && shownAsk && !deskSplit)) sheetUp = '';
     // The report shown on a desk stays in place under a new list and bar while it is the same report, so its frame is not loaded again.
     const keptRead = document.querySelector('#board .split-detail > .read'), newRead = content[0]?.querySelector?.('.split-detail > .read');
     if (keptRead && newRead && keptRead.dataset.sig === newRead.dataset.sig) {
-      keptRead.closest('.split').querySelector('.split-list').replaceWith(newRead.closest('.split').querySelector('.split-list'));
-      keptRead.parentElement.querySelector('.split-bar').replaceWith(newRead.parentElement.querySelector('.split-bar'));
+      // The page stays; the head, the list, the report's head line and its parts beside it are drawn again.
+      for (const part of ['.ui-dhead', '.split-list', '.split-detail > .split-bar', '.split-detail > .pside']) document.querySelector(`#board ${part}`).replaceWith(content[0].querySelector(part));
     } else board.replaceChildren(...content);
     // A redraw keeps the desk list where it was scrolled, with the selected row in view.
     const listEl = document.querySelector('.split-list');
@@ -4903,6 +4901,7 @@
     applyPicks();
     if (FROZEN) freeze();
     if (document.querySelector('.tk-desk')) requestAnimationFrame(tkSettle), document.fonts.ready.then(tkSettle);
+    if (document.querySelector('.ui-desk')) requestAnimationFrame(uiSettle), document.fonts.ready.then(uiSettle);
   }
   function freeze() {
     // Answers stay as they are, but nothing in the copy can be sent.
