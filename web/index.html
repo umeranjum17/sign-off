@@ -7,7 +7,9 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="preload" href="inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="ui.css">
 <meta name="theme-color" content="#F5F5F7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <style>
@@ -15,61 +17,42 @@
      The board's own names below are all mapped onto tokens.css, where every raw value lives. --accent is the blue for text, links and focus; --action is the blue a button is filled with.
      Meaning colours are the token mixed toward black where they set text on a light ground, so they keep 4.5:1. */
   :root {
-    --page: var(--tk-grouped); --tile: var(--tk-surface); --desk: var(--tk-surface); --desk-tile: var(--tk-grouped); --bar: var(--tk-surface-high); --sunk: var(--tk-surface-selected); --line: var(--tk-rail);
+    --page: var(--tk-grouped); --tile: var(--tk-surface); --desk: var(--tk-canvas); --desk-tile: var(--tk-card); --bar: var(--tk-surface-high); --sunk: var(--tk-surface-selected); --line: var(--tk-rail);
     --text: var(--tk-text); --muted: var(--tk-text-secondary); --border: var(--tk-text-tertiary); --accent: color-mix(in srgb, var(--tk-link) 80%, #000); --action: color-mix(in srgb, var(--tk-link) 90%, #000); --on-accent: #FFFFFF; --danger: color-mix(in srgb, var(--tk-critical) 75%, #000); --bezel: var(--tk-text);
     --c-waiting: var(--action); --c-evidence: color-mix(in srgb, var(--tk-success) 55%, #000); --c-reports: color-mix(in srgb, var(--tk-warning) 62%, #000); --c-answered: var(--muted); --c-gate: #8A6100;
     --ok: var(--c-evidence); --warn: var(--c-reports); --badge: color-mix(in srgb, var(--tk-critical) 80%, #000); --faint: var(--tk-text-tertiary);
-    --bg: var(--page); --surface: var(--tile); --seg-on: var(--tk-surface); --teal: var(--tk-teal); }
+    --bg: var(--page); --surface: var(--tile); --seg-on: var(--tk-on); --teal: var(--tk-teal); --gutter: var(--tk-gutter); }
   /* One type scale (28/20/17/16/15/13/12, 32 and 22 on a desk), one 4px spacing grid, one control size per role: 44px for a main action and every tap target, 10px corners.
      The sizes of a title, body, secondary line and footnote, the card corner and the raised shadow come from tokens.css; the display sizes are the board's own. */
   :root { --t-xl: 1.75rem; --t-l: 1.25rem; --t-m: var(--tk-fs-title); --t-b: var(--tk-fs-body); --t-s: var(--tk-fs-secondary); --t-xs: var(--tk-fs-footnote); --t-xxs: 0.75rem; --r-ctl: var(--tk-r-ctl); --r-card: var(--tk-r-card); --ctl: 2.75rem; }
   @media (min-width: 64rem) { :root { --t-xl: 2rem; --t-l: 1.375rem; } }
   /* The approved feel's surfaces: Today's ground and raised cards, the glass tab bar and its pill, an iOS hairline, a second fill, and the lift of a card and of a capture. */
-  :root { --ground: var(--tk-grouped); --card: var(--tk-surface); --side: #F5F5F7; --tabbar: rgba(255, 255, 255, 0.72); --tab-on: rgba(0, 0, 0, 0.06); --hairline: rgba(60, 60, 67, 0.29); --fill-2: rgba(118, 118, 128, 0.2);
+  :root { --ground: var(--tk-grouped); --card: var(--tk-surface); --side: var(--tk-canvas); --tabbar: var(--tk-card); --tab-on: var(--tk-on); --hairline: rgba(60, 60, 67, 0.29); --fill-2: rgba(118, 118, 128, 0.2);
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.05); --shot-edge: 0 0 0 0.5px rgba(0, 0, 0, 0.14), 0 12px 32px rgba(0, 0, 0, 0.12); }
-  @media (prefers-color-scheme: dark) { :root { --ground: #0D0D0F; --side: #141416; --tabbar: rgba(36, 36, 40, 0.72); --tab-on: rgba(255, 255, 255, 0.1); --hairline: rgba(255, 255, 255, 0.1); --fill-2: rgba(118, 118, 128, 0.34);
+  @media (prefers-color-scheme: dark) { :root { --ground: var(--tk-canvas); --side: var(--tk-canvas); --tabbar: var(--tk-card); --tab-on: var(--tk-on); --hairline: rgba(255, 255, 255, 0.1); --fill-2: rgba(118, 118, 128, 0.34);
     --shadow-card: 0 0 0 0.5px rgba(255, 255, 255, 0.06); --shot-edge: 0 0 0 0.5px rgba(255, 255, 255, 0.16), 0 16px 40px rgba(0, 0, 0, 0.55); } }
   @media (prefers-color-scheme: dark) { :root {
-    --page: var(--tk-grouped); --tile: var(--tk-surface-high); --desk: var(--tk-grouped); --desk-tile: var(--tk-surface-high); --bar: var(--tk-surface-high); --sunk: var(--tk-input); --line: var(--tk-rail);
+    --page: var(--tk-grouped); --tile: var(--tk-surface); --desk: var(--tk-canvas); --desk-tile: var(--tk-card); --bar: var(--tk-surface-high); --sunk: var(--tk-input); --line: var(--tk-rail);
     --accent: var(--tk-link); --danger: var(--tk-critical); --bezel: var(--tk-rail);
-    --c-waiting: var(--tk-link); --c-evidence: var(--tk-success); --c-reports: var(--tk-warning); --c-gate: #FFD60A; --badge: var(--tk-critical); --seg-on: var(--tk-text-tertiary); } }
+    --c-waiting: var(--tk-link); --c-evidence: var(--tk-success); --c-reports: var(--tk-warning); --c-gate: #FFD60A; --badge: var(--tk-critical); --seg-on: var(--tk-on); } }
   * { box-sizing: border-box; }
   /* A phone keeps 140px at the bottom, so the last row scrolls fully clear of the floating tab bar. */
   /* A phone keeps the text size it was given on every screen, so the tab bar never grows or shrinks. */
   html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   body { margin: 0; padding-bottom: calc(8.75rem + env(safe-area-inset-bottom)); background: var(--bg); color: var(--text); overflow-wrap: anywhere;
-    -webkit-font-smoothing: antialiased; font: var(--t-b)/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif; letter-spacing: -0.011em; }
+    -webkit-font-smoothing: antialiased; font: var(--t-b)/1.5 var(--tk-font); letter-spacing: -0.011em; }
   /* The board areas each have a colour, used on icons, dots and marks. */
   .i-waiting { --area: var(--c-waiting); } .i-evidence { --area: var(--c-evidence); } .i-reports { --area: var(--c-reports); } .i-answered { --area: var(--c-answered); }
-  main { max-width: 72rem; margin: 0 auto; padding: 0 max(1.25rem, env(safe-area-inset-right)) 0 max(1.25rem, env(safe-area-inset-left)); }
-  .side { display: none; }
-  /* A phone moves between areas with a floating glass pill, 62px tall and 12px over the bottom edge; the area on screen sits in a lighter pill that slides between tabs on a spring. */
-  .tabs { position: fixed; z-index: 2; left: max(1rem, env(safe-area-inset-left)); right: max(1rem, env(safe-area-inset-right)); bottom: calc(0.75rem + env(safe-area-inset-bottom));
-    display: flex; height: 3.875rem; padding: 0.25rem; border-radius: 1.9375rem; background: var(--tabbar); -webkit-backdrop-filter: saturate(180%) blur(24px); backdrop-filter: saturate(180%) blur(24px);
-    box-shadow: 0 0 0 0.5px var(--hairline), 0 8px 30px rgba(0, 0, 0, 0.12); }
-  .tabs .hl { position: absolute; top: 0.25rem; bottom: 0.25rem; left: 0.25rem; width: calc((100% - 0.5rem) / 4); border-radius: 1.6875rem; background: var(--tab-on); transition: transform 300ms var(--spring); }
-  .tabs a { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 0; border-radius: 1.6875rem; color: var(--muted);
-    font-size: 0.6875rem; line-height: 0.8125rem; font-weight: 600; letter-spacing: 0; text-decoration: none; white-space: nowrap; -webkit-tap-highlight-color: transparent; }
-  .tabs a[aria-current] { color: var(--accent); }
-  .tabs a:active .icon { transform: scale(0.86); transition-duration: 90ms; }
-  /* Decide carries a red count of what waits on you over its icon's corner, Reports a blue count of what is new; a count that changes bumps. */
-  .tabs .bd { position: absolute; top: 0.3125rem; left: calc(50% + 0.375rem); min-width: 1.125rem; height: 1.125rem; padding: 0 0.3125rem; border-radius: 0.5625rem;
-    background: var(--badge); color: #FFFFFF; font-size: 0.75rem; line-height: 1.125rem; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--tabbar); }
-  .bd.bump, .side .n.bump { animation: bump 380ms var(--spring); }
-  @keyframes bump { 30% { transform: scale(1.25); } }
-  .tabs a:focus-visible { outline-offset: -2px; border-radius: 1.6875rem; }
-  .tabs .icon, .side .icon { width: 1.5rem; height: 1.5rem; background: none; transition: transform 300ms var(--spring); }
-  .tabs .icon svg, .side .icon svg { width: 1.5rem; height: 1.5rem; stroke: currentColor; stroke-width: 1.9; }
-  .side .icon { color: var(--muted); } .side [aria-current] .icon { color: var(--accent); }
-  .side .icon, .side .icon svg { width: 1.25rem; height: 1.25rem; }
+  main { max-width: 72rem; margin: 0 auto; padding: 0 max(var(--gutter), env(safe-area-inset-right)) 0 max(var(--gutter), env(safe-area-inset-left)); }
   .banner { margin: 1rem 0 0; padding: 0.75rem 1rem; border: 1px solid var(--danger); border-radius: 0.5rem; color: var(--danger); }
-  .top { position: relative; padding: 1.5rem 0 1.25rem; }
+  /* The page's title row, as ui.css draws it: 8px from the top, a 24px medium title in a 44px row. */
+  .top { position: relative; padding: 0.5rem 0 1rem; }
   /* A search field; what matches lists under it. */
   .search { margin: 0 0 1rem; }
   .search input { width: 100%; min-height: 2.75rem; padding: 0 0.875rem; border: 0; border-radius: 0.625rem; background: var(--sunk); color: var(--text); font: inherit; }
   .search .rows { margin-top: 0.75rem; }
-  .top h1 { margin: 0; font-size: var(--t-xl); line-height: 1.2; font-weight: 700; letter-spacing: -0.022em; outline: none; }
-  .lede { margin: 0.375rem 0 0; color: var(--muted); }
+  .top h1 { margin: 0; color: var(--tk-ink); font-size: var(--tk-fs-page); line-height: var(--tk-lh-page); font-weight: 500; letter-spacing: 0; outline: none; }
+  .lede { margin: 0.5rem 0 0; color: var(--muted); }
   .back, .sec-head a, .more { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--accent); font-weight: 400; text-decoration: none; }
   h2 { font-size: 1.375rem; line-height: 1.25; margin: 0 0 0.75rem; }
   .icon { flex: none; display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 0.5rem; background: var(--area, var(--muted)); }
@@ -78,7 +61,7 @@
      four tiles in two rows (each opens what it counts), the latest proof with a capture each, the new report, and what was cleared today, on a grey ground. */
   body.today { --bg: var(--ground); --surface: var(--card); }
   body.today main { padding: 0 max(1rem, env(safe-area-inset-right)) 0 max(1rem, env(safe-area-inset-left)); }
-  .top.today-top { padding: 1.25rem 0.25rem 0; }
+  .top.today-top { padding: 1.25rem 0 0; }
   .today-top .date-kicker { height: 1.25rem; margin: 0; line-height: 1.25rem; letter-spacing: 0.01em; }
   .head-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.75rem; }
   body.today .today-top h1 { font-size: 2.125rem; line-height: 2.5625rem; letter-spacing: -0.026em; }
@@ -833,22 +816,7 @@
   @media (min-width: 64rem) {
     :root { --bg: var(--desk); --surface: var(--desk-tile); }
     body { display: grid; grid-template-columns: 15rem minmax(0, 1fr); padding-bottom: 3rem; }
-    .tabs { display: none; }
-    /* The sidebar: the board's mark and whose board it is, the four areas with a red count on Decide and a blue one on new Reports, then the keys. */
-    .side { display: flex; flex-direction: column; gap: 0.125rem; position: sticky; top: 0; height: 100vh; padding: 1.125rem 0.75rem 1rem; box-shadow: 0.5px 0 0 var(--hairline); background: var(--side); }
-    .side a { display: flex; align-items: center; gap: 0.75rem; min-height: var(--ctl); padding: 0 0.625rem; border-radius: 0.625rem; color: var(--text); font-size: var(--t-s); font-weight: 500; text-decoration: none; }
-    .side a:hover:not([aria-current]) { background: var(--tab-on); }
-    .side a[aria-current] { background: var(--tab-on); font-weight: 600; }
-    .side a:active .icon { transform: scale(0.86); transition-duration: 90ms; }
-    .side .n { display: grid; place-items: center; min-width: 1.375rem; height: 1.25rem; margin-left: auto; padding: 0 0.375rem; border-radius: 0.625rem; color: var(--muted);
-      font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-    .side .n.red { background: var(--badge); color: #FFFFFF; } .side .n.blue { background: var(--action); color: #FFFFFF; }
-    .brand { display: flex; align-items: center; gap: 0.625rem; margin: 0; padding: 0 0.625rem 1.125rem; font-size: var(--t-m); line-height: 1.375rem; font-weight: 700; }
-    .brand .logo { display: grid; flex: none; place-items: center; width: 1.875rem; height: 1.875rem; border-radius: 0.5625rem; background: var(--action); color: #FFFFFF; }
-    .brand .logo .glyph { width: 1.125rem; height: 1.125rem; stroke-width: 2.6; }
-    .brand small { display: block; color: var(--muted); font-size: var(--t-xs); line-height: 1.125rem; font-weight: 500; }
-    .top { padding: 3.5rem 0 1.5rem; }
-    .top h1 { font-size: var(--t-xl); line-height: 1.15; letter-spacing: -0.026em; }
+    .top { padding: 1.5rem 0 1rem; }
     #toast button { min-height: var(--ctl); }
     #toast { bottom: 1.75rem; }
     main { width: 100%; padding: 0 3rem; }
@@ -1197,8 +1165,8 @@
   body:has(.decide-list, .decide) { --bg: var(--tk-surface); --surface: var(--tk-grouped); }
   @media (prefers-color-scheme: dark) { body:has(.decide-list, .decide) { --surface: var(--tk-surface-highest); } }
   main { overflow-x: clip; }
-  .date-kicker { margin: 0 0 0.125rem; color: var(--muted); font-size: var(--t-xs); line-height: 1.125rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
-  .top:has(> .date-kicker) h1 { font-size: 2.125rem; line-height: 2.625rem; }
+  .date-kicker { margin: 0; color: var(--muted); font-size: var(--t-xs); line-height: 1.25rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
+  .top:has(> .date-kicker):has(+ .decide-list) h1 { font-size: 2.125rem; line-height: 2.625rem; }
   .top > .dl-more { position: absolute; top: 2.75rem; right: -0.5rem; }
   /* Decide's head on a phone, as the prototype sets it: the date from 20px down, the large title, a 15px line of what waits, and More beside the title. */
   @media (max-width: 63.999rem) {
@@ -1229,10 +1197,10 @@
   .dl-menu > button:disabled { background: none; color: var(--faint); cursor: default; }
   .dl-menu > .dl-sep { height: 0.375rem; margin: 0.25rem 0; background: var(--sunk); }
   /* Group heads with their count, then the rows: full width on a phone, a rounded block wider up. */
-  .decide-list .dl-head, .rp-page .dl-head { display: flex; align-items: baseline; gap: 0.5rem; margin: 1.75rem 0 0.25rem; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; font-weight: 600; letter-spacing: -0.01em; }
-  .decide-list > .dl-head:first-child, .rp-page > .dl-head:first-child { margin-top: 0.5rem; }
+  .decide-list .dl-head { display: flex; align-items: baseline; gap: 0.5rem; margin: 1.75rem 0 0.25rem; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; font-weight: 600; letter-spacing: -0.01em; }
+  .decide-list > .dl-head:first-child { margin-top: 0.5rem; }
   .dl-head .n { color: var(--faint); font-weight: 500; font-variant-numeric: tabular-nums; }
-  .dl-list { list-style: none; margin: 0 -1.25rem; padding: 0; }
+  .dl-list { list-style: none; margin: 0 calc(-1 * var(--gutter)); padding: 0; }
   @media (min-width: 45rem) { .dl-list { margin: 0; border-radius: 0.75rem; overflow: hidden; } }
   .dl-row { position: relative; overflow: hidden; }
   .dl-face { position: relative; z-index: 1; display: flex; align-items: center; gap: 0.875rem; min-height: 4.75rem; padding: 0.75rem 1.25rem; background: var(--bg); color: inherit; text-decoration: none;
@@ -1266,23 +1234,17 @@
   .rise .dl-row, .rise .dl-head { animation: rise 280ms var(--ease) both; animation-delay: calc(min(var(--n, 0), 12) * 28ms); }
   @keyframes rise { from { opacity: 0; transform: translateY(0.625rem); } }
   .decide-list > .gone-asks { margin-top: 1.5rem; }
-  /* Reports: a 58px picture of what each one explains with (teal, which no other area uses), its title and a blue dot while it is not read,
-     two lines of what it says, then one quiet line of its form, video, project and time. Read and unread is blue under a right swipe, Archive indigo under a left one. */
-  .rp-list .dl-face { align-items: flex-start; min-height: 6.5rem; padding-top: 0.875rem; padding-bottom: 0.875rem; }
-  .rp-list .dl-row:not(.leaving) ~ .dl-row .dl-face::before { content: ""; position: absolute; top: 0; right: 0; left: 5.75rem; border-top: 0.5px solid var(--line); }
-  .rp-list .rth { display: grid; flex: none; place-items: center; width: 3.625rem; height: 3.625rem; border-radius: 0.9375rem; color: var(--teal);
-    background: color-mix(in srgb, var(--teal) 13%, var(--tile)); box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--teal) 30%, transparent); }
-  .rp-list .rth svg { width: 2.625rem; height: 2.625rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  .rp-list .r1 { align-items: center; }
-  .rp-list .sub { display: -webkit-box; white-space: normal; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-  .rp-list .when { overflow: hidden; margin-top: 0.3125rem; color: var(--faint); font-size: var(--t-xs); line-height: 1.125rem; font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
-  .rp-list .new { flex: none; width: 0.625rem; height: 0.625rem; border-radius: 50%; background: var(--action); transition: transform 280ms var(--spring); }
+  /* Reports: a card of the new look's rows (ui.css), each the report's icon tile, its title with a blue dot while it is not read, then its project and time.
+     Each row's face spans the card, so a swipe shows its action edge to edge: read and unread blue under a right swipe, Archive indigo under a left one. */
+  .rp-list.ui-list { margin: 0; padding: 0.25rem 0; border-radius: var(--tk-r-card); }
+  .rp-list.ui-list > li + li::before { right: 0.75rem; left: 0.75rem; }
+  .rp-list .dl-face.ui-row { gap: 0.75rem; min-height: 0; padding: 0 0.75rem; background: var(--tk-card); }
+  .rp-list .dl-face.ui-row.down { background: color-mix(in srgb, var(--text) 6%, var(--tk-card)); }
+  .rp-list .new { flex: none; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--action); transition: transform 280ms var(--spring); }
   .rp-list .new.out { animation: dot-out 280ms var(--spring) 120ms forwards; }
   @keyframes dot-out { to { transform: scale(0); } }
-  .rp-list .flow { margin-top: 0.625rem; max-width: 20rem; }
   .rp-list details > summary.dl-face { list-style: none; cursor: pointer; } .rp-list details > summary.dl-face::-webkit-details-marker { display: none; }
-  .rp-list details > summary.dl-face:active { background: color-mix(in srgb, var(--text) 6%, var(--bg)); }
-  .rp-list details > :not(summary) { margin: 0 1.25rem 1rem 6rem; }
+  .rp-list details > :not(summary) { margin: 0 0.75rem 1rem 4rem; }
   .rp-list .dl-act.yes { background: var(--action); }
   .rp-list .dl-act.later { background: var(--c-indigo); }
   .rp-page > .notes, .rp-page > .gone-asks { margin-top: 1.5rem; }
@@ -1322,7 +1284,7 @@
   .decide { --opt: var(--bg); --ring: color-mix(in srgb, var(--faint) 45%, transparent); } .decide.g-answer { --k: var(--accent); }
   @media (prefers-color-scheme: dark) { .decide { --opt: var(--tk-surface-high); } }
   @media (max-width: 63.999rem) {
-    .top.ask-nav { position: sticky; z-index: 3; top: 0; display: flex; align-items: center; justify-content: space-between; height: 3.25rem; margin: 0 -1.25rem; padding: 0 0.25rem; background: var(--bg); transition: box-shadow 150ms linear; }
+    .top.ask-nav { position: sticky; z-index: 3; top: 0; display: flex; align-items: center; justify-content: space-between; height: 3.25rem; margin: 0 calc(-1 * var(--gutter)); padding: 0 0.25rem; background: var(--bg); transition: box-shadow 150ms linear; }
     .top.ask-nav.scrolled { box-shadow: 0 0.5px 0 var(--line); }
     .top.ask-nav h1 { width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
     .ask-nav .back { padding: 0 0.75rem 0 0.125rem; font-size: 1.0625rem; }
@@ -1335,8 +1297,8 @@
     .ask-nav .steps { display: flex; margin-left: auto; }
     .ask-nav .step { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; color: var(--action); -webkit-tap-highlight-color: transparent; }
     .ask-nav span.step { color: var(--faint); } .ask-nav .step .glyph { width: 1.625rem; height: 1.625rem; stroke-width: 2.2; }
-    #tabs { transition: transform 250ms var(--ease); }
-    body:has(#board > .decide) #tabs { transform: translateY(calc(100% + 2.5rem)); }
+    #tabs, #dock-find { transition: transform 250ms var(--ease); }
+    body:has(#board > .decide) :is(#tabs, #dock-find) { transform: translateY(calc(100% + 2.5rem)); }
     body:has(#board > .decide) { padding-bottom: calc(6.5rem + env(safe-area-inset-bottom)); }
     body:has(#board > .decide) #toast { bottom: calc(6rem + env(safe-area-inset-bottom)); }
     .decide-bar { position: fixed; z-index: 2; left: 0; right: 0; bottom: 0; margin: 0; padding: 0.75rem max(1.25rem, calc((100vw - 42.5rem) / 2)) calc(1rem + env(safe-area-inset-bottom));
@@ -1520,9 +1482,12 @@
     .split-list { display: flex; flex-direction: column; min-height: 0; overflow: auto; padding: 0 1.5rem; border-right: 1px solid var(--line); overscroll-behavior: contain; }
     .split-list > .top { padding: 2.75rem 0 0.5rem; }
     .split-list .dl-list { margin: 0 -1.5rem; border-radius: 0; }
+    .split-list .rp-list.ui-list { margin: 0; border-radius: var(--tk-r-card); }
     .split-list .dl-face { min-height: 4.5rem; padding: 0.75rem 1.5rem; }
     .dl-row.sel .dl-face { background: color-mix(in srgb, var(--action) 11%, var(--bg)); box-shadow: inset 3px 0 0 var(--action); outline: none; }
     .dl-row.sel + .dl-row .dl-face::before, .dl-row.sel .dl-face::before { border-color: transparent; }
+    /* The report shown sits on the sunk fill, as the prototype marks the open item. */
+    .rp-list .dl-row.sel .dl-face.ui-row { background: var(--tk-inset); box-shadow: none; }
     /* The toast, as the prototype sets it on a desk: 440px wide, centred over the list and its pane together. */
     body.split-view #toast { left: calc(50% + 7.5rem - 13.75rem); right: auto; width: 27.5rem; }
     .split-hints { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem 1rem; margin: auto -1.5rem 0; padding: 0.75rem 1.5rem;
@@ -1614,6 +1579,7 @@
   <div class="skel" aria-hidden="true"><span class="sk sk-kicker"></span><span class="sk sk-title"></span><span class="sk sk-line" style="width:55%"></span>
     <div class="sk-row"><span class="sk sk-ic"></span><span class="sk-lines"><span class="sk sk-line" style="width:72%"></span><span class="sk sk-line" style="width:48%"></span></span></div><div class="sk-row"><span class="sk sk-ic"></span><span class="sk-lines"><span class="sk sk-line" style="width:72%"></span><span class="sk sk-line" style="width:48%"></span></span></div><div class="sk-row"><span class="sk sk-ic"></span><span class="sk-lines"><span class="sk sk-line" style="width:72%"></span><span class="sk sk-line" style="width:48%"></span></span></div><div class="sk-row"><span class="sk sk-ic"></span><span class="sk-lines"><span class="sk sk-line" style="width:72%"></span><span class="sk sk-line" style="width:48%"></span></span></div><div class="sk-row"><span class="sk sk-ic"></span><span class="sk-lines"><span class="sk sk-line" style="width:72%"></span><span class="sk sk-line" style="width:48%"></span></span></div></div></div></main>
 <nav class="tabs" id="tabs" aria-label="Board areas"></nav>
+<a class="dock-find" id="dock-find" href="#find" aria-label="Search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></a>
 <div id="reader" role="dialog" aria-modal="true" aria-labelledby="reader-title" hidden></div>
 <div id="toast" role="status" hidden><span class="tk" aria-hidden="true"><svg class="ok" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><svg class="later" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><svg class="undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><svg class="dismiss" viewBox="0 0 24 24"><path d="M3 7h18M5 7l1 13h12l1-13M9 7V4h6v3"/></svg><svg class="error" viewBox="0 0 24 24"><path d="M12 7v6M12 17h.01"/></svg></span><span id="toast-text"></span><button id="undo" hidden>Undo</button><span class="bar" aria-hidden="true"></span></div>
 <script>
@@ -2519,8 +2485,16 @@
     expand: '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>', layers: '<rect x="3" y="3" width="12" height="12" rx="2"/><path d="M9 21h10a2 2 0 0 0 2-2V9"/>' };
   const glyph = (a) => { const s = el('span', { 'aria-hidden': 'true', style: 'display:inline-flex' }); s.innerHTML = `<svg class="glyph" viewBox="0 0 24 24">${GLYPHS[a]}</svg>`; return s; };
   const icon = (a) => { const s = el('span', { class: `icon i-${a}`, 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[a]}"/></svg>`; return s; };
+  /** The new look's icon tile (ui.css): a project's own picture when the board holds one, else one of this page's line drawings. */
+  const uiIcon = ({ src, draw }) => { const s = el('span', { class: 'ui-icon', 'aria-hidden': 'true' }); if (src) s.append(el('img', { src, alt: '' })); else s.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[draw]}"/></svg>`; return s; };
+  /** The new look's row (ui.css), as the parts of a link or button: the icon tile, the title with what follows it and a P0-P3 chip only when one is set,
+   * then one second line (project and time) or, where there is progress, a bar with its percent. */
+  const uiRow = ({ tile, title, after = '', priority, meta, progress }) => [tile, el('span', { class: 'rm' },
+    el('span', { class: 'l1' }, el('span', { class: 't', dir: 'auto' }, title), after, priority ? el('span', { class: `ui-pc ${priority.toLowerCase()}` }, priority) : ''),
+    progress === undefined ? el('span', { class: 'l2 meta', dir: 'auto' }, meta) : el('span', { class: 'l2' }, el('span', { class: 'ui-bar' }, el('i', { style: `width: ${progress}%` })), el('span', { class: 'pct' }, `${progress}%`)))];
   /** The phone's tab bar is drawn once, so its pill slides from the area left to the one opened; each redraw marks the area on screen and sets the badges, and a badge whose count changed bumps. */
-  const tabPill = el('span', { class: 'hl', 'aria-hidden': 'true' }), tabLinks = TABS.map(([a, name]) => el('a', { href: `#${a}` }, icon(a || 'summary'), name));
+  const tabPill = el('span', { class: 'hl', 'aria-hidden': 'true' }), tabLinks = TABS.map(([a, name]) => el('a', { href: `#${a}`, 'aria-label': name }, icon(a || 'summary')));
+  document.documentElement.style.setProperty('--dock-n', TABS.length);
   tabLinks.forEach((t) => t.addEventListener('click', () => buzz('tick')));
   document.getElementById('tabs').append(tabPill, ...tabLinks);
   function paintTabs(active, count, badged) {
@@ -2532,7 +2506,7 @@
       // The first drawing puts the pill in place; after that it slides.
       const first = !tabPill.style.transform;
       if (first) tabPill.style.transition = 'none';
-      tabPill.style.transform = `translateX(${i * 100}%)`;
+      tabPill.style.transform = `translateX(calc(${i} * (100% + 2px)))`;
       if (first) void tabPill.offsetWidth, tabPill.style.transition = '';
     });
     tabLinks.forEach((t, i) => {
@@ -2861,11 +2835,10 @@
   /** A report: a row with its picture, title, what it says, then its form, video, project and time, and a dot while it is not read. A tap opens its page over the board;
    *  an explainer with no page opens in place, to its numbered steps or its video card. */
   function report(d, i = 0) {
-    const n = d.steps?.length, dot = unread(d) || fading.has(d.key);
-    const face = [rth(d), el('span', { class: 'copy' }, el('span', { class: 'r1' }, el('strong', { class: 'title', dir: 'auto' }, title(d)),
-      dot ? el('span', { class: `new${fading.has(d.key) ? ' out' : ''}`, role: 'img', 'aria-label': 'Not read yet' }) : ''),
-      d.about ? el('span', { class: 'meta sub', dir: 'auto' }, d.about) : '', el('span', { class: 'when' }, reportLine(d)),
-      n ? el('ol', { class: 'flow', style: `--n: ${n}`, 'aria-label': `${n} steps: ${d.steps.map((t) => t.title).join(', ')}` }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), marks(t)))) : '')];
+    const n = d.steps?.length, dot = unread(d) || fading.has(d.key), at = d.filed ? (isToday(d.filed) ? hhmm(d.filed) : day(d.filed)) : '';
+    // The row says the project and when; one that names neither says what it is.
+    const face = uiRow({ tile: uiIcon({ draw: 'plan' }), title: title(d), after: dot ? el('span', { class: `new${fading.has(d.key) ? ' out' : ''}`, role: 'img', 'aria-label': 'Not read yet' }) : '',
+      meta: [d.group, at].filter(Boolean).join(' · ') || reportLine(d) });
     const sel = rpSel === d.key;
     const li = (...kids) => el('li', { class: `report dl-row${flash === d.key ? ' returned' : ''}${sel ? ' sel' : ''}`, style: `--n:${i}`, ...(reads(d) && { 'data-key': d.key, 'data-list': 'reports' }) }, ...kids);
     const act = (cls, mark, words) => el('div', { class: `dl-act ${cls}`, 'aria-hidden': 'true' }, glyph(mark), el('span', {}, words));
@@ -2874,10 +2847,10 @@
     const hover = rpSel === null || !canDismiss() ? '' : el('span', { class: 'dl-hover' }, quick('read-q', unread(d) ? 'check' : 'dot', unread(d) ? 'Read' : 'Unread', () => readToggle(d)),
       quick('later-q', 'archive', 'Archive', () => archiveReport(d)));
     if (reads(d)) return li(act('yes', unread(d) ? 'check' : 'dot', unread(d) ? 'Read' : 'Unread'), canDismiss() ? act('later', 'archive', 'Archive') : '',
-      el('a', { class: 'dl-face', href: `#reports/${d.key}`, draggable: 'false', id: `item-${d.key}`, 'data-row': '', ...(sel && { 'aria-current': 'true' }) }, ...face), hover);
+      el('a', { class: 'dl-face ui-row', href: `#reports/${d.key}`, draggable: 'false', id: `item-${d.key}`, 'data-row': '', ...(sel && { 'aria-current': 'true' }) }, ...face), hover);
     const full = n ? el('ol', { class: 'steps' }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), el('span', { dir: 'auto' }, t.title), marks(t)))) : row(d, { x: false });
     full.removeAttribute('id');
-    const box = el('details', { class: 'done', id: `item-${d.key}`, ...(opened.has(d.key) && { open: '' }) }, el('summary', { class: 'dl-face' }, ...face), full, decided(d), xBtn(d, 'Dismiss'));
+    const box = el('details', { class: 'done', id: `item-${d.key}`, ...(opened.has(d.key) && { open: '' }) }, el('summary', { class: 'dl-face ui-row' }, ...face), full, decided(d), xBtn(d, 'Dismiss'));
     box.ontoggle = () => (box.open ? opened.add(d.key) : opened.delete(d.key));
     return li(box);
   }
@@ -3754,7 +3727,7 @@
     const fresh = (d) => !!d.filed && isToday(d.filed), newest = [...items].sort((a, b) => (Date.parse(b.filed) || 0) - (Date.parse(a.filed) || 0));
     let i = 0;
     return [['Today', newest.filter(fresh)], ['Earlier', newest.filter((d) => !fresh(d))]].filter(([, list]) => list.length)
-      .flatMap(([name, list]) => [el('h2', { class: 'dl-head', style: `--n:${i++}` }, name, el('span', { class: 'n' }, String(list.length))), el('ul', { class: 'dl-list rp-list', 'aria-label': name }, ...list.map((d) => report(d, i++)))]);
+      .flatMap(([name, list]) => [el('h2', { class: 'dl-head ui-sec', style: `--n:${i++}` }, name, el('span', { class: 'n' }, String(list.length))), el('ul', { class: 'dl-list rp-list ui-card ui-list', 'aria-label': name }, ...list.map((d) => report(d, i++)))]);
   }
 
   const designStatus = (d) => { const a = state.answers[d.key]?.answer; return a === 'approve' ? 'Approved' : a === 'change' ? 'Changes requested' : d.status === 'draft' ? 'Draft' : 'In review'; };
@@ -4315,7 +4288,7 @@
     const link = ([a, name]) => el('a', { href: `#${a}`, ...(a === active && { 'aria-current': 'page' }) }, icon(a || 'summary'), name,
       count(a) === undefined || (badge(a) && !count(a)) ? '' : el('span', { class: `n ${badge(a)}`.trim() }, String(count(a))));
     document.getElementById('nav').replaceChildren(el('p', { class: 'brand' }, el('span', { class: 'logo', 'aria-hidden': 'true' }, glyph('check')), el('span', {}, 'Sign-off', state.name ? el('small', {}, state.name) : '')),
-      ...TABS.map(link), el('p', { class: 'go' }, kc('G'), 'then a letter jumps'), keysBtn);
+      el('a', { class: 'sfind', href: '#find' }, document.getElementById('dock-find').firstChild.cloneNode(true), 'Search'), ...TABS.map(link), el('p', { class: 'go' }, kc('G'), 'then a letter jumps'), keysBtn);
     paintTabs(active, count, badge);
     const ro = state.readonly ? 'Read only' : FROZEN ? `Read-only copy, ${FROZEN.exported}` : '';
     const pageTitle = head === 'decide' || head === 'waiting' ? 'Decide' : head === 'reports' ? 'Reports' : head === 'ticket' ? tk?.title ?? 'Ticket' : AREAS[head];
@@ -4341,8 +4314,8 @@
     board.removeAttribute('aria-busy');
     const listTop = document.querySelector('.split-list')?.scrollTop;
     // An update in the address opens even when the list leaves it off (a failed run); with none, the newest is selected.
-    // Reports' list: the legend, Today over Earlier, Notes and Archived; on a desk an empty board says so in the pane beside it.
-    const rpPage = () => el('div', { class: `rp-page${rpRisen ? '' : ' rise'}` }, by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
+    // Reports' list: the legend (only while a report with no page lists its steps in place), Today over Earlier, Notes and Archived; on a desk an empty board says so in the pane beside it.
+    const rpPage = () => el('div', { class: `rp-page${rpRisen ? '' : ' rise'}` }, by.reports.some((d) => d.steps && !reads(d)) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
       ...(by.reports.length ? reportGroups(by.reports) : rpSel !== null ? [] : [el('div', { class: 'all-clear-big' }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, 'Nothing to read'), el('p', {}, EMPTY.reports))]),
       notes(by.notes), dismissed(state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && ['reports', 'notes'].includes(area(d))), 'Archived'));
     const update = at === 'evidence' && ((key && state.decisions.find((d) => d.key === key && !gone.has(d.key) && d.type === 'evidence')) || by.evidence.find((d) => d.type === 'evidence'));
@@ -4423,6 +4396,8 @@
     jump = null;
     item ? item.scrollIntoView() : scrollTo(0, 0);
     titleBar();
+    // Search, in the dock or the sidebar, opens Today with its search box in hand.
+    if (location.hash === '#find') return findBox();
     // A Today tile opens Decide at its group, whose head flashes.
     const group = toGroup && location.hash === '#waiting' && [...document.querySelectorAll('.dl-head')].find((h) => h.firstChild.textContent === GROUPS.find(([g]) => g === toGroup)?.[1]);
     toGroup = '';
@@ -4431,6 +4406,8 @@
     // On a desk the focus stays on the selected row, so J, K and Enter carry on from it.
     ((back && (item?.matches('a.dl-face') ? item : item?.querySelector('h3 a, .open-link, a.compact'))) || document.querySelector('.split-list [data-row][aria-current]') || document.querySelector('#board h1')).focus({ preventScroll: true });
   });
+  const findBox = () => { const box = document.getElementById('find'); box?.scrollIntoView({ block: 'center' }); box?.focus({ preventScroll: true }); };
+  addEventListener('click', (e) => { if (e.target.closest?.('a[href="#find"]') && location.hash === '#find') e.preventDefault(), findBox(); });
   // An interactive page may post its own height, `{ height: <px> }`, and its frame then fits it with no blank below.
   // Only a frame's own message sizes it. Document readers must fit even long pages; previews stay capped.
   addEventListener('message', (e) => {

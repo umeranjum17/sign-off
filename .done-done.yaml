@@ -39,6 +39,10 @@ journeys:
   # The board foundation (type scale, 44px controls, tab bar): Decide and Today, one theme and width per run; FOUNDATION_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
   foundation:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/foundation-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${FOUNDATION_THEME:-light}" "${FOUNDATION_WIDTH:-390}"'
+  # The new look's foundation (web/tokens.css, web/ui.css): Today and Reports at 390 and 1280, light and dark, measured in the browser (edges, 4px grid, rows, dock, sidebar, Inter);
+  # NEWLOOK_PROTO=<the approved prototype's index.html> saves each beside the prototype's frame, NEWLOOK_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
+  newlook:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/newlook-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $NEWLOOK_PROTO'
   # The board's design tokens (web/tokens.css) in use on Today, Decide, Evidence and a report, one theme and width per run; TOKENS_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
   tokens:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/tokens-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${TOKENS_THEME:-light}" "${TOKENS_WIDTH:-390}"'

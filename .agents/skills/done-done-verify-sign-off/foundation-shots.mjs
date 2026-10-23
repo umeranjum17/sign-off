@@ -23,7 +23,7 @@ const probe = `() => {
   const sp = (s) => { const e = document.querySelector(s); if (!e || !vis(e)) return null; const c = getComputedStyle(e); return [c.paddingTop, c.paddingRight, c.paddingBottom, c.paddingLeft, c.marginTop, c.marginBottom, c.gap, c.fontSize, c.minHeight].join(' '); };
   const spacing = {}; for (const s of ['main', '.top', '.top h1', 'button', '.open-link', '.row', '.tabs a', '.tabs', '.glance', '.tile', '.decide-bar']) spacing[s] = sp(s);
   const css = (s, p) => { const e = document.querySelector(s); return e ? getComputedStyle(e)[p] : null; };
-  return JSON.stringify({ body: css('body', 'fontSize'), bodyLine: css('body', 'lineHeight'), h1: css('.top h1', 'fontSize'), tabBar: bar && { h: Math.round(bar.height * 10) / 10, link: Math.round(document.querySelector('.tabs a').getBoundingClientRect().height * 10) / 10, bg: css('.tabs', 'backgroundColor'), blur: css('.tabs', 'backdropFilter') }, tabLabel: css('.tabs a', 'fontSize'), tabNames: [...document.querySelectorAll('.tabs a')].map((a) => a.textContent.trim().replace(/[0-9]+$/, '')), overflowX: document.documentElement.scrollWidth > innerWidth, under, spacing });
+  return JSON.stringify({ body: css('body', 'fontSize'), bodyLine: css('body', 'lineHeight'), h1: css('.top h1', 'fontSize'), tabBar: bar && { h: Math.round(bar.height * 10) / 10, link: Math.round(document.querySelector('.tabs a').getBoundingClientRect().height * 10) / 10, bg: css('.tabs', 'backgroundColor'), blur: css('.tabs', 'backdropFilter') }, tabLabel: css('.tabs a', 'fontSize'), tabNames: [...document.querySelectorAll('.tabs a')].map((a) => a.getAttribute('aria-label').replace(/, .*$/, '')), overflowX: document.documentElement.scrollWidth > innerWidth, under, spacing });
 }`;
 let base;
 try {
@@ -48,11 +48,11 @@ try {
     writeFileSync(join(out, `spacing.${stem}.${side}.${theme}.${width}w.json`), JSON.stringify(m.spacing, null, 2) + '\n');
     if (side === 'after') assert.deepEqual([m.under.length, m.overflowX], [0, false], JSON.stringify(m));
   }
-  // The floating tab bar: a 62px glass pill whose tabs are 54px tall inside its 4px inset.
-  if (side === 'after' && width === 390) assert.deepEqual([cell.decide.tabBar.h, cell.decide.tabBar.link], [62, 54], `tab bar ${JSON.stringify(cell.decide.tabBar)}`);
+  // The floating dock: a 56px pill whose round tabs are 48px inside its 4px inset.
+  if (side === 'after' && width === 390) assert.deepEqual([cell.decide.tabBar.h, cell.decide.tabBar.link], [56, 48], `tab bar ${JSON.stringify(cell.decide.tabBar)}`);
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board with a sign-in ask, asks, a plan, a report and an update.',
     steps: [`Open the board at ${width} px in ${theme} mode on the sign-in ask in Decide and scroll the page so text sits behind the bottom tab bar, then open Today.`, 'Measure the tab bar height, read its four labels, and measure every control (button, link, select) against 44px, with the type scale sizes.'],
-    result: side === 'after' ? `At ${width} px in ${theme} mode on a phone the floating tab bar is a 62px glass pill with 54px tabs, its four labels show once each over the scrolled page text with no ghost label, every control on Decide and Today is at least 44px, and body text is 16px.` : `At ${width} px in ${theme} mode the board is captured as it was for comparison: the tab bar, controls and type scale before the change.` }, null, 2) + '\n');  try { browser('stop'); } catch {}
+    result: side === 'after' ? `At ${width} px in ${theme} mode on a phone the floating dock is a 56px pill with four round 48px tabs, each named once for screen readers with no ghost label over the scrolled page text, every control on Decide and Today is at least 44px, and body text is 16px.` : `At ${width} px in ${theme} mode the board is captured as it was for comparison: the tab bar, controls and type scale before the change.` }, null, 2) + '\n');  try { browser('stop'); } catch {}
 } finally {
   try { browser('stop'); } catch {}
   try { sh(process.execPath, [join(repo, 'dist/cli.js'), 'stop', join(dir, 'board.json')], { env: seedEnv }); } catch {}

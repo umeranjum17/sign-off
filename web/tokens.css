@@ -1,29 +1,46 @@
-/* The board's design tokens: the raw palette, type scale, spacing, corners and elevation, copied from a house design system.
-   index.html maps its own names (--page, --tile, --text, ...) onto these; change a value here and every screen follows.
-   Light and dark differ in colour only: spacing, type, corners and elevation are one set. */
+/* The board's design tokens: the raw palette, type scale, spacing, corners and elevation of the approved new look (a warm canvas, a card a step lighter,
+   near-black ink as the one accent), measured in pixels from the owner's reference. index.html maps its own names (--page, --tile, --text, ...) onto these,
+   and ui.css builds the shared parts from them; change a value here and every screen follows. Light and dark differ in colour only. */
+@font-face { font-family: Inter; src: url(inter.woff2) format('woff2'); font-weight: 100 900; font-display: swap; }
 :root {
   color-scheme: light dark;
-  /* Ink and surfaces */
-  --tk-text: #000000; --tk-text-secondary: #666666; --tk-text-tertiary: #767577;
-  --tk-surface: #FFFFFF; --tk-surface-high: #F8F8F8; --tk-surface-highest: #F0F0F0; --tk-surface-selected: #EAEAEA; --tk-input: #F5F5F5;
-  --tk-grouped: #F2F2F7; --tk-rail: #D1D1D6;
+  /* The new look's surfaces and ink: the canvas, a card on it, a white raised part (an icon tile), the pressed segment, a field sunk into a card. */
+  --tk-canvas: #E8E4E0; --tk-card: #F3F3F0; --tk-raised: #FFFFFF; --tk-on: #FBFBFA; --tk-inset: #EAE7E3;
+  --tk-ink: #121210; --tk-text: #21211E; --tk-text-secondary: #6E6E6B; --tk-text-tertiary: #8A8A86; --tk-idle: #AAAAAA;
+  /* A progress bar's track and fill, and the hairline between rows in a card. */
+  --tk-track: #E5E3DE; --tk-fill: #2D2D2A; --tk-line: #DCD8D4;
+  /* The board's older names, on the new surfaces. */
+  --tk-surface: var(--tk-card); --tk-surface-high: var(--tk-raised); --tk-surface-highest: var(--tk-on); --tk-surface-selected: var(--tk-inset); --tk-input: var(--tk-inset);
+  --tk-grouped: var(--tk-canvas); --tk-rail: var(--tk-line);
   /* Colour that carries meaning. Each is drawn in full, and the board mixes it toward black where it sets text on a light ground. */
-  --tk-link: #007AFF; --tk-success: #34C759; --tk-warning: #FF9500; --tk-critical: #FF3B30; --tk-teal: #0E9BB3;
-  /* Type: a title, a body, a secondary line and a footnote, with their line heights. Weights are regular, semi-bold and bold. */
+  --tk-link: #007AFF; --tk-success: #34C759; --tk-warning: #FF9500; --tk-critical: #D7372B; --tk-teal: #0E9BB3;
+  /* The priority chip: P0 and P1 tinted, P2 and P3 quiet; each a ground and its text. */
+  --tk-p0: #F6DCD8; --tk-p0-text: #B42318; --tk-p1: #F5E6CF; --tk-p1-text: #8F4E08; --tk-p2: #E6E3DE; --tk-p2-text: #4F4B46; --tk-p3: #ECEAE6; --tk-p3-text: #85817B;
+  /* Type: Inter. A page title, a section head, a big number, a row's title, its second line and a small label, with their line heights (each a multiple of 4).
+     The older title, body, secondary and footnote sizes stay for the screens not yet in the new look. */
+  --tk-font: Inter, -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif;
+  --tk-fs-page: 1.5rem; --tk-lh-page: 2.75rem; --tk-fs-head: 1.125rem; --tk-lh-head: 1.75rem; --tk-fs-big: 1.5rem; --tk-lh-big: 2rem;
+  --tk-fs-row: 0.875rem; --tk-lh-row: 1.25rem; --tk-fs-meta: 0.8125rem; --tk-lh-meta: 1rem; --tk-fs-small: 0.75rem; --tk-lh-small: 1rem;
   --tk-fs-title: 1.0625rem; --tk-lh-title: 1.375rem;
   --tk-fs-body: 1rem; --tk-lh-body: 1.5rem;
   --tk-fs-secondary: 0.9375rem; --tk-lh-secondary: 1.25rem;
   --tk-fs-footnote: 0.8125rem; --tk-lh-footnote: 1.125rem;
-  --tk-fw-regular: 400; --tk-fw-semibold: 600; --tk-fw-bold: 700;
-  /* A 4px grid, and the corners of a grouped card and a control. */
-  --tk-sp-1: 0.25rem; --tk-sp-2: 0.5rem; --tk-sp-3: 0.75rem; --tk-sp-4: 1rem; --tk-sp-6: 1.5rem; --tk-sp-8: 2rem;
-  --tk-r-card: 1rem; --tk-r-ctl: 0.625rem;
-  /* Elevation: a raised control. */
-  --tk-elev-raised: 0 2px 3.84px rgba(0, 0, 0, 0.1);
+  --tk-fw-regular: 400; --tk-fw-medium: 500; --tk-fw-semibold: 600; --tk-fw-bold: 700;
+  /* A 4px grid (8px between blocks), the 16px page gutter, and the corners: a hero or list card, a tile, an icon tile, a control. */
+  --tk-sp-1: 0.25rem; --tk-sp-2: 0.5rem; --tk-sp-3: 0.75rem; --tk-sp-4: 1rem; --tk-sp-6: 1.5rem; --tk-sp-8: 2rem; --tk-gutter: 1rem;
+  --tk-r-card: 1.375rem; --tk-r-tile: 1.25rem; --tk-r-icon: 0.75rem; --tk-r-ctl: 0.625rem;
+  /* Elevation: a card's soft lift with a light top edge, a raised control (the pressed segment, the dock's tab), and the dock. */
+  --tk-hl: rgba(255, 255, 255, 0.75);
+  --tk-elev-card: 0 1px 2px rgba(60, 40, 20, 0.05), 0 6px 18px rgba(60, 40, 20, 0.045);
+  --tk-elev-raised: 0 1px 2px rgba(40, 30, 20, 0.10), 0 2px 8px rgba(40, 30, 20, 0.06);
+  --tk-elev-dock: 0 2px 6px rgba(40, 30, 20, 0.06), 0 10px 28px rgba(40, 30, 20, 0.10);
 }
 @media (prefers-color-scheme: dark) { :root {
-  --tk-text: #ECECEC; --tk-text-secondary: #9A9A9F; --tk-text-tertiary: #77777D;
-  --tk-surface: #1A1A1A; --tk-surface-high: #212121; --tk-surface-highest: #2A2A2A; --tk-surface-selected: #2A2A2A; --tk-input: #303030;
-  --tk-grouped: #1E1E1E; --tk-rail: #38383A;
-  --tk-link: #0A84FF; --tk-success: #30D158; --tk-warning: #FF9F0A; --tk-critical: #FF453A; --tk-teal: #40C8E0;
+  --tk-canvas: #131210; --tk-card: #1E1D1A; --tk-raised: #2A2825; --tk-on: #34322E; --tk-inset: #262421;
+  --tk-ink: #F4F2EE; --tk-text: #E9E6E1; --tk-text-secondary: #A9A49D; --tk-text-tertiary: #827D76; --tk-idle: #6C6863;
+  --tk-track: #2F2D2A; --tk-fill: #ECE9E4; --tk-line: #2E2C29;
+  --tk-link: #0A84FF; --tk-success: #30D158; --tk-warning: #FF9F0A; --tk-critical: #FF6B5E; --tk-teal: #40C8E0;
+  --tk-p0: rgba(255, 107, 94, 0.16); --tk-p0-text: #FF8E84; --tk-p1: rgba(242, 166, 72, 0.15); --tk-p1-text: #F2B262; --tk-p2: #34322E; --tk-p2-text: #CFCAC3; --tk-p3: #2C2A27; --tk-p3-text: #9C978F;
+  --tk-hl: rgba(255, 255, 255, 0.05);
+  --tk-elev-card: 0 1px 2px rgba(0, 0, 0, 0.3); --tk-elev-raised: 0 1px 3px rgba(0, 0, 0, 0.45); --tk-elev-dock: 0 8px 24px rgba(0, 0, 0, 0.5);
 } }
