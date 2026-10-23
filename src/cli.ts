@@ -153,7 +153,7 @@ Blocks until the user answers, then prints the answer the way answers does. Use 
   --json     {"<key>":{"answer","label","close","at","note"?}} for the new answers; note only when the user wrote one
   --events   needs --filer (or SIGN_OFF_FILER); JSON lines for new answers, another-round asks, Go deeper and comments on a part (each wait returns one batch).
              Answer and round lines come in the order they were saved (${CONTRACT}#7-answers):
-             {"event":"answer","contract":1,"kind","schema","key","title","answer","label","close","at","note"?,"filer"?,"comments"?}
+             {"event":"answer","contract":1,"kind","schema","key","title","answer","label","close","at","note"?,"replaces"?,"filer"?,"comments"?}; replaces names the answer a changed one replaces
              {"event":"round","contract":1,"kind","schema","key","title","note","at","filer"?,"comments"?}; a board-format item reports as ask schema 1
 A note column appears when any shown answer has a note.
 Ctrl-C stops waiting; nothing is changed.
@@ -600,18 +600,19 @@ function printAnswers(file: string, rows: ReturnType<typeof board>, waiting: num
   const rounds = readRounds(file).filter((r) => rows.some((d) => d.key === r.key));
   if (values.json) {
     const asked = (key: string) => rounds.filter((r) => r.key === key).map(({ note, at, comments }) => ({ note, at, comments }));
-    const out: Record<string, any> = Object.fromEntries(done.map(({ key, answer, label, close, at, note, comments, notes, decisions, pick }) => [key, { answer, label, close, at, note, comments, notes, decisions, pick, ...(asked(key).length && { rounds: asked(key) }) }]));
+    const out: Record<string, any> = Object.fromEntries(done.map(({ key, answer, label, close, at, note, comments, notes, decisions, pick, replaces }) => [key, { answer, label, close, at, note, comments, notes, decisions, pick, replaces, ...(asked(key).length && { rounds: asked(key) }) }]));
     for (const r of rounds) if (!out[r.key]) out[r.key] = { rounds: asked(r.key) };
     return JSON.stringify(out);
   }
-  const notes = done.some((a) => a.note), sent = [...done, ...rounds].flatMap(({ key, comments = [] }) => comments.map(({ mock, ref, tag, words, text }) => ({ key, mock, ref, tag, words, text })));
+  const notes = done.some((a) => a.note), changed = done.some((a) => a.replaces), sent = [...done, ...rounds].flatMap(({ key, comments = [] }) => comments.map(({ mock, ref, tag, words, text }) => ({ key, mock, ref, tag, words, text })));
   const plan = done.flatMap(({ key, notes: sections = [], decisions: picks = {} }) => [
     ...sections.map((n: any) => ({ key, section: n.section ?? `${n.journey}/${n.screen}`, verdict: n.verdict ?? 'change', note: n.note ?? '' })),
     ...Object.entries(picks).map(([decision, pick]) => ({ key, decision, pick })),
   ]);
   return toon({
     board: tilde(file),
-    answers: done.length ? done.map(({ key, answer, at, label, close, title, note = '' }) => ({ key, answer, at, ...(values.full && { label, close, title }), ...(notes && { note }) })) : '0 saved yet',
+    // A changed answer names the one it replaces, which the agent may already have acted on.
+    answers: done.length ? done.map(({ key, answer, at, label, close, title, note = '', replaces }) => ({ key, answer, at, ...(values.full && { label, close, title }), ...(notes && { note }), ...(changed && { replaces: replaces?.answer ?? '' }) })) : '0 saved yet',
     ...(rounds.length && { rounds: rounds.map(({ key, note, at }) => ({ key, note, at })) }),
     // Comments on mock elements that went with an answer or a round, each with the element it points at.
     ...(sent.length && { comments: sent }),
@@ -642,7 +643,7 @@ function eventLines(file: string, rows: Decision[], answers: Answer[], rounds: R
   const kind = kindOf(file), item = new Map(rows.map((d) => [d.key, d]));
   const head = (event: string, key: string) => ({ event, ...kind(key), key, title: item.get(key)?.title });
   const tail = (key: string, comments?: Sent[]) => ({ ...(item.get(key)?.filer && { filer: item.get(key)!.filer }), ...(comments?.length && { comments }) });
-  return [...answers.map(({ key, answer, label, close, at, note, comments, notes, decisions, pick }) => ({ at, line: { ...head('answer', key), answer, label, close, at, ...(note && { note }), ...(notes && { notes, decisions }), ...(pick !== undefined && { pick }), ...tail(key, comments) } })),
+  return [...answers.map(({ key, answer, label, close, at, note, comments, notes, decisions, pick, replaces }) => ({ at, line: { ...head('answer', key), answer, label, close, at, ...(note && { note }), ...(notes && { notes, decisions }), ...(pick !== undefined && { pick }), ...(replaces && { replaces }), ...tail(key, comments) } })),
     ...rounds.map(({ key, note, at, comments }) => ({ at, line: { ...head('round', key), note, at, ...tail(key, comments) } }))]
     .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0)).map(({ line }) => JSON.stringify(line)).join('\n');
 }

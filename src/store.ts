@@ -55,7 +55,11 @@ export type Decision = {
 };
 export type Answer = { key: string; answer: string; label: string; close: string; at: string; note?: string; comments?: Sent[]; merged_by?: string;
   /** A plan's send-back: every section's verdict, and the option picked for each decision key. */
-  notes?: PlanNote[] | DesignNote[]; decisions?: Record<string, string>; pick?: string };
+  notes?: PlanNote[] | DesignNote[]; decisions?: Record<string, string>; pick?: string;
+  /** A changed answer: the one it replaces, or after an Undo back to no answer the one the filer took, which the agent may already have acted on. */
+  replaces?: Given };
+/** An earlier answer as a change names it. */
+export type Given = Pick<Answer, 'answer' | 'label' | 'at' | 'note'>;
 export type Round = { key: string; note: string; at: string; comments?: Sent[] };
 /** A comment on a mock element as it went to the agent with an answer or a round. */
 export type Sent = Pick<Annotation, 'id' | 'mock' | 'hash' | 'ref' | 'tag' | 'words' | 'text'>;
@@ -294,6 +298,12 @@ export function readAnswers(decisionsPath: string, warn: (msg: string) => void =
   return Object.fromEntries([...latest].map(([key, a]) => [key, sent.has(key) ? { ...a, comments: sent.get(key) } : a]));
 }
 
+/** The answer the filer last took for a key with `wait --filer`, as it was saved: after an Undo it is what the agent may still act on. */
+function lastTaken(decisionsPath: string, key: string): Answer | undefined {
+  const lines = (path: string) => readRaw(path).split('\n').flatMap((line) => { try { const a = line && JSON.parse(line); return a?.key === key ? [a] : []; } catch { return []; } });
+  const last = lines(seenPath(decisionsPath)).at(-1);
+  return last && lines(answersPath(decisionsPath)).findLast((a) => taken(a) === taken(last));
+}
 /** The option an Undo saves when the item had no answer before: an empty answer, so the item waits again. */
 export const CLEARED: Option = { value: '', label: '' };
 /** Appends one answer line unless it equals the current answer and note, and returns the saved answer. Starts a new line after a torn fragment.
@@ -330,7 +340,9 @@ export function sameDecision(a: Decision, b: Decision): boolean {
 function saveAnswer(decisionsPath: string, d: Decision, option: Option, note: string, comments: Sent[] = [], by?: string): Answer | undefined {
   const current = readAnswers(decisionsPath)[d.key];
   if (option === CLEARED ? !current : current?.answer === option.value && (current.note ?? '') === note && !comments.length) return;
-  const answer: Answer = { key: d.key, answer: option.value, label: option.label, close: d.close, at: now(), ...(note && { note }), ...(comments.length && { comments }), ...(by && { merged_by: by }) };
+  const was = option === CLEARED ? undefined : current ?? lastTaken(decisionsPath, d.key);
+  const answer: Answer = { key: d.key, answer: option.value, label: option.label, close: d.close, at: now(), ...(note && { note }), ...(comments.length && { comments }), ...(by && { merged_by: by }),
+    ...(was && { replaces: { answer: was.answer, label: was.label, at: was.at, ...(was.note && { note: was.note }) } }) };
   appendLine(answersPath(decisionsPath), answer);
   return answer;
 }

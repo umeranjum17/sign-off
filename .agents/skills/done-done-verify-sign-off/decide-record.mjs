@@ -1,8 +1,8 @@
 // Records Decide's motion at phone size (390x844, 2x) in one theme, from a board seed-board.sh served:
 // the shimmering rows while the board is read (the first read held for 1.2 s), rows rising in, a row's press, a short drag that
 // springs back, a swipe right that answers (the toast and its countdown, then Undo and the row coming back), a swipe left to Later
-// and Undo, an ask pushed in, a pick whose label slides onto Answer, Answer turning into a check, the pop back with the row folding
-// away, More's menu, and Answer all recommended.
+// and Undo, an ask pushed in, a pick whose label slides onto Answer, Answer turning into a check and the next ask opening, Undo bringing the ask back,
+// Decide again, More's menu, and Answer all recommended.
 // With desk, it records the desk (1280x800) by keys instead: J and K moving the selection, Enter answering (the check, the row folding, the next ask
 // sliding in), Cmd+Z, L to Later, the ? sheet, C and Cmd+Enter answering with a comment, a row's hover answer, and G then E and D; a pill names each key.
 // Its own headless Chromium on a scratch profile, driven over the DevTools protocol; taps, drags and keys are events in the page.
@@ -19,13 +19,19 @@
 // Decide's badge counting down, the next ask sliding in), Undo, the Review tile, the Evidence tab and a Latest proof row opening its update.
 // Usage: node decide-record.mjs <board url> <light|dark> <out.mp4> today
 // With `flows`, on a board seed-proto-board.sh seeded, it records the phone's answer flows: an ask with nothing picked, a pick naming the button, a note typed and sent with it;
-// Your own answer opening its one box, Send answer off until words are typed, then sent; a pick sent with no note, and its Undo; More on the list; and an ask's More, Ask me later.
+// the next ask, then Next to another; Your own answer opening its one box, Send answer off until words are typed, then sent; a pick sent with no note, and its Undo;
+// Back to Decide and More on the list; and an ask's More, Ask me later.
 // Usage: node decide-record.mjs <board url> <light|dark> <out.mp4> flows
+// With `back`, on a board seed-proto-board.sh seeded, it records going back to an answer at phone size, tapping with real input (no focus ring a finger would not show):
+// a pick with a note answered and the next ask opening, Back to the one answered (Answered, the pick, the note), Change answer, another pick sent as a change
+// (Changed, the answer before it, the toast), Undo (Back to: Friday), the arrows stepping on through the asks, another answer, a swipe right back to it,
+// Previous to the first answer, Decide with its Answered group, and Today's Cleared today.
+// Usage: node decide-record.mjs <board url> <light|dark> <out.mp4> back
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-const [url, theme, out, ...modes] = process.argv.slice(2), desk = modes.includes('desk'), flows = modes.includes('flows'), screen = modes.includes('today') ? 'today' : modes.includes('reports') ? 'reports' : 'decide', [W, H] = desk ? [1280, 800] : [390, 844];
+const [url, theme, out, ...modes] = process.argv.slice(2), desk = modes.includes('desk'), flows = modes.includes('flows'), back = modes.includes('back'), screen = modes.includes('today') ? 'today' : modes.includes('reports') ? 'reports' : 'decide', [W, H] = desk ? [1280, 800] : [390, 844];
 const dir = mkdtempSync(join(tmpdir(), 'decide-rec-'));
 const chrome = spawn('/usr/bin/chromium', ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(dir, 'profile')}`, `--window-size=${W},${H}`,
   '--hide-scrollbars', '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: 'ignore' });
@@ -75,15 +81,40 @@ try {
     p.textContent = ${JSON.stringify((mod ? 'Ctrl+' : '') + ({ Enter: '↵' }[k] ?? k.toUpperCase()))};
     (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, bubbles: true, ctrlKey: ${mod} })); return 'ok';`);
   const type = (words) => inPage(`const t = document.activeElement; if (t?.tagName !== 'TEXTAREA') return 'missing'; for (const c of ${JSON.stringify(words)}) { t.value += c; t.dispatchEvent(new Event('input')); await s(45); } return 'ok';`);
+  // A tap sent as real input at the element's centre (brought into view first unless the bars hold it), so the page sees a pointer as on a phone.
+  const finger = async (q) => {
+    const at = await inPage(`const e = document.querySelector(${JSON.stringify(q)}); if (!e) return 'missing'; const v = e.getBoundingClientRect();
+      if (!e.closest('.ask-nav, .decide-bar, #toast, .tabs') && (v.top < 60 || v.bottom > innerHeight - 110)) { e.scrollIntoView({ block: 'center' }); await s(350); }
+      const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2];`);
+    if (at === 'missing') return at;
+    for (const type of ['mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: at[0], y: at[1], button: 'left', clickCount: 1 });
+    return 'ok';
+  };
+  // A finger swiping right across the ask, as real touches: back.
+  const swipeBack = async () => {
+    await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+    let x = 30;
+    await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: 430 }] });
+    for (let i = 0; i < 12; i++) { x += 26; await wait(16); await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: 430 }] }); }
+    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    return 'ok';
+  };
   // A tap into a box focuses it and brings it into view, as a finger does.
   const into = (q) => inPage(`const t = document.querySelector(${JSON.stringify(q)}); if (!t) return 'missing'; t.focus({ preventScroll: true }); t.scrollIntoView({ block: 'center', behavior: 'smooth' }); return 'ok';`);
   await send('Page.startScreencast', { format: 'jpeg', quality: 90, everyNthFrame: 1 });
   await send('Page.navigate', { url: `${url}${{ reports: '#reports', decide: '#waiting', today: '' }[screen]}` });
-  const steps = flows ? [[2600], [() => tap('a.dl-face[href="#decide/ship"]'), 1800], [() => tap('.pick-list li:nth-child(2) .pick-option'), 1300], [() => into('.decide .note-box'), 900],
+  const steps = back ? [[2600], [() => finger('a.dl-face[href="#decide/ship"]'), 1800], [() => finger('.pick-list li:nth-child(2) .pick-option'), 1100], [() => finger('.decide .note-box'), 700],
+    [() => type('Keep support on call until Monday.'), 900], [() => finger('.decide-bar .answer'), 2600], [() => finger('.ask-nav .back'), 2600],
+    [() => finger('.decide-bar .answer'), 1700], [() => finger('.pick-list li:nth-child(1) .pick-option'), 1200], [() => finger('.decide-bar .answer'), 2800], [() => finger('#undo'), 2600],
+    [() => finger('.ask-nav .step[aria-label=Next]'), 1600], [() => finger('.ask-nav .step[aria-label=Next]'), 1600], [() => finger('.pick-list li:nth-child(1) .pick-option'), 1000],
+    [() => finger('.decide-bar .answer'), 2400], [() => swipeBack(), 2400], [() => finger('.ask-nav .step[aria-label=Previous]'), 2000], [() => finger('.ask-nav .back'), 1600],
+    [() => inPage("scrollTo({ top: 99999, behavior: 'smooth' }); return 'ok';"), 2200], [() => finger('.tabs a[href="#"]'), 1500],
+    [() => inPage("document.querySelector('.t-cleared').scrollIntoView({ block: 'center', behavior: 'smooth' }); return 'ok';"), 2400]]
+    : flows ? [[2600], [() => tap('a.dl-face[href="#decide/ship"]'), 1800], [() => tap('.pick-list li:nth-child(2) .pick-option'), 1300], [() => into('.decide .note-box'), 900],
     [() => type('Keep support on call until Monday.'), 900], [() => tap('.decide-bar .answer'), 2600],
-    [() => tap('a.dl-face[href="#decide/export"]'), 1800], [() => tap('.decide .own-option'), 1600], [() => type('Call it Download, and keep Export in the menu.'), 900], [() => tap('.decide-bar .answer'), 2600],
-    [() => tap('a.dl-face[href="#decide/digest"]'), 1600], [() => tap('.pick-list li:nth-child(1) .pick-option'), 1100], [() => tap('.decide-bar .answer'), 2200], [() => tap('#undo'), 1600],
-    [() => tap('.top .dl-more > summary'), 1600], [() => tap('.top .dl-more > summary'), 700], [() => tap('a.dl-face[href="#decide/digest"]'), 1500], [() => tap('.ask-nav .dl-more > summary'), 1500],
+    [() => tap('.ask-nav .step[aria-label=Next]'), 1800], [() => tap('.decide .own-option'), 1600], [() => type('Call it Download, and keep Export in the menu.'), 900], [() => tap('.decide-bar .answer'), 2600],
+    [() => tap('.ask-nav .step[aria-label=Next]'), 1600], [() => tap('.pick-list li:nth-child(1) .pick-option'), 1100], [() => tap('.decide-bar .answer'), 2200], [() => tap('#undo'), 1600],
+    [() => tap('.ask-nav .back'), 1400], [() => tap('.top .dl-more > summary'), 1600], [() => tap('.top .dl-more > summary'), 700], [() => tap('a.dl-face[href="#decide/digest"]'), 1500], [() => tap('.ask-nav .dl-more > summary'), 1500],
     [() => tap('[data-act="later"]'), 2200]]
     : screen === 'reports' && desk ? [[2600], [() => key('j'), 1100], [() => key('j'), 1100], [() => key('k'), 1100], [() => key('u'), 1600], [() => key('u'), 1400],
     [() => inPage("const b = document.querySelector('.split-list .dl-row:not(.sel) .dl-hover .read-q'); if (!b) return 'missing'; b.focus(); return 'ok';"), 1400],
@@ -102,7 +133,7 @@ try {
     [() => inPage("document.querySelector('.t-proof .lrow').scrollIntoView({ block: 'center', behavior: 'smooth' }); return 'ok';"), 1300], [() => tap('.t-proof .lrow'), 2000], [() => tap('.tabs a[href="#"]'), 1600]] : [[2600], [() => press('ship'), 700], [() => drag('ship', 80, 10, 45), 1000], [() => drag('keep-the-weekly-digest', 300), 1600], [() => tap('#undo'), 1400],
     [() => drag('ship', -280), 1600], [() => tap('#undo'), 1300], [() => tap('a.dl-face[href="#decide/ship"]'), 900],
     [() => tap('.pick-list li:nth-child(2) .pick-option'), 900], [() => tap('.pick-list li:nth-child(1) .pick-option'), 900],
-    [() => tap('.decide-bar .answer'), 1800], [() => tap('#undo'), 1200], [() => tap('.top .dl-more > summary'), 1200], [() => tap('[data-act="answer-all"]'), 2000], [() => tap('#undo'), 1500]];
+    [() => tap('.decide-bar .answer'), 1800], [() => tap('#undo'), 1200], [() => tap('.ask-nav .back'), 1200], [() => tap('.top .dl-more > summary'), 1200], [() => tap('[data-act="answer-all"]'), 2000], [() => tap('#undo'), 1500]];
   for (const [i, [act, ms]] of steps.map((s) => (s.length === 1 ? [null, s[0]] : s)).entries()) {
     const r = act && (await act());
     if (r === 'missing') throw new Error(`step ${i + 1} found nothing to tap at ${await evaluate('location.hash')}: ${act}`);

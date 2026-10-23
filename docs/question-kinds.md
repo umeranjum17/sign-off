@@ -245,9 +245,10 @@ without posting.
   that command for every saved answer, read when the board starts. It runs
   with no shell, in the board's folder, and gets the answer as one JSON line
   on stdin (`{"event":"answer","contract":1,"kind","schema","key","answer",
-  "label","close","at","note"?,"title"?,"filer"?,"comments"?}`, where `kind`
-  and `schema` are the item's contract kind, or `ask` and 1 for a
-  board-format item, and `comments`, present when the answer carried comments
+  "label","close","at","note"?,"replaces"?,"title"?,"filer"?,"comments"?}`,
+  where `kind` and `schema` are the item's contract kind, or `ask` and 1 for
+  a board-format item, `replaces`, present on a changed answer, names the
+  answer it replaces, and `comments`, present when the answer carried comments
   on mock elements, lists each as `id`, `mock`, `hash`, `ref`, `tag`,
   `words` and `text`); the answer is never put into its arguments, so a
   typed note cannot inject a command. A failure is logged and never blocks
