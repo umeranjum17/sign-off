@@ -14,7 +14,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, appendPromoted, appendSendBack, appendTicket, readTickets, ticketFault, type Ticket, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, appendPromoted, appendSendBack, appendTicket, readTickets, ticketFault, type Ticket, appendDesignAnswer, answerLines, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -2331,12 +2331,13 @@ const state = () => {
   const rounds = readRounds(file, warn).map(({ comments: _, ...r }) => r);
   // The board file is read once for the whole state: it can hold thousands of items.
   const { extra } = readItems(file), fed = extra.readonly === true || extra.answers_only === true, items = loadDecisions(file);
+  const lines = items.some((d) => d.type === 'design') ? answerLines(file) : [];
   return {
     file,
     mockBase: `/mock/${loopback(bind) ? 'local' : mockPass(tokenOf(file))}/`,
     // Who filed an item stays in the file, except as `by`, the name a card's thread says posted it and took its answer: never a bare session id, which names nobody.
     // A sign-in's start command stays on this host too: the page only learns that a tap makes a new link, and how the last run went.
-    decisions: items.filter((d) => !fakeEvidence(d)).map(({ filer, start, ...d }) => ({ ...d, ...(filer && !SESSION_ID.test(filer) && { by: filer }), ...(d.type === 'design' && answers[d.key]?.answer === 'approve' && { status: 'approved' }), ...(start && { start: true, run: signinState(d.key) }), evidenceCard: d.evidence ? evidenceCard(d.evidence) : null,
+    decisions: items.filter((d) => !fakeEvidence(d)).map(({ filer, start, ...d }) => ({ ...d, ...(filer && !SESSION_ID.test(filer) && { by: filer }), ...(d.type === 'design' && answers[d.key]?.answer === 'approve' && { status: 'approved' }), ...(d.type === 'design' && designState(d, answers[d.key], lines)), ...(start && { start: true, run: signinState(d.key) }), evidenceCard: d.evidence ? evidenceCard(d.evidence) : null,
       ...(d.mocks && { mocks: d.mocks.map((m) => ({ ...m, hash: mockHash(m.path) })) }) })),
     readonly: extra.readonly === true,
     answers_only: extra.answers_only === true,
@@ -2368,6 +2369,16 @@ const mockHash = (path: string) => {
     mockHashes.set(actual, { at, hash });
     return hash;
   } catch { return null; }
+};
+/** A design's files as the board serves them: its preview and every screen view. */
+const designPaths = (d: Decision) => [...new Set([d.preview, ...(d.journeys ?? []).flatMap((j) => j.screens.flatMap((s) => Object.values(s.views)))])].filter((p): p is string => !!p);
+/** A design's round: its time, screens and options and the bytes of its files, so the same key posted again with a new time or a changed screen is a new round. */
+const designRound = (d: Decision) => sha256(Buffer.from(JSON.stringify([d.filed, d.journeys, d.options, designPaths(d).map((p) => [p, mockHash(p)])])));
+/** What the page needs to know of a design beyond its fields: whether its answer is from an earlier round, the notes of the last answer given on
+ * an earlier round (history, not this round's), and the files that are gone, so the page shows the preview picture in place of a screen it cannot draw. */
+const designState = (d: Decision, a: Answer | undefined, lines: Answer[]) => {
+  const round = designRound(d), before = lines.findLast((x) => x.key === d.key && x.answer && !sameRound(x, d, round)), missing = designPaths(d).filter((p) => mockHash(p) === null);
+  return { ...(a && !sameRound(a, d, round) && { earlier_answer: true }), ...(before?.notes?.length && { earlier_notes: before.notes }), ...(missing.length && { missing }) };
 };
 /** The comments that go with a card's next answer or round: not sent yet, and made on the mock file the card shows now. */
 const unsent = (d: Decision): Sent[] => {
@@ -2652,7 +2663,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   }
   if (d.kind === 'design') {
     try {
-      const before = readAnswers(file)[d.key]?.answer, a = appendDesignAnswer(file, d, verdict, notes, pick, requested);
+      const before = readAnswers(file)[d.key]?.answer, a = appendDesignAnswer(file, d, designRound(d), verdict, notes, pick, requested);
       if (a && !awaitsVerdict(d.type, a) && (verdict !== undefined || a.answer !== before)) answered(a, d);
     } catch (e) { if (e instanceof InputError) return [400, { error: e.message }]; throw e; }
     return [200, state()];

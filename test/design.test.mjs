@@ -8,6 +8,7 @@ import { createServer } from 'node:net';
 import { networkInterfaces, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { crc32, deflateSync } from 'node:zlib';
+import jpeg from 'jpeg-js';
 import { asked } from './ask.mjs';
 
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
@@ -553,7 +554,9 @@ async function browse(_dir, width = 800, height = 4000, mobile = false) {
   };
   // Text typed as a phone's keyboard does: the browser fires beforeinput and input on the focused field, as an IME commit does.
   const insertText = (text) => send('Input.insertText', { text });
-  return { evaluate, click, tap, swipe, insertText, close: () => call('Target.disposeBrowserContext', { browserContextId }).catch(() => {}) };
+  // A capture of part of the page as the screen shows it, decoded to RGBA.
+  const capture = async (clip) => jpeg.decode(Buffer.from((await send('Page.captureScreenshot', { format: 'jpeg', quality: 90, clip: { ...clip, scale: 1 } }))?.data ?? '', 'base64'), { useTArray: true });
+  return { evaluate, click, tap, swipe, insertText, send, capture, close: () => call('Target.disposeBrowserContext', { browserContextId }).catch(() => {}) };
 }
 
 test('an interactive page that posts its height gets a frame that fits it, each frame only its own and never past 10000px; a design shows the recommended phone frame first', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
@@ -2627,6 +2630,98 @@ test('a design-level inline Approve or Change stores its verdict with the note, 
   await evaluate('document.querySelector(".design-review .foot button").click()');
   await until(() => JSON.parse(run('answers', file, '--json').out)['d3-plain'].notes.length === 1);
   assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d3-plain'].notes, [{ verdict: 'approve', note: 'Looks good' }]);
+  close();
+  proc.kill();
+});
+
+test('a design posted again is a new round: the note box starts empty, the earlier note is folded under it, and a save on this round leaves it out', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'design-new-round'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), png);
+  writeFileSync(join(dir, 'design', 'a.png'), png);
+  writeFileSync(join(dir, 'design', 'b.png'), png);
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd6-round', title: 'Review the flow screens',
+    about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
+    journeys: [{ id: 'flow', title: 'Flow', screens: [
+      { id: 'a', title: 'First', views: { phone_light: 'design/a.png' } },
+      { id: 'b', title: 'Second', views: { phone_light: 'design/b.png' } },
+    ] }] };
+  writeFileSync(source, JSON.stringify(message));
+  assert.equal(run('post', file, '--kind', 'design', '--from', source).code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1], { evaluate, close } = await browse(join(dir, 'browser'), 390, 844, true);
+  assert.equal((await post(url, 'api/answers', { key: 'd6-round', verdict: 'change', notes: [{ journey: 'flow', screen: 'a', verdict: 'change', note: 'Round one: bigger title' }] })).status, 200);
+  const open = async () => {
+    await evaluate(`(() => { const u = ${JSON.stringify(`${url}#designs/d6-round`)}; if (location.href === u) location.reload(); else location.href = u; })()`);
+    await until(() => evaluate('!!document.querySelector(".design-review textarea")'));
+    return evaluate('({ note: document.querySelector(".design-review textarea").value, earlier: document.querySelector(".design-review .earlier-note:not([hidden]) p")?.textContent ?? null })');
+  };
+  // The same round: the note is the one being written, nothing earlier.
+  assert.deepEqual(await open(), { note: 'Round one: bigger title', earlier: null });
+  // The agent draws the screen again in place: same key, same fields, new bytes. That is a new round.
+  writeFileSync(join(dir, 'design', 'a.png'), sized(4, 4));
+  assert.deepEqual(await open(), { note: '', earlier: 'Round one: bigger title' });
+  // In the viewer the screen is not reviewed yet, and approving it sends this round's note only: the earlier change does not carry over.
+  await evaluate('document.querySelector("[aria-haspopup=dialog]").click()');
+  await until(async () => (await evaluate('document.querySelector(".design-viewer[open] [role=status]")?.textContent')) === 'Not reviewed yet');
+  await evaluate('document.querySelector(".design-viewer .open-link").click()');
+  await until(async () => (await evaluate('document.querySelector(".design-viewer[open] [role=status]")?.textContent')) === 'Screen approved');
+  const saved = JSON.parse(run('answers', file, '--json').out)['d6-round'];
+  assert.deepEqual([saved.answer, saved.notes], ['screens', [{ journey: 'flow', screen: 'a', verdict: 'approve', note: '' }]]);
+  // The earlier note stays readable after this round's first save.
+  assert.deepEqual(await open(), { note: '', earlier: 'Round one: bigger title' });
+  // An answer saved before answers named their round counts as this round's only when it came after the design was filed.
+  const answers = join(dir, 'board.answers.jsonl'), old = (at) => appendFileSync(answers, `${JSON.stringify({ key: 'd6-round', answer: 'change', label: 'Changes requested', close: 'done', at, notes: [{ journey: 'flow', screen: 'a', verdict: 'change', note: 'Older note' }] })}\n`);
+  old('2026-10-19T08:00:00Z');
+  assert.deepEqual(await open(), { note: 'Older note', earlier: 'Round one: bigger title' });
+  old('2026-10-17T08:00:00Z');
+  assert.deepEqual(await open(), { note: '', earlier: 'Older note' });
+  close();
+  proc.kill();
+});
+
+test('a design review shows its screen on a phone in light and dark: the page fills the preview, and a screen whose file is gone shows the preview picture and says so', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'design-preview-phone'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  writeFileSync(join(dir, 'design', 'preview.png'), sized(390, 844));
+  const page = (bg, fg) => `<!doctype html><meta name="viewport" content="width=device-width"><body style="margin:0;padding:24px;background:${bg};color:${fg};font:32px sans-serif"><h1>Fleet overview</h1><p>sign-off working</p><p>muxr needs a decision</p>`;
+  writeFileSync(join(dir, 'design', 'light.html'), page('#fff', '#111'));
+  writeFileSync(join(dir, 'design', 'dark.html'), page('#111', '#eee'));
+  writeFileSync(join(dir, 'design', 'gone.html'), page('#fff', '#111'));
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd7-preview', title: 'Review the fleet screens',
+    about: 'The fleet overview.', group: 'Fleet', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
+    journeys: [{ id: 'fleet', title: 'Fleet', screens: [
+      { id: 'home', title: 'Overview', views: { phone_light: 'design/light.html', phone_dark: 'design/dark.html' } },
+      { id: 'gone', title: 'Lanes', views: { phone_light: 'design/gone.html' } },
+    ] }] };
+  writeFileSync(source, JSON.stringify(message));
+  assert.equal(run('post', file, '--kind', 'design', '--from', source).code, 0);
+  rmSync(join(dir, 'design', 'gone.html'));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1], { evaluate, send, capture, close } = await browse(join(dir, 'browser'), 390, 844, true);
+  for (const theme of ['light', 'dark']) {
+    await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] });
+    await evaluate(`(() => { const u = ${JSON.stringify(`${url}#designs/d7-preview`)}; if (location.href === u) location.reload(); else location.href = u; })()`);
+    await until(() => evaluate('!!document.querySelector(".design-preview-window iframe")'));
+    const box = await evaluate('(() => { const w = document.querySelector(".design-preview-window"); w.scrollIntoView({ block: "start" }); const f = w.firstElementChild.getBoundingClientRect(), r = w.getBoundingClientRect(); return { src: w.firstElementChild.getAttribute("src"), frame: [f.width, f.height], window: [r.left, r.top, r.width, r.height] }; })()');
+    assert.ok(box.src.endsWith(`design%2F${theme}.html`), JSON.stringify(box));
+    // The page fills the window it is drawn in: no 150px strip over an empty box.
+    assert.deepEqual(box.frame, box.window.slice(2), JSON.stringify(box));
+    assert.ok(box.frame[1] > 400, JSON.stringify(box));
+    // What the screen shows there is the page: its text, not one flat colour.
+    const [x, y, width, height] = box.window;
+    await until(async () => {
+      const { data } = await capture({ x, y, width, height });
+      let lo = 255, hi = 0;
+      for (let i = 0; i < data.length; i += 4) { const l = (data[i] + data[i + 1] + data[i + 2]) / 3; lo = Math.min(lo, l); hi = Math.max(hi, l); }
+      return hi - lo > 150;
+    });
+    await evaluate('(() => { const s = document.querySelector("select[aria-label=\'Screen for note\']"); s.value = "fleet/gone"; s.dispatchEvent(new Event("change")); })()');
+    await until(() => evaluate('document.querySelector(".design-preview-window .design-fallback img")?.naturalWidth > 0'));
+    assert.equal(await evaluate('document.querySelector(".design-preview-window figcaption").textContent'), 'This screen could not be shown: this is the design’s preview picture.');
+  }
   close();
   proc.kill();
 });
