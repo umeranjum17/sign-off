@@ -86,7 +86,7 @@ New guided defaults use plan schema 3 / report schema 4, contract 1, with a requ
   no filer the file names by key); every other item, the board's other top-level fields and the answers stay.
 - `ticket`: optional, the id of the ticket the item belongs to (1-128 of `A-Z a-z 0-9 . _ -`), written by `raise` and `post` with `--ticket <id>` or carried in a message or `--from` item.
   It is only a reference: the ticket need not be on the board, and nothing checks or needs it. While a ticket with that id is on the board (**Tickets**, below),
-  the item's screen shows a **Ticket** row, the ticket's title, id and progress, that opens the ticket's page; otherwise it shows none. It does not change what the item asks or how it is answered.
+  the item's screen shows a **Ticket** row (on an ask, **Its ask** in the panel under the question), the ticket's title, id and progress, that opens the ticket's page; otherwise it shows none. It does not change what the item asks or how it is answered.
 - `priority`: optional, how urgent the item is: `P0` (most), `P1`, `P2` or `P3` (least), written by `raise` and `post` with `--priority` or carried in a message or `--from` item. Any other value refuses the board file.
   The board shows it as a chip and can sort by it; an item without one shows no chip. It does not change what the item asks or how it is answered.
 - **Activity**: every card's screen (an ask, a sign-in, an update, a design review, a report and a plan) lists, oldest first, what the board keeps of it: when it was posted and by whom (its `filer`, with its `link` when that is a web link),

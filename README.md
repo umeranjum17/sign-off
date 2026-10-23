@@ -81,7 +81,7 @@ A board that fills up with noise stops being read, so the rules sit at the door.
 
 ### One ticket ties a task's cards together
 
-A ticket is one piece of work, with a title and how far along it is. Post any card with `--ticket <id>` (an ask, a design, proof, a report or a plan) and its screen shows a **Ticket** row with the ticket's title and progress; tap it for the ticket's page, which lists every card on that ticket, newest first, and the tickets under it. It is optional and only a link: a card without one, or naming a ticket the board has not got, works exactly as before.
+A ticket is one piece of work, with a title and how far along it is. Post any card with `--ticket <id>` (an ask, a design, proof, a report or a plan) and its screen shows a **Ticket** row (on an ask, **Its ask** in the panel under the question) with the ticket's title and progress; tap it for the ticket's page, which lists every card on that ticket, newest first, and the tickets under it. It is optional and only a link: a card without one, or naming a ticket the board has not got, works exactly as before.
 
 ```sh
 sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40

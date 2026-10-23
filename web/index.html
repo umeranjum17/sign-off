@@ -119,9 +119,9 @@
   .t-sheet .ask .actions button { background: var(--tk-inset); }
   /* A row's second line sits 4px under its title, as ui.css spaces it, not at the board's older line spacing. */
   :is(.t-wait, .t-sheet) .ui-row .meta { margin: 0; }
-  /* The round light-or-dark button stays a 40px circle with its icon centred: the board's older button rule would make it 44px tall and pad it. */
-  .today-top .ui-rb { min-height: 0; padding: 0; }
-  .today-top .ui-rb .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.6; }
+  /* The round light-or-dark button (Today's and Decide's heads) stays a 40px circle with its icon centred: the board's older button rule would make it 44px tall and pad it. */
+  .ui-top > .ui-rb { min-height: 0; padding: 0; }
+  .ui-top > .ui-rb .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.6; }
   /* Under the tiles, one quiet line opens More. */
   .t-more-line { display: flex; align-items: center; justify-content: center; gap: 0.25rem; width: 100%; min-height: 2.75rem; margin-top: 1rem; padding: 0 1rem; border: 0; border-radius: 1.375rem;
     background: none; color: var(--tk-text-tertiary); font: inherit; font-size: var(--tk-fs-meta); line-height: 1.25rem; -webkit-tap-highlight-color: transparent; }
@@ -141,10 +141,6 @@
   .seg button { min-height: var(--ctl); border: 0; border-radius: 0.4375rem; background: none; color: var(--text); font: inherit; font-size: var(--t-xs); line-height: 1.2; padding: 0.25rem 0.375rem; }
   .seg button[aria-pressed="true"] { background: var(--seg-on); box-shadow: var(--tk-elev-raised); color: var(--text); font-weight: var(--tk-fw-semibold); }
   .seg button[aria-pressed="true"]::before { content: none; }
-  @media (max-width: 63.999rem) {
-    /* The smaller Decide title lifts a short ask; the page still reaches the bar so a swipe anywhere above it skips. */
-    .decide { min-height: calc(100dvh - 13.5rem - env(safe-area-inset-bottom)); }
-  }
 
   /* Reports: a grouped list under small section heads, a row per report: its picture, title, what it says, then its kind, steps and date.
      A blue dot marks one filed today. A row with steps draws them as numbered nodes on a line, with only the marks that matter under each. */
@@ -346,62 +342,12 @@
   .readonly .rung iframe { height: 80vh; }
   .row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.875rem; padding: 1rem; scroll-margin-top: 4.5rem;
     background: var(--surface); border-radius: 0.875rem; }
-  /* Waiting and Decide use separate board cards; the R1 answer renderer remains the source of answer writes. */
+  /* Reports' line under its title. */
   .waiting-lede { margin: 0; color: var(--muted); }
-  .ask-group { list-style: none; margin: .5rem 0 0; padding: 0 0 0 1rem; overflow: hidden; border-radius: 1rem; background: var(--surface); }
-  .ask-group > li { position: relative; display: flex; align-items: center; gap: .75rem; min-height: 4.125rem; padding: .5rem .5rem .5rem 0; }
-  .ask-group > li + li { border-top: .5px solid var(--line); }
-  .ask-card { display: flex; flex: 1; min-width: 0; align-items: center; gap: .75rem; color: inherit; text-decoration: none; }
-  .ask-card .icon { width: 2rem; height: 2rem; border-radius: .5rem; background: var(--action); }
-  .ask-card .icon svg { width: 1.125rem; height: 1.125rem; stroke: white; }
-  .ask-card .copy { display: grid; flex: 1; min-width: 0; gap: .125rem; }
-  .ask-card .title { font-size: 1.0625rem; font-weight: 400; line-height: 1.3; }
-  .ask-card .meta { margin: 0; color: var(--muted); font-size: .9375rem; }
-  .ask-group .x { margin: 0; }
-  .decide { max-width: 42.5rem; margin: 0 auto; padding-bottom: 1rem; }
-  .decide-preview { margin: .5rem 0 .75rem; padding: 1rem; min-height: 8rem; display: grid; place-items: center; overflow: hidden; border-radius: 1.125rem; background: var(--surface); }
-  .decide-preview > img { display: block; max-width: 100%; max-height: 15rem; object-fit: contain; border-radius: .75rem; }
   /* A device frame: a dark bezel round the capture, as the design draws every shot. Wide captures get a slimmer bezel. */
   .phone { display: block; box-sizing: border-box; padding: 7px 7px 0; border-radius: 28px 28px 0 0; background: #1D1D1F; box-shadow: inset 0 0 0 1px #3A3A3C; }
   .phone img { display: block; width: 100%; border-radius: 21px 21px 0 0; }
   .phone.wide { padding: 6px 6px 0; border-radius: 14px 14px 0 0; } .phone.wide img { border-radius: 9px 9px 0 0; }
-  .decide-preview .rung { width: 100%; }
-  .decide-preview .rung .frame, .decide-preview .rung iframe { max-height: 15rem; }
-  .decide-preview .mocks { --tall: min(32svh, 16rem); }
-  .decide-preview .shot { aspect-ratio: 236 / 273; }
-  .decide-preview .mock figcaption .label { flex: 1 1 auto; min-width: 0; font-size: .75rem; }
-  .decide-preview .mock figcaption .badge { padding: .1rem .25rem; font-size: .6875rem; white-space: nowrap; }
-  @media (max-width: 63.999rem) {
-    .decide-preview { margin: .25rem 0 .5rem; padding: .75rem; }
-    .decide-preview .mocks { grid-auto-columns: min(85%, 8rem); --tall: min(20svh, 10rem); }
-    .decide-preview .shot { aspect-ratio: 1; }
-  }
-  .decide h2 { margin: .5rem 0 .5rem; text-wrap: balance; font-size: 1.75rem; line-height: 1.15; letter-spacing: -.01em; }
-  .decide .why { margin: 0; color: var(--muted); font-size: 1.0625rem; font-weight: 400; }
-  .pick-label { margin: 1.75rem 0 0; padding: 0 1rem .5rem; color: var(--muted); font-size: .875rem; line-height: 1.1875rem; letter-spacing: .02em; }
-  .pick-list { list-style: none; margin: 0; padding: 0 0 0 1rem; overflow: hidden; border-radius: 1rem; background: var(--surface); }
-  .pick-list li + li { border-top: .5px solid var(--line); }
-  .pick-option { display: flex; width: 100%; min-height: 3.5rem; align-items: center; gap: .75rem; padding: .625rem 1rem .625rem 0; border: 0; border-radius: 0; background: transparent; text-align: left; }
-  .pick-option .words { display: grid; flex: 1; min-width: 0; gap: .125rem; }
-  .pick-option .label-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 .5rem; }
-  .pick-option .label { font-size: 1.0625rem; line-height: 1.3; }
-  .pick-option .reason { color: var(--muted); font-size: 0.9375rem; line-height: 1.35; }
-  .pick-option .recommend { color: var(--accent); font-size: .9375rem; }
-  .pick-option .check { display: inline-flex; color: var(--accent); visibility: hidden; } .pick-option .check .glyph { width: 1.375rem; height: 1.375rem; stroke-width: 2.4; }
-  .pick-option, .pick-option[aria-pressed="true"] { color: var(--text); background: transparent; font-weight: 400; }
-  .pick-option[aria-pressed="true"] .reason { color: var(--muted); }
-  .pick-option[aria-pressed="true"]::before { content: none; }
-  .pick-option[aria-pressed="true"] .check { visibility: visible; }
-  .silent-line { display: flex; flex-basis: 100%; gap: 0.625rem; align-items: flex-start; margin: 0; padding: 0 .25rem .25rem; color: var(--muted); font-size: 0.9375rem; line-height: 1.4; letter-spacing: -0.016em; }
-  .silent-line b { color: var(--text); font-weight: 600; }
-  .silent-line .icon { width: 1.0625rem; height: 1.0625rem; margin-top: 0.125rem; background: none; } .silent-line .icon svg { width: 1.0625rem; height: 1.0625rem; stroke: currentColor; }
-  /* A comment with the answer, your own words, another round: one quiet line right under the choices. */
-  .decide-bar { position: sticky; z-index: 1; bottom: calc(4.625rem + env(safe-area-inset-bottom)); display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
-    margin-top: 1rem; padding: .75rem 0 .5rem; background: var(--bg); }
-  /* Answer takes the row on one line; when a long label leaves no room, Skip and Later move under it rather than squeeze it. */
-  .decide-bar > * { white-space: nowrap; }
-  .decide-bar > .silent-line { white-space: normal; min-width: 0; } /* the stay-quiet line wraps; nowrap pushed it past a phone's edge in a wider font */
-  .decide-bar .answer { flex: 1 1 auto; background: var(--action); color: var(--on-accent); font-weight: 400; }
   /* Evidence: one list of cards, newest first, each with its capture as the hero; the whole card opens the update.
      The project picker sits quietly beside the search box, as tall as it and in the same sunk fill. */
   .ev-find { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; } .ev-find input { flex: 1 1 auto; min-width: 0; }
@@ -1117,24 +1063,13 @@
   .gd-bar .txt b { display: block; color: var(--text); font-weight: 600; }
   .gd-bar .gd-btn { min-height: 3rem; padding: 0 1.25rem; white-space: nowrap; }
   @media (prefers-reduced-motion: reduce) { #reader .gd *, #reader .gd-scroll { animation: none !important; transition: none !important; scroll-behavior: auto; } }
-  /* ---- Decide, phone first: one plain page of rows grouped Sign in, Answer, Review and Later, as in Mail and Reminders.
+  /* ---- Decide, in the approved new look (ui.css): Newest or By priority, the hero, the asks as rows in one card, and an ask as a sheet over them on a phone.
      Every tap answers at once: rows tint on press, buttons shrink a little, and pops settle on a spring (--spring, set by the script). ---- */
   :root { --ease: cubic-bezier(0.22, 1, 0.36, 1); --spring: var(--ease); --c-indigo: #5E5CE6; --skel: rgba(118, 118, 128, 0.12); --skel-hi: rgba(118, 118, 128, 0.04); }
   @media (prefers-color-scheme: dark) { :root { --c-indigo: #7D7AFF; --skel: rgba(255, 255, 255, 0.07); --skel-hi: rgba(255, 255, 255, 0.02); } }
-  body:has(.decide-list, .decide) { --bg: var(--tk-surface); --surface: var(--tk-grouped); }
-  @media (prefers-color-scheme: dark) { body:has(.decide-list, .decide) { --surface: var(--tk-surface-highest); } }
   main { overflow-x: clip; }
   .date-kicker { margin: 0; color: var(--muted); font-size: var(--t-xs); line-height: 1.25rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
-  .top:has(> .date-kicker):has(+ .decide-list) h1 { font-size: 2.125rem; line-height: 2.625rem; }
   .top > .dl-more { position: absolute; top: 2.75rem; right: -0.5rem; }
-  /* Decide's head on a phone, as the prototype sets it: the date from 20px down, the large title, a 15px line of what waits, and More beside the title. */
-  @media (max-width: 63.999rem) {
-    .top:has(+ .decide-list) { padding-top: 1.25rem; }
-    .top:has(+ .decide-list) .date-kicker { margin: 0; line-height: 1.25rem; }
-    .top:has(+ .decide-list) h1 { margin-top: 0.1875rem; line-height: 2.5625rem; }
-    .top:has(+ .decide-list) .waiting-lede { margin-top: 0.125rem; font-size: var(--t-s); line-height: 1.25rem; }
-    .top:has(+ .decide-list) > .dl-more { top: 2.25rem; right: 0; }
-  }
   .top > .bulk { margin-top: 0.25rem; }
   /* More: a disc at the top right (or beside Answer) whose menu scales out of it. */
   .dl-more { position: relative; flex: none; }
@@ -1155,9 +1090,7 @@
   .dl-menu > button.dis { color: var(--danger); }
   .dl-menu > button:disabled { background: none; color: var(--faint); cursor: default; }
   .dl-menu > .dl-sep { height: 0.375rem; margin: 0.25rem 0; background: var(--sunk); }
-  /* Group heads with their count, then the rows: full width on a phone, a rounded block wider up. */
-  .decide-list .dl-head { display: flex; align-items: baseline; gap: 0.5rem; margin: 1.75rem 0 0.25rem; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; font-weight: 600; letter-spacing: -0.01em; }
-  .decide-list > .dl-head:first-child { margin-top: 0.5rem; }
+  /* Rows in a list: full width on a phone, a rounded block wider up; Reports' section heads keep their count muted. */
   .dl-head .n { color: var(--faint); font-weight: 500; font-variant-numeric: tabular-nums; }
   .dl-list { list-style: none; margin: 0 calc(-1 * var(--gutter)); padding: 0; }
   @media (min-width: 45rem) { .dl-list { margin: 0; border-radius: 0.75rem; overflow: hidden; } }
@@ -1165,16 +1098,6 @@
   .dl-face { position: relative; z-index: 1; display: flex; align-items: center; gap: 0.875rem; min-height: 4.75rem; padding: 0.75rem 1.25rem; background: var(--bg); color: inherit; text-decoration: none;
     touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; transition: background-color 120ms linear; }
   .dl-face.down { background: color-mix(in srgb, var(--text) 6%, var(--bg)); transition: none; }
-  .dl-face .icon { width: 2rem; height: 2rem; border-radius: 0.5625rem; background: var(--k, var(--action)); transition: transform 300ms var(--spring), background-color 120ms linear; }
-  .dl-face .icon svg { width: 1.1875rem; height: 1.1875rem; stroke: #FFFFFF; stroke-width: 2.1; }
-  .g-signin { --k: var(--tk-warning); } .g-review { --k: var(--c-indigo); } .g-later { --k: var(--muted); }
-  .dl-face .copy { display: grid; flex: 1; min-width: 0; gap: 0.125rem; }
-  .dl-face .r1 { display: flex; align-items: baseline; gap: 0.625rem; }
-  .dl-face .title { flex: 1; min-width: 0; display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: var(--t-m); line-height: 1.375rem; font-weight: 600; letter-spacing: -0.022em; }
-  .dl-face .tm { flex: none; color: var(--faint); font-size: var(--t-s); line-height: 1.25rem; font-variant-numeric: tabular-nums; }
-  .dl-face .tm.hot { color: var(--warn); font-weight: 600; }
-  .dl-face .sub { overflow: hidden; margin: 0; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; white-space: nowrap; text-overflow: ellipsis; }
-  .dl-face .sub b { color: var(--text); font-weight: 500; }
   /* The actions under a row show only while it is swiped, so a press tint never lets them through. */
   .dl-act { position: absolute; inset: 0; display: none; flex-direction: column; justify-content: center; gap: 0.1875rem; padding: 0 1.625rem; color: #FFFFFF; font-size: var(--t-s); line-height: 1.25rem; font-weight: 600; }
   .dl-act.yes { align-items: flex-start; background: var(--tk-success); }
@@ -1187,7 +1110,7 @@
   /* Answered: the row tints green and its icon pops green, then it folds away; a row taken back flashes blue. */
   .leaving.answered:not([data-side]) .dl-face { background: color-mix(in srgb, var(--tk-success) 9%, var(--bg)); }
   .leaving.later:not([data-side]) .dl-face { background: color-mix(in srgb, var(--c-indigo) 12%, var(--bg)); }
-  .leaving.answered .icon { background: var(--tk-success); transform: scale(1.08); }
+  .leaving.answered .ui-icon { background: var(--tk-success); color: #FFFFFF; transform: scale(1.08); transition: transform 300ms var(--spring); }
   .dl-row.returned .dl-face { animation: row-back 600ms var(--ease); }
   @keyframes row-back { from { background: color-mix(in srgb, var(--accent) 14%, var(--bg)); } }
   .rise .dl-row, .rise .dl-head { animation: rise 280ms var(--ease) both; animation-delay: calc(min(var(--n, 0), 12) * 28ms); }
@@ -1207,6 +1130,28 @@
   .rp-list .dl-act.yes { background: var(--action); }
   .rp-list .dl-act.later { background: var(--c-indigo); }
   .rp-page > .notes, .rp-page > .gone-asks { margin-top: 1.5rem; }
+  /* Decide's list: More in a round button at the title's right edge, then the rows in cards (ui.css). Each row's face spans its card, so a swipe shows its action edge to edge:
+     the recommended answer green under a right swipe, Later indigo under a left one. With nothing waiting the card says All clear. The last row clears the dock. */
+  #d-more .ui-pr { width: 100%; min-height: 3rem; padding: 0; border-radius: 0; background: none; color: var(--tk-ink); font: inherit; font-size: var(--tk-fs-row); font-weight: 400; text-align: left; }
+  #d-more .ui-pr:disabled { background: none; color: var(--tk-text-tertiary); cursor: default; } #d-more .ui-pr:disabled .k { color: inherit; }
+  #d-more .ui-pr .k .glyph { width: 1.125rem; height: 1.125rem; }
+  .ui-top > .bulk { margin: 0; }
+  .decide-list .dl-list.ui-list { margin: 0; padding: 0.25rem 0; border-radius: var(--tk-r-card); }
+  .decide-list .dl-list.ui-list > li + li::before { right: 0.75rem; left: 0.75rem; }
+  .decide-list .dl-face.ui-row { gap: 0.75rem; min-height: 0; padding: 0 0.75rem; background: var(--tk-card); }
+  .decide-list .dl-face.ui-row.down { background: color-mix(in srgb, var(--tk-ink) 6%, var(--tk-card)); }
+  .decide-list .leaving.answered:not([data-side]) .dl-face.ui-row { background: color-mix(in srgb, var(--tk-success) 10%, var(--tk-card)); }
+  .decide-list .leaving.later:not([data-side]) .dl-face.ui-row { background: color-mix(in srgb, var(--c-indigo) 10%, var(--tk-card)); }
+  .decide-list .dl-row.returned .dl-face.ui-row { animation: row-flash 900ms var(--ease); }
+  @keyframes row-flash { from, 30% { background: var(--tk-inset); } }
+  /* The page's older .meta rule gives a second line a top margin; the shared row's has none. */
+  .decide-list .ui-row .l2.meta { margin: 0; }
+  .decide-list .ui-row .l2.meta > span { overflow: hidden; text-overflow: ellipsis; }
+  .decide-list .dl-clear { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.25rem; height: 8.5rem; text-align: center; }
+  .decide-list .dl-clear b { color: var(--tk-ink); font-size: var(--tk-fs-row); font-weight: 500; }
+  .decide-list .dl-clear span { color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); }
+  .decide-list > .gone-asks { margin-top: 1rem; }
+  .rise .ui-sec, .rise .ui-hero { animation: rise 280ms var(--ease) both; }
   .tabs .bd.blue { background: var(--action); }
   /* All clear: a green check pops in. */
   .all-clear-big { padding: 4rem 1.5rem 1rem; text-align: center; }
@@ -1216,10 +1161,8 @@
   .all-clear-big h2 { margin: 0 0 0.375rem; font-size: var(--t-l); line-height: 1.75rem; }
   .all-clear-big p { margin: 0; color: var(--muted); font-size: var(--t-s); }
   @keyframes pop { from { opacity: 0; transform: scale(0.4); } }
-  /* Decide's all clear sits where the prototype's does: 55px under the head on a phone, 48px on a desk's list, and larger in the desk's pane. */
-  .decide-list > .all-clear-big { padding-top: 3.4375rem; }
+  /* All clear in Decide's pane on a desk, larger. */
   @media (min-width: 64rem) {
-    .split-list .decide-list > .all-clear-big { padding-top: 3rem; }
     .split-detail > .all-clear-big.pane .big { width: 5.5rem; height: 5.5rem; margin-bottom: 1.25rem; } .split-detail > .all-clear-big.pane .glyph { width: 2.625rem; height: 2.625rem; }
     .split-detail > .all-clear-big.pane h2 { font-size: 1.75rem; line-height: 2.125rem; letter-spacing: -0.024em; } .split-detail > .all-clear-big.pane p { font-size: var(--t-m); }
   }
@@ -1232,52 +1175,50 @@
   .sk-lines { display: grid; flex: 1; gap: 0.5rem; }
   .sk-line { height: 0.8125rem; border-radius: 0.4375rem; }
   @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
-  /* An ask pushes in from the right over Decide; going back slides the list in from the left. The dock stays put: a moving ancestor would carry it off the screen. */
-  #board.push > :not(.decide), #board.push > .decide > :not(.decide-bar) { animation: push-in 250ms var(--ease); }
-  #board.pop > * { animation: pop-in 250ms var(--ease); }
-  @keyframes push-in { from { opacity: 0.4; transform: translateX(32%); } }
-  @keyframes pop-in { from { opacity: 0.6; transform: translateX(-24%); } }
-  /* The ask, as the approved prototype lays it out. A phone gives it a bar of its own (back to Decide, the question once the page scrolls past it, and More) and slides the tab bar away.
-     Its kind, who asked and when sit over the question; the proof it rests on is one row; the answers are outlined cards with a radio, ending in Your own answer;
-     one note sits open under them; what happens if you stay quiet is a footnote; and one button, off until a pick and then naming it, sits in a dock at the foot. */
-  .decide { --opt: var(--bg); --ring: color-mix(in srgb, var(--faint) 45%, transparent); } .decide.g-answer { --k: var(--accent); }
-  @media (prefers-color-scheme: dark) { .decide { --opt: var(--tk-surface-high); } }
+  /* The ask, as the approved prototype's sheet draws it: on a phone a sheet rises over Decide's list (a grab handle, the ask's tile with whose it is and when, More and Close),
+     then the question in full, since when it has waited, why, its preview, one panel of what it carries (priority, its ticket), the proof it rests on,
+     Your answer as one inset group of rows with a radio each (Recommended a white tag, Your own answer last), one note, and Ask me later beside one ink button that names the pick. */
+  .ask-over { position: fixed; z-index: 30; inset: 0; }
+  .ask-scrim { position: absolute; inset: 0; background: rgba(30, 24, 18, 0.28); }
+  .ask-sheet { position: absolute; left: 0; right: 0; bottom: 0; max-width: 30rem; max-height: calc(100% - 3rem); margin: 0 auto; overflow: auto; overscroll-behavior: contain;
+    padding: 0 1rem; border-radius: 1.75rem 1.75rem 0 0; background: var(--tk-card); box-shadow: 0 -8px 32px rgba(30, 20, 10, 0.12); }
+  @media (prefers-color-scheme: dark) { .ask-scrim { background: rgba(0, 0, 0, 0.5); } }
+  .ask-over.up .ask-scrim { animation: scrim-in 250ms var(--ease); } .ask-over.up .ask-sheet { animation: sheet-up 300ms var(--ease); }
+  @keyframes scrim-in { from { opacity: 0; } }
+  body:has(.ask-sheet) { overflow: hidden; }
+  body:has(.ask-sheet) #toast { z-index: 31; }
+  .ask-sheet .grab { width: 2.25rem; height: 0.25rem; margin: 0.5rem auto 0.5rem; border-radius: 2px; background: var(--tk-line); }
+  .sh-head { display: flex; align-items: center; gap: 0.5rem; height: 2.5rem; }
+  .sh-head > .ui-icon { width: 1.25rem; height: 1.25rem; border-radius: 0.3125rem; background: none; box-shadow: none; }
+  .sh-head > .ui-icon :is(img, .mono) { width: 1.25rem; height: 1.25rem; border-radius: 0.3125rem; } .sh-head > .ui-icon .mono { font-size: 0.5rem; line-height: 1.25rem; }
+  .sh-head > .ui-icon svg { width: 1.125rem; height: 1.125rem; }
+  .sh-lab { flex: 1; min-width: 0; overflow: hidden; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); white-space: nowrap; text-overflow: ellipsis; }
+  .sh-head > .dl-more > summary { width: 2.75rem; color: var(--tk-text-secondary); }
+  .sh-head > .dl-more > summary > span { background: var(--tk-inset); }
+  .sh-x { position: relative; display: grid; flex: none; place-items: center; width: 2rem; height: 2rem; border-radius: 1rem; background: var(--tk-inset); color: var(--tk-text-secondary); }
+  .sh-x::after { content: ''; position: absolute; inset: -0.375rem; }
+  .sh-x .glyph { width: 1.125rem; height: 1.125rem; stroke-width: 2; }
+  .decide { --ring: #D3CCC9; max-width: 42.5rem; margin: 0 auto; color: var(--tk-text); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
+  @media (prefers-color-scheme: dark) { .decide { --ring: #55514C; } }
+  .decide .lead h2 { margin: 0.5rem 0 0; color: var(--tk-ink); font-size: 1.25rem; line-height: 1.75rem; font-weight: 500; letter-spacing: -0.017em; text-wrap: pretty; outline: none; }
+  .decide .since, .decide .why { margin: 0.5rem 0 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 400; }
+  .decide .lead .st { display: inline-block; margin-top: 0.5rem; }
+  .decide .ui-props { margin-top: 0.5rem; }
+  .decide .ui-pr .k .glyph { width: 1.125rem; height: 1.125rem; stroke-width: 1.8; }
+  .decide-preview { display: grid; place-items: center; min-height: 8rem; margin: 1rem 0 0; padding: 0.75rem; overflow: hidden; border-radius: 1rem; background: var(--tk-inset); }
+  .decide-preview > img { display: block; max-width: 100%; max-height: 15rem; object-fit: contain; border-radius: 0.75rem; }
+  .decide-preview .rung { width: 100%; }
+  .decide-preview .rung .frame, .decide-preview .rung iframe { max-height: 15rem; }
+  .decide-preview .mocks { --tall: min(32svh, 16rem); }
+  .decide-preview .shot { aspect-ratio: 236 / 273; }
+  .decide-preview .mock figcaption .label { flex: 1 1 auto; min-width: 0; font-size: 0.75rem; }
+  .decide-preview .mock figcaption .badge { padding: 0.1rem 0.25rem; font-size: 0.6875rem; white-space: nowrap; }
   @media (max-width: 63.999rem) {
-    .top.ask-nav { position: sticky; z-index: 3; top: 0; display: flex; align-items: center; justify-content: space-between; height: 3.25rem; margin: 0 calc(-1 * var(--gutter)); padding: 0 0.25rem; background: var(--bg); transition: box-shadow 150ms linear; }
-    .top.ask-nav.scrolled { box-shadow: 0 0.5px 0 var(--line); }
-    .top.ask-nav h1 { width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-    .ask-nav .back { padding: 0 0.75rem 0 0.125rem; font-size: 1.0625rem; }
-    .ask-nav .back .glyph { width: 1.75rem; height: 1.75rem; margin-right: -0.125rem; stroke-width: 2.2; }
-    .ask-nav .mid { position: absolute; left: 7.25rem; right: 9.25rem; overflow: hidden; font-weight: 600; text-align: center; white-space: nowrap; text-overflow: ellipsis;
-      opacity: 0; visibility: hidden; transition: opacity 150ms linear, visibility 0s linear 150ms; }
-    .ask-nav.scrolled .mid { opacity: 1; visibility: visible; transition: opacity 150ms linear; }
-    .top.ask-nav > .dl-more { position: static; }
-    /* The arrows to the ask before and after this one, answered ones too, beside More; one with nowhere to go is faint. */
-    .ask-nav .steps { display: flex; margin-left: auto; }
-    .ask-nav .step { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; color: var(--action); -webkit-tap-highlight-color: transparent; }
-    .ask-nav span.step { color: var(--faint); } .ask-nav .step .glyph { width: 1.625rem; height: 1.625rem; stroke-width: 2.2; }
-    #tabs, #dock-find { transition: transform 250ms var(--ease); }
-    body:has(#board > .decide) :is(#tabs, #dock-find) { transform: translateY(calc(100% + 2.5rem)); }
-    body:has(#board > .decide) { padding-bottom: calc(6.5rem + env(safe-area-inset-bottom)); }
-    body:has(#board > .decide) #toast { bottom: calc(6rem + env(safe-area-inset-bottom)); }
-    .decide-bar { position: fixed; z-index: 2; left: 0; right: 0; bottom: 0; margin: 0; padding: 0.75rem max(1.25rem, calc((100vw - 42.5rem) / 2)) calc(1rem + env(safe-area-inset-bottom));
-      background: linear-gradient(to bottom, transparent, var(--bg) 1.625rem); }
-    .decide-bar .answer, .decide-bar .open-link { flex: 1 1 100%; }
+    .decide-preview .mocks { grid-auto-columns: min(85%, 8rem); --tall: min(20svh, 10rem); }
+    .decide-preview .shot { aspect-ratio: 1; }
   }
-  /* The prototype sets its text 0.374px tight (-0.022em of its 17px body), buttons too; Decide follows it, so its lines break where the prototype's do. */
-  :is(.decide-list, .decide, .split-bar:has(> .crumb)) { letter-spacing: -0.374px; } :is(.decide-list, .decide) :is(button, textarea) { letter-spacing: inherit; }
-  .decide .kicker { margin: 0.25rem 0 0; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; }
-  .decide .kicker .k { color: var(--k); font-weight: 600; }
-  .decide .lead h2 { margin: 0.375rem 0 0.625rem; font-size: 1.75rem; line-height: 2.125rem; letter-spacing: -0.024em; }
-  .decide .why { font-size: var(--t-m); line-height: 1.5rem; letter-spacing: -0.02em; }
-  .decide .pick-label { margin: 1.75rem 0 0.5rem; padding: 0; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; font-weight: 600; letter-spacing: -0.01em; }
-  /* The proof: a small capture, what it shows, its result and when it was checked; it opens the capture in a sheet. */
-  .proof-row { display: flex; align-items: center; gap: 0.875rem; width: 100%; padding: 0.75rem 0.875rem; border-radius: 1rem; background: var(--opt); box-shadow: 0 0 0 0.5px var(--line); color: var(--text); font-weight: 400; text-align: left; transition: background-color 120ms linear; }
-  .proof-row:active { background: color-mix(in srgb, var(--text) 6%, var(--opt)); }
-  .proof-row .pthumb { flex: none; width: 2.625rem; height: 3.5rem; overflow: hidden; border-radius: 0.375rem; background: var(--sunk); box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.14), 0 6px 16px rgba(0, 0, 0, 0.12); }
-  .proof-row .pthumb img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
-  .proof-row .pt { display: grid; flex: 1; min-width: 0; gap: 0.125rem; } .proof-row .pt b { font-size: var(--t-b); line-height: 1.375rem; font-weight: 600; }
-  .proof-row > :last-child .glyph { width: 1.375rem; height: 1.375rem; stroke-width: 1.9; color: var(--text); }
+  .decide .proof-block .ui-dl, .decide .thread .tk-label { margin: 1.5rem 0 0.5rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 400; letter-spacing: 0; text-transform: none; }
+  .decide > .ui-dl, .decide > label.ui-dl { display: block; margin-top: 1.5rem; }
   /* A card's ticket: one row, its title over its id and progress, that opens the ticket's page; and that page's bar and lists. */
   .ticket-block { margin-top: 1.25rem; }
   /* On an update's screen the row reads as one of its groups: the label as Proof's, the row as its cells. */
@@ -1316,65 +1257,87 @@
   .pst { color: var(--muted); font-size: 0.875rem; line-height: 1.25rem; }
   .res { display: inline-flex; align-items: center; gap: 0.3125rem; font-weight: 600; } .res::before { content: ""; width: 0.4375rem; height: 0.4375rem; border-radius: 50%; background: currentColor; }
   .res.ok { color: var(--ok); } .res.bad { color: var(--danger); } .res.warn { color: var(--warn); }
-  /* The answers: outlined cards; the one picked has a blue ring and its radio fills with a check that springs in. */
-  .decide .pick-list { display: grid; gap: 0.625rem; padding: 0; overflow: visible; border-radius: 0; background: none; }
-  .decide .pick-list li + li { border-top: 0; }
-  .decide .pick-option { align-items: flex-start; gap: 0.875rem; min-height: 0; padding: 0.875rem 1rem; border-radius: 1rem; background: var(--opt); box-shadow: 0 0 0 0.5px var(--line);
-    -webkit-tap-highlight-color: transparent; transition: box-shadow 160ms var(--ease), transform 260ms var(--spring), background-color 120ms linear; }
-  .decide .pick-option:active { transform: scale(0.985); transition-duration: 90ms; }
-  .decide .pick-option[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 5%, var(--opt)); box-shadow: 0 0 0 2px var(--accent); }
-  .decide .pick-option .label-line { align-items: center; }
-  .decide .pick-option .label { font-size: var(--t-m); line-height: 1.375rem; font-weight: 600; }
-  .decide .pick-option .reason { font-size: var(--t-s); line-height: 1.25rem; }
-  .decide .pick-option .recommend { display: inline-flex; align-items: center; height: 1.375rem; padding: 0 0.5rem; border-radius: 0.6875rem; background: color-mix(in srgb, var(--tk-link) 12%, transparent); color: var(--accent); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.01em; }
-  .decide .pick-option .check { display: grid; flex: none; place-items: center; width: 1.5rem; height: 1.5rem; margin-top: -0.0625rem; border-radius: 50%; box-shadow: inset 0 0 0 1.75px var(--ring); color: #FFFFFF; visibility: visible; transition: background-color 160ms var(--ease); }
-  .decide .pick-option[aria-pressed="true"] .check { background: var(--tk-link); box-shadow: none; }
-  .decide .pick-option .check .glyph { width: 0.9375rem; height: 0.9375rem; stroke-width: 3; transform: scale(0); transition: transform 280ms var(--spring); }
+  /* Your answer: one inset group, a hairline between rows; each row its answer and what it does, with a radio at the right that fills with ink and a check once picked. */
+  .decide .pick-list { margin: 0.5rem 0 0; padding: 0 1rem; list-style: none; border-radius: 1rem; background: var(--tk-inset); }
+  .decide .pick-list > li { position: relative; }
+  .decide .pick-list > li + li::before { content: ''; position: absolute; top: -0.5px; right: 0; left: 0; height: 1px; background: var(--tk-line); }
+  .decide .pick-option { display: flex; align-items: flex-start; gap: 0.75rem; width: 100%; min-height: 4rem; padding: 0.75rem 0; border-radius: 0; background: none; color: var(--tk-ink); font-weight: 400; text-align: left;
+    -webkit-tap-highlight-color: transparent; transition: opacity 120ms linear; }
+  .decide .pick-option:active { opacity: 0.6; transition-duration: 60ms; }
+  .decide .pick-option[aria-pressed="true"] { background: none; color: var(--tk-ink); font-weight: 400; }
+  .decide .pick-option[aria-pressed="true"]::before { content: none; }
+  .decide .pick-option .words { display: grid; flex: 1; min-width: 0; gap: 0.125rem; }
+  .decide .pick-option .label-line { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem; }
+  .decide .pick-option .label { color: var(--tk-ink); font-size: var(--tk-fs-secondary); line-height: var(--tk-lh-secondary); font-weight: 500; }
+  .decide .pick-option .reason { color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: 1.125rem; }
+  .decide .pick-option .recommend { display: inline-flex; align-items: center; height: 1.25rem; padding: 0 0.5rem; border-radius: 0.625rem; background: var(--tk-raised); color: var(--tk-ink);
+    font-size: 0.6875rem; line-height: 1.25rem; font-weight: 600; letter-spacing: 0.01em; }
+  .decide .pick-option .recommend.now { background: var(--tk-ink); color: var(--tk-canvas); }
+  .decide .pick-option .check { display: grid; flex: none; place-items: center; width: 1.25rem; height: 1.25rem; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--ring); color: var(--tk-canvas); visibility: visible;
+    transition: background-color 160ms var(--ease); }
+  .decide .pick-option[aria-pressed="true"] .check { background: var(--tk-ink); box-shadow: none; }
+  .decide .pick-option .check .glyph { width: 0.875rem; height: 0.875rem; stroke-width: 3; transform: scale(0); transition: transform 280ms var(--spring); }
   .decide .pick-option[aria-pressed="true"] .check .glyph { transform: scale(1); }
-  .decide .pick-option > .kc { margin-left: auto; align-self: center; }
-  /* Your own answer: the last card; picking it opens one box under it, and the note below steps aside. The note: one optional box for any pick, always open under its head. */
+  .decide .pick-option > .kc { align-self: center; }
+  /* Your own answer: the last row; picking it opens one box under the group, and the note steps aside. The note: one box for any pick, always open. */
   .decide .own-field { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 220ms var(--ease); }
   .decide .own-field > div { overflow: hidden; margin: 0 -0.1875rem -0.1875rem; padding: 0 0.1875rem 0.1875rem; }
   .decide.own .own-field { grid-template-rows: 1fr; }
-  .decide :is(.own-box, .note-box) { max-width: none; min-height: 4.25rem; margin: 0; padding: 0.75rem 0.875rem; border: 0; border-radius: 0.875rem; background: var(--sunk); resize: none;
-    font-size: var(--t-m); line-height: 1.375rem; outline: none; transition: box-shadow 140ms var(--ease); }
-  .decide :is(.own-box, .note-box):focus { box-shadow: 0 0 0 2px var(--accent); }
-  @media (max-width: 63.999rem) { .decide :is(.own-box, .note-box) { scroll-margin-bottom: 7.5rem; } }
-  .decide .own-box { min-height: 5.25rem; margin-top: 0.625rem; }
-  .decide label.pick-label { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
-  .decide .pick-label small { color: var(--faint); font-size: var(--t-xs); font-weight: 500; }
+  .decide :is(.own-box, .note-box) { display: block; width: 100%; max-width: none; min-height: 3rem; margin: 0.5rem 0 0; padding: 0.875rem 1rem; border: 0; border-radius: 1rem; background: var(--tk-inset);
+    color: var(--tk-ink); font: inherit; font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); resize: none; outline: none; transition: box-shadow 140ms var(--ease); }
+  .decide :is(.own-box, .note-box)::placeholder { color: var(--tk-text-tertiary); }
+  .decide :is(.own-box, .note-box):focus { box-shadow: 0 0 0 1.5px var(--tk-ink); }
+  .decide .own-box { min-height: 5.25rem; }
+  @media (max-width: 63.999rem) { .decide :is(.own-box, .note-box) { scroll-margin-bottom: 6rem; } }
   .decide.own .note-field { display: none; }
-  /* An answered ask, as the prototype's answered sheet draws it: Answered (or Changed) and when, then the answer in a green card with its note and whether the agent read it,
-     the answer before a change under it, and Change answer as its one button. Brought back for a change, the card of the answer given is tagged Your answer. */
-  .decide .ans-meta { margin: 0; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; }
-  .decide .ans-card { display: flex; align-items: flex-start; gap: 0.875rem; margin-top: 0.75rem; padding: 0.875rem 1rem; border-radius: 1rem; background: color-mix(in srgb, var(--tk-success) 10%, var(--opt)); box-shadow: 0 0 0 0.5px var(--line); }
+  /* An answered ask: Answered (or Changed) and when, then the answer in an inset card with its note and whether the agent read it, the answer before a change under it,
+     and Change answer as its one button. Brought back for a change, the row of the answer given is tagged Your answer. */
+  .decide .ans-meta { margin: 0.5rem 0 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
+  .decide .ans-card { display: flex; align-items: flex-start; gap: 0.75rem; margin-top: 0.5rem; padding: 0.75rem 1rem; border-radius: 1rem; background: var(--tk-inset); }
   .decide .ans-card > div { display: grid; gap: 0.125rem; min-width: 0; }
-  .decide .ans-card b { font-size: var(--t-m); line-height: 1.375rem; } .decide .ans-card q { font-size: var(--t-s); line-height: 1.25rem; overflow-wrap: anywhere; }
-  .decide .ans-card > div > span { color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; }
-  .decide .ans-was { margin: 0.75rem 0 0; color: var(--faint); font-size: var(--t-xs); line-height: 1.125rem; }
-  .decide .pick-option .recommend.now { background: color-mix(in srgb, var(--tk-success) 14%, transparent); color: var(--ok); }
-  .g-done { --k: var(--tk-success); }
-  .decide-bar .answer:disabled:not(.done) { box-shadow: none; cursor: default; }
-  .decide > .silent-line { display: block; margin: 0.875rem 0 0; padding: 0; color: var(--faint); font-size: var(--t-xs); line-height: 1.125rem; letter-spacing: -0.004em; }
-  /* A sign-in: its key large, then the facts as one inset group, and Open sign-in with what it does under it. */
-  .signin-ask > .icon { width: 4rem; height: 4rem; margin: 0.5rem 0 1.125rem; border-radius: 1.125rem; background: var(--k); box-shadow: 0 10px 24px -10px var(--k); }
-  .signin-ask > .icon svg { width: 2rem; height: 2rem; stroke: #FFFFFF; stroke-width: 2; }
-  .decide .facts { margin-top: 1.375rem; overflow: hidden; border-radius: 1rem; background: var(--opt); box-shadow: 0 0 0 0.5px var(--line); }
-  .decide .fact { display: flex; align-items: center; gap: 0.875rem; padding: 0.875rem 1rem; font-size: var(--t-s); }
-  .decide .fact + .fact { box-shadow: inset 0 0.5px 0 var(--line); }
-  .decide .fact .glyph { width: 1.25rem; height: 1.25rem; color: var(--muted); }
-  .decide .fact > span:nth-child(2) { flex: 1; color: var(--muted); } .decide .fact b { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
-  .decide-bar .hint { flex-basis: 100%; margin: 0.5rem 0 0; color: var(--faint); font-size: var(--t-xs); line-height: 1.125rem; text-align: center; white-space: normal; letter-spacing: -0.374px; }
-  .decide-bar .open-link { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; }
-  .open-link .spin { width: 1.25rem; height: 1.25rem; border: 2.2px solid rgba(255, 255, 255, 0.35); border-top-color: #FFFFFF; border-radius: 50%; animation: spin 700ms linear infinite; }
+  .decide .ans-card b { color: var(--tk-ink); font-size: var(--tk-fs-secondary); line-height: var(--tk-lh-secondary); font-weight: 500; } .decide .ans-card q { overflow-wrap: anywhere; }
+  .decide .ans-card > div > span { color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: 1.125rem; }
+  .decide .ans-was { margin: 0.75rem 0 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: 1.125rem; }
+  .decide .silent-line { display: block; margin: 0.75rem 0 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: 1.125rem; }
+  /* The proof it rests on: one inset row, a small capture, what it shows and its result; it opens the capture in a sheet. */
+  .proof-row { display: flex; align-items: center; gap: 0.75rem; width: 100%; min-height: 4.5rem; padding: 0.75rem 1rem; border-radius: 1rem; background: var(--tk-inset); color: var(--tk-ink); font-weight: 400; text-align: left; }
+  .proof-row:active { opacity: 0.6; }
+  .proof-row .pthumb { flex: none; width: 2.25rem; height: 3rem; overflow: hidden; border-radius: 0.375rem; background: var(--tk-card); }
+  .proof-row .pthumb img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+  .proof-row .pt { display: grid; flex: 1; min-width: 0; gap: 0.125rem; } .proof-row .pt b { overflow: hidden; font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
+  .proof-row > :last-child .glyph { width: 1.125rem; height: 1.125rem; stroke-width: 2; color: var(--tk-text-tertiary); }
+  /* The ask's Activity: the label as the panel's, the thread as one inset group. */
+  .decide .thread { margin: 0; }
+  .decide .th-list { padding: 0 1rem; border-radius: 1rem; background: var(--tk-inset); box-shadow: none; }
+  .decide .th-list li + li { border-top: 1px solid var(--tk-line); }
+  .decide .th-list li:last-child .th-dot { background: var(--tk-fill); }
+  .decide .th-b { font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); } .decide .th-t a { color: var(--tk-ink); text-decoration: underline; text-underline-offset: 2px; }
+  /* A sign-in: its key in a tile, the facts as one inset group, and Open sign-in with what it does under it. */
+  .signin-ask > .icon { width: 3rem; height: 3rem; margin: 0.5rem 0 0; border-radius: var(--tk-r-icon); background: var(--tk-raised); box-shadow: var(--tk-elev-raised); }
+  .signin-ask > .icon svg { width: 1.5rem; height: 1.5rem; stroke: var(--tk-ink); stroke-width: 1.8; }
+  .decide .facts { margin-top: 1rem; padding: 0 1rem; border-radius: 1rem; background: var(--tk-inset); }
+  .decide .fact { display: flex; align-items: center; gap: 0.75rem; min-height: 3rem; }
+  .decide .fact + .fact { box-shadow: inset 0 1px 0 var(--tk-line); }
+  .decide .fact .glyph { width: 1.125rem; height: 1.125rem; color: var(--tk-text-secondary); }
+  .decide .fact > span:nth-child(2) { flex: 1; color: var(--tk-text-secondary); } .decide .fact b { color: var(--tk-ink); font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; }
+  /* The bar: Ask me later in white beside one ink button, 52px pills; the button is faint until a pick and then names it. On a phone it stays at the sheet's foot. */
+  .decide-bar { position: sticky; z-index: 1; bottom: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0 -1rem; padding: 1.5rem 1rem calc(1.5rem + env(safe-area-inset-bottom));
+    background: linear-gradient(to bottom, transparent, var(--tk-card) 1.25rem); }
+  .decide-bar > * { white-space: nowrap; }
+  .decide-bar :is(.answer, .open-link, .later-btn) { position: relative; display: inline-flex; flex: 1 1 0; align-items: center; justify-content: center; gap: 0.5rem; min-width: 0; min-height: 3.25rem; padding: 0 1rem;
+    overflow: hidden; border-radius: 1.625rem; font-size: var(--tk-fs-secondary); font-weight: 500; letter-spacing: 0; text-decoration: none; transition: transform 260ms var(--spring), background-color 160ms linear; }
+  .decide-bar :is(.answer, .open-link) { background: var(--tk-ink); color: var(--tk-canvas); box-shadow: none; }
+  .decide-bar .later-btn { background: var(--tk-raised); color: var(--tk-ink); box-shadow: var(--tk-elev-raised); }
+  @media (prefers-color-scheme: dark) { .decide-bar .later-btn { background: var(--tk-on); } }
+  .decide-bar :is(.answer, .open-link, .later-btn):active { transform: scale(0.97); transition-duration: 90ms; }
+  .decide-bar .answer:disabled:not(.done) { background: var(--tk-ink); color: var(--tk-canvas); opacity: 0.35; cursor: default; }
+  .decide-bar .hint { flex-basis: 100%; margin: 0.25rem 0 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: 1.125rem; text-align: center; white-space: normal; }
+  .open-link .spin { width: 1.25rem; height: 1.25rem; border: 2.2px solid color-mix(in srgb, var(--tk-canvas) 35%, transparent); border-top-color: var(--tk-canvas); border-radius: 50%; animation: spin 700ms linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .decide-bar .answer, .decide-bar .open-link { position: relative; overflow: hidden; min-height: 3.25rem; border-radius: 1rem; font-size: var(--t-m); font-weight: 600; letter-spacing: -0.02em;
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset, 0 6px 16px -6px color-mix(in srgb, var(--action) 70%, transparent); transition: background-color 160ms linear, transform 260ms var(--spring); }
-  .decide-bar .answer:active, .decide-bar .open-link:active { transform: scale(0.97); transition-duration: 90ms; }
-  .answer .lbl { display: inline-block; } .answer .lbl.swap { animation: lbl-in 200ms var(--ease); }
+  .answer .lbl { display: inline-block; overflow: hidden; text-overflow: ellipsis; } .answer .lbl.swap { animation: lbl-in 200ms var(--ease); }
   @keyframes lbl-in { from { opacity: 0; transform: translateY(0.5rem); } }
   .answer .okmark { position: absolute; inset: 0; display: none !important; place-items: center; }
-  .decide-bar .answer.done, .decide-bar .answer.done:disabled { background: var(--tk-success); color: #FFFFFF; box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--tk-success) 70%, transparent); }
+  .decide-bar .answer.done, .decide-bar .answer.done:disabled { background: var(--tk-success); color: #FFFFFF; opacity: 1; }
   .answer.done .lbl { animation: lbl-out 140ms var(--ease) forwards; }
   @keyframes lbl-out { to { opacity: 0; transform: translateY(-0.5rem); } }
   .answer.done .okmark { display: grid !important; }
@@ -1460,18 +1423,13 @@
     .split-bar .later .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.75; color: var(--muted); }
     /* Decide on a desk, at the prototype's measures: the list's head 22px down with a 28px title, rows 18px in, a 56px bar over the ask (its kind, Later and More),
        the ask 44px in under a 30px question, and its answer bar right after it: never at the pane's foot, and under a tall ask after the last option, so it never covers one. */
-    .split-list:has(> .decide-list) { padding: 0 1.25rem; }
-    .split-list:has(> .decide-list) > .top { padding: 1.375rem 0 0.375rem; }
-    .split-list:has(> .decide-list) .date-kicker { margin: 0; line-height: 1.25rem; }
-    .split-list:has(> .decide-list) h1 { margin-top: 0.625rem; font-size: 1.75rem; line-height: 2.125rem; }
-    .split-list:has(> .decide-list) .waiting-lede { margin-top: 0.125rem; font-size: var(--t-s); line-height: 1.25rem; }
-    .split-list:has(> .decide-list) > .top > .dl-more { top: 2.375rem; right: 0; }
-    .split-list .decide-list > .dl-head:first-child { margin-top: 1.75rem; }
-    .split-list .decide-list .dl-list { margin: 0 -1.25rem; }
-    .split-list .decide-list .dl-face { padding: 0.75rem 1.125rem; }
-    .split-list .decide-list .dl-face .title { font-size: 1rem; line-height: 1.3125rem; }
-    .split-list .decide-list .dl-face .sub { font-size: 0.875rem; line-height: 1.1875rem; }
-    .split-list:has(> .decide-list) .split-hints { margin: auto -1.25rem 0; padding: 0.625rem 1.25rem 0.75rem; }
+    .split-list:has(> .decide-list) { padding: 0 1rem; }
+    .split-list .decide-list .dl-row.sel .dl-face.ui-row { background: var(--tk-inset); box-shadow: none; }
+    /* A desk's column is narrow for a question: its title takes two lines before it is cut, and the row grows to hold them. */
+    .split-list .decide-list .ui-row { height: auto; min-height: 4.25rem; padding-block: 0.75rem; }
+    .split-list .decide-list .ui-row .l1 { align-items: flex-start; height: auto; }
+    .split-list .decide-list .ui-row .l1 .t { display: -webkit-box; white-space: normal; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .split-list:has(> .decide-list) .split-hints { margin: auto -1rem 0; padding: 0.625rem 1rem 0.75rem; }
     .split-bar:has(> .crumb) { min-height: 3.5rem; padding: 0 1rem 0 2rem; }
     .split-bar .crumb { flex: 1; min-width: 0; margin: 0; overflow: hidden; color: var(--muted); font-size: 0.875rem; white-space: nowrap; text-overflow: ellipsis; }
     .split-bar .crumb b { color: var(--text); font-weight: 600; }
@@ -1479,10 +1437,9 @@
     .split-bar:has(> .crumb) .later::after { min-width: 1.25rem; height: 1.25rem; margin-left: 0.5rem; font-size: 0.6875rem; }
     .split-detail > .decide { width: 100%; max-width: 45rem; margin: 0 auto; padding: 1.75rem 2.75rem 0; }
     .split-detail > .decide .decide-preview { margin-top: 1.5rem; }
-    .split-detail .decide .lead h2 { font-size: 1.875rem; line-height: 2.25rem; }
-    .split-detail .decide-bar { gap: 0.875rem; margin: 1.5rem -2.75rem 0; padding: 1rem 2.75rem 1.5rem; box-shadow: 0 -0.5px 0 var(--line); background: var(--bg); }
-    .split-detail .decide-bar .answer { min-width: 15rem; padding: 0 1.5rem; }
-    .split-detail .decide-bar .open-link { display: inline-flex; align-items: center; justify-content: center; min-width: 15rem; min-height: 3.25rem; padding: 0 1.5rem; border-radius: 1rem; font-size: var(--t-m); }
+    .split-detail .decide .lead h2 { font-size: 1.5rem; line-height: 2rem; }
+    .split-detail .decide-bar { gap: 0.875rem; margin: 1.5rem -2.75rem 0; padding: 1rem 2.75rem 1.5rem; background: var(--tk-canvas); }
+    .split-detail .decide-bar :is(.answer, .open-link) { flex: 0 1 auto; min-width: 15rem; padding: 0 1.5rem; }
     .split-detail .decide-bar .hint { flex: 1 1 12rem; max-width: 18.75rem; margin: 0; text-align: left; }
     .split-detail .decide-bar .bar-hint { display: inline-flex; align-items: center; gap: 0.375rem; margin-left: auto; color: var(--faint); font-size: var(--t-xs); }
     .split-detail [data-kbd]::after { content: attr(data-kbd); display: inline-grid; place-items: center; min-width: 1.375rem; height: 1.375rem; margin-left: 0.625rem; padding: 0 0.3125rem; border-radius: 0.375rem;
@@ -1524,10 +1481,10 @@
   }
   @media (prefers-reduced-motion: reduce) { #keys[open], .split-detail.in > * { animation: none; } }
   @media (prefers-reduced-motion: reduce) {
-    #board.push *, #board.pop *, .rise .dl-row, .rise .dl-head, .rp-list .new.out, .sk, #toast, #toast .bar, .all-clear-big .big, .dl-menu, .answer .lbl, .answer .okmark .glyph, .design-stage .stamp, .decide .pick-option .check, .dl-row.returned .dl-face, .t-up.next > *, .t-btn .okmark .glyph, .bd.bump { animation: none !important; }
+    .ask-over.up > *, .rise .ui-sec, .rise .ui-hero, .rise .dl-row, .rise .dl-head, .rp-list .new.out, .sk, #toast, #toast .bar, .all-clear-big .big, .dl-menu, .answer .lbl, .answer .okmark .glyph, .design-stage .stamp, .decide .pick-option .check, .dl-row.returned .dl-face, .t-up.next > *, .t-btn .okmark .glyph, .bd.bump { animation: none !important; }
     .answer .okmark .glyph { stroke-dashoffset: 0; }
     .rp-list .new.out { display: none; }
-    .dl-face, .dl-act > *, .dl-face .icon, .decide .pick-option, .decide-bar .answer, .dl-more > summary > span, .tabs .hl, .tabs .icon, .side .icon, .t-btn, .t-tiles .ui-stat { transition: none !important; }
+    .dl-face, .dl-act > *, .leaving .ui-icon, .decide .pick-option, .decide .own-field, .decide-bar > *, .dl-more > summary > span, .tabs .hl, .tabs .icon, .side .icon, .t-btn, .t-tiles .ui-stat { transition: none !important; }
   }
 </style>
 </head>
@@ -1629,7 +1586,6 @@
     if (!toast.hidden && bar?.height && t.bottom > bar.top && t.top < bar.bottom) toast.style.bottom = `${innerHeight - bar.top + 8}px`;
   };
   addEventListener('scroll', () => toast.hidden || placeToast(), { passive: true });
-  addEventListener('scroll', () => document.querySelector('.ask-nav')?.classList.toggle('scrolled', scrollY > 64), { passive: true });
   // A redraw or a resize can move the bar under a toast that is already up.
   new ResizeObserver(() => toast.hidden || placeToast()).observe(document.documentElement);
   addEventListener('resize', () => toast.hidden || placeToast());
@@ -2031,7 +1987,7 @@
     img.onerror = () => row.parentElement?.remove();
     row.onclick = () => openSheet(name, status(), el('a', { class: 'sheet-shot', href: update ? `#evidence/${of.key}` : pageHref(of) || src(url), ...(!update && !pageHref(of) && { target: '_blank', rel: 'noopener' }),
       'aria-label': `Open the proof, ${name}` }, framed(el('img', { src: src(url), alt: name }))));
-    return el('div', { class: 'proof-block' }, el('p', { class: 'pick-label' }, 'Proof'), row);
+    return el('div', { class: 'proof-block' }, el('p', { class: 'ui-dl' }, 'Proof'), row);
   }
   /** The ticket a card names, when it is on the board: tickets stand alone, so a card without one, or naming one the board has not got, shows nothing. */
   const ticketOf = (d) => (d?.ticket ? (state.tickets ?? []).find((t) => t.id === d.ticket) : undefined);
@@ -2465,7 +2421,7 @@
     sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>', msg: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
     x: '<path d="M18 6 6 18M6 6l12 12"/>', bolt: '<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>', lock: '<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>', trash: '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>',
     phone: '<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M11 18.5h2"/>', desktop: '<rect x="2.5" y="4" width="19" height="12.5" rx="1.5"/><path d="M8.5 20.5h7M12 16.5v4"/>',
-    expand: '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>', layers: '<rect x="3" y="3" width="12" height="12" rx="2"/><path d="M9 21h10a2 2 0 0 0 2-2V9"/>' };
+    flag: '<path d="M5 21V4M5 4h12l-2.5 4.5L17 13H5"/>', expand: '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>', layers: '<rect x="3" y="3" width="12" height="12" rx="2"/><path d="M9 21h10a2 2 0 0 0 2-2V9"/>' };
   const glyph = (a) => { const s = el('span', { 'aria-hidden': 'true', style: 'display:inline-flex' }); s.innerHTML = `<svg class="glyph" viewBox="0 0 24 24">${GLYPHS[a]}</svg>`; return s; };
   const icon = (a) => { const s = el('span', { class: `icon i-${a}`, 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[a]}"/></svg>`; return s; };
   /** The new look's icon tile (ui.css): a project's own picture when the board holds one, else one of this page's line drawings. */
@@ -2570,8 +2526,10 @@
   /* Today, as the approved prototype draws it: the title row with light or dark, Up next with one main action, the next three asks waiting on you, then Cleared today and Proofs today,
      and under them one quiet line into More, which holds what the screen leaves off. A phone stacks them; a desk sets Up next and the tiles beside what else waits.
      Search is the dock's round button (the sidebar's on a desk). */
-  /** The project a card is for: a plan names it, a report or design names its group, proof names the app its done-done check verified, and an ask takes the project of the proof it rests on. */
-  const projectName = (d) => d.project || d.group || (d.type === 'evidence' ? projectOf(d) : d.proof && projectOf(state.decisions.find((x) => x.key === d.proof) ?? {})) || undefined;
+  /** The project a card is for: a plan names it, a report or design names its group, proof names the app its done-done check verified, and an ask takes the project of the proof it rests on,
+   *  or, filed by a tool that is itself a project on the board (its icon set with project --icon), that project. */
+  const projectName = (d) => d.project || d.group || (d.type === 'evidence' ? projectOf(d) : d.proof && projectOf(state.decisions.find((x) => x.key === d.proof) ?? {}))
+    || (d.by && (state.projects ?? []).find((p) => p.name.toLowerCase() === d.by.toLowerCase())?.name) || undefined;
   /** A project's picture: the icon the board serves for it (set with sign-off-axi project --icon), else its initials, as also when the icon cannot be served. */
   function projectPic(name) {
     const parts = name.split(/[-\s_]+/).filter(Boolean), mono = el('span', { class: 'mono' }, (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : name.slice(0, 2)).toUpperCase());
@@ -2707,14 +2665,16 @@
     document.querySelectorAll('meta[name="theme-color"]').forEach((m) => { m.dataset.media ??= m.media; m.media = pick ? (m.dataset.media.includes(pick) ? 'all' : 'not all') : m.dataset.media; });
   }
   applyTheme();
-  /** Today's head: its title, and the round light-or-dark button at the right: a moon in light, a sun in dark. */
-  function todayHead() {
+  /** The round light-or-dark button at the right of a screen's head (Today's and Decide's): a moon in light, a sun in dark. */
+  function themeButton() {
     const dark = (() => { try { return isDark(); } catch { return sysDark.matches; } })();
-    const b = el('button', { class: 'ui-rb', 'aria-label': dark ? 'Switch to light' : 'Switch to dark' });
+    const b = el('button', { class: 'ui-rb theme', 'aria-label': dark ? 'Switch to light' : 'Switch to dark' });
     b.innerHTML = `<svg class="glyph" viewBox="0 0 20 20" aria-hidden="true">${dark ? '<circle cx="10" cy="10" r="3.2"/><path d="M10 2.5v1.8M10 15.7v1.8M2.5 10h1.8M15.7 10h1.8M4.7 4.7l1.3 1.3M14 14l1.3 1.3M4.7 15.3 6 14M14 6l1.3-1.3"/>' : '<path d="M16 11.6A6.5 6.5 0 1 1 8.4 4a5.2 5.2 0 0 0 7.6 7.6z"/>'}</svg>`;
-    b.onclick = () => { try { localStorage.setItem('so-theme', dark ? 'light' : 'dark'); } catch {} applyTheme(); render(); document.querySelector('.today-top .ui-rb')?.focus({ preventScroll: true }); };
-    return [el('h1', { tabindex: '-1' }, 'Today'), b];
+    b.onclick = () => { try { localStorage.setItem('so-theme', dark ? 'light' : 'dark'); } catch {} applyTheme(); render(); document.querySelector('#board .ui-top .theme')?.focus({ preventScroll: true }); };
+    return b;
   }
+  /** Today's head: its title and the light-or-dark button. */
+  function todayHead() { return [el('h1', { tabindex: '-1' }, 'Today'), themeButton()]; }
   sysDark.addEventListener('change', () => loaded && render());
   /** The one quiet line under the tiles into More, naming what it holds. */
   function moreLine(by) {
@@ -3765,7 +3725,8 @@
   const dateLine = (t = new Date()) => `${t.toLocaleDateString('en-GB', { weekday: 'long' })} ${t.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}`;
   const badge = (d) => { const r = RESULT[d.evidenceCard?.result]; return r ? el('span', { class: `st ${r[0]}` }, r[1]) : ''; };
 
-  /* Decide: every open ask in one list, grouped Sign in, Answer and Review, with Later at its foot. A row opens its ask.
+  /* Decide, as the approved new look draws it: Newest or By priority, how many wait on you and how many were answered today, then every open ask in one card of rows,
+     with Later and Answered under it. A row opens its ask, over the list on a phone and beside it on a desk.
      A swipe right answers with the recommended pick, a swipe left moves the ask to Later; past a third of the row it commits, and a fast fling commits sooner. */
   // Later is this browser's own shelf, kept per board file: the agent still waits, and an answered or gone ask simply drops off it.
   let shelf;
@@ -3777,10 +3738,30 @@
     keys.forEach((k) => (on ? shelved().add(k) : shelved().delete(k)));
     try { localStorage.setItem(`sign-off-later ${state.file}`, JSON.stringify([...shelf])); } catch {}
   };
-  const GROUPS = [['signin', 'Sign in'], ['answer', 'Answer'], ['review', 'Review'], ['later', 'Later']];
   // A plan or a design is looked over before it is answered, so it is reviewed, never answered from its row.
   const reviewed = (d) => d.type === 'plan' || d.kind === 'design' || typeOf(d) === 'design';
   const groupOf = (d) => (shelved().has(d.key) ? 'later' : d.type === 'signin' ? 'signin' : reviewed(d) ? 'review' : 'answer');
+  /** Which card of rows an ask sits in: the asks, or Later under them. */
+  const sideOf = (d) => (groupOf(d) === 'later' ? 'later' : 'now');
+  /** A card's priority, P0 to P3, when it has one the board knows. */
+  const priOf = (d) => (/^P[0-3]$/.test(d.priority ?? '') ? d.priority : undefined);
+  /** Decide's order, kept in this browser: Newest (the board's order, a sign-in first) or By priority (P0 first, newest first within one, a card with none last); Later always at the foot. */
+  let dsort = (() => { try { return localStorage.getItem('sign-off-decide-sort') === 'priority' ? 'priority' : 'new'; } catch { return 'new'; } })();
+  const decideOrder = (items) => {
+    const s = dsort === 'priority' ? [...items].sort((x, y) => (priOf(x) ?? 'P9').localeCompare(priOf(y) ?? 'P9')) : items;
+    return [...s.filter((d) => sideOf(d) === 'now'), ...s.filter((d) => sideOf(d) === 'later')];
+  };
+  /** Whose an ask is, as its row and its sheet name it: its project when it has one, else who asked. */
+  const whoOf = (d) => projectName(d) || (d.type === 'signin' ? d.waits : d.by) || 'Agent';
+  /** What an ask carries, as one panel under its question (ui.css): its priority, and the ticket it belongs to (Its ask) with its progress, which opens the ticket's page.
+   *  An ask with neither shows no panel: a ticket is only a reference, and a card without one shows nothing more. */
+  function askProps(d) {
+    const t = ticketOf(d), p = priOf(d), k = (mark, name) => el('span', { class: 'k' }, glyph(mark), name);
+    const rows = [p && el('div', { class: 'ui-pr' }, k('flag', 'Priority'), el('span', { class: 'v' }, el('span', { class: `ui-pc ${p.toLowerCase()}` }, p))),
+      t && el('a', { class: 'ui-pr', href: `#ticket/${t.id}`, 'aria-label': `Its ask, ticket ${t.id}: ${t.title}, ${t.progress}% done` }, k('layers', 'Its ask'),
+        el('span', { class: 'v' }, el('span', { dir: 'auto' }, t.title), ...(t.progress > 0 ? [el('span', { class: 'ui-bar', 'aria-hidden': 'true' }, el('i', { style: `width: ${t.progress}%` })), el('span', { class: 'n' }, `${t.progress}%`)] : [el('span', { class: 'n' }, 'Not started')])))].filter(Boolean);
+    return rows.length ? el('div', { class: 'ui-props' }, ...rows) : '';
+  }
   /** An answered ask Decide opens again, to see the answer or change it: one the person picked or wrote, not a sign-in, a review, a verdict or a card answered with another. */
   const redo = (d) => !state.readonly && d.type !== 'signin' && d.type !== 'evidence' && d.type !== 'plan' && d.kind !== 'design' && !state.answers[d.key]?.merged_by && !!(d.options?.length || d.reply);
   /** What an answer says in a row: the pick (or the person's own words), and the note that went with it. */
@@ -3796,60 +3777,63 @@
   function depart(keys, how, side) {
     const t = performance.now(), order = decideCtx.all;
     for (const k of keys) {
-      const d = state.decisions.find((x) => x.key === k), g = groupOf(d), at = order.findIndex((x) => x.key === k);
-      leaving.set(k, { d, how, side, t, group: g, before: order.slice(at + 1).find((x) => groupOf(x) === g && !keys.includes(x.key))?.key });
+      const d = state.decisions.find((x) => x.key === k), g = sideOf(d), at = order.findIndex((x) => x.key === k);
+      leaving.set(k, { d, how, side, t, group: g, before: order.slice(at + 1).find((x) => sideOf(x) === g && !keys.includes(x.key))?.key });
     }
     // Once folded, the rows leave the page for good (and a group left empty loses its head).
     setTimeout(() => { keys.forEach((k) => leaving.get(k)?.t === t && leaving.delete(k)); if (document.querySelector('.dl-row.leaving')) render(); }, 500);
   }
   /** When an ask was filed, as Decide says it: today's time, Yesterday, or the date. */
   const filedAt = (at) => (isToday(at) ? hhmm(at) : isToday(Date.parse(at) + 864e5) ? 'Yesterday' : day(at));
-  /** A row: its kind's icon, the question in up to two lines, its time, and the answer it recommends or what it is, with the swipe actions under it. */
+  /** A row (ui.css): the ask's icon tile, its question with its priority chip, then its ticket's progress once the ticket has any (a full bar when it is done), else whose it is and when it was filed (a sign-in counts its link down);
+   *  the swipe actions sit under it, and on a desk a hover shows the same two as round buttons. */
   function decideRow(d, i, gone) {
-    const g = gone?.group ?? groupOf(d), rec = recOf(d), who = d.filer || 'Agent', screens = (d.journeys ?? []).reduce((n, j) => n + j.screens.length, 0);
-    const sub = d.type === 'signin' ? [`Unlocks ${lower(d.unlocks)}`] : d.type === 'plan' ? [`${plural(d.sections.length, 'section')} · ${plural(d.decisions.length, 'decision')}`]
-      : rec ? ['Recommended ', el('b', {}, rec.label), ` · ${who}`] : [`${screens ? plural(screens, 'screen') : d.kind === 'design' ? 'Design' : TYPE_NAMES[typeOf(d)]} · ${who}`];
-    // A sign-in counts down its link; any other ask shows when it was filed.
-    const time = d.type === 'signin' && d.expires ? el('span', { class: 'tm hot', 'data-left': d.expires }, left(d.expires))
-      : d.filed ? el('span', { class: 'tm' }, filedAt(d.filed)) : '';
+    const g = gone?.group ?? sideOf(d), rec = recOf(d), t = ticketOf(d);
+    const meta = d.type === 'signin' && d.expires ? el('span', {}, `${whoOf(d)} · `, el('span', { 'data-left': d.expires }, left(d.expires))) : `${whoOf(d)}${d.filed ? ` · ${filedAt(d.filed)}` : ''}`;
     const sel = deskSel === d.key && !gone, opens = askHref(d).startsWith('#decide/');
-    const face = el('a', { class: 'ask-card dl-face', href: askHref(d), draggable: 'false', ...(!(gone && gone.how === 'later') && { id: `item-${d.key}` }), ...(opens && { 'data-row': '' }), ...(sel && { 'aria-current': 'true' }) }, icon(askIcon(d)),
-      el('span', { class: 'copy' }, el('span', { class: 'r1' }, el('strong', { class: 'title', dir: 'auto' }, d.type === 'signin' ? `Sign in to ${d.title}` : title(d)), time), el('span', { class: 'meta sub', dir: 'auto' }, ...sub)));
+    const face = el('a', { class: 'dl-face ui-row', href: askHref(d), draggable: 'false', ...(!(gone && gone.how === 'later') && { id: `item-${d.key}` }), ...(opens && { 'data-row': '' }), ...(sel && { 'aria-current': 'true' }) },
+      ...uiRow({ tile: cardTile(d), title: d.type === 'signin' ? `Sign in to ${d.title}` : title(d), priority: priOf(d), ...(t?.progress > 0 ? { progress: t.progress } : { meta }) }));
     const act = (cls, mark, words) => el('div', { class: `dl-act ${cls}`, 'aria-hidden': 'true' }, glyph(mark), el('span', {}, words));
-    // On a desk, hovering a row shows the same two actions as its swipes, as round buttons over its time.
     const quick = (cls, mark, words, tip, fn) => { const b = el('button', { class: cls, 'aria-label': `${words}, ${d.title}`, title: tip }, glyph(mark)); b.onclick = fn; return b; };
     const hover = deskSel === null || gone || state.readonly ? '' : el('span', { class: 'dl-hover' }, rec ? quick('yes', 'check', rec.label, `Answer ${rec.label}`, () => quickAnswer(d.key)) : '',
       quick('later-q', 'clock', g === 'later' ? 'Now' : 'Later', g === 'later' ? 'Back from Later' : 'Later (L)', () => toLater([d.key], g !== 'later')));
-    return el('li', { class: `dl-row g-${g}${gone ? ` leaving ${gone.how}` : ''}${flash === d.key ? ' returned' : ''}${sel ? ' sel' : ''}`, 'data-key': d.key, style: `--n:${i}`, ...(gone?.side && { 'data-side': gone.side }) },
+    return el('li', { class: `dl-row${gone ? ` leaving ${gone.how}` : ''}${flash === d.key ? ' returned' : ''}${sel ? ' sel' : ''}`, 'data-key': d.key, 'data-group': groupOf(d), style: `--n:${i}`, ...(gone?.side && { 'data-side': gone.side }) },
       rec ? act('yes', 'check', rec.label) : '', act('later', 'clock', g === 'later' ? 'Now' : 'Later'), face, hover);
   }
-  /** All clear, by name; the ask's pane on a desk adds that agents will ask when they need you. */
+  /** All clear in the ask's pane on a desk: agents will ask when they need you. */
   const allClear = (pane) => el('div', { class: `all-clear-big${pane ? ' pane' : ''}` }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, 'All clear'),
     el('p', {}, `Nothing is waiting on you${state.name ? `, ${state.name}` : ''}.${pane ? ' Agents will ask when they need you.' : ''}`));
-  /** An answered row: a green check, the question, when it was answered, and the answer with its note; it opens the ask, to see the answer or change it. */
+  /** An answered row: a check, the question, then the answer with its note and when it was given; it opens the ask, to see the answer or change it. */
   function doneRow(d, i) {
     const s = state.answers[d.key], sel = deskSel === d.key;
-    return el('li', { class: `dl-row g-done${sel ? ' sel' : ''}`, 'data-key': d.key, style: `--n:${i}` }, el('a', { class: 'dl-face', href: `#decide/${d.key}`, draggable: 'false', 'data-row': '', ...(sel && { 'aria-current': 'true' }) },
-      icon('done'), el('span', { class: 'copy' }, el('span', { class: 'r1' }, el('strong', { class: 'title', dir: 'auto' }, title(d)), el('span', { class: 'tm' }, filedAt(s.at))),
-        el('span', { class: 'meta sub', dir: 'auto' }, s.replaces ? 'Changed to ' : '', saidOf(d, s)))));
+    return el('li', { class: `dl-row g-done${sel ? ' sel' : ''}`, 'data-key': d.key, style: `--n:${i}` }, el('a', { class: 'dl-face ui-row', href: `#decide/${d.key}`, draggable: 'false', 'data-row': '', ...(sel && { 'aria-current': 'true' }) },
+      ...uiRow({ tile: uiIcon({ draw: 'done' }), title: title(d), meta: `${s.replaces ? 'Changed to ' : ''}${saidOf(d, s)} · ${filedAt(s.at)}` })));
   }
-  function decideList(items, hidden, done = []) {
-    const rows = new Map(GROUPS.map(([g]) => [g, []]));
-    items.forEach((d, i) => !leaving.has(d.key) || leaving.get(d.key).how === 'later' ? rows.get(groupOf(d)).push(decideRow(d, i)) : '');
-    for (const [k, g] of leaving) {
-      const list = rows.get(g.group), at = list.findIndex((r) => r.dataset.key === g.before && !r.classList.contains('leaving'));
+  /** Decide's list: Newest or By priority, the hero (how many wait on you, how many you answered today, how many are for later), the asks in one card, then Later and Answered. */
+  function decideList(items, hidden, done = [], today = 0) {
+    const rows = { now: [], later: [] };
+    decideOrder(items).forEach((d, i) => !leaving.has(d.key) || leaving.get(d.key).how === 'later' ? rows[sideOf(d)].push(decideRow(d, i)) : '');
+    for (const [, g] of leaving) {
+      const list = rows[g.group], at = list.findIndex((r) => r.dataset.key === g.before && !r.classList.contains('leaving'));
       list.splice(at < 0 ? list.length : at, 0, decideRow(g.d, 0, g));
     }
-    const groups = GROUPS.flatMap(([g, name]) => {
-      const list = rows.get(g), n = list.filter((r) => !r.classList.contains('leaving')).length;
-      return list.length ? [el('h2', { class: 'dl-head' }, name, el('span', { class: 'n' }, String(n))), el('ul', { class: 'dl-list', 'aria-label': name }, ...list)] : [];
-    });
+    const count = (list) => list.filter((r) => !r.classList.contains('leaving')).length, n = count(rows.now), later = count(rows.later);
     const fresh = !risen;
     risen = true;
-    // Every answer given, newest first, under all clear when nothing waits.
-    const answered = done.length ? [el('h2', { class: 'dl-head' }, 'Answered', el('span', { class: 'n' }, String(done.length))), el('ul', { class: 'dl-list', 'aria-label': 'Answered' }, ...done.map(doneRow))] : [];
-    return el('div', { class: `waiting-page decide-list${fresh ? ' rise' : ''}` }, ...groups,
-      items.length ? '' : allClear(), ...answered, dismissed(hidden));
+    const seg = el('div', { class: 'ui-seg', role: 'group', 'aria-label': 'Order' }, ...[['new', 'Newest'], ['priority', 'By priority']].map(([v, name]) => {
+      const b = el('button', { type: 'button', 'aria-pressed': String(dsort === v) }, name);
+      b.onclick = () => { dsort = v; try { localStorage.setItem('sign-off-decide-sort', v); } catch {} render(); };
+      return b;
+    }));
+    const hero = el('section', { class: 'ui-card ui-hero' }, el('div', { class: 'hl' }, el('span', { class: 'lab' }, 'Waiting on you'), today ? el('span', { class: 'chip' }, `${today} answered today`) : ''),
+      el('div', { class: 'hv' }, el('span', { class: 'big' }, String(n)), later ? el('span', { class: 'vs' }, `${later} for later`) : ''));
+    const sec = (name, k) => el('h2', { class: 'ui-sec' }, name, k === undefined ? '' : el('span', { class: 'n' }, String(k)));
+    const card = (name, list) => el('ul', { class: 'ui-card ui-list dl-list', 'aria-label': name }, ...list);
+    return el('div', { class: `waiting-page decide-list${fresh ? ' rise' : ''}` }, seg, hero, sec('Asks'),
+      rows.now.length ? card('Asks', rows.now) : el('div', { class: 'ui-card dl-clear' }, el('b', {}, 'All clear'), el('span', {}, `Nothing is waiting on you${state.name ? `, ${state.name}` : ''}.`)),
+      ...(rows.later.length ? [sec('Later', later), card('Later', rows.later)] : []),
+      // Every answer given, newest first.
+      ...(done.length ? [sec('Answered', done.length), card('Answered', done.map(doneRow))] : []), items.length ? decideMoreLine(items) : '', dismissed(hidden));
   }
   /** After a redraw, a row on its way out keeps its height for a moment, then folds to nothing; a redraw midway picks up where it was. */
   function fold() {
@@ -3901,16 +3885,22 @@
     return menu;
   }
   addEventListener('click', (e) => document.querySelectorAll('.dl-more[open]').forEach((m) => !m.contains(e.target) && (m.open = false)));
-  /** Decide's line under its title: how many wait, that each has a recommended answer when every ask to answer has one, and how many are for later. */
-  const waitingLede = (items) => {
-    const answer = items.filter((d) => groupOf(d) === 'answer'), later = items.filter((d) => groupOf(d) === 'later').length;
-    return items.length ? `${items.length} waiting${answer.length && answer.every(recOf) ? ' · each has a recommended answer' : ''}${later ? ` · ${later} for later` : ''}` : 'Nothing waiting';
-  };
-  /** Decide's More, as the approved prototype has it: Answer all recommended, a gap, then Move all to later; each is off when it has nothing to do. */
-  function listMore(items) {
+  /** Decide's More, under the list as Today's is: one quiet line naming what it holds, which opens a sheet of Answer all recommended and Move all to later,
+   *  each with how many it would move and off when it has nothing to do. */
+  const decideMore = sheetOf('d-more');
+  function decideMoreLine(items) {
+    if (FROZEN || selecting) return '';
     const answerable = items.filter((d) => groupOf(d) === 'answer' && recOf(d)), now = items.filter((d) => groupOf(d) !== 'later');
-    return moreSheet('More', [['Answer all recommended', () => answerAll(answerable), 'answer-all', 'sparkle', !answerable.length], el('div', { class: 'dl-sep', role: 'separator' }),
-      ['Move all to later', () => toLater(now.map((d) => d.key), true), 'later-all', 'clock', !now.length]]);
+    const act = (name, words, mark, list, fn) => { const b = el('button', { class: 'ui-pr', type: 'button', 'data-act': name, ...(!list.length && { disabled: '' }) },
+      el('span', { class: 'k' }, glyph(mark), words), el('span', { class: 'v' }, el('span', { class: 'n' }, String(list.length))));
+      b.onclick = () => { decideMore.close(); fn(); }; return b; };
+    const line = el('button', { class: 't-more-line', type: 'button', 'aria-haspopup': 'dialog' }, el('span', {}, 'Answer all recommended and Move all to later'), glyph('right'));
+    line.onclick = () => {
+      decideMore.replaceChildren(el('div', {}, sheetHead('d-more', 'More'), el('div', { class: 'ui-props' }, act('answer-all', 'Answer all recommended', 'sparkle', answerable, () => answerAll(answerable)),
+        act('later-all', 'Move all to later', 'clock', now, () => toLater(now.map((d) => d.key), true)))));
+      decideMore.showModal(); decideMore.querySelector('h2').focus();
+    };
+    return line;
   }
   // The swipe follows the finger; the action under the row grows once it would commit, with a tick on Android.
   let sw = null, swiped = false;
@@ -3994,21 +3984,32 @@
   }
   const selected = new Map();
   let decideCtx = { all: [], shown: [], hidden: [] };
-  // A phone moves through Decide as a stack: an ask pushes in over the list, and answering it pops back to the list. A desk steps on to the next ask.
+  // A phone opens an ask as a sheet over the list, and answering it closes back to the list. A desk steps on to the next ask.
   const phone = () => matchMedia('(max-width: 63.999rem)').matches;
   /** Where E (and a swipe left) goes from the ask on screen: the next ask, round to the first after the last. */
   let skipTo = '';
   /** Asks the person chose to answer in their own words, and sign-ins whose link they opened, kept across redraws. */
   const own = new Set(), signingIn = new Set();
-  /** The answered ask whose cards are back for a change; the last ask answered and the one that opened after it, so Back there returns to it;
-   *  where Back (and a swipe right) goes from the ask shown; and the order the arrows step in: every answered ask, oldest first, then the open ones. */
+  /** The answered ask whose cards are back for a change. */
   const changing = new Set();
-  let cameFrom = null, stepBack = '#waiting', walkKeys = [];
+  /** The ask whose sheet is up on a phone ('' for none), so a redraw keeps it in place and only a newly opened one rises. */
+  let sheetUp = '';
+  addEventListener('keydown', (e) => e.key === 'Escape' && !e.defaultPrevented && document.querySelector('.ask-sheet') && !document.querySelector('dialog[open], .dl-more[open]') && (location.hash = '#waiting'));
+  /** An ask on a phone, as the prototype's sheet draws it over Decide's list: a grab handle, its tile with whose it is and when, More and Close, then the ask.
+   *  A tap on the dimmed list, Close or Escape goes back to the list. */
+  function askSheet(d) {
+    const bar = {}, page = decidePage(d, undefined, false, bar), rise = sheetUp !== d.key;
+    sheetUp = d.key;
+    return el('div', { class: `ask-over${rise ? ' up' : ''}` }, el('a', { class: 'ask-scrim', href: '#waiting', tabindex: '-1', 'aria-hidden': 'true' }),
+      el('section', { class: 'ask-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'ask-title' }, el('div', { class: 'grab', 'aria-hidden': 'true' }),
+        el('header', { class: 'sh-head' }, cardTile(d), el('span', { class: 'sh-lab', dir: 'auto' }, `${whoOf(d)}${d.filed ? ` · ${filedAt(d.filed)}` : ''}`), bar.more,
+          el('a', { class: 'sh-x', href: '#waiting', 'aria-label': 'Close' }, glyph('x'))), page));
+  }
   /** An ask's kind as Decide names it over the question, as in "Pick one · Release agent · 08:01". */
   const askKind = (d) => ({ signin: 'Sign in', 'yes-no': 'Yes or no' })[typeOf(d)] ?? TYPE_NAMES[typeOf(d)];
   /** A sign-in as a page of its own: its key, the headline, what it unlocks, how long the link lasts (on a phone; on a desk the row beside it counts that down) and where it signs in,
    *  with Open sign-in as the one button; once tapped it says it waits for you until the agent closes the card. */
-  function signinPage(d, desk, kicker) {
+  function signinPage(d, desk) {
     const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` }), { open, line } = signinOpen(d, undefined, err);
     const gone = !!d.expires && Date.parse(d.expires) <= Date.now(), host = /^https?:\/\/(?:www\.)?([^/?#]+)/.exec(d.link ?? '')?.[1];
     const waits = () => open.replaceChildren(el('span', { class: 'spin', 'aria-hidden': 'true' }), 'Waiting for you to sign in');
@@ -4020,10 +4021,10 @@
     const fact = (mark, name, value) => el('div', { class: 'fact' }, glyph(mark), el('span', {}, name), value);
     const hint = d.start || gone ? line : el('p', {}, `Opens ${d.title} in a new tab. This card closes itself once you are in.`);
     if (hint) hint.classList.add('hint');
-    return el('section', { class: 'decide signin-ask g-signin', ...(!desk && { id: `item-${d.key}` }) }, icon('key'), el('div', { class: 'lead' }, kicker, el('h2', { dir: 'auto' }, `Sign in to ${d.title}`)),
+    return el('section', { class: 'decide signin-ask g-signin' }, icon('key'), el('div', { class: 'lead' }, el('h2', { id: 'ask-title', tabindex: '-1', dir: 'auto' }, `Sign in to ${d.title}`)), askProps(d),
       d.about ? el('p', { class: 'why', dir: 'auto' }, d.about) : '',
       el('div', { class: 'facts' }, fact('bolt', 'Unlocks', el('b', { dir: 'auto' }, d.unlocks)), d.expires && !gone && !desk ? fact('clock', 'Expires in', el('b', { 'data-ends': d.expires }, countdown(d.expires))) : '',
-        host ? fact('lock', 'Where', el('b', {}, host)) : ''), ticketRow(d), thread(d), err, el('div', { class: 'decide-bar' }, open, hint));
+        host ? fact('lock', 'Where', el('b', {}, host)) : ''), thread(d), err, el('div', { class: 'decide-bar' }, open, hint));
   }
   /** An ask, as the approved prototype lays it out: its kind, who asked and when over the question (on a desk that line is the bar's), why, the proof it rests on, the answers as cards
    *  ending in Your own answer, one optional note, what happens if you stay quiet, and one button. Nothing is picked until the person picks: Recommended is only a tag, and the button
@@ -4033,29 +4034,17 @@
     if (!d) return el('p', { class: 'empty' }, EMPTY.waiting);
     const to = next ? `#decide/${next.key}` : '#waiting';
     skipTo = next && !state.readonly ? to : '';
-    const goNext = next && !state.readonly ? () => (location.hash = to) : null;
-    const swipe = (page, right) => {
-      let start;
-      page.addEventListener('touchstart', (e) => (start = e.target.closest('.mocks, textarea') ? null : e.touches[0]), { passive: true });
-      page.addEventListener('touchend', (e) => {
-        const t = e.changedTouches[0], dx = start ? t.clientX - start.clientX : 0;
-        if (!start || Math.abs(dx) <= 90 || Math.abs(t.clientY - start.clientY) >= Math.abs(dx) / 2) return;
-        if (dx > 0) right?.(); else goNext?.();
-      });
-    };
-    const who = d.type === 'signin' ? d.waits : d.filer || 'Agent', at = d.filed ? ` · ${filedAt(d.filed)}` : '';
-    const kicker = desk ? '' : el('p', { class: 'kicker' }, el('span', { class: 'k' }, askKind(d)), ` · ${who}${at}`);
+    const who = d.type === 'signin' ? d.waits : d.by || 'Agent', at = d.filed ? ` · ${filedAt(d.filed)}` : '';
     sink.crumb = el('p', { class: 'crumb', dir: 'auto' }, el('b', {}, askKind(d)), ` · ${who}${at}`);
-    sink.mid = el('span', { class: 'mid', 'aria-hidden': 'true', dir: 'auto' }, d.type === 'signin' ? `Sign in to ${d.title}` : headline(d));
     const gone = xBtn(d, 'Dismiss');
     if (gone) { gone.setAttribute('role', 'menuitem'); gone.append(glyph('trash')); gone.addEventListener('click', () => (location.hash = to)); }
-    const more = (...items) => (state.readonly ? '' : moreSheet('More', [['Ask me later', () => { location.hash = '#waiting'; toLater([d.key], true); }, 'later', 'clock'], ...items, gone]));
-    // A sign-in keeps More too (the prototype shows none): one started on this host has no expiry, and Dismiss is the way to clear it.
+    const later = () => { location.hash = '#waiting'; toLater([d.key], true); };
+    // On a phone Ask me later is a button beside the answer, so More keeps only Dismiss; a sign-in's one button opens its link, so its More keeps both.
+    const more = () => { const items = state.readonly ? [] : [(desk || d.type === 'signin') && ['Ask me later', later, 'later', 'clock'], gone].filter(Boolean); return items.length ? moreSheet('More', items) : ''; };
+    // A sign-in keeps More too: one started on this host has no expiry, and Dismiss is the way to clear it.
     if (d.type === 'signin') {
       sink.more = more();
-      const page = signinPage(d, desk, kicker);
-      if (!state.readonly && !desk) swipe(page);
-      return page;
+      return signinPage(d, desk);
     }
     const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` }), opts = d.options ?? [], live = !state.readonly, name = headline(d);
     // An answered ask shows the answer given; Change answer brings the cards back, with nothing picked and that answer marked.
@@ -4067,13 +4056,12 @@
     const isOwn = () => reply || own.has(d.key), chosen = () => opts.find((o) => o.value === selected.get(d.key));
     const ownBox = mine ? el('textarea', { class: 'own-box', id: `own-${d.key}`, rows: 3, maxlength: 500, dir: 'auto', placeholder: reply ? 'Your reply' : 'Your answer', 'aria-label': `Your own answer, ${name}` }) : null;
     // One note for any pick, always open: it goes with the answer as its comment.
-    const note = live && opts.length ? el('textarea', { class: 'note-box', id: `note-${d.key}`, rows: 2, maxlength: 500, dir: 'auto', placeholder: 'A note for the agent', 'aria-label': `Note, ${name}` }) : null;
+    const note = live && opts.length ? el('textarea', { class: 'note-box', id: `note-${d.key}`, rows: 1, maxlength: 500, dir: 'auto', placeholder: 'A note for the agent, optional', 'aria-label': `Note, goes with your answer, ${name}` }) : null;
     // The answers are cards, numbered on a desk for their keys; the one picked gets a ring and a check that springs in, and the button's label slides to it.
-    const card = (label, line, chip, n, now) => [el('span', { class: 'check', 'aria-hidden': 'true' }, glyph('check')),
-      el('span', { class: 'words' }, el('span', { class: 'label-line' }, el('span', { class: 'label' }, label), chip ? el('span', { class: 'recommend' }, 'Recommended') : '', now ? el('span', { class: 'recommend now' }, 'Your answer') : ''),
-        line ? el('span', { class: 'reason', dir: 'auto' }, line) : ''), desk && n <= 9 ? kc(String(n)) : ''];
+    const card = (label, line, chip, n, now) => [el('span', { class: 'words' }, el('span', { class: 'label-line' }, el('span', { class: 'label' }, label), chip ? el('span', { class: 'recommend' }, 'Recommended') : '', now ? el('span', { class: 'recommend now' }, 'Your answer') : ''),
+        line ? el('span', { class: 'reason', dir: 'auto' }, line) : ''), desk && n <= 9 ? kc(String(n)) : '', el('span', { class: 'check', 'aria-hidden': 'true' }, glyph('check'))];
     const pickers = opts.map((o, i) => el('button', { class: 'pick-option', 'aria-pressed': String(o.value === selected.get(d.key) && !own.has(d.key)) }, ...card(o.label, o.outcome, o.value === d.recommend_value, i + 1, given?.answer === o.value)));
-    const ownRow = mine && !reply ? el('button', { class: 'pick-option own-option', 'aria-pressed': String(own.has(d.key)), 'aria-controls': ownBox.id }, ...card('Your own answer', 'Write it in your own words', false, opts.length + 1, given?.answer === 'text')) : null;
+    const ownRow = mine && !reply ? el('button', { class: 'pick-option own-option', 'aria-pressed': String(own.has(d.key)), 'aria-controls': ownBox.id }, ...card('Your own answer', 'Write it in your words', false, opts.length + 1, given?.answer === 'text')) : null;
     const lbl = el('span', { class: 'lbl' });
     const answer = el('button', { class: 'answer', 'data-kbd': '↵', 'aria-keyshortcuts': 'Enter' }, lbl, el('span', { class: 'okmark', 'aria-hidden': 'true' }, glyph('check')));
     // The button reads the choice, and is off until there is one: a card picked, or words in Your own answer. A change is off while it would send the answer already given.
@@ -4105,7 +4093,7 @@
       save(d, o, [...pickers, ownRow, answer].filter(Boolean), err, null, async () => {
         await held; own.delete(d.key); selected.delete(d.key);
         if (given) return changing.delete(d.key);
-        depart([d.key], 'answered'); cameFrom = { from: d.key, to }; location.hash = to;
+        depart([d.key], 'answered'); location.hash = to;
       }, words);
     };
     answer.onclick = () => (isOwn() ? ownBox.value.trim() && answerWith({ value: 'text' }, ownKey) : chosen() && answerWith(chosen()));
@@ -4114,7 +4102,7 @@
     // The answer given: when, what with its note or words, whether the agent has read it, and the answer it replaced. Its one button brings the cards back.
     const seen = done && state.seen_at?.[d.key], was = given?.replaces, change = done && el('button', { class: 'answer', 'data-kbd': '↵', 'aria-keyshortcuts': 'Enter' }, el('span', { class: 'lbl' }, 'Change answer'));
     if (change) change.onclick = () => { changing.add(d.key); selected.delete(d.key); own.delete(d.key); render(); document.querySelector('.decide .pick-list')?.scrollIntoView({ block: 'nearest', behavior: calm.matches ? 'auto' : 'smooth' }); };
-    const said = done ? [el('p', { class: 'pick-label' }, 'Your answer'), el('p', { class: 'ans-meta' }, el('span', { class: 'res ok' }, was ? 'Changed' : 'Answered'), ` · ${when(given.at)}`),
+    const said = done ? [el('p', { class: 'ui-dl' }, 'Your answer'), el('p', { class: 'ans-meta' }, el('span', { class: 'res ok' }, was ? 'Changed' : 'Answered'), ` · ${when(given.at)}`),
       el('div', { class: 'ans-card' }, el('span', { class: 'donek', 'aria-hidden': 'true' }, glyph('check')), el('div', {}, el('b', { dir: 'auto' }, saidOf(d, { ...given, note: '' })),
         given.note ? el('q', { dir: 'auto' }, given.note) : '', el('span', {}, seen ? `Agent read it ${hhmm(seen)}` : 'Agent has not read it yet'))),
       was ? el('p', { class: 'ans-was', dir: 'auto' }, `Before: ${saidOf(d, was)} · ${when(was.at)}`) : ''] : [];
@@ -4122,17 +4110,20 @@
     const preview = cards ?? (d.view ? rung(d) : proofLine ? '' : proof(d));
     const quiet = opts.find((o) => o.value === d.default_if_silent);
     const why = unchecked(d) || d.why || (d.tradeoff && firstDraft(d).text) || d.about;
-    const page = el('section', { class: `decide g-${reviewed(d) ? 'review' : 'answer'}${isOwn() ? ' own' : ''}` }, preview ? el('div', { class: 'decide-preview' }, preview, cards ? fullButton(d) : '') : '',
-      ...(d.mocks?.length ? [annotations(d)] : []), el('div', { class: 'lead' }, badge(d), kicker, el('h2', { dir: 'auto' }, name)),
-      why ? el('p', { class: 'why', dir: 'auto' }, why) : '', firstDraftLinks(d), proofLine, ticketRow(d),
-      ...(done ? said : [...(live && opts.length ? [el('p', { class: 'pick-label' }, 'Your answer'), el('ul', { class: 'pick-list', 'aria-label': d.title }, ...pickers.map((b) => el('li', {}, b)),
-        ownRow ? el('li', {}, ownRow, el('div', { class: 'own-field' }, el('div', {}, ownBox))) : '')] : []),
-      reply ? el('label', { class: 'pick-label', for: ownBox.id }, 'Your reply') : '', reply ? ownBox : '',
-      note ? el('div', { class: 'note-field' }, el('label', { class: 'pick-label', for: note.id }, 'Note', el('small', {}, 'Optional · goes with your answer')), note) : '',
+    // On a phone the bar holds Ask me later beside the answer, as the prototype's sheet does; a desk keeps Later in the bar over the ask.
+    const askLater = !desk && live && !given ? el('button', { class: 'later-btn', type: 'button' }, 'Ask me later') : '';
+    if (askLater) askLater.onclick = later;
+    const page = el('section', { class: `decide g-${reviewed(d) ? 'review' : 'answer'}${isOwn() ? ' own' : ''}` },
+      el('div', { class: 'lead' }, badge(d), el('h2', { id: 'ask-title', tabindex: '-1', dir: 'auto' }, name), d.filed && !given ? el('p', { class: 'since' }, `Waiting on you since ${day(d.filed)} ${hhmm(d.filed)}`) : ''),
+      // What it carries (Priority, Its ask) sits right under when it was asked, as the prototype's sheet has it; then why, its preview and its proof.
+      askProps(d), why ? el('p', { class: 'why', dir: 'auto' }, why) : '', firstDraftLinks(d), preview ? el('div', { class: 'decide-preview' }, preview, cards ? fullButton(d) : '') : '',
+      ...(d.mocks?.length ? [annotations(d)] : []), proofLine,
+      ...(done ? said : [...(live && opts.length ? [el('p', { class: 'ui-dl' }, 'Your answer'), el('ul', { class: 'pick-list', 'aria-label': d.title }, ...pickers.map((b) => el('li', {}, b)),
+        ownRow ? el('li', {}, ownRow) : ''), ownRow ? el('div', { class: 'own-field' }, el('div', {}, ownBox)) : ''] : []),
+      reply ? el('label', { class: 'ui-dl', for: ownBox.id }, 'Your reply') : '', reply ? ownBox : '',
+      note ? el('div', { class: 'note-field' }, note) : '',
       quiet && !given ? el('p', { class: 'silent-line' }, `If you stay quiet, the agent goes with ${quiet.label}${d.silent_by ? ` at ${when(d.silent_by)}` : ''}.`) : '']), thread(d), err,
-      done ? el('div', { class: 'decide-bar' }, change) : mine || (live && opts.length) ? el('div', { class: 'decide-bar' }, answer, desk && note ? el('span', { class: 'bar-hint' }, kc('C'), 'Note') : '') : '');
-    // A swipe right on a phone goes back, as an edge swipe does: to the ask answered just before, else to the list; a swipe left goes on to the next ask.
-    if (live) swipe(page, () => (location.hash = stepBack));
+      done ? el('div', { class: 'decide-bar' }, change) : mine || (live && opts.length) ? el('div', { class: 'decide-bar' }, askLater, answer, desk && note ? el('span', { class: 'bar-hint' }, kc('C'), 'Note') : '') : '');
     return page;
   }
   /** The desk shell: a list (with its header) beside a detail pane, and a strip under the list naming the list's keys. Any area can set itself out this way. */
@@ -4141,10 +4132,10 @@
     el('div', { class: 'split-list' }, ...list, el('p', { class: 'split-hints' }, ...hints.map(([keys, words]) => el('span', {}, ...keys.map(kc), words)))),
     el('div', { class: 'split-detail' }, ...detail));
   /** Decide on a desk: the list beside the ask it has selected (the first until a row is picked), under a bar with its kind, Later and More. Answering folds the row away and selects the next. */
-  function decideDesk(top, items, hidden, queue, key, done) {
+  function decideDesk(top, items, hidden, queue, key, done, today) {
     const old = done.find((x) => x.key === key), i = Math.max(0, queue.findIndex((d) => d.key === key)), d = old ?? queue[i], next = !old && queue.length > 1 ? queue[(i + 1) % queue.length] : undefined;
     deskSel = d?.key ?? '';
-    const list = decideList(items, hidden, done);
+    const list = decideList(items, hidden, done, today);
     if (!d) return split([top, list], [items.length ? el('p', { class: 'empty' }, 'Open a review from the list.') : allClear(true)], [[['?'], 'All keys']]);
     const g = groupOf(d), later = el('button', { class: 'later', 'data-kbd': 'L', 'aria-keyshortcuts': 'L' }, glyph('clock'), g === 'later' ? 'Back from Later' : 'Later');
     later.onclick = () => { toLater([d.key], g !== 'later'); if (g !== 'later' && next) location.hash = `#decide/${next.key}`; };
@@ -4251,18 +4242,17 @@
     const asked = inFileOrder.sort((x, y) => (x.t === y.t ? x.i - y.i : x.t - y.t)).map((x) => x.d).reverse();
     by.waiting = [...asked.filter((d) => d.type === 'signin'), ...asked.filter((d) => d.type !== 'signin')];
     const hidden = state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'waiting');
-    decideCtx = { all: by.waiting, hidden };
+    decideCtx = { all: decideOrder(by.waiting), hidden };
     by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
     const [, at, key] = /^#(waiting|decide|designs|evidence|reports|answered|ticket)(?:\/([\w.-]+))?$/.exec(location.hash) ?? [];
     const tk = at === 'ticket' ? (state.tickets ?? []).find((t) => t.id === key) : undefined, tkUp = tk?.parent && (state.tickets ?? []).find((t) => t.id === tk.parent);
-    // The asks Decide steps through, in the list's order: sign-ins, then answers, then Later.
-    const groupAt = (d) => GROUPS.findIndex(([g]) => g === groupOf(d));
-    const decideQueue = by.waiting.filter((d) => d.type === 'signin' || (d.type !== 'plan' && d.kind !== 'design')).sort((x, y) => groupAt(x) - groupAt(y));
+    // The asks Decide steps through, in the list's order, Later last.
+    const decideQueue = decideCtx.all.filter((d) => d.type === 'signin' || (d.type !== 'plan' && d.kind !== 'design'));
     // Answered asks it opens again, newest first in its list; the arrows step through them oldest first, then through the open asks.
     const decideDone = by.answered.filter(redo), walk = [...decideDone].reverse().concat(decideQueue);
-    walkKeys = walk.map((d) => d.key);
     // On a desk, Decide's list and its ask share the screen, Evidence's list and its update, and Reports' list and its report.
-    const deskSplit = !phone() && ((at === 'waiting' || at === 'decide' || at === 'reports') && !state.readonly || at === 'evidence'), head = deskSplit && at === 'decide' ? 'waiting' : at;
+    // On a phone an ask opens as a sheet over Decide's list, so the page under it keeps the list's head.
+    const deskSplit = !phone() && ((at === 'waiting' || at === 'decide' || at === 'reports') && !state.readonly || at === 'evidence'), head = at === 'decide' ? 'waiting' : at;
     deskSel = null;
     // A report in the address is shown (and read) beside the list; with none, the newest is shown, not yet marked read.
     const newest = [...by.reports].filter(reads).sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0))[0];
@@ -4279,10 +4269,8 @@
     if (rpSel === null || rpFull !== shownReport?.key) rpFull = '';
     document.body.classList.toggle('split-view', deskSplit);
     const askAt = decideQueue.findIndex((d) => d.key === key), decideAt = key ? askAt : 0, doneAt = key && askAt < 0 ? walk.findIndex((d) => d.key === key && isAnswered(d)) : -1;
-    const shownAsk = doneAt >= 0 ? walk[doneAt] : decideQueue[decideAt], wi = walk.indexOf(shownAsk);
+    const shownAsk = doneAt >= 0 ? walk[doneAt] : decideQueue[decideAt];
     for (const k of changing) if (k !== shownAsk?.key) changing.delete(k);
-    // Back from the ask that opened after an answer returns to that answer; from any other ask it returns to the list.
-    stepBack = at === 'decide' && cameFrom?.to === location.hash && decideDone.some((d) => d.key === cameFrom.from) ? `#decide/${cameFrom.from}` : '#waiting';
     // A design and a decision live under Decide; Answered is reached from Today.
     const active = at === 'decide' || at === 'designs' ? 'waiting' : at === 'answered' ? '' : at ?? '';
     const count = (a) => (a === 'reports' && !state.readonly ? by.reports.filter(unread).length : a ? by[a].length : undefined);
@@ -4297,23 +4285,23 @@
     const pageTitle = head === 'decide' || head === 'waiting' ? 'Decide' : head === 'reports' ? 'Reports' : head === 'ticket' ? tk?.title ?? 'Ticket' : AREAS[head];
     document.body.classList.toggle('today', !at);
     const bulk = { waiting: by.waiting, designs: by.designs, evidence: by.evidence, reports: [...by.reports, ...by.notes], answered: by.answered }[at] ?? [];
-    // An ask on a phone has a bar of its own: back to Decide, the question once the page scrolls past it, and the ask's More.
-    const top = el('header', { class: head === 'decide' ? 'top ask-nav' : head ? 'top' : 'ui-top today-top' }, head && !TABS.some(([a]) => a === head)
-      ? el('a', { class: head === 'ticket' ? 'back tk-back' : 'back', href: head === 'decide' ? stepBack : head === 'ticket' ? ticketBack || '#' : '#' }, ...(head === 'decide' ? [glyph('left'), stepBack === '#waiting' ? 'Decide' : 'Back'] : [head === 'ticket' && ticketBack ? '‹ Back' : '‹ Today'])) : '',
+    const answeredToday = by.answered.filter((d) => isToday(state.answers[d.key].at)).length;
+    // Decide's head, as ui.css draws it: the title and the light-or-dark button at its right edge; More sits under the list.
+    const top = head === 'waiting' && !state.readonly ? el('header', { class: 'ui-top' }, el('h1', { tabindex: '-1' }, pageTitle), ro ? el('p', { class: 'meta' }, ro) : '', themeButton(), selecting || FROZEN ? bulkBar(bulk) : '')
+      : el('header', { class: head ? 'top' : 'ui-top today-top' }, head && !TABS.some(([a]) => a === head)
+      ? el('a', { class: head === 'ticket' ? 'back tk-back' : 'back', href: head === 'ticket' ? ticketBack || '#' : '#' }, head === 'ticket' && ticketBack ? '‹ Back' : '‹ Today') : '',
     // A ticket's page names the ticket it sits under, which opens that one.
     head === 'ticket' && tk ? el('p', { class: 'kicker tk-kicker' }, ...(tkUp ? [el('a', { href: `#ticket/${tkUp.id}`, dir: 'auto' }, tkUp.title), ' › '] : ['Ticket · ']), tk.id) : '',
-    // Decide leads with the date over a large title, and keeps its More at the top right.
-    (head === 'waiting' || at === 'reports') && !state.readonly ? el('p', { class: 'kicker date-kicker' }, dateLine()) : '',
+    // Reports leads with the date over its title.
+    at === 'reports' && !state.readonly ? el('p', { class: 'kicker date-kicker' }, dateLine()) : '',
     ...(head ? [el('h1', { tabindex: '-1' }, pageTitle)] : todayHead()),
     ro ? el('p', { class: 'meta' }, ro) : '',
-    head === 'waiting' && !state.readonly ? el('p', { class: 'lede waiting-lede' }, waitingLede(by.waiting))
-      : head === 'reports' && !state.readonly && by.reports.length ? el('p', { class: 'lede waiting-lede' }, (() => { const n = by.reports.filter(unread).length; return n ? `${n} new · ${by.reports.length} in all` : `${plural(by.reports.length, 'report')} · all read`; })())
+    head === 'reports' && !state.readonly && by.reports.length ? el('p', { class: 'lede waiting-lede' }, (() => { const n = by.reports.filter(unread).length; return n ? `${n} new · ${by.reports.length} in all` : `${plural(by.reports.length, 'report')} · all read`; })())
       : head === 'answered' && by.answered.length ? el('p', { class: 'lede' }, (() => { const n = by.answered.filter((d) => isToday(state.answers[d.key].at)).length; return `${n} ${n === 1 ? 'answer' : 'answers'} today. Each one has gone back to its agent.`; })())
       : head === 'designs' && by.designs.length ? el('p', { class: 'lede' }, 'Designs to look over. Approve one, or say what should change.')
       : head === 'evidence' && by.evidence.length ? el('p', { class: 'lede' }, 'Every proof filed, newest first.') : '',
-    head === 'decide' ? '' : head === 'waiting' && !selecting && !state.readonly && !FROZEN ? listMore(by.waiting)
-      : head === 'reports' && !selecting && !state.readonly && !FROZEN ? (bulk.length ? reportsMore(by.reports, bulk) : '') : bulkBar(bulk));
-    const board = document.getElementById('board'), askBar = {};
+    head === 'reports' && !selecting && !state.readonly && !FROZEN ? (bulk.length ? reportsMore(by.reports, bulk) : '') : bulkBar(bulk));
+    const board = document.getElementById('board');
     board.removeAttribute('aria-busy');
     const listTop = document.querySelector('.split-list')?.scrollTop;
     // An update in the address opens even when the list leaves it off (a failed run); with none, the newest is selected.
@@ -4323,15 +4311,10 @@
       notes(by.notes), dismissed(state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && ['reports', 'notes'].includes(area(d))), 'Archived'));
     const update = at === 'evidence' && ((key && state.decisions.find((d) => d.key === key && !gone.has(d.key) && d.type === 'evidence')) || by.evidence.find((d) => d.type === 'evidence'));
     const content = [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived'), update)
-      : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0) : decideDesk(top, by.waiting, hidden, decideQueue, key, decideDone)] : [top]), ...(deskSplit ? [] : at === 'waiting' && !state.readonly ? [decideList(by.waiting, hidden, decideDone)]
-      : at === 'decide' ? [!shownAsk ? el('p', { class: 'empty' }, 'Nothing to decide for that question.')
-        : decidePage(shownAsk, doneAt >= 0 ? walk[wi + 1] : decideQueue.length > 1 ? decideQueue[(decideAt + 1) % decideQueue.length] : undefined, false, askBar)]
+      : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0) : decideDesk(top, by.waiting, hidden, decideQueue, key, decideDone, answeredToday)] : [top]), ...(deskSplit ? [] : (at === 'waiting' || at === 'decide') && !state.readonly ? [at === 'decide' && !shownAsk ? el('p', { class: 'empty' }, 'Nothing to decide for that question.') : '', decideList(by.waiting, hidden, decideDone, answeredToday), at === 'decide' && shownAsk ? askSheet(shownAsk) : '']
       : at === 'designs' ? [...designGroups(by.designs)] : at === 'ticket' ? ticketPage(tk) : at === 'evidence' ? [...evidenceList(by.evidence), dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived')] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : today(by))];
-    // On a phone the ask's bar steps to the ask before and after it, answered ones too.
-    const step = (to, mark, words) => (to ? el('a', { class: 'step', href: `#decide/${to.key}`, 'aria-label': words }, glyph(mark)) : el('span', { class: 'step', 'aria-hidden': 'true' }, glyph(mark)));
-    if (head === 'decide' && shownAsk && !state.readonly) askBar.steps = el('span', { class: 'steps' }, step(walk[wi - 1], 'up', 'Previous'), step(walk[wi + 1], 'down', 'Next'));
-    top.append(...[askBar.mid, askBar.steps, askBar.more].filter(Boolean));
+    if (!(at === 'decide' && shownAsk && !deskSplit)) sheetUp = '';
     // The report shown on a desk stays in place under a new list and bar while it is the same report, so its frame is not loaded again.
     const keptRead = document.querySelector('#board .split-detail > .read'), newRead = content[0]?.querySelector?.('.split-detail > .read');
     if (keptRead && newRead && keptRead.dataset.sig === newRead.dataset.sig) {
@@ -4363,16 +4346,8 @@
   // Closing a report or plan goes back to its card, with the focus on its link; an open report takes the focus on its title.
   // On a phone an ask pushes in from the right over Decide, and going back (or answering) slides the list in from the left; the list's rows rise in when the tab opens.
   let lastHash = location.hash;
-  const slide = (dir) => {
-    const b = document.getElementById('board');
-    b.classList.remove('push', 'pop');
-    if (!dir || calm.matches) return;
-    void b.offsetWidth;
-    b.classList.add(dir);
-  };
   // Crossing 64rem swaps the phone's stack for the desk's list beside its ask, and back.
   matchMedia('(max-width: 63.999rem)').addEventListener('change', () => loaded && render());
-  addEventListener('animationend', (e) => /^(push|pop)-in$/.test(e.animationName) && document.getElementById('board').classList.remove('push', 'pop'));
   addEventListener('hashchange', () => {
     const back = !reader.hidden && reader.dataset.key, from = lastHash, ask = /^#decide\//;
     lastHash = location.hash;
@@ -4389,18 +4364,18 @@
     if (!phone()) {
       const detail = document.querySelector('.split-detail'), now = document.querySelector('.split-list [data-row][aria-current]')?.getAttribute('href');
       if (detail && was >= 0 && now && now !== order[was] && !calm.matches) detail.dataset.dir = order.indexOf(now) >= 0 && order.indexOf(now) < was ? 'up' : 'down', detail.classList.add('in');
-    } else {
-      // From one ask to another the page pushes on going forward and pops on going back, in the order the arrows step.
-      const order = (h) => walkKeys.indexOf(h.slice(8));
-      slide(ask.test(location.hash) && from === '#waiting' ? 'push' : ask.test(from) && location.hash === '#waiting' ? 'pop' : ask.test(from) && ask.test(location.hash) ? (order(location.hash) < order(from) ? 'pop' : 'push') : '');
     }
+    // On a phone an ask's sheet rises over Decide's list and closes back to it: the list stays where it was scrolled.
+    const overList = phone() && [location.hash, from].every((h) => h === '#waiting' || ask.test(h));
     if (!reader.hidden) { scrollTo(0, 0); return reader.querySelector('h1').focus({ preventScroll: true }); }
     const item = (jump || back) && document.getElementById(`item-${jump || back}`);
     jump = null;
-    item ? item.scrollIntoView() : scrollTo(0, 0);
+    item ? item.scrollIntoView() : overList ? '' : scrollTo(0, 0);
     // A Decide row is itself the link back to its page.
     // On a desk the focus stays on the selected row, so J, K and Enter carry on from it.
-    ((back && (item?.matches('a.dl-face') ? item : item?.querySelector('h3 a, .open-link, a.compact'))) || document.querySelector('.split-list [data-row][aria-current]') || document.querySelector('#board h1')).focus({ preventScroll: true });
+    // An ask's sheet takes the focus on its question; closed, the focus goes back to the row it was opened from.
+    ((back && (item?.matches('a.dl-face') ? item : item?.querySelector('h3 a, .open-link, a.compact'))) || document.querySelector('.ask-sheet #ask-title')
+      || (overList && ask.test(from) && document.getElementById(`item-${from.slice(8)}`)) || document.querySelector('.split-list [data-row][aria-current]') || document.querySelector('#board h1')).focus({ preventScroll: true });
   });
   // An interactive page may post its own height, `{ height: <px> }`, and its frame then fits it with no blank below.
   // Only a frame's own message sizes it. Document readers must fit even long pages; previews stay capped.

@@ -107,7 +107,7 @@ sign-off-axi ticket --id T-29 --progress 80
 sign-off-axi ticket --id T-29          # the ticket and its cards, newest first
 ```
 
-The card then shows a **Ticket** row, the title and progress, that opens the
+The card then shows a **Ticket** row (on an ask, **Its ask**), the title and progress, that opens the
 ticket's page: its cards (asks, designs, proof, reports and plans), newest first,
 and the tickets under it. A card whose ticket is not on the board shows no row.
 The file format is in [file-formats.md](file-formats.md), under **Tickets**.

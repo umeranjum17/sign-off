@@ -110,33 +110,33 @@ const PAGES = [
   { name: 'waiting', hash: '#waiting', ready: '[id="item-npm"]', stages: [
     { run: async (h) => {
       const links = { 'plan-kind-board': '#waiting/plan-kind-board', npm: '#decide/npm', ship: '#decide/ship', 'keep-the-weekly-digest': '#decide/keep-the-weekly-digest', look: '#decide/look' };
-      // Every row is the link to its ask; Decide groups them Sign in, Answer and Review, with every answer given under Answered. A design review is Main's until promoted, so it is under Designs only.
+      // Every row is the link to its ask; Decide lists them in one card under Asks, with every answer given under Answered. A design review is Main's until promoted, so it is under Designs only.
       for (const [key, href] of Object.entries(links)) await h.nav(`open ${key}`, h.card(key), new RegExp(`^${href}$`));
       h.has('no design review in Decide', !h.card('chat-journeys') && h.board());
-      const heads = () => [...h.board().querySelectorAll('.dl-head')].map((e) => e.firstChild.textContent).join('|');
-      h.has('groups Sign in, Answer, Review, Answered', heads() === 'Sign in|Answer|Review|Answered' && h.board().querySelector('.dl-head'));
+      const heads = () => [...h.board().querySelectorAll('.decide-list .ui-sec')].map((e) => e.firstChild.textContent).join('|');
+      h.has('Asks, then Answered', heads() === 'Asks|Answered' && h.board().querySelector('.decide-list .ui-sec'));
       await h.nav('open an answered ask', h.board().querySelector('.g-done .dl-face'), /^#decide\/[\w-]+$/);
-      // More, as the prototype has it: Answer all recommended and Move all to later, each taken back with Undo.
-      const more = () => h.board().querySelector('.top .dl-more'), item = (act) => more()?.querySelector(`[data-act="${act}"]`);
+      // More, the line under the list as Today's: its sheet holds Answer all recommended and Move all to later, each taken back with Undo.
+      const item = (act) => { h.board().querySelector('.decide-list .t-more-line')?.click(); return document.querySelector(`#d-more[open] [data-act="${act}"]`); };
       await h.cycle('More: Answer all recommended', item('answer-all'), () => !h.card('ship') && !h.card('keep-the-weekly-digest'), () => h.card('ship') && h.card('keep-the-weekly-digest'), /answered with the recommended pick/);
-      await h.cycle('More: Move all to later', item('later-all'), () => heads() === 'Later|Answered', () => !h.board().querySelector('.g-later'), /to later/);
+      await h.cycle('More: Move all to later', item('later-all'), () => heads() === 'Asks|Later|Answered', () => !h.board().querySelector('.dl-row[data-group=later]'), /to later/);
     } },
-    { shot: 'waiting-menu', run: async (h) => { const m = h.board().querySelector('.top .dl-more'); m.open = true; await h.until('menu', () => m.querySelector('.dl-menu')?.getBoundingClientRect().height); } },
+    { shot: 'waiting-menu', run: async (h) => { h.board().querySelector('.decide-list .t-more-line').click(); await h.until('menu', () => document.querySelector('#d-more[open] .ui-props')?.getBoundingClientRect().height); } },
   ] },
   ...[['npm', 'signin', []], ['ship', 'ask', ['^Friday', '^Next week']], ['look', 'design', ['^A: one column', '^B: two columns']]].map(([key, kind, options]) => ({
     name: `decide-${key}`, hash: `#decide/${key}`, ready: '.decide', stages: [{ data: { options, key, kind }, run: async (h, { options, key, kind }) => {
-      const bar = () => h.board().querySelector('.decide-bar'), more = () => h.board().querySelector('.ask-nav .dl-more, .split-bar .dl-more');
+      const bar = () => h.board().querySelector('.decide-bar'), more = () => h.board().querySelector('.sh-head .dl-more, .split-bar .dl-more');
       if (kind === 'signin') await h.need('Open the npm sign-in', h.find(/^Open the npm sign-in$/, h.board()));
       // Nothing is picked until a pick: the one button waits, off, then names the pick.
       if (options.length) h.has('Pick an answer (off until a pick)', bar()?.querySelector('.answer:disabled'));
       for (const o of options) await h.press(`option ${o}`, h.find(new RegExp(o), h.board().querySelector('.pick-list, .choices, .decide')), () => true);
-      // One button in the bar, and one More over the ask holding Ask me later and Dismiss.
+      // One button in the bar, and one More over the ask (on a phone Ask me later is a button beside the answer, and More holds Dismiss).
       h.has('More', more()?.querySelector('summary'));
       if (options.length) {
         await h.press('Your own answer', h.find(/^Your own answer/, h.board().querySelector('.pick-list')), () => bar().querySelector('.answer').textContent === 'Send answer');
         await h.press(`option ${options[0]} again`, h.find(new RegExp(options[0]), h.board().querySelector('.pick-list')), () => /^Answer /.test(bar().querySelector('.answer').textContent));
       }
-      await h.cycle('Ask me later', h.find(/^Ask me later$/, more()), () => location.hash === '#waiting' && h.board().querySelector('.g-later'), () => h.board().querySelector('.decide'), /moved to later/);
+      await h.cycle('Ask me later', h.find(/^Ask me later$/, h.board().querySelector('.ask-sheet') ?? more()), () => location.hash === '#waiting' && h.board().querySelector('.dl-row[data-group=later]'), () => h.board().querySelector('.decide'), /moved to later/);
       if (options.length) {
         await h.press(`option ${options[0]} once more`, h.find(new RegExp(options[0]), h.board().querySelector('.pick-list')), () => /^Answer /.test(bar().querySelector('.answer').textContent));
         await h.cycle(`Answer ${key}`, h.find(/^Answer /, bar()), () => location.hash !== `#decide/${key}` || !h.board().querySelector('.decide-bar .answer'), () => h.board().querySelector('.decide-bar .answer'), /\? · /);

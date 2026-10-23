@@ -126,3 +126,7 @@
     font-size: var(--tk-fs-small); font-weight: 500; font-variant-numeric: tabular-nums; }
   .side .n.red { background: var(--badge); color: #FFFFFF; font-weight: 600; } .side .n.blue { background: var(--action); color: #FFFFFF; font-weight: 600; }
 }
+
+/* The hero's chip (added with Decide): a small raised pill at the right of the hero's label line, as "2 answered today". */
+.ui-hero .chip { flex: none; margin-left: auto; height: 1.5rem; padding: 0 0.5rem; border-radius: 0.75rem; background: var(--tk-on); color: var(--tk-ink); font-size: var(--tk-fs-small); line-height: 1.5rem;
+  font-weight: 500; letter-spacing: 0; text-transform: none; white-space: nowrap; font-variant-numeric: tabular-nums; border: 0; box-shadow: var(--tk-elev-raised); }
