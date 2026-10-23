@@ -58,6 +58,10 @@ journeys:
     command: 'npm run build > /dev/null && REPORTS_RECORD=1 node .agents/skills/done-done-verify-sign-off/reports-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   decide:
     command: 'npm run build > /dev/null && DECIDE_RECORD=1 bash .agents/skills/done-done-verify-sign-off/decide-shots.sh "$DONE_DONE_EVIDENCE_ROOT"'
+  # Going back to an answer, on the prototype's demo data at 390, light and dark: answered, the next ask with Back, Back to the answer, Change answer, a change and its Undo,
+  # the Answered group and Cleared today, and at 1280 the answered ask beside the list; the agent's wait --filer events (the change named by replaces) as text; the phone recorded with real taps (BACK_RECORD).
+  decide-back:
+    command: 'npm run build > /dev/null && BACK_RECORD=1 bash .agents/skills/done-done-verify-sign-off/decide-back.sh "$DONE_DONE_EVIDENCE_ROOT"'
   # Decide beside the approved feel prototype, on the prototype's own demo data: each state it has a shot of at 390 and 1280, light and dark, paired with that shot
   # (the prototype left, the board right) when PROTO_SHOTS names its shots folder, and the phone's answer flows recorded (a pick with a note, Your own answer, a pick with no note).
   decide-match:

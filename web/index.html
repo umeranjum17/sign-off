@@ -1279,10 +1279,14 @@
     .top.ask-nav h1 { width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
     .ask-nav .back { padding: 0 0.75rem 0 0.125rem; font-size: 1.0625rem; }
     .ask-nav .back .glyph { width: 1.75rem; height: 1.75rem; margin-right: -0.125rem; stroke-width: 2.2; }
-    .ask-nav .mid { position: absolute; left: 7.25rem; right: 7.25rem; overflow: hidden; font-weight: 600; text-align: center; white-space: nowrap; text-overflow: ellipsis;
+    .ask-nav .mid { position: absolute; left: 7.25rem; right: 9.25rem; overflow: hidden; font-weight: 600; text-align: center; white-space: nowrap; text-overflow: ellipsis;
       opacity: 0; visibility: hidden; transition: opacity 150ms linear, visibility 0s linear 150ms; }
     .ask-nav.scrolled .mid { opacity: 1; visibility: visible; transition: opacity 150ms linear; }
     .top.ask-nav > .dl-more { position: static; }
+    /* The arrows to the ask before and after this one, answered ones too, beside More; one with nowhere to go is faint. */
+    .ask-nav .steps { display: flex; margin-left: auto; }
+    .ask-nav .step { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; color: var(--action); -webkit-tap-highlight-color: transparent; }
+    .ask-nav span.step { color: var(--faint); } .ask-nav .step .glyph { width: 1.625rem; height: 1.625rem; stroke-width: 2.2; }
     #tabs { transition: transform 250ms var(--ease); }
     body:has(#board > .decide) #tabs { transform: translateY(calc(100% + 2.5rem)); }
     body:has(#board > .decide) { padding-bottom: calc(6.5rem + env(safe-area-inset-bottom)); }
@@ -1336,6 +1340,16 @@
   .decide label.pick-label { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
   .decide .pick-label small { color: var(--faint); font-size: var(--t-xs); font-weight: 500; }
   .decide.own .note-field { display: none; }
+  /* An answered ask, as the prototype's answered sheet draws it: Answered (or Changed) and when, then the answer in a green card with its note and whether the agent read it,
+     the answer before a change under it, and Change answer as its one button. Brought back for a change, the card of the answer given is tagged Your answer. */
+  .decide .ans-meta { margin: 0; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; }
+  .decide .ans-card { display: flex; align-items: flex-start; gap: 0.875rem; margin-top: 0.75rem; padding: 0.875rem 1rem; border-radius: 1rem; background: color-mix(in srgb, var(--tk-success) 10%, var(--opt)); box-shadow: 0 0 0 0.5px var(--line); }
+  .decide .ans-card > div { display: grid; gap: 0.125rem; min-width: 0; }
+  .decide .ans-card b { font-size: var(--t-m); line-height: 1.375rem; } .decide .ans-card q { font-size: var(--t-s); line-height: 1.25rem; overflow-wrap: anywhere; }
+  .decide .ans-card > div > span { color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; }
+  .decide .ans-was { margin: 0.75rem 0 0; color: var(--faint); font-size: var(--t-xs); line-height: 1.125rem; }
+  .decide .pick-option .recommend.now { background: color-mix(in srgb, var(--tk-success) 14%, transparent); color: var(--ok); }
+  .g-done { --k: var(--tk-success); }
   .decide-bar .answer:disabled:not(.done) { box-shadow: none; cursor: default; }
   .decide > .silent-line { display: block; margin: 0.875rem 0 0; padding: 0; color: var(--faint); font-size: var(--t-xs); line-height: 1.125rem; letter-spacing: -0.004em; }
   /* A sign-in: its key large, then the facts as one inset group, and Open sign-in with what it does under it. */
@@ -1634,7 +1648,7 @@
     if (!now) return;
     undoBtn.setAttribute('aria-label', `Undo, ${headline(d)}`);
     buzz('success');
-    say([el('b', {}, headline(d)), ` · ${now.answer === 'text' ? 'your reply' : now.label}${now.note && now.answer !== 'text' ? ' · with your comment' : ''}`], 5000, () => {
+    say([el('b', {}, headline(d)), ` · ${before ? 'changed to ' : ''}${now.answer === 'text' ? 'your reply' : now.label}${now.note && now.answer !== 'text' ? ' · with your comment' : ''}`], 5000, () => {
       undoBtn.disabled = true;
       // On the Decide list the row comes back in place, with a flash; anywhere else the ask opens again.
       // On Today it comes back as Up next.
@@ -2269,10 +2283,10 @@
     keys: 'M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zM6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10',
     // Decide's other kinds, as the approved prototype draws them: a question for yes or no, a bubble for a reply.
     yesno: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01',
-    reply: 'M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z' };
+    reply: 'M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z', done: 'M20 6 9 17l-5-5' };
   // The drawings are fixed strings from this page, never text from the board file.
   // Small stroke drawings the plan page puts beside a button label or in a section badge; fixed strings from this page.
-  const GLYPHS = { left: '<path d="m15 18-6-6 6-6"/>', more: '<path d="M5 12h.01M12 12h.01M19 12h.01"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', right: '<path d="m9 18 6-6-6-6"/>', check: '<path d="M20 6 9 17l-5-5"/>', pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
+  const GLYPHS = { left: '<path d="m15 18-6-6 6-6"/>', up: '<path d="m18 15-6-6-6 6"/>', down: '<path d="m6 9 6 6 6-6"/>', more: '<path d="M5 12h.01M12 12h.01M19 12h.01"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', right: '<path d="m9 18 6-6-6-6"/>', check: '<path d="M20 6 9 17l-5-5"/>', pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
     archive: '<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/>', dot: '<circle cx="12" cy="12" r="4.5" fill="currentColor"/>',
     send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.112z"/><path d="m21.854 2.147-10.94 10.939"/>',
     sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>', msg: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
@@ -2508,13 +2522,13 @@
     link.onclick = () => (jump = d.key);
     return tSec('t-report', unread(d) ? 'New report' : 'Latest report', '#reports', link);
   }
-  /** Cleared today: each ask answered today with a green check, the answer and its comment and when; a tap opens it under Answered, to change it. */
+  /** Cleared today: each ask answered today with a green check, the answer and its comment and when; a tap opens it, to see or change the answer (under Answered for one Decide does not open). */
   function cleared(items, all) {
     if (!items.length) return '';
     const SHOWN = 5;
     return tSec('t-cleared', 'Cleared today', all.length > SHOWN ? '#answered' : '', el('ul', { class: 't-list' }, ...items.slice(0, SHOWN).map((d) => {
       const s = state.answers[d.key], said = s.answer === 'text' ? 'Your reply' : s.answer === 'sent' ? 'Sent back' : s.label ?? s.answer;
-      const link = el('a', { class: 'lrow', href: '#answered' }, el('span', { class: 'donek', 'aria-hidden': 'true' }, glyph('check')),
+      const link = el('a', { class: 'lrow', href: redo(d) ? `#decide/${d.key}` : '#answered' }, el('span', { class: 'donek', 'aria-hidden': 'true' }, glyph('check')),
         el('span', { class: 'lt' }, el('b', { dir: 'auto' }, title(d)), el('span', { dir: 'auto' }, [said, s.note && `“${s.note}”`, hhmm(s.at)].filter(Boolean).join(' · '))), chev());
       link.onclick = () => (jump = d.key);
       return el('li', {}, link);
@@ -3563,6 +3577,10 @@
   // A plan or a design is looked over before it is answered, so it is reviewed, never answered from its row.
   const reviewed = (d) => d.type === 'plan' || d.kind === 'design' || typeOf(d) === 'design';
   const groupOf = (d) => (shelved().has(d.key) ? 'later' : d.type === 'signin' ? 'signin' : reviewed(d) ? 'review' : 'answer');
+  /** An answered ask Decide opens again, to see the answer or change it: one the person picked or wrote, not a sign-in, a review, a verdict or a card answered with another. */
+  const redo = (d) => !state.readonly && d.type !== 'signin' && d.type !== 'evidence' && d.type !== 'plan' && d.kind !== 'design' && !state.answers[d.key]?.merged_by && !!(d.options?.length || d.reply);
+  /** What an answer says in a row: the pick (or the person's own words), and the note that went with it. */
+  const saidOf = (d, s) => [s.answer === 'text' ? (d.reply ? 'Your reply' : 'Your own answer') : s.label, s.note && `“${s.note}”`].filter(Boolean).join(' · ');
   const recOf = (d) => (d.type === 'signin' || reviewed(d) ? undefined : d.options?.find((o) => o.value === d.recommend_value));
   const post = (body) => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   // Rows on their way out (answered, or moved to Later) stay drawn where they were while they tint and fold away; a row taken back flashes.
@@ -3604,7 +3622,14 @@
   /** All clear, by name; the ask's pane on a desk adds that agents will ask when they need you. */
   const allClear = (pane) => el('div', { class: `all-clear-big${pane ? ' pane' : ''}` }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, 'All clear'),
     el('p', {}, `Nothing is waiting on you${state.name ? `, ${state.name}` : ''}.${pane ? ' Agents will ask when they need you.' : ''}`));
-  function decideList(items, hidden) {
+  /** An answered row: a green check, the question, when it was answered, and the answer with its note; it opens the ask, to see the answer or change it. */
+  function doneRow(d, i) {
+    const s = state.answers[d.key], sel = deskSel === d.key;
+    return el('li', { class: `dl-row g-done${sel ? ' sel' : ''}`, 'data-key': d.key, style: `--n:${i}` }, el('a', { class: 'dl-face', href: `#decide/${d.key}`, draggable: 'false', 'data-row': '', ...(sel && { 'aria-current': 'true' }) },
+      icon('done'), el('span', { class: 'copy' }, el('span', { class: 'r1' }, el('strong', { class: 'title', dir: 'auto' }, title(d)), el('span', { class: 'tm' }, filedAt(s.at))),
+        el('span', { class: 'meta sub', dir: 'auto' }, s.replaces ? 'Changed to ' : '', saidOf(d, s)))));
+  }
+  function decideList(items, hidden, done = []) {
     const rows = new Map(GROUPS.map(([g]) => [g, []]));
     items.forEach((d, i) => !leaving.has(d.key) || leaving.get(d.key).how === 'later' ? rows.get(groupOf(d)).push(decideRow(d, i)) : '');
     for (const [k, g] of leaving) {
@@ -3617,8 +3642,10 @@
     });
     const fresh = !risen;
     risen = true;
+    // Every answer given, newest first, under all clear when nothing waits.
+    const answered = done.length ? [el('h2', { class: 'dl-head' }, 'Answered', el('span', { class: 'n' }, String(done.length))), el('ul', { class: 'dl-list', 'aria-label': 'Answered' }, ...done.map(doneRow))] : [];
     return el('div', { class: `waiting-page decide-list${fresh ? ' rise' : ''}` }, ...groups,
-      items.length ? '' : allClear(), dismissed(hidden));
+      items.length ? '' : allClear(), ...answered, dismissed(hidden));
   }
   /** After a redraw, a row on its way out keeps its height for a moment, then folds to nothing; a redraw midway picks up where it was. */
   function fold() {
@@ -3684,7 +3711,7 @@
   // The swipe follows the finger; the action under the row grows once it would commit, with a tick on Android.
   let sw = null, swiped = false;
   addEventListener('pointerdown', (e) => {
-    const face = !selecting && !state.readonly && !FROZEN && e.isPrimary && e.target.closest?.('.dl-row:not(.leaving) > .dl-face');
+    const face = !selecting && !state.readonly && !FROZEN && e.isPrimary && e.target.closest?.('.dl-row:not(.leaving, .g-done) > .dl-face');
     if (!face) return;
     face.classList.add('down');
     sw = { face, row: face.parentElement, x: e.clientX, y: e.clientY, id: e.pointerId, dx: 0, on: false, armed: false, t: e.timeStamp, v: 0, lx: e.clientX };
@@ -3769,6 +3796,10 @@
   let skipTo = '';
   /** Asks the person chose to answer in their own words, and sign-ins whose link they opened, kept across redraws. */
   const own = new Set(), signingIn = new Set();
+  /** The answered ask whose cards are back for a change; the last ask answered and the one that opened after it, so Back there returns to it;
+   *  where Back (and a swipe right) goes from the ask shown; and the order the arrows step in: every answered ask, oldest first, then the open ones. */
+  const changing = new Set();
+  let cameFrom = null, stepBack = '#waiting', walkKeys = [];
   /** An ask's kind as Decide names it over the question, as in "Pick one · Release agent · 08:01". */
   const askKind = (d) => ({ signin: 'Sign in', 'yes-no': 'Yes or no' })[typeOf(d)] ?? TYPE_NAMES[typeOf(d)];
   /** A sign-in as a page of its own: its key, the headline, what it unlocks, how long the link lasts (on a phone; on a desk the row beside it counts that down) and where it signs in,
@@ -3823,6 +3854,8 @@
       return page;
     }
     const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` }), opts = d.options ?? [], live = !state.readonly, name = headline(d);
+    // An answered ask shows the answer given; Change answer brings the cards back, with nothing picked and that answer marked.
+    const given = live ? answerOf(d.key) : undefined, done = !!given && !changing.has(d.key);
     // A pick remembered from an earlier round only counts while the ask still offers it.
     if (!opts.some((o) => o.value === selected.get(d.key))) selected.delete(d.key);
     // Your own answer: its words are the answer, kept in a draft of their own so the note stays the note. A reply ask is only words; an ask with an option valued text takes words only as a note.
@@ -3832,17 +3865,18 @@
     // One note for any pick, always open: it goes with the answer as its comment.
     const note = live && opts.length ? el('textarea', { class: 'note-box', id: `note-${d.key}`, rows: 2, maxlength: 500, dir: 'auto', placeholder: 'A note for the agent', 'aria-label': `Note, ${name}` }) : null;
     // The answers are cards, numbered on a desk for their keys; the one picked gets a ring and a check that springs in, and the button's label slides to it.
-    const card = (label, line, chip, n) => [el('span', { class: 'check', 'aria-hidden': 'true' }, glyph('check')),
-      el('span', { class: 'words' }, el('span', { class: 'label-line' }, el('span', { class: 'label' }, label), chip ? el('span', { class: 'recommend' }, 'Recommended') : ''),
+    const card = (label, line, chip, n, now) => [el('span', { class: 'check', 'aria-hidden': 'true' }, glyph('check')),
+      el('span', { class: 'words' }, el('span', { class: 'label-line' }, el('span', { class: 'label' }, label), chip ? el('span', { class: 'recommend' }, 'Recommended') : '', now ? el('span', { class: 'recommend now' }, 'Your answer') : ''),
         line ? el('span', { class: 'reason', dir: 'auto' }, line) : ''), desk && n <= 9 ? kc(String(n)) : ''];
-    const pickers = opts.map((o, i) => el('button', { class: 'pick-option', 'aria-pressed': String(o.value === selected.get(d.key) && !own.has(d.key)) }, ...card(o.label, o.outcome, o.value === d.recommend_value, i + 1)));
-    const ownRow = mine && !reply ? el('button', { class: 'pick-option own-option', 'aria-pressed': String(own.has(d.key)), 'aria-controls': ownBox.id }, ...card('Your own answer', 'Write it in your own words', false, opts.length + 1)) : null;
+    const pickers = opts.map((o, i) => el('button', { class: 'pick-option', 'aria-pressed': String(o.value === selected.get(d.key) && !own.has(d.key)) }, ...card(o.label, o.outcome, o.value === d.recommend_value, i + 1, given?.answer === o.value)));
+    const ownRow = mine && !reply ? el('button', { class: 'pick-option own-option', 'aria-pressed': String(own.has(d.key)), 'aria-controls': ownBox.id }, ...card('Your own answer', 'Write it in your own words', false, opts.length + 1, given?.answer === 'text')) : null;
     const lbl = el('span', { class: 'lbl' });
     const answer = el('button', { class: 'answer', 'data-kbd': '↵', 'aria-keyshortcuts': 'Enter' }, lbl, el('span', { class: 'okmark', 'aria-hidden': 'true' }, glyph('check')));
-    // The button reads the choice, and is off until there is one: a card picked, or words in Your own answer.
+    // The button reads the choice, and is off until there is one: a card picked, or words in Your own answer. A change is off while it would send the answer already given.
+    const same = () => (isOwn() ? given.answer === 'text' && ownBox.value.trim() === given.note : chosen()?.value === given.answer && (note?.value ?? '').trim() === (given.note ?? ''));
     const sync = (swap) => {
-      const text = isOwn() ? 'Send answer' : chosen() ? `Answer ${chosen().label}` : 'Pick an answer';
-      answer.disabled = isOwn() ? !ownBox.value.trim() : !chosen();
+      const text = isOwn() ? 'Send answer' : chosen() ? `${given ? 'Change to' : 'Answer'} ${chosen().label}` : given ? 'Pick a new answer' : 'Pick an answer';
+      answer.disabled = (isOwn() ? !ownBox.value.trim() : !chosen()) || (!!given && same());
       if (lbl.textContent === text) return;
       lbl.textContent = text;
       if (swap) { lbl.classList.remove('swap'); void lbl.offsetWidth; lbl.classList.add('swap'); }
@@ -3856,19 +3890,30 @@
     if (ownRow) ownRow.onclick = () => { own.add(d.key); pickOne(ownRow); ownBox.focus({ preventScroll: true }); setTimeout(() => ownBox.scrollIntoView({ block: 'nearest', behavior: calm.matches ? 'auto' : 'smooth' }), 230); };
     for (const [box, key] of [[ownBox, ownKey], [note, d.key]]) {
       if (!box) continue;
-      box.value = drafts.get(key) ?? (box === note ? noteOf(d) : '');
-      box.oninput = () => { drafts.set(key, box.value); keep(); if (box === ownBox) sync(); };
+      box.value = drafts.get(key) ?? (box === note ? noteOf(d) : given?.answer === 'text' ? given.note ?? '' : '');
+      box.oninput = () => { drafts.set(key, box.value); keep(); if (box === ownBox || given) sync(); };
     }
-    // The button turns green and draws a check, then this row folds away: a phone pops back to the list, a desk selects the next ask beside it.
+    // The button turns green and draws a check, then this row folds away and the next ask opens, with Back to this one. A change stays on its ask.
     const answerWith = (o, words) => {
       answer.classList.add('done');
       const held = pause(380);
       // Once sent, the pick is spent: an Undo brings the ask back with nothing picked.
-      save(d, o, [...pickers, ownRow, answer].filter(Boolean), err, null, async () => { await held; own.delete(d.key); selected.delete(d.key); depart([d.key], 'answered'); location.hash = phone() ? '#waiting' : to; }, words);
+      save(d, o, [...pickers, ownRow, answer].filter(Boolean), err, null, async () => {
+        await held; own.delete(d.key); selected.delete(d.key);
+        if (given) return changing.delete(d.key);
+        depart([d.key], 'answered'); cameFrom = { from: d.key, to }; location.hash = to;
+      }, words);
     };
     answer.onclick = () => (isOwn() ? ownBox.value.trim() && answerWith({ value: 'text' }, ownKey) : chosen() && answerWith(chosen()));
     sync();
-    sink.more = more();
+    sink.more = given ? '' : more();
+    // The answer given: when, what with its note or words, whether the agent has read it, and the answer it replaced. Its one button brings the cards back.
+    const seen = done && state.seen_at?.[d.key], was = given?.replaces, change = done && el('button', { class: 'answer', 'data-kbd': '↵', 'aria-keyshortcuts': 'Enter' }, el('span', { class: 'lbl' }, 'Change answer'));
+    if (change) change.onclick = () => { changing.add(d.key); selected.delete(d.key); own.delete(d.key); render(); document.querySelector('.decide .pick-list')?.scrollIntoView({ block: 'nearest', behavior: calm.matches ? 'auto' : 'smooth' }); };
+    const said = done ? [el('p', { class: 'pick-label' }, 'Your answer'), el('p', { class: 'ans-meta' }, el('span', { class: 'res ok' }, was ? 'Changed' : 'Answered'), ` · ${when(given.at)}`),
+      el('div', { class: 'ans-card' }, el('span', { class: 'donek', 'aria-hidden': 'true' }, glyph('check')), el('div', {}, el('b', { dir: 'auto' }, saidOf(d, { ...given, note: '' })),
+        given.note ? el('q', { dir: 'auto' }, given.note) : '', el('span', {}, seen ? `Agent read it ${hhmm(seen)}` : 'Agent has not read it yet'))),
+      was ? el('p', { class: 'ans-was', dir: 'auto' }, `Before: ${saidOf(d, was)} · ${when(was.at)}`) : ''] : [];
     const cards = d.mocks?.length && d.options?.length ? mockCards(d, []) : null, proofLine = cards || d.view ? '' : proofRow(d);
     const preview = cards ?? (d.view ? rung(d) : proofLine ? '' : proof(d));
     const quiet = opts.find((o) => o.value === d.default_if_silent);
@@ -3876,14 +3921,14 @@
     const page = el('section', { class: `decide g-${reviewed(d) ? 'review' : 'answer'}${isOwn() ? ' own' : ''}` }, preview ? el('div', { class: 'decide-preview' }, preview) : '',
       ...(d.mocks?.length ? [annotations(d)] : []), el('div', { class: 'lead' }, badge(d), kicker, el('h2', { dir: 'auto' }, name)),
       why ? el('p', { class: 'why', dir: 'auto' }, why) : '', firstDraftLinks(d), proofLine,
-      ...(live && opts.length ? [el('p', { class: 'pick-label' }, 'Your answer'), el('ul', { class: 'pick-list', 'aria-label': d.title }, ...pickers.map((b) => el('li', {}, b)),
+      ...(done ? said : [...(live && opts.length ? [el('p', { class: 'pick-label' }, 'Your answer'), el('ul', { class: 'pick-list', 'aria-label': d.title }, ...pickers.map((b) => el('li', {}, b)),
         ownRow ? el('li', {}, ownRow, el('div', { class: 'own-field' }, el('div', {}, ownBox))) : '')] : []),
       reply ? el('label', { class: 'pick-label', for: ownBox.id }, 'Your reply') : '', reply ? ownBox : '',
       note ? el('div', { class: 'note-field' }, el('label', { class: 'pick-label', for: note.id }, 'Note', el('small', {}, 'Optional · goes with your answer')), note) : '',
-      quiet ? el('p', { class: 'silent-line' }, `If you stay quiet, the agent goes with ${quiet.label}${d.silent_by ? ` at ${when(d.silent_by)}` : ''}.`) : '', err,
-      mine || (live && opts.length) ? el('div', { class: 'decide-bar' }, answer, desk && note ? el('span', { class: 'bar-hint' }, kc('C'), 'Note') : '') : '');
-    // A swipe right on a phone goes back to the list, as an edge swipe does; a swipe left skips to the next ask.
-    if (live) swipe(page, () => (location.hash = '#waiting'));
+      quiet && !given ? el('p', { class: 'silent-line' }, `If you stay quiet, the agent goes with ${quiet.label}${d.silent_by ? ` at ${when(d.silent_by)}` : ''}.`) : '']), err,
+      done ? el('div', { class: 'decide-bar' }, change) : mine || (live && opts.length) ? el('div', { class: 'decide-bar' }, answer, desk && note ? el('span', { class: 'bar-hint' }, kc('C'), 'Note') : '') : '');
+    // A swipe right on a phone goes back, as an edge swipe does: to the ask answered just before, else to the list; a swipe left goes on to the next ask.
+    if (live) swipe(page, () => (location.hash = stepBack));
     return page;
   }
   /** The desk shell: a list (with its header) beside a detail pane, and a strip under the list naming the list's keys. Any area can set itself out this way. */
@@ -3892,15 +3937,15 @@
     el('div', { class: 'split-list' }, ...list, el('p', { class: 'split-hints' }, ...hints.map(([keys, words]) => el('span', {}, ...keys.map(kc), words)))),
     el('div', { class: 'split-detail' }, ...detail));
   /** Decide on a desk: the list beside the ask it has selected (the first until a row is picked), under a bar with its kind, Later and More. Answering folds the row away and selects the next. */
-  function decideDesk(top, items, hidden, queue, key) {
-    const i = Math.max(0, queue.findIndex((d) => d.key === key)), d = queue[i], next = queue.length > 1 ? queue[(i + 1) % queue.length] : undefined;
+  function decideDesk(top, items, hidden, queue, key, done) {
+    const old = done.find((x) => x.key === key), i = Math.max(0, queue.findIndex((d) => d.key === key)), d = old ?? queue[i], next = !old && queue.length > 1 ? queue[(i + 1) % queue.length] : undefined;
     deskSel = d?.key ?? '';
-    const list = decideList(items, hidden);
+    const list = decideList(items, hidden, done);
     if (!d) return split([top, list], [items.length ? el('p', { class: 'empty' }, 'Open a review from the list.') : allClear(true)], [[['?'], 'All keys']]);
     const g = groupOf(d), later = el('button', { class: 'later', 'data-kbd': 'L', 'aria-keyshortcuts': 'L' }, glyph('clock'), g === 'later' ? 'Back from Later' : 'Later');
     later.onclick = () => { toLater([d.key], g !== 'later'); if (g !== 'later' && next) location.hash = `#decide/${next.key}`; };
     const bar = {}, page = decidePage(d, next, true, bar);
-    return split([top, list], [el('div', { class: 'split-bar' }, bar.crumb, state.readonly ? '' : later, bar.more), page],
+    return split([top, list], [el('div', { class: 'split-bar' }, bar.crumb, state.readonly || old ? '' : later, bar.more), page],
       [[['J', 'K'], 'Move'], [['↵'], 'Answer'], [['?'], 'All keys']]);
   }
   /** Evidence on a desk: the list of updates beside the one selected. */
@@ -4010,6 +4055,9 @@
     // The asks Decide steps through, in the list's order: sign-ins, then answers, then Later.
     const groupAt = (d) => GROUPS.findIndex(([g]) => g === groupOf(d));
     const decideQueue = by.waiting.filter((d) => d.type === 'signin' || (d.type !== 'plan' && d.kind !== 'design')).sort((x, y) => groupAt(x) - groupAt(y));
+    // Answered asks it opens again, newest first in its list; the arrows step through them oldest first, then through the open asks.
+    const decideDone = by.answered.filter(redo), walk = [...decideDone].reverse().concat(decideQueue);
+    walkKeys = walk.map((d) => d.key);
     // On a desk, Decide's list and its ask share the screen, Evidence's list and its update, and Reports' list and its report.
     const deskSplit = !phone() && ((at === 'waiting' || at === 'decide' || at === 'reports') && !state.readonly || at === 'evidence'), head = deskSplit && at === 'decide' ? 'waiting' : at;
     deskSel = null;
@@ -4027,7 +4075,11 @@
     }
     if (rpSel === null || rpFull !== shownReport?.key) rpFull = '';
     document.body.classList.toggle('split-view', deskSplit);
-    const askAt = decideQueue.findIndex((d) => d.key === key), decideAt = key ? askAt : 0;
+    const askAt = decideQueue.findIndex((d) => d.key === key), decideAt = key ? askAt : 0, doneAt = key && askAt < 0 ? walk.findIndex((d) => d.key === key && isAnswered(d)) : -1;
+    const shownAsk = doneAt >= 0 ? walk[doneAt] : decideQueue[decideAt], wi = walk.indexOf(shownAsk);
+    for (const k of changing) if (k !== shownAsk?.key) changing.delete(k);
+    // Back from the ask that opened after an answer returns to that answer; from any other ask it returns to the list.
+    stepBack = at === 'decide' && cameFrom?.to === location.hash && decideDone.some((d) => d.key === cameFrom.from) ? `#decide/${cameFrom.from}` : '#waiting';
     // A design and a decision live under Decide; Answered is reached from Today.
     const active = at === 'decide' || at === 'designs' ? 'waiting' : at === 'answered' ? '' : at ?? '';
     const count = (a) => (a === 'reports' && !state.readonly ? by.reports.filter(unread).length : a ? by[a].length : undefined);
@@ -4044,7 +4096,7 @@
     const bulk = { waiting: by.waiting, designs: by.designs, evidence: by.evidence, reports: [...by.reports, ...by.notes], answered: by.answered }[at] ?? [];
     // An ask on a phone has a bar of its own: back to Decide, the question once the page scrolls past it, and the ask's More.
     const top = el('header', { class: head === 'decide' ? 'top ask-nav' : head ? 'top' : 'top today-top' }, head && !TABS.some(([a]) => a === head)
-      ? el('a', { class: 'back', href: head === 'decide' ? '#waiting' : '#' }, ...(head === 'decide' ? [glyph('left'), 'Decide'] : ['‹ Today'])) : '',
+      ? el('a', { class: 'back', href: head === 'decide' ? stepBack : '#' }, ...(head === 'decide' ? [glyph('left'), stepBack === '#waiting' ? 'Decide' : 'Back'] : ['‹ Today'])) : '',
     // Decide leads with the date over a large title, and keeps its More at the top right.
     (head === 'waiting' || at === 'reports') && !state.readonly ? el('p', { class: 'kicker date-kicker' }, dateLine()) : '',
     ...(head ? [el('h1', { tabindex: '-1' }, pageTitle)] : todayTop(by.waiting.length, by.answered.filter((d) => isToday(state.answers[d.key].at)).length)),
@@ -4066,12 +4118,15 @@
       notes(by.notes), dismissed(state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && ['reports', 'notes'].includes(area(d))), 'Archived'));
     const update = at === 'evidence' && ((key && state.decisions.find((d) => d.key === key && !gone.has(d.key) && d.type === 'evidence')) || by.evidence.find((d) => d.type === 'evidence'));
     const content = [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived'), update)
-      : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0) : decideDesk(top, by.waiting, hidden, decideQueue, key)] : [top]), ...(deskSplit ? [] : at === 'waiting' && !state.readonly ? [decideList(by.waiting, hidden)]
-      : at === 'decide' ? [decideAt < 0 ? el('p', { class: 'empty' }, 'Nothing to decide for that question.')
-        : decidePage(decideQueue[decideAt], decideQueue.length > 1 ? decideQueue[(decideAt + 1) % decideQueue.length] : undefined, false, askBar)]
+      : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0) : decideDesk(top, by.waiting, hidden, decideQueue, key, decideDone)] : [top]), ...(deskSplit ? [] : at === 'waiting' && !state.readonly ? [decideList(by.waiting, hidden, decideDone)]
+      : at === 'decide' ? [!shownAsk ? el('p', { class: 'empty' }, 'Nothing to decide for that question.')
+        : decidePage(shownAsk, doneAt >= 0 ? walk[wi + 1] : decideQueue.length > 1 ? decideQueue[(decideAt + 1) % decideQueue.length] : undefined, false, askBar)]
       : at === 'designs' ? [...designGroups(by.designs)] : at === 'evidence' ? [...evidenceList(by.evidence), dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived')] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : today(by))];
-    top.append(...[askBar.mid, askBar.more].filter(Boolean));
+    // On a phone the ask's bar steps to the ask before and after it, answered ones too.
+    const step = (to, mark, words) => (to ? el('a', { class: 'step', href: `#decide/${to.key}`, 'aria-label': words }, glyph(mark)) : el('span', { class: 'step', 'aria-hidden': 'true' }, glyph(mark)));
+    if (head === 'decide' && shownAsk && !state.readonly) askBar.steps = el('span', { class: 'steps' }, step(walk[wi - 1], 'up', 'Previous'), step(walk[wi + 1], 'down', 'Next'));
+    top.append(...[askBar.mid, askBar.steps, askBar.more].filter(Boolean));
     // The report shown on a desk stays in place under a new list and bar while it is the same report, so its frame is not loaded again.
     const keptRead = document.querySelector('#board .split-detail > .read'), newRead = content[0]?.querySelector?.('.split-detail > .read');
     if (keptRead && newRead && keptRead.dataset.sig === newRead.dataset.sig) {
@@ -4127,7 +4182,11 @@
     if (!phone()) {
       const detail = document.querySelector('.split-detail'), now = document.querySelector('.split-list [data-row][aria-current]')?.getAttribute('href');
       if (detail && was >= 0 && now && now !== order[was] && !calm.matches) detail.dataset.dir = order.indexOf(now) >= 0 && order.indexOf(now) < was ? 'up' : 'down', detail.classList.add('in');
-    } else slide(ask.test(location.hash) && from === '#waiting' ? 'push' : ask.test(from) && location.hash === '#waiting' ? 'pop' : '');
+    } else {
+      // From one ask to another the page pushes on going forward and pops on going back, in the order the arrows step.
+      const order = (h) => walkKeys.indexOf(h.slice(8));
+      slide(ask.test(location.hash) && from === '#waiting' ? 'push' : ask.test(from) && location.hash === '#waiting' ? 'pop' : ask.test(from) && ask.test(location.hash) ? (order(location.hash) < order(from) ? 'pop' : 'push') : '');
+    }
     if (!reader.hidden) { scrollTo(0, 0); return reader.querySelector('h1').focus({ preventScroll: true }); }
     const item = (jump || back) && document.getElementById(`item-${jump || back}`);
     jump = null;

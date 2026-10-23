@@ -176,9 +176,13 @@ without posting.
   last card is **Your own answer**: it opens one box, and the button becomes
   **Send answer**, which sends the words as the answer. One **Note**, open
   under the cards, goes with any pick. **More** over the ask holds **Ask me
-  later** and **Dismiss**. On a phone the button turns
-  into a check and takes you back to the list, where the row folds away; on
-  a wider screen it opens the next ask, or the list after the last.
+  later** and **Dismiss**. The button turns into a check and opens the next
+  ask, or the list after the last; on a phone that ask's bar reads **Back**,
+  which (as a swipe right does) returns to the ask just answered. An answered
+  ask opens with its answer, its note and when, and **Change answer**: a new
+  pick goes to the agent as an answer that `replaces` the earlier one, with
+  **Undo**. Decide lists every answer under **Answered**, and the arrows in a
+  phone ask's bar step through answered asks and open ones.
   **1**–**9** picks an option and answers it, **E** skips to the next ask,
   **Z** undoes the last answer, and a swipe right takes the recommended answer
   while a swipe left skips. A plan opens its own page instead, and a design
@@ -245,9 +249,10 @@ without posting.
   that command for every saved answer, read when the board starts. It runs
   with no shell, in the board's folder, and gets the answer as one JSON line
   on stdin (`{"event":"answer","contract":1,"kind","schema","key","answer",
-  "label","close","at","note"?,"title"?,"filer"?,"comments"?}`, where `kind`
-  and `schema` are the item's contract kind, or `ask` and 1 for a
-  board-format item, and `comments`, present when the answer carried comments
+  "label","close","at","note"?,"replaces"?,"title"?,"filer"?,"comments"?}`,
+  where `kind` and `schema` are the item's contract kind, or `ask` and 1 for
+  a board-format item, `replaces`, present on a changed answer, names the
+  answer it replaces, and `comments`, present when the answer carried comments
   on mock elements, lists each as `id`, `mock`, `hash`, `ref`, `tag`,
   `words` and `text`); the answer is never put into its arguments, so a
   typed note cannot inject a command. A failure is logged and never blocks
