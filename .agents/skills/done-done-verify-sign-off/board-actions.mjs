@@ -111,44 +111,33 @@ const PAGES = [
       for (const [key, href] of Object.entries(links)) await h.nav(`open ${key}`, h.card(key), new RegExp(`^${href}$`));
       const heads = () => [...h.board().querySelectorAll('.dl-head')].map((e) => e.firstChild.textContent).join('|');
       h.has('groups Sign in, Answer, Review', heads() === 'Sign in|Answer|Review' && h.board().querySelector('.dl-head'));
-      // More: the sort both ways, then Answer all recommended and Move all to Later, each taken back with Undo.
+      // More, as the prototype has it: Answer all recommended and Move all to later, each taken back with Undo.
       const more = () => h.board().querySelector('.top .dl-more'), item = (act) => more()?.querySelector(`[data-act="${act}"]`);
-      for (const order of ['Newest first', 'Oldest first']) await h.press(`More: ${order === 'Newest first' ? 'Oldest' : 'Newest'} first`, item('sort'), () => item('sort')?.textContent === order);
       await h.cycle('More: Answer all recommended', item('answer-all'), () => !h.card('ship') && !h.card('keep-the-weekly-digest'), () => h.card('ship') && h.card('keep-the-weekly-digest'), /answered with the recommended pick/);
-      await h.cycle('More: Move all to Later', item('later-all'), () => [...h.board().querySelectorAll('.dl-head')].every((e) => /^Later/.test(e.textContent)), () => !h.board().querySelector('.g-later'), /to Later/);
+      await h.cycle('More: Move all to later', item('later-all'), () => [...h.board().querySelectorAll('.dl-head')].every((e) => /^Later/.test(e.textContent)), () => !h.board().querySelector('.g-later'), /to later/);
     } },
-    { run: async (h) => { const m = h.board().querySelector('.top .dl-more'); m.open = true; await h.until('menu', () => m.querySelector('.dl-menu')?.getBoundingClientRect().height); } },
-    { shot: 'waiting-menu', run: async (h) => { h.board().querySelector('.top .dl-more').open = false; await h.press('More: Select', h.board().querySelector('.top .dl-more [data-act="select"]'), () => h.find(/^Cancel$/)); h.card('npm').click(); h.card('ship').click(); await h.until('picked', () => h.box(h.card('ship')).classList.contains('picked')); } },
-    { shot: 'waiting-select', run: async (h) => {
-      await h.press('Cancel', h.find(/^Cancel$/), () => h.board().querySelector('.top .dl-more'));
-      await h.press('More: Select again', h.board().querySelector('.top .dl-more [data-act="select"]'), () => h.find(/^Cancel$/));
-      await h.press('pick npm', h.card('npm'), () => h.box(h.card('npm')).classList.contains('picked'));
-      await h.cycle('Dismiss 1 selected', h.find(/^Dismiss 1$/), () => !h.card('npm'), () => h.card('npm'), /1 dismissed/);
-    } },
+    { shot: 'waiting-menu', run: async (h) => { const m = h.board().querySelector('.top .dl-more'); m.open = true; await h.until('menu', () => m.querySelector('.dl-menu')?.getBoundingClientRect().height); } },
   ] },
   ...[['npm', 'signin', []], ['ship', 'ask', ['^Friday', '^Next week']], ['look', 'design', ['^A: one column', '^B: two columns']]].map(([key, kind, options]) => ({
     name: `decide-${key}`, hash: `#decide/${key}`, ready: '.decide', stages: [{ data: { options, key, kind }, run: async (h, { options, key, kind }) => {
-      const bar = () => h.board().querySelector('.decide-bar');
+      const bar = () => h.board().querySelector('.decide-bar'), more = () => h.board().querySelector('.ask-nav .dl-more, .split-bar .dl-more');
       if (kind === 'signin') await h.need('Open the npm sign-in', h.find(/^Open the npm sign-in$/, h.board()));
+      // Nothing is picked until a pick: the one button waits, off, then names the pick.
+      if (options.length) h.has('Pick an answer (off until a pick)', bar()?.querySelector('.answer:disabled'));
       for (const o of options) await h.press(`option ${o}`, h.find(new RegExp(o), h.board().querySelector('.pick-list, .choices, .decide')), () => true);
-      // The first ask has no previous and the last has no next: the pager shows that end as a dimmed mark, not a link.
-      const [at, of] = h.board().querySelector('.pager .of').textContent.split(' of ').map(Number);
-      for (const [what, end] of [['Previous ask', at === 1], ['Next ask', at === of]]) {
-        const step = h.find(new RegExp(`^${what}$`), h.board().querySelector('.pager'), 'a, span.step');
-        if (end) h.has(`${what} (dimmed at the end)`, step?.getAttribute('aria-disabled') === 'true' && step); else await h.nav(what, step, /^#decide\//);
-      }
-      // One Answer button and one More beside it: More holds Ask me later, Write my own answer, Ask for another round and Dismiss.
-      h.has('More', bar()?.querySelector('.dl-more > summary'));
+      // One button in the bar, and one More over the ask holding Ask me later and Dismiss.
+      h.has('More', more()?.querySelector('summary'));
       if (options.length) {
-        await h.press('Write my own answer', h.find(/^Write my own answer$/, bar()), () => /^Send your answer/.test(bar().querySelector('.answer').textContent));
+        await h.press('Your own answer', h.find(/^Your own answer/, h.board().querySelector('.pick-list')), () => bar().querySelector('.answer').textContent === 'Send answer');
         await h.press(`option ${options[0]} again`, h.find(new RegExp(options[0]), h.board().querySelector('.pick-list')), () => /^Answer /.test(bar().querySelector('.answer').textContent));
       }
-      await h.cycle('Ask me later', h.find(/^Ask me later$/, bar()), () => location.hash === '#waiting' && h.board().querySelector('.g-later'), () => h.board().querySelector('.decide'), /Moved to Later/);
+      await h.cycle('Ask me later', h.find(/^Ask me later$/, more()), () => location.hash === '#waiting' && h.board().querySelector('.g-later'), () => h.board().querySelector('.decide'), /moved to later/);
       if (options.length) {
-        await h.cycle(`Answer ${key}`, h.find(/^Answer /, bar()), () => location.hash !== `#decide/${key}` || !h.board().querySelector('.decide-bar .answer'), () => h.board().querySelector('.decide-bar .answer'), /Saved/);
+        await h.press(`option ${options[0]} once more`, h.find(new RegExp(options[0]), h.board().querySelector('.pick-list')), () => /^Answer /.test(bar().querySelector('.answer').textContent));
+        await h.cycle(`Answer ${key}`, h.find(/^Answer /, bar()), () => location.hash !== `#decide/${key}` || !h.board().querySelector('.decide-bar .answer'), () => h.board().querySelector('.decide-bar .answer'), /\? · /);
       }
       // Another ask opens after a dismiss; the last sign-in leaves its page saying nothing is left to decide.
-      await h.cycle(`Dismiss ${key}`, h.find(/^Dismiss,/, bar()), () => location.hash !== `#decide/${key}` || /Nothing to decide/.test(h.board().textContent), () => h.find(/^Dismiss,/, h.board().querySelector('.decide-bar')), /Dismissed/);
+      await h.cycle(`Dismiss ${key}`, h.find(/^Dismiss,/, more()), () => location.hash !== `#decide/${key}` || /Nothing to decide/.test(h.board().textContent), () => h.find(/^Dismiss,/, more()), /Dismissed/);
     } }] })),
   { name: 'plan', hash: '#waiting/plan-kind-board', ready: '.plan-section', stages: [{ run: async (h) => {
     const r = h.reader(), sections = [...r.querySelectorAll('.plan-section')].filter((s) => s.querySelector('.approve'));
@@ -174,7 +163,7 @@ const PAGES = [
   { name: 'evidence-update', hash: '#evidence/update-2', ready: ':is(#reader, .split-detail) :is(.choices, [aria-label^="Pass"])', stages: [{ run: async (h) => {
     const pane = () => document.querySelector('.split-detail') ?? h.reader(), r = pane();
     for (const verdict of ['Pass', 'Fail', 'Needs work']) {
-      await h.cycle(`${verdict} verdict`, h.find(new RegExp(`^${verdict},`), pane()), () => h.find(new RegExp(`^${verdict},`), pane())?.getAttribute('aria-pressed') === 'true', () => true, /Saved/);
+      await h.cycle(`${verdict} verdict`, h.find(new RegExp(`^${verdict},`), pane()), () => h.find(new RegExp(`^${verdict},`), pane())?.getAttribute('aria-pressed') === 'true', () => true, / · /);
     }
     if (r === h.reader()) await h.nav('Back to Evidence', h.find(/Evidence$/, r, 'a'), /^#evidence$/);
     await h.cycle('Dismiss update 2', h.find(/^Dismiss,/, pane()), () => location.hash === '#evidence' || !document.getElementById('err-update-2'), () => h.find(/^Pass,/, pane()), /Dismissed/);
@@ -208,19 +197,18 @@ const PAGES = [
   } }] },
   { name: 'answered', hash: '#answered', ready: '[id="item-digest-old"]', stages: [{ run: async (h) => {
     const row = h.card('digest-old');
-    await h.cycle('Change answer to No', h.find(/^No:/, row), () => h.find(/^No:/, h.card('digest-old'))?.getAttribute('aria-pressed') === 'true', () => true, /Saved/);
+    await h.cycle('Change answer to No', h.find(/^No:/, row), () => h.find(/^No:/, h.card('digest-old'))?.getAttribute('aria-pressed') === 'true', () => true, / · /);
     await h.dismissCard('digest-old');
     await h.bulk('digest-old');
   } }] },
-  // Last, because these cannot be taken back: a comment, another round, a reply, and the design's own verdict.
+  // Last, because these cannot be taken back: a note with a pick, an answer in your own words, and the design's own verdict.
   { name: 'messages', hash: '#decide/keep-the-weekly-digest', ready: '.decide', stages: [{ run: async (h) => {
-    const other = () => h.board().querySelector('.decide-other'), say = (text) => { const t = other().querySelector('textarea'); t.closest('details').open = true; h.board().querySelector('.decide-bar .dl-more').open = true; h.type(t, text); };
-    if (!h.need('Add a comment', other()?.querySelector('summary'))) return;
-    say('Keep it short.');
-    await h.press('Ask for another round', h.find(/^Ask for another round,/), () => /1 round asked/.test(other().querySelector('summary').textContent));
-    say('Keep it short.');
-    await h.press('Write my own answer', h.find(/^Write my own answer$/), () => /^Send your answer/.test(h.board().querySelector('.decide-bar .answer').textContent));
-    await h.cycle('Send your answer', h.board().querySelector('.decide-bar .answer'), () => location.hash !== '#decide/keep-the-weekly-digest', () => true, /Saved/);
+    const page = () => h.board().querySelector('.decide'), answer = () => page().querySelector('.decide-bar .answer');
+    if (!h.need('Note', page()?.querySelector('.note-box'))) return;
+    h.type(page().querySelector('.note-box'), 'Keep it short.');
+    await h.press('Your own answer', h.find(/^Your own answer/, page().querySelector('.pick-list')), () => answer().textContent === 'Send answer' && answer().disabled);
+    h.type(page().querySelector('.own-box'), 'Keep it, but send it on Mondays.');
+    await h.cycle('Send answer', answer(), () => location.hash !== '#decide/keep-the-weekly-digest', () => true, /your reply/);
   } }] },
   { name: 'design-review', hash: '#designs/chat-journeys', ready: '#reader .design-review', stages: [
     { shot: 'design-approved', run: async (h) => {

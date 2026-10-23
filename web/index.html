@@ -203,14 +203,9 @@
   .seg button[aria-pressed="true"]::before { content: none; }
     .leash-line { margin: 0.5rem 1rem 0; color: var(--muted); font-size: var(--t-xs); line-height: 1.1875rem; letter-spacing: -0.01em; }
   @media (max-width: 63.999rem) {
-    body:has(.decide) { padding-bottom: calc(9.5rem + env(safe-area-inset-bottom)); }
     /* The smaller Decide title lifts a short ask; the page still reaches the bar so a swipe anywhere above it skips. */
     .decide { min-height: calc(100dvh - 13.5rem - env(safe-area-inset-bottom)); }
   }
-  /* Decide names itself in the bar, small and centred, and the question is the headline. */
-  .top:has(+ .decide) { height: 3.25rem; padding: 0; }
-  .top:has(+ .decide) h1 { position: absolute; top: 0; left: 50%; transform: translateX(-50%); font-size: 1.0625rem; line-height: 3.25rem; font-weight: 600; letter-spacing: -0.022em; white-space: nowrap; }
-  @media (min-width: 64rem) { .top:has(+ .decide) { height: 3.75rem; } .top:has(+ .decide) h1 { line-height: 3.75rem; } }
 
   /* Reports: a grouped list under small section heads, a row per report: its picture, title, what it says, then its kind, steps and date.
      A blue dot marks one filed today. A row with steps draws them as numbered nodes on a line, with only the marks that matter under each. */
@@ -431,14 +426,6 @@
   .phone { display: block; box-sizing: border-box; padding: 7px 7px 0; border-radius: 28px 28px 0 0; background: #1D1D1F; box-shadow: inset 0 0 0 1px #3A3A3C; }
   .phone img { display: block; width: 100%; border-radius: 21px 21px 0 0; }
   .phone.wide { padding: 6px 6px 0; border-radius: 14px 14px 0 0; } .phone.wide img { border-radius: 9px 9px 0 0; }
-  .dhero { position: relative; display: flex; justify-content: center; box-sizing: border-box; max-height: 10.25rem; margin: .5rem 0 0; padding: 1.25rem 1.5rem 0; overflow: hidden; border-radius: 1.125rem; background: var(--surface); color: inherit; text-decoration: none; }
-  .dhero .phone { width: min(150px, 44%); } .dhero .phone.wide { width: min(280px, 80%); }
-  .dhero .phone img { aspect-ratio: 9 / 16; object-fit: cover; object-position: top; } .dhero .phone.wide img { aspect-ratio: 16 / 10; }
-  .dhero .pass, .dhero .open { position: absolute; top: .875rem; display: flex; align-items: center; gap: .375rem; height: 1.875rem; padding: 0 .75rem; border-radius: .9375rem; background: var(--bg); font-size: .9375rem; }
-  .dhero .pass { left: .875rem; font-weight: 600; } .dhero .open { right: .875rem; color: var(--accent); }
-  .dhero .pass.ok { color: var(--ok); } .dhero .pass.bad { color: var(--danger); } .dhero .pass.warn { color: var(--warn); }
-  .dhero .pass svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-  @media (min-width: 64rem) { .dhero { max-height: 15rem; padding: 1.75rem 1.5rem 0; } .dhero .phone { width: min(200px, 56%); } }
   .decide-preview .rung { width: 100%; }
   .decide-preview .rung .frame, .decide-preview .rung iframe { max-height: 15rem; }
   .decide-preview .mocks { --tall: min(32svh, 16rem); }
@@ -449,9 +436,6 @@
     .decide-preview { margin: .25rem 0 .5rem; padding: .75rem; }
     .decide-preview .mocks { grid-auto-columns: min(85%, 8rem); --tall: min(20svh, 10rem); }
     .decide-preview .shot { aspect-ratio: 1; }
-    .decide .lead h2 { margin: 1rem 0 .5rem; }
-    .decide .pick-label { margin-top: 1rem; }
-    body:has(.decide) #toast { bottom: calc(10rem + env(safe-area-inset-bottom)); }
   }
   .decide h2 { margin: .5rem 0 .5rem; text-wrap: balance; font-size: 1.75rem; line-height: 1.15; letter-spacing: -.01em; }
   .decide .why { margin: 0; color: var(--muted); font-size: 1.0625rem; font-weight: 400; }
@@ -472,14 +456,7 @@
   .silent-line { display: flex; flex-basis: 100%; gap: 0.625rem; align-items: flex-start; margin: 0; padding: 0 .25rem .25rem; color: var(--muted); font-size: 0.9375rem; line-height: 1.4; letter-spacing: -0.016em; }
   .silent-line b { color: var(--text); font-weight: 600; }
   .silent-line .icon { width: 1.0625rem; height: 1.0625rem; margin-top: 0.125rem; background: none; } .silent-line .icon svg { width: 1.0625rem; height: 1.0625rem; stroke: currentColor; }
-  .pager { position: absolute; top: 0; right: 0; display: flex; align-items: center; gap: .25rem; height: 3.25rem; color: var(--muted); font-size: .9375rem; font-variant-numeric: tabular-nums; }
-  .pager .of { white-space: nowrap; }
-  .pager .step { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: 50%; color: var(--accent); text-decoration: none; }
-  .pager .step[aria-disabled] { opacity: .3; }
-  .pager .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.75; }
-  @media (min-width: 64rem) { .pager { height: 3.75rem; } }
   /* A comment with the answer, your own words, another round: one quiet line right under the choices. */
-  .decide-other { margin-top: 0.5rem; } .decide-other .other > summary { padding-left: 1rem; color: var(--accent); font-size: 1.0625rem; font-weight: 400; }
   .decide-bar { position: sticky; z-index: 1; bottom: calc(4.625rem + env(safe-area-inset-bottom)); display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
     margin-top: 1rem; padding: .75rem 0 .5rem; background: var(--bg); }
   /* Answer takes the row on one line; when a long label leaves no room, Skip and Later move under it rather than squeeze it. */
@@ -843,7 +820,6 @@
     .up-next .go .kc { display: inline-grid; }
     .t-sec .sec-head { margin: 1.75rem 0 0.625rem; }
     .lrow:hover, .rp-card:hover { background: color-mix(in srgb, var(--text) 4%, var(--card)); }
-    .decide h2 { font-size: 2.5rem; line-height: 1.1; }
     .decide-bar { position: static; margin: 1rem 0 0; padding: 0; background: transparent; }
     .decide-bar .answer { flex: none; }
     .rows.reports, .sec-h:has(+ .reports), .legend { max-width: 50rem; }
@@ -1173,6 +1149,14 @@
   .date-kicker { margin: 0 0 0.125rem; color: var(--muted); font-size: var(--t-xs); line-height: 1.125rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
   .top:has(> .date-kicker) h1 { font-size: 2.125rem; line-height: 2.625rem; }
   .top > .dl-more { position: absolute; top: 2.75rem; right: -0.5rem; }
+  /* Decide's head on a phone, as the prototype sets it: the date from 20px down, the large title, a 15px line of what waits, and More beside the title. */
+  @media (max-width: 63.999rem) {
+    .top:has(+ .decide-list) { padding-top: 1.25rem; }
+    .top:has(+ .decide-list) .date-kicker { margin: 0; line-height: 1.25rem; }
+    .top:has(+ .decide-list) h1 { margin-top: 0.1875rem; line-height: 2.5625rem; }
+    .top:has(+ .decide-list) .waiting-lede { margin-top: 0.125rem; font-size: var(--t-s); line-height: 1.25rem; }
+    .top:has(+ .decide-list) > .dl-more { top: 2.25rem; right: 0; }
+  }
   .top > .bulk { margin-top: 0.25rem; }
   /* More: a disc at the top right (or beside Answer) whose menu scales out of it. */
   .dl-more { position: relative; flex: none; }
@@ -1191,6 +1175,8 @@
   .dl-menu > button + button { border-top: 0.5px solid var(--line); }
   .dl-menu > button:active { background: var(--sunk); }
   .dl-menu > button.dis { color: var(--danger); }
+  .dl-menu > button:disabled { background: none; color: var(--faint); cursor: default; }
+  .dl-menu > .dl-sep { height: 0.375rem; margin: 0.25rem 0; background: var(--sunk); }
   /* Group heads with their count, then the rows: full width on a phone, a rounded block wider up. */
   .decide-list .dl-head, .rp-page .dl-head { display: flex; align-items: baseline; gap: 0.5rem; margin: 1.75rem 0 0.25rem; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; font-weight: 600; letter-spacing: -0.01em; }
   .decide-list > .dl-head:first-child, .rp-page > .dl-head:first-child { margin-top: 0.5rem; }
@@ -1201,10 +1187,9 @@
   .dl-face { position: relative; z-index: 1; display: flex; align-items: center; gap: 0.875rem; min-height: 4.75rem; padding: 0.75rem 1.25rem; background: var(--bg); color: inherit; text-decoration: none;
     touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; transition: background-color 120ms linear; }
   .dl-face.down { background: color-mix(in srgb, var(--text) 6%, var(--bg)); transition: none; }
-  .dl-row:not(.leaving) ~ .dl-row .dl-face::before { content: ""; position: absolute; top: 0; right: 0; left: 4.125rem; border-top: 0.5px solid var(--line); }
   .dl-face .icon { width: 2rem; height: 2rem; border-radius: 0.5625rem; background: var(--k, var(--action)); transition: transform 300ms var(--spring), background-color 120ms linear; }
   .dl-face .icon svg { width: 1.1875rem; height: 1.1875rem; stroke: #FFFFFF; stroke-width: 2.1; }
-  .g-signin { --k: color-mix(in srgb, var(--tk-warning) 88%, #000); } .g-review { --k: var(--c-indigo); } .g-later { --k: var(--muted); }
+  .g-signin { --k: var(--tk-warning); } .g-review { --k: var(--c-indigo); } .g-later { --k: var(--muted); }
   .dl-face .copy { display: grid; flex: 1; min-width: 0; gap: 0.125rem; }
   .dl-face .r1 { display: flex; align-items: baseline; gap: 0.625rem; }
   .dl-face .title { flex: 1; min-width: 0; display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: var(--t-m); line-height: 1.375rem; font-weight: 600; letter-spacing: -0.022em; }
@@ -1214,7 +1199,7 @@
   .dl-face .sub b { color: var(--text); font-weight: 500; }
   /* The actions under a row show only while it is swiped, so a press tint never lets them through. */
   .dl-act { position: absolute; inset: 0; display: none; flex-direction: column; justify-content: center; gap: 0.1875rem; padding: 0 1.625rem; color: #FFFFFF; font-size: var(--t-s); line-height: 1.25rem; font-weight: 600; }
-  .dl-act.yes { align-items: flex-start; background: color-mix(in srgb, var(--tk-success) 82%, #000); }
+  .dl-act.yes { align-items: flex-start; background: var(--tk-success); }
   .dl-act.later { align-items: flex-end; background: var(--c-indigo); }
   .dl-act > * { transition: transform 240ms var(--spring), opacity 120ms linear; opacity: 0.85; }
   .dl-act .glyph { width: 1.5rem; height: 1.5rem; stroke-width: 2.2; }
@@ -1222,9 +1207,9 @@
   .dl-row.swiping[data-side="yes"] .yes, .dl-row.swiping[data-side="later"] .later, .leaving[data-side="yes"] .yes, .leaving[data-side="later"] .later { display: flex; }
   .leaving[data-side="yes"] .dl-face { transform: translateX(100%); } .leaving[data-side="later"] .dl-face { transform: translateX(-100%); }
   /* Answered: the row tints green and its icon pops green, then it folds away; a row taken back flashes blue. */
-  .leaving.answered:not([data-side]) .dl-face { background: color-mix(in srgb, var(--tk-success) 12%, var(--bg)); }
+  .leaving.answered:not([data-side]) .dl-face { background: color-mix(in srgb, var(--tk-success) 9%, var(--bg)); }
   .leaving.later:not([data-side]) .dl-face { background: color-mix(in srgb, var(--c-indigo) 12%, var(--bg)); }
-  .leaving.answered .icon { background: color-mix(in srgb, var(--tk-success) 82%, #000); transform: scale(1.08); }
+  .leaving.answered .icon { background: var(--tk-success); transform: scale(1.08); }
   .dl-row.returned .dl-face { animation: row-back 600ms var(--ease); }
   @keyframes row-back { from { background: color-mix(in srgb, var(--accent) 14%, var(--bg)); } }
   .rise .dl-row, .rise .dl-head { animation: rise 280ms var(--ease) both; animation-delay: calc(min(var(--n, 0), 12) * 28ms); }
@@ -1233,7 +1218,7 @@
   /* Reports: a 58px picture of what each one explains with (teal, which no other area uses), its title and a blue dot while it is not read,
      two lines of what it says, then one quiet line of its form, video, project and time. Read and unread is blue under a right swipe, Archive indigo under a left one. */
   .rp-list .dl-face { align-items: flex-start; min-height: 6.5rem; padding-top: 0.875rem; padding-bottom: 0.875rem; }
-  .rp-list .dl-row:not(.leaving) ~ .dl-row .dl-face::before { left: 5.75rem; }
+  .rp-list .dl-row:not(.leaving) ~ .dl-row .dl-face::before { content: ""; position: absolute; top: 0; right: 0; left: 5.75rem; border-top: 0.5px solid var(--line); }
   .rp-list .rth { display: grid; flex: none; place-items: center; width: 3.625rem; height: 3.625rem; border-radius: 0.9375rem; color: var(--teal);
     background: color-mix(in srgb, var(--teal) 13%, var(--tile)); box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--teal) 30%, transparent); }
   .rp-list .rth svg { width: 2.625rem; height: 2.625rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -1254,11 +1239,18 @@
   /* All clear: a green check pops in. */
   .all-clear-big { padding: 4rem 1.5rem 1rem; text-align: center; }
   .all-clear-big .big { display: grid !important; place-items: center; width: 4.5rem; height: 4.5rem; margin: 0 auto 1.125rem; border-radius: 50%; color: #FFFFFF;
-    background: color-mix(in srgb, var(--tk-success) 82%, #000); box-shadow: 0 10px 28px -8px color-mix(in srgb, var(--tk-success) 70%, transparent); animation: pop 520ms var(--spring); }
+    background: var(--tk-success); box-shadow: 0 10px 28px -8px color-mix(in srgb, var(--tk-success) 70%, transparent); animation: pop 520ms var(--spring); }
   .all-clear-big .glyph { width: 2.125rem; height: 2.125rem; stroke-width: 2.6; }
   .all-clear-big h2 { margin: 0 0 0.375rem; font-size: var(--t-l); line-height: 1.75rem; }
   .all-clear-big p { margin: 0; color: var(--muted); font-size: var(--t-s); }
   @keyframes pop { from { opacity: 0; transform: scale(0.4); } }
+  /* Decide's all clear sits where the prototype's does: 55px under the head on a phone, 48px on a desk's list, and larger in the desk's pane. */
+  .decide-list > .all-clear-big { padding-top: 3.4375rem; }
+  @media (min-width: 64rem) {
+    .split-list .decide-list > .all-clear-big { padding-top: 3rem; }
+    .split-detail > .all-clear-big.pane .big { width: 5.5rem; height: 5.5rem; margin-bottom: 1.25rem; } .split-detail > .all-clear-big.pane .glyph { width: 2.625rem; height: 2.625rem; }
+    .split-detail > .all-clear-big.pane h2 { font-size: 1.75rem; line-height: 2.125rem; letter-spacing: -0.024em; } .split-detail > .all-clear-big.pane p { font-size: var(--t-m); }
+  }
   /* Shimmering rows hold the place while the board loads. */
   .skel { padding: 1.5rem 0 0; }
   .sk { display: block; border-radius: 0.375rem; background: linear-gradient(90deg, var(--skel) 0%, var(--skel-hi) 50%, var(--skel) 100%); background-size: 200% 100%; animation: shimmer 1.1s linear infinite; }
@@ -1273,50 +1265,128 @@
   #board.pop > * { animation: pop-in 250ms var(--ease); }
   @keyframes push-in { from { opacity: 0.4; transform: translateX(32%); } }
   @keyframes pop-in { from { opacity: 0.6; transform: translateX(-24%); } }
-  /* The ask: its kind, who asked and when over the question; the answers as cards with a radio; one Answer button that names the pick, and More. */
-  @media (max-width: 63.999rem) { .top:has(+ .decide) h1 { width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); } }
-  .decide .kicker { margin: 1.25rem 0 0; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; }
-  .decide .kicker .k { color: var(--accent); font-weight: 600; }
-  .decide .kicker + h2 { margin-top: 0.375rem; }
-  .decide .pick-label { margin: 1.75rem 0 0.625rem; padding: 0; color: var(--muted); font-size: var(--t-s); font-weight: 600; letter-spacing: -0.01em; }
+  /* The ask, as the approved prototype lays it out. A phone gives it a bar of its own (back to Decide, the question once the page scrolls past it, and More) and slides the tab bar away.
+     Its kind, who asked and when sit over the question; the proof it rests on is one row; the answers are outlined cards with a radio, ending in Your own answer;
+     one note sits open under them; what happens if you stay quiet is a footnote; and one button, off until a pick and then naming it, sits in a dock at the foot. */
+  .decide { --opt: var(--bg); --ring: color-mix(in srgb, var(--faint) 45%, transparent); } .decide.g-answer { --k: var(--accent); }
+  @media (prefers-color-scheme: dark) { .decide { --opt: var(--tk-surface-high); } }
+  @media (max-width: 63.999rem) {
+    .top.ask-nav { position: sticky; z-index: 3; top: 0; display: flex; align-items: center; justify-content: space-between; height: 3.25rem; margin: 0 -1.25rem; padding: 0 0.25rem; background: var(--bg); transition: box-shadow 150ms linear; }
+    .top.ask-nav.scrolled { box-shadow: 0 0.5px 0 var(--line); }
+    .top.ask-nav h1 { width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    .ask-nav .back { padding: 0 0.75rem 0 0.125rem; font-size: 1.0625rem; }
+    .ask-nav .back .glyph { width: 1.75rem; height: 1.75rem; margin-right: -0.125rem; stroke-width: 2.2; }
+    .ask-nav .mid { position: absolute; left: 7.25rem; right: 7.25rem; overflow: hidden; font-weight: 600; text-align: center; white-space: nowrap; text-overflow: ellipsis;
+      opacity: 0; visibility: hidden; transition: opacity 150ms linear, visibility 0s linear 150ms; }
+    .ask-nav.scrolled .mid { opacity: 1; visibility: visible; transition: opacity 150ms linear; }
+    .top.ask-nav > .dl-more { position: static; }
+    #tabs { transition: transform 250ms var(--ease); }
+    body:has(#board > .decide) #tabs { transform: translateY(calc(100% + 2.5rem)); }
+    body:has(#board > .decide) { padding-bottom: calc(6.5rem + env(safe-area-inset-bottom)); }
+    body:has(#board > .decide) #toast { bottom: calc(6rem + env(safe-area-inset-bottom)); }
+    .decide-bar { position: fixed; z-index: 2; left: 0; right: 0; bottom: 0; margin: 0; padding: 0.75rem max(1.25rem, calc((100vw - 42.5rem) / 2)) calc(1rem + env(safe-area-inset-bottom));
+      background: linear-gradient(to bottom, transparent, var(--bg) 1.625rem); }
+    .decide-bar .answer, .decide-bar .open-link { flex: 1 1 100%; }
+  }
+  /* The prototype sets its text 0.374px tight (-0.022em of its 17px body), buttons too; Decide follows it, so its lines break where the prototype's do. */
+  :is(.decide-list, .decide, .split-bar:has(> .crumb)) { letter-spacing: -0.374px; } :is(.decide-list, .decide) :is(button, textarea) { letter-spacing: inherit; }
+  .decide .kicker { margin: 0.25rem 0 0; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; }
+  .decide .kicker .k { color: var(--k); font-weight: 600; }
+  .decide .lead h2 { margin: 0.375rem 0 0.625rem; font-size: 1.75rem; line-height: 2.125rem; letter-spacing: -0.024em; }
+  .decide .why { font-size: var(--t-m); line-height: 1.5rem; letter-spacing: -0.02em; }
+  .decide .pick-label { margin: 1.75rem 0 0.5rem; padding: 0; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; font-weight: 600; letter-spacing: -0.01em; }
+  /* The proof: a small capture, what it shows, its result and when it was checked; it opens the capture in a sheet. */
+  .proof-row { display: flex; align-items: center; gap: 0.875rem; width: 100%; padding: 0.75rem 0.875rem; border-radius: 1rem; background: var(--opt); box-shadow: 0 0 0 0.5px var(--line); color: var(--text); font-weight: 400; text-align: left; transition: background-color 120ms linear; }
+  .proof-row:active { background: color-mix(in srgb, var(--text) 6%, var(--opt)); }
+  .proof-row .pthumb { flex: none; width: 2.625rem; height: 3.5rem; overflow: hidden; border-radius: 0.375rem; background: var(--sunk); box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.14), 0 6px 16px rgba(0, 0, 0, 0.12); }
+  .proof-row .pthumb img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+  .proof-row .pt { display: grid; flex: 1; min-width: 0; gap: 0.125rem; } .proof-row .pt b { font-size: var(--t-b); line-height: 1.375rem; font-weight: 600; }
+  .proof-row > :last-child .glyph { width: 1.375rem; height: 1.375rem; stroke-width: 1.9; color: var(--text); }
+  .pst { color: var(--muted); font-size: 0.875rem; line-height: 1.25rem; }
+  .res { display: inline-flex; align-items: center; gap: 0.3125rem; font-weight: 600; } .res::before { content: ""; width: 0.4375rem; height: 0.4375rem; border-radius: 50%; background: currentColor; }
+  .res.ok { color: var(--ok); } .res.bad { color: var(--danger); } .res.warn { color: var(--warn); }
+  /* The answers: outlined cards; the one picked has a blue ring and its radio fills with a check that springs in. */
   .decide .pick-list { display: grid; gap: 0.625rem; padding: 0; overflow: visible; border-radius: 0; background: none; }
   .decide .pick-list li + li { border-top: 0; }
-  .decide .pick-option { gap: 0.875rem; min-height: 4.5rem; padding: 0.875rem 1rem; border-radius: 1rem; background: var(--surface); box-shadow: inset 0 0 0 2px transparent;
-    -webkit-tap-highlight-color: transparent; transition: box-shadow 160ms linear, transform 260ms var(--spring), background-color 120ms linear; }
-  .decide .pick-option:active { transform: scale(0.98); transition-duration: 90ms; }
-  .decide .pick-option[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); box-shadow: inset 0 0 0 2px var(--accent); }
-  .decide .pick-option .label { font-weight: 600; }
-  .decide .pick-option .recommend { padding: 0 0.5rem; border-radius: 999px; background: color-mix(in srgb, var(--accent) 14%, transparent); font-size: var(--t-xs); line-height: 1.375rem; font-weight: 600; }
-  .decide .pick-option .check { display: grid; flex: none; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--border); color: transparent; visibility: visible; }
-  .decide .pick-option[aria-pressed="true"] .check { background: var(--action); box-shadow: none; color: #FFFFFF; animation: pop 300ms var(--spring); }
-  .decide .pick-option .check .glyph { width: 0.9375rem; height: 0.9375rem; stroke-width: 3; }
-  .decide-bar { flex-wrap: wrap; }
-  .decide > .silent-line { margin-top: 1.25rem; }
-  /* On a phone the bar is a dock over the tab bar, as the answer is always one tap away; the toast rises above it. */
-  @media (max-width: 44.999rem) { .decide-bar { position: fixed; left: 0; right: 0; margin: 0; padding: 0.75rem max(1.25rem, env(safe-area-inset-right)) 0.5rem max(1.25rem, env(safe-area-inset-left)); } }
-  .decide-bar .answer { position: relative; overflow: hidden; min-height: 3.25rem; border-radius: 1rem; font-size: var(--t-m); font-weight: 600;
-    box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--action) 70%, transparent); transition: background-color 160ms linear, transform 260ms var(--spring); }
-  .decide-bar .answer:active { transform: scale(0.97); transition-duration: 90ms; }
-  .decide-bar .dl-more:only-child { margin-left: auto; }
+  .decide .pick-option { align-items: flex-start; gap: 0.875rem; min-height: 0; padding: 0.875rem 1rem; border-radius: 1rem; background: var(--opt); box-shadow: 0 0 0 0.5px var(--line);
+    -webkit-tap-highlight-color: transparent; transition: box-shadow 160ms var(--ease), transform 260ms var(--spring), background-color 120ms linear; }
+  .decide .pick-option:active { transform: scale(0.985); transition-duration: 90ms; }
+  .decide .pick-option[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 5%, var(--opt)); box-shadow: 0 0 0 2px var(--accent); }
+  .decide .pick-option .label-line { align-items: center; }
+  .decide .pick-option .label { font-size: var(--t-m); line-height: 1.375rem; font-weight: 600; }
+  .decide .pick-option .reason { font-size: var(--t-s); line-height: 1.25rem; }
+  .decide .pick-option .recommend { display: inline-flex; align-items: center; height: 1.375rem; padding: 0 0.5rem; border-radius: 0.6875rem; background: color-mix(in srgb, var(--tk-link) 12%, transparent); color: var(--accent); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.01em; }
+  .decide .pick-option .check { display: grid; flex: none; place-items: center; width: 1.5rem; height: 1.5rem; margin-top: -0.0625rem; border-radius: 50%; box-shadow: inset 0 0 0 1.75px var(--ring); color: #FFFFFF; visibility: visible; transition: background-color 160ms var(--ease); }
+  .decide .pick-option[aria-pressed="true"] .check { background: var(--tk-link); box-shadow: none; }
+  .decide .pick-option .check .glyph { width: 0.9375rem; height: 0.9375rem; stroke-width: 3; transform: scale(0); transition: transform 280ms var(--spring); }
+  .decide .pick-option[aria-pressed="true"] .check .glyph { transform: scale(1); }
+  .decide .pick-option > .kc { margin-left: auto; align-self: center; }
+  /* Your own answer: the last card; picking it opens one box under it, and the note below steps aside. The note: one optional box for any pick, always open under its head. */
+  .decide .own-field { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 220ms var(--ease); }
+  .decide .own-field > div { overflow: hidden; margin: 0 -0.1875rem -0.1875rem; padding: 0 0.1875rem 0.1875rem; }
+  .decide.own .own-field { grid-template-rows: 1fr; }
+  .decide :is(.own-box, .note-box) { max-width: none; min-height: 4.25rem; margin: 0; padding: 0.75rem 0.875rem; border: 0; border-radius: 0.875rem; background: var(--sunk); resize: none;
+    font-size: var(--t-m); line-height: 1.375rem; outline: none; transition: box-shadow 140ms var(--ease); }
+  .decide :is(.own-box, .note-box):focus { box-shadow: 0 0 0 2px var(--accent); }
+  @media (max-width: 63.999rem) { .decide :is(.own-box, .note-box) { scroll-margin-bottom: 7.5rem; } }
+  .decide .own-box { min-height: 5.25rem; margin-top: 0.625rem; }
+  .decide label.pick-label { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+  .decide .pick-label small { color: var(--faint); font-size: var(--t-xs); font-weight: 500; }
+  .decide.own .note-field { display: none; }
+  .decide-bar .answer:disabled:not(.done) { box-shadow: none; cursor: default; }
+  .decide > .silent-line { display: block; margin: 0.875rem 0 0; padding: 0; color: var(--faint); font-size: var(--t-xs); line-height: 1.125rem; letter-spacing: -0.004em; }
+  /* A sign-in: its key large, then the facts as one inset group, and Open sign-in with what it does under it. */
+  .signin-ask > .icon { width: 4rem; height: 4rem; margin: 0.5rem 0 1.125rem; border-radius: 1.125rem; background: var(--k); box-shadow: 0 10px 24px -10px var(--k); }
+  .signin-ask > .icon svg { width: 2rem; height: 2rem; stroke: #FFFFFF; stroke-width: 2; }
+  .decide .facts { margin-top: 1.375rem; overflow: hidden; border-radius: 1rem; background: var(--opt); box-shadow: 0 0 0 0.5px var(--line); }
+  .decide .fact { display: flex; align-items: center; gap: 0.875rem; padding: 0.875rem 1rem; font-size: var(--t-s); }
+  .decide .fact + .fact { box-shadow: inset 0 0.5px 0 var(--line); }
+  .decide .fact .glyph { width: 1.25rem; height: 1.25rem; color: var(--muted); }
+  .decide .fact > span:nth-child(2) { flex: 1; color: var(--muted); } .decide .fact b { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+  .decide-bar .hint { flex-basis: 100%; margin: 0.5rem 0 0; color: var(--faint); font-size: var(--t-xs); line-height: 1.125rem; text-align: center; white-space: normal; letter-spacing: -0.374px; }
+  .decide-bar .open-link { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; }
+  .open-link .spin { width: 1.25rem; height: 1.25rem; border: 2.2px solid rgba(255, 255, 255, 0.35); border-top-color: #FFFFFF; border-radius: 50%; animation: spin 700ms linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .decide-bar .answer, .decide-bar .open-link { position: relative; overflow: hidden; min-height: 3.25rem; border-radius: 1rem; font-size: var(--t-m); font-weight: 600; letter-spacing: -0.02em;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset, 0 6px 16px -6px color-mix(in srgb, var(--action) 70%, transparent); transition: background-color 160ms linear, transform 260ms var(--spring); }
+  .decide-bar .answer:active, .decide-bar .open-link:active { transform: scale(0.97); transition-duration: 90ms; }
   .answer .lbl { display: inline-block; } .answer .lbl.swap { animation: lbl-in 200ms var(--ease); }
   @keyframes lbl-in { from { opacity: 0; transform: translateY(0.5rem); } }
   .answer .okmark { position: absolute; inset: 0; display: none !important; place-items: center; }
-  .decide-bar .answer.done, .decide-bar .answer.done:disabled { background: color-mix(in srgb, var(--tk-success) 82%, #000); color: #FFFFFF; box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--tk-success) 70%, transparent); }
+  .decide-bar .answer.done, .decide-bar .answer.done:disabled { background: var(--tk-success); color: #FFFFFF; box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--tk-success) 70%, transparent); }
   .answer.done .lbl { animation: lbl-out 140ms var(--ease) forwards; }
   @keyframes lbl-out { to { opacity: 0; transform: translateY(-0.5rem); } }
   .answer.done .okmark { display: grid !important; }
   .answer .okmark .glyph { width: 1.75rem; height: 1.75rem; stroke-width: 2.6; stroke-dasharray: 24; stroke-dashoffset: 24; animation: draw 260ms 90ms var(--ease) forwards; }
   @keyframes draw { to { stroke-dashoffset: 0; } }
-  /* The toast rises on a spring with its mark, and a hairline counts down to when it goes. */
-  #toast { overflow: hidden; min-height: 3.375rem; padding-left: 0.875rem; border-radius: 1.125rem; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24); animation: toast-in 300ms var(--spring); }
+  /* A sheet: the proof's capture, from the bottom on a phone. */
+  #sheet { width: 100%; max-width: none; max-height: 92dvh; margin: auto 0 0; padding: 0; border: 0; border-radius: 1.375rem 1.375rem 0 0; background: var(--bg); color: var(--text); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.16); }
+  #sheet[open] { animation: sheet-up 250ms var(--ease); }
+  #sheet::backdrop { background: rgba(0, 0, 0, 0.22); }
+  @keyframes sheet-up { from { transform: translateY(100%); } }
+  #sheet > div { padding: 0 1.25rem calc(1.5rem + env(safe-area-inset-bottom)); }
+  #sheet > div::before { content: ""; display: block; width: 2.375rem; height: 0.3125rem; margin: 0.5625rem auto 0.625rem; border-radius: 0.1875rem; background: var(--sunk); }
+  #sheet h2:focus { outline: none; }
+  #sheet header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  #sheet h2 { margin: 0; font-size: var(--t-m); }
+  #sheet header button { flex: none; width: 2.75rem; padding: 0; border-radius: 50%; background: none; color: var(--accent); }
+  #sheet header button .glyph { width: 1.125rem; height: 1.125rem; padding: 0.4375rem; box-sizing: content-box; border-radius: 50%; background: var(--sunk); }
+  #sheet .sheet-shot { display: grid; place-items: center; margin-top: 1rem; } #sheet .sheet-shot .phone { width: min(13.75rem, 60%); }
+  /* The toast rises on a spring with its mark: dark on a light page and light on a dark one, the words, Undo in blue, and a hairline that counts down to when it goes. */
+  #toast { overflow: hidden; gap: 0.75rem; min-height: 3.375rem; padding: 0 0.375rem 0 0.875rem; border-radius: 1.125rem; background: rgba(28, 28, 30, 0.94); color: #FFFFFF; font-size: var(--t-s); line-height: 1.25rem;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); animation: toast-in 300ms var(--spring); --toast-accent: #64B5FF; }
+  @media (prefers-color-scheme: dark) { #toast { background: rgba(242, 242, 244, 0.96); color: #0B0B0D; --toast-accent: #0066D6; } }
+  #toast #toast-text b { font-weight: 600; }
+  #toast button { min-height: var(--ctl); padding: 0 0.875rem; border-radius: 0.8125rem; background: none; color: var(--toast-accent); font-size: var(--t-b); font-weight: 600; }
+  #toast button:active { background: rgba(127, 127, 127, 0.18); }
   @keyframes toast-in { from { opacity: 0; transform: translateY(calc(100% + 2rem)); } }
   #toast .tk { display: none; flex: none; place-items: center; width: 1.625rem; height: 1.625rem; border-radius: 50%; color: #FFFFFF; }
   #toast[data-mark] .tk { display: grid; }
-  #toast[data-mark="ok"] .tk { background: color-mix(in srgb, var(--tk-success) 82%, #000); } #toast[data-mark="later"] .tk { background: var(--c-indigo); }
+  #toast[data-mark="ok"] .tk { background: var(--tk-success); } #toast[data-mark="later"] .tk { background: var(--faint); }
   #toast[data-mark="undo"] .tk, #toast[data-mark="dismiss"] .tk { background: var(--action); } #toast[data-mark="error"] .tk { background: var(--danger); }
   #toast .tk svg { display: none; width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
   #toast[data-mark="ok"] .tk .ok, #toast[data-mark="later"] .tk .later, #toast[data-mark="undo"] .tk .undo, #toast[data-mark="dismiss"] .tk .dismiss, #toast[data-mark="error"] .tk .error { display: block; }
-  #toast .bar { position: absolute; left: 0; bottom: 0; width: 100%; height: 2px; background: currentColor; opacity: 0.35; transform-origin: left; animation: countdown var(--tms, 5s) linear forwards; }
+  #toast .bar { position: absolute; left: 0; bottom: 0; width: 100%; height: 2px; background: var(--toast-accent); opacity: 0.5; transform-origin: left; animation: countdown var(--tms, 5s) linear forwards; }
   @keyframes countdown { to { transform: scaleX(0); } }
   /* An approved screen in the viewer carries a green check stamp in its corner. */
   .design-stage .stamp { position: absolute; z-index: 1; top: 1rem; right: 1rem; display: grid !important; place-items: center; width: 3.5rem; height: 3.5rem; border-radius: 50%; pointer-events: none;
@@ -1353,24 +1423,44 @@
     .split-list .dl-face { min-height: 4.5rem; padding: 0.75rem 1.5rem; }
     .dl-row.sel .dl-face { background: color-mix(in srgb, var(--action) 11%, var(--bg)); box-shadow: inset 3px 0 0 var(--action); outline: none; }
     .dl-row.sel + .dl-row .dl-face::before, .dl-row.sel .dl-face::before { border-color: transparent; }
-    body.split-view #toast { left: calc(15rem + clamp(20rem, 32vw, 25rem) + 1.5rem); right: 1.5rem; }
+    /* The toast, as the prototype sets it on a desk: 440px wide, centred over the list and its pane together. */
+    body.split-view #toast { left: calc(50% + 7.5rem - 13.75rem); right: auto; width: 27.5rem; }
     .split-hints { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem 1rem; margin: auto -1.5rem 0; padding: 0.75rem 1.5rem;
       border-top: 1px solid var(--line); background: var(--bg); color: var(--faint); font-size: var(--t-xs); }
     .split-hints > span { display: inline-flex; align-items: center; gap: 0.25rem; }
     .split-hints .kc { margin-right: 0.125rem; }
     .split-detail { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; }
     .split-bar { position: sticky; z-index: 2; top: 0; display: flex; align-items: center; gap: 0.5rem; min-height: 3.75rem; padding: 0 1.5rem 0 1rem; border-bottom: 1px solid var(--line); background: var(--bg); }
-    .split-bar .pager { position: static; height: auto; }
     .split-bar .later { display: inline-flex; align-items: center; gap: 0.5rem; margin-left: auto; min-height: var(--ctl); padding: 0 0.75rem; border-radius: var(--r-ctl); background: none; color: var(--text); font-weight: 400; }
     .split-bar .later:hover, .dl-hover button:hover { background: var(--sunk); }
     .split-bar .later .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.75; color: var(--muted); }
-    /* The ask fills the pane, so its answer bar stays at the pane's foot even under a short ask; under a tall one it comes after the last option, so it never covers one. */
-    .split-detail > .decide { display: flex; flex: 1; flex-direction: column; width: 100%; max-width: 46rem; margin: 0 auto; padding: 0.5rem 2.5rem 0; }
-    .split-detail > .decide .dhero, .split-detail > .decide .decide-preview { margin-top: 1.5rem; }
-    .split-detail .decide > * { flex: none; } .split-detail .decide > :not(.decide-bar):nth-last-child(2) { margin-bottom: 1.5rem; }
-    .split-detail .decide-bar { margin: auto -2.5rem 0; padding: 1rem 2.5rem 1.25rem; border-top: 1px solid var(--line); background: var(--bg); }
-    .split-detail .decide-bar .answer { min-width: 13rem; padding: 0 1.5rem; }
-    .split-detail .decide-bar .open-link { display: inline-flex; align-items: center; justify-content: center; min-width: 13rem; min-height: 3.25rem; padding: 0 1.5rem; border-radius: 1rem; font-size: var(--t-m); }
+    /* Decide on a desk, at the prototype's measures: the list's head 22px down with a 28px title, rows 18px in, a 56px bar over the ask (its kind, Later and More),
+       the ask 44px in under a 30px question, and its answer bar right after it: never at the pane's foot, and under a tall ask after the last option, so it never covers one. */
+    .split-list:has(> .decide-list) { padding: 0 1.25rem; }
+    .split-list:has(> .decide-list) > .top { padding: 1.375rem 0 0.375rem; }
+    .split-list:has(> .decide-list) .date-kicker { margin: 0; line-height: 1.25rem; }
+    .split-list:has(> .decide-list) h1 { margin-top: 0.625rem; font-size: 1.75rem; line-height: 2.125rem; }
+    .split-list:has(> .decide-list) .waiting-lede { margin-top: 0.125rem; font-size: var(--t-s); line-height: 1.25rem; }
+    .split-list:has(> .decide-list) > .top > .dl-more { top: 2.375rem; right: 0; }
+    .split-list .decide-list > .dl-head:first-child { margin-top: 1.75rem; }
+    .split-list .decide-list .dl-list { margin: 0 -1.25rem; }
+    .split-list .decide-list .dl-face { padding: 0.75rem 1.125rem; }
+    .split-list .decide-list .dl-face .title { font-size: 1rem; line-height: 1.3125rem; }
+    .split-list .decide-list .dl-face .sub { font-size: 0.875rem; line-height: 1.1875rem; }
+    .split-list:has(> .decide-list) .split-hints { margin: auto -1.25rem 0; padding: 0.625rem 1.25rem 0.75rem; }
+    .split-bar:has(> .crumb) { min-height: 3.5rem; padding: 0 1rem 0 2rem; }
+    .split-bar .crumb { flex: 1; min-width: 0; margin: 0; overflow: hidden; color: var(--muted); font-size: 0.875rem; white-space: nowrap; text-overflow: ellipsis; }
+    .split-bar .crumb b { color: var(--text); font-weight: 600; }
+    .split-bar:has(> .crumb) .later { min-height: 2.25rem; margin-left: 0; padding: 0 0.625rem 0 0.75rem; border-radius: 0.625rem; font-size: 0.875rem; font-weight: 500; }
+    .split-bar:has(> .crumb) .later::after { min-width: 1.25rem; height: 1.25rem; margin-left: 0.5rem; font-size: 0.6875rem; }
+    .split-detail > .decide { width: 100%; max-width: 45rem; margin: 0 auto; padding: 1.75rem 2.75rem 0; }
+    .split-detail > .decide .decide-preview { margin-top: 1.5rem; }
+    .split-detail .decide .lead h2 { font-size: 1.875rem; line-height: 2.25rem; }
+    .split-detail .decide-bar { gap: 0.875rem; margin: 1.5rem -2.75rem 0; padding: 1rem 2.75rem 1.5rem; box-shadow: 0 -0.5px 0 var(--line); background: var(--bg); }
+    .split-detail .decide-bar .answer { min-width: 15rem; padding: 0 1.5rem; }
+    .split-detail .decide-bar .open-link { display: inline-flex; align-items: center; justify-content: center; min-width: 15rem; min-height: 3.25rem; padding: 0 1.5rem; border-radius: 1rem; font-size: var(--t-m); }
+    .split-detail .decide-bar .hint { flex: 1 1 12rem; max-width: 18.75rem; margin: 0; text-align: left; }
+    .split-detail .decide-bar .bar-hint { display: inline-flex; align-items: center; gap: 0.375rem; margin-left: auto; color: var(--faint); font-size: var(--t-xs); }
     .split-detail [data-kbd]::after { content: attr(data-kbd); display: inline-grid; place-items: center; min-width: 1.375rem; height: 1.375rem; margin-left: 0.625rem; padding: 0 0.3125rem; border-radius: 0.375rem;
       background: rgb(255 255 255 / 0.22); color: inherit; font-size: 0.75rem; font-weight: 600; line-height: 1; vertical-align: 0.0625rem; }
     .split-bar [data-kbd]::after { background: var(--sunk); color: var(--muted); }
@@ -1476,12 +1566,13 @@
     return () => controls.forEach((b) => (b.disabled = false));
   }
 
-  async function save(d, o, buttons, err, after, land) {
+  // `words` names the draft the note is read from: the card's box, or Decide's Your own answer, which it keeps apart from the note.
+  async function save(d, o, buttons, err, after, land, words = d.key) {
     const unlock = lock(...buttons);
     // An answers-only board takes no comments, and words sent as the answer are the answer itself (a reply item's also go as a comment).
     const typed = state.answers_only || (o.value === 'text' && !d.reply) ? '' : (drafts.get(d.key) ?? '').trim();
-    const note = drafts.get(d.key) ?? noteOf(d), before = answerOf(d.key);
-    const drop = clearIfSaved(d.key, drafts.get(d.key));
+    const note = drafts.get(words) ?? noteOf(d), before = answerOf(d.key);
+    const drop = clearIfSaved(words, drafts.get(words));
     try {
       await call('/api/answers', {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
@@ -1513,18 +1604,20 @@
     if (!toast.hidden && bar?.height && t.bottom > bar.top && t.top < bar.bottom) toast.style.bottom = `${innerHeight - bar.top + 8}px`;
   };
   addEventListener('scroll', () => toast.hidden || placeToast(), { passive: true });
+  addEventListener('scroll', () => document.querySelector('.ask-nav')?.classList.toggle('scrolled', scrollY > 64), { passive: true });
   // A redraw or a resize can move the bar under a toast that is already up.
   new ResizeObserver(() => toast.hidden || placeToast()).observe(document.documentElement);
   addEventListener('resize', () => toast.hidden || placeToast());
   // Every toast is one style: it rises on a spring, marked with what happened (a check, a clock for Later, an arrow for an undo,
   // a tray for a dismiss, a stop for a failure), and a hairline counts down to when it goes.
   const toastMark = (text) => (/^Could(n't| not)/.test(text) ? 'error' : /^(Undone|Back)/.test(text) ? 'undo' : /dismissed|cleared|archived/i.test(text) ? 'dismiss' : 'ok');
-  const say = (text, ms, undo, mark = toastMark(text)) => {
-    toastText.textContent = text;
+  // The words may lead with what they are about in bold, as in "<b>Keep the weekly digest?</b> · Yes".
+  const say = (text, ms, undo, mark) => {
+    toastText.replaceChildren(...[text].flat());
     undoBtn.hidden = !undo;
     undoBtn.disabled = false;
     undoBtn.onclick = undo && (() => { buzz('undo'); undo(); });
-    toast.dataset.mark = mark;
+    toast.dataset.mark = mark ?? toastMark(toastText.textContent);
     toast.style.setProperty('--tms', `${ms}ms`);
     toast.hidden = true;
     void toast.offsetWidth;
@@ -1538,7 +1631,7 @@
     if (!now) return;
     undoBtn.setAttribute('aria-label', `Undo, ${headline(d)}`);
     buzz('success');
-    say(`Saved: ${now.answer === 'text' ? 'your reply' : now.label}`, 5000, () => {
+    say([el('b', {}, headline(d)), ` · ${now.answer === 'text' ? 'your reply' : now.label}${now.note && now.answer !== 'text' ? ' · with your comment' : ''}`], 5000, () => {
       undoBtn.disabled = true;
       // On the Decide list the row comes back in place, with a flash; anywhere else the ask opens again.
       // On Today it comes back as Up next.
@@ -1703,6 +1796,8 @@
 
   /** A count with its unit in the form it deserves: 1 section, 2 sections. */
   const plural = (n, one) => `${n} ${one}${n === 1 ? '' : 's'}`;
+  /** A phrase set mid-sentence: "Publishing the release" reads "publishing the release"; a name with more capitals (GitHub, NPM) keeps them. */
+  const lower = (s) => (/^[A-Z][a-z]*\b/.test(s) ? s[0].toLowerCase() + s.slice(1) : s);
   /** A plan: its one-line answer, how many sections and decisions it asks about, and one Open plan for its page over the board. */
   function plan(d, lead) {
     return el('article', { class: 'row plan', id: `item-${d.key}` }, el('div', {}, lead,
@@ -1783,16 +1878,21 @@
       p.textContent = clock(p.dataset.clock);
     }
   }, 1000);
+  /** The time left on a sign-in's page, as a clock that counts down each second: 11:40, or 1:05:00 over the hour. */
+  const countdown = (at) => {
+    const s = Math.max(0, Math.round((Date.parse(at) - Date.now()) / 1000)), two = (n) => String(n).padStart(2, '0');
+    return s >= 3600 ? `${Math.floor(s / 3600)}:${two(Math.floor(s / 60) % 60)}:${two(s % 60)}` : `${Math.floor(s / 60)}:${two(s % 60)}`;
+  };
+  setInterval(() => document.querySelectorAll('[data-ends]').forEach((p) => (p.textContent = countdown(p.dataset.ends))), 1000);
 
   /** Boxes the person unfolded, kept open across redraws. */
   const unfolded = new Set();
+  /** More…: the actions a card keeps out of the way of its one answer button, folded into one control. */
+  const moreMenu = (name, items) => (items.length ? el('details', { class: 'more-menu' }, el('summary', { 'aria-label': `More, ${name}` }, 'More…'), el('div', { class: 'menu' }, ...items)) : '');
   /** The one place to type on a card, folded behind a quiet Add a comment so the buttons come first and an answer still takes one tap.
    * Typed before a button is picked the words go with that answer as its comment (the note the agent reads); Send reply makes them the answer (`text`).
    * On a normal board they can also ask for another round (not on an evidence update) or go as a comment. */
-  /** More…: the actions a card keeps out of the way of its one answer button, folded into one control. */
-  const moreMenu = (name, items) => (items.length ? el('details', { class: 'more-menu' }, el('summary', { 'aria-label': `More, ${name}` }, 'More…'), el('div', { class: 'menu' }, ...items)) : '');
-  /** With a sink (Decide), the card keeps no More of its own: the page's one More takes Ask for another round, and the box itself (for Write my own answer). */
-  function other(d, saved, err, after, sink) {
+  function other(d, saved, err) {
     const name = headline(d), reply = !d.options.length;
     const box = el('textarea', { id: `note-${d.key}`, rows: 2, maxlength: 500, dir: 'auto', placeholder: reply ? 'Reply in a few words' : 'Add a note (optional)',
       'aria-label': `${reply ? 'Reply' : 'Note'}, ${name}` });
@@ -1802,7 +1902,7 @@
     // An option valued text would be the same answer, so that item takes words only as a note.
     const words = !d.options.some((o) => o.value === 'text'), talk = !state.answers_only, round = talk && d.type !== 'evidence';
     const sendBtn = el('button', { 'aria-label': `${reply ? 'Send reply' : 'Send as my own answer'}, ${name}` }, reply ? 'Send reply' : 'Send as my own answer');
-    sendBtn.onclick = () => (box.value.trim() ? save(d, { value: 'text' }, [sendBtn], err, after) : (shown(err).textContent = 'Write the reply first.'));
+    sendBtn.onclick = () => (box.value.trim() ? save(d, { value: 'text' }, [sendBtn], err) : (shown(err).textContent = 'Write the reply first.'));
     const roundBtn = el('button', { 'aria-label': `Ask for another round, ${name}` }, 'Ask for another round');
     roundBtn.onclick = () => {
       const unlock = lock(roundBtn);
@@ -1819,7 +1919,7 @@
     commentBtn.onclick = () => send(commentBtn, err, { kind: 'comment', key: d.key }, d.key, box.value.trim());
     // The card keeps one way to answer: the note goes with the answer button. Sending the words some other way is in More.
     const extra = [!reply && words ? sendBtn : '', round ? roundBtn : '', talk && !FROZEN ? commentBtn : ''].filter(Boolean);
-    const more = sink ? '' : moreMenu(name, extra);
+    const more = moreMenu(name, extra);
     const asked = (state.rounds ?? []).filter((r) => r.key === d.key);
     // A comment typed before a pick also went on its own to the agent: it shows once, as the comment sent with the answer.
     const comments = (state.messages ?? []).filter((m) => m.kind === 'comment' && m.key === d.key && !(kept && m.text === kept));
@@ -1833,7 +1933,6 @@
       box, reply || more ? el('div', { class: 'actions' }, reply ? sendBtn : '', more) : '');
     fold.ontoggle = () => (fold.open ? unfolded.add(d.key) : unfolded.delete(d.key));
     fold.firstChild.onclick = () => setTimeout(() => fold.open && box.focus());
-    if (sink) Object.assign(sink, { round: round ? roundBtn : null, box, fold, words });
     return el('div', { class: 'note' }, saved?.answer === 'text' ? el('p', { class: 'meta saved-note', dir: 'auto' }, `Your reply: ${saved.note}`) : '',
       kept ? el('p', { class: 'meta saved-note', dir: 'auto' }, `Your comment, sent with ${saved.label}: ${kept}`) : '', fold);
   }
@@ -1883,14 +1982,27 @@
   })) : '');
   /** A capture in a device frame; a wide one (a desktop screen) gets the slimmer bezel. */
   const framed = (img, cls = '') => { const f = el('span', { class: `phone ${cls}`.trim() }, img); img.addEventListener('load', () => img.naturalWidth / img.naturalHeight > 0.8 && f.classList.add('wide')); return f; };
-  /** The proof an ask rests on, as the top of Decide: its capture in a frame, the check's result and a way into the whole proof. */
-  function proofHero(d) {
+  /** A sheet over the page, from the bottom on a phone and a centred dialog on a desk; its ✕, a tap outside it, Escape or a link in it closes it. */
+  const sheet = el('dialog', { id: 'sheet', 'aria-labelledby': 'sheet-title' });
+  function openSheet(name, ...body) {
+    const shut = el('button', { 'aria-label': 'Close' }, glyph('x'));
+    shut.onclick = () => sheet.close();
+    sheet.replaceChildren(el('div', {}, el('header', {}, el('h2', { id: 'sheet-title', dir: 'auto', tabindex: '-1', autofocus: '' }, name), shut), ...body));
+    sheet.showModal();
+  }
+  sheet.onclick = (e) => (e.target === sheet || e.target.closest('a')) && sheet.close();
+  document.body.append(sheet);
+  /** The proof an ask rests on, as one row under the question: a small capture, what it shows, and its result with when it was checked. The row opens the capture in a sheet, and the capture opens the whole proof. */
+  function proofRow(d) {
     const of = (d.proof && state.decisions.find((x) => x.key === d.proof)) || d, url = pic(of);
     if (!url) return '';
-    const img = el('img', { src: src(url), alt: '' }), result = RESULT[of.evidenceCard?.result], update = of.type === 'evidence';
-    img.onerror = () => img.closest('.dhero')?.remove();
-    return el('a', { class: 'dhero', href: update ? `#evidence/${of.key}` : pageHref(of) || src(url), ...(!update && !pageHref(of) && { target: '_blank', rel: 'noopener' }), 'aria-label': `View proof, ${headline(of)}` },
-      result ? el('span', { class: `pass ${result[0]}` }, mark(result[0]), result[2]) : '', el('span', { class: 'open' }, 'View proof'), framed(img));
+    const result = RESULT[of.evidenceCard?.result], name = of === d ? 'Capture' : of.title, update = of.type === 'evidence', img = el('img', { src: src(url), alt: '' });
+    const status = () => el('span', { class: 'pst' }, result ? el('span', { class: `res ${result[0]}` }, result[2]) : '', of.filed ? `${result ? ' · checked ' : 'Filed '}${when(of.filed)}` : '');
+    const row = el('button', { class: 'proof-row', 'aria-label': `View proof, ${name}` }, el('span', { class: 'pthumb' }, img), el('span', { class: 'pt' }, el('b', { dir: 'auto' }, name), status()), glyph('right'));
+    img.onerror = () => row.parentElement?.remove();
+    row.onclick = () => openSheet(name, status(), el('a', { class: 'sheet-shot', href: update ? `#evidence/${of.key}` : pageHref(of) || src(url), ...(!update && !pageHref(of) && { target: '_blank', rel: 'noopener' }),
+      'aria-label': `Open the proof, ${name}` }, framed(el('img', { src: src(url), alt: name }))));
+    return el('div', { class: 'proof-block' }, el('p', { class: 'pick-label' }, 'Proof'), row);
   }
 
   /** A result's mark: the pass tick only for passed proof, a cross for failed, an alert for not finished or unchecked. */
@@ -2132,26 +2244,28 @@
   const EMPTY = { waiting: 'Nothing is waiting on you.', designs: 'No designs yet.', evidence: 'No evidence updates.', reports: 'No reports or explainers.', answered: 'Nothing answered yet.' };
   const ICONS = { summary: 'M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
     designs: 'M3 3h18v18H3zM3 9h18M9 21V9',
-    toggle: 'M8 6h8a6 6 0 0 1 0 12H8A6 6 0 0 1 8 6zM16 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4z', calendar: 'M8 2v4M16 2v4M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM3 10h18',
     waiting: 'M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z',
     evidence: 'M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1zM9 12l2 2 4-4',
     reports: 'M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z',
     answered: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM9 12l2 2 4-4',
     plan: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7zM14 2v6h6M8 13h8M8 17h8M8 9h2',
-    calendar: 'M8 2v4M16 2v4M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM3 10h18',
     list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
     split: 'M16 3h5v5M8 3H3v5M12 22v-8.3a4 4 0 0 0-1.17-2.87L3 3M15 9l6-6',
     clock: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 6v6l4 2',
     you: 'M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4.5 20.5c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5',
     pick: 'm3 17 2 2 4-4M3 7l2 2 4-4M13 6h8M13 12h8M13 18h8', phone: 'M7.5 2h9A2.5 2.5 0 0 1 19 4.5v15a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 19.5v-15A2.5 2.5 0 0 1 7.5 2zM11 18h2',
     key: 'M2.6 17.4A2 2 0 0 0 2 18.8V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.2a2 2 0 0 0 1.4-.6l.8-.8a6.5 6.5 0 1 0-4-4zM16.5 7.5h.01',
-    keys: 'M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zM6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10' };
+    keys: 'M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zM6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10',
+    // Decide's other kinds, as the approved prototype draws them: a question for yes or no, a bubble for a reply.
+    yesno: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01',
+    reply: 'M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z' };
   // The drawings are fixed strings from this page, never text from the board file.
   // Small stroke drawings the plan page puts beside a button label or in a section badge; fixed strings from this page.
   const GLYPHS = { left: '<path d="m15 18-6-6 6-6"/>', more: '<path d="M5 12h.01M12 12h.01M19 12h.01"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', right: '<path d="m9 18 6-6-6-6"/>', check: '<path d="M20 6 9 17l-5-5"/>', pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
     archive: '<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/>', dot: '<circle cx="12" cy="12" r="4.5" fill="currentColor"/>',
     send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.112z"/><path d="m21.854 2.147-10.94 10.939"/>',
-    sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>', msg: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>' };
+    sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>', msg: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
+    x: '<path d="M18 6 6 18M6 6l12 12"/>', bolt: '<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>', lock: '<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>', trash: '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>' };
   const glyph = (a) => { const s = el('span', { 'aria-hidden': 'true', style: 'display:inline-flex' }); s.innerHTML = `<svg class="glyph" viewBox="0 0 24 24">${GLYPHS[a]}</svg>`; return s; };
   const icon = (a) => { const s = el('span', { class: `icon i-${a}`, 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[a]}"/></svg>`; return s; };
   /** The phone's tab bar is drawn once, so its pill slides from the area left to the one opened; each redraw marks the area on screen and sets the badges, and a badge whose count changed bumps. */
@@ -3409,15 +3523,8 @@
     box.ontoggle = () => (box.open ? opened.add(`#${name}`) : opened.delete(`#${name}`));
     return box;
   }
-  // Decide reads newest first; the viewer may choose oldest first, which stays in this browser (a failed read or write keeps the default).
-  const SORT_KEY = 'sign-off-waiting-sort';
-  let waitSort = 'newest';
-  try { if (localStorage.getItem(SORT_KEY) === 'oldest') waitSort = 'oldest'; } catch {}
-  // A plain ask is marked by its options, as the design marks a question: a yes or no is a switch, a choice of days is a calendar.
-  // ponytail: day names matched in English only; an icon field on the ask would let the agent choose.
-  const WHEN = /^(today|tonight|tomorrow|(next|this) (week|month)|(mon|tues|wednes|thurs|fri|satur|sun)day|.*\d)/i;
-  const markOf = (d) => { const o = d.options ?? []; return o.length === 2 && o.every((x) => /^(yes|no)$/i.test(x.value)) ? 'toggle' : o.length && o.every((x) => WHEN.test(x.label ?? x.value)) ? 'calendar' : 'waiting'; };
-  const askIcon = (d) => { const a = { design: 'designs', signin: 'you', plan: 'plan' }[typeOf(d)] ?? markOf(d); return ICONS[a] ? a : 'waiting'; };
+  /** Each kind of ask has its own mark: a key, a plan, a phone for screens or mocks to look over, a question for yes or no, a bubble for a reply, a checklist for any other pick. */
+  const askIcon = (d) => (d.type === 'signin' ? 'key' : d.type === 'plan' ? 'plan' : reviewed(d) ? 'phone' : { 'yes-no': 'yesno', reply: 'reply' }[typeOf(d)] ?? 'pick');
   /** An update that waits on you says how its linked run went, in plain words. */
   const dateLine = (t = new Date()) => `${t.toLocaleDateString('en-GB', { weekday: 'long' })} ${t.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}`;
   const badge = (d) => { const r = RESULT[d.evidenceCard?.result]; return r ? el('span', { class: `st ${r[0]}` }, r[1]) : ''; };
@@ -3455,26 +3562,30 @@
     // Once folded, the rows leave the page for good (and a group left empty loses its head).
     setTimeout(() => { keys.forEach((k) => leaving.get(k)?.t === t && leaving.delete(k)); if (document.querySelector('.dl-row.leaving')) render(); }, 500);
   }
+  /** When an ask was filed, as Decide says it: today's time, Yesterday, or the date. */
+  const filedAt = (at) => (isToday(at) ? hhmm(at) : isToday(Date.parse(at) + 864e5) ? 'Yesterday' : day(at));
   /** A row: its kind's icon, the question in up to two lines, its time, and the answer it recommends or what it is, with the swipe actions under it. */
   function decideRow(d, i, gone) {
-    const g = gone?.group ?? groupOf(d), rec = recOf(d), who = d.filer || 'Agent';
-    const sub = d.type === 'signin' ? [`Unlocks: ${d.unlocks}`] : d.type === 'plan' ? [`${plural(d.sections.length, 'section')} · ${plural(d.decisions.length, 'decision')}`]
-      : rec ? ['Recommended ', el('b', {}, rec.label), ` · ${who}`] : [`${d.kind === 'design' ? 'Design' : TYPE_NAMES[typeOf(d)]} · ${who}`];
+    const g = gone?.group ?? groupOf(d), rec = recOf(d), who = d.filer || 'Agent', screens = (d.journeys ?? []).reduce((n, j) => n + j.screens.length, 0);
+    const sub = d.type === 'signin' ? [`Unlocks ${lower(d.unlocks)}`] : d.type === 'plan' ? [`${plural(d.sections.length, 'section')} · ${plural(d.decisions.length, 'decision')}`]
+      : rec ? ['Recommended ', el('b', {}, rec.label), ` · ${who}`] : [`${screens ? plural(screens, 'screen') : d.kind === 'design' ? 'Design' : TYPE_NAMES[typeOf(d)]} · ${who}`];
     // A sign-in counts down its link; any other ask shows when it was filed.
     const time = d.type === 'signin' && d.expires ? el('span', { class: 'tm hot', 'data-left': d.expires }, left(d.expires))
-      : d.filed ? el('span', { class: 'tm' }, isToday(d.filed) ? hhmm(d.filed) : day(d.filed)) : '';
+      : d.filed ? el('span', { class: 'tm' }, filedAt(d.filed)) : '';
     const sel = deskSel === d.key && !gone, opens = askHref(d).startsWith('#decide/');
     const face = el('a', { class: 'ask-card dl-face', href: askHref(d), draggable: 'false', ...(!(gone && gone.how === 'later') && { id: `item-${d.key}` }), ...(opens && { 'data-row': '' }), ...(sel && { 'aria-current': 'true' }) }, icon(askIcon(d)),
       el('span', { class: 'copy' }, el('span', { class: 'r1' }, el('strong', { class: 'title', dir: 'auto' }, d.type === 'signin' ? `Sign in to ${d.title}` : title(d)), time), el('span', { class: 'meta sub', dir: 'auto' }, ...sub)));
     const act = (cls, mark, words) => el('div', { class: `dl-act ${cls}`, 'aria-hidden': 'true' }, glyph(mark), el('span', {}, words));
-    // On a desk, hovering a row shows the same two actions as its swipes.
-    const quick = (cls, mark, words, fn) => { const b = el('button', { class: cls, 'aria-label': `${words}, ${d.title}` }, glyph(mark), words); b.onclick = fn; return b; };
-    const hover = deskSel === null || gone || state.readonly ? '' : el('span', { class: 'dl-hover' }, rec ? quick('yes', 'check', rec.label, () => quickAnswer(d.key)) : '',
-      quick('later-q', 'clock', g === 'later' ? 'Now' : 'Later', () => toLater([d.key], g !== 'later')));
+    // On a desk, hovering a row shows the same two actions as its swipes, as round buttons over its time.
+    const quick = (cls, mark, words, tip, fn) => { const b = el('button', { class: cls, 'aria-label': `${words}, ${d.title}`, title: tip }, glyph(mark)); b.onclick = fn; return b; };
+    const hover = deskSel === null || gone || state.readonly ? '' : el('span', { class: 'dl-hover' }, rec ? quick('yes', 'check', rec.label, `Answer ${rec.label}`, () => quickAnswer(d.key)) : '',
+      quick('later-q', 'clock', g === 'later' ? 'Now' : 'Later', g === 'later' ? 'Back from Later' : 'Later (L)', () => toLater([d.key], g !== 'later')));
     return el('li', { class: `dl-row g-${g}${gone ? ` leaving ${gone.how}` : ''}${flash === d.key ? ' returned' : ''}${sel ? ' sel' : ''}`, 'data-key': d.key, style: `--n:${i}`, ...(gone?.side && { 'data-side': gone.side }) },
       rec ? act('yes', 'check', rec.label) : '', act('later', 'clock', g === 'later' ? 'Now' : 'Later'), face, hover);
   }
-  const allClear = () => el('div', { class: 'all-clear-big' }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, 'All clear'), el('p', {}, EMPTY.waiting));
+  /** All clear, by name; the ask's pane on a desk adds that agents will ask when they need you. */
+  const allClear = (pane) => el('div', { class: `all-clear-big${pane ? ' pane' : ''}` }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, 'All clear'),
+    el('p', {}, `Nothing is waiting on you${state.name ? `, ${state.name}` : ''}.${pane ? ' Agents will ask when they need you.' : ''}`));
   function decideList(items, hidden) {
     const rows = new Map(GROUPS.map(([g]) => [g, []]));
     items.forEach((d, i) => !leaving.has(d.key) || leaving.get(d.key).how === 'later' ? rows.get(groupOf(d)).push(decideRow(d, i)) : '');
@@ -3489,7 +3600,7 @@
     const fresh = !risen;
     risen = true;
     return el('div', { class: `waiting-page decide-list${fresh ? ' rise' : ''}` }, ...groups,
-      items.length || deskSel !== null ? '' : allClear(), dismissed(hidden));
+      items.length ? '' : allClear(), dismissed(hidden));
   }
   /** After a redraw, a row on its way out keeps its height for a moment, then folds to nothing; a redraw midway picks up where it was. */
   function fold() {
@@ -3511,7 +3622,7 @@
       for (const d of items) await call('/api/answers', post({ key: d.key, answer: recOf(d).value, note: drafts.get(d.key) ?? noteOf(d) }));
     } catch (e) { leaving.clear(); render(); return say(`Couldn't save: ${e.message}`, 8000); }
     buzz('success');
-    say(`${plural(items.length, 'ask')} answered with the recommended pick`, 6000, async () => {
+    say([el('b', {}, `${items.length} answered`), ' with the recommended pick'], 6000, async () => {
       undoBtn.disabled = true;
       try {
         for (const [d, before] of was) await call('/api/answers', post({ key: d.key, answer: before?.answer ?? '', note: before?.note ?? '' }));
@@ -3525,26 +3636,32 @@
     shelve(keys, on);
     render();
     fold();
-    say(on ? `${keys.length > 1 ? plural(keys.length, 'ask') : 'Moved'} to Later` : 'Back from Later', 5000, () => { shelve(keys, !on); keys.forEach(returned); render(); say(on ? 'Back from Later' : 'Moved to Later', 3000, null, on ? 'undo' : 'later'); }, 'later');
+    const one = keys.length === 1 && state.decisions.find((d) => d.key === keys[0]);
+    say(!on ? 'Back from Later' : one ? [el('b', {}, headline(one)), ' · moved to later'] : [el('b', {}, `${keys.length} moved`), ' to later'], 5000,
+      () => { shelve(keys, !on); keys.forEach(returned); render(); say(on ? 'Back from Later' : 'Moved to Later', 3000, null, on ? 'undo' : 'later'); }, 'later');
   }
   /** One More control: a menu that scales out of its button and closes on a tap anywhere else. */
   function moreSheet(label, items) {
     const menu = el('details', { class: 'dl-more' }, el('summary', { 'aria-label': label }, glyph('more')), el('div', { class: 'dl-menu', role: 'menu' },
       ...items.filter(Boolean).map((item) => {
         if (item instanceof Node) return item;
-        const [words, fn, act, mark] = item, b = el('button', { role: 'menuitem', 'data-act': act }, el('span', {}, words), mark ? glyph(mark) : '');
+        const [words, fn, act, mark, off] = item, b = el('button', { role: 'menuitem', 'data-act': act, ...(off && { disabled: '' }) }, el('span', {}, words), mark ? glyph(mark) : '');
         b.onclick = () => { menu.open = false; fn(); };
         return b;
       })));
     return menu;
   }
   addEventListener('click', (e) => document.querySelectorAll('.dl-more[open]').forEach((m) => !m.contains(e.target) && (m.open = false)));
+  /** Decide's line under its title: how many wait, that each has a recommended answer when every ask to answer has one, and how many are for later. */
+  const waitingLede = (items) => {
+    const answer = items.filter((d) => groupOf(d) === 'answer'), later = items.filter((d) => groupOf(d) === 'later').length;
+    return items.length ? `${items.length} waiting${answer.length && answer.every(recOf) ? ' · each has a recommended answer' : ''}${later ? ` · ${later} for later` : ''}` : 'Nothing waiting';
+  };
+  /** Decide's More, as the approved prototype has it: Answer all recommended, a gap, then Move all to later; each is off when it has nothing to do. */
   function listMore(items) {
     const answerable = items.filter((d) => groupOf(d) === 'answer' && recOf(d)), now = items.filter((d) => groupOf(d) !== 'later');
-    return moreSheet('More', [answerable.length && ['Answer all recommended', () => answerAll(answerable), 'answer-all'],
-      now.length && ['Move all to Later', () => toLater(now.map((d) => d.key), true), 'later-all', 'clock'],
-      [waitSort === 'newest' ? 'Oldest first' : 'Newest first', () => { waitSort = waitSort === 'newest' ? 'oldest' : 'newest'; try { localStorage.setItem(SORT_KEY, waitSort); } catch {} render(); }, 'sort'],
-      canDismiss() && items.length && ['Select', () => { selecting = true; render(); }, 'select']]);
+    return moreSheet('More', [['Answer all recommended', () => answerAll(answerable), 'answer-all', 'sparkle', !answerable.length], el('div', { class: 'dl-sep', role: 'separator' }),
+      ['Move all to later', () => toLater(now.map((d) => d.key), true), 'later-all', 'clock', !now.length]]);
   }
   // The swipe follows the finger; the action under the row grows once it would commit, with a tick on Android.
   let sw = null, swiped = false;
@@ -3627,20 +3744,39 @@
     archive(d);
   }
   const selected = new Map();
-  /** The bar's "‹ 1 of N ›": steps through the open asks; an end is a dimmed mark, not a link. */
-  const pager = (queue, i) => {
-    const step = (to, label, mark) => to < 0 || to >= queue.length ? el('span', { class: 'step', 'aria-disabled': 'true', 'aria-label': label }, mark)
-      : el('a', { class: 'step', href: `#decide/${queue[to].key}`, 'aria-label': label }, mark);
-    return el('nav', { class: 'pager', 'aria-label': 'Asks' }, step(i - 1, 'Previous ask', glyph('left')), el('span', { class: 'of' }, `${i + 1} of ${queue.length}`), step(i + 1, 'Next ask', glyph('right')));
-  };
   let decideCtx = { all: [], shown: [], hidden: [] };
   // A phone moves through Decide as a stack: an ask pushes in over the list, and answering it pops back to the list. A desk steps on to the next ask.
   const phone = () => matchMedia('(max-width: 63.999rem)').matches;
   /** Where E (and a swipe left) goes from the ask on screen: the next ask, round to the first after the last. */
   let skipTo = '';
-  /** Asks the person chose to answer in their own words, kept across redraws. */
-  const own = new Set();
-  function decidePage(d, next, desk = false) {
+  /** Asks the person chose to answer in their own words, and sign-ins whose link they opened, kept across redraws. */
+  const own = new Set(), signingIn = new Set();
+  /** An ask's kind as Decide names it over the question, as in "Pick one · Release agent · 08:01". */
+  const askKind = (d) => ({ signin: 'Sign in', 'yes-no': 'Yes or no' })[typeOf(d)] ?? TYPE_NAMES[typeOf(d)];
+  /** A sign-in as a page of its own: its key, the headline, what it unlocks, how long the link lasts (on a phone; on a desk the row beside it counts that down) and where it signs in,
+   *  with Open sign-in as the one button; once tapped it says it waits for you until the agent closes the card. */
+  function signinPage(d, desk, kicker) {
+    const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` }), { open, line } = signinOpen(d, undefined, err);
+    const gone = !!d.expires && Date.parse(d.expires) <= Date.now(), host = /^https?:\/\/(?:www\.)?([^/?#]+)/.exec(d.link ?? '')?.[1];
+    const waits = () => open.replaceChildren(el('span', { class: 'spin', 'aria-hidden': 'true' }), 'Waiting for you to sign in');
+    if (open) {
+      open.textContent = 'Open sign-in';
+      if (desk) open.dataset.kbd = '↵';
+      if (open.tagName === 'A') { if (signingIn.has(d.key)) waits(); open.addEventListener('click', () => { signingIn.add(d.key); waits(); }); }
+    }
+    const fact = (mark, name, value) => el('div', { class: 'fact' }, glyph(mark), el('span', {}, name), value);
+    const hint = d.start || gone ? line : el('p', {}, `Opens ${d.title} in a new tab. This card closes itself once you are in.`);
+    if (hint) hint.classList.add('hint');
+    return el('section', { class: 'decide signin-ask g-signin', ...(!desk && { id: `item-${d.key}` }) }, icon('key'), el('div', { class: 'lead' }, kicker, el('h2', { dir: 'auto' }, `Sign in to ${d.title}`)),
+      d.about ? el('p', { class: 'why', dir: 'auto' }, d.about) : '',
+      el('div', { class: 'facts' }, fact('bolt', 'Unlocks', el('b', { dir: 'auto' }, d.unlocks)), d.expires && !gone && !desk ? fact('clock', 'Expires in', el('b', { 'data-ends': d.expires }, countdown(d.expires))) : '',
+        host ? fact('lock', 'Where', el('b', {}, host)) : ''), err, el('div', { class: 'decide-bar' }, open, hint));
+  }
+  /** An ask, as the approved prototype lays it out: its kind, who asked and when over the question (on a desk that line is the bar's), why, the proof it rests on, the answers as cards
+   *  ending in Your own answer, one optional note, what happens if you stay quiet, and one button. Nothing is picked until the person picks: Recommended is only a tag, and the button
+   *  stays off until a pick, then names it (Send answer for their own words). The sink takes the parts of the bar above it:
+   *  the kind line for a desk (crumb), the question for a phone's bar once scrolled (mid), and More (···): Ask me later and Dismiss. */
+  function decidePage(d, next, desk = false, sink = {}) {
     if (!d) return el('p', { class: 'empty' }, EMPTY.waiting);
     const to = next ? `#decide/${next.key}` : '#waiting';
     skipTo = next && !state.readonly ? to : '';
@@ -3654,85 +3790,82 @@
         if (dx > 0) right?.(); else goNext?.();
       });
     };
-    // One More holds what is not the answer, at most four: Ask me later (a swipe left on its row does the same), Write my own answer,
-    // Ask for another round, and Dismiss last. The next ask is a swipe left, E or the pager.
+    const who = d.type === 'signin' ? d.waits : d.filer || 'Agent', at = d.filed ? ` · ${filedAt(d.filed)}` : '';
+    const kicker = desk ? '' : el('p', { class: 'kicker' }, el('span', { class: 'k' }, askKind(d)), ` · ${who}${at}`);
+    sink.crumb = el('p', { class: 'crumb', dir: 'auto' }, el('b', {}, askKind(d)), ` · ${who}${at}`);
+    sink.mid = el('span', { class: 'mid', 'aria-hidden': 'true', dir: 'auto' }, d.type === 'signin' ? `Sign in to ${d.title}` : headline(d));
     const gone = xBtn(d, 'Dismiss');
-    if (gone) { gone.setAttribute('role', 'menuitem'); gone.addEventListener('click', () => (location.hash = to)); }
+    if (gone) { gone.setAttribute('role', 'menuitem'); gone.append(glyph('trash')); gone.addEventListener('click', () => (location.hash = to)); }
     const more = (...items) => (state.readonly ? '' : moreSheet('More', [['Ask me later', () => { location.hash = '#waiting'; toLater([d.key], true); }, 'later', 'clock'], ...items, gone]));
-    if (d.type === 'signin' && desk) {
-      // On a desk a sign-in reads like any ask: who waits, the headline, what it unlocks, and Open as the bar's one button. Its row beside it counts the link's time down, so only a line that is not that countdown shows here.
-      const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` }), { open, line } = signinOpen(d, undefined, err);
-      if (open) open.textContent = 'Open sign-in', open.dataset.kbd = '↵';
-      const kicker = el('p', { class: 'kicker' }, el('span', { class: 'k' }, TYPE_NAMES.signin), ` · ${d.waits}${d.filed ? ` · ${when(d.filed)}` : ''}`);
-      return el('section', { class: 'decide signin-ask' }, el('div', { class: 'lead' }, kicker, el('h2', { dir: 'auto' }, `Sign in to ${d.title}`)),
-        el('p', { class: 'why', dir: 'auto' }, `Unlocks: ${d.unlocks}`), line?.dataset?.expires ? '' : line, err, el('div', { class: 'decide-bar' }, open, more()));
-    }
+    // A sign-in keeps More too (the prototype shows none): one started on this host has no expiry, and Dismiss is the way to clear it.
     if (d.type === 'signin') {
-      const signinPage = el('div', { class: 'decide' }, row(d, { x: false }), el('div', { class: 'decide-bar' }, more()));
-      if (!state.readonly) swipe(signinPage);
-      return signinPage;
+      sink.more = more();
+      const page = signinPage(d, desk, kicker);
+      if (!state.readonly && !desk) swipe(page);
+      return page;
     }
-    const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` }), opts = d.options ?? [], live = !state.readonly;
+    const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` }), opts = d.options ?? [], live = !state.readonly, name = headline(d);
     // A pick remembered from an earlier round only counts while the ask still offers it.
     if (!opts.some((o) => o.value === selected.get(d.key))) selected.delete(d.key);
-    const initial = selected.get(d.key) ?? d.recommend_value ?? opts[0]?.value;
-    // The answers are cards; the one picked gets a ring and a check that springs in, and the button's label slides to it.
-    const optionButtons = opts.map((o) => {
-      const recommended = o.value === d.recommend_value, b = el('button', { class: 'pick-option', 'aria-pressed': String(o.value === initial) },
-        el('span', { class: 'check', 'aria-hidden': 'true' }, glyph('check')), el('span', { class: 'words' }, el('span', { class: 'label-line' }, el('span', { class: 'label' }, o.label),
-          recommended ? el('span', { class: 'recommend' }, 'Recommended') : ''), o.outcome ? el('span', { class: 'reason', dir: 'auto' }, o.outcome) : ''));
-      b.onclick = () => {
-        selected.set(d.key, o.value);
-        own.delete(d.key);
-        optionButtons.forEach((btn) => btn.setAttribute('aria-pressed', String(btn === b)));
-        relabel(`Answer ${o.label}`);
-      };
-      return b;
-    });
-    const selectedOption = () => opts.find((o) => o.value === (selected.get(d.key) ?? initial));
-    // Writing my own answer clears the cards' pick, and the button then sends the words as the answer.
-    if (own.has(d.key)) optionButtons.forEach((b) => b.setAttribute('aria-pressed', 'false'));
-    const lbl = el('span', { class: 'lbl' }, own.has(d.key) ? 'Send your answer' : `Answer ${selectedOption()?.label ?? 'now'}`);
-    const relabel = (text) => { lbl.textContent = text; lbl.classList.remove('swap'); void lbl.offsetWidth; lbl.classList.add('swap'); };
+    // Your own answer: its words are the answer, kept in a draft of their own so the note stays the note. A reply ask is only words; an ask with an option valued text takes words only as a note.
+    const reply = !opts.length && !!d.reply, mine = live && (reply || (opts.length > 0 && !opts.some((o) => o.value === 'text'))), ownKey = reply ? d.key : `own:${d.key}`;
+    const isOwn = () => reply || own.has(d.key), chosen = () => opts.find((o) => o.value === selected.get(d.key));
+    const ownBox = mine ? el('textarea', { class: 'own-box', id: `own-${d.key}`, rows: 3, maxlength: 500, dir: 'auto', placeholder: reply ? 'Your reply' : 'Your answer', 'aria-label': `Your own answer, ${name}` }) : null;
+    // One note for any pick, always open: it goes with the answer as its comment.
+    const note = live && opts.length ? el('textarea', { class: 'note-box', id: `note-${d.key}`, rows: 2, maxlength: 500, dir: 'auto', placeholder: 'A note for the agent', 'aria-label': `Note, ${name}` }) : null;
+    // The answers are cards, numbered on a desk for their keys; the one picked gets a ring and a check that springs in, and the button's label slides to it.
+    const card = (label, line, chip, n) => [el('span', { class: 'check', 'aria-hidden': 'true' }, glyph('check')),
+      el('span', { class: 'words' }, el('span', { class: 'label-line' }, el('span', { class: 'label' }, label), chip ? el('span', { class: 'recommend' }, 'Recommended') : ''),
+        line ? el('span', { class: 'reason', dir: 'auto' }, line) : ''), desk && n <= 9 ? kc(String(n)) : ''];
+    const pickers = opts.map((o, i) => el('button', { class: 'pick-option', 'aria-pressed': String(o.value === selected.get(d.key) && !own.has(d.key)) }, ...card(o.label, o.outcome, o.value === d.recommend_value, i + 1)));
+    const ownRow = mine && !reply ? el('button', { class: 'pick-option own-option', 'aria-pressed': String(own.has(d.key)), 'aria-controls': ownBox.id }, ...card('Your own answer', 'Write it in your own words', false, opts.length + 1)) : null;
+    const lbl = el('span', { class: 'lbl' });
     const answer = el('button', { class: 'answer', 'data-kbd': '↵', 'aria-keyshortcuts': 'Enter' }, lbl, el('span', { class: 'okmark', 'aria-hidden': 'true' }, glyph('check')));
+    // The button reads the choice, and is off until there is one: a card picked, or words in Your own answer.
+    const sync = (swap) => {
+      const text = isOwn() ? 'Send answer' : chosen() ? `Answer ${chosen().label}` : 'Pick an answer';
+      answer.disabled = isOwn() ? !ownBox.value.trim() : !chosen();
+      if (lbl.textContent === text) return;
+      lbl.textContent = text;
+      if (swap) { lbl.classList.remove('swap'); void lbl.offsetWidth; lbl.classList.add('swap'); }
+    };
+    const pickOne = (b) => {
+      [...pickers, ownRow].forEach((x) => x?.setAttribute('aria-pressed', String(x === b)));
+      page.classList.toggle('own', isOwn());
+      sync(true);
+    };
+    pickers.forEach((b, i) => (b.onclick = () => { selected.set(d.key, opts[i].value); own.delete(d.key); pickOne(b); }));
+    if (ownRow) ownRow.onclick = () => { own.add(d.key); pickOne(ownRow); ownBox.focus({ preventScroll: true }); setTimeout(() => ownBox.scrollIntoView({ block: 'nearest', behavior: calm.matches ? 'auto' : 'smooth' }), 230); };
+    for (const [box, key] of [[ownBox, ownKey], [note, d.key]]) {
+      if (!box) continue;
+      box.value = drafts.get(key) ?? (box === note ? noteOf(d) : '');
+      box.oninput = () => { drafts.set(key, box.value); keep(); if (box === ownBox) sync(); };
+    }
     // The button turns green and draws a check, then this row folds away: a phone pops back to the list, a desk selects the next ask beside it.
-    const answerWith = (o) => {
+    const answerWith = (o, words) => {
       answer.classList.add('done');
       const held = pause(380);
-      save(d, o, [...optionButtons, answer], err, null, async () => { await held; own.delete(d.key); depart([d.key], 'answered'); location.hash = phone() ? '#waiting' : to; });
+      // Once sent, the pick is spent: an Undo brings the ask back with nothing picked.
+      save(d, o, [...pickers, ownRow, answer].filter(Boolean), err, null, async () => { await held; own.delete(d.key); selected.delete(d.key); depart([d.key], 'answered'); location.hash = phone() ? '#waiting' : to; }, words);
     };
-    answer.onclick = () => {
-      if (!own.has(d.key)) { const o = selectedOption(); if (o) answerWith(o); return; }
-      if (sink.box.value.trim()) return answerWith({ value: 'text' });
-      shown(err).textContent = 'Write your answer first.';
-      sink.box.focus();
-    };
-    const recOpt = opts.find((o) => o.value === d.recommend_value);
-    const cards = d.mocks?.length && d.options?.length ? mockCards(d, []) : null;
-    const hero = cards || d.view ? '' : proofHero(d), preview = hero || (cards ?? (d.view ? rung(d) : proof(d)));
+    answer.onclick = () => (isOwn() ? ownBox.value.trim() && answerWith({ value: 'text' }, ownKey) : chosen() && answerWith(chosen()));
+    sync();
+    sink.more = more();
+    const cards = d.mocks?.length && d.options?.length ? mockCards(d, []) : null, proofLine = cards || d.view ? '' : proofRow(d);
+    const preview = cards ?? (d.view ? rung(d) : proofLine ? '' : proof(d));
     const quiet = opts.find((o) => o.value === d.default_if_silent);
-    const silent = quiet ? [icon('clock'), el('span', {}, el('b', {}, 'If you stay quiet:'), ` ${quiet.outcome ?? quiet.label}${d.silent_by ? ` At ${when(d.silent_by)}. ${left(d.silent_by)}.` : ''}`)] : '';
-    const kicker = el('p', { class: 'kicker' }, el('span', { class: 'k' }, TYPE_NAMES[typeOf(d)]), ` · ${d.filer || 'Agent'}${d.filed ? ` · ${when(d.filed)}` : ''}`);
-    const head = el('div', { class: 'lead' }, badge(d), kicker, el('h2', { dir: 'auto' }, headline(d)));
     const why = unchecked(d) || d.why || (d.tradeoff && firstDraft(d).text) || d.about;
-    const sink = {}, box = live ? el('div', { class: 'decide-other' }, other(d, answerOf(d.key), err, () => (location.hash = to), sink)) : '';
-    const write = live && opts.length && sink.words && ['Write my own answer', () => {
-      own.add(d.key);
-      optionButtons.forEach((b) => b.setAttribute('aria-pressed', 'false'));
-      relabel('Send your answer');
-      sink.fold.open = true;
-      sink.box.placeholder = 'Your answer';
-      sink.box.focus();
-    }, 'own'];
-    sink.round?.setAttribute('role', 'menuitem');
-    const page = el('section', { class: 'decide' }, hero || (preview ? el('div', { class: 'decide-preview' }, preview) : ''),
-      ...(d.mocks?.length ? [annotations(d)] : []), head,
-      why ? el('p', { class: 'why', dir: 'auto' }, why) : '', firstDraftLinks(d),
-      ...(live && opts.length ? [el('p', { class: 'pick-label' }, 'Your answer'),
-        el('ul', { class: 'pick-list', 'aria-label': d.title }, ...optionButtons.map((b) => el('li', {}, b)))] : []),
-      box, silent ? el('p', { class: 'silent-line' }, ...silent) : '', err,
-      el('div', { class: 'decide-bar' }, live && opts.length ? answer : '', more(write, sink.round)));
-    if (live) swipe(page, () => { if (recOpt && !answer.disabled) answerWith(recOpt); });
+    const page = el('section', { class: `decide g-${reviewed(d) ? 'review' : 'answer'}${isOwn() ? ' own' : ''}` }, preview ? el('div', { class: 'decide-preview' }, preview) : '',
+      ...(d.mocks?.length ? [annotations(d)] : []), el('div', { class: 'lead' }, badge(d), kicker, el('h2', { dir: 'auto' }, name)),
+      why ? el('p', { class: 'why', dir: 'auto' }, why) : '', firstDraftLinks(d), proofLine,
+      ...(live && opts.length ? [el('p', { class: 'pick-label' }, 'Your answer'), el('ul', { class: 'pick-list', 'aria-label': d.title }, ...pickers.map((b) => el('li', {}, b)),
+        ownRow ? el('li', {}, ownRow, el('div', { class: 'own-field' }, el('div', {}, ownBox))) : '')] : []),
+      reply ? el('label', { class: 'pick-label', for: ownBox.id }, 'Your reply') : '', reply ? ownBox : '',
+      note ? el('div', { class: 'note-field' }, el('label', { class: 'pick-label', for: note.id }, 'Note', el('small', {}, 'Optional · goes with your answer')), note) : '',
+      quiet ? el('p', { class: 'silent-line' }, `If you stay quiet, the agent goes with ${quiet.label}${d.silent_by ? ` at ${when(d.silent_by)}` : ''}.`) : '', err,
+      mine || (live && opts.length) ? el('div', { class: 'decide-bar' }, answer, desk && note ? el('span', { class: 'bar-hint' }, kc('C'), 'Note') : '') : '');
+    // A swipe right on a phone goes back to the list, as an edge swipe does; a swipe left skips to the next ask.
+    if (live) swipe(page, () => (location.hash = '#waiting'));
     return page;
   }
   /** The desk shell: a list (with its header) beside a detail pane, and a strip under the list naming the list's keys. Any area can set itself out this way. */
@@ -3740,15 +3873,16 @@
   const split = (list, detail, hints) => el('div', { class: 'split' },
     el('div', { class: 'split-list' }, ...list, el('p', { class: 'split-hints' }, ...hints.map(([keys, words]) => el('span', {}, ...keys.map(kc), words)))),
     el('div', { class: 'split-detail' }, ...detail));
-  /** Decide on a desk: the list beside the ask it has selected (the first until a row is picked). Answering folds the row away and selects the next. */
+  /** Decide on a desk: the list beside the ask it has selected (the first until a row is picked), under a bar with its kind, Later and More. Answering folds the row away and selects the next. */
   function decideDesk(top, items, hidden, queue, key) {
     const i = Math.max(0, queue.findIndex((d) => d.key === key)), d = queue[i], next = queue.length > 1 ? queue[(i + 1) % queue.length] : undefined;
     deskSel = d?.key ?? '';
     const list = decideList(items, hidden);
-    if (!d) return split([top, list], [items.length ? el('p', { class: 'empty' }, 'Open a review from the list.') : allClear()], [[['?'], 'All keys']]);
+    if (!d) return split([top, list], [items.length ? el('p', { class: 'empty' }, 'Open a review from the list.') : allClear(true)], [[['?'], 'All keys']]);
     const g = groupOf(d), later = el('button', { class: 'later', 'data-kbd': 'L', 'aria-keyshortcuts': 'L' }, glyph('clock'), g === 'later' ? 'Back from Later' : 'Later');
     later.onclick = () => { toLater([d.key], g !== 'later'); if (g !== 'later' && next) location.hash = `#decide/${next.key}`; };
-    return split([top, list], [el('div', { class: 'split-bar' }, queue.length > 1 ? pager(queue, i) : '', state.readonly ? '' : later), decidePage(d, next, true)],
+    const bar = {}, page = decidePage(d, next, true, bar);
+    return split([top, list], [el('div', { class: 'split-bar' }, bar.crumb, state.readonly ? '' : later, bar.more), page],
       [[['J', 'K'], 'Move'], [['↵'], 'Answer'], [['?'], 'All keys']]);
   }
   /** Evidence on a desk: the list of updates beside the one selected. */
@@ -3782,7 +3916,7 @@
   const KEYS = [['Anywhere', [['Go to Today', 'G', 'T'], ['Go to Decide', 'G', 'D'], ['Go to Evidence', 'G', 'E'], ['Go to Reports', 'G', 'R'], ['Undo', MOD, 'Z'], ['This list', '?']]],
     ['Lists', [['Next', 'J'], ['Previous', 'K']]],
     ['Today', [['Up next', '↵']]],
-    ['Decide', [['Answer', '↵'], ['Answer with option 1 to 9', '1', '–', '9'], ['Comment', 'C'], ['Answer from the comment', MOD, '↵'], ['Later', 'L'], ['Next ask', 'E']]],
+    ['Decide', [['Answer', '↵'], ['Pick option 1 to 9', '1', '–', '9'], ['Note', 'C'], ['Answer from the note', MOD, '↵'], ['Later', 'L'], ['Next ask', 'E']]],
     ['Reports', [['Read or unread', 'U'], ['Archive', 'E'], ['Open a guided report', '↵']]]];
   const shut = el('button', { 'aria-label': 'Close' }, '✕');
   const keysSheet = el('dialog', { id: 'keys', 'aria-labelledby': 'keys-title' }, el('div', {}, el('header', {}, el('h2', { id: 'keys-title' }, 'Keyboard shortcuts'), shut),
@@ -3796,7 +3930,7 @@
   let gAt = 0;
   addEventListener('keydown', (e) => {
     const typing = e.target.closest?.('textarea, input, select'), mod = e.metaKey || e.ctrlKey;
-    // From the comment under an ask, Cmd+Enter answers with it.
+    // From the note (or Your own answer) on an ask, Cmd+Enter answers with it.
     if (mod && e.key === 'Enter' && typing?.closest('.decide')) { e.preventDefault(); document.querySelector('.decide-bar .answer')?.click(); return; }
     const undo = !toast.hidden && !undoBtn.hidden && !undoBtn.disabled && (!location.hash.slice(1) || location.hash === '#waiting' || /^#(decide|reports)\//.test(location.hash) || location.hash === '#reports') ? undoBtn : null;
     if (mod && !e.altKey && e.key.toLowerCase() === 'z' && !typing && undo) { e.preventDefault(); undo.click(); return; }
@@ -3808,10 +3942,10 @@
     // J and K (or the arrow keys) move the selection through a desk list.
     const rows = [...document.querySelectorAll('.split-list [data-row]')], step = { j: 1, ArrowDown: 1, k: -1, ArrowUp: -1 }[k];
     if (step && rows.length) { e.preventDefault(); const at = rows.findIndex((r) => r.matches('[aria-current]')); rows[Math.min(rows.length - 1, Math.max(0, at + step))].click(); return; }
-    // On Decide, a number picks that answer and sends it; E skips to the next ask, Z undoes the last answer.
+    // On Decide, a number picks that answer (Enter then sends it); E skips to the next ask, Z undoes the last answer.
     const onDecide = /^#decide\//.test(location.hash) || !!document.querySelector('.split-detail .decide'), choices = [...document.querySelectorAll('.decide .pick-option')];
     const pick = onDecide && /^[1-9]$/.test(k) ? choices[Number(k) - 1] : null;
-    if (pick) { e.preventDefault(); pick.click(); document.querySelector('.decide-bar .answer')?.click(); return; }
+    if (pick) { e.preventDefault(); pick.click(); return; }
     if (k === 'e' && onDecide && skipTo) { e.preventDefault(); location.hash = skipTo; return; }
     if (k === 'z' && undo) { e.preventDefault(); undo.click(); return; }
     // On a desk's Reports, U reads or unreads the report shown, E archives it, Enter opens a guided one.
@@ -3820,9 +3954,9 @@
     // On Today, Enter takes Up next's main action: open the sign-in, answer with the pick, or start the review.
     if (k === 'Enter' && !location.hash.slice(1) && !e.target.closest?.('a, button, summary')) { const go = document.querySelector('.up-next .go:not(:disabled)'); if (go) e.preventDefault(), go.click(); return; }
     if (!onDecide) return;
-    // Enter answers (or opens a sign-in), C opens the comment, L moves the ask to Later.
+    // Enter answers (or opens a sign-in), C goes to the note, L moves the ask to Later.
     if (k === 'Enter' && !e.target.closest?.('a:not([aria-current]), button, summary')) { const go = document.querySelector('.decide-bar .answer:not(:disabled), .decide .open-link:not(:disabled)'); if (go) e.preventDefault(), go.click(); }
-    if (k === 'c') { const f = document.querySelector('.decide .other.comment'), box = f?.querySelector('textarea'); if (box) { e.preventDefault(); f.open = true; box.focus({ preventScroll: true }); box.scrollIntoView({ block: 'center' }); } }
+    if (k === 'c') { const box = document.querySelector('.decide .note-box'); if (box) { e.preventDefault(); box.focus({ preventScroll: true }); box.scrollIntoView({ block: 'center' }); } }
     if (k === 'l') { const b = document.querySelector('.split-bar .later'); if (b) e.preventDefault(), b.click(); }
   });
   const reshow = (control) => { render(); document.querySelector(control)?.focus({ preventScroll: true }); };
@@ -3846,11 +3980,10 @@
     by.evidence = [...by.evidence.filter((d) => d.type !== 'evidence'), ...shownProof].sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
     by.failedProof = state.decisions.filter((d) => d.type === 'evidence' && d.evidenceCard?.result === 'RUN FAIL' && !gone.has(d.key));
     by.designs = [...state.decisions].reverse().filter((d) => d.kind === 'design' && !gone.has(d.key));
-    // Waiting on you reads newest first unless the viewer chose oldest first. A sign-in blocks someone now, so sign-ins come first either way.
+    // Waiting on you reads newest first. A sign-in blocks someone now, so sign-ins come first.
     let latest = -Infinity;
     const inFileOrder = by.waiting.slice().reverse().map((d, i) => { const t = Date.parse(d.filed); if (!Number.isNaN(t)) latest = t; return { d, t: latest, i }; });
-    const byTime = inFileOrder.sort((x, y) => (x.t === y.t ? x.i - y.i : x.t - y.t)).map((x) => x.d);
-    const asked = waitSort === 'oldest' ? byTime : byTime.reverse();
+    const asked = inFileOrder.sort((x, y) => (x.t === y.t ? x.i - y.i : x.t - y.t)).map((x) => x.d).reverse();
     by.waiting = [...asked.filter((d) => d.type === 'signin'), ...asked.filter((d) => d.type !== 'signin')];
     const hidden = state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'waiting');
     decideCtx = { all: by.waiting, hidden };
@@ -3891,21 +4024,21 @@
     const pageTitle = head === 'decide' || head === 'waiting' ? 'Decide' : head === 'reports' ? 'Reports' : AREAS[head];
     document.body.classList.toggle('today', !at);
     const bulk = { waiting: by.waiting, designs: by.designs, evidence: by.evidence, reports: [...by.reports, ...by.notes], answered: by.answered }[at] ?? [];
-    const top = el('header', { class: head ? 'top' : 'top today-top' }, head && !TABS.some(([a]) => a === head) ? el('a', { class: 'back', href: head === 'decide' ? '#waiting' : '#' }, head === 'decide' ? '‹ Decide' : '‹ Today') : '',
+    // An ask on a phone has a bar of its own: back to Decide, the question once the page scrolls past it, and the ask's More.
+    const top = el('header', { class: head === 'decide' ? 'top ask-nav' : head ? 'top' : 'top today-top' }, head && !TABS.some(([a]) => a === head)
+      ? el('a', { class: 'back', href: head === 'decide' ? '#waiting' : '#' }, ...(head === 'decide' ? [glyph('left'), 'Decide'] : ['‹ Today'])) : '',
     // Decide leads with the date over a large title, and keeps its More at the top right.
     (head === 'waiting' || at === 'reports') && !state.readonly ? el('p', { class: 'kicker date-kicker' }, dateLine()) : '',
     ...(head ? [el('h1', { tabindex: '-1' }, pageTitle)] : todayTop(by.waiting.length, by.answered.filter((d) => isToday(state.answers[d.key].at)).length)),
     ro ? el('p', { class: 'meta' }, ro) : '',
-    head === 'decide' && decideAt >= 0 ? pager(decideQueue, decideAt) : '',
-    head === 'waiting' && !state.readonly && by.waiting.length ? el('p', { class: 'lede waiting-lede' }, `${by.waiting.length} ${by.waiting.length === 1 ? 'item needs' : 'items need'} you`,
-      by.waiting.some((d) => shelved().has(d.key)) ? ` · ${by.waiting.filter((d) => shelved().has(d.key)).length} for later` : '')
+    head === 'waiting' && !state.readonly ? el('p', { class: 'lede waiting-lede' }, waitingLede(by.waiting))
       : head === 'reports' && !state.readonly && by.reports.length ? el('p', { class: 'lede waiting-lede' }, (() => { const n = by.reports.filter(unread).length; return n ? `${n} new · ${by.reports.length} in all` : `${plural(by.reports.length, 'report')} · all read`; })())
       : head === 'answered' && by.answered.length ? el('p', { class: 'lede' }, (() => { const n = by.answered.filter((d) => isToday(state.answers[d.key].at)).length; return `${n} ${n === 1 ? 'answer' : 'answers'} today. Each one has gone back to its agent.`; })())
       : head === 'designs' && by.designs.length ? el('p', { class: 'lede' }, 'Designs to look over. Approve one, or say what should change.')
       : head === 'evidence' && by.evidence.length ? el('p', { class: 'lede' }, 'Every proof filed, newest first.') : '',
-    head === 'decide' ? '' : head === 'waiting' && !selecting && !state.readonly && !FROZEN ? (by.waiting.length ? listMore(by.waiting) : '')
+    head === 'decide' ? '' : head === 'waiting' && !selecting && !state.readonly && !FROZEN ? listMore(by.waiting)
       : head === 'reports' && !selecting && !state.readonly && !FROZEN ? (bulk.length ? reportsMore(by.reports, bulk) : '') : bulkBar(bulk));
-    const board = document.getElementById('board');
+    const board = document.getElementById('board'), askBar = {};
     board.removeAttribute('aria-busy');
     const listTop = document.querySelector('.split-list')?.scrollTop;
     // An update in the address opens even when the list leaves it off (a failed run); with none, the newest is selected.
@@ -3917,9 +4050,10 @@
     const content = [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived'), update)
       : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0) : decideDesk(top, by.waiting, hidden, decideQueue, key)] : [top]), ...(deskSplit ? [] : at === 'waiting' && !state.readonly ? [decideList(by.waiting, hidden)]
       : at === 'decide' ? [decideAt < 0 ? el('p', { class: 'empty' }, 'Nothing to decide for that question.')
-        : decidePage(decideQueue[decideAt], decideQueue.length > 1 ? decideQueue[(decideAt + 1) % decideQueue.length] : undefined)]
+        : decidePage(decideQueue[decideAt], decideQueue.length > 1 ? decideQueue[(decideAt + 1) % decideQueue.length] : undefined, false, askBar)]
       : at === 'designs' ? [...designGroups(by.designs)] : at === 'evidence' ? [...evidenceList(by.evidence), dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived')] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : today(by))];
+    top.append(...[askBar.mid, askBar.more].filter(Boolean));
     // The report shown on a desk stays in place under a new list and bar while it is the same report, so its frame is not loaded again.
     const keptRead = document.querySelector('#board .split-detail > .read'), newRead = content[0]?.querySelector?.('.split-detail > .read');
     if (keptRead && newRead && keptRead.dataset.sig === newRead.dataset.sig) {

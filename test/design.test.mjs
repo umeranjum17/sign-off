@@ -891,11 +891,12 @@ test('each card has one place to type: Add a comment holds the note sent with th
     '--window-size=800,4000', '--virtual-time-budget=10000', '--dump-dom', url + hash], { env: chromeEnv, maxBuffer: 1 << 24 }, (e, out) => (e ? no(e) : ok(out))));
   const cards = (dom) => [...dom.matchAll(/<article class="row[^"]*" id="item-(\w+)">(.*?)<\/article>/gs)].map((m) => [m[1], m[2]]);
   const waiting = await dump('#waiting');
-  assert.match(waiting, /class="lede waiting-lede">2 items need you/);
-  // Decide groups its rows: the plain ask under Answer with its recommended pick, the design pick under Review; More holds the sort.
+  assert.match(waiting, /class="lede waiting-lede">2 waiting · each has a recommended answer/);
+  // Decide groups its rows: the plain ask under Answer with its recommended pick, the design pick under Review; More holds Answer all recommended and Move all to later, and no sort.
   assert.match(waiting, /<h2 class="dl-head">Answer<span class="n">1<\/span><\/h2><ul class="dl-list" aria-label="Answer">.*?When should it ship\?.*?Recommended <b>B<\/b>/s);
   assert.match(waiting, /<h2 class="dl-head">Review<span class="n">1<\/span><\/h2><ul class="dl-list" aria-label="Review">.*?href="#decide\/look".*?Pick the look.*?Design pick/s);
-  assert.match(waiting, /data-act="sort"><span>Oldest first<\/span>/);
+  assert.match(waiting, /data-act="answer-all"><span>Answer all recommended<\/span>.*?<div class="dl-sep" role="separator"><\/div>.*?data-act="later-all"><span>Move all to later<\/span>/s);
+  assert.doesNotMatch(waiting, /data-act="sort"|Oldest first/);
   assert.doesNotMatch(waiting, /<ol class="queue"|<p class="fhead"/);
   // Today: the date over its title and the ring of what was cleared, how many wait, Up next with the recommended answer as its one button,
   // and four tiles counting each group Decide lists; the search sits at the foot.
@@ -1036,14 +1037,16 @@ test('a sign-in card: posted on top of what waits with its link and time left, t
   // A sign-in blocks someone now, so both come before the question, newest first among them.
   const queue = () => evaluate('[...document.querySelectorAll(".ask-card .title")].map((s) => s.textContent).join("|")');
   await until(async () => (await queue()) === 'Sign in to GitHub|Sign in to npm|Keep the weekly digest?');
-  const card = (key) => evaluate(`(() => { const c = document.getElementById("item-${key}"), o = c?.querySelector(".open-link");
-    return c && [c.querySelector(".title, h3")?.textContent, ...[...c.querySelectorAll(".line, .expiry, .meta")].map((p) => p.textContent), o ? [o.tagName, o.getAttribute("href"), o.target, o.rel, o.disabled].join(" ") : "no open"].join("|"); })()`);
+  // A sign-in's page: its headline, its facts (what it unlocks, a clock of the time left, where it signs in) and its one Open.
+  const card = (key) => evaluate(`(() => { const c = document.querySelector("section#item-${key}.signin-ask"), o = c?.querySelector(".open-link");
+    return c && [c.querySelector("h2")?.textContent, ...[...c.querySelectorAll(".fact")].map((p) => p.textContent), o ? [o.tagName, o.getAttribute("href"), o.target, o.rel, o.disabled].join(" ") : "no open"].join("|"); })()`);
   // Decide shows the card in focus: the GitHub sign-in is newest, so the npm one is tapped in the queue first.
   await evaluate('document.querySelector("#item-npm-login").click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/npm-login' && (await card('npm-login')) !== null);
-  assert.equal(await card('npm-login'), `npm|Unlocks: Publish npm|Waits: Main|Expires in 15 min|A ${link} _blank noopener noreferrer `);
-  // A sign-in's More holds Ask me later and Dismiss; it skips on to the next ask like any other, by a swipe left and with E as its key.
-  assert.equal(await evaluate('[...document.querySelectorAll(".decide-bar .dl-menu > button")].map((b) => b.textContent).join("|")'), 'Ask me later|Dismiss');
+  assert.match(await card('npm-login'), new RegExp(`^Sign in to npm\\|UnlocksPublish npm\\|Expires in1[45]:\\d\\d\\|Whereexample\\.com\\|A ${link.replace(/[.?]/g, '\\$&')} _blank noopener noreferrer $`));
+  assert.match(await evaluate('document.querySelector(".decide .kicker").textContent'), /^Sign in · Main · \d\d:\d\d$/);
+  // A sign-in's More, in its bar, holds Ask me later and Dismiss; it skips on to the next ask like any other, by a swipe left and with E as its key.
+  assert.equal(await evaluate('[...document.querySelectorAll(".ask-nav .dl-menu > button")].map((b) => b.textContent).join("|")'), 'Ask me later|Dismiss');
   await swipe({ x: 340, y: 300 }, { x: 40, y: 300 });
   await until(async () => /^#decide\/(?!npm-login)/.test(await evaluate('location.hash')));
   const at = await evaluate('location.hash');
@@ -1055,7 +1058,7 @@ test('a sign-in card: posted on top of what waits with its link and time left, t
   signin('tmp-login', 'Tmp', 'https://example.com/tmp', '15m');
   await evaluate('location.hash = "#decide/tmp-login"');
   await until(async () => (await card('tmp-login')) !== null);
-  await evaluate('document.querySelector(".decide-bar .dis").click()');
+  await evaluate('document.querySelector(".ask-nav .dis").click()');
   await until(async () => /^#decide\/(?!tmp-login)/.test(await evaluate('location.hash')));
   assert.equal(await evaluate('document.querySelector("#board .empty")?.textContent'), undefined);
   // Past its time the link has nothing left to open: its card leaves what waits and Decide on its own, counted nowhere, and the page is not reloaded.
@@ -1067,7 +1070,8 @@ test('a sign-in card: posted on top of what waits with its link and time left, t
   assert.match(signin('gh-login', 'GitHub', 'https://example.com/device?code=one-time-3', '10m').out, /gh-login,new link,GitHub,/);
   await until(async () => (await queue()).includes('GitHub'));
   await evaluate('document.querySelector("#item-gh-login").click()');
-  await until(async () => (await evaluate('location.hash')) === '#decide/gh-login' && (await card('gh-login')) === 'GitHub|Unlocks: Publish GitHub|Waits: Main|Expires in 10 min|A https://example.com/device?code=one-time-3 _blank noopener noreferrer ');
+  await until(async () => (await evaluate('location.hash')) === '#decide/gh-login'
+    && /^Sign in to GitHub\|UnlocksPublish GitHub\|Expires in(10:00|9:\d\d)\|Whereexample\.com\|A https:\/\/example\.com\/device\?code=one-time-3 _blank noopener noreferrer $/.test(await card('gh-login')));
   // signin done closes a card: it leaves what waits and shows as done.
   assert.match(run('signin', 'done', file, '--key', 'npm-login').out, /npm-login,done,npm/);
   assert.match(run('signin', 'done', file, '--key', 'npm-login').out, /npm-login,already done,npm/);
@@ -1240,10 +1244,11 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   const more = (act) => evaluate(`(() => { const m = document.querySelector(".top .dl-more"); m.open = true; m.querySelector('[data-act="${act}"]').click(); return true; })()`);
   // Decide groups the asks, newest first in each group: the two to answer, then the design pick to review.
   await until(async () => (await askTitles()) === 'Which day for release?|Keep the weekly digest?|Pick the look');
-  assert.equal(await evaluate('document.querySelector(".waiting-lede").textContent.includes("3 items need you")'), true);
+  assert.equal(await evaluate('document.querySelector(".waiting-lede").textContent'), '3 waiting · each has a recommended answer');
   assert.equal(await heads(), 'Answer2|Review1');
+  // Each kind has its mark: a checklist for a pick, a question for yes or no, a phone for a design to look over.
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".ask-card .icon")].map((s) => [s.className, (s.querySelector("path")?.getAttribute("d") ?? "").length > 10])'),
-    [['icon i-waiting', true], ['icon i-toggle', true], ['icon i-designs', true]]);
+    [['icon i-pick', true], ['icon i-yesno', true], ['icon i-phone', true]]);
   // A row names the pick it recommends; a design pick, reviewed before it is answered, says what it is.
   assert.equal(await evaluate('[...document.querySelectorAll(".dl-face .sub")].map((s) => s.textContent).join("|")'), 'Recommended friday · Agent|Recommended Yes · Agent|Design pick · Agent');
   await evaluate('document.querySelector("#item-look").click()');
@@ -1251,27 +1256,23 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   assert.equal(await evaluate('document.querySelector(".decide .why")?.textContent'), 'No new bugs in three weeks, and support is fully staffed on Friday.');
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-preview .mock")].map((f) => [f.querySelector(".label").textContent, f.querySelector(".shot.none")?.textContent ?? null])'),
     [['B', null], ['A', 'No mock for this option'], ['C', 'No mock for this option']]);
-  assert.equal(await evaluate('document.querySelector(".silent-line")?.textContent'), 'If you stay quiet: Safest. One more week of waiting.');
-  assert.equal(await evaluate('getComputedStyle(document.querySelector(".pick-option[aria-pressed=true]"), "::before").content'), 'none');
+  assert.equal(await evaluate('document.querySelector(".silent-line")?.textContent'), 'If you stay quiet, the agent goes with C.');
+  assert.equal(await evaluate('getComputedStyle(document.querySelector(".pick-option"), "::before").content'), 'none');
+  // The bar sits under the last card and the quiet line once the page scrolls to its end.
+  await evaluate('scrollTo(0, 1e5)');
   assert.equal(await evaluate('(() => { const b = document.querySelector(".decide-bar").getBoundingClientRect().top; return document.querySelector(".pick-list").getBoundingClientRect().bottom <= b && document.querySelector(".decide > .silent-line").getBoundingClientRect().bottom <= b; })()'), true);
-  // One Answer button and one More beside it, both big enough for a thumb.
-  assert.equal(await evaluate('[...document.querySelectorAll(".decide-bar > button, .decide-bar > .dl-more")].map((e) => e.className + ":" + (e.getBoundingClientRect().height >= 44)).join("|")'), 'answer:true|dl-more:true');
+  // One button in the bar, and More in the ask's own bar at the top, both big enough for a thumb.
+  assert.equal(await evaluate('[...document.querySelectorAll(".decide-bar > *")].map((e) => e.className).join() + "|" + [document.querySelector(".decide-bar .answer"), document.querySelector(".ask-nav > .dl-more > summary")].map((e) => e.getBoundingClientRect().height >= 44).join()'), 'answer|true,true');
   await evaluate('location.hash = "#waiting"');
   await until(async () => (await askTitles()) === 'Which day for release?|Keep the weekly digest?|Pick the look');
-  // Oldest first, from More, stays in this browser.
-  await more('sort');
-  await until(async () => (await askTitles()) === 'Keep the weekly digest?|Which day for release?|Pick the look'
-    && (await evaluate('localStorage.getItem("sign-off-waiting-sort")')) === 'oldest');
-  await evaluate('window.old = true, location.reload()');
-  await until(() => evaluate('!window.old'));
-  await until(async () => (await askTitles()) === 'Keep the weekly digest?|Which day for release?|Pick the look');
-  assert.equal(await evaluate('document.querySelector(".top .dl-more [data-act=sort]").textContent'), 'Newest first');
+  // More on the list holds no sort: Decide reads newest first.
+  assert.equal(await evaluate('[...document.querySelectorAll(".top .dl-more [data-act]")].map((b) => b.dataset.act).join("|")'), 'answer-all|later-all');
   // Today's Up next is the first ask Decide lists with a recommended answer, and Other answer opens it; the Review tile opens Decide at its group, whose head flashes.
   await evaluate('location.hash = ""');
-  await until(async () => (await evaluate('document.querySelector(".up-next h2")?.textContent')) === 'Keep the weekly digest?');
-  assert.equal(await evaluate('document.querySelector(".up-next .go .lbl").textContent + "|" + document.querySelector(".up-next .soft").textContent'), 'Answer Yes|Other answer');
+  await until(async () => (await evaluate('document.querySelector(".up-next h2")?.textContent')) === 'Which day for release?');
+  assert.equal(await evaluate('document.querySelector(".up-next .go .lbl").textContent + "|" + document.querySelector(".up-next .soft").textContent'), 'Answer friday|Other answer');
   await evaluate('document.querySelector(".up-next .soft").click()');
-  await until(async () => await evaluate('location.hash === "#decide/digest" && document.querySelector(".decide h2")?.textContent === "Keep the weekly digest?"'));
+  await until(async () => await evaluate('location.hash === "#decide/release" && document.querySelector(".decide h2")?.textContent === "Which day for release?"'));
   await evaluate('location.hash = ""');
   await until(async () => (await evaluate('document.querySelector(".tile.g-review .n")?.textContent')) === '1');
   await evaluate('document.querySelector(".tile.g-review").click()');
@@ -1284,16 +1285,18 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   assert.equal(await evaluate('document.querySelector(".decide .why")?.textContent'), 'Open rate held steady.');
   // Answer, undo, then accept by keyboard so the Waiting list and its toast reflect the durable answer.
   await evaluate("location.hash = '#waiting'");
-  await until(async () => (await askTitles()) === 'Keep the weekly digest?|Which day for release?|Pick the look');
+  await until(async () => (await askTitles()) === 'Which day for release?|Keep the weekly digest?|Pick the look');
   // On a phone the ask pushes in over the list.
   assert.equal(await evaluate('new Promise((ok) => { document.querySelector(`a[href="#decide/release"]`).click(); setTimeout(() => ok(location.hash + "|" + document.getElementById("board").classList.contains("push")), 30); })'), '#decide/release|true');
   await until(async () => (await evaluate('location.hash')) === '#decide/release');
   assert.equal(await evaluate('document.querySelector(".decide h2").textContent'), 'Which day for release?');
   // A reason text wins over the ask's context line.
   assert.equal(await evaluate('document.querySelector(".decide .why").textContent'), 'The release needs one calm day.');
-  assert.equal(await evaluate('document.querySelectorAll(".pick-option").length'), 3);
-  assert.equal(await evaluate('document.querySelector(".pick-option[aria-pressed=true] .recommend")?.textContent'), 'Recommended');
-  // Picking another answer slides the button's label to it; the answer turns the button green with a check, then the list comes back with the row folding away.
+  // Three answers then Your own answer; nothing is picked yet: Recommended is a tag on its card, and the button waits, off, until a pick.
+  assert.equal(await evaluate('[...document.querySelectorAll(".pick-option")].map((b) => b.querySelector(".label").textContent + (b.querySelector(".recommend") ? "*" : "") + ":" + b.getAttribute("aria-pressed")).join("|")'),
+    'today:false|friday*:false|next-week:false|Your own answer:false');
+  assert.equal(await evaluate('(() => { const a = document.querySelector(".decide-bar .answer"); return a.textContent + "|" + a.disabled; })()'), 'Pick an answer|true');
+  // A pick slides the button's label to it; the answer turns the button green with a check, then the list comes back with the row folding away.
   await evaluate('document.querySelector(".pick-option").click()');
   assert.equal(await evaluate('document.querySelector(".decide-bar .answer").textContent + "|" + document.querySelector(".answer .lbl").classList.contains("swap")'), 'Answer today|true');
   await evaluate('document.querySelector(".decide-bar .answer").click()');
@@ -1305,11 +1308,14 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   // Undo on the list puts the row back in place, with a flash, and stays on the list.
   await evaluate('document.querySelector("#undo").click()');
   await until(async () => !/today/.test(run('answers', file, '--key', 'release').out));
-  await until(async () => (await askTitles()) === 'Keep the weekly digest?|Which day for release?|Pick the look');
+  await until(async () => (await askTitles()) === 'Which day for release?|Keep the weekly digest?|Pick the look');
   assert.equal(await evaluate('location.hash'), '#waiting');
   await evaluate("location.hash = '#decide/release'");
-  await until(async () => (await evaluate('location.hash')) === '#decide/release' && (await evaluate('document.querySelectorAll(".pick-option").length')) === 3);
+  await until(async () => (await evaluate('location.hash')) === '#decide/release' && (await evaluate('document.querySelectorAll(".pick-option").length')) === 4);
+  // A number picks that answer, and Enter sends it.
   await evaluate('document.dispatchEvent(new KeyboardEvent("keydown", { key: "1", bubbles: true }))');
+  assert.equal(await evaluate('document.querySelector(".decide-bar .answer").textContent'), 'Answer today');
+  await evaluate('document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))');
   // On a phone the answer pops back to the list once its check has played; waiting for that keeps the late pop from landing on Answered below.
   await until(async () => /today/.test(run('answers', file, '--key', 'release').out) && (await evaluate('location.hash')) === '#waiting');
   // An undo of a changed answer from Answered puts it back and stays there; Decide says so when its key is not in its queue.
@@ -1336,14 +1342,11 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   const planRow = 'document.getElementById("item-plan-kind-board")';
   assert.equal(await evaluate(`${planRow}.querySelector(".title").textContent + "|" + ${planRow}.querySelector(".sub").textContent + "|" + ${planRow}.getAttribute("href")`), 'Show plans on the board|5 sections · 2 decisions|#waiting/plan-kind-board');
   assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
-  // Select mode, from More: tap the plan row to pick it, Dismiss N clears it with a toast and Undo.
-  await more('select');
-  await evaluate(`${planRow}.click()`);
-  assert.equal(await evaluate('location.hash + "|" + document.querySelectorAll(".picked").length + "|" + document.querySelector(".sel-go").textContent'), '#waiting|1|Dismiss 1');
-  await evaluate('document.querySelector(".sel-go").click()');
-  await until(async () => await evaluate(`!${planRow}`));
+  // Move all to later, from More: every row goes under Later, with a toast and Undo, which brings them back.
+  await more('later-all');
+  await until(async () => (await heads()) === 'Later3');
   await evaluate('document.getElementById("undo").click()');
-  await until(async () => await evaluate(`!!${planRow}`));
+  await until(async () => (await heads()) === 'Answer1|Review2');
   await evaluate(`${planRow}.click()`);
   await until(async () => (await evaluate('location.hash + "|" + document.querySelector("#reader iframe")?.title')) === '#waiting/plan-kind-board|Plan: Show plans on the board');
   await until(async () => await evaluate('document.querySelector("#reader .plan-view")?.clientHeight > 100'));
@@ -1394,7 +1397,7 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
 });
 
 // Waiting on you sorts by when each ask was filed, not by where it sits in the file: an ask re-filed later leads the newest-first list.
-test('Waiting on you: newest and oldest first follow each ask\'s filed time, and an ask with no filed time keeps its place in the file', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Waiting on you: newest first follows each ask\'s filed time, and an ask with no filed time keeps its place in the file', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'filed-sort'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
@@ -1410,13 +1413,11 @@ test('Waiting on you: newest and oldest first follow each ask\'s filed time, and
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
   const queue = () => evaluate('[...document.querySelectorAll(".ask-card .title")].map((s) => s.textContent).join("|")');
   await until(async () => (await queue()) === 'Plain ask|Relinked ask|Older ask');
-  await evaluate('(() => { const m = document.querySelector(".top .dl-more"); m.open = true; m.querySelector("[data-act=sort]").click(); })()');
-  await until(async () => (await queue()) === 'Older ask|Relinked ask|Plain ask');
   close();
   proc.kill();
 });
 
-test('Waiting on you: a board with no filed times lists newest first as the file reversed and oldest first as the file', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Waiting on you: a board with no filed times lists newest first as the file reversed', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'unfiled-sort'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
@@ -1432,8 +1433,6 @@ test('Waiting on you: a board with no filed times lists newest first as the file
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
   const queue = () => evaluate('[...document.querySelectorAll(".ask-card .title")].map((s) => s.textContent).join("|")');
   await until(async () => (await queue()) === 'Third ask|Second ask|First ask');
-  await evaluate('(() => { const m = document.querySelector(".top .dl-more"); m.open = true; m.querySelector("[data-act=sort]").click(); })()');
-  await until(async () => (await queue()) === 'First ask|Second ask|Third ask');
   close();
   proc.kill();
 });
@@ -1464,13 +1463,13 @@ test('Waiting on you: a reply-only ask shows Reply, a type-ask yes/no shows Yes/
   await evaluate('document.querySelector("#item-ship").click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/ship');
   assert.equal(await evaluate('document.querySelector(".decide .eyebrow")'), null); // no kind eyebrow on Decide
-  assert.equal(await evaluate('document.querySelectorAll(".pick-option").length'), 2);
+  assert.equal(await evaluate('[...document.querySelectorAll(".pick-option .label")].map((l) => l.textContent).join("|")'), 'Yes|No|Your own answer');
   await evaluate('location.hash = "#waiting"');
   await evaluate('document.querySelector("#item-ready").click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/ready');
+  // A reply ask is only words: its box is open, and Send answer waits for them.
   assert.equal(await evaluate('document.querySelectorAll(".decide .pick-option").length'), 0);
-  await evaluate('document.querySelector(".decide .other summary").click()');
-  assert.notEqual(await evaluate('document.querySelector(".decide textarea")'), null);
+  assert.equal(await evaluate('(() => { const b = document.querySelector(".decide .own-box"), a = document.querySelector(".decide-bar .answer"); return b.placeholder + "|" + a.textContent + "|" + a.disabled; })()'), 'Your reply|Send answer|true');
   await evaluate('location.hash = "#waiting"');
   await evaluate('document.querySelector("#item-cover").click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/cover');
@@ -1479,7 +1478,7 @@ test('Waiting on you: a reply-only ask shows Reply, a type-ask yes/no shows Yes/
   proc.kill();
 });
 
-test('Decide on a pick-one ask: the reply box sits under the options, More holds four items with Dismiss last, Write my own answer sends the words as the answer, and the pager or E moves to the next ask', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Decide on a pick-one ask: nothing is picked until you pick and the button then names the pick, Your own answer is the last card and opens one box whose words Send answer sends, one note goes with any pick, More holds only Ask me later and Dismiss, and E moves to the next ask', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'decide-option-box'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l }));
@@ -1493,32 +1492,46 @@ test('Decide on a pick-one ask: the reply box sits under the options, More holds
   const { evaluate, close } = await browse(join(dir, 'b'), 1280);
   await evaluate(`location.href = ${JSON.stringify(`${url}#decide/beta`)}`);
   await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'Beta question?');
-  assert.equal(await evaluate('document.querySelectorAll(".decide .pick-option").length'), 3);
-  // Each answer is a card of its own, with a radio before its words.
-  assert.equal(await evaluate('(() => { const rows = [...document.querySelectorAll(".decide .pick-list > li")]; return rows.length === 3 && rows.every((li) => li.firstElementChild?.classList.contains("pick-option") && li.firstElementChild.firstElementChild.classList.contains("check")) && getComputedStyle(rows[1].firstElementChild).borderTopLeftRadius !== "0px" && rows[1].getBoundingClientRect().top > rows[0].getBoundingClientRect().bottom; })()'), true);
-  await evaluate('document.querySelector(".decide .other summary").click()');
-  assert.equal(await evaluate('document.querySelector(".decide .other").open'), true);
-  // More holds four items, Dismiss last and in red.
-  assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-bar .dl-menu > button")].map((b) => [b.textContent, getComputedStyle(b).color === getComputedStyle(document.documentElement).getPropertyValue("--danger") || b.classList.contains("dis")])'),
-    [['Ask me later', false], ['Write my own answer', false], ['Ask for another round', false], ['Dismiss', true]]);
-  await evaluate('document.querySelector(".pager .step:last-child").click()');
+  const cards = () => evaluate('[...document.querySelectorAll(".decide .pick-option")].map((b) => b.querySelector(".label").textContent + (b.querySelector(".recommend") ? "*" : "") + ":" + b.getAttribute("aria-pressed")).join("|")');
+  const button = () => evaluate('(() => { const a = document.querySelector(".decide-bar .answer"); return a.textContent + "|" + a.disabled; })()');
+  // The answers then Your own answer, each a card of its own with a radio before its words; nothing is picked, Recommended is only a tag, and the button waits, off.
+  assert.equal(await cards(), 'A:false|B*:false|C:false|Your own answer:false');
+  assert.equal(await evaluate('(() => { const rows = [...document.querySelectorAll(".decide .pick-list > li")]; return rows.length === 4 && rows.every((li) => li.firstElementChild?.classList.contains("pick-option") && li.firstElementChild.firstElementChild.classList.contains("check")) && getComputedStyle(rows[1].firstElementChild).borderTopLeftRadius !== "0px" && rows[1].getBoundingClientRect().top > rows[0].getBoundingClientRect().bottom; })()'), true);
+  assert.equal(await button(), 'Pick an answer|true');
+  // One note, open under the cards with no toggle to find it, and no box for your own answer until you pick it.
+  assert.equal(await evaluate('[!!document.querySelector(".decide .note-field .note-box"), !!document.querySelector(".decide details"), document.querySelector(".decide .own-field").getBoundingClientRect().height].join("|")'), 'true|false|0');
+  // More, in the bar over the ask, holds only Ask me later and Dismiss, in red.
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".split-bar .dl-menu > button")].map((b) => [b.textContent, b.classList.contains("dis")])'), [['Ask me later', false], ['Dismiss', true]]);
+  await evaluate('window.dispatchEvent(new KeyboardEvent("keydown", { key: "e" }))');
   await until(async () => (await evaluate('location.hash')) === '#decide/alpha');
   await evaluate('window.dispatchEvent(new KeyboardEvent("keydown", { key: "e" }))');
   await until(async () => (await evaluate('location.hash')) === '#decide/beta');
-  // Write my own answer clears the pick and makes the button Send your answer; empty, it asks for the words; with them, they are the answer.
-  await evaluate('document.querySelector(\'.decide-bar [data-act="own"]\').click()');
-  assert.equal(await evaluate('document.querySelector(".decide-bar .answer").textContent + "|" + document.querySelectorAll(".pick-option[aria-pressed=true]").length + "|" + (document.activeElement === document.querySelector(".decide .other textarea"))'), 'Send your answer|0|true');
+  // A pick names itself on the button, and the note goes with it.
+  await evaluate('document.querySelectorAll(".decide .pick-option")[2].click()');
+  assert.equal(await cards(), 'A:false|B*:false|C:true|Your own answer:false');
+  assert.equal(await button(), 'Answer C|false');
+  await evaluate('(() => { const t = document.querySelector(".decide .note-box"); t.value = "Only after the release"; t.dispatchEvent(new Event("input")); })()');
   await evaluate('document.querySelector(".decide-bar .answer").click()');
-  assert.equal(await evaluate('document.querySelector(".decide .err").textContent'), 'Write your answer first.');
-  await evaluate('(() => { const t = document.querySelector(".decide .other textarea"); t.value = "Ship it Thursday"; t.dispatchEvent(new Event("input")); })()');
+  await until(async () => JSON.parse(run('answers', file, '--json').out).beta?.answer === 'c');
+  assert.equal(JSON.parse(run('answers', file, '--json').out).beta.note, 'Only after the release');
+  // Answered, the desk moves on to the next ask. Your own answer opens its one box, the note steps aside, and the button reads Send answer, off until there are words.
+  await until(async () => (await evaluate('location.hash + "|" + document.querySelector(".split-detail .decide h2")?.textContent')) === '#decide/alpha|Alpha question?');
+  await evaluate('(() => { const t = document.querySelector(".decide .note-box"); t.value = "A note that stays behind"; t.dispatchEvent(new Event("input")); })()');
+  await evaluate('document.querySelector(".decide .own-option").click()');
+  assert.equal(await cards(), 'A*:false|B:false|C:false|Your own answer:true');
+  assert.equal(await button(), 'Send answer|true');
+  await until(async () => (await evaluate('document.querySelector(".decide .own-field").getBoundingClientRect().height')) > 60);
+  assert.equal(await evaluate('[document.activeElement === document.querySelector(".decide .own-box"), getComputedStyle(document.querySelector(".decide .note-field")).display].join("|")'), 'true|none');
+  await evaluate('(() => { const t = document.querySelector(".decide .own-box"); t.value = "Ship it Thursday"; t.dispatchEvent(new Event("input")); })()');
+  assert.equal(await button(), 'Send answer|false');
   await evaluate('document.querySelector(".decide-bar .answer").click()');
-  await until(async () => /beta,text,/.test(run('answers', file).out));
-  assert.equal(JSON.parse(run('answers', file, '--json').out).beta.note, 'Ship it Thursday');
+  await until(async () => /alpha,text,/.test(run('answers', file).out));
+  assert.equal(JSON.parse(run('answers', file, '--json').out).alpha.note, 'Ship it Thursday');
   close();
   proc.kill();
 });
 
-test('Add a comment on every answer: a yes/no on a phone and a pick-one on a desk each send a comment with the answer through the one Answer button, other ways to send sit in More, an answer with none still takes one tap, typing leaves no focus ring, and answers reads it back', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Add a comment on every answer: a yes/no on a phone and a pick-one on a desk each send the one note under the cards with the answer picked, More holds only Ask me later and Dismiss, an answer with no note carries none, typing leaves no focus ring, and answers reads it back', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'answer-comment'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }], abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l }));
@@ -1530,34 +1543,32 @@ test('Add a comment on every answer: a yes/no on a phone and a pick-one on a des
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
-  // Add a comment is one quiet line between the choices and the Answer bar; it opens to the box, and what is typed goes with the answer picked.
+  // The note is one box between the cards and the bar, open with no toggle to find it; what is typed goes with the answer picked.
   const comment = async ({ evaluate, insertText }, key, text) => {
     await evaluate(`location.href = ${JSON.stringify(`${url}#decide/${key}`)}`);
     await until(async () => (await evaluate('document.querySelector(".decide .pick-option") && location.hash')) === `#decide/${key}`);
-    assert.deepEqual(await evaluate(`(() => { const s = document.querySelector('.decide summary[aria-label^="Add a comment,"]'), list = document.querySelector('.decide .pick-list'), bar = document.querySelector('.decide .decide-bar');
-      return { open: s.parentElement.open, after: !!(list.compareDocumentPosition(s) & 4), before: !!(s.compareDocumentPosition(bar) & 4), text: s.textContent }; })()`), { open: false, after: true, before: true, text: 'Add a comment' }, key);
-    await evaluate('document.querySelector(\'.decide summary[aria-label^="Add a comment,"]\').click()');
-    await until(() => evaluate('document.querySelector(".decide details.comment").open'));
-    await evaluate('document.querySelector(".decide details.comment textarea").focus()');
+    assert.deepEqual(await evaluate(`(() => { const box = document.querySelector('.decide .note-box'), list = document.querySelector('.decide .pick-list'), bar = document.querySelector('.decide .decide-bar');
+      return { shown: box.getClientRects().length > 0, after: !!(list.compareDocumentPosition(box) & 4), before: !!(box.compareDocumentPosition(bar) & 4), head: box.previousElementSibling.textContent, placeholder: box.placeholder, toggles: document.querySelectorAll('.decide details').length }; })()`),
+      { shown: true, after: true, before: true, head: 'NoteOptional · goes with your answer', placeholder: 'A note for the agent', toggles: 0 }, key);
+    await evaluate('document.querySelector(".decide .note-box").focus()');
     await insertText(text);
-    // Open, the card still has one way to answer: the box with its placeholder and no help line, the Answer button, and one More… holding the rest.
-    assert.deepEqual(await evaluate(`(() => { const shown = (e) => e.getClientRects().length > 0, page = document.querySelector('.decide');
-      return { controls: [...page.querySelectorAll('.decide-other button, .decide-other summary, .decide-bar button, .decide-bar a, .decide-bar summary')].filter(shown).map((b) => b.textContent || b.getAttribute('aria-label')),
-        placeholder: page.querySelector('details.comment textarea').placeholder, help: [...page.querySelectorAll('details.comment label')].filter(shown).length,
-        folded: [...page.querySelectorAll('.decide-bar .dl-more .dl-menu > *')].map((b) => b.textContent) }; })()`),
-      { controls: ['Add a comment', `Answer ${key === 'layout' ? 'A' : 'Yes'}`, 'More'], placeholder: 'Add a note (optional)', help: 0,
-        folded: ['Ask me later', 'Write my own answer', 'Ask for another round', 'Dismiss'] }, key);
+    // The page keeps one way to answer, the bar's one button, off until a pick; More, over the ask, holds only Ask me later and Dismiss.
+    assert.deepEqual(await evaluate(`(() => ({ bar: [...document.querySelectorAll('.decide-bar button')].map((b) => b.textContent + (b.disabled ? ' (off)' : '')),
+      folded: [...document.querySelectorAll('.ask-nav .dl-menu > *, .split-bar .dl-menu > *')].map((b) => b.textContent) }))()`),
+      { bar: ['Pick an answer (off)'], folded: ['Ask me later', 'Dismiss'] }, key);
     // Keys typed into the box are not keyboard navigation, so the next page's title gets no focus ring; Tab out of the box is.
-    await evaluate('document.querySelector(".decide details.comment textarea").dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }))');
+    await evaluate('document.querySelector(".decide .note-box").dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }))');
     assert.equal(await evaluate('"kbd" in document.documentElement.dataset'), false, key);
   };
   const phone = await browse(join(dir, 'phone'), 390, 844, true);
   await comment(phone, 'feel', 'Looks good, but I want to see reports and the desktop variant too');
+  await phone.evaluate('document.querySelector(".decide .pick-option").click()');
   await phone.evaluate('document.querySelector(".decide-bar .answer").click()');
   await until(async () => (await phone.evaluate('location.hash')) !== '#decide/feel');
-  // No comment: Answer on the next ask is still the one tap, and it carries no note.
+  // No note: a pick and the button, and the answer carries none.
   await phone.evaluate(`location.href = ${JSON.stringify(`${url}#decide/quick`)}`);
   await until(async () => (await phone.evaluate('document.querySelector(".decide h2")?.textContent')) === 'Keep the weekly digest?');
+  await phone.evaluate('document.querySelector(".decide .pick-option").click()');
   await phone.evaluate('document.querySelector(".decide-bar .answer").click()');
   await until(async () => (await phone.evaluate('location.hash')) !== '#decide/quick');
   phone.close();
@@ -1587,7 +1598,7 @@ test('Add a comment on every answer: a yes/no on a phone and a pick-one on a des
   proc.kill();
 });
 
-test('Decide on a phone: an answer pops back to the list with its Undo toast over the tab bar, the toast never covers the next question’s Answer, and a row swipes right to answer and left to Later', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Decide on a phone: a pick then the button pops back to the list with its Undo toast over the tab bar, the toast never covers the next question’s button, the bar keeps to the foot with the tab bar slid away, and a row swipes right to answer and left to Later', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'decide-toast'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l })), why = 'The release needs one calm day. '.repeat(140);
@@ -1603,9 +1614,11 @@ test('Decide on a phone: an answer pops back to the list with its Undo toast ove
   const { evaluate, swipe, close } = await browse(join(dir, 'b'), 390, 844);
   await evaluate(`location.href = ${JSON.stringify(`${url}#decide/alpha`)}`);
   await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'Alpha question?');
-  // The ask is taller than the phone, so its bar is stuck to the bottom of the screen.
+  // The ask has its own page: the tab bar slides away and the bar keeps to the foot of the screen.
   assert.equal(await evaluate('document.querySelector(".decide-bar").getBoundingClientRect().bottom <= innerHeight'), true);
   assert.equal(await evaluate('document.querySelector(".decide-bar").getBoundingClientRect().top > innerHeight / 2'), true);
+  await until(() => evaluate('document.querySelector(".tabs").getBoundingClientRect().top >= innerHeight'));
+  await evaluate('document.querySelector(".decide .pick-option").click()');
   await evaluate('document.querySelector(".decide-bar .answer").click()');
   await until(async () => (await evaluate('location.hash')) === '#waiting' && (await evaluate('!document.querySelector("#toast").hidden')));
   // Once it has risen into place, the toast sits over the tab bar.
@@ -1615,18 +1628,19 @@ test('Decide on a phone: an answer pops back to the list with its Undo toast ove
   await until(() => evaluate('!document.getElementById("board").getAnimations({ subtree: true }).length'));
   assert.equal(await evaluate('document.querySelector("#toast").getBoundingClientRect().bottom <= document.querySelector(".decide-bar").getBoundingClientRect().top'), true);
   assert.equal(await evaluate('(() => { const r = document.querySelector(".decide-bar .answer").getBoundingClientRect(); return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest(".answer") != null; })()'), true);
+  await evaluate('document.querySelectorAll(".decide .pick-option")[1].click()');
   await evaluate('document.querySelector(".decide-bar .answer").click()');
   await until(async () => (await evaluate('location.hash')) === '#waiting' && /beta,b,/.test(run('answers', file).out));
   await evaluate('location.hash = "#decide/gamma"');
   await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'Gamma question?' && (await evaluate('!document.querySelector("#toast").hidden')));
   await until(() => evaluate('!document.getElementById("board").getAnimations({ subtree: true }).length')); // the push in has landed
-  // A short ask keeps its bar right under the content; once the ask is taller than the phone the bar sticks to one band above the tab bar, with the toast above it.
-  // Every length in between too: on any font one of them leaves the bar just above the tab bar, where the toast would sit on it.
+  // Short or tall, the ask keeps its bar at the foot of the screen, with the toast above it.
+  // Every length in between too: on any font one of them would leave the bar where the toast sits.
   for (const words of ['One calm day.', ...Array.from({ length: 24 }, (_, i) => why.slice(0, 60 * (i + 1))), why]) {
     await evaluate(`document.querySelector('.decide .why').textContent = ${JSON.stringify(words)}`);
     // Measured after the page has laid the new words out (two frames), as a person would see it.
     const at = await evaluate('new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok))).then(() => { const b = document.querySelector(".decide-bar").getBoundingClientRect(), t = document.querySelector("#toast"), r = t.getBoundingClientRect(); return { hidden: t.hidden, inner: innerHeight, bar: [b.top, b.bottom], toast: [r.top, r.bottom], scroll: scrollY }; })');
-    assert.ok(!at.hidden && at.bar[1] <= at.inner - 64 + 1 && (at.bar[1] >= at.inner - 64 - 1 || at.toast[0] >= at.bar[1] || at.toast[1] <= at.bar[0]), JSON.stringify({ chars: words.length, ...at }));
+    assert.ok(!at.hidden && Math.abs(at.bar[1] - at.inner) <= 1 && at.toast[1] <= at.bar[0] + 13, JSON.stringify({ chars: words.length, ...at }));
     assert.equal(await evaluate('(() => { const r = document.querySelector(".decide-bar .answer").getBoundingClientRect(); return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest(".answer") != null; })()'), true);
   }
   // A finger on a row: a short drag springs back and opens nothing; a swipe right answers with the recommended pick, with Undo.
@@ -1639,7 +1653,7 @@ test('Decide on a phone: an answer pops back to the list with its Undo toast ove
   assert.equal(await evaluate('location.hash'), '#waiting');
   assert.doesNotMatch(run('answers', file).out, /gamma/);
   await swipe({ x: 40, y }, { x: 360, y });
-  await until(async () => /gamma,c,/.test(run('answers', file).out) && (await evaluate('document.querySelector("#toast").dataset.mark + "|" + document.querySelector("#toast-text").textContent')) === 'ok|Saved: C');
+  await until(async () => /gamma,c,/.test(run('answers', file).out) && (await evaluate('document.querySelector("#toast").dataset.mark + "|" + document.querySelector("#toast-text").textContent')) === 'ok|Gamma question? · C');
   await until(async () => !(await row('gamma')));
   await evaluate('document.querySelector("#undo").click()');
   await until(async () => !/gamma,c,/.test(run('answers', file).out) && !!(await row('gamma')));
@@ -1649,7 +1663,7 @@ test('Decide on a phone: an answer pops back to the list with its Undo toast ove
   ({ y } = await row('gamma'));
   await swipe({ x: 360, y }, { x: 30, y });
   await until(async () => (await evaluate('[...document.querySelectorAll(".dl-head")].map((h) => h.textContent).join("|")')) === 'Later1');
-  assert.equal(await evaluate('document.querySelector("#toast-text").textContent + "|" + document.querySelector(".waiting-lede").textContent + "|" + document.querySelector(".tabs .bd").textContent'), 'Moved to Later|1 item needs you · 1 for later|1');
+  assert.equal(await evaluate('document.querySelector("#toast-text").textContent + "|" + document.querySelector(".waiting-lede").textContent + "|" + document.querySelector(".tabs .bd").textContent'), 'Gamma question? · moved to later|1 waiting · 1 for later|1');
   await evaluate('window.old = true, location.reload()');
   await until(() => evaluate('!window.old && document.querySelectorAll(".dl-head").length === 1'));
   assert.equal(await evaluate('document.querySelector(".dl-head").textContent'), 'Later1');
@@ -1661,7 +1675,7 @@ test('Decide on a phone: an answer pops back to the list with its Undo toast ove
   proc.kill();
 });
 
-test('Decide on a desk: the list beside its ask, J and K move the selection, Enter answers and selects the next while the row folds, Cmd+Z, L, C with Cmd+Enter, a row\'s hover answer, the ? sheet, G then a letter (Evidence on the same shell), a sign-in laid out as an ask, a tall ask\'s bar after its last option, and the phone layout under 1024px', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Decide on a desk: the list beside its ask, J and K move the selection, a number picks and Enter answers and selects the next while the row folds, Cmd+Z, L, C with Cmd+Enter, a row\'s hover answer, the ? sheet, G then a letter (Evidence on the same shell), a sign-in laid out as an ask, a tall ask\'s bar after its last option, and the phone layout under 1024px', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'decide-desk'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l }));
@@ -1682,11 +1696,15 @@ test('Decide on a desk: the list beside its ask, J and K move the selection, Ent
   await until(async () => (await seen()) === '#decide/beta|beta|Beta question?|true');
   await key('j'), await key('k');
   await until(async () => (await seen()) === '#decide/beta|beta|Beta question?|true');
-  // Enter answers with the pick: the button draws its check, the row folds away, the next ask is selected beside the list, and the toast sits over the ask's pane.
+  // Nothing is picked until a number picks: 2 picks B and the button names it. Enter answers with the pick: the button draws its check, the row folds away,
+  // the next ask is selected beside the list, and the toast, 440px wide, sits centred over the list and the ask's pane.
+  assert.equal(await evaluate('document.querySelector(".split-detail .answer").disabled'), true);
+  await key('2');
+  assert.equal(await evaluate('document.querySelector(".split-detail .answer").textContent + "|" + document.querySelector(".split-detail .answer").disabled'), 'Answer B|false');
   await key('Enter');
   await until(() => evaluate('document.querySelector(".split-detail .answer.done") !== null'));
   await until(async () => /beta,b,/.test(run('answers', file).out) && (await seen()) === '#decide/gamma|gamma|Gamma question?|true' && (await rows()) === 'alpha,gamma,delta');
-  await until(() => evaluate('!document.querySelector("#toast").hidden && document.querySelector("#toast").getBoundingClientRect().left >= document.querySelector(".split-detail").getBoundingClientRect().left'));
+  await until(() => evaluate('(() => { const t = document.querySelector("#toast"), r = t.getBoundingClientRect(), side = document.querySelector(".side").getBoundingClientRect(); return !t.hidden && r.width <= 440 && Math.abs((r.left + r.right) / 2 - (side.right + innerWidth) / 2) <= 2; })()'));
   // Cmd+Z takes it back and the row returns.
   await key('z', true);
   await until(async () => !/beta,b,/.test(run('answers', file).out) && (await rows()) === 'alpha,beta,gamma,delta');
@@ -1695,12 +1713,14 @@ test('Decide on a desk: the list beside its ask, J and K move the selection, Ent
   await until(async () => (await seen()) === '#decide/gamma|gamma|Gamma question?|true');
   await key('l');
   await until(async () => (await seen()) === '#decide/delta|delta|Delta question?|true' && (await evaluate('[...document.querySelectorAll(".dl-head")].map((h) => h.textContent).join("|")')) === 'Answer3|Later1');
-  // C opens the comment under the answers, and Cmd+Enter answers from it with the comment.
+  // C goes to the note under the answers, and Cmd+Enter answers the pick from it with the note.
+  await key('3');
   await key('c');
   assert.equal(await evaluate('document.activeElement.id'), 'note-delta');
   await evaluate('(() => { const t = document.activeElement; t.value = "After the demo"; t.dispatchEvent(new Event("input")); })()');
   await key('Enter', true);
   await until(() => JSON.parse(run('answers', file, '--json').out).delta?.note === 'After the demo');
+  assert.equal(JSON.parse(run('answers', file, '--json').out).delta.answer, 'c');
   // Hovering a row shows its quick answer, which answers with the recommended pick.
   await until(async () => (await rows()) === 'alpha,beta,gamma');
   await evaluate('document.querySelector(\'.dl-row[data-key="alpha"] .dl-hover .yes\').click()');
@@ -1721,11 +1741,12 @@ test('Decide on a desk: the list beside its ask, J and K move the selection, Ent
   await evaluate('location.hash = "#decide/npm"; location.reload()');
   await until(async () => (await evaluate('document.querySelector(".split-detail .decide h2")?.textContent')) === 'Sign in to npm');
   assert.equal(await evaluate(`(() => { const p = document.querySelector(".split-detail .decide"), o = p.querySelector(".decide-bar .open-link");
-    return [p.querySelector(".kicker").textContent, p.querySelector(".why").textContent, o.textContent, o.getAttribute("href"), !!p.querySelector(".row"), /Expires|left/.test(p.textContent), / left$/.test(document.querySelector('.dl-row[data-key="npm"] .tm').textContent)].join("|"); })()`),
-  'Sign-in · Release agent|Unlocks: Publishing the release|Open sign-in|https://example.com/login|false|false|true');
+    return [document.querySelector(".split-bar .crumb").textContent, [...p.querySelectorAll(".fact")].map((f) => f.textContent).join(","), o.textContent, o.getAttribute("href"), !!p.querySelector(".row"),
+      /Expires|left/.test(p.textContent), / left$/.test(document.querySelector('.dl-row[data-key="npm"] .tm').textContent), !!document.querySelector(".split-bar .dl-more")].join("|"); })()`),
+  'Sign in · Release agent|UnlocksPublishing the release,Whereexample.com|Open sign-in|https://example.com/login|false|false|true|true');
   // An ask taller than the pane: its bar comes after the last option and never covers it.
   await evaluate('location.hash = "#decide/tall"');
-  await until(async () => (await evaluate('document.querySelectorAll(".split-detail .pick-option").length')) === 6);
+  await until(async () => (await evaluate('document.querySelectorAll(".split-detail .pick-option:not(.own-option)").length')) === 6);
   assert.equal(await evaluate(`(() => { const s = document.querySelector(".split-detail"), bar = () => document.querySelector(".split-detail .decide-bar").getBoundingClientRect().top, last = () => [...s.querySelectorAll(".pick-option")].at(-1).getBoundingClientRect().bottom;
     const rest = bar() >= last(); s.scrollTop = 1e5; return [s.scrollHeight > s.clientHeight, rest, bar() >= last()].join("|"); })()`), 'true|true|true');
   close();
@@ -1900,7 +1921,7 @@ test('Undo on a card outside Waiting takes the answer back and stays on that are
   proc.kill();
 });
 
-test('Decide after an ask is replaced under the same key: the pick remembered from the old options is not offered, and Answer still answers', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Decide after an ask is replaced under the same key: the pick remembered from the old options is dropped, so nothing is picked and the button waits, and a new pick answers', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'decide-options-changed'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const doc = (options) => JSON.stringify({ schema: 2, items: [{ key: 'when', title: 'When should it ship?', options, recommend_value: options[0].value }] });
@@ -1916,7 +1937,9 @@ test('Decide after an ask is replaced under the same key: the pick remembered fr
   writeFileSync(file, doc([{ value: 'c', label: 'C' }, { value: 'd', label: 'D' }]));
   await evaluate('refresh()');
   await until(async () => (await evaluate('document.querySelector(".decide .pick-option .label")?.textContent')) === 'C');
-  assert.equal(await evaluate('document.querySelectorAll(".decide .pick-option[aria-pressed=true]").length'), 1);
+  assert.equal(await evaluate('document.querySelectorAll(".decide .pick-option[aria-pressed=true]").length'), 0);
+  assert.equal(await evaluate('document.querySelector(".decide-bar .answer").textContent + "|" + document.querySelector(".decide-bar .answer").disabled'), 'Pick an answer|true');
+  await evaluate('document.querySelector(".decide .pick-option").click()');
   assert.equal(await evaluate('document.querySelector(".decide-bar .answer").textContent'), 'Answer C');
   await evaluate('document.querySelector(".decide-bar .answer").click()');
   await until(async () => (await evaluate('location.hash')) !== '#decide/when');
@@ -1949,7 +1972,7 @@ test('a posted contract design is listed with its preview and date, and opens fo
   const { evaluate, close } = await browse(join(dir, 'browser'));
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
   await until(async () => (await evaluate('document.querySelector("#item-d1-design .title")?.textContent')) === message.title);
-  assert.equal(await evaluate('document.querySelector("#item-d1-design .tm")?.textContent + "|" + document.querySelector("#item-d1-design .sub")?.textContent'), '18 Oct|Design · Agent'); // the row is its title, what it is and when it came
+  assert.equal(await evaluate('document.querySelector("#item-d1-design .tm")?.textContent + "|" + document.querySelector("#item-d1-design .sub")?.textContent'), '18 Oct|17 screens · Agent'); // the row is its title, how many screens it holds and when it came
   assert.equal(await evaluate('document.querySelector("#item-d1-design")?.getAttribute("href")'), '#designs/d1-design');
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
   await until(async () => (await evaluate('document.querySelector(".designs strong")?.textContent')) === message.title);
