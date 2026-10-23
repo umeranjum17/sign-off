@@ -57,10 +57,25 @@ url=$(grep -o 'http://127.0.0.1:[0-9]*/' "$tmp/serve.out" | head -1)
   curl -s -o /dev/null -w 'HTTP %{http_code}\n' "${url}api/project-icon?name=Nobody"
   echo
 } >> "$log"
-# The served icon in a real browser at phone width: the picture the board gives a project's rows. The browser keeps the real HOME so it finds its Chrome.
 browse() { HOME=$home CHROME_DEVTOOLS_AXI_SESSION=so-icon-$$ chrome-devtools-axi "$@" > /dev/null; }
-if browse open "${url}api/project-icon?name=beacon" && browse emulate --viewport 390x844x2,mobile,touch --color-scheme light && browse screenshot "$out/icon-served.png"; then
-  echo "icon-served.png: Chrome at 390 px opened ${url}api/project-icon?name=beacon and shows the Beacon icon the board serves" | sed "s#$tmp#<tmp>#g" >> "$log"
+# The served icon in a real browser at phone width. The sheet is this journey's own test page, not board UI (no screen draws icons yet):
+# it loads the icon from the running board by its URL, beside what the board returned for each request. The browser keeps the real HOME so it finds its Chrome.
+state=$(curl -s "${url}api/decisions" | node -e 'const s=JSON.parse(require("fs").readFileSync(0,"utf8"));console.log(s.decisions.map(d=>`${d.key}: ${d.priority??"no priority"}`).join(" · "))')
+none=$(curl -s -o /dev/null -w '%{http_code}' "${url}api/project-icon?name=Nobody")
+cat > "$tmp/sheet.html" <<HTML
+<!doctype html><meta name="viewport" content="width=device-width"><title>priority-icon proof sheet</title>
+<style>body{font:16px/1.4 system-ui,sans-serif;margin:16px;color:#111;background:#fff}h1{font-size:18px}code{font-size:13px;word-break:break-all}img{width:96px;height:96px;display:block;margin:8px 0;border:1px solid #ccc}p{margin:8px 0 16px}</style>
+<h1>Test page of the priority-icon journey (not board UI)</h1>
+<p>Project <b>Beacon</b>, icon set with <code>project --name Beacon --icon icons/beacon.png</code>, loaded from the running board:</p>
+<code>GET ${url}api/project-icon?name=beacon</code>
+<img id="icon" src="${url}api/project-icon?name=beacon" alt="Beacon icon">
+<p id="loaded">loading</p>
+<p>Project <b>Nobody</b> has no icon: <code>GET ${url}api/project-icon?name=Nobody</code> answered <b>HTTP ${none}</b>, so the page shows its initials.</p>
+<p>Card priorities in the board's state (<code>/api/decisions</code>): <b>${state}</b></p>
+<script>const i=document.getElementById('icon');const done=()=>document.getElementById('loaded').textContent=i.naturalWidth?'Loaded from the board: '+i.naturalWidth+' x '+i.naturalHeight+' px PNG.':'The board did not serve it.';i.complete?done():(i.onload=i.onerror=done);</script>
+HTML
+if browse open "file://$tmp/sheet.html" && browse emulate --viewport 390x844x2,mobile,touch --color-scheme light && sleep 1 && browse screenshot "$out/icon-served.png"; then
+  echo "icon-served.png: Chrome at 390 px on the journey's test page, which loads the Beacon icon from ${url}api/project-icon?name=beacon and shows Nobody's 404 and the card priorities" | sed "s#$tmp#<tmp>#g" >> "$log"
 else echo "icon-served.png: the browser could not capture the served icon" >> "$log"; failed=1; fi
 browse stop
 echo >> "$log"
