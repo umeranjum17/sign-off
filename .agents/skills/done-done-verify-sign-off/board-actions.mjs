@@ -106,9 +106,10 @@ const PAGES = [
   } }] },
   { name: 'waiting', hash: '#waiting', ready: '[id="item-npm"]', stages: [
     { run: async (h) => {
-      const links = { 'plan-kind-board': '#waiting/plan-kind-board', npm: '#decide/npm', ship: '#decide/ship', 'keep-the-weekly-digest': '#decide/keep-the-weekly-digest', look: '#decide/look', 'chat-journeys': '#designs/chat-journeys' };
-      // Every row is the link to its ask; Decide groups them Sign in, Answer and Review.
+      const links = { 'plan-kind-board': '#waiting/plan-kind-board', npm: '#decide/npm', ship: '#decide/ship', 'keep-the-weekly-digest': '#decide/keep-the-weekly-digest', look: '#decide/look' };
+      // Every row is the link to its ask; Decide groups them Sign in, Answer and Review. A design review is Main's until promoted, so it is under Designs only.
       for (const [key, href] of Object.entries(links)) await h.nav(`open ${key}`, h.card(key), new RegExp(`^${href}$`));
+      h.has('no design review in Decide', !h.card('chat-journeys') && h.board());
       const heads = () => [...h.board().querySelectorAll('.dl-head')].map((e) => e.firstChild.textContent).join('|');
       h.has('groups Sign in, Answer, Review', heads() === 'Sign in|Answer|Review' && h.board().querySelector('.dl-head'));
       // More, as the prototype has it: Answer all recommended and Move all to later, each taken back with Undo.

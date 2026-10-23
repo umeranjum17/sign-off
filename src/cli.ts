@@ -14,7 +14,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, sameDecision, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, appendPromoted, appendSendBack, appendDesignAnswer, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -34,8 +34,8 @@ const AGENTS: Record<string, { bin: string; dir: string; home: string }> = {
   'gemini-cli': { bin: 'gemini', dir: '.agents/skills', home: join(homedir(), '.gemini', 'skills') },
 };
 const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
-commands[23]:
-  (none)=list, raise, post, answers, wait, poll, deeper, owner, open, status, stop, serve, export, init, report, signin, dismiss, restore, refile, doctor, notify, validate, help
+commands[24]:
+  (none)=list, raise, post, answers, wait, poll, deeper, owner, open, status, stop, serve, export, init, report, signin, dismiss, restore, promote, refile, doctor, notify, validate, help
 board: the nearest .sign-off/ board (the walk's bounds and SIGN_OFF_HOME: README, "Test runs never touch your board"), else ~/.sign-off/decisions.json; a board file given always wins
 flags: --full and --json on list, answers and wait, --events on wait, --json on status, --filer on post, raise and wait, --help on every command, -v/--version
 examples:
@@ -258,6 +258,7 @@ examples:
   sign-off-axi post --kind plan --from plan.json --filer agent-41
   sign-off-axi post --kind design --from design.json --filer agent-41
 A design message lists project journeys, per-screen image or HTML view variants, and a card preview; post checks every asset stays under the board folder.
+A design shows under Designs for Main to review, never in the user's Decide or any count of asks, until Main runs promote (see promote --help).
   sign-off-axi post .sign-off/decisions.json --type interactive --title "Does the sign-in flow feel right?" --view mocks/sign-in/demo.html --option yes=Yes --option no="Needs work" --recommend yes
   sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media phone.png --media flow.mp4 --link https://github.com/acme/app/pull/12
   sign-off-axi post --type evidence --title "Debug build for the phone" --about "The app installs and signs in." --media phone.png --attach app-debug.apk
@@ -290,6 +291,15 @@ examples:
 `,
   restore: `usage: sign-off-axi restore <key> [board.json]
 Brings back a card that dismiss hid. See \`sign-off-axi dismiss --help\`.
+`,
+  promote: `usage: sign-off-axi promote <key> [board.json] [--undo]
+For Main only, never a lead. A design review a lead posts (post --kind design) shows under Designs, where Main reviews it; it never waits in Decide or counts as the user's ask.
+Once Main has passed every screen, the lead posts one design per product that opens all its screens, phone and desktop, and Main promotes that one card:
+it then waits in Decide, counts there and notifies like any ask until the user answers it. --undo puts it back under Designs only.
+It writes one line to <board>.promoted.jsonl beside the board; no post, feed or board request writes that file.
+examples:
+  sign-off-axi promote fleet-dashboard-prototype
+  sign-off-axi promote fleet-dashboard-prototype --undo
 `,
   report: `usage: sign-off-axi report init <folder> [--plan] [--page]
 Writes the guided template to fill: <folder>/report.json, or <folder>/plan.json with --plan. A file already there is kept.
@@ -539,6 +549,8 @@ const waitFor = (on: string, filer?: string, key?: string) => (filer ? `Run \`si
 
 /** Still waiting on the user: not answered, not dismissed, not an expired sign-in, and something to answer (an item with no options and no reply is only shown). */
 const waits = (d: Decision & { answer?: unknown; dismissed?: boolean }) => asks(d) && !lapsed(d) && !d.dismissed && awaitsVerdict(d.type, d.answer as { answer?: string } | undefined);
+/** Waiting on the user, as Decide counts it: a design review waits on Main instead until Main promotes it (web/index.html area() says the same); its poster's wait still waits for the verdict. */
+const asksUser = (d: Parameters<typeof waits>[0] & { promoted?: boolean }) => waits(d) && (d.kind !== 'design' || !!d.promoted);
 /** The items that archive after a day: all of them, except on a board another program feeds, which owns what it shows. */
 const archivable = (file: string, decisions: Decision[]) => ((x) => (x.readonly === true || x.answers_only === true ? [] : decisions))(readItems(file).extra);
 /** The board's decisions with their latest answer; a missing board file is an empty board.
@@ -548,7 +560,8 @@ function board(file: string, say = warn) {
   const decisions = loadDecisions(file), answers = readAnswers(file, say);
   const hidden = new Set(readDismissed(file, answers, readRounds(file), say, archivable(file, decisions)));
   for (const key of Object.keys(answers)) if (!decisions.some((d) => d.key === key)) say(`left out the answer for ${key}: that question is no longer in ${basename(file)}`);
-  return decisions.map((d) => ({ ...d, answer: Object.hasOwn(answers, d.key) ? answers[d.key] : undefined, dismissed: hidden.has(d.key) }));
+  const promoted = new Set(readPromoted(file, say));
+  return decisions.map((d) => ({ ...d, answer: Object.hasOwn(answers, d.key) ? answers[d.key] : undefined, dismissed: hidden.has(d.key), ...(promoted.has(d.key) && { promoted: true }) }));
 }
 function ready(file: string, on: string, root?: string) {
   if (!existsSync(file)) throw fail(`no board yet at ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi raise${on} --title "<question>"\` first`);
@@ -562,7 +575,7 @@ function ready(file: string, on: string, root?: string) {
 
 function list(args: string[]) {
   const { file, values, on } = parse('list', args, TIERS);
-  const rows = board(file), waiting = rows.filter(waits), answered = rows.filter((d) => d.answer && !awaitsVerdict(d.type, d.answer) && !d.dismissed).length;
+  const rows = board(file), waiting = rows.filter(asksUser), answered = rows.filter((d) => d.answer && !awaitsVerdict(d.type, d.answer) && !d.dismissed).length;
   if (values.json) return JSON.stringify({ board: file, decisions: rows.map(({ dismissed, ...d }) => ({ ...d, ...(d.type === 'signin' && { link: undefined }), ...(dismissed && { dismissed }) })) });
   const help = [
     ...(waiting.length ? [`Run \`sign-off-axi open${on}\` to show the board to the user`] : []),
@@ -571,7 +584,7 @@ function list(args: string[]) {
   ];
   const where = tilde(file) + (existsSync(file) ? '' : ' (no file yet; raise creates it)');
   if (values.full) {
-    return toon({ board: where, decisions: rows.map((d) => ({ key: d.key, status: awaitsVerdict(d.type, d.answer) ? (d.dismissed ? 'dismissed' : d.type === 'evidence' ? 'shown' : 'waiting') : d.answer!.answer, title: d.title, about: d.about ?? '', detail: d.detail ?? '',
+    return toon({ board: where, decisions: rows.map((d) => ({ key: d.key, status: awaitsVerdict(d.type, d.answer) ? (d.dismissed ? 'dismissed' : d.type === 'evidence' ? 'shown' : d.kind === 'design' && !d.promoted ? 'in review' : 'waiting') : d.answer!.answer, title: d.title, about: d.about ?? '', detail: d.detail ?? '',
       recommend: d.recommend_value ?? '', default_if_silent: d.default_if_silent ?? '', close: d.close })) }, help);
   }
   return toon({
@@ -1039,6 +1052,22 @@ function dismiss(restoring: boolean) {
       return toon({ board: tilde(file), [restoring ? 'restored' : 'dismissed']: [key] }, [`Run \`sign-off-axi ${restoring ? 'dismiss' : 'restore'}${on} ${key}\` to undo`]);
     });
   };
+}
+
+/** promote <key> [board.json] [--undo]: Main puts a design review it passed in front of the user, in Decide; --undo takes it back to Designs. */
+function promote(args: string[]) {
+  const at = args.findIndex((a) => !a.startsWith('-') && !existsSync(a) && !a.endsWith('.json')), key = args[at];
+  if (at < 0 || !isKey(key)) throw fail('promote needs a design card key', 'VALIDATION_ERROR', 'sign-off-axi promote <key> [board.json]');
+  const { file, named, values, on } = parse('promote', args.filter((_, i) => i !== at), { undo: { type: 'boolean' } });
+  return locked(`${file}.lock`, () => {
+    const d = board(file).find((x) => x.key === key);
+    if (!d) throw fail(`no card with key ${key} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi list${on} --full\` to see the keys`);
+    if (d.kind !== 'design') throw fail(`${key} is not a design review`, 'VALIDATION_ERROR', 'Only a design posted with post --kind design is promoted; every other ask already waits in Decide');
+    const before = waitingKeys(file);
+    appendPromoted(file, key, !values.undo);
+    notifyEntered(file, named, before);
+    return toon({ board: tilde(file), [values.undo ? 'unpromoted' : 'promoted']: [key] }, [values.undo ? `It shows under Designs only. Run \`sign-off-axi promote${on} ${key}\` to put it in Decide again` : `It waits in Decide. Run \`sign-off-axi promote${on} ${key} --undo\` to take it back`]);
+  });
 }
 
 /** refile <key> [board.json] --media <file>...: an old proof posted as a Pass/Fail ask becomes an evidence update (title and note kept), and the ask is dismissed. */
@@ -1660,7 +1689,7 @@ const skillInstalled = (dir: string, agent: string) => [join(dir, AGENTS[agent].
 const SKILL_ADD = ['-y', 'skills', 'add', 'umeranjum17/sign-off', '--skill', 'sign-off-axi', '-y', '-a'];
 const skillAdd = (agents: string[]) => `npx ${[...SKILL_ADD, ...agents].join(' ')}`;
 
-const GITIGNORE = 'mocks/\nevidence/\n*.answers.jsonl\n*.rounds.jsonl\n*.messages.jsonl\n*.annotations.jsonl\n*.seen.jsonl\n*.dismissed.jsonl\n*.reads.jsonl\n*.deeper.jsonl\n*.owners.json\n*.delivery.jsonl\n*.board.pid\n*.board.log\nnotify.log\n*.token\n*.export.html\n';
+const GITIGNORE = 'mocks/\nevidence/\n*.answers.jsonl\n*.rounds.jsonl\n*.messages.jsonl\n*.annotations.jsonl\n*.seen.jsonl\n*.dismissed.jsonl\n*.promoted.jsonl\n*.reads.jsonl\n*.deeper.jsonl\n*.owners.json\n*.delivery.jsonl\n*.board.pid\n*.board.log\nnotify.log\n*.token\n*.export.html\n';
 /** The board, port, bind and hosts in <so>/config.yaml (the `key: value` lines init writes). A bad line falls back on its own default
  * (decisions.json, 4410) and `problems` says what is wrong; a file that cannot be read throws. */
 function readSetup(so: string) {
@@ -1721,7 +1750,7 @@ const tokenMissing = (n: Notify) => n.muxr
 const NOTIFY_SENDER = `void (async()=>{const delays=[2000,10000,60000],f=process.env.SIGN_OFF_NOTIFY_TOKEN_FILE;for(let i=0;i<4;i++){try{const t=f?require('node:fs').readFileSync(f,'utf8').trim():process.env.SIGN_OFF_NOTIFY_TOKEN;if((await fetch(process.env.SIGN_OFF_NOTIFY_URL,{method:'POST',headers:{'content-type':'application/json',...(t&&{authorization:'Bearer '+t})},body:process.env.SIGN_OFF_NOTIFY_BODY,signal:AbortSignal.timeout(10000)})).ok)return}catch{}if(i<3)await new Promise(r=>setTimeout(r,delays[i]))}require('node:fs').appendFileSync(process.env.SIGN_OFF_NOTIFY_LOG,new Date().toISOString()+' notification send failed for card '+process.env.SIGN_OFF_NOTIFY_ID+'\\n')})();`;
 
 /** Cards worth a notice: those waiting on the user, and a new evidence update (shown, never waiting). */
-const notifies = (d: Parameters<typeof waits>[0]) => waits(d) || (d.type === 'evidence' && !d.dismissed);
+const notifies = (d: Parameters<typeof asksUser>[0]) => asksUser(d) || (d.type === 'evidence' && !d.dismissed);
 
 /** The cards that would notify before a write: one that notifies after the write but not before it is new to the user. */
 function waitingKeys(file: string) {
@@ -2255,6 +2284,7 @@ const state = () => {
     annotations: fed ? [] : ((sent) => readAnnotations(file, warn).map((a) => (sent.has(a.id) ? { ...a, sent: true } : a)))(sentIds(file)),
     comments: fed ? [] : readPartComments(file),
     dismissed: readDismissed(file, answers, rounds, warn, fed ? [] : items),
+    promoted: readPromoted(file, warn),
   };
 };
 /** A mock file's sha256 now, or null when it is gone: a comment shows only on the exact file it was made on.
@@ -2732,7 +2762,7 @@ await runAxiCli({
   topLevelHelp: TOP_HELP,
   getCommandHelp: (cmd) => HELP[cmd],
   home: axi('list', list),
-  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), report: axi('report', report), owner: axi('owner', owner), deeper: axi('deeper', deeper), signin: axi('signin', signin), dismiss: axi('dismiss', dismiss(false)), restore: axi('restore', dismiss(true)), refile: axi('refile', refile), doctor: axi('doctor', doctor), notify: axi('notify', notify), validate, help: ([name, ...rest]) => {
+  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), report: axi('report', report), owner: axi('owner', owner), deeper: axi('deeper', deeper), signin: axi('signin', signin), dismiss: axi('dismiss', dismiss(false)), restore: axi('restore', dismiss(true)), promote: axi('promote', promote), refile: axi('refile', refile), doctor: axi('doctor', doctor), notify: axi('notify', notify), validate, help: ([name, ...rest]) => {
     if (rest.length || (name && !HELP[name])) throw fail(`unknown command or argument: ${[name, ...rest].join(' ')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi --help` to see the commands');
     return name ? HELP[name] : TOP_HELP;
   } },

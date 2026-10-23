@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync, readFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, mkdirSync, readdirSync, rmSync, symlinkSync, writeFileSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -93,6 +93,26 @@ test('a card is announced once, so a sign-in that gets a new link is not announc
   await sleep(400);
   assert.deepEqual(hits.map((h) => h.body.id), ['npm-login'], 'the card left Waiting and came back: the receiver already knows it');
   assert.equal(JSON.parse(await cli(dir, ['list', board(dir), '--json'])).decisions[0].key, 'npm-login');
+});
+
+test('a design review a lead posts sends the user no notice; Main promoting it sends one, once', { timeout: 15_000 }, async (t) => {
+  const dir = join(scratch, 'design'); mkdirSync(dir);
+  const { server, hits, url } = await listen();
+  t.after(() => server.close());
+  setup(dir, notifyBlock(url));
+  const fixture = join(root, 'fixtures', 'contract', 'design.v1');
+  mkdirSync(join(dir, '.sign-off', 'design'));
+  for (const f of readdirSync(join(fixture, 'design'))) copyFileSync(join(fixture, 'design', f), join(dir, '.sign-off', 'design', f));
+  await cli(dir, ['post', board(dir), '--kind', 'design', '--from', join(fixture, 'valid-basic.json')], TOKEN);
+  await sleep(400);
+  assert.equal(hits.length, 0, 'a design under review is not the user\'s ask');
+  await cli(dir, ['promote', 'chat-journeys', board(dir)], TOKEN);
+  await until(() => hits.length === 1);
+  assert.equal(hits[0].body.kind, 'design');
+  await cli(dir, ['promote', 'chat-journeys', board(dir), '--undo'], TOKEN);
+  await cli(dir, ['promote', 'chat-journeys', board(dir)], TOKEN);
+  await sleep(400);
+  assert.equal(hits.length, 1, 'a card is announced once');
 });
 
 test('an undone answer puts the card back in Waiting without another notice', { timeout: 20_000 }, async (t) => {

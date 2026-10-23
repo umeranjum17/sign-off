@@ -56,7 +56,7 @@ test('design review posts journeys and returns change notes through answers --js
   assert.equal(duplicate.status, 2); assert.match(duplicate.stdout, /journeys\[0\]\.screens\[1\]\.id.*repeats welcome/);
   const noScreens = { ...msg, key: 'design-level', journeys: [] };
   assert.equal(run('post', board, '--kind', 'design', '--from', message('design-level.json', JSON.stringify(noScreens))).status, 0);
-  assert.match(run('list', board).stdout, /beacon-account-setup/);
+  assert.match(run('list', board, '--full').stdout, /beacon-account-setup,in review,/);
   const outside = join(scratch, 'outside-design.png'); writeFileSync(outside, 'image'); symlinkSync(outside, join(dir, 'design', 'escape.png'));
   const escaped = run('post', board, '--kind', 'design', '--from', message('escaped-design.json', JSON.stringify({ ...msg, key: 'escaped-design', journeys: [{ ...msg.journeys[0], screens: [{ ...msg.journeys[0].screens[0], views: { phone_light: 'design/escape.png' } }] }] })));
   assert.equal(escaped.status, 2); assert.match(escaped.stdout, /outside the board folder/);
@@ -386,6 +386,52 @@ test('Decide holds only what waits on the reader: not an expired sign-in, not a 
   assert.equal(post(plan).status, 0);
   assert.equal(post({ ...plan, key: 'for-reading', decisions: [] }).status, 0);
   assert.deepEqual(decode(cli2('list', board).stdout.split('\nhelp[')[0]).waiting.map((d) => d.key), ['npm', plan.key]);
+});
+
+test('a design review cannot put itself in Decide: no post, feed or stored field promotes it, only promote does, and only a design', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const dir = join(scratch, 'design-promote'), board = join(dir, 'board.json'), cli2 = (...args) => spawnSync('node', [cli, ...asked(args)], { encoding: 'utf8', env });
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  for (const f of readdirSync(join(fixtures, 'design.v1', 'design'))) copyFileSync(join(fixtures, 'design.v1', 'design', f), join(dir, 'design', f));
+  const design = JSON.parse(readFileSync(join(fixtures, 'design.v1', 'valid-basic.json')));
+  const post = (m, ...flags) => cli2('post', board, '--kind', 'design', '--from', message('design-promote.json', JSON.stringify(m)), ...flags);
+  // A lead's message that names an area or a promotion is refused before anything is stored.
+  for (const extra of [{ area: 'waiting' }, { promoted: true }]) {
+    const refused = post({ ...design, ...extra });
+    assert.equal(refused.status, 2, JSON.stringify(extra));
+    assert.match(refused.stdout, new RegExp(`${Object.keys(extra)[0]} is not a field of design`));
+  }
+  assert.equal(post(design).status, 0);
+  // list counts what waits on the user as Decide does: the design is in review, not waiting.
+  assert.match(cli2('list', board).stdout, /nothing is waiting on the user/);
+  assert.match(cli2('list', board, '--full').stdout, /chat-journeys,in review,/);
+  const promoted = () => JSON.parse(cli2('list', board, '--json').stdout).decisions.find((d) => d.key === design.key).promoted;
+  assert.equal(promoted(), undefined);
+  assert.equal(existsSync(join(dir, 'board.promoted.jsonl')), false);
+  // A feed that rewrites the board with the design in Decide is refused, and the board is left as it was.
+  const fed = cli2('post', board, '--from', message('design-feed.json', JSON.stringify({ schema: 2, items: [{ ...design, area: 'waiting' }] })), '--replace');
+  assert.equal(fed.status, 2);
+  assert.match(fed.stdout, /area is not a field of design/);
+  // So is a board file edited by hand: the board will not load until the field goes.
+  const items = JSON.parse(readFileSync(board, 'utf8'));
+  writeFileSync(board, JSON.stringify({ ...items, items: items.items.map((d) => ({ ...d, area: 'waiting' })) }));
+  const edited = cli2('list', board);
+  assert.equal(edited.status, 2);
+  assert.match(edited.stdout, /area must be left out: a design shows under Designs, and Main moves it to Decide with sign-off-axi promote/);
+  writeFileSync(board, JSON.stringify(items));
+  // Main's promote is the one path: a line in the promoted log, undone the same way; any other card is refused.
+  assert.equal(cli2('promote', design.key, board).status, 0);
+  assert.equal(promoted(), true);
+  assert.deepEqual(decode(cli2('list', board).stdout.split('\nhelp[')[0]).waiting.map((d) => d.key), [design.key]);
+  assert.equal(cli2('promote', design.key, board, '--undo').status, 0);
+  assert.equal(promoted(), undefined);
+  assert.deepEqual(readFileSync(join(dir, 'board.promoted.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).promoted), [true, false]);
+  assert.equal(cli2('post', board, '--kind', 'ask', '--from', message('promote-ask.json', JSON.stringify(ask))).status, 0);
+  const notDesign = cli2('promote', ask.key, board);
+  assert.equal(notDesign.status, 2);
+  assert.match(notDesign.stdout, /is not a design review/);
 });
 
 test('a stored report with reply, area or type is refused: it can never wait, be answered, or leave Reports', () => {

@@ -171,6 +171,8 @@ A run held for the person's approval. Shows in Waiting on you.
 
 A set of project design reviews and screen views. The board groups reviews by project, with a preview, filed date and status; the review screen supports an optional direction pick, screen-targeted notes and design-level notes when there are no screens. The board opens a design review with its selected screen preview and note target, and "Review full screen" opens a full-screen viewer that steps through every screen in order, with approve or change per screen.
 
+A design is reviewed by Main, not the user: it shows under Designs only and is never an ask of the user's (not in Decide, Answered or any count) until Main runs `sign-off-axi promote <key>`, which no message field can do.
+
 - Required: the common fields, `about`, `group` (project name, text 1-40), `filed` (real UTC date-time with seconds), `status` (`draft` or `in_review`), `preview` (relative `.png`, `.jpg`, `.jpeg` or `.webp` path), and `journeys`.
 - `journeys`: 0-40 objects with unique lowercase slug `id`, `title` (text 1-120), and 1-80 `screens`. An empty list is a design-level review with no screen-specific views.
 - Each screen has a lowercase slug `id`, `title` (text 1-120), and `views`, a nonempty map of `phone_light`, `phone_dark`, `computer_light` or `computer_dark` to a relative `.png`, `.jpg`, `.jpeg`, `.webp` or `.html` path.
