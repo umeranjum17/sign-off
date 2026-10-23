@@ -1,112 +1,149 @@
-// Today on the board (glance, three tiles, section heads, rows, report card, leash) at one theme and width per run, so a run's steps.json holds one claim.
+// Today on the board against the approved feel prototype, at one theme and width per run, so a run's steps.json holds one claim.
+// The board is seeded by feel-board.sh with the prototype's own Today (a sign-in, three asks with a pick, a six-screen review, five updates, two new reports)
+// and captured at the mock's size (390x844 or 1280x800, both 2x): the head with its date and ring, Up next, the tiles, Latest proof, New report and the tab bar or sidebar.
 // Usage: node .agents/skills/done-done-verify-sign-off/today-shots.mjs <output> [light|dark] [390|1280]
 // SIGN_OFF_REPO names another built checkout to drive, such as the base for a before (TODAY_SIDE=before names its files).
-// Saves today.<side>.<theme>.<width>w.png/.txt (sizes, gaps, controls under 44px, Proven today against Evidence, the capture's share of its frame, the closed Ask box), today-ask-open.<side>.<theme>.<width>w.png and spacing.today.<side>.<theme>.<width>w.json;
-// the .txt also says whether the spacing is identical in the other theme. A light 390 after run adds today-scroll.mp4: scroll the page, swipe Proven today, tap a tile.
+// TODAY_MOCK names the folder of the approved mock's shots (data/signoff-feel-v2/shots): each capture with a mock of the same state is then also saved
+// side by side, the mock on the left and the board on the right, as vs-mock/<state>.<side>.<theme>.<width>w.png.
+// Saves today.<side>.<theme>.<width>w.png/.txt (what each part says, the tab bar's place, controls under 44px, the Proof tile against Evidence, the thumbnails' fill,
+// the closed Ask the agent, whether the spacing is identical in the other theme), today-end.* (the foot), at 390 today-scrolled.* (the small title in its bar),
+// and spacing.today.<side>.<theme>.<width>w.json. A light 390 after run also records today-flow.light.390w.mp4 with decide-record.mjs.
 import assert from 'node:assert/strict';
-import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'node:fs';
-import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 const out = resolve(process.argv[2] ?? process.env.DONE_DONE_EVIDENCE_ROOT), theme = process.argv[3] ?? 'light', width = +(process.argv[4] ?? 390);
-const side = process.env.TODAY_SIDE ?? 'after', here = resolve('.'), repo = resolve(process.env.SIGN_OFF_REPO ?? '.');
+const side = process.env.TODAY_SIDE ?? 'after', here = resolve('.'), repo = resolve(process.env.SIGN_OFF_REPO ?? '.'), mocks = process.env.TODAY_MOCK && resolve(process.env.TODAY_MOCK);
 mkdirSync(out, { recursive: true });
 const dir = mkdtempSync(join(tmpdir(), 'so-today-'));
 const env = { ...process.env, SIGN_OFF_FILER: 'verify', CHROME_DEVTOOLS_AXI_SESSION: `so-today-${process.pid}` };
-const sh = (bin, args, options = {}) => { const r = spawnSync(bin, args, { encoding: 'utf8', timeout: 120000, ...options }); assert.equal(r.status, 0, r.stdout + r.stderr); return r.stdout; };
+const sh = (bin, args, options = {}) => { const r = spawnSync(bin, args, { encoding: 'utf8', timeout: 180000, ...options }); assert.equal(r.status, 0, r.stdout + r.stderr); return r.stdout; };
 const browser = (...args) => sh('chrome-devtools-axi', args, { env });
 const seedEnv = { ...process.env, PATH: `${dirname(process.execPath)}:${process.env.PATH}`, HOME: dir, XDG_CONFIG_HOME: join(dir, '.config'), XDG_DATA_HOME: join(dir, '.local/share'), XDG_STATE_HOME: join(dir, '.local/state'), XDG_CACHE_HOME: join(dir, '.cache'), SIGN_OFF_FILER: 'verify' };
-// A tall window holds the whole page in one capture, so the fixed tab bar and sidebar stay where a person sees them.
-const height = 1900;
-const settle = () => browser('eval', '() => new Promise((ok) => setTimeout(ok, 700))');
+// The approved mock's sizes: an iPhone-sized phone and a laptop's window, both at 2x.
+const height = width === 390 ? 844 : 800, viewport = (t) => browser('emulate', '--viewport', `${width}x${height}x2${width === 390 ? ',mobile,touch' : ''}`, '--color-scheme', t);
+const settle = (ms = 800) => browser('eval', `() => new Promise((ok) => setTimeout(ok, ${ms}))`);
 const result = (text) => { let m = JSON.parse(text.match(/result: (".*")/)[1]); while (typeof m === 'string') m = JSON.parse(m); return m; };
 const probe = `() => {
+  const q = (s) => document.querySelector(s), qa = (s) => [...document.querySelectorAll(s)], text = (s) => q(s)?.textContent.trim() ?? null;
   const vis = (e) => { const r = e.getBoundingClientRect(), c = getComputedStyle(e); return r.width > 0 && r.height > 0 && c.visibility !== 'hidden' && c.display !== 'none'; };
-  const under = [...document.querySelectorAll('button, a[href], summary, select, input, textarea')].filter(vis).map((e) => { const r = e.getBoundingClientRect(); return { text: (e.textContent || e.getAttribute('aria-label') || e.tagName).trim().slice(0, 24), w: Math.round(r.width), h: Math.round(r.height) }; }).filter((x) => x.h < 44 || x.w < 44);
-  const sp = (s) => { const e = document.querySelector(s); if (!e || !vis(e)) return null; const c = getComputedStyle(e); return [c.paddingTop, c.paddingRight, c.paddingBottom, c.paddingLeft, c.marginTop, c.marginBottom, c.gap, c.fontSize, c.lineHeight, c.minHeight, c.borderRadius].join(' '); };
-  const spacing = {}; for (const s of ['main', '.top', '.top h1', '.glance', '.glance .seen', '.tiles', '.tile', '.tile .n', '.tile .name', '.areas .sec-head', '.areas h2', '.areas .ask-group > li', '.areas .ask-card', '.areas .ask-card .title', '.areas .ask-card .icon', '.ev-scroll-row', '.rp-card', '.rp-body', '.rp-eyebrow', '.rp-title', '.rp-about', '.leash', '.seg button', '.leash-line']) spacing[s] = sp(s);
-  const css = (s, p) => { const e = document.querySelector(s); return e ? getComputedStyle(e)[p] : null; };
-  const top = (s) => { const e = document.querySelector(s); return e ? Math.round(e.getBoundingClientRect().top + scrollY) : null; };
-  const heads = [...document.querySelectorAll('.areas .sec-head')].map((h) => ({ name: h.querySelector('h2').textContent, top: Math.round(h.getBoundingClientRect().top + scrollY), above: Math.round(h.getBoundingClientRect().top - (h.parentElement.previousElementSibling ?? document.querySelector('.tiles')).getBoundingClientRect().bottom), h2: getComputedStyle(h.querySelector('h2')).fontSize }));
-  const tiles = [...document.querySelectorAll('.tile')].map((t) => ({ name: t.querySelector('.name').textContent.trim(), n: +t.querySelector('.n').textContent, h: Math.round(t.getBoundingClientRect().height), nSize: getComputedStyle(t.querySelector('.n')).fontSize, nameSize: getComputedStyle(t.querySelector('.name')).fontSize }));
-  // How much of the first Proven today frame the capture paints, from its natural size, object-fit and padding; and the closed Ask the agent box's height.
-  const fill = (() => { const f = document.querySelector('.ev-scroll-row .ev-media'), i = f?.querySelector('img'); if (!i?.naturalWidth) return null; const c = getComputedStyle(i), b = i.getBoundingClientRect(), a = f.getBoundingClientRect();
-    const cw = b.width - parseFloat(c.paddingLeft) - parseFloat(c.paddingRight), ch = b.height - parseFloat(c.paddingTop) - parseFloat(c.paddingBottom), k = (c.objectFit === 'cover' ? Math.max : Math.min)(cw / i.naturalWidth, ch / i.naturalHeight);
-    return Math.round(100 * Math.min(i.naturalWidth * k, cw) * Math.min(i.naturalHeight * k, ch) / (a.width * a.height)); })();
-  const ask = document.querySelector('details.ask:not([open])');
-  // Proof whose run kept only text: a compact row with its result's check, never a frame left empty.
-  const textRows = [...document.querySelectorAll('.i-evidence .ev-rows .ev-card')].map((c) => ({ media: c.querySelectorAll('.ev-media').length, check: !!c.querySelector('.ev-ok svg'), h: Math.round(c.getBoundingClientRect().height) }));
-  const emptyFrames = [...document.querySelectorAll('.i-evidence .ev-media')].filter((f) => !f.querySelector('img, video')).length;
-  return JSON.stringify({ fill, textRows, emptyFrames, askClosed: ask ? Math.round(ask.getBoundingClientRect().height) : null, glance: css('.glance', 'fontSize'), tiles, heads, provenCards: document.querySelectorAll('.i-evidence .ev-card').length, rpTitle: css('.rp-title', 'fontSize'), rpAbout: css('.rp-about', 'fontSize'), radius: css('.tile', 'borderRadius'), overflowX: document.documentElement.scrollWidth > innerWidth, under, spacing });
+  const box = (e) => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top + scrollY), Math.round(r.width), Math.round(r.height)]; };
+  const under = qa('button, a[href], summary, select, input, textarea').filter(vis).map((e) => { const r = e.getBoundingClientRect(); return { text: (e.textContent || e.getAttribute('aria-label') || e.tagName).trim().slice(0, 24), w: Math.round(r.width), h: Math.round(r.height) }; }).filter((x) => x.h < 44 || x.w < 44);
+  const sp = (s) => { const e = q(s); if (!e || !vis(e)) return null; const c = getComputedStyle(e); return [c.paddingTop, c.paddingRight, c.paddingBottom, c.paddingLeft, c.marginTop, c.marginBottom, c.gap, c.fontSize, c.lineHeight, c.minHeight, c.borderRadius].join(' '); };
+  const spacing = {}; for (const s of ['main', '.today-top', '.today-top h1', '.today-top .sub', '.ring', '.up-next', '.up-next h2', '.up-next .go', '.up-next .soft', '.tiles', '.tile', '.tile .n', '.tile .name', '.t-sec .sec-head', '.t-sec h2', '.t-list', '.lrow', '.mini', '.rp-card', '.tabs', '.tabs a', '.side a', '.leash', '.seg button']) spacing[s] = sp(s);
+  // How much of each proof row's frame its capture paints, from its natural size and object-fit; a row with no capture shows its result's mark.
+  const fill = (f) => { const i = f.querySelector('img'); if (!i?.naturalWidth) return 0; const c = getComputedStyle(i), a = f.getBoundingClientRect(), k = (c.objectFit === 'cover' ? Math.max : Math.min)(a.width / i.naturalWidth, a.height / i.naturalHeight);
+    return Math.round(100 * Math.min(i.naturalWidth * k, a.width) * Math.min(i.naturalHeight * k, a.height) / (a.width * a.height)); };
+  const tabs = q('.tabs'), bar = tabs && vis(tabs) ? tabs.getBoundingClientRect() : null, on = q('.tabs a[aria-current]'), pill = q('.tabs .hl');
+  // A badge's count and which of red, green and blue its fill is strongest in, read from a painted pixel so any colour syntax compares.
+  const hue = (c) => { const x = document.createElement('canvas').getContext('2d'); x.fillStyle = c; x.fillRect(0, 0, 1, 1); const p = [...x.getImageData(0, 0, 1, 1).data].slice(0, 3); return ['red', 'green', 'blue'][p.indexOf(Math.max(...p))]; };
+  const badge = (href) => { const b = [...qa('.tabs a[href="' + href + '"] .bd'), ...qa('.side a[href="' + href + '"] .n')].find(vis); return b ? b.textContent + ' ' + hue(getComputedStyle(b).backgroundColor) : 'none'; };
+  const ask = q('details.ask:not([open])');
+  return JSON.stringify({ date: text('.today-top .date-kicker'), title: text('.today-top h1'), ring: text('.ring b'), sub: text('.today-top .sub'),
+    upNext: { line: text('.up-next .lk'), title: text('.up-next h2'), main: qa('.up-next .acts .go').map((e) => e.textContent.replace('↵', '').trim()), second: qa('.up-next .acts .soft').map((e) => e.textContent.trim()), box: q('.up-next') && box(q('.up-next')) },
+    tiles: qa('.tile').map((t) => ({ name: t.querySelector('.name')?.firstChild.textContent, n: +t.querySelector('.n')?.textContent, line: t.querySelector('.name small')?.textContent ?? '', box: box(t) })),
+    proof: qa('.t-proof .lrow').map((a) => ({ title: a.querySelector('b').textContent, line: a.querySelector('.lt > span').textContent, frame: a.querySelector('.mini') ? fill(a.querySelector('.mini')) : 'mark' })),
+    proofHead: text('.t-proof h2'), report: q('.t-report .rp-card') && { head: text('.t-report h2'), eyebrow: text('.rp-card .ey'), title: text('.rp-card .h'), meta: text('.rp-card .m') },
+    bar: bar && { left: Math.round(bar.left), right: Math.round(innerWidth - bar.right), bottom: Math.round(innerHeight - bar.bottom), height: Math.round(bar.height), on: on?.getAttribute('href'), pillOn: !!pill && !!on && Math.round(pill.getBoundingClientRect().left) === Math.round(on.getBoundingClientRect().left) },
+    sidebar: !bar && qa('.side a').filter(vis).map((a) => a.textContent.trim()), badges: { decide: badge('#waiting'), reports: badge('#reports') },
+    askClosed: ask ? Math.round(ask.getBoundingClientRect().height) : null, overflowX: document.documentElement.scrollWidth > innerWidth, under, spacing });
 }`;
-const frames = join(dir, 'frames');
-let recorder;
+// The approved mock of each state, by the prototype's names.
+const mockOf = (state, t) => mocks && join(mocks, width === 390 ? `${state}.${t}.390w.png` : `desk-${state}.${t}.1280w.png`);
+// The mock on the left and the board on the right, at the same size, each under its name.
+function sideBySide(state, t) {
+  const mock = mockOf(state, t), board = join(out, `${state}.${side}.${t}.${width}w.png`);
+  if (!mock || !existsSync(mock)) return null;
+  mkdirSync(join(out, 'vs-mock'), { recursive: true });
+  const file = join(out, 'vs-mock', `${state}.${side}.${t}.${width}w.png`), font = '/usr/share/fonts/liberation/LiberationSans-Bold.ttf', size = width === 390 ? 40 : 56;
+  const label = (words) => `pad=iw+48:ih+${size * 3}:24:${size * 2}:color=0x8E8E93,drawtext=fontfile=${font}:text='${words}':fontsize=${size}:fontcolor=white:x=24:y=${Math.round(size / 2)}`;
+  sh('ffmpeg', ['-y', '-v', 'error', '-i', mock, '-i', board, '-filter_complex', `[0]${label('Approved mock')}[a];[1]${label('Board')}[b];[a][b]hstack`, '-frames:v', '1', file]);
+  return file;
+}
+let url;
 try {
-  const url = sh('bash', [join(here, '.agents/skills/done-done-verify-sign-off/seed-board.sh'), dir], { cwd: repo, env: seedEnv }).trim().split('\n').pop();
-  const so = (...args) => sh(process.execPath, [join(repo, 'dist/cli.js'), ...args], { env: seedEnv });
-  // A second passed update, so Proven today counts two and Evidence must list the same two.
-  writeFileSync(join(dir, 'ev2.json'), readFileSync(join(dir, 'evidence-run.json'), 'utf8').replace('The sign-in screen fits a phone', 'Settings page fits a phone'));
-  so('post', join(dir, 'board.json'), '--kind', 'evidence', '--from', join(dir, 'ev2.json'));
-  // A third passed update from a CLI journey: no capture of its own, and its run kept only a text log.
-  const log = 'ok 1 - stopping one board leaves the other running\n', runId = '20260102T000000Z-b1b2c3d4', commit = '0'.repeat(40);
-  writeFileSync(join(dir, 'stop.txt'), log);
-  writeFileSync(join(dir, '.done-done/runs', `${runId}.json`), JSON.stringify({ schema: 1, run_id: runId, commit, tree: 'a'.repeat(40), dirty: false, exit: 0, files: [{ path: 'stop.txt', sha256: createHash('sha256').update(log).digest('hex'), bytes: Buffer.byteLength(log) }] }));
-  writeFileSync(join(dir, 'ev3.json'), JSON.stringify({ contract: 1, kind: 'evidence', schema: 1, title: 'Stopping one board leaves the other running', filer: 'verify', about: 'Umer stops one board and the other keeps answering.',
-    run: { run_id: runId, commit, outcome: 'Stopping one board leaves the other running', repro: 'repro: n/a: no bug', proof: 'done-done-verify-sign-off: npm test, serve-stop, passed', evidence: 'stop.txt' } }));
-  so('post', join(dir, 'board.json'), '--kind', 'evidence', '--from', join(dir, 'ev3.json'));
+  url = sh('bash', [join(here, '.agents/skills/done-done-verify-sign-off/feel-board.sh'), dir], { cwd: repo, env: seedEnv }).trim().split('\n').pop();
+  // The size and theme take hold on a page that is open, and the board is read again under them.
   browser('open', url);
-  browser('emulate', '--viewport', `${width}x${height}x1${width === 390 ? ',mobile,touch' : ''}`, '--color-scheme', theme);
+  viewport(theme);
   browser('open', url);
-  settle();
-  const name = `today.${side}.${theme}.${width}w`;
+  browser('eval', '() => { location.reload(); return 1; }');
+  settle(1200);
+  const name = `today.${side}.${theme}.${width}w`, pair = [];
   browser('screenshot', join(out, `${name}.png`));
+  pair.push(sideBySide('today', theme));
   const m = result(browser('eval', probe));
-  // Ask the agent opened, in a window tall enough that its prompt box and button clear the tab bar.
-  browser('emulate', '--viewport', `${width}x${height + 400}x1${width === 390 ? ',mobile,touch' : ''}`, '--color-scheme', theme);
-  browser('open', url); settle();
-  browser('eval', `() => { document.querySelector('details.ask summary').click(); return 1; }`); settle();
-  browser('screenshot', join(out, `today-ask-open.${side}.${theme}.${width}w.png`));
+  // On a phone, scrolled until the second row of tiles sits where the mock's does: the small title shows in its bar.
+  let scrolled = null;
+  if (width === 390) {
+    // A page with no Sign in tile (the base) scrolls as far as the mock does.
+    browser('eval', `() => { const t = document.querySelector('.tile.g-signin'); scrollTo(0, t ? t.getBoundingClientRect().top + scrollY - 115 : 337); return 1; }`);
+    settle(500);
+    scrolled = result(browser('eval', `() => { const b = document.querySelector('.cbar'); return JSON.stringify(b ? [getComputedStyle(b).opacity, b.textContent] : ['none', '']); }`));
+    browser('screenshot', join(out, `today-scrolled.${side}.${theme}.${width}w.png`));
+    pair.push(sideBySide('today-scrolled', theme));
+  }
+  // The foot: the tools the mock has no place for (search, the Leash, Ask the agent) sit under what it draws.
+  browser('eval', '() => { scrollTo(0, document.documentElement.scrollHeight); return 1; }');
+  settle(500);
+  browser('screenshot', join(out, `today-end.${side}.${theme}.${width}w.png`));
+  const endClear = result(browser('eval', `() => JSON.stringify(!document.querySelector('.tabs') || getComputedStyle(document.querySelector('.tabs')).display === 'none' || document.querySelector('#board').lastElementChild.getBoundingClientRect().bottom <= document.querySelector('.tabs').getBoundingClientRect().top)`));
   // The same page in the other theme: the spacing must be the same numbers.
   const other = theme === 'light' ? 'dark' : 'light';
-  browser('emulate', '--viewport', `${width}x${height}x1${width === 390 ? ',mobile,touch' : ''}`, '--color-scheme', other);
+  viewport(other);
   browser('open', url); settle();
   const o = result(browser('eval', probe));
   const same = JSON.stringify(m.spacing) === JSON.stringify(o.spacing);
-  browser('emulate', '--viewport', `${width}x${height}x1${width === 390 ? ',mobile,touch' : ''}`, '--color-scheme', theme);
-  browser('open', `${url}#evidence`); settle();
-  // Evidence lists every proof; the passed ones are what Proven today counts.
-  const [evidenceCards, evidenceAll] = result(browser('eval', `() => JSON.stringify([[...document.querySelectorAll('.ev-card')].filter((c) => /Passed/.test(c.textContent)).length, document.querySelectorAll('.ev-card').length])`));
-  const proven = m.tiles.find((t) => t.name === 'Proven today').n;
-  const lines = [`glance text ${m.glance}`, `tiles ${m.tiles.map((t) => `${t.name} ${t.n} (count ${t.nSize}, label ${t.nameSize}, ${t.h}px tall)`).join('; ')}`, `tile corner radius ${m.radius}`,
-    `section heads ${m.heads.map((h) => `${h.name} ${h.h2} with ${h.above}px above`).join('; ')}`, `report card title ${m.rpTitle}, about ${m.rpAbout}`,
-    `Proven today tile ${proven}, cards in the Proven today row ${m.provenCards}, passed cards on Evidence ${evidenceCards} of ${evidenceAll} listed`,
-    `spacing in ${theme} equals spacing in ${other}: ${same ? 'yes' : 'no'} (${Object.keys(m.spacing).length} elements)`,
-    `Proven today capture paints ${m.fill}% of its frame`, `Proven today text-only rows ${JSON.stringify(m.textRows)}, frames with no picture ${m.emptyFrames}`, `Ask the agent closed: ${m.askClosed}px tall`,
-    `controls under 44px ${m.under.length}${m.under.length ? ': ' + m.under.map((x) => `${x.text} ${x.w}x${x.h}`).join(', ') : ''}`, `horizontal overflow ${m.overflowX ? 1 : 0}`];
+  viewport(theme);
+  // Evidence lists every update but a failed run; the Proof tile counts those and the failed runs, as its line says.
+  browser('open', `${url}#evidence`); browser('eval', '() => { location.reload(); return 1; }'); settle(1200);
+  const [evidenceCards, failed] = result(browser('eval', `() => fetch('api/decisions').then((r) => r.json()).then((s) => JSON.stringify([document.querySelectorAll('.ev-card').length, s.decisions.filter((d) => d.evidenceCard?.result === 'RUN FAIL').length]))`));
+  browser('open', `${url}#waiting`); browser('eval', '() => { location.reload(); return 1; }'); settle(1200);
+  const decideRows = result(browser('eval', `() => JSON.stringify(document.querySelectorAll('.dl-row').length)`));
+  const proofTile = m.tiles.find((t) => t.name === 'Proof')?.n;
+  const rows = m.tiles.length === 4 ? new Set(m.tiles.map((t) => t.box[1])).size : 0;
+  const lines = [`date ${m.date}; title ${m.title}; ring ${m.ring}; ${m.sub}`,
+    `Up next: ${m.upNext.line} / ${m.upNext.title} / main ${JSON.stringify(m.upNext.main)} / second ${JSON.stringify(m.upNext.second)}`,
+    `tiles in ${rows} row(s): ${m.tiles.map((t) => `${t.name} ${t.n} "${t.line}" ${t.box[2]}x${t.box[3]}`).join('; ')}`,
+    `${m.proofHead}: ${m.proof.map((p) => `${p.title} (${p.line}, capture paints ${p.frame === 'mark' ? 'none: result mark' : `${p.frame}% of its frame`})`).join('; ')}`,
+    `${m.report?.head}: ${m.report?.eyebrow} / ${m.report?.title} / ${m.report?.meta}`,
+    m.bar ? `tab bar ${m.bar.height}px tall, ${m.bar.left}px and ${m.bar.right}px from the sides, ${m.bar.bottom}px over the bottom; on ${m.bar.on || '#'}; pill on it ${m.bar.pillOn}` : `sidebar ${m.sidebar.join(' | ')}`,
+    `badges: Decide ${m.badges.decide}; Reports ${m.badges.reports}; Decide lists ${decideRows}`,
+    `Proof tile ${proofTile}: Evidence lists ${evidenceCards}, failed runs ${failed}`,
+    scrolled ? `scrolled: small title "${scrolled[1]}" at opacity ${scrolled[0]}` : '', `the last thing on Today clears the tab bar: ${endClear}`,
+    `spacing in ${theme} equals spacing in ${other}: ${same ? 'yes' : 'no'} (${Object.keys(m.spacing).length} elements)`, `Ask the agent closed: ${m.askClosed}px tall`,
+    `controls under 44px ${m.under.length}${m.under.length ? ': ' + m.under.map((x) => `${x.text} ${x.w}x${x.h}`).join(', ') : ''}`, `horizontal overflow ${m.overflowX ? 1 : 0}`,
+    ...pair.filter(Boolean).map((f) => `side by side: vs-mock/${f.split('/vs-mock/')[1]}`)].filter(Boolean);
   writeFileSync(join(out, `${name}.txt`), `${side} ${theme} ${width}w today\n${lines.join('\n')}\n`);
   writeFileSync(join(out, `spacing.today.${side}.${theme}.${width}w.json`), JSON.stringify(m.spacing, null, 2) + '\n');
-  if (side === 'after') assert.deepEqual([m.under.length, m.overflowX, same, proven === evidenceCards, proven, m.fill, m.askClosed <= 48, m.textRows.map((r) => [r.media, r.check, r.h <= 96]), m.emptyFrames], [0, false, true, true, 3, 100, true, [[0, true, true]], 0], JSON.stringify(m));
-  if (side === 'after' && theme === 'light' && width === 390) {
-    // A sampled-frame recording through the same isolated browser: scroll Today down and back, swipe Proven today, tap the Need you tile.
-    mkdirSync(frames, { recursive: true });
-    browser('emulate', '--viewport', '390x844x1,mobile,touch', '--color-scheme', theme);
-    browser('open', url); settle();
-    const snap = (n) => browser('screenshot', join(frames, `${String(n).padStart(3, '0')}.png`));
-    let n = 0;
-    snap(n++);
-    for (const y of [240, 560, 900, 1240, 1600, 900, 0]) { browser('eval', `() => { scrollTo(0, ${y}); return 1; }`); snap(n++); snap(n++); }
-    browser('eval', `() => { document.querySelector('.ev-scroll-row').scrollIntoView({ block: 'center' }); document.querySelector('.ev-scroll-row').scrollTo({ left: 260, behavior: 'instant' }); return 1; }`); snap(n++); snap(n++);
-    browser('eval', `() => { scrollTo(0, 0); document.querySelector('.tile').click(); return 1; }`); settle(); snap(n++); snap(n++);
-    const list = readdirSync(frames).sort();
-    writeFileSync(join(frames, 'frames.txt'), list.map((f) => `file '${join(frames, f)}'\nduration 0.6\n`).join(''));
-    sh('ffmpeg', ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', join(frames, 'frames.txt'), '-vf', 'scale=390:-2', '-pix_fmt', 'yuv420p', '-c:v', 'libx264', '-movflags', '+faststart', join(out, 'today-scroll.mp4')]);
+  if (side === 'after') {
+    // The prototype's Today, word for word where the board has the same data.
+    assert.match(m.date, /^[A-Z][a-z]+day \d{1,2} [A-Z][a-z]+$/);
+    assert.deepEqual([m.title, m.ring, m.sub], ['Today', '0/5', '5 waiting on you · 0 cleared']);
+    assert.deepEqual([/^Up next · Sign in\d{1,2}:\d\d left$/.test(m.upNext.line), m.upNext.title, m.upNext.main, m.upNext.second], [true, 'Sign in to npm', ['Open sign-in'], ['Details']]);
+    assert.deepEqual(m.tiles.map((t) => `${t.name} ${t.n} ${t.line}`), ['Answer 3 Each has a pick', 'Review 1 6 screens to check', 'Sign in 1 12 min left', 'Proof 5 1 failed, 4 fine']);
+    assert.equal(rows, width === 390 ? 2 : 1);
+    assert.deepEqual(m.proof.map((p) => [p.title, p.frame]), [['Settings page loads in a second', 100], ['Dark mode keeps every label readable', 100], ['Sign-in screen fits a phone', 100]]);
+    assert.deepEqual([m.report?.head, m.report?.eyebrow, m.report?.title], ['New report', 'Before and after · Video 0:28', 'How the new sign-in works']);
+    assert.deepEqual([m.badges.decide, m.badges.reports], ['5 red', '2 blue']);
+    if (m.bar) assert.deepEqual(m.bar, { left: 16, right: 16, bottom: 12, height: 62, on: '#', pillOn: true });
+    else assert.deepEqual(m.sidebar.map((s) => s.replace(/\d+$/, '')), ['Today', 'Decide', 'Evidence', 'Reports']);
+    assert.deepEqual([decideRows, proofTile, evidenceCards + failed], [5, 5, 5]);
+    if (scrolled) assert.deepEqual(scrolled, ['1', 'Today']);
+    assert.deepEqual([endClear, m.under.length, m.overflowX, same, m.askClosed <= 48], [true, 0, false, true, true], JSON.stringify(m));
   }
-  writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board with a sign-in ask, asks, a plan, a report, two passed updates with a capture and one whose run kept only text.',
-    steps: [`Open Today at ${width} px in ${theme} mode.`, 'Measure the glance, the three tiles, the section heads, the report card and every control against 44px.', 'Measure how much of its frame the first Proven today capture paints, that the text-only proof is a compact row with its check and no empty frame, and how tall the closed Ask the agent box is, then open it.', 'Open Evidence and count its cards against the Proven today tile.', `Read the same spacing numbers in ${other} mode.`],
-    result: side === 'after' ? `At ${width} px in ${theme} mode Today uses the type scale (tile counts ${m.tiles[0].nSize}, section heads ${m.heads[0]?.h2}), every control is at least 44px, the Proven today capture paints ${m.fill}% of its frame, the text-only proof is a compact row with no empty frame, Ask the agent is ${m.askClosed}px tall until opened, Proven today shows ${proven} and Evidence lists ${evidenceCards}, and the spacing is the same in ${other} mode.` : `At ${width} px in ${theme} mode Today is captured as it was for comparison.` }, null, 2) + '\n');
+  writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
+    start: "A throwaway board seeded by feel-board.sh with the approved prototype's Today: a sign-in with 12 minutes left, three asks with a pick, a six-screen review, five updates (one a failed run) and two new reports.",
+    steps: [`Open Today at ${width}x${height} in ${theme} mode, the approved mock's size.`, 'Read the date, the ring, Up next, the four tiles, Latest proof, New report and the badges; measure the tab bar or sidebar, every control against 44px and the proof thumbnails.',
+      ...(width === 390 ? ['Scroll until the second row of tiles is where the mock has it, and read the small title bar.'] : []), 'Scroll to the end.', 'Open Evidence and Decide and count their rows against the Proof tile and the Decide badge.', `Read the same spacing numbers in ${other} mode.`],
+    result: side === 'after' ? `At ${width} px in ${theme} mode Today shows what the approved mock shows for the same board: ${m.date} over Today and the ${m.ring} ring, Up next "${m.upNext.title}" with one main action ${m.upNext.main[0]} beside ${m.upNext.second[0]}, the tiles Answer, Review, Sign in and Proof ${width === 390 ? 'two by two' : 'across'} with their counts, Latest proof as ${m.proof.length} rows each with its capture, and New report; ${m.bar ? 'the tab bar floats 12 px over the bottom with its pill on Today' : 'the sidebar marks Today'}, Decide carries a red 5 and Reports a blue 2, and the spacing is the same in ${other} mode.` : `At ${width} px in ${theme} mode Today is captured as it was for comparison.` }, null, 2) + '\n');
 } finally {
   try { browser('stop'); } catch {}
-  try { sh(process.execPath, [join(repo, 'dist/cli.js'), 'stop', join(dir, 'board.json')], { env: seedEnv }); } catch {}
-  rmSync(dir, { recursive: true, force: true });
+  // The flow, recorded once (light, phone) in its own browser after the one above has stopped.
+  try { if (url && side === 'after' && theme === 'light' && width === 390 && process.env.TODAY_RECORD !== '0') sh(process.execPath, [join(here, '.agents/skills/done-done-verify-sign-off/decide-record.mjs'), url, theme, join(out, 'today-flow.light.390w.mp4'), 'today'], { stdio: 'inherit' }); }
+  finally {
+    try { sh(process.execPath, [join(repo, 'dist/cli.js'), 'stop', join(dir, 'board.json')], { env: seedEnv }); } catch {}
+    rmSync(dir, { recursive: true, force: true });
+  }
 }

@@ -48,10 +48,11 @@ try {
     writeFileSync(join(out, `spacing.${stem}.${side}.${theme}.${width}w.json`), JSON.stringify(m.spacing, null, 2) + '\n');
     if (side === 'after') assert.deepEqual([m.under.length, m.overflowX], [0, false], JSON.stringify(m));
   }
-  if (side === 'after' && width === 390) assert.equal(cell.decide.tabBar.link, 52, `tab bar ${cell.decide.tabBar.link}`);
+  // The floating tab bar: a 62px glass pill whose tabs are 54px tall inside its 4px inset.
+  if (side === 'after' && width === 390) assert.deepEqual([cell.decide.tabBar.h, cell.decide.tabBar.link], [62, 54], `tab bar ${JSON.stringify(cell.decide.tabBar)}`);
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board with a sign-in ask, asks, a plan, a report and an update.',
     steps: [`Open the board at ${width} px in ${theme} mode on the sign-in ask in Decide and scroll the page so text sits behind the bottom tab bar, then open Today.`, 'Measure the tab bar height, read its four labels, and measure every control (button, link, select) against 44px, with the type scale sizes.'],
-    result: side === 'after' ? `At ${width} px in ${theme} mode on a phone the bottom tab bar is a clean 52px, its four labels show once each over the scrolled page text with no ghost label, every control on Decide and Today is at least 44px, and body text is 16px.` : `At ${width} px in ${theme} mode the board is captured as it was for comparison: the tab bar, controls and type scale before the change.` }, null, 2) + '\n');  try { browser('stop'); } catch {}
+    result: side === 'after' ? `At ${width} px in ${theme} mode on a phone the floating tab bar is a 62px glass pill with 54px tabs, its four labels show once each over the scrolled page text with no ghost label, every control on Decide and Today is at least 44px, and body text is 16px.` : `At ${width} px in ${theme} mode the board is captured as it was for comparison: the tab bar, controls and type scale before the change.` }, null, 2) + '\n');  try { browser('stop'); } catch {}
 } finally {
   try { browser('stop'); } catch {}
   try { sh(process.execPath, [join(repo, 'dist/cli.js'), 'stop', join(dir, 'board.json')], { env: seedEnv }); } catch {}

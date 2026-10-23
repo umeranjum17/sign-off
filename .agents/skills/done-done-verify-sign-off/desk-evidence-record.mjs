@@ -51,7 +51,7 @@ try {
   await send('Page.startScreencast', { format: 'jpeg', quality: 90, everyNthFrame: 1 });
   await send('Page.navigate', { url });
   const row = (n) => `.ev-grid > :nth-child(${n}) .ev-card`;
-  const steps = [[2200], [() => hover('.areas .ev-scroll-row > :nth-child(2) .ev-card'), 1200], [() => click('.areas .ev-scroll-row > :nth-child(2) .ev-card'), 1800],
+  const steps = [[2200], [() => hover('.t-proof li:nth-child(2) .lrow'), 1200], [() => click('.t-proof li:nth-child(2) .lrow'), 1800],
     [() => click(row(3)), 1300], [() => click(row(5)), 1300], [() => click(row(1)), 1300], [() => hover(row(2)), 1400]];
   for (const [i, [act, ms]] of steps.map((s) => (s.length === 1 ? [null, s[0]] : s)).entries()) {
     const r = act && (await act());
