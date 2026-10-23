@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 const out = resolve(process.argv[2] ?? process.env.DONE_DONE_EVIDENCE_ROOT), theme = process.argv[3] ?? 'light', width = +(process.argv[4] ?? 390);
@@ -34,7 +35,10 @@ const probe = `() => {
     const cw = b.width - parseFloat(c.paddingLeft) - parseFloat(c.paddingRight), ch = b.height - parseFloat(c.paddingTop) - parseFloat(c.paddingBottom), k = (c.objectFit === 'cover' ? Math.max : Math.min)(cw / i.naturalWidth, ch / i.naturalHeight);
     return Math.round(100 * Math.min(i.naturalWidth * k, cw) * Math.min(i.naturalHeight * k, ch) / (a.width * a.height)); })();
   const ask = document.querySelector('details.ask:not([open])');
-  return JSON.stringify({ fill, askClosed: ask ? Math.round(ask.getBoundingClientRect().height) : null, glance: css('.glance', 'fontSize'), tiles, heads, provenCards: document.querySelectorAll('.i-evidence .ev-card').length, rpTitle: css('.rp-title', 'fontSize'), rpAbout: css('.rp-about', 'fontSize'), radius: css('.tile', 'borderRadius'), overflowX: document.documentElement.scrollWidth > innerWidth, under, spacing });
+  // Proof whose run kept only text: a compact row with its result's check, never a frame left empty.
+  const textRows = [...document.querySelectorAll('.i-evidence .ev-rows .ev-card')].map((c) => ({ media: c.querySelectorAll('.ev-media').length, check: !!c.querySelector('.ev-ok svg'), h: Math.round(c.getBoundingClientRect().height) }));
+  const emptyFrames = [...document.querySelectorAll('.i-evidence .ev-media')].filter((f) => !f.querySelector('img, video')).length;
+  return JSON.stringify({ fill, textRows, emptyFrames, askClosed: ask ? Math.round(ask.getBoundingClientRect().height) : null, glance: css('.glance', 'fontSize'), tiles, heads, provenCards: document.querySelectorAll('.i-evidence .ev-card').length, rpTitle: css('.rp-title', 'fontSize'), rpAbout: css('.rp-about', 'fontSize'), radius: css('.tile', 'borderRadius'), overflowX: document.documentElement.scrollWidth > innerWidth, under, spacing });
 }`;
 const frames = join(dir, 'frames');
 let recorder;
@@ -44,6 +48,13 @@ try {
   // A second passed update, so Proven today counts two and Evidence must list the same two.
   writeFileSync(join(dir, 'ev2.json'), readFileSync(join(dir, 'evidence-run.json'), 'utf8').replace('The sign-in screen fits a phone', 'Settings page fits a phone'));
   so('post', join(dir, 'board.json'), '--kind', 'evidence', '--from', join(dir, 'ev2.json'));
+  // A third passed update from a CLI journey: no capture of its own, and its run kept only a text log.
+  const log = 'ok 1 - stopping one board leaves the other running\n', runId = '20260102T000000Z-b1b2c3d4', commit = '0'.repeat(40);
+  writeFileSync(join(dir, 'stop.txt'), log);
+  writeFileSync(join(dir, '.done-done/runs', `${runId}.json`), JSON.stringify({ schema: 1, run_id: runId, commit, tree: 'a'.repeat(40), dirty: false, exit: 0, files: [{ path: 'stop.txt', sha256: createHash('sha256').update(log).digest('hex'), bytes: Buffer.byteLength(log) }] }));
+  writeFileSync(join(dir, 'ev3.json'), JSON.stringify({ contract: 1, kind: 'evidence', schema: 1, title: 'Stopping one board leaves the other running', filer: 'verify', about: 'Umer stops one board and the other keeps answering.',
+    run: { run_id: runId, commit, outcome: 'Stopping one board leaves the other running', repro: 'repro: n/a: no bug', proof: 'done-done-verify-sign-off: npm test, serve-stop, passed', evidence: 'stop.txt' } }));
+  so('post', join(dir, 'board.json'), '--kind', 'evidence', '--from', join(dir, 'ev3.json'));
   browser('open', url);
   browser('emulate', '--viewport', `${width}x${height}x1${width === 390 ? ',mobile,touch' : ''}`, '--color-scheme', theme);
   browser('open', url);
@@ -71,11 +82,11 @@ try {
     `section heads ${m.heads.map((h) => `${h.name} ${h.h2} with ${h.above}px above`).join('; ')}`, `report card title ${m.rpTitle}, about ${m.rpAbout}`,
     `Proven today tile ${proven}, cards in the Proven today row ${m.provenCards}, passed cards on Evidence ${evidenceCards} of ${evidenceAll} listed`,
     `spacing in ${theme} equals spacing in ${other}: ${same ? 'yes' : 'no'} (${Object.keys(m.spacing).length} elements)`,
-    `Proven today capture paints ${m.fill}% of its frame`, `Ask the agent closed: ${m.askClosed}px tall`,
+    `Proven today capture paints ${m.fill}% of its frame`, `Proven today text-only rows ${JSON.stringify(m.textRows)}, frames with no picture ${m.emptyFrames}`, `Ask the agent closed: ${m.askClosed}px tall`,
     `controls under 44px ${m.under.length}${m.under.length ? ': ' + m.under.map((x) => `${x.text} ${x.w}x${x.h}`).join(', ') : ''}`, `horizontal overflow ${m.overflowX ? 1 : 0}`];
   writeFileSync(join(out, `${name}.txt`), `${side} ${theme} ${width}w today\n${lines.join('\n')}\n`);
   writeFileSync(join(out, `spacing.today.${side}.${theme}.${width}w.json`), JSON.stringify(m.spacing, null, 2) + '\n');
-  if (side === 'after') assert.deepEqual([m.under.length, m.overflowX, same, proven === evidenceCards, proven, m.fill, m.askClosed <= 48], [0, false, true, true, 2, 100, true], JSON.stringify(m));
+  if (side === 'after') assert.deepEqual([m.under.length, m.overflowX, same, proven === evidenceCards, proven, m.fill, m.askClosed <= 48, m.textRows.map((r) => [r.media, r.check, r.h <= 96]), m.emptyFrames], [0, false, true, true, 3, 100, true, [[0, true, true]], 0], JSON.stringify(m));
   if (side === 'after' && theme === 'light' && width === 390) {
     // A sampled-frame recording through the same isolated browser: scroll Today down and back, swipe Proven today, tap the Need you tile.
     mkdirSync(frames, { recursive: true });
@@ -91,9 +102,9 @@ try {
     writeFileSync(join(frames, 'frames.txt'), list.map((f) => `file '${join(frames, f)}'\nduration 0.6\n`).join(''));
     sh('ffmpeg', ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', join(frames, 'frames.txt'), '-vf', 'scale=390:-2', '-pix_fmt', 'yuv420p', '-c:v', 'libx264', '-movflags', '+faststart', join(out, 'today-scroll.mp4')]);
   }
-  writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board with a sign-in ask, asks, a plan, a report and two passed updates.',
-    steps: [`Open Today at ${width} px in ${theme} mode.`, 'Measure the glance, the three tiles, the section heads, the report card and every control against 44px.', 'Measure how much of its frame the first Proven today capture paints and how tall the closed Ask the agent box is, then open it.', 'Open Evidence and count its cards against the Proven today tile.', `Read the same spacing numbers in ${other} mode.`],
-    result: side === 'after' ? `At ${width} px in ${theme} mode Today uses the type scale (tile counts ${m.tiles[0].nSize}, section heads ${m.heads[0]?.h2}), every control is at least 44px, the Proven today capture paints ${m.fill}% of its frame, Ask the agent is ${m.askClosed}px tall until opened, Proven today shows ${proven} and Evidence lists ${evidenceCards}, and the spacing is the same in ${other} mode.` : `At ${width} px in ${theme} mode Today is captured as it was for comparison.` }, null, 2) + '\n');
+  writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board with a sign-in ask, asks, a plan, a report, two passed updates with a capture and one whose run kept only text.',
+    steps: [`Open Today at ${width} px in ${theme} mode.`, 'Measure the glance, the three tiles, the section heads, the report card and every control against 44px.', 'Measure how much of its frame the first Proven today capture paints, that the text-only proof is a compact row with its check and no empty frame, and how tall the closed Ask the agent box is, then open it.', 'Open Evidence and count its cards against the Proven today tile.', `Read the same spacing numbers in ${other} mode.`],
+    result: side === 'after' ? `At ${width} px in ${theme} mode Today uses the type scale (tile counts ${m.tiles[0].nSize}, section heads ${m.heads[0]?.h2}), every control is at least 44px, the Proven today capture paints ${m.fill}% of its frame, the text-only proof is a compact row with no empty frame, Ask the agent is ${m.askClosed}px tall until opened, Proven today shows ${proven} and Evidence lists ${evidenceCards}, and the spacing is the same in ${other} mode.` : `At ${width} px in ${theme} mode Today is captured as it was for comparison.` }, null, 2) + '\n');
 } finally {
   try { browser('stop'); } catch {}
   try { sh(process.execPath, [join(repo, 'dist/cli.js'), 'stop', join(dir, 'board.json')], { env: seedEnv }); } catch {}
