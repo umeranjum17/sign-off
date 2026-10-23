@@ -60,7 +60,9 @@ try {
       // A fresh load per screen, so the bytes counted are the ones that screen asks for.
       browser('open', 'about:blank');
       browser('open', `${base}${hash}`);
-      const name = `${stem}.${side}.${theme}.${width}w`, m = evalIn(probe);
+      const name = `${stem}.${side}.${theme}.${width}w`, m = { screen: stem, width, theme, side, ...evalIn(probe) };
+      // Sharp: the frame stretches the picture no more than 1 (a pixel per device pixel or better), or no more than the original would be stretched there.
+      for (const s of m.shown) Object.assign(s, { copy: /&v=(light|thumb)/.exec(s.src)?.[1] ?? 'original', sharp: s.blur <= Math.max(1, s.original_blur) + 0.02 });
       browser('screenshot', join(out, `${name}.png`));
       writeFileSync(join(out, `${name}.json`), JSON.stringify(m, null, 2) + '\n');
       totals.push(`${stem} ${width}w: ${m.shown.length} pictures, ${m.loaded_bytes} picture bytes loaded, ${m.shown.map((s) => `${s.pixels.join('x')} in a ${s.frame.join('x')} frame (stretch ${s.blur}, original ${s.original_blur})`).join('; ')}`);
@@ -68,7 +70,7 @@ try {
       assert.ok(m.shown.length, `${name}: no picture on screen`);
       assert.ok(m.shown.every((s) => s.pixels[0] > 0), `${name}: a picture did not load`);
       assert.equal(m.overflow, false, `${name}: the page scrolls sideways`);
-      if (side === 'after') for (const s of m.shown) assert.ok(s.blur <= Math.max(1, s.original_blur) + 0.02, `${name}: ${s.src} is blurrier than its original there: ${JSON.stringify(s)}`);
+      if (side === 'after') for (const s of m.shown) assert.ok(s.sharp, `${name}: ${s.src} is blurrier than its original there: ${JSON.stringify(s)}`);
     }
   }
   writeFileSync(join(out, `images.${side}.${theme}.txt`), `${side} ${theme}, posted: ${shots.map((s) => s.split('/').pop()).join(', ')}\n${totals.join('\n')}\n`);
