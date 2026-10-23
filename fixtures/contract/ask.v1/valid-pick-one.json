@@ -5,6 +5,7 @@
   "schema": 1,
   "key": "release-day",
   "title": "Which day should the sign-in screen ship?",
+  "ticket": "T-29",
   "link": "https://example.com/pull/41",
   "detail": "Umer asked for a date before the weekly demo.\nFriday leaves a day for fixes.",
   "why": "Umer wants a date before the weekly demo: A, B or C.",

@@ -9,7 +9,7 @@ Status: v1 target, built in parts. Built: seven kinds, `ask`, `report` (schema 4
 - One contract, `"contract": 1`. Seven kinds: `ask`, `report`, `evidence`, `gate`, `finding`, `plan` and `design`.
 - Each kind has its own `"schema"` number, starting at `1`. Every message carries `contract`, `kind` and `schema`.
 - Strict: an unlisted field, a wrong type or a broken limit refuses the whole message, at every level (options, `run`, `media`). Nothing is dropped quietly, and nothing is stored or shown half-valid.
-- Inside one `contract`, `kind` and `schema`, no field is added, removed, renamed or retyped. Any such change is a new `schema`.
+- Inside one `contract`, `kind` and `schema`, no field is added, removed, renamed or retyped. Any such change is a new `schema`. Two optional fields are the exception, added inside schema 1: `ask_ref` on `ask` and `ticket` on every kind. A message without them means exactly what it did, and a sign-off-axi older than the field refuses a message that carries it, so a producer that also posts to older boards leaves it out.
 - sign-off-axi accepts only the schemas it ships: the latest of each kind, and for `report` schemas 2/3 and for `plan` schemas 1/2, which older boards and agents still post. Any other `schema` number is refused with the fix "upgrade sign-off-axi".
 - The board file keeps its own `"schema": 2`. A posted message is stored as a board item that keeps its `kind` and `schema`.
 - Producers pin an exact version in CI, for example `npx -y sign-off-axi@0.3.0`.
@@ -51,6 +51,7 @@ A message file holds one JSON object, in any layout. The validator reads it with
 | `key` | all, required (optional on `evidence`) | a key-set id, unique on the board |
 | `title` | all, required | text, 1-160 |
 | `filer` | all, optional | a key-set id: the agent session id or tool name |
+| `ticket` | all, optional | a key-set id: the ticket this card belongs to. Only a reference: the ticket need not be on the board, and nothing needs it (section 13) |
 | `link` | all, optional | `http://` or `https://` followed by 1-500 characters with no whitespace, control character (C0, DEL or C1) or unpaired surrogate, or a 7-40 character lowercase hex commit |
 | `about` | all, required (optional on `ask`) | text, 1-500 |
 | `detail` | `ask`, optional | text, 1-1000 |
@@ -65,6 +66,7 @@ A message file holds one JSON object, in any layout. The validator reads it with
 | `merges` | `ask`, optional | 1-10 distinct keys of other items on the same board that this ask replaces, never its own; each must offer every option of this ask and merge nothing itself; a key named by an ask not yet answered, open or dismissed, cannot be named again, and an answered or dismissed card cannot be named |
 
 When `filer` is missing, `post` takes it from `--filer`, else `SIGN_OFF_FILER` (empty means unset), else the agent session id. A `filer` in the message that differs from `--filer` is refused. Only `post` checks this; `validate` checks `filer` only when the message has one.
+When `ticket` is missing, `post` takes it from `--ticket`; a `ticket` in the message that differs from `--ticket` is refused. It is part of the message, so a key already on the board takes another `ticket` only as a new message (`CONFLICT`).
 
 A key already on the board takes only the same message again (the same fields and values, in any order, with the same `filer`), which changes nothing. "In any order" refers to the order of fields; the order of options is part of the message, because it is the order the user sees, so the same options listed in another order are a different message. A message that names no `filed` matches the time the board stamped; a board-format item under that key is not the same message. Anything else under that key is refused with code `CONFLICT`, exit 2 and the help line "Post it under a new key". Today's CLI exits 1 on `CONFLICT`; this contract changes that, so every refusal exits 2.
 
@@ -294,3 +296,11 @@ A skill works alone: it never needs a supervisor or another tool to post.
 
 - Should the board show a finding's `proposal`? Retro reports keep change text out; the board is local to the person.
 - Should `ask` gain design, diagram and interactive shapes in schema 2, or should they get kinds of their own?
+
+## 13. Tickets
+
+A ticket is one piece of work: an `id` (a key-set id), a `title` (text, 1-160), its `progress` (a whole number, 0 to 100) and optionally the `parent` ticket it sits under. It is not a message kind and has no `schema`: it stands alone beside the board, in the open format of [file-formats.md](file-formats.md) (**Tickets**), written by `sign-off-axi ticket --id <id> --title <text> [--progress <0-100>] [--parent <id>]` or by any program that appends lines in that shape.
+
+- A card links to a ticket only by naming its id in `ticket` (section 4). The link is loose on both sides: posting never checks that the ticket exists, a ticket's record never names its cards (its page finds them by their `ticket`), and removing either leaves the other as it was.
+- Where the card's ticket is on the board, the card's screen shows a **Ticket** row, the ticket's title, id and progress, that opens the ticket's page; where it is not, the card shows nothing more than before. The ticket's page lists the cards that name it (asks, designs, proof, reports and plans), newest first, and the tickets under it.
+- `ticket --id <id> --json` reads a ticket and its cards back (`key`, `kind`, `status`, `title`, `filed`); `ticket --json` lists every ticket. A ticket changes nothing about how a card is asked, answered or waited for.

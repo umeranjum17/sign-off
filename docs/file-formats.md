@@ -81,9 +81,15 @@ New guided defaults use plan schema 3 / report schema 4, contract 1, with a requ
   `raise` and `post` refuse an item that lists `options` without one; a plain Yes/No may leave it out.
   In a `--from` file (a `--replace` feed too), a new item of a contract kind must be a contract message: see [contract.md](contract.md) section 2. An item already on the board is not checked again, except in a `--replace` feed, which replaces the stored item: a contract message that changed is checked against its kind's rules again, so one that no longer matches is refused and the board is left as it was.
 - `filer`: optional, who filed the item (1-128 of `A-Z a-z 0-9 . _ -`), written by `post --filer`.
-  `wait --filer` with the same id returns the answers to that filer's items. The page never shows it.
+  `wait --filer` with the same id returns the answers to that filer's items. The page shows it only in a card's **Activity** (below), as who posted the card and picked up its answer, and never a session UUID, which reads `Agent` there.
   `post --from <file> --replace --filer <id>` replaces only the items with that filer (and items with
   no filer the file names by key); every other item, the board's other top-level fields and the answers stay.
+- `ticket`: optional, the id of the ticket the item belongs to (1-128 of `A-Z a-z 0-9 . _ -`), written by `raise` and `post` with `--ticket <id>` or carried in a message or `--from` item.
+  It is only a reference: the ticket need not be on the board, and nothing checks or needs it. While a ticket with that id is on the board (**Tickets**, below),
+  the item's screen shows a **Ticket** row, the ticket's title, id and progress, that opens the ticket's page; otherwise it shows none. It does not change what the item asks or how it is answered.
+- **Activity**: every card's screen (an ask, a sign-in, an update, a design review, a report and a plan) lists, oldest first, what the board keeps of it: when it was posted and by whom (its `filer`, with its `link` when that is a web link),
+  the answer a change replaced, the answer and its note, when its filer took it with `wait --filer` (`*.seen.jsonl`), each another-round ask with its note (`*.rounds.jsonl`) and each comment on it (`*.messages.jsonl`).
+  Steps are compared to the second (answers are stored to the second); within one second they keep that order. A card whose only step is its posting shows no Activity. A ticket's page shows its cards' steps after their postings together, each under the card's title. Nothing is written for it.
 - `area`: optional, the board area the item shows in: `waiting`, `evidence`, `reports` or `answered`
   (Waiting on you, Evidence, Reports and explainers, Answered). Without it an `evidence` item is in Evidence;
   an `explainer`, an item with nothing to answer, or any item on a read-only board is in Reports and
@@ -306,6 +312,22 @@ A new answer or another round after the line brings the item back. Reports and o
 ```json
 {"key":"keep-the-weekly-digest","dismissed":true,"at":"2026-10-12T15:41:10Z"}
 ```
+
+**Tickets**, written only by `sign-off-axi ticket --id <id> ...` (`decisions.tickets.jsonl`, mode 600, one line per write, the latest line per `id` wins). A ticket stands alone:
+no item needs one, a board without the file has none, and every card and command works the same. Another program may append lines in the same shape (one JSON object and a newline per write).
+
+```json
+{"id":"T-9","title":"The new settings page","progress":45,"at":"2026-10-23T09:10:00Z"}
+{"id":"T-29","title":"Ship the new settings page","progress":60,"parent":"T-9","at":"2026-10-23T09:12:00Z"}
+```
+
+- `id`: 1-128 of `A-Z a-z 0-9 . _ -`, what items name in `ticket`. `title`: text, 160 characters or fewer. `progress`: a whole number from 0 to 100, the percent done.
+  `parent`: optional, the id of the ticket it sits under, never its own; that ticket need not be on the board. `at`: when the line was written.
+- A new ticket needs a title; its progress starts at 0. A later write with the same `id` changes only the fields it gives; a write that changes nothing adds no line.
+- A line that breaks a rule, or a torn line, is skipped with a warning; the other tickets still show.
+- The board's state (`/api/state`) carries `tickets`, each id's latest line. A ticket's page, `#ticket/<id>`, shows the ticket it sits under, its progress,
+  the items that name it (not dismissed) newest first by `filed`, each opening where it lives, and the tickets whose `parent` it is.
+  `ticket --id <id> --json` prints the same: the ticket and its `cards` (`key`, `kind`, `status`, `title`, `filed`); `ticket --json` lists every ticket with its card keys.
 
 **Taken answers**, written by `wait --filer` next to the questions (`decisions.seen.jsonl`, mode 600):
 one line per answer the item's filer took, so the card shows **Seen by agent**. A changed answer is new
