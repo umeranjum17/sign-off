@@ -1,61 +1,45 @@
 # Vision
 
-This file records the shared vision for the tool family.
+## Who it is for
 
-## The family
+A person with coding agents working for them across their projects. sign-off is the open-source review board where those agents bring what needs that person: questions, proof of finished work, plans, reports and proposed changes.
 
-Three tools cover three jobs.
+## The problem
 
-sign-off is the main communication board between agents and projects on one side and the user on the other. It owns the written contract for how projects communicate.
+Agents need answers and the person needs proof. Without one board, questions come scattered, repeated and badly formed, proof arrives as text in a picture, and a board that fills with noise stops being read. An ask the person cannot answer is a defect.
 
-done-done is the main verification tool.
+## The end state
 
-learn-from-mistakes is the main retro tool.
+sign-off is the main communication board between agents and projects on one side and the person on the other. It is the one place the person decides:
 
-## Self-sufficient tools
+- **Evidence** from done-done: captures of the real product with the honest result of the check.
+- **Quick yes or no decisions**: quick answers first, the recommended answer first, typing last; one tap, with Undo.
+- **Retro changes by version** from learn-from-mistakes, to Apply or Skip.
+- **Plans and reports** as pages to read and answer in place.
 
-Each tool stands alone. Its skill and its CLI work with or without the other two tools. They work with or without an agent supervisor.
+It works on phone and desktop, by day and by night (light and dark), and at the design bar below. The answer reaches the filing agent as a durable record that survives reloads and restarts.
 
-The tools also connect well together. They connect through small written contracts. Each contract stays short and explicit.
+## Principles and quality bar
 
-## Primitives, not forks
+- **The best human-computer interaction on every surface.** Linear-grade and visual first. Every screen, message and command line respects the person's time and attention.
+- **Keeps only what matters.** Decide holds only live asks, and old stuff goes; one decision is one card.
+- **Self-sufficient.** The CLI and the skill work alone, with no other tool and no supervisor, and connect well with the sibling tools when installed together. They work the same inside or outside an agent supervisor such as Firstmate. A newcomer installs it from npm in under 5 minutes.
+- **Taste built in.** Every design and behaviour call lands in the published package and its shipped skill as the default, never in one person's setup.
+- **Strict, written contract.** One small contract covers asks, reports, evidence, gates, retro findings and plans ([docs/contract.md](docs/contract.md)). A message that does not match is refused with one fix line, never shown half-broken.
+- **Primitives, not forks.** Per-project behaviour becomes a reusable building block every project gets.
+- **Users set everything.** Nothing runs automatically. Users bring their own agents, models and accounts; sign-off adds zero hosted cost.
+- **Provider agnostic.** It names no particular person, agent vendor or model.
 
-Each tool owns project-agnostic primitives. A primitive is a small building block that any project can reuse.
+## What it is not
 
-Custom per-project behaviour becomes a primitive. It does not become a fork. The tool absorbs the pattern so every project benefits.
+- Not the worker. sign-off is a dashboard only: it does not do the work, run the checks (done-done does) or run the retros (learn-from-mistakes does). It shows them and carries the answer back.
+- Not a hosted service. It runs on the person's own machine.
+- Not a status feed. Merges, PR outcomes, receipts and status notes are never reports, and proof is never a Pass/Fail question.
 
-## One migration
+## Next milestones
 
-An existing project migrates once. It moves its local pieces onto the tool's primitives. It keeps no old copy.
+Each ships in the next [npm release](https://www.npmjs.com/package/sign-off-axi?activeTab=versions) once it merges.
 
-A new project starts from the tool's base. It builds on the primitives from day one.
-
-## Users set everything
-
-Users set everything up. Nothing runs automatically.
-
-Users bring their own agents, models, and accounts. The tools add zero hosted cost.
-
-## Design bar
-
-The bar is the best human-computer interaction on every surface. Every screen, message, and command line respects the user's time and attention.
-
-## Shared patterns
-
-The tools share a few patterns: the AXI CLI shape, TOON output, next-command help lines, skill install, and npm distribution.
-
-## Sign-off's role
-
-sign-off is the board where agents and projects post asks, reports, evidence, mocks, and sign-offs. They read the user's answers on the same board.
-
-Answers reach the filing agent as durable records. The record survives reloads and restarts.
-
-sign-off owns the written communication contract. The contract covers the file and CLI shape, the schema, and answer delivery. The contract lives in [docs/contract.md](docs/contract.md). This file names it but does not define its fields.
-
-## Works with
-
-Integrations live in this section. They stay out of the description and the intro.
-
-sign-off owns one communication contract for asks, reports, evidence, gates, retro findings and plans. In its v1 every message is strict and versioned, and a message that does not match is refused with one fix line, never shown half-broken. It is being built: the status line in [docs/contract.md](docs/contract.md) says what works today.
-
-Conformance will run on shared fixtures from the sign-off package. Each tool runs them in its CI with `sign-off-axi validate`, pinned to an exact version.
+1. **The approved design on every screen.** Today, Decide, Evidence and Reports, phone and desk, match the approved prototype, including the floating tab bar and the design review flow.
+2. **A fast, light board.** Performance tests with budgets, and built-in image compression and resizing for everything posted to the board.
+3. **Alerts when something needs you.** A card that enters Decide reaches the person's phone or tablet as an alert.

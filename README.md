@@ -118,6 +118,7 @@ sign-off stands alone: the CLI and the skill need no other tool and no superviso
 - [Question kinds](docs/question-kinds.md): the reference for each kind.
 - [Contract](docs/contract.md): the message rules agents post by.
 - [File formats](docs/file-formats.md): board and message files.
+- [Vision](VISION.md): who sign-off is for and where it is going.
 
 ## Development
 
