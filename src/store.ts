@@ -316,8 +316,8 @@ export function appendAnswer(decisionsPath: string, d: Decision, option: Option,
   }
   return answer;
 }
-/** Two asks put one decision: plain asks that offer the same answers and whose titles share at least 80% of their words. */
 const copyRef = ({ path, sha256, bytes, width, height }: CopyRef): CopyRef => ({ path, sha256, bytes, width, height });
+/** Two asks put one decision: plain asks that offer the same answers and whose titles share at least 80% of their words. */
 export function sameDecision(a: Decision, b: Decision): boolean {
   const plain = (d: Decision) => d.type === 'decision' && (!d.kind || d.kind === 'ask') && !!d.options?.length;
   const values = (d: Decision) => d.options.map((o) => o.value).sort().join();

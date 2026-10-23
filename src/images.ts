@@ -4,9 +4,12 @@ import jpeg from 'jpeg-js';
 import { pngPixels } from './evidence-text.js';
 
 /** A smaller copy of a still the board shows in place of the original: light on a card and the update's own screen, thumb in a list.
- * Each fits its box (width, height) and is never enlarged; at twice and three times device pixels it stays as sharp as the frame shows it.
- * Every frame a thumb fills shows the top of the picture, at most twice as tall as it is wide, so a thumb keeps only that top, at full width. */
-const BOXES = { light: [1600, 3200], thumb: [720, 1440] } as const;
+ * Each fits its box (width, height) and is never enlarged; at twice device pixels it stays as sharp as the frame shows it. A light copy is
+ * bounded by its width (the height bound only stops runaway pages): a full-page capture is shown whole on a card and from its top across a
+ * wide frame, so its width is what keeps it sharp.
+ * Every frame a thumb fills crops the picture to its own shape, from the top and centred, and none is more than twice as tall as it is wide
+ * or twice as wide as it is tall: a thumb keeps only that part, so its short side still fills the frame. */
+const BOXES = { light: [1600, 16384], thumb: [720, 1440] } as const;
 export type Size = keyof typeof BOXES;
 export type Copy = { ext: '.jpg' | '.png'; bytes: Buffer; width: number; height: number };
 /** JPEG quality, with no chroma subsampling (jpeg-js keeps every pixel's colour), so coloured text and thin lines keep their edges. */
@@ -30,6 +33,10 @@ function shrink(pic: Picture, size: Size, against: number): Copy | undefined {
   if (size === 'thumb' && pic.height > pic.width * 2) {
     const height = pic.width * 2;
     pic = { ...pic, height, data: pic.data.subarray(0, pic.width * height * 4) };
+  } else if (size === 'thumb' && pic.width > pic.height * 2) {
+    const width = pic.height * 2, left = (pic.width - width) >> 1, data = Buffer.alloc(width * pic.height * 4);
+    for (let y = 0; y < pic.height; y++) pic.data.copy(data, y * width * 4, (y * pic.width + left) * 4, (y * pic.width + left + width) * 4);
+    pic = { ...pic, width, data };
   }
   const [bw, bh] = BOXES[size], scale = Math.min(1, bw / pic.width, bh / pic.height);
   const width = Math.max(1, Math.round(pic.width * scale)), height = Math.max(1, Math.round(pic.height * scale));
@@ -136,18 +143,28 @@ function rotate<P extends { width: number; height: number; data: Buffer }>(pic: 
  * fringe. It runs one output row at a time, so memory stays a row, not a second picture. */
 function resize(pic: Picture, W: number, H: number): Buffer {
   const { width: w, height: h, data } = pic;
-  const spans = (n: number, N: number) => Array.from({ length: N }, (_, j) => {
-    const a = (j * n) / N, b = ((j + 1) * n) / N, taps: [number, number][] = [];
-    for (let i = Math.floor(a); i < Math.min(n, Math.ceil(b)); i++) taps.push([i, Math.min(b, i + 1) - Math.max(a, i)]);
-    return taps;
-  });
+  // Each output column or row: the first source index it covers, how many, and how much of each (flat, so the loops stay on typed arrays).
+  const spans = (n: number, N: number) => {
+    const most = Math.ceil(n / N) + 1, first = new Int32Array(N), count = new Int32Array(N), share = new Float64Array(N * most);
+    for (let j = 0; j < N; j++) {
+      const a = (j * n) / N, b = ((j + 1) * n) / N;
+      first[j] = Math.floor(a);
+      for (let i = first[j]; i < Math.min(n, Math.ceil(b)); i++) share[j * most + count[j]++] = Math.min(b, i + 1) - Math.max(a, i);
+    }
+    return { first, count, share, most };
+  };
   const xs = spans(w, W), ys = spans(h, H), area = (w / W) * (h / H), sum = new Float64Array(W * 4), out = Buffer.alloc(W * H * 4);
   for (let y = 0; y < H; y++) {
     sum.fill(0);
-    for (const [sy, wy] of ys[y]) for (let x = 0; x < W; x++) {
-      for (const [sx, wx] of xs[x]) {
-        const o = (sy * w + sx) * 4, al = data[o + 3] * wx * wy;
-        sum[x * 4] += data[o] * al; sum[x * 4 + 1] += data[o + 1] * al; sum[x * 4 + 2] += data[o + 2] * al; sum[x * 4 + 3] += al;
+    for (let k = 0; k < ys.count[y]; k++) {
+      const row = (ys.first[y] + k) * w, wy = ys.share[y * ys.most + k];
+      for (let x = 0; x < W; x++) {
+        let r = 0, g = 0, b = 0, a = 0;
+        for (let t = 0, o = (row + xs.first[x]) * 4; t < xs.count[x]; t++, o += 4) {
+          const al = data[o + 3] * xs.share[x * xs.most + t];
+          r += data[o] * al; g += data[o + 1] * al; b += data[o + 2] * al; a += al;
+        }
+        sum[x * 4] += r * wy; sum[x * 4 + 1] += g * wy; sum[x * 4 + 2] += b * wy; sum[x * 4 + 3] += a * wy;
       }
     }
     for (let x = 0; x < W; x++) {

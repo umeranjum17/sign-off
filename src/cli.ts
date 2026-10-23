@@ -228,7 +228,7 @@ An empty items list removes that filer's items.
 --type diagram and --type interactive are a decision shown with a picture: --view names one board-relative file,
 an image (.svg, .png, .jpg, .jpeg, .webp, 5 MB or less) shown at card width for a diagram, or one self-contained .html page for interactive.
 The page runs in a sandboxed frame: no fetch, no remote files, no access to the dashboard or its tab. Answers work as for a decision.
---type evidence posts the next numbered update (key update-<number>): 1 to ${MEDIA_MAX} screenshots or recordings (.png, .jpg, .jpeg, .webp, .mp4, .webm, 50 MB each), copied into evidence/<number>/ next to the board, with a short note and an optional commit or PR link. A still that is not a picture of the product is refused: mostly text (a log, receipt or summary), a colour-bar test card or a placeholder card. Post a real capture of the running product; a colour-bar or placeholder card already posted is not shown on the board.
+--type evidence posts the next numbered update (key update-<number>): 1 to ${MEDIA_MAX} screenshots or recordings (.png, .jpg, .jpeg, .webp, .mp4, .webm, 50 MB each), copied into evidence/<number>/ next to the board (each still also gets a lighter copy and a thumbnail there, which the board shows; the original stays and opens full size), with a short note and an optional commit or PR link. A still that is not a picture of the product is refused: mostly text (a log, receipt or summary), a colour-bar test card or a placeholder card. Post a real capture of the running product; a colour-bar or placeholder card already posted is not shown on the board.
 --attach <file> (up to ${ATTACH_MAX}, any file type, such as an Android .apk) adds a file the user downloads from the card, over the board link, on a phone or tablet. It is copied (never read into memory) into evidence/<number>/ and streamed on download. A file over ${ATTACH_DEFAULT_MB} MB is refused; raise the limit with SIGN_OFF_ATTACH_MAX_MB=<megabytes>. An update may have only --attach files and no --media.
 The user gives a verdict, pass, fail or needs-work, with an optional note; read it with answers or wait --key update-<number>.
 --type explainer is a decision shown with a narrated video you made: one --media .mp4 or .webm (50 MB or less), copied into evidence/<number>/ like evidence
@@ -1218,7 +1218,7 @@ function postMedia(file: string, named: string, on: string, values: Record<strin
           writeFileSync(join(dir, `${i + 1}-${size}${c.ext}`), c.bytes, { mode: 0o600 });
           refs[size] = { path: `evidence/${number}/${i + 1}-${size}${c.ext}`, sha256: sha256(c.bytes), bytes: c.bytes.length, width: c.width, height: c.height };
         }
-        if (made.reason && !made.light) full.push(`Capture ${i + 1} shows at full size: ${made.reason}`);
+        if (made.reason) full.push(`Capture ${i + 1} shows at full size: ${made.reason}`);
         return { path, sha256: sha256(bytes), bytes: bytes.length, ...refs };
       });
       // An attachment is copied by the kernel and hashed in chunks: the file is never held in memory.

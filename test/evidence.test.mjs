@@ -187,21 +187,22 @@ test('a still is shown upright and lighter: a phone photo turned by its EXIF, a 
   writeFileSync(join(dir, 'photo.jpg'), Buffer.concat([photo.subarray(0, 2), app1, photo.subarray(2)]));
   assert.equal(run('post', file, '--type', 'evidence', '--title', 'Photo of the phone', '--about', 'Umer holds it sideways.', '--media', join(dir, 'photo.jpg')).code, 0);
   const { light, thumb } = stored().media[0];
-  assert.deepEqual([light.width, light.height, thumb.width, thumb.height, light.path.endsWith('.jpg')], [941, 3200, 720, 1440, true]);
+  assert.deepEqual([light.width, light.height, thumb.width, thumb.height, light.path.endsWith('.jpg')], [1000, 3400, 720, 1440, true]);
   // Turned clockwise, the photo's left half is the top: no blue there, all blue at the bottom.
   const upright = jpeg.decode(readFileSync(join(so, light.path))), blue = (x, y) => upright.data[(y * upright.width + x) * 4 + 2];
-  assert.deepEqual([blue(470, 40) < 64, blue(470, 3160) > 192], [true, true]);
+  assert.deepEqual([blue(500, 40) < 64, blue(500, 3360) > 192], [true, true]);
 
-  // A capture with transparency gets PNG copies with an alpha channel, never a JPEG on a black or white ground.
-  const [cw, ch] = [1800, 900], raw = Buffer.alloc((cw * 4 + 1) * ch);
-  for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) raw.set([x % 256, y % 256, 90, x < 200 ? 0 : 255], y * (cw * 4 + 1) + 1 + x * 4);
+  // A capture with transparency gets PNG copies with an alpha channel, never a JPEG on a black or white ground. A wide one keeps a thumb of
+  // its centre, twice as wide as tall, so it still fills a list card's height.
+  const [cw, ch] = [2000, 800], raw = Buffer.alloc((cw * 4 + 1) * ch);
+  for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) raw.set([(x * 255 / cw) | 0, (y * 255 / ch) | 0, 90, x < 200 ? 0 : 255], y * (cw * 4 + 1) + 1 + x * 4);
   const chunk = (name, data) => { const b = Buffer.alloc(12 + data.length); b.writeUInt32BE(data.length); b.write(name, 4, 'latin1'); data.copy(b, 8); b.writeUInt32BE(crc32(b.subarray(4, 8 + data.length)), 8 + data.length); return b; };
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(cw); ihdr.writeUInt32BE(ch, 4); ihdr.set([8, 6], 8);
   writeFileSync(join(dir, 'clear.png'), Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]));
   assert.equal(run('post', file, '--type', 'evidence', '--title', 'Floating panel', '--about', 'Its edge is clear.', '--media', join(dir, 'clear.png')).code, 0);
-  const clear = stored().media[0].light, head = readFileSync(join(so, clear.path));
-  assert.deepEqual([clear.path.endsWith('-light.png'), clear.width, clear.height, head[25]], [true, 1600, 800, 6]);
+  const { light: clear, thumb: centre } = stored().media[0], head = readFileSync(join(so, clear.path));
+  assert.deepEqual([clear.path.endsWith('-light.png'), clear.width, clear.height, head[25], centre.width, centre.height], [true, 1600, 640, 6, 720, 360]);
 
   // A still the board cannot read is posted and shown as it is, and the post says so.
   writeFileSync(join(dir, 'odd.webp'), Buffer.concat([Buffer.from('RIFF\0\0\0\0WEBPVP8 ', 'latin1'), Buffer.alloc(64, 7)]));
