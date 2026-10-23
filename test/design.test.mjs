@@ -925,33 +925,32 @@ test('each card has one place to type: Add a comment holds the note sent with th
   await until(async () => (await evaluate('!document.querySelector(".gone-asks") && document.querySelectorAll(".ask-card").length')) === 2);
   close();
   assert.deepEqual(readFileSync(gone, 'utf8').trim().split('\n').map((l) => JSON.parse(l)).map(({ key, dismissed }) => [key, dismissed]), [['ship', true], ['ship', false]]);
-  // Reports leads with the date over its title and how many are new, keeps its More at the top right, draws a report's steps as numbered nodes, each with only the marks it lists, and the legend once.
+  // Reports leads with the date over its title and how many are new and keeps its More at the top right; its rows are the new look's, so a report with a page
+  // draws no steps in the list and no legend for them.
   const reports = await dump('#reports');
   assert.match(reports, /<p class="kicker date-kicker">[^<]+<\/p><h1 tabindex="-1">Reports<\/h1>.*?<p class="lede waiting-lede">1 new · 1 in all<\/p><details class="dl-more"><summary aria-label="More">/s);
-  assert.equal(reports.match(/class="card legend"/g).length, 1);
+  assert.doesNotMatch(reports, /class="card legend"|class="flow"/);
   // The list row has no ×: Dismiss lives on the report's page.
   assert.doesNotMatch(reports, /aria-label="Dismiss, How it ships"/);
-  const flow = reports.match(/<ol class="flow"[^>]*>(.*?)<\/ol>/s)[1];
-  assert.deepEqual([...flow.matchAll(/<li>(.*?)<\/li>/gs)].map((m) => [...m[1].matchAll(/mk mk-(\w+)/g)].map((x) => x[1])), [['store'], [], ['gate', 'fail']]);
-  // Today heads the list with its count; the row is a link that opens it, with its picture, its title and a dot while it is not read, then its form, steps, video, project and time.
-  assert.match(reports, /<h2 class="dl-head" style="--n:0">Today<span class="n">1<\/span><\/h2><ul class="dl-list rp-list" aria-label="Today">/);
-  assert.match(reports, /<a class="dl-face" href="#reports\/how" draggable="false" id="item-how" data-row=""><span class="rth" aria-hidden="true"><svg viewBox="0 0 48 48">.*?<strong class="title" dir="auto">How it ships<\/strong><span class="new" role="img" aria-label="Not read yet"><\/span>.*?<span class="when">Diagram · 3 steps · Video 0:28 · How it works · \d\d:\d\d<\/span>/s);
+  // Today heads the list with its count, over one card of rows; the row is a link that opens it, with its icon tile, its title and a dot while it is not read, then its project and time.
+  assert.match(reports, /<h2 class="dl-head ui-sec" style="--n:0">Today<span class="n">1<\/span><\/h2><ul class="dl-list rp-list ui-card ui-list" aria-label="Today">/);
+  assert.match(reports, /<a class="dl-face ui-row" href="#reports\/how" draggable="false" id="item-how" data-row=""><span class="ui-icon" aria-hidden="true"><svg viewBox="0 0 24 24">.*?<span class="t" dir="auto">How it ships<\/span><span class="new" role="img" aria-label="Not read yet"><\/span>.*?<span class="l2 meta" dir="auto">How it works · \d\d:\d\d<\/span>/s);
   // Under the row, a swipe right marks it read and a swipe left archives it.
   assert.match(reports, /<div class="dl-act yes" aria-hidden="true">.*?<span>Read<\/span><\/div><div class="dl-act later" aria-hidden="true">.*?<span>Archive<\/span><\/div>/s);
   // Only the report is a row and counted; the text-only one is folded under Notes, a short row with no page to open.
   assert.deepEqual([...reports.matchAll(/<li class="report dl-row" style="--n:\d+" data-key="(\w+)"/g)].map((m) => m[1]), ['how']);
   // The sidebar counts what is new under its short name; the phone's tab bar marks Reports as the area on screen and carries a blue count.
   assert.match(reports, /<\/svg><\/span>Reports<span class="n blue">1<\/span>/);
-  assert.match(reports, /<a href="#reports" aria-label="Reports, 1 new" aria-current="page"><span class="icon i-reports" aria-hidden="true">.*?<\/span>Reports<span class="bd blue" aria-hidden="true">1<\/span><\/a>/);
+  assert.match(reports, /<a href="#reports" aria-label="Reports, 1 new" aria-current="page"><span class="icon i-reports" aria-hidden="true">.*?<\/span><span class="bd blue" aria-hidden="true">1<\/span><\/a>/);
   assert.match(reports, /<details class="other notes"><summary>Notes \(1\)<\/summary>.*<strong dir="auto">Merged: the sign-in fix<\/strong>/s);
   // On a phone, a tap on the card opens the report over the whole board with the focus on its title; the board under it takes no taps.
   // ‹ Reports goes back to the card with the focus on its link, and Escape closes it too.
   {
     const { evaluate, tap, swipe, close } = await browse(join(dir, 'reader'), 390);
     await evaluate(`location.href = ${JSON.stringify(`${url}#reports`)}`);
-    await until(async () => (await evaluate('document.querySelector("#item-how .flow") && innerWidth')) === 390);
+    await until(async () => (await evaluate('document.querySelector("#item-how .t") && innerWidth')) === 390);
     const at = (sel) => evaluate(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`);
-    await tap(await at('#item-how strong'));
+    await tap(await at('#item-how .t'));
     await until(async () => (await evaluate('location.hash')) === '#reports/how');
     // The hash lands before its handler draws the reader, so wait for the drawn reader itself, not just the hash.
     let open;
@@ -2809,10 +2808,10 @@ test('Today on a phone: the floating tab bar with its pill on Today, Up next wit
   await evaluate(`location.href = ${JSON.stringify(url)}`);
   await until(async () => (await evaluate('document.querySelectorAll(".t-proof .lrow").length')) === 3);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= 390'));
-  // The tab bar floats 12px over the bottom edge with 16px either side, 62px tall, and its pill sits on Today.
+  // The dock floats 24px over the bottom edge: a 56px pill of four 48px tabs, then the round 56px Search 12px beside it, the two centred together; its pill sits on Today.
   const rect = (sel) => `(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right), Math.round(r.top), Math.round(r.bottom)]; })()`;
-  const bar = await evaluate(rect('.tabs'));
-  assert.deepEqual([bar[0], (await evaluate('document.documentElement.clientWidth')) - bar[1], bar[3] - bar[2], (await evaluate('innerHeight')) - bar[3]], [16, 16, 62, 12]);
+  const bar = await evaluate(rect('.tabs')), find = await evaluate(rect('.dock-find')), tab = await evaluate(rect('.tabs a')), [vw, vh] = await evaluate('[document.documentElement.clientWidth, innerHeight]');
+  assert.deepEqual([bar[1] - bar[0], bar[3] - bar[2], vh - bar[3], tab[1] - tab[0], find[1] - find[0], find[3] - find[2], vh - find[3], find[0] - bar[1], Math.abs(bar[0] - (vw - find[1])) <= 1], [206, 56, 24, 48, 56, 56, 24, 12, true]);
   await until(async () => (await evaluate(rect('.tabs .hl')))[0] === (await evaluate(rect('.tabs a[href="#"]')))[0]);
   // Up next is the plan, to review: its kind in the line over its title and one main action that opens it.
   assert.equal(await evaluate('document.querySelector(".up-next .lk").textContent.startsWith("Up next · Review") + "|" + document.querySelector(".up-next .go").getAttribute("href")'), `true|#waiting/${JSON.parse(readFileSync(join(fixture, 'valid-full.json'), 'utf8')).key}`);
@@ -2844,6 +2843,9 @@ test('Today on a phone: the floating tab bar with its pill on Today, Up next wit
   await until(async () => (await evaluate('document.querySelector("#board h1").textContent')) === 'Designs');
   assert.equal(await evaluate('document.querySelector(".tabs [aria-current]").getAttribute("href")'), '#waiting');
   await until(async () => (await evaluate(rect('.tabs .hl')))[0] === (await evaluate(rect('.tabs a[href="#waiting"]')))[0]);
+  // The dock's round Search opens Today with its search box in hand, under the lit Today tab.
+  await evaluate('document.querySelector(".dock-find").click()');
+  await until(async () => (await evaluate('[location.hash, document.activeElement?.id, document.querySelector("#board h1")?.textContent, document.querySelector(".tabs [aria-current]")?.getAttribute("href")].join("|")')) === '#find|find|Today|#');
   close();
   proc.kill();
 });

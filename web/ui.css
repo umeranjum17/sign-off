@@ -1,0 +1,127 @@
+/* The new look's shared parts, built from tokens.css, as the approved prototype draws them: the dock and the sidebar, the page's title row and segmented control,
+   a section head, the hero and list cards, a row, its icon tile and priority chip, two stat tiles, and the property panel (Its ask, Ticket).
+   Every box sits on a 4px grid with one 16px gutter. index.html's own rules come after this file, so a screen not yet in the new look keeps its own. */
+
+/* The dock: a 56px pill of round 48px tabs, 24px over the bottom and centred with the round Search button 12px beside it. The tab on screen sits raised. */
+:root { --dock-n: 4; --dock-w: calc(0.5rem + var(--dock-n) * 3rem + (var(--dock-n) - 1) * 2px); --dock-at: calc(50% - (var(--dock-w) + 4.25rem) / 2); }
+.side { display: none; }
+.tabs { position: fixed; z-index: 2; left: var(--dock-at); bottom: calc(1.5rem + env(safe-area-inset-bottom)); width: var(--dock-w); display: flex; gap: 2px; height: 3.5rem; padding: 0.25rem;
+  border-radius: 1.75rem; background: var(--tk-card); box-shadow: var(--tk-elev-dock), inset 0 1px 0 var(--tk-hl); }
+.tabs .hl { position: absolute; top: 0.25rem; left: 0.25rem; width: 3rem; height: 3rem; border-radius: 1.5rem; background: var(--tk-on); box-shadow: var(--tk-elev-raised); transition: transform 300ms var(--spring); }
+.tabs a { position: relative; flex: none; display: grid; place-items: center; width: 3rem; height: 3rem; border-radius: 1.5rem; color: var(--tk-idle); text-decoration: none; -webkit-tap-highlight-color: transparent; }
+.tabs a[aria-current] { color: var(--tk-ink); }
+.tabs a:active .icon { transform: scale(0.86); transition-duration: 90ms; }
+.tabs a:focus-visible { outline-offset: -2px; }
+/* Decide carries a red count of what waits on you at its tab's corner, Reports one of what is new; a count that changes bumps. */
+.tabs .bd { position: absolute; top: 0.375rem; right: 0.375rem; min-width: 1rem; height: 1rem; padding: 0 0.25rem; border-radius: 0.5rem; background: var(--badge); color: #FFFFFF;
+  font-size: 0.625rem; line-height: 1rem; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--tk-card); }
+.tabs a[aria-current] .bd { box-shadow: 0 0 0 2px var(--tk-on); }
+.bd.bump, .side .n.bump { animation: bump 380ms var(--spring); }
+@keyframes bump { 30% { transform: scale(1.25); } }
+.tabs .icon, .side .icon { width: 1.5rem; height: 1.5rem; background: none; transition: transform 300ms var(--spring); }
+.tabs .icon svg, .side .icon svg { width: 1.5rem; height: 1.5rem; stroke: currentColor; stroke-width: 1.9; }
+.dock-find { position: fixed; z-index: 2; left: calc(var(--dock-at) + var(--dock-w) + 0.75rem); bottom: calc(1.5rem + env(safe-area-inset-bottom)); display: grid; place-items: center;
+  width: 3.5rem; height: 3.5rem; border-radius: 1.75rem; background: #262624; color: #FFFFFF; box-shadow: 0 6px 18px rgba(20, 16, 12, 0.25); -webkit-tap-highlight-color: transparent; }
+.dock-find:active { transform: scale(0.94); }
+.dock-find svg, .sfind svg { width: 1.5rem; height: 1.5rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+@media (prefers-color-scheme: dark) { .dock-find { background: var(--tk-ink); color: var(--tk-canvas); } }
+
+/* The page's title row: 8px from the top (24px on a desk), a 24px medium title in a 44px row, round 40px buttons at its right edge. */
+.ui-top { display: flex; align-items: center; gap: 0.5rem; height: 2.75rem; margin-top: 0.5rem; }
+.ui-top h1 { flex: 1; min-width: 0; margin: 0; overflow: hidden; color: var(--tk-ink); font-size: var(--tk-fs-page); line-height: var(--tk-lh-page); font-weight: 500; letter-spacing: 0; white-space: nowrap; text-overflow: ellipsis; }
+.ui-rb { position: relative; display: grid; flex: none; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: 1.25rem; background: var(--tk-card); color: var(--tk-ink); box-shadow: var(--tk-elev-card), inset 0 1px 0 var(--tk-hl); }
+.ui-rb::after { content: ''; position: absolute; inset: -2px; }
+/* The segmented control: 40px, a 4px inset, the segment on screen raised. */
+.ui-seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; height: 2.5rem; margin-top: 0.75rem; padding: 0.25rem; border-radius: 1.25rem; background: var(--tk-card); box-shadow: var(--tk-elev-card), inset 0 1px 0 var(--tk-hl); }
+.ui-seg button { position: relative; display: flex; align-items: center; justify-content: center; gap: 0.375rem; height: 2rem; min-height: 0; padding: 0; border: 0; border-radius: 1rem; background: none;
+  color: var(--tk-text-tertiary); font: inherit; font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 500; box-shadow: none; }
+.ui-seg button::after { content: ''; position: absolute; inset: -0.375rem 0; }
+.ui-seg button[aria-pressed="true"] { background: var(--tk-on); color: var(--tk-ink); box-shadow: var(--tk-elev-raised); font-weight: 500; }
+.ui-seg button[aria-pressed="true"]::before { content: none; }
+
+/* Cards: the hero and a list, radius 22, a step lighter than the canvas. */
+.ui-card { border-radius: var(--tk-r-card); background: var(--tk-card); box-shadow: var(--tk-elev-card), inset 0 1px 0 var(--tk-hl); }
+/* The hero: a label (and a chip) on one 24px line, the big number, then what it is made of on the right. */
+.ui-hero { margin-top: 1rem; padding: 0.75rem 1rem 1rem; }
+.ui-hero .hl { display: flex; align-items: center; gap: 0.5rem; height: 1.5rem; }
+.ui-hero .lab { overflow: hidden; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: 1.5rem; white-space: nowrap; text-overflow: ellipsis; }
+.ui-hero .hv { display: flex; align-items: baseline; gap: 0.5rem; height: 2rem; }
+.ui-hero .big { color: var(--tk-ink); font-size: var(--tk-fs-big); line-height: var(--tk-lh-big); font-weight: 500; letter-spacing: -0.02em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ui-hero .big small { color: var(--tk-text-tertiary); font-size: inherit; font-weight: 500; }
+.ui-hero .vs { margin-left: auto; color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* A section head: 18px, its count muted, See all at the card's right edge. */
+.ui-sec { display: flex; align-items: center; gap: 0.5rem; height: 1.75rem; margin: 1rem 0 0.25rem; color: var(--tk-ink); font-size: var(--tk-fs-head); line-height: var(--tk-lh-head); font-weight: 500; letter-spacing: -0.014em; }
+.ui-sec .n, .ui-sec small { color: var(--tk-text-tertiary); font-size: inherit; font-weight: 500; font-variant-numeric: tabular-nums; }
+.ui-sec .see { position: relative; margin-left: auto; color: var(--tk-ink); font-size: var(--tk-fs-row); line-height: 1.5rem; font-weight: 500; text-decoration: none; white-space: nowrap; }
+.ui-sec .see::after { content: ''; position: absolute; inset: -0.625rem -0.25rem; }
+
+/* A list card: 12px in, rows 68px tall, a hairline between rows on the card's content box. */
+.ui-list { margin: 0; padding: 0.25rem 0.75rem; list-style: none; overflow: hidden; }
+.ui-list > li { position: relative; }
+.ui-list > li + li::before { content: ''; position: absolute; z-index: 2; top: -0.5px; right: 0; left: 0; height: 1px; background: var(--tk-line); }
+/* A row: its 40px icon tile, then the title over one second line (project and time) or a progress bar with its percent in a 40px column; a priority chip only where one is set. */
+.ui-row { position: relative; display: flex; align-items: center; gap: 0.75rem; width: 100%; height: 4.25rem; color: var(--tk-text); text-decoration: none; }
+.ui-row .rm { display: flex; flex: 1; flex-direction: column; gap: 0.25rem; min-width: 0; }
+.ui-row .l1 { display: flex; align-items: center; gap: 0.75rem; height: 1.25rem; }
+.ui-row .l1 .t { flex: 1; min-width: 0; overflow: hidden; color: var(--tk-text); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 400; letter-spacing: -0.006em; white-space: nowrap; text-overflow: ellipsis; }
+.ui-row .l1 .val { flex: none; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-variant-numeric: tabular-nums; }
+.ui-row .l2 { display: flex; align-items: center; height: 1rem; }
+.ui-row .meta { display: block; overflow: hidden; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: var(--tk-lh-meta); white-space: nowrap; text-overflow: ellipsis; }
+.ui-bar { flex: 1; height: 0.25rem; overflow: hidden; border-radius: 2px; background: var(--tk-track); }
+.ui-bar i { display: block; height: 100%; border-radius: 2px; background: var(--tk-fill); }
+.ui-row .pct { flex: none; width: 2.5rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); line-height: var(--tk-lh-small); text-align: right; font-variant-numeric: tabular-nums; }
+/* The icon tile: 40px white, radius 12, the project's own icon inside at 24px, else a 20px line icon (optically the same size) or its monogram. */
+.ui-icon { position: relative; display: grid; flex: none; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: var(--tk-r-icon); background: var(--tk-raised); color: var(--tk-ink);
+  box-shadow: 0 1px 2px rgba(40, 30, 20, 0.08), 0 2px 6px rgba(40, 30, 20, 0.05); }
+.ui-icon img, .ui-icon svg { display: block; width: 1.5rem; height: 1.5rem; border-radius: 0.375rem; object-fit: cover; }
+.ui-icon svg { width: 1.25rem; height: 1.25rem; border-radius: 0; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ui-icon .mono { width: 1.5rem; height: 1.5rem; border-radius: 0.375rem; background: var(--tk-ink); color: var(--tk-raised); font-size: 0.625rem; line-height: 1.5rem; font-weight: 600; text-align: center; letter-spacing: 0.02em; }
+@media (prefers-color-scheme: dark) { .ui-icon { box-shadow: none; } }
+/* The priority chip: one width so the column reads straight; P0 and P1 tinted. */
+.ui-pc { display: grid; flex: none; place-items: center; width: 2.25rem; height: 1.25rem; border-radius: 0.375rem; font-size: 0.6875rem; line-height: 1.25rem; font-weight: 600; letter-spacing: 0.01em; }
+.ui-pc.p0 { background: var(--tk-p0); color: var(--tk-p0-text); } .ui-pc.p1 { background: var(--tk-p1); color: var(--tk-p1-text); }
+.ui-pc.p2 { background: var(--tk-p2); color: var(--tk-p2-text); } .ui-pc.p3 { background: var(--tk-p3); color: var(--tk-p3-text); }
+
+/* Two stat tiles, 8px apart, radius 20: a 20px icon, the label, the number. */
+.ui-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 1rem; }
+.ui-stat { display: flex; flex-direction: column; padding: 0.75rem 0.75rem 0.5rem; border-radius: var(--tk-r-tile); color: inherit; text-align: left; text-decoration: none; }
+.ui-stat .si { height: 1.25rem; color: var(--tk-ink); }
+.ui-stat .si svg { width: 1.25rem; height: 1.25rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ui-stat .lab { margin-top: 0.75rem; overflow: hidden; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: 1rem; white-space: nowrap; text-overflow: ellipsis; }
+.ui-stat b { color: var(--tk-text); font-size: var(--tk-fs-head); line-height: var(--tk-lh-head); font-weight: 500; letter-spacing: -0.014em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ui-stat b small { color: var(--tk-text-tertiary); font-size: inherit; font-weight: 500; }
+
+/* The property panel on a card's screen: a label over a sunk group of 48px rows (Its ask, Ticket, PR), each a name at the left and its value, or a bar and percent, at the right. */
+.ui-dl { margin: 1.5rem 0 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 400; }
+.ui-props { margin-top: 0.5rem; padding: 0 1rem; border-radius: 1rem; background: var(--tk-inset); }
+.ui-pr { position: relative; display: flex; align-items: center; gap: 0.75rem; min-height: 3rem; color: var(--tk-ink); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); text-decoration: none; }
+.ui-pr + .ui-pr::before { content: ''; position: absolute; top: -0.5px; right: 0; left: 0; height: 1px; background: var(--tk-line); }
+.ui-pr .k { display: flex; flex: none; align-items: center; gap: 0.5rem; color: var(--tk-text-secondary); }
+.ui-pr .v { display: flex; flex: 1; align-items: center; justify-content: flex-end; gap: 0.5rem; min-width: 0; color: var(--tk-ink); text-align: right; }
+.ui-pr .v > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ui-pr .v .ui-bar { flex: none; width: 4rem; }
+.ui-pr .v .n { flex: none; font-variant-numeric: tabular-nums; }
+
+/* A desk (64rem and wider) keeps the areas in a slim sidebar on the canvas: the board's mark, Search, then the areas, the one on screen raised.
+   The mark, Search's glass and every area's icon are 20px on one left edge, and the name, Search and every label start on the next one;
+   the mark sits on the name's line, centred on it, with whose board it is under the name. */
+@media (min-width: 64rem) {
+  .tabs, .dock-find { display: none; }
+  .ui-top { margin-top: 1.5rem; }
+  .side { display: flex; flex-direction: column; gap: 0.25rem; position: sticky; top: 0; height: 100vh; padding: 1.5rem 1rem; background: none; }
+  .brand { display: flex; align-items: flex-start; gap: 0.75rem; min-height: 2.5rem; margin: 0; padding: 0.625rem 0.75rem 0; color: var(--tk-ink); font-size: var(--tk-fs-body); line-height: 1.25rem; font-weight: 600; letter-spacing: -0.01em; }
+  .brand .logo { display: grid; flex: none; place-items: center; width: 1.25rem; height: 1.25rem; border-radius: 0.3125rem; background: var(--action); color: #FFFFFF; }
+  .brand .logo .glyph { width: 0.875rem; height: 0.875rem; stroke-width: 2.8; }
+  .brand small { display: block; color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); line-height: 1rem; font-weight: 500; }
+  .sfind { display: flex; align-items: center; gap: 0.75rem; height: 2.75rem; margin: 1rem 0 0.75rem; padding: 0 0.75rem; border-radius: 1.375rem; background: var(--tk-card); color: var(--tk-text-tertiary);
+    font-size: var(--tk-fs-row); text-decoration: none; box-shadow: var(--tk-elev-card), inset 0 1px 0 var(--tk-hl); }
+  .sfind svg { width: 1.25rem; height: 1.25rem; }
+  .side a:not(.sfind) { display: flex; align-items: center; gap: 0.75rem; min-height: 2.75rem; padding: 0 0.75rem; border-radius: 1.375rem; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); font-weight: 500; text-decoration: none; }
+  .side a:not(.sfind):hover:not([aria-current]) { background: color-mix(in srgb, var(--tk-on) 55%, transparent); }
+  .side a[aria-current] { background: var(--tk-on); color: var(--tk-ink); box-shadow: var(--tk-elev-raised); }
+  .side a:active .icon { transform: scale(0.86); transition-duration: 90ms; }
+  .side .icon, .side .icon svg { width: 1.25rem; height: 1.25rem; }
+  .side .n { display: grid; place-items: center; min-width: 1.25rem; height: 1.25rem; margin-left: auto; padding: 0 0.375rem; border-radius: 0.625rem; color: var(--tk-text-tertiary);
+    font-size: var(--tk-fs-small); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .side .n.red { background: var(--badge); color: #FFFFFF; font-weight: 600; } .side .n.blue { background: var(--action); color: #FFFFFF; font-weight: 600; }
+}

@@ -127,7 +127,8 @@ try {
     assert.deepEqual(m.proof.map((p) => [p.title, p.frame]), [['Settings page loads in a second', 100], ['Dark mode keeps every label readable', 100], ['Sign-in screen fits a phone', 100]]);
     assert.deepEqual([m.report?.head, m.report?.eyebrow, m.report?.title], ['New report', 'Before and after · Video 0:28', 'How the new sign-in works']);
     assert.deepEqual([m.badges.decide, m.badges.reports], ['5 red', '2 blue']);
-    if (m.bar) assert.deepEqual(m.bar, { left: 16, right: 16, bottom: 12, height: 62, on: '#', pillOn: true });
+    // The dock: a 56px pill of four 48px tabs 24px over the bottom, centred with the 56px Search 12px beside it (206 + 12 + 56 = 274 of 390: 58px either side).
+    if (m.bar) assert.deepEqual(m.bar, { left: 58, right: 126, bottom: 24, height: 56, on: '#', pillOn: true });
     else assert.deepEqual(m.sidebar.map((s) => s.replace(/\d+$/, '')), ['Today', 'Decide', 'Evidence', 'Reports']);
     assert.deepEqual([decideRows, proofTile, evidenceCards + failed], [5, 5, 5]);
     if (scrolled) assert.deepEqual(scrolled, ['1', 'Today']);

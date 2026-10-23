@@ -2249,9 +2249,9 @@ const pageAs = (encoding: 'br' | 'gzip') => (squeezed[encoding] ??= encoding ===
   ? brotliCompressSync(page, { params: { [zlib.BROTLI_PARAM_QUALITY]: 9, [zlib.BROTLI_PARAM_SIZE_HINT]: page.length } }) : gzipSync(page, { level: 9 }));
 /** The browser keeps a reply and asks again with its tag, so an unchanged page, state or file costs a 304 and no body. */
 const unchanged = (req: IncomingMessage, tag: string) => req.headers['if-none-match']?.split(/\s*,\s*/).includes(tag) ?? false;
-/** The board's design tokens, favicon, home-screen icon and install manifest, served beside the page; see web/tokens.css and web/icon.svg. */
+/** The board's design tokens, shared parts and typeface, favicon, home-screen icon and install manifest, served beside the page; see web/tokens.css, web/ui.css and web/icon.svg. */
 const ICONS: Record<string, { type: string; bytes: Buffer }> = Object.fromEntries(
-  [['tokens.css', 'text/css; charset=utf-8'], ['icon.svg', 'image/svg+xml'], ['apple-touch-icon.png', 'image/png'], ['icon-192.png', 'image/png'], ['icon-512.png', 'image/png'], ['icon-maskable-512.png', 'image/png'], ['manifest.webmanifest', 'application/manifest+json']]
+  [['tokens.css', 'text/css; charset=utf-8'], ['ui.css', 'text/css; charset=utf-8'], ['inter.woff2', 'font/woff2'], ['icon.svg', 'image/svg+xml'], ['apple-touch-icon.png', 'image/png'], ['icon-192.png', 'image/png'], ['icon-512.png', 'image/png'], ['icon-maskable-512.png', 'image/png'], ['manifest.webmanifest', 'application/manifest+json']]
     .map(([name, type]) => [`/${name}`, { type, bytes: readFileSync(new URL(`../web/${name}`, import.meta.url)) }]));
 /** Added to each design mock page and plan page so the person can point at a part of it; see web/point.js. */
 const pointer = Buffer.from(`<script>${readFileSync(new URL('../web/point.js', import.meta.url), 'utf8')}</script>`);
