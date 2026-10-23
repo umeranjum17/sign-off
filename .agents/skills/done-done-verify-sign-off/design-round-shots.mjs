@@ -3,7 +3,8 @@
 // ROUND_WIDTH=390 or 1280 (default 390). A throwaway board (its own HOME and XDG_*) holds a fleet dashboard design with a light and a dark phone page
 // and a computer page per screen, and a second design whose screen page was moved away after it was posted.
 // The person types a screen note with real key events and taps Change; the agent then draws the screen again in place (a new round).
-// Saves preview (the new round's screen in the preview), note (the empty note box with Earlier note opened) and fallback (the design whose page is gone),
+// Saves preview (the new round's screen in the preview), note (the empty note box with Earlier note opened), round (the whole review page on a taller screen
+// of the same width: the preview, the empty note box and the opened Earlier note in one capture) and fallback (the design whose page is gone),
 // each <state>.<theme>.<width>w.png, and design-round.<theme>.<width>w.json: what each step measured. Exits non-zero when a check fails.
 // ROUND_SIDE=before SIGN_OFF_REPO=<built base checkout> takes the same shots from that build without the checks, for the before.
 import assert from 'node:assert/strict';
@@ -76,6 +77,11 @@ try {
   browser('eval', `() => { const s = document.querySelector('.design-review .earlier-note summary'); s?.click(); document.querySelector('.design-review textarea').scrollIntoView({ block: 'center' }); return 1; }`); settle();
   record.opened = read(`() => JSON.stringify(!!document.querySelector('.design-review .earlier-note')?.open)`);
   shot('note');
+  // The whole review page in one capture, its preview, note box and Earlier note together: the same width, a taller screen.
+  browser('emulate', '--viewport', width === 390 ? '390x1700x2,mobile,touch' : '1280x1700x1', '--color-scheme', theme); settle(900);
+  browser('eval', `() => { document.querySelector('.design-review').scrollTop = 0; return 1; }`); settle();
+  shot('round');
+  browser('emulate', '--viewport', width === 390 ? '390x844x2,mobile,touch' : '1280x800x1', '--color-scheme', theme); settle();
   browser('eval', `() => { document.querySelector('[data-design]').click(); return 1; }`); settle();
   record.viewer = read(`() => JSON.stringify({ screen: document.querySelector('.design-viewer[open] .design-viewer-panel [role=status]')?.textContent, note: document.querySelector('.design-viewer[open] textarea')?.value })`);
   browser('eval', `() => { document.querySelector('[aria-label="Close viewer"]').click(); return 1; }`); settle();
