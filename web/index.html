@@ -148,7 +148,6 @@
   .rows.reports > li, .rows.reports .compact { align-items: start; }
   .rows.reports .when { margin-top: 0.1875rem; line-height: 1.3571; color: var(--muted); font-size: 0.875rem; }
   .rows.reports .flow { margin-top: 0.625rem; max-width: 20rem; }
-  .rows.reports .new { flex: none; width: 0.5625rem; height: 0.5625rem; margin: 0.5rem 0.25rem 0 0; border-radius: 50%; background: var(--action); }
   .rows.reports .done > :not(summary) { margin: 0 0 1rem 4.25rem; }
   .sec-h:has(+ .reports) { margin: 1.75rem 0 0.5rem; padding: 0 1rem; }
   .rows.reports .compact > .t > .meta { font-size: 0.9375rem; line-height: 1.3333; letter-spacing: -0.016em; }
@@ -1116,19 +1115,26 @@
   .rise .dl-row, .rise .dl-head { animation: rise 280ms var(--ease) both; animation-delay: calc(min(var(--n, 0), 12) * 28ms); }
   @keyframes rise { from { opacity: 0; transform: translateY(0.625rem); } }
   .decide-list > .gone-asks { margin-top: 1.5rem; }
-  /* Reports: a card of the new look's rows (ui.css), each the report's icon tile, its title with a blue dot while it is not read, then its project and time.
-     Each row's face spans the card, so a swipe shows its action edge to edge: read and unread blue under a right swipe, Archive indigo under a left one. */
+  /* Reports, as the approved prototype draws it from ui.css's parts: the title with the round light-or-dark button, Newest or By project, Still to read, then cards of rows,
+     each the project's icon, the title and a bar of how much of it is read with its percent. A row's face spans its card, so a swipe shows its action edge to edge, in ink:
+     Read or Unread under a right swipe, Archive under a left one. */
+  .top.rp-top { padding: 0; }
+  /* The round light-or-dark button stays a 40px circle with its icon centred, as on Today; More is the quiet line under the list, its actions in a sheet. */
+  .rp-top .ui-rb { min-height: 0; padding: 0; }
+  .rp-top .ui-rb .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.6; }
+  #rp-more button.ui-pr { width: 100%; min-height: 3rem; padding: 0; border-radius: 0; background: none; font: inherit; text-align: left; }
+  #rp-more .ui-pr .k { color: var(--tk-ink); }
+  .rp-page > .ui-seg { margin-top: 0.75rem; }
+  .rp-page .ui-sec .see { min-height: 0; padding: 0; border-radius: 0; background: none; font: inherit; font-size: var(--tk-fs-row); line-height: 1.5rem; font-weight: 500; }
   .rp-list.ui-list { margin: 0; padding: 0.25rem 0; border-radius: var(--tk-r-card); }
+  .rp-list .ui-icon .mono { font-style: normal; }
   .rp-list.ui-list > li + li::before { right: 0.75rem; left: 0.75rem; }
   .rp-list .dl-face.ui-row { gap: 0.75rem; min-height: 0; padding: 0 0.75rem; background: var(--tk-card); }
-  .rp-list .dl-face.ui-row.down { background: color-mix(in srgb, var(--text) 6%, var(--tk-card)); }
-  .rp-list .new { flex: none; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--action); transition: transform 280ms var(--spring); }
-  .rp-list .new.out { animation: dot-out 280ms var(--spring) 120ms forwards; }
-  @keyframes dot-out { to { transform: scale(0); } }
+  .rp-list .dl-face.ui-row.down { background: color-mix(in srgb, var(--tk-ink) 6%, var(--tk-card)); }
   .rp-list details > summary.dl-face { list-style: none; cursor: pointer; } .rp-list details > summary.dl-face::-webkit-details-marker { display: none; }
   .rp-list details > :not(summary) { margin: 0 0.75rem 1rem 4rem; }
-  .rp-list .dl-act.yes { background: var(--action); }
-  .rp-list .dl-act.later { background: var(--c-indigo); }
+  .rp-list .dl-act { color: var(--tk-canvas); }
+  .rp-list .dl-act.yes, .rp-list .dl-act.later { background: var(--tk-ink); }
   .rp-page > .notes, .rp-page > .gone-asks { margin-top: 1.5rem; }
   /* Decide's list: More in a round button at the title's right edge, then the rows in cards (ui.css). Each row's face spans its card, so a swipe shows its action edge to edge:
      the recommended answer green under a right swipe, Later indigo under a left one. With nothing waiting the card says All clear. The last row clears the dock. */
@@ -1152,6 +1158,51 @@
   .decide-list .dl-clear span { color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); }
   .decide-list > .gone-asks { margin-top: 1rem; }
   .rise .ui-sec, .rise .ui-hero { animation: rise 280ms var(--ease) both; }
+  /* On a desk the title row keeps its own 44px (the desk column's padding is for the older heads), and a long title takes two lines rather than being cut to a few words. */
+  @media (min-width: 64rem) {
+    .split-list > .top.rp-top { padding: 0; }
+    .rp-list .dl-face.ui-row { height: auto; min-height: 4.25rem; padding-top: 0.75rem; padding-bottom: 0.75rem; }
+    .rp-list .ui-row .l1 { height: auto; }
+    .rp-list .ui-row .l1 .t { display: -webkit-box; white-space: normal; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  }
+  /* A report opened from the list: a sheet over it, as the prototype's draws it. A 28px top corner and a handle; its project's mark, what it is and the day, with a round Close;
+     the title in full at 20px and what it says; what it found (or decided) and its parts in sunk panels, each part with a check once read; then its page or Read the report. */
+  #reader.rp-sheet { z-index: 3; background: none; }
+  #reader.rp-sheet .rp-scrim { position: absolute; inset: 0; background: rgba(30, 24, 18, 0.28); }
+  #reader.rp-sheet .rp-sheet-body { position: absolute; right: 0; bottom: 0; left: 0; max-width: 26.875rem; max-height: calc(100% - 3rem); margin: 0 auto; padding: 0.5rem 1rem calc(1.5rem + env(safe-area-inset-bottom));
+    border-radius: 1.75rem 1.75rem 0 0; background: var(--tk-card); box-shadow: 0 -8px 32px rgba(30, 20, 10, 0.12); color: var(--tk-text); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); letter-spacing: -0.006em; }
+  /* A page loads into its frame after the sheet opens; the sheet holds its top 48px down, so nothing moves under a finger while the page grows. */
+  #reader.rp-sheet .rp-sheet-body:has(> iframe) { top: 3rem; }
+  #reader.rp-sheet .rp-sheet-body > * { max-width: none; margin-right: 0; margin-left: 0; }
+  #reader.rp-sheet .rp-grab { display: block; width: 2.25rem; height: 0.25rem; margin: 0 auto; border-radius: 2px; background: var(--tk-line); }
+  #reader.rp-sheet .rp-shd { display: flex; align-items: center; gap: 0.5rem; height: 2.5rem; margin-top: 0.5rem; }
+  #reader.rp-sheet .rp-what { display: flex; flex: 1; align-items: center; gap: 0.5rem; min-width: 0; margin: 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: 1.5rem; white-space: nowrap; }
+  #reader.rp-sheet .rp-what > span { overflow: hidden; text-overflow: ellipsis; }
+  #reader.rp-sheet .rp-what > :is(img, .mono) { flex: none; width: 1.25rem; height: 1.25rem; border-radius: 0.3125rem; object-fit: cover; }
+  #reader.rp-sheet .rp-what > .mono { background: var(--tk-ink); color: var(--tk-raised); font-size: 0.5rem; font-style: normal; line-height: 1.25rem; font-weight: 600; text-align: center; }
+  #reader.rp-sheet .rp-x { position: relative; display: grid; flex: none; place-items: center; width: 2rem; height: 2rem; border-radius: 1rem; background: var(--tk-inset); color: var(--tk-text-secondary); }
+  #reader.rp-sheet .rp-x::after { content: ''; position: absolute; inset: -0.375rem; }
+  #reader.rp-sheet .rp-x .glyph { width: 1rem; height: 1rem; stroke-width: 2; }
+  #reader.rp-sheet h1 { margin-top: 0.5rem; margin-bottom: 0; color: var(--tk-ink); font-size: 1.25rem; line-height: 1.75rem; font-weight: 500; letter-spacing: -0.017em; }
+  #reader.rp-sheet .about { margin-top: 0.5rem; margin-bottom: 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
+  #reader.rp-sheet .rp-found { padding: 0.75rem 1rem; color: var(--tk-ink); }
+  #reader.rp-sheet .rp-part { width: 100%; min-height: 3rem; padding: 0; border-radius: 0; background: none; font: inherit; text-align: left; }
+  #reader.rp-sheet .rp-part .k { flex: 1; min-width: 0; color: var(--tk-ink); font-weight: 500; }
+  #reader.rp-sheet .rp-check { display: grid; flex: none; place-items: center; width: 1.25rem; height: 1.25rem; border-radius: 0.625rem; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--tk-text-tertiary) 55%, transparent); }
+  #reader.rp-sheet .rp-check.on { background: var(--tk-ink); box-shadow: none; color: var(--tk-canvas); }
+  #reader.rp-sheet .rp-check .glyph { width: 0.875rem; height: 0.875rem; stroke-width: 2.6; }
+  #reader.rp-sheet .rp-open-full { width: 100%; min-height: 3rem; margin-top: 1rem; border-radius: 1.5rem; background: var(--tk-ink); color: var(--tk-canvas); font: inherit; font-size: 0.9375rem; font-weight: 500; }
+  #reader.rp-sheet :is(.ticket-block, .thread, iframe) { margin-top: 1.5rem; }
+  /* The ticket row and Activity (#228's parts) take the sheet's own look here: the quiet label, a sunk panel, and ink for the bar, its mark and the newest step. */
+  #reader.rp-sheet .tk-label { margin: 0 0 0.5rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 400; }
+  #reader.rp-sheet :is(.ticket-row, .th-list) { background: var(--tk-inset); box-shadow: none; }
+  #reader.rp-sheet .tk-mark { background: var(--tk-raised); color: var(--tk-ink); }
+  #reader.rp-sheet .tk-bar { background: var(--tk-track); } #reader.rp-sheet .tk-bar i, #reader.rp-sheet .th-list li:last-child .th-dot { background: var(--tk-fill); }
+  #reader.rp-sheet .read > .dis { display: block; min-height: 2.75rem; margin-top: 1rem; padding: 0; border: 0; background: none; color: var(--tk-text-tertiary); font: inherit; }
+  @media (prefers-color-scheme: dark) { #reader.rp-sheet .rp-scrim { background: rgba(0, 0, 0, 0.5); } }
+  /* On a desk the sheet sits in the middle of the window, with all four corners rounded. */
+  @media (min-width: 64rem) { #reader.rp-sheet .rp-sheet-body { top: 50%; bottom: auto; max-height: calc(100% - 6rem); border-radius: 1.75rem; transform: translateY(-50%); }
+    #reader.rp-sheet .rp-sheet-body:has(> iframe) { top: 3rem; bottom: 3rem; transform: none; } #reader.rp-sheet .rp-grab { visibility: hidden; } }
   .tabs .bd.blue { background: var(--action); }
   /* All clear: a green check pops in. */
   .all-clear-big { padding: 4rem 1.5rem 1rem; text-align: center; }
@@ -1459,7 +1510,7 @@
     .dl-hover button { position: relative; } .dl-hover .glyph { width: 1rem; height: 1rem; stroke-width: 2.2; }
     .dl-hover .yes .glyph { color: color-mix(in srgb, var(--tk-success) 82%, #000); } .dl-hover .later-q .glyph { color: var(--c-indigo); }
     /* Reports: the bar says what the report is, who asked and when, beside Mark read and Archive; the page reads under it at the pane's width. */
-    .dl-hover .read-q .glyph { color: var(--action); }
+    .dl-hover .read-q .glyph { color: var(--tk-ink); }
     .rp-bar .eyebrow { display: block; flex: 1; min-width: 0; margin: 0 0 0 0.5rem; overflow: hidden; color: var(--muted); font-size: var(--t-s); font-weight: 400; white-space: nowrap; text-overflow: ellipsis; }
     .rp-bar .eyebrow b { color: var(--teal); font-weight: 600; }
     .split-bar :is(.rp-read, .rp-archive) { display: inline-flex; flex: none; align-items: center; gap: 0.5rem; min-height: var(--ctl); padding: 0 0.75rem; border-radius: var(--r-ctl); background: none; color: var(--text); font-weight: 400;
@@ -1467,7 +1518,7 @@
     .split-bar :is(.rp-read, .rp-archive):hover { background: var(--sunk); }
     .split-bar :is(.rp-read, .rp-archive, .later):active, .dl-hover button:active { background: var(--sunk); transform: scale(0.96); }
     .split-bar :is(.rp-read, .rp-archive) .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.75; color: var(--muted); }
-    .split-bar .rp-read .glyph { color: var(--action); } .split-bar :is(.rp-read, .rp-archive)::after { margin-left: 0.125rem; }
+    .split-bar .rp-read .glyph { color: var(--tk-ink); } .split-bar :is(.rp-read, .rp-archive)::after { margin-left: 0.125rem; }
     #board .split-detail > .read { flex: none; overflow: visible; padding: 1.75rem 2.5rem 4rem; }
     #board .split-detail > .read > * { max-width: 46rem; }
     #board .split-detail > .read h1 { margin-top: 0; font-size: 2.125rem; line-height: 1.1765; letter-spacing: 0.011em; }
@@ -1483,7 +1534,6 @@
   @media (prefers-reduced-motion: reduce) {
     .ask-over.up > *, .rise .ui-sec, .rise .ui-hero, .rise .dl-row, .rise .dl-head, .rp-list .new.out, .sk, #toast, #toast .bar, .all-clear-big .big, .dl-menu, .answer .lbl, .answer .okmark .glyph, .design-stage .stamp, .decide .pick-option .check, .dl-row.returned .dl-face, .t-up.next > *, .t-btn .okmark .glyph, .bd.bump { animation: none !important; }
     .answer .okmark .glyph { stroke-dashoffset: 0; }
-    .rp-list .new.out { display: none; }
     .dl-face, .dl-act > *, .leaving .ui-icon, .decide .pick-option, .decide .own-field, .decide-bar > *, .dl-more > summary > span, .tabs .hl, .tabs .icon, .side .icon, .t-btn, .t-tiles .ui-stat { transition: none !important; }
   }
 </style>
@@ -2737,21 +2787,36 @@
     tile.innerHTML = `<svg viewBox="0 0 48 48">${FORMS[d.form]?.[1] ?? BOOK}</svg>`;
     return tile;
   }
-  /** A report's line: what it explains with, its video, its project and when (who asked heads its page); a report that says none of that reads Report and when. */
-  function reportLine(d) {
-    const at = d.filed ? (isToday(d.filed) ? hhmm(d.filed) : day(d.filed)) : '', n = d.steps?.length;
-    return [FORMS[d.form]?.[0] ?? (kind(d) || 'Report'), n ? `${n} steps` : '', d.video && `Video ${d.video}`, d.group, at].filter(Boolean).join(' · ');
-  }
-  /* Reports: Today's over Earlier ones, newest first, a row each, and a blue dot on each one not read yet. A tap opens its page;
-     a swipe right marks it read or unread (the row springs home and its dot changes, as in Mail), a swipe left archives it, with Undo. */
+  /* Reports, as the approved prototype draws them: Newest (or By project), a row each with its project's icon, its title and a bar of how much of it is read. A tap opens it;
+     a swipe right marks it read or unread (the row springs home and its bar fills or empties, as in Mail), a swipe left archives it, with Undo. */
   // Read state is kept beside the board, so a phone and a desk agree: one filed today is new until it is opened; read and unread marks override that.
   const unread = (d) => { const o = state.opened?.[d.key]; return o === undefined ? !!d.filed && isToday(d.filed) : !o; };
-  // A report just opened keeps its dot on the way back to the list, where it shrinks away.
-  const fading = new Set();
+  /** A guided report's parts, as its page reads them: what this is, what I understood, each section, the next step. A page report has none. */
+  const rpParts = (d) => (d.guided ? [['this', GSTAGES.this], ['understood', GSTAGES.understood], ...(d.sections ?? []).map((s) => [s.id, s.heading]), ['next', GSTAGES.next]] : []);
+  const partRead = (d, part) => !!state.reads?.[`${d.key}/${part}`];
+  /** How much of a report is read: all of it once read; one not read yet, by the parts of it read (a page report has none). */
+  const readPct = (d) => { if (!unread(d)) return 100; const ps = rpParts(d); return ps.length ? Math.round((100 * ps.filter(([p]) => partRead(d, p)).length) / ps.length) : 0; };
+  /** A title or line in plain words: no ticket code ("6198 ", "RL-02: ", "P1 ") ahead of it, and no file path in it ("the report" or "the plan" for one, else "the file"). */
+  const plain = (t) => {
+    const s = String(t ?? '').replace(/^[\w.-]+ #\d+:\s*/, '').replace(/^\d{3,5}\s+/, '').replace(/^(?:audit\s+)?[A-Z]{2,3}-\d{1,3}:\s*/i, '').replace(/^P[0-3]:?\s+/, '')
+      .replace(/(?:~|\/home)\/\S+/g, '').replace(/\b(?:[\w.-]+\/)+([\w.-]+)\.(?:md|json|png|jpe?g|html|sh|mjs|js|ts|py|yaml)\b/g, (m, b) => (/^(report|plan)$/i.test(b) ? `the ${b.toLowerCase()}` : 'the file')).replace(/\s{2,}/g, ' ').trim();
+    return s && s[0].toUpperCase() + s.slice(1);
+  };
+  /** A project's mark: the icon the board pins for it, else its initials; a report with no project gets the page drawing. */
+  const initials = (name) => { const ps = name.split(/[-\s_]+/).filter(Boolean); return (ps.length > 1 ? ps[0][0] + ps.at(-1)[0] : name.slice(0, 2)).toUpperCase(); };
+  function projectMark(name) {
+    const p = name && (state.projects ?? []).find((x) => x.name.toLowerCase() === name.toLowerCase());
+    const mono = name ? el('i', { class: 'mono' }, initials(name)) : '';
+    if (!p?.icon) return mono;
+    // A file changed or moved since it was pinned answers 404; the initials stand in.
+    const img = el('img', { src: `/api/project-icon?name=${encodeURIComponent(p.name)}&h=${p.icon.sha256.slice(0, 16)}`, alt: '' });
+    img.onerror = () => img.replaceWith(mono);
+    return img;
+  }
+  const projectTile = (name) => { const m = projectMark(name); return m ? el('span', { class: 'ui-icon', 'aria-hidden': 'true' }, m) : uiIcon({ draw: 'plan' }); };
   let rpRisen = false;
   function markRead(keys, read, text) {
-    // A report marked unread shows its dot at once, even one still shrinking away.
-    keys.forEach((k) => { (state.opened ??= {})[k] = read; if (!read) fading.delete(k); });
+    keys.forEach((k) => ((state.opened ??= {})[k] = read));
     render();
     return call('/api/reads', post({ keys, read })).then(() => {
       if (!text) return;
@@ -2780,13 +2845,11 @@
     await archive(d);
     if (next && location.hash === `#reports/${d.key}`) rpPicked = true, location.hash = next;
   }
-  /** A report: a row with its picture, title, what it says, then its form, video, project and time, and a dot while it is not read. A tap opens its page over the board;
-   *  an explainer with no page opens in place, to its numbered steps or its video card. */
+  /** A report: a row with its project's icon, its title (and its priority when it has one), then a bar of how much of it is read with its percent, as the prototype draws every row.
+   *  A tap opens its page; an explainer with no page opens in place, to its numbered steps or its video card. */
   function report(d, i = 0) {
-    const n = d.steps?.length, dot = unread(d) || fading.has(d.key), at = d.filed ? (isToday(d.filed) ? hhmm(d.filed) : day(d.filed)) : '';
-    // The row says the project and when; one that names neither says what it is.
-    const face = uiRow({ tile: uiIcon({ draw: 'plan' }), title: title(d), after: dot ? el('span', { class: `new${fading.has(d.key) ? ' out' : ''}`, role: 'img', 'aria-label': 'Not read yet' }) : '',
-      meta: [d.group, at].filter(Boolean).join(' · ') || reportLine(d) });
+    const n = d.steps?.length;
+    const face = uiRow({ tile: projectTile(d.group), title: plain(title(d)), priority: d.priority, progress: readPct(d) });
     const sel = rpSel === d.key;
     const li = (...kids) => el('li', { class: `report dl-row${flash === d.key ? ' returned' : ''}${sel ? ' sel' : ''}`, style: `--n:${i}`, ...(reads(d) && { 'data-key': d.key, 'data-list': 'reports' }) }, ...kids);
     const act = (cls, mark, words) => el('div', { class: `dl-act ${cls}`, 'aria-hidden': 'true' }, glyph(mark), el('span', {}, words));
@@ -2802,12 +2865,25 @@
     box.ontoggle = () => (box.open ? opened.add(d.key) : opened.delete(d.key));
     return li(box);
   }
-  /** Reports' More: Mark all as read, then Select and Archive all, which archive with Undo. */
+  /** Reports' More, under the list as Today's is: one quiet line naming what it holds, opening a sheet with Mark all as read (while one is new), then Select and Archive all,
+   *  which archive with Undo. The title's round button is the light-or-dark one. */
+  const reportsSheet = sheetOf('rp-more');
   function reportsMore(items, all) {
-    const fresh = items.filter(unread);
-    return moreSheet('More', [fresh.length && ['Mark all as read', () => markRead(fresh.map((d) => d.key), true, `${plural(fresh.length, 'report')} marked read`), 'read-all', 'check'],
-      canDismiss() && all.length && ['Select', () => { selecting = true; render(); }, 'select'],
-      canDismiss() && all.length && ['Archive all', () => dismiss(all.map((d) => d.key), `${plural(all.length, 'report')} archived`), 'archive-all', 'archive']]);
+    const fresh = items.filter(unread), acts = [fresh.length && ['Mark all as read', 'read-all', () => markRead(fresh.map((d) => d.key), true, `${plural(fresh.length, 'report')} marked read`)],
+      canDismiss() && all.length && ['Select', 'select', () => { selecting = true; render(); }],
+      canDismiss() && all.length && ['Archive all', 'archive-all', () => dismiss(all.map((d) => d.key), `${plural(all.length, 'report')} archived`)]].filter(Boolean);
+    if (!acts.length) return '';
+    const names = acts.map(([name]) => name), line = el('button', { class: 't-more-line rp-more-line', 'aria-haspopup': 'dialog' }, el('span', {}, names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]), glyph('right'));
+    line.onclick = () => {
+      reportsSheet.replaceChildren(el('div', {}, sheetHead('rp-more', 'More'), el('div', { class: 'ui-props' }, ...acts.map(([name, act, fn]) => {
+        const b = el('button', { class: 'ui-pr', 'data-act': act }, el('span', { class: 'k' }, name), el('span', { class: 'v' }, glyph('right')));
+        b.onclick = () => { reportsSheet.close(); fn(); };
+        return b;
+      }))));
+      reportsSheet.showModal();
+      reportsSheet.querySelector('h2').focus();
+    };
+    return line;
   }
 
   /** What landed under Reports with no page and nothing to answer (receipts, status notes): folded under one row, each opening to its card in place. */
@@ -3651,25 +3727,49 @@
     document.getElementById('nav').inert = !!d && !inline;
     document.getElementById('tabs').inert = !!d;
     reader.hidden = !d;
-    const url = d?.guided ? `guide:${d.key}` : d?.kind === 'design' ? `design:${d.key}` : d?.type === 'evidence' ? `evidence:${d.key}` : d ? src(mockUrl(d.key, '', d.view)) : '';
+    // A report opened from Reports (and not beside a desk's list) reads as a sheet over the list. A guided one tapped in the list shows its parts there until
+    // Read the report opens it in full; reached by a link (Today's card, the CLI's open) it opens in full at once.
+    if (rpGuide !== d?.key) rpGuide = '';
+    if (rpListed !== d?.key) rpListed = '';
+    const sheet = !!d && from === 'reports' && !inline, summary = sheet && d.guided && rpListed === d.key && rpGuide !== d.key;
+    reader.classList.toggle('rp-sheet', sheet && (summary || !d.guided));
+    const url = summary ? `sheet:${d.key}:${unread(d)}:${rpParts(d).filter(([p]) => partRead(d, p)).length}` : d?.guided ? `guide:${d.key}` : d?.kind === 'design' ? `design:${d.key}` : d?.type === 'evidence' ? `evidence:${d.key}` : d ? src(mockUrl(d.key, '', d.view)) : '';
     const answer = d?.guided ? '' : d?.type === 'plan' || d?.kind === 'design' || d?.type === 'evidence' ? JSON.stringify(state.answers[d.key] ?? null) : '';
     const plan = d?.type === 'plan' || d?.guided ? JSON.stringify(d) : '';
     const evidence = d?.type === 'evidence' ? JSON.stringify([d, (state.messages ?? []).filter((m) => m.key === d.key), (state.rounds ?? []).filter((r) => r.key === d.key)]) : '', ticket = JSON.stringify([ticketOf(d) ?? null, d ? threadOf(d) : null]);
-    if (reader.dataset.url === url && reader.dataset.answer === answer && reader.dataset.plan === plan && reader.dataset.evidence === evidence && reader.dataset.ticket === ticket) return d && (reader._guide?.sync(), 1) && (reader.querySelector('h1').textContent = d.type === 'evidence' ? headline(d) : d.title);
+    if (reader.dataset.url === url && reader.dataset.answer === answer && reader.dataset.plan === plan && reader.dataset.evidence === evidence && reader.dataset.ticket === ticket) return d && (reader._guide?.sync(), 1) && (reader.querySelector('h1').textContent = d.type === 'evidence' ? headline(d) : sheet ? plain(d.title) : d.title);
     Object.assign(reader.dataset, { answer, plan, evidence, ticket });
     Object.assign(reader.dataset, { url, key: d?.key ?? '', from });
     if (!d) return reader.replaceChildren();
-    if (from === 'reports' && unread(d) && !state.readonly && !FROZEN) { fading.add(d.key); setTimeout(() => markRead([d.key], true)); }
-    const back = el('a', { class: 'close', href: `#${from}` }, `‹ ${from.startsWith('reports') ? 'Reports' : AREAS[from]}`), h1 = el('h1', { id: 'reader-title', tabindex: '-1', dir: 'auto' }, d.title);
+    if (from === 'reports' && unread(d) && !state.readonly && !FROZEN) setTimeout(() => markRead([d.key], true));
+    const back = el('a', { class: 'close', href: `#${from}` }, `‹ ${from.startsWith('reports') ? 'Reports' : AREAS[from]}`), h1 = el('h1', { id: 'reader-title', tabindex: '-1', dir: 'auto' }, sheet ? plain(d.title) : d.title);
     back.onclick = (e) => { if (`#${from}` === location.hash) e.preventDefault(), shutFull(); };
     const out = d.type === 'evidence' ? changeLink(d) : '';
     // A report's page reads under its own head: what it is and when, its title, what it says and decided; a plan or a design keeps its title in the bar;
     // an update shows its own title on its screen, with the change link in the bar.
     reader._guide = undefined;
-    reader.replaceChildren(...(d.guided ? [el('header', {}, back), (reader._guide = guideView(d))] : d.type === 'plan' ? [el('header', {}, back, Object.assign(h1, { className: 'plan-name' })), planReview(d, url)] : d.kind === 'design' ? [el('header', {}, back), designReview(d, h1)]
+    reader.replaceChildren(...(summary ? reportSheet(d, h1) : d.guided ? [el('header', {}, back), (reader._guide = guideView(d))] : d.type === 'plan' ? [el('header', {}, back, Object.assign(h1, { className: 'plan-name' })), planReview(d, url)] : d.kind === 'design' ? [el('header', {}, back), designReview(d, h1)]
       : d.type === 'evidence' ? [el('header', {}, back, out), evidenceItem(d)]
+      : sheet ? reportSheet(d, h1, el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }))
       : [el('header', {}, back), el('div', { class: 'read' }, el('p', { class: 'eyebrow' }, [FORMS[d.form]?.[0] ?? (kind(d) || 'Report'), d.asked_by, d.filed ? when(d.filed) : ''].filter(Boolean).join(' · ')), h1,
         d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided(d), ticketRow(d), thread(d), el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }), dismissReport(d))]));
+  }
+  /** A guided report opened in full from its sheet (its key), else ''; and the report last tapped in the list, whose sheet stays until another opens. */
+  let rpGuide = '', rpListed = '';
+  addEventListener('click', (e) => { const row = e.target.closest?.('.rp-list a[data-row]'); if (row) rpListed = row.getAttribute('href').slice('#reports/'.length); }, true);
+  /** A report as the prototype's sheet draws it: a handle; its project, what it is and the day, with Close; its title in full and what it says; what it found (or decided);
+   *  for a guided report its parts, each with a check once read, and Read the report, which opens it in full at that part; its ticket and Activity; then its page. */
+  function reportSheet(d, h1, page) {
+    const x = el('a', { class: 'rp-x', href: '#reports', 'aria-label': 'Close' }, glyph('x')), scrim = el('a', { class: 'rp-scrim', href: '#reports', tabindex: '-1', 'aria-hidden': 'true' });
+    const what = [d.guided ? 'Guided report' : FORMS[d.form]?.[0] ?? 'Report', d.group, d.filed ? day(d.filed) : ''].filter(Boolean).join(' · ');
+    const found = d.guided ? d.visual?.heading : d.decided, ps = rpParts(d), n = ps.filter(([p]) => partRead(d, p)).length;
+    const full = (part) => { rpGuide = d.key; readPage(d, 'reports'); const at = part && document.getElementById(`gd-${part.replace(/\W/g, '-')}`); at ? at.scrollIntoView({ block: 'start' }) : reader.querySelector('h1')?.focus({ preventScroll: true }); };
+    const parts = ps.map(([p, name]) => { const b = el('button', { class: 'ui-pr rp-part', 'aria-label': `${name}, ${partRead(d, p) ? 'read' : 'not read yet'}` }, el('span', { class: 'k', dir: 'auto' }, name), el('span', { class: `rp-check${partRead(d, p) ? ' on' : ''}`, 'aria-hidden': 'true' }, partRead(d, p) ? glyph('check') : '')); b.onclick = () => full(p); return b; });
+    const open = d.guided ? el('button', { class: 'rp-open-full' }, 'Read the report') : '';
+    if (open) open.onclick = () => full();
+    return [scrim, el('div', { class: 'read rp-sheet-body' }, el('span', { class: 'rp-grab', 'aria-hidden': 'true' }), el('div', { class: 'rp-shd' }, el('p', { class: 'rp-what', dir: 'auto' }, projectMark(d.group), el('span', {}, what)), x),
+      h1, d.about ? el('p', { class: 'about', dir: 'auto' }, plain(d.about)) : '', found ? el('p', { class: 'ui-dl' }, d.guided ? 'What it found' : 'What it decided') : '', found ? el('div', { class: 'ui-props rp-found', dir: 'auto' }, plain(found)) : '',
+      ...(ps.length ? [el('p', { class: 'ui-dl' }, `Read ${n} of ${plural(ps.length, 'part')}`), el('div', { class: 'ui-props rp-parts' }, ...parts), open] : []), ticketRow(d), thread(d), page ?? '', dismissReport(d))];
   }
   /** Dismiss moved from the list row to the report's own page; once it is dismissed the page closes back to the list. */
   function dismissReport(d) {
@@ -3687,12 +3787,33 @@
   addEventListener('keydown', (e) => { if (e.key === 'Escape' && !reader.hidden) `#${reader.dataset.from}` === location.hash ? shutFull() : (location.hash = `#${reader.dataset.from}`); });
   addEventListener('resize', () => { if (!reader.hidden) readPage(state.decisions.find((d) => d.key === reader.dataset.key), reader.dataset.from); });
 
-  /** Reports in two lists, Today (filed today) above Earlier, newest first inside each, under a head with its count; the rows rise in when the tab opens. */
+  /** Newest or By project, this browser's choice; Newest shows six on a phone until See all. */
+  let rpBy = (() => { try { return localStorage.getItem('sign-off-reports-by') === 'project' ? 'project' : 'new'; } catch { return 'new'; } })(), rpAll = false;
+  /** Reports' head under the title: Newest or By project, then how many are still to read of all listed, and how many were filed this week (the archived ones too). */
+  function reportsHead(items) {
+    const seg = el('div', { class: 'ui-seg rp-seg', role: 'group', 'aria-label': 'Order' }, ...[['new', 'Newest'], ['project', 'By project']].map(([v, name]) => {
+      const b = el('button', { 'aria-pressed': String(rpBy === v) }, name);
+      b.onclick = () => { rpBy = v; try { localStorage.setItem('sign-off-reports-by', v); } catch {} buzz('tick'); render(); };
+      return b;
+    }));
+    const week = state.decisions.filter((d) => area(d) === 'reports' && d.filed && Date.now() - Date.parse(d.filed) < 7 * 864e5).length;
+    return [seg, el('section', { class: 'ui-card ui-hero rp-hero' }, el('div', { class: 'hl' }, el('span', { class: 'lab' }, 'Still to read')),
+      el('div', { class: 'hv' }, el('span', { class: 'big' }, String(items.filter(unread).length), el('small', {}, ` of ${items.length}`)), el('span', { class: 'vs' }, `${week} filed this week`)))];
+  }
+  /** Reports newest first under Newest, or in one list per project (the most reports first, No project last), each under a head with its count; the rows rise in when the tab opens. */
   function reportGroups(items) {
-    const fresh = (d) => !!d.filed && isToday(d.filed), newest = [...items].sort((a, b) => (Date.parse(b.filed) || 0) - (Date.parse(a.filed) || 0));
+    const newest = [...items].sort((a, b) => (Date.parse(b.filed) || 0) - (Date.parse(a.filed) || 0));
     let i = 0;
-    return [['Today', newest.filter(fresh)], ['Earlier', newest.filter((d) => !fresh(d))]].filter(([, list]) => list.length)
-      .flatMap(([name, list]) => [el('h2', { class: 'dl-head ui-sec', style: `--n:${i++}` }, name, el('span', { class: 'n' }, String(list.length))), el('ul', { class: 'dl-list rp-list ui-card ui-list', 'aria-label': name }, ...list.map((d) => report(d, i++)))]);
+    const head = (name, n, right = '') => el('h2', { class: 'dl-head ui-sec', style: `--n:${i++}` }, name, n === undefined ? '' : el('span', { class: 'n' }, String(n)), right);
+    const list = (name, ds) => el('ul', { class: 'dl-list rp-list ui-card ui-list', 'aria-label': name }, ...ds.map((d) => report(d, i++)));
+    if (rpBy === 'project') {
+      const groups = Map.groupBy(newest, (d) => d.group || 'No project');
+      return [...groups].sort((a, b) => (a[0] === 'No project') - (b[0] === 'No project') || b[1].length - a[1].length).flatMap(([name, ds]) => [head(name, ds.length), list(name, ds)]);
+    }
+    // On a desk the list scrolls beside the report shown, so every row stays for J and K.
+    const cut = rpSel === null && newest.length > 6, see = cut ? el('button', { class: 'see' }, rpAll ? 'Show fewer' : 'See all') : '';
+    if (see) see.onclick = () => { rpAll = !rpAll; render(); };
+    return [head('Newest', undefined, see), list('Newest', cut && !rpAll ? newest.slice(0, 6) : newest)];
   }
 
   const designStatus = (d) => { const a = state.answers[d.key]?.answer; return a === 'approve' ? 'Approved' : a === 'change' ? 'Changes requested' : d.status === 'draft' ? 'Draft' : 'In review'; };
@@ -4264,7 +4385,7 @@
       rpVisit = key;
       // A guided report reached by a link rather than from the list (Today's card, the CLI's open) opens over the board, as on a phone.
       if (shownReport.guided && !rpPicked) rpFull = key;
-      if (unread(shownReport) && !FROZEN) { fading.add(key); setTimeout(() => { markRead([key], true); setTimeout(() => fading.delete(key), 400); }); }
+      if (unread(shownReport) && !FROZEN) setTimeout(() => markRead([key], true));
     }
     if (rpSel === null || rpFull !== shownReport?.key) rpFull = '';
     document.body.classList.toggle('split-view', deskSplit);
@@ -4288,27 +4409,26 @@
     const answeredToday = by.answered.filter((d) => isToday(state.answers[d.key].at)).length;
     // Decide's head, as ui.css draws it: the title and the light-or-dark button at its right edge; More sits under the list.
     const top = head === 'waiting' && !state.readonly ? el('header', { class: 'ui-top' }, el('h1', { tabindex: '-1' }, pageTitle), ro ? el('p', { class: 'meta' }, ro) : '', themeButton(), selecting || FROZEN ? bulkBar(bulk) : '')
-      : el('header', { class: head ? 'top' : 'ui-top today-top' }, head && !TABS.some(([a]) => a === head)
+      : el('header', { class: head === 'reports' && !state.readonly ? 'top ui-top rp-top' : head ? 'top' : 'ui-top today-top' }, head && !TABS.some(([a]) => a === head)
       ? el('a', { class: head === 'ticket' ? 'back tk-back' : 'back', href: head === 'ticket' ? ticketBack || '#' : '#' }, head === 'ticket' && ticketBack ? '‹ Back' : '‹ Today') : '',
     // A ticket's page names the ticket it sits under, which opens that one.
     head === 'ticket' && tk ? el('p', { class: 'kicker tk-kicker' }, ...(tkUp ? [el('a', { href: `#ticket/${tkUp.id}`, dir: 'auto' }, tkUp.title), ' › '] : ['Ticket · ']), tk.id) : '',
-    // Reports leads with the date over its title.
-    at === 'reports' && !state.readonly ? el('p', { class: 'kicker date-kicker' }, dateLine()) : '',
     ...(head ? [el('h1', { tabindex: '-1' }, pageTitle)] : todayHead()),
     ro ? el('p', { class: 'meta' }, ro) : '',
-    head === 'reports' && !state.readonly && by.reports.length ? el('p', { class: 'lede waiting-lede' }, (() => { const n = by.reports.filter(unread).length; return n ? `${n} new · ${by.reports.length} in all` : `${plural(by.reports.length, 'report')} · all read`; })())
-      : head === 'answered' && by.answered.length ? el('p', { class: 'lede' }, (() => { const n = by.answered.filter((d) => isToday(state.answers[d.key].at)).length; return `${n} ${n === 1 ? 'answer' : 'answers'} today. Each one has gone back to its agent.`; })())
+    head === 'answered' && by.answered.length ? el('p', { class: 'lede' }, (() => { const n = by.answered.filter((d) => isToday(state.answers[d.key].at)).length; return `${n} ${n === 1 ? 'answer' : 'answers'} today. Each one has gone back to its agent.`; })())
       : head === 'designs' && by.designs.length ? el('p', { class: 'lede' }, 'Designs to look over. Approve one, or say what should change.')
       : head === 'evidence' && by.evidence.length ? el('p', { class: 'lede' }, 'Every proof filed, newest first.') : '',
-    head === 'reports' && !selecting && !state.readonly && !FROZEN ? (bulk.length ? reportsMore(by.reports, bulk) : '') : bulkBar(bulk));
+    head === 'reports' && !selecting && !state.readonly && !FROZEN ? themeButton() : bulkBar(bulk));
     const board = document.getElementById('board');
     board.removeAttribute('aria-busy');
     const listTop = document.querySelector('.split-list')?.scrollTop;
     // An update in the address opens even when the list leaves it off (a failed run); with none, the newest is selected.
-    // Reports' list: the legend (only while a report with no page lists its steps in place), Today over Earlier, Notes and Archived; on a desk an empty board says so in the pane beside it.
-    const rpPage = () => el('div', { class: `rp-page${rpRisen ? '' : ' rise'}` }, by.reports.some((d) => d.steps && !reads(d)) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
+    // Reports' list: Newest or By project and what is still to read, the legend (only while a report with no page lists its steps in place), the lists, Notes and Archived;
+    // on a desk an empty board says so in the pane beside it.
+    const rpPage = () => el('div', { class: `rp-page${rpRisen ? '' : ' rise'}` }, ...(by.reports.length ? reportsHead(by.reports) : []), by.reports.some((d) => d.steps && !reads(d)) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
       ...(by.reports.length ? reportGroups(by.reports) : rpSel !== null ? [] : [el('div', { class: 'all-clear-big' }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, 'Nothing to read'), el('p', {}, EMPTY.reports))]),
-      notes(by.notes), dismissed(state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && ['reports', 'notes'].includes(area(d))), 'Archived'));
+      notes(by.notes), dismissed(state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && ['reports', 'notes'].includes(area(d))), 'Archived'),
+      !selecting && !state.readonly && !FROZEN && bulk.length ? reportsMore(by.reports, bulk) : '');
     const update = at === 'evidence' && ((key && state.decisions.find((d) => d.key === key && !gone.has(d.key) && d.type === 'evidence')) || by.evidence.find((d) => d.type === 'evidence'));
     const content = [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived'), update)
       : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0) : decideDesk(top, by.waiting, hidden, decideQueue, key, decideDone, answeredToday)] : [top]), ...(deskSplit ? [] : (at === 'waiting' || at === 'decide') && !state.readonly ? [at === 'decide' && !shownAsk ? el('p', { class: 'empty' }, 'Nothing to decide for that question.') : '', decideList(by.waiting, hidden, decideDone, answeredToday), at === 'decide' && shownAsk ? askSheet(shownAsk) : '']
@@ -4326,7 +4446,7 @@
     if (listEl && listTop) listEl.scrollTop = listTop;
     listEl?.querySelector('[data-row][aria-current]')?.scrollIntoView({ block: 'nearest' });
     if (!toast.hidden) placeToast();
-    if (at === 'reports' && !key) { rpRisen = true; if (fading.size) setTimeout(() => fading.clear(), 400); }
+    if (at === 'reports' && !key) rpRisen = true;
     if (rpSel !== null) rpRisen = true;
     readPage(rpFull ? shownReport : key && !(deskSplit && (at === 'evidence' || at === 'reports')) ? state.decisions.find((d) => d.key === key && !gone.has(d.key) && (at === 'reports' && reads(d) || at === 'designs' && d.kind === 'design' || at === 'evidence' && d.type === 'evidence' || d.type === 'plan' && (area(d) === at || (d.guided && (at === 'waiting' || at === 'answered'))))) : undefined, rpFull ? location.hash.slice(1) : at);
     fold();

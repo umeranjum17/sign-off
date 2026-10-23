@@ -69,7 +69,9 @@ journeys:
   # A comment sent with an answer: Add a comment under a yes/no on Decide, Answer and one More…, then the Answered card and `answers`, at 390 and 1280 in light and dark.
   answer-comment:
     command: 'npm run build > /dev/null && for w in 390 1280; do for t in light dark; do COMMENT_WIDTH=$w node .agents/skills/done-done-verify-sign-off/comment-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t || exit 1; done; done'
-  # Reports at 390 and 1280, light and dark: the list, its end over the tab bar, a report's page, read state, press, both swipes, More, archive with Undo. At 1280 also the desk: the list beside the report shown, J, U, E, Ctrl+Z, hover, a guided report opened and closed, the ? sheet. SIGN_OFF_REPO=<built base checkout> records the before.
+  # Reports in the new look at 390x844 and 1280x800 (2x), light and dark, measured in the browser: the list (Newest, See all, By project), a guided report's sheet and a page report's,
+  # Read the report, both swipes, archive with Undo and More; at 1280 the desk beside the report shown, J and U, a guided report by its link; the phone recorded (REPORTS_RECORD=1).
+  # REPORTS_PROTO=<the approved prototype's index.html> pairs each phone state with the prototype's own (vs-proto/).
   reports:
     command: 'npm run build > /dev/null && REPORTS_RECORD=1 node .agents/skills/done-done-verify-sign-off/reports-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   # Decide in the new look beside the approved prototype (slice 3): the list (Newest, By priority, the hero, rows with P0-P3 chips, ticket bars and project tiles, Answered)

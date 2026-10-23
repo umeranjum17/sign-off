@@ -174,30 +174,33 @@ const PAGES = [
     await h.cycle('Dismiss update 2', h.find(/^Dismiss,/, pane()), () => location.hash === '#evidence' || !document.getElementById('err-update-2'), () => h.find(/^Pass,/, pane()), /Dismissed/);
   } }] },
   { name: 'reports', hash: '#reports', ready: '[id="item-new-sign-in"]', stages: [{ run: async (h) => {
-    // More: Mark all as read while the report is new, then opening it (which reads it), Select (pick, Dismiss 1, Undo; Cancel) and Archive all, each taken back with Undo.
-    const more = () => h.board().querySelector('.top .dl-more'), item = (act) => more()?.querySelector(`[data-act="${act}"]`), bar = () => h.board().querySelector('.bulk');
-    // Opening it from Today read it: a finger's swipe right marks it unread again, and its dot comes back.
+    // More (the quiet line under the list, opening a sheet): Mark all as read while the report is new, then opening it (which reads it), Select (pick, Dismiss 1, Undo; Cancel)
+    // and Archive all, each taken back with Undo.
+    const more = () => h.board().querySelector('.rp-more-line'), bar = () => h.board().querySelector('.bulk');
+    const item = async (act) => { more().click(); await h.until('the More sheet', () => document.getElementById('rp-more').open); return document.querySelector(`#rp-more [data-act="${act}"]`); };
+    const isNew = () => h.box(h.card('new-sign-in'))?.querySelector('.pct')?.textContent === '0%';
+    // Opening it from Today read it: a finger's swipe right marks it unread again, and its bar empties.
     const swipe = async (key, dx) => { const f = h.card(key), r = f.getBoundingClientRect(), y = r.top + 30, o = (x) => ({ bubbles: true, pointerId: 7, isPrimary: true, pointerType: 'touch', clientX: x, clientY: y });
       f.dispatchEvent(new PointerEvent('pointerdown', o(r.left + 40))); for (let i = 1; i <= 8; i++) { await h.sleep(16); f.dispatchEvent(new PointerEvent('pointermove', o(r.left + 40 + dx * i / 8))); } f.dispatchEvent(new PointerEvent('pointerup', o(r.left + 40 + dx))); };
-    if (!item('read-all')) { await swipe('new-sign-in', 300); await h.until('swipe right to mark it unread', () => h.box(h.card('new-sign-in'))?.querySelector('.new')); h.did.push('Swipe right: mark unread'); }
-    await h.cycle('More: Mark all as read', item('read-all'), () => !h.box(h.card('new-sign-in')).querySelector('.new'), () => h.box(h.card('new-sign-in'))?.querySelector('.new'), /marked read/);
+    if (!more()?.textContent.includes('Mark all as read')) { await swipe('new-sign-in', 300); await h.until('swipe right to mark it unread', isNew); h.did.push('Swipe right: mark unread'); }
+    await h.cycle('More: Mark all as read', await item('read-all'), () => !isNew(), isNew, /marked read/);
     await h.nav('Open report', h.card('new-sign-in'), /^#reports\/new-sign-in$/);
-    await h.press('More: Select', item('select'), () => h.find(/^Cancel$/, bar()));
+    await h.press('More: Select', await item('select'), () => h.find(/^Cancel$/, bar()));
     await h.press('pick new-sign-in', h.card('new-sign-in'), () => h.box(h.card('new-sign-in')).classList.contains('picked'));
     await h.cycle('Dismiss 1 selected', h.find(/^Dismiss 1$/, bar()), () => !h.card('new-sign-in'), () => h.card('new-sign-in'), /1 dismissed/);
-    await h.press('More: Select again', item('select'), () => h.find(/^Cancel$/, bar()));
+    await h.press('More: Select again', await item('select'), () => h.find(/^Cancel$/, bar()));
     await h.press('Cancel', h.find(/^Cancel$/, bar()), () => more());
-    await h.cycle('More: Archive all', item('archive-all'), () => !h.card('new-sign-in'), () => h.card('new-sign-in'), /archived/);
+    await h.cycle('More: Archive all', await item('archive-all'), () => !h.card('new-sign-in'), () => h.card('new-sign-in'), /archived/);
   } }] },
-  // On a phone a report opens over the board with ‹ Reports and Dismiss; on a desk it reads beside the list, with Mark read or unread and Archive in its bar.
+  // On a phone a report opens in a sheet over the list with Close and Dismiss; on a desk it reads beside the list, with Mark read or unread and Archive in its bar.
   { name: 'report', hash: '#reports/new-sign-in', ready: '#reader iframe, .split-detail .read iframe', stages: [{ run: async (h) => {
-    const bar = h.board().querySelector('.rp-bar'), dot = () => h.box(h.card('new-sign-in'))?.querySelector('.new:not(.out)');
+    const bar = h.board().querySelector('.rp-bar'), dot = () => h.box(h.card('new-sign-in'))?.querySelector('.pct')?.textContent === '0%';
     if (bar) {
       await h.cycle('Mark unread', h.find(/^Mark unread$/, bar), dot, () => !dot(), /Marked unread/);
       await h.cycle('Archive report', h.find(/^Archive$/, bar), () => !h.card('new-sign-in'), () => h.card('new-sign-in'), /Archived/);
       return;
     }
-    await h.nav('Back to Reports', h.find(/Reports$/, h.reader(), 'a'), /^#reports$/);
+    await h.nav('Close the report', h.find(/^Close$/, h.reader(), 'a'), /^#reports$/);
     await h.cycle('Dismiss report', h.find(/^Dismiss,/, h.reader()), () => location.hash === '#reports', () => h.reader().querySelector('iframe'), /Dismissed/);
   } }] },
   { name: 'answered', hash: '#answered', ready: '[id="item-digest-old"]', stages: [{ run: async (h) => {
