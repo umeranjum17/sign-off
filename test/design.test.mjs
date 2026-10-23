@@ -2634,7 +2634,7 @@ test('a design-level inline Approve or Change stores its verdict with the note, 
   proc.kill();
 });
 
-test('a design posted again is a new round: the note box starts empty, the earlier note is folded under it, and a save on this round leaves it out', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('a design posted again is a new round: the note box starts empty, the earlier note is in the card\'s Activity once, and a save on this round leaves it out', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'design-new-round'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
   mkdirSync(join(dir, 'design'), { recursive: true });
   writeFileSync(join(dir, 'design', 'preview.png'), png);
@@ -2655,13 +2655,14 @@ test('a design posted again is a new round: the note box starts empty, the earli
   const open = async () => {
     await evaluate(`(() => { const u = ${JSON.stringify(`${url}#designs/d6-round`)}; if (location.href === u) location.reload(); else location.href = u; })()`);
     await until(() => evaluate('!!document.querySelector(".design-review textarea")'));
-    return evaluate('({ note: document.querySelector(".design-review textarea").value, earlier: document.querySelector(".design-review .earlier-note:not([hidden]) p")?.textContent ?? null })');
+    // The note box, and the card's Activity: each answer step and the notes it shows.
+    return evaluate('({ note: document.querySelector(".design-review textarea").value, steps: [...document.querySelectorAll(".design-review .thread .th-t")].map((e) => e.textContent).filter((t) => t.startsWith("Your answer")), notes: [...document.querySelectorAll(".design-review .thread .th-n")].map((e) => e.textContent) })');
   };
   // The same round: the note is the one being written, nothing earlier.
-  assert.deepEqual(await open(), { note: 'Round one: bigger title', earlier: null });
+  assert.deepEqual(await open(), { note: 'Round one: bigger title', steps: ['Your answer: Changes requested'], notes: [] });
   // The agent draws the screen again in place: same key, same fields, new bytes. That is a new round.
   writeFileSync(join(dir, 'design', 'a.png'), sized(4, 4));
-  assert.deepEqual(await open(), { note: '', earlier: 'Round one: bigger title' });
+  assert.deepEqual(await open(), { note: '', steps: ['Your answer on the earlier round: Changes requested (First)'], notes: ['“Round one: bigger title”'] });
   // In the viewer the screen is not reviewed yet, and approving it sends this round's note only: the earlier change does not carry over.
   await evaluate('document.querySelector("[aria-haspopup=dialog]").click()');
   await until(async () => (await evaluate('document.querySelector(".design-viewer[open] [role=status]")?.textContent')) === 'Not reviewed yet');
@@ -2669,14 +2670,15 @@ test('a design posted again is a new round: the note box starts empty, the earli
   await until(async () => (await evaluate('document.querySelector(".design-viewer[open] [role=status]")?.textContent')) === 'Screen approved');
   const saved = JSON.parse(run('answers', file, '--json').out)['d6-round'];
   assert.deepEqual([saved.answer, saved.notes], ['screens', [{ journey: 'flow', screen: 'a', verdict: 'approve', note: '' }]]);
-  // The earlier note stays readable after this round's first save.
-  assert.deepEqual(await open(), { note: '', earlier: 'Round one: bigger title' });
+  // The earlier note stays in the Activity after this round's first save, with this round's answer after it.
+  assert.deepEqual(await open(), { note: '', steps: ['Your answer on the earlier round: Changes requested (First)', 'Your answer: Screens reviewed'], notes: ['“Round one: bigger title”'] });
   // An answer saved before answers named their round counts as this round's only when it came after the design was filed.
   const answers = join(dir, 'board.answers.jsonl'), old = (at) => appendFileSync(answers, `${JSON.stringify({ key: 'd6-round', answer: 'change', label: 'Changes requested', close: 'done', at, notes: [{ journey: 'flow', screen: 'a', verdict: 'change', note: 'Older note' }] })}\n`);
   old('2026-10-19T08:00:00Z');
-  assert.deepEqual(await open(), { note: 'Older note', earlier: 'Round one: bigger title' });
+  // The Activity is in time order, and this older answer is dated before round one's.
+  assert.deepEqual(await open(), { note: 'Older note', steps: ['Your answer: Changes requested', 'Your answer on the earlier round: Changes requested (First)'], notes: ['“Round one: bigger title”'] });
   old('2026-10-17T08:00:00Z');
-  assert.deepEqual(await open(), { note: '', earlier: 'Older note' });
+  assert.deepEqual(await open(), { note: '', steps: ['Your answer on the earlier round: Changes requested (First)'], notes: ['“Older note”'] });
   close();
   proc.kill();
 });

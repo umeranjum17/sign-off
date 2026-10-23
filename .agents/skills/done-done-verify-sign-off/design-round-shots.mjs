@@ -3,8 +3,8 @@
 // ROUND_WIDTH=390 or 1280 (default 390). A throwaway board (its own HOME and XDG_*) holds a fleet dashboard design with a light and a dark phone page
 // and a computer page per screen, and a second design whose screen page was moved away after it was posted.
 // The person types a screen note with real key events and taps Change; the agent then draws the screen again in place (a new round).
-// Saves preview (the new round's screen in the preview), note (the empty note box with Earlier note opened), round (the whole review page on a taller screen
-// of the same width: the preview, the empty note box and the opened Earlier note in one capture) and fallback (the design whose page is gone),
+// Saves preview (the new round's screen in the preview), note (the empty note box with the card's Activity under it), round (the whole review page on a taller
+// screen of the same width: the preview, the empty note box and the Activity with the earlier note in one capture) and fallback (the design whose page is gone),
 // each <state>.<theme>.<width>w.png, and design-round.<theme>.<width>w.json: what each step measured. Exits non-zero when a check fails.
 // ROUND_SIDE=before SIGN_OFF_REPO=<built base checkout> takes the same shots from that build without the checks, for the before.
 import assert from 'node:assert/strict';
@@ -68,14 +68,13 @@ try {
   draw(22);
   browser('open', 'about:blank'); browser('open', `${base}#designs/fleet-dashboard`); ready(); settle(1500);
   const facts = `() => JSON.stringify((() => { const w = document.querySelector('.design-preview-window'), f = w?.firstElementChild, box = (e) => { const r = e?.getBoundingClientRect(); return r && [Math.round(r.width), Math.round(r.height)]; };
-    const e = document.querySelector('.design-review .earlier-note');
-    return { note: document.querySelector('.design-review textarea').value, earlier: e && !e.hidden ? e.querySelector('p').textContent : null, status: document.querySelector('.design-review [role=status]')?.textContent,
+    const steps = [...document.querySelectorAll('.design-review .thread li')].map((li) => [li.querySelector('.th-t')?.textContent, li.querySelector('.th-n')?.textContent ?? '']);
+    return { note: document.querySelector('.design-review textarea').value, activity: steps, status: document.querySelector('.design-review [role=status]')?.textContent,
       preview: f?.tagName.toLowerCase(), src: decodeURIComponent(f?.getAttribute('src') ?? ''), frame: box(f), window: box(w) }; })())`;
   record.round2 = read(facts);
   browser('eval', `() => { document.querySelector('.design-preview-window').scrollIntoView({ block: 'start' }); return 1; }`); settle(900);
   shot('preview');
-  browser('eval', `() => { const s = document.querySelector('.design-review .earlier-note summary'); s?.click(); document.querySelector('.design-review textarea').scrollIntoView({ block: 'center' }); return 1; }`); settle();
-  record.opened = read(`() => JSON.stringify(!!document.querySelector('.design-review .earlier-note')?.open)`);
+  browser('eval', `() => { (document.querySelector('.design-review .thread') ?? document.querySelector('.design-review textarea')).scrollIntoView({ block: 'end' }); return 1; }`); settle();
   shot('note');
   // The whole review page in one capture, its preview, note box and Earlier note together: the same width, a taller screen.
   browser('emulate', '--viewport', width === 390 ? '390x1700x2,mobile,touch' : '1280x1700x1', '--color-scheme', theme); settle(900);
@@ -93,19 +92,20 @@ try {
   writeFileSync(join(out, `design-round.${cell}.json`), JSON.stringify(record, null, 2) + '\n');
   if (!before) {
     assert.equal(record.round1?.notes?.[0]?.note, 'Make the lane names bigger', JSON.stringify(record.round1));
-    assert.deepEqual([record.round2.note, record.round2.earlier], ['', 'Make the lane names bigger'], JSON.stringify(record.round2));
+    // The note box is empty, and the card's Activity holds the round-one answer and its note once.
+    assert.equal(record.round2.note, '', JSON.stringify(record.round2));
+    assert.deepEqual(record.round2.activity.filter(([t]) => t.startsWith('Your answer')), [['Your answer on the earlier round: Changes requested', '“Make the lane names bigger”']], JSON.stringify(record.round2));
     assert.equal(record.round2.preview, 'iframe');
     assert.ok(record.round2.src.endsWith(theme === 'dark' ? 'overview-dark.html' : 'overview.html'), record.round2.src);
     assert.deepEqual(record.round2.frame, record.round2.window, 'the screen fills the preview window');
     assert.ok(record.round2.frame[1] > 300, JSON.stringify(record.round2));
-    assert.equal(record.opened, true);
     assert.deepEqual(record.viewer, { screen: 'Not reviewed yet', note: '' });
     assert.ok(record.fallback.text.startsWith('This screen could not be shown') && record.fallback.picture > 0 && record.fallback.link.endsWith('preview.webp'), JSON.stringify(record.fallback));
   }
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board holding a fleet dashboard design with one screen, light and dark, and a second design whose screen page was moved away.',
     steps: [`The board is opened ${width === 390 ? 'on a phone' : `at ${width} px`} in ${theme} mode on the fleet dashboard design.`, 'The person types "Make the lane names bigger" in the screen note and taps Change.',
-      'The design agent draws the screen again with bigger lane names (a new round) and the person opens the design again.', 'The person taps Earlier note.', 'The person opens the second design.'],
-    result: `${width === 390 ? 'On a phone' : `At ${width} px`} in ${theme} mode the new round's screen fills the preview, the note box is empty with the round-one note folded under Earlier note, and the design whose page is gone shows its preview picture with a line saying so.` }, null, 2) + '\n');
+      'The design agent draws the screen again with bigger lane names (a new round) and the person opens the design again.', 'The person opens the second design.'],
+    result: `${width === 390 ? 'On a phone' : `At ${width} px`} in ${theme} mode the new round's screen fills the preview, the note box is empty and the card's Activity shows the round-one answer with its note once, and the design whose page is gone shows its preview picture with a line saying so.` }, null, 2) + '\n');
 } finally {
   server?.kill();
   try { browser('stop'); } catch {}

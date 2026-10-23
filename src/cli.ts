@@ -2374,11 +2374,11 @@ const mockHash = (path: string) => {
 const designPaths = (d: Decision) => [...new Set([d.preview, ...(d.journeys ?? []).flatMap((j) => j.screens.flatMap((s) => Object.values(s.views)))])].filter((p): p is string => !!p);
 /** A design's round: its time, screens and options and the bytes of its files, so the same key posted again with a new time or a changed screen is a new round. */
 const designRound = (d: Decision) => sha256(Buffer.from(JSON.stringify([d.filed, d.journeys, d.options, designPaths(d).map((p) => [p, mockHash(p)])])));
-/** What the page needs to know of a design beyond its fields: whether its answer is from an earlier round, the notes of the last answer given on
- * an earlier round (history, not this round's), and the files that are gone, so the page shows the preview picture in place of a screen it cannot draw. */
+/** What the page needs to know of a design beyond its fields: whether its answer is from an earlier round, the last answer given on an earlier round
+ * (history for the card's Activity, not this round's), and the files that are gone, so the page shows the preview picture in place of a screen it cannot draw. */
 const designState = (d: Decision, a: Answer | undefined, lines: Answer[]) => {
   const round = designRound(d), before = lines.findLast((x) => x.key === d.key && x.answer && !sameRound(x, d, round)), missing = designPaths(d).filter((p) => mockHash(p) === null);
-  return { ...(a && !sameRound(a, d, round) && { earlier_answer: true }), ...(before?.notes?.length && { earlier_notes: before.notes }), ...(missing.length && { missing }) };
+  return { ...(a && !sameRound(a, d, round) && { earlier_answer: true }), ...(before && { earlier: { at: before.at, label: before.label, notes: before.notes ?? [] } }), ...(missing.length && { missing }) };
 };
 /** The comments that go with a card's next answer or round: not sent yet, and made on the mock file the card shows now. */
 const unsent = (d: Decision): Sent[] => {
