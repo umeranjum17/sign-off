@@ -941,7 +941,7 @@ test('each card has one place to type: Add a comment holds the note sent with th
   assert.deepEqual([...reports.matchAll(/<li class="report dl-row" style="--n:\d+" data-key="(\w+)"/g)].map((m) => m[1]), ['how']);
   // The sidebar counts what is new under its short name; the phone's tab bar marks Reports as the area on screen and carries a blue count.
   assert.match(reports, /<\/svg><\/span>Reports<span class="n blue">1<\/span>/);
-  assert.match(reports, /<a href="#reports" aria-label="Reports, 1 new" aria-current="page"><span class="icon i-reports" aria-hidden="true">.*?<\/span><span class="bd blue" aria-hidden="true">1<\/span><\/a>/);
+  assert.match(reports, /<a href="#reports" aria-label="Reports, 1 new" aria-current="page"><span class="icon i-tab-reports" aria-hidden="true">.*?<\/span><span class="bd blue" aria-hidden="true">1<\/span><\/a>/);
   assert.match(reports, /<details class="other notes"><summary>Notes \(1\)<\/summary>.*<strong dir="auto">Merged: the sign-in fix<\/strong>/s);
   // On a phone, a tap on the card opens the report over the whole board with the focus on its title; the board under it takes no taps.
   // ‹ Reports goes back to the card with the focus on its link, and Escape closes it too.

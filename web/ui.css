@@ -2,7 +2,8 @@
    a section head, the hero and list cards, a row, its icon tile and priority chip, two stat tiles, and the property panel (Its ask, Ticket).
    Every box sits on a 4px grid with one 16px gutter. index.html's own rules come after this file, so a screen not yet in the new look keeps its own. */
 
-/* The dock: a 56px pill of round 48px tabs, 24px over the bottom and centred with the round Search button 12px beside it. The tab on screen sits raised. */
+/* The dock: a 56px pill of round 48px tabs, 24px over the bottom and centred with the round Search button 12px beside it. The tab on screen sits raised,
+   its filled icon in ink; the others are quiet grey. */
 :root { --dock-n: 4; --dock-w: calc(0.5rem + var(--dock-n) * 3rem + (var(--dock-n) - 1) * 2px); --dock-at: calc(50% - (var(--dock-w) + 4.25rem) / 2); }
 .side { display: none; }
 .tabs { position: fixed; z-index: 2; left: var(--dock-at); bottom: calc(1.5rem + env(safe-area-inset-bottom)); width: var(--dock-w); display: flex; gap: 2px; height: 3.5rem; padding: 0.25rem;
@@ -19,7 +20,7 @@
 .bd.bump, .side .n.bump { animation: bump 380ms var(--spring); }
 @keyframes bump { 30% { transform: scale(1.25); } }
 .tabs .icon, .side .icon { width: 1.5rem; height: 1.5rem; background: none; transition: transform 300ms var(--spring); }
-.tabs .icon svg, .side .icon svg { width: 1.5rem; height: 1.5rem; stroke: currentColor; stroke-width: 1.9; }
+.tabs .icon svg, .side .icon svg { width: 1.5rem; height: 1.5rem; fill: currentColor; fill-rule: evenodd; stroke: none; }
 .dock-find { position: fixed; z-index: 2; left: calc(var(--dock-at) + var(--dock-w) + 0.75rem); bottom: calc(1.5rem + env(safe-area-inset-bottom)); display: grid; place-items: center;
   width: 3.5rem; height: 3.5rem; border-radius: 1.75rem; background: #262624; color: #FFFFFF; box-shadow: 0 6px 18px rgba(20, 16, 12, 0.25); -webkit-tap-highlight-color: transparent; }
 .dock-find:active { transform: scale(0.94); }

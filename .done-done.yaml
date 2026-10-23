@@ -50,6 +50,10 @@ journeys:
   # NEWLOOK_PROTO=<the approved prototype's index.html> saves each beside the prototype's frame, NEWLOOK_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
   newlook:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/newlook-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $NEWLOOK_PROTO'
+  # The dock's and the sidebar's filled icons beside the approved prototype's (DOCK_PROTO=<its index.html>): Today at 390 and 1280, light and dark, each icon's fill, ink box,
+  # colour and place measured on both pages, and each tab opened in turn; DOCK_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
+  dock-icons:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/dock-icons-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "$DOCK_PROTO"'
   # The board's design tokens (web/tokens.css) in use on Today, Decide, Evidence and a report, one theme and width per run; TOKENS_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
   tokens:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/tokens-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${TOKENS_THEME:-light}" "${TOKENS_WIDTH:-390}"'
