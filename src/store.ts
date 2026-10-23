@@ -362,8 +362,10 @@ export const awaitsVerdict = (type: string | undefined, a?: { answer?: string })
 const DESIGN_LABEL: Record<string, string> = { approve: 'Approved', change: 'Changes requested', [SCREENS_ONLY]: 'Screens reviewed' };
 
 /** Is a design answer one given on the design's current round? A design posted again under its key is a new round when its files or fields changed:
- * the answer names the round it was given on, and an older answer that names none was given on this round only when it came after the design was filed. */
-export const sameRound = (a: Answer, d: Decision, round: string) => (a.round ? a.round === round : !d.filed || Date.parse(a.at) >= Date.parse(d.filed));
+ * the answer names the round it was given on, and an older answer that names none was given on this round only when it came after the design was filed
+ * (in whole seconds: an answer's time has no milliseconds, a post's may). */
+const second = (at: string) => Math.floor(Date.parse(at) / 1000);
+export const sameRound = (a: Answer, d: Decision, round: string) => (a.round ? a.round === round : !d.filed || second(a.at) >= second(d.filed));
 
 /** Saves a design answer with screen-specific notes and an optional listed direction pick. A screen save omits the verdict: the design keeps its saved verdict, a requested change on a screen sets it to change, and any other screen save with none yet waits as screens-only.
  * An answer from an earlier round is history: its verdict and pick do not carry into this round's. */
