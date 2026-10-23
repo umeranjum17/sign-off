@@ -69,21 +69,14 @@ journeys:
   # A comment sent with an answer: Add a comment under a yes/no on Decide, Answer and one More…, then the Answered card and `answers`, at 390 and 1280 in light and dark.
   answer-comment:
     command: 'npm run build > /dev/null && for w in 390 1280; do for t in light dark; do COMMENT_WIDTH=$w node .agents/skills/done-done-verify-sign-off/comment-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t || exit 1; done; done'
-  # Decide from the feel prototype: the grouped list, a press, swipes, More on the list and on an ask, an answer and its Undo toast, a swiped answer and all clear,
-  # at 390 and 1280 (DECIDE_WIDTHS) in light and dark, and the motion recorded at 390 (DECIDE_RECORD=1).
   # Reports at 390 and 1280, light and dark: the list, its end over the tab bar, a report's page, read state, press, both swipes, More, archive with Undo. At 1280 also the desk: the list beside the report shown, J, U, E, Ctrl+Z, hover, a guided report opened and closed, the ? sheet. SIGN_OFF_REPO=<built base checkout> records the before.
   reports:
     command: 'npm run build > /dev/null && REPORTS_RECORD=1 node .agents/skills/done-done-verify-sign-off/reports-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
+  # Decide in the new look beside the approved prototype (slice 3): the list (Newest, By priority, the hero, rows with P0-P3 chips, ticket bars and project tiles, Answered)
+  # and an ask as a sheet over it (nothing picked, a pick, its ticket and priority, an answered ask) at 390 light and dark, the list beside an ask at 1280,
+  # each measured in the browser and paired with the prototype's frame (vs-proto/), and the phone's motion recorded (decide-flow.light.390w.mp4).
   decide:
-    command: 'npm run build > /dev/null && DECIDE_RECORD=1 bash .agents/skills/done-done-verify-sign-off/decide-shots.sh "$DONE_DONE_EVIDENCE_ROOT"'
-  # Going back to an answer, on the prototype's demo data at 390, light and dark: answered, the next ask with Back, Back to the answer, Change answer, a change and its Undo,
-  # the Answered group and Cleared today, and at 1280 the answered ask beside the list; the agent's wait --filer events (the change named by replaces) as text; the phone recorded with real taps (BACK_RECORD).
-  decide-back:
-    command: 'npm run build > /dev/null && BACK_RECORD=1 bash .agents/skills/done-done-verify-sign-off/decide-back.sh "$DONE_DONE_EVIDENCE_ROOT"'
-  # Decide beside the approved feel prototype, on the prototype's own demo data: each state it has a shot of at 390 and 1280, light and dark, paired with that shot
-  # (the prototype left, the board right) when PROTO_SHOTS names its shots folder, and the phone's answer flows recorded (a pick with a note, Your own answer, a pick with no note).
-  decide-match:
-    command: 'npm run build > /dev/null && MATCH_RECORD=1 bash .agents/skills/done-done-verify-sign-off/decide-match.sh "$DONE_DONE_EVIDENCE_ROOT"'
+    command: 'npm run build > /dev/null && DECIDE_RECORD=1 node .agents/skills/done-done-verify-sign-off/decide-newlook-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${SIGN_OFF_PROTO:-}"'
   # Agree, Disagree and Comment on a part and its Ask menu, per theme and width: the foot row at 44 px tap targets, Disagree's What is off? box, a sent comment taken by wait --filer and answered with deeper, and a short phone recording. PART_COMMENT_BEFORE=1 SIGN_OFF_REPO=<base checkout, built> records the same page without them.
   part-comment:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/part-comment-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${PART_COMMENT_THEME:-light}" "${PART_COMMENT_WIDTH:-390}"'

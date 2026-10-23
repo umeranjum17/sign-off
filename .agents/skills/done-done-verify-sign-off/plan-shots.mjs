@@ -67,10 +67,10 @@ try {
     writeFileSync(join(records, `${stem}.dom.json`), JSON.stringify(dom));
     writeFileSync(join(records, `${stem}.claim.txt`), `${width}px ${theme}: ${claim}\n`);
   };
-  drive('await wait(".ask-card .i-plan"); await page.eval(() => scrollTo(0, 0));');
-  capture('home', 'Decide lists the plan under Review with a document icon, its sections and decisions.');
+  drive('await wait(".dl-row[data-group=review] a[href^=\'#waiting/\']"); await page.eval(() => scrollTo(0, 0));');
+  capture('home', 'Decide lists the plan as one of its rows, with its icon tile and its title.');
   // The phone tab bar covers the bottom edge, so bring the link clear of it before the real click.
-  drive('await page.eval(() => document.querySelector(".ask-card .i-plan").scrollIntoView({ block: "center" }));');
+  drive('await page.eval(() => document.querySelector(".dl-row[data-group=review] a[href^=\'#waiting/\']").scrollIntoView({ block: "center" }));');
   const openRef = new RegExp(`uid=(\\S+) link "${plan.title}`).exec(browser('snapshot'))[1];
   browser('click', `@${openRef}`); drive('await wait(".plan-section"); await wait(".plan-view[style]");');
   assert.equal(JSON.parse(drive('console.log(JSON.stringify(await page.eval(() => getComputedStyle(document.querySelector("#reader h1")).outlineStyle)));')), 'none');

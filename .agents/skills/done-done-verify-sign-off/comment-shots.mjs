@@ -40,14 +40,14 @@ try {
   browser('eval', `async () => { for (let i = 0; i < 50 && !document.querySelector('.decide .pick-option'); i++) await new Promise((r) => setTimeout(r, 100)); scrollTo(0, 0); return 1; }`);
   pause(400);
   // Where the note sits: in the first screen, or below it.
-  const place = read(`() => { const s = document.querySelector('.decide .note-field label'), r = s.getBoundingClientRect(); return JSON.stringify({ label: s.textContent, top: Math.round(r.top), inFirstScreen: r.bottom <= innerHeight }); }`);
+  const place = read(`() => { const s = document.querySelector('.decide .note-box'), r = s.getBoundingClientRect(); return JSON.stringify({ label: s.getAttribute('aria-label').split(',')[0], placeholder: s.placeholder, top: Math.round(r.top), inFirstScreen: r.bottom <= innerHeight }); }`);
   settle();
   browser('screenshot', join(out, `decide.${cell}.png`));
   // The ask's one More, in the bar over it, tapped open on its own: what the page keeps out of the way of its one button.
-  const more = `document.querySelector('.ask-nav .dl-more > summary, .split-bar .dl-more > summary')`;
+  const more = `document.querySelector('.sh-head .dl-more > summary, .split-bar .dl-more > summary')`;
   browser('eval', `() => { ${more}.click(); document.activeElement?.blur(); return 1; }`);
   settle();
-  const menu = read(`() => JSON.stringify([...document.querySelectorAll('.ask-nav .dl-more .dl-menu > *, .split-bar .dl-more .dl-menu > *')].filter((e) => e.getClientRects().length).map((e) => e.textContent))`);
+  const menu = read(`() => JSON.stringify([...document.querySelectorAll('.sh-head .dl-more .dl-menu > *, .split-bar .dl-more .dl-menu > *')].filter((e) => e.getClientRects().length).map((e) => e.textContent))`);
   browser('screenshot', join(out, `more-open.${cell}.png`));
   browser('eval', `() => { ${more}.click(); return 1; }`);
   // Yes picked, then the note: one box, open under the cards.
@@ -73,7 +73,7 @@ try {
   assert.equal(JSON.parse(json).feel.note, text);
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board holding one yes/no ask, Does the new feel look right?',
     steps: [`The board is opened on the ask in Decide at ${width} px wide, ${theme}.`, 'The person taps More over the ask, sees what it holds, and taps it closed.', 'The person taps Yes and types a note in the box under the cards.', 'The person taps Answer Yes.', 'The person opens Answered.'],
-    result: 'The ask opens with nothing picked, its one button off and reading Pick an answer, the note open under the cards, and one More (holding only Ask me later and Dismiss); after Yes the button reads Answer Yes; the note is saved as the answer\'s note and read back by sign-off-axi answers; the Answered card reads only Yes and shows "Your comment, sent with Yes: …" with Edit comment.' }, null, 2) + '\n');
+    result: 'The ask opens with nothing picked, its one button off and reading Pick an answer, the note open under the cards, Ask me later beside the button on a phone, and one More (Dismiss on a phone; Ask me later and Dismiss on a desk); after Yes the button reads Answer Yes; the note is saved as the answer\'s note and read back by sign-off-axi answers; the Answered card reads only Yes and shows "Your comment, sent with Yes: …" with Edit comment.' }, null, 2) + '\n');
 } finally {
   server?.kill();
   try { browser('stop'); } catch {}
