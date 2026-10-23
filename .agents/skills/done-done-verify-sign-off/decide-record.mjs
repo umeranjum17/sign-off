@@ -14,9 +14,9 @@
 // With both, it records the desk's Reports by keys: J and K moving the selection (each report read as it is shown), U twice, a row's hover actions,
 // E archiving the report shown (the row folds, the next is selected), Cmd+Z, Enter opening a guided report over the board and Escape, and the ? sheet.
 // Usage: node decide-record.mjs <board url> <light|dark> <out.mp4> [desk] [reports]
-// With `today` it records Today at phone size on a board feel-board.sh seeded: the page scrolled (the small title in its bar) and back, the Sign in tile opening Decide at its
-// group (the pill sliding), the sign-in swiped to Later, the Today tab (Up next is now the next ask), a comment typed under it, Answer turning into a check (the ring closing a step,
-// Decide's badge counting down, the next ask sliding in), Undo, the Review tile, the Evidence tab and a Latest proof row opening its update.
+// With `today` it records Today at phone size on a board feel-board.sh seeded: See all opening Decide (the pill sliding), the sign-in swiped to Later, the Today tab (Up next is now
+// the next ask), Answer turning into a check (Cleared today counting it, Decide's badge counting down, the next ask rising in), Undo, More's sheet opened and closed,
+// the dock's Search with words typed and closed, and a Waiting on you row opening its ask.
 // Usage: node decide-record.mjs <board url> <light|dark> <out.mp4> today
 // With `flows`, on a board seed-proto-board.sh seeded, it records the phone's answer flows: an ask with nothing picked, a pick naming the button, a note typed and sent with it;
 // the next ask, then Next to another; Your own answer opening its one box, Send answer off until words are typed, then sent; a pick sent with no note, and its Undo;
@@ -80,7 +80,7 @@ try {
     p.style.cssText = 'position:fixed;z-index:9;right:20px;bottom:20px;padding:6px 14px;border-radius:10px;background:rgba(0,0,0,.72);color:#fff;font:600 15px system-ui'; document.body.append(p); }
     p.textContent = ${JSON.stringify((mod ? 'Ctrl+' : '') + ({ Enter: '↵' }[k] ?? k.toUpperCase()))};
     (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, bubbles: true, ctrlKey: ${mod} })); return 'ok';`);
-  const type = (words) => inPage(`const t = document.activeElement; if (t?.tagName !== 'TEXTAREA') return 'missing'; for (const c of ${JSON.stringify(words)}) { t.value += c; t.dispatchEvent(new Event('input')); await s(45); } return 'ok';`);
+  const type = (words) => inPage(`const t = document.activeElement; if (!['TEXTAREA', 'INPUT'].includes(t?.tagName)) return 'missing'; for (const c of ${JSON.stringify(words)}) { t.value += c; t.dispatchEvent(new Event('input')); await s(45); } return 'ok';`);
   // A tap sent as real input at the element's centre (brought into view first unless the bars hold it), so the page sees a pointer as on a phone.
   const finger = async (q) => {
     const at = await inPage(`const e = document.querySelector(${JSON.stringify(q)}); if (!e) return 'missing'; const v = e.getBoundingClientRect();
@@ -109,7 +109,7 @@ try {
     [() => finger('.ask-nav .step[aria-label=Next]'), 1600], [() => finger('.ask-nav .step[aria-label=Next]'), 1600], [() => finger('.pick-list li:nth-child(1) .pick-option'), 1000],
     [() => finger('.decide-bar .answer'), 2400], [() => swipeBack(), 2400], [() => finger('.ask-nav .step[aria-label=Previous]'), 2000], [() => finger('.ask-nav .back'), 1600],
     [() => inPage("scrollTo({ top: 99999, behavior: 'smooth' }); return 'ok';"), 2200], [() => finger('.tabs a[href="#"]'), 1500],
-    [() => inPage("document.querySelector('.t-cleared').scrollIntoView({ block: 'center', behavior: 'smooth' }); return 'ok';"), 2400]]
+    [() => inPage("document.querySelector('.t-tiles').scrollIntoView({ block: 'center', behavior: 'smooth' }); return 'ok';"), 2400]]
     : flows ? [[2600], [() => tap('a.dl-face[href="#decide/ship"]'), 1800], [() => tap('.pick-list li:nth-child(2) .pick-option'), 1300], [() => into('.decide .note-box'), 900],
     [() => type('Keep support on call until Monday.'), 900], [() => tap('.decide-bar .answer'), 2600],
     [() => tap('.ask-nav .step[aria-label=Next]'), 1800], [() => tap('.decide .own-option'), 1600], [() => type('Call it Download, and keep Export in the menu.'), 900], [() => tap('.decide-bar .answer'), 2600],
@@ -126,11 +126,10 @@ try {
     [() => key('l'), 1500], [() => key('?'), 1800], [() => tap('#keys header button'), 700], [() => key('j'), 800], [() => key('1'), 700], [() => key('c'), 600], [() => type('After the demo'), 500], [() => key('Enter', true), 1800],
     [() => inPage("const b = document.querySelector('.split-list .dl-row:not(.sel) .dl-hover .yes'); if (!b) return 'missing'; b.focus(); await s(700); b.click(); return 'ok';"), 1600],
     [() => key('g'), 200], [() => key('e'), 1200], [() => key('g'), 200], [() => key('d'), 1500]]
-    : screen === 'today' ? [[2600], [() => inPage("scrollTo({ top: 760, behavior: 'smooth' }); return 'ok';"), 1700], [() => inPage("scrollTo({ top: 0, behavior: 'smooth' }); return 'ok';"), 1500],
-    [() => tap('.tile.g-signin'), 1800], [() => drag('npm', -280), 1700], [() => tap('.tabs a[href="#"]'), 1600], [() => tap('.up-next .cmt > summary'), 800],
-    [() => type('Keep support on call until Monday.'), 700], [() => tap('.up-next .go'), 2400], [() => tap('#undo'), 1700], [() => tap('.tile.g-review'), 1800],
-    [() => tap('.tabs a[href="#evidence"]'), 1600], [() => tap('.tabs a[href="#"]'), 1400],
-    [() => inPage("document.querySelector('.t-proof .lrow').scrollIntoView({ block: 'center', behavior: 'smooth' }); return 'ok';"), 1300], [() => tap('.t-proof .lrow'), 2000], [() => tap('.tabs a[href="#"]'), 1600]] : [[2600], [() => press('ship'), 700], [() => drag('ship', 80, 10, 45), 1000], [() => drag('keep-the-weekly-digest', 300), 1600], [() => tap('#undo'), 1400],
+    : screen === 'today' ? [[2600],
+    [() => tap('.t-wait .see'), 1800], [() => drag('npm', -280), 1700], [() => tap('.tabs a[href="#"]'), 1600], [() => tap('.t-up .t-btn.ink'), 2400], [() => tap('#undo'), 1700],
+    [() => tap('.today-top .ui-rb'), 1600], [() => tap('#t-more .x'), 1000], [() => tap('.dock-find'), 1200], [() => type('settings'), 1600], [() => tap('#t-search .x'), 1000],
+    [() => tap('.t-wait .ui-row'), 1800], [() => tap('.tabs a[href="#"]'), 1600]] : [[2600], [() => press('ship'), 700], [() => drag('ship', 80, 10, 45), 1000], [() => drag('keep-the-weekly-digest', 300), 1600], [() => tap('#undo'), 1400],
     [() => drag('ship', -280), 1600], [() => tap('#undo'), 1300], [() => tap('a.dl-face[href="#decide/ship"]'), 900],
     [() => tap('.pick-list li:nth-child(2) .pick-option'), 900], [() => tap('.pick-list li:nth-child(1) .pick-option'), 900],
     [() => tap('.decide-bar .answer'), 1800], [() => tap('#undo'), 1200], [() => tap('.ask-nav .back'), 1200], [() => tap('.top .dl-more > summary'), 1200], [() => tap('[data-act="answer-all"]'), 2000], [() => tap('#undo'), 1500]];

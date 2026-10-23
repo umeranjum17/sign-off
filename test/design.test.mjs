@@ -901,22 +901,20 @@ test('each card has one place to type: Add a comment holds the note sent with th
   assert.match(waiting, /data-act="answer-all"><span>Answer all recommended<\/span>.*?<div class="dl-sep" role="separator"><\/div>.*?data-act="later-all"><span>Move all to later<\/span>/s);
   assert.doesNotMatch(waiting, /data-act="sort"|Oldest first/);
   assert.doesNotMatch(waiting, /<ol class="queue"|<p class="fhead"/);
-  // Today: the date over its title and the ring of what was cleared, how many wait, Up next with the recommended answer as its one button,
-  // and four tiles counting each group Decide lists; the search sits at the foot.
+  // Today: its title with More, Up next (how many wait, the question, what it is, when and the answer recommended) with that answer as its main button beside Other answer,
+  // the next ask under Waiting on you with See all, and two tiles: Cleared today opening Answered and Proofs today opening Evidence.
   const home = await dump('');
-  assert.match(home, /<header class="top today-top"><div class="cbar" aria-hidden="true">Today<\/div><p class="kicker date-kicker">[^<]+<\/p><div class="head-row"><h1 tabindex="-1">Today<\/h1><span class="ring" role="img" aria-label="0 of 2 cleared">/);
-  assert.match(home, /<p class="sub">2 waiting on you · 0 cleared<\/p>/);
-  assert.match(home, /<section class="up-next g-answer" aria-label="Up next"><p class="lk">.*?Up next · Pick one<span class="when">\d\d:\d\d<\/span><\/p><h2 dir="auto">When should it ship\?<\/h2>.*?<span class="lbl">Answer B<\/span>.*?<a class="soft" href="#decide\/ship">Other answer<\/a>/s);
-  assert.deepEqual([...home.matchAll(/<a class="tile g-\w+[^"]*" href="([^"]*)" aria-label="([^"]*)"/g)].map((m) => `${m[1]} ${m[2]}`),
-    ['#waiting Answer, 1: Each has a pick', '#waiting Review, 1: 1 item to look over', '#waiting Sign in, 0: Nothing waiting', '#evidence Proof, 0: Nothing filed yet']);
-  assert.match(home, /<div class="t-foot"><div class="search" role="search"><input type="search" id="find" aria-label="Search the board"/);
+  assert.match(home, /<header class="ui-top today-top"><h1 tabindex="-1">Today<\/h1><button class="ui-rb" aria-label="More" aria-haspopup="dialog">/);
+  assert.match(home, /<section class="ui-card ui-hero t-up" aria-label="Up next"><div class="hl"><span class="lab">Up next · 1 of 2<\/span><\/div><h2 class="q" dir="auto">When should it ship\?<\/h2><p class="meta"><span dir="auto">Pick one · \d\d:\d\d · Recommended B<\/span><\/p><div class="t-btns"><button class="t-btn ink" aria-label="Answer B, When should it ship\?"><span class="lbl">Answer B<\/span>.*?<a class="t-btn white" href="#decide\/ship"><span class="lbl">Other answer<\/span><\/a>/s);
+  assert.match(home, /<section class="t-wait" aria-label="Waiting on you"><h2 class="ui-sec">Waiting on you<a class="see" href="#waiting">See all<\/a><\/h2><ul class="ui-card ui-list"><li><a class="ui-row" href="#decide\/look">.*?Pick the look/s);
+  assert.deepEqual([...home.matchAll(/<a class="ui-card ui-stat" href="([^"]*)" aria-label="([^"]*)"/g)].map((m) => `${m[1]} ${m[2]}`), ['#answered Cleared today: 0 of 2', '#evidence Proofs today: 0']);
   // An ask dismissed from Waiting on you sits under Dismissed (1) at its end, with Restore.
   const gone = file.replace(/\.json$/, '.dismissed.jsonl');
   writeFileSync(gone, JSON.stringify({ key: 'ship', dismissed: true, at: new Date().toISOString() }) + '\n');
   const pages = {};
   for (const hash of ['#waiting']) assert.match(pages[hash] = await dump(hash), /<details class="other gone-asks"><summary>Dismissed \(1\)<\/summary><ul class="rows"><li><strong dir="auto">When should it ship\?<\/strong><button class="dis" aria-label="Restore, When should it ship\?">Restore<\/button><\/li><\/ul><\/details>/, hash);
   // Only the design ask waits now, and it is Up next.
-  assert.match(await dump(''), /<p class="sub">1 waiting on you · 0 cleared<\/p>.*?Up next · Review/s);
+  assert.match(await dump(''), /<span class="lab">Up next · 1 of 1<\/span>.*?<span class="lbl">Review<\/span>/s);
   // Restore returns the dismissed ask to the grouped list.
   const { evaluate, close } = await browse(join(dir, 'live'));
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
@@ -987,12 +985,11 @@ test('each card has one place to type: Add a comment holds the note sent with th
   }
   // Answered is Done today: a count under the title, Clear all beside it, and a short row per item with its answer and time under the title, beside its ×. Clear all sits at the right of the title.
   writeFileSync(file.replace(/\.json$/, '.answers.jsonl'), ['ship', 'look'].map((key) => JSON.stringify({ key, answer: 'a', label: 'A', close: 'done', at: new Date().toISOString() })).join('\n') + '\n');
-  // Once both are answered, nothing needs you: the ring is closed, Up next says all clear, and Cleared today lists both with the answer, each opening its ask, to see or change the answer.
+  // Once both are answered, nothing needs you: Up next says so, nothing is listed under Waiting on you, and Cleared today counts both and opens Answered.
   const after = await dump('');
-  assert.match(after, /<span class="ring" role="img" aria-label="2 of 2 cleared">.*?<p class="sub">Everything is answered<\/p>/s);
-  assert.match(after, /<section class="up-next clear" aria-label="Up next">.*?<h2>You're all clear<\/h2>/s);
-  assert.deepEqual([...after.matchAll(/<a class="lrow" href="#decide\/(\w+)">.*?<b dir="auto">(.*?)<\/b><span dir="auto">(\w+) · \d\d:\d\d<\/span>/gs)].map((m) => [m[1], m[2], m[3]]).sort(), [['look', 'Pick the look', 'A'], ['ship', 'When should it ship?', 'A']]);
-  assert.match(after, /<a class="more" href="#answered">Answered \(2\)<\/a>/);
+  assert.match(after, /<section class="ui-card ui-hero t-up clear" aria-label="Up next">.*?<h2 class="q">Nothing waits on you<\/h2>/s);
+  assert.doesNotMatch(after, /class="t-wait"/);
+  assert.match(after, /<a class="ui-card ui-stat" href="#answered" aria-label="Cleared today: 2 of 2">/);
   const answered = await dump('#answered');
   assert.match(answered, /<p class="lede">2 answers today\. Each one has gone back to its agent\.<\/p><div class="bulk">.*?<\/div><\/header><div class="sec-head"><h2>Today<\/h2><\/div>/);
   const lines = [...answered.matchAll(/<summary class="compact">.*?<strong[^>]*>(.*?)<\/strong>.*?<span class="ans"><b[^>]*>(\w+)<\/b><time>\d\d:\d\d<\/time><\/span><\/span><\/summary>.*?<\/details><button class="x" aria-label="Dismiss, [^"]+">×<\/button>/gs)];
@@ -1011,7 +1008,7 @@ test('each card has one place to type: Add a comment holds the note sent with th
   writeFileSync(file.replace(/\.json$/, '.dismissed.jsonl'), JSON.stringify({ key: 'look', dismissed: true, at: new Date(Date.now() + 1000).toISOString() }) + '\n');
   const left = await dump('#answered');
   assert.deepEqual(cards(left).map(([key]) => key), ['ship']);
-  assert.deepEqual([...(await dump('')).matchAll(/<a class="lrow" href="#decide\/\w+">.*?<b dir="auto">(.*?)<\/b>/gs)].map((m) => m[1]), ['When should it ship?']);
+  assert.match(await dump(''), /<a class="ui-card ui-stat" href="#answered" aria-label="Cleared today: 1 of 1">/);
   writeFileSync(file.replace(/\.json$/, '.dismissed.jsonl'), ['look', 'ship'].map((key) => JSON.stringify({ key, dismissed: true, at: new Date(Date.now() + 1000).toISOString() })).join('\n') + '\n');
   assert.match(await dump('#answered'), /<p class="empty">All done items cleared\.<\/p>/);
   proc.kill();
@@ -1269,16 +1266,16 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await until(async () => (await askTitles()) === 'Which day for release?|Keep the weekly digest?|Pick the look');
   // More on the list holds no sort: Decide reads newest first.
   assert.equal(await evaluate('[...document.querySelectorAll(".top .dl-more [data-act]")].map((b) => b.dataset.act).join("|")'), 'answer-all|later-all');
-  // Today's Up next is the first ask Decide lists with a recommended answer, and Other answer opens it; the Review tile opens Decide at its group, whose head flashes.
+  // Today's Up next is the first ask Decide lists with a recommended answer, and Other answer opens it; Waiting on you's See all opens Decide.
   await evaluate('location.hash = ""');
-  await until(async () => (await evaluate('document.querySelector(".up-next h2")?.textContent')) === 'Which day for release?');
-  assert.equal(await evaluate('document.querySelector(".up-next .go .lbl").textContent + "|" + document.querySelector(".up-next .soft").textContent'), 'Answer friday|Other answer');
-  await evaluate('document.querySelector(".up-next .soft").click()');
+  await until(async () => (await evaluate('document.querySelector(".t-up .q")?.textContent')) === 'Which day for release?');
+  assert.equal(await evaluate('document.querySelector(".t-up .t-btn.ink .lbl").textContent + "|" + document.querySelector(".t-up .t-btn.white").textContent'), 'Answer friday|Other answer');
+  await evaluate('document.querySelector(".t-up .t-btn.white").click()');
   await until(async () => await evaluate('location.hash === "#decide/release" && document.querySelector(".decide h2")?.textContent === "Which day for release?"'));
   await evaluate('location.hash = ""');
-  await until(async () => (await evaluate('document.querySelector(".tile.g-review .n")?.textContent')) === '1');
-  await evaluate('document.querySelector(".tile.g-review").click()');
-  await until(async () => (await evaluate('location.hash + "|" + document.querySelector(".dl-head.flash")?.firstChild.textContent')) === '#waiting|Review');
+  await until(async () => await evaluate('!!document.querySelector(".t-wait .see")'));
+  await evaluate('document.querySelector(".t-wait .see").click()');
+  await until(async () => (await evaluate('location.hash')) === '#waiting');
   await evaluate("location.hash = '#waiting'");
   await until(async () => (await evaluate('location.hash')) === '#waiting');
   // Decide shows the ask's context line when it carries no reason text of its own.
@@ -2131,11 +2128,13 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const { evaluate, close } = await browse(join(dir, 'browser'));
-  // A lead's design is Main's to review: Today counts no ask for it and links it under Designs, and Decide is all clear with no badge.
+  // A lead's design is Main's to review: Today counts no ask for it and links it under Designs in its More, and Decide is all clear with no badge.
   await evaluate(`location.href = ${JSON.stringify(url)}`);
-  await until(async () => (await evaluate('document.querySelector("a.more[href=\'#designs\']")?.textContent')) === 'Designs (1)');
-  assert.equal(await evaluate('[...document.querySelectorAll(".tiles .tile")].map((t) => t.textContent.replace(/\\s+/g, " ").trim()).slice(0, 3).join("|")'), '0AnswerAll answered|0ReviewNothing to review|0Sign inNothing waiting');
-  assert.equal(await evaluate('document.querySelector(".up-next h2")?.textContent'), "You're all clear");
+  await until(async () => await evaluate('!!document.querySelector(".today-top .ui-rb")'));
+  await evaluate('document.querySelector(".today-top .ui-rb").click()');
+  await until(async () => (await evaluate('[...document.querySelectorAll("#t-more .ui-pr")].map((a) => a.getAttribute("href") + " " + a.textContent).join("|")')) === '#designs Designs1');
+  assert.equal(await evaluate('document.querySelector(".t-up .q").textContent + "|" + document.querySelector(".t-tiles .ui-stat").getAttribute("aria-label")'), 'Nothing waits on you|Cleared today: 0 of 0');
+  await evaluate('document.getElementById("t-more").close()');
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
   await until(async () => (await evaluate('document.querySelector(".waiting-lede")?.textContent')) === 'Nothing waiting');
   assert.equal(await evaluate('!document.querySelector("#item-d1-design") && !document.querySelector("#tabs a[href=\'#waiting\'] .bd, #nav a[href=\'#waiting\'] .n")'), true);
@@ -2180,10 +2179,13 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-design'].notes, [{ journey: 'account-setup', screen: 'security', verdict: 'change', note: 'Make the title clearer' }]);
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
   await until(async () => (await evaluate('document.querySelector(".designs .when")?.textContent')).startsWith('Changes requested'));
-  // Main's verdict is no answer of the user's: Today lists nothing under Answered for it.
+  // Main's verdict is no answer of the user's: Today's More lists nothing under Answered for it, and Cleared today counts nothing.
   await evaluate(`location.href = ${JSON.stringify(url)}`);
-  await until(async () => (await evaluate('document.querySelector("a.more[href=\'#designs\']")?.textContent')) === 'Designs (1)');
-  assert.equal(await evaluate('document.querySelector("a.more[href=\'#answered\']")'), null);
+  await until(async () => await evaluate('!!document.querySelector(".today-top .ui-rb")'));
+  await evaluate('document.querySelector(".today-top .ui-rb").click()');
+  await until(async () => (await evaluate('[...document.querySelectorAll("#t-more .ui-pr")].map((a) => a.getAttribute("href") + " " + a.textContent).join("|")')) === '#designs Designs1');
+  assert.equal(await evaluate('document.querySelector(".t-tiles .ui-stat").getAttribute("aria-label")'), 'Cleared today: 0 of 0');
+  await evaluate('document.getElementById("t-more").close()');
   const desktop = await browse(join(dir, 'desktop-browser'), 1280);
   await desktop.evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
   await until(async () => (await desktop.evaluate('document.querySelector("#nav a[href=\\"#waiting\\"][aria-current=page]")?.textContent.trim().startsWith("Decide")')) === true);
@@ -2819,7 +2821,7 @@ test('Evidence: with no --evidence-root a linked run is found in done-done\'s ow
   proc.kill();
 });
 
-test('Today on a phone: the floating tab bar with its pill on Today, Up next with one main action, four tiles two by two, the latest proof as rows each with its tall capture filling a small frame from the top and proof with only text a row with its check and no empty frame, nothing wider than the screen, and Ask the agent one row at the foot', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Today on a phone: the floating tab bar with its pill on Today, Up next with one main action in ink, Waiting on you as 68px rows with a long title on one line, two tiles side by side, nothing wider than the screen, More holding Ask the agent as one row, the last tile clear of the tab bar, and the dock\'s Search a sheet over the screen it is opened on', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'summary-wide'), file = join(dir, 'board.json');
   mkdirSync(join(dir, 'page'), { recursive: true });
   // A capture as tall and thin as a phone screenshot (414 x 2262).
@@ -2844,33 +2846,34 @@ test('Today on a phone: the floating tab bar with its pill on Today, Up next wit
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const { evaluate, close } = await browse(join(dir, 'b'), 390, 844);
   await evaluate(`location.href = ${JSON.stringify(url)}`);
-  await until(async () => (await evaluate('document.querySelectorAll(".t-proof .lrow").length')) === 3);
+  await until(async () => (await evaluate('document.querySelectorAll(".t-wait .ui-row").length')) === 1);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= 390'));
   // The dock floats 24px over the bottom edge: a 56px pill of four 48px tabs, then the round 56px Search 12px beside it, the two centred together; its pill sits on Today.
   const rect = (sel) => `(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right), Math.round(r.top), Math.round(r.bottom)]; })()`;
   const bar = await evaluate(rect('.tabs')), find = await evaluate(rect('.dock-find')), tab = await evaluate(rect('.tabs a')), [vw, vh] = await evaluate('[document.documentElement.clientWidth, innerHeight]');
   assert.deepEqual([bar[1] - bar[0], bar[3] - bar[2], vh - bar[3], tab[1] - tab[0], find[1] - find[0], find[3] - find[2], vh - find[3], find[0] - bar[1], Math.abs(bar[0] - (vw - find[1])) <= 1], [206, 56, 24, 48, 56, 56, 24, 12, true]);
   await until(async () => (await evaluate(rect('.tabs .hl')))[0] === (await evaluate(rect('.tabs a[href="#"]')))[0]);
-  // Up next is the plan, to review: its kind in the line over its title and one main action that opens it.
-  assert.equal(await evaluate('document.querySelector(".up-next .lk").textContent.startsWith("Up next · Review") + "|" + document.querySelector(".up-next .go").getAttribute("href")'), `true|#waiting/${JSON.parse(readFileSync(join(fixture, 'valid-full.json'), 'utf8')).key}`);
-  // Four tiles, two by two, each 92px tall and as wide as its neighbour.
-  const tiles = await evaluate('[...document.querySelectorAll(".tile")].map((t) => { const r = t.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; })');
-  assert.equal(tiles.length, 4);
-  assert.ok(tiles[0][1] === tiles[1][1] && tiles[2][1] === tiles[3][1] && tiles[2][1] > tiles[0][1] && tiles[0][0] === tiles[2][0] && tiles.every((t) => t[2] === tiles[0][2] && t[3] === 92), JSON.stringify(tiles));
-  // Each proof row with a capture carries it, filling a 36 by 48 frame from the top instead of shrinking to a sliver;
-  // the proof that kept only text has its result's check where the frame would be, never an empty frame.
-  await until(() => evaluate('[...document.querySelectorAll(".t-proof .mini img")].every((i) => i.naturalWidth > 0)'));
-  assert.deepEqual(await evaluate('(() => { const a = document.querySelector(\'.t-proof a[href="#evidence/u3"]\'); return [!!a.querySelector(".mini"), a.querySelector(".donek")?.className, a.querySelector(".res").textContent]; })()'), [false, 'donek ok', 'Passed']);
-  assert.deepEqual(await evaluate('[...document.querySelectorAll(".t-proof .mini")].map((f) => { const i = f.querySelector("img"), a = f.getBoundingClientRect(), b = i.getBoundingClientRect(), c = getComputedStyle(i); return [Math.round(a.width), Math.round(a.height), Math.round(b.width - a.width), Math.round(b.height - a.height), c.objectFit, c.objectPosition].join(); })'),
-    Array(2).fill('36,48,0,0,cover,50% 0%'));
-  // Closed, Ask the agent is one line of text in a 44px row with no box around it; a tap opens the prompt box.
-  const ask = await evaluate('(() => { const a = document.querySelector("details.ask"), s = a.querySelector("summary"), r = document.createRange(); r.selectNodeContents(s); const box = a.getBoundingClientRect(), t = r.getBoundingClientRect(), c = getComputedStyle(a); return [a.open, Math.round(box.height), Math.abs(Math.round((t.top + t.bottom) / 2 - (box.top + box.bottom) / 2)) <= 2, c.borderTopWidth, c.backgroundColor, Math.round(t.left)]; })()');
-  assert.deepEqual(ask, [false, 44, true, '0px', 'rgba(0, 0, 0, 0)', 20]);
-  await evaluate('document.querySelector("details.ask summary").click()');
-  assert.ok(await evaluate('document.querySelector("details.ask").open && document.getElementById("prompt").getBoundingClientRect().height > 40'));
+  // Up next is the plan, to review: one main action in ink that opens it, and no second.
+  const plan = JSON.parse(readFileSync(join(fixture, 'valid-full.json'), 'utf8')).key;
+  assert.deepEqual(await evaluate('(() => { const b = document.querySelectorAll(".t-up .t-btns > *"), c = getComputedStyle(b[0]); return [document.querySelector(".t-up .lab").textContent, b.length, b[0].textContent, b[0].getAttribute("href"), Math.round(b[0].getBoundingClientRect().height), c.backgroundColor === getComputedStyle(document.querySelector(".today-top h1")).color]; })()'),
+    ['Up next · 1 of 2', 1, 'Review', `#waiting/${plan}`, 44, true]);
+  // The other ask is one 68px row: its long title on one line, cut with an ellipsis, its kind and when under it.
+  assert.deepEqual(await evaluate('(() => { const r = document.querySelector(".t-wait .ui-row"), t = r.querySelector(".t"); return [Math.round(r.getBoundingClientRect().height), Math.round(t.getBoundingClientRect().height), t.scrollWidth > t.clientWidth, getComputedStyle(t).textOverflow, r.querySelector(".meta").textContent.split(" · ")[0], r.getAttribute("href")]; })()'),
+    [68, 20, true, 'ellipsis', 'Yes/No', '#decide/a']);
+  // Two tiles side by side, each 96px tall, as wide as each other and 8px apart.
+  const tiles = await evaluate('[...document.querySelectorAll(".t-tiles .ui-stat")].map((t) => { const r = t.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; })');
+  assert.ok(tiles.length === 2 && tiles[0][1] === tiles[1][1] && tiles[0][2] === tiles[1][2] && tiles.every((t) => t[3] === 96) && tiles[1][0] - (tiles[0][0] + tiles[0][2]) === 8, JSON.stringify(tiles));
+  // More holds Ask the agent: closed, one line of text in a 44px row with no box around it; a tap opens the prompt box.
+  await evaluate('document.querySelector(".today-top .ui-rb").click()');
+  await until(async () => await evaluate('document.getElementById("t-more").open'));
+  const ask = await evaluate('(() => { const a = document.querySelector("#t-more details.ask"), s = a.querySelector("summary"), r = document.createRange(); r.selectNodeContents(s); const box = a.getBoundingClientRect(), t = r.getBoundingClientRect(), c = getComputedStyle(a); return [a.open, Math.round(box.height), Math.abs(Math.round((t.top + t.bottom) / 2 - (box.top + box.bottom) / 2)) <= 2, c.borderTopWidth, c.backgroundColor, Math.round(t.left)]; })()');
+  assert.deepEqual(ask, [false, 44, true, '0px', 'rgba(0, 0, 0, 0)', 16]);
+  await evaluate('document.querySelector("#t-more details.ask summary").click()');
+  assert.ok(await evaluate('document.querySelector("#t-more details.ask").open && document.getElementById("prompt").getBoundingClientRect().height > 40'));
+  await evaluate('document.getElementById("t-more").close()');
   // The last thing on Today scrolls fully clear of the floating tab bar.
   await evaluate('scrollTo(0, document.documentElement.scrollHeight)');
-  assert.ok(await evaluate('document.querySelector(".t-foot").getBoundingClientRect().bottom <= document.querySelector(".tabs").getBoundingClientRect().top'));
+  assert.ok(await evaluate('document.querySelector(".t-tiles").getBoundingClientRect().bottom <= document.querySelector(".tabs").getBoundingClientRect().top - 16'));
   // On Evidence the same proof is a compact row of its claim and its Passed check, with no frame left empty.
   await evaluate('location.hash = "#evidence"');
   await until(async () => await evaluate('!!document.getElementById("item-u3")'));
@@ -2881,9 +2884,18 @@ test('Today on a phone: the floating tab bar with its pill on Today, Up next wit
   await until(async () => (await evaluate('document.querySelector("#board h1").textContent')) === 'Designs');
   assert.equal(await evaluate('document.querySelector(".tabs [aria-current]").getAttribute("href")'), '#waiting');
   await until(async () => (await evaluate(rect('.tabs .hl')))[0] === (await evaluate(rect('.tabs a[href="#waiting"]')))[0]);
-  // The dock's round Search opens Today with its search box in hand, under the lit Today tab.
+  // The dock's round Search opens a sheet over the screen it is tapped on, its box in hand; what is typed lists in groups that open where each card lives, and Escape closes it there.
   await evaluate('document.querySelector(".dock-find").click()');
-  await until(async () => (await evaluate('[location.hash, document.activeElement?.id, document.querySelector("#board h1")?.textContent, document.querySelector(".tabs [aria-current]")?.getAttribute("href")].join("|")')) === '#find|find|Today|#');
+  await until(async () => (await evaluate('[location.hash, document.getElementById("t-search").open, document.activeElement?.id, document.querySelector("#board h1")?.textContent].join("|")')) === '#designs|true|find|Designs');
+  await evaluate('(() => { const b = document.getElementById("find"); b.value = "update"; b.dispatchEvent(new Event("input")); })()');
+  assert.deepEqual(await evaluate('[[...document.querySelectorAll("#t-search .t-grp")].map((g) => g.textContent).join(), [...document.querySelectorAll("#t-search .ui-row")].map((a) => a.getAttribute("href")).join()]'), ['Proof', '#evidence/u3,#evidence/u2,#evidence/u1']);
+  await evaluate('document.getElementById("t-search").dispatchEvent(new Event("cancel")); document.getElementById("t-search").close()');
+  assert.equal(await evaluate('location.hash + "|" + document.getElementById("t-search").open'), '#designs|false');
+  // The address #find opens Today with Search over it; closing it leaves Today at its own address.
+  await evaluate('location.hash = "#find"');
+  await until(async () => (await evaluate('[document.getElementById("t-search").open, document.querySelector("#board h1")?.textContent, document.querySelector(".tabs [aria-current]")?.getAttribute("href")].join("|")')) === 'true|Today|#');
+  await evaluate('document.getElementById("t-search").close()');
+  await until(async () => (await evaluate('location.hash')) === '');
   close();
   proc.kill();
 });
@@ -3018,7 +3030,7 @@ test('a long answer at 390 px sits under its long title, which keeps most of the
   proc.kill();
 });
 
-test('Evidence: a card per proof ever filed, in one list, newest first, with a project picker, with its capture as the hero, its result, its time and what it proves; Proven today counts only the passed ones of the last day, and a failed run is on neither; the card opens the update, which shows the whole shot, what ran, who checked it, the change, when, and its verdict; at 1440 Today sets the proof beside the asks and Evidence is a list beside the selected update, and nothing squashed at 390', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Evidence: a card per proof ever filed, in one list, newest first, with a project picker, with its capture as the hero, its result, its time and what it proves; Proven today counts only the passed ones of the last day, and a failed run is on neither; the card opens the update, which shows the whole shot, what ran, who checked it, the change, when, and its verdict; at 1440 Today sets its tiles under Up next and Evidence is a list beside the selected update, and nothing squashed at 390', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'updates'), file = join(dir, '.sign-off', 'decisions.json');
   mkdirSync(dir);
   run('init', dir);
@@ -3086,18 +3098,14 @@ test('Evidence: a card per proof ever filed, in one list, newest first, with a p
   assert.deepEqual(await pick('-'), ['item-update-2', 'item-update-7']);
   assert.deepEqual(await pick('sign-off'), ['item-update-5', 'item-update-4', 'item-update-3', 'item-update-6']);
   assert.equal((await pick('')).length, 6);
-  // Today reads the same list: Latest proof is its three newest, and the Proof tile counts it and the failed run it leaves off.
-  const newest = await evaluate('[...document.querySelectorAll(".ev-card")].slice(0, 3).map((a) => a.getAttribute("href"))');
+  // Today's Proofs today counts each update filed today, the failed run too, and opens Evidence; on a desk its tiles sit under Up next in the left column.
+  const filedToday = `Proofs today: ${doc.items.filter((d) => d.type === 'evidence' && d.filed && new Date(d.filed).toDateString() === new Date().toDateString()).length}`;
   await evaluate('location.hash = ""');
-  await until(async () => (await evaluate('document.querySelectorAll(".t-proof .lrow").length')) === 3);
-  assert.deepEqual(await evaluate('[...document.querySelectorAll(".t-proof .lrow")].map((a) => a.getAttribute("href"))'), newest);
-  assert.equal(await evaluate('document.querySelector(".tile.g-proof").getAttribute("aria-label")'), 'Proof, 7: 1 failed, 1 not checked, 5 fine');
-  // A desk's Today is a dashboard: the latest proof and the new report sit in a column right of Up next, the proof stacked as rows.
+  await until(async () => await evaluate('!!document.querySelector(".t-tiles .ui-stat[href=\'#evidence\']")'));
+  assert.equal(await evaluate('document.querySelector(".t-tiles .ui-stat[href=\'#evidence\']").getAttribute("aria-label")'), filedToday);
   const box = (sel) => `(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { top: r.top, left: r.left, right: r.right, bottom: r.bottom }; })()`;
-  const [asks, proof] = [await evaluate(box('.up-next')), await evaluate(box('.t-proof'))];
-  assert.ok(proof.left > asks.right && Math.abs(proof.top - asks.top) < 2, 'Latest proof sits right of Up next, level with it');
-  const proofRows = await evaluate('[...document.querySelectorAll(".t-proof .lrow")].map((a) => { const r = a.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.height)]; })');
-  assert.ok(proofRows.every(([l, t, h], i) => l === proofRows[0][0] && h < 120 && (!i || t > proofRows[i - 1][1])), 'the proof rows stack, each one short');
+  const [asks, tiles] = [await evaluate(box('.t-up')), await evaluate(box('.t-tiles'))];
+  assert.ok(tiles.left === asks.left && tiles.right === asks.right && tiles.top >= asks.bottom, 'the tiles sit under Up next, as wide');
   await evaluate('location.hash = "#evidence"');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
   // Evidence on a desk is one list beside the selected update: the cards stack in one column, newest first, and the newest is selected and open beside it.
@@ -3117,8 +3125,8 @@ test('Evidence: a card per proof ever filed, in one list, newest first, with a p
   // Decide's red count goes away at zero, as the tab bar's does.
   assert.deepEqual(await evaluate('[!!document.querySelector(\'#nav a[href="#waiting"] .n\'), document.querySelectorAll("[id^=item-update-]").length]'), [false, 0]);
   await evaluate('location.hash = ""');
-  await until(async () => (await evaluate('!!document.querySelector(".tile.g-proof")')));
-  assert.deepEqual(await evaluate('[...document.querySelectorAll(".tile .n")].map((n) => n.textContent).join() + "|" + !!document.querySelector(".up-next.clear")'), '0,0,0,7|true');
+  await until(async () => (await evaluate('!!document.querySelector(".t-tiles")')));
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".t-tiles .ui-stat")].map((t) => t.getAttribute("aria-label")).join() + "|" + !!document.querySelector(".t-up.clear")'), `Cleared today: 0 of 0,${filedToday}|true`);
   for (const [k, result, why] of [['update-1', 'Failed', ''], ['update-6', 'Could not check', 'A picture or recording changed after the run. Ask the agent to run the check again.']]) {
     await evaluate(`location.hash = "#evidence/${k}"`);
     await until(async () => (await evaluate('!!document.querySelector(".ev-item")')));
@@ -3185,12 +3193,12 @@ test('Evidence: a card per proof ever filed, in one list, newest first, with a p
   await evaluate('[...document.querySelectorAll(".ev-verdict .choices button")].find((b) => b.textContent === "Pass").click()');
   await until(async () => (await evaluate('!document.querySelector("#toast").hidden && document.querySelector(".ev-verdict [aria-pressed=true]")?.textContent === "Pass"')));
   assert.equal(await evaluate('location.hash'), '#evidence/update-4');
-  // Back on the list, that update is answered: it stays on Evidence, in the Proof tile's count and in Latest proof, since a verdict does not unprove it.
+  // Back on the list, that update is answered: it stays on Evidence and in Proofs today's count, since a verdict does not unprove it.
   await evaluate('location.hash = "#evidence"');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
   await evaluate('location.hash = ""');
-  await until(async () => (await evaluate('document.querySelectorAll(".t-proof .lrow").length')) === 3);
-  assert.deepEqual(await evaluate('[document.querySelector(".tile.g-proof .n").textContent, [...document.querySelectorAll(".t-proof .lrow")].some((a) => a.getAttribute("href") === "#evidence/update-4")]'), ['7', true]);
+  await until(async () => await evaluate('!!document.querySelector(".t-tiles")'));
+  assert.equal(await evaluate('document.querySelector(".t-tiles .ui-stat[href=\'#evidence\']").getAttribute("aria-label")'), filedToday);
   await evaluate('location.hash = "#evidence"');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
   close();

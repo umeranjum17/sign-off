@@ -15,4 +15,5 @@ The repo's maintained verification map; a proof that drives one entry point is i
 - [Design viewer](design-viewer.md): the full-screen screen-by-screen review, its note box and buttons at 390, 820 and 1280
 - [Notification sender](notifications.md): the notify POST a local receiver gets, once per card
 - [Board actions](board-actions.md): every card kind on every tab, each action clicked (Dismiss, bulk Select, answers), 390 and 1280, light and dark, with the look step
+- [Today](today.md): the title with More, Up next with Answer in ink, Waiting on you rows, Cleared today and Proofs today, the More and Search sheets, 390 and 1280, light and dark, each beside the approved prototype
 - [Tickets](tickets.md): `ticket` writes, lists and shows a ticket; `--ticket` on every post; the Ticket row on each card kind and the ticket's page with its cards and the tickets under it, 390 and 1280, light and dark

@@ -54,7 +54,7 @@ for theme in light dark; do
   cp "$d/board.answers.jsonl" "$out/answers-file.$theme.txt"
   answer digest no 'Readers can still subscribe to the monthly.'
   go waiting; js "scrollTo(0, 99999)"; pause 500; shot back-list
-  go ''; js "document.querySelector('.t-cleared')?.scrollIntoView({ block: 'center' })"; pause 500; shot back-today
+  go ''; js "document.querySelector('.t-tiles')?.scrollIntoView({ block: 'center' })"; pause 500; shot back-today
   w=1280; ax emulate --viewport 1280x800x2 --color-scheme $theme
   go decide/ship; shot back-answered
   if has '.decide .ans-card'; then tap '.decide-bar .answer'; pause 700; shot back-change; fi
@@ -74,6 +74,6 @@ node -e 'const [out, v] = process.argv.slice(1); require("fs").writeFileSync(out
     "The person picks Today and taps Change to Today: the ask shows Changed, Today in the green card, Before: Friday with the note and the time under it, and a toast says changed to Today with Undo; the agent waiting with wait --filer receives the answer today with replaces naming friday.",
     "The person taps Undo: the ask shows Friday again, the toast says Back to: Friday, and the agent receives friday with replaces naming today.",
     "On Decide, below the open asks, the Answered group lists When should the new settings page ship? with Friday and the note, and Keep the weekly digest? with No and its note, each with a green check and the time.",
-    "On Today, Cleared today lists the same two answers with their notes and times.",
+    "On Today, Cleared today counts the same two answers.",
     "At 1280 px, on a desk, the answered ask sits beside Decide\x27s list with the Answered group selected, showing Friday and Change answer; Change answer brings back its numbered cards with Friday tagged Your answer."],
   result: "After an answer the next ask opens with Back, and Back returns to the ask just answered, which shows the answer, its note, when it was given and whether the agent read it. Change answer brings the cards back; a new pick is saved as a change: the ask reads Changed with the answer before it, and the agent receives the new answer with replaces naming the earlier one, while the answers file keeps every earlier line. Undo puts the earlier answer back, and the agent receives that as a change too. Decide lists every answer under Answered and Today under Cleared today, each with the answer, its note and its time." }, null, 2) + "\n")' "$out" "$(node -p "require('$repo/package.json').version")"

@@ -57,134 +57,82 @@
   h2 { font-size: 1.375rem; line-height: 1.25; margin: 0 0 0.75rem; }
   .icon { flex: none; display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 0.5rem; background: var(--area, var(--muted)); }
   .icon svg { width: 1.125rem; height: 1.125rem; fill: none; stroke: var(--surface); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  /* Today, as the approved feel draws it: the date over a large title and a ring that fills as asks are cleared, one Up next card with one main action,
-     four tiles in two rows (each opens what it counts), the latest proof with a capture each, the new report, and what was cleared today, on a grey ground. */
-  body.today { --bg: var(--ground); --surface: var(--card); }
-  body.today main { padding: 0 max(1rem, env(safe-area-inset-right)) 0 max(1rem, env(safe-area-inset-left)); }
-  .top.today-top { padding: 1.25rem 0 0; }
-  .today-top .date-kicker { height: 1.25rem; margin: 0; line-height: 1.25rem; letter-spacing: 0.01em; }
-  .head-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.75rem; }
-  body.today .today-top h1 { font-size: 2.125rem; line-height: 2.5625rem; letter-spacing: -0.026em; }
-  .today-top .sub { margin: 2px 0 0; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; }
-  /* Scrolled on a phone, the large title gives way to a small one in a glass bar at the top, as on iOS. */
-  .cbar { position: fixed; z-index: 2; top: 0; left: 0; right: 0; display: grid; place-items: center; height: calc(3.25rem + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top);
-    background: var(--tabbar); -webkit-backdrop-filter: saturate(180%) blur(24px); backdrop-filter: saturate(180%) blur(24px); box-shadow: 0 0.5px 0 var(--hairline);
-    font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.02em; opacity: 0; pointer-events: none; transition: opacity 160ms linear; }
-  body.scrolled .cbar { opacity: 1; }
-  .ring { position: relative; flex: none; width: 2.75rem; height: 2.75rem; margin-bottom: 2px; }
-  .ring svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
-  .ring circle { fill: none; stroke-width: 4.5; }
-  .ring .bg { stroke: var(--fill-2); } .ring .fg { stroke: var(--tk-success); stroke-linecap: round; transition: stroke-dashoffset 600ms var(--spring); }
-  .ring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: var(--t-xs); font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-  /* Up next: the one ask that matters most, its kind in its colour, and one main action beside a quiet second one. */
-  .up-next { position: relative; margin: 1.25rem 0 0; padding: 1.125rem; border-radius: 1.375rem; background: var(--card); box-shadow: var(--shadow-card); overflow: hidden; }
-  .g-answer { --k: var(--action); } .up-next.clear { --k: var(--tk-success); }
-  .up-next .lk { display: flex; align-items: center; gap: 0.5rem; margin: 0; color: var(--k); font-size: var(--t-xs); line-height: 1.125rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; }
-  .up-next .lk .dot { flex: none; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--k); box-shadow: 0 0 0 4px color-mix(in srgb, var(--k) 18%, transparent); }
-  .up-next .lk .when { margin-left: auto; color: var(--muted); font-weight: 500; text-transform: none; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .up-next .lk .when.hot { color: var(--warn); font-weight: 600; }
-  .up-next h2 { margin: 0.625rem 0 0.375rem; font-size: 1.375rem; line-height: 1.75rem; letter-spacing: -0.022em; }
-  .up-next p { margin: 0; color: var(--muted); font-size: var(--t-s); line-height: 1.3125rem; }
-  .up-next .rec { display: flex; align-items: center; gap: 0.625rem; margin-top: 0.875rem; padding: 0.75rem 0.875rem; border-radius: 0.875rem; background: var(--sunk); color: var(--text); }
-  .up-next .rec .glyph { width: 1.25rem; height: 1.25rem; color: var(--k); }
-  .up-next .rec b { font-weight: 600; }
-  .up-next .acts { display: flex; gap: 0.625rem; margin-top: 1rem; }
-  .up-next .acts > * { display: flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 3.25rem; padding: 0 1.125rem; border-radius: 1rem; font-size: var(--t-m); font-weight: 600;
-    letter-spacing: -0.02em; text-decoration: none; white-space: nowrap; -webkit-tap-highlight-color: transparent; transition: transform 260ms var(--spring), filter 120ms linear; }
-  .up-next .acts > :active { transform: scale(0.965); transition-duration: 90ms; }
-  /* The main action names the pick, so a long one wraps inside the button rather than being cut. */
-  .up-next .go { position: relative; overflow: hidden; flex: 1; min-width: 0; padding-block: 0.5rem; white-space: normal; text-align: center; line-height: 1.25rem; background: var(--action); color: #FFFFFF; box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset, 0 6px 16px -6px color-mix(in srgb, var(--action) 70%, transparent); }
-  .up-next .go:active { filter: brightness(0.92); }
-  /* Answered from here, the button turns green and draws a check; then the next ask slides up into the card. */
-  .up-next .go.done, .up-next .go.done:disabled { background: color-mix(in srgb, var(--tk-success) 82%, #000); color: #FFFFFF; } .up-next .go.done .kc { visibility: hidden; }
-  .up-next.next > * { animation: lead-in 260ms var(--ease); }
+  /* Today, as the approved prototype draws it from ui.css's parts: the title row with More, Up next (the one ask that matters most: its question, its project, time and
+     the answer recommended, then Answer in ink beside Other answer), the next three asks waiting on you, and two tiles, Cleared today and Proofs today. */
+  .t-up .lab { flex: 1; min-width: 0; }
+  .t-up .q { display: -webkit-box; overflow: hidden; margin: 0.25rem 0 0; color: var(--tk-ink); font-size: var(--tk-fs-head); line-height: 1.5rem; font-weight: 500; letter-spacing: -0.014em;
+    -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+  .t-up .meta { display: flex; align-items: center; gap: 0.5rem; height: 1.25rem; margin: 0.5rem 0 0; overflow: hidden; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: 1.25rem; white-space: nowrap; }
+  .t-up .meta > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+  .t-up .meta img, .t-up .meta .mono { flex: none; width: 1rem; height: 1rem; border-radius: 0.25rem; object-fit: cover; }
+  .t-up .meta .mono { background: var(--tk-ink); color: var(--tk-raised); font-size: 0.4375rem; line-height: 1rem; font-weight: 600; text-align: center; }
+  .t-up .err { margin-top: 0.5rem; }
+  /* Up next's buttons: 44px pills side by side, the main one in ink; one alone takes the row. */
+  .t-btns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0.5rem; margin-top: 1rem; }
+  .t-btn { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; height: 2.75rem; padding: 0 1rem; border: 0; border-radius: 1.375rem; font: inherit;
+    font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 500; letter-spacing: -0.006em; text-decoration: none; white-space: nowrap; -webkit-tap-highlight-color: transparent; transition: transform 120ms var(--ease); }
+  .t-btn > .lbl { overflow: hidden; text-overflow: ellipsis; }
+  .t-btn:active { transform: scale(0.97); }
+  .t-btn.ink { background: var(--tk-ink); color: var(--tk-canvas); }
+  .t-btn.white { background: var(--tk-raised); color: var(--tk-ink); box-shadow: var(--tk-elev-raised); }
+  .t-btn:disabled { cursor: default; }
+  .t-btn.ink:disabled { background: var(--tk-ink); color: var(--tk-canvas); } .t-btn.white:disabled { background: var(--tk-raised); color: var(--tk-ink); }
+  :is(.today-top, .t-up, .t-wait, .t-tiles, .t-sheet) :focus-visible { outline-color: var(--tk-ink); }
+  .t-btn:disabled:not(.done) { opacity: 0.35; }
+  @media (prefers-color-scheme: dark) { .t-btn.white, .t-btn.white:disabled { background: var(--tk-on); } }
+  /* Answered here, the ink button draws a check; then the next ask rises into the card. */
+  .t-btn .okmark { position: absolute; inset: 0; display: none; place-items: center; }
+  .t-btn .okmark .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 2.6; stroke-dasharray: 24; stroke-dashoffset: 24; animation: draw 260ms 90ms var(--ease) forwards; }
+  .t-btn.done > .lbl { visibility: hidden; } .t-btn.done .okmark { display: grid; }
+  .t-up.next > * { animation: lead-in 260ms var(--ease); }
   @keyframes lead-in { from { opacity: 0; transform: translateY(0.875rem); } }
-  .up-next .soft { flex: none; background: var(--sunk); color: var(--text); }
-  .up-next .go .kc { display: none; background: rgba(255, 255, 255, 0.22); color: #FFFFFF; box-shadow: none; }
-  .up-next .strip { display: flex; gap: 0.5rem; margin-top: 0.875rem; }
-  .up-next .strip img { width: 4.125rem; height: 8.9375rem; border-radius: 0.5rem; object-fit: cover; object-position: top; box-shadow: var(--shot-edge); }
-  /* An optional comment under a pick, folded until asked for; what is typed goes with the answer. */
-  .up-next .cmt { margin: 0.625rem -0.875rem 0; }
-  .up-next .cmt > summary { display: flex; align-items: center; gap: 0.625rem; min-height: 3rem; padding: 0 0.875rem; border-radius: 0.875rem; color: var(--accent); font-weight: 500; list-style: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-  .up-next .cmt > summary::-webkit-details-marker { display: none; }
-  .up-next .cmt > summary:active { background: var(--sunk); }
-  .up-next .cmt[open] > summary { color: var(--muted); }
-  .up-next .cmt > summary .glyph { width: 1.25rem; height: 1.25rem; }
-  .up-next .cmt > summary small { margin-left: auto; color: var(--faint); font-size: var(--t-xs); font-weight: 500; }
-  .up-next .cmt textarea { display: block; width: calc(100% - 1.75rem); min-height: 4rem; margin: 0.25rem 0.875rem 0; padding: 0.75rem 0.875rem; border: 0; border-radius: 0.875rem; background: var(--sunk); color: var(--text); font: inherit; resize: none; }
-  .up-next.clear { padding: 1.75rem 1.125rem 1.875rem; text-align: center; }
-  .up-next.clear .big { display: grid !important; place-items: center; width: 4.5rem; height: 4.5rem; margin: 0 auto 1.125rem; border-radius: 50%; color: #FFFFFF; background: var(--tk-success);
-    box-shadow: 0 10px 28px -8px color-mix(in srgb, var(--tk-success) 70%, transparent); animation: pop 520ms var(--spring); }
-  .up-next.clear .big .glyph { width: 2.125rem; height: 2.125rem; stroke-width: 2.6; }
-  .up-next.clear h2 { margin: 0 0 0.375rem; }
-  /* Four tiles, two by two on a phone: a disc in the group's colour, the count large, the group and one line; a tile at zero greys and shakes when tapped. */
-  .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; margin: 0.75rem 0 0; }
-  .card, .tile { background: var(--surface); border-radius: var(--r-card); }
+  /* Today's two tiles carry the prototype's filled marks. */
+  .t-tiles .si svg { fill: currentColor; stroke: none; }
+  .t-tiles .ui-stat { -webkit-tap-highlight-color: transparent; transition: transform 120ms var(--ease); } .t-tiles .ui-stat:active { transform: scale(0.97); }
+  /* More (the round button in the title row) and Search (the dock's round button) open a sheet from the bottom: its handle, its name and a round close, then its rows on a sunk ground. */
+  .t-sheet { width: 100%; max-width: 26.875rem; max-height: calc(100dvh - 3rem); margin: auto auto 0; padding: 0; border: 0; border-radius: 1.75rem 1.75rem 0 0; background: var(--tk-card); color: var(--tk-text);
+    box-shadow: 0 -8px 32px rgba(30, 20, 10, 0.12); overscroll-behavior: contain; }
+  .t-sheet[open] { animation: sheet-up 250ms var(--ease); }
+  .t-sheet::backdrop { background: rgba(30, 24, 18, 0.28); }
+  @media (prefers-color-scheme: dark) { .t-sheet::backdrop { background: rgba(0, 0, 0, 0.5); } }
+  .t-sheet::before { content: ""; display: block; width: 2.25rem; height: 0.25rem; margin: 0.5rem auto 0; border-radius: 2px; background: var(--tk-line); }
+  .t-sheet > div { padding: 0.5rem 1rem calc(1.5rem + env(safe-area-inset-bottom)); }
+  .t-shd { display: flex; align-items: center; gap: 0.5rem; height: 2.5rem; }
+  .t-shd h2 { flex: 1; min-width: 0; margin: 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: 1.5rem; font-weight: 400; letter-spacing: -0.006em; outline: none; }
+  .t-shd .x { position: relative; display: grid; flex: none; place-items: center; width: 2rem; height: 2rem; padding: 0; border: 0; border-radius: 1rem; background: var(--tk-inset); color: var(--tk-text-secondary); }
+  .t-shd .x::after { content: ""; position: absolute; inset: -0.375rem; }
+  .t-shd .x .glyph { width: 1rem; height: 1rem; }
+  .t-find { display: flex; align-items: center; gap: 0.5rem; height: 2.75rem; margin-top: 1rem; padding: 0 0.5rem 0 1rem; border-radius: 1.375rem; background: var(--tk-inset); color: var(--tk-text-tertiary); }
+  .t-find svg { flex: none; width: 1.125rem; height: 1.125rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .t-find input { flex: 1; min-width: 0; height: 2.75rem; padding: 0; border: 0; background: none; color: var(--tk-ink); font: inherit; font-size: 0.9375rem; outline: none; -webkit-appearance: none; appearance: none; }
+  .t-find input::placeholder { color: var(--tk-text-tertiary); }
+  .t-find input::-webkit-search-cancel-button { display: none; }
+  .t-grp { margin: 1.25rem 0 0.5rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: 1.25rem; }
+  .t-sheet .ui-list { background: var(--tk-inset); box-shadow: none; border-radius: 1rem; }
+  .t-sheet .ui-icon { box-shadow: none; }
+  .t-sheet .ui-props { margin-top: 1rem; }
+  .t-sheet .ui-pr .v .glyph { color: var(--tk-text-tertiary); }
+  .t-sheet .ui-seg { margin-top: 0.5rem; }
+  .t-line { margin: 0.5rem 0 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: 1.25rem; }
+  .t-sheet .ask { margin-top: 1rem; }
+  .t-sheet .ask > summary, .t-sheet .ask .actions button { color: var(--tk-ink); }
+  .t-sheet .ask .actions button { background: var(--tk-inset); }
+  /* A row's second line sits 4px under its title, as ui.css spaces it, not at the board's older line spacing. */
+  :is(.t-wait, .t-sheet) .ui-row .meta { margin: 0; }
+  .today-top .ui-rb .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 3; }
+  /* Cards, a run's result mark and its check badge (Decide's answered ask), and the small segmented control (the full screen's sizes). */
+  .card { background: var(--surface); border-radius: var(--r-card); }
   .card { padding: var(--tk-sp-4); }
-  .tile { display: flex; flex-direction: column; justify-content: space-between; min-height: 5.75rem; padding: 0.75rem 0.875rem; border-radius: 1.125rem; background: var(--card); box-shadow: var(--shadow-card);
-    color: var(--text); text-decoration: none; -webkit-tap-highlight-color: transparent; transition: transform 260ms var(--spring); }
-  .tile:active { transform: scale(0.975); transition-duration: 90ms; }
-  .tile .tt { display: flex; align-items: flex-start; justify-content: space-between; }
-  .tile .icon { width: 2rem; height: 2rem; border-radius: 50%; background: var(--k); }
-  .tile .icon svg { width: 1.125rem; height: 1.125rem; stroke: #FFFFFF; stroke-width: 2.2; }
-  .tile .n { font-size: 1.75rem; line-height: 2rem; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-  .tile .name { font-size: var(--t-s); line-height: 1.125rem; font-weight: 600; }
-  .tile .name small { display: block; margin-top: 1px; color: var(--muted); font-size: var(--t-xs); line-height: 1rem; font-weight: 500; }
-  .tile.zero .n { color: var(--faint); } .tile.zero .icon { background: var(--fill-2); } .tile.zero .icon svg { stroke: var(--muted); }
-  .tile.shake { animation: shake 360ms var(--ease); }
-  @keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
-  .tile:focus-visible { outline-offset: 2px; }
-  .tile.g-answer { --k: var(--tk-link); } .tile.g-signin { --k: var(--tk-warning); } .g-proof { --k: var(--tk-success); } .g-proof.failed { --k: var(--tk-critical); }
-  /* A tile opens Decide at its group, whose head flashes. */
-  .dl-head { scroll-margin-top: 1rem; } .dl-head.flash { animation: head-flash 900ms var(--ease); }
-  @keyframes head-flash { from, 40% { color: var(--accent); } }
-  /* Section heads 32px under what comes before them, the link keeping a tall tap area without pushing the rows down. */
-  .t-sec .sec-head { align-items: baseline; margin: 2rem 0.25rem 0.625rem; }
-  .t-sec .sec-head h2 { margin: 0; font-size: 1.25rem; line-height: 1.5625rem; letter-spacing: -0.02em; }
-  .t-sec .sec-head a { min-height: 2.75rem; margin: -0.75rem -0.5rem -0.75rem 0; padding: 0 0.5rem; font-size: var(--t-s); font-weight: 500; }
-  /* A grouped list: a capture or a check, the title on one line, one quiet line under it, then a chevron. */
-  .t-list { list-style: none; margin: 0; padding: 0; overflow: hidden; border-radius: 1.125rem; background: var(--card); box-shadow: var(--shadow-card); }
-  .t-list li { position: relative; }
-  .t-list li + li::before { content: ""; position: absolute; z-index: 1; top: 0; right: 0; left: 3.875rem; border-top: 0.5px solid var(--hairline); }
-  .lrow { display: flex; align-items: center; gap: 0.75rem; min-height: 3.75rem; padding: 0.625rem 0.875rem; color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent; transition: background-color 120ms linear; }
-  .lrow:active { background: color-mix(in srgb, var(--text) 6%, var(--card)); transition: none; }
-  .lrow .lt { display: grid; flex: 1; min-width: 0; }
-  .lrow .lt b { font-size: 1rem; line-height: 1.3125rem; font-weight: 600; letter-spacing: -0.02em; }
-  .lrow .lt > span { color: var(--muted); font-size: 0.875rem; line-height: 1.1875rem; }
-  .lrow .chev { flex: none; } .lrow .chev .glyph { width: 1.125rem; height: 1.125rem; color: var(--tk-rail); }
-  .mini { flex: none; width: 2.25rem; height: 3rem; overflow: hidden; border-radius: 0.375rem; background: var(--sunk); box-shadow: var(--shot-edge); }
-  .mini img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
-  .mini .icon { width: 100%; height: 100%; border-radius: 0; background: none; } .mini .icon svg { stroke: var(--muted); }
   .res { display: inline-flex; align-items: center; gap: 0.3125rem; font-weight: 600; }
   .res::before { content: ""; width: 0.4375rem; height: 0.4375rem; border-radius: 50%; background: currentColor; }
   .res.ok { color: var(--ok); } .res.bad { color: var(--danger); } .res.warn { color: var(--warn); } .res.none::before { display: none; }
   .donek { display: grid; flex: none; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 50%; background: color-mix(in srgb, var(--tk-success) 16%, transparent); color: var(--tk-success); }
   .donek .glyph { width: 1.125rem; height: 1.125rem; stroke-width: 2.6; }
-  /* Proof that kept only text has its result's mark where a capture would be, never an empty frame. */
   .donek.bad { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); } .donek:is(.warn, .none) { background: var(--sunk); color: var(--muted); }
-  /* The new report: its picture (teal, as on Reports), what it explains with, its title, two lines of what it says, and who filed it when. */
-  .rp-card { display: flex; align-items: flex-start; gap: 0.875rem; padding: 1rem; border-radius: 1.125rem; background: var(--card); box-shadow: var(--shadow-card); color: inherit; text-decoration: none;
-    -webkit-tap-highlight-color: transparent; transition: transform 260ms var(--spring); }
-  .rp-card:active { transform: scale(0.975); transition-duration: 90ms; }
-  .rp-card .rth { display: grid; flex: none; place-items: center; width: 4.5rem; height: 4.5rem; border-radius: 1.125rem; color: var(--teal);
-    background: color-mix(in srgb, var(--teal) 13%, var(--card)); box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--teal) 30%, transparent); }
-  .rp-card .rth svg { width: 3.25rem; height: 3.25rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  .rp-card .t { display: block; flex: 1; min-width: 0; }
-  .rp-card .ey { display: block; color: var(--teal); font-size: var(--t-xs); line-height: 1.125rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; }
-  .rp-card .h { display: block; margin: 0.25rem 0; font-size: 1.125rem; line-height: 1.4375rem; font-weight: 700; letter-spacing: -0.02em; }
-  .rp-card .p { display: -webkit-box; overflow: hidden; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-  .rp-card .m { display: block; margin-top: 0.5rem; color: var(--faint); font-size: var(--t-xs); font-weight: 500; }
-  /* Under all that, the tools the approved feel has no place for: search, the way to everything answered, the Leash and Ask the agent. */
-  .t-foot { margin-top: 2rem; }
-  .t-foot > .search { margin: 0; } .t-foot > .more, .t-foot > .ask > summary { padding: 0 0.25rem; }
-  .t-foot .leash-h { margin: 2rem 0.25rem 0.625rem; } .t-foot .leash-h h2 { margin: 0; font-size: 1.25rem; line-height: 1.5625rem; letter-spacing: -0.02em; }
-  /* The Leash: one control for how much agents may do without asking, and what the chosen one means below it. */
-  .leash { display: flex; flex-direction: column; gap: var(--tk-sp-3); padding: 0.875rem 1rem 1rem; border-radius: var(--r-card); }
   .seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--sunk); border-radius: 0.5625rem; padding: 2px; }
   .seg button { min-height: var(--ctl); border: 0; border-radius: 0.4375rem; background: none; color: var(--text); font: inherit; font-size: var(--t-xs); line-height: 1.2; padding: 0.25rem 0.375rem; }
   .seg button[aria-pressed="true"] { background: var(--seg-on); box-shadow: var(--tk-elev-raised); color: var(--text); font-weight: var(--tk-fw-semibold); }
   .seg button[aria-pressed="true"]::before { content: none; }
-    .leash-line { margin: 0.5rem 1rem 0; color: var(--muted); font-size: var(--t-xs); line-height: 1.1875rem; letter-spacing: -0.01em; }
   @media (max-width: 63.999rem) {
     /* The smaller Decide title lifts a short ask; the page still reaches the bar so a swipe anywhere above it skips. */
     .decide { min-height: calc(100dvh - 13.5rem - env(safe-area-inset-bottom)); }
@@ -830,23 +778,17 @@
     #toast { bottom: 1.75rem; }
     main { width: 100%; padding: 0 3rem; }
     .back { display: none; }
-    /* Today on a desk is a dashboard within 1160px: the four tiles across, then Up next and what was cleared on the left, the latest proof and the new report on the right. */
-    body.today main { max-width: 72.5rem; margin: 0 auto; padding: 0.75rem 3rem 3.5rem; }
-    .top.today-top { padding: 1.25rem 0 0; }
-    body.today .today-top h1 { font-size: 2.5rem; line-height: 2.875rem; }
-    .cbar { display: none; }
-    .ring { width: 3.25rem; height: 3.25rem; }
-    .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.875rem; margin: 1.5rem 0 0; }
-    .tile { min-height: 6.5rem; padding: 0.875rem 1rem; }
-    .tile:hover { box-shadow: var(--shadow-card), 0 0 0 1px var(--tk-rail); }
-    .t-cols { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 2rem; align-items: start; }
-    .up-next { margin: 1.75rem 0 0; padding: 1.5rem 1.5rem 1.375rem; }
-    .up-next::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--k); opacity: 0.9; }
-    .up-next h2 { font-size: 1.625rem; line-height: 2rem; }
-    .up-next .go { flex: none; min-width: 13.75rem; }
-    .up-next .go .kc { display: inline-grid; }
-    .t-sec .sec-head { margin: 1.75rem 0 0.625rem; }
-    .lrow:hover, .rp-card:hover { background: color-mix(in srgb, var(--text) 4%, var(--card)); }
+    /* Today on a desk, as the prototype's desk sets it: the title row across, then a 400px column of Up next and the tiles beside what else waits on you; a sheet opens in the middle. */
+    body.today main { max-width: 61rem; margin: 0; padding: 0 2.5rem 2.5rem 1rem; }
+    .t-cols { display: grid; grid-template-columns: 25rem minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+    .t-cols > * > :first-child { margin-top: 1rem; }
+    .t-btn:hover { filter: brightness(0.94); } .t-tiles .ui-stat:hover, #board .t-wait .ui-row:hover { opacity: 0.85; }
+    .t-sheet { margin: auto; border-radius: 1.75rem; max-height: calc(100dvh - 6rem); }
+    .t-sheet::before { visibility: hidden; }
+    /* A long title takes two lines on a desk rather than being cut; a row keeps its 68px when it has one. */
+    :is(.t-wait, .t-sheet) .ui-row { height: auto; min-height: 4.25rem; padding: 0.75rem 0; }
+    :is(.t-wait, .t-sheet) .ui-row .l1 { align-items: flex-start; height: auto; }
+    :is(.t-wait, .t-sheet) .ui-row .l1 .t { display: -webkit-box; white-space: normal; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
     .decide-bar { position: static; margin: 1rem 0 0; padding: 0; background: transparent; }
     .decide-bar .answer { flex: none; }
     .rows.reports, .sec-h:has(+ .reports), .legend { max-width: 50rem; }
@@ -1574,10 +1516,10 @@
   }
   @media (prefers-reduced-motion: reduce) { #keys[open], .split-detail.in > * { animation: none; } }
   @media (prefers-reduced-motion: reduce) {
-    #board.push *, #board.pop *, .rise .dl-row, .rise .dl-head, .rp-list .new.out, .sk, #toast, #toast .bar, .all-clear-big .big, .dl-menu, .answer .lbl, .answer .okmark .glyph, .design-stage .stamp, .decide .pick-option .check, .dl-row.returned .dl-face, .up-next > *, .up-next .big, .tile.shake, .dl-head.flash, .bd.bump { animation: none !important; }
+    #board.push *, #board.pop *, .rise .dl-row, .rise .dl-head, .rp-list .new.out, .sk, #toast, #toast .bar, .all-clear-big .big, .dl-menu, .answer .lbl, .answer .okmark .glyph, .design-stage .stamp, .decide .pick-option .check, .dl-row.returned .dl-face, .t-up.next > *, .t-btn .okmark .glyph, .bd.bump { animation: none !important; }
     .answer .okmark .glyph { stroke-dashoffset: 0; }
     .rp-list .new.out { display: none; }
-    .dl-face, .dl-act > *, .dl-face .icon, .decide .pick-option, .decide-bar .answer, .dl-more > summary > span, .tabs .hl, .tabs .icon, .side .icon, .ring .fg, .tile, .up-next .acts > *, .rp-card, .cbar { transition: none !important; }
+    .dl-face, .dl-act > *, .dl-face .icon, .decide .pick-option, .decide-bar .answer, .dl-more > summary > span, .tabs .hl, .tabs .icon, .side .icon, .t-btn, .t-tiles .ui-stat { transition: none !important; }
   }
 </style>
 </head>
@@ -2597,10 +2539,10 @@
 
   const LEASH = { ask: ['Ask me first', 'Ask first', 'Agents wait for you on every ask.'], matters: ['Ask when it matters', 'When it matters', 'At the deadline, agents take the safe default.'],
     act: ['Act, then tell me', 'Act, then tell', 'Agents take their pick now and report back.'] };
-  /** The Leash on Today: three buttons that save the leash: line of config.yaml. A board that takes no changes shows it without them working. */
+  /** The Leash, in Today's More: three segments that save the leash: line of config.yaml, and what the chosen one means under them. A board that takes no changes shows it without them working. */
   function leash() {
     const err = el('div', { class: 'err', role: 'alert' }), still = FROZEN || state.readonly || state.answers_only;
-    const seg = el('div', { class: 'seg', role: 'group', 'aria-label': 'Leash' }, ...Object.entries(LEASH).map(([v, [, short]]) => {
+    const seg = el('div', { class: 'ui-seg', role: 'group', 'aria-label': 'Leash' }, ...Object.entries(LEASH).map(([v, [, short]]) => {
       const b = el('button', { 'aria-pressed': String(state.leash === v) }, short);
       b.disabled = Boolean(still);
       b.onclick = () => {
@@ -2613,168 +2555,140 @@
       };
       return b;
     }));
-    return [el('div', { class: 'sec-h leash-h' }, el('h2', {}, 'Leash')), el('div', { class: 'card leash' }, el('span', {}, 'How much may agents do without asking?'), seg, err),
-      el('p', { class: 'leash-line' }, LEASH[state.leash][2])];
+    return [el('p', { class: 'ui-dl' }, 'How much may agents do without asking?'), seg, el('p', { class: 't-line' }, LEASH[state.leash][2]), err];
   }
-  /** Search on Today: matches each item's title and what it says, and lists them as short rows that open where the item lives. */
-  let query = '';
   const hrefOf = (d) => (area(d) === 'reports' && reads(d) ? `#reports/${d.key}` : area(d) === 'evidence' ? `#evidence/${d.key}` : askHref(d));
-  function search() {
-    const box = el('input', { type: 'search', id: 'find', 'aria-label': 'Search the board', placeholder: 'Search', autocomplete: 'off' }), out = el('div', {});
-    const show = () => {
-      const q = query.trim().toLowerCase(), gone = new Set(state.dismissed ?? []);
-      const hits = q ? state.decisions.filter((d) => !gone.has(d.key) && `${title(d)} ${d.about ?? ''}`.toLowerCase().includes(q)).reverse() : [];
-      out.replaceChildren(!q ? '' : hits.length ? el('ul', { class: 'card rows' }, ...hits.slice(0, 20).map((d) => {
-        const link = el('a', { class: 'compact', href: hrefOf(d) }, ...compact(d, area(d) === 'notes' ? 'reports' : area(d)));
-        link.onclick = () => (jump = d.key);
-        return el('li', {}, link);
-      })) : el('p', { class: 'meta' }, 'Nothing matches.'));
-    };
-    box.value = query;
-    box.oninput = () => { query = box.value; show(); };
-    show();
-    return el('div', { class: 'search', role: 'search' }, box, out);
-  }
 
-  /* Today, as the approved feel draws it: the date over a large title and a ring, Up next with one main action, four tiles, the latest proof, the new report and what was cleared today.
-     A phone stacks them; a desk sets the tiles across, then Up next and Cleared today beside the latest proof and the new report. */
-  /** The ring: what was cleared today out of that and what still waits. It fills from where it was last drawn, so an answer closes it a step; with nothing left it is closed. */
-  let ringAt = null;
-  function ring(done, all) {
-    const C = 2 * Math.PI * 17.5, to = all ? C * (1 - done / all) : 0, from = calm.matches || ringAt === null ? to : ringAt;
-    const r = el('span', { class: 'ring', role: 'img', 'aria-label': `${done} of ${all} cleared` }, el('b', { 'aria-hidden': 'true' }, `${done}/${all}`));
-    r.insertAdjacentHTML('afterbegin', `<svg viewBox="0 0 44 44" aria-hidden="true"><circle class="bg" cx="22" cy="22" r="17.5"/><circle class="fg" cx="22" cy="22" r="17.5" stroke-dasharray="${C}" stroke-dashoffset="${from}"/></svg>`);
-    ringAt = to;
-    if (from !== to) requestAnimationFrame(() => requestAnimationFrame(() => r.querySelector('.fg').setAttribute('stroke-dashoffset', to)));
-    return r;
+  /* Today, as the approved prototype draws it: the title row with More, Up next with one main action, the next three asks waiting on you, then Cleared today and Proofs today.
+     A phone stacks them; a desk sets Up next and the tiles beside what else waits. Search is the dock's round button (the sidebar's on a desk), and More holds what the screen leaves off. */
+  /** The project a card is for: a plan names it, a report or design names its group, and proof names the app its done-done check verified. */
+  const projectName = (d) => d.project ?? d.group ?? (d.type === 'evidence' ? projectOf(d) : undefined);
+  /** A project's picture: the icon the board serves for it (set with sign-off-axi project --icon), else its initials, as also when the icon cannot be served. */
+  function projectPic(name) {
+    const parts = name.split(/[-\s_]+/).filter(Boolean), mono = el('span', { class: 'mono' }, (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : name.slice(0, 2)).toUpperCase());
+    if (!(state.projects ?? []).some((p) => p.icon && p.name.toLowerCase() === name.toLowerCase())) return mono;
+    const img = el('img', { src: `/api/project-icon?name=${encodeURIComponent(name)}`, alt: '' });
+    img.onerror = () => img.replaceWith(mono);
+    return img;
   }
-  /** Today's head: the date over a large title, how many asks wait and how many were cleared today, and the ring. */
-  const todayTop = (waiting, cleared) => [el('div', { class: 'cbar', 'aria-hidden': 'true' }, 'Today'), el('p', { class: 'kicker date-kicker' }, dateLine()), el('div', { class: 'head-row' }, el('h1', { tabindex: '-1' }, 'Today'), ring(cleared, waiting + cleared)),
-    el('p', { class: 'sub' }, waiting ? `${waiting} waiting on you · ${cleared} cleared` : 'Everything is answered')];
+  /** A card's 40px tile: its project's picture, else the line drawing of what it is. */
+  const cardTile = (d) => { const name = projectName(d), a = area(d); if (!name) return uiIcon({ draw: a === 'waiting' ? askIcon(d) : { evidence: 'evidence', answered: 'done', designs: 'phone' }[a] ?? 'plan' });
+    const t = el('span', { class: 'ui-icon', 'aria-hidden': 'true' }, projectPic(name)); return t; };
+  /** A card as the new look's row, a link to where it opens: its tile, its title and priority, then its ticket's progress while it is partly done, or else its project (or what it is) and when. */
+  const partly = (n) => (n > 0 && n < 100 ? n : undefined);
+  function cardRow(d) {
+    const t = ticketOf(d), what = projectName(d) ?? (area(d) === 'waiting' ? kind(d) : NAMES[d.type] ?? 'Report');
+    const link = el('a', { class: 'ui-row', href: hrefOf(d), ...(t && { 'aria-label': `${title(d)}, ticket ${t.title}, ${t.progress}% done` }) }, ...uiRow({ tile: cardTile(d), title: d.type === 'signin' ? `Sign in to ${d.title}` : d.type === 'evidence' ? headline(d) : title(d), priority: d.priority,
+      meta: [what, d.type === 'signin' && d.expires ? left(d.expires) : d.filed && filedAt(d.filed)].filter(Boolean).join(' · '), progress: partly(t?.progress) }));
+    link.onclick = () => (jump = d.key);
+    return el('li', {}, link);
+  }
 
   /** Up next leads with a sign-in (someone is blocked now), then an ask with a recommended answer, then one to review; Later comes last. */
   const lead = (d) => (groupOf(d) === 'later' ? 3 : d.type === 'signin' ? 0 : recOf(d) ? 1 : 2);
   let upKey;
-  /** Up next: the one ask that matters most, its kind in its colour, and one main action (open the sign-in, answer with the pick, or review) beside a quiet way into the ask. */
-  function upNext(items) {
-    const d = [...items].sort((x, y) => lead(x) - lead(y))[0];
-    if (!d) return el('section', { class: 'up-next clear', 'aria-label': 'Up next' }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, "You're all clear"), el('p', {}, 'Nothing is waiting on you. Agents will ask when they need you.'));
-    const g = groupOf(d) === 'later' ? (d.type === 'signin' ? 'signin' : reviewed(d) ? 'review' : 'answer') : groupOf(d), rec = recOf(d), err = el('div', { class: 'err', role: 'alert', id: 'up-err' });
-    const filed = d.filed ? (isToday(d.filed) ? hhmm(d.filed) : day(d.filed)) : '';
-    const when = d.type === 'signin' ? (d.expires ? el('span', { class: 'when hot', 'data-clock': d.expires }, clock(d.expires)) : '') : el('span', { class: 'when' }, [d.group, filed].filter(Boolean).join(' · '));
-    const details = (words) => el('a', { class: 'soft', href: askHref(d) }, words);
-    let go, soft = details('Details'), body = [el('p', { dir: 'auto' }, d.why || d.about || '')], cmt = '';
+  /** Up next: the one ask that matters most, how many wait, its priority, its question, its project, time and the answer recommended, then one main action in ink
+   * (answer with the pick, open the sign-in, or review) beside Other answer (or Details), which opens the ask. */
+  function upNext(queue) {
+    const d = queue[0];
+    if (!d) return el('section', { class: 'ui-card ui-hero t-up clear', 'aria-label': 'Up next' }, el('div', { class: 'hl' }, el('span', { class: 'lab' }, 'Up next')),
+      el('h2', { class: 'q' }, 'Nothing waits on you'), el('p', { class: 'meta' }, el('span', {}, 'Agents will ask when they need you.')));
+    const rec = recOf(d), err = el('div', { class: 'err', role: 'alert', id: 'up-err' }), name = projectName(d);
+    const btn = (cls, words, href) => el(href ? 'a' : 'button', { class: `t-btn ${cls}`, ...(href && { href }) }, el('span', { class: 'lbl' }, words));
+    let go, soft = btn('white', 'Other answer', askHref(d));
     if (d.type === 'signin') {
-      body = [el('p', { dir: 'auto' }, `${d.waits} needs your ${d.title} sign-in. It unlocks: ${d.unlocks.replace(/\.$/, '')}.`)];
       go = signinOpen(d, undefined, err).open;
-      go.className = 'go';
-      go.replaceChildren('Open sign-in', kc('↵'));
+      go.className = 't-btn ink';
+      go.replaceChildren(el('span', { class: 'lbl' }, 'Open sign-in'));
+      soft = btn('white', 'Details', askHref(d));
     } else if (rec) {
-      body.push(el('p', { class: 'rec' }, glyph('sparkle'), el('span', {}, 'Recommended: ', el('b', { dir: 'auto' }, rec.label), `.${rec.outcome || d.recommend_reason ? ` ${rec.outcome || d.recommend_reason}` : ''}`)));
-      go = el('button', { class: 'go answer', 'aria-label': `Answer ${rec.label}, ${d.title}` }, el('span', { class: 'lbl' }, `Answer ${rec.label}`), kc('↵'), el('span', { class: 'okmark', 'aria-hidden': 'true' }, glyph('check')));
-      soft = details('Other answer');
+      go = btn('ink', `Answer ${rec.label}`);
+      go.setAttribute('aria-label', `Answer ${rec.label}, ${d.title}`);
+      go.append(el('span', { class: 'okmark', 'aria-hidden': 'true' }, glyph('check')));
       go.onclick = () => { go.classList.add('done'); save(d, rec, [go], err); };
-      if (!state.answers_only && !FROZEN) {
-        const box = el('textarea', { id: 'up-note', rows: 2, dir: 'auto', placeholder: 'Add a note (optional)', 'aria-label': 'Comment, optional' });
-        box.value = drafts.get(d.key) ?? '';
-        box.oninput = () => { drafts.set(d.key, box.value); keep(); };
-        cmt = el('details', { class: 'cmt', ...((box.value || unfolded.has(`up ${d.key}`)) && { open: '' }) }, el('summary', {}, glyph('msg'), 'Add a comment', el('small', {}, 'Optional')), box);
-        cmt.ontoggle = () => { cmt.open ? unfolded.add(`up ${d.key}`) : unfolded.delete(`up ${d.key}`); if (cmt.open) box.focus(); };
-      }
     } else {
-      const shots = [...(d.mocks ?? []).filter((m) => !/\.html?$/i.test(m.path)).map((m) => mockUrl(d.key, m.value, m.path)), ...(d.mocks?.length ? [] : [pic(d)])].filter(Boolean).slice(0, phone() ? 4 : 6);
-      if (shots.length) body.push(el('span', { class: 'strip', 'aria-hidden': 'true' }, ...shots.map((u) => el('img', { src: src(u), alt: '' }))));
-      go = el('a', { class: 'go', href: askHref(d) }, g === 'review' ? 'Review' : 'Answer', kc('↵'));
+      go = btn('ink', groupOf(d) === 'review' || reviewed(d) ? 'Review' : 'Answer', askHref(d));
       soft = '';
     }
-    go.onclick ??= () => (jump = d.key);
+    for (const a of [go, soft]) if (a?.tagName === 'A' && a.getAttribute('href')?.startsWith('#')) a.onclick = () => (jump = d.key);
     const fresh = upKey !== undefined && upKey !== d.key;
     upKey = d.key;
-    return el('section', { class: `up-next g-${g}${fresh ? ' next' : ''}`, 'aria-label': 'Up next' },
-      el('p', { class: 'lk' }, el('span', { class: 'dot', 'aria-hidden': 'true' }), `Up next · ${{ signin: 'Sign in', review: 'Review' }[g] ?? TYPE_NAMES[typeOf(d)]}`, when),
-      el('h2', { dir: 'auto' }, d.type === 'signin' ? `Sign in to ${d.title}` : title(d)), ...body.filter((p) => p.textContent || p.tagName !== 'P'), el('div', { class: 'acts' }, go, soft), cmt, err);
+    const when = d.type === 'signin' ? (d.expires ? el('span', { 'data-clock': d.expires }, clock(d.expires)) : '') : d.filed && filedAt(d.filed);
+    return el('section', { class: `ui-card ui-hero t-up${fresh ? ' next' : ''}`, 'aria-label': 'Up next' },
+      el('div', { class: 'hl' }, el('span', { class: 'lab' }, `Up next · 1 of ${queue.length}`), d.priority ? el('span', { class: `ui-pc ${d.priority.toLowerCase()}` }, d.priority) : ''),
+      el('h2', { class: 'q', dir: 'auto' }, d.type === 'signin' ? `Sign in to ${d.title}` : title(d)),
+      el('p', { class: 'meta' }, name ? projectPic(name) : '', el('span', { dir: 'auto' }, name ?? (d.type === 'signin' ? d.waits : kind(d)), ...[when, rec && `Recommended ${rec.label}`].filter(Boolean).flatMap((x) => [' · ', x]))),
+      el('div', { class: 't-btns' }, go, soft), err);
   }
+  /** A filled 20px mark for a tile, as the prototype draws them. */
+  const fill = (d) => { const s = el('span', { class: 'si', 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 20 20"><path d="${d}"/></svg>`; return s; };
+  /** Cleared today (answered today, of that and what still waits), which opens Answered, and Proofs today (proof filed today), which opens Evidence. */
+  function todayTiles(by) {
+    const cleared = by.answered.filter((d) => isToday(state.answers[d.key].at)).length, proofs = state.decisions.filter((d) => d.type === 'evidence' && d.filed && isToday(d.filed) && !(state.dismissed ?? []).includes(d.key)).length;
+    const stat = (href, mark, lab, n, of) => el('a', { class: 'ui-card ui-stat', href, 'aria-label': `${lab}: ${n}${of === undefined ? '' : ` of ${of}`}` }, fill(mark), el('span', { class: 'lab' }, lab), el('b', {}, String(n), of === undefined ? '' : el('small', {}, ` of ${of}`)));
+    return el('div', { class: 'ui-tiles t-tiles' }, stat('#answered', 'M10 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm3.4 5.1-4.3 4.4-2-2-1.2 1.2 3.2 3.2 5.5-5.6z', 'Cleared today', cleared, cleared + by.waiting.length),
+      stat('#evidence', 'M10 1.8l6.8 2.7v5c0 4.4-2.9 7.4-6.8 8.9-3.9-1.5-6.8-4.5-6.8-8.9v-5zm3.6 5.6-1.1-1.1-3.4 3.5-1.6-1.6-1.1 1.1 2.7 2.7z', 'Proofs today', proofs));
+  }
+  /** Waiting on you: the next three asks after Up next, with See all into Decide. */
+  const waitingOn = (rest) => (rest.length ? el('section', { class: 't-wait', 'aria-label': 'Waiting on you' }, el('h2', { class: 'ui-sec' }, 'Waiting on you', el('a', { class: 'see', href: '#waiting' }, 'See all')),
+    el('ul', { class: 'ui-card ui-list' }, ...rest.slice(0, 3).map(cardRow))) : '');
 
-  /** The group a Decide tile opens at; set by the tap, used once the list is drawn. */
-  let toGroup = '';
-  /** A tile on Today: a disc in its group's colour, the count large, the group and one line. It opens what it counts; at zero it greys, and a tap shakes it. */
-  function tile(g, n, name, line, href, mark, also = '') {
-    const t = el('a', { class: `tile g-${g}${n ? '' : ' zero'}${also}`, href, 'aria-label': `${name}, ${n}: ${line}` }, el('span', { class: 'tt' }, icon(mark), el('span', { class: 'n' }, String(n))),
-      el('span', { class: 'name' }, name, el('small', {}, line)));
-    t.onclick = (e) => {
-      if (n) return void (toGroup = href === '#waiting' ? g : '');
-      e.preventDefault();
-      t.classList.remove('shake');
-      void t.offsetWidth;
-      t.classList.add('shake');
-      buzz('tick');
+  /** A sheet from the bottom (in the middle on a desk): a modal dialog, so the keyboard stays in it and Escape or a tap outside closes it; a link in it closes it as it opens. */
+  function sheetOf(id) {
+    const s = el('dialog', { class: 't-sheet', id, 'aria-labelledby': `${id}-h` });
+    s.onclick = (e) => { if (e.target === s || e.target.closest('a[href^="#"]')) s.close(); };
+    document.body.append(s);
+    return s;
+  }
+  const sheetHead = (id, name) => { const x = el('button', { class: 'x', 'aria-label': 'Close' }, glyph('x')); x.onclick = () => x.closest('dialog').close(); return el('div', { class: 't-shd' }, el('h2', { id: `${id}-h`, tabindex: '-1' }, name), x); };
+  /** More: what Today leaves off, Answered and Designs with their counts, the Leash and Ask the agent. */
+  const todayMore = sheetOf('t-more');
+  function fillMore(by) {
+    const go = (href, name, n) => el('a', { class: 'ui-pr', href }, el('span', { class: 'k' }, name), el('span', { class: 'v' }, el('span', { class: 'n' }, String(n)), glyph('right')));
+    const links = [['#answered', 'Answered', by.answered], ['#designs', 'Designs', by.designs]].filter(([, , l]) => l.length);
+    todayMore.replaceChildren(el('div', {}, sheetHead('t-more', 'More'), links.length ? el('div', { class: 'ui-props' }, ...links.map(([h, name, l]) => go(h, name, l.length))) : '',
+      ...(state.leash ? leash() : []), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()])));
+  }
+  const hasMore = (by) => by.answered.length || by.designs.length || state.leash || !(FROZEN || state.readonly || state.answers_only);
+  /** Search: each card's title and what it says, matched as typed, in groups (Asks, Proof, Reports, Answered, Designs, Tickets) of the first four rows each. */
+  const searchSheet = sheetOf('t-search');
+  let query = '';
+  function openSearch() {
+    if (searchSheet.open) return searchSheet.querySelector('input').focus();
+    const box = el('input', { type: 'search', id: 'find', 'aria-label': 'Search the board', placeholder: 'An ask, a proof, a report or a ticket', autocomplete: 'off', enterkeyhint: 'search' }), out = el('div', {});
+    const show = () => {
+      const q = query.trim().toLowerCase(), gone = new Set(state.dismissed ?? []), hit = (...s) => s.join(' ').toLowerCase().includes(q);
+      const cards = q ? state.decisions.filter((d) => !gone.has(d.key) && hit(title(d), d.about ?? '', projectName(d) ?? '')).reverse() : [];
+      const group = (name, ...as) => [name, cards.filter((d) => as.includes(area(d))).slice(0, 4).map(cardRow)];
+      const tickets = q ? (state.tickets ?? []).filter((t) => hit(t.title, t.id)).slice(0, 4).map((t) => el('li', {}, el('a', { class: 'ui-row', href: `#ticket/${t.id}` }, ...uiRow({ tile: uiIcon({ draw: 'pick' }), title: t.title, progress: partly(t.progress), meta: t.progress >= 100 ? 'Done' : 'Not started' })))) : [];
+      const groups = [group('Asks', 'waiting'), group('Proof', 'evidence'), group('Reports', 'reports', 'notes'), group('Answered', 'answered'), group('Designs', 'designs'), ['Tickets', tickets]].filter(([, rows]) => rows.length);
+      out.replaceChildren(...(!q ? [el('p', { class: 't-grp' }, 'Type to search the whole board.')] : groups.length ? groups.flatMap(([name, rows]) => [el('p', { class: 't-grp' }, name), el('ul', { class: 'ui-card ui-list' }, ...rows)])
+        : [el('p', { class: 't-grp' }, `Nothing matches “${query.trim()}”.`)]));
     };
-    return t;
+    box.value = query;
+    box.oninput = () => { query = box.value; show(); };
+    show();
+    searchSheet.replaceChildren(el('div', {}, sheetHead('t-search', 'Search'), el('label', { class: 't-find', role: 'search' }, document.getElementById('dock-find').firstChild.cloneNode(true), box), out));
+    searchSheet.showModal();
+    box.focus();
   }
-  function tiles(by) {
-    const of = (g) => by.waiting.filter((d) => groupOf(d) === g), [ans, rev, sig] = ['answer', 'review', 'signin'].map(of);
-    const screens = rev.reduce((n, d) => n + (d.journeys ?? []).reduce((m, j) => m + j.screens.length, 0), 0), soonest = sig.map((d) => d.expires).filter(Boolean).sort()[0];
-    const proofs = by.evidence.filter((d) => d.type === 'evidence'), passed = proofs.filter((d) => d.evidenceCard?.result === 'RUN PASS').length, failed = by.failedProof.length;
-    // A run that could not be checked is not fine either, so the line names it.
-    const unchecked = proofs.filter((d) => d.evidenceCard?.result === 'UNVERIFIED').length, fine = proofs.length - unchecked;
-    return el('div', { class: 'tiles' },
-      tile('answer', ans.length, 'Answer', !ans.length ? 'All answered' : ans.every(recOf) ? 'Each has a pick' : `${ans.filter(recOf).length} with a pick`, '#waiting', 'pick'),
-      tile('review', rev.length, 'Review', !rev.length ? 'Nothing to review' : screens ? `${plural(screens, 'screen')} to check` : `${plural(rev.length, 'item')} to look over`, '#waiting', 'phone'),
-      tile('signin', sig.length, 'Sign in', !sig.length ? 'Nothing waiting' : soonest ? left(soonest) : 'Waiting on you', '#waiting', 'key'),
-      tile('proof', proofs.length + failed, 'Proof', failed || unchecked ? [failed && `${failed} failed`, unchecked && `${unchecked} not checked`, `${fine} fine`].filter(Boolean).join(', ') : !proofs.length ? 'Nothing filed yet' : passed === proofs.length ? 'All passing' : `${passed} passed, ${proofs.length - passed} not run`,
-        '#evidence', 'evidence', failed ? ' failed' : ''));
-  }
+  // Closed from the address #find, the sheet leaves Today at its own address.
+  searchSheet.addEventListener('close', () => location.hash === '#find' && history.replaceState(null, '', location.pathname + location.search));
+  // Search, the dock's round button or the sidebar's, opens over the screen it is tapped on.
+  addEventListener('click', (e) => { if (e.target.closest?.('a[href="#find"]')) e.preventDefault(), openSearch(); });
 
-  /** A Today section: its head, with See all when there is more to see, over its list or card. */
-  const tSec = (cls, name, all, ...body) => el('section', { class: `t-sec ${cls}` }, el('div', { class: 'sec-head' }, el('h2', {}, name), all ? el('a', { href: all }, 'See all') : ''), ...body);
-  const chev = () => Object.assign(glyph('right'), { className: 'chev' });
-  /** Latest proof: the three newest updates, each with its capture, its result, its project and when. */
-  function latestProof(items) {
-    const shown = items.filter((d) => d.type === 'evidence').slice(0, 3), also = twins(shown);
-    if (!shown.length) return '';
-    return tSec('t-proof', 'Latest proof', '#evidence', el('ul', { class: 't-list' }, ...shown.map((d) => {
-      // A row is a list, so it loads the capture's thumb, lazily.
-      const r = RESULT[d.evidenceCard?.result], [, , , small] = filesOf(d).find(([, clip]) => !clip) ?? [];
-      const mark = () => el('span', { class: `donek ${r?.[0] ?? 'none'}`, 'aria-hidden': 'true' }, glyph(r?.[0] === 'ok' ? 'check' : 'dot'));
-      const frame = small ? el('span', { class: 'mini' }, shot(small, '')) : mark();
-      if (small) frame.firstChild.onerror = () => frame.replaceWith(mark());
-      const link = el('a', { class: 'lrow', href: `#evidence/${d.key}` }, frame,
-        el('span', { class: 'lt' }, el('b', { dir: 'auto' }, [headline(d), also.get(d.key)].filter(Boolean).join(' · ')),
-          el('span', {}, el('span', { class: `res ${r?.[0] ?? 'none'}` }, r?.[2] ?? 'Not run'), ...[projectOf(d), d.filed && (isToday(d.filed) ? hhmm(d.filed) : day(d.filed))].filter(Boolean).map((t) => ` · ${t}`))), chev());
-      link.onclick = () => (jump = d.key);
-      return el('li', {}, link);
-    })));
+  /** Today's head: its title, and More at the right when it holds something. */
+  function todayHead(by) {
+    const more = el('button', { class: 'ui-rb', 'aria-label': 'More', 'aria-haspopup': 'dialog' }, glyph('more'));
+    more.onclick = () => { fillMore(by); todayMore.showModal(); todayMore.querySelector('h2').focus(); };
+    return [el('h1', { tabindex: '-1' }, 'Today'), hasMore(by) ? more : ''];
   }
-  /** The newest report not read yet (else the newest), as one card: its picture, what it explains with, its title, two lines of what it says, and who filed it when. */
-  function newReport(items) {
-    const byNew = [...items].sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0)), d = byNew.find(unread) ?? byNew[0];
-    if (!d) return '';
-    const link = el('a', { class: 'rp-card', href: reads(d) ? `#reports/${d.key}` : '#reports' }, rth(d), el('span', { class: 't' },
-      el('span', { class: 'ey' }, [FORMS[d.form]?.[0] ?? (kind(d) || 'Report'), d.video && `Video ${d.video}`].filter(Boolean).join(' · ')), el('span', { class: 'h', dir: 'auto' }, title(d)),
-      d.about ? el('span', { class: 'p', dir: 'auto' }, d.about) : '', el('span', { class: 'm' }, [d.group, d.filed && stamp(d.filed)].filter(Boolean).join(' · '))));
-    link.onclick = () => (jump = d.key);
-    return tSec('t-report', unread(d) ? 'New report' : 'Latest report', '#reports', link);
-  }
-  /** Cleared today: each ask answered today with a green check, the answer and its comment and when; a tap opens it, to see or change the answer (under Answered for one Decide does not open). */
-  function cleared(items, all) {
-    if (!items.length) return '';
-    const SHOWN = 5;
-    return tSec('t-cleared', 'Cleared today', all.length > SHOWN ? '#answered' : '', el('ul', { class: 't-list' }, ...items.slice(0, SHOWN).map((d) => {
-      const s = state.answers[d.key], said = s.answer === 'text' ? 'Your reply' : s.answer === 'sent' ? 'Sent back' : s.label ?? s.answer;
-      const link = el('a', { class: 'lrow', href: redo(d) ? `#decide/${d.key}` : '#answered' }, el('span', { class: 'donek', 'aria-hidden': 'true' }, glyph('check')),
-        el('span', { class: 'lt' }, el('b', { dir: 'auto' }, title(d)), el('span', { dir: 'auto' }, [said, s.note && `“${s.note}”`, hhmm(s.at)].filter(Boolean).join(' · '))), chev());
-      link.onclick = () => (jump = d.key);
-      return el('li', {}, link);
-    })));
-  }
-  /** Today itself. Under what the approved feel draws come the tools it has no place for: search, the way to everything answered, the Leash and Ask the agent. */
+  /** Today itself. A redraw keeps an open More current; the address #find opens Search over it. */
   function today(by) {
-    const done = by.answered.filter((d) => isToday(state.answers[d.key].at)), clearedList = cleared(done, by.answered);
-    const foot = el('div', { class: 't-foot' }, search(),
-      ...[['answered', 'Answered', by.answered], ['designs', 'Designs', by.designs]].filter(([, , l]) => l.length).map(([a, name, l]) => el('a', { class: 'more', href: `#${a}` }, `${name} (${l.length})`)),
-      ...(state.leash ? leash() : []), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()]));
-    return phone() ? [upNext(by.waiting), tiles(by), latestProof(by.evidence), newReport(by.reports), clearedList, foot]
-      : [tiles(by), el('div', { class: 't-cols' }, el('div', {}, upNext(by.waiting), clearedList), el('div', {}, latestProof(by.evidence), newReport(by.reports))), foot];
+    const queue = [...by.waiting].sort((x, y) => lead(x) - lead(y)), up = upNext(queue), rest = waitingOn(queue.slice(1)), tiles = todayTiles(by);
+    if (todayMore.open) fillMore(by);
+    if (location.hash === '#find' && !searchSheet.open) openSearch();
+    return phone() ? [up, rest, tiles] : [el('div', { class: 't-cols' }, el('div', {}, up, tiles), el('div', {}, rest))];
   }
 
   /** A short row's second line: what changed, unless the headline already says it. */
@@ -4264,7 +4178,7 @@
     const rp = document.querySelector('.split-bar.rp-bar')?.parentElement, rpKey = rp && { u: '.rp-read', e: '.rp-archive', Enter: '.rp-open' }[k];
     if (rpKey && !(k === 'Enter' && e.target.closest?.('a:not([aria-current]), button, summary'))) { const b = rp.querySelector(rpKey); if (b) e.preventDefault(), b.click(); return; }
     // On Today, Enter takes Up next's main action: open the sign-in, answer with the pick, or start the review.
-    if (k === 'Enter' && !location.hash.slice(1) && !e.target.closest?.('a, button, summary')) { const go = document.querySelector('.up-next .go:not(:disabled)'); if (go) e.preventDefault(), go.click(); return; }
+    if (k === 'Enter' && !location.hash.slice(1) && !e.target.closest?.('a, button, summary')) { const go = document.querySelector('.t-up .t-btn.ink:not(:disabled)'); if (go) e.preventDefault(), go.click(); return; }
     if (!onDecide) return;
     // Enter answers (or opens a sign-in), C goes to the note, L moves the ask to Later.
     if (k === 'Enter' && !e.target.closest?.('a:not([aria-current]), button, summary')) { const go = document.querySelector('.decide-bar .answer:not(:disabled), .decide .open-link:not(:disabled)'); if (go) e.preventDefault(), go.click(); }
@@ -4273,8 +4187,6 @@
   });
   const reshow = (control) => { render(); document.querySelector(control)?.focus({ preventScroll: true }); };
   /** Today's small title shows in its bar once the large one has scrolled under it. */
-  const titleBar = () => { const h = document.querySelector('.today-top h1'); document.body.classList.toggle('scrolled', !!h && h.getBoundingClientRect().bottom < 52); };
-  addEventListener('scroll', titleBar, { passive: true });
 
   function render() {
     if (designSession?.open) return (boardStale = true);
@@ -4345,13 +4257,13 @@
     document.body.classList.toggle('today', !at);
     const bulk = { waiting: by.waiting, designs: by.designs, evidence: by.evidence, reports: [...by.reports, ...by.notes], answered: by.answered }[at] ?? [];
     // An ask on a phone has a bar of its own: back to Decide, the question once the page scrolls past it, and the ask's More.
-    const top = el('header', { class: head === 'decide' ? 'top ask-nav' : head ? 'top' : 'top today-top' }, head && !TABS.some(([a]) => a === head)
+    const top = el('header', { class: head === 'decide' ? 'top ask-nav' : head ? 'top' : 'ui-top today-top' }, head && !TABS.some(([a]) => a === head)
       ? el('a', { class: head === 'ticket' ? 'back tk-back' : 'back', href: head === 'decide' ? stepBack : head === 'ticket' ? ticketBack || '#' : '#' }, ...(head === 'decide' ? [glyph('left'), stepBack === '#waiting' ? 'Decide' : 'Back'] : [head === 'ticket' && ticketBack ? '‹ Back' : '‹ Today'])) : '',
     // A ticket's page names the ticket it sits under, which opens that one.
     head === 'ticket' && tk ? el('p', { class: 'kicker tk-kicker' }, ...(tkUp ? [el('a', { href: `#ticket/${tkUp.id}`, dir: 'auto' }, tkUp.title), ' › '] : ['Ticket · ']), tk.id) : '',
     // Decide leads with the date over a large title, and keeps its More at the top right.
     (head === 'waiting' || at === 'reports') && !state.readonly ? el('p', { class: 'kicker date-kicker' }, dateLine()) : '',
-    ...(head ? [el('h1', { tabindex: '-1' }, pageTitle)] : todayTop(by.waiting.length, by.answered.filter((d) => isToday(state.answers[d.key].at)).length)),
+    ...(head ? [el('h1', { tabindex: '-1' }, pageTitle)] : todayHead(by)),
     ro ? el('p', { class: 'meta' }, ro) : '',
     head === 'waiting' && !state.readonly ? el('p', { class: 'lede waiting-lede' }, waitingLede(by.waiting))
       : head === 'reports' && !state.readonly && by.reports.length ? el('p', { class: 'lede waiting-lede' }, (() => { const n = by.reports.filter(unread).length; return n ? `${n} new · ${by.reports.length} in all` : `${plural(by.reports.length, 'report')} · all read`; })())
@@ -4399,7 +4311,7 @@
   }
   function freeze() {
     // Answers stay as they are, but nothing in the copy can be sent.
-    document.querySelectorAll('#board .choices button, #board .pick-list button, #board .decide-bar .answer, #board .up-next button, #board .mock button, #board .note button, #board .note textarea').forEach((e) => (e.disabled = true));
+    document.querySelectorAll('#board .choices button, #board .pick-list button, #board .decide-bar .answer, #board .t-up button, #board .mock button, #board .note button, #board .note textarea').forEach((e) => (e.disabled = true));
     // A browser will not open a data: link in a new tab; the inline preview is the copy.
     document.querySelectorAll('#board a[href^="data:"]').forEach((a) => a.removeAttribute('href'));
   }
@@ -4445,19 +4357,10 @@
     const item = (jump || back) && document.getElementById(`item-${jump || back}`);
     jump = null;
     item ? item.scrollIntoView() : scrollTo(0, 0);
-    titleBar();
-    // Search, in the dock or the sidebar, opens Today with its search box in hand.
-    if (location.hash === '#find') return findBox();
-    // A Today tile opens Decide at its group, whose head flashes.
-    const group = toGroup && location.hash === '#waiting' && [...document.querySelectorAll('.dl-head')].find((h) => h.firstChild.textContent === GROUPS.find(([g]) => g === toGroup)?.[1]);
-    toGroup = '';
-    if (group) { group.scrollIntoView({ block: 'start' }); group.classList.add('flash'); }
     // A Decide row is itself the link back to its page.
     // On a desk the focus stays on the selected row, so J, K and Enter carry on from it.
     ((back && (item?.matches('a.dl-face') ? item : item?.querySelector('h3 a, .open-link, a.compact'))) || document.querySelector('.split-list [data-row][aria-current]') || document.querySelector('#board h1')).focus({ preventScroll: true });
   });
-  const findBox = () => { const box = document.getElementById('find'); box?.scrollIntoView({ block: 'center' }); box?.focus({ preventScroll: true }); };
-  addEventListener('click', (e) => { if (e.target.closest?.('a[href="#find"]') && location.hash === '#find') e.preventDefault(), findBox(); });
   // An interactive page may post its own height, `{ height: <px> }`, and its frame then fits it with no blank below.
   // Only a frame's own message sizes it. Document readers must fit even long pages; previews stay capped.
   addEventListener('message', (e) => {

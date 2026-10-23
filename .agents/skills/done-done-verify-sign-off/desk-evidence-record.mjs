@@ -1,5 +1,5 @@
-// Records the desk's Today and Evidence at 1280x800 in one theme, from a board seed-board.sh served: Today's proof column beside the asks,
-// a real mouse over a proof row (its hover tint and quiet ×), a press on it that opens Evidence with that update selected beside the list,
+// Records the desk's Today and Evidence at 1280x800 in one theme, from a board seed-board.sh served: Today's Proofs today tile under Up next,
+// a real mouse over it, a press on it that opens Evidence with the newest update selected beside the list,
 // then three more rows picked, each selection's tint and accent bar moving and its update sliding in.
 // Its own headless Chromium on a scratch profile, driven over the DevTools protocol with real mouse events.
 // Usage: node desk-evidence-record.mjs <board url> <light|dark> <out.mp4>
@@ -51,7 +51,7 @@ try {
   await send('Page.startScreencast', { format: 'jpeg', quality: 90, everyNthFrame: 1 });
   await send('Page.navigate', { url });
   const row = (n) => `.ev-grid > :nth-child(${n}) .ev-card`;
-  const steps = [[2200], [() => hover('.t-proof li:nth-child(2) .lrow'), 1200], [() => click('.t-proof li:nth-child(2) .lrow'), 1800],
+  const steps = [[2200], [() => hover('.t-tiles a[href="#evidence"]'), 1200], [() => click('.t-tiles a[href="#evidence"]'), 1800],
     [() => click(row(3)), 1300], [() => click(row(5)), 1300], [() => click(row(1)), 1300], [() => hover(row(2)), 1400]];
   for (const [i, [act, ms]] of steps.map((s) => (s.length === 1 ? [null, s[0]] : s)).entries()) {
     const r = act && (await act());
