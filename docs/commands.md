@@ -27,6 +27,7 @@ Guided plan 3 / report 4 add **Simplify this**. Inspect version-1 action/target 
 | `signin` | close a sign-in card as done |
 | `dismiss` | hide a card, like its Dismiss button; `--filer <id>` hides every card of a finished task |
 | `restore` | bring a dismissed card back |
+| `promote` | Main only: put a design review it passed in Decide (`--undo` takes it back to Designs); a lead's design never counts as an ask without it |
 | `doctor` | check the setup; each failure names its fix |
 | `notify` | check device notifications, or send a test notice |
 | `validate` | check messages against the contract |

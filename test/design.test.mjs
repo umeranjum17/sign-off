@@ -1948,7 +1948,7 @@ test('Decide after an ask is replaced under the same key: the pick remembered fr
   proc.kill();
 });
 
-test('a posted contract design is listed with its preview and date, and opens for a saved approve/change review', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('a posted contract design is listed under Designs only, never in Decide or a count of asks until Main promotes it, with its preview and date, and opens for a saved approve/change review', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'contract-design-plain-row'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
   mkdirSync(join(dir, 'design'), { recursive: true });
   writeFileSync(join(dir, 'design', 'preview.png'), png);
@@ -1970,10 +1970,26 @@ test('a posted contract design is listed with its preview and date, and opens fo
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const { evaluate, close } = await browse(join(dir, 'browser'));
+  // A lead's design is Main's to review: Today counts no ask for it and links it under Designs, and Decide is all clear with no badge.
+  await evaluate(`location.href = ${JSON.stringify(url)}`);
+  await until(async () => (await evaluate('document.querySelector("a.more[href=\'#designs\']")?.textContent')) === 'Designs (1)');
+  assert.equal(await evaluate('[...document.querySelectorAll(".tiles .tile")].map((t) => t.textContent.replace(/\\s+/g, " ").trim()).slice(0, 3).join("|")'), '0AnswerAll answered|0ReviewNothing to review|0Sign inNothing waiting');
+  assert.equal(await evaluate('document.querySelector(".up-next h2")?.textContent'), "You're all clear");
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+  await until(async () => (await evaluate('document.querySelector(".waiting-lede")?.textContent')) === 'Nothing waiting');
+  assert.equal(await evaluate('!document.querySelector("#item-d1-design") && !document.querySelector("#tabs a[href=\'#waiting\'] .bd, #nav a[href=\'#waiting\'] .n")'), true);
+  // Main promotes it: it waits in Decide like any ask, and --undo puts it back under Designs.
+  assert.match(run('promote', 'd1-design', file).out, /promoted\[1\]: d1-design/);
+  await evaluate('location.reload()');
   await until(async () => (await evaluate('document.querySelector("#item-d1-design .title")?.textContent')) === message.title);
   assert.equal(await evaluate('document.querySelector("#item-d1-design .tm")?.textContent + "|" + document.querySelector("#item-d1-design .sub")?.textContent'), '18 Oct|17 screens · Agent'); // the row is its title, how many screens it holds and when it came
   assert.equal(await evaluate('document.querySelector("#item-d1-design")?.getAttribute("href")'), '#designs/d1-design');
+  assert.equal(await evaluate('document.querySelector(".waiting-lede")?.textContent'), '1 waiting');
+  assert.match(run('promote', 'd1-design', file, '--undo').out, /unpromoted\[1\]: d1-design/);
+  await evaluate('window.old = true, location.reload()');
+  await until(async () => (await evaluate('!window.old && document.querySelector(".waiting-lede")?.textContent')) === 'Nothing waiting');
+  // Only a design is promoted, and only a key on the board.
+  assert.equal(run('promote', 'nope', file).code, 1);
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
   await until(async () => (await evaluate('document.querySelector(".designs strong")?.textContent')) === message.title);
   assert.equal(await evaluate('document.querySelector(".designs img")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent(message.preview)}`);
@@ -1997,6 +2013,10 @@ test('a posted contract design is listed with its preview and date, and opens fo
   assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-design'].notes, [{ journey: 'account-setup', screen: 'security', verdict: 'change', note: 'Make the title clearer' }]);
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
   await until(async () => (await evaluate('document.querySelector(".designs .when")?.textContent')).startsWith('Changes requested'));
+  // Main's verdict is no answer of the user's: Today lists nothing under Answered for it.
+  await evaluate(`location.href = ${JSON.stringify(url)}`);
+  await until(async () => (await evaluate('document.querySelector("a.more[href=\'#designs\']")?.textContent')) === 'Designs (1)');
+  assert.equal(await evaluate('document.querySelector("a.more[href=\'#answered\']")'), null);
   const desktop = await browse(join(dir, 'desktop-browser'), 1280);
   await desktop.evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
   await until(async () => (await desktop.evaluate('document.querySelector("#nav a[href=\\"#waiting\\"][aria-current=page]")?.textContent.trim().startsWith("Decide")')) === true);
@@ -2137,7 +2157,8 @@ test('a screen approval on a design with no design verdict keeps the design wait
   assert.deepEqual(saved.notes, [{ journey: 'flow', screen: 'a', verdict: 'approve', note: '' }]);
   assert.equal(saved.answer, 'screens');
   assert.match(run('list', file).out, /answered: 0/);
-  assert.match(run('list', file, '--full').out, /waiting/);
+  // Still no verdict: under review by Main, not answered (a design waits on the user only once promoted).
+  assert.match(run('list', file, '--full').out, /d2-screens,in review,/);
   // Request change on the next screen is the person's answer: the design reads Changes requested and leaves waiting.
   await evaluate('document.querySelector("[aria-label=\\"Next screen\\"]").click()');
   await evaluate('document.querySelector(".design-viewer textarea").value = "Make the title clearer"');

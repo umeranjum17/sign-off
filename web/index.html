@@ -2249,8 +2249,8 @@
   }
 
   const AREAS = { waiting: 'Waiting on you', designs: 'Designs', evidence: 'Evidence', reports: 'Reports and explainers', answered: 'Answered' };
-  // The sidebar and the tab bar hold four places: Today, Decide (what waits on you, design asks too), Evidence and Reports.
-  // Designs and Answered are not tabs: a design ask opens from Decide, and Answered is a link on Today.
+  // The sidebar and the tab bar hold four places: Today, Decide (what waits on you, a design Main promoted too), Evidence and Reports.
+  // Designs and Answered are not tabs: both are links on Today, and a promoted design also opens from Decide.
   const TABS = [['', 'Today'], ['waiting', 'Decide'], ['evidence', 'Evidence'], ['reports', 'Reports']];
   const EMPTY = { waiting: 'Nothing is waiting on you.', designs: 'No designs yet.', evidence: 'No evidence updates.', reports: 'No reports or explainers.', answered: 'Nothing answered yet.' };
   const ICONS = { summary: 'M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
@@ -2308,9 +2308,13 @@
   const isAnswered = (d) => Object.hasOwn(state.answers, d.key) && !(d.type === 'design' && state.answers[d.key].answer === 'screens');
   /** A sign-in whose link has expired has nothing left to open: it leaves the board until its poster posts a new link on the same key. */
   const lapsed = (d) => d.type === 'signin' && !d.start && !!d.expires && Date.parse(d.expires) <= Date.now() && !isAnswered(d);
-  /** Each item lives in one area: answered items, then the area the item names, then evidence updates (never an ask, whatever their result), then what is only to read (explainers, pages with nothing to answer), then the open asks.
+  /** A design review a lead posts is Main's to pass first: it lives under Designs, never in Decide, Answered or any count of asks, until Main promotes it (sign-off-axi promote). */
+  const promoted = (d) => (state.promoted ?? []).includes(d.key);
+  /** Each item lives in one area: a design review Main has not promoted under Designs, then answered items, then the area the item names, then evidence updates (never an ask, whatever their result),
+   *  then what is only to read (explainers, pages with nothing to answer), then the open asks.
    *  A plan has no options but waits for its send-back, unless it is guided with no decisions: that one is for reading. */
   const area = (d) => {
+    if (d.kind === 'design' && !promoted(d)) return 'designs';
     const a = isAnswered(d) ? 'answered' : d.type === 'evidence' ? 'evidence' : d.area ?? (state.readonly || d.type === 'explainer' || !(d.options.length || d.reply || d.type === 'signin' || (d.type === 'plan' && !(d.guided && !d.decisions?.length)) || d.kind === 'design') ? 'reports' : 'waiting');
     // Reports lists only what explains: a page to tap through, or a narrated video. Text alone (a receipt, a status line) is a note, folded under it.
     return a === 'reports' && !state.readonly && d.type !== 'explainer' && !reads(d) ? 'notes' : a;
@@ -2322,9 +2326,10 @@
   // One formatter each, made once: a list of hundreds of cards stamps every one.
   const HHMM = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' }), DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
   const hhmm = (at) => HHMM.format(new Date(at));
-  /** Where an item opens: its own area, and inside Waiting on you a plan or a design has its own screen; every other ask opens on Decide. */
+  /** Where an item opens: its own area, and inside Waiting on you a plan or a design has its own screen; every other ask opens on Decide. A design under Designs opens its review. */
   const askHref = (d) => {
     const a = area(d);
+    if (a === 'designs') return `#designs/${d.key}`;
     if (a !== 'waiting') return `#${a === 'notes' ? 'reports' : a}`;
     return d.type === 'plan' ? `#waiting/${d.key}` : d.kind === 'design' ? `#designs/${d.key}` : `#decide/${d.key}`;
   };

@@ -25,6 +25,8 @@ process.stdout.write(JSON.stringify({ contract: 1, kind: "design", schema: 1, ke
   about: "Six screens, from the first open to the first message. Approve each one, or say what should change.", status: "in_review", preview: "design/preview.png", journeys: [{ id: "onboarding", title: "Onboarding", screens }] }));
 ' > "$dir/design.json"
 so post "$board" --kind design --from "$dir/design.json"
+# The prototype's screen design is the one card per product that Main passed and promoted, so it waits in Decide.
+so promote onboarding "$board" >/dev/null
 so post "$board" --ask-ref message-feel --key digest --filer newsletter-agent --title "Keep the weekly digest?" --why "About a third of readers opened it in each of the last two months." \
   --outcome yes="It keeps going out each Monday." --outcome no="It stops after this week." --recommend yes --recommend-reason "Readers still open it." --default yes
 so post "$board" --ask-ref message-feel --key ship --filer release-agent --title "When should the new settings page ship?" --why "No new bug reports in three weeks, and support is fully staffed on Friday." \

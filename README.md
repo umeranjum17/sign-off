@@ -87,6 +87,7 @@ One line on what the agent runs per kind; the full reference is [docs/question-k
 |---|---|---|
 | Yes or no, pick one | `raise --ask-ref <captain-message-id-or-hold-id> --title ... --recommend ...` | buttons, the recommended one first |
 | Design pick (mocks A/B/C) | `post --type design --mock a=... --mock b=... --link a=<url>` | mocks side by side, an Open live link under each option that has a `--link`, a note on any part |
+| Design review (screens of a product) | `post --kind design --from design.json` | nothing in Decide: it waits under **Designs** for Main to review; once Main passes every screen, the lead posts one card per product that opens them all, phone and desktop, and Main's `promote <key>` puts that card in Decide |
 | Proof update | `post --type evidence --media shot.png` | the capture, its result, Pass / Fail / Needs work |
 | Proof with a file to install | `post --type evidence --media shot.png --attach app.apk` | the capture, and the file with its size and a Download button (any type, up to 1 GB, `SIGN_OFF_ATTACH_MAX_MB` to change) |
 | Explainer video | `post --type explainer --media clip.mp4 --chapter 0:00=Start` | a player with chapter buttons, then Yes or No |

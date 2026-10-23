@@ -221,6 +221,8 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     if (report && views && !viewOk(d.preview, VIEWS.diagram)) throw bad('preview', `must be a board-relative ${VIEWS.diagram[0]} file`);
     // A report (contract kind report) takes no answer: it has no options, on any board.
     if (report) for (const f of ['options', 'reply', 'area', 'type']) if (d[f] !== undefined) throw bad(f, `must be left out: a report takes no answer${f === 'options' ? '' : ' and shows only under Reports'}`);
+    // A design review is Main's to pass first: only `promote` puts one in Decide, never a field its poster sets.
+    if (design && d.area !== undefined) throw bad('area', 'must be left out: a design shows under Designs, and Main moves it to Decide with sign-off-axi promote');
     // A plan takes its answer from its sections and decisions, sent back at once, so it has no options of its own.
     const options = d.options ?? (report || signin || plan || design ? [] : d.type === 'evidence' ? VERDICTS : YES_NO);
     // An empty list is an item to look at only, unless it takes a reply: only a board another program feeds, a report or a sign-in shows those.
@@ -445,6 +447,26 @@ export const dismissedPath = (decisionsPath: string) => decisionsPath.replace(/\
 export function appendDismissed(decisionsPath: string, keys: string[], dismissed: boolean): void {
   const at = now();
   for (const key of keys) appendLine(dismissedPath(decisionsPath), { key, dismissed, at });
+}
+/** Design reviews Main has put to the user, one line per key and change. A design a lead posts is reviewed under Designs and is no ask of the user's
+ *  until the promote command names it here; no post, feed or board request writes this log. */
+export const promotedPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.promoted.jsonl';
+export function appendPromoted(decisionsPath: string, key: string, promoted: boolean): void {
+  appendLine(promotedPath(decisionsPath), { key, promoted, at: now() });
+}
+/** Keys promoted now: the last line for each promoted it. A torn line is skipped and reported through warn. */
+export function readPromoted(decisionsPath: string, warn: (msg: string) => void = () => {}): string[] {
+  const promoted = new Set<string>();
+  readRaw(promotedPath(decisionsPath)).split('\n').forEach((line, n) => {
+    try {
+      const x = line && JSON.parse(line);
+      if (x?.promoted === true && typeof x.key === 'string') promoted.add(x.key);
+      else if (x) promoted.delete(x.key);
+    } catch {
+      warn(`skipped unreadable line ${n + 1} in ${promotedPath(decisionsPath)}`);
+    }
+  });
+  return [...promoted];
 }
 /** True while an item asks the user something: evidence is never an ask, and an item with no options, reply, sign-in, plan or design is only read. */
 export const asks = (d: Decision) => d.type !== 'evidence' && !reading(d) && (d.options.length > 0 || !!d.reply || ['signin', 'plan', 'design'].includes(d.type));
