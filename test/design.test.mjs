@@ -901,10 +901,10 @@ test('each card has one place to type: Add a comment holds the note sent with th
   assert.match(waiting, /data-act="answer-all"><span>Answer all recommended<\/span>.*?<div class="dl-sep" role="separator"><\/div>.*?data-act="later-all"><span>Move all to later<\/span>/s);
   assert.doesNotMatch(waiting, /data-act="sort"|Oldest first/);
   assert.doesNotMatch(waiting, /<ol class="queue"|<p class="fhead"/);
-  // Today: its title with More, Up next (how many wait, the question, what it is, when and the answer recommended) with that answer as its main button beside Other answer,
+  // Today: its title with the light-or-dark button, Up next (how many wait, the question, what it is, when and the answer recommended) with that answer as its main button beside Other answer,
   // the next ask under Waiting on you with See all, and two tiles: Cleared today opening Answered and Proofs today opening Evidence.
   const home = await dump('');
-  assert.match(home, /<header class="ui-top today-top"><h1 tabindex="-1">Today<\/h1><button class="ui-rb" aria-label="More" aria-haspopup="dialog">/);
+  assert.match(home, /<header class="ui-top today-top"><h1 tabindex="-1">Today<\/h1><button class="ui-rb" aria-label="Switch to (dark|light)">/);
   assert.match(home, /<section class="ui-card ui-hero t-up" aria-label="Up next"><div class="hl"><span class="lab">Up next · 1 of 2<\/span><\/div><h2 class="q" dir="auto">When should it ship\?<\/h2><p class="meta"><span dir="auto">Pick one · \d\d:\d\d · Recommended B<\/span><\/p><div class="t-btns"><button class="t-btn ink" aria-label="Answer B, When should it ship\?"><span class="lbl">Answer B<\/span>.*?<a class="t-btn white" href="#decide\/ship"><span class="lbl">Other answer<\/span><\/a>/s);
   assert.match(home, /<section class="t-wait" aria-label="Waiting on you"><h2 class="ui-sec">Waiting on you<a class="see" href="#waiting">See all<\/a><\/h2><ul class="ui-card ui-list"><li><a class="ui-row" href="#decide\/look">.*?Pick the look/s);
   assert.deepEqual([...home.matchAll(/<a class="ui-card ui-stat" href="([^"]*)" aria-label="([^"]*)"/g)].map((m) => `${m[1]} ${m[2]}`), ['#answered Cleared today: 0 of 2', '#evidence Proofs today: 0']);
@@ -2130,8 +2130,8 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   const { evaluate, close } = await browse(join(dir, 'browser'));
   // A lead's design is Main's to review: Today counts no ask for it and links it under Designs in its More, and Decide is all clear with no badge.
   await evaluate(`location.href = ${JSON.stringify(url)}`);
-  await until(async () => await evaluate('!!document.querySelector(".today-top .ui-rb")'));
-  await evaluate('document.querySelector(".today-top .ui-rb").click()');
+  await until(async () => await evaluate('!!document.querySelector(".t-more-line")'));
+  await evaluate('document.querySelector(".t-more-line").click()');
   await until(async () => (await evaluate('[...document.querySelectorAll("#t-more .ui-pr")].map((a) => a.getAttribute("href") + " " + a.textContent).join("|")')) === '#designs Designs1');
   assert.equal(await evaluate('document.querySelector(".t-up .q").textContent + "|" + document.querySelector(".t-tiles .ui-stat").getAttribute("aria-label")'), 'Nothing waits on you|Cleared today: 0 of 0');
   await evaluate('document.getElementById("t-more").close()');
@@ -2181,8 +2181,8 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   await until(async () => (await evaluate('document.querySelector(".designs .when")?.textContent')).startsWith('Changes requested'));
   // Main's verdict is no answer of the user's: Today's More lists nothing under Answered for it, and Cleared today counts nothing.
   await evaluate(`location.href = ${JSON.stringify(url)}`);
-  await until(async () => await evaluate('!!document.querySelector(".today-top .ui-rb")'));
-  await evaluate('document.querySelector(".today-top .ui-rb").click()');
+  await until(async () => await evaluate('!!document.querySelector(".t-more-line")'));
+  await evaluate('document.querySelector(".t-more-line").click()');
   await until(async () => (await evaluate('[...document.querySelectorAll("#t-more .ui-pr")].map((a) => a.getAttribute("href") + " " + a.textContent).join("|")')) === '#designs Designs1');
   assert.equal(await evaluate('document.querySelector(".t-tiles .ui-stat").getAttribute("aria-label")'), 'Cleared today: 0 of 0');
   await evaluate('document.getElementById("t-more").close()');
@@ -2821,7 +2821,7 @@ test('Evidence: with no --evidence-root a linked run is found in done-done\'s ow
   proc.kill();
 });
 
-test('Today on a phone: the floating tab bar with its pill on Today, Up next with one main action in ink, Waiting on you as 68px rows with a long title on one line, two tiles side by side, nothing wider than the screen, More holding Ask the agent as one row, the last tile clear of the tab bar, and the dock\'s Search a sheet over the screen it is opened on', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Today on a phone: the floating tab bar with its pill on Today, Up next with one main action in ink, Waiting on you as 68px rows with a long title on one line, two tiles side by side, nothing wider than the screen, a line under the tiles opening More with Ask the agent as one row, the last line clear of the tab bar, the title row\'s button switching light and dark, and the dock\'s Search a sheet over the screen it is opened on', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'summary-wide'), file = join(dir, 'board.json');
   mkdirSync(join(dir, 'page'), { recursive: true });
   // A capture as tall and thin as a phone screenshot (414 x 2262).
@@ -2863,8 +2863,8 @@ test('Today on a phone: the floating tab bar with its pill on Today, Up next wit
   // Two tiles side by side, each 96px tall, as wide as each other and 8px apart.
   const tiles = await evaluate('[...document.querySelectorAll(".t-tiles .ui-stat")].map((t) => { const r = t.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; })');
   assert.ok(tiles.length === 2 && tiles[0][1] === tiles[1][1] && tiles[0][2] === tiles[1][2] && tiles.every((t) => t[3] === 96) && tiles[1][0] - (tiles[0][0] + tiles[0][2]) === 8, JSON.stringify(tiles));
-  // More holds Ask the agent: closed, one line of text in a 44px row with no box around it; a tap opens the prompt box.
-  await evaluate('document.querySelector(".today-top .ui-rb").click()');
+  // The line under the tiles opens More, which holds Ask the agent: closed, one line of text in a 44px row with no box around it; a tap opens the prompt box.
+  await evaluate('document.querySelector(".t-more-line").click()');
   await until(async () => await evaluate('document.getElementById("t-more").open'));
   const ask = await evaluate('(() => { const a = document.querySelector("#t-more details.ask"), s = a.querySelector("summary"), r = document.createRange(); r.selectNodeContents(s); const box = a.getBoundingClientRect(), t = r.getBoundingClientRect(), c = getComputedStyle(a); return [a.open, Math.round(box.height), Math.abs(Math.round((t.top + t.bottom) / 2 - (box.top + box.bottom) / 2)) <= 2, c.borderTopWidth, c.backgroundColor, Math.round(t.left)]; })()');
   assert.deepEqual(ask, [false, 44, true, '0px', 'rgba(0, 0, 0, 0)', 16]);
@@ -2873,7 +2873,19 @@ test('Today on a phone: the floating tab bar with its pill on Today, Up next wit
   await evaluate('document.getElementById("t-more").close()');
   // The last thing on Today scrolls fully clear of the floating tab bar.
   await evaluate('scrollTo(0, document.documentElement.scrollHeight)');
-  assert.ok(await evaluate('document.querySelector(".t-tiles").getBoundingClientRect().bottom <= document.querySelector(".tabs").getBoundingClientRect().top - 16'));
+  assert.ok(await evaluate('document.querySelector(".t-more-line").getBoundingClientRect().bottom <= document.querySelector(".tabs").getBoundingClientRect().top - 16'));
+  // The round button in the title row switches light and dark: the page and its cards take the other theme, the button says so, the pick holds across a reload, and a second tap puts it back.
+  const look = () => evaluate('[document.querySelector(".today-top .ui-rb").getAttribute("aria-label"), getComputedStyle(document.body).backgroundColor, getComputedStyle(document.querySelector(".t-up")).backgroundColor].join("|")');
+  const first = await look(), other = first.startsWith('Switch to dark|') ? 'Switch to light|' : 'Switch to dark|';
+  assert.match(first, /^Switch to (dark|light)\|/);
+  await evaluate('document.querySelector(".today-top .ui-rb").click()');
+  await until(async () => (await look()).startsWith(other));
+  const picked = await look();
+  assert.ok(picked.split('|')[1] !== first.split('|')[1] && picked.split('|')[2] !== first.split('|')[2], `${first} -> ${picked}`);
+  await evaluate('location.reload()');
+  await until(async () => (await evaluate('!!document.querySelector(".t-up")')) && (await look()) === picked);
+  await evaluate('document.querySelector(".today-top .ui-rb").click()');
+  await until(async () => (await look()) === first);
   // On Evidence the same proof is a compact row of its claim and its Passed check, with no frame left empty.
   await evaluate('location.hash = "#evidence"');
   await until(async () => await evaluate('!!document.getElementById("item-u3")'));

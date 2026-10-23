@@ -22,7 +22,7 @@ go() { ax open "$url#$1"; ax eval "() => { location.reload(); return 1 }"; pause
 counts='() => { const txt = (s) => document.querySelector(s)?.textContent.trim() ?? ""; const badge = [...document.querySelectorAll("#nav a, #tabs a")].find((a) => a.getAttribute("href") === "#waiting")?.querySelector(".n, .bd")?.textContent ?? "0";
   return { hash: location.hash, decide_badge: Number(badge), rows: document.querySelectorAll(".dl-row").length, design_rows: document.querySelectorAll(".dl-row a[href^=\"#designs/\"], a.dl-face[href^=\"#designs/\"]").length,
     lede: txt(".waiting-lede"), tiles: [...document.querySelectorAll(".t-tiles .ui-stat")].map((t) => t.getAttribute("aria-label")), up_next: txt(".t-up .q"),
-    more: (document.querySelector(".today-top .ui-rb")?.click(), [...document.querySelectorAll("#t-more .ui-pr")].map((a) => a.textContent.replace(/\s+/g, " ").trim())), designs_listed: document.querySelectorAll(".designs li").length } }'
+    more: (document.querySelector(".t-more-line")?.click(), [...document.querySelectorAll("#t-more .ui-pr")].map((a) => a.textContent.replace(/\s+/g, " ").trim())), designs_listed: document.querySelectorAll(".designs li").length } }'
 ax open "$url"
 for w in 390 1280; do
   vp=390x844x2,mobile,touch; [ "$w" = 1280 ] && vp=1280x800x1

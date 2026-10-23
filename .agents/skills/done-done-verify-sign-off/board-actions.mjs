@@ -103,7 +103,7 @@ const PAGES = [
     await h.nav('Today See all', h.board().querySelector('.t-wait .see'), /^#waiting$/);
     await h.nav('Today Waiting on you row', h.board().querySelector('.t-wait .ui-row'), /^#(decide|waiting|designs)\/[\w.-]+$/);
     for (const [what, href] of [['Answered', '#answered'], ['Designs', '#designs']]) {
-      h.board().querySelector('.today-top .ui-rb')?.click();
+      h.board().querySelector('.t-more-line')?.click();
       await h.nav(`Today More: ${what}`, document.querySelector(`#t-more a[href="${href}"]`), new RegExp(`^${href}$`));
     }
   } }] },

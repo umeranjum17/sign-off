@@ -15,7 +15,7 @@
 // E archiving the report shown (the row folds, the next is selected), Cmd+Z, Enter opening a guided report over the board and Escape, and the ? sheet.
 // Usage: node decide-record.mjs <board url> <light|dark> <out.mp4> [desk] [reports]
 // With `today` it records Today at phone size on a board feel-board.sh seeded: See all opening Decide (the pill sliding), the sign-in swiped to Later, the Today tab (Up next is now
-// the next ask), Answer turning into a check (Cleared today counting it, Decide's badge counting down, the next ask rising in), Undo, More's sheet opened and closed,
+// the next ask), Answer turning into a check (Cleared today counting it, Decide's badge counting down, the next ask rising in), Undo, the light-or-dark button tapped twice, More opened from the line under the tiles and closed,
 // the dock's Search with words typed and closed, and a Waiting on you row opening its ask.
 // Usage: node decide-record.mjs <board url> <light|dark> <out.mp4> today
 // With `flows`, on a board seed-proto-board.sh seeded, it records the phone's answer flows: an ask with nothing picked, a pick naming the button, a note typed and sent with it;
@@ -128,7 +128,7 @@ try {
     [() => key('g'), 200], [() => key('e'), 1200], [() => key('g'), 200], [() => key('d'), 1500]]
     : screen === 'today' ? [[2600],
     [() => tap('.t-wait .see'), 1800], [() => drag('npm', -280), 1700], [() => tap('.tabs a[href="#"]'), 1600], [() => tap('.t-up .t-btn.ink'), 2400], [() => tap('#undo'), 1700],
-    [() => tap('.today-top .ui-rb'), 1600], [() => tap('#t-more .x'), 1000], [() => tap('.dock-find'), 1200], [() => type('settings'), 1600], [() => tap('#t-search .x'), 1000],
+    [() => tap('.today-top .ui-rb'), 1600], [() => tap('.today-top .ui-rb'), 1200], [() => tap('.t-more-line'), 1600], [() => tap('#t-more .x'), 1000], [() => tap('.dock-find'), 1200], [() => type('settings'), 1600], [() => tap('#t-search .x'), 1000],
     [() => tap('.t-wait .ui-row'), 1800], [() => tap('.tabs a[href="#"]'), 1600]] : [[2600], [() => press('ship'), 700], [() => drag('ship', 80, 10, 45), 1000], [() => drag('keep-the-weekly-digest', 300), 1600], [() => tap('#undo'), 1400],
     [() => drag('ship', -280), 1600], [() => tap('#undo'), 1300], [() => tap('a.dl-face[href="#decide/ship"]'), 900],
     [() => tap('.pick-list li:nth-child(2) .pick-option'), 900], [() => tap('.pick-list li:nth-child(1) .pick-option'), 900],

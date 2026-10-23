@@ -1,9 +1,11 @@
 // Today in the new look, as the approved prototype draws it, at one theme and width per run (so a run's steps.json holds one claim), driven and measured in a headless
 // Chromium of its own over the DevTools protocol with exact device metrics (390x844 or 1280x800, 2x).
 // The board is feel-board.sh's (a sign-in, three asks with a pick, a six-screen design to review, five updates, two reports), then: a P0 on the ship ask and a P2 on the
-// digest ask, and the design's project (Chat app) given its own icon with sign-off-axi project --icon, so the rows show a priority chip and a project icon where they exist.
-// States: today-signin (the sign-in up next, as seeded), today (after signin done: the ship ask up next), today-answered (its Answer tapped), more (the More sheet),
-// search (the dock's Search with "settings" typed) and today-end (scrolled to the end, the last tile clear of the dock); at 1280, today and search.
+// digest ask, the ship ask resting on the settings proof (so it takes that proof's project), and the settings and Chat app projects given their own icons with
+// sign-off-axi project --icon, so Up next and the rows show a priority chip, a project's name and its icon where they exist.
+// States: today-signin (the sign-in up next, as seeded), today (after signin done: the ship ask up next), today-answered (its Answer tapped), theme (the round
+// light-or-dark button tapped: the other theme), more (the More sheet from the line under the tiles), search (the dock's Search with "settings" typed) and today-end
+// (scrolled to the end, the last line clear of the dock); at 1280, today and search.
 // Each capture is measured in the browser: every block on the 16px gutter's two edges, the 4px grid, 68px rows (40px tile, title 12px after it), the hero, the section head, the tiles,
 // the dock, no control under 44px on a phone, no sideways overflow, no file path or internal code in the words on screen, and no console error.
 // Usage: node .agents/skills/done-done-verify-sign-off/today-shots.mjs <output> [light|dark|light,dark] [390|1280]   (two themes: one run each, then one steps.json naming both)
@@ -64,7 +66,7 @@ const MEASURE = `(async () => {
     return { pill: r2(p.width) + 'x' + r2(p.height), bottom: r2(innerHeight - p.bottom), find: r2(f.width) + 'x' + r2(f.height), gap: r2(f.left - p.right), top: r2(p.top) }; })() : null;
   if (dock && (dock.pill.split('x')[1] !== '56' || dock.bottom !== 24 || dock.find !== '56x56' || dock.gap !== 12)) fail.push('dock ' + JSON.stringify(dock));
   // At the scroll end the last block clears the dock.
-  const last = [...document.querySelectorAll('main .t-tiles, main .ui-list, main .t-up')].filter(vis).map((e) => box(e).bottom).sort((a, b) => b - a)[0];
+  const last = [...document.querySelectorAll('main .t-more-line, main .t-tiles, main .ui-list, main .t-up')].filter(vis).map((e) => box(e).bottom).sort((a, b) => b - a)[0];
   const atEnd = Math.ceil(scrollY + innerHeight) >= document.documentElement.scrollHeight - 1, clear = dock && last !== undefined ? r2(dock.top - last) : null;
   if (atEnd && clear !== null && clear < 16) fail.push('the last block is ' + clear + 'px from the dock');
   const sh = sheet && (() => { const r = box(sheet); return { left: r2(r.left), right: r2(r.right), top: r2(r.top), bottom: r2(innerHeight - r.bottom), field: sheet.querySelector('.t-find') ? r2(box(sheet.querySelector('.t-find')).height) : null,
@@ -90,10 +92,12 @@ try {
   const url = sh('bash', [join(here, '.agents/skills/done-done-verify-sign-off/feel-board.sh'), dir], { cwd: repo }).trim().split('\n').pop();
   // A priority on two asks (the board takes P0-P3 on any card) and the design's project given its own icon.
   const b = JSON.parse(readFileSync(board, 'utf8'));
-  for (const d of b.items) if (d.key === 'ship') d.priority = 'P0'; else if (d.key === 'digest') d.priority = 'P2';
+  for (const d of b.items) if (d.key === 'ship') Object.assign(d, { priority: 'P0', proof: 'ev1' }); else if (d.key === 'digest') d.priority = 'P2';
   writeFileSync(board, JSON.stringify(b, null, 2) + '\n');
   copyFileSync(join(repo, 'web/icon-192.png'), join(dir, 'chat-app.png'));
   cli('project', board, '--name', 'Chat app', '--icon', 'chat-app.png');
+  writeFileSync(join(dir, 'settings.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#E8590C"/><circle cx="12" cy="12" r="3" fill="none" stroke="#fff" stroke-width="2"/><path d="M12 4.5v3M12 16.5v3M4.5 12h3M16.5 12h3" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>');
+  cli('project', board, '--name', 'settings', '--icon', 'settings.svg');
 
   let port; for (let i = 0; i < 100 && !port; i++) { await wait(100); const f = join(prof, 'DevToolsActivePort'); if (existsSync(f)) port = readFileSync(f, 'utf8').split('\n')[0]; }
   assert.ok(port, 'Chromium opened its DevTools port');
@@ -174,10 +178,24 @@ try {
     await capture('today-answered');
     const firstKey = proto ? await (async () => { await go(`file://${proto}#v=today`, 700); return js('D.decide[0].key'); })() : '';
     await pair('today-answered', `v=today&answered=${encodeURIComponent(firstKey)}`);
-    // More, the round button in the title row.
+    // The round button in the title row switches light and dark (a moon in light, a sun in dark); the pick stays across a reload, and a second tap puts it back.
     await go(url);
-    await until(`!!document.querySelector('.today-top .ui-rb')`, 'More drawn');
+    await until(`!!document.querySelector('.today-top .ui-rb')`, 'the light-or-dark button drawn');
+    facts.theme = { before: await js(`document.querySelector('.today-top .ui-rb').getAttribute('aria-label') + ' | ' + getComputedStyle(document.body).backgroundColor`) };
     await tap('.today-top .ui-rb');
+    await until(`document.querySelector('.today-top .ui-rb').getAttribute('aria-label') === ${JSON.stringify(theme === 'dark' ? 'Switch to dark' : 'Switch to light')}`, 'the other theme');
+    await go(url);
+    await until(`!!document.querySelector('.t-up')`, 'Today drawn again');
+    facts.theme.after = await js(`document.querySelector('.today-top .ui-rb').getAttribute('aria-label') + ' | ' + getComputedStyle(document.body).backgroundColor`);
+    await capture('theme');
+    await tap('.today-top .ui-rb');
+    await until(`localStorage.getItem('so-theme') === ${JSON.stringify(theme)}`, 'the theme put back');
+    await js(`localStorage.removeItem('so-theme')`);
+    // More, the quiet line under the tiles.
+    await go(url);
+    await until(`!!document.querySelector('.t-more-line')`, 'More drawn');
+    await js(`document.querySelector('.t-more-line').scrollIntoView({ block: 'center' })`);
+    await tap('.t-more-line');
     await until(`document.getElementById('t-more').open`, 'More open');
     facts.more = await js(`document.getElementById('t-more').innerText.replace(/\\s+/g, ' ').trim()`);
     await capture('more');
@@ -205,10 +223,10 @@ try {
   if (side === 'after') writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
     start: 'A throwaway board (feel-board.sh: a sign-in, three asks with a recommended answer, a design to review, five updates, two reports), with a P0 and a P2 on two asks and the Chat app project given its own icon.',
     steps: [`Open Today at ${metrics.width}x${metrics.height} (2x), ${theme}, in a headless Chromium of its own, and measure every block, row, button and the dock in the browser.`,
-      ...(phone ? ['With the sign-in up next, read Up next.', 'Mark the sign-in done with sign-off-axi signin done; Today shows the ship ask up next.', 'Tap Answer Friday; the next ask rises into Up next, Cleared today counts it and the answer is in the board\'s answers file.', 'Tap More in the title row and read the sheet.'] : []),
+      ...(phone ? ['With the sign-in up next, read Up next.', 'Mark the sign-in done with sign-off-axi signin done; Today shows the ship ask up next.', 'Tap Answer Friday; the next ask rises into Up next, Cleared today counts it and the answer is in the board\'s answers file.', 'Tap the round button in the title row: the other theme, kept across a reload; tap it again to put it back.', 'Tap the line under the tiles and read More.'] : []),
       `${phone ? 'Tap the dock\'s round Search' : 'Click Search in the sidebar'}, type "settings" and read the groups.`, ...(phone ? ['Scroll to the end and measure the last tile against the dock.'] : []),
       ...(proto ? ['Capture the approved prototype at the same size and theme (today, today-answered, search) and save each beside the board.'] : [])],
-    result: `${theme}, ${metrics.width}px: Today is drawn as the approved prototype: the title with a round More, Up next (how many wait, the priority chip where one is set, the question, its project or kind, time and the recommended answer, Answer in ink beside Other answer), Waiting on you (68px rows with the project's own icon or initials or a drawing, a P chip only where set), and Cleared today and Proofs today; every block on one gutter and the 4px grid; Answer saves and the next ask rises in; More holds Answered, Designs, the Leash and Ask the agent; Search opens as a sheet over the screen with its groups; the last tile clears the dock; no control under 44px, no file path or code in the words, no sideways overflow, no console error.` }, null, 2) + '\n');
+    result: `${theme}, ${metrics.width}px: Today is drawn as the approved prototype: the title with the round light-or-dark button (it switches the theme and keeps it), Up next (how many wait, the priority chip where one is set, the question, its project's icon and name (else its kind), time and the recommended answer, Answer in ink beside Other answer), Waiting on you (68px rows with the project's own icon or initials or a drawing, a P chip only where set), and Cleared today and Proofs today; every block on one gutter and the 4px grid; Answer saves and the next ask rises in; one quiet line under the tiles opens More, which holds Answered, Designs, the Leash and Ask the agent; Search opens as a sheet over the screen with its groups; the last tile clears the dock; no control under 44px, no file path or code in the words, no sideways overflow, no console error.` }, null, 2) + '\n');
   console.log(report.join('\n'));
   console.log(JSON.stringify(facts, null, 2));
   if (side === 'after') assert.deepEqual(problems, [], 'every capture measures clean');
