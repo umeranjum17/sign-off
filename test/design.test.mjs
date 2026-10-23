@@ -1206,7 +1206,7 @@ test('a capture opens the raw file on a desk and its own live screen on a phone'
     try {
       await evaluate(`location.href = ${JSON.stringify(`${url}#evidence/update-1`)}`);
       await until(() => evaluate('!!document.querySelector(".ev-hero a")'));
-      const link = await evaluate('(() => { const a = document.querySelector(".ev-hero a"); return [a.getAttribute("href"), a.target]; })()');
+      const link = await evaluate('(() => { const a = document.querySelector(".ev-hero a"); return [a.getAttribute("href").replace(/&h=[0-9a-f]{16}$/, ""), a.target]; })()');
       assert.deepEqual(link, width === 390 ? ['#evidence/update-1', ''] : ['/api/media?key=update-1&i=0', '_blank'], `${width}: ${link}`);
     } finally { close(); }
   }
@@ -3274,4 +3274,67 @@ test('no board named: doctor checks the nearest setup from a subfolder, a missin
   assert.equal(at(proj, { HOME: join(scratch, 'no-such-home') }, 'raise', '--title', 'Missing home?').status, 0);
   assert.deepEqual(JSON.parse(readFileSync(join(proj, '.sign-off', 'decisions.json'), 'utf8')).items.map((i) => i.key), ['missing-home']);
   assert.match(at(proj, {}, 'doctor', join('~', 'x')).stdout, /init '~\/x'/);
+});
+
+test('load budget: a board of 60 updates opens Evidence on a phone with at most 12 captures and 1.5 MB, sends text compressed, and a reload or a poll costs only 304s', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'budget'), file = join(dir, 'board.json'), capture = readFileSync(new URL('../fixtures/evidence/product-board.png', import.meta.url));
+  const hash = createHash('sha256').update(capture).digest('hex');
+  mkdirSync(join(dir, 'evidence', '1'), { recursive: true });
+  writeFileSync(join(dir, 'evidence', '1', '1.png'), capture);
+  const items = Array.from({ length: 60 }, (_, i) => ({ key: `update-${i + 1}`, type: 'evidence', number: i + 1, title: `Sign-in check ${i + 1}`, about: 'Umer checks the sign-in screen on a phone.',
+    filed: new Date(Date.now() - i * 60_000).toISOString(), media: [{ path: 'evidence/1/1.png', sha256: hash, bytes: capture.length }] }));
+  writeFileSync(file, JSON.stringify({ schema: 2, items }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  // Bytes as they go over the wire, with the headers a browser sends.
+  const raw = (path, headers = {}) => new Promise((ok, no) => get(`${url}${path.slice(1)}`, { agent: false, headers: { 'accept-encoding': 'gzip, deflate, br', ...headers } }, (r) => {
+    const parts = [];
+    r.on('data', (b) => parts.push(b)).on('end', () => ok({ status: r.statusCode, headers: r.headers, bytes: Buffer.concat(parts).length }));
+  }).on('error', no));
+  const page = await raw('/'), state = await raw('/api/decisions'), plainPage = readFileSync(new URL('../web/index.html', import.meta.url)).length;
+  assert.equal(page.headers['content-encoding'], 'br');
+  assert.ok(page.bytes < plainPage / 3, `the page goes compressed: ${page.bytes} of ${plainPage} bytes`);
+  assert.equal(state.headers['content-encoding'], 'br');
+  // The page's 20-second poll of an unchanged board, and a reload of the page itself, answer 304 with no body.
+  assert.deepEqual([(await raw('/api/decisions', { 'if-none-match': state.headers.etag })).status, (await raw('/', { 'if-none-match': page.headers.etag })).status], [304, 304]);
+  // A capture's address carries its hash, so the browser keeps it and never asks again; asked by its tag, it is a 304.
+  const media = await raw(`/api/media?key=update-1&i=0&h=${hash.slice(0, 16)}`);
+  assert.equal(media.headers['cache-control'], 'private, max-age=31536000, immutable');
+  assert.equal((await raw('/api/media?key=update-1&i=0', { 'if-none-match': media.headers.etag })).status, 304);
+
+  const { evaluate, close } = await browse(join(dir, 'b'), 390, 844, true);
+  try {
+    // What the page fetched, settled: no new request for a second.
+    const fetched = async () => {
+      let last = -1;
+      for (;;) {
+        await new Promise((r) => setTimeout(r, 1000));
+        const now = await evaluate('performance.getEntriesByType("resource").length');
+        if (now === last) break;
+        last = now;
+      }
+      return evaluate(`(() => { const all = [...performance.getEntriesByType("navigation"), ...performance.getEntriesByType("resource")];
+        return { captures: all.filter((e) => e.name.includes("/api/media")).length, kb: Math.round(all.reduce((a, e) => a + e.transferSize, 0) / 1024),
+          page: all[0].transferSize, state: all.filter((e) => e.name.endsWith("/api/decisions")).map((e) => e.transferSize), media: all.filter((e) => e.name.includes("/api/media")).map((e) => e.transferSize) }; })()`);
+    };
+    await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
+    await until(() => evaluate('document.querySelectorAll(".ev-card").length === 60 && !!document.querySelector(".ev-media img")?.complete'));
+    const first = await fetched();
+    // Only the captures near the screen load: 60 full captures would be over 6 MB.
+    assert.ok(first.captures >= 1 && first.captures <= 12, `captures on the first screen: ${first.captures}`);
+    assert.ok(first.kb <= 1536, `page weight of the first screen: ${first.kb} KB`);
+    // Reloaded, the page and the state are 304s (headers only) and every capture comes from the browser's own copy. Chrome keeps a page
+    // opened from about:blank apart from the same page reloaded, so the page reloads once to be kept, and the second reload is measured.
+    // Each old page is marked, so the counts are read from the reloaded one.
+    for (let i = 0; i < 2; i++) {
+      await evaluate('window.before = true; location.reload()');
+      await until(() => evaluate('!window.before && document.querySelectorAll(".ev-card").length === 60'));
+    }
+    const again = await fetched();
+    assert.ok(again.page < 1024 && again.state.every((b) => b < 1024), `reload: page ${again.page} B, state ${again.state} B`);
+    assert.ok(again.media.every((b) => b === 0), `reload refetched a capture: ${again.media}`);
+    console.log(`Evidence on a phone: ${first.captures} of 60 captures, ${first.kb} KB; reload ${again.kb} KB`);
+  } finally { close(); }
+  proc.kill();
 });

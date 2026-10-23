@@ -7,6 +7,7 @@ import { accessSync, chmodSync, closeSync, constants, copyFileSync, createReadSt
 import { lookup } from 'node:dns/promises';
 import { availableParallelism, homedir, networkInterfaces, tmpdir, userInfo } from 'node:os';
 import { Worker } from 'node:worker_threads';
+import { brotliCompressSync, constants as zlib, gzipSync } from 'node:zlib';
 import { pipeline } from 'node:stream';
 import { basename, delimiter, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -2102,7 +2103,7 @@ async function exportBoard(args: string[]) {
   let missing = 0;
   // The same URLs the page asks the server for, read through the same hash and path checks.
   const inline = async (url: string, query?: string, document = false) => {
-    const [code, body] = await route({ method: 'GET', url } as IncomingMessage).catch((): [number, unknown] => [404, null]);
+    const [code, body] = await route({ method: 'GET', url, headers: {} } as IncomingMessage).catch((): [number, unknown] => [404, null]);
     if (code !== 200) { missing++; return; }
     const { media: bytes, type } = body as { media: Buffer; type: string };
     const media = document && type === 'text/html' ? Buffer.concat([bytes, pointer]) : bytes;
@@ -2134,6 +2135,23 @@ async function exportBoard(args: string[]) {
 
 
 const page = readFileSync(new URL('../web/index.html', import.meta.url));
+/** Text a browser fetches is sent compressed when it takes that: the page and the board's state are mostly text and shrink 4-8x, which on a
+ * phone's network is most of the wait. Brotli at a fast level for each reply; the page itself is squeezed once, on its first request. */
+const COMPRESSIBLE = /^(text\/|application\/(json|javascript|manifest\+json)|image\/svg)/;
+const squeeze = (req: IncomingMessage, bytes: Buffer): { bytes: Buffer; encoding?: string } => {
+  const takes = String(req.headers['accept-encoding'] ?? '');
+  if (bytes.length < 1024) return { bytes };
+  if (/\bbr\b/.test(takes)) return { bytes: brotliCompressSync(bytes, { params: { [zlib.BROTLI_PARAM_QUALITY]: 5, [zlib.BROTLI_PARAM_SIZE_HINT]: bytes.length } }), encoding: 'br' };
+  if (/\bgzip\b/.test(takes)) return { bytes: gzipSync(bytes, { level: 6 }), encoding: 'gzip' };
+  return { bytes };
+};
+const pageTag = `"${createHash('sha256').update(page).digest('hex').slice(0, 32)}"`;
+// Level 9 takes about 50 ms and level 11 over half a second for 7% less, so the page is squeezed at 9.
+const squeezed: Record<string, Buffer> = {};
+const pageAs = (encoding: 'br' | 'gzip') => (squeezed[encoding] ??= encoding === 'br'
+  ? brotliCompressSync(page, { params: { [zlib.BROTLI_PARAM_QUALITY]: 9, [zlib.BROTLI_PARAM_SIZE_HINT]: page.length } }) : gzipSync(page, { level: 9 }));
+/** The browser keeps a reply and asks again with its tag, so an unchanged page, state or file costs a 304 and no body. */
+const unchanged = (req: IncomingMessage, tag: string) => req.headers['if-none-match']?.split(/\s*,\s*/).includes(tag) ?? false;
 /** The board's design tokens, favicon, home-screen icon and install manifest, served beside the page; see web/tokens.css and web/icon.svg. */
 const ICONS: Record<string, { type: string; bytes: Buffer }> = Object.fromEntries(
   [['tokens.css', 'text/css; charset=utf-8'], ['icon.svg', 'image/svg+xml'], ['apple-touch-icon.png', 'image/png'], ['icon-192.png', 'image/png'], ['icon-512.png', 'image/png'], ['icon-maskable-512.png', 'image/png'], ['manifest.webmanifest', 'application/manifest+json']]
@@ -2213,15 +2231,17 @@ const state = () => {
   // The page marks sent comments in annotations, so answers and rounds go without theirs: a read-only board or an export carries none.
   const answers = Object.fromEntries(Object.entries(readAnswers(file, warn)).map(([k, { comments: _, ...a }]) => [k, a])), taken = seenBy(file);
   const rounds = readRounds(file, warn).map(({ comments: _, ...r }) => r);
+  // The board file is read once for the whole state: it can hold thousands of items.
+  const { extra } = readItems(file), fed = extra.readonly === true || extra.answers_only === true, items = loadDecisions(file);
   return {
     file,
     mockBase: `/mock/${loopback(bind) ? 'local' : mockPass(tokenOf(file))}/`,
     // Who filed an item stays in the file: the page only learns that its filer took the answer.
     // A sign-in's start command stays on this host too: the page only learns that a tap makes a new link, and how the last run went.
-    decisions: loadDecisions(file).filter((d) => !fakeEvidence(d)).map(({ filer: _, start, ...d }) => ({ ...d, ...(d.type === 'design' && answers[d.key]?.answer === 'approve' && { status: 'approved' }), ...(start && { start: true, run: signinState(d.key) }), evidenceCard: d.evidence ? evidenceCard(d.evidence) : null,
+    decisions: items.filter((d) => !fakeEvidence(d)).map(({ filer: _, start, ...d }) => ({ ...d, ...(d.type === 'design' && answers[d.key]?.answer === 'approve' && { status: 'approved' }), ...(start && { start: true, run: signinState(d.key) }), evidenceCard: d.evidence ? evidenceCard(d.evidence) : null,
       ...(d.mocks && { mocks: d.mocks.map((m) => ({ ...m, hash: mockHash(m.path) })) }) })),
-    readonly: readOnly(),
-    answers_only: answersOnly(),
+    readonly: extra.readonly === true,
+    answers_only: extra.answers_only === true,
     ...profile(),
     answers,
     seen: Object.values(answers).filter(taken).map((a) => a.key),
@@ -2232,14 +2252,23 @@ const state = () => {
     delivery: deliveries(file),
     rounds,
     messages: readMessages(file, warn),
-    annotations: readOnly() || answersOnly() ? [] : ((sent) => readAnnotations(file, warn).map((a) => (sent.has(a.id) ? { ...a, sent: true } : a)))(sentIds(file)),
-    comments: readOnly() || answersOnly() ? [] : readPartComments(file),
-    dismissed: readDismissed(file, answers, rounds, warn, archivable(file, loadDecisions(file))),
+    annotations: fed ? [] : ((sent) => readAnnotations(file, warn).map((a) => (sent.has(a.id) ? { ...a, sent: true } : a)))(sentIds(file)),
+    comments: fed ? [] : readPartComments(file),
+    dismissed: readDismissed(file, answers, rounds, warn, fed ? [] : items),
   };
 };
 /** A mock file's sha256 now, or null when it is gone: a comment shows only on the exact file it was made on.
- * ponytail: hashes every mock on each state read; cache by mtime if boards carry many big mocks. */
-const mockHash = (path: string) => { try { return sha256(readFileSync(under(dirname(file), mockFile(path)))); } catch { return null; } };
+ * Kept per file while its size, change time and inode stay the same, so a state read does not rehash every mock. */
+const mockHashes = new Map<string, { at: string; hash: string }>();
+const mockHash = (path: string) => {
+  try {
+    const actual = under(dirname(file), mockFile(path)), st = statSync(actual), at = `${st.ino}:${st.size}:${st.mtimeMs}:${st.ctimeMs}`, kept = mockHashes.get(actual);
+    if (kept?.at === at) return kept.hash;
+    const hash = sha256(readFileSync(actual));
+    mockHashes.set(actual, { at, hash });
+    return hash;
+  } catch { return null; }
+};
 /** The comments that go with a card's next answer or round: not sent yet, and made on the mock file the card shows now. */
 const unsent = (d: Decision): Sent[] => {
   const sent = sentIds(file), now = new Map((d.mocks ?? []).map((m) => [m.value, mockHash(m.path)]));
@@ -2369,11 +2398,13 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     const m = v === null ? posted : v === 'light' || v === 'thumb' ? posted?.[v] : undefined, type = m && mediaTypes[extname(m.path).toLowerCase()];
     if (!m || !type) return [404, { error: 'Evidence is unavailable' }];
     try {
-      const actual = under(dirname(file), m.path);
+      const actual = under(dirname(file), m.path), forever = q.get('h') === m.sha256.slice(0, 16);
       if (statSync(actual).size !== m.bytes) return [404, { error: 'Evidence file changed since it was posted' }];
+      // The browser already holds this exact capture: no read and no hash.
+      if (unchanged(req, `"${m.sha256.slice(0, 32)}"`)) return [200, { media: Buffer.alloc(0), type, tag: m.sha256.slice(0, 32), forever }];
       const bytes = readFileSync(actual);
       if (sha256(bytes) !== m.sha256) return [404, { error: 'Evidence file changed since it was posted' }];
-      return [200, { media: bytes, type }];
+      return [200, { media: bytes, type, tag: m.sha256.slice(0, 32), forever }];
     } catch { return [404, { error: 'Evidence is unavailable' }]; }
   }
   if (req.method === 'GET' && req.url?.startsWith('/api/attachment?')) {
@@ -2642,7 +2673,10 @@ const server = createServer(async (req, res) => {
   if (icon) return res.writeHead(200, { 'content-type': icon.type, 'cache-control': 'public, max-age=86400' }).end(icon.bytes);
   if (req.method === 'GET' && req.url === '/favicon.ico') return res.writeHead(204).end();
   if (req.method === 'GET' && req.url === '/') {
-    return res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'self' 'unsafe-inline'" }).end(page);
+    const headers = { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'self' 'unsafe-inline'", etag: pageTag, 'cache-control': 'no-cache', vary: 'accept-encoding' };
+    if (unchanged(req, pageTag)) return res.writeHead(304, headers).end();
+    const takes = String(req.headers['accept-encoding'] ?? ''), encoding = /\bbr\b/.test(takes) ? 'br' : /\bgzip\b/.test(takes) ? 'gzip' : undefined, bytes = encoding ? pageAs(encoding) : page;
+    return res.writeHead(200, { ...headers, ...(encoding && { 'content-encoding': encoding }), 'content-length': bytes.length }).end(bytes);
   }
   let status: number, body: unknown;
   try {
@@ -2663,17 +2697,29 @@ const server = createServer(async (req, res) => {
     return bytes ? pipeline(createReadStream(path, { start, end }), res, () => {}) : res.end();
   }
   if (body && typeof body === 'object' && 'media' in body) {
-    const { media: bytes, type, point, page } = body as { media: Buffer; type: string; point?: boolean; page?: Buffer }, media = point ? Buffer.concat([bytes, pointer, ...(page ? [page] : [])]) : bytes;
-    const headers = { 'content-type': type, 'x-content-type-options': 'nosniff', 'content-security-policy': FRAME_CSP, 'accept-ranges': 'bytes', 'content-length': media.length };
+    const { media: bytes, type, point, page, tag: stored, forever } = body as { media: Buffer; type: string; point?: boolean; page?: Buffer; tag?: string; forever?: boolean };
+    const media = point ? Buffer.concat([bytes, pointer, ...(page ? [page] : [])]) : bytes, tag = `"${stored ?? sha256(media).slice(0, 32)}"`;
+    // A capture named by its hash never changes, so the browser keeps it; any other file is asked again with its tag.
+    const kept = { etag: tag, 'cache-control': forever ? 'private, max-age=31536000, immutable' : 'private, no-cache' };
+    if (status === 200 && unchanged(req, tag)) return res.writeHead(304, kept).end();
+    const headers = { 'content-type': type, 'x-content-type-options': 'nosniff', 'content-security-policy': FRAME_CSP, 'accept-ranges': 'bytes', 'content-length': media.length, ...(status === 200 && kept) };
     // One byte range, so phone browsers can play and seek a recording.
     const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? '');
-    if (!range || (!range[1] && !range[2])) return res.writeHead(status, headers).end(media);
+    if (!range || (!range[1] && !range[2])) {
+      const sent = COMPRESSIBLE.test(type) ? squeeze(req, media) : { bytes: media };
+      return res.writeHead(status, { ...headers, 'content-length': sent.bytes.length, ...(sent.encoding && { 'content-encoding': sent.encoding, vary: 'accept-encoding' }) }).end(sent.bytes);
+    }
     const start = range[1] ? Number(range[1]) : Math.max(0, media.length - Number(range[2]));
     const end = range[1] && range[2] ? Math.min(Number(range[2]), media.length - 1) : media.length - 1;
     if (start > end) return res.writeHead(416, { 'content-range': `bytes */${media.length}` }).end();
     return res.writeHead(206, { ...headers, 'content-length': end - start + 1, 'content-range': `bytes ${start}-${end}/${media.length}` }).end(media.subarray(start, end + 1));
   }
-  res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body));
+  const json = Buffer.from(JSON.stringify(body));
+  // The page reads the state again every 20 seconds: unchanged, that read is a 304 with no body.
+  const tag = req.method === 'GET' && status === 200 ? `"${sha256(json).slice(0, 32)}"` : undefined;
+  if (tag && unchanged(req, tag)) return res.writeHead(304, { etag: tag, 'cache-control': 'no-cache' }).end();
+  const sent = squeeze(req, json);
+  res.writeHead(status, { 'content-type': 'application/json', 'content-length': sent.bytes.length, ...(sent.encoding && { 'content-encoding': sent.encoding }), vary: 'accept-encoding', ...(tag && { etag: tag, 'cache-control': 'no-cache' }) }).end(sent.bytes);
 });
 
 const argv = process.argv.slice(2);

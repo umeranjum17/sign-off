@@ -492,6 +492,8 @@
   .ev-find select { flex: none; max-width: 40%; min-height: 2.75rem; padding: 0 0.75rem; border: 0; border-radius: 0.625rem; background: var(--sunk); color: var(--muted); font: inherit; }
   .ev-find select.on { color: var(--text); }
   .ev-grid { display: grid; gap: 1.75rem; grid-template-columns: minmax(0, 1fr); }
+  /* Evidence lists every proof ever filed: a card off the screen is not laid out or painted until it nears it. */
+  .ev-grid > * { content-visibility: auto; contain-intrinsic-size: auto 26rem; }
   .ev-card { display: flex; flex-direction: column; gap: 0.75rem; color: inherit; text-align: left; text-decoration: none; }
   .ev-media { position: relative; display: grid; place-items: center; aspect-ratio: 2 / 1; overflow: hidden;
     border-radius: 1.125rem; background: var(--surface); }
@@ -876,6 +878,7 @@
     .split-list .ev-find { margin: 0 0 0.75rem; }
     .split-list .ev-find select { max-width: 50%; }
     .split-list .ev-grid { grid-template-columns: minmax(0, 1fr); gap: 0; margin: 0 -1.5rem; }
+    .split-list .ev-grid > * { contain-intrinsic-size: auto 5rem; }
     .split-list .ev-grid > .row, .split-list .ev-grid > .empty { margin: 0 1.5rem; }
     .split-list .ev-card { position: relative; padding-left: 1.5rem; }
     .split-list .ev-card::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: var(--action); transform: scaleY(0); transition: transform 260ms var(--spring); }
@@ -1854,7 +1857,11 @@
 
   /** The proof on the card itself: its own captures, or else the media of its linked run.
    * Each file is hash-checked by the server; one that changed or went missing says so instead of a broken frame. */
-  const mediaUrl = (d, i, v = '') => `/api/media?key=${encodeURIComponent(d.key)}&i=${i}${v && `&v=${v}`}`;
+  /** A capture's address names the file's hash (h), so the browser keeps it for good and never asks for it again; a frozen copy keys its files without it. */
+  const mediaUrl = (d, i, v = '') => {
+    const sha = (v ? d.media[i][v] : d.media[i])?.sha256;
+    return `/api/media?key=${encodeURIComponent(d.key)}&i=${i}${v && `&v=${v}`}${FROZEN || !sha ? '' : `&h=${sha.slice(0, 16)}`}`;
+  };
   /** Each capture as [original, clip?, light, thumb]: the board shows the lighter copies post made of a still, and opens the original full size.
    * A capture with no copies (a clip, an older post, a run's media) shows the original everywhere. */
   const filesOf = (d) => d.media?.map((m, i) => [mediaUrl(d, i), /\.(mp4|webm)$/i.test(m.path), mediaUrl(d, i, m.light ? 'light' : ''), mediaUrl(d, i, m.thumb ? 'thumb' : m.light ? 'light' : '')])
@@ -1908,14 +1915,18 @@
   const changeName = (url) => { const m = /\/(?:pull|pulls|merge_requests)\/(\d+)/.exec(url); return m ? `Pull request ${m[1]}` : `Open on ${new URL(url).host}`; };
   /** A link to a change, only when it is a full http(s) URL: a bare `http:` is text, not a place to open. */
   const changeHref = (d) => { try { const u = new URL(d.link ?? ''); return /^https?:$/.test(u.protocol) ? u.href : ''; } catch { return ''; } };
+  /** Calls go once the node is about a screen from view: a clip has no lazy loading of its own, and each one asks for its first frame. */
+  const watcher = 'IntersectionObserver' in window && new IntersectionObserver((seen) => seen.forEach((e) => { if (e.isIntersecting) watcher.unobserve(e.target), e.target.near?.(); }), { rootMargin: '100% 0px' });
+  const nearby = (node, go) => { if (!watcher) return go(); node.near = go; watcher.observe(node); };
   /** A card's hero: the first picture of its proof, else its first clip; proof with neither (a run that kept only text) has none. */
   function hero(d) {
     const files = filesOf(d), [path, video, , small] = files.find(([, clip]) => !clip) ?? files[0] ?? [];
     if (!path) return [];
     const url = src(path);
     if (video) {
-      const clip = el('video', { src: url, muted: '', playsinline: '', preload: 'metadata', 'aria-label': `Clip, ${headline(d)}` });
+      const clip = el('video', { muted: '', playsinline: '', preload: 'metadata', 'aria-label': `Clip, ${headline(d)}` });
       clip.onerror = () => clip.replaceWith(el('p', { class: 'ev-missing' }, 'The capture is missing or changed.'));
+      nearby(clip, () => { clip.src = url; });
       return [el('span', { class: 'ev-badge' }, 'Clip'), clip];
     }
     const img = shot(small, '');
@@ -2194,7 +2205,9 @@
   const reads = (d) => /\.html$/i.test(d.view ?? '') || !!d.guided;
   /** Where a card's picture opens: a report or plan is its live page, and on a phone any card is its own screen, never the raw capture file (a desktop screenshot shrunk to nothing). Empty on a desk, where the file opens in a tab. */
   const pageHref = (d) => (reads(d) ? (d.type === 'plan' ? `#waiting/${d.key}` : `#reports/${d.key}`) : matchMedia('(max-width: 43.6875rem)').matches ? (d.type === 'evidence' ? `#evidence/${d.key}` : askHref(d)) : '');
-  const hhmm = (at) => new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  // One formatter each, made once: a list of hundreds of cards stamps every one.
+  const HHMM = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' }), DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
+  const hhmm = (at) => HHMM.format(new Date(at));
   /** Where an item opens: its own area, and inside Waiting on you a plan or a design has its own screen; every other ask opens on Decide. */
   const askHref = (d) => {
     const a = area(d);
@@ -2205,7 +2218,7 @@
   /** The time left to the second, as a timer reads (11:41 left), for the last hour; before that, as left says it. */
   const clock = (at) => { const s = Math.ceil((Date.parse(at) - Date.now()) / 1000); return s <= 0 ? 'deadline passed' : s < 3600 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} left` : left(at); };
   const isToday = (at) => new Date(at).toDateString() === new Date().toDateString();
-  const day = (at) => new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const day = (at) => DAY.format(new Date(at));
   const when = (at) => (isToday(at) ? hhmm(at) : `${day(at)} ${hhmm(at)}`);
   /** A time as a person says it: today needs no date. */
   const stamp = (at) => (isToday(at) ? `Today, ${hhmm(at)}` : `${day(at)}, ${hhmm(at)}`);
