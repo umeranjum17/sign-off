@@ -229,7 +229,10 @@
     font-size: 0.875rem; font-weight: 650; white-space: nowrap; }
   .st::before { content: ""; width: 0.4375rem; height: 0.4375rem; border-radius: 50%; background: currentColor; }
   .st.ok { color: var(--ok); } .st.new { color: var(--c-reports); } .st.bad { color: var(--danger); } .st.warn { color: var(--warn); }
-  .decided .lbl { display: block; color: var(--muted); font-size: 0.875rem; font-weight: 650; }
+  /* What a report decided: a green box with a check, as the prototype ends a report's page. */
+  .decided { display: flex; gap: 0.75rem; margin: 1.375rem 0 0; padding: 0.875rem 1rem; border-radius: 1rem; background: color-mix(in srgb, var(--tk-success) 10%, var(--bg)); box-shadow: 0 0 0 0.5px var(--line); }
+  .decided .donek { width: 1.875rem; height: 1.875rem; } .decided p { margin: 0; font-size: var(--t-b); line-height: 1.375rem; }
+  .decided .lbl { display: block; color: var(--ok); font-size: var(--t-xs); line-height: 1.125rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; }
   .sec-h { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; margin: 1.5rem 0 0.75rem; }
   .sec-h h2, .sec-h .meta { margin: 0; }
   .legend { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin: 0 0 0.75rem; padding: 0.625rem 1rem; color: var(--muted); font-size: 0.875rem; }
@@ -262,8 +265,10 @@
   #reader[hidden] { display: none; }
   #reader header { display: flex; align-items: center; gap: 0.5rem; min-height: 3.5rem; padding: 0.25rem 1rem; }
   #reader .close { display: inline-flex; flex: none; align-items: center; min-height: 3rem; margin-left: -0.5rem; padding: 0 0.5rem; border-radius: 0.625rem; color: var(--accent); font-weight: 400; text-decoration: none; }
-  :is(#reader header, .split-bar) .change-link { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; margin-left: auto; border-radius: 0.625rem; color: var(--accent); }
-  :is(#reader header, .split-bar) .change-link svg { width: 1.5rem; height: 1.5rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  /* A report's page and an update go back as the prototype's bar does: a 52px bar, the chevron and the area's name at 17px. */
+  #reader header:has(> .close .glyph) { min-height: 3.25rem; padding: 0 1rem; }
+  #reader .close:has(.glyph) { margin-left: -0.75rem; padding: 0 0.75rem 0 0.125rem; font-size: var(--t-m); }
+  #reader .close .glyph { width: 1.75rem; height: 1.75rem; margin-right: -0.125rem; stroke-width: 2.2; }
   #reader header h1 { margin: 0; min-width: 0; overflow: hidden; font-size: 1rem; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
   #reader iframe { flex: 1; width: 100%; border: 0; background: var(--bg); }
   /* A title takes the focus from script when a screen opens; it shows a ring only when the last input was a key. */
@@ -273,10 +278,10 @@
   #reader .design-review h1 { margin: 0.75rem auto; font-size: 2.125rem; line-height: 1.1765; font-weight: 700; letter-spacing: 0.011em; white-space: normal; overflow: visible; }
   #reader .read { flex: 1; min-height: 0; overflow: auto; padding: 0 1.25rem 2rem; }
   :is(#reader, .split-detail) .read > * { max-width: 42.5rem; margin-left: auto; margin-right: auto; }
-  :is(#reader, .split-detail) .read .eyebrow { margin-top: 0.5rem; font-weight: 400; }
-  :is(#reader, .split-detail) .read h1 { margin-top: 0.75rem; margin-bottom: 0.75rem; font-size: 2.125rem; line-height: 1.1765; font-weight: 700; letter-spacing: 0.011em; white-space: normal; overflow: visible; }
-  :is(#reader, .split-detail) .read .about { margin-bottom: 1rem; font-size: 1.25rem; line-height: 1.4; }
-  :is(#reader, .split-detail) .read .decided { margin-bottom: 1.25rem; }
+  :is(#reader, .split-detail) .read .eyebrow { display: block; margin: 0.25rem auto 0; font-size: var(--t-s); line-height: 1.25rem; font-weight: 400; letter-spacing: -0.01em; }
+  :is(#reader .read .eyebrow, .rp-bar .crumb) b { color: var(--teal); font-weight: 600; }
+  :is(#reader, .split-detail) .read h1 { margin-top: 0.375rem; margin-bottom: 0.625rem; font-size: 1.75rem; line-height: 2.125rem; font-weight: 700; letter-spacing: -0.024em; white-space: normal; overflow: visible; }
+  :is(#reader, .split-detail) .read .about { margin-bottom: 1.375rem; color: var(--muted); font-size: var(--t-m); line-height: 1.5rem; letter-spacing: -0.02em; }
   :is(#reader, .split-detail) .read iframe { display: block; width: 100%; max-width: none; height: 1px; flex: none; border-radius: 1rem; background: var(--surface); }
   .i-plan { --area: var(--c-waiting); }
   #reader .plan-scroll { flex: 1; min-height: 0; overflow: auto; padding: 1.25rem 1.25rem 9rem; }
@@ -368,7 +373,7 @@
   @media (min-width: 64rem) {
     #reader .read { padding: 0 3rem 3rem; }
     #reader .design-review { padding-bottom: 3rem; } #reader .design-review h1 { font-size: 3rem; line-height: 1.0833; letter-spacing: -0.003em; }
-    #reader .read h1 { font-size: 3rem; line-height: 1.0833; letter-spacing: -0.003em; }
+    #reader .read h1 { font-size: 1.875rem; line-height: 2.25rem; }
     body.pane-reading main { display: none; }
     body.pane-reading #reader { position: static; inset: auto; z-index: auto; grid-column: 2; grid-row: 1; width: 100%; height: 100vh; min-width: 0; }
   }
@@ -463,55 +468,39 @@
   .decide-bar > * { white-space: nowrap; }
   .decide-bar > .silent-line { white-space: normal; min-width: 0; } /* the stay-quiet line wraps; nowrap pushed it past a phone's edge in a wider font */
   .decide-bar .answer { flex: 1 1 auto; background: var(--action); color: var(--on-accent); font-weight: 400; }
-  /* Evidence: one list of cards, newest first, each with its capture as the hero; the whole card opens the update.
-     The project picker sits quietly beside the search box, as tall as it and in the same sunk fill. */
-  .ev-find { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; } .ev-find input { flex: 1 1 auto; min-width: 0; }
-  .ev-find select { flex: none; max-width: 40%; min-height: 2.75rem; padding: 0 0.75rem; border: 0; border-radius: 0.625rem; background: var(--sunk); color: var(--muted); font: inherit; }
-  .ev-find select.on { color: var(--text); }
-  .ev-grid { display: grid; gap: 1.75rem; grid-template-columns: minmax(0, 1fr); }
-  /* Evidence lists every proof ever filed: a card off the screen is not laid out or painted until it nears it. */
-  .ev-grid > * { content-visibility: auto; contain-intrinsic-size: auto 26rem; }
-  .ev-card { display: flex; flex-direction: column; gap: 0.75rem; color: inherit; text-align: left; text-decoration: none; }
-  .ev-media { position: relative; display: grid; place-items: center; aspect-ratio: 2 / 1; overflow: hidden;
-    border-radius: 1.125rem; background: var(--surface); }
-  .ev-card:hover .ev-media { background: color-mix(in srgb, var(--surface) 94%, var(--text)); }
-  .ev-media img, .ev-media video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; object-position: center top; border-radius: 1.125rem;
-    transition: transform 260ms var(--spring); }
-  .ev-card:active .ev-media img, .ev-card:active .ev-media video { transform: scale(0.985); }
-  /* Proof that kept only text: a compact row of its claim and its result's small check. */
-  .has-x > .ev-text { padding-right: 3rem; }
-  .ev-badge { position: absolute; z-index: 1; top: 0.75rem; left: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 1rem;
-    background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.8125rem; font-weight: 600; }
-  .ev-missing { margin: 0 0 1rem; color: var(--muted); font-size: 0.9375rem; }
-  .ev-card .t { font-size: 1.1875rem; font-weight: 600; line-height: 1.32; letter-spacing: -0.012em; }
-  .ev-card .also { display: block; margin-top: 0.125rem; color: var(--muted); font-size: 0.9375rem; font-weight: 400; line-height: 1.3; letter-spacing: 0; }
-  .ev-card .m { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; color: var(--muted); font-size: 0.9375rem; }
-  .ev-ok, .ev-bad, .ev-warn { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--ok); }
-  .ev-bad { color: var(--danger); } .ev-warn { color: var(--warn); } .ev-none { color: var(--muted); }
-  .ev-ok svg, .ev-bad svg, .ev-warn svg { width: 0.9375rem; height: 0.9375rem; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-  /* One update: the whole capture on its tile, what it proves in a line, what the check recorded, then its verdict. */
-  #reader .ev-scroll { flex: 1; min-height: 0; overflow: auto; padding: 1rem 1.25rem 3rem; }
+  /* Evidence, as the approved prototype draws it: one list of rows on a white page, newest first. A row is the top of its capture in a 54 by 72 thumb,
+     what it proves in up to two lines, its result (a dot in its colour) and project, then when it was filed; a swipe left clears it.
+     When proof names more than one project, a quiet All projects pill under the title opens a menu of them, the one shown ticked. */
+  .ev-page > .pick { margin: 0.25rem 0 0 -0.125rem; }
+  .dl-more.pick > summary { justify-content: start; width: auto; color: var(--text); }
+  .dl-more.pick > summary > .pill { display: inline-flex; align-items: center; gap: 0.25rem; height: 2rem; padding: 0 0.625rem 0 0.75rem; border-radius: 1rem; background: var(--sunk); font-size: var(--t-s); font-weight: 500; transition: background-color 120ms linear; }
+  .dl-more.pick > summary:active > .pill { background: var(--fill-2); }
+  .dl-more.pick .pill .glyph { width: 1rem; height: 1rem; stroke-width: 2; color: var(--muted); }
+  .dl-more.pick > .dl-menu { right: auto; left: 0.125rem; transform-origin: top left; }
+  .dl-more.pick > .dl-menu > button + button { border-top: 0; }
+  .dl-more.pick > .dl-menu .glyph { color: var(--accent); }
+  .ev-page > .ev-list { margin-top: 0.5rem; }
+  /* Evidence lists every proof ever filed: a row off the screen is not laid out or painted until it nears it. */
+  .ev-list > li { content-visibility: auto; contain-intrinsic-size: auto 6rem; }
+  .ev-list .dl-face { min-height: 6rem; }
+  .ev-list .dl-row ~ .dl-row .dl-face::before { content: ""; position: absolute; top: 0; right: 0; left: 5.5rem; border-top: 0.5px solid var(--line); }
+  .ev-list .copy { gap: 0; } .ev-list .title { margin-bottom: 0.125rem; } .ev-list .also { white-space: normal; }
+  .ev-media { position: relative; flex: none; width: 3.375rem; height: 4.5rem; overflow: hidden; border-radius: 0.5rem; background: var(--sunk); box-shadow: var(--shot-edge); }
+  .ev-media img, .ev-media video { display: block; width: 100%; height: 100%; object-fit: cover; object-position: left top; transform: scale(1.35); transform-origin: 0 0; }
+  .ev-missing { margin: 0; padding: 0.25rem; color: var(--muted); font-size: 0.625rem; line-height: 1.2; }
+  /* One update, as the prototype's page: its result, project and when, its title, what it proves, then the whole capture with a screenshot's soft edge
+     (a tap opens it full size); under them what the check recorded and the verdict. */
+  #reader .ev-scroll { flex: 1; min-height: 0; overflow: auto; padding: 0.25rem 1.25rem 2.5rem; }
   .ev-item { display: grid; gap: 1rem; max-width: 42.5rem; margin: 0 auto; }
-  .ev-hero { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; padding: 2rem 1.5rem; border-radius: 1.125rem; background: var(--surface); }
-  /* The update's capture in a full phone frame, filling the card as in the design; a wide one gets the slimmer bezel and the width. */
-  .phone.full { width: min(250px, 64%); padding: 9px; border-radius: 40px; }
-  .phone.full img { border-radius: 31px; } .phone.full.wide { width: min(100%, 36rem); padding: 7px; border-radius: 18px; } .phone.full.wide img { border-radius: 11px; }
-  .ev-hero:has(.phone.full) { padding: 2rem 1.5rem; } .ev-hero a { display: contents; } .ev-hero .phone img { max-height: none; aspect-ratio: 10 / 17; object-fit: cover; object-position: top; } .ev-hero .phone.wide img { aspect-ratio: 16 / 10; }
-  /* On a desk the capture fills the preview's width, cropped to the top of the shot; a tap opens it full size. */
-  @media (min-width: 64rem) {
-    .ev-hero:has(.phone.full) { padding: 0; gap: 0.75rem; background: none; }
-    .ev-hero .phone.full { position: relative; width: 100%; padding: 0; overflow: hidden; border-radius: 1.125rem; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); cursor: zoom-in; }
-    .ev-hero .phone.full img { aspect-ratio: 4 / 3; border-radius: 0; transition: transform 260ms var(--spring); }
-    .ev-hero .phone.full.wide img { aspect-ratio: auto; }
-    .ev-hero .phone.full::after { content: "Open full size" / ""; position: absolute; right: 0.75rem; bottom: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 1rem;
-      background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 0.8125rem; font-weight: 600; }
-    .ev-hero a:active .phone.full img { transform: scale(0.99); }
-  }
-  .ev-hero img, .ev-hero video { display: block; max-width: 100%; max-height: min(26rem, 55vh); border-radius: 0.75rem; }
+  .ev-meta { margin: 0; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; }
+  .ev-title { margin: 0.375rem 0 0.625rem; font-size: 1.75rem; line-height: 2.125rem; font-weight: 700; letter-spacing: -0.024em; }
+  .ev-intro { margin: 0; color: var(--muted); font-size: var(--t-m); line-height: 1.5rem; letter-spacing: -0.02em; }
+  .ev-hero { display: grid; justify-items: center; gap: 1rem; margin-top: 0.25rem; padding: 0.375rem 0 0.75rem; }
+  .ev-hero a { display: contents; }
+  .phone.full { width: min(17.0625rem, 100%); padding: 0; overflow: hidden; border-radius: 1rem; background: var(--sunk); box-shadow: var(--shot-edge); }
+  .phone.full img { max-height: 36.9375rem; border-radius: 0; object-fit: cover; object-position: top; } .phone.full.wide { width: 100%; }
+  .ev-hero img, .ev-hero video { display: block; max-width: 100%; } .ev-hero video { max-height: min(26rem, 55vh); border-radius: 1rem; }
   .ev-hero .gone { margin: 0; color: var(--danger); font-size: 0.9375rem; }
-  .ev-say { text-align: center; }
-  .ev-title { margin: 0.875rem 0 0.5rem; font-size: 1.75rem; line-height: 1.22; font-weight: 700; letter-spacing: 0.007em; text-wrap: balance; }
-  .ev-intro { margin: 0; color: var(--muted); font-size: 1.1875rem; line-height: 1.47; }
   .ev-gl { margin: 1rem 0 0; color: var(--muted); font-size: 0.875rem; letter-spacing: 0.02em; text-transform: uppercase; }
   .ev-grp { overflow: hidden; border-radius: 0.75rem; background: var(--surface); }
   .ev-grp .cell { display: flex; flex-wrap: wrap; align-items: center; gap: 0.875rem; min-height: 3.5rem; padding: 0.625rem 1rem; color: inherit; font-size: 1.0625rem; text-decoration: none; }
@@ -705,8 +694,6 @@
   .bulk { display: flex; justify-content: flex-end; gap: 0.5rem; margin: 0.5rem -0.5rem -0.5rem; }
   .bulk button { padding: 0 0.5rem; }
   .picked { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 1rem; }
-  .has-x { position: relative; }
-  .has-x > .x { position: absolute; top: 0.25rem; right: 0.25rem; margin: 0; background: color-mix(in srgb, var(--surface) 88%, transparent); }
   .chip { padding: 0 0.5rem; border: 1px solid currentColor; border-radius: 999px; color: var(--accent);
     font-size: 0.875rem; font-weight: 600; line-height: 1.25rem; letter-spacing: 0.04em; text-transform: uppercase; }
   /* Each option is a tall phone frame, side by side; on a phone the row swipes, one frame at a time, and the next one peeks in.
@@ -825,43 +812,16 @@
     .decide-bar { position: static; margin: 1rem 0 0; padding: 0; background: transparent; }
     .decide-bar .answer { flex: none; }
     .rows.reports, .sec-h:has(+ .reports), .legend { max-width: 50rem; }
-    /* Evidence sets its cards two across, the whole capture on each tile; a page that is not an update keeps the whole width. */
-    .ev-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; }
-    .ev-grid > .row { grid-column: 1 / -1; }
-    #reader .ev-scroll { padding: 2rem 3rem 4rem; }
+    #reader .ev-scroll { padding: 1.75rem 2.75rem 2.5rem; }
     .ev-grp { border-radius: 1.125rem; }
-    .ev-title { font-size: 2.5rem; line-height: 1.1; margin-top: 1.25rem; }
-    .ev-intro { font-size: 1.3125rem; }
+    .ev-title { font-size: 1.875rem; line-height: 2.25rem; }
+    .phone.full { width: 19rem; } .phone.full img { max-height: 41.125rem; } .phone.full.wide { width: 100%; }
   }
-  /* The desk from 1024px: Evidence is a list beside the update it has selected, as in Mail. */
+  /* The desk from 1024px: Evidence is a list beside the update it has selected, as in Mail; the bar over it holds its result, project and when. */
   @media (min-width: 64rem) {
-    .split-list .ev-card { display: grid; grid-template-columns: 3.5rem minmax(0, 1fr); align-items: center; gap: 0.25rem 0.875rem;
-      padding: 0.75rem 3rem 0.75rem 1rem; transition: background-color 120ms linear; -webkit-tap-highlight-color: transparent; }
-    .split-list .ev-card .ev-media { flex: none; width: 3.5rem; aspect-ratio: 3 / 4; padding: 0; border-radius: 0.5rem;
-      background: var(--sunk); transition: transform 260ms var(--spring); }
-    .split-list .ev-media :is(img, video) { padding: 0; border-radius: 0.5rem; object-fit: cover; object-position: center top; }
-    .split-list .ev-card.ev-text { grid-template-columns: minmax(0, 1fr); }
-    .split-list .ev-badge { display: none; }
-    .split-list .ev-card .ev-media { grid-row: 1 / span 2; }
-    .split-list .ev-card .t { align-self: end; font-size: 1.0625rem; line-height: 1.375rem; }
-    .split-list .ev-card .m { align-self: start; gap: 0.375rem; font-size: 0.9375rem; line-height: 1.25rem; }
-    .split-list .ev-card:hover { background: color-mix(in srgb, var(--sunk) 45%, transparent); }
-    .split-list .ev-card:active { background: var(--sunk); }
-    .split-list .ev-card:active .ev-media { transform: scale(0.96); }
-    .split-list .has-x > .x { opacity: 0; transition: opacity 120ms linear; }
-    .split-list .has-x:is(:hover, :has(:focus-visible)) > .x { opacity: 1; }
-    /* Evidence in the desk shell: one column of rows, the selected one tinted with an accent bar, the update beside it. */
-    .split-list .ev-find { margin: 0 0 0.75rem; }
-    .split-list .ev-find select { max-width: 50%; }
-    .split-list .ev-grid { grid-template-columns: minmax(0, 1fr); gap: 0; margin: 0 -1.5rem; }
-    .split-list .ev-grid > * { contain-intrinsic-size: auto 5rem; }
-    .split-list .ev-grid > .row, .split-list .ev-grid > .empty { margin: 0 1.5rem; }
-    .split-list .ev-card { position: relative; padding-left: 1.5rem; }
-    .split-list .ev-card::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: var(--action); transform: scaleY(0); transition: transform 260ms var(--spring); }
-    .split-list .ev-card[aria-current] { background: color-mix(in srgb, var(--action) 12%, transparent); outline: none; }
-    .split-list .ev-card[aria-current]::before { transform: scaleY(1); }
-    .split-detail > .ev-scroll { padding: 2rem 2.5rem 4rem; }
-    .split-detail .ev-item { max-width: 40rem; }
+    .split-detail .ev-meta { display: none; }
+    .split-detail > .ev-scroll { padding: 1.75rem 2.75rem 2.5rem; }
+    .split-detail .ev-item { max-width: 39.5rem; }
   }
   /* The guided plan and report: one scroll with a rail and Your answers on a desk, a progress bar and a Go ahead bar on a phone. */
   #reader .gd-scroll { flex: 1; min-height: 0; overflow: auto; padding: 0 1rem 7rem; scroll-behavior: smooth; }
@@ -1146,20 +1106,22 @@
      Every tap answers at once: rows tint on press, buttons shrink a little, and pops settle on a spring (--spring, set by the script). ---- */
   :root { --ease: cubic-bezier(0.22, 1, 0.36, 1); --spring: var(--ease); --c-indigo: #5E5CE6; --skel: rgba(118, 118, 128, 0.12); --skel-hi: rgba(118, 118, 128, 0.04); }
   @media (prefers-color-scheme: dark) { :root { --c-indigo: #7D7AFF; --skel: rgba(255, 255, 255, 0.07); --skel-hi: rgba(255, 255, 255, 0.02); } }
-  body:has(.decide-list, .decide) { --bg: var(--tk-surface); --surface: var(--tk-grouped); }
-  @media (prefers-color-scheme: dark) { body:has(.decide-list, .decide) { --surface: var(--tk-surface-highest); } }
+  body:has(.decide-list, .decide, .rp-page, .ev-page) { --bg: var(--tk-surface); --surface: var(--tk-grouped); }
+  @media (prefers-color-scheme: dark) { body:has(.decide-list, .decide, .rp-page, .ev-page) { --surface: var(--tk-surface-highest); } }
   main { overflow-x: clip; }
   .date-kicker { margin: 0 0 0.125rem; color: var(--muted); font-size: var(--t-xs); line-height: 1.125rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
   .top:has(> .date-kicker) h1 { font-size: 2.125rem; line-height: 2.625rem; }
   .top > .dl-more { position: absolute; top: 2.75rem; right: -0.5rem; }
-  /* Decide's head on a phone, as the prototype sets it: the date from 20px down, the large title, a 15px line of what waits, and More beside the title. */
+  /* The head of Decide, Evidence and Reports on a phone, as the prototype sets it: the date from 20px down, the large title, a 15px line of what waits or is new, and More beside the title.
+     Evidence's project pill sits under the title, then its rows. */
   @media (max-width: 63.999rem) {
-    .top:has(+ .decide-list) { padding-top: 1.25rem; }
-    .top:has(+ .decide-list) .date-kicker { margin: 0; line-height: 1.25rem; }
-    .top:has(+ .decide-list) h1 { margin-top: 0.1875rem; line-height: 2.5625rem; }
-    .top:has(+ .decide-list) .waiting-lede { margin-top: 0.125rem; font-size: var(--t-s); line-height: 1.25rem; }
-    .top:has(+ .decide-list) > .dl-more { top: 2.25rem; right: 0; }
+    .top:has(+ :is(.decide-list, .rp-page, .ev-page)) { padding-top: 1.25rem; }
+    .top:has(+ :is(.decide-list, .rp-page, .ev-page)) .date-kicker { margin: 0; line-height: 1.25rem; }
+    .top:has(+ :is(.decide-list, .rp-page, .ev-page)) h1 { margin-top: 0.1875rem; line-height: 2.5625rem; }
+    .top:has(+ :is(.decide-list, .rp-page, .ev-page)) .waiting-lede { margin-top: 0.125rem; font-size: var(--t-s); line-height: 1.25rem; }
+    .top:has(+ :is(.decide-list, .rp-page, .ev-page)) > .dl-more { top: 2.25rem; right: 0; }
   }
+  .top:has(+ .ev-page) { padding-bottom: 0; }
   .top > .bulk { margin-top: 0.25rem; }
   /* More: a disc at the top right (or beside Answer) whose menu scales out of it. */
   .dl-more { position: relative; flex: none; }
@@ -1169,7 +1131,7 @@
   .dl-more > summary:active > span { transform: scale(0.92); transition-duration: 90ms; }
   .dl-more > summary .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 3; }
   .dl-more:not([open]) > .dl-menu { display: none; }
-  .dl-menu { position: absolute; z-index: 4; top: calc(100% + 0.25rem); right: 0.25rem; min-width: 15rem; padding: 0.375rem 0; border-radius: 0.875rem; background: var(--tile);
+  .dl-menu { position: absolute; z-index: 4; top: calc(100% + 0.375rem); right: 0.25rem; min-width: 14.5rem; padding: 0.375rem 0; border-radius: 0.875rem; background: var(--tile);
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.16), 0 0 0 0.5px var(--line); transform-origin: top right; animation: menu-in 260ms var(--spring); }
   .decide-bar .dl-menu { top: auto; bottom: calc(100% + 0.25rem); transform-origin: bottom right; }
   @keyframes menu-in { from { opacity: 0; transform: scale(0.6); } }
@@ -1221,13 +1183,12 @@
   /* Reports: a 58px picture of what each one explains with (teal, which no other area uses), its title and a blue dot while it is not read,
      two lines of what it says, then one quiet line of its form, video, project and time. Read and unread is blue under a right swipe, Archive indigo under a left one. */
   .rp-list .dl-face { align-items: flex-start; min-height: 6.5rem; padding-top: 0.875rem; padding-bottom: 0.875rem; }
-  .rp-list .dl-row:not(.leaving) ~ .dl-row .dl-face::before { content: ""; position: absolute; top: 0; right: 0; left: 5.75rem; border-top: 0.5px solid var(--line); }
   .rp-list .rth { display: grid; flex: none; place-items: center; width: 3.625rem; height: 3.625rem; border-radius: 0.9375rem; color: var(--teal);
     background: color-mix(in srgb, var(--teal) 13%, var(--tile)); box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--teal) 30%, transparent); }
   .rp-list .rth svg { width: 2.625rem; height: 2.625rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .rp-list .r1 { align-items: center; }
   .rp-list .sub { display: -webkit-box; white-space: normal; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-  .rp-list .when { overflow: hidden; margin-top: 0.3125rem; color: var(--faint); font-size: var(--t-xs); line-height: 1.125rem; font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
+  .rp-list .when { overflow: hidden; margin-top: 0.1875rem; color: var(--faint); font-size: var(--t-xs); line-height: 1.125rem; font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
   .rp-list .new { flex: none; width: 0.625rem; height: 0.625rem; border-radius: 50%; background: var(--action); transition: transform 280ms var(--spring); }
   .rp-list .new.out { animation: dot-out 280ms var(--spring) 120ms forwards; }
   @keyframes dot-out { to { transform: scale(0); } }
@@ -1292,7 +1253,7 @@
     .decide-bar .answer, .decide-bar .open-link { flex: 1 1 100%; }
   }
   /* The prototype sets its text 0.374px tight (-0.022em of its 17px body), buttons too; Decide follows it, so its lines break where the prototype's do. */
-  :is(.decide-list, .decide, .split-bar:has(> .crumb)) { letter-spacing: -0.374px; } :is(.decide-list, .decide) :is(button, textarea) { letter-spacing: inherit; }
+  :is(.decide-list, .decide, .rp-page, .ev-page, .read, .ev-scroll, .split-bar:has(> .crumb)) { letter-spacing: -0.374px; } :is(.decide-list, .decide) :is(button, textarea) { letter-spacing: inherit; }
   .decide .kicker { margin: 0.25rem 0 0; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; }
   .decide .kicker .k { color: var(--k); font-weight: 600; }
   .decide .lead h2 { margin: 0.375rem 0 0.625rem; font-size: 1.75rem; line-height: 2.125rem; letter-spacing: -0.024em; }
@@ -1439,23 +1400,27 @@
     .split-bar .later .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.75; color: var(--muted); }
     /* Decide on a desk, at the prototype's measures: the list's head 22px down with a 28px title, rows 18px in, a 56px bar over the ask (its kind, Later and More),
        the ask 44px in under a 30px question, and its answer bar right after it: never at the pane's foot, and under a tall ask after the last option, so it never covers one. */
-    .split-list:has(> .decide-list) { padding: 0 1.25rem; }
-    .split-list:has(> .decide-list) > .top { padding: 1.375rem 0 0.375rem; }
-    .split-list:has(> .decide-list) .date-kicker { margin: 0; line-height: 1.25rem; }
-    .split-list:has(> .decide-list) h1 { margin-top: 0.625rem; font-size: 1.75rem; line-height: 2.125rem; }
-    .split-list:has(> .decide-list) .waiting-lede { margin-top: 0.125rem; font-size: var(--t-s); line-height: 1.25rem; }
-    .split-list:has(> .decide-list) > .top > .dl-more { top: 2.375rem; right: 0; }
-    .split-list .decide-list > .dl-head:first-child { margin-top: 1.75rem; }
-    .split-list .decide-list .dl-list { margin: 0 -1.25rem; }
-    .split-list .decide-list .dl-face { padding: 0.75rem 1.125rem; }
-    .split-list .decide-list .dl-face .title { font-size: 1rem; line-height: 1.3125rem; }
-    .split-list .decide-list .dl-face .sub { font-size: 0.875rem; line-height: 1.1875rem; }
-    .split-list:has(> .decide-list) .split-hints { margin: auto -1.25rem 0; padding: 0.625rem 1.25rem 0.75rem; }
+    .split-list:has(> :is(.decide-list, .rp-page, .ev-page)) { padding: 0 1.25rem; }
+    .split-list:has(> :is(.decide-list, .rp-page, .ev-page)) > .top { padding: 1.375rem 0 0.375rem; }
+    .split-list:has(> :is(.decide-list, .rp-page, .ev-page)) .date-kicker { margin: 0; line-height: 1.25rem; }
+    .split-list:has(> :is(.decide-list, .rp-page, .ev-page)) h1 { margin-top: 0.625rem; font-size: 1.75rem; line-height: 2.125rem; }
+    .split-list:has(> :is(.decide-list, .rp-page, .ev-page)) .waiting-lede { margin-top: 0.125rem; font-size: var(--t-s); line-height: 1.25rem; }
+    .split-list:has(> :is(.decide-list, .rp-page, .ev-page)) > .top > .dl-more { top: 2.375rem; right: 0; }
+    .split-list :is(.decide-list, .rp-page) > .dl-head:first-child { margin-top: 1.75rem; }
+    .split-list :is(.decide-list, .rp-page, .ev-page) .dl-list { margin: 0 -1.25rem; }
+    .split-list :is(.decide-list, .rp-page, .ev-page) .dl-face { padding: 0.75rem 1.125rem; }
+    .split-list :is(.decide-list, .rp-page, .ev-page) .dl-face .title { font-size: 1rem; line-height: 1.3125rem; }
+    .split-list :is(.decide-list, .rp-page, .ev-page) .dl-face .sub { font-size: 0.875rem; line-height: 1.1875rem; }
+    .split-list .rp-list .dl-face { min-height: 6rem; }
+    .split-list:has(> :is(.decide-list, .rp-page, .ev-page)) .split-hints { margin: auto -1.25rem 0; padding: 0.625rem 1.25rem 0.75rem; }
+    /* Evidence's head ends at its project pill, then 14px to the rows, as the prototype's desk list. */
+    .split-list:has(> .ev-page) > .top { padding-bottom: 0; }
+    .split-list .ev-page > .ev-list.dl-list { margin-top: 0.875rem; }
     .split-bar:has(> .crumb) { min-height: 3.5rem; padding: 0 1rem 0 2rem; }
     .split-bar .crumb { flex: 1; min-width: 0; margin: 0; overflow: hidden; color: var(--muted); font-size: 0.875rem; white-space: nowrap; text-overflow: ellipsis; }
     .split-bar .crumb b { color: var(--text); font-weight: 600; }
-    .split-bar:has(> .crumb) .later { min-height: 2.25rem; margin-left: 0; padding: 0 0.625rem 0 0.75rem; border-radius: 0.625rem; font-size: 0.875rem; font-weight: 500; }
-    .split-bar:has(> .crumb) .later::after { min-width: 1.25rem; height: 1.25rem; margin-left: 0.5rem; font-size: 0.6875rem; }
+    .split-bar:has(> .crumb) :is(.later, .rp-read, .rp-archive) { min-height: 2.25rem; margin-left: 0; padding: 0 0.625rem 0 0.75rem; border-radius: 0.625rem; font-size: 0.875rem; font-weight: 500; }
+    .split-bar:has(> .crumb) :is(.later, .rp-read, .rp-archive)::after { min-width: 1.25rem; height: 1.25rem; margin-left: 0.5rem; font-size: 0.6875rem; }
     .split-detail > .decide { width: 100%; max-width: 45rem; margin: 0 auto; padding: 1.75rem 2.75rem 0; }
     .split-detail > .decide .decide-preview { margin-top: 1.5rem; }
     .split-detail .decide .lead h2 { font-size: 1.875rem; line-height: 2.25rem; }
@@ -1480,20 +1445,17 @@
     .dl-hover button::after { content: ""; position: absolute; inset: -0.375rem 0; }
     .dl-hover button { position: relative; } .dl-hover .glyph { width: 1rem; height: 1rem; stroke-width: 2.2; }
     .dl-hover .yes .glyph { color: color-mix(in srgb, var(--tk-success) 82%, #000); } .dl-hover .later-q .glyph { color: var(--c-indigo); }
-    /* Reports: the bar says what the report is, who asked and when, beside Mark read and Archive; the page reads under it at the pane's width. */
+    /* Reports: the bar says what the report is, who asked and when, beside Mark read and Archive; the page reads under it at the prototype's width. */
     .dl-hover .read-q .glyph { color: var(--action); }
-    .rp-bar .eyebrow { display: block; flex: 1; min-width: 0; margin: 0 0 0 0.5rem; overflow: hidden; color: var(--muted); font-size: var(--t-s); font-weight: 400; white-space: nowrap; text-overflow: ellipsis; }
-    .rp-bar .eyebrow b { color: var(--teal); font-weight: 600; }
     .split-bar :is(.rp-read, .rp-archive) { display: inline-flex; flex: none; align-items: center; gap: 0.5rem; min-height: var(--ctl); padding: 0 0.75rem; border-radius: var(--r-ctl); background: none; color: var(--text); font-weight: 400;
       transition: background-color 120ms linear, transform 120ms var(--ease); }
     .split-bar :is(.rp-read, .rp-archive):hover { background: var(--sunk); }
     .split-bar :is(.rp-read, .rp-archive, .later):active, .dl-hover button:active { background: var(--sunk); transform: scale(0.96); }
     .split-bar :is(.rp-read, .rp-archive) .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.75; color: var(--muted); }
     .split-bar .rp-read .glyph { color: var(--action); } .split-bar :is(.rp-read, .rp-archive)::after { margin-left: 0.125rem; }
-    #board .split-detail > .read { flex: none; overflow: visible; padding: 1.75rem 2.5rem 4rem; }
-    #board .split-detail > .read > * { max-width: 46rem; }
-    #board .split-detail > .read h1 { margin-top: 0; font-size: 2.125rem; line-height: 1.1765; letter-spacing: 0.011em; }
-    #board .split-detail > .read .about { color: var(--muted); }
+    #board .split-detail > .read { flex: none; overflow: visible; padding: 1.75rem 2.75rem 2.5rem; }
+    #board .split-detail > .read > * { max-width: 39.5rem; }
+    #board .split-detail > .read h1 { margin-top: 0.375rem; font-size: 1.875rem; line-height: 2.25rem; }
     #board .split-detail > .read iframe { border: 0; }
     #board .split-detail > .read .rp-open { display: inline-flex; align-items: center; margin-left: 0; padding: 0 1.5rem; }
     .side .keys { display: flex; align-items: center; gap: 0.75rem; width: 100%; min-height: var(--ctl); padding: 0 0.625rem; border-radius: 0.625rem; background: none; color: var(--text); font-size: var(--t-s); font-weight: 500; text-align: left; white-space: nowrap; }
@@ -1720,7 +1682,7 @@
   /** A card that is itself a link keeps its × beside it, at its corner. */
   /** Select mode: tap cards to pick them, then Dismiss them together; the same bar sits at the right of every tab's title. */
   let selecting = false;
-  const picked = new Set(), cardOf = (e) => e.closest('li') ?? e.closest('.has-x, article') ?? e;
+  const picked = new Set(), cardOf = (e) => e.closest('li') ?? e.closest('article') ?? e;
   const applyPicks = () => document.querySelectorAll('#board [id^="item-"]').forEach((e) => cardOf(e).classList.toggle('picked', selecting && picked.has(e.id.slice(5))));
   function bulkBar(items) {
     if (!canDismiss() || !items.length) return '';
@@ -1739,7 +1701,6 @@
     picked.has(k) ? picked.delete(k) : picked.add(k);
     render();
   }, true);
-  const withX = (d, card) => (canDismiss() ? el('div', { class: 'has-x' }, card, xBtn(d)) : card);
 
   function row(d, { x = true } = {}) {
     if (d.kind === 'design') {
@@ -2030,7 +1991,7 @@
   /** Calls go once the node is about a screen from view: a clip has no lazy loading of its own, and each one asks for its first frame. */
   const watcher = 'IntersectionObserver' in window && new IntersectionObserver((seen) => seen.forEach((e) => { if (e.isIntersecting) watcher.unobserve(e.target), e.target.near?.(); }), { rootMargin: '100% 0px' });
   const nearby = (node, go) => { if (!watcher) return go(); node.near = go; watcher.observe(node); };
-  /** A card's hero: the first picture of its proof, else its first clip; proof with neither (a run that kept only text) has none. */
+  /** A row's thumb: the first picture of its proof, else its first clip; proof with neither (a run that kept only text) has none. */
   function hero(d) {
     const files = filesOf(d), [path, video, , small] = files.find(([, clip]) => !clip) ?? files[0] ?? [];
     if (!path) return [];
@@ -2039,7 +2000,7 @@
       const clip = el('video', { muted: '', playsinline: '', preload: 'metadata', 'aria-label': `Clip, ${headline(d)}` });
       clip.onerror = () => clip.replaceWith(el('p', { class: 'ev-missing' }, 'The capture is missing or changed.'));
       nearby(clip, () => { clip.src = url; });
-      return [el('span', { class: 'ev-badge' }, 'Clip'), clip];
+      return [clip];
     }
     const img = shot(small, '');
     img.onerror = () => img.replaceWith(el('p', { class: 'ev-missing' }, 'The capture is missing or changed.'));
@@ -2057,37 +2018,50 @@
     }
     return out;
   }
-  /** One update on the Evidence screen: its capture as the hero, what it proves and how it went; the whole card opens the update. `also` names what tells it from a card with the same headline.
-   * Proof with no picture or clip is a compact row of its claim and result, never an empty frame. */
+  /** One update on Evidence, as a row: the top of its capture, what it proves in up to two lines, its result (a dot in its colour) and project, then when it was filed.
+   * `also` names what tells it from a row with the same headline. A swipe left clears it; on a desk, hovering shows Clear. Proof with no picture or clip has no thumb. */
+  const evRes = (d) => { const r = RESULT[d.evidenceCard?.result]; return el('span', { class: `res ${r?.[0] ?? 'none'}` }, r?.[2] ?? 'Not run'); };
   function evCard(d, also = '') {
-    const result = RESULT[d.evidenceCard?.result], shot = hero(d);
-    return el('a', { class: shot.length ? 'ev-card' : 'ev-card ev-text', href: `#evidence/${d.key}`, id: `item-${d.key}`, 'data-row': '' }, shot.length ? el('span', { class: 'ev-media' }, ...shot) : '',
-      el('span', { class: 't', dir: 'auto' }, headline(d), also ? el('span', { class: 'also', dir: 'auto' }, also) : ''),
-      el('span', { class: 'm' }, result ? el('span', { class: `ev-${result[0]}` }, mark(result[0]), result[2]) : el('span', { class: 'ev-none' }, 'Not run'), d.attachments?.length ? el('span', {}, d.attachments.length === 1 ? '1 file' : `${d.attachments.length} files`) : '', d.filed ? el('span', {}, stamp(d.filed)) : ''));
+    const shot = hero(d), files = d.attachments?.length;
+    const clear = el('button', { class: 'later-q', 'aria-label': `Clear, ${headline(d)}`, title: 'Clear (E)' }, glyph('archive'), 'Clear');
+    clear.onclick = () => clearProof(d);
+    return el('li', { class: `dl-row${flash === d.key ? ' returned' : ''}`, 'data-key': d.key, 'data-list': 'evidence' }, canDismiss() ? el('div', { class: 'dl-act later', 'aria-hidden': 'true' }, glyph('archive'), el('span', {}, 'Clear')) : '',
+      el('a', { class: shot.length ? 'dl-face ev-card' : 'dl-face ev-card ev-text', href: `#evidence/${d.key}`, id: `item-${d.key}`, 'data-row': '', draggable: 'false' }, shot.length ? el('span', { class: 'ev-media' }, ...shot) : '',
+        el('span', { class: 'copy' }, el('strong', { class: 'title t', dir: 'auto' }, headline(d)), also ? el('span', { class: 'sub also', dir: 'auto' }, also) : '',
+          el('span', { class: 'sub m' }, evRes(d), ...[projectOf(d), files && (files === 1 ? '1 file' : `${files} files`)].filter(Boolean).map((t) => ` · ${t}`)),
+          d.filed ? el('span', { class: 'sub' }, stamp(d.filed)) : '')),
+      canDismiss() ? el('span', { class: 'dl-hover' }, clear) : '');
   }
-  /** Evidence as its own screen: one list of every proof ever filed, newest first, each card carrying its own day and time. The search box narrows it by what
-   * the card says; when proof names more than one project, a quiet picker beside it narrows it to one (proof that names no project is Other).
-   * An item put in this area that is not an update (a page, a diagram) keeps the card it always had. */
-  let evFind = '', evProject = '';
+  /** Evidence as its own screen: one list of every proof ever filed, newest first, each row carrying its own day and time. When proof names more than one project,
+   * a quiet All projects pill opens a menu that narrows the list to one (proof that names no project is Other). An item put in this area that is not an update keeps its card. */
+  let evProject = '';
+  const projectsOf = (items) => [...new Set(items.map(projectOf))].sort((x, y) => (x === '') - (y === '') || x.localeCompare(y)).map((g) => g || '-');
+  /** The updates the project picked shows (all of them for All projects, or when that project has none left). */
+  const evShown = (items) => (projectsOf(items).includes(evProject) ? items.filter((d) => (projectOf(d) || '-') === evProject) : items);
   function evidenceList(items) {
     if (!items.length) return [el('p', { class: 'empty' }, EMPTY.evidence)];
-    const box = el('input', { type: 'search', id: 'ev-find', 'aria-label': 'Search evidence', placeholder: 'Search evidence', autocomplete: 'off' }), out = el('div', { class: 'ev-grid' }), node = (d, also) => (d.type === 'evidence' ? withX(d, evCard(d, also.get(d.key))) : row(d));
-    const projects = [...new Set(items.map(projectOf))].sort((x, y) => (x === '') - (y === '') || x.localeCompare(y));
+    const projects = projectsOf(items);
     if (!projects.includes(evProject)) evProject = '';
-    const pick = projects.length > 1 ? el('select', { id: 'ev-project', 'aria-label': 'Show one project' }, el('option', { value: '' }, 'All projects'),
-      ...projects.map((g) => el('option', { value: g || '-' }, g || 'Other'))) : '';
-    const show = () => {
-      const q = evFind.trim().toLowerCase(), of = evProject ? items.filter((d) => (projectOf(d) || '-') === evProject) : items;
-      const hits = q ? of.filter((d) => `${headline(d)} ${d.title} ${d.about ?? ''} ${projectOf(d)} ${d.evidence?.proof ?? ''}`.toLowerCase().includes(q)) : of;
-      const also = twins(hits.filter((d) => d.type === 'evidence'));
-      out.replaceChildren(...(hits.length ? hits.map((d) => node(d, also)) : [el('p', { class: 'empty' }, 'Nothing matches.')]));
-    };
-    box.value = evFind;
-    box.oninput = () => { evFind = box.value; show(); };
-    if (pick) { pick.value = evProject; pick.classList.toggle('on', !!evProject); pick.onchange = () => { evProject = pick.value; pick.classList.toggle('on', !!evProject); show(); }; }
-    show();
-    return [el('div', { class: 'search ev-find', role: 'search' }, box, pick), out];
+    const name = (g) => (g === '' ? 'All projects' : g === '-' ? 'Other' : g), to = (g) => [name(g), () => pickProject(g), `project-${g || 'all'}`, evProject === g ? 'check' : ''];
+    const pick = projects.length > 1 ? moreSheet('Show one project', [to(''), el('div', { class: 'dl-sep', role: 'separator' }), ...projects.map(to)], el('b', { class: 'pill' }, name(evProject), glyph('down'))) : '';
+    if (pick) pick.id = 'ev-project';
+    const hits = evShown(items), also = twins(hits.filter((d) => d.type === 'evidence'));
+    return [pick, el('ul', { class: 'dl-list ev-list', 'aria-label': 'Evidence' }, ...hits.map((d) => (d.type === 'evidence' ? evCard(d, also.get(d.key)) : el('li', {}, row(d)))))];
   }
+  /** Shows one project's updates (or all, for ''); on a desk the update shown stays while it is in that project, else the project's newest is shown. */
+  function pickProject(g) {
+    evProject = g;
+    const k = /^#evidence\/(.+)$/.exec(location.hash)?.[1], d = k && state.decisions.find((x) => x.key === k);
+    d && g && (projectOf(d) || '-') !== g ? (location.hash = '#evidence') : render();
+  }
+  /** Evidence's More, as the prototype has it: Clear passed, off when nothing has passed. */
+  function evidenceMore(items) {
+    const passed = items.filter((d) => d.evidenceCard?.result === 'RUN PASS');
+    return moreSheet('More', [['Clear passed', () => dismiss(passed.map((d) => d.key), `${passed.length} cleared from Evidence`), 'clear-passed', 'archive', !passed.length]]);
+  }
+  /** Clears one update, with Undo: from a swipe left, or on a desk from Clear, E or its hover, where it folds away and the next update is selected. */
+  const clearOne = (d) => dismiss([d.key], 'Cleared from Evidence', () => returned(d.key), true);
+  const clearProof = (d) => leave(d, 'evidence', clearOne);
   /** An update's verdict: one tap per option, marked once it is saved. A read-only board takes none. */
   function verdicts(d) {
     const saved = state.answers[d.key], err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` });
@@ -2096,7 +2070,9 @@
     return el('div', { class: 'ev-verdict' }, el('p', { class: 'ev-ask' }, 'Does this look right?'),
       el('div', { class: 'choices', role: 'group', 'aria-label': headline(d) }, ...buttons), err, other(d, saved, err), xBtn(d, 'Dismiss'));
   }
-  /** One update as its own screen: the whole capture, what it proves in a line, then what the check recorded and the verdict. */
+  /** An update's result, project and when, as one line: over its title on a phone, in the bar over it on a desk. */
+  const evMeta = (d, cls) => el('p', { class: cls }, evRes(d), ...[projectOf(d), d.filed && stamp(d.filed)].filter(Boolean).map((t) => ` · ${t}`));
+  /** One update as its own screen, as the prototype has it: its result, project and when, its title, what it proves, then the whole capture; under them what the check recorded and the verdict. */
   function evidenceItem(d) {
     const run = d.evidence ?? {}, result = RESULT[d.evidenceCard?.result], name = headline(d), proofLine = (run.proof ?? '').trim(),
       // Checked by is the checker's name before the line's first colon ("done-done-verify-sign-off: …"); a sentence with a colon names no checker.
@@ -2104,8 +2080,8 @@
     const short = (label, value) => (value ? el('div', { class: 'cell' }, el('span', { class: 'k' }, label), el('span', { class: 'v', dir: 'auto' }, value)) : '');
     const long = (label, text) => (text ? el('div', { class: 'cell long' }, el('span', { class: 'k' }, label), el('p', { class: 'x', dir: 'auto' }, text)) : '');
     const change = changeHref(d);
-    return el('div', { class: 'ev-scroll' }, el('div', { class: 'ev-item' }, captures(d, 'ev-hero'), attachments(d),
-      el('div', { class: 'ev-say' }, el('h1', { class: 'ev-title', id: 'reader-title', tabindex: '-1', dir: 'auto' }, name), d.about && d.about !== name ? el('p', { class: 'ev-intro', dir: 'auto' }, d.about) : ''),
+    return el('div', { class: 'ev-scroll' }, el('div', { class: 'ev-item' }, el('div', { class: 'ev-say' }, evMeta(d, 'ev-meta'), el('h1', { class: 'ev-title', id: 'reader-title', tabindex: '-1', dir: 'auto' }, name),
+      d.about && d.about !== name ? el('p', { class: 'ev-intro', dir: 'auto' }, d.about) : ''), captures(d, 'ev-hero'), attachments(d),
       el('p', { class: 'ev-gl' }, 'Proof'),
       el('div', { class: 'ev-grp' },
         el('div', { class: 'cell' }, el('span', { class: 'k' }, 'Result'), result ? el('span', { class: `v ${result[0]}` }, mark(result[0]), ' ', result[2]) : el('span', { class: 'v', dir: 'auto' }, 'No result yet')),
@@ -2272,7 +2248,7 @@
     reply: 'M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z' };
   // The drawings are fixed strings from this page, never text from the board file.
   // Small stroke drawings the plan page puts beside a button label or in a section badge; fixed strings from this page.
-  const GLYPHS = { left: '<path d="m15 18-6-6 6-6"/>', more: '<path d="M5 12h.01M12 12h.01M19 12h.01"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', right: '<path d="m9 18 6-6-6-6"/>', check: '<path d="M20 6 9 17l-5-5"/>', pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
+  const GLYPHS = { left: '<path d="m15 18-6-6 6-6"/>', down: '<path d="m6 9 6 6 6-6"/>', more: '<path d="M5 12h.01M12 12h.01M19 12h.01"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', right: '<path d="m9 18 6-6-6-6"/>', check: '<path d="M20 6 9 17l-5-5"/>', pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
     archive: '<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/>', dot: '<circle cx="12" cy="12" r="4.5" fill="currentColor"/>',
     send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.112z"/><path d="m21.854 2.147-10.94 10.939"/>',
     sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>', msg: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
@@ -2335,7 +2311,7 @@
   const day = (at) => DAY.format(new Date(at));
   const when = (at) => (isToday(at) ? hhmm(at) : `${day(at)} ${hhmm(at)}`);
   /** A time as a person says it: today needs no date. */
-  const stamp = (at) => (isToday(at) ? `Today, ${hhmm(at)}` : `${day(at)}, ${hhmm(at)}`);
+  const stamp = (at) => `${isToday(at) ? 'Today' : isToday(Date.parse(at) + 864e5) ? 'Yesterday' : day(at)}, ${hhmm(at)}`;
   const pic = (d) => {
     const i = d.media?.findIndex((m) => !/\.(mp4|webm)$/i.test(m.path)), m = d.mocks?.find((x) => !/\.html?$/i.test(x.path));
     return d.kind === 'design' && d.preview ? designUrl(d, d.preview) : i >= 0 ? filesOf(d)[i][3] : d.preview ? mockUrl(d.key, '', d.preview) : d.type === 'diagram' ? mockUrl(d.key, '', d.view)
@@ -2462,14 +2438,14 @@
   function tiles(by) {
     const of = (g) => by.waiting.filter((d) => groupOf(d) === g), [ans, rev, sig] = ['answer', 'review', 'signin'].map(of);
     const screens = rev.reduce((n, d) => n + (d.journeys ?? []).reduce((m, j) => m + j.screens.length, 0), 0), soonest = sig.map((d) => d.expires).filter(Boolean).sort()[0];
-    const proofs = by.evidence.filter((d) => d.type === 'evidence'), passed = proofs.filter((d) => d.evidenceCard?.result === 'RUN PASS').length, failed = by.failedProof.length;
-    // A run that could not be checked is not fine either, so the line names it.
-    const unchecked = proofs.filter((d) => d.evidenceCard?.result === 'UNVERIFIED').length, fine = proofs.length - unchecked;
+    // Proof counts every update Evidence lists; a run that failed, could not be checked or did not finish is not fine, so the line names it.
+    const proofs = by.evidence.filter((d) => d.type === 'evidence'), got = (r) => proofs.filter((d) => d.evidenceCard?.result === r).length;
+    const passed = got('RUN PASS'), failed = got('RUN FAIL'), unchecked = got('UNVERIFIED'), unfinished = got('INCONCLUSIVE'), fine = proofs.length - failed - unchecked - unfinished;
     return el('div', { class: 'tiles' },
       tile('answer', ans.length, 'Answer', !ans.length ? 'All answered' : ans.every(recOf) ? 'Each has a pick' : `${ans.filter(recOf).length} with a pick`, '#waiting', 'pick'),
       tile('review', rev.length, 'Review', !rev.length ? 'Nothing to review' : screens ? `${plural(screens, 'screen')} to check` : `${plural(rev.length, 'item')} to look over`, '#waiting', 'phone'),
       tile('signin', sig.length, 'Sign in', !sig.length ? 'Nothing waiting' : soonest ? left(soonest) : 'Waiting on you', '#waiting', 'key'),
-      tile('proof', proofs.length + failed, 'Proof', failed || unchecked ? [failed && `${failed} failed`, unchecked && `${unchecked} not checked`, `${fine} fine`].filter(Boolean).join(', ') : !proofs.length ? 'Nothing filed yet' : passed === proofs.length ? 'All passing' : `${passed} passed, ${proofs.length - passed} not run`,
+      tile('proof', proofs.length, 'Proof', failed || unchecked || unfinished ? [failed && `${failed} failed`, unchecked && `${unchecked} not checked`, unfinished && `${unfinished} did not finish`, `${fine} fine`].filter(Boolean).join(', ') : !proofs.length ? 'Nothing filed yet' : passed === proofs.length ? 'All passing' : `${passed} passed, ${proofs.length - passed} not run`,
         '#evidence', 'evidence', failed ? ' failed' : ''));
   }
 
@@ -2557,7 +2533,8 @@
   const MARKS = { ai: 'AI model', store: 'Stores', gate: 'Gate', fail: 'Hard fail' };
   const marks = (t) => el('span', { class: 'marks' }, ...(t.marks ?? []).map((m) => el('span', { class: `mk mk-${m}`, role: 'img', 'aria-label': MARKS[m] })));
   const opened = new Set(); // Reports and answered rows opened in place, kept open across redraws.
-  const decided = (d) => (d.decided ? el('p', { class: 'decided', dir: 'auto' }, el('span', { class: 'lbl' }, 'What it decided'), d.decided) : '');
+  /** What a report decided, as the prototype ends its page: a green box with a check. */
+  const decided = (d) => (d.decided ? el('div', { class: 'decided' }, el('span', { class: 'donek ok', 'aria-hidden': 'true' }, glyph('check')), el('p', { dir: 'auto' }, el('b', { class: 'lbl' }, 'What it decided'), d.decided)) : '');
   /** One line drawing per form a report explains with, as the design draws them; a report with no form gets the book. */
   const FORMS = {
     diagram: ['Diagram', '<rect x="7" y="10" width="14" height="26" rx="3"/><path d="M15 17a4 4 0 1 0 4 5 3 3 0 0 1-4-5z"/><rect x="28" y="12" width="14" height="18" rx="2"/><path d="M33 34h4M21 23h7" stroke-dasharray="2 3"/>'],
@@ -2572,7 +2549,7 @@
   }
   /** A report's line: what it explains with, its video, its project and when (who asked heads its page); a report that says none of that reads Report and when. */
   function reportLine(d) {
-    const at = d.filed ? (isToday(d.filed) ? hhmm(d.filed) : day(d.filed)) : '', n = d.steps?.length;
+    const at = d.filed ? filedAt(d.filed) : '', n = d.steps?.length;
     return [FORMS[d.form]?.[0] ?? (kind(d) || 'Report'), n ? `${n} steps` : '', d.video && `Video ${d.video}`, d.group, at].filter(Boolean).join(' · ');
   }
   /* Reports: Today's over Earlier ones, newest first, a row each, and a blue dot on each one not read yet. A tap opens its page;
@@ -2598,10 +2575,10 @@
   // A report chosen in the desk's list (a click, or J and K) is shown beside it; one reached any other way is a link.
   addEventListener('click', (e) => { if (e.target.closest?.('.split-list a[data-row]')) rpPicked = true; }, true);
   const readToggle = (d) => markRead([d.key], unread(d), `${unread(d) ? 'Marked read' : 'Marked unread'}: ${title(d)}`);
-  /** Archive from a desk's key, bar or hover: the row folds away, and when it was the one shown, the next report is selected once the board has it. */
-  async function archiveReport(d) {
+  /** A row leaving a desk's list (a report archived, an update cleared) from a key, the bar or its hover: it folds away, and when the address names it, the next row is selected once the board has it. */
+  async function leave(d, list, go) {
     const li = document.querySelector(`.split-list .dl-row[data-key="${CSS.escape(d.key)}"]`), rows = [...document.querySelectorAll('.split-list [data-row]')].map((r) => r.getAttribute('href'));
-    const at = rows.indexOf(`#reports/${d.key}`), next = rpSel === d.key && location.hash !== '#reports' ? rows[at + 1] ?? rows[at - 1] ?? '#reports' : '';
+    const at = rows.indexOf(`#${list}/${d.key}`), next = location.hash === `#${list}/${d.key}` ? rows[at + 1] ?? rows[at - 1] ?? `#${list}` : '';
     if (li) {
       li.style.height = `${li.offsetHeight}px`;
       void li.offsetHeight;
@@ -2610,9 +2587,10 @@
       li.style.opacity = '0';
       await pause(220);
     }
-    await archive(d);
-    if (next && location.hash === `#reports/${d.key}`) rpPicked = true, location.hash = next;
+    await go(d);
+    if (next && location.hash === `#${list}/${d.key}`) rpPicked = true, location.hash = next;
   }
+  const archiveReport = (d) => leave(d, 'reports', archive);
   /** A report: a row with its picture, title, what it says, then its form, video, project and time, and a dot while it is not read. A tap opens its page over the board;
    *  an explainer with no page opens in place, to its numbered steps or its video card. */
   function report(d, i = 0) {
@@ -2636,12 +2614,10 @@
     box.ontoggle = () => (box.open ? opened.add(d.key) : opened.delete(d.key));
     return li(box);
   }
-  /** Reports' More: Mark all as read, then Select and Archive all, which archive with Undo. */
-  function reportsMore(items, all) {
+  /** Reports' More, as the prototype has it: Mark all as read, off when every report is read. */
+  function reportsMore(items) {
     const fresh = items.filter(unread);
-    return moreSheet('More', [fresh.length && ['Mark all as read', () => markRead(fresh.map((d) => d.key), true, `${plural(fresh.length, 'report')} marked read`), 'read-all', 'check'],
-      canDismiss() && all.length && ['Select', () => { selecting = true; render(); }, 'select'],
-      canDismiss() && all.length && ['Archive all', () => dismiss(all.map((d) => d.key), `${plural(all.length, 'report')} archived`), 'archive-all', 'archive']]);
+    return moreSheet('More', [['Mark all as read', () => markRead(fresh.map((d) => d.key), true, `${plural(fresh.length, 'report')} marked read`), 'read-all', 'check', !fresh.length]]);
   }
 
   /** What landed under Reports with no page and nothing to answer (receipts, status notes): folded under one row, each opening to its card in place. */
@@ -3448,15 +3424,6 @@
     return root;
   }
   const reader = document.getElementById('reader');
-  /** An update's change, opened in a new tab from the bar over the update. */
-  function changeLink(d) {
-    const change = changeHref(d);
-    if (!change) return '';
-    const out = el('a', { class: 'change-link', href: change, target: '_blank', rel: 'noopener', 'aria-label': `Open the change for ${d.title}` }), s = el('span', { 'aria-hidden': 'true' });
-    s.innerHTML = '<svg viewBox="0 0 24 24"><path d="M14 3h7v7M21 3l-9 9M19 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/></svg>';
-    out.append(s);
-    return out;
-  }
   function readPage(d, from = 'reports') {
     // A design or a report takes the board's place beside the sidebar on a desk; a plan, and anything on a phone, opens over the whole board.
     const pane = !!d && d.type !== 'plan' && !d.guided, inline = pane && matchMedia('(min-width: 64rem)').matches;
@@ -3477,17 +3444,20 @@
     Object.assign(reader.dataset, { url, key: d?.key ?? '', from });
     if (!d) return reader.replaceChildren();
     if (from === 'reports' && unread(d) && !state.readonly && !FROZEN) { fading.add(d.key); setTimeout(() => markRead([d.key], true)); }
-    const back = el('a', { class: 'close', href: `#${from}` }, `‹ ${from.startsWith('reports') ? 'Reports' : AREAS[from]}`), h1 = el('h1', { id: 'reader-title', tabindex: '-1', dir: 'auto' }, d.title);
+    // A report's page and an update go back with the prototype's chevron; a plan, a design or a guided report keeps its ‹ link.
+    const name = from.startsWith('reports') ? 'Reports' : AREAS[from], h1 = el('h1', { id: 'reader-title', tabindex: '-1', dir: 'auto' }, d.title);
+    const back = el('a', { class: 'close', href: `#${from}` }, ...(d.guided || d.type === 'plan' || d.kind === 'design' ? [`‹ ${name}`] : [glyph('left'), name]));
     back.onclick = (e) => { if (`#${from}` === location.hash) e.preventDefault(), shutFull(); };
-    const out = d.type === 'evidence' ? changeLink(d) : '';
-    // A report's page reads under its own head: what it is and when, its title, what it says and decided; a plan or a design keeps its title in the bar;
-    // an update shows its own title on its screen, with the change link in the bar.
+    // A report's page reads under its own head: what it is, who asked and when, its title and what it says, then its page and what it decided; a plan or a design keeps its title in the bar;
+    // an update shows its own title on its screen.
     reader._guide = undefined;
     reader.replaceChildren(...(d.guided ? [el('header', {}, back), (reader._guide = guideView(d))] : d.type === 'plan' ? [el('header', {}, back, Object.assign(h1, { className: 'plan-name' })), planReview(d, url)] : d.kind === 'design' ? [el('header', {}, back), designReview(d, h1)]
-      : d.type === 'evidence' ? [el('header', {}, back, out), evidenceItem(d)]
-      : [el('header', {}, back), el('div', { class: 'read' }, el('p', { class: 'eyebrow' }, [FORMS[d.form]?.[0] ?? (kind(d) || 'Report'), d.asked_by, d.filed ? when(d.filed) : ''].filter(Boolean).join(' · ')), h1,
-        d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided(d), el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }), dismissReport(d))]));
+      : d.type === 'evidence' ? [el('header', {}, back), evidenceItem(d)]
+      : [el('header', {}, back), el('div', { class: 'read' }, el('p', { class: 'eyebrow' }, ...rpWhat(d)), h1,
+        d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }), decided(d), dismissReport(d))]));
   }
+  /** What a report explains with (in teal), who asked and when, over its title or in the desk's bar: "Before and after · You asked · Today, 07:19". */
+  const rpWhat = (d) => [el('b', {}, FORMS[d.form]?.[0] ?? (kind(d) || 'Report')), ...[d.asked_by, d.filed && stamp(d.filed)].filter(Boolean).map((t) => ` · ${t}`)];
   /** Dismiss moved from the list row to the report's own page; once it is dismissed the page closes back to the list. */
   function dismissReport(d) {
     const b = xBtn(d, 'Dismiss');
@@ -3653,9 +3623,9 @@
     say(!on ? 'Back from Later' : one ? [el('b', {}, headline(one)), ' · moved to later'] : [el('b', {}, `${keys.length} moved`), ' to later'], 5000,
       () => { shelve(keys, !on); keys.forEach(returned); render(); say(on ? 'Back from Later' : 'Moved to Later', 3000, null, on ? 'undo' : 'later'); }, 'later');
   }
-  /** One More control: a menu that scales out of its button and closes on a tap anywhere else. */
-  function moreSheet(label, items) {
-    const menu = el('details', { class: 'dl-more' }, el('summary', { 'aria-label': label }, glyph('more')), el('div', { class: 'dl-menu', role: 'menu' },
+  /** One More control: a menu that scales out of its button and closes on a tap anywhere else. With a face of its own (Evidence's All projects pill) it opens from the left. */
+  function moreSheet(label, items, face) {
+    const menu = el('details', { class: face ? 'dl-more pick' : 'dl-more' }, el('summary', { 'aria-label': label }, face ?? glyph('more')), el('div', { class: 'dl-menu', role: 'menu' },
       ...items.filter(Boolean).map((item) => {
         if (item instanceof Node) return item;
         const [words, fn, act, mark, off] = item, b = el('button', { role: 'menuitem', 'data-act': act, ...(off && { disabled: '' }) }, el('span', {}, words), mark ? glyph(mark) : '');
@@ -3726,7 +3696,7 @@
   /** Past the line the row flies off its side, then folds away; a right swipe saves the recommended pick, a left one shelves the ask. */
   async function swipeDone(s) {
     const key = s.row.dataset.key, d = state.decisions.find((x) => x.key === key), yes = s.dx > 0;
-    if (s.row.dataset.list === 'reports') return reportSwiped(s, d, yes);
+    if (s.row.dataset.list) return reportSwiped(s, d, yes);
     s.face.style.transition = `transform ${calm.matches ? 0 : 200}ms cubic-bezier(0.2, 0.7, 0.2, 1)`;
     s.face.style.transform = `translateX(${yes ? '' : '-'}100%)`;
     await pause(190);
@@ -3742,7 +3712,7 @@
     call('/api/answers', post({ key, answer: recOf(d).value, note: drafts.get(key) ?? noteOf(d) }), () => forget(key))
       .then(() => offerUndo(d, before), (e) => { leaving.delete(key); render(); say(`Couldn't save: ${e.message}`, 8000); });
   }
-  /** A report row swiped right springs home and toggles its dot; swiped left it flies off, folds away and is archived. */
+  /** A report row swiped right springs home and toggles its dot; swiped left it flies off, folds away and is archived. An update swiped left is cleared the same way. */
   async function reportSwiped(s, d, yes) {
     s.face.style.transition = `transform ${calm.matches ? 0 : yes ? 420 : 200}ms ${yes ? 'var(--spring)' : 'cubic-bezier(0.2, 0.7, 0.2, 1)'}`;
     s.face.style.transform = yes ? '' : 'translateX(-100%)';
@@ -3754,7 +3724,7 @@
     s.row.style.height = '0px';
     s.row.style.opacity = '0';
     await pause(220);
-    archive(d);
+    (s.row.dataset.list === 'evidence' ? clearOne : archive)(d);
   }
   const selected = new Map();
   let decideCtx = { all: [], shown: [], hidden: [] };
@@ -3898,17 +3868,20 @@
     return split([top, list], [el('div', { class: 'split-bar' }, bar.crumb, state.readonly ? '' : later, bar.more), page],
       [[['J', 'K'], 'Move'], [['↵'], 'Answer'], [['?'], 'All keys']]);
   }
-  /** Evidence on a desk: the list of updates beside the one selected. */
-  function evidenceDesk(top, items, archived, d) {
-    const view = split([top, ...evidenceList(items), archived], d ? [el('header', { class: 'split-bar' }, changeLink(d)), evidenceItem(d)] : [el('p', { class: 'empty' }, EMPTY.evidence)], [[['J', 'K'], 'Move'], [['?'], 'All keys']]);
-    if (d) view.querySelector(`#item-${CSS.escape(d.key)}`)?.setAttribute('aria-current', 'true');
+  /** Evidence on a desk: the list of updates beside the one selected. Its bar says how it went, its project and when, beside Clear (E). */
+  function evidenceDesk(top, page, d) {
+    const clear = canDismiss() ? el('button', { class: 'later ev-clear', 'data-kbd': 'E', 'aria-keyshortcuts': 'E' }, glyph('archive'), 'Clear') : '';
+    if (clear) clear.onclick = () => clearProof(d);
+    const view = split([top, page], d ? [el('header', { class: 'split-bar ev-bar' }, evMeta(d, 'crumb'), clear), evidenceItem(d)] : [el('p', { class: 'empty' }, EMPTY.evidence)],
+      [[['J', 'K'], 'Move'], ...(canDismiss() ? [[['E'], 'Clear']] : []), [['?'], 'All keys']]);
+    if (d) view.querySelector(`#item-${CSS.escape(d.key)}`)?.setAttribute('aria-current', 'true'), view.querySelector(`.dl-row[data-key="${CSS.escape(d.key)}"]`)?.classList.add('sel');
     return view;
   }
   /** Reports on a desk: the list beside the report selected (the newest until a row is picked). Its bar says what it is, who asked and when, and reads or archives it;
    *  its page sits under the bar, and a guided report, which reads in stages, opens over the board from there. */
-  function reportsDesk(top, page, d, any) {
+  function reportsDesk(top, page, d, items) {
     const hints = [[['J', 'K'], 'Move'], ...(FROZEN ? [] : [[['U'], 'Read']]), ...(canDismiss() ? [[['E'], 'Archive']] : []), [['?'], 'All keys']];
-    if (!d) return split([top, page], [any ? el('p', { class: 'empty' }, 'Open a report from the list.')
+    if (!d) return split([top, page], [items.length ? el('p', { class: 'empty' }, 'Open a report from the list.')
       : el('div', { class: 'all-clear-big' }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, 'Nothing to read'), el('p', {}, EMPTY.reports))], hints);
     // A read-only copy keeps no read marks.
     const read = FROZEN ? '' : el('button', { class: 'rp-read', 'data-kbd': 'U', 'aria-keyshortcuts': 'U' }, glyph(unread(d) ? 'check' : 'dot'), unread(d) ? 'Mark read' : 'Mark unread');
@@ -3918,11 +3891,10 @@
     const url = d.guided ? '' : src(mockUrl(d.key, '', d.view)), h1 = el('h1', { id: 'report-title', dir: 'auto' }, d.title);
     const full = d.guided ? el('button', { class: 'open-link rp-open', 'data-kbd': '↵', 'aria-keyshortcuts': 'Enter' }, 'Read the report') : '';
     if (full) full.onclick = () => { rpFull = d.key; render(); reader.querySelector('h1')?.focus({ preventScroll: true }); };
-    return split([top, page], [el('div', { class: 'split-bar rp-bar' }, el('p', { class: 'eyebrow', dir: 'auto' }, el('b', {}, FORMS[d.form]?.[0] ?? (kind(d) || 'Report')),
-      ...[d.asked_by, d.filed ? when(d.filed) : ''].filter(Boolean).map((t) => ` · ${t}`)), read, gone),
+    return split([top, page], [el('div', { class: 'split-bar rp-bar' }, el('p', { class: 'crumb', dir: 'auto' }, ...rpWhat(d)), read, gone),
       // The page is kept across redraws while this signature holds, so marking it read or a change elsewhere on the board does not load its frame again.
-      el('div', { class: 'read', 'data-sig': JSON.stringify([d.key, url, d.title, d.about, d.decided]) }, h1, d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided(d),
-        full || el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }))], hints);
+      el('div', { class: 'read', 'data-sig': JSON.stringify([d.key, url, d.title, d.about, d.decided]) }, h1, d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '',
+        full || el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }), decided(d))], hints);
   }
   /** Every key, in one sheet behind ?. A desk hints each where it works; they work at any width with a keyboard. */
   const MOD = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
@@ -3930,7 +3902,7 @@
     ['Lists', [['Next', 'J'], ['Previous', 'K']]],
     ['Today', [['Up next', '↵']]],
     ['Decide', [['Answer', '↵'], ['Pick option 1 to 9', '1', '–', '9'], ['Note', 'C'], ['Answer from the note', MOD, '↵'], ['Later', 'L'], ['Next ask', 'E']]],
-    ['Reports', [['Read or unread', 'U'], ['Archive', 'E'], ['Open a guided report', '↵']]]];
+    ['Evidence and Reports', [['Clear or archive', 'E'], ['Read or unread', 'U'], ['Open a guided report', '↵']]]];
   const shut = el('button', { 'aria-label': 'Close' }, '✕');
   const keysSheet = el('dialog', { id: 'keys', 'aria-labelledby': 'keys-title' }, el('div', {}, el('header', {}, el('h2', { id: 'keys-title' }, 'Keyboard shortcuts'), shut),
     ...KEYS.flatMap(([head, rows]) => [el('h3', {}, head), el('ul', {}, ...rows.map(([words, ...keys]) => el('li', {}, el('span', {}, words), ...keys.map(kc))))])));
@@ -3945,7 +3917,7 @@
     const typing = e.target.closest?.('textarea, input, select'), mod = e.metaKey || e.ctrlKey;
     // From the note (or Your own answer) on an ask, Cmd+Enter answers with it.
     if (mod && e.key === 'Enter' && typing?.closest('.decide')) { e.preventDefault(); document.querySelector('.decide-bar .answer')?.click(); return; }
-    const undo = !toast.hidden && !undoBtn.hidden && !undoBtn.disabled && (!location.hash.slice(1) || location.hash === '#waiting' || /^#(decide|reports)\//.test(location.hash) || location.hash === '#reports') ? undoBtn : null;
+    const undo = !toast.hidden && !undoBtn.hidden && !undoBtn.disabled && (!location.hash.slice(1) || /^#(waiting|reports|evidence)$|^#(decide|reports|evidence)\//.test(location.hash)) ? undoBtn : null;
     if (mod && !e.altKey && e.key.toLowerCase() === 'z' && !typing && undo) { e.preventDefault(); undo.click(); return; }
     if (mod || e.altKey || typing || keysSheet.open || designSession?.open || !reader.hidden) return;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key, g = gAt && e.timeStamp - gAt < 1500;
@@ -3961,8 +3933,8 @@
     if (pick) { e.preventDefault(); pick.click(); return; }
     if (k === 'e' && onDecide && skipTo) { e.preventDefault(); location.hash = skipTo; return; }
     if (k === 'z' && undo) { e.preventDefault(); undo.click(); return; }
-    // On a desk's Reports, U reads or unreads the report shown, E archives it, Enter opens a guided one.
-    const rp = document.querySelector('.split-bar.rp-bar')?.parentElement, rpKey = rp && { u: '.rp-read', e: '.rp-archive', Enter: '.rp-open' }[k];
+    // On a desk's Reports, U reads or unreads the report shown, E archives it, Enter opens a guided one; on its Evidence, E clears the update shown.
+    const rp = document.querySelector('.split-bar:is(.rp-bar, .ev-bar)')?.parentElement, rpKey = rp && { u: '.rp-read', e: '.rp-archive, .ev-clear', Enter: '.rp-open' }[k];
     if (rpKey && !(k === 'Enter' && e.target.closest?.('a:not([aria-current]), button, summary'))) { const b = rp.querySelector(rpKey); if (b) e.preventDefault(), b.click(); return; }
     // On Today, Enter takes Up next's main action: open the sign-in, answer with the pick, or start the review.
     if (k === 'Enter' && !location.hash.slice(1) && !e.target.closest?.('a, button, summary')) { const go = document.querySelector('.up-next .go:not(:disabled)'); if (go) e.preventDefault(), go.click(); return; }
@@ -3973,8 +3945,8 @@
     if (k === 'l') { const b = document.querySelector('.split-bar .later'); if (b) e.preventDefault(), b.click(); }
   });
   const reshow = (control) => { render(); document.querySelector(control)?.focus({ preventScroll: true }); };
-  /** Today's small title shows in its bar once the large one has scrolled under it. */
-  const titleBar = () => { const h = document.querySelector('.today-top h1'); document.body.classList.toggle('scrolled', !!h && h.getBoundingClientRect().bottom < 52); };
+  /** On a phone, Today's, Evidence's and Reports' small title shows in its bar once the large one has scrolled under it. */
+  const titleBar = () => { const h = document.querySelector('.top:has(> .cbar) h1'); document.body.classList.toggle('scrolled', !!h && h.getBoundingClientRect().bottom < 52); };
   addEventListener('scroll', titleBar, { passive: true });
 
   function render() {
@@ -3986,12 +3958,10 @@
     const openKeys = new Set(open.map((d) => d.key));
     const merged = new Set(open.flatMap((d) => d.merges ?? []).filter((k) => openKeys.has(k)));
     for (const d of [...state.decisions].reverse()) if (!gone.has(d.key) && !merged.has(d.key) && !lapsed(d)) by[area(d)].push(d);
-    // Evidence keeps every proof that is not dismissed, answered or not, newest first, however old: a passed check, a capture with no run to check (it says Not run) or one that could not be checked.
-    // A failed run or one that did not finish is no proof, so it is left off; its own screen still opens, and a verdict moves it to Answered.
-    // Today's Proof tile counts the same list, and says how many runs failed.
-    const shownProof = state.decisions.filter((d) => d.type === 'evidence' && !['RUN FAIL', 'INCONCLUSIVE'].includes(d.evidenceCard?.result) && !gone.has(d.key));
+    // Evidence keeps every update that is not dismissed, answered or not, newest first, however old, each saying its honest result: Passed, Failed, Did not finish,
+    // Could not check, or Not run for a capture with no run to check. Today's Proof tile counts the same list, and says how many runs failed.
+    const shownProof = state.decisions.filter((d) => d.type === 'evidence' && !gone.has(d.key));
     by.evidence = [...by.evidence.filter((d) => d.type !== 'evidence'), ...shownProof].sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
-    by.failedProof = state.decisions.filter((d) => d.type === 'evidence' && d.evidenceCard?.result === 'RUN FAIL' && !gone.has(d.key));
     by.designs = [...state.decisions].reverse().filter((d) => d.kind === 'design' && !gone.has(d.key));
     // Waiting on you reads newest first. A sign-in blocks someone now, so sign-ins come first.
     let latest = -Infinity;
@@ -4041,30 +4011,32 @@
     const top = el('header', { class: head === 'decide' ? 'top ask-nav' : head ? 'top' : 'top today-top' }, head && !TABS.some(([a]) => a === head)
       ? el('a', { class: 'back', href: head === 'decide' ? '#waiting' : '#' }, ...(head === 'decide' ? [glyph('left'), 'Decide'] : ['‹ Today'])) : '',
     // Decide leads with the date over a large title, and keeps its More at the top right.
-    (head === 'waiting' || at === 'reports') && !state.readonly ? el('p', { class: 'kicker date-kicker' }, dateLine()) : '',
+    head === 'reports' || head === 'evidence' ? el('div', { class: 'cbar', 'aria-hidden': 'true' }, pageTitle) : '',
+    (head === 'waiting' || at === 'reports' || head === 'evidence') && !state.readonly ? el('p', { class: 'kicker date-kicker' }, dateLine()) : '',
     ...(head ? [el('h1', { tabindex: '-1' }, pageTitle)] : todayTop(by.waiting.length, by.answered.filter((d) => isToday(state.answers[d.key].at)).length)),
     ro ? el('p', { class: 'meta' }, ro) : '',
     head === 'waiting' && !state.readonly ? el('p', { class: 'lede waiting-lede' }, waitingLede(by.waiting))
       : head === 'reports' && !state.readonly && by.reports.length ? el('p', { class: 'lede waiting-lede' }, (() => { const n = by.reports.filter(unread).length; return n ? `${n} new · ${by.reports.length} in all` : `${plural(by.reports.length, 'report')} · all read`; })())
       : head === 'answered' && by.answered.length ? el('p', { class: 'lede' }, (() => { const n = by.answered.filter((d) => isToday(state.answers[d.key].at)).length; return `${n} ${n === 1 ? 'answer' : 'answers'} today. Each one has gone back to its agent.`; })())
-      : head === 'designs' && by.designs.length ? el('p', { class: 'lede' }, 'Designs to look over. Approve one, or say what should change.')
-      : head === 'evidence' && by.evidence.length ? el('p', { class: 'lede' }, 'Every proof filed, newest first.') : '',
+      : head === 'designs' && by.designs.length ? el('p', { class: 'lede' }, 'Designs to look over. Approve one, or say what should change.') : '',
     head === 'decide' ? '' : head === 'waiting' && !selecting && !state.readonly && !FROZEN ? listMore(by.waiting)
-      : head === 'reports' && !selecting && !state.readonly && !FROZEN ? (bulk.length ? reportsMore(by.reports, bulk) : '') : bulkBar(bulk));
+      : head === 'reports' && !state.readonly && !FROZEN ? (by.reports.length ? reportsMore(by.reports) : '')
+      : head === 'evidence' && canDismiss() ? (by.evidence.length ? evidenceMore(by.evidence) : '') : bulkBar(bulk));
     const board = document.getElementById('board'), askBar = {};
     board.removeAttribute('aria-busy');
     const listTop = document.querySelector('.split-list')?.scrollTop;
-    // An update in the address opens even when the list leaves it off (a failed run); with none, the newest is selected.
+    // Evidence's page: the project pill, the rows and Archived. An update in the address opens even when it is not listed (one answered); with none, the newest is selected.
     // Reports' list: the legend, Today over Earlier, Notes and Archived; on a desk an empty board says so in the pane beside it.
+    const evPage = () => el('div', { class: 'ev-page' }, ...evidenceList(by.evidence), dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived'));
     const rpPage = () => el('div', { class: `rp-page${rpRisen ? '' : ' rise'}` }, by.reports.some((d) => d.steps) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
       ...(by.reports.length ? reportGroups(by.reports) : rpSel !== null ? [] : [el('div', { class: 'all-clear-big' }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, 'Nothing to read'), el('p', {}, EMPTY.reports))]),
       notes(by.notes), dismissed(state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && ['reports', 'notes'].includes(area(d))), 'Archived'));
-    const update = at === 'evidence' && ((key && state.decisions.find((d) => d.key === key && !gone.has(d.key) && d.type === 'evidence')) || by.evidence.find((d) => d.type === 'evidence'));
-    const content = [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived'), update)
-      : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0) : decideDesk(top, by.waiting, hidden, decideQueue, key)] : [top]), ...(deskSplit ? [] : at === 'waiting' && !state.readonly ? [decideList(by.waiting, hidden)]
+    const update = at === 'evidence' && ((key && state.decisions.find((d) => d.key === key && !gone.has(d.key) && d.type === 'evidence')) || evShown(by.evidence).find((d) => d.type === 'evidence'));
+    const content = [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, evPage(), update)
+      : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports) : decideDesk(top, by.waiting, hidden, decideQueue, key)] : [top]), ...(deskSplit ? [] : at === 'waiting' && !state.readonly ? [decideList(by.waiting, hidden)]
       : at === 'decide' ? [decideAt < 0 ? el('p', { class: 'empty' }, 'Nothing to decide for that question.')
         : decidePage(decideQueue[decideAt], decideQueue.length > 1 ? decideQueue[(decideAt + 1) % decideQueue.length] : undefined, false, askBar)]
-      : at === 'designs' ? [...designGroups(by.designs)] : at === 'evidence' ? [...evidenceList(by.evidence), dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived')] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
+      : at === 'designs' ? [...designGroups(by.designs)] : at === 'evidence' ? [evPage()] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : today(by))];
     top.append(...[askBar.mid, askBar.more].filter(Boolean));
     // The report shown on a desk stays in place under a new list and bar while it is the same report, so its frame is not loaded again.

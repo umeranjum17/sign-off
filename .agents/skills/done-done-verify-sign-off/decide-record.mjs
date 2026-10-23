@@ -21,11 +21,15 @@
 // With `flows`, on a board seed-proto-board.sh seeded, it records the phone's answer flows: an ask with nothing picked, a pick naming the button, a note typed and sent with it;
 // Your own answer opening its one box, Send answer off until words are typed, then sent; a pick sent with no note, and its Undo; More on the list; and an ask's More, Ask me later.
 // Usage: node decide-record.mjs <board url> <light|dark> <out.mp4> flows
+// With `evidence`, on a board seed-proto-board.sh seeded, it records Evidence and Reports at phone size: All projects opened and chat-app picked, then All projects again;
+// a row pressed and swiped left to clear it (it folds away), and Undo; the failed update opened and scrolled to its proof, and back; the Reports tab; a swipe right that reads
+// a report and a swipe left that archives one, each undone; a report opened, scrolled to what it decided, and closed (its dot shrinks away); and More's Mark all as read with Undo.
+// Usage: node decide-record.mjs <board url> <light|dark> <out.mp4> evidence
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-const [url, theme, out, ...modes] = process.argv.slice(2), desk = modes.includes('desk'), flows = modes.includes('flows'), screen = modes.includes('today') ? 'today' : modes.includes('reports') ? 'reports' : 'decide', [W, H] = desk ? [1280, 800] : [390, 844];
+const [url, theme, out, ...modes] = process.argv.slice(2), desk = modes.includes('desk'), flows = modes.includes('flows'), screen = modes.includes('today') ? 'today' : modes.includes('reports') ? 'reports' : modes.includes('evidence') ? 'evidence' : 'decide', [W, H] = desk ? [1280, 800] : [390, 844];
 const dir = mkdtempSync(join(tmpdir(), 'decide-rec-'));
 const chrome = spawn('/usr/bin/chromium', ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(dir, 'profile')}`, `--window-size=${W},${H}`,
   '--hide-scrollbars', '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: 'ignore' });
@@ -78,13 +82,19 @@ try {
   // A tap into a box focuses it and brings it into view, as a finger does.
   const into = (q) => inPage(`const t = document.querySelector(${JSON.stringify(q)}); if (!t) return 'missing'; t.focus({ preventScroll: true }); t.scrollIntoView({ block: 'center', behavior: 'smooth' }); return 'ok';`);
   await send('Page.startScreencast', { format: 'jpeg', quality: 90, everyNthFrame: 1 });
-  await send('Page.navigate', { url: `${url}${{ reports: '#reports', decide: '#waiting', today: '' }[screen]}` });
+  await send('Page.navigate', { url: `${url}${{ reports: '#reports', decide: '#waiting', today: '', evidence: '#evidence' }[screen]}` });
   const steps = flows ? [[2600], [() => tap('a.dl-face[href="#decide/ship"]'), 1800], [() => tap('.pick-list li:nth-child(2) .pick-option'), 1300], [() => into('.decide .note-box'), 900],
     [() => type('Keep support on call until Monday.'), 900], [() => tap('.decide-bar .answer'), 2600],
     [() => tap('a.dl-face[href="#decide/export"]'), 1800], [() => tap('.decide .own-option'), 1600], [() => type('Call it Download, and keep Export in the menu.'), 900], [() => tap('.decide-bar .answer'), 2600],
     [() => tap('a.dl-face[href="#decide/digest"]'), 1600], [() => tap('.pick-list li:nth-child(1) .pick-option'), 1100], [() => tap('.decide-bar .answer'), 2200], [() => tap('#undo'), 1600],
     [() => tap('.top .dl-more > summary'), 1600], [() => tap('.top .dl-more > summary'), 700], [() => tap('a.dl-face[href="#decide/digest"]'), 1500], [() => tap('.ask-nav .dl-more > summary'), 1500],
     [() => tap('[data-act="later"]'), 2200]]
+    : screen === 'evidence' ? [[2600], [() => tap('#ev-project > summary'), 1300], [() => tap('[data-act="project-chat-app"]'), 1600], [() => tap('#ev-project > summary'), 1000],
+    [() => tap('[data-act="project-all"]'), 1500], [() => press('dark-labels'), 700], [() => drag('dark-labels', -280), 1700], [() => tap('#undo'), 1500],
+    [() => tap('a.dl-face[href="#evidence/code-keypad"]'), 1800], [() => inPage("document.querySelector('#reader .ev-scroll').scrollTo({ top: 640, behavior: 'smooth' }); return 'ok';"), 1600], [() => tap('#reader .close'), 1400],
+    [() => tap('.tabs a[href="#reports"]'), 1700], [() => drag('first-second', 300), 1600], [() => tap('#undo'), 1400], [() => drag('release-train', -280), 1600], [() => tap('#undo'), 1400],
+    [() => tap('a.dl-face[href="#reports/new-sign-in"]'), 1800], [() => inPage("const r = document.querySelector('#reader .read'); r.scrollTo({ top: r.scrollHeight, behavior: 'smooth' }); return 'ok';"), 1800],
+    [() => tap('#reader .close'), 1500], [() => tap('.top .dl-more > summary'), 1200], [() => tap('[data-act="read-all"]'), 1600], [() => tap('#undo'), 1500]]
     : screen === 'reports' && desk ? [[2600], [() => key('j'), 1100], [() => key('j'), 1100], [() => key('k'), 1100], [() => key('u'), 1600], [() => key('u'), 1400],
     [() => inPage("const b = document.querySelector('.split-list .dl-row:not(.sel) .dl-hover .read-q'); if (!b) return 'missing'; b.focus(); return 'ok';"), 1400],
     [() => inPage("document.querySelector('.split-list [data-row][aria-current]').focus(); return 'ok';"), 300], [() => key('e'), 1800], [() => key('z', true), 1600],
