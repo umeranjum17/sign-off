@@ -29,12 +29,12 @@ const shot = (state) => browser('screenshot', join(out, `${state}.${cell}.png`))
 const viewport = (w, h) => browser('emulate', '--viewport', `${w}x${h}x${w < 600 ? '2,mobile,touch' : '1'}`, '--color-scheme', theme);
 // What the prototype printed at the bottom of its viewport, read from the accessibility snapshot, which reaches into the sandboxed frame.
 const printed = () => /Viewport (\d+ x \d+)/.exec(browser('snapshot'))?.[1] ?? null;
-// A frame's box and the box it sits in, the viewport its page gets, and the column's width (the note box spans it).
+// A frame's box and the box it sits in, the viewport its page gets, and the column's width (a desk's open design's picture area, else the note box, which spans the column).
 const measure = (frame, holder) => `() => { const f = document.querySelector(${JSON.stringify(frame)}), h = f && (${holder}); if (!f) return JSON.stringify(null);
   const box = (e) => { const r = e.getBoundingClientRect(); return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) }; };
   const fb = box(f), hb = box(h), cs = getComputedStyle(f);
   return JSON.stringify({ frame: fb, box: hb, viewport: [parseFloat(cs.width), parseFloat(cs.height)], blankBelow: hb.y + hb.h - (fb.y + fb.h), blankRight: hb.x + hb.w - (fb.x + fb.w),
-    column: Math.round(document.querySelector('.design-review textarea')?.getBoundingClientRect().width ?? 0), sameFrame: window.__frame === f.contentWindow,
+    column: Math.round((document.querySelector('.dz-fill') ?? document.querySelector('.design-review textarea'))?.getBoundingClientRect().width ?? 0), sameFrame: window.__frame === f.contentWindow,
     overflow: document.documentElement.scrollWidth > innerWidth }); }`;
 let server;
 const record = {};
@@ -60,7 +60,7 @@ try {
   browser('eval', `() => { window.__frame = document.querySelector('iframe.design-review-preview').contentWindow; return 1; }`);
   record.preview = { ...read(inline), printed: printed() }; shot('preview');
   // The window narrows: the same page scales again, never loads again.
-  const [nw, nh] = width === 390 ? [360, 780] : [700, 800];
+  const [nw, nh] = width === 390 ? [360, 780] : [1100, 800];
   viewport(nw, nh); settle();
   record.resized = { at: [nw, nh], ...read(inline), printed: printed() }; shot('resized');
   viewport(w, h); settle();
@@ -86,9 +86,9 @@ try {
     writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
       start: 'A throwaway board holding a design review whose one screen has phone and computer views of a fleet dashboard prototype that fills its viewport and prints the viewport it sees.',
       steps: ['The board is opened on the design review, once per cell: 390 px (a phone) and 1280 px (a desk), each in light and dark.',
-        'On the desk (1280) the review page shows the screen\'s desktop preview: the prototype runs in a 1280 by 800 viewport, scaled to fit the review column (680 px wide), and the preview box ends where the scaled page ends, with no empty band under it.',
+        'On the desk (1280) the review page shows the screen\'s desktop preview: the prototype runs in a 1280 by 800 viewport, scaled to fit the open design's picture area, and the preview box ends where the scaled page ends, with no empty band under it.',
         'On the phone (390) the review page shows the screen\'s phone preview: the prototype runs in a 390 by 844 viewport, scaled to fit, with no empty band under it.',
-        'The window narrows (to 360 on the phone, 700 on the desk, where the column first narrows): the same page scales down again without loading again.',
+        'The window narrows (to 360 on the phone, 1100 on the desk, still a desk, where the open design narrows): the same page scales down again without loading again.',
         'The person taps Review full screen: the same viewport shows whole and centred in the stage.'],
       result: `The prototype runs in a ${vw} by ${vh} viewport scaled to the column, the preview box ends where the page ends, a narrower window scales the same page without loading it again, and Review full screen shows it whole and centred.` }, null, 2) + '\n');
   }

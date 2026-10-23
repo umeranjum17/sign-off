@@ -156,8 +156,18 @@ const PAGES = [
   } }] },
   { name: 'designs', hash: '#designs', ready: '[id="item-chat-journeys"]', stages: [{ run: async (h) => {
     await h.nav('Open design', h.find(/^Open design,/), /^#designs\/chat-journeys$/);
-    await h.dismissCard('chat-journeys');
-    await h.bulk('chat-journeys');
+    // Select and Clear all are in the title row's More; Dismiss is on the design's own page.
+    const sheet = () => document.getElementById('dz-sheet'), bar = () => h.board().querySelector('.bulk');
+    const more = async (re) => { await h.press('More', h.board().querySelector('.dz-more'), () => sheet().open); return h.find(re, sheet(), 'button'); };
+    await h.press('Select', await more(/^Select$/), () => h.find(/^Cancel$/, bar()));
+    await h.press('pick chat-journeys', h.card('chat-journeys'), () => h.box(h.card('chat-journeys')).classList.contains('picked'));
+    await h.cycle('Dismiss 1 selected', h.find(/^Dismiss 1$/, bar()), () => !h.card('chat-journeys'), () => h.card('chat-journeys'), /1 dismissed/);
+    await h.press('Select again', await more(/^Select$/), () => h.find(/^Cancel$/, bar()));
+    await h.press('Cancel', h.find(/^Cancel$/, bar()), () => !bar());
+    await h.cycle('Clear all', await more(/^Clear all$/), () => !h.card('chat-journeys'), () => h.card('chat-journeys'), /cleared/);
+    location.hash = '#designs/chat-journeys';
+    await h.until('the design open', () => h.find(/^Dismiss,/, document.body, 'button'));
+    await h.cycle('Dismiss chat-journeys', h.find(/^Dismiss,/, document.body, 'button'), () => !h.card('chat-journeys'), () => h.card('chat-journeys'), /Dismissed/);
   } }] },
   { name: 'evidence', hash: '#evidence', ready: '[id="item-update-2"]', stages: [{ run: async (h) => {
     await h.nav('Open update', h.card('update-2'), /^#evidence\/update-2$/);
@@ -215,18 +225,19 @@ const PAGES = [
     h.type(page().querySelector('.own-box'), 'Keep it, but send it on Mondays.');
     await h.cycle('Send answer', answer(), () => location.hash !== '#decide/keep-the-weekly-digest', () => true, /your reply/);
   } }] },
-  { name: 'design-review', hash: '#designs/chat-journeys', ready: '#reader .design-review', stages: [
+  { name: 'design-review', hash: '#designs/chat-journeys', ready: '.design-review [data-design]', stages: [
     { shot: 'design-approved', run: async (h) => {
-      const r = h.reader(), change = () => [...r.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Change' && !b.closest('dialog')), status = () => r.querySelector('.design-review .eyebrow').textContent;
-      h.has('Open full preview', h.find(/^Open full preview$/, r));
-      await h.press('Review full screen', h.find(/^Review full screen$/, r), () => r.querySelector('dialog[open]'));
-      const viewer = r.querySelector('dialog[open]');
-      for (const name of ['Approve screen', 'Request change', 'Previous screen', 'Next screen']) h.has(name, h.find(new RegExp(`^${name}$`), viewer));
-      await h.press('Close viewer', h.find(/^Close viewer$/, viewer), () => !r.querySelector('dialog[open]') && change());
-      await h.press('Change with no note', change(), () => /Add a note/.test(r.querySelector('.design-review .err').textContent));
-      h.type(r.querySelector('.design-review textarea'), 'Tighten the spacing.');
+      // The review: in the reader on a phone, beside where it stands on a desk; a save draws it again, so each step finds it anew.
+      const r = () => document.querySelector('.design-review'), viewer = () => document.querySelector('.design-viewer[open]');
+      const change = () => [...r().querySelectorAll('button')].find((b) => b.textContent.trim() === 'Change'), status = () => r().querySelector('[role=status]').textContent;
+      h.has('Open full preview', h.find(/^Open full preview$/, r()));
+      await h.press('Review full screen', h.find(/^Review full screen$/, r()), viewer);
+      for (const name of ['Approve screen', 'Request change', 'Previous screen', 'Next screen']) h.has(name, h.find(new RegExp(`^${name}$`), viewer()));
+      await h.press('Close viewer', h.find(/^Close viewer$/, viewer()), () => !viewer() && change());
+      await h.press('Change with no note', change(), () => /Add a note/.test(r().querySelector('.err').textContent));
+      h.type(r().querySelector('textarea'), 'Tighten the spacing.');
       await h.press('Change', change(), () => status() === 'Changes requested');
-      await h.press('Approve', h.find(/^Approve$/, r, 'button'), () => status() === 'Approved');
+      await h.press('Approve', h.find(/^Approve$/, r(), 'button'), () => status() === 'Approved');
     } },
   ] },
 ];

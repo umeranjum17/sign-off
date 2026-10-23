@@ -40,6 +40,10 @@ journeys:
   # a narrower window scaling the same page without loading it again, and Review full screen showing it whole. DESIGN_SIDE=before SIGN_OFF_REPO=<built base checkout> records the before.
   design-preview:
     command: 'npm run build > /dev/null && for w in 390 1280; do for t in light dark; do DESIGN_WIDTH=$w node .agents/skills/done-done-verify-sign-off/design-preview-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t || exit 1; done; done'
+  # Designs in the new look (the list, a design's review, More, Change; on a desk the cards, the open design and Where it stands), one theme and width per run (DESIGNS_WIDTH=390|1280|1440),
+  # measured in the browser; DESIGNS_PROTO=<the approved prototype's index.html> saves each beside the prototype's frame, DESIGNS_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
+  designs:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/designs-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${DESIGNS_THEME:-light}" "${DESIGNS_WIDTH:-390}"'
   # A screen note typed in the design viewer on an answers-only (fed) board and Request change sent, one width per run: REQUEST_WIDTH=390|1280.
   request-change:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/request-change-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${REQUEST_THEME:-light}"'

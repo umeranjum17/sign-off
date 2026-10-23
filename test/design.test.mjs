@@ -2153,9 +2153,10 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   // Only a design is promoted, and only a key on the board.
   assert.equal(run('promote', 'nope', file).code, 1);
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
-  await until(async () => (await evaluate('document.querySelector(".designs strong")?.textContent')) === message.title);
-  assert.equal(await evaluate('document.querySelector(".designs img")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent(message.preview)}`);
-  assert.equal(await evaluate('document.querySelector(".designs .when")?.textContent'), 'In review · 18 Oct');
+  // On a phone a design is a row: its project's initials, its title, and its state and day.
+  await until(async () => (await evaluate('document.querySelector(".dz-list .t")?.textContent')) === message.title);
+  assert.equal(await evaluate('document.querySelector(".dz-list .ui-icon .mono")?.textContent'), 'SI');
+  assert.equal(await evaluate('document.querySelector(".dz-list .meta")?.textContent'), 'In review · 18 Oct');
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
   await until(async () => (await evaluate('document.querySelector(".design-review .foot button")?.textContent')) === 'Approve');
   assert.equal(await evaluate('document.querySelector(".design-preview-full")?.getAttribute("target")'), '_blank');
@@ -2180,7 +2181,7 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Changes requested');
   assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-design'].notes, [{ journey: 'account-setup', screen: 'security', verdict: 'change', note: 'Make the title clearer' }]);
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
-  await until(async () => (await evaluate('document.querySelector(".designs .when")?.textContent')).startsWith('Changes requested'));
+  await until(async () => (await evaluate('document.querySelector(".dz-list .meta")?.textContent')).startsWith('Changes requested'));
   // Main's verdict is no answer of the user's: Today's More lists nothing under Answered for it, and Cleared today counts nothing.
   await evaluate(`location.href = ${JSON.stringify(url)}`);
   await until(async () => await evaluate('!!document.querySelector(".t-more-line")'));
@@ -2195,15 +2196,16 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   await until(async () => (await desktop.evaluate('document.querySelector(".design-review .foot button")?.textContent')) === 'Approve');
   assert.equal(await desktop.evaluate('document.querySelector("#nav a[href=\\"#waiting\\"][aria-current=page]")?.getClientRects().length > 0'), true);
   assert.equal(await desktop.evaluate('document.querySelector(".design-review")?.getBoundingClientRect().bottom <= innerHeight'), true);
-  assert.equal(await desktop.evaluate('document.querySelector("#reader").getBoundingClientRect().left >= document.querySelector("#nav").getBoundingClientRect().right'), true);
-  // On a desk the security screen's computer view runs in a desk's own 1280 by 800, scaled down to the column's width, as tall as that scale makes it: no blank band under it.
+  // On a desk the design opens in the board, its card marked, beside where it stands; the reader stays shut.
+  assert.equal(await desktop.evaluate('document.getElementById("reader").hidden && document.querySelector(".dz-card[aria-current]")?.id === "item-d1-design" && !!document.querySelector(".dz-open .dz-fill .design-preview-window") && !!document.querySelector(".dz-info .foot .dz-ink")'), true);
+  // On a desk the security screen's computer view runs in a desk's own 1280 by 800, scaled down to fit the open design's picture area, in the desk's shape: no blank band under it.
   await desktop.evaluate('window.vp = [], window.loads = 0, addEventListener("message", (e) => { if (!e.data?.vp) return; loads += e.data.load; vp.push(e.data.vp.join("x")); })');
   await desktop.evaluate('(() => { const s = document.querySelector("[aria-label=\\"Screen for note\\"]"); s.value = "account-setup/security"; s.dispatchEvent(new Event("change")); })()');
   await until(async () => (await desktop.evaluate('vp.at(-1)')) === '1280x800');
   await until(async () => { const p = await desktop.evaluate(preview); return p.frame[0] === p.box[0]; });
-  const desk = await desktop.evaluate(preview);
-  assert.deepEqual([desk.box[0], desk.frame, desk.blankBelow], [desk.column, desk.box, 0]);
-  assert.ok(Math.abs(desk.box[1] - desk.column * 800 / 1280) <= 1, JSON.stringify(desk));
+  const desk = await desktop.evaluate(preview), area = await desktop.evaluate('(() => { const r = document.querySelector(".dz-fill").getBoundingClientRect(); return [r.width, r.height].map(Math.round); })()');
+  assert.deepEqual([desk.frame, desk.blankBelow], [desk.box, 0]);
+  assert.ok(Math.abs(desk.box[1] - desk.box[0] * 800 / 1280) <= 1 && desk.box[0] <= area[0] && desk.box[1] <= area[1] && (desk.box[0] === area[0] || Math.abs(desk.box[1] - area[1]) <= 1), JSON.stringify({ desk, area }));
   // A narrower box scales the same page again, without loading it again.
   await desktop.evaluate('document.querySelector(".design-preview-window").style.width = "500px"');
   await until(async () => (await desktop.evaluate(preview)).frame.join() === '500,313');
@@ -2211,8 +2213,8 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   desktop.close();
   // The inline Change saved a change note on this screen: the viewer must show it as a change, not an approval.
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
-  await until(async () => (await evaluate('document.querySelector("[aria-haspopup=dialog]")?.textContent')) === 'Review full screen');
-  await evaluate('document.querySelector("[aria-haspopup=dialog]").click()');
+  await until(async () => (await evaluate('document.querySelector("[data-design]")?.textContent')) === 'Review full screen');
+  await evaluate('document.querySelector("[data-design]").click()');
   await until(() => evaluate('!!document.querySelector(".design-viewer[open]")'));
   assert.match(await evaluate('document.querySelector(".design-viewer header").textContent'), /2 of 17.*Security/);
   assert.equal(await evaluate('document.querySelector(".design-viewer [role=status]").textContent'), 'Changes requested');
@@ -2239,8 +2241,8 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   // The old page stays readable for a moment after location.reload(), so the wait names this load: a button read and clicked
   // on the outgoing page goes away with it, and the viewer it opened never shows.
   await evaluate('window.old = true, location.reload()');
-  await until(async () => (await evaluate('!window.old && document.querySelector("[aria-haspopup=dialog]")?.textContent')) === 'Review full screen');
-  await evaluate('document.querySelector("[aria-haspopup=dialog]").click()');
+  await until(async () => (await evaluate('!window.old && document.querySelector("[data-design]")?.textContent')) === 'Review full screen');
+  await evaluate('document.querySelector("[data-design]").click()');
   await until(() => evaluate('!!document.querySelector(".design-viewer[open]")'));
   await evaluate('document.querySelector("[aria-label=\\"Next screen\\"]").click(); document.querySelector("[aria-label=\\"Next screen\\"]").click()');
   assert.equal(await evaluate('document.querySelector(".design-viewer [role=status]").textContent'), 'Screen approved');
@@ -2276,9 +2278,9 @@ test('a design without journey screens accepts a design-level change note', { sk
   await evaluate('document.querySelector(".design-review button:last-of-type").click()');
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Changes requested');
   assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-no-screens'].notes, [{ verdict: 'change', note: 'Clarify the overall hierarchy.' }]);
+  assert.match(await evaluate('document.querySelector(".design-review .dz-said")?.textContent'), /Clarify the overall hierarchy/);
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
-  await until(async () => (await evaluate('document.querySelector(".designs .when")?.textContent')).startsWith('Changes requested'));
-  assert.match(await evaluate('document.querySelector(".designs")?.textContent'), /Clarify the overall hierarchy/);
+  await until(async () => (await evaluate('document.querySelector(".dz-list .meta")?.textContent'))?.startsWith('Changes requested'));
   close();
   proc.kill();
 });
@@ -2298,8 +2300,8 @@ test('an answers-only board takes a screen review: typing a note in the viewer e
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1], { evaluate, tap, insertText, close } = await browse(join(dir, 'browser'), 390, 844, true);
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d3-fed`)}`);
-  await until(async () => (await evaluate('document.querySelector("[aria-haspopup=dialog]")?.textContent')) === 'Review full screen');
-  await evaluate('document.querySelector("[aria-haspopup=dialog]").click()');
+  await until(async () => (await evaluate('document.querySelector("[data-design]")?.textContent')) === 'Review full screen');
+  await evaluate('document.querySelector("[data-design]").click()');
   await until(() => evaluate('!!document.querySelector(".design-viewer[open]")'));
   const centre = (label) => evaluate(`(() => { const r = [...document.querySelectorAll(".design-viewer .foot button")].find((b) => b.textContent === ${JSON.stringify(label)}).getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`);
   await evaluate('document.querySelector(".design-viewer textarea").focus()');
@@ -2331,8 +2333,8 @@ test('a screen approval on a design with no design verdict keeps the design wait
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1], { evaluate, close } = await browse(join(dir, 'browser'), 390);
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d2-screens`)}`);
-  await until(async () => (await evaluate('document.querySelector("[aria-haspopup=dialog]")?.textContent')) === 'Review full screen');
-  await evaluate('document.querySelector("[aria-haspopup=dialog]").click()');
+  await until(async () => (await evaluate('document.querySelector("[data-design]")?.textContent')) === 'Review full screen');
+  await evaluate('document.querySelector("[data-design]").click()');
   await until(() => evaluate('!!document.querySelector(".design-viewer[open]")'));
   await evaluate('document.querySelector(".design-viewer .open-link").click()');
   await until(async () => (await evaluate('document.querySelector(".design-viewer[open] [role=status]")?.textContent')) === 'Screen approved');
@@ -2620,8 +2622,8 @@ test('design review: a viewer approve needs no direction pick, and an inline App
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1], { evaluate, close } = await browse(join(dir, 'browser'), 1280);
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d3-direction`)}`);
-  await until(async () => (await evaluate('document.querySelector("[aria-haspopup=dialog]")?.textContent')) === 'Review full screen');
-  await evaluate('document.querySelector("[aria-haspopup=dialog]").click()');
+  await until(async () => (await evaluate('document.querySelector("[data-design]")?.textContent')) === 'Review full screen');
+  await evaluate('document.querySelector("[data-design]").click()');
   await until(() => evaluate('!!document.querySelector(".design-viewer[open]")'));
   await evaluate('document.querySelector(".design-viewer .open-link").click()');
   await until(async () => (await evaluate('document.querySelector(".design-viewer[open] [role=status]")?.textContent')) === 'Screen approved');
@@ -2702,7 +2704,7 @@ test('a design posted again is a new round: the note box starts empty, the earli
   writeFileSync(join(dir, 'design', 'a.png'), sized(4, 4));
   assert.deepEqual(await open(), { note: '', steps: ['Your answer on the earlier round: Changes requested (First)'], notes: ['“Round one: bigger title”'] });
   // In the viewer the screen is not reviewed yet, and approving it sends this round's note only: the earlier change does not carry over.
-  await evaluate('document.querySelector("[aria-haspopup=dialog]").click()');
+  await evaluate('document.querySelector("[data-design]").click()');
   await until(async () => (await evaluate('document.querySelector(".design-viewer[open] [role=status]")?.textContent')) === 'Not reviewed yet');
   await evaluate('document.querySelector(".design-viewer .open-link").click()');
   await until(async () => (await evaluate('document.querySelector(".design-viewer[open] [role=status]")?.textContent')) === 'Screen approved');
