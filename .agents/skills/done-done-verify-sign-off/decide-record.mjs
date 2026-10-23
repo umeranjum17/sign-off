@@ -8,8 +8,8 @@
 // Its own headless Chromium on a scratch profile, driven over the DevTools protocol; taps, drags and keys are events in the page.
 // Usage: node decide-record.mjs <board url> <light|dark> <out.mp4> [desk]
 // With `reports` last it records Reports instead, on a board reports-shots.mjs seeded: rows rising in, a press, a short drag that springs back,
-// a swipe right that reads a report (its dot goes, Undo brings it back), a swipe left that archives one (it folds away, Undo flashes it back),
-// a report opened and closed (its dot shrinks away), and More's Mark all as read with Undo.
+// a swipe right that reads a report (its bar fills, Undo empties it), a swipe left that archives one (it folds away, Undo flashes it back),
+// a report opened in its sheet and closed (its bar then full), By project and back to Newest, and More's Mark all as read with Undo.
 // Its own headless Chromium on a scratch profile, driven over the DevTools protocol; taps and drags are pointer events in the page.
 // With both, it records the desk's Reports by keys: J and K moving the selection (each report read as it is shown), U twice, a row's hover actions,
 // E archiving the report shown (the row folds, the next is selected), Cmd+Z, Enter opening a guided report over the board and Escape, and the ? sheet.
@@ -79,8 +79,8 @@ try {
     [() => inPage("document.querySelector('.split-list [data-row][aria-current]').focus(); return 'ok';"), 300], [() => key('e'), 1800], [() => key('z', true), 1600],
     [() => key('j'), 1100], [() => key('Enter'), 1800], [() => key('Escape'), 1200], [() => key('?'), 1800], [() => tap('#keys header button'), 900]]
     : screen === 'reports' ? [[2600], [() => press('settings-speed'), 700], [() => drag('settings-speed', 80, 10, 45), 1000], [() => drag('settings-speed', 300), 1600], [() => tap('#undo'), 1400],
-    [() => drag('release-train', -280), 1600], [() => tap('#undo'), 1400], [() => tap('a.dl-face[href="#reports/new-sign-in"]'), 1600], [() => tap('#reader .close'), 1400],
-    [() => tap('.top .dl-more > summary'), 1200], [() => tap('[data-act="read-all"]'), 1600], [() => tap('#undo'), 1500]] : desk ? [[2600], [() => key('j'), 900], [() => key('j'), 900], [() => key('k'), 900], [() => key('2'), 900], [() => key('Enter'), 1800], [() => key('z', true), 1500],
+    [() => drag('release-notes', -280), 1600], [() => tap('#undo'), 1400], [() => tap('a.dl-face[href="#reports/new-sign-in"]'), 1600], [() => tap('#reader .rp-x'), 1400],
+    [() => tap('.rp-seg button:last-child'), 1600], [() => tap('.rp-seg button:first-child'), 1400], [() => tap('.rp-more-line'), 1200], [() => tap('#rp-more [data-act="read-all"]'), 1600], [() => tap('#undo'), 1500]] : desk ? [[2600], [() => key('j'), 900], [() => key('j'), 900], [() => key('k'), 900], [() => key('2'), 900], [() => key('Enter'), 1800], [() => key('z', true), 1500],
     [() => key('l'), 1500], [() => key('?'), 1800], [() => tap('#keys header button'), 700], [() => key('j'), 800], [() => key('1'), 700], [() => key('c'), 600], [() => type('After the demo'), 500], [() => key('Enter', true), 1800],
     [() => inPage("const b = document.querySelector('.split-list .dl-row:not(.sel) .dl-hover .yes'); if (!b) return 'missing'; b.focus(); await s(700); b.click(); return 'ok';"), 1600],
     [() => key('g'), 200], [() => key('e'), 1200], [() => key('g'), 200], [() => key('d'), 1500]]

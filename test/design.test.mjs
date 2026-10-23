@@ -665,7 +665,7 @@ test('report and plan documents use one page scroll and the available width at 3
         assert.ok(got.width <= got.frameWidth + 1 && got.inner === 0, JSON.stringify(got));
         // A forced document scrollbar must not paint a gutter even after its content fits.
         assert.equal(got.scrollbar, 0, `painted inner scrollbar at ${width}px (mobile=${mobile}): ${JSON.stringify(got)}`);
-        assert.deepEqual(got.scrollers, [hash.includes('reports') ? (width === 1280 ? 'split-detail' : 'read') : 'plan-scroll']);
+        assert.deepEqual(got.scrollers, [hash.includes('reports') ? (width === 1280 ? 'split-detail' : 'read rp-sheet-body') : 'plan-scroll']);
         const previous = got.frameHeight;
         await evaluate(`document.querySelector(${JSON.stringify(selector)}).contentWindow.postMessage('grow', '*')`);
         await until(async () => { const next = await layout();
@@ -925,16 +925,18 @@ test('each card has one place to type: Add a comment holds the note sent with th
   await until(async () => (await evaluate('!document.querySelector(".gone-asks") && document.querySelectorAll(".decide-list .dl-row:not(.g-done)").length')) === 2);
   close();
   assert.deepEqual(readFileSync(gone, 'utf8').trim().split('\n').map((l) => JSON.parse(l)).map(({ key, dismissed }) => [key, dismissed]), [['ship', true], ['ship', false]]);
-  // Reports leads with the date over its title and how many are new and keeps its More at the top right; its rows are the new look's, so a report with a page
-  // draws no steps in the list and no legend for them.
+  // Reports, as the approved prototype draws it: the title with the light-or-dark button at its right, Newest or By project, then how many are still to read of all listed and how many
+  // were filed this week, and More as one quiet line under the list; its rows are the new look's, so a report with a page draws no steps in the list and no legend for them.
   const reports = await dump('#reports');
-  assert.match(reports, /<p class="kicker date-kicker">[^<]+<\/p><h1 tabindex="-1">Reports<\/h1>.*?<p class="lede waiting-lede">1 new · 1 in all<\/p><details class="dl-more"><summary aria-label="More">/s);
+  assert.match(reports, /<header class="top ui-top rp-top"><h1 tabindex="-1">Reports<\/h1><button class="ui-rb theme" aria-label="Switch to (dark|light)">/);
+  assert.match(reports, /<button class="t-more-line rp-more-line" aria-haspopup="dialog"><span>Mark all as read, Select and Archive all<\/span>/);
+  assert.match(reports, /<div class="ui-seg rp-seg" role="group" aria-label="Order"><button aria-pressed="true">Newest<\/button><button aria-pressed="false">By project<\/button><\/div><section class="ui-card ui-hero rp-hero"><div class="hl"><span class="lab">Still to read<\/span><\/div><div class="hv"><span class="big">1<small> of 1<\/small><\/span><span class="vs">1 filed this week<\/span><\/div><\/section>/);
   assert.doesNotMatch(reports, /class="card legend"|class="flow"/);
   // The list row has no ×: Dismiss lives on the report's page.
   assert.doesNotMatch(reports, /aria-label="Dismiss, How it ships"/);
-  // Today heads the list with its count, over one card of rows; the row is a link that opens it, with its icon tile, its title and a dot while it is not read, then its project and time.
-  assert.match(reports, /<h2 class="dl-head ui-sec" style="--n:0">Today<span class="n">1<\/span><\/h2><ul class="dl-list rp-list ui-card ui-list" aria-label="Today">/);
-  assert.match(reports, /<a class="dl-face ui-row" href="#reports\/how" draggable="false" id="item-how" data-row=""><span class="ui-icon" aria-hidden="true"><svg viewBox="0 0 24 24">.*?<span class="t" dir="auto">How it ships<\/span><span class="new" role="img" aria-label="Not read yet"><\/span>.*?<span class="l2 meta" dir="auto">How it works · \d\d:\d\d<\/span>/s);
+  // Newest heads one card of rows; the row is a link that opens it, with its project's initials (it has no icon), its title, then a bar of how much of it is read with its percent.
+  assert.match(reports, /<h2 class="dl-head ui-sec" style="--n:0">Newest<\/h2><ul class="dl-list rp-list ui-card ui-list" aria-label="Newest">/);
+  assert.match(reports, /<a class="dl-face ui-row" href="#reports\/how" draggable="false" id="item-how" data-row=""><span class="ui-icon" aria-hidden="true"><i class="mono">HW<\/i><\/span>.*?<span class="t" dir="auto">How it ships<\/span>.*?<span class="l2"><span class="ui-bar"><i style="width: 0%"><\/i><\/span><span class="pct">0%<\/span><\/span>/s);
   // Under the row, a swipe right marks it read and a swipe left archives it.
   assert.match(reports, /<div class="dl-act yes" aria-hidden="true">.*?<span>Read<\/span><\/div><div class="dl-act later" aria-hidden="true">.*?<span>Archive<\/span><\/div>/s);
   // Only the report is a row and counted; the text-only one is folded under Notes, a short row with no page to open.
@@ -943,8 +945,8 @@ test('each card has one place to type: Add a comment holds the note sent with th
   assert.match(reports, /<\/svg><\/span>Reports<span class="n blue">1<\/span>/);
   assert.match(reports, /<a href="#reports" aria-label="Reports, 1 new" aria-current="page"><span class="icon i-tab-reports" aria-hidden="true">.*?<\/span><span class="bd blue" aria-hidden="true">1<\/span><\/a>/);
   assert.match(reports, /<details class="other notes"><summary>Notes \(1\)<\/summary>.*<strong dir="auto">Merged: the sign-in fix<\/strong>/s);
-  // On a phone, a tap on the card opens the report over the whole board with the focus on its title; the board under it takes no taps.
-  // ‹ Reports goes back to the card with the focus on its link, and Escape closes it too.
+  // On a phone, a tap on the card opens the report in a sheet over the list with the focus on its title; the board under it takes no taps.
+  // Close goes back to the card with the focus on its link, and Escape closes it too.
   {
     const { evaluate, tap, swipe, close } = await browse(join(dir, 'reader'), 390);
     await evaluate(`location.href = ${JSON.stringify(`${url}#reports`)}`);
@@ -956,27 +958,28 @@ test('each card has one place to type: Add a comment holds the note sent with th
     let open;
     await until(async () => (open = await evaluate(`(() => { const f = reader.querySelector('iframe').getBoundingClientRect(); return { hidden: reader.hidden, title: document.activeElement.textContent,
       inert: document.querySelector('main').inert, src: reader.querySelector('iframe').getAttribute('src'), sandbox: reader.querySelector('iframe').getAttribute('sandbox'),
-      frame: [f.x, Math.round(f.width) === reader.querySelector('.read').clientWidth - 40], back: reader.querySelector('a').textContent, decided: reader.querySelector('.decided')?.textContent }; })()`))?.src === '/mock/local/how~/index.html');
-    // The page sits in a tile inside the phone's gutters, under its title and what it decided.
-    assert.deepEqual(open, { hidden: false, title: 'How it ships', inert: true, src: '/mock/local/how~/index.html', sandbox: 'allow-scripts', frame: [20, true], back: '‹ Reports',
-      decided: 'What it decidedShips only when the check passes.' });
+      frame: [f.x, Math.round(f.width) === reader.querySelector('.read').clientWidth - 32], back: reader.querySelector('.rp-x').getAttribute('aria-label'), what: reader.querySelector('.rp-what').textContent,
+      decided: [...reader.querySelectorAll('.ui-dl, .rp-found')].map((e) => e.textContent) }; })()`))?.src === '/mock/local/how~/index.html');
+    // The page sits in a tile inside the sheet's 16px gutters, under what it is, its title and what it decided.
+    assert.deepEqual(open, { hidden: false, title: 'How it ships', inert: true, src: '/mock/local/how~/index.html', sandbox: 'allow-scripts', frame: [16, true], back: 'Close',
+      what: `HWDiagram · How it works · ${new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(new Date())}`, decided: ['What it decided', 'Ships only when the check passes.'] });
     // The page itself is served: the filled scaffold, with its steps to tap.
     assert.match(await (await fetch(new URL('/mock/local/how~/index.html', url))).text(), /<button type="button" class="next">Next<\/button>/);
-    await tap(await at('#reader .close'));
+    await tap(await at('#reader .rp-x'));
     await until(async () => (await evaluate('location.hash + reader.hidden')) === '#reportstrue');
     assert.deepEqual(await evaluate('[document.activeElement.getAttribute("href"), document.querySelector("main").inert, document.body.className]'), ['#reports/how', false, '']);
     await evaluate('location.hash = "#reports/how"');
     await until(async () => (await evaluate('reader.hidden')) === false);
     await evaluate('dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))');
     await until(async () => (await evaluate('location.hash + reader.hidden')) === '#reportstrue');
-    // Opening it read it, beside the board: back on the list its dot is gone, the lede says so and the tab bar's count is gone.
+    // Opening it read it, beside the board: back on the list its row reads 100%, nothing is still to read and the tab bar's count is gone.
     const reads = () => readFileSync(file.replace(/\.json$/, '.reads.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).map(({ key, read }) => [key, read]);
-    await until(async () => (await evaluate('[document.querySelector(".top .lede").textContent, !!document.querySelector(".tabs .bd.blue")].join()')) === '1 report · all read,false');
+    await until(async () => (await evaluate('[document.querySelector("#item-how .pct").textContent, document.querySelector(".rp-hero .big").textContent, !!document.querySelector(".tabs .bd.blue")].join()')) === '100%,0 of 1,false');
     assert.deepEqual(reads(), [['how', true]]);
-    // A swipe right marks it unread again (the dot and the count come back); a swipe left archives it, and Undo puts it back.
+    // A swipe right marks it unread again (its bar empties and the count comes back); a swipe left archives it, and Undo puts it back.
     const y = await evaluate('(() => { const r = document.querySelector("#item-how").getBoundingClientRect(); return r.y + 30; })()');
     await swipe({ x: 40, y }, { x: 360, y });
-    await until(async () => (await evaluate('[!!document.querySelector("#item-how .new"), document.querySelector(".tabs .bd.blue")?.textContent, document.getElementById("toast-text").textContent].join()')) === 'true,1,Marked unread: How it ships');
+    await until(async () => (await evaluate('[document.querySelector("#item-how .pct").textContent, document.querySelector(".tabs .bd.blue")?.textContent, document.getElementById("toast-text").textContent].join()')) === '0%,1,Marked unread: How it ships');
     assert.deepEqual(reads(), [['how', true], ['how', false]]);
     await swipe({ x: 360, y }, { x: 30, y });
     await until(async () => (await evaluate('[!document.querySelector("#item-how"), document.getElementById("toast-text").textContent].join()')) === 'true,Archived: How it ships');
@@ -1821,7 +1824,7 @@ test('Reports on a desk: the list beside the newest report, J moves and reads, U
   const reads = () => { try { return readFileSync(file.replace(/\.json$/, '.reads.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).map(({ key, read }) => `${key}:${read}`).join(','); } catch { return ''; } };
   const { evaluate, close } = await browse(join(dir, 'b'), 1280, 800);
   const key = (k, mod = false) => evaluate(`(document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, bubbles: true, ctrlKey: ${mod}, metaKey: ${mod} }))`);
-  const seen = () => evaluate('[location.hash, document.querySelector(".split-list .sel")?.dataset.key, document.querySelector(".split-detail .read h1")?.textContent, document.querySelectorAll("#board .report .new:not(.out)").length].join("|")');
+  const seen = () => evaluate('[location.hash, document.querySelector(".split-list .sel")?.dataset.key, document.querySelector(".split-detail .read h1")?.textContent, [...document.querySelectorAll("#board .report .pct")].filter((m) => m.textContent === "0%").length].join("|")');
   const rows = () => evaluate('[...document.querySelectorAll(".split-list .dl-row[data-key]")].filter((r) => r.style.height !== "0px").map((r) => r.dataset.key).join(",")');
   await evaluate(`location.href = ${JSON.stringify(`${url}#reports`)}`);
   // The newest report is shown beside the list, not yet marked read; the bar says what it is, and the strip under the list names its keys.
@@ -1831,7 +1834,7 @@ test('Reports on a desk: the list beside the newest report, J moves and reads, U
     'Mark read,Archive|JKMoveUReadEArchive?All keys|true');
   assert.equal(await rows(), `alpha,beta,${guided.key},gamma`);
   assert.equal(reads(), '');
-  // J selects the next report and reads it: its dot goes and the read is saved beside the board.
+  // J selects the next report and reads it: its row reads 100% and the read is saved beside the board.
   await key('j');
   await until(async () => (await seen()) === '#reports/beta|beta|Beta report|3' && reads() === 'beta:true');
   // U marks it unread; the page beside the list is not loaded again, and the mark holds.
