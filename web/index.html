@@ -1340,7 +1340,7 @@
   }
   .decide .proof-block .ui-dl, .decide .thread .tk-label { margin: 1.5rem 0 0.5rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 400; letter-spacing: 0; text-transform: none; }
   .decide > .ui-dl, .decide > label.ui-dl { display: block; margin-top: 1.5rem; }
-  /* A card's ticket: one row, its title over its id and progress, that opens the ticket's page; and that page's bar and lists. */
+  /* A card's ticket: one row, its title over its id and progress, that opens the ticket. */
   .ticket-block { margin-top: 1.25rem; }
   /* On an update's screen the row reads as one of its groups: the label as Proof's, the row as its cells. */
   .ev-item .tk-label { margin: 1rem 0 0.5rem; font-weight: 400; letter-spacing: 0.02em; text-transform: uppercase; } .ev-item .ticket-block { margin: 0; }
@@ -1356,14 +1356,8 @@
   .tk-m { display: flex; align-items: center; gap: 0.5rem; min-width: 0; color: var(--muted); font-size: 0.875rem; line-height: 1.1875rem; }
   .tk-bar { flex: none; width: 4rem; height: 0.25rem; overflow: hidden; border-radius: 0.125rem; background: var(--fill-2); }
   .tk-bar i { display: block; height: 100%; border-radius: inherit; background: var(--action); }
-  .tk-n, .tk-done b { font-variant-numeric: tabular-nums; }
+  .tk-n { font-variant-numeric: tabular-nums; }
   .ticket-row > :last-child .glyph { width: 1.25rem; height: 1.25rem; color: var(--muted); }
-  .tk-kicker { margin: 0 0 0.25rem; color: var(--muted); font-size: var(--t-s); line-height: 1.25rem; } .tk-kicker a { color: var(--accent); text-decoration: none; }
-  .tk-done { display: flex; align-items: center; gap: 0.75rem; color: var(--muted); }
-  .tk-done .tk-bar { flex: 1; max-width: 20rem; height: 0.375rem; border-radius: 0.1875rem; }
-  .tk-done b { color: var(--text); font-weight: 600; }
-  .tk-h { margin: 1.75rem 0 0.5rem; padding: 0 1rem; } .tk-h .meta { margin: 0; font-size: 0.875rem; font-weight: 400; } .tk-h h2 { margin: 0; color: var(--muted); font-size: 0.875rem; font-weight: 400; letter-spacing: 0.02em; text-transform: uppercase; }
-  .tk-sub { min-height: 3.5rem; }
   /* A card's thread: one grouped list, oldest first, a dot per step (the newest blue), its words, the note in quotes and the time. */
   .thread { margin-top: 1.25rem; } .ev-item .thread { margin: 0; }
   .th-list { margin: 0; padding: 0.125rem 1rem; list-style: none; border-radius: 1rem; background: var(--opt, var(--surface)); box-shadow: 0 0 0 0.5px var(--line); }
@@ -1371,10 +1365,9 @@
   .th-list li { display: flex; gap: 0.75rem; padding: 0.625rem 0; } .th-list li + li { border-top: 0.5px solid var(--line); }
   .th-dot { flex: none; width: 0.5rem; height: 0.5rem; margin-top: 0.5rem; border-radius: 50%; background: var(--fill-2); } .th-list li:last-child .th-dot { background: var(--action); }
   .th-b { display: grid; flex: 1; min-width: 0; gap: 0.125rem; font-size: 0.9375rem; line-height: 1.25rem; }
-  .th-t a, a.th-card { color: var(--accent); text-decoration: none; } a.th-card { overflow: hidden; font-size: 0.8125rem; white-space: nowrap; text-overflow: ellipsis; }
+  .th-t a { color: var(--accent); text-decoration: none; }
   .th-n { color: var(--muted); }
   .th-b time { color: var(--muted); font-size: 0.8125rem; line-height: 1.125rem; font-variant-numeric: tabular-nums; }
-  @media (min-width: 64rem) { .top .back.tk-back { display: inline-flex; margin: -2.75rem 0 0; } }
   .pst { color: var(--muted); font-size: 0.875rem; line-height: 1.25rem; }
   .res { display: inline-flex; align-items: center; gap: 0.3125rem; font-weight: 600; } .res::before { content: ""; width: 0.4375rem; height: 0.4375rem; border-radius: 50%; background: currentColor; }
   .res.ok { color: var(--ok); } .res.bad { color: var(--danger); } .res.warn { color: var(--warn); }
@@ -1606,6 +1599,109 @@
     .answer .okmark .glyph { stroke-dashoffset: 0; }
     .dl-face, .dl-act > *, .leaving .ui-icon, .decide .pick-option, .decide .own-field, .decide-bar > *, .dl-more > summary > span, .tabs .hl, .tabs .icon, .side .icon, .t-btn, .t-tiles .ui-stat { transition: none !important; }
   }
+  /* ---- Tickets, as the approved prototype draws them from ui.css's parts: the title row (the project filter and light or dark), Your asks or System, the hero with its done
+     dot grid, then In progress, On hold, To do and Done, and two tiles. A ticket rises over the list as a sheet on a phone; a desk is one filled screen of three columns,
+     the open ticket in the third, each list ending on a whole row. ---- */
+  body.tickets .ui-row .meta, body.tickets .ui-row .l2 { margin: 0; }
+  :is(.tk-top, .tk-dhead) .ui-rb { min-height: 0; padding: 0; border: 0; }
+  :is(.tk-top, .tk-dhead) .ui-rb .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.6; }
+  .tk-rb.on { background: var(--tk-ink); color: var(--tk-canvas); }
+  body.tickets :focus-visible { outline-color: var(--tk-ink); }
+  .tk-seg small { color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .tk-fpill { position: relative; display: inline-flex; align-items: center; gap: 0.5rem; height: 2rem; min-height: 0; margin-top: 0.75rem; padding: 0 0.625rem 0 0.375rem; border: 0; border-radius: 1rem;
+    background: var(--tk-card); color: var(--tk-ink); font: inherit; font-size: var(--tk-fs-row); font-weight: 500; box-shadow: var(--tk-elev-card), inset 0 1px 0 var(--tk-hl); }
+  .tk-fpill::after { content: ""; position: absolute; inset: -0.375rem 0; }
+  .tk-fpill .glyph { width: 0.875rem; height: 0.875rem; color: var(--tk-text-tertiary); }
+  .tk-pt { display: inline-grid; flex: none; place-items: center; width: 1.25rem; height: 1.25rem; }
+  .tk-pt img, .tk-pt .mono { width: 1.25rem; height: 1.25rem; border-radius: 0.3125rem; object-fit: cover; }
+  .tk-pt .mono { background: var(--tk-ink); color: var(--tk-raised); font-size: 0.5rem; line-height: 1.25rem; font-weight: 600; text-align: center; }
+  /* The hero: its label and how many were done this week, the big count, how many move, and one square per ticket. */
+  .tk-hero { container-type: inline-size; }
+  /* The shared hero chip (ui.css), with the prototype's green rise before its count. */
+  .tk-hero .chip { display: inline-flex; align-items: center; gap: 0.25rem; }
+  .tk-hero .chip .up { width: 0; height: 0; border-right: 4.5px solid transparent; border-bottom: 7px solid #2BB673; border-left: 4.5px solid transparent; }
+  .tk-hero .vs i { display: inline-block; width: 0.5rem; height: 0.5rem; margin-right: 0.375rem; border-radius: 2px; background: var(--tk-mid); }
+  .tk-hero, .tk-dots { --tk-mid: #D3CCC9; }
+  @media (prefers-color-scheme: dark) { .tk-hero, .tk-dots { --tk-mid: #55514C; } }
+  .tk-dots { --cell: calc((100cqw - (var(--cols) - 1) * 2px) / var(--cols)); display: grid; grid-template-columns: repeat(var(--cols), var(--cell)); grid-auto-rows: var(--cell); gap: 2px; align-content: start;
+    height: round(up, calc(var(--rows) * (var(--cell) + 2px) - 2px), 4px); margin-top: 0.75rem; }
+  .tk-dots i { border-radius: 2px; background: var(--tk-track); } .tk-dots i.d { background: var(--tk-fill); } .tk-dots i.m { background: var(--tk-mid); }
+  /* A section's See all, at the card's right edge. */
+  body.tickets .ui-sec .see { min-height: 0; padding: 0; border: 0; background: none; font: inherit; font-size: var(--tk-fs-row); line-height: 1.5rem; font-weight: 500; }
+  .tk-tiles .si svg { fill: currentColor; stroke: none; }
+  .tk-tiles a.ui-stat:active { transform: scale(0.97); }
+  .tk-empty { margin-top: 1rem; padding: 1rem; } .tk-empty h2 { margin: 0; color: var(--tk-ink); font-size: var(--tk-fs-head); line-height: 1.5rem; font-weight: 500; }
+  .tk-empty p, .tk-none { margin: 0.25rem 0 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
+  .tk-none { margin: 0.75rem 0 0; color: var(--tk-text-tertiary); }
+  /* The project filter's sheet: Every project, then each project with its tickets' count, the one picked checked. */
+  .tk-pick { width: 100%; min-height: 3rem; padding: 0; border: 0; border-radius: 0; background: none; font: inherit; font-size: var(--tk-fs-row); text-align: left; }
+  .tk-pick .k { color: var(--tk-ink); } .tk-pick:active { background: none; } .tk-pick .glyph { width: 1rem; height: 1rem; color: var(--tk-ink); }
+  /* A ticket over the list, on a phone: a sheet from the bottom over a dimmed list, up to 48px from the top, scrolling inside. */
+  .tk-over { position: fixed; z-index: 30; inset: 0; }
+  .tk-scrim { position: absolute; inset: 0; background: rgba(30, 24, 18, 0.28); }
+  @media (prefers-color-scheme: dark) { .tk-scrim { background: rgba(0, 0, 0, 0.5); } }
+  .tk-sheet { position: absolute; right: 0; bottom: 0; left: 0; max-width: 30rem; max-height: calc(100% - 3rem); margin: 0 auto; padding: 0 1rem calc(2rem + env(safe-area-inset-bottom)); overflow: auto;
+    overscroll-behavior: contain; border-radius: 1.75rem 1.75rem 0 0; background: var(--tk-card); color: var(--tk-text); box-shadow: 0 -8px 32px rgba(30, 20, 10, 0.12); }
+  .tk-over.up .tk-sheet { animation: sheet-up 300ms var(--ease); } .tk-over.up .tk-scrim { animation: tk-fade 250ms var(--ease); }
+  @keyframes tk-fade { from { opacity: 0; } }
+  body:has(.tk-sheet) { overflow: hidden; }
+  .tk-sheet .grab { width: 2.25rem; height: 0.25rem; margin: 0.5rem auto; border-radius: 2px; background: var(--tk-line); }
+  /* The ticket: its project and state (with Close on a phone), its title in full, its properties, the tickets under it, Linked and Activity. */
+  .tk-shd { display: flex; align-items: center; gap: 0.5rem; min-height: 2.5rem; }
+  .tk-shd p { display: flex; flex: 1; align-items: center; gap: 0.5rem; min-width: 0; margin: 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: 1.5rem; }
+  .tk-shd .x { position: relative; display: grid; flex: none; place-items: center; width: 2rem; height: 2rem; min-height: 0; padding: 0; border-radius: 1rem; background: var(--tk-inset); color: var(--tk-text-secondary); }
+  .tk-shd .x::after { content: ""; position: absolute; inset: -0.375rem; } .tk-shd .x .glyph { width: 1rem; height: 1rem; }
+  .tk-dt { margin: 0.5rem 0 0; color: var(--tk-ink); font-size: 1.25rem; line-height: 1.75rem; font-weight: 500; letter-spacing: -0.017em; outline: none; }
+  .tk-k { display: inline-grid; flex: none; place-items: center; width: 1.125rem; height: 1.125rem; }
+  .tk-k svg { width: 1.125rem; height: 1.125rem; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  :is(.tk-sheet, .tk-pane) .ui-pr .v a { position: relative; color: var(--tk-ink); text-decoration: underline; text-decoration-color: var(--tk-line); text-underline-offset: 3px; }
+  :is(.tk-sheet, .tk-pane) .ui-pr .v a::after { content: ""; position: absolute; inset: -0.75rem 0; }
+  :is(.tk-sheet, .tk-pane) .ui-props { margin-top: 0.5rem; }
+  :is(.tk-sheet, .tk-pane) .ui-pr .v > span:not(.ui-bar) { white-space: normal; }
+  .tk-in { margin-top: 0.5rem; border-radius: 1rem; background: var(--tk-inset); } .tk-in .ui-icon { box-shadow: none; }
+  .tk-act { margin-bottom: 0; list-style: none; }
+  .tk-act .ui-pr { flex-direction: column; align-items: flex-start; gap: 0.125rem; padding: 0.75rem 0; }
+  .tk-act .aw { display: flex; align-items: baseline; gap: 0.5rem; width: 100%; } .tk-act .aw b { color: var(--tk-ink); font-weight: 500; }
+  .tk-act time { flex: none; margin-left: auto; color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .tk-act .th-n { color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); line-height: 1.25rem; }
+  .tk-act .tk-on { max-width: 100%; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: 1.25rem; text-decoration: none; }
+  /* A desk: one filled screen with no page scroll. The head across (where you are, the 32px title, one line of what it holds, the controls at its right), then three columns:
+     the hero over In progress, On hold over To do, and the open ticket. A list scrolls inside its card with no scrollbar and comes to rest on whole rows; 88px rows, titles on two lines. */
+  @media (min-width: 64rem) {
+    body.tickets { height: 100vh; padding-bottom: 0; overflow: hidden; }
+    body.tickets main { max-width: none; margin: 0; padding: 1.5rem; }
+    .tk-desk { display: flex; flex-direction: column; gap: 1rem; height: calc(100vh - 3rem); }
+    .tk-dhead { display: flex; flex: none; align-items: flex-end; gap: 1rem; }
+    .tk-dhead .tx { flex: 1; min-width: 0; }
+    .tk-dhead .crumb { margin: 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: 1.25rem; } .tk-dhead .crumb span { margin: 0 0.25rem; }
+    .tk-dhead h1 { margin: 0; color: var(--tk-ink); font-size: 2rem; line-height: 2.5rem; font-weight: 500; letter-spacing: -0.012em; outline: none; }
+    .tk-dhead .tx > p:last-child { margin: 0.25rem 0 0; color: var(--tk-text-secondary); font-size: 0.9375rem; line-height: 1.5rem; }
+    .tk-dhead .acts { display: flex; align-items: center; gap: 0.5rem; padding-bottom: 0.25rem; }
+    .tk-dhead .acts .ui-seg { min-width: 17.5rem; margin: 0; } .tk-dhead .tk-fpill { margin: 0; }
+    .tk-grid { display: grid; flex: 1; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; min-height: 0; }
+    .tk-col { display: flex; flex-direction: column; gap: 1rem; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: none; }
+    .tk-col > * { flex: none; margin: 0; } .tk-col > .grow { flex: 1 1 0; min-height: 14.5rem; } .tk-col > .half { flex: 0 1 auto; min-height: 0; max-height: calc(50% - 0.5rem); }
+    .tk-desk .tk-hero { margin: 0; padding: 1.25rem 1.5rem 1.5rem; }
+    .tk-card { display: flex; flex-direction: column; min-height: 0; padding: 1.25rem 1.5rem; }
+    .tk-ch { display: flex; flex: none; align-items: center; gap: 0.5rem; height: 2rem; margin: 0; color: var(--tk-ink); font-size: var(--tk-fs-head); line-height: 1.5rem; font-weight: 500; letter-spacing: -0.014em; white-space: nowrap; }
+    .tk-ch small { color: var(--tk-text-tertiary); font-size: inherit; font-weight: 500; font-variant-numeric: tabular-nums; }
+    .tk-rows { flex: 1 1 auto; min-height: 0; margin: 0.25rem 0 0; padding: 0; overflow: auto; overflow-x: hidden; scrollbar-width: none; scroll-snap-type: y mandatory; overscroll-behavior: contain; }
+    .tk-rows > li { scroll-snap-align: start; }
+    .tk-rows.fades:not(.at-end) { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fz)), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fz)), transparent); }
+    :is(.tk-col, .tk-rows, .tk-pane)::-webkit-scrollbar { display: none; }
+    .tk-desk .ui-row { z-index: 0; height: 5.5rem; }
+    .tk-desk .ui-row .rm { gap: 0.375rem; }
+    .tk-desk .ui-row .l1 { align-items: flex-start; height: auto; }
+    .tk-desk .ui-row .l1 .t { display: -webkit-box; font-size: 0.9375rem; line-height: 1.25rem; white-space: normal; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .tk-desk .ui-row:hover:not([aria-current]) { opacity: 0.85; }
+    .tk-row[aria-current]::after { content: ""; position: absolute; z-index: -1; inset: 0.25rem -0.5rem; border-radius: 0.875rem; background: var(--tk-inset); }
+    .tk-pane { min-height: 0; padding: 1.25rem 1.5rem 1.5rem; overflow: auto; overflow-x: hidden; scrollbar-width: none; overscroll-behavior: contain; }
+    .tk-pane.fades:not(.at-end) { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 4rem), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 4rem), transparent); }
+    .tk-pane .tk-dt { font-size: 1.5rem; line-height: 2rem; }
+    .tk-desk .tk-in .ui-row { height: auto; min-height: 4.25rem; padding: 0.75rem 0; }
+    .tk-desk .tk-empty { width: 25rem; margin: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) { .tk-over.up .tk-sheet, .tk-over.up .tk-scrim { animation: none; } }
 </style>
 </head>
 <body>
@@ -2148,28 +2244,11 @@
       ...(state.messages ?? []).filter((m) => m.kind === 'comment' && m.key === d.key).map((m) => ({ at: m.at, text: 'Your comment', note: m.text }))]
       .filter((e) => e && !Number.isNaN(Date.parse(e.at))).sort(bySecond);
   };
-  /** A thread drawn as a list, newest last; a card whose only step is its posting shows none (its time is already on it). */
-  const threadView = (steps, min = 2) => (steps.length < min ? '' : el('div', { class: 'thread' }, el('p', { class: 'tk-label' }, 'Activity'), el('ol', { class: 'th-list' }, ...steps.map((e) => el('li', {},
-    el('span', { class: 'th-dot', 'aria-hidden': 'true' }), el('span', { class: 'th-b' }, e.card ? el('a', { class: 'th-card', href: e.card[1], dir: 'auto' }, e.card[0]) : '',
+  /** A card's thread drawn as a list, newest last; a card whose only step is its posting shows none (its time is already on it). */
+  const thread = (d, steps = threadOf(d)) => (steps.length < 2 ? '' : el('div', { class: 'thread' }, el('p', { class: 'tk-label' }, 'Activity'), el('ol', { class: 'th-list' }, ...steps.map((e) => el('li', {},
+    el('span', { class: 'th-dot', 'aria-hidden': 'true' }), el('span', { class: 'th-b' },
       el('span', { class: 'th-t', dir: 'auto' }, e.text, ...(e.link ? [' · ', el('a', { href: e.link[1], ...(/^https?:/.test(e.link[1]) && { target: '_blank', rel: 'noopener' }), dir: 'auto' }, e.link[0])] : [])),
       e.note ? el('span', { class: 'th-n', dir: 'auto' }, `“${e.note}”`) : '', el('time', { datetime: e.at }, stamp(e.at))))))));
-  const thread = (d) => threadView(threadOf(d));
-  /** A ticket's page: the ticket it sits under, its progress, then every card that names it, newest first, each opening where it lives, and the tickets under it. */
-  function ticketPage(t) {
-    if (!t) return [el('p', { class: 'empty' }, 'This ticket is not on the board.')];
-    const gone = new Set(state.dismissed ?? []), cards = state.decisions.filter((d) => d.ticket === t.id && !gone.has(d.key)).reverse().sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
-    const under = (state.tickets ?? []).filter((x) => x.parent === t.id);
-    const card = (d) => { const a = area(d), link = el('a', { class: 'compact', href: hrefOf(d) }, thumb(d.type === 'plan' ? 'plan' : a === 'notes' ? 'reports' : a, pic(d)),
-      el('span', { class: 't' }, el('strong', { dir: 'auto' }, title(d)), el('span', { class: 'meta' }, [tkKind(d), tkState(d), d.filed ? stamp(d.filed) : ''].filter(Boolean).join(' · ')))); link.onclick = () => (jump = d.key); return el('li', {}, link); };
-    const sub = (x) => el('li', {}, el('a', { class: 'compact tk-sub', href: `#ticket/${x.id}` }, el('span', { class: 't' }, el('strong', { dir: 'auto' }, x.title), el('span', { class: 'tk-m' }, el('span', {}, x.id), tkBar(x), el('span', { class: 'tk-n' }, `${x.progress}%`)))));
-    return [el('div', { class: 'tk-done' }, tkBar(t), el('span', {}, el('b', {}, `${t.progress}%`), ' done')),
-      el('div', { class: 'sec-head tk-h' }, el('h2', {}, 'Linked'), el('span', { class: 'meta' }, plural(cards.length, 'card'))),
-      cards.length ? el('ul', { class: 'card rows' }, ...cards.map(card)) : el('p', { class: 'empty' }, 'No card on the board names this ticket yet.'),
-      // Its cards' steps together, after their postings, which Linked already shows.
-      threadView([...cards].reverse().flatMap((d) => threadOf(d).filter((e) => !e.posted).map((e) => ({ ...e, card: [title(d), hrefOf(d)] }))).sort(bySecond), 1),
-      ...(under.length ? [el('div', { class: 'sec-head tk-h' }, el('h2', {}, 'Tickets under it'), el('span', { class: 'meta' }, String(under.length))), el('ul', { class: 'card rows' }, ...under.map(sub))] : [])];
-  }
-
   /** A result's mark: the pass tick only for passed proof, a cross for failed, an alert for not finished or unchecked. */
   const mark = (kind) => { const s = el('span', { 'aria-hidden': 'true' }); s.innerHTML = kind === 'ok'
     ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>'
@@ -2506,9 +2585,9 @@
   }
 
   const AREAS = { waiting: 'Waiting on you', designs: 'Designs', evidence: 'Evidence', reports: 'Reports and explainers', answered: 'Answered' };
-  // The sidebar and the tab bar hold four places: Today, Decide (what waits on you, a design Main promoted too), Evidence and Reports.
+  // The sidebar and the tab bar hold five places: Today, Decide (what waits on you, a design Main promoted too), Evidence, Reports and Tickets.
   // Designs and Answered are not tabs: both are links on Today, and a promoted design also opens from Decide.
-  const TABS = [['', 'Today'], ['waiting', 'Decide'], ['evidence', 'Evidence'], ['reports', 'Reports']];
+  const TABS = [['', 'Today'], ['waiting', 'Decide'], ['evidence', 'Evidence'], ['reports', 'Reports'], ['tickets', 'Tickets']];
   const EMPTY = { waiting: 'Nothing is waiting on you.', designs: 'No designs yet.', evidence: 'No evidence updates.', reports: 'No reports or explainers.', answered: 'Nothing answered yet.' };
   const ICONS = { designs: 'M3 3h18v18H3zM3 9h18M9 21V9',
     waiting: 'M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z',
@@ -2559,7 +2638,7 @@
   function paintTabs(active, count, badged) {
     TABS.forEach(([a, name], i) => {
       const t = tabLinks[i];
-      t.setAttribute('aria-label', a ? `${name}, ${count(a)}${a === 'reports' && !state.readonly ? ' new' : ''}` : name);
+      t.setAttribute('aria-label', count(a) !== undefined ? `${name}, ${count(a)}${a === 'reports' && !state.readonly ? ' new' : ''}` : name);
       if (a !== active) return t.removeAttribute('aria-current');
       t.setAttribute('aria-current', 'page');
       // The first drawing puts the pill in place; after that it slides.
@@ -2764,6 +2843,169 @@
   // Search, the dock's round button or the sidebar's, opens over the screen it is tapped on.
   addEventListener('click', (e) => { if (e.target.closest?.('a[href="#find"]')) e.preventDefault(), openSearch(); });
 
+  /* Tickets, as the approved prototype draws them: Your asks or System, the done dot grid, then In progress, On hold and To do; a ticket opens over the list on a phone
+     (its project and state, its title in full, its priority, progress and what it sits under, the tickets under it, its cards and their Activity) and in a third column on a desk.
+     An epic is a ticket with tickets under it, and those may have sub-tasks: the lists hold the tickets that sit under none, each as far along as what is under it (the server rolls it up). */
+  const TK_WORDS = { done: 'Done', hold: 'On hold', moving: 'In progress', todo: 'To do' };
+  // The property rows' marks, as the prototype draws them: a flag, a half-filled circle, two stacked sheets and a clock; fixed strings from this page.
+  const TK_MARKS = { flag: '<path d="M5 21V4h11l-2 4 2 4H5"/>', half: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/>',
+    layers: '<rect x="3" y="3" width="12" height="12" rx="2"/><path d="M9 21h10a2 2 0 0 0 2-2V9"/>', clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>' };
+  const tkMark = (a) => { const s = el('span', { class: 'tk-k', 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24">${TK_MARKS[a]}</svg>`; return s; };
+  let tkWhose = 'asks', tkProj = '', tkShown = '';
+  const tkMore = new Set();
+  const tkAll = () => state.tickets ?? [];
+  const tkById = (id) => tkAll().find((t) => t.id === id);
+  const tkStateOf = (t) => (t.progress >= 100 ? 'done' : t.hold ? 'hold' : t.progress > 0 ? 'moving' : 'todo');
+  const tkUnder = (t) => tkAll().filter((x) => x.parent === t.id);
+  /** The tickets a ticket sits under, nearest first; a parent not on the board, or a loop of parents, ends the line. */
+  const tkAbove = (t) => { const up = []; for (let x = tkById(t.parent); x && x !== t && !up.includes(x); x = tkById(x.parent)) up.push(x); return up; };
+  const tkRoot = (t) => tkAbove(t).at(-1) ?? t;
+  // A ticket under another takes the project and the asking of the ticket at the top of its line, unless it names its own project.
+  const tkProject = (t) => t.project ?? tkRoot(t).project;
+  const tkWhen = (at) => (isToday(at) ? hhmm(at) : day(at));
+  /** Under an epic its tickets; under a ticket its sub-tasks. */
+  const tkKids = (t) => (tkAbove(t).length ? 'sub-task' : 'ticket');
+  /** A ticket's 40px tile: its project's picture or initials, else the list drawing. */
+  const tkTile = (t) => (tkProject(t) ? el('span', { class: 'ui-icon', 'aria-hidden': 'true' }, projectPic(tkProject(t))) : uiIcon({ draw: 'pick' }));
+  /** A ticket's row: its tile, its title and priority, then a bar with its percent once it has progress (a full bar when done), or else where it stands and when it last moved,
+   * with how many of what sits under it are done. On a desk the open ticket is marked. */
+  function tkRow(t) {
+    const kids = tkUnder(t), done = kids.filter((x) => tkStateOf(x) === 'done').length, s = tkStateOf(t);
+    const link = el('a', { class: 'ui-row tk-row', href: `#ticket/${t.id}`, ...(t.id === tkShown && { 'aria-current': 'true' }), 'aria-label': `${t.title}, ${TK_WORDS[s].toLowerCase()}${t.progress ? `, ${t.progress}% done` : ''}` },
+      ...uiRow({ tile: tkTile(t), title: t.title, priority: t.priority, progress: progressOf(t.progress),
+        meta: [TK_WORDS[s], kids.length ? `${done} of ${plural(kids.length, tkKids(kids[0]))} done` : tkWhen(t.at)].join(' · ') }));
+    return el('li', {}, link);
+  }
+  /** The tickets the lists hold (those under no ticket on the board), of the kind and project picked. The kinds show only while the board has both. */
+  function tkLists() {
+    const roots = tkAll().filter((t) => !tkById(t.parent)), asked = roots.filter((t) => t.asked), both = asked.length > 0 && asked.length < roots.length;
+    const kind = both ? tkWhose : '', ofKind = roots.filter((t) => !kind || !!t.asked === (kind === 'asks')), shown = ofKind.filter((t) => !tkProj || tkProject(t) === tkProj);
+    const byPrio = (x, y) => (x.priority ?? 'P9').localeCompare(y.priority ?? 'P9') || (Date.parse(y.at) || 0) - (Date.parse(x.at) || 0);
+    const of = (s) => shown.filter((t) => tkStateOf(t) === s).sort(byPrio);
+    return { roots, both, kind, asked: asked.length, ofKind, shown, done: of('done'), moving: of('moving'), hold: of('hold'), todo: of('todo') };
+  }
+  const tkHeroLabel = (kind) => (kind === 'asks' ? 'Your asks done' : kind === 'system' ? 'System work done' : 'Tickets done');
+  /** The done dot grid: one square per ticket, done in ink, moving in the middle tone, the rest light; as many columns (24 to 30) as leave the fewest empty squares. */
+  function tkDots(L) {
+    const n = L.shown.length;
+    if (!n) return '';
+    let cols = 27, best = Infinity;
+    for (let c = 24; c <= 30; c++) { const waste = Math.ceil(n / c) * c - n; if (waste < best || (waste === best && c === 27)) [best, cols] = [waste, c]; }
+    return el('div', { class: 'tk-dots', role: 'img', style: `--cols:${cols};--rows:${Math.ceil(n / cols)}`, 'aria-label': `${L.done.length} done, ${L.moving.length} in progress, ${n - L.done.length - L.moving.length} on hold or to do` },
+      ...[...L.done, ...L.moving, ...L.hold, ...L.todo].map((t) => el('i', { class: { done: 'd', moving: 'm' }[tkStateOf(t)] ?? '' })));
+  }
+  function tkHero(L) {
+    const week = L.done.filter((t) => Date.now() - Date.parse(t.at) < 7 * 864e5).length;
+    return el('section', { class: 'ui-card ui-hero tk-hero' }, el('div', { class: 'hl' }, el('span', { class: 'lab' }, tkHeroLabel(L.kind)), week ? el('span', { class: 'chip' }, el('i', { class: 'up', 'aria-hidden': 'true' }), `${week} this week`) : ''),
+      el('div', { class: 'hv' }, el('span', { class: 'big' }, String(L.done.length), el('small', {}, ` of ${L.shown.length}`)), L.moving.length ? el('span', { class: 'vs' }, el('i', { 'aria-hidden': 'true' }), `${L.moving.length} moving`) : ''), tkDots(L));
+  }
+  /** Your asks or System, each with how many it holds. */
+  function tkSeg(L) {
+    const b = (v, name, n) => { const x = el('button', { 'aria-pressed': String(L.kind === v) }, name, el('small', {}, String(n))); x.onclick = () => { tkWhose = v; tkProj = ''; buzz('tick'); render(); }; return x; };
+    return L.both ? el('div', { class: 'ui-seg tk-seg', role: 'group', 'aria-label': 'Whose tickets' }, b('asks', 'Your asks', L.asked), b('system', 'System', L.roots.length - L.asked)) : '';
+  }
+  /** The project filter: a round button in the header (marked while one is picked) that opens a sheet of the projects with tickets, and Every project. */
+  const tkFilterSheet = sheetOf('tk-filter');
+  function tkFilter(L) {
+    const names = [...new Set(L.ofKind.map(tkProject).filter(Boolean))].sort((x, y) => x.localeCompare(y));
+    if (!names.length) return '';
+    const b = el('button', { class: `ui-rb tk-rb${tkProj ? ' on' : ''}`, 'aria-label': tkProj ? `Filter by project: ${tkProj}` : 'Filter by project', 'aria-haspopup': 'dialog' });
+    b.innerHTML = '<svg class="glyph" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 6h13M6 10h8M8.5 14h3"/></svg>';
+    b.onclick = () => {
+      const pick = (name, n, tile) => { const x = el('button', { class: 'ui-pr tk-pick', ...(tkProj === name && { 'aria-current': 'true' }) }, el('span', { class: 'k' }, tile, name || 'Every project'), el('span', { class: 'v' }, el('span', { class: 'n' }, String(n)), tkProj === name ? glyph('check') : ''));
+        x.onclick = () => { tkProj = name; tkFilterSheet.close(); render(); }; return x; };
+      tkFilterSheet.replaceChildren(el('div', {}, sheetHead('tk-filter', 'Filter by project'), el('div', { class: 'ui-props' }, pick('', L.ofKind.length, ''),
+        ...names.map((p) => pick(p, L.ofKind.filter((t) => tkProject(t) === p).length, el('span', { class: 'tk-pt', 'aria-hidden': 'true' }, projectPic(p)))))));
+      tkFilterSheet.showModal();
+      tkFilterSheet.querySelector('h2').focus();
+    };
+    return b;
+  }
+  /** One list of tickets under its head: on a phone the first three with See all, on a desk a card whose rows scroll inside it. */
+  function tkGroup(key, name, list, desk, cls = '') {
+    if (desk) return el('section', { class: `ui-card tk-card ${cls}`, 'aria-label': name }, el('h2', { class: 'tk-ch' }, name, el('small', {}, String(list.length))),
+      list.length ? el('ul', { class: 'ui-list tk-rows' }, ...list.map(tkRow)) : el('p', { class: 'tk-none' }, 'None.'));
+    if (!list.length) return '';
+    const all = tkMore.has(key), see = el('button', { class: 'see' }, all ? 'Show fewer' : 'See all');
+    see.onclick = () => { all ? tkMore.delete(key) : tkMore.add(key); render(); };
+    return el('section', { 'aria-label': name }, el('h2', { class: 'ui-sec' }, name, el('small', {}, String(list.length)), list.length > 3 ? see : ''), el('ul', { class: 'ui-card ui-list' }, ...(all ? list : list.slice(0, 3)).map(tkRow)));
+  }
+  /** The Tickets screen. On a phone: the title row, Your asks or System, the hero, then In progress, On hold, To do and Done, and two tiles, with the open ticket as a sheet over them.
+   * On a desk: one filled screen, the head across, then the hero over In progress, On hold over To do, and the open ticket (the first one moving when none is picked). */
+  function tickets(by, id) {
+    const L = tkLists(), desk = !phone(), picked = id && tkById(id);
+    const open = picked || (desk ? L.moving[0] ?? L.hold[0] ?? L.todo[0] ?? L.done[0] : undefined);
+    tkShown = open?.id ?? '';
+    const empty = !tkAll().length;
+    const say = `${L.kind === 'asks' ? 'Your asks: ' : L.kind === 'system' ? 'System work: ' : ''}${L.done.length} of ${L.shown.length} done · ${L.moving.length} moving · ${L.hold.length} on hold · ${L.todo.length} to do`;
+    const pick = tkProj ? el('button', { class: 'tk-fpill' }, el('span', { class: 'tk-pt', 'aria-hidden': 'true' }, projectPic(tkProj)), tkProj, glyph('x')) : '';
+    if (pick) pick.onclick = () => { tkProj = ''; render(); }, pick.setAttribute('aria-label', `Show every project, not only ${tkProj}`);
+    const none = el('section', { class: 'ui-card tk-empty' }, el('h2', {}, 'No tickets yet'), el('p', {}, 'Agents add tickets as they plan work. Each one shows here with how far along it is.'));
+    if (desk) {
+      const head = el('header', { class: 'tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets'), el('p', {}, empty ? 'Nothing tracked yet' : say)),
+        el('div', { class: 'acts' }, pick, tkSeg(L), tkFilter(L), themeButton()));
+      if (empty) return [el('div', { class: 'tk-desk' }, head, none)];
+      return [el('div', { class: 'tk-desk' }, head, el('div', { class: 'tk-grid' }, el('div', { class: 'tk-col' }, tkHero(L), tkGroup('mv', 'In progress', L.moving, true, 'grow')),
+        el('div', { class: 'tk-col' }, tkGroup('hold', 'On hold', L.hold, true, 'half'), tkGroup('todo', 'To do', L.todo, true, 'grow')),
+        open ? el('section', { class: 'ui-card tk-pane', 'aria-label': open.title }, ...ticketPage(open)) : el('section', { class: 'ui-card tk-pane' }, el('p', { class: 'tk-none' }, 'No ticket here.'))))];
+    }
+    const stat = (href, mark, lab, n) => el(href ? 'a' : 'div', { class: 'ui-card ui-stat', ...(href && { href }), 'aria-label': `${lab}: ${n}` }, fill(mark), el('span', { class: 'lab' }, lab), el('b', {}, String(n)));
+    const p0 = L.shown.filter((t) => t.priority === 'P0' && tkStateOf(t) !== 'done').length;
+    return [el('header', { class: 'ui-top tk-top' }, el('h1', { tabindex: '-1' }, 'Tickets'), tkFilter(L), themeButton()), tkSeg(L), pick,
+      ...(empty ? [none] : [tkHero(L), tkGroup('mv', 'In progress', L.moving), tkGroup('hold', 'On hold', L.hold), tkGroup('todo', 'To do', L.todo), tkGroup('done', 'Done', L.done),
+        el('div', { class: 'ui-tiles tk-tiles' }, stat('#waiting', 'M5 3h10a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-4.5L6 18.2V15H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3zm1.5 4.2v1.6h7V7.2zm0 3v1.6h5v-1.6z', 'Wait on you', by.waiting.length),
+          stat('', 'M4 2.5h1.6v1h9.9l-2.1 3.75 2.1 3.75H5.6v6.5H4z', 'Open at P0', p0))]),
+      picked ? tkSheet(picked) : (tkUp = '')];
+  }
+  /** On a phone the ticket rises over the list as a sheet: a grab handle, its project and state with a close, then the ticket. Close (or Escape, or a tap above it) goes back. */
+  let tkUp = '';
+  function tkSheet(t) {
+    const rise = tkUp !== t.id, x = el('a', { class: 'x', href: ticketBack || '#tickets', 'aria-label': 'Close' }, glyph('x'));
+    tkUp = t.id;
+    return el('div', { class: `tk-over${rise ? ' up' : ''}` }, el('a', { class: 'tk-scrim', href: ticketBack || '#tickets', tabindex: '-1', 'aria-label': 'Close' }),
+      el('section', { class: 'tk-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': t.title }, el('div', { class: 'grab', 'aria-hidden': 'true' }), ...ticketPage(t, x)));
+  }
+  addEventListener('keydown', (e) => e.key === 'Escape' && !e.defaultPrevented && document.querySelector('.tk-sheet') && !document.querySelector('dialog[open]') && (location.hash = ticketBack || '#tickets'));
+  /** A ticket: its project and where it stands, its title in full, its priority, progress, what it sits under and when it last moved; then the tickets under it, the cards that name it
+   * and their Activity, newest first. */
+  function ticketPage(t, close = '') {
+    const gone = new Set(state.dismissed ?? []), cards = state.decisions.filter((d) => d.ticket === t.id && !gone.has(d.key)).reverse().sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
+    const kids = tkUnder(t), done = kids.filter((x) => tkStateOf(x) === 'done').length, s = tkStateOf(t), up = tkAbove(t)[0], proj = tkProject(t);
+    const prop = (draw, k, ...v) => el('div', { class: 'ui-pr' }, el('span', { class: 'k' }, tkMark(draw), k), el('span', { class: 'v' }, ...v));
+    const linked = (d) => { const a = el('a', { class: 'ui-row', href: hrefOf(d) }, ...uiRow({ tile: cardTile(d), title: title(d), priority: d.priority, meta: [tkKind(d), tkState(d), d.filed && tkWhen(d.filed)].filter(Boolean).join(' · ') }));
+      a.onclick = () => (jump = d.key); return el('li', {}, a); };
+    // Its cards' steps after their postings (Linked shows those), newest first, each naming its card.
+    const steps = cards.flatMap((d) => threadOf(d).filter((e) => !e.posted).map((e) => ({ ...e, card: d }))).sort(bySecond).reverse();
+    return [el('div', { class: 'tk-shd' }, el('p', {}, proj ? el('span', { class: 'tk-pt', 'aria-hidden': 'true' }, projectPic(proj)) : '', el('span', {}, [proj, TK_WORDS[s]].filter(Boolean).join(' · '))), close),
+      el('h2', { class: 'tk-dt', tabindex: '-1', dir: 'auto' }, t.title),
+      el('div', { class: 'ui-props' }, t.priority ? prop('flag', 'Priority', el('span', { class: `ui-pc ${t.priority.toLowerCase()}` }, t.priority)) : '',
+        prop('half', 'Progress', ...(t.progress > 0 && t.progress < 100 ? [el('span', { class: 'ui-bar' }, el('i', { style: `width: ${t.progress}%` })), el('span', { class: 'n' }, `${t.progress}%`)] : [el('span', {}, t.progress >= 100 ? 'All done' : 'Not started')])),
+        up ? prop('layers', 'Part of', el('a', { href: `#ticket/${up.id}`, dir: 'auto' }, up.title)) : '',
+        prop('clock', 'Last update', el('span', {}, stamp(t.at)))),
+      ...(kids.length ? [el('p', { class: 'ui-dl' }, `${tkAbove(t).length ? 'Sub-tasks' : 'Tickets in this epic'} · ${done} of ${kids.length} done`), el('ul', { class: 'ui-list tk-in' }, ...kids.map(tkRow))] : []),
+      el('p', { class: 'ui-dl' }, 'Linked'), cards.length ? el('ul', { class: 'ui-list tk-in' }, ...cards.map(linked)) : el('p', { class: 'tk-none' }, 'No card names this ticket yet.'),
+      ...(steps.length ? [el('p', { class: 'ui-dl' }, 'Activity'), el('ol', { class: 'ui-props tk-act' }, ...steps.map((e) => el('li', { class: 'ui-pr' },
+        el('span', { class: 'aw' }, el('b', { dir: 'auto' }, e.text), el('time', { datetime: e.at }, stamp(e.at))), e.note ? el('span', { class: 'th-n', dir: 'auto' }, `“${e.note}”`) : '',
+        el('a', { class: 'tk-on', href: hrefOf(e.card), dir: 'auto' }, title(e.card)))))] : [])];
+  }
+  /** On a desk every list ends on a whole row: with 40px or more left under its whole rows, the next row fades out there (and the list's end is padded the same, so scrolled
+   * to its end it shows whole rows); with less, the list ends on its last whole row. The open ticket fades at its foot while it holds more than it shows. */
+  function tkSettle() {
+    if (phone()) return;
+    for (const l of document.querySelectorAll('.tk-card .tk-rows')) {
+      l.classList.remove('fades', 'at-end'); l.style.height = l.style.flex = l.style.paddingBottom = '';
+      if (l.scrollHeight <= l.clientHeight + 1) continue;
+      const top = l.getBoundingClientRect().top + l.clientTop, h = l.clientHeight, ends = [...l.children].map((r) => r.getBoundingClientRect().bottom - top);
+      const last = ends.filter((b) => b <= h + 0.5).at(-1) ?? 0, room = h - last;
+      if (room < 40) { l.style.flex = 'none'; l.style.height = `${last}px`; continue; }
+      l.style.setProperty('--fz', `${room}px`); l.style.paddingBottom = `${room}px`; l.classList.add('fades');
+      l.onscroll = () => l.classList.toggle('at-end', l.scrollTop + l.clientHeight >= l.scrollHeight - 2);
+    }
+    const p = document.querySelector('.tk-pane');
+    if (p) { p.classList.toggle('fades', p.scrollHeight > p.clientHeight + 1); p.onscroll = () => p.classList.toggle('at-end', p.scrollTop + p.clientHeight >= p.scrollHeight - 2); }
+  }
+  addEventListener('resize', () => document.querySelector('.tk-desk') && tkSettle());
+
   /** Light or dark: the system's, unless one is picked here. A pick turns each dark-scheme media rule of the page's own sheets on or off (the board draws dark only there),
    * sets the colour scheme and the browser's bar colour, and is kept in this browser. */
   const sysDark = matchMedia('(prefers-color-scheme: dark)'), schemeRules = new Map();
@@ -2785,12 +3027,12 @@
     document.querySelectorAll('meta[name="theme-color"]').forEach((m) => { m.dataset.media ??= m.media; m.media = pick ? (m.dataset.media.includes(pick) ? 'all' : 'not all') : m.dataset.media; });
   }
   applyTheme();
-  /** The round light-or-dark button at the right of a screen's head (Today's and Decide's): a moon in light, a sun in dark. */
+  /** The round light-or-dark button at the right of a screen's head (Today's, Decide's and Tickets'): a moon in light, a sun in dark. */
   function themeButton() {
     const dark = (() => { try { return isDark(); } catch { return sysDark.matches; } })();
     const b = el('button', { class: 'ui-rb theme', 'aria-label': dark ? 'Switch to light' : 'Switch to dark' });
     b.innerHTML = `<svg class="glyph" viewBox="0 0 20 20" aria-hidden="true">${dark ? '<circle cx="10" cy="10" r="3.2"/><path d="M10 2.5v1.8M10 15.7v1.8M2.5 10h1.8M15.7 10h1.8M4.7 4.7l1.3 1.3M14 14l1.3 1.3M4.7 15.3 6 14M14 6l1.3-1.3"/>' : '<path d="M16 11.6A6.5 6.5 0 1 1 8.4 4a5.2 5.2 0 0 0 7.6 7.6z"/>'}</svg>`;
-    b.onclick = () => { try { localStorage.setItem('so-theme', dark ? 'light' : 'dark'); } catch {} applyTheme(); render(); document.querySelector('#board .ui-top .theme')?.focus({ preventScroll: true }); };
+    b.onclick = () => { try { localStorage.setItem('so-theme', dark ? 'light' : 'dark'); } catch {} applyTheme(); render(); document.querySelector('#board .theme')?.focus({ preventScroll: true }); };
     return b;
   }
   /** Today's head: its title and the light-or-dark button. */
@@ -4496,8 +4738,7 @@
     const hidden = state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'waiting');
     decideCtx = { all: decideOrder(by.waiting), hidden };
     by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
-    const [, at, key] = /^#(waiting|decide|designs|evidence|reports|answered|ticket)(?:\/([\w.-]+))?$/.exec(location.hash) ?? [];
-    const tk = at === 'ticket' ? (state.tickets ?? []).find((t) => t.id === key) : undefined, tkUp = tk?.parent && (state.tickets ?? []).find((t) => t.id === tk.parent);
+    const [, at, key] = /^#(waiting|decide|designs|evidence|reports|answered|tickets|ticket)(?:\/([\w.-]+))?$/.exec(location.hash) ?? [];
     // The asks Decide steps through, in the list's order, Later last.
     const decideQueue = decideCtx.all.filter((d) => d.type === 'signin' || (d.type !== 'plan' && d.kind !== 'design'));
     // Answered asks it opens again, newest first in its list; the arrows step through them oldest first, then through the open asks.
@@ -4524,8 +4765,9 @@
     const shownAsk = doneAt >= 0 ? walk[doneAt] : decideQueue[decideAt];
     for (const k of changing) if (k !== shownAsk?.key) changing.delete(k);
     // A design and a decision live under Decide; Answered is reached from Today.
-    const active = at === 'decide' || at === 'designs' ? 'waiting' : at === 'answered' ? '' : at ?? '';
-    const count = (a) => (a === 'reports' && !state.readonly ? by.reports.filter(unread).length : a ? by[a].length : undefined);
+    const active = at === 'decide' || at === 'designs' ? 'waiting' : at === 'answered' ? '' : at === 'ticket' ? 'tickets' : at ?? '';
+    // Tickets, as the prototype draws its place, carries no count.
+    const count = (a) => (a === 'reports' && !state.readonly ? by.reports.filter(unread).length : a && a !== 'tickets' ? by[a].length : undefined);
     // Decide's count is a red badge and new Reports' a blue one, in the sidebar and the tab bar alike; Evidence's is a plain number.
     const badge = (a) => (a === 'waiting' ? 'red' : a === 'reports' && !state.readonly ? 'blue' : '');
     const link = ([a, name]) => el('a', { href: `#${a}`, ...(a === active && { 'aria-current': 'page' }) }, icon(`tab-${a || 'today'}`), name,
@@ -4534,16 +4776,15 @@
       el('a', { class: 'sfind', href: '#find' }, document.getElementById('dock-find').firstChild.cloneNode(true), 'Search'), ...TABS.map(link), el('p', { class: 'go' }, kc('G'), 'then a letter jumps'), keysBtn);
     paintTabs(active, count, badge);
     const ro = state.readonly ? 'Read only' : FROZEN ? `Read-only copy, ${FROZEN.exported}` : '';
-    const pageTitle = head === 'decide' || head === 'waiting' ? 'Decide' : head === 'reports' ? 'Reports' : head === 'ticket' ? tk?.title ?? 'Ticket' : AREAS[head];
+    const pageTitle = head === 'decide' || head === 'waiting' ? 'Decide' : head === 'reports' ? 'Reports' : AREAS[head];
     document.body.classList.toggle('today', !at);
+    document.body.classList.toggle('tickets', at === 'tickets' || at === 'ticket');
     const bulk = { waiting: by.waiting, designs: by.designs, evidence: by.evidence, reports: [...by.reports, ...by.notes], answered: by.answered }[at] ?? [];
     const answeredToday = by.answered.filter((d) => isToday(state.answers[d.key].at)).length;
     // Decide's head, as ui.css draws it: the title and the light-or-dark button at its right edge; More sits under the list.
     const top = head === 'waiting' && !state.readonly ? el('header', { class: 'ui-top' }, el('h1', { tabindex: '-1' }, pageTitle), ro ? el('p', { class: 'meta' }, ro) : '', themeButton(), selecting || FROZEN ? bulkBar(bulk) : '')
       : el('header', { class: head === 'reports' && !state.readonly ? 'top ui-top rp-top' : head ? 'top' : 'ui-top today-top' }, head && !TABS.some(([a]) => a === head)
-      ? el('a', { class: head === 'ticket' ? 'back tk-back' : 'back', href: head === 'ticket' ? ticketBack || '#' : '#' }, head === 'ticket' && ticketBack ? '‹ Back' : '‹ Today') : '',
-    // A ticket's page names the ticket it sits under, which opens that one.
-    head === 'ticket' && tk ? el('p', { class: 'kicker tk-kicker' }, ...(tkUp ? [el('a', { href: `#ticket/${tkUp.id}`, dir: 'auto' }, tkUp.title), ' › '] : ['Ticket · ']), tk.id) : '',
+      ? el('a', { class: 'back', href: '#' }, '‹ Today') : '',
     ...(head ? [el('h1', { tabindex: '-1' }, pageTitle)] : todayHead()),
     ro ? el('p', { class: 'meta' }, ro) : '',
     head === 'answered' && by.answered.length ? el('p', { class: 'lede' }, (() => { const n = by.answered.filter((d) => isToday(state.answers[d.key].at)).length; return `${n} ${n === 1 ? 'answer' : 'answers'} today. Each one has gone back to its agent.`; })())
@@ -4561,9 +4802,9 @@
       notes(by.notes), dismissed(state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && ['reports', 'notes'].includes(area(d))), 'Archived'),
       !selecting && !state.readonly && !FROZEN && bulk.length ? reportsMore(by.reports, bulk) : '');
     const update = at === 'evidence' && ((key && state.decisions.find((d) => d.key === key && !gone.has(d.key) && d.type === 'evidence')) || by.evidence.find((d) => d.type === 'evidence'));
-    const content = [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived'), update)
+    const content = at === 'tickets' || at === 'ticket' ? tickets(by, at === 'ticket' ? key : '') : [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived'), update)
       : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0) : decideDesk(top, by.waiting, hidden, decideQueue, key, decideDone, answeredToday)] : [top]), ...(deskSplit ? [] : (at === 'waiting' || at === 'decide') && !state.readonly ? [at === 'decide' && !shownAsk ? el('p', { class: 'empty' }, 'Nothing to decide for that question.') : '', decideList(by.waiting, hidden, decideDone, answeredToday), at === 'decide' && shownAsk ? askSheet(shownAsk) : '']
-      : at === 'designs' ? designGroups(by.designs, top, key) : at === 'ticket' ? ticketPage(tk) : at === 'evidence' ? [...evidenceList(by.evidence), dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived')] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
+      : at === 'designs' ? designGroups(by.designs, top, key) : at === 'evidence' ? [...evidenceList(by.evidence), dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived')] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : today(by))];
     if (!(at === 'decide' && shownAsk && !deskSplit)) sheetUp = '';
     // The report shown on a desk stays in place under a new list and bar while it is the same report, so its frame is not loaded again.
@@ -4583,6 +4824,7 @@
     fold();
     applyPicks();
     if (FROZEN) freeze();
+    if (document.querySelector('.tk-desk')) requestAnimationFrame(tkSettle), document.fonts.ready.then(tkSettle);
   }
   function freeze() {
     // Answers stay as they are, but nothing in the copy can be sent.
@@ -4621,11 +4863,13 @@
     if (!reader.hidden) { scrollTo(0, 0); return reader.querySelector('h1').focus({ preventScroll: true }); }
     const item = (jump || back) && document.getElementById(`item-${jump || back}`);
     jump = null;
-    item ? item.scrollIntoView() : overList ? '' : scrollTo(0, 0);
+    // Opening or closing a ticket over Tickets' list leaves the list where it was, as an ask over Decide's does.
+    const tix = /^#tickets?(\/|$)/;
+    item ? item.scrollIntoView() : overList || (tix.test(from) && tix.test(location.hash)) ? '' : scrollTo(0, 0);
     // A Decide row is itself the link back to its page.
     // On a desk the focus stays on the selected row, so J, K and Enter carry on from it.
     // An ask's sheet takes the focus on its question; closed, the focus goes back to the row it was opened from.
-    ((back && (item?.matches('a.dl-face') ? item : item?.querySelector('h3 a, .open-link, a.compact'))) || document.querySelector('.ask-sheet #ask-title')
+    ((back && (item?.matches('a.dl-face') ? item : item?.querySelector('h3 a, .open-link, a.compact'))) || document.querySelector('.ask-sheet #ask-title') || document.querySelector('.tk-sheet .tk-dt')
       || (overList && ask.test(from) && document.getElementById(`item-${from.slice(8)}`)) || document.querySelector('.split-list [data-row][aria-current]') || document.querySelector('#board h1')).focus({ preventScroll: true });
   });
   // An interactive page may post its own height, `{ height: <px> }`, and its frame then fits it with no blank below.

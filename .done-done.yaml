@@ -90,7 +90,10 @@ journeys:
   # in light and dark, each picture's sharpness against its frame and the bytes loaded. IMAGES_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
   images:
     command: 'npm run build > /dev/null && for t in light dark; do node .agents/skills/done-done-verify-sign-off/image-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t || exit 1; done'
-  # Tickets: a card of each kind linked and unlinked, a card naming an unknown ticket, and the ticket's page, at 390 and 1280 in light and dark, with a tap through the row and Back.
+  # The Tickets tab and a ticket in the new look, one width per run (TICKETS_WIDTH=390|1280|1440), light and dark, measured in the browser; TICKETS_PROTO and TICKETS_PROTO_TREE (the prototypes' index.html) save each state beside the prototype's.
+  tickets:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/tickets-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${TICKETS_THEME:-light,dark}" "${TICKETS_WIDTH:-390}"'
+  # Tickets: a card of each kind linked and unlinked, a card naming an unknown ticket, and the ticket, at 390 and 1280 in light and dark, with a tap through the row and Close or Back.
   ticket:
     command: 'npm run build > /dev/null && for w in 390 1280; do for t in light dark; do TICKET_WIDTH=$w node .agents/skills/done-done-verify-sign-off/ticket-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t || exit 1; done; done'
   board-actions:
