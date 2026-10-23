@@ -113,6 +113,11 @@ try {
     document.querySelector('.top .back').click(); await pause(600);
     return JSON.stringify({ at, title, back: location.hash });
   }`));
+  writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board seeded with one card of each kind and no tickets, then tickets T-9, T-29 (under T-9) and T-30, a card of each kind posted with --ticket T-29, and one ask naming T-404.',
+    steps: ['Open each linked card (an ask, an update, a design review, a guided report, a guided plan), the same kind with no ticket, and the ask naming T-404, on a phone and at 1280 px, in light and dark.',
+      'Answer an ask No with a note, change it to Yes with a note, let its agent take it, ask for a new round; give the update Pass with a note and a comment.',
+      'Open each card\'s Activity, tap the ask\'s Ticket row to open T-29, read its Linked list and Activity, tap Back, then open T-9.'],
+    result: 'Each linked card shows a Ticket row with the ticket title, T-29 and 60% that opens the ticket page; unlinked cards and the T-404 ask show none; the ticket page lists its six cards newest first under its parent with 60% done and the cards\' activity; each card lists its answers, notes, pickup and new round oldest first.' }, null, 2) + '\n');
   writeFileSync(join(out, `walk.${cell}.txt`), `Tap the Ticket row on #decide/settings-friday: the page is ${walk.at}, titled "${walk.title}".\nTap Back: the page is ${walk.back} again.\n`);
   assert.deepEqual(walk, { at: '#ticket/T-29', title: 'Ship the new settings page', back: '#decide/settings-friday' });
 } finally {
