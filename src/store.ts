@@ -790,6 +790,67 @@ export function markEngagementSeen(file: string, id: string, revision: number) {
   appendLine(deeperPath(file), { op: 'seen', version: 1, id, answerRevision: revision, at: now() });
 }
 
+/** The trail of what the person sent: each answer (a pick, a note, a design's change notes, a plan's send-back), each new round and each comment, and how far it got:
+ * delivered (handed over by a wait, a poll or the on_answer hook), read (taken by the agent itself) and replied (its words, a link to what it made, or the card posted again).
+ * The agent's marks are one line each in <board>.trail.jsonl: a mark names a key and covers every send on it up to its time. The person opening a reply marks it seen. */
+export type TrailMark = { op: 'delivered' | 'read' | 'reply' | 'seen'; key: string; id?: string; text?: string; link?: string; at: string };
+export type Trail = { id: string; key: string; kind: 'answer' | 'round' | 'comment' | 'ask' | 'part' | 'ticket'; part?: string; /** A ticket comment's words: the board keeps them nowhere else. */ said?: string; at: string; delivered?: string; read?: string; reply?: { at: string; text?: string; link?: string; acted?: true }; seen?: string };
+export const trailPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.trail.jsonl';
+export const appendMark = (decisionsPath: string, mark: Omit<TrailMark, 'at'>) => appendLine(trailPath(decisionsPath), { ...mark, at: now() });
+/** `delivery` is the owner dispatch's record per Go deeper ask (src/owner.ts deliveries): handed to the author's session, then acknowledged by it. */
+export function readTrail(decisionsPath: string, items: Decision[], delivery: Record<string, { state: string; at: string }> = {}): Trail[] {
+  const marks: TrailMark[] = readRaw(trailPath(decisionsPath)).split('\n').flatMap((line) => {
+    try { const m = line && JSON.parse(line); return m && ['delivered', 'read', 'reply', 'seen'].includes(m.op) && typeof m.key === 'string' && !Number.isNaN(Date.parse(m.at)) ? [m] : []; } catch { return []; }
+  });
+  const taken = seenAt(decisionsPath), filed = new Map(items.map((d) => [d.key, d.filed]));
+  const first = (...at: (string | undefined)[]) => at.filter((x): x is string => !!x).sort((x, y) => Date.parse(x) - Date.parse(y))[0];
+  const sends: Trail[] = [
+    ...answerLines(decisionsPath).filter((a) => a.answer !== '' && !a.merged_by).map((a): Trail => ({ id: `answer:${a.key}:${a.at}`, key: a.key, kind: 'answer', at: a.at, read: taken(a) === '' ? a.at : taken(a) })),
+    ...readRounds(decisionsPath).map((r): Trail => ({ id: `round:${r.key}:${r.at}`, key: r.key, kind: 'round', at: r.at })),
+    ...readMessages(decisionsPath).flatMap((m): Trail[] => (m.kind === 'comment' && m.key ? [{ id: m.id, key: m.key, kind: 'comment', at: m.at, delivered: m.delivered }] : [])),
+    // On a guided plan or report: each Go deeper (or other) ask on a part, read when a wait handed it over or its author's session acknowledged it, replied once answered;
+    // and each Agree, Disagree or Comment on a part, read when a wait handed it over, replied with the agent's words.
+    ...readDeeper(decisionsPath).map((x): Trail => {
+      const d = delivery[x.id], owned = d?.state === 'owner-read' ? d.at : undefined;
+      return { id: x.id, key: x.key, kind: 'ask', part: x.part, at: x.at, ...(d?.state === 'delivered' && { delivered: d.at }), read: first(owned, x.read),
+        ...(x.done && x.answered && { reply: { at: x.answered, text: x.text } }) };
+    }),
+    // A comment on a ticket, as the fleet dashboard keeps it: delivered unless its delivery failed, read once the lead picked it up, replied with the lead's last answer.
+    ...readTicketComments(decisionsPath).map((c): Trail => ({ id: c.id, key: c.ticket, kind: 'ticket', said: c.text, at: iso(c.at), ...(!c.error && { delivered: iso(c.at) }), ...(c.picked && { read: iso(c.picked) }),
+      ...(c.replies?.length && { reply: { at: iso(c.replies.at(-1)!.at ?? c.at), text: c.replies.at(-1)!.text } }) })),
+    ...readPartComments(decisionsPath).map((c): Trail => ({ id: c.id, key: c.key, kind: 'part', part: c.part, at: c.at, read: c.read, ...(c.reply !== undefined && c.replied && { reply: { at: c.replied, text: c.reply } }) })),
+  ];
+  return sends.map((s) => {
+    // A mark covers a send made at or before it (to the second: a post's time may carry milliseconds, a send's does not).
+    const mark = (...ops: string[]) => marks.find((m) => ops.includes(m.op) && m.key === s.key && (!m.id || m.id === s.id) && second(m.at) >= second(s.at));
+    const said = s.reply ? undefined : mark('reply'), again = filed.get(s.key), posted = again && second(again) > second(s.at) ? again : undefined;
+    const reply = s.reply ?? (said ? { at: said.at, ...(said.text && { text: said.text }), ...(said.link && { link: said.link }) } : posted ? { at: posted, acted: true as const } : undefined);
+    const read = first(mark('read')?.at, s.read, reply?.at), delivered = first(mark('delivered')?.at, s.delivered, read);
+    const seen = reply && marks.find((m) => m.op === 'seen' && m.key === s.key && second(m.at) >= second(reply.at))?.at;
+    return { ...s, ...(delivered && { delivered }), ...(read && { read }), ...(reply && { reply }), ...(seen && { seen }) };
+  });
+}
+
+/** A comment the person made on a ticket in the fleet dashboard, in the dashboard's own thread record: its id, when it was sent (seconds since 1970), the words,
+ * the delivery error if it failed, when the lead picked it up, and the lead's answers. The dashboard sends the record again as it moves (`ticket --id <id> --comment`):
+ * one line each in <board>.ticket-comments.jsonl, the latest line for an id wins. */
+export type TicketComment = { ticket: string; id: string; at: number; text: string; to?: string; error?: string | null; picked?: number | null; replies?: { at: number | null; text: string; by?: string }[] };
+export const ticketCommentsPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.ticket-comments.jsonl';
+const seconds = (v: unknown) => Number.isSafeInteger(v) && (v as number) > 0;
+export const ticketCommentFault = (c: any) => (!c || typeof c !== 'object' || Array.isArray(c) ? 'must be one JSON object, a comment as the dashboard keeps it'
+  : !isKey(c.id) ? 'id must be the comment id, 1-128 of A-Z a-z 0-9 . _ -' : !seconds(c.at) ? 'at must be when it was sent, whole seconds since 1970'
+  : !isText(c.text) || !c.text.trim() || [...c.text].length > 1000 ? 'text must be the comment, 1-1000 characters'
+  : c.error != null && !isText(c.error) ? 'error must be text or null' : c.picked != null && !seconds(c.picked) ? 'picked must be whole seconds since 1970 or null'
+  : c.replies !== undefined && (!Array.isArray(c.replies) || c.replies.some((r: any) => !r || (r.at != null && !seconds(r.at)) || !isText(r.text) || !r.text.trim() || [...r.text].length > 2000)) ? 'replies must be a list of {at, text, by}' : '');
+export const appendTicketComment = (decisionsPath: string, ticket: string, c: any) => appendLine(ticketCommentsPath(decisionsPath),
+  { ticket, id: c.id, at: c.at, text: c.text, ...(c.to && { to: c.to }), error: c.error ?? null, picked: c.picked ?? null, replies: (c.replies ?? []).map(({ at, text, by }: any) => ({ at: at ?? null, text, ...(by && { by }) })) });
+export function readTicketComments(decisionsPath: string): TicketComment[] {
+  const all = new Map<string, TicketComment>();
+  for (const line of readRaw(ticketCommentsPath(decisionsPath)).split('\n')) { try { const c = line && JSON.parse(line); if (c && isKey(c.ticket) && !ticketCommentFault(c)) all.set(c.id, c); } catch {} }
+  return [...all.values()];
+}
+const iso = (s: number) => new Date(s * 1000).toISOString().slice(0, 19) + 'Z';
+
 const now = () => new Date().toISOString().slice(0, 19) + 'Z';
 /** Appends one JSON line, starting a new line after a torn fragment. */
 function appendLine(file: string, entry: object) {

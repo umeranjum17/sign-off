@@ -2202,7 +2202,7 @@
   /** A card's thread, oldest first, from what the board keeps: when it was posted (and the change it links), the answer it replaced,
    *  the answer and its note, when its agent took it, each new round asked for and each comment. Nothing is made up: a step the board has no record of is left out. */
   const threadOf = (d) => {
-    const a = state.answers[d.key], by = d.by ?? 'Agent', seen = state.seen_at?.[d.key], change = changeHref(d);
+    const a = state.answers[d.key], by = d.by ?? 'Agent', change = changeHref(d);
     const said = (x) => (x.answer === 'text' ? 'in your own words' : x.label);
     // A design's answer on an earlier round with its notes, each named by its screen when the design has more than one: one note's screen goes in the step.
     const screens = (d.journeys ?? []).flatMap((j) => j.screens.map((s) => ({ j: j.id, s: s.id, title: s.title }))), was = d.earlier, wrote = was?.notes.filter((n) => n.note) ?? [];
@@ -2212,16 +2212,57 @@
         note: wrote.length === 1 ? wrote[0].note : wrote.map((n) => (on(n) ? `${on(n)}: ${n.note}` : n.note)).join(' · ') },
       a?.replaces?.at && { at: a.replaces.at, text: `Your answer: ${said(a.replaces)}`, note: a.replaces.note },
       a && !d.earlier_answer && { at: a.at, text: `${a.replaces ? 'Changed to' : 'Your answer'}: ${said(a)}`, note: a.note },
-      seen && { at: seen, text: `${by} picked it up` },
+      ...trailOf(d.key).flatMap((t) => [t.delivered && { at: t.delivered, text: `Delivered to ${by}` }, t.read && { at: t.read, text: `${by} read it` },
+        t.reply && !t.reply.acted && { at: t.reply.at, text: `${by} ${t.reply.text ? 'replied' : 'acted on it'}`, note: t.reply.text, link: t.reply.link && [linkName(t.reply.link), t.reply.link] }]),
       ...(state.rounds ?? []).filter((r) => r.key === d.key).map((r) => ({ at: r.at, text: 'You asked for a new round', note: r.note })),
       ...(state.messages ?? []).filter((m) => m.kind === 'comment' && m.key === d.key).map((m) => ({ at: m.at, text: 'Your comment', note: m.text }))]
-      .filter((e) => e && !Number.isNaN(Date.parse(e.at))).sort(bySecond);
+      .filter((e, i, all) => e && !Number.isNaN(Date.parse(e.at)) && all.findIndex((x) => x && x.text === e.text && bySecond(x, e) === 0) === i).sort(bySecond);
   };
   /** A card's thread drawn as a list, newest last; a card whose only step is its posting shows none (its time is already on it). */
   const thread = (d, steps = threadOf(d)) => (steps.length < 2 ? '' : el('div', { class: 'thread' }, el('p', { class: 'tk-label' }, 'Activity'), el('ol', { class: 'th-list' }, ...steps.map((e) => el('li', {},
     el('span', { class: 'th-dot', 'aria-hidden': 'true' }), el('span', { class: 'th-b' },
       el('span', { class: 'th-t', dir: 'auto' }, e.text, ...(e.link ? [' · ', el('a', { href: e.link[1], ...(/^https?:/.test(e.link[1]) && { target: '_blank', rel: 'noopener' }), dir: 'auto' }, e.link[0])] : [])),
       e.note ? el('span', { class: 'th-n', dir: 'auto' }, `“${e.note}”`) : '', el('time', { datetime: e.at }, stamp(e.at))))))));
+  /* ---- The feedback trail: each answer, note, new round and comment the person sent on a card, and how far it got with its agent (src/store.ts readTrail). ---- */
+  const TRAIL = ['Sent', 'Delivered', 'Read', 'Replied'];
+  const trailOf = (key, kind) => (state.trail ?? []).filter((t) => t.key === key && (kind ? t.kind === kind : t.kind !== 'ticket')).sort(bySecond);
+  /** How far a send got: 1 sent, 2 delivered, 3 read, 4 replied (or acted on, when the agent sent a link or posted the card again with no words). */
+  const stepOf = (t) => (t.reply ? 4 : t.read ? 3 : t.delivered ? 2 : 1);
+  const stepWord = (t, n) => (n === 3 && t.reply && !t.reply.text ? 'Acted' : TRAIL[n]);
+  const stepAt = (t, n) => [t.at, t.delivered, t.read, t.reply?.at][n];
+  /** A reply the person has not opened yet: it waits in Today, and its badge is ink. */
+  const unseen = (t) => !!t?.reply && !t.seen;
+  /** A link the agent sent names the pull request it is, or else says it opens the new version. */
+  const linkName = (url) => (/\/(?:pull|pulls|merge_requests)\/\d+/.test(url) ? changeName(url) : 'Open the new version');
+  const trailWhen = (at) => (isToday(at) ? hhmm(at) : day(at));
+  /** The trail on a card: four steps on one track, each its word and time once reached; under it the agent's reply and the link to what changed,
+   *  unless the place it sits already shows the reply (an ask or a comment on a part of a guided page). */
+  function trailTrack(t, said = true) {
+    const n = stepOf(t), r = t.reply;
+    return el('div', { class: 'ui-trail', role: 'group', 'aria-label': `${stepWord(t, n - 1)}: ${TRAIL.slice(0, n).map((w, i) => `${stepWord(t, i)} ${trailWhen(stepAt(t, i))}`).join(', ')}` },
+      el('ol', { 'aria-hidden': 'true' }, ...TRAIL.map((_, i) => el('li', { class: i < n ? 'on' : '' }, el('i', {}), el('b', {}, stepWord(t, i)), el('time', {}, i < n ? trailWhen(stepAt(t, i)) : '')))),
+      said && r && (r.text || r.link || r.acted) ? el('div', { class: 'tr-said' }, r.text ? el('p', { dir: 'auto' }, r.text) : r.acted ? el('p', {}, 'Posted a new version') : '',
+        r.link ? el('a', { href: r.link, target: '_blank', rel: 'noopener', dir: 'auto' }, linkName(r.link)) : '') : '');
+  }
+  /** A card's badge in a list: where the last thing sent on it stands, four marks and a word; a reply not opened yet is ink. */
+  const trailBadge = (key) => { const t = trailOf(key).at(-1); if (!t) return ''; const n = stepOf(t);
+    return el('span', { class: `ui-tb${unseen(t) ? ' new' : ''}`, title: `${stepWord(t, n - 1)} ${trailWhen(stepAt(t, n - 1))}` }, el('span', { class: 'tb-d', 'aria-hidden': 'true' }, ...TRAIL.map((_, i) => el('i', { class: i < n ? 'on' : '' }))), stepWord(t, n - 1)); };
+  /** Opening a card with a reply not opened yet marks it seen, once: it then leaves Today. */
+  const seeReply = (key, kind) => { const t = trailOf(key, kind).at(-1); if (!unseen(t) || FROZEN || state.readonly) return; t.seen = new Date().toISOString(); postJson('/api/trail', { key }).catch(() => (t.seen = undefined)); };
+  /** Replies: each card whose agent replied to what the person sent and the person has not opened it yet, newest first, the reply's words as its second line. */
+  function repliesOn() {
+    const gone = new Set(state.dismissed ?? []), last = new Map();
+    for (const t of [...(state.trail ?? [])].filter((x) => x.kind !== 'ticket').sort(bySecond)) last.set(t.key, t);
+    // A reply on a ticket comment opens its ticket.
+    const asCard = (t) => { const k = tkById(t.key); return k && { key: `ticket:${k.id}`, onTicket: k }; };
+    for (const t of [...(state.trail ?? [])].filter((x) => x.kind === 'ticket').sort(bySecond)) last.set(`ticket:${t.key}`, t);
+    const rows = [...last.entries()].filter(([, t]) => unseen(t)).map(([k, t]) => [k.startsWith('ticket:') ? asCard(t) : state.decisions.find((d) => d.key === t.key), t])
+      .filter(([d]) => d && !gone.has(d.key)).sort(([, x], [, y]) => Date.parse(y.reply.at) - Date.parse(x.reply.at));
+    if (!rows.length) return '';
+    return el('section', { class: 't-wait t-replies', 'aria-label': 'Replies' }, el('h2', { class: 'ui-sec' }, 'Replies', el('span', { class: 'n' }, String(rows.length))),
+      el('ul', { class: 'ui-card ui-list' }, ...rows.map(([d, t]) => { const k = d.onTicket, a = el('a', { class: 'ui-row', href: k ? `#ticket/${k.id}` : hrefOf(d) }, ...uiRow({ tile: k ? tkTile(k) : cardTile(d), title: k ? k.title : title(d),
+        meta: [trailWhen(t.reply.at), t.reply.text ?? (t.reply.link ? linkName(t.reply.link) : 'Posted a new version')].join(' · ') })); a.onclick = () => (jump = d.key); return el('li', {}, a); })));
+  }
   /** A result's mark: the pass tick only for passed proof, a cross for failed, an alert for not finished or unchecked. */
   const mark = (kind) => { const s = el('span', { 'aria-hidden': 'true' }); s.innerHTML = kind === 'ok'
     ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>'
@@ -2635,9 +2676,9 @@
   const uiIcon = ({ src, draw }) => { const s = el('span', { class: 'ui-icon', 'aria-hidden': 'true' }); if (src) s.append(el('img', { src, alt: '' })); else s.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[draw]}"/></svg>`; return s; };
   /** The new look's row (ui.css), as the parts of a link or button: the icon tile, the title with what follows it and a P0-P3 chip only when one is set,
    * then one second line (project and time) or, where there is progress, a bar with its percent. */
-  const uiRow = ({ tile, title, after = '', priority, meta, progress }) => [tile, el('span', { class: 'rm' },
-    el('span', { class: 'l1' }, el('span', { class: 't', dir: 'auto' }, title), after, priority ? el('span', { class: `ui-pc ${priority.toLowerCase()}` }, priority) : ''),
-    progress === undefined ? el('span', { class: 'l2 meta', dir: 'auto' }, meta) : el('span', { class: 'l2' }, el('span', { class: 'ui-bar' }, el('i', { style: `width: ${progress}%` })), el('span', { class: 'pct' }, `${progress}%`)))];
+  const uiRow = ({ tile, title, after = '', priority, meta, progress, badge = '' }) => [tile, el('span', { class: 'rm' },
+    el('span', { class: 'l1' }, el('span', { class: 't', dir: 'auto' }, title), after, progress === undefined ? '' : badge, priority ? el('span', { class: `ui-pc ${priority.toLowerCase()}` }, priority) : ''),
+    progress === undefined ? (badge ? el('span', { class: 'l2' }, el('span', { class: 'meta', dir: 'auto' }, meta), badge) : el('span', { class: 'l2 meta', dir: 'auto' }, meta)) : el('span', { class: 'l2' }, el('span', { class: 'ui-bar' }, el('i', { style: `width: ${progress}%` })), el('span', { class: 'pct' }, `${progress}%`)))];
   /** The phone's tab bar is drawn once, so its pill slides from the area left to the one opened; each redraw marks the area on screen and sets the badges, and a badge whose count changed bumps. */
   const tabPill = el('span', { class: 'hl', 'aria-hidden': 'true' }), tabLinks = TABS.map(([a, name]) => el('a', { href: `#${a}`, 'aria-label': name }, icon(`tab-${a || 'today'}`)));
   document.documentElement.style.setProperty('--dock-n', TABS.length);
@@ -2752,7 +2793,7 @@
   const progressOf = (n) => (n > 0 ? Math.min(n, 100) : undefined);
   function cardRow(d) {
     const t = ticketOf(d), what = projectName(d) ?? (area(d) === 'waiting' ? kind(d) : NAMES[d.type] ?? 'Report');
-    const link = el('a', { class: 'ui-row', href: hrefOf(d), ...(t && { 'aria-label': `${title(d)}, ticket ${t.title}, ${t.progress}% done` }) }, ...uiRow({ tile: cardTile(d), title: d.type === 'signin' ? `Sign in to ${d.title}` : d.type === 'evidence' ? headline(d) : title(d), priority: d.priority,
+    const link = el('a', { class: 'ui-row', href: hrefOf(d), ...(t && { 'aria-label': `${title(d)}, ticket ${t.title}, ${t.progress}% done` }) }, ...uiRow({ tile: cardTile(d), title: d.type === 'signin' ? `Sign in to ${d.title}` : d.type === 'evidence' ? headline(d) : title(d), priority: d.priority, badge: trailBadge(d.key),
       meta: [what, d.type === 'signin' && d.expires ? left(d.expires) : d.filed && filedAt(d.filed)].filter(Boolean).join(' · '), progress: progressOf(t?.progress) }));
     link.onclick = () => (jump = d.key);
     return el('li', {}, link);
@@ -2980,10 +3021,11 @@
     const gone = new Set(state.dismissed ?? []), cards = state.decisions.filter((d) => d.ticket === t.id && !gone.has(d.key)).reverse().sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
     const kids = tkUnder(t), done = kids.filter((x) => tkStateOf(x) === 'done').length, s = tkStateOf(t), up = tkAbove(t)[0], proj = tkProject(t);
     const prop = (draw, k, ...v) => el('div', { class: 'ui-pr' }, el('span', { class: 'k' }, tkMark(draw), k), el('span', { class: 'v' }, ...v));
-    const linked = (d) => { const a = el('a', { class: 'ui-row', href: hrefOf(d) }, ...uiRow({ tile: cardTile(d), title: title(d), priority: d.priority, meta: [tkKind(d), tkState(d), d.filed && tkWhen(d.filed)].filter(Boolean).join(' · ') }));
+    const linked = (d) => { const a = el('a', { class: 'ui-row', href: hrefOf(d) }, ...uiRow({ tile: cardTile(d), title: title(d), priority: d.priority, badge: trailBadge(d.key), meta: [tkKind(d), tkState(d), d.filed && tkWhen(d.filed)].filter(Boolean).join(' · ') }));
       a.onclick = () => (jump = d.key); return el('li', {}, a); };
     // Its cards' steps after their postings (Linked shows those), newest first, each naming its card.
-    const steps = cards.flatMap((d) => threadOf(d).filter((e) => !e.posted).map((e) => ({ ...e, card: d }))).sort(bySecond).reverse();
+    const steps = cards.flatMap((d) => threadOf(d).filter((e) => !e.posted).map((e) => ({ ...e, card: d }))).sort(bySecond).reverse(), said = trailOf(t.id, 'ticket');
+    seeReply(t.id, 'ticket');
     return [el('div', { class: 'tk-shd' }, el('p', {}, proj ? el('span', { class: 'tk-pt', 'aria-hidden': 'true' }, projectPic(proj)) : '', el('span', {}, [proj, TK_WORDS[s]].filter(Boolean).join(' · '))), close),
       el('h2', { class: 'tk-dt', tabindex: '-1', dir: 'auto' }, t.title),
       el('div', { class: 'ui-props' }, t.priority ? prop('flag', 'Priority', el('span', { class: `ui-pc ${t.priority.toLowerCase()}` }, t.priority)) : '',
@@ -2992,6 +3034,8 @@
         prop('clock', 'Last update', el('span', {}, stamp(t.at)))),
       ...(kids.length ? [el('p', { class: 'ui-dl' }, `${tkAbove(t).length ? 'Sub-tasks' : 'Tickets in this epic'} · ${done} of ${kids.length} done`), el('ul', { class: 'ui-list tk-in' }, ...kids.map(tkRow))] : []),
       el('p', { class: 'ui-dl' }, 'Linked'), cards.length ? el('ul', { class: 'ui-list tk-in' }, ...cards.map(linked)) : el('p', { class: 'tk-none' }, 'No card names this ticket yet.'),
+      // The person's comments on it (made in the fleet dashboard), oldest first, each with how far it got and the lead's reply.
+      ...(said.length ? [el('p', { class: 'ui-dl' }, 'Your comments'), ...said.map((c) => el('div', { class: 'tk-said' }, el('p', { dir: 'auto' }, c.said), trailTrack(c)))] : []),
       ...(steps.length ? [el('p', { class: 'ui-dl' }, 'Activity'), el('ol', { class: 'ui-props tk-act' }, ...steps.map((e) => el('li', { class: 'ui-pr' },
         el('span', { class: 'aw' }, el('b', { dir: 'auto' }, e.text), el('time', { datetime: e.at }, stamp(e.at))), e.note ? el('span', { class: 'th-n', dir: 'auto' }, `“${e.note}”`) : '',
         el('a', { class: 'tk-on', href: hrefOf(e.card), dir: 'auto' }, title(e.card)))))] : [])];
@@ -3056,10 +3100,10 @@
   }
   /** Today itself. A redraw keeps an open More current; the address #find opens Search over it. */
   function today(by) {
-    const queue = [...by.waiting].sort((x, y) => lead(x) - lead(y)), up = upNext(queue), rest = waitingOn(queue.slice(1)), tiles = todayTiles(by), more = moreLine(by);
+    const queue = [...by.waiting].sort((x, y) => lead(x) - lead(y)), up = upNext(queue), rest = waitingOn(queue.slice(1)), tiles = todayTiles(by), more = moreLine(by), replies = repliesOn();
     if (todayMore.open) fillMore(by);
     if (location.hash === '#find' && !searchSheet.open) openSearch();
-    return phone() ? [up, rest, tiles, more] : [el('div', { class: 't-cols' }, el('div', {}, up, tiles, more), el('div', {}, rest))];
+    return phone() ? [up, replies, rest, tiles, more] : [el('div', { class: 't-cols' }, el('div', {}, up, tiles, more), el('div', {}, replies, rest))];
   }
 
   /** A short row's second line: what changed, unless the headline already says it. */
@@ -3169,7 +3213,7 @@
    *  A tap opens its page; an explainer with no page opens in place, to its numbered steps or its video card. */
   function report(d, i = 0) {
     const n = d.steps?.length;
-    const face = uiRow({ tile: projectTile(d.group), title: plain(title(d)), priority: d.priority, progress: readPct(d) });
+    const face = uiRow({ tile: projectTile(d.group), title: plain(title(d)), priority: d.priority, progress: readPct(d), badge: trailBadge(d.key) });
     const sel = rpSel === d.key;
     const li = (...kids) => el('li', { class: `report dl-row${flash === d.key ? ' returned' : ''}${sel ? ' sel' : ''}`, style: `--n:${i}`, ...(reads(d) && { 'data-key': d.key, 'data-list': 'reports' }) }, ...kids);
     const act = (cls, mark, words) => el('div', { class: `dl-act ${cls}`, 'aria-hidden': 'true' }, glyph(mark), el('span', {}, words));
@@ -3426,7 +3470,10 @@
       saved?.at && saved.answer !== 'screens' ? prop('<circle cx="10" cy="10" r="7"/><path d="M10 6.2V10l2.6 1.8"/>', 'Answered', el('span', {}, day(saved.at))) : '');
     const said = roundNotes().filter((n) => n.note);
     const screenName = (n) => screens.length > 1 && screenFor(`${n.journey}/${n.screen}`)?.screen.title;
-    const told = said.length ? [el('p', { class: 'ui-dl' }, 'What you said'), ...said.map((n) => el('blockquote', { class: 'dz-said', dir: 'auto' }, screenName(n) ? el('cite', {}, screenName(n)) : '', el('span', { class: 'q' }, n.note)))] : [];
+    const sent = trailOf(d.key).at(-1);
+    const told = [...(said.length ? [el('p', { class: 'ui-dl' }, 'What you said'), ...said.map((n) => el('blockquote', { class: 'dz-said', dir: 'auto' }, screenName(n) ? el('cite', {}, screenName(n)) : '', el('span', { class: 'q' }, n.note)))] : []),
+      ...(sent ? [said.length ? '' : el('p', { class: 'ui-dl' }, 'What you sent'), trailTrack(sent)] : [])];
+    seeReply(d.key);
     const lab = el('p', { class: 'dz-lab' }, d.group ? el('span', { class: 'dz-pic' }, projectPic(d.group)) : '', el('span', {}, [d.group, d.filed && day(d.filed)].filter(Boolean).join(' · ')));
     const about = d.about ? el('p', { class: 'about dz-about', dir: 'auto' }, d.about) : '', original = d.link ? el('a', { class: 'dz-link', href: d.link, target: '_blank', rel: 'noopener noreferrer' }, 'Open original design') : '';
     const screenPick = screenSelect ? el('label', {}, 'Screen for note', screenSelect) : '';
@@ -3630,9 +3677,12 @@
     const actionLabels = { question: 'Ask a question', deeper: 'Go deeper', simplify: 'Simplify this', example: 'Show an example', why: 'Why?', custom: 'Your ask' };
     // ---- The person's ask, the agent's answer streaming in under the part
     const asksOf = (part) => (state.deeper ?? []).filter((x) => x.key === key && x.part === part);
+    /** What the person sent on this page, by its id, as far as it got (the feedback trail). */
+    const sentOf = (id) => (state.trail ?? []).find((t) => t.id === id);
+    seeReply(key);
     const unfinished = () => (state.deeper ?? []).some((x) => x.key === key && !x.done);
     function paintAns(part) {
-      const panel = panels.get(part), asks = asksOf(part), sig = JSON.stringify([asks, asks.map(a => [state.delivery?.[a.id], again.get(a.id) > Date.now()])]);
+      const panel = panels.get(part), asks = asksOf(part), sig = JSON.stringify([asks, asks.map(a => [state.delivery?.[a.id], again.get(a.id) > Date.now(), sentOf(a.id)])]);
       if (!panel || panel.dataset.sig === sig) return;
       panel.dataset.sig = sig;
       const blocks = asks.map((a) => {
@@ -3643,7 +3693,7 @@
           ...(a.selection ? [E('blockquote', '', a.selection.quote)] : []),
           ...(a.version === 1 && delivery?.error ? [E('p', 'gd-err', `Delivery pending: ${delivery.error}`)] : []),
           ...(a.text ? a.text.split(/\n+/).map((t, i, all) => E('p', '', t, ...(writing && i === all.length - 1 ? [E('span', 'caret')] : []))) : [E('div', 'shim', ''), E('div', 'shim', '')]),
-          E('div', 'gd-rc s', E('span', '', rd(), E('b', '', 'You asked'), ` ${hhmm(a.at)}`), a.read ? E('span', '', rd('agent'), E('b', '', 'Agent read it'), ` ${hhmm(a.read)}`) : E('span', '', rd('hollow'), 'Agent has not read it yet')),
+          sentOf(a.id) ? trailTrack(sentOf(a.id), false) : '',
           ...(late ? [E('p', 'slow', 'The agent has not picked this up yet. It answers the next time it checks the board.')] : []));
         if (a.version === 1 && a.text && a.seen !== a.answerRevision) { block.dataset.answerId = a.id; block.dataset.answerRevision = a.answerRevision; answerIO.observe(block); }
         return block;
@@ -3720,12 +3770,12 @@
     function paintTalk(part) {
       const v = verdictOf(part), pair = votes.get(part);
       if (pair) for (const [name, b] of Object.entries(pair)) { const on = v === name; b.setAttribute('aria-pressed', String(on)); b.lastChild.textContent = on ? name === 'agree' ? 'Agreed' : 'Disagreed' : name === 'agree' ? 'Agree' : 'Disagree'; }
-      const box = threads.get(part), mine = said(part).filter((c) => c.text), sig = JSON.stringify(mine);
+      const box = threads.get(part), mine = said(part).filter((c) => c.text), sig = JSON.stringify([mine, mine.map((c) => sentOf(c.id))]);
       if (!box || box.dataset.sig === sig) return;
       box.dataset.sig = sig;
       box.replaceChildren(...mine.flatMap((c) => [E('div', 'gd-cmt', E('span', 'av', 'Y'),
         E('div', 'hd', E('b', '', 'You'), ...(c.verdict ? [E('span', 'verdict ' + c.verdict, c.verdict === 'agree' ? 'Agree' : 'Disagree')] : []), E('span', '', hhmm(c.at))),
-        E('p', '', c.text), E('div', 'gd-st', E('i', c.read ? 'on' : ''), c.read ? 'Agent read it ' + hhmm(c.read) : 'Sent to the agent')),
+        E('p', '', c.text), sentOf(c.id) ? trailTrack(sentOf(c.id), false) : ''),
         ...(c.reply ? [E('div', 'gd-cmt agent', E('span', 'av', 'A'), E('div', 'hd', E('b', '', 'Agent'), E('span', '', hhmm(c.replied))), E('p', '', c.reply))] : [])]));
     }
     const acts = (part, rows, inItem) => {
@@ -4119,6 +4169,7 @@
   /** A report as the prototype's sheet draws it: a handle; its project, what it is and the day, with Close; its title in full and what it says; what it found (or decided);
    *  for a guided report its parts, each with a check once read, and Read the report, which opens it in full at that part; its ticket and Activity; then its page. */
   function reportSheet(d, h1, page) {
+    seeReply(d.key);
     const x = el('a', { class: 'rp-x', href: '#reports', 'aria-label': 'Close' }, glyph('x')), scrim = el('a', { class: 'rp-scrim', href: '#reports', tabindex: '-1', 'aria-hidden': 'true' });
     const what = [d.guided ? 'Guided report' : FORMS[d.form]?.[0] ?? 'Report', d.group, d.filed ? day(d.filed) : ''].filter(Boolean).join(' · ');
     const found = d.guided ? d.visual?.heading : d.decided, ps = rpParts(d), n = ps.filter(([p]) => partRead(d, p)).length;
@@ -4221,7 +4272,7 @@
       el('h2', { class: 'ui-sec' }, 'Newest', el('span', { class: 'n' }, String(items.length))),
       el('ul', { class: 'ui-card ui-list dz-list' }, ...items.map((d) => { const t = ticketOf(d);
         return el('li', { id: `item-${d.key}` }, el('a', { class: 'ui-row', href: `#designs/${d.key}`, 'aria-label': `Open design, ${d.title}${t?.progress > 0 ? `, ticket ${t.title}, ${t.progress}% done` : ''}` },
-          ...uiRow({ tile: cardTile(d), title: d.title, priority: d.priority, meta: [designStatus(d), d.filed && day(d.filed)].filter(Boolean).join(' · '), progress: progressOf(t?.progress) }))); }))];
+          ...uiRow({ tile: cardTile(d), title: d.title, priority: d.priority, badge: trailBadge(d.key), meta: [designStatus(d), d.filed && day(d.filed)].filter(Boolean).join(' · '), progress: progressOf(t?.progress) }))); }))];
   }
 
   /** The asks dismissed from Waiting on you, or the evidence and reports archived a day after they were filed, folded under one row; Restore puts one back on the board. */
@@ -4309,7 +4360,7 @@
     const meta = d.type === 'signin' && d.expires ? el('span', {}, `${whoOf(d)} · `, el('span', { 'data-left': d.expires }, left(d.expires))) : `${whoOf(d)}${d.filed ? ` · ${filedAt(d.filed)}` : ''}`;
     const sel = deskSel === d.key && !gone, opens = askHref(d).startsWith('#decide/');
     const face = el('a', { class: 'dl-face ui-row', href: askHref(d), draggable: 'false', ...(!(gone && gone.how === 'later') && { id: `item-${d.key}` }), ...(opens && { 'data-row': '' }), ...(sel && { 'aria-current': 'true' }) },
-      ...uiRow({ tile: cardTile(d), title: d.type === 'signin' ? `Sign in to ${d.title}` : title(d), priority: priOf(d), ...(t?.progress > 0 ? { progress: t.progress } : { meta }) }));
+      ...uiRow({ tile: cardTile(d), title: d.type === 'signin' ? `Sign in to ${d.title}` : title(d), priority: priOf(d), badge: trailBadge(d.key), ...(t?.progress > 0 ? { progress: t.progress } : { meta }) }));
     const act = (cls, mark, words) => el('div', { class: `dl-act ${cls}`, 'aria-hidden': 'true' }, glyph(mark), el('span', {}, words));
     const quick = (cls, mark, words, tip, fn) => { const b = el('button', { class: cls, 'aria-label': `${words}, ${d.title}`, title: tip }, glyph(mark)); b.onclick = fn; return b; };
     const hover = deskSel === null || gone || state.readonly ? '' : el('span', { class: 'dl-hover' }, rec ? quick('yes', 'check', rec.label, `Answer ${rec.label}`, () => quickAnswer(d.key)) : '',
@@ -4324,7 +4375,7 @@
   function doneRow(d, i) {
     const s = state.answers[d.key], sel = deskSel === d.key;
     return el('li', { class: `dl-row g-done${sel ? ' sel' : ''}`, 'data-key': d.key, style: `--n:${i}` }, el('a', { class: 'dl-face ui-row', href: `#decide/${d.key}`, draggable: 'false', 'data-row': '', ...(sel && { 'aria-current': 'true' }) },
-      ...uiRow({ tile: uiIcon({ draw: 'done' }), title: title(d), meta: `${s.replaces ? 'Changed to ' : ''}${saidOf(d, s)} · ${filedAt(s.at)}` })));
+      ...uiRow({ tile: uiIcon({ draw: 'done' }), title: title(d), badge: trailBadge(d.key), meta: `${s.replaces ? 'Changed to ' : ''}${saidOf(d, s)} · ${filedAt(s.at)}` })));
   }
   /** Decide's list: Newest or By priority, the hero (how many wait on you, how many you answered today, how many are for later), the asks in one card, then Later and Answered. */
   function decideList(items, hidden, done = [], today = 0) {
@@ -4616,12 +4667,13 @@
     answer.onclick = () => (isOwn() ? ownBox.value.trim() && answerWith({ value: 'text' }, ownKey) : chosen() && answerWith(chosen()));
     sync();
     sink.more = given ? '' : more();
+    if (done) seeReply(d.key);
     // The answer given: when, what with its note or words, whether the agent has read it, and the answer it replaced. Its one button brings the cards back.
-    const seen = done && state.seen_at?.[d.key], was = given?.replaces, change = done && el('button', { class: 'answer', 'data-kbd': '↵', 'aria-keyshortcuts': 'Enter' }, el('span', { class: 'lbl' }, 'Change answer'));
+    const was = given?.replaces, sent = done && trailOf(d.key).at(-1), change = done && el('button', { class: 'answer', 'data-kbd': '↵', 'aria-keyshortcuts': 'Enter' }, el('span', { class: 'lbl' }, 'Change answer'));
     if (change) change.onclick = () => { changing.add(d.key); selected.delete(d.key); own.delete(d.key); render(); document.querySelector('.decide .pick-list')?.scrollIntoView({ block: 'nearest', behavior: calm.matches ? 'auto' : 'smooth' }); };
     const said = done ? [el('p', { class: 'ui-dl' }, 'Your answer'), el('p', { class: 'ans-meta' }, el('span', { class: 'res ok' }, was ? 'Changed' : 'Answered'), ` · ${when(given.at)}`),
       el('div', { class: 'ans-card' }, el('span', { class: 'donek', 'aria-hidden': 'true' }, glyph('check')), el('div', {}, el('b', { dir: 'auto' }, saidOf(d, { ...given, note: '' })),
-        given.note ? el('q', { dir: 'auto' }, given.note) : '', el('span', {}, seen ? `Agent read it ${hhmm(seen)}` : 'Agent has not read it yet'))),
+        given.note ? el('q', { dir: 'auto' }, given.note) : '')), sent ? trailTrack(sent) : '',
       was ? el('p', { class: 'ans-was', dir: 'auto' }, `Before: ${saidOf(d, was)} · ${when(was.at)}`) : ''] : [];
     const cards = d.mocks?.length && d.options?.length ? mockCards(d, []) : null, proofLine = cards || d.view ? '' : proofRow(d);
     const preview = cards ?? (d.view ? rung(d) : proofLine ? '' : proof(d));

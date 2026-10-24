@@ -118,9 +118,9 @@ try {
   const event = JSON.parse(cli('wait', board, '--filer', FILER, '--events', '--timeout', '20').trim().split('\n')[0]);
   assert.deepEqual([event.event, event.key, event.part, event.verdict, event.text], ['comment', KEY, PART, 'disagree', TEXT]);
   writeFileSync(join(records, `wait-event.${theme}.${width}w.json`), JSON.stringify(event, null, 1));
-  drive("await wait('.gd-st i.on');");
-  assert.match(page(`() => document.querySelector('[data-part="${PART}"] > .gd-thread').innerText`), /Agent read it/);
-  capture('comment-read', 'After the agent takes it, the line reads Agent read it with the time.');
+  drive("await wait('.gd-cmt .ui-trail li.on:nth-child(3)');");
+  assert.match(page(`() => document.querySelector('[data-part="${PART}"] > .gd-thread .ui-trail').innerText`), /Read\s+\d\d:\d\d/);
+  capture('comment-read', 'After the agent takes it, the track under the comment reads Sent, Delivered and Read, each with its time.');
   const REPLY = 'Yes. With 30 seconds it still hung; with the input closed it ended in 0.8 s.';
   cli('deeper', board, '--filer', FILER, '--id', event.id, '--text', REPLY);
   drive("await wait('.gd-cmt.agent');");
