@@ -360,6 +360,38 @@
   .ev-list .ev-card:active { background: var(--tk-inset); }
   .ev-list .ev-card .meta { margin: 0; }
   .ev-list > li.picked { outline: none; border-radius: 0; background: var(--tk-inset); } .ev-list > li.picked .ui-icon { box-shadow: 0 0 0 2px var(--tk-ink); }
+  /* A row's first capture: 40 by 52 at its end, cropped from the top; with Previews on, 88 by 120 in place of the tile, the title over three lines beside it. */
+  .ev-list button.ev-card { min-height: 0; border: 0; border-radius: 0; background: none; font: inherit; text-align: left; box-shadow: none; }
+  .ev-th { position: relative; display: grid; flex: none; place-items: center; width: 2.5rem; height: 3.25rem; overflow: hidden; border-radius: 0.5rem; background: var(--tk-inset); box-shadow: inset 0 0 0 1px var(--tk-line); }
+  .ev-th img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+  .ev-th::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--tk-line); }
+  .ev-v { color: var(--tk-ink); font-weight: 500; } .ev-v.not { color: var(--tk-critical); } .ev-v.none { color: inherit; font-weight: 400; }
+  .ev-list .ev-card.rich { align-items: flex-start; height: auto; padding-block: 0.75rem; }
+  .ev-card.rich > .ui-icon { display: none; } .ev-card.rich .ev-th { order: -1; width: 5.5rem; height: 7.5rem; border-radius: 0.75rem; }
+  .ev-card.rich .l1 { align-items: flex-start; height: auto; } .ev-card.rich .l1 .t { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; white-space: normal; }
+  .ev-card.rich .rm { gap: 0.5rem; padding-top: 0.25rem; }
+  .ev-sec { gap: 0.75rem; } .ev-sec .ev-st { flex: 1; min-width: 0; }
+  .ev-pv { position: relative; display: inline-flex; flex: none; align-items: center; gap: 0.375rem; height: 1.75rem; min-height: 0; padding: 0 0.75rem 0 0.625rem; border: 0; border-radius: 0.875rem;
+    background: var(--tk-card); color: var(--tk-ink); box-shadow: var(--tk-elev-card), inset 0 1px 0 var(--tk-hl); font: inherit; font-size: var(--tk-fs-meta); line-height: 1.75rem; font-weight: 500; letter-spacing: 0; }
+  .ev-pv::after { content: ''; position: absolute; inset: -0.5rem -0.25rem; } .ev-pv .ev-g svg { width: 1rem; height: 1rem; }
+  .ev-pv[aria-pressed="true"] { background: var(--tk-ink); color: var(--tk-canvas); box-shadow: none; } .ev-pv[aria-pressed="true"]::before { content: none; }
+  .ev-sec .ev-pv + .see { margin-left: 0; }
+  /* A proof opened in its row: its captures in a strip that snaps one per swipe, a dot each under it, its claim in full, its panel, then Open proof. */
+  .ev-open { padding: 0 0.75rem 0.25rem; }
+  .ev-strip { display: flex; gap: 0.5rem; margin: 0 -0.75rem; padding: 0 0.75rem; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding: 0 0.75rem; scrollbar-width: none; }
+  .ev-strip::-webkit-scrollbar { display: none; }
+  .ev-strip a { display: block; flex: none; height: 20rem; max-width: 100%; overflow: hidden; border-radius: 0.75rem; background: var(--tk-inset); scroll-snap-align: start; box-shadow: inset 0 0 0 1px var(--tk-line); }
+  .ev-strip img { display: block; width: auto; height: 100%; max-width: 100%; object-fit: contain; }
+  .ev-dots-n { display: flex; justify-content: center; gap: 0.375rem; height: 0.375rem; margin-top: 0.75rem; } .ev-dots-n i { width: 0.375rem; height: 0.375rem; border-radius: 50%; background: var(--tk-mid); } .ev-dots-n i.on { background: var(--tk-ink); }
+  .ev-list > li.open > .ev-card { align-items: flex-start; height: auto; padding-block: 0.75rem; } .ev-list > li.open .l1 { height: auto; } .ev-list > li.open .l1 .t { white-space: normal; color: var(--tk-ink); font-weight: 500; }
+  .ev-list > li.open > .ev-card > .ev-th { display: none; } :is(.ev-list > li.open, .ev-card.rich) .l1 .ui-pc { align-self: flex-start; }
+  .ev-th.none { box-shadow: none; } .ev-th.none::after { content: none; } .ev-th .ui-icon img { width: 1.5rem; height: 1.5rem; object-fit: cover; }
+  .ev-open .ev-about { margin-top: 0.75rem; } .ev-open .ui-props { margin-top: 0.75rem; } .ev-open .ev-hero.none { margin-top: 0; }
+  .ev-go { display: flex; align-items: center; gap: 0.5rem; min-height: 3rem; margin-top: 0.25rem; color: var(--tk-ink); font-size: var(--tk-fs-row); font-weight: 500; text-decoration: none; }
+  .ev-go .ev-go-s { flex: 1; color: var(--tk-text-tertiary); font-weight: 400; text-align: right; } .ev-go .glyph { width: 1rem; height: 1rem; color: var(--tk-text-tertiary); }
+  /* Under the dock on a phone the page fades into the canvas over the 24px above it, so no row's words show cut under the dock. */
+  @media (max-width: 63.999rem) { body::after { content: ''; position: fixed; z-index: 1; right: 0; bottom: 0; left: 0; height: calc(6.5rem + env(safe-area-inset-bottom)); pointer-events: none;
+    background: linear-gradient(to bottom, transparent, var(--tk-canvas) 1.5rem); } main .ui-list { isolation: isolate; } }
   main > .bulk:has(+ .ev-seg), .split-list > .bulk:has(+ .ev-seg) { margin: 0.25rem 0 0; } .bulk:has(+ .ev-seg) button { color: var(--tk-ink); } /* the board's own .meta sets a top margin the row's second line does not take */
   .ev-ok { position: absolute; right: -0.25rem; bottom: -0.25rem; display: grid; place-items: center; width: 1rem; height: 1rem; border-radius: 0.5rem; background: var(--tk-fill); color: var(--tk-card); box-shadow: 0 0 0 2px var(--tk-card); }
   .ev-ok.not { background: var(--tk-critical); color: #FFFFFF; }
@@ -2172,10 +2204,10 @@
     const sha = (v ? d.media[i][v] : d.media[i])?.sha256;
     return `/api/media?key=${encodeURIComponent(d.key)}&i=${i}${v && `&v=${v}`}${FROZEN || !sha ? '' : `&h=${sha.slice(0, 16)}`}`;
   };
-  /** Each capture as [original, clip?, light, thumb]: the board shows the lighter copies post made of a still, and opens the original full size.
+  /** Each capture as [original, clip?, light, thumb, tile]: the board shows the lighter copies post made of a still, and opens the original full size.
    * A capture with no copies (a clip, an older post, a run's media) shows the original everywhere. */
-  const filesOf = (d) => d.media?.map((m, i) => [mediaUrl(d, i), /\.(mp4|webm)$/i.test(m.path), mediaUrl(d, i, m.light ? 'light' : ''), mediaUrl(d, i, m.thumb ? 'thumb' : m.light ? 'light' : '')])
-    ?? d.evidenceCard?.media.map((m) => [m.url, m.type.startsWith('video/'), m.url, m.url]) ?? [];
+  const filesOf = (d) => d.media?.map((m, i) => [mediaUrl(d, i), /\.(mp4|webm)$/i.test(m.path), mediaUrl(d, i, m.light ? 'light' : ''), mediaUrl(d, i, m.thumb ? 'thumb' : m.light ? 'light' : ''), mediaUrl(d, i, m.tile ? 'tile' : m.thumb ? 'thumb' : m.light ? 'light' : '')])
+    ?? d.evidenceCard?.media.map((m) => [m.url, m.type.startsWith('video/'), m.url, m.url, m.url]) ?? [];
   /** A capture's picture, fetched only as it nears the screen and decoded off the main thread. */
   const shot = (url, alt) => el('img', { src: src(url), alt, loading: 'lazy', decoding: 'async' });
   function captures(d, cls) {
@@ -2349,12 +2381,39 @@
   const evWhen = (d) => (d.filed ? (isToday(d.filed) ? hhmm(d.filed) : day(d.filed)) : '');
   /** A ticket's progress shows as a bar once work on it has begun, a full one at 100%, as the prototype draws it: never an empty bar. */
   const begun = (t) => !!t && t.progress > 0;
-  /** One proof as a row: its project's tile with done-done's check, its title and P0-P3 chip, then its ticket's progress once begun, or its project and time. */
+  /** Evidence's rows show each proof's first capture: small at the row's end, or with Previews on, larger beside the title. The pick is kept in this browser. */
+  let evRich = (() => { try { return localStorage.getItem('so-ev-view') === 'rich'; } catch { return false; } })(), evOpen = '';
+  const evStills = (d) => filesOf(d).filter(([, video]) => !video);
+  /** A row's picture is asked for only when its row is within 100px of the screen, so a long list or See all sends the few the eye can reach, not one per row. */
+  const seen = 'IntersectionObserver' in window ? new IntersectionObserver((hits) => hits.forEach((h) => { if (h.isIntersecting) { h.target.src = h.target.dataset.src; seen.unobserve(h.target); } }), { rootMargin: '100px 0px' }) : null;
+  const lazyImg = (url) => { const img = el('img', { alt: '', decoding: 'async', 'data-src': url }); if (seen) seen.observe(img); else img.src = url; return img; };
+  /** done-done's word as the row's second line leads with it: ink where it holds up, red where it did not, quiet where nothing checked it. */
+  const frag = (...kids) => { const f = document.createDocumentFragment(); f.append(...kids); return f; };
+  const evVerdict = (d) => el('span', { class: `ev-v ${judged(d) || 'none'}` }, judgedWord(d));
+  /** One proof as a row: its project's tile with done-done's check, its title and P0-P3 chip, done-done's word with its project and time, and its first capture.
+   *  On a phone a tap opens it in place: its captures in a strip to swipe, what it says in full, done-done's word, its ticket and pull request, and Open proof. */
   function evRow(d) {
-    const t = begun(ticketOf(d)) && ticketOf(d), project = projectOf(d), meta = [project, evWhen(d)].filter(Boolean).join(' · '), title = plain(headline(d));
-    return el('li', {}, el('a', { class: 'ui-row ev-card', href: `#evidence/${d.key}`, id: `item-${d.key}`, 'data-row': '',
-      'aria-label': [title, judgedWord(d), prio(d), t ? `${t.title}, ${t.progress}% done` : meta].filter(Boolean).join(', ') },
-    ...uiRow({ tile: evTile(project, judgedMark(d)), title, priority: prio(d), ...(t ? { progress: t.progress } : { meta }) })));
+    const project = projectOf(d), meta = [project, evWhen(d)].filter(Boolean).join(' · '), title = plain(headline(d)), first = evStills(d)[0], desk = !phone(), open = !desk && evOpen === d.key;
+    const th = first ? el('span', { class: 'ev-th', 'aria-hidden': 'true' }, lazyImg(src(first[4])))
+      : evRich ? el('span', { class: 'ev-th none', 'aria-hidden': 'true' }, projectTile(project)) : '';
+    const parts = uiRow({ tile: evTile(project, judgedMark(d)), title, priority: prio(d), meta: frag(evVerdict(d), meta ? ` · ${meta}` : '') });
+    const label = [title, judgedWord(d), prio(d), meta].filter(Boolean).join(', ');
+    const row = desk ? el('a', { class: `ui-row ev-card${evRich ? ' rich' : ''}`, href: `#evidence/${d.key}`, id: `item-${d.key}`, 'data-row': '', 'aria-label': label }, ...parts, th)
+      : el('button', { class: `ui-row ev-card${evRich ? ' rich' : ''}`, id: `item-${d.key}`, 'data-row': '', 'aria-expanded': String(open), 'aria-label': label }, ...parts, th);
+    if (!desk) row.onclick = () => { evOpen = open ? '' : d.key; reshow(`#item-${CSS.escape(d.key)}`); };
+    return el('li', { class: open ? 'open' : '' }, row, open ? evOpened(d) : '');
+  }
+  /** A proof opened in its row: its captures in a strip that snaps one to a swipe (each its own shape, as tall as the strip), what it says in full, its panel and Open proof. */
+  function evOpened(d) {
+    const stills = evStills(d), said = plain((d.about ?? '').replace(HELD, '').replace(UNCONFIRMED, '')), name = plain(headline(d));
+    const strip = stills.length ? el('div', { class: 'ev-strip', role: 'group', 'aria-label': `${plural(stills.length, 'capture')}, swipe for the next` },
+      ...stills.map(([path, , light], i) => el('a', { href: src(path), target: '_blank', rel: 'noopener', 'aria-label': `Open capture ${i + 1} of ${stills.length} full size` }, el('img', { src: src(light), alt: '', loading: 'lazy', decoding: 'async' }))))
+      : el('div', { class: 'ev-hero none' }, evGlyph('image'), 'Text only: no capture was filed');
+    const dots = stills.length > 1 ? el('div', { class: 'ev-dots-n', 'aria-hidden': 'true' }, ...stills.map((_, i) => el('i', { class: i ? '' : 'on' }))) : '';
+    if (dots) strip.onscroll = () => { const kids = [...strip.children], at = kids.reduce((b, k, i) => (Math.abs(k.offsetLeft - strip.scrollLeft) < Math.abs(kids[b].offsetLeft - strip.scrollLeft) ? i : b), 0); [...dots.children].forEach((x, i) => x.classList.toggle('on', i === at)); };
+    const go = el('a', { class: 'ev-go', href: `#evidence/${d.key}` }, el('span', {}, 'Open proof'), el('span', { class: 'ev-go-s' }, 'Verdict and activity'), glyph('right'));
+    go.onclick = () => { evOpen = ''; };
+    return el('div', { class: 'ev-open' }, strip, dots, said && said !== name ? el('p', { class: 'ev-about', dir: 'auto' }, said) : '', evProps(d), go);
   }
   /** Evidence as the approved new look draws it: the title row with the project filter, Newest or By priority, Held up today (one square per proof filed today
    *  in the order filed: ink where done-done says it holds up, red where it failed or could not be confirmed), then the proof as rows, six until See all.
@@ -2402,6 +2461,9 @@
     const sorted = evSort === 'prio' ? [...list].sort((x, y) => rank(x) - rank(y)) : list, all = evMore || sorted.findIndex((d) => d.key === selected) >= 6;
     const see = sorted.length > 6 ? el('button', { class: 'see' }, all ? 'Show fewer' : 'See all') : '';
     if (see) see.onclick = () => { evMore = !all; redraw('.ev-sec .see'); };
+    // Previews: every row with its first capture large beside its title, or compact rows; kept in this browser.
+    const pv = el('button', { class: 'ev-pv', 'aria-pressed': String(evRich) }, evGlyph('image'), 'Previews');
+    pv.onclick = () => { evRich = !evRich; try { localStorage.setItem('so-ev-view', evRich ? 'rich' : 'compact'); } catch {} redraw('.ev-pv'); };
     // The board's Select and Clear all, as Today keeps its More: while selecting, Cancel and Dismiss sit under the title; otherwise one quiet line under the list opens them.
     const bulk = canDismiss() && proofs.length ? (selecting ? bulkBar(proofs) : el('button', { class: 't-more-line ev-more', 'aria-haspopup': 'dialog' }, el('span', {}, 'Select or clear all'), glyph('right'))) : '';
     if (bulk && !selecting) bulk.onclick = () => openSheet('Proof', el('div', { class: 'ui-props ev-pick' }, ...[['Select', () => { selecting = true; render(); }],
@@ -2410,7 +2472,7 @@
       b.onclick = () => { sheet.close(); fn(); };
       return b;
     })));
-    return [...(ro ? [ro] : []), ...(selecting ? [bulk] : []), seg, head, el('h2', { class: 'ui-sec ev-sec' }, evSort === 'prio' ? 'By priority' : 'Latest proof', see),
+    return [...(ro ? [ro] : []), ...(selecting ? [bulk] : []), seg, head, el('h2', { class: 'ui-sec ev-sec' }, el('span', { class: 'ev-st' }, evSort === 'prio' ? 'By priority' : 'Latest proof'), pv, see),
       sorted.length ? el('ul', { class: 'ui-card ui-list ev-list' }, ...(all ? sorted : sorted.slice(0, 6)).map(evRow)) : el('p', { class: 'empty' }, 'No proof for this project.'),
       ...items.filter((d) => d.type !== 'evidence').map((d) => row(d)), ...(selecting ? [] : [bulk])];
   }
