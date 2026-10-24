@@ -1209,7 +1209,7 @@ function ticket(args: string[]) {
     const next: any = { ...had, id, title: title ?? had!.title, progress: progress ?? had?.progress ?? 0 };
     for (const [k, v] of Object.entries({ parent, priority: values.priority, project: values.project, hold: yesNo(values.hold), asked: yesNo(values.asked), release: values.release, state: values.state, prs: values.pr === undefined ? undefined : values.pr.every((v: string) => v === '') ? '' : [...new Set(values.pr.flatMap((v: string) => v.split(',').map((u: string) => u.trim())))] })) if (v === '') delete next[k]; else if (v !== undefined) next[k] = v;
     const fault = ticketFault(next);
-    if (fault) throw fail(`ticket ${id}: ${fault.replace(/^(title|progress|parent|priority|project|hold|asked|release|state|prs)/, '--$1').replace('must be true or false', 'must be yes or no')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi ticket --help`');
+    if (fault) throw fail(`ticket ${id}: ${fault.replace(/^(title|progress|parent|priority|project|hold|asked|release|state|prs)/, '--$1').replace(/^--prs\b/, '--pr').replace('must be true or false', 'must be yes or no')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi ticket --help`');
     const same = had && JSON.stringify(row(had)) === JSON.stringify(row(next));
     if (!same) appendTicket(file, next);
     return toon({ board: tilde(file), ticket: row(next), status: same ? 'unchanged' : had ? 'updated' : 'created' }, [`Pass --ticket ${id} to raise or post, so the card shows this ticket`, `Run \`sign-off-axi ticket${on} --id ${id} --progress <0-100>\` as the work moves`]);
