@@ -52,7 +52,9 @@ after(async () => {
   // Let Chrome flush its profile before deleting it; killing its parent can leave children writing into the removed folder.
   if (shared?.proc.exitCode === null) {
     const exited = new Promise((ok) => shared.proc.once('exit', ok));
-    await shared.call('Browser.close');
+    // Chrome can exit before replying to Browser.close. Await its exit, not an unref'ed
+    // reply timeout that lets Node leave this hook before scratch cleanup runs.
+    shared.call('Browser.close');
     await exited;
     shared.ws.close();
   }
@@ -565,6 +567,32 @@ async function browse(_dir, width = 800, height = 4000, mobile = false) {
   const capture = async (clip) => jpeg.decode(Buffer.from((await send('Page.captureScreenshot', { format: 'jpeg', quality: 90, clip: { ...clip, scale: 1 } }))?.data ?? '', 'base64'), { useTArray: true });
   return { evaluate, click, tap, swipe, insertText, send, capture, close: () => call('Target.disposeBrowserContext', { browserContextId }).catch(() => {}) };
 }
+
+
+test('a merged card is hidden while its shown merger waits, and shown again once the merger is dismissed', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const file = join(scratch, 'merged-hide.json');
+  assert.equal(run('raise', file, '--key', 'hide-x', '--title', 'Keep the old login screen?').code, 0);
+  assert.equal(run('raise', file, '--key', 'hide-y', '--title', 'Ship the new login screen?', '--merge', 'hide-x').code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(scratch);
+  const visible = (key) => until(async () => (await evaluate(`[...document.querySelectorAll('.decide-list .dl-face[id]')].map((e) => e.id).join()`)) === `item-${key}`);
+  try {
+    // One isolated browser checks the actual list after each load. Three cold --dump-dom
+    // processes with a virtual-time budget used process exit as a proxy for list readiness.
+    await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+    await visible('hide-y');
+    for (const [dismissed, shown] of [[true, 'hide-x'], [false, 'hide-y']]) {
+      const response = await post(url, 'api/dismiss', { keys: ['hide-y'], dismissed });
+      assert.equal(response.status, 200, await response.text());
+      await evaluate('location.reload()');
+      await visible(shown);
+    }
+  } finally {
+    await close(); proc.kill();
+  }
+});
 
 test('an interactive page that posts its height gets a frame that fits it, each frame only its own and never past 10000px; a design shows the recommended phone frame first', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'fit'), file = join(dir, 'board.json'), pages = join(dir, 'mocks', 'page');
