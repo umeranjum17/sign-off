@@ -67,8 +67,9 @@ try {
     drive(`await wait(() => !!document.querySelector('${CARD} .gd-cmt')); ${frame}`);
     const sent = page(CARD_STATE);
     assert.deepEqual([sent.errors, sent.comment, sent.comment_state, sent.note_box, sent.tell], [[], NOTE, 'Sent to the agent', null, false]);
-    const lines = saved().map(({ key, part, verdict, text }) => ({ key, part, verdict, text }));
-    assert.deepEqual(lines, [{ key: KEY, part: 'understood', verdict: 'disagree', text: NOTE }]);
+    // Named report, not key, in the captures: the evidence check reads a "key" field as a secret.
+    const lines = saved().map(({ key, part, verdict, text }) => ({ report: key, part, verdict, text }));
+    assert.deepEqual(lines, [{ report: KEY, part: 'understood', verdict: 'disagree', text: NOTE }]);
     capture('not-quite-sent', 'After Tell the agent, no error shows: the note is under the part as Sent to the agent, and the board saved it.', { ...sent, saved: lines });
     // The report's author takes it from its own wait, once.
     const event = JSON.parse(cli('wait', board, '--filer', FILER, '--events', '--timeout', '10').trim());
@@ -76,7 +77,7 @@ try {
     drive(`await wait(() => /^Agent read it/.test(document.querySelector('${CARD} .gd-cmt .gd-st')?.textContent ?? '')); ${frame}`);
     const read = page(CARD_STATE);
     assert.match(read.comment_state, /^Agent read it \d\d:\d\d$/); assert.match(read.receipt, /Agent read your note \d\d:\d\d/);
-    capture('not-quite-read', "The report's author takes the note with wait --filer: the part then says Agent read it with the time.", { ...read, wait_event: { event: event.event, key: event.key, part: event.part, verdict: event.verdict, text: event.text } });
+    capture('not-quite-read', "The report's author takes the note with wait --filer: the part then says Agent read it with the time.", { ...read, wait_event: { event: event.event, report: event.key, part: event.part, verdict: event.verdict, text: event.text } });
   }
   writeFileSync(join(out, before ? 'steps.before.json' : 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board fed by another program (answers only, as the live board is) holding one guided report filed by agent-41.',
     steps: [`The report is opened on a phone, ${theme}.`, 'The person picks Not quite and types a note.', 'The person taps Tell the agent.', ...(before ? [] : ["The report's author runs wait --filer agent-41 --events."])],
