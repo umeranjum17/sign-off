@@ -1,7 +1,7 @@
 # 0.6.3 performance and PWA plan
 
 Measured 24 October 2026 on main `39eb6c236557c2c714ae761dc071a73dfd37c65f` (0.6.2-dev).
-This PR delivers profiling and the implementation plan, not the 0.6.3 release.
+This PR delivers profiling, the first Decide rendering slice and the remaining implementation plan, not the 0.6.3 release.
 
 ## Baseline
 
@@ -47,7 +47,9 @@ Targets below are acceptance floors. Predicted gains are hypotheses to test on t
 | Parallel prerequisite | Sonnet, medium | Service worker/offline shell and manifest palette in new `web/sw.js`, `web/manifest.webmanifest`, registration/status in `web/index.html`, routes/cache headers in `src/cli.ts`; icons only if install tests require. Update PWA feature map and integration/browser journey. | Installable on HTTPS/localhost, offline reload and already-loaded data on all five routes; P≥90/A≥95/BP≥95. Cold unknown data gets an honest unavailable state. | Authenticated cached data, stale versions, cache eviction, cookie/token rotation, remote HTTP origins; no silently successful offline writes. Cache only successful authorized reads, version/purge shell caches, keep board data scoped and visibly stale. |
 | Final | Sonnet, small | 0.6.3 release bump (`package.json`, lockfile), README/packaged skill/site as applicable, final evidence and feature map. | Three cold mobile runs per screen, median P≥90/A≥95/BP≥95 and no run below floors; Android Chrome and iPad Safari add-to-home-screen launch/offline proof, install-prompt frame (Android) and Safari Add to Home Screen flow frame, theme/splash screenshots. | iPad has its own home-screen flow, no equivalent Android install prompt; current Lighthouse has no PWA category. Verify capabilities explicitly. |
 
-No hard implementation slice is included in this profiling PR: the first baseline exceeds the numeric floors, the diagnostic repeat has unresolved TBT variance, a clean repeat also drops Tickets below 90, and no single hard refactor has been shown to outweigh the missing PWA capability or cheaper CSS work. Sol owns slices 3 and 4 after the cheap slices are remeasured. Firstmate can start the PWA worker and CSS worker independently (both touch `src/cli.ts`, so assign distinct route branches and reconcile before proof); contrast should avoid the PWA worker's manifest files.
+The first hard slice now bounds phone Decide rendering to 24 rows each in Asks, Later and Answered, loading the next batch on Show more. The 250-row fixture had 5407 mobile DOM nodes and zero images; its ask JSON was 392838 bytes (1571 bytes per ask on average), while all state transferred in about 30 KB compressed. The mobile trace spent ~330 ms updating styles. This targets the expensive row construction/layout/animations without changing API payloads, counts, bulk operations or the full answer queue. Desk lists keep every row for J/K navigation. Before/after Lighthouse and the new large-list verification journey must confirm Decide P≥90, A≥95, BP≥95; the wider shell and payload refactors remain separate work.
+
+Firstmate can start PWA and static-compression builders independently (both touch `src/cli.ts`, so assign distinct route branches and reconcile before proof); contrast should avoid the PWA worker's manifest files. Sol retains screen splitting and producer-side state pagination as later hard slices. PWA proof must include a manifest/installability check beside Lighthouse: valid name/icons/start URL, service-worker control, successful offline navigation and loaded data, native Android install eligibility/prompt and iPad Add to Home Screen. Lighthouse 13 has no PWA category, so do not invent a numeric PWA score.
 
 ## Repeat the measurement
 

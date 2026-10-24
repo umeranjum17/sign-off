@@ -8,6 +8,8 @@ app: "sign-off"
 journeys:
   detail-sequence:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/sequence-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
+  decide-load:
+    command: 'node .agents/skills/done-done-verify-sign-off/decide-load-shots.mjs "$DECIDE_PERF_BASE" "$DONE_DONE_EVIDENCE_ROOT" after'
   # Production-sized synthetic board, five mobile Lighthouse navigations; tooling stays outside the checkout.
   pwa-profile:
     command: 'node scripts/profile-board.mjs "$DONE_DONE_EVIDENCE_ROOT"'

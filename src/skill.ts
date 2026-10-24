@@ -32,7 +32,7 @@ ${HERMES_TAGS.map((tag) => `      - ${tag}`).join('\n')}
 
 sign-off-axi puts your questions on one local page (127.0.0.1) where the user answers each with one click, and saves the answers for you to read back.
 Every question is an item: post it, wait, read the answer back.
-The board has four places: Today (what needs the user and what was proven today), Decide (every ask that waits), Evidence (proof, never an ask) and Reports (explainers).
+The board has four places: Today (what needs the user and what was proven today), Decide (every ask that waits; Show more on a phone reveals the next rows without changing the counts), Evidence (proof, never an ask) and Reports (explainers).
 
 With no board file named, a command uses the nearest \`.sign-off/\` board that \`npx -y sign-off-axi init\` set up in the project (looking up to the repo root), else \`~/.sign-off/decisions.json\`. Name a board file after the command only to use another one. Tests and scratch runs must never reach the user's own board: set \`SIGN_OFF_HOME\` to a temporary folder.
 When you start a throwaway server with \`open <board>\` or foreground \`serve <board>\`, stop it before finishing with \`npx -y sign-off-axi stop <board>\` (the same board file). Do not shell-kill the printed PID or leave the server running for a timeout: stop checks that the recorded server serves that board and leaves other boards alone.
