@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import { accessSync, constants, readFileSync, realpathSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
-import { GUARDS, isKey, MEDIA_MAX, PRIORITIES, REPORT_FORMS, REPORT_PARTS, REPORT_PURPOSES } from './store.js';
+import { CAPTION_MAX, EVIDENCE_STATUSES, GUARDS, isKey, MEDIA_MAX, PRIORITIES, REPORT_FORMS, REPORT_PARTS, REPORT_PURPOSES } from './store.js';
 
 /** A message that does not match: what is wrong, and the one line that says how to fix it. */
 export class ContractError extends Error {
@@ -21,7 +21,7 @@ const COMMON = ['contract', 'kind', 'schema', 'key', 'title', 'filer', 'ticket',
 const FIELDS: Record<string, string[]> = {
   ask: [...COMMON, 'ask_ref', 'detail', 'why', 'options', 'recommend_value', 'recommend_reason', 'default_if_silent', 'silent_by', 'guard', 'close', 'merges', 'proof', 'report'],
   report: [...COMMON, 'filed', 'group', 'decided', 'form', 'video', 'asked_by', 'view', 'preview'],
-  evidence: [...COMMON, 'media', 'run'],
+  evidence: [...COMMON, 'media', 'run', 'status', 'captions'],
   gate: [...COMMON, 'run', 'options', 'recommend_value', 'close'],
   finding: [...COMMON, 'cause', 'incidents', 'days', 'evidence_ids', 'change_kind', 'proposal', 'options', 'recommend_value'],
   plan: [...COMMON, 'project', 'sections', 'decisions', 'steps', 'view'],
@@ -328,7 +328,7 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
     text('about', m.about, 500, `${what}, in 500 characters or fewer`);
   }
   if (m.kind === 'evidence') {
-    if (!Object.hasOwn(m, 'media') && !Object.hasOwn(m, 'run')) throw bad('media', 'or run is required', 'Add "media": ["shot.png"], files next to the message, or "run": the done-done run it proves');
+    if (!Object.hasOwn(m, 'media') && !Object.hasOwn(m, 'run') && !Object.hasOwn(m, 'status')) throw bad('media', 'or run is required', 'Add "media": ["shot.png"], files next to the message, or "run": the done-done run it proves, or a "status" to post the card with its frame pending');
     if (Object.hasOwn(m, 'media')) {
       if (!Array.isArray(m.media) || !m.media.length || m.media.length > MEDIA_MAX) throw bad('media', `must list 1 to ${MEDIA_MAX} files`, 'Set "media" to file paths next to the message, such as ["shot.png"]');
       m.media.forEach((p: unknown, n: number) => {
@@ -336,6 +336,11 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
         if (/^([\\/]|[A-Za-z]:)/.test(p as string) || (p as string).split(/[\\/]/).includes('..')) throw bad(`media[${n}]`, `${show(p)} must be a relative path with no ..`, 'Give the path from the message file\'s folder, such as "evidence-out/after.png"');
         if (!/\.(png|jpe?g|webp|mp4|webm)$/i.test(p as string)) throw bad(`media[${n}]`, `${show(p)} must end in .png, .jpg, .jpeg, .webp, .mp4 or .webm`, 'Post a screenshot or recording in one of those formats');
       });
+    }
+    if (Object.hasOwn(m, 'status') && !EVIDENCE_STATUSES.includes(m.status)) throw bad('status', `${show(m.status)} is not one of ${EVIDENCE_STATUSES.join(', ')}`, `Set "status" to where the work stands: ${EVIDENCE_STATUSES.join(', ')}, or leave it out`);
+    if (Object.hasOwn(m, 'captions')) {
+      if (!Array.isArray(m.captions) || !Array.isArray(m.media) || m.captions.length !== m.media.length) throw bad('captions', 'must list one caption for each file in "media"', 'Set "captions" to one short caption per capture, such as ["Before", "After"], or leave it out');
+      m.captions.forEach((c: unknown, n: number) => text(`captions[${n}]`, c, CAPTION_MAX, 'a caption such as "Before, phone", in 40 characters or fewer'));
     }
     if (Object.hasOwn(m, 'run')) checkRun(RUN);
     return { kind: m.kind, schema: m.schema };

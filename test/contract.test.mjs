@@ -1538,3 +1538,48 @@ test('a card carries a priority and a project its own icon: every post takes --p
     assert.equal((await fetch(`${url}api/project-icon?name=Beacon`)).status, 404);
   } finally { proc.kill(); }
 });
+
+test('post --kind evidence: a concern card keeps its status and a caption for each capture, and refuses a status or captions that do not fit', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const dir = mkdtempSync(join(scratch, 'concern-')), board = join(dir, 'board.json');
+  const cli2 = (...args) => spawnSync('node', [cli, ...asked(args)], { encoding: 'utf8', env });
+  const write = (name, body) => {
+    const path = join(dir, name);
+    writeFileSync(path, JSON.stringify(body));
+    return path;
+  };
+  for (const n of ['before.png', 'after.png']) writeFileSync(join(dir, n), readFileSync(join(fixtures, 'evidence.v1', 'shot.png')));
+  const card = { contract: 1, kind: 'evidence', schema: 1, key: 'concern-send', title: 'Comment Send answers at once', about: 'Send shows Sending, then Sent.', media: ['before.png', 'after.png'], status: 'Fixed', captions: ['Before, phone', 'After, phone'] };
+  for (const [change, error] of [[{ status: 'Done' }, /status .*Done.* is not one of Fixed, In progress, Waiting on you/], [{ captions: ['Before'] }, /captions must list one caption for each file in .*media/], [{ captions: ['Before', 'x'.repeat(41)] }, /captions\[1\] is 41 characters, over 40/]]) {
+    const refused = cli2('post', board, '--kind', 'evidence', '--from', write('bad.json', { ...card, ...change }));
+    assert.equal(refused.status, 2, refused.stdout + refused.stderr);
+    assert.match(refused.stdout, error);
+  }
+  const posted = cli2('post', board, '--kind', 'evidence', '--from', write('card.json', card));
+  assert.equal(posted.status, 0, posted.stdout + posted.stderr);
+  const item = JSON.parse(readFileSync(board, 'utf8')).items[0];
+  assert.equal(item.status, 'Fixed');
+  assert.deepEqual(item.captions, ['Before, phone', 'After, phone']);
+  // The same message again adds nothing, and a card with neither field still posts as before.
+  assert.match(cli2('post', board, '--kind', 'evidence', '--from', join(dir, 'card.json')).stdout, /already posted/);
+  assert.equal(cli2('post', board, '--kind', 'evidence', '--from', write('plain.json', { ...card, key: 'concern-plain', status: undefined, captions: undefined })).status, 0);
+});
+
+test('post --kind evidence: a concern card with a status and no frame posts and keeps no media; with neither status nor proof it is refused', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const dir = mkdtempSync(join(scratch, 'pending-')), board = join(dir, 'board.json');
+  const cli2 = (...args) => spawnSync('node', [cli, ...asked(args)], { encoding: 'utf8', env });
+  const write = (name, body) => { const path = join(dir, name); writeFileSync(path, JSON.stringify(body)); return path; };
+  const card = { contract: 1, kind: 'evidence', schema: 1, key: 'concern-pending', title: 'The leash is not real yet', about: 'Frame pending: nothing is built yet.', status: 'In progress' };
+  const { status: _s, ...bare } = card;
+  assert.equal(cli2('post', board, '--kind', 'evidence', '--from', write('bare.json', bare)).status, 2);
+  const posted = cli2('post', board, '--kind', 'evidence', '--from', write('card.json', card));
+  assert.equal(posted.status, 0, posted.stdout + posted.stderr);
+  const item = JSON.parse(readFileSync(board, 'utf8')).items[0];
+  assert.equal(item.status, 'In progress');
+  assert.equal(item.media, undefined);
+});

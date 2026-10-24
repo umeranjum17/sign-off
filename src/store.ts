@@ -63,8 +63,8 @@ export type Decision = {
   sections?: PlanSection[]; decisions?: PlanDecision[]; project?: string;
   /** A guided plan or report (plan 2, report 3): the board draws it as one page from these fields, with no page of the agent's own. */
   engagement?: { kind: string; schema: number; filer: string; revision: string }; guided?: boolean; understood?: { label: string; text: string }[]; visual?: GuideVisual; next?: { heading: string; lines: string[] };
-  /** Designs: project, date, review status, preview and screen views. */
-  status?: 'draft' | 'in_review' | 'approved'; journeys?: DesignJourney[]; recommend?: string;
+  /** Designs: project, date, review status, preview and screen views. An evidence update's `status` is one of EVIDENCE_STATUSES and its `captions` name each capture, in order. */
+  status?: 'draft' | 'in_review' | 'approved' | 'Fixed' | 'In progress' | 'Waiting on you'; captions?: string[]; journeys?: DesignJourney[]; recommend?: string;
   /** Design 2: the frame role Yes approves, and the reviewer's note shown as Main reviewed. */
   accepts?: string; reviewed?: string;
 };
@@ -104,6 +104,10 @@ export const SIGNED_IN: Option = { value: 'done', label: 'Signed in' };
 export const REPLY: Option = { value: 'text', label: 'Reply' };
 const VERDICTS: Option[] = [{ value: 'pass', label: 'Pass' }, { value: 'fail', label: 'Fail' }, { value: 'needs-work', label: 'Needs work' }];
 export const MEDIA_MAX = 12;
+/** Where a concern stands, as an evidence update says it in plain words. */
+export const EVIDENCE_STATUSES = ['Fixed', 'In progress', 'Waiting on you'];
+/** A capture's caption, such as "Before, phone": 40 characters or fewer. */
+export const CAPTION_MAX = 40;
 export const ATTACH_MAX = 5;
 export const ATTACH_DEFAULT_MB = 1024;
 /** A download name: letters, digits and . _ ( ) + - or a space, never a path. */
@@ -206,7 +210,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
         && /^[a-f0-9]{64}$/.test(a.sha256 ?? '') && Number.isInteger(a.bytes) && a.bytes >= 0))) {
       throw bad('attachments', `must list 1 to ${ATTACH_MAX} files on an evidence update, each under evidence/<number>/ with its name, sha256 and bytes`);
     }
-    if (stored && !(d.type === 'evidence' && d.media === undefined && (d.evidence || d.attachments))) {
+    if (stored && !(d.type === 'evidence' && d.media === undefined && (d.evidence || d.attachments || d.status))) {
       const [max, kinds, ext] = stored;
       if (!Array.isArray(d.media) || !d.media.length || d.media.length > max || !d.media.every((m: any) => isText(m?.path)
         && /^evidence\/\d+\/\w[\w-]*\.\w+$/.test(m.path) && ext.test(m.path) && /^[a-f0-9]{64}$/.test(m.sha256 ?? '') && Number.isInteger(m.bytes) && m.bytes >= 0)) {
@@ -217,6 +221,11 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       if (!d.media.every((m: any) => copy(m.light, m, 'light') && copy(m.thumb, m, 'thumb') && copy(m.tile, m, 'tile'))) {
         throw bad('media', 'light, thumb and tile copies must sit beside their file as <n>-light, <n>-thumb or <n>-tile .jpg or .png, each with its sha256, bytes, width and height');
       }
+    }
+    if (d.type === 'evidence' && d.status !== undefined && !EVIDENCE_STATUSES.includes(d.status)) throw bad('status', `must be one of ${EVIDENCE_STATUSES.join(', ')}`);
+    if (d.captions !== undefined && (d.type !== 'evidence' || !Array.isArray(d.media) || !Array.isArray(d.captions) || d.captions.length !== d.media.length
+      || !d.captions.every((c: any) => isText(c) && c.trim() && [...c].length <= CAPTION_MAX))) {
+      throw bad('captions', `must list one caption of ${CAPTION_MAX} characters or fewer for each capture of an evidence update`);
     }
     if (d.type === 'explainer' && d.chapters !== undefined && (!Array.isArray(d.chapters) || !d.chapters.length || d.chapters.length > CHAPTERS_MAX
       || !d.chapters.every((c: any, n: number) => Number.isInteger(c?.at) && c.at >= 0 && (!n || c.at > d.chapters[n - 1].at) && isText(c.title) && c.title.trim() && c.title.length <= 120))) {
@@ -304,7 +313,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       ...(d.steps && { steps: d.steps.map(({ title, marks, text }: Step) => ({ title, ...(text && { text }), ...(marks?.length && { marks }) })) }),
       ...(stored && d.media && { media: d.media.map(({ path, sha256, bytes, light, thumb, tile }: MediaRef) => ({ path, sha256, bytes, ...(light && { light: copyRef(light) }), ...(thumb && { thumb: copyRef(thumb) }), ...(tile && { tile: copyRef(tile) }) })) }),
       ...(d.attachments && { attachments: d.attachments.map(({ path, name, sha256, bytes }: AttachRef) => ({ path, name, sha256, bytes })) }),
-      ...(d.type === 'evidence' && { number: d.number }),
+      ...(d.type === 'evidence' && { number: d.number, ...(d.status && { status: d.status }), ...(d.captions && { captions: d.captions }) }),
       // A gate's run is part of its question: the same key with another run is a different question.
       // A report keeps its kind, so an ask can name it (--report) and the board can find it.
       ...(report && { kind: 'report' }),

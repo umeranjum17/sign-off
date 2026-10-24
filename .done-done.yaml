@@ -175,6 +175,9 @@ journeys:
   # Evidence's inline previews on a throwaway board of eight proofs: the list at 390 in light and dark (each row's project icon, done-done's word and first capture), one row opened in place with its captures in a strip, Previews on, and the list on a 1280 desk.
   evidence-previews:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/evidence-previews-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
+  # Concern cards on a throwaway board of three cards (Fixed and In progress with before and after captions, one with its frame pending): the list at 390 in light and dark, the Fixed card opened at 390, and the list beside it at 1280.
+  concern-cards:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/concern-cards-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   board-actions:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/board-actions.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   attach:
