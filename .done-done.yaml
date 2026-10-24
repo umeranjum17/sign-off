@@ -69,6 +69,10 @@ journeys:
   # measured in the browser; DESIGNS_PROTO=<the approved prototype's index.html> saves each beside the prototype's frame, DESIGNS_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
   designs:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/designs-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${DESIGNS_THEME:-light}" "${DESIGNS_WIDTH:-390}"'
+  # Designs one tap away on a phone: Decide's Asks and Designs, Designs lighting Decide, the order sheet, Today's Designs to review with design thumbnails, project icons in every tile
+  # and each phone list's end clear of the dock, at 360, 390, 445, 1280 and 1440 in light and dark. DESIGNS_ACCESS_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
+  designs-access:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/designs-access-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   # A screen note typed in the design viewer on an answers-only (fed) board and Request change sent, one width per run: REQUEST_WIDTH=390|1280.
   request-change:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/request-change-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${REQUEST_THEME:-light}"'

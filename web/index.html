@@ -1619,9 +1619,9 @@
   body.tickets .ui-row .meta, body.tickets .ui-row .l2 { margin: 0; }
   :is(.tk-top, .tk-dhead) .ui-rb { min-height: 0; padding: 0; border: 0; }
   :is(.tk-top, .tk-dhead) .ui-rb .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.6; }
-  .tk-rb.on { background: var(--tk-ink); color: var(--tk-canvas); }
+  :is(.tk-rb, .dl-rb).on { background: var(--tk-ink); color: var(--tk-canvas); }
   body.tickets :focus-visible { outline-color: var(--tk-ink); }
-  .tk-seg small { color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); font-weight: 500; font-variant-numeric: tabular-nums; }
+  :is(.tk-seg, .dl-seg) small { color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); font-weight: 500; font-variant-numeric: tabular-nums; }
   .tk-fpill { position: relative; display: inline-flex; align-items: center; gap: 0.5rem; height: 2rem; min-height: 0; margin-top: 0.75rem; padding: 0 0.625rem 0 0.375rem; border: 0; border-radius: 1rem;
     background: var(--tk-card); color: var(--tk-ink); font: inherit; font-size: var(--tk-fs-row); font-weight: 500; box-shadow: var(--tk-elev-card), inset 0 1px 0 var(--tk-hl); }
   .tk-fpill::after { content: ""; position: absolute; inset: -0.375rem 0; }
@@ -1647,8 +1647,8 @@
   .tk-empty p, .tk-none { margin: 0.25rem 0 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
   .tk-none { margin: 0.75rem 0 0; color: var(--tk-text-tertiary); }
   /* The project filter's sheet: Every project, then each project with its tickets' count, the one picked checked. */
-  .tk-pick { width: 100%; min-height: 3rem; padding: 0; border: 0; border-radius: 0; background: none; font: inherit; font-size: var(--tk-fs-row); text-align: left; }
-  .tk-pick .k { color: var(--tk-ink); } .tk-pick:active { background: none; } .tk-pick .glyph { width: 1rem; height: 1rem; color: var(--tk-ink); }
+  :is(.tk-pick, .dl-pick) { width: 100%; min-height: 3rem; padding: 0; border: 0; border-radius: 0; background: none; font: inherit; font-size: var(--tk-fs-row); text-align: left; }
+  :is(.tk-pick, .dl-pick) .k { color: var(--tk-ink); } :is(.tk-pick, .dl-pick):active { background: none; } :is(.tk-pick, .dl-pick) .glyph { width: 1rem; height: 1rem; color: var(--tk-ink); }
   /* A ticket over the list, on a phone: a sheet from the bottom over a dimmed list, up to 48px from the top, scrolling inside. */
   .tk-over { position: fixed; z-index: 30; inset: 0; }
   .tk-scrim { position: absolute; inset: 0; background: var(--tk-scrim); }
@@ -3215,7 +3215,9 @@
     const queue = [...by.waiting].sort((x, y) => lead(x) - lead(y)), up = upNext(queue), rest = waitingOn(queue.slice(1)), tiles = todayTiles(by), more = moreLine(by), replies = repliesOn();
     if (todayMore.open) fillMore(by);
     if (location.hash === '#find' && !searchSheet.open) openSearch();
-    return phone() ? [up, replies, rest, tiles, more] : [el('div', { class: 't-cols' }, el('div', {}, up, tiles, more), el('div', {}, replies, rest))];
+    const open = by.designs.filter(dzOpen), designs = open.length ? el('section', { class: 't-wait', 'aria-label': 'Designs to review' }, el('h2', { class: 'ui-sec' }, 'Designs to review', el('a', { class: 'see', href: '#designs' }, 'See all')),
+      el('ul', { class: 'ui-card ui-list' }, ...open.slice(0, 2).map(designRow))) : '';
+    return phone() ? [up, replies, rest, designs, tiles, more] : [el('div', { class: 't-cols' }, el('div', {}, up, tiles, more), el('div', {}, replies, rest, designs))];
   }
 
   /** A short row's second line: what changed, unless the headline already says it. */
@@ -4434,10 +4436,11 @@
     }
     if (sel) h1.textContent = sel.title;
     const changes = items.filter((d) => designStatus(d) === 'Changes requested').length;
+    if (phone() && !sel) h1.textContent = 'Decide';
     if (phone()) top.className = 'ui-top dz-top', top.replaceChildren(h1, ...(sel ? [sel.all, sel.bar] : [more, theme]));
     else top.className = 'ui-dhead dz-head', top.replaceChildren(el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Designs'), h1,
       el('p', {}, items.length ? `${plural(items.length, 'design')} on your board${changes ? ` · changes requested on ${changes > 1 && changes === items.length ? `all ${changes}` : changes}` : ''}` : EMPTY.designs), ro), el('div', { class: 'acts' }, ...(sel ? [sel.all, sel.bar] : [more, theme])));
-    return [phone() ? ro : ''];
+    return phone() ? [ro, decideSeg('designs')] : [''];
   }
   /** Designs, newest first: on a phone To review and the rows, then Archived; on a desk the cards and the open design (the one in the address, else the newest). */
   function designGroups(items, top, key, gone = []) {
@@ -4457,9 +4460,13 @@
     return [...head, el('section', { class: 'ui-card ui-hero dz-hero', 'aria-label': 'To review' }, el('div', { class: 'hl' }, el('span', { class: 'lab' }, 'To review')),
       el('div', { class: 'hv' }, el('span', { class: 'big' }, String(toReview), el('small', {}, ` of ${items.length}`)), approved ? el('span', { class: 'vs' }, `${approved} approved`) : '')),
       el('h2', { class: 'ui-sec' }, 'Newest', el('span', { class: 'n' }, String(items.length))),
-      el('ul', { class: 'ui-card ui-list dz-list' }, ...items.map((d) => { const t = ticketOf(d);
-        return el('li', { id: `item-${d.key}` }, el('a', { class: 'ui-row', href: `#designs/${d.key}`, 'aria-label': `Open design, ${d.title}${t?.progress > 0 ? `, ticket ${t.title}, ${t.progress}% done` : ''}` },
-          ...uiRow({ tile: cardTile(d), title: d.title, priority: d.priority, badge: trailBadge(d.key), meta: [designStatus(d), d.filed && day(d.filed)].filter(Boolean).join(' · '), progress: progressOf(t?.progress) }), selMark(d.key))); })), archived(gone)];
+      el('ul', { class: 'ui-card ui-list dz-list' }, ...items.map(designRow)), archived(gone)];
+  }
+  /** A design as a row: its tile (a thumbnail of its first screen), the title, its state and day (or its ticket's bar); it opens the design's review. */
+  function designRow(d) {
+    const t = ticketOf(d);
+    return el('li', { id: `item-${d.key}` }, el('a', { class: 'ui-row', href: `#designs/${d.key}`, 'aria-label': `Open design, ${d.title}${t?.progress > 0 ? `, ticket ${t.title}, ${t.progress}% done` : ''}` },
+      ...uiRow({ tile: cardTile(d), title: d.title, priority: d.priority, badge: trailBadge(d.key), meta: [designStatus(d), d.filed && day(d.filed)].filter(Boolean).join(' · '), progress: progressOf(t?.progress) }), selMark(d.key)));
   }
 
   /** Archived: what was discarded or dismissed from a screen, and the evidence and reports archived a day after they were filed. One quiet line at the list's end opens them
@@ -4570,6 +4577,28 @@
     return el('li', { class: `dl-row g-done${sel ? ' sel' : ''}`, 'data-key': d.key, style: `--n:${i}` }, el('a', { class: 'dl-face ui-row', href: `#decide/${d.key}`, draggable: 'false', 'data-row': '', ...(sel && { 'aria-current': 'true' }) },
       ...uiRow({ tile: uiIcon({ draw: 'done' }), title: title(d), badge: trailBadge(d.key), meta: `${s.replaces ? 'Changed to ' : ''}${saidOf(d, s)} · ${filedAt(s.at)}` })));
   }
+  /** On a phone Decide holds two lists, as Tickets holds Your asks and System: Asks (what waits on you) and Designs (the reviews still open), each with its count.
+   *  A desk keeps Designs in the sidebar. */
+  let decideCounts = { asks: 0, designs: 0 };
+  const dzOpen = (d) => ['In review', 'Draft'].includes(designStatus(d));
+  function decideSeg(on) {
+    const b = (v, href, name, n) => { const x = el('button', { type: 'button', 'aria-pressed': String(on === v) }, name, el('small', {}, String(n))); x.onclick = () => { if (on !== v) buzz('tick'), location.hash = href; }; return x; };
+    return el('div', { class: 'ui-seg dl-seg', role: 'group', 'aria-label': 'Decide' }, b('asks', '#waiting', 'Asks', decideCounts.asks), b('designs', '#designs', 'Designs', decideCounts.designs));
+  }
+  /** On a phone Decide's order (Newest or By priority) is a round button in its head, marked while By priority is on, opening a sheet of the two. */
+  const dlSortSheet = sheetOf('dl-sort');
+  function decideSortButton() {
+    const b = el('button', { class: `ui-rb dl-rb${dsort === 'priority' ? ' on' : ''}`, 'aria-label': `Order: ${dsort === 'priority' ? 'By priority' : 'Newest'}`, 'aria-haspopup': 'dialog' });
+    b.innerHTML = '<svg class="glyph" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 6h13M6 10h8M8.5 14h3"/></svg>';
+    b.onclick = () => {
+      const pick = (v, name) => { const x = el('button', { class: 'ui-pr dl-pick', ...(dsort === v && { 'aria-current': 'true' }) }, el('span', { class: 'k' }, name), el('span', { class: 'v' }, dsort === v ? glyph('check') : ''));
+        x.onclick = () => { dsort = v; try { localStorage.setItem('sign-off-decide-sort', v); } catch {} dlSortSheet.close(); render(); }; return x; };
+      dlSortSheet.replaceChildren(el('div', {}, sheetHead('dl-sort', 'Order'), el('div', { class: 'ui-props' }, pick('new', 'Newest'), pick('priority', 'By priority'))));
+      dlSortSheet.showModal();
+      dlSortSheet.querySelector('h2').focus();
+    };
+    return b;
+  }
   /** Decide's list: Newest or By priority, the hero (how many wait on you, how many you answered today, how many are for later), the asks in one card, then Later and Answered. */
   function decideList(items, hidden, done = [], today = 0) {
     const rows = { now: [], later: [] };
@@ -4593,7 +4622,7 @@
     // On a phone the asks' head sits over their card; on a desk, where the hero is hidden, the card carries its head and count inside it, as the prototype's list card.
     const desk = deskSel !== null, asks = rows.now.length ? card('Asks', rows.now, desk)
       : el('div', { class: `${desk ? '' : 'ui-card '}dl-clear` }, el('b', {}, 'All clear'), el('span', {}, `Nothing is waiting on you${state.name ? `, ${state.name}` : ''}.`));
-    return el('div', { class: `waiting-page decide-list${fresh ? ' rise' : ''}` }, seg, hero, ...(desk ? [el('section', { class: 'ui-card dl-asks' }, sec('Asks', n), asks)] : [sec('Asks'), asks]),
+    return el('div', { class: `waiting-page decide-list${fresh ? ' rise' : ''}` }, phone() ? decideSeg('asks') : seg, hero, ...(desk ? [el('section', { class: 'ui-card dl-asks' }, sec('Asks', n), asks)] : [sec('Asks'), asks]),
       ...(rows.later.length ? [sec('Later', later), card('Later', rows.later)] : []),
       // Every answer given, newest first.
       ...(done.length ? [sec('Answered', done.length), card('Answered', done.map(doneRow))] : []), items.length ? decideMoreLine(items) : '', archived(hidden));
@@ -5054,6 +5083,7 @@
     const decideDone = by.answered.filter(redo), walk = [...decideDone].reverse().concat(decideQueue);
     // On a desk, Decide's list and its ask share the screen, Evidence's list and its update, and Reports' list and its report.
     // On a phone an ask opens as a sheet over Decide's list, so the page under it keeps the list's head.
+    decideCounts = { asks: by.waiting.filter((d) => sideOf(d) === 'now').length, designs: by.designs.filter(dzOpen).length };
     const deskSplit = !phone() && ((at === 'waiting' || at === 'decide' || at === 'reports') && !state.readonly || at === 'evidence'), head = at === 'decide' ? 'waiting' : at;
     deskSel = null;
     // A report in the address is shown (and read) beside the list; with none, the newest is shown, not yet marked read.
@@ -5090,7 +5120,7 @@
       el('a', { class: 'sfind', href: '#find' }, document.getElementById('dock-find').firstChild.cloneNode(true), 'Search'), ...SIDE.map(link),
       el('div', { class: 'me' }, el('i', { 'aria-hidden': 'true' }, [...who][0].toUpperCase()), el('span', { dir: 'auto' }, who), themeButton()),
       state.version ? el('p', { class: 'ver' }, `Version ${state.version}`) : '');
-    paintTabs(active === 'designs' ? '' : active, count, badge);
+    paintTabs(active === 'designs' ? 'waiting' : active, count, badge);
     const ro = state.readonly ? 'Read only' : FROZEN ? `Read-only copy, ${FROZEN.exported}` : '';
     const pageTitle = head === 'decide' || head === 'waiting' ? 'Decide' : head === 'reports' ? 'Reports' : AREAS[head];
     document.body.classList.toggle('today', !at);
@@ -5099,7 +5129,7 @@
     const answeredToday = by.answered.filter((d) => isToday(state.answers[d.key].at)).length;
     // Decide's head, as ui.css draws it: the title and the light-or-dark button at its right edge; More sits under the list.
     const sel = selecting && canDismiss() && bulk.length && ['waiting', 'designs'].includes(head) && selectHead(bulk);
-    const top = head === 'waiting' && !state.readonly ? el('header', { class: 'ui-top' }, el('h1', { tabindex: '-1', 'data-crumb': pageTitle }, sel ? sel.title : pageTitle), ro ? el('p', { class: 'meta' }, ro) : '', ...(sel ? [sel.all, sel.bar] : [themeButton()]))
+    const top = head === 'waiting' && !state.readonly ? el('header', { class: 'ui-top' }, el('h1', { tabindex: '-1', 'data-crumb': pageTitle }, sel ? sel.title : pageTitle), ro ? el('p', { class: 'meta' }, ro) : '', ...(sel ? [sel.all, sel.bar] : [phone() ? decideSortButton() : '', themeButton()]))
       : el('header', { class: head === 'reports' && !state.readonly ? 'top ui-top rp-top' : head ? 'top' : 'ui-top today-top' }, head && !TABS.some(([a]) => a === head)
       ? el('a', { class: 'back', href: '#' }, '‹ Today') : '',
     ...(head ? [el('h1', { tabindex: '-1' }, pageTitle)] : todayHead()),

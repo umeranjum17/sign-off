@@ -937,8 +937,8 @@ test('each card has one place to type: Add a comment holds the note sent with th
     '--window-size=800,4000', '--virtual-time-budget=10000', '--dump-dom', url + hash], { env: chromeEnv, maxBuffer: 1 << 24 }, (e, out) => (e ? no(e) : ok(out))));
   const cards = (dom) => [...dom.matchAll(/<article class="row[^"]*" id="item-(\w+)">(.*?)<\/article>/gs)].map((m) => [m[1], m[2]]);
   const waiting = await dump('#waiting');
-  // Decide: Newest and By priority, the hero with how many wait, then the asks in one card of rows; More, the line under them, opens Select, Answer all recommended and Move all to later.
-  assert.match(waiting, /<div class="ui-seg" role="group" aria-label="Order"><button type="button" aria-pressed="true">Newest<\/button><button type="button" aria-pressed="false">By priority<\/button><\/div><section class="ui-card ui-hero"><div class="hl"><span class="lab">Waiting on you<\/span><\/div><div class="hv"><span class="big">2<\/span><\/div><\/section><h2 class="ui-sec">Asks<\/h2><ul class="ui-card ui-list dl-list" aria-label="Asks">/);
+  // Decide on a phone: Asks and Designs with their counts, the hero with how many wait, then the asks in one card of rows; More, the line under them, opens Select, Answer all recommended and Move all to later.
+  assert.match(waiting, /<div class="ui-seg dl-seg" role="group" aria-label="Decide"><button type="button" aria-pressed="true">Asks<small>2<\/small><\/button><button type="button" aria-pressed="false">Designs<small>0<\/small><\/button><\/div><section class="ui-card ui-hero"><div class="hl"><span class="lab">Waiting on you<\/span><\/div><div class="hv"><span class="big">2<\/span><\/div><\/section><h2 class="ui-sec">Asks<\/h2><ul class="ui-card ui-list dl-list" aria-label="Asks">/);
   assert.match(waiting, /href="#decide\/ship"[^>]*><span class="ui-icon"[^>]*>.*?<span class="t" dir="auto">When should it ship\?<\/span>/s);
   assert.match(waiting, /href="#decide\/look"[^>]*><span class="ui-icon"[^>]*>.*?<span class="t" dir="auto">Pick the look<\/span>/s);
   assert.match(waiting, /<button class="t-more-line" type="button" aria-haspopup="dialog"><span>Select, answer all or move all to later<\/span>/);
@@ -1433,8 +1433,19 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   assert.equal(await evaluate('[...document.querySelectorAll(".decide-bar > *")].map((e) => e.className).join() + "|" + [document.querySelector(".decide-bar .later-btn"), document.querySelector(".decide-bar .answer"), document.querySelector(".sh-head > .dl-more > summary")].map((e) => e.getBoundingClientRect().height >= 44).join()'), 'later-btn,answer|true,true,true');
   await evaluate('location.hash = "#waiting"');
   await until(async () => (await askTitles()) === 'Pick the look|Which day for release?|Keep the weekly digest?');
-  // The head holds the title and the light-or-dark button; More is the line under the list, whose sheet holds no sort (Newest and By priority are the control under the title).
-  assert.equal(await evaluate('[...document.querySelectorAll(".ui-top > *")].map((e) => e.tagName.toLowerCase() + (e.classList.contains("theme") ? ".theme" : "")).join("|")'), 'h1|button.theme');
+  // The head holds the title, the order and the light-or-dark button; More is the line under the list, whose sheet holds no sort.
+  assert.equal(await evaluate('[...document.querySelectorAll(".ui-top > *")].map((e) => e.tagName.toLowerCase() + (e.classList.contains("theme") ? ".theme" : e.classList.contains("dl-rb") ? ".order" : "")).join("|")'), 'h1|button.order|button.theme');
+  // The order button opens a sheet of Newest and By priority; By priority marks the button and puts P0 first, Newest puts the board's order back.
+  const order = () => evaluate('[document.querySelector(".dl-rb").getAttribute("aria-label"), document.querySelector(".dl-rb").classList.contains("on"), document.getElementById("dl-sort").open ? [...document.querySelectorAll("#dl-sort .dl-pick")].map((b) => b.textContent + (b.hasAttribute("aria-current") ? "*" : "")).join() : ""].join("|")');
+  await evaluate('document.querySelector(".dl-rb").click()');
+  await until(async () => (await evaluate('document.getElementById("dl-sort").open')) === true);
+  assert.equal(await order(), 'Order: Newest|false|Newest*,By priority');
+  await evaluate('document.querySelectorAll("#dl-sort .dl-pick")[1].click()');
+  await until(async () => (await order()) === 'Order: By priority|true|');
+  await evaluate('document.querySelector(".dl-rb").click()');
+  await until(async () => (await evaluate('document.getElementById("dl-sort").open')) === true);
+  await evaluate('document.querySelectorAll("#dl-sort .dl-pick")[0].click()');
+  await until(async () => (await order()) === 'Order: Newest|false|' && (await askTitles()) === 'Pick the look|Which day for release?|Keep the weekly digest?');
   // Its button is Today's: a tap switches light and dark for the whole board, and a second tap switches back.
   const scheme = () => evaluate('document.querySelector(".ui-top .theme").getAttribute("aria-label") + "|" + document.documentElement.style.colorScheme');
   const was = await scheme();
@@ -2425,9 +2436,14 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   await until(async () => (await evaluate('[...document.querySelectorAll("#t-more a.ui-pr")].map((a) => a.getAttribute("href") + " " + a.textContent).join("|")')) === '#designs Designs1');
   assert.equal(await evaluate('document.querySelector(".t-up .q").textContent + "|" + document.querySelector(".t-tiles .ui-stat").getAttribute("aria-label")'), 'Nothing waits on you|Cleared today: 0 of 0');
   await evaluate('document.getElementById("t-more").close()');
+  // Today lists it under Designs to review, its tile a thumbnail of its first screen, one tap from its review.
+  assert.equal(await evaluate('(() => { const s = document.querySelector(".t-wait[aria-label=\'Designs to review\']"), a = s?.querySelector(".ui-row"); return [s?.querySelector(".see").getAttribute("href"), a?.getAttribute("href"), a?.querySelector(".t").textContent, decodeURIComponent(a?.querySelector(".ui-icon img.design-thumb")?.getAttribute("src") ?? "").split("/").pop()].join("|"); })()'),
+    `#designs|#designs/d1-design|${message.title}|welcome.webp`);
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
   await until(async () => (await evaluate('document.querySelector(".decide-list .ui-hero .big")?.textContent')) === '0');
   assert.equal(await evaluate('!document.querySelector("#item-d1-design") && !document.querySelector("#tabs a[href=\'#waiting\'] .bd, #nav a[href=\'#waiting\'] .n")'), true);
+  // On a phone Decide's Designs counts it apart from the asks, one tap from its list.
+  assert.equal(await evaluate('[...document.querySelectorAll(".dl-seg button")].map((b) => b.textContent + (b.getAttribute("aria-pressed") === "true" ? "*" : "")).join()'), 'Asks0*,Designs1');
   // Main promotes it: it waits in Decide like any ask, and --undo puts it back under Designs.
   assert.match(run('promote', 'd1-design', file).out, /promoted\[1\]: d1-design/);
   await evaluate('location.reload()');
@@ -3191,14 +3207,16 @@ test('Today on a phone: the floating tab bar with its pill on Today, Up next wit
   await until(async () => await evaluate('!!document.getElementById("item-u3")'));
   assert.deepEqual(await evaluate('(() => { const c = document.getElementById("item-u3"); return [c.classList.contains("ui-row"), c.querySelectorAll("img:not(.ui-icon img)").length, c.querySelector(".t").textContent, c.querySelector(".ev-ok")?.className]; })()'),
     [true, 0, 'It works.', 'ev-ok held']);
-  // With no designs filed, the Designs screen still opens; the dock keeps its five, and as the prototype's dock has it Designs lights Today, whose More opens it, and the pill slides there.
-  await evaluate('location.hash = "#designs"');
-  await until(async () => (await evaluate('document.querySelector("#board h1").textContent')) === 'Designs');
-  assert.deepEqual(await evaluate('[document.querySelectorAll(".tabs a").length, document.querySelector(".tabs [aria-current]").getAttribute("href")]'), [5, '#']);
-  await until(async () => (await evaluate(rect('.tabs .hl')))[0] === (await evaluate(rect('.tabs a[href="#"]')))[0]);
+  // With no designs filed, Designs still opens from Decide's Designs; the dock keeps its five and lights Decide, and the pill slides there.
+  await evaluate('location.hash = "#waiting"');
+  await until(async () => !!(await evaluate('document.querySelector(".dl-seg button[aria-pressed=false]")')));
+  await evaluate('document.querySelector(".dl-seg button[aria-pressed=false]").click()');
+  await until(async () => (await evaluate('location.hash + "|" + document.querySelector("#board h1").textContent + "|" + document.querySelector(".dl-seg [aria-pressed=true]")?.textContent')) === '#designs|Decide|Designs0');
+  assert.deepEqual(await evaluate('[document.querySelectorAll(".tabs a").length, document.querySelector(".tabs [aria-current]").getAttribute("href")]'), [5, '#waiting']);
+  await until(async () => (await evaluate(rect('.tabs .hl')))[0] === (await evaluate(rect('.tabs a[href="#waiting"]')))[0]);
   // The dock's round Search opens a sheet over the screen it is tapped on, its box in hand; what is typed lists in groups that open where each card lives, and Escape closes it there.
   await evaluate('document.querySelector(".dock-find").click()');
-  await until(async () => (await evaluate('[location.hash, document.getElementById("t-search").open, document.activeElement?.id, document.querySelector("#board h1")?.textContent].join("|")')) === '#designs|true|find|Designs');
+  await until(async () => (await evaluate('[location.hash, document.getElementById("t-search").open, document.activeElement?.id, document.querySelector("#board h1")?.textContent].join("|")')) === '#designs|true|find|Decide');
   await evaluate('(() => { const b = document.getElementById("find"); b.value = "update"; b.dispatchEvent(new Event("input")); })()');
   assert.deepEqual(await evaluate('[[...document.querySelectorAll("#t-search .t-grp")].map((g) => g.textContent).join(), [...document.querySelectorAll("#t-search .ui-row")].map((a) => a.getAttribute("href")).join()]'), ['Proof', '#evidence/u3,#evidence/u2,#evidence/u1']);
   // close() clears .open immediately, but its close event (and the route cleanup) is queued.
@@ -4570,8 +4588,8 @@ test('the new look draws only the approved prototype\'s colours: Today, Decide, 
         if (hash === '#find') await evaluate('document.querySelector("#find").value = "settings", document.querySelector("#find").dispatchEvent(new Event("input"))');
         assert.deepEqual(await evaluate('[...document.querySelectorAll(".ui-row .ui-icon, .dz-shot, .t-up .meta")].filter(e => e.querySelector(".mono") || (!e.querySelector("img,svg") && /^[A-Z]{2}$/.test(e.textContent.trim()))).map(e => e.textContent)'), [], 'no monogram tiles in any list');
         const at = hash + (tap ? ` (${[tap].flat().map((t) => t.split(',')[0]).join(' then ')} tapped)` : '');
-        // On Designs the colours read include the sidebar's own Designs place, lit, on a desk, and the dock with Today lit on a phone.
-        if (hash.startsWith('#designs')) assert.deepEqual(await evaluate('[...document.querySelectorAll(".side [aria-current], .tabs [aria-current]")].filter((a) => a.getClientRects().length).map((a) => a.getAttribute("href"))'), [width === 390 ? '#' : '#designs'], at);
+        // On Designs the colours read include the sidebar's own Designs place, lit, on a desk, and the dock with Decide lit on a phone.
+        if (hash.startsWith('#designs')) assert.deepEqual(await evaluate('[...document.querySelectorAll(".side [aria-current], .tabs [aria-current]")].filter((a) => a.getClientRects().length).map((a) => a.getAttribute("href"))'), [width === 390 ? '#waiting' : '#designs'], at);
         check(await evaluate(drawnColours), at);
         // A keyboard user's first dozen stops on the screen.
         for (let i = 0; i < 12; i++) {
