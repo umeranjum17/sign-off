@@ -27,7 +27,7 @@ The regression is test/design.test.mjs ("the feedback trail"), with the hook's D
 
 ## Before the server answers
 
-Every comment and note sender extends this same trail with an immediate `Sending…` receipt and the existing pressed `aria-busy` control. Success clears the draft and reads `Sent · HH:MM`; a transport or server error keeps the words and reads `Not sent · <cause>` with Retry. Report-section comments and design change notes appear in Activity as soon as the real save returns, without waiting for the poll or reloading.
+Every comment and note sender extends this same trail with an immediate `Sending…` receipt and the existing pressed `aria-busy` control. Success clears the draft and reads `Sent · HH:MM`; a transport or server error keeps the words and reads `Not sent · <cause>` with Retry. A report's comment is sent from its one action bar (the composer over it) and shows in the report's Activity; design change notes appear in Activity as soon as the real save returns, without waiting for the poll or reloading.
 
 Regression and captures: `SEND_FEEDBACK_ONLY=1 node .agents/skills/done-done-verify-sign-off/part-comment-shots.mjs <folder> <light|dark> <360|390|445|1280|1440>`. The report captures are `comment-typing`, `comment-sending`, `comment-not-sent`, `comment-receipt` and `comment-sent`, plus the other composers' resulting frames and `send-regression.<theme>.<width>w.json`. The slow/failing connection is held at the browser boundary; Retry releases a real request to the isolated board. No saved server response is fabricated. `comment-send` in `.done-done.yaml` runs all ten cells (360, 390, 445, 1280 and 1440, light and dark). The pre-existing delivery/read/reply journey remains `trail`.
 
