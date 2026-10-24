@@ -29,8 +29,9 @@ try {
   so('ticket', board, '--id', 'T-9', '--title', 'Clear project identity everywhere', '--project', 'sign-off');
   so('ticket', board, '--id', 'T-29', '--title', 'Make report rows useful', '--project', 'sign-off', '--progress', '40', '--parent', 'T-9');
   so('ticket', board, '--id', 'T-30', '--title', 'Check inherited project icons', '--parent', 'T-29', '--progress', '40');
+  if (process.env.REPORT_ROWS_MUXR_ICON) { cpSync(process.env.REPORT_ROWS_MUXR_ICON, join(dir, 'muxr.svg')); so('project', board, '--name', 'Muxr', '--icon', 'muxr.svg'); so('ticket', board, '--id', 'T-39', '--title', 'Make Muxr notifications clear', '--project', 'Muxr', '--progress', '20'); }
   const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
-  post('report', { ...fx('report.v5/valid-full.json'), key: 'research', title: 'Which notification service fits a small team?', group: 'sign-off', ticket: 'T-29', filed: now });
+  post('report', { ...fx('report.v5/valid-full.json'), key: 'research', title: 'Which notification service fits a small team?', group: process.env.REPORT_ROWS_MUXR_ICON ? 'Muxr' : 'sign-off', ticket: process.env.REPORT_ROWS_MUXR_ICON ? 'T-39' : 'T-29', filed: now });
   post('report', { ...fx('report.v4/valid-minimal.json'), key: 'retro', title: 'Why messages were sent twice: a retro', group: 'sign-off', filed: now });
   post('report', { ...fx('report.v4/valid-minimal.json'), key: 'read', title: 'Where the weekly digest stands', group: 'sign-off', ticket: 'T-29', filed: now });
   post('plan', { ...fx('plan.v3/valid-full.json'), key: 'plan', project: 'sign-off' }, '--ticket', 'T-29');
