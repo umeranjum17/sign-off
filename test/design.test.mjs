@@ -2913,8 +2913,8 @@ test('a design posted again is a new round: the note box starts empty, the earli
     // The note box, and the card's Activity: each answer step and the notes it shows.
     return evaluate('({ note: document.querySelector(".design-review textarea").value, steps: [...document.querySelectorAll(".design-review .thread .aw b")].map((e) => e.textContent).filter((t) => t.startsWith("Your answer")), notes: [...document.querySelectorAll(".design-review .thread .th-n")].map((e) => e.textContent) })');
   };
-  // The same round: the note is the one being written, nothing earlier.
-  assert.deepEqual(await open(), { note: 'Round one: bigger title', steps: ['Your answer: Changes requested'], notes: [] });
+  // The same round: its saved note appears in Activity as well as the editor; nothing is from an earlier round.
+  assert.deepEqual(await open(), { note: 'Round one: bigger title', steps: ['Your answer: Changes requested'], notes: ['“Round one: bigger title”'] });
   // The agent draws the screen again in place: same key, same fields, new bytes. That is a new round.
   writeFileSync(join(dir, 'design', 'a.png'), sized(4, 4));
   assert.deepEqual(await open(), { note: '', steps: ['Your answer on the earlier round: Changes requested (First)'], notes: ['“Round one: bigger title”'] });
@@ -2931,7 +2931,7 @@ test('a design posted again is a new round: the note box starts empty, the earli
   const answers = join(dir, 'board.answers.jsonl'), old = (at) => appendFileSync(answers, `${JSON.stringify({ key: 'd6-round', answer: 'change', label: 'Changes requested', close: 'done', at, notes: [{ journey: 'flow', screen: 'a', verdict: 'change', note: 'Older note' }] })}\n`);
   old('2026-10-19T08:00:00Z');
   // The Activity is in time order, and this older answer is dated before round one's.
-  assert.deepEqual(await open(), { note: 'Older note', steps: ['Your answer: Changes requested', 'Your answer on the earlier round: Changes requested (First)'], notes: ['“Round one: bigger title”'] });
+  assert.deepEqual(await open(), { note: 'Older note', steps: ['Your answer: Changes requested', 'Your answer on the earlier round: Changes requested (First)'], notes: ['“Older note”', '“Round one: bigger title”'] });
   old('2026-10-17T08:00:00Z');
   assert.deepEqual(await open(), { note: '', steps: ['Your answer on the earlier round: Changes requested (First)'], notes: ['“Older note”'] });
   close();
