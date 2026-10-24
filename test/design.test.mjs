@@ -2776,7 +2776,7 @@ test('a design review shows its screen on a phone in light and dark: the page fi
   proc.kill();
 });
 
-test('Evidence: an update with no run is never waiting on you, and is listed under Evidence as not run, with no project picker for one project', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Evidence: an update with no run is never waiting on you, and is listed under Evidence as not checked, with no project filter for one project', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'waiting-update'), file = join(dir, 'board.json');
   mkdirSync(dir);
   writeFileSync(file, JSON.stringify({ schema: 2, items: [
@@ -2792,9 +2792,10 @@ test('Evidence: an update with no run is never waiting on you, and is listed und
   assert.equal(await evaluate('document.querySelector("#item-upd")'), null);
   await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
   await until(async () => (await evaluate('document.querySelector("#item-upd") !== null')));
-  assert.equal(await evaluate('document.querySelector("#item-upd .m span").textContent'), 'Not run');
-  // With proof for only one project there is nothing to pick: the search box stands alone.
-  assert.equal(await evaluate('document.getElementById("ev-project")'), null);
+  // Nothing checked it: no check at its tile's corner, and it says so to a screen reader.
+  assert.deepEqual(await evaluate('[document.querySelector("#item-upd .ev-ok"), document.querySelector("#item-upd").getAttribute("aria-label")]'), [null, 'Login checked, Not checked']);
+  // With proof for only one project there is nothing to pick: the title stands alone.
+  assert.equal(await evaluate('document.querySelector(".ev-fb")'), null);
   close();
   proc.kill();
 });
@@ -2821,10 +2822,11 @@ test('Evidence: with no --evidence-root a linked run is found in done-done\'s ow
   assert.equal((await fetch(`${url}${api.decisions[0].evidenceCard.media[0].url.slice(1)}`)).status, 200);
   const { evaluate, close } = await browse(join(dir, 'b'), 390);
   await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
-  const result = (key) => evaluate(`document.querySelector("#item-${key} .m span")?.textContent`);
-  await until(async () => (await result('found')) === 'Passed');
-  // A run found nowhere is claimed as nothing: its update is on Evidence, saying it was not run.
-  assert.equal(await result('lost'), 'Not run');
+  const result = (key) => evaluate(`(() => { const a = document.querySelector("#item-${key}"); return a ? [a.querySelector(".ev-ok")?.className ?? "", a.getAttribute("aria-label").split(", ")[1]] : null; })()`);
+  await until(async () => (await result('found'))?.[0] === 'ev-ok held');
+  assert.deepEqual(await result('found'), ['ev-ok held', 'Holds up']);
+  // A run found nowhere is claimed as nothing: its update is on Evidence, saying nothing checked it.
+  assert.deepEqual(await result('lost'), ['', 'Not checked']);
   close();
   proc.kill();
 });
@@ -2895,11 +2897,11 @@ test('Today on a phone: the floating tab bar with its pill on Today, Up next wit
   await evaluate('document.querySelector(".today-top .ui-rb").click()');
   await until(async () => (await look()) === first);
   await evaluate('localStorage.removeItem("so-theme")');
-  // On Evidence the same proof is a compact row of its claim and its Passed check, with no frame left empty.
+  // On Evidence the same proof is a row of its claim with done-done's check at its tile's corner, with no frame left empty.
   await evaluate('location.hash = "#evidence"');
   await until(async () => await evaluate('!!document.getElementById("item-u3")'));
-  assert.deepEqual(await evaluate('(() => { const c = document.getElementById("item-u3"); return [c.classList.contains("ev-text"), c.querySelectorAll(".ev-media").length, c.querySelector(".t").firstChild.textContent, c.querySelector(".m").textContent.startsWith("Passed")]; })()'),
-    [true, 0, 'It works.', true]);
+  assert.deepEqual(await evaluate('(() => { const c = document.getElementById("item-u3"); return [c.classList.contains("ui-row"), c.querySelectorAll("img:not(.ui-icon img)").length, c.querySelector(".t").textContent, c.querySelector(".ev-ok")?.className]; })()'),
+    [true, 0, 'It works.', 'ev-ok held']);
   // With no designs filed, the Designs screen still opens; the dock keeps its five, and as the prototype's dock has it Designs lights Today, whose More opens it, and the pill slides there.
   await evaluate('location.hash = "#designs"');
   await until(async () => (await evaluate('document.querySelector("#board h1").textContent')) === 'Designs');
@@ -3051,7 +3053,7 @@ test('a long answer at 390 px sits under its long title, which keeps most of the
   proc.kill();
 });
 
-test('Evidence: a card per proof ever filed, in one list, newest first, with a project picker, with its capture as the hero, its result, its time and what it proves; Proven today counts only the passed ones of the last day, and a failed run is on neither; the card opens the update, which shows the whole shot, what ran, who checked it, the change, when, and its verdict; at 1440 Today sets its tiles under Up next and Evidence is a list beside the selected update, and nothing squashed at 390', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Evidence: a row per proof ever filed, in one list, newest first, each with its project, done-done\'s check and its time; Held up today over the day\'s proofs; a project filter; a failed run is not listed; the row opens the proof, which shows its project and time, the whole shot, done-done\'s word, its change, its Activity and its verdict; at 1440 Today sets its tiles under Up next and Evidence is a list beside the selected update; at 390 rows of 68px, a sheet 48px down and nothing squashed', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'updates'), file = join(dir, '.sign-off', 'decisions.json');
   mkdirSync(dir);
   run('init', dir);
@@ -3094,31 +3096,35 @@ test('Evidence: a card per proof ever filed, in one list, newest first, with a p
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   let { evaluate, close } = await browse(join(dir, 'b'), 1440);
   await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
-  // Per card: its id, what it proves, its result and the picture that leads it; every card is drawn.
-  const cards = '[...document.querySelectorAll(".ev-card")].map((a) => [a.id, a.querySelector(".t").firstChild.textContent, a.querySelector(".m span").textContent, a.querySelector(".m svg path")?.getAttribute("d") ?? "", a.querySelectorAll(".ev-media img").length])';
-  await until(async () => (await evaluate(`${cards}.length === 6 && [...document.querySelectorAll(".ev-media img")].every((i) => i.complete && i.naturalWidth)`)));
+  // Per row: its id, what it proves, done-done's check at its tile's corner, its second line and whether it carries a picture (a row never does: the capture is the proof's own).
+  const cards = '[...document.querySelectorAll(".ev-card")].map((a) => [a.id, a.querySelector(".t").textContent, a.querySelector(".ev-ok")?.className ?? "", a.querySelector(".l2").textContent, a.querySelectorAll(".ev-media, .ev-hero").length])';
+  await until(async () => (await evaluate(`${cards}.length`)) === 6);
   // Nothing is archived on its own: the week-old update-7 is listed, and no Archived row exists.
   assert.equal(await evaluate('document.querySelector(".gone-asks")'), null);
   const clock = (at) => at.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  const at = (i) => new Date(doc.items[i - 1].filed);
+  const at = (i) => new Date(doc.items[i - 1].filed), when = (i) => (at(i).toDateString() === new Date().toDateString() ? clock(at(i)) : at(i).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }));
   // Evidence lists every proof in one list, newest first, however old: the plain update (5), the passed ones (4, 3, 2), the unchecked one (6) and last week's (7); only the failed run (1) is left off.
-  const passed = ['m9 12 2 2 4-4', 1], none = ['', 1];
-  assert.deepEqual(await evaluate(cards), [['item-update-5', 'Sign-in, plain update', 'Not run', ...none], ['item-update-4', outcome, 'Passed', ...passed], ['item-update-3', outcome, 'Passed', ...passed],
-    ['item-update-2', outcome, 'Passed', ...passed], ['item-update-6', outcome, 'Could not check', 'M12 7v6', 0], ['item-update-7', 'Sign-in, last week', 'Not run', ...none]]);
-  // Four cards share one headline, so each names what tells them apart best, here its own title; a card with a headline of its own names nothing more.
-  assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-card")].map((a) => a.querySelector(".t .also")?.textContent ?? "")'),
-    ['', 'sign-off board verify: pass', 'sign-off board verify: pass', 'Sign-in', 'A capture changed after the run', '']);
-  for (const n of [4, 3, 2]) assert.equal(await evaluate(`document.getElementById("item-update-${n}").querySelector(".m > span:last-child").textContent`), `Today, ${clock(at(n))}`, `update ${n}`);
-  // No project or day headings break the list; a card filed on another day says that day itself.
-  assert.equal(await evaluate('document.querySelectorAll("#board h2, #board h3").length'), 0);
-  assert.match(await evaluate('document.getElementById("item-update-7").querySelector(".m > span:last-child").textContent'), new RegExp(`, ${clock(at(7))}$`));
+  // Both proof-prefix forms name one project, a capture with no run takes its linked repository, and a proof with neither names none.
+  assert.deepEqual(await evaluate(cards), [['item-update-5', 'Sign-in, plain update', '', `sign-off · ${when(5)}`, 0], ['item-update-4', outcome, 'ev-ok held', `sign-off · ${when(4)}`, 0],
+    ['item-update-3', outcome, 'ev-ok held', `sign-off · ${when(3)}`, 0], ['item-update-2', outcome, 'ev-ok held', when(2), 0], ['item-update-6', outcome, '', `sign-off · ${when(6)}`, 0], ['item-update-7', 'Sign-in, last week', '', when(7), 0]]);
+  // One head over the list, Latest proof; no project or day headings break it.
+  assert.deepEqual(await evaluate('[...document.querySelectorAll("#board h2, #board h3")].map((h) => h.firstChild.textContent)'), ['Latest proof']);
   assert.equal(await evaluate('document.querySelector(\'#nav a[href="#evidence"] .n\').textContent'), '6');
-  // The project picker: both proof-prefix forms are one project, a capture with no run takes the linked repository, and an unnamed project is Other, last.
-  assert.deepEqual(await evaluate('[...document.querySelectorAll("#ev-project option")].map((o) => o.textContent)'), ['All projects', 'sign-off', 'Other']);
-  const pick = async (v) => evaluate(`(() => { const p = document.getElementById("ev-project"); p.value = ${JSON.stringify(v)}; p.dispatchEvent(new Event("change")); return [...document.querySelectorAll(".ev-card")].map((a) => a.id); })()`);
-  assert.deepEqual(await pick('-'), ['item-update-2', 'item-update-7']);
-  assert.deepEqual(await pick('sign-off'), ['item-update-5', 'item-update-4', 'item-update-3', 'item-update-6']);
-  assert.equal((await pick('')).length, 6);
+  // The head: the title with the project filter, Newest and By priority, and Held up today over the proofs filed today, one square each, ink where the check passed.
+  const today = doc.items.filter((d) => new Date(d.filed).toDateString() === new Date().toDateString()), held = today.filter((d) => ['update-2', 'update-3', 'update-4'].includes(d.key)).length;
+  assert.deepEqual(await evaluate('[document.querySelector(".ev-top h1").textContent, !!document.querySelector(".ev-top .ev-fb"), [...document.querySelectorAll(".ev-seg button")].map((b) => b.textContent + " " + b.getAttribute("aria-pressed")), document.querySelector(".ev-held").innerText.replace(/\\s+/g, " ").trim(), document.querySelectorAll(".ev-dots i").length, document.querySelectorAll(".ev-dots i.held").length]'),
+    ['Evidence', true, ['Newest true', 'By priority false'], `Held up today ${held} of ${today.length} ${today.length - held} not checked`, today.length, held]);
+  // The project filter: a sheet of each project with its count, then No project; a pick lists only its proof, newest first, under a pill that clears it.
+  const pick = async (name) => evaluate(`(async () => { document.querySelector(".ev-fb").click(); await new Promise((r) => setTimeout(r, 200));
+    const opts = [...document.querySelectorAll("#sheet .ev-pick button")].map((b) => [b.querySelector(".pn").textContent, b.querySelector(".n").textContent]);
+    [...document.querySelectorAll("#sheet .ev-pick button")].find((b) => b.querySelector(".pn").textContent === ${JSON.stringify(name)}).click(); await new Promise((r) => setTimeout(r, 200));
+    return [opts, document.querySelector(".ev-pill > span[dir]")?.textContent ?? "", !!document.querySelector(".ev-held"), [...document.querySelectorAll(".ev-card")].map((a) => a.id)]; })()`);
+  assert.deepEqual(await pick('No project'), [[['sign-off', '4'], ['No project', '2']], 'No project', false, ['item-update-2', 'item-update-7']]);
+  await evaluate('document.querySelector(".ev-pill .ev-unpick").click()');
+  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
+  assert.deepEqual((await pick('sign-off')).slice(1), ['sign-off', false, ['item-update-5', 'item-update-4', 'item-update-3', 'item-update-6']]);
+  await evaluate('document.querySelector(".ev-pill .ev-unpick").click()');
+  await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
   // Today's Proofs today counts each update filed today, the failed run too, and opens Evidence; on a desk its tiles sit under Up next in the left column.
   const filedToday = `Proofs today: ${doc.items.filter((d) => d.type === 'evidence' && d.filed && new Date(d.filed).toDateString() === new Date().toDateString()).length}`;
   await evaluate('location.hash = ""');
@@ -3129,7 +3135,7 @@ test('Evidence: a card per proof ever filed, in one list, newest first, with a p
   assert.ok(tiles.left === asks.left && tiles.right === asks.right && tiles.top >= asks.bottom, 'the tiles sit under Up next, as wide');
   await evaluate('location.hash = "#evidence"');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
-  // Evidence on a desk is one list beside the selected update: the cards stack in one column, newest first, and the newest is selected and open beside it.
+  // Evidence on a desk is one list beside the selected update: the rows stack in one column, newest first, and the newest is selected and open beside it.
   const boxes = `[5, 4, 3, 2].map((n) => { const r = document.getElementById(\`item-update-\${n}\`).getBoundingClientRect(); return { n, top: r.top, left: r.left, right: r.right, bottom: r.bottom }; })`;
   // Measured once the list has laid out its cards (a busy runner can still be drawing them when the sixth card arrives).
   const stacked = ([five, four, three, two]) => four.top >= five.bottom && three.top >= four.bottom && two.top >= three.bottom && [four, three, two].every((b) => b.left === five.left);
@@ -3137,13 +3143,10 @@ test('Evidence: a card per proof ever filed, in one list, newest first, with a p
   await until(async () => stacked(laid = await evaluate(boxes))).catch(() => assert.fail(`one column, newest first, with no heading between: ${JSON.stringify(laid)}`));
   const [five] = laid;
   await until(async () => (await evaluate('(() => { const a = document.querySelector(".split-list .ev-card[aria-current]"); return a && document.querySelector(".split-detail .ev-title") ? a.id.slice(5) : ""; })()')) === 'update-5');
-  assert.deepEqual(await evaluate('[!!document.querySelector(".split-list .ev-grid"), document.querySelector("main").inert, [...document.querySelectorAll(".ev-card[aria-current]")].map((a) => a.id), document.querySelector(".ev-title").textContent]'),
+  assert.deepEqual(await evaluate('[!!document.querySelector(".split-list .ev-list"), document.querySelector("main").inert, [...document.querySelectorAll(".ev-card[aria-current]")].map((a) => a.id), document.querySelector(".ev-title").textContent]'),
     [true, false, ['item-update-5'], 'Sign-in, plain update']);
   assert.ok((await evaluate(box('.split-detail'))).left >= five.right, 'the update opens right of the list');
-  // Under the title: how many are listed, how many filed today and when the newest came.
-  assert.equal(await evaluate('document.querySelector(".top .lede").textContent'), 'Every proof filed, newest first.');
   // No update is an ask, whatever its result: Decide counts none of them and Today says nothing needs you.
-  // A failed or unchecked update still opens on Evidence with its result, the reason a run could not be checked, and the normal verdicts.
   await evaluate('location.hash = "#waiting"');
   await until(async () => (await evaluate('document.querySelector("#board :is(.top, .ui-top) h1")?.textContent')) === 'Waiting on you' || (await evaluate('document.querySelector("#board :is(.top, .ui-top) h1")?.textContent')) === 'Decide');
   // Decide's red count goes away at zero, as the tab bar's does.
@@ -3151,11 +3154,12 @@ test('Evidence: a card per proof ever filed, in one list, newest first, with a p
   await evaluate('location.hash = ""');
   await until(async () => (await evaluate('!!document.querySelector(".t-tiles")')));
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".t-tiles .ui-stat")].map((t) => t.getAttribute("aria-label")).join() + "|" + !!document.querySelector(".t-up.clear")'), `Cleared today: 0 of 0,${filedToday}|true`);
+  // A failed or unchecked update still opens on Evidence with done-done's word, the reason a run could not be checked, and the verdicts, Pass last.
   for (const [k, result, why] of [['update-1', 'Failed', ''], ['update-6', 'Could not check', 'A picture or recording changed after the run. Ask the agent to run the check again.']]) {
     await evaluate(`location.hash = "#evidence/${k}"`);
     await until(async () => (await evaluate('!!document.querySelector(".ev-item")')));
-    assert.deepEqual(await evaluate('[document.querySelector(".ev-grp .v").textContent.trim(), [...document.querySelectorAll(".ev-grp .long")].find((c) => c.querySelector(".k").textContent === "Why")?.textContent.slice(3) ?? "", [...document.querySelectorAll(".ev-verdict .choices button")].map((b) => b.textContent)]'),
-      [result, why, ['Pass', 'Fail', 'Needs work']]);
+    assert.deepEqual(await evaluate('[document.querySelector(".ev-props .ev-word").textContent, document.querySelector(".ev-why")?.textContent ?? "", [...document.querySelectorAll(".ev-verdict .choices button")].map((b) => b.textContent)]'),
+      [result, why, ['Fail', 'Needs work', 'Pass']]);
   }
   await evaluate('location.hash = "#evidence"');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
@@ -3175,20 +3179,17 @@ test('Evidence: a card per proof ever filed, in one list, newest first, with a p
   writeFileSync(file, JSON.stringify(doc));
   await evaluate('refresh()');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
-  // The card opens the update itself: the whole capture, what it proves, then what the check recorded.
+  // The row opens the update itself: its project and time, the whole capture, what it proves, then done-done's word and its change.
   await evaluate('document.getElementById("item-update-4").click()');
   await until(async () => (await evaluate('location.hash')) === '#evidence/update-4' && (await evaluate('document.querySelector(".ev-title")?.textContent')) === outcome);
   // The selection follows the click and the list stays beside the update.
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-card[aria-current]")].map((a) => a.id)'), ['item-update-4']);
-  const rows = '[...document.querySelectorAll(".ev-grp .cell")].map((c) => [c.querySelector(".k").textContent, (c.querySelector(".v") ?? c.querySelector(".x")).textContent.trim()])';
-  // Checked by is the checker before the proof line's first colon; What ran is the rest of that line.
-  assert.deepEqual(await evaluate(rows), [['Result', 'Passed'], ['What ran', 'npm test, phone, 390, passed'], ['Change', 'Pull request 12'],
-    ['Project', 'sign-off'], ['Checked by', 'done-done-verify-sign-off'], ['When', `Today, ${clock(at(4))}`]]);
-  assert.deepEqual(await evaluate('[document.querySelector(".ev-grp a.cell[href]").getAttribute("href"), document.querySelector("header .change-link").getAttribute("href")]'), [pr, pr]);
+  const props = '[...document.querySelectorAll(".ev-props .ui-pr")].map((p) => [p.querySelector(".k").textContent, p.querySelector(".v").textContent])';
+  assert.deepEqual(await evaluate(props), [['done-done', 'Holds up'], ['Pull request', '#12']]);
+  assert.deepEqual(await evaluate('[document.querySelector(".ev-shd .pt").textContent, document.querySelector(".ev-props a.ui-pr").getAttribute("href"), document.querySelector("header .change-link").getAttribute("href")]'), [`sign-off · ${clock(at(4))}`, pr, pr]);
   assert.deepEqual(await evaluate('[document.querySelector(".ev-title").textContent, document.querySelectorAll(".ev-hero img").length, document.querySelectorAll(".ev-verdict .choices button").length]'),
     [outcome, 1, 3]);
-  assert.equal(await evaluate('document.querySelector(".ev-grp .v.ok svg path").getAttribute("d")'), 'm9 12 2 2 4-4');
-  // On a desk the capture fills the preview's width and a tap opens it full size; Pass, Fail and Needs work sit on one row, equally wide.
+  // On a desk the capture fills the proof's width and a tap opens it full size; Fail, Needs work and Pass sit on one row, equally wide.
   await until(() => evaluate('document.querySelector(".ev-hero img")?.naturalWidth > 0'));
   assert.deepEqual(await evaluate('(() => { const i = document.querySelector(".ev-hero img").getBoundingClientRect(), w = document.querySelector(".ev-item").getBoundingClientRect().width, a = document.querySelector(".ev-hero a"); return [Math.round(i.width - w), a.getAttribute("href").startsWith("/api/media?key=update-4"), a.target]; })()'),
     [0, true, '_blank']);
@@ -3197,22 +3198,20 @@ test('Evidence: a card per proof ever filed, in one list, newest first, with a p
   // A redraw of the same update keeps its headline, not the raw run title.
   await evaluate('dispatchEvent(new Event("resize"))');
   assert.equal(await evaluate('document.querySelector(".ev-title").textContent'), outcome);
-  // The board changes under the open update: the next refresh shows its new proof, not the one it opened with.
+  // The board changes under the open update: the next refresh shows what it now says, not what it opened with.
   const changed = 'The check now proves something else.';
   doc.items[3].about = changed;
   writeFileSync(file, JSON.stringify(doc));
   await evaluate('refresh()');
-  await until(async () => (await evaluate('document.querySelector(".ev-intro")?.textContent')) === changed);
+  await until(async () => (await evaluate('document.querySelector(".ev-about")?.textContent')) === changed);
   assert.equal(await evaluate('document.querySelector(".ev-title").textContent'), outcome);
-  // A comment sent from the open item shows on it at once and clears the box.
+  // A comment sent from the open item shows on it at once, clears the box and joins its Activity.
   await evaluate('document.querySelector(".ev-verdict details.other summary").click()');
   await evaluate('(() => { const t = document.querySelector("#note-update-4"); t.value = "Looks right on my phone."; t.dispatchEvent(new Event("input")); })()');
   await evaluate('[...document.querySelectorAll(".ev-verdict button")].find((b) => b.textContent === "Send without answering").click()');
   await until(async () => (await evaluate('[...document.querySelectorAll(".ev-verdict .saved-note")].some((p) => p.textContent.includes("Looks right on my phone."))')));
   assert.equal(await evaluate('document.querySelector("#note-update-4").value'), '');
-  // The run's raw lines stay folded under Details until they are asked for.
-  await evaluate('document.querySelector(".ev-item .tech summary").click()');
-  assert.match(await evaluate('document.querySelector(".ev-item .tech").textContent'), /Commit c0ffee0{34}.*repro: npm test/s);
+  await until(async () => (await evaluate('[...document.querySelectorAll(".ev-item .th-list li .th-t")].map((t) => t.textContent).at(-1)')) === 'Your comment');
   // A verdict is saved from the update's own screen, which stays open.
   await evaluate('[...document.querySelectorAll(".ev-verdict .choices button")].find((b) => b.textContent === "Pass").click()');
   await until(async () => (await evaluate('!document.querySelector("#toast").hidden && document.querySelector(".ev-verdict [aria-pressed=true]")?.textContent === "Pass"')));
@@ -3226,21 +3225,38 @@ test('Evidence: a card per proof ever filed, in one list, newest first, with a p
   await evaluate('location.hash = "#evidence"');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
   close();
-  // On a phone the card keeps the screen's width, the update's own screen never scrolls sideways and nothing squashes.
+  // On a phone each row is 68px with its 40px tile and keeps the list's width, the proof opens as a sheet 48px down, nothing scrolls sideways and nothing squashes.
   ({ evaluate, close } = await browse(join(dir, 'p'), 390));
   await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length === 6')));
   assert.deepEqual(await evaluate(SQUASH), []);
-  assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-card")].filter((a) => a.getBoundingClientRect().width < 0.95 * document.querySelector(".ev-grid").getBoundingClientRect().width).map((a) => a.id)'), []);
-  // Each capture fills its tile from the top of the shot, and the tile is half as tall as it is wide.
-  assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-card .ev-media")].filter((m) => m.querySelector("img")).map((m) => { const a = m.getBoundingClientRect(), b = m.querySelector("img").getBoundingClientRect(), c = getComputedStyle(m.querySelector("img")); return [Math.round(b.width - a.width), Math.round(b.height - a.height), c.objectFit, c.objectPosition, Math.round(a.width / a.height)]; }).filter((x) => x.join() !== "0,0,cover,50% 0%,2")'), []);
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-card")].map((a) => { const r = a.getBoundingClientRect(), t = a.querySelector(".ui-icon").getBoundingClientRect(), l = a.closest(".ev-list").getBoundingClientRect(); return [Math.round(r.height), Math.round(t.width), Math.round(l.right - r.right), Math.round(r.left - l.left)].join(); }).filter((x) => x !== "68,40,0,0")'), []);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'));
+  // The shared light or dark button (Today's) sits in Evidence's title row too: a tap turns the board to the other theme and keeps the pick in this browser; a second tap turns it back.
+  const look = '(() => [getComputedStyle(document.body).backgroundColor, document.querySelector(".ev-top .ui-rb[aria-label^=Switch] circle") ? "sun" : "moon", localStorage.getItem("so-theme")])()';
+  const system = await evaluate(look);
+  await evaluate('document.querySelector(".ev-top .ui-rb[aria-label^=Switch]").click()');
+  const picked = await evaluate(look);
+  assert.notEqual(picked[0], system[0]);
+  assert.deepEqual(picked.slice(1), system[1] === 'moon' ? ['sun', 'dark'] : ['moon', 'light']);
+  await evaluate('document.querySelector(".ev-top .ui-rb[aria-label^=Switch]").click()');
+  assert.deepEqual((await evaluate(look)).slice(0, 2), system.slice(0, 2));
+  await evaluate('localStorage.removeItem("so-theme")');
+  // Select and Clear all stay reachable: one quiet line under the list opens them; Select puts Cancel and Dismiss under the title and a tap picks a row.
+  await evaluate('document.querySelector(".ev-more").click()');
+  assert.deepEqual(await evaluate('[...document.querySelectorAll("#sheet .ev-pick .pn")].map((p) => p.textContent)'), ['Select', 'Clear all']);
+  await evaluate('[...document.querySelectorAll("#sheet .ev-pick button")][0].click()');
+  await until(async () => (await evaluate('[...document.querySelectorAll("#board .bulk button")].map((b) => b.textContent).join()')) === 'Cancel,Dismiss');
+  await evaluate('document.getElementById("item-update-3").click()');
+  await until(async () => (await evaluate('document.getElementById("item-update-3").closest("li").classList.contains("picked") && document.querySelector(".sel-go").textContent')) === 'Dismiss 1');
+  assert.equal(await evaluate('location.hash'), '#evidence');
+  await evaluate('[...document.querySelectorAll("#board .bulk button")].find((b) => b.textContent === "Cancel").click()');
+  await until(async () => (await evaluate('!document.querySelector("#board .bulk") && !!document.querySelector(".ev-more")')));
   await evaluate('document.getElementById("item-update-2").click()');
   await until(async () => (await evaluate('!!document.querySelector(".ev-item") && document.querySelectorAll(".ev-hero img").length === 2')));
-  // A proof line without the checker prefix shows no Checked by row, and What ran is the whole line.
-  assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-grp .cell")].map((c) => [c.querySelector(".k").textContent, (c.querySelector(".v") ?? c.querySelector(".x")).textContent.trim()])'),
-    [['Result', 'Passed'], ['What ran', 'npm test, phone, passed'], ['When', `Today, ${clock(at(2))}`]]);
-  assert.equal(await evaluate('new Set([...document.querySelectorAll(".ev-verdict .choices button")].map((b) => { const r = b.getBoundingClientRect(); return `${Math.round(r.top)} ${Math.round(r.width)}`; })).size'), 1);
+  // A proof with no project says so in its head, and a link that is not a full URL is no Pull request row.
+  assert.deepEqual(await evaluate(`[document.querySelector(".ev-shd .pt").textContent, ${props}, Math.round(document.getElementById("reader").getBoundingClientRect().top)]`), [`No project · ${clock(at(2))}`, [['done-done', 'Holds up']], 48]);
+  assert.equal(await evaluate(verdictRow), 1);
   assert.deepEqual(await evaluate(SQUASH), []);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'));
   assert.ok(await evaluate('[...document.querySelectorAll(".ev-hero img")].every((i) => i.getBoundingClientRect().width <= document.querySelector(".ev-item").getBoundingClientRect().width)'));
@@ -3683,17 +3699,19 @@ test('load budget: a board of 60 updates opens Evidence on a phone with at most 
           page: all[0].transferSize, state: all.filter((e) => e.name.endsWith("/api/decisions")).map((e) => e.transferSize), media: all.filter((e) => e.name.includes("/api/media")).map((e) => e.transferSize) }; })()`);
     };
     await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
-    await until(() => evaluate('document.querySelectorAll(".ev-card").length === 60 && !!document.querySelector(".ev-media img")?.complete'));
+    // The list is rows, six until See all, and no row carries a capture; See all lists all 60 and still loads none: 60 full captures would be over 6 MB.
+    await until(() => evaluate('document.querySelectorAll(".ev-card").length === 6'));
+    await evaluate('document.querySelector(".ev-sec .see").click()');
+    await until(() => evaluate('document.querySelectorAll(".ev-card").length === 60'));
     const first = await fetched();
-    // Only the captures near the screen load: 60 full captures would be over 6 MB.
-    assert.ok(first.captures >= 1 && first.captures <= 12, `captures on the first screen: ${first.captures}`);
+    assert.ok(first.captures <= 12, `captures on the first screen: ${first.captures}`);
     assert.ok(first.kb <= 1536, `page weight of the first screen: ${first.kb} KB`);
     // Reloaded, the page and the state are 304s (headers only) and every capture comes from the browser's own copy. Chrome keeps a page
     // opened from about:blank apart from the same page reloaded, so the page reloads once to be kept, and the second reload is measured.
     // Each old page is marked, so the counts are read from the reloaded one.
     for (let i = 0; i < 2; i++) {
       await evaluate('window.before = true; location.reload()');
-      await until(() => evaluate('!window.before && document.querySelectorAll(".ev-card").length === 60'));
+      await until(() => evaluate('!window.before && document.querySelectorAll(".ev-card").length === 6'));
     }
     const again = await fetched();
     assert.ok(again.page < 1024 && again.state.every((b) => b < 1024), `reload: page ${again.page} B, state ${again.state} B`);
@@ -3764,10 +3782,22 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     // Each linked card's screen shows one Ticket row (on an ask, the Its ask row of its panel), the ticket's title, id and progress, opening its page; a card with no ticket, or one not on the board, shows none.
     const row = `(() => { const top = document.querySelector('#reader:not([hidden])') ?? document; const r = [...top.querySelectorAll('.ticket-row, .decide .ui-props a[href^="#ticket/"]')];
       return r.length + '|' + r.map((x) => x.getAttribute('href') + ' ' + x.getAttribute('aria-label').replace(/^.*?ticket (\\S+): (.*), (\\d+)% done$/i, '$2 $1 $3%')).join(); })()`;
-    for (const [hash, seen] of [['#decide/ask-linked', 1], ['#decide/ask-plain', 0], ['#decide/ask-unknown', 0], ['#decide/npm', 1], ['#decide/from-linked', 1], ['#evidence/update-1', 1], ['#designs/chat-journeys', 1], ['#reports/digest-ran', 1], ['#waiting/faster-sign-in', 1]]) {
+    for (const [hash, seen] of [['#decide/ask-linked', 1], ['#decide/ask-plain', 0], ['#decide/ask-unknown', 0], ['#decide/npm', 1], ['#decide/from-linked', 1], ['#designs/chat-journeys', 1], ['#reports/digest-ran', 1], ['#waiting/faster-sign-in', 1]]) {
       await evaluate(`location.href = ${JSON.stringify(url + hash)}`);
       await until(async () => (await evaluate(`document.querySelector('#board h1, #reader:not([hidden]) h1') !== null && location.hash === ${JSON.stringify(hash)}`)) === true && (await evaluate(row)) === (seen ? '1|#ticket/T-29 Ship the new settings page T-29 60%' : '0|'));
       assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true, hash);
+    }
+    // A proof's sheet shows its ticket as the Ticket row of its panel: the title, a bar once work on it has begun (full at 100%) and the percent, opening the ticket's page.
+    await evaluate(`location.href = ${JSON.stringify(`${url}#evidence/update-1`)}`);
+    await until(async () => (await evaluate('(() => { const r = [...document.querySelectorAll("#reader:not([hidden]) .ev-props a.ui-pr")].filter((a) => a.getAttribute("href").startsWith("#ticket/")); return r.length + "|" + r.map((x) => x.getAttribute("href") + " " + x.innerText.replace(/\\s+/g, " ").trim() + " " + !!x.querySelector(".ui-bar")).join(); })()')) === '1|#ticket/T-29 Ticket Ship the new settings page 60% true');
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
+    // On Evidence the proof's row carries the same bar; a finished ticket shows a full bar at 100%, and one not begun shows no bar: its row shows the project and time.
+    const bars = `(() => { const row = document.querySelector("#item-update-1 .l2"), sheet = [...document.querySelectorAll("#reader:not([hidden]) .ev-props a.ui-pr")].find((a) => a.getAttribute("href").startsWith("#ticket/"));
+      return JSON.stringify([row?.querySelector(".ui-bar i")?.style.width ?? "none", row?.querySelector(".pct")?.textContent ?? "", sheet?.querySelector(".ui-bar i")?.style.width ?? "none", sheet?.querySelector(".n").textContent]); })()`;
+    for (const [progress, want] of [[100, ['100%', '100%', '100%', '100%']], [0, ['none', '', 'none', '0%']], [60, ['60%', '60%', '60%', '60%']]]) {
+      assert.equal(run('ticket', file, '--id', 'T-29', '--progress', String(progress)).code, 0);
+      await evaluate('refresh()');
+      await until(async () => (await evaluate(bars)) === JSON.stringify(want));
     }
     // The row opens the ticket over Tickets: its project (its epic's) and where it stands, its title, what it sits under, then its seven cards newest first, each opening where it lives; Close returns to the card.
     await evaluate(`location.href = ${JSON.stringify(`${url}#decide/ask-linked`)}`);
@@ -3869,7 +3899,7 @@ const focusColours = `(() => { const el = document.activeElement; if (!el || el 
   if (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0) out.push([s.outlineColor, 'outline']); if (s.boxShadow !== 'none') out.push([s.boxShadow, 'shadow']);
   return out.map(([v, p]) => v + '|' + el.tagName.toLowerCase() + [...el.classList].slice(0, 2).map((c) => '.' + c).join('') + ':focus-visible ' + p); })()`;
 
-test('the new look draws only the approved prototype\'s colours: Today, Decide, Designs, Reports and Tickets, their sheets and keyboard focus, at 390 and 1280, light and dark', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('the new look draws only the approved prototype\'s colours: Today, Decide, Designs, Reports, Evidence and Tickets, their sheets and keyboard focus, at 390 and 1280, light and dark', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'palette'), file = join(dir, 'board.json'), fx = new URL('../fixtures/contract/', import.meta.url).pathname, now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   mkdirSync(join(dir, 'design'), { recursive: true });
   for (const f of readdirSync(join(fx, 'design.v1/design'))) writeFileSync(join(dir, 'design', f), readFileSync(join(fx, 'design.v1/design', f)));
@@ -3896,10 +3926,10 @@ test('the new look draws only the approved prototype\'s colours: Today, Decide, 
   // Each state: its address and what is tapped on it, on a phone and on a desk.
   const states = {
     390: [['#', ''], ['#', '.t-more-line'], ['#find', ''], ['#answered', ''], ['#waiting', ''], ['#decide/release-day', '.decide [role="radio"], .decide input[type="radio"]'], ['#decide/npm', ''],
-      ['#reports', ''], [`#reports/${keys.report}`, ''], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#tickets', ''], ['#ticket/T-29', ''],
+      ['#reports', ''], [`#reports/${keys.report}`, ''], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#evidence', ''], ['#evidence', '.ev-more'], [`#evidence/${keys.evidence}`, ''], ['#tickets', ''], ['#ticket/T-29', ''],
       // Last, an answer and the toast it raises: a yes/no in light, the pick-one in dark.
       [(theme) => (theme === 'light' ? '#decide/ask-plain' : '#decide/release-day'), ['.decide .pick-option', '.decide-bar .answer']]],
-    1280: [['#', ''], ['#waiting', ''], ['#decide/ask-linked', ''], ['#reports', ''], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#tickets', ''], ['#ticket/T-29', '']],
+    1280: [['#', ''], ['#waiting', ''], ['#decide/ask-linked', ''], ['#reports', ''], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#evidence', ''], ['#tickets', ''], ['#ticket/T-29', '']],
   };
   const off = [];
   for (const width of [390, 1280]) for (const theme of ['light', 'dark']) {

@@ -50,7 +50,7 @@ try {
   const click = async (q) => { if ((await hover(q)) === 'missing') return 'missing'; await wait(500); await mouse('mousePressed', at); await wait(160); await mouse('mouseReleased', at); return 'ok'; };
   await send('Page.startScreencast', { format: 'jpeg', quality: 90, everyNthFrame: 1 });
   await send('Page.navigate', { url });
-  const row = (n) => `.ev-grid > :nth-child(${n}) .ev-card`;
+  const row = (n) => `.ev-list > :nth-child(${n}) .ev-card`;
   const steps = [[2200], [() => hover('.t-tiles a[href="#evidence"]'), 1200], [() => click('.t-tiles a[href="#evidence"]'), 1800],
     [() => click(row(3)), 1300], [() => click(row(5)), 1300], [() => click(row(1)), 1300], [() => hover(row(2)), 1400]];
   for (const [i, [act, ms]] of steps.map((s) => (s.length === 1 ? [null, s[0]] : s)).entries()) {

@@ -339,76 +339,100 @@
   .phone { display: block; box-sizing: border-box; padding: 7px 7px 0; border-radius: 28px 28px 0 0; background: #1D1D1F; box-shadow: inset 0 0 0 1px #3A3A3C; }
   .phone img { display: block; width: 100%; border-radius: 21px 21px 0 0; }
   .phone.wide { padding: 6px 6px 0; border-radius: 14px 14px 0 0; } .phone.wide img { border-radius: 9px 9px 0 0; }
-  /* Evidence: one list of cards, newest first, each with its capture as the hero; the whole card opens the update.
-     The project picker sits quietly beside the search box, as tall as it and in the same sunk fill. */
-  .ev-find { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; } .ev-find input { flex: 1 1 auto; min-width: 0; }
-  .ev-find select { flex: none; max-width: 40%; min-height: 2.75rem; padding: 0 0.75rem; border: 0; border-radius: 0.625rem; background: var(--sunk); color: var(--muted); font: inherit; }
-  .ev-find select.on { color: var(--text); }
-  .ev-grid { display: grid; gap: 1.75rem; grid-template-columns: minmax(0, 1fr); }
-  /* Evidence lists every proof ever filed: a card off the screen is not laid out or painted until it nears it. */
-  .ev-grid > * { content-visibility: auto; contain-intrinsic-size: auto 26rem; }
-  .ev-card { display: flex; flex-direction: column; gap: 0.75rem; color: inherit; text-align: left; text-decoration: none; }
-  .ev-media { position: relative; display: grid; place-items: center; aspect-ratio: 2 / 1; overflow: hidden;
-    border-radius: 1.125rem; background: var(--surface); }
-  .ev-card:hover .ev-media { background: color-mix(in srgb, var(--surface) 94%, var(--text)); }
-  .ev-media img, .ev-media video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; object-position: center top; border-radius: 1.125rem;
-    transition: transform 260ms var(--spring); }
-  .ev-card:active .ev-media img, .ev-card:active .ev-media video { transform: scale(0.985); }
-  /* Proof that kept only text: a compact row of its claim and its result's small check. */
-  .has-x > .ev-text { padding-right: 3rem; }
-  .ev-badge { position: absolute; z-index: 1; top: 0.75rem; left: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 1rem;
-    background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.8125rem; font-weight: 600; }
-  .ev-missing { margin: 0 0 1rem; color: var(--muted); font-size: 0.9375rem; }
-  .ev-card .t { font-size: 1.1875rem; font-weight: 600; line-height: 1.32; letter-spacing: -0.012em; }
-  .ev-card .also { display: block; margin-top: 0.125rem; color: var(--muted); font-size: 0.9375rem; font-weight: 400; line-height: 1.3; letter-spacing: 0; }
-  .ev-card .m { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; color: var(--muted); font-size: 0.9375rem; }
-  .ev-ok, .ev-bad, .ev-warn { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--ok); }
-  .ev-bad { color: var(--danger); } .ev-warn { color: var(--warn); } .ev-none { color: var(--muted); }
-  .ev-ok svg, .ev-bad svg, .ev-warn svg { width: 0.9375rem; height: 0.9375rem; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-  /* One update: the whole capture on its tile, what it proves in a line, what the check recorded, then its verdict. */
-  #reader .ev-scroll { flex: 1; min-height: 0; overflow: auto; padding: 1rem 1.25rem 3rem; }
-  .ev-item { display: grid; gap: 1rem; max-width: 42.5rem; margin: 0 auto; }
-  .ev-hero { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; padding: 2rem 1.5rem; border-radius: 1.125rem; background: var(--surface); }
-  /* The update's capture in a full phone frame, filling the card as in the design; a wide one gets the slimmer bezel and the width. */
-  .phone.full { width: min(250px, 64%); padding: 9px; border-radius: 40px; }
-  .phone.full img { border-radius: 31px; } .phone.full.wide { width: min(100%, 36rem); padding: 7px; border-radius: 18px; } .phone.full.wide img { border-radius: 11px; }
-  .ev-hero:has(.phone.full) { padding: 2rem 1.5rem; } .ev-hero a { display: contents; } .ev-hero .phone img { max-height: none; aspect-ratio: 10 / 17; object-fit: cover; object-position: top; } .ev-hero .phone.wide img { aspect-ratio: 16 / 10; }
-  /* On a desk the capture fills the preview's width, cropped to the top of the shot; a tap opens it full size. */
-  @media (min-width: 64rem) {
-    .ev-hero:has(.phone.full) { padding: 0; gap: 0.75rem; background: none; }
-    .ev-hero .phone.full { position: relative; width: 100%; padding: 0; overflow: hidden; border-radius: 1.125rem; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); cursor: zoom-in; }
-    .ev-hero .phone.full img { aspect-ratio: 4 / 3; border-radius: 0; transition: transform 260ms var(--spring); }
-    .ev-hero .phone.full.wide img { aspect-ratio: auto; }
-    .ev-hero .phone.full::after { content: "Open full size" / ""; position: absolute; right: 0.75rem; bottom: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 1rem;
-      background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 0.8125rem; font-weight: 600; }
-    .ev-hero a:active .phone.full img { transform: scale(0.99); }
+  /* Evidence, as the approved new look draws it (ui.css builds the title row, segments, hero, list and rows): the project filter's round button with its count,
+     Held up today's squares, one per proof filed today, sized from the card's width and the box rounded up to the 4px grid, a project pill in its place when one is picked,
+     and the proof rows, each its project's tile with done-done's check at the corner. Actions are in ink. */
+  .ev-top .ui-rb { min-height: 0; padding: 0; border: 0; } .ev-top .ui-rb :is(.ev-g svg, .glyph) { width: 1.25rem; height: 1.25rem; } .ev-top .ui-rb .glyph { stroke-width: 1.6; }
+  .ev-fb b { position: absolute; top: -2px; right: -2px; min-width: 1rem; height: 1rem; padding: 0 0.25rem; border-radius: 0.5rem; background: var(--tk-ink); color: var(--tk-canvas);
+    font-size: 0.625rem; line-height: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .ev-g { display: inline-grid; flex: none; place-items: center; } .ev-g svg { width: 1.125rem; height: 1.125rem; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .ev-held { container-type: inline-size; }
+  .ev-dots { --cell: calc((100cqw - (var(--cols) - 1) * 2px) / var(--cols)); display: grid; grid-template-columns: repeat(var(--cols), var(--cell)); grid-auto-rows: var(--cell); gap: 2px; align-content: start;
+    height: round(up, calc(var(--rows) * var(--cell) + (var(--rows) - 1) * 2px), 4px); margin-top: 0.75rem; }
+  .ev-dots i { border-radius: 2px; background: var(--tk-track); } .ev-dots i.held { background: var(--tk-fill); } .ev-dots i.not { background: var(--tk-critical); }
+  .ev-pill { display: flex; align-items: center; gap: 0.75rem; height: 3.5rem; margin-top: 1rem; padding: 0 0.5rem; border-radius: 1.75rem; color: var(--tk-ink); font-size: var(--tk-fs-secondary); font-weight: 500; }
+  .ev-pill > span[dir] { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .ev-unpick { position: relative; display: grid; flex: none; place-items: center; width: 2.5rem; height: 2.5rem; min-height: 0; padding: 0; border-radius: 1.25rem; background: none; color: var(--tk-text-secondary); }
+  .ev-unpick::after { content: ''; position: absolute; inset: -2px; } .ev-unpick .glyph { width: 1rem; height: 1rem; }
+  .ev-sec .see { min-height: 0; padding: 0; border: 0; border-radius: 0; background: none; font: inherit; font-size: var(--tk-fs-row); line-height: 1.5rem; font-weight: 500; color: var(--tk-ink); cursor: pointer; }
+  .ev-list.ui-list { padding: 0.25rem 0; } .ev-list.ui-list > li + li::before { right: 0.75rem; left: 0.75rem; }
+  .ev-list .ev-card { padding: 0 0.75rem; transition: background-color 120ms linear; -webkit-tap-highlight-color: transparent; }
+  .ev-list .ev-card:active { background: var(--tk-inset); }
+  .ev-list .ev-card .meta { margin: 0; }
+  .ev-list > li.picked { outline: none; border-radius: 0; background: var(--tk-inset); } .ev-list > li.picked .ui-icon { box-shadow: 0 0 0 2px var(--tk-ink); }
+  main > .bulk:has(+ .ev-seg), .split-list > .bulk:has(+ .ev-seg) { margin: 0.25rem 0 0; } .bulk:has(+ .ev-seg) button { color: var(--tk-ink); } /* the board's own .meta sets a top margin the row's second line does not take */
+  .ev-ok { position: absolute; right: -0.25rem; bottom: -0.25rem; display: grid; place-items: center; width: 1rem; height: 1rem; border-radius: 0.5rem; background: var(--tk-fill); color: var(--tk-card); box-shadow: 0 0 0 2px var(--tk-card); }
+  .ev-ok.not { background: var(--tk-critical); color: #FFFFFF; }
+  .ui-icon .ev-ok svg { width: 0.625rem; height: 0.625rem; stroke-width: 2.6; }
+  /* The project filter's sheet, as the prototype's: the card's fill, a quiet label and a round close. */
+  #sheet:has(.ev-pick) { border-radius: 1.75rem 1.75rem 0 0; background: var(--tk-card); }
+  #sheet:has(.ev-pick) > div { padding: 0 1rem calc(1.5rem + env(safe-area-inset-bottom)); } #sheet:has(.ev-pick) > div::before { width: 2.25rem; height: 0.25rem; margin: 0.5rem auto 0.75rem; background: var(--tk-line); }
+  #sheet:has(.ev-pick) h2 { color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 400; }
+  #sheet:has(.ev-pick) header button { position: relative; width: 2rem; height: 2rem; min-height: 0; background: var(--tk-inset); color: var(--tk-text-secondary); }
+  #sheet:has(.ev-pick) header button::after { content: ''; position: absolute; inset: -0.375rem; } #sheet:has(.ev-pick) header button .glyph { padding: 0; background: none; width: 1rem; height: 1rem; }
+  /* The project filter: a sunk group of rows in the sheet, each the project's small tile, its name, how many proofs it has, and a check on the one shown. */
+  .ev-pick { margin-top: 1rem; } .ev-pick .ui-pr { width: 100%; min-height: 3rem; padding: 0; border: 0; border-radius: 0; background: none; font: inherit; font-size: var(--tk-fs-row); font-weight: 400; text-align: left; }
+  .ev-pick .ui-pr[aria-pressed="true"] { background: none; color: var(--tk-ink); } .ev-pick .ui-pr[aria-pressed="true"]::before { content: none; }
+  .ev-pick .ui-pr + .ui-pr::before { content: ''; } .ev-pick .k { color: var(--tk-ink); } .ev-pick .v { color: var(--tk-text-secondary); } .ev-pick .v i { width: 1.125rem; }
+  .ev-pick .ui-icon, .ev-shd .ui-icon { width: 1.25rem; height: 1.25rem; border-radius: 0.3125rem; background: none; box-shadow: none; }
+  :is(.ev-pick, .ev-shd) .ui-icon :is(img, .mono, svg) { width: 1.25rem; height: 1.25rem; border-radius: 0.3125rem; } :is(.ev-pick, .ev-shd) .ui-icon .mono { font-size: 0.5rem; line-height: 1.25rem; }
+  /* One proof: a sheet over the list on a phone, as the prototype's: its handle, its project and time with the close, the whole title, the capture, a sunk panel
+     (done-done's word, priority, ticket, pull request), what it says, its Activity, then Fail, Needs work and Pass on one row. */
+  .ev-scroll { flex: 1; min-height: 0; overflow: auto; padding: 0.5rem 1rem calc(1.5rem + env(safe-area-inset-bottom)); }
+  .ev-item { max-width: 42.5rem; margin: 0 auto; }
+  .ev-shd { display: flex; align-items: center; gap: 0.5rem; height: 2.5rem; }
+  .ev-shd .lab { display: flex; flex: 1; align-items: center; gap: 0.5rem; min-width: 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-secondary); }
+  .ev-shd .pt { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .ev-x { position: relative; display: grid; flex: none; place-items: center; width: 2rem; height: 2rem; border-radius: 1rem; background: var(--tk-inset); color: var(--tk-text-secondary); }
+  .ev-x::after { content: ''; position: absolute; inset: -0.375rem; } .ev-x .glyph { width: 1rem; height: 1rem; }
+  .ev-title { margin: 0.5rem 0 0; color: var(--tk-ink); font-size: 1.25rem; line-height: 1.75rem; font-weight: 500; letter-spacing: -0.017em; outline: none; }
+  .ev-hero { display: grid; gap: 0.5rem; margin-top: 1rem; }
+  .ev-hero a, .ev-hero video { display: block; overflow: hidden; border-radius: 1rem; background: var(--tk-inset); }
+  .ev-hero img, .ev-hero video { display: block; width: 100%; max-height: 26.25rem; object-fit: contain; }
+  .ev-hero.none { display: flex; align-items: center; justify-content: center; gap: 0.5rem; height: 6rem; border-radius: 1rem; background: var(--tk-inset); color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); }
+  .ev-hero .gone { margin: 0; color: var(--tk-critical); font-size: var(--tk-fs-row); }
+  .ev-item > .files { margin-top: 0.5rem; }
+  .ev-props { margin-top: 0.5rem; } .ev-props .k .ev-g { color: var(--tk-text-secondary); } .ev-props .v a, .ev-props a .v { font-weight: 500; }
+  .ev-props a.ui-pr .v > span:last-child:not(.n) { font-weight: 500; }
+  .ev-word.not { color: var(--tk-critical); }
+  .ev-about, .ev-why { margin: 0.5rem 0 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
+  .ev-item > .thread { margin-top: 1.5rem; }
+  /* Its Activity as the panel above it: a quiet label, ink not blue. */
+  .ev-item .thread .tk-label { margin: 0 0 0.5rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 400; letter-spacing: 0; text-transform: none; }
+  .ev-item .th-list { border-radius: 1rem; background: var(--tk-inset); box-shadow: none; } .ev-item .th-list li:last-child .th-dot { background: var(--tk-ink); } .ev-item .th-t a { color: var(--tk-ink); font-weight: 500; }
+  .ev-verdict .other > summary { color: var(--tk-text-secondary); font-size: var(--tk-fs-row); font-weight: 500; }
+  .ev-item .th-t a { position: relative; } .ev-item .th-t a::after { content: ''; position: absolute; inset: -0.8125rem -0.25rem; }
+  .ev-verdict { display: grid; gap: 0.5rem; margin-top: 1.5rem; }
+  .ev-verdict .choices { display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0.5rem; }
+  .ev-verdict .choices button { display: flex; align-items: center; justify-content: center; height: 3.25rem; min-height: 0; padding: 0 0.5rem; border: 0; border-radius: 1.625rem;
+    background: var(--tk-raised); color: var(--tk-ink); box-shadow: var(--tk-elev-raised); font-size: var(--tk-fs-secondary); font-weight: 500; white-space: nowrap; }
+  .ev-verdict .choices .v-fail { color: var(--tk-critical); }
+  .ev-verdict .choices .ink { background: var(--tk-ink); color: var(--tk-canvas); box-shadow: none; }
+  .ev-verdict .choices button[aria-pressed="true"] { padding: 0 0.5rem; font-weight: 500; } .ev-verdict .choices button[aria-pressed="true"]::before { position: static; translate: none; margin-right: 0.375rem; }
+  .ev-verdict > .dis { justify-self: start; min-height: 2.75rem; padding: 0; background: none; color: var(--tk-text-secondary); font-weight: 400; }
+  @media (prefers-color-scheme: dark) { .ev-verdict .choices button:not(.ink) { background: var(--tk-on); } .ev-verdict .choices .ink { background: var(--tk-ink); } }
+  @media (max-width: 63.999rem) {
+    /* The sheet: 48px under the top, the list dimmed behind it; the dock goes under it. */
+    #reader:has(> .ev-scroll) { top: 3rem; z-index: 3; max-width: 42.5rem; margin: 0 auto; border-radius: 1.75rem 1.75rem 0 0; background: var(--tk-card);
+      box-shadow: 0 0 0 100vmax rgba(30, 24, 18, 0.28), 0 -8px 32px rgba(30, 20, 10, 0.12); }
+    #reader:has(> .ev-scroll)::before { content: ''; flex: none; width: 2.25rem; height: 0.25rem; margin: 0.5rem auto 0; border-radius: 2px; background: var(--tk-line); }
+    @media (prefers-color-scheme: dark) { #reader:has(> .ev-scroll) { box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.5); } }
   }
-  .ev-hero img, .ev-hero video { display: block; max-width: 100%; max-height: min(26rem, 55vh); border-radius: 0.75rem; }
-  .ev-hero .gone { margin: 0; color: var(--danger); font-size: 0.9375rem; }
-  .ev-say { text-align: center; }
-  .ev-title { margin: 0.875rem 0 0.5rem; font-size: 1.75rem; line-height: 1.22; font-weight: 700; letter-spacing: 0.007em; text-wrap: balance; }
-  .ev-intro { margin: 0; color: var(--muted); font-size: 1.1875rem; line-height: 1.47; }
-  .ev-gl { margin: 1rem 0 0; color: var(--muted); font-size: 0.875rem; letter-spacing: 0.02em; text-transform: uppercase; }
-  .ev-grp { overflow: hidden; border-radius: 0.75rem; background: var(--surface); }
-  .ev-grp .cell { display: flex; flex-wrap: wrap; align-items: center; gap: 0.875rem; min-height: 3.5rem; padding: 0.625rem 1rem; color: inherit; font-size: 1.0625rem; text-decoration: none; }
-  /* The hairline between rows starts at the row's text, as in an iOS inset list. */
-  .ev-grp .cell { position: relative; }
-  .ev-grp .cell + .cell::before { content: ""; position: absolute; top: 0; left: 1rem; right: 0; border-top: 0.5px solid var(--line); }
-  .ev-grp a.cell:hover { background: color-mix(in srgb, var(--surface) 94%, var(--text)); }
-  .ev-grp .k { flex: none; min-width: 6.5rem; }
-  .ev-grp .v { min-width: 0; overflow-wrap: anywhere; margin-left: auto; color: var(--muted); text-align: right; }
-  .ev-grp .v.ok { color: var(--ok); } .ev-grp .v.bad { color: var(--danger); font-weight: 600; } .ev-grp .v.warn { color: var(--warn); font-weight: 600; }
-  .ev-grp .v svg { width: 1.15rem; height: 1.15rem; margin-right: 0.2rem; vertical-align: -0.2rem; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-  .ev-grp .v.go { color: var(--accent); }
-  .ev-grp .cell.long { display: grid; gap: 0.0625rem; align-items: start; }
-  .ev-grp .cell.long .k { min-width: 0; }
-  .ev-grp .x { display: block; width: auto; min-height: 0; margin: 0; padding: 0; border: 0; background: none; color: var(--muted); font-size: 0.9375rem; line-height: 1.4; }
-  .ev-grp .chev { margin-left: 0.25rem; color: var(--muted); }
-  .ev-verdict { display: grid; gap: 0.5rem; }
-  .ev-verdict .choices:not(:has(> :nth-child(4))) { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
-  .ev-verdict .choices button, .ev-verdict .choices button[aria-pressed="true"] { grid-auto-flow: column; justify-content: center; align-items: center; padding-inline: 0.5rem; text-align: center; }
-  .ev-verdict .choices button[aria-pressed="true"]::before { position: static; translate: none; margin-right: 0.375rem; }
-  .ev-ask { margin: 1rem 0 0.25rem; font-weight: 650; }
+  /* On a desk the list sits in the desk shell's column, the row shown on the sunk fill; the proof opens beside it under the change link, with no close. */
+  @media (min-width: 64rem) {
+    .split-list > :is(.ev-seg, .ev-held, .ev-pill, .ev-sec, .ev-list) { flex: none; }
+    .split-list .ev-list .ev-card:hover:not([aria-current]) { opacity: 0.85; }
+    .split-list .ev-list .ev-card[aria-current] { background: var(--tk-inset); outline: none; }
+    /* A desk has the room for a long title: it wraps to two lines, and the row grows with it. */
+    .split-list .ev-list .ev-card { height: auto; min-height: 4.25rem; padding-block: 0.75rem; }
+    .split-list .ev-list .ev-card .l1 { align-items: flex-start; height: auto; }
+    .split-list .ev-list .ev-card .l1 .t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; }
+    .split-detail > .ev-scroll { padding: 1.5rem 2.5rem 4rem; }
+    .split-detail .ev-x { display: none; }
+    #board .split-detail:has(> .ev-scroll) .change-link { color: var(--tk-ink); }
+    .split-detail .ev-title { font-size: 1.5rem; line-height: 2rem; }
+    .split-detail .ev-hero img { max-height: 22.5rem; }
+  }
   .in-answered .row { background: transparent; box-shadow: none; }
   .in-answered .row h3 { color: var(--muted); font-weight: 500; }
   /* A sign-in: one big Open for its link, off once the link expired. */
@@ -809,43 +833,6 @@
     .dz-info > .foot { display: flex; flex: none; gap: 0.5rem; margin: 0; padding: 0.75rem 1.5rem 1.25rem; border-top: 1px solid var(--tk-line); }
     .decide-bar .answer { flex: none; }
     .rows.reports, .sec-h:has(+ .reports), .legend { max-width: 50rem; }
-    /* Evidence sets its cards two across, the whole capture on each tile; a page that is not an update keeps the whole width. */
-    .ev-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; }
-    .ev-grid > .row { grid-column: 1 / -1; }
-    #reader .ev-scroll { padding: 2rem 3rem 4rem; }
-    .ev-grp { border-radius: 1.125rem; }
-    .ev-title { font-size: 2.5rem; line-height: 1.1; margin-top: 1.25rem; }
-    .ev-intro { font-size: 1.3125rem; }
-  }
-  /* The desk from 1024px: Evidence is a list beside the update it has selected, as in Mail. */
-  @media (min-width: 64rem) {
-    .split-list .ev-card { display: grid; grid-template-columns: 3.5rem minmax(0, 1fr); align-items: center; gap: 0.25rem 0.875rem;
-      padding: 0.75rem 3rem 0.75rem 1rem; transition: background-color 120ms linear; -webkit-tap-highlight-color: transparent; }
-    .split-list .ev-card .ev-media { flex: none; width: 3.5rem; aspect-ratio: 3 / 4; padding: 0; border-radius: 0.5rem;
-      background: var(--sunk); transition: transform 260ms var(--spring); }
-    .split-list .ev-media :is(img, video) { padding: 0; border-radius: 0.5rem; object-fit: cover; object-position: center top; }
-    .split-list .ev-card.ev-text { grid-template-columns: minmax(0, 1fr); }
-    .split-list .ev-badge { display: none; }
-    .split-list .ev-card .ev-media { grid-row: 1 / span 2; }
-    .split-list .ev-card .t { align-self: end; font-size: 1.0625rem; line-height: 1.375rem; }
-    .split-list .ev-card .m { align-self: start; gap: 0.375rem; font-size: 0.9375rem; line-height: 1.25rem; }
-    .split-list .ev-card:hover { background: color-mix(in srgb, var(--sunk) 45%, transparent); }
-    .split-list .ev-card:active { background: var(--sunk); }
-    .split-list .ev-card:active .ev-media { transform: scale(0.96); }
-    .split-list .has-x > .x { opacity: 0; transition: opacity 120ms linear; }
-    .split-list .has-x:is(:hover, :has(:focus-visible)) > .x { opacity: 1; }
-    /* Evidence in the desk shell: one column of rows, the selected one tinted with an accent bar, the update beside it. */
-    .split-list .ev-find { margin: 0 0 0.75rem; }
-    .split-list .ev-find select { max-width: 50%; }
-    .split-list .ev-grid { grid-template-columns: minmax(0, 1fr); gap: 0; margin: 0 -1.5rem; }
-    .split-list .ev-grid > * { contain-intrinsic-size: auto 5rem; }
-    .split-list .ev-grid > .row, .split-list .ev-grid > .empty { margin: 0 1.5rem; }
-    .split-list .ev-card { position: relative; padding-left: 1.5rem; }
-    .split-list .ev-card::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: var(--action); transform: scaleY(0); transition: transform 260ms var(--spring); }
-    .split-list .ev-card[aria-current] { background: var(--tk-inset); outline: none; }
-    .split-list .ev-card[aria-current]::before { transform: scaleY(1); }
-    .split-detail > .ev-scroll { padding: 2rem 2.5rem 4rem; }
-    .split-detail .ev-item { max-width: 40rem; }
   }
   /* The guided plan and report: one scroll with a rail and Your answers on a desk, a progress bar and a Go ahead bar on a phone. */
   #reader .gd-scroll { flex: 1; min-height: 0; overflow: auto; padding: 0 1rem 7rem; scroll-behavior: smooth; }
@@ -1329,8 +1316,6 @@
   /* A card's ticket: one row, its title over its id and progress, that opens the ticket. */
   .ticket-block { margin-top: 1.25rem; }
   /* On an update's screen the row reads as one of its groups: the label as Proof's, the row as its cells. */
-  .ev-item .tk-label { margin: 1rem 0 0.5rem; font-weight: 400; letter-spacing: 0.02em; text-transform: uppercase; } .ev-item .ticket-block { margin: 0; }
-  .ev-item .ticket-row { border-radius: 0.75rem; box-shadow: none; } @media (min-width: 64rem) { .ev-item .ticket-row { border-radius: 1.125rem; } }
   .tk-label { margin: 0 0 0.5rem; color: var(--muted); font-size: 0.875rem; line-height: 1.1875rem; font-weight: 600; letter-spacing: 0; text-transform: none; }
   .ticket-row { display: flex; align-items: center; gap: 0.75rem; min-height: 3.75rem; padding: 0.625rem 0.875rem; border-radius: 1rem; background: var(--opt, var(--surface)); box-shadow: 0 0 0 0.5px var(--line);
     color: var(--text); text-decoration: none; transition: background-color 120ms linear; }
@@ -1345,9 +1330,8 @@
   .tk-n { font-variant-numeric: tabular-nums; }
   .ticket-row > :last-child .glyph { width: 1.25rem; height: 1.25rem; color: var(--muted); }
   /* A card's thread: one grouped list, oldest first, a dot per step (the newest in ink), its words, the note in quotes and the time. */
-  .thread { margin-top: 1.25rem; } .ev-item .thread { margin: 0; }
+  .thread { margin-top: 1.25rem; }
   .th-list { margin: 0; padding: 0.125rem 1rem; list-style: none; border-radius: 1rem; background: var(--opt, var(--surface)); box-shadow: 0 0 0 0.5px var(--line); }
-  .ev-item .th-list { border-radius: 0.75rem; box-shadow: none; } @media (min-width: 64rem) { .ev-item .th-list { border-radius: 1.125rem; } }
   .th-list li { display: flex; gap: 0.75rem; padding: 0.625rem 0; } .th-list li + li { border-top: 0.5px solid var(--line); }
   .th-dot { flex: none; width: 0.5rem; height: 0.5rem; margin-top: 0.5rem; border-radius: 50%; background: var(--fill-2); } .th-list li:last-child .th-dot { background: var(--action); }
   .th-b { display: grid; flex: 1; min-width: 0; gap: 0.125rem; font-size: 0.9375rem; line-height: 1.25rem; }
@@ -2148,7 +2132,7 @@
       const url = src(path);
       const name = d.type === 'explainer' ? `Explainer video, ${d.title}` : `${d.type === 'evidence' ? `Update ${d.number}` : 'Proof'}, capture ${i + 1} of ${files.length}`;
       const node = video ? el('video', { src: url, controls: '', playsinline: '', preload: 'metadata', 'aria-label': name })
-        : el('a', { href: pageHref(d) || url, ...(!pageHref(d) && { target: '_blank', rel: 'noopener' }), 'aria-label': `Open ${name}` }, cls === 'ev-hero' ? framed(shot(light, name), 'full') : shot(light, name));
+        : el('a', { href: pageHref(d) || url, ...(!pageHref(d) && { target: '_blank', rel: 'noopener' }), 'aria-label': `Open ${name}` }, shot(light, name));
       (node.tagName === 'A' ? node.querySelector('img') : node).onerror = () => node.replaceWith(el('p', { class: 'gone' }, `${name} can't be shown: the file is missing, changed since it was posted, or in a format this browser can't play.`));
       return node;
     }));
@@ -2244,24 +2228,6 @@
   const changeName = (url) => { const m = /\/(?:pull|pulls|merge_requests)\/(\d+)/.exec(url); return m ? `Pull request ${m[1]}` : `Open on ${new URL(url).host}`; };
   /** A link to a change, only when it is a full http(s) URL: a bare `http:` is text, not a place to open. */
   const changeHref = (d) => { try { const u = new URL(d.link ?? ''); return /^https?:$/.test(u.protocol) ? u.href : ''; } catch { return ''; } };
-  /** Calls go once the node is about a screen from view: a clip has no lazy loading of its own, and each one asks for its first frame. */
-  const watcher = 'IntersectionObserver' in window && new IntersectionObserver((seen) => seen.forEach((e) => { if (e.isIntersecting) watcher.unobserve(e.target), e.target.near?.(); }), { rootMargin: '100% 0px' });
-  const nearby = (node, go) => { if (!watcher) return go(); node.near = go; watcher.observe(node); };
-  /** A card's hero: the first picture of its proof, else its first clip; proof with neither (a run that kept only text) has none. */
-  function hero(d) {
-    const files = filesOf(d), [path, video, , small] = files.find(([, clip]) => !clip) ?? files[0] ?? [];
-    if (!path) return [];
-    const url = src(path);
-    if (video) {
-      const clip = el('video', { muted: '', playsinline: '', preload: 'metadata', 'aria-label': `Clip, ${headline(d)}` });
-      clip.onerror = () => clip.replaceWith(el('p', { class: 'ev-missing' }, 'The capture is missing or changed.'));
-      nearby(clip, () => { clip.src = url; });
-      return [el('span', { class: 'ev-badge' }, 'Clip'), clip];
-    }
-    const img = shot(small, '');
-    img.onerror = () => img.replaceWith(el('p', { class: 'ev-missing' }, 'The capture is missing or changed.'));
-    return [img];
-  }
   /** What the run's proof line says ran: the line after the checker's name ("done-done-verify-sign-off: npm test, phone" says "npm test, phone"). */
   const whatRan = (d) => { const line = (d.evidence?.proof ?? '').trim(); return /^[\w.-]{1,40}:\s*(.*)$/s.exec(line)?.[1] ?? line; };
   /** Updates listed together under one headline would read as one proof twice; each such card names what tells them apart best: its project, its own title or what ran. */
@@ -2274,63 +2240,115 @@
     }
     return out;
   }
-  /** One update on the Evidence screen: its capture as the hero, what it proves and how it went; the whole card opens the update. `also` names what tells it from a card with the same headline.
-   * Proof with no picture or clip is a compact row of its claim and result, never an empty frame. */
-  function evCard(d, also = '') {
-    const result = RESULT[d.evidenceCard?.result], shot = hero(d);
-    return el('a', { class: shot.length ? 'ev-card' : 'ev-card ev-text', href: `#evidence/${d.key}`, id: `item-${d.key}`, 'data-row': '' }, shot.length ? el('span', { class: 'ev-media' }, ...shot) : '',
-      el('span', { class: 't', dir: 'auto' }, headline(d), also ? el('span', { class: 'also', dir: 'auto' }, also) : ''),
-      el('span', { class: 'm' }, result ? el('span', { class: `ev-${result[0]}` }, mark(result[0]), result[2]) : el('span', { class: 'ev-none' }, 'Not run'), d.attachments?.length ? el('span', {}, d.attachments.length === 1 ? '1 file' : `${d.attachments.length} files`) : '', d.filed ? el('span', {}, stamp(d.filed)) : ''));
+  /** done-done's word on a proof: the board's check of its linked run when it has one, else the judge's line at the start of what the update says
+   *  (a board served with no evidence root keeps only that line): 'held' when it holds up, 'not' when it failed or could not be confirmed, '' when nothing checked it. */
+  const HELD = /^done-done checked the proof and it holds up\b[:.]?\s*/i, UNCONFIRMED = /^done-done could not confirm the proof\b[:.]?\s*/i;
+  const judged = (d) => { const r = d.evidenceCard?.result; return r === 'RUN PASS' || (!r && HELD.test(d.about ?? '')) ? 'held' : r === 'RUN FAIL' || r === 'INCONCLUSIVE' || (!r && UNCONFIRMED.test(d.about ?? '')) ? 'not' : ''; };
+  const judgedWord = (d) => ({ 'RUN PASS': 'Holds up', 'RUN FAIL': 'Failed', INCONCLUSIVE: 'Did not finish', UNVERIFIED: 'Could not check' })[d.evidenceCard?.result] ?? { held: 'Holds up', not: 'Could not confirm' }[judged(d)] ?? 'Not checked';
+  /** The line drawings of Evidence's rows and sheet, as the approved prototype draws them on a 20px box; fixed strings from this page. */
+  const EV_ICONS = { shield: '<path d="M10 2.6l6 2.4v4.4c0 3.9-2.6 6.6-6 8-3.4-1.4-6-4.1-6-8V5z"/><path d="M7.3 10l1.9 1.9 3.6-3.7"/>', flag: '<path d="M5 17.5v-14M5 4h9.5l-2 3.5 2 3.5H5"/>',
+    layers: '<path d="M10 3.2 17 7l-7 3.8L3 7z"/><path d="M3 10.6l7 3.8 7-3.8"/>', pr: '<circle cx="6" cy="4.8" r="1.8"/><circle cx="6" cy="15.2" r="1.8"/><circle cx="14" cy="15.2" r="1.8"/><path d="M6 6.6v6.8M14 13.4V8.8a2.5 2.5 0 0 0-2.5-2.5H9.5"/>',
+    image: '<rect x="3" y="4" width="14" height="12" rx="2"/><circle cx="7.5" cy="8.5" r="1.3"/><path d="M17 13l-3.5-3.5L6 16"/>', filter: '<path d="M3.5 5.5h13M6 10h8M8.5 14.5h3"/>',
+    check: '<path d="M5 10.4l3.2 3.1L15 6.6"/>', cross: '<path d="M6.5 6.5l7 7M13.5 6.5l-7 7"/>' };
+  const evGlyph = (a) => { const s = el('span', { class: 'ev-g', 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 20 20">${EV_ICONS[a]}</svg>`; return s; };
+  /** A proof's tile: its project's mark (the Reports tile), with done-done's check at its corner. */
+  const evTile = (name, mark = '') => { const t = projectTile(name); t.append(mark); return t; };
+  const judgedMark = (d) => (judged(d) ? el('span', { class: `ev-ok ${judged(d)}` }, evGlyph(judged(d) === 'held' ? 'check' : 'cross')) : '');
+  const prio = (d) => (/^P[0-3]$/.test(d.priority ?? '') ? d.priority : '');
+  const evWhen = (d) => (d.filed ? (isToday(d.filed) ? hhmm(d.filed) : day(d.filed)) : '');
+  /** A ticket's progress shows as a bar once work on it has begun, a full one at 100%, as the prototype draws it: never an empty bar. */
+  const begun = (t) => !!t && t.progress > 0;
+  /** One proof as a row: its project's tile with done-done's check, its title and P0-P3 chip, then its ticket's progress once begun, or its project and time. */
+  function evRow(d) {
+    const t = begun(ticketOf(d)) && ticketOf(d), project = projectOf(d), meta = [project, evWhen(d)].filter(Boolean).join(' · '), title = plain(headline(d));
+    return el('li', {}, el('a', { class: 'ui-row ev-card', href: `#evidence/${d.key}`, id: `item-${d.key}`, 'data-row': '',
+      'aria-label': [title, judgedWord(d), prio(d), t ? `${t.title}, ${t.progress}% done` : meta].filter(Boolean).join(', ') },
+    ...uiRow({ tile: evTile(project, judgedMark(d)), title, priority: prio(d), ...(t ? { progress: t.progress } : { meta }) })));
   }
-  /** Evidence as its own screen: one list of every proof ever filed, newest first, each card carrying its own day and time. The search box narrows it by what
-   * the card says; when proof names more than one project, a quiet picker beside it narrows it to one (proof that names no project is Other).
-   * An item put in this area that is not an update (a page, a diagram) keeps the card it always had. */
-  let evFind = '', evProject = '';
-  function evidenceList(items) {
-    if (!items.length) return [el('p', { class: 'empty' }, EMPTY.evidence)];
-    const box = el('input', { type: 'search', id: 'ev-find', 'aria-label': 'Search evidence', placeholder: 'Search evidence', autocomplete: 'off' }), out = el('div', { class: 'ev-grid' }), node = (d, also) => (d.type === 'evidence' ? withX(d, evCard(d, also.get(d.key))) : row(d));
-    const projects = [...new Set(items.map(projectOf))].sort((x, y) => (x === '') - (y === '') || x.localeCompare(y));
-    if (!projects.includes(evProject)) evProject = '';
-    const pick = projects.length > 1 ? el('select', { id: 'ev-project', 'aria-label': 'Show one project' }, el('option', { value: '' }, 'All projects'),
-      ...projects.map((g) => el('option', { value: g || '-' }, g || 'Other'))) : '';
-    const show = () => {
-      const q = evFind.trim().toLowerCase(), of = evProject ? items.filter((d) => (projectOf(d) || '-') === evProject) : items;
-      const hits = q ? of.filter((d) => `${headline(d)} ${d.title} ${d.about ?? ''} ${projectOf(d)} ${d.evidence?.proof ?? ''}`.toLowerCase().includes(q)) : of;
-      const also = twins(hits.filter((d) => d.type === 'evidence'));
-      out.replaceChildren(...(hits.length ? hits.map((d) => node(d, also)) : [el('p', { class: 'empty' }, 'Nothing matches.')]));
-    };
-    box.value = evFind;
-    box.oninput = () => { evFind = box.value; show(); };
-    if (pick) { pick.value = evProject; pick.classList.toggle('on', !!evProject); pick.onchange = () => { evProject = pick.value; pick.classList.toggle('on', !!evProject); show(); }; }
-    show();
-    return [el('div', { class: 'search ev-find', role: 'search' }, box, pick), out];
+  /** Evidence as the approved new look draws it: the title row with the project filter, Newest or By priority, Held up today (one square per proof filed today
+   *  in the order filed: ink where done-done says it holds up, red where it failed or could not be confirmed), then the proof as rows, six until See all.
+   *  A project picked from the filter shows as a pill in place of the hero. `top` is the page's head, which this screen draws as its title row. */
+  let evSort = 'new', evProject = '', evMore = false;
+  function evidenceList(items, top, selected = '') {
+    const proofs = items.filter((d) => d.type === 'evidence'), counts = new Map();
+    for (const d of proofs) counts.set(projectOf(d) || '-', (counts.get(projectOf(d) || '-') ?? 0) + 1);
+    if (!counts.has(evProject)) evProject = '';
+    const pname = (p) => (p === '-' ? 'No project' : p), redraw = (control) => reshow(control);
+    const h1 = top.querySelector('h1'), ro = top.querySelector(':scope > .meta');
+    if (counts.size > 1) {
+      const fb = el('button', { class: 'ui-rb ev-fb', 'aria-haspopup': 'dialog', 'aria-label': evProject ? `Filter by project, ${pname(evProject)} shown` : 'Filter by project' }, evGlyph('filter'), evProject ? el('b', { 'aria-hidden': 'true' }, '1') : '');
+      fb.onclick = () => openSheet('Filter by project', el('div', { class: 'ui-props ev-pick' }, ...[...counts].sort((x, y) => y[1] - x[1] || (x[0] === '-') - (y[0] === '-') || x[0].localeCompare(y[0])).map(([p, n]) => {
+        const b = el('button', { class: 'ui-pr', 'aria-pressed': String(p === evProject) }, el('span', { class: 'k' }, projectTile(p === '-' ? '' : p), el('span', { class: 'pn', dir: 'auto' }, pname(p))), el('span', { class: 'v' }, el('span', { class: 'n' }, String(n)), p === evProject ? evGlyph('check') : el('i')));
+        b.onclick = () => { evProject = p === evProject ? '' : p; evMore = false; sheet.close(); redraw('.ev-fb'); };
+        return b;
+      })));
+      top.replaceChildren(h1, fb, themeButton());
+    } else top.replaceChildren(h1, themeButton());
+    top.className = 'ui-top ev-top';
+    if (!proofs.length) return [...(ro ? [ro] : []), el('p', { class: 'empty' }, EMPTY.evidence), ...items.map((d) => row(d))];
+    const seg = el('div', { class: 'ui-seg ev-seg', role: 'group', 'aria-label': 'Order' }, ...[['new', 'Newest'], ['prio', 'By priority']].map(([v, n]) => {
+      const b = el('button', { 'aria-pressed': String(evSort === v) }, n);
+      b.onclick = () => { evSort = v; redraw('.ev-seg [aria-pressed="true"]'); };
+      return b;
+    }));
+    let head;
+    if (evProject) {
+      const x = el('button', { class: 'ev-unpick', 'aria-label': 'Show every project' }, glyph('x'));
+      x.onclick = () => { evProject = ''; redraw('.ev-fb'); };
+      head = el('div', { class: 'ui-card ev-pill' }, projectTile(evProject === '-' ? '' : evProject), el('span', { dir: 'auto' }, pname(evProject)), x);
+    } else {
+      // Today's proofs in the order filed; as many columns (24 to 30) as leave the fewest empty squares, 27 on a tie.
+      const today = state.decisions.filter((d) => d.type === 'evidence' && d.filed && isToday(d.filed)).sort((x, y) => Date.parse(x.filed) - Date.parse(y.filed)), marks = today.map(judged), n = marks.length;
+      const held = marks.filter((m) => m === 'held').length, open = marks.filter((m) => !m).length;
+      let cols = 27, waste = Infinity;
+      for (let c = 24; c <= 30; c++) { const w = Math.ceil(n / c) * c - n; if (w < waste || (w === waste && c === 27)) cols = c, waste = w; }
+      head = el('section', { class: 'ui-card ui-hero ev-held' }, el('div', { class: 'hl' }, el('span', { class: 'lab' }, 'Held up today')),
+        el('div', { class: 'hv' }, el('span', { class: 'big' }, n ? `${held} ` : '0', n ? el('small', {}, `of ${n}`) : ''), el('span', { class: 'vs' }, n ? `${open} not checked` : 'None filed yet')),
+        n ? el('div', { class: 'ev-dots', role: 'img', style: `--cols:${cols};--rows:${Math.ceil(n / cols)}`, 'aria-label': `${held} held up, ${n - held - open} not confirmed, ${open} not checked` },
+          ...marks.map((m) => el('i', { class: m }))) : '');
+    }
+    const rank = (d) => (prio(d) ? Number(prio(d)[1]) : 9), list = (evProject ? proofs.filter((d) => (projectOf(d) || '-') === evProject) : proofs);
+    const sorted = evSort === 'prio' ? [...list].sort((x, y) => rank(x) - rank(y)) : list, all = evMore || sorted.findIndex((d) => d.key === selected) >= 6;
+    const see = sorted.length > 6 ? el('button', { class: 'see' }, all ? 'Show fewer' : 'See all') : '';
+    if (see) see.onclick = () => { evMore = !all; redraw('.ev-sec .see'); };
+    // The board's Select and Clear all, as Today keeps its More: while selecting, Cancel and Dismiss sit under the title; otherwise one quiet line under the list opens them.
+    const bulk = canDismiss() && proofs.length ? (selecting ? bulkBar(proofs) : el('button', { class: 't-more-line ev-more', 'aria-haspopup': 'dialog' }, el('span', {}, 'Select or clear all'), glyph('right'))) : '';
+    if (bulk && !selecting) bulk.onclick = () => openSheet('Proof', el('div', { class: 'ui-props ev-pick' }, ...[['Select', () => { selecting = true; render(); }],
+      ['Clear all', () => dismiss(proofs.map((d) => d.key), `${plural(proofs.length, 'proof')} cleared`)]].map(([name, fn]) => {
+      const b = el('button', { class: 'ui-pr' }, el('span', { class: 'k' }, el('span', { class: 'pn' }, name)));
+      b.onclick = () => { sheet.close(); fn(); };
+      return b;
+    })));
+    return [...(ro ? [ro] : []), ...(selecting ? [bulk] : []), seg, head, el('h2', { class: 'ui-sec ev-sec' }, evSort === 'prio' ? 'By priority' : 'Latest proof', see),
+      sorted.length ? el('ul', { class: 'ui-card ui-list ev-list' }, ...(all ? sorted : sorted.slice(0, 6)).map(evRow)) : el('p', { class: 'empty' }, 'No proof for this project.'),
+      ...items.filter((d) => d.type !== 'evidence').map((d) => row(d)), ...(selecting ? [] : [bulk])];
   }
-  /** An update's verdict: one tap per option, marked once it is saved. A read-only board takes none. */
+  /** An update's verdict: Fail, Needs work and Pass on one row, Pass in ink until one is saved, then the saved one; a read-only board takes none. */
   function verdicts(d) {
-    const saved = state.answers[d.key], err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` });
-    const buttons = d.options.map((o) => el('button', { 'aria-pressed': o.value === saved?.answer, 'aria-label': `${o.label}, ${headline(d)}` }, o.label));
-    buttons.forEach((b, i) => (b.onclick = () => save(d, d.options[i], buttons, err)));
-    return el('div', { class: 'ev-verdict' }, el('p', { class: 'ev-ask' }, 'Does this look right?'),
-      el('div', { class: 'choices', role: 'group', 'aria-label': headline(d) }, ...buttons), err, other(d, saved, err), xBtn(d, 'Dismiss'));
+    const saved = state.answers[d.key], err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` }), order = { fail: 0, 'needs-work': 1, pass: 2 };
+    const opts = [...d.options].sort((x, y) => (order[x.value] ?? 1) - (order[y.value] ?? 1)), lead = saved?.answer ?? 'pass';
+    const buttons = opts.map((o) => el('button', { class: `v-${o.value}${o.value === lead ? ' ink' : ''}`, 'aria-pressed': o.value === saved?.answer, 'aria-label': `${o.label}, ${headline(d)}` }, o.label));
+    buttons.forEach((b, i) => (b.onclick = () => save(d, opts[i], buttons, err)));
+    return el('div', { class: 'ev-verdict' }, el('div', { class: 'choices', role: 'group', 'aria-label': `Your verdict, ${headline(d)}` }, ...buttons), err, other(d, saved, err), xBtn(d, 'Dismiss'));
   }
-  /** One update as its own screen: the whole capture, what it proves in a line, then what the check recorded and the verdict. */
+  /** One update as a sheet over the list on a phone, and beside it on a desk: its project and time, its whole title, the capture, then done-done's word,
+   *  its priority, its ticket's progress and its pull request, what it says, its Activity and the verdict. */
   function evidenceItem(d) {
-    const run = d.evidence ?? {}, result = RESULT[d.evidenceCard?.result], name = headline(d), proofLine = (run.proof ?? '').trim(),
-      // Checked by is the checker's name before the line's first colon ("done-done-verify-sign-off: …"); a sentence with a colon names no checker.
-      [, checker = '', ran = proofLine] = /^([\w.-]{1,40}):\s*(.*)$/s.exec(proofLine) ?? [];
-    const short = (label, value) => (value ? el('div', { class: 'cell' }, el('span', { class: 'k' }, label), el('span', { class: 'v', dir: 'auto' }, value)) : '');
-    const long = (label, text) => (text ? el('div', { class: 'cell long' }, el('span', { class: 'k' }, label), el('p', { class: 'x', dir: 'auto' }, text)) : '');
-    const change = changeHref(d);
-    return el('div', { class: 'ev-scroll' }, el('div', { class: 'ev-item' }, captures(d, 'ev-hero'), attachments(d),
-      el('div', { class: 'ev-say' }, el('h1', { class: 'ev-title', id: 'reader-title', tabindex: '-1', dir: 'auto' }, name), d.about && d.about !== name ? el('p', { class: 'ev-intro', dir: 'auto' }, d.about) : ''),
-      ticketRow(d), el('p', { class: 'ev-gl' }, 'Proof'),
-      el('div', { class: 'ev-grp' },
-        el('div', { class: 'cell' }, el('span', { class: 'k' }, 'Result'), result ? el('span', { class: `v ${result[0]}` }, mark(result[0]), ' ', result[2]) : el('span', { class: 'v', dir: 'auto' }, 'No result yet')),
-        long('Why', unchecked(d)), long('What ran', ran),
-        change ? el('a', { class: 'cell', href: change, target: '_blank', rel: 'noopener', 'aria-label': `Open the change for ${name}` },
-          el('span', { class: 'k' }, 'Change'), el('span', { class: 'v go' }, changeName(change)), el('span', { class: 'chev', 'aria-hidden': 'true' }, '›')) : '',
-        short('Project', projectOf(d)), short('Checked by', checker), short('When', d.filed ? stamp(d.filed) : '')), thread(d),
-      state.readonly || FROZEN || !(d.options.length || d.reply) ? '' : verdicts(d), tech(d)));
+    const t = ticketOf(d), change = changeHref(d), pr = /\/(?:pull|pulls|merge_requests)\/(\d+)/.exec(change)?.[1], project = projectOf(d);
+    const said = plain((d.about ?? '').replace(HELD, '').replace(UNCONFIRMED, '')), name = plain(headline(d)), why = plain(unchecked(d));
+    const prop = (tag, attrs, icon, k, ...v) => el(tag, { class: 'ui-pr', ...attrs }, el('span', { class: 'k' }, evGlyph(icon), k), el('span', { class: 'v' }, ...v));
+    return el('div', { class: 'ev-scroll' }, el('div', { class: 'ev-item' },
+      el('div', { class: 'ev-shd' }, el('span', { class: 'lab' }, projectTile(project), el('span', { class: 'pt', dir: 'auto' }, [project || 'No project', d.filed && (isToday(d.filed) ? hhmm(d.filed) : stamp(d.filed))].filter(Boolean).join(' · '))),
+        el('a', { class: 'ev-x', href: '#evidence', 'aria-label': 'Close' }, glyph('x'))),
+      el('h1', { class: 'ev-title', id: 'reader-title', tabindex: '-1', dir: 'auto' }, name),
+      captures(d, 'ev-hero') || el('div', { class: 'ev-hero none' }, evGlyph('image'), 'Text only: no capture was filed'), attachments(d),
+      el('div', { class: 'ui-props ev-props' }, prop('div', {}, 'shield', 'done-done', el('span', { class: `ev-word ${judged(d)}` }, judgedWord(d))),
+        prio(d) ? prop('div', {}, 'flag', 'Priority', el('span', { class: `ui-pc ${prio(d).toLowerCase()}` }, prio(d))) : '',
+        t ? prop('a', { href: `#ticket/${t.id}`, 'aria-label': `Ticket: ${t.title}, ${t.progress}% done` }, 'layers', 'Ticket', el('span', { dir: 'auto' }, t.title),
+          begun(t) ? el('span', { class: 'ui-bar' }, el('i', { style: `width:${t.progress}%` })) : '', el('span', { class: 'n' }, `${t.progress}%`)) : '',
+        change ? prop('a', { href: change, target: '_blank', rel: 'noopener', 'aria-label': `Open the change for ${name}` }, 'pr', pr ? 'Pull request' : 'Change', el('span', {}, pr ? `#${pr}` : new URL(change).host)) : ''),
+      said && said !== name ? el('p', { class: 'ev-about', dir: 'auto' }, said) : '', why ? el('p', { class: 'ev-why', dir: 'auto' }, why) : '', thread(d),
+      state.readonly || FROZEN || !(d.options.length || d.reply) ? '' : verdicts(d)));
   }
 
   /** An explainer's chapter list: each button starts the video at that chapter. */
@@ -4061,12 +4079,11 @@
     if (from === 'reports' && unread(d) && !state.readonly && !FROZEN) setTimeout(() => markRead([d.key], true));
     const back = el('a', { class: 'close', href: `#${from}` }, `‹ ${from.startsWith('reports') ? 'Reports' : AREAS[from]}`), h1 = el('h1', { id: 'reader-title', tabindex: '-1', dir: 'auto' }, sheet ? plain(d.title) : d.title);
     back.onclick = (e) => { if (`#${from}` === location.hash) e.preventDefault(), shutFull(); };
-    const out = d.type === 'evidence' ? changeLink(d) : '';
     // A report's page reads under its own head: what it is and when, its title, what it says and decided; a plan or a design keeps its title in the bar;
-    // an update shows its own title on its screen, with the change link in the bar.
+    // an update is a sheet of its own, with its own head and close.
     reader._guide = undefined;
     reader.replaceChildren(...(summary ? reportSheet(d, h1) : d.guided ? [el('header', {}, back), (reader._guide = guideView(d))] : d.type === 'plan' ? [el('header', {}, back, Object.assign(h1, { className: 'plan-name' })), planReview(d, url)] : d.kind === 'design' ? [el('header', {}, back), designReview(d, h1)]
-      : d.type === 'evidence' ? [el('header', {}, back, out), evidenceItem(d)]
+      : d.type === 'evidence' ? [evidenceItem(d)]
       : sheet ? reportSheet(d, h1, el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }))
       : [el('header', {}, back), el('div', { class: 'read' }, el('p', { class: 'eyebrow' }, [FORMS[d.form]?.[0] ?? (kind(d) || 'Report'), d.asked_by, d.filed ? when(d.filed) : ''].filter(Boolean).join(' · ')), h1,
         d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided(d), ticketRow(d), thread(d), el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }), dismissReport(d))]));
@@ -4620,7 +4637,7 @@
   }
   /** Evidence on a desk: the list of updates beside the one selected. */
   function evidenceDesk(top, items, archived, d) {
-    const view = split([top, ...evidenceList(items), archived], d ? [el('header', { class: 'split-bar' }, changeLink(d)), evidenceItem(d)] : [el('p', { class: 'empty' }, EMPTY.evidence)], [[['J', 'K'], 'Move'], [['?'], 'All keys']]);
+    const view = split([top, ...evidenceList(items, top, d?.key), archived], d ? [el('header', { class: 'split-bar' }, changeLink(d)), evidenceItem(d)] : [el('p', { class: 'empty' }, EMPTY.evidence)], [[['J', 'K'], 'Move'], [['?'], 'All keys']]);
     if (d) view.querySelector(`#item-${CSS.escape(d.key)}`)?.setAttribute('aria-current', 'true');
     return view;
   }
@@ -4769,8 +4786,7 @@
     ...(head ? [el('h1', { tabindex: '-1' }, pageTitle)] : todayHead()),
     ro ? el('p', { class: 'meta' }, ro) : '',
     head === 'answered' && by.answered.length ? el('p', { class: 'lede' }, (() => { const n = by.answered.filter((d) => isToday(state.answers[d.key].at)).length; return `${n} ${n === 1 ? 'answer' : 'answers'} today. Each one has gone back to its agent.`; })())
-      : head === 'designs' && by.designs.length ? el('p', { class: 'lede' }, 'Designs to look over. Approve one, or say what should change.')
-      : head === 'evidence' && by.evidence.length ? el('p', { class: 'lede' }, 'Every proof filed, newest first.') : '',
+      : head === 'designs' && by.designs.length ? el('p', { class: 'lede' }, 'Designs to look over. Approve one, or say what should change.') : '',
     head === 'reports' && !selecting && !state.readonly && !FROZEN ? themeButton() : bulkBar(bulk));
     const board = document.getElementById('board');
     board.removeAttribute('aria-busy');
@@ -4785,7 +4801,7 @@
     const update = at === 'evidence' && ((key && state.decisions.find((d) => d.key === key && !gone.has(d.key) && d.type === 'evidence')) || by.evidence.find((d) => d.type === 'evidence'));
     const content = at === 'tickets' || at === 'ticket' ? tickets(by, at === 'ticket' ? key : '') : [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived'), update)
       : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0) : decideDesk(top, by.waiting, hidden, decideQueue, key, decideDone, answeredToday)] : [top]), ...(deskSplit ? [] : (at === 'waiting' || at === 'decide') && !state.readonly ? [at === 'decide' && !shownAsk ? el('p', { class: 'empty' }, 'Nothing to decide for that question.') : '', decideList(by.waiting, hidden, decideDone, answeredToday), at === 'decide' && shownAsk ? askSheet(shownAsk) : '']
-      : at === 'designs' ? designGroups(by.designs, top, key) : at === 'evidence' ? [...evidenceList(by.evidence), dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived')] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
+      : at === 'designs' ? designGroups(by.designs, top, key) : at === 'evidence' ? [...evidenceList(by.evidence, top), dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived')] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : today(by))];
     if (!(at === 'decide' && shownAsk && !deskSplit)) sheetUp = '';
     // The report shown on a desk stays in place under a new list and bar while it is the same report, so its frame is not loaded again.
