@@ -30,3 +30,5 @@ Report kinds: `node .agents/skills/done-done-verify-sign-off/report-kinds-shots.
 Board actions (`board-actions.mjs`) clicks the Reports actions in every cell: a swipe right to mark unread, Mark all as read with Undo, open, Select, Dismiss 1 with Undo, Cancel and Archive all with Undo, and on a report Close and Dismiss (phone) or Mark unread and Archive (desk).
 
 Regression: test/design.test.mjs ("Reports on a desk") drives the desk at 1280 by keys and checks the phone layout at 1000px; ("each card has one place to type ... a report opens full screen and back") checks the head, the hero, the row, the swipe layers and the count, then at 390 opens a report in its sheet (read saved, Read and the count gone), closes it, swipes right (unread saved, New back) and left (archived, Undo restores); ("report and plan documents use one page scroll") checks the sheet is the page's one scroll.
+
+The shared `report-rows` journey measures at least 6 px between the kind/ticket line and each unread progress track at every width and theme.

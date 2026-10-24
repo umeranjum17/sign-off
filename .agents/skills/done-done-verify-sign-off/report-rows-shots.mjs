@@ -50,7 +50,7 @@ try {
         const rows = [...document.querySelectorAll('main .ui-row')], report = location.hash === '#reports';
         const data = rows.map(r => ({ title: r.querySelector('.t')?.textContent, kind: r.querySelector('.rkc')?.textContent, ticket: r.querySelector('.rp-ticket')?.textContent,
           icon: r.querySelector('.ui-icon img')?.getAttribute('src'), loaded: !!r.querySelector('.ui-icon img')?.naturalWidth, mono: !!r.querySelector('.mono'),
-          progress: r.querySelector('.rp-progress')?.getAttribute('aria-valuenow') ?? null, oldBar: !!r.querySelector('.l2 .ui-bar, .l2 .rp-strip') }));
+          progress: r.querySelector('.rp-progress')?.getAttribute('aria-valuenow') ?? null, progressGap: r.querySelector('.rp-progress') && r.querySelector('.rp-meta') ? r.querySelector('.rp-progress').getBoundingClientRect().top - r.querySelector('.rp-meta').getBoundingClientRect().bottom : null, oldBar: !!r.querySelector('.l2 .ui-bar, .l2 .rp-strip') }));
         const w = document.documentElement.clientWidth;
         return { url: location.href, width: innerWidth, rows: data, designCards: document.querySelectorAll('.dz-card').length, overflow: document.documentElement.scrollWidth > w,
           overflowing: [...document.querySelectorAll('main .ui-row *')].filter(e => e.getBoundingClientRect().right > w + 1).map(e => e.className),
@@ -58,15 +58,16 @@ try {
       })));`).trim());
       const name = `${area === 'waiting' ? 'decide' : area}.${theme}.${width}w`;
       axi('screenshot', join(dest, name + '.png'));
-      result.console = axi('console', '--type', 'error'); result.network = axi('network');
+      result.console = axi('console', '--type', 'error'); const network = axi('network');
       result.console_errors = result.console.includes('<no console messages found>') ? [] : [result.console];
-      result.failed_requests = result.network.split('\n').filter(l => /\[(?:[45]\d\d|failed)\]/i.test(l));
+      result.failed_requests = network.split('\n').filter(l => /\[(?:[45]\d\d|failed)\]/i.test(l));
       writeFileSync(join(dest, name + '.dom.json'), JSON.stringify(result, null, 2)); measures.push(result);
       if (!before) {
         assert.deepEqual(result.console_errors, []); assert.deepEqual(result.failed_requests, []); assert.equal(result.overflow, false); assert.deepEqual(result.overflowing, []); assert.deepEqual(result.squashed_text.filter(x => /rp-ticket|rkc|ui-icon/.test(x.element)), []);
         assert.ok(result.rows.length || (area === 'designs' && width >= 1024 && result.designCards > 0)); assert.ok(result.rows.every(r => r.loaded && !r.mono), name + ': real project icons');
         if (area === 'reports') {
           assert.ok(result.rows.every(r => r.kind && r.ticket && !r.oldBar));
+          assert.ok(result.rows.every(r => r.progressGap === null || r.progressGap >= 6), name + ': six pixels below metadata');
           assert.match(result.rows.find(r => r.title.includes('retro')).kind, /kind guessed/);
           assert.equal(result.rows.find(r => r.title.includes('weekly')).progress, null);
           assert.ok(result.rows.some(r => r.progress !== null));

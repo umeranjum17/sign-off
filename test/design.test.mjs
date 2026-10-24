@@ -2075,6 +2075,7 @@ test('report kinds and their workflows: post names what a report is for and hold
   // Each row leads its second line with its kind; the plan's bar is its nine parts, three read; the older report's kind is the board's guess.
   await until(async () => (await rows()) === `Move settings into the profile page Plan 111000000 33%|${base.title} Research bar 0%|Why messages were sent twice: a retro Incident · kind guessed bar 0%`);
   assert.equal(await evaluate('document.querySelector("#item-k-retro .rkc").textContent'), 'Incident · kind guessed');
+  assert.ok(await evaluate('(() => { const r = document.querySelector("#item-k-retro"); return r.querySelector(".rp-progress").getBoundingClientRect().top - r.querySelector(".rp-meta").getBoundingClientRect().bottom >= 6; })()'), "unread progress leaves six pixels below the kind and ticket");
   assert.equal(await evaluate('document.querySelector("#item-k-plan .rp-ticket").textContent'), 'T-29');
   assert.equal(await evaluate('!!document.querySelector("#item-k-plan .l1 .ui-tb") && !!document.querySelector("#item-k-plan .l2 .rkc")'), true);
   assert.equal(await evaluate('document.querySelector("#item-k-plan .ui-icon img").naturalWidth > 0'), true);
