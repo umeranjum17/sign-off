@@ -4647,8 +4647,8 @@ test('detail sequence follows the originating list across phone sheets, desk pan
   writeFileSync(join(dir, 'report.html'), '<!doctype html><p>A report for Umer.</p>');
   writeFileSync(join(dir, 'screen.png'), sized(300, 650));
   writeFileSync(file, JSON.stringify({ schema: 2, items: [
-    ...['alpha', 'beta', 'gamma'].map((key) => ({ key, title: `${key} question?`, options, ...(key === 'alpha' && { options: ['a','b','c','d'].map(value => ({ value, label: value.toUpperCase() })), mocks: ['a','b','c','d'].map(value => ({ value, path: 'screen.png' })) }), ...(key === 'beta' && { about: 'Umer can scroll this detailed explanation without leaving the question. '.repeat(30) }) })),
-    ...['research', 'other', 'research'].map((report_kind, i) => ({ contract: 1, kind: 'report', schema: 2, key: `r${i}`, title: `Report ${i}`, view: 'report.html', preview: 'preview.svg', purpose: report_kind, filed: new Date().toISOString() })),
+    ...['alpha', 'beta', 'gamma'].map((key) => ({ key, title: `${key} question?`, group: 'Release agent', filed: new Date().toISOString(), options, ...(key === 'alpha' && { options: ['a','b','c','d'].map(value => ({ value, label: value.toUpperCase() })), mocks: ['a','b','c','d'].map(value => ({ value, path: 'screen.png' })) }), ...(key === 'beta' && { about: 'Umer can scroll this detailed explanation without leaving the question. '.repeat(30) }) })),
+    ...['research', 'other', 'research'].map((report_kind, i) => ({ contract: 1, kind: 'report', schema: 2, key: `r${i}`, title: `Report ${i}`, group: 'Sign-in', view: 'report.html', preview: 'preview.svg', purpose: report_kind, filed: new Date().toISOString() })),
   ] }));
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] }); procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
@@ -4660,6 +4660,8 @@ test('detail sequence follows the originating list across phone sheets, desk pan
       const routes = await evaluate('[...document.querySelectorAll(".dl-face[data-row]")].map(a => a.hash)');
       await evaluate('document.querySelector("#item-beta").click()');
       await until(async () => (await evaluate('document.querySelector(".detail-sequence .position")?.textContent')) === '2 of 3');
+      const metadataFits = () => evaluate('[...document.querySelectorAll(".ask-sheet .sh-lab, .rp-bar > span[dir]")].every(n => n.scrollWidth <= n.clientWidth + 1)');
+      assert.equal(await metadataFits(), true, 'the full who/when label fits beside navigation');
       const key = (key) => send('Input.dispatchKeyEvent', { type: 'keyDown', key });
       await key('j'); await until(async () => (await evaluate('location.hash')) === routes[2]);
       assert.equal(await evaluate('document.querySelector(".detail-sequence button:last-child").disabled'), true);
@@ -4719,6 +4721,7 @@ test('detail sequence follows the originating list across phone sheets, desk pan
       if (width === 1280) assert.equal(await evaluate('document.querySelector(".detail-sequence .position")?.textContent'), '1 of 2', 'a desk filter updates its implicit selection sequence');
       const filtered = await evaluate(`[...document.querySelectorAll('.rp-page a.dl-face, .split-list a.dl-face')].map(a => a.hash)`);
       assert.equal(filtered.length, 2);
+      assert.equal(await metadataFits(), true, 'report metadata fits beside its controls');
       await evaluate(`document.querySelector('.rp-page a.dl-face, .split-list a.dl-face').click()`);
       await until(async () => (await evaluate('document.querySelector(".detail-sequence .position")?.textContent')) === '1 of 2');
       await key('j'); await until(async () => (await evaluate('location.hash')) === filtered[1]);
