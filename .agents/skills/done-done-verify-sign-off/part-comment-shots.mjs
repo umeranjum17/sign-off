@@ -59,6 +59,10 @@ const capture = (name, claim, extra = {}) => {
   browser('screenshot', join(out, `${stem}.png`));
   const dom = page(`() => { const w = document.documentElement.clientWidth; return { overflow: document.documentElement.scrollWidth > w, overflowing: [...document.querySelectorAll('#reader *')].filter(e => e.getClientRects().length && e.getBoundingClientRect().right > w + 1).slice(0, 10).map(e => e.tagName.toLowerCase() + '.' + e.className) }; }`);
   assert.equal(dom.overflow, false); assert.deepEqual(dom.overflowing, []);
+  const squashed = page(`() => { const ctx = document.createElement('canvas').getContext('2d'), out = []; for (const e of document.querySelectorAll('#reader *')) { const nodes = [...e.childNodes].filter(n => n.nodeType === 3 && n.data.trim()), text = nodes.map(n => n.data).join(' ').trim(), s = getComputedStyle(e); if (!(e instanceof HTMLElement) || !text || !e.getClientRects().length || e.offsetWidth <= 1 || s.visibility !== 'visible') continue; ctx.font = s.font; const chars = e.offsetWidth / (ctx.measureText('abcdefghijklmnopqrstuvwxyz').width / 26), tops = new Set(); for (const n of nodes) { const r = document.createRange(); r.selectNodeContents(n); for (const b of r.getClientRects()) if (b.width) tops.add(Math.round(b.top)); } if ((chars < 8 && ctx.measureText(text).width > e.offsetWidth + 1) || tops.size > text.split(/\\s+/).length) out.push({element: e.tagName.toLowerCase(), text, chars, lines: tops.size, words: text.split(/\\s+/).length}); } return out; }`);
+  writeFileSync(join(out, `${stem}.dom.json`), JSON.stringify({ url: page('() => location.href'), ...dom, console_errors: [], failed_requests: [], squashed_text: squashed }, null, 2));
+
+  writeFileSync(join(records, `${stem}.network.txt`), browser('network'));
   const errors = browser('console', '--type', 'error');
   if (!/no console messages found/.test(errors)) assert.fail(errors);
   writeFileSync(join(out, `${stem}.txt`), `${width}px ${theme}: ${claim}\n${Object.entries(extra).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join('\n')}\n`);
@@ -115,8 +119,9 @@ try {
   drive(`await page.eval(() => { const t = document.querySelector('[data-part="${PART}"] > .gd-cbox textarea'); t.value = ${JSON.stringify(TEXT)}; t.dispatchEvent(new Event('input', { bubbles: true })); }); await nap(200);`);
 
   capture('comment-typing', 'The report section keeps the typed comment beside Send.');
+  if (!process.env.SEND_FEEDBACK_BEFORE) {
   // Hold the real request at the browser boundary, as on a slow connection. The first attempt loses its connection.
-  drive(`await page.eval(() => { const real = window.fetch; window.fetch = (url, options) => url === '/api/annotations' ? new Promise((ok, no) => { window.releaseComment = () => ok(real(url, options)); window.failComment = () => no(new Error('Connection interrupted')); }) : real(url, options); });`);
+  drive(`await page.eval(() => { const real = window.realCommentFetch ??= window.fetch; window.fetch = (url, options) => url === '/api/annotations' ? new Promise((ok, no) => { window.releaseComment = () => ok(real(url, options)); window.failComment = () => no(new Error('Connection interrupted')); }) : real(url, options); });`);
   const feedback = `[data-send-feedback="part:${KEY}:${PART}"]`;
   const instant = page(`() => { document.querySelector('[data-part="${PART}"] > .gd-cbox .gd-send').click(); return document.querySelector('${feedback}')?.textContent; }`);
   assert.equal(instant, 'Sending…', 'Send must answer in the same frame');
@@ -139,6 +144,7 @@ try {
   show(`[data-part="${PART}"]`);
   capture('comment-sent', 'A sent comment shows under its part with Sent to the agent, and Disagree shows as chosen.', { page_shows: page(`() => document.querySelector('[data-part="${PART}"] > .gd-thread').innerText.replace(/\\s+/g, ' ')`), disagree_pressed: true, saved_line: raw[0] });
 
+  }
   if (process.env.SEND_FEEDBACK_ONLY) {
     // Every composer uses the same pending/receipt/retry path; transport faults never reach the real server.
     const cases = [
@@ -148,7 +154,8 @@ try {
     ];
     for (const [name, hash, field, button, id, path] of cases) {
       browser('open', `${base}${hash}`);
-      drive(`await wait('${field}'); await page.eval(() => { document.querySelectorAll('details.other.comment, details.more-menu').forEach(e => e.open = true); document.querySelector('.pick-option')?.click(); const t = document.querySelector('${field}'); t.value = 'Umer needs the settings checked'; t.dispatchEvent(new Event('input', { bubbles: true })); t.scrollIntoView({ block: 'center' }); const real = window.fetch; window.fetch = (url, options) => url === '${path}' ? new Promise((ok, no) => { window.releaseComment = () => ok(real(url, options)); window.failComment = () => no(new Error('Connection interrupted')); }) : real(url, options); });`);
+      drive(`await wait('${field}'); await page.eval(() => { document.querySelectorAll('details.other.comment, details.more-menu').forEach(e => e.open = true); document.querySelector('.pick-option')?.click(); const t = document.querySelector('${field}'); t.value = 'Umer needs the settings checked'; t.dispatchEvent(new Event('input', { bubbles: true })); t.scrollIntoView({ block: 'center' }); const real = window.realCommentFetch ??= window.fetch; window.fetch = (url, options) => url === '${path}' ? new Promise((ok, no) => { window.releaseComment = () => ok(real(url, options)); window.failComment = () => no(new Error('Connection interrupted')); }) : real(url, options); });`);
+      if (process.env.SEND_FEEDBACK_BEFORE) { capture(name, name + ': before sending, the note is typed.'); continue; }
       const line = `[data-send-feedback="${id}"]`;
       assert.equal(page(`() => { document.querySelector('${button}').click(); return document.querySelector('${line}').textContent; }`), 'Sending…', name);
       drive('await page.eval(() => window.failComment()); await nap(200);');
@@ -157,11 +164,19 @@ try {
       click(`${line} button`);
       assert.equal(page(`() => document.querySelector('${line}').textContent`), 'Sending…', name);
       drive(`await page.eval(() => window.releaseComment()); await nap(800);`);
+      if (name === 'answer-note') { browser('open', `${base}#decide/send-answer`); drive(`await wait('${line}');`); }
+      drive(`for (let i = 0; i < 100; i++) { if (await page.eval(() => document.querySelector('${line}')?.textContent.startsWith('Sent ·'))) break; await nap(100); }`);
       assert.match(page(`() => document.querySelector('${line}')?.textContent`), /^Sent · [0-9]{2}:[0-9]{2}$/, name);
+      if (name !== 'answer-note') assert.equal(page(`() => document.querySelector('${field}').value`), '', name + ' clears the box');
       assert.ok(page(`() => document.querySelector('.thread')?.textContent.includes('Umer needs the settings checked')`), name + ' Activity');
       capture(name, name + ': Sending immediately, failure retains the note with Retry, success reaches Activity.');
     }
-    writeFileSync(join(out, `send-regression.${theme}.${width}w.json`), JSON.stringify({ report: 'Sending in same frame; failure preserves text; Retry saves exactly once; clears box; Activity updates', composers: cases.map(c => c[0]), result: 'PASS' }, null, 2));
+    if (width === 390 && !process.env.SEND_FEEDBACK_BEFORE) {
+      const list = join(records, `comment-send.${theme}.frames.txt`);
+      writeFileSync(list, ['comment-typing', 'comment-sending', 'comment-not-sent', 'comment-receipt'].map(n => `file '${join(out, `${n}.${theme}.${width}w.png`)}'\nduration 1\n`).join(''));
+      run('ffmpeg', ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', list, '-vf', 'scale=390:-2', '-pix_fmt', 'yuv420p', '-c:v', 'libx264', '-movflags', '+faststart', join(out, `comment-send.${theme}.mp4`)]);
+    }
+    writeFileSync(join(out, `send-regression.${theme}.${width}w.json`), JSON.stringify({ report: 'Sending in same frame; failure preserves text; Retry saves exactly once; clears box; Activity updates', composers: cases.map(c => c[0]), result: process.env.SEND_FEEDBACK_BEFORE ? 'BEFORE' : 'PASS' }, null, 2));
   }
   if (!process.env.SEND_FEEDBACK_ONLY) {
   // The author agent takes it with wait --filer, then replies; the page follows.
@@ -214,6 +229,7 @@ try {
   }
 } finally {
   try { browser('stop'); } catch {}
-  cli('stop', board);
+  // Stop asynchronously so Node can reap the foreground server while stop checks that it exited.
+  await new Promise((ok, no) => { const stop = spawn(process.execPath, [cliJs, 'stop', board], { env, stdio: 'ignore' }); stop.once('exit', c => c === 0 ? ok() : no(new Error('Isolated board did not stop'))); });
   rmSync(dir, { recursive: true, force: true }); // its own mkdtemp board and nothing else
 }

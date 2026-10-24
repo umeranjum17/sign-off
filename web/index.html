@@ -3878,12 +3878,12 @@
       const s = same(part, action, q, selection), prior = sentAs(s);
       if (prior) { already(part, prior); return prior; }
       if (outbox.has(s)) { outbox.set(s, true); return; }
-      outbox.set(s, false); btn?.setAttribute('aria-busy', 'true');
-      try { await post(); sync(); const a = sentAs(s); if (a) (outbox.get(s) ? already(part, a) : showAsk(part, a.id)); return a; }
-      finally { outbox.delete(s); btn?.removeAttribute('aria-busy'); }
+      outbox.set(s, false);
+      try { if (!await sendWithFeedback(`ask:${key}:${part}`, btn, post)) throw new Error(sending.get(`ask:${key}:${part}`).error); sync(); const a = sentAs(s); if (a) (outbox.get(s) ? already(part, a) : showAsk(part, a.id)); return a; }
+      finally { outbox.delete(s); }
     }
     async function ask(part, q, btn) {
-      try { await sendAsk(part, 'deeper', q, undefined, btn, () => postJson('/api/deeper', { key, part, ...(q && { q }) })); } catch (e) { panels.get(part).hidden = false; panels.get(part).append(E('p', 'gd-err', `Could not ask: ${e.message}`)); }
+      try { await sendAsk(part, 'deeper', q, undefined, btn, () => postJson('/api/deeper', { key, part, ...(q && { q }) })); } catch { panels.get(part).hidden = false; }
     }
     const deepBtn = (part) => {
       const b = el('button', { class: 'gd-lnk deep', type: 'button', 'aria-expanded': 'false', 'aria-controls': `gd-a-${part.replace(/\W/g, '-')}` }, gic('deeper'), 'Go deeper');
@@ -3905,19 +3905,14 @@
     };
     async function engage(part, action, q, id = crypto.randomUUID(), selection, btn) {
       try { return await sendAsk(part, action, q, selection, btn, () => postJson('/api/engagement', { version: 1, id, key, ...d.engagement, part, action, ...(q !== undefined && { q }), ...(selection && { selection }) })); }
-      catch (e) {
-        const retry = el('button', { type: 'button', class: 'gd-lnk' }, 'Retry');
-        const error = E('p', 'gd-err', `Could not ask: ${e.message} `, retry);
-        retry.onclick = () => { error.remove(); engage(part, action, q, id, selection, retry); };
-        panels.get(part).hidden = false; panels.get(part).append(error);
-      }
+      catch { panels.get(part).hidden = false; }
     }
     // The presets and the composer for one part. With a selection they ask about those words, through this same engage().
     const controls = (part, selection) => {
       const form = el('form', { class: 'gd-fu' }), input = el('input', { 'aria-label': selection ? 'Ask about the selected text' : 'Ask about this part', placeholder: selection ? 'Ask about these words' : 'Ask about this' }), send = el('button', { type: 'submit' }, 'Send');
       let action = 'custom';
       form.append(input, send); form.hidden = !!selection;
-      form.onsubmit = (e) => { e.preventDefault(); if (input.value.trim()) { const sent = engage(part, action, input.value, undefined, selection, send); input.value = ''; action = 'custom'; input.placeholder = 'Ask a follow-up'; if (selection) asked(part, sent); } };
+      form.onsubmit = async (e) => { e.preventDefault(); if (input.value.trim()) { const sent = engage(part, action, input.value, undefined, selection, send); if (selection) asked(part, sent); if (await sent) { input.value = ''; action = 'custom'; input.placeholder = 'Ask a follow-up'; } } };
       const buttons = Object.entries(actionLabels).filter(([a]) => a !== 'custom').map(([a, label]) => {
         const b = el('button', { class: `gd-lnk ${a === 'deeper' ? 'deep' : a}`, type: 'button' }, label);
         b.onclick = () => { if (a === 'question') { action = a; form.hidden = false; input.focus(); } else { const sent = engage(part, a, undefined, undefined, selection, b); if (selection) asked(part, sent); } };
@@ -3959,7 +3954,7 @@
       box.onsubmit = async (e) => {
         e.preventDefault(); const text = ta.value.trim(); if (!text || sending.get(`part:${key}:${part}`)?.busy) return;
         send.disabled = ta.disabled = cancel.disabled = comment.disabled = true;
-        if (mode === 'question') { if (await sendWithFeedback(`part:${key}:${part}`, send, async () => { if (!await engage(part, 'question', text, undefined, undefined, send)) throw new Error('The ask was not saved. Try again.'); })) close(); } else if (await post({ text, ...(lean && { verdict: lean }) })) close();
+        if (mode === 'question') { if (await engage(part, 'question', text, undefined, undefined, send)) close(); } else if (await post({ text, ...(lean && { verdict: lean }) })) close();
         ta.disabled = cancel.disabled = comment.disabled = false; paint();
       };
       const vote = (name, label, icon) => el('button', { type: 'button', class: 'gd-v ' + name + (inItem ? ' icon-only' : ''), 'aria-pressed': 'false', title: label }, gic(icon), E('span', '', label));
@@ -3981,7 +3976,7 @@
         ask = [E('div', 'gd-menuwrap', more, menu)];
       } else if (live) ask = [deepBtn(part)];
       queueMicrotask(() => paintTalk(part));
-      return [...(dp ? [dp] : []), thread, box, sendLine(`part:${key}:${part}`), E('div', 'gd-acts gd-foot' + (d.engagement ? '' : ' legacy'), agree, disagree, comment, E('span', 'sp'), ...(db ? [db] : []), ...ask), panel];
+      return [...(dp ? [dp] : []), thread, box, sendLine(`part:${key}:${part}`), sendLine(`ask:${key}:${part}`), E('div', 'gd-acts gd-foot' + (d.engagement ? '' : ' legacy'), agree, disagree, comment, E('span', 'sp'), ...(db ? [db] : []), ...ask), panel];
     };
 
     // ---- selected words: native selection of one authored field, offered the same presets right under that field
