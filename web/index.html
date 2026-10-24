@@ -3647,7 +3647,11 @@
     const stages = ['this', 'understood', by('found').length && 'found', by('recommend').length && 'recommend', decisions.length && 'decide', 'next'].filter(Boolean);
     const saved0 = answerOf(key);
     const sentNote = (saved0?.notes ?? []).find((n) => n.section === 'understood');
-    const S = { understood: sentNote ? (sentNote.verdict === 'approve' ? 'yes' : 'no') : null, note: sentNote?.note ?? '', picks: Object.fromEntries(decisions.map((q) => [q.key, saved0?.decisions?.[q.key] ?? q.recommend])), told: false };
+    // On a report, That is right and Not quite are said to the author as the understood part's Agree and Disagree, so a reload shows what was said.
+    const saidU = () => (plan ? undefined : (state.comments ?? []).filter((c) => c.key === key && c.part === 'understood' && c.verdict).at(-1));
+    const toldU = (c = saidU()) => (c?.verdict === 'disagree' && c.text ? c : undefined);
+    const said0 = saidU();
+    const S = { understood: sentNote ? (sentNote.verdict === 'approve' ? 'yes' : 'no') : said0 ? (said0.verdict === 'agree' ? 'yes' : 'no') : null, note: sentNote?.note ?? '', picks: Object.fromEntries(decisions.map((q) => [q.key, saved0?.decisions?.[q.key] ?? q.recommend])), told: !!toldU(said0) };
     const sent = () => answerOf(key)?.answer === 'sent';
     const parts = new Map();   // part id -> its card
     const stageOf = new Map(); // part id -> stage
@@ -3660,16 +3664,15 @@
     function receipt(part) {
       const at = readAt(part), seen = state.seen_at?.[key], mine = answerOf(key);
       const you = at ? E('span', '', rd(), E('b', '', 'Read by you'), ` ${hhmm(at)}`) : E('span', '', rd('hollow'), 'You have not read this yet');
-      const told = part === 'understood' && !plan && (state.messages ?? []).filter((m) => m.key === key && m.text.startsWith(NOTOFF)).at(-1);
+      const told = part === 'understood' && toldU();
       let agent;
       if (plan && mine?.answer === 'sent' && ((part === 'understood' && sentNoteNow()) || part === 'next' || part.startsWith('d:'))) {
         const what = part === 'understood' ? 'note' : 'answers';
         agent = seen ? E('span', '', rd('agent'), E('b', '', `Agent read your ${what}`), ` ${hhmm(seen)}`) : E('span', '', rd('hollow'), `Agent has not read your ${what} yet`);
-      } else if (told) agent = told.delivered ? E('span', '', rd('agent'), E('b', '', 'Agent read your note'), ` ${hhmm(told.delivered)}`) : E('span', '', rd('hollow'), 'Agent has not read your note yet');
+      } else if (told) agent = told.read ? E('span', '', rd('agent'), E('b', '', 'Agent read your note'), ` ${hhmm(told.read)}`) : E('span', '', rd('hollow'), 'Agent has not read your note yet');
       else agent = E('span', '', rd('agent'), E('b', '', 'Agent wrote this'), d.filed ? ` ${hhmm(d.filed)}` : '');
       return [you, agent];
     }
-    const NOTOFF = 'What I understood is off: ';
     const sentNoteNow = () => (answerOf(key)?.notes ?? []).some((n) => n.section === 'understood' && n.note);
     const rc = (part, small) => { const box = E('div', `gd-rc${small ? ' s' : ''}`); rcs.set(part + (small ? '~s' : ''), box); return box; };
     const paintRc = () => rcs.forEach((box, k) => box.replaceChildren(...receipt(k.replace(/~s$/, ''))));
@@ -3763,7 +3766,6 @@
       return [E('div', 'gd-acts', ...buttons), form];
     };
     // ---- Agree, Disagree and Comment on a part: posted through /api/annotations like a note on a design, taken by the author agent's wait
-    const chat = live && !state.answers_only;
     const said = (part) => (state.comments ?? []).filter((c) => c.key === key && c.part === part);
     const votes = new Map(), threads = new Map();
     const verdictOf = (part) => said(part).filter((c) => c.verdict).at(-1)?.verdict;
@@ -3781,7 +3783,7 @@
     const acts = (part, rows, inItem) => {
       const [db, dp] = rows?.length ? detailsBtn(part, rows) : [];
       const panel = live ? ansPanel(part) : null;
-      if (!chat && !(live && d.engagement)) return [E('div', 'gd-acts', ...(db ? [db] : []), ...(live ? [deepBtn(part)] : [])), ...(dp ? [dp] : []), ...(live ? [panel] : [])];
+      if (!live) return [E('div', 'gd-acts', ...(db ? [db] : [])), ...(dp ? [dp] : [])];
       const err = E('p', 'gd-err'), ta = el('textarea', { rows: '2', maxlength: '500' }), send = el('button', { type: 'submit', class: 'gd-send', disabled: '' }, 'Send'), cancel = el('button', { type: 'button', class: 'gd-q' }, 'Cancel');
       const hint = E('span', 'gd-hint'), box = el('form', { class: 'gd-cbox', hidden: '' }, ta, E('div', 'gd-cbar', hint, cancel, send), err);
       err.setAttribute('role', 'alert');
@@ -3818,7 +3820,7 @@
         ask = [E('div', 'gd-menuwrap', more, menu)];
       } else if (live) ask = [deepBtn(part)];
       queueMicrotask(() => paintTalk(part));
-      return [...(dp ? [dp] : []), thread, ...(chat ? [box] : []), E('div', 'gd-acts gd-foot' + (live && !d.engagement ? ' legacy' : ''), ...(chat ? [agree, disagree, comment] : []), E('span', 'sp'), ...(db ? [db] : []), ...ask), ...(live ? [panel] : [])];
+      return [...(dp ? [dp] : []), thread, box, E('div', 'gd-acts gd-foot' + (d.engagement ? '' : ' legacy'), agree, disagree, comment, E('span', 'sp'), ...(db ? [db] : []), ...ask), panel];
     };
 
     // ---- selected words: native selection of one authored field, offered the same presets right under that field
@@ -3937,18 +3939,20 @@
     const tell = el('button', { class: 'gd-lnk gd-tell', type: 'button', hidden: '' }, 'Tell the agent');
     const choices = [['yes', 'That is right', true], ['no', 'Not quite']].map(([v, label, tick]) => {
       const b = el('button', { class: 'gd-choice', type: 'button', 'aria-pressed': 'false', 'data-u': v }, ...(tick ? [gic('check')] : []), label);
-      b.onclick = () => { S.understood = S.understood === v ? null : v; syncU(); paintSummary(); };
+      b.onclick = () => { S.understood = S.understood === v ? null : v; syncU(); paintSummary(); if (!plan && S.understood === 'yes') sayU({ verdict: 'agree' }, b); };
       return b;
     });
     noteBox.oninput = () => { S.note = noteBox.value; if (!plan) syncU(); };
-    tell.onclick = async () => {
-      const err = tell.parentElement.querySelector('.gd-err'); err?.remove(); tell.disabled = true;
-      try { await postJson('/api/messages', { kind: 'comment', key, text: `${NOTOFF}${S.note.trim()}` }); S.told = true; syncU(); sync(); } catch (e) { tell.after(E('p', 'gd-err', `Could not send: ${e.message}`)); tell.disabled = false; }
-    };
+    // Said as a comment on the understood part, so the author's wait --filer takes it and the part shows Sent to the agent, then Agent read it.
+    async function sayU(body, btn) {
+      tell.parentElement.querySelector(':scope > .gd-err')?.remove(); btn.disabled = true;
+      try { await postJson('/api/annotations', { key, part: 'understood', ...body }); sync(); return true; } catch (e) { tell.after(E('p', 'gd-err', `Could not send: ${e.message}`)); btn.disabled = false; return false; }
+    }
+    tell.onclick = async () => { if (await sayU({ verdict: 'disagree', text: S.note.trim() }, tell)) { S.told = true; S.note = noteBox.value = ''; syncU(); } };
     function syncU() {
       const lock = sent() || !live;
       choices.forEach((b) => { b.setAttribute('aria-pressed', String(S.understood === b.dataset.u)); b.disabled = lock; });
-      noteBox.hidden = S.understood !== 'no'; noteBox.disabled = lock;
+      noteBox.hidden = S.understood !== 'no' || S.told; noteBox.disabled = lock;
       tell.hidden = plan || S.understood !== 'no' || !S.note.trim() || S.told || !live; tell.disabled = false;
     }
     const understood = card('understood', 'understood', head('Check that I have this right', 'This is your ask in my words. If it is off, say what is off. That is the only correction that matters.'),
@@ -3976,7 +3980,7 @@
       const cmp = compared(s.items ?? []);
       const items = cmp ? [] : (s.items ?? []).map((it, i) => {
         const part = `${s.id}:${i}`;
-        if (!it.more && !it.diagram) return E('li', '', E('div', 'rowstat', E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), fld(part, 'title', mdSpan('span', '', it.title))), fld(part, 'text', mdSpan('span', 'sm', it.text)))), ...(d.engagement || chat ? [E('div', 'body', ...acts(part, undefined, true))] : []));
+        if (!it.more && !it.diagram) return E('li', '', E('div', 'rowstat', E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), fld(part, 'title', mdSpan('span', '', it.title))), fld(part, 'text', mdSpan('span', 'sm', it.text)))), ...(d.engagement || live ? [E('div', 'body', ...acts(part, undefined, true))] : []));
         const body = E('div', 'body', ...(it.more ? [fld(part, 'more', mdDiv(it.more))] : []), ...(it.diagram ? [diagramFig(it.diagram)] : []), ...acts(part, undefined, true));
         body.hidden = true;
         const b = el('button', { class: 'rowbtn', type: 'button', 'aria-expanded': 'false' }, E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), mdSpan('span', '', it.title, NOLINK)), mdSpan('span', 'sm', it.text, NOLINK)), gic('chev', 'gchev'));
@@ -4006,7 +4010,7 @@
     // ---- next step and Go ahead
     const sendSlot = E('div', ''), err = E('p', 'gd-err');
     err.setAttribute('role', 'alert');
-    const nextCard = card('next', 'next', head(d.next.heading, undefined, undefined, 'next', 'heading'), E('ul', 'gd-checks', ...d.next.lines.map((l, n) => E('li', '', E('span', 'tk', gic('check')), fld('next', `lines.${n}`, mdSpan('span', '', l))))), ...(plan ? [sendSlot, err] : []), ...(d.engagement || chat ? acts('next') : []), rc('next'));
+    const nextCard = card('next', 'next', head(d.next.heading, undefined, undefined, 'next', 'heading'), E('ul', 'gd-checks', ...d.next.lines.map((l, n) => E('li', '', E('span', 'tk', gic('check')), fld('next', `lines.${n}`, mdSpan('span', '', l))))), ...(plan ? [sendSlot, err] : []), ...(d.engagement || live ? acts('next') : []), rc('next'));
     async function go(b) {
       if (S.understood === 'no' && !S.note.trim()) { noteBox.focus(); noteBox.scrollIntoView({ block: 'center' }); err.textContent = 'Say what is off first, or choose That is right.'; return; }
       err.textContent = ''; b.disabled = true;
@@ -4103,7 +4107,7 @@
       if (!root.isConnected && timer) { clearInterval(timer); timer = undefined; return; }
       syncU(); paintOpts(); paintSummary(); paintRc(); paintRail(); votes.forEach((_, part) => paintTalk(part));
       panels.forEach((_, part) => { paintAns(part); if (asksOf(part).length && (d.engagement || (deeps.get(part).getAttribute('aria-expanded') === 'false' && !deeps.get(part).dataset.shut))) { deeps.get(part)?.setAttribute('aria-expanded', 'true'); panels.get(part).hidden = false; } });
-      const need = live && (unfinished() || (state.comments ?? []).some((c) => c.key === key && c.text && !c.reply) || (plan && sent() && !state.seen_at?.[key]) || (!plan && S.told && !(state.messages ?? []).some((m) => m.key === key && m.text.startsWith(NOTOFF) && m.delivered)));
+      const need = live && (unfinished() || (state.comments ?? []).some((c) => c.key === key && c.text && !c.reply) || (plan && sent() && !state.seen_at?.[key]));
       if (need && !timer) timer = setInterval(async () => {
         if (!root.isConnected) { clearInterval(timer); timer = undefined; return; }
         try { const res = await fetch('/api/decisions'); if (res.ok) { state = await res.json(); sync(); } } catch {}

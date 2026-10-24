@@ -52,8 +52,10 @@ New guided defaults use plan schema 3 / report schema 4, contract 1, with a requ
   another program: the same Summary and area screens, checked every 20 seconds, but the items
   that ask something take answers and replies. There is no Ask box, and
   **Add a comment** has no Ask for another round or Send without answering; the server refuses rounds, comments
-  and prompts with 403. Go deeper on a guided plan or report is an ask for an
-  explanation, so it works here. An answer or reply to an item the program dropped
+  on cards and mocks, and prompts with 403. What the person says on a guided plan or report goes to its own
+  author's `wait --filer`, so it works here: Go deeper, Agree, Disagree and Comment on a part, and a report's
+  **That is right** and **Not quite** with its note (**Tell the agent**), saved as the Agree or Disagree of its
+  `understood` part. An answer or reply to an item the program dropped
   while the person answered it is still saved. A feeding program writes the
   board with `sign-off-axi post <board> --from <file> --replace`, which checks
   the whole file the way the board reads it and refuses a bad item before
@@ -393,7 +395,7 @@ Each names its item's `key`, the option's `mock`, the sha256 `hash` of that mock
 and the element as `ref`, `tag` and `words` (see the pointing script above). A later line with the same `id` edits it,
 and a `deleted` line removes it. A save sends the `hash` the page showed; when the file has changed since, the server answers 409 and nothing is written. An edit sends the `id` of its comment; when that comment is no longer live, the server answers 404 and writes nothing. The board shows an unsent comment only while its mock file still has that hash,
 and under the list it counts the unsent comments on an earlier version of each mock as hidden; a sent one is always listed.
-A read-only or answers-only board returns none of them from its state, so its page shows none:
+A read-only or answers-only board returns none of them from its state, so its page shows none (comments on a part of a guided page, in the same file, an answers-only board keeps):
 
 ```json
 {"key":"sign-in-layout","mock":"a","hash":"1ca1060e…","ref":"#sign-in > button:nth-of-type(1)","tag":"button","words":"Sign in","text":"Make it green.","id":"b61d84c0f9b3","at":"2026-10-13T21:50:02Z"}

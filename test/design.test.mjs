@@ -1244,7 +1244,51 @@ test('an ask on a guided report answers the tap on a phone: the Ask control is p
   proc.kill();
 });
 
-test('a guided report on a phone never stacks two action rows: every item keeps its one row in its card, and a section\'s own row shows once at its end unless its last item already shows a row, with its Details kept', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Not quite with a note and Tell the agent, on a phone on an answers-only board: the note is taken, saved, handed to the report\'s author by wait --filer and shown as Sent, then Agent read it', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'fed-not-quite'), file = join(dir, 'board.json'), note = 'It is VMs, not containers: each agent gets its own machine.';
+  mkdirSync(dir);
+  const report = { ...JSON.parse(readFileSync(new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url))), key: 'mx-agents-on-vms-v2', filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+  writeFileSync(join(dir, 'report.json'), JSON.stringify(report));
+  assert.equal(run('post', file, '--kind', 'report', '--from', join(dir, 'report.json')).code, 0);
+  // The owner's board is fed by another program, so it takes answers only.
+  writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, 'utf8')), answers_only: true }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, tap, insertText, close } = await browse(join(dir, 'b'), 390, 844, true);
+  const centre = (sel) => evaluate(`(() => { const b = document.querySelector(${JSON.stringify(sel)}); b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`);
+  const card = '[data-part="understood"]', status = `[...document.querySelectorAll('${card} .gd-cmt')].map((c) => c.textContent).join('|') + '#' + [...document.querySelectorAll('${card} .gd-err')].filter((e) => e.textContent).length`;
+  try {
+    await evaluate(`location.href = ${JSON.stringify(`${url}#reports/${report.key}`)}`);
+    await until(() => evaluate(`!!document.querySelector('${card} .gd-choice[data-u="no"]')?.getClientRects().length`));
+    await evaluate(`document.querySelector('.gd-scroll').style.scrollBehavior = 'auto'`);
+    await tap(await centre(`${card} .gd-choice[data-u="no"]`));
+    await until(() => evaluate(`!document.querySelector('${card} .gd-note').hidden`));
+    await evaluate(`document.querySelector('${card} .gd-note').focus()`);
+    await insertText(note);
+    await until(() => evaluate(`!document.querySelector('${card} .gd-tell').hidden`));
+    await tap(await centre(`${card} .gd-tell`));
+    // Accepted, no "takes answers only": the note shows under the part as sent, and the note box and Tell the agent make way for it.
+    const shown = (state) => new RegExp(`^YYouDisagree\\d\\d:\\d\\d${note.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}${state}#0$`);
+    await until(async () => shown('Sent to the agent').test(await evaluate(status)));
+    assert.equal(await evaluate(`[document.querySelector('${card} .gd-note').hidden, document.querySelector('${card} .gd-tell').hidden].join()`), 'true,true');
+    const saved = readFileSync(join(dir, 'board.annotations.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    assert.deepEqual(saved.map(({ key, part, verdict, text }) => [key, part, verdict, text]), [[report.key, 'understood', 'disagree', note]]);
+    // The report's author gets it from its own wait, once.
+    const taken = execFileSync(process.execPath, [cli, 'wait', file, '--filer', report.filer, '--events', '--timeout', '10'], { encoding: 'utf8', env });
+    const event = JSON.parse(taken.trim());
+    assert.deepEqual([event.event, event.key, event.part, event.verdict, event.text], ['comment', report.key, 'understood', 'disagree', note]);
+    await until(async () => shown('Agent read it \\d\\d:\\d\\d').test(await evaluate(status)));
+    assert.match(await evaluate(`document.querySelector('${card} .gd-rc').textContent`), /Agent read your note \d\d:\d\d/);
+    // That is right is the same part's Agree, saved and taken the same way.
+    await tap(await centre(`${card} .gd-choice[data-u="yes"]`));
+    await until(() => readFileSync(join(dir, 'board.annotations.jsonl'), 'utf8').includes('"verdict":"agree"'));
+    assert.equal(JSON.parse(execFileSync(process.execPath, [cli, 'wait', file, '--filer', report.filer, '--events', '--timeout', '10'], { encoding: 'utf8', env }).trim()).verdict, 'agree');
+  } finally { close(); }
+  proc.kill();
+});
+
+test('a guided report on a phone never stacks two action rows:every item keeps its one row in its card, and a section\'s own row shows once at its end unless its last item already shows a row, with its Details kept', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'one-row'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const report = { ...JSON.parse(readFileSync(new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url))), filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
@@ -3536,7 +3580,8 @@ test('an answers-only board fed through post --replace: a bad item is refused, y
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const shown = await (await fetch(`${url}api/decisions`)).json();
   assert.deepEqual([shown.answers_only, shown.decisions.map((d) => d.area)], [true, ['evidence', undefined, undefined]]);
-  for (const [path, body] of [['api/rounds', { key: 'ask-1', note: 'again' }], ['api/messages', { kind: 'prompt', text: 'hi' }], ['api/messages', { kind: 'comment', key: 'ask-1', text: 'hi' }]]) {
+  for (const [path, body] of [['api/rounds', { key: 'ask-1', note: 'again' }], ['api/messages', { kind: 'prompt', text: 'hi' }], ['api/messages', { kind: 'comment', key: 'ask-1', text: 'hi' }],
+    ['api/annotations', { key: 'ask-1', mock: 'a', ref: '#x', tag: 'p', words: 'x', text: 'hi' }]]) {
     const res = await post(url, path, body);
     assert.deepEqual([res.status, (await res.json()).error], [403, 'This board takes answers only'], path);
   }
