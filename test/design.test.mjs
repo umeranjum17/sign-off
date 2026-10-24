@@ -2277,7 +2277,7 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   // On a desk the design opens in the board, its card marked, beside where it stands; the reader stays shut.
   assert.equal(await desktop.evaluate('document.getElementById("reader").hidden && document.querySelector(".dz-card[aria-current]")?.id === "item-d1-design" && !!document.querySelector(".dz-open .dz-fill .design-preview-window") && !!document.querySelector(".dz-info .foot .dz-ink")'), true);
   // On a desk the security screen's computer view runs in a desk's own 1280 by 800, scaled down to fit the open design's picture area, in the desk's shape: no blank band under it.
-  await desktop.evaluate('window.vp = [], window.loads = 0, addEventListener("message", (e) => { if (!e.data?.vp) return; loads += e.data.load; vp.push(e.data.vp.join("x")); })');
+  await desktop.evaluate('window.vp = [], window.frameLoads = [], addEventListener("message", (e) => { if (!e.data?.vp) return; if (e.data.load) frameLoads.push(e.source); vp.push(e.data.vp.join("x")); })');
   await desktop.evaluate('(() => { const s = document.querySelector("[aria-label=\\"Screen for note\\"]"); s.value = "account-setup/security"; s.dispatchEvent(new Event("change")); })()');
   await until(async () => (await desktop.evaluate('vp.at(-1)')) === '1280x800');
   await until(async () => { const p = await desktop.evaluate(preview); return p.frame[0] === p.box[0]; });
@@ -2285,9 +2285,12 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   assert.deepEqual([desk.frame, desk.blankBelow], [desk.box, 0]);
   assert.ok(Math.abs(desk.box[1] - desk.box[0] * 800 / 1280) <= 1 && desk.box[0] <= area[0] && desk.box[1] <= area[1] && (desk.box[0] === area[0] || Math.abs(desk.box[1] - area[1]) <= 1), JSON.stringify({ desk, area }));
   // A narrower box scales the same page again, without loading it again.
+  // The board may draw the open design again while it settles, so the page that is measured is the one on the desk now: once it has loaded, narrowing the box must not load it again, and it is still the one in the board.
+  await desktop.evaluate('window.testFrame = document.querySelector(".design-preview-window iframe")');
+  await until(async () => (await desktop.evaluate('frameLoads.filter((w) => w === testFrame.contentWindow).length')) >= 1);
   await desktop.evaluate('document.querySelector(".design-preview-window").style.width = "500px"');
   await until(async () => (await desktop.evaluate(preview)).frame.join() === '500,313');
-  assert.deepEqual(await desktop.evaluate('[loads, vp.at(-1), document.querySelector(".design-preview-window").getBoundingClientRect().height]'), [1, '1280x800', 312.5]);
+  assert.deepEqual(await desktop.evaluate('[testFrame === document.querySelector(".design-preview-window iframe"), frameLoads.filter((w) => w === testFrame.contentWindow).length, vp.at(-1), document.querySelector(".design-preview-window").getBoundingClientRect().height]'), [true, 1, '1280x800', 312.5]);
   desktop.close();
   // The inline Change saved a change note on this screen: the viewer must show it as a change, not an approval.
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
