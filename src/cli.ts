@@ -1499,7 +1499,7 @@ function postMedia(file: string, named: string, on: string, values: Record<strin
         writeFileSync(join(dir, `${i + 1}${extname(src).toLowerCase()}`), bytes, { mode: 0o600 });
         // The original stays as it was posted; the board shows a lighter copy of a still where one weighs less.
         const made = isStill(src) ? copiesOf(bytes, extname(src)) : {}, refs: Record<string, CopyRef> = {};
-        for (const size of ['light', 'thumb'] as const) {
+        for (const size of ['light', 'thumb', 'tile'] as const) {
           const c = made[size];
           if (!c) continue;
           writeFileSync(join(dir, `${i + 1}-${size}${c.ext}`), c.bytes, { mode: 0o600 });
@@ -2452,7 +2452,7 @@ async function exportBoard(args: string[]) {
     // A diagram or an interactive page is the item's own view, inlined the same way.
     if (d.view) await inline(at(d.key, '', d.view), undefined, true);
     if (d.preview) await inline(at(d.key, '', d.preview));
-    for (const [i, m] of (d.media ?? []).entries()) for (const v of ['', ...['light', 'thumb'].filter((v) => m[v as 'light'])]) await inline(`/api/media?key=${q(d.key)}&i=${i}${v && `&v=${v}`}`);
+    for (const [i, m] of (d.media ?? []).entries()) for (const v of ['', ...['light', 'thumb', 'tile'].filter((v) => m[v as 'light'])]) await inline(`/api/media?key=${q(d.key)}&i=${i}${v && `&v=${v}`}`);
     for (const m of d.evidenceCard?.media ?? []) await inline(m.url);
   }
   const out = resolve(parsed.values.out ?? `${parsed.file.replace(/\.json$/, '')}.export.html`);
@@ -2755,9 +2755,9 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   }
   if (req.method === 'GET' && req.url?.startsWith('/api/media?')) {
     const q = new URL(req.url, 'http://localhost').searchParams;
-    // v=light or v=thumb asks for the copy post made of a still; with no v, the file as it was posted.
+    // v=light, v=thumb or v=tile asks for the copy post made of a still; with no v, the file as it was posted.
     const v = q.get('v'), posted = loadDecisions(file).find((d) => d.key === q.get('key'))?.media?.[Number(q.get('i') || NaN)];
-    const m = v === null ? posted : v === 'light' || v === 'thumb' ? posted?.[v] : undefined, type = m && mediaTypes[extname(m.path).toLowerCase()];
+    const m = v === null ? posted : v === 'light' || v === 'thumb' || v === 'tile' ? posted?.[v] : undefined, type = m && mediaTypes[extname(m.path).toLowerCase()];
     if (!m || !type) return [404, { error: 'Evidence is unavailable' }];
     try {
       const actual = under(dirname(file), m.path), forever = q.get('h') === m.sha256.slice(0, 16);

@@ -3,13 +3,13 @@ import { crc32, deflateSync, inflateSync } from 'node:zlib';
 import jpeg from 'jpeg-js';
 import { pngPixels } from './evidence-text.js';
 
-/** A smaller copy of a still the board shows in place of the original: light on a card and the update's own screen, thumb in a list.
+/** A smaller copy of a still the board shows in place of the original: light on a card and the update's own screen, thumb in a list, tile in a row of Evidence.
  * Each fits its box (width, height) and is never enlarged; at twice device pixels it stays as sharp as the frame shows it. A light copy is
  * bounded by its width (the height bound only stops runaway pages): a full-page capture is shown whole on a card and from its top across a
  * wide frame, so its width is what keeps it sharp.
  * Every frame a thumb fills crops the picture to its own shape, from the top and centred, and none is more than twice as tall as it is wide
- * or twice as wide as it is tall: a thumb keeps only that part, so its short side still fills the frame. */
-const BOXES = { light: [1600, 16384], thumb: [720, 1440] } as const;
+ * or twice as wide as it is tall: a thumb keeps only that part, so its short side still fills the frame. A tile is that same crop, 264 wide at most (three times the widest frame a row gives it). */
+const BOXES = { light: [1600, 16384], thumb: [720, 1440], tile: [264, 528] } as const;
 export type Size = keyof typeof BOXES;
 export type Copy = { ext: '.jpg' | '.png'; bytes: Buffer; width: number; height: number };
 /** JPEG quality, with no chroma subsampling (jpeg-js keeps every pixel's colour), so coloured text and thin lines keep their edges. */
@@ -20,20 +20,20 @@ const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0
 
 type Picture = { width: number; height: number; data: Buffer; opaque: boolean; icc?: Buffer; png: Buffer[]; pngOnly: boolean };
 
-/** The light and thumb copies of a still, each kept only when it weighs less than what the board would show without it (the light copy,
+/** The light, thumb and tile copies of a still, each kept only when it weighs less than what the board would show without it (the light copy,
  * else the original). The same bytes always give the same copies. `reason` says why a still could not be read: the board then shows the original. */
-export function copiesOf(bytes: Buffer, ext: string): { light?: Copy; thumb?: Copy; reason?: string } {
+export function copiesOf(bytes: Buffer, ext: string): { light?: Copy; thumb?: Copy; tile?: Copy; reason?: string } {
   let pic: Picture;
   try { pic = decode(bytes, ext.toLowerCase()); } catch (e: any) { return { reason: e.message }; }
-  const light = shrink(pic, 'light', bytes.length), thumb = shrink(pic, 'thumb', light?.bytes.length ?? bytes.length);
-  return { ...(light && { light }), ...(thumb && { thumb }) };
+  const light = shrink(pic, 'light', bytes.length), thumb = shrink(pic, 'thumb', light?.bytes.length ?? bytes.length), tile = shrink(pic, 'tile', thumb?.bytes.length ?? light?.bytes.length ?? bytes.length);
+  return { ...(light && { light }), ...(thumb && { thumb }), ...(tile && { tile }) };
 }
 
 function shrink(pic: Picture, size: Size, against: number): Copy | undefined {
-  if (size === 'thumb' && pic.height > pic.width * 2) {
+  if (size !== 'light' && pic.height > pic.width * 2) {
     const height = pic.width * 2;
     pic = { ...pic, height, data: pic.data.subarray(0, pic.width * height * 4) };
-  } else if (size === 'thumb' && pic.width > pic.height * 2) {
+  } else if (size !== 'light' && pic.width > pic.height * 2) {
     const width = pic.height * 2, left = (pic.width - width) >> 1, data = Buffer.alloc(width * pic.height * 4);
     for (let y = 0; y < pic.height; y++) pic.data.copy(data, y * width * 4, (y * pic.width + left) * 4, (y * pic.width + left + width) * 4);
     pic = { ...pic, width, data };
