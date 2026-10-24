@@ -22,3 +22,9 @@ It seeds the standard board (seed-board.sh, whose cards name no ticket), adds ti
 It saves `<state>.<theme>.<width>w.png` and `.txt` for each linked card, the same kind unlinked, the unknown-ticket ask, `ask-thread`, `proof-thread`, `ticket` (T-29), `ticket-activity` (its steps) and `ticket-parent` (T-9 with its two tickets, at 80%); `cli.<cell>.txt` (ticket list and show) and `walk.<cell>.txt` (a tap on the ask's row opens T-29, and Close on a phone or Back on a desk returns). It fails when a linked screen lacks the row, an unlinked one has it, the page lists the wrong cards or anything scrolls sideways.
 Look at every shot: the row sits under the card's words, its title is not cut, and the bar reads in dark.
 test/design.test.mjs ("a card names its ticket": the CLI's fields, refusals and roll-up, the ticket over Tickets, Close, the epic, the Tickets tab's kinds and lists, and the Activity) is the regression.
+
+## Fleet sync fields (0.6.1)
+
+`--release <text>`, `--state queued|"in progress"|"on hold"|done` and repeatable/comma-separated `--pr <full HTTP(S) URL>` write `release`, `state`, `prs` on the same latest-line ticket record. Empty values clear; absent flags preserve. The single `tkStateOf` grouping helper uses explicit state first and derives from progress/hold for legacy records. Progress roll-up stays independent.
+
+Drive `node .agents/skills/done-done-verify-sign-off/ticket-fields-shots.mjs <folder> [before|after]` after building. It seeds an isolated real board, writes through the public CLI, opens the ticket with chrome-devtools-axi, checks release/PRs and captures the ticket in both themes at 390 and 1280. Pass `before` on the base build for matching frames. Inspect all eight frames; confirm the row/page release chips, existing state groups and Linked PRs. The extended "a card names its ticket" integration journey covers preservation, no-op, clear, invalid inputs, repeat/comma PRs and all state labels in the real browser.

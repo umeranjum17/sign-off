@@ -3962,6 +3962,19 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
   assert.equal(run('ticket', file, '--id', 'T-9', '--priority', 'P1', '--project', 'Settings', '--asked', 'yes').code, 0);
   assert.equal(run('ticket', file, '--id', 'T-31', '--title', 'Write the release notes', '--priority', 'P2', '--hold', 'yes').code, 0);
   assert.equal(run('ticket', file, '--id', 'T-31', '--priority', '').code, 0);
+  // Sync fields round-trip through the public CLI, preserve old flags and clear independently.
+  const getTicket = () => JSON.parse(run('ticket', file, '--id', 'T-29', '--json').out).ticket;
+  const prs = ['https://github.com/example/app/pull/1', 'https://github.com/example/app/pull/2'];
+  assert.equal(run('ticket', file, '--id', 'T-29', '--release', '0.6.1', '--state', 'queued', '--pr', prs.join(','), '--pr', prs[0]).code, 0);
+  assert.deepEqual([getTicket().release, getTicket().state, getTicket().prs], ['0.6.1', 'queued', prs]);
+  assert.match(run('ticket', file, '--id', 'T-29', '--release', '0.6.1').out, /status: unchanged/);
+  for (const bad of [['--state', 'unknown'], ['--pr', 'javascript:alert(1)'], ['--pr', '/pull/1'], ['--release', 'x'.repeat(41)]]) {
+    const before = readFileSync(join(dir, 'board.tickets.jsonl'), 'utf8');
+    assert.equal(run('ticket', file, '--id', 'T-29', ...bad).code, 2);
+    assert.equal(readFileSync(join(dir, 'board.tickets.jsonl'), 'utf8'), before);
+  }
+  assert.equal(run('ticket', file, '--id', 'T-29', '--release', '', '--state', '', '--pr', '').code, 0);
+  assert.deepEqual([getTicket().release, getTicket().state, getTicket().prs], [undefined, undefined, undefined]);
   const lines = readFileSync(join(dir, 'board.tickets.jsonl'), 'utf8');
   for (const bad of [['--priority', 'P7'], ['--hold', 'maybe'], ['--asked', '1'], ['--project', 'x'.repeat(41)]]) assert.equal(run('ticket', file, '--id', 'T-31', ...bad).code, 2, bad.join(' '));
   assert.equal(readFileSync(join(dir, 'board.tickets.jsonl'), 'utf8'), lines);
@@ -4035,6 +4048,19 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
       tab: document.querySelector('#tabs a[aria-current]')?.getAttribute('href'), wide: document.documentElement.scrollWidth > 390 })`));
     assert.deepEqual({ ...page, rows: page.rows.map(([t]) => t) }, { head: 'Settings · In progress', title: 'Ship the new settings page', props: ['Progress 60%', 'Part of The new settings page'], rows: shown.cards.map((c) => c.title), tab: '#tickets', wide: false });
     assert.deepEqual(['Ship the settings page on Friday?', 'Settings on a phone', 'Chat app journeys', 'The weekly digest ran'].map((t) => Object.fromEntries(page.rows)[t]), ['#decide/ask-linked', '#evidence/update-1', '#designs/chat-journeys', '#reports/digest-ran']);
+    assert.equal(run('ticket', file, '--id', 'T-29', '--release', '0.6.1', '--state', 'on hold', '--pr', prs[0], '--pr', prs[1]).code, 0);
+    await evaluate('refresh()');
+    await until(() => evaluate('document.querySelector(".tk-sheet .tk-release")?.textContent === "0.6.1"'));
+    assert.equal(await evaluate('document.querySelector(".tk-sheet .tk-shd").textContent.includes("On hold")'), true);
+    assert.deepEqual(JSON.parse(await evaluate('JSON.stringify([...document.querySelectorAll(".tk-sheet .tk-in a[target]")].map(a => a.href))')), prs);
+    for (const [value, word] of [['queued', 'To do'], ['in progress', 'In progress'], ['done', 'Done']]) {
+      assert.equal(run('ticket', file, '--id', 'T-29', '--state', value).code, 0);
+      await evaluate('refresh()');
+      await until(() => evaluate(`document.querySelector('.tk-sheet .tk-shd').textContent.includes(${JSON.stringify(word)})`));
+    }
+    assert.equal(run('ticket', file, '--id', 'T-29', '--release', '', '--state', '', '--pr', '').code, 0);
+    await evaluate('refresh()');
+    await until(() => evaluate('!document.querySelector(".tk-sheet .tk-release")'));
     await evaluate('document.querySelector(".tk-sheet .tk-shd .x").click()');
     await until(async () => (await evaluate('location.hash')) === '#decide/ask-linked');
     // The ticket above it lists the ticket under it, and no card names it.

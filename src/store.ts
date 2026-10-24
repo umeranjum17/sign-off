@@ -520,7 +520,7 @@ export function readPromoted(decisionsPath: string, warn: (msg: string) => void 
 }
 /** A ticket: a standalone record of work, its percent done and the ticket it sits under, and optionally its priority, its project, whether it is on hold and whether the board's owner asked for it.
  * Cards name one by id; nothing else reads or needs it. */
-export type Ticket = { id: string; title: string; progress: number; parent?: string; priority?: string; project?: string; hold?: boolean; asked?: boolean; at: string };
+export type Ticket = { id: string; title: string; progress: number; parent?: string; priority?: string; project?: string; hold?: boolean; asked?: boolean; release?: string; state?: 'queued' | 'in progress' | 'on hold' | 'done'; prs?: string[]; at: string };
 /** Tickets, one line per write (`ticket <id> --title`), the latest line per id wins. A board without the file has no tickets, and every card works as before. */
 export const ticketsPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.tickets.jsonl';
 /** The ticket rules, shared by the writer and the reader: a line that breaks one is skipped, never shown half-valid. */
@@ -530,9 +530,12 @@ export const ticketFault = (t: any) => (!isKey(t?.id) ? 'id must be 1-128 of A-Z
   : t.parent !== undefined && (!isKey(t.parent) || t.parent === t.id) ? 'parent must be the id of another ticket'
   : t.priority !== undefined && !PRIORITIES.includes(t.priority) ? `priority must be one of ${PRIORITIES.join(', ')}`
   : t.project !== undefined && projectFault({ name: t.project }) ? 'project must be a project name, text of 40 characters or fewer'
+  : t.release !== undefined && (!isText(t.release) || !t.release.trim() || [...t.release].length > 40) ? 'release must be text of 40 characters or fewer'
+  : t.state !== undefined && !['queued', 'in progress', 'on hold', 'done'].includes(t.state) ? 'state must be queued, in progress, on hold or done'
+  : t.prs !== undefined && (!Array.isArray(t.prs) || !t.prs.every((u: any) => { try { return typeof u === 'string' && /^https?:\/\//.test(u) && !!new URL(u).hostname; } catch { return false; } })) ? 'prs must be an array of full HTTP or HTTPS URLs'
   : t.hold !== undefined && typeof t.hold !== 'boolean' ? 'hold must be true or false'
   : t.asked !== undefined && typeof t.asked !== 'boolean' ? 'asked must be true or false' : '');
-const TICKET_FIELDS = ['parent', 'priority', 'project', 'hold', 'asked'] as const;
+const TICKET_FIELDS = ['parent', 'priority', 'project', 'hold', 'asked', 'release', 'state', 'prs'] as const;
 /** A ticket's fields in the file's order, leaving out each optional one it does not carry. */
 const ticketLine = (t: any): Ticket => ({ id: t.id, title: t.title, progress: t.progress, ...Object.fromEntries(TICKET_FIELDS.filter((k) => t[k] !== undefined).map((k) => [k, t[k]])), at: t.at });
 export function appendTicket(decisionsPath: string, t: Omit<Ticket, 'at'>): Ticket {
