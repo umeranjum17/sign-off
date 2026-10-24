@@ -359,7 +359,9 @@
   .ev-unpick::after { content: ''; position: absolute; inset: -2px; } .ev-unpick .glyph { width: 1rem; height: 1rem; }
   .ev-sec .see { min-height: 0; padding: 0; border: 0; border-radius: 0; background: none; font: inherit; font-size: var(--tk-fs-row); line-height: 1.5rem; font-weight: 500; color: var(--tk-ink); cursor: pointer; }
   .ev-list.ui-list { padding: 0.25rem 0; } .ev-list.ui-list > li + li::before { right: 0.75rem; left: 0.75rem; }
-  .ev-list .ev-card { padding: 0 0.75rem; transition: background-color 120ms linear; -webkit-tap-highlight-color: transparent; }
+  .ev-list .ev-card { height: auto; min-height: 4.25rem; padding: 0.75rem; transition: background-color 120ms linear; -webkit-tap-highlight-color: transparent; }
+  .ev-list .ev-card .l1 { align-items: flex-start; height: auto; }
+  .ev-list .ev-card .l1 .t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; }
   .ev-list .ev-card:active { background: var(--tk-inset); }
   .ev-list .ev-card .meta { margin: 0; }
   .ev-list > li.picked { outline: none; border-radius: 0; background: var(--tk-inset); } .ev-list > li.picked .ui-icon { box-shadow: 0 0 0 2px var(--tk-ink); }
@@ -420,9 +422,6 @@
     .split-list .ev-list .ev-card:hover:not([aria-current]) { opacity: 0.85; }
     .split-list .ev-list .ev-card[aria-current] { background: var(--tk-inset); outline: none; }
     /* A desk has the room for a long title: it wraps to two lines, and the row grows with it. */
-    .split-list .ev-list .ev-card { height: auto; min-height: 4.25rem; padding-block: 0.75rem; }
-    .split-list .ev-list .ev-card .l1 { align-items: flex-start; height: auto; }
-    .split-list .ev-list .ev-card .l1 .t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; }
     .split-detail > .ev-scroll { padding: 1.5rem 2.5rem 4rem; }
     .split-detail .ev-x { display: none; }
     #board .split-detail:has(> .ev-scroll) .change-link { color: var(--tk-ink); }

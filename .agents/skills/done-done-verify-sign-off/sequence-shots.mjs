@@ -64,6 +64,7 @@ try {
     for (const [area, selector] of [['evidence', '.ev-list a[href]'], ['reports', '.rp-page a.dl-face'], ['designs', '.dz-list a[href], .dz-strip a[href]'], ['tickets', '.tk-row']]) {
       capture(area, () => {
       browser('open', base + '#' + area); settle();
+      if (area === 'evidence') { browser('screenshot', join(out, `evidence-list.${cell}.png`)); records.push({ cell, area: 'evidence-list' }); }
       browser('eval', `() => { document.querySelector(${JSON.stringify(selector)}).click(); return 1; }`); settle();
       const position = read('() => JSON.stringify(document.querySelector(".detail-sequence .position")?.textContent ?? null)');
       if (!before) assert.ok(position, area + ' header');
@@ -81,6 +82,7 @@ try {
     }
   }
   writeFileSync(join(out, 'sequence-checks.json'), JSON.stringify(records, null, 2));
+  writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(resolve('package.json'), 'utf8')).version }, start: 'The originating filtered list', steps: ['Open each detail kind from its list at five phone/desk widths in both themes', 'Use J/K to move in the captured list order', 'Reload and confirm the same sequence and position', 'Read header position and disabled end arrows'], result: 'All detail kinds retain their list sequence with visible header navigation', captures: records }, null, 2));
 } finally {
   browser('stop');
   cli('stop', join(dir, 'board.json'));

@@ -3545,7 +3545,7 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length === 6')));
   assert.deepEqual(await evaluate(SQUASH), []);
-  assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-card")].map((a) => { const r = a.getBoundingClientRect(), t = a.querySelector(".ui-icon").getBoundingClientRect(), l = a.closest(".ev-list").getBoundingClientRect(); return [Math.round(r.height), Math.round(t.width), Math.round(l.right - r.right), Math.round(r.left - l.left)].join(); }).filter((x) => x !== "68,40,0,0")'), []);
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-card")].map((a) => { const r = a.getBoundingClientRect(), t = a.querySelector(".ui-icon").getBoundingClientRect(), l = a.closest(".ev-list").getBoundingClientRect(); return [Math.round(r.height) - (a.querySelector(".t").getBoundingClientRect().height > 20 ? 84 : 68), Math.round(t.width), Math.round(l.right - r.right), Math.round(r.left - l.left)].join(); }).filter((x) => x !== "0,40,0,0")'), []);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'));
   // The shared light or dark button (Today's) sits in Evidence's title row too: a tap turns the board to the other theme and keeps the pick in this browser; a second tap turns it back.
   const look = '(() => [getComputedStyle(document.body).backgroundColor, document.querySelector(".ev-top .ui-rb[aria-label^=Switch] circle") ? "sun" : "moon", localStorage.getItem("so-theme")])()';
