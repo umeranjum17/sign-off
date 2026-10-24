@@ -13,8 +13,8 @@
 .tabs a[aria-current] { color: var(--tk-ink); }
 .tabs a:active .icon { transform: scale(0.86); transition-duration: 90ms; }
 .tabs a:focus-visible { outline-offset: -2px; }
-/* Decide carries a red count of what waits on you at its tab's corner, Reports one of what is new; a count that changes bumps. */
-.tabs .bd { position: absolute; top: 0.375rem; right: 0.375rem; min-width: 1rem; height: 1rem; padding: 0 0.25rem; border-radius: 0.5rem; background: var(--badge); color: #FFFFFF;
+/* Decide carries a red count of what waits on you at its tab's corner, Reports an ink one of what is new; a count that changes bumps. */
+.tabs .bd { position: absolute; top: 0.375rem; right: 0.375rem; min-width: 1rem; height: 1rem; padding: 0 0.25rem; border-radius: 0.5rem; background: var(--tk-critical); color: var(--tk-on-critical);
   font-size: 0.625rem; line-height: 1rem; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--tk-card); }
 .tabs a[aria-current] .bd { box-shadow: 0 0 0 2px var(--tk-on); }
 .bd.bump, .side .n.bump { animation: bump 380ms var(--spring); }
@@ -22,10 +22,9 @@
 .tabs .icon, .side .icon { width: 1.5rem; height: 1.5rem; background: none; transition: transform 300ms var(--spring); }
 .tabs .icon svg, .side .icon svg { width: 1.5rem; height: 1.5rem; fill: currentColor; fill-rule: evenodd; stroke: none; }
 .dock-find { position: fixed; z-index: 2; left: calc(var(--dock-at) + var(--dock-w) + 0.75rem); bottom: calc(1.5rem + env(safe-area-inset-bottom)); display: grid; place-items: center;
-  width: 3.5rem; height: 3.5rem; border-radius: 1.75rem; background: #262624; color: #FFFFFF; box-shadow: 0 6px 18px rgba(20, 16, 12, 0.25); -webkit-tap-highlight-color: transparent; }
+  width: 3.5rem; height: 3.5rem; border-radius: 1.75rem; background: var(--tk-go); color: var(--tk-on-go); box-shadow: var(--tk-elev-go); -webkit-tap-highlight-color: transparent; }
 .dock-find:active { transform: scale(0.94); }
 .dock-find svg, .sfind svg { width: 1.5rem; height: 1.5rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-@media (prefers-color-scheme: dark) { .dock-find { background: var(--tk-ink); color: var(--tk-canvas); } }
 
 /* The page's title row: 8px from the top (24px on a desk), a 24px medium title in a 44px row, round 40px buttons at its right edge. */
 .ui-top { display: flex; align-items: center; gap: 0.5rem; height: 2.75rem; margin-top: 0.5rem; }
@@ -73,11 +72,10 @@
 .ui-row .pct { flex: none; width: 2.5rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); line-height: var(--tk-lh-small); text-align: right; font-variant-numeric: tabular-nums; }
 /* The icon tile: 40px white, radius 12, the project's own icon inside at 24px, else a 20px line icon (optically the same size) or its monogram. */
 .ui-icon { position: relative; display: grid; flex: none; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: var(--tk-r-icon); background: var(--tk-raised); color: var(--tk-ink);
-  box-shadow: 0 1px 2px rgba(40, 30, 20, 0.08), 0 2px 6px rgba(40, 30, 20, 0.05); }
+  box-shadow: var(--tk-elev-tile); }
 .ui-icon img, .ui-icon svg { display: block; width: 1.5rem; height: 1.5rem; border-radius: 0.375rem; object-fit: cover; }
 .ui-icon svg { width: 1.25rem; height: 1.25rem; border-radius: 0; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .ui-icon .mono { width: 1.5rem; height: 1.5rem; border-radius: 0.375rem; background: var(--tk-ink); color: var(--tk-raised); font-size: 0.625rem; line-height: 1.5rem; font-weight: 600; text-align: center; letter-spacing: 0.02em; }
-@media (prefers-color-scheme: dark) { .ui-icon { box-shadow: none; } }
 /* The priority chip: one width so the column reads straight; P0 and P1 tinted. */
 .ui-pc { display: grid; flex: none; place-items: center; width: 2.25rem; height: 1.25rem; border-radius: 0.375rem; font-size: 0.6875rem; line-height: 1.25rem; font-weight: 600; letter-spacing: 0.01em; }
 .ui-pc.p0 { background: var(--tk-p0); color: var(--tk-p0-text); } .ui-pc.p1 { background: var(--tk-p1); color: var(--tk-p1-text); }
@@ -111,20 +109,20 @@
   .ui-top { margin-top: 1.5rem; }
   .side { display: flex; flex-direction: column; gap: 0.25rem; position: sticky; top: 0; height: 100vh; padding: 1.5rem 1rem; background: none; }
   .brand { display: flex; align-items: flex-start; gap: 0.75rem; min-height: 2.5rem; margin: 0; padding: 0.625rem 0.75rem 0; color: var(--tk-ink); font-size: var(--tk-fs-body); line-height: 1.25rem; font-weight: 600; letter-spacing: -0.01em; }
-  .brand .logo { display: grid; flex: none; place-items: center; width: 1.25rem; height: 1.25rem; border-radius: 0.3125rem; background: var(--action); color: #FFFFFF; }
+  .brand .logo { display: grid; flex: none; place-items: center; width: 1.25rem; height: 1.25rem; border-radius: 0.3125rem; background: var(--tk-ink); color: var(--tk-canvas); }
   .brand .logo .glyph { width: 0.875rem; height: 0.875rem; stroke-width: 2.8; }
   .brand small { display: block; color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); line-height: 1rem; font-weight: 500; }
   .sfind { display: flex; align-items: center; gap: 0.75rem; height: 2.75rem; margin: 1rem 0 0.75rem; padding: 0 0.75rem; border-radius: 1.375rem; background: var(--tk-card); color: var(--tk-text-tertiary);
     font-size: var(--tk-fs-row); text-decoration: none; box-shadow: var(--tk-elev-card), inset 0 1px 0 var(--tk-hl); }
   .sfind svg { width: 1.25rem; height: 1.25rem; }
   .side a:not(.sfind) { display: flex; align-items: center; gap: 0.75rem; min-height: 2.75rem; padding: 0 0.75rem; border-radius: 1.375rem; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); font-weight: 500; text-decoration: none; }
-  .side a:not(.sfind):hover:not([aria-current]) { background: color-mix(in srgb, var(--tk-on) 55%, transparent); }
+  .side a:not(.sfind):hover:not([aria-current]) { background: var(--tk-card); }
   .side a[aria-current] { background: var(--tk-on); color: var(--tk-ink); box-shadow: var(--tk-elev-raised); }
   .side a:active .icon { transform: scale(0.86); transition-duration: 90ms; }
   .side .icon, .side .icon svg { width: 1.25rem; height: 1.25rem; }
   .side .n { display: grid; place-items: center; min-width: 1.25rem; height: 1.25rem; margin-left: auto; padding: 0 0.375rem; border-radius: 0.625rem; color: var(--tk-text-tertiary);
     font-size: var(--tk-fs-small); font-weight: 500; font-variant-numeric: tabular-nums; }
-  .side .n.red { background: var(--badge); color: #FFFFFF; font-weight: 600; } .side .n.blue { background: var(--action); color: #FFFFFF; font-weight: 600; }
+  .side .n.red { background: var(--tk-critical); color: var(--tk-on-critical); font-weight: 600; } .side .n.ink { background: var(--tk-ink); color: var(--tk-canvas); font-weight: 600; }
 }
 
 /* The hero's chip (added with Decide): a small raised pill at the right of the hero's label line, as "2 answered today". */

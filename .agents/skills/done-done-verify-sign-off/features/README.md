@@ -8,7 +8,7 @@ The repo's maintained verification map; a proof that drives one entry point is i
 - [Plan review](plan-review.md): section verdicts, Change notes, decisions and structured Send back at both widths and themes
 - [Guided plan and report](guide.md): clean install and authoring, the one-scroll Guide view with read receipts and a real Go deeper, 390 and 1280, light and dark
 - [Evidence media guard](evidence-text-guard.md): a text, colour-bar or placeholder still is refused at post; a real capture is posted; a colour-bar or placeholder card is not shown
-- [Reports](reports.md): the list with a picture per form, read dots and the blue count, swipe right for read or unread and left to archive with Undo, More, opening reads it, on a desk the list beside the report with keys and hover actions, 390 and 1280, light and dark
+- [Reports](reports.md): the list with a picture per form, read dots and the ink count, swipe right for read or unread and left to archive with Undo, More, opening reads it, on a desk the list beside the report with keys and hover actions, 390 and 1280, light and dark
 - [Evidence](evidence.md): the one newest-first list with its project filter and the update screen, light and dark at 390 and 1280
 - [Evidence attachment](evidence-attach.md): `post --attach` puts a downloadable file (an APK) on an update card; the file row at 390 and 1280, a real download whose bytes match, range, limits, token
 - [Prototype full screen](full-screen.md): Open full screen on a design pick or an interactive page, the prototype's own navigation, Phone 390 and Desktop 1280, Reference beside or over, Close, 390 and 1280, light and dark

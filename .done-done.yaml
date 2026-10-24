@@ -54,6 +54,11 @@ journeys:
   # NEWLOOK_PROTO=<the approved prototype's index.html> saves each beside the prototype's frame, NEWLOOK_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
   newlook:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/newlook-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $NEWLOOK_PROTO'
+  # The new look's colours beside the approved prototype (PALETTE_PROTO=<its index.html>): Today, Search, Decide and an ask, Reports and a report, Designs and a design,
+  # Tickets and a ticket at 390 and 1280, light and dark, every colour each page draws read in the browser and checked against the prototype's palette on both pages
+  # (Evidence listed, not checked); PALETTE_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
+  palette:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/palette-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "$PALETTE_PROTO"'
   # The dock's and the sidebar's filled icons beside the approved prototype's (DOCK_PROTO=<its index.html>): Today at 390 and 1280, light and dark, each icon's fill, ink box,
   # colour and place measured on both pages, and each tab opened in turn; DOCK_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
   dock-icons:

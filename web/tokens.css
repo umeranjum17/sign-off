@@ -1,5 +1,6 @@
 /* The board's design tokens: the raw palette, type scale, spacing, corners and elevation of the approved new look (a warm canvas, a card a step lighter,
-   near-black ink as the one accent), measured in pixels from the owner's reference. index.html maps its own names (--page, --tile, --text, ...) onto these,
+   near-black ink as the one accent), measured in pixels from the owner's reference. The palette is the approved prototype's (mocks/signoff-proto-3), every colour
+   in light and in dark and no other: no blue, no system green; test/design.test.mjs fails on any colour drawn outside it. index.html maps its own names (--page, --tile, --text, ...) onto these,
    and ui.css builds the shared parts from them; change a value here and every screen follows. Light and dark differ in colour only. */
 @font-face { font-family: Inter; src: url(inter.woff2) format('woff2'); font-weight: 100 900; font-display: swap; }
 :root {
@@ -7,13 +8,16 @@
   /* The new look's surfaces and ink: the canvas, a card on it, a white raised part (an icon tile), the pressed segment, a field sunk into a card. */
   --tk-canvas: #E8E4E0; --tk-card: #F3F3F0; --tk-raised: #FFFFFF; --tk-on: #FBFBFA; --tk-inset: #EAE7E3;
   --tk-ink: #121210; --tk-text: #21211E; --tk-text-secondary: #6E6E6B; --tk-text-tertiary: #8A8A86; --tk-idle: #AAAAAA;
-  /* A progress bar's track and fill, and the hairline between rows in a card. */
-  --tk-track: #E5E3DE; --tk-fill: #2D2D2A; --tk-line: #DCD8D4;
+  /* A progress bar's track and fill, the dot grid's middle tone and empty cell, and the hairline between rows in a card. */
+  --tk-track: #E5E3DE; --tk-fill: #2D2D2A; --tk-mid: #D3CCC9; --tk-light: #E6E2DE; --tk-line: #DCD8D4;
   /* The board's older names, on the new surfaces. */
   --tk-surface: var(--tk-card); --tk-surface-high: var(--tk-raised); --tk-surface-highest: var(--tk-on); --tk-surface-selected: var(--tk-inset); --tk-input: var(--tk-inset);
   --tk-grouped: var(--tk-canvas); --tk-rail: var(--tk-line);
-  /* Colour that carries meaning. Each is drawn in full, and the board mixes it toward black where it sets text on a light ground. */
-  --tk-link: #007AFF; --tk-success: #34C759; --tk-warning: #FF9500; --tk-critical: #D7372B; --tk-teal: #0E9BB3;
+  /* The only colours that carry meaning: red for what failed or waits on you (with white words on it), amber for a warning, and the green of a rise.
+     Done is the bar's ink fill; a link, a main button and a focus ring are ink. The dock's round Search is a warm near-black of its own. */
+  --tk-critical: #D7372B; --tk-on-critical: #FFFFFF; --tk-warn: #C8841A; --tk-up: #2BB673; --tk-go: #262624; --tk-on-go: #FFFFFF;
+  /* The dim behind a sheet, and the light ground of a button on an ink pill (the toast's Undo). */
+  --tk-scrim: rgba(30, 24, 18, 0.28); --tk-on-ink-press: rgba(255, 255, 255, 0.14);
   /* The priority chip: P0 and P1 tinted, P2 and P3 quiet; each a ground and its text. */
   --tk-p0: #F6DCD8; --tk-p0-text: #B42318; --tk-p1: #F5E6CF; --tk-p1-text: #8F4E08; --tk-p2: #E6E3DE; --tk-p2-text: #4F4B46; --tk-p3: #ECEAE6; --tk-p3-text: #85817B;
   /* Type: Inter. A page title, a section head, a big number, a row's title, its second line and a small label, with their line heights (each a multiple of 4).
@@ -34,13 +38,17 @@
   --tk-elev-card: 0 1px 2px rgba(60, 40, 20, 0.05), 0 6px 18px rgba(60, 40, 20, 0.045);
   --tk-elev-raised: 0 1px 2px rgba(40, 30, 20, 0.10), 0 2px 8px rgba(40, 30, 20, 0.06);
   --tk-elev-dock: 0 2px 6px rgba(40, 30, 20, 0.06), 0 10px 28px rgba(40, 30, 20, 0.10);
+  /* An icon tile's lift, a sheet rising from the foot, the dock's Search, and a floating pill or menu (the toast). */
+  --tk-elev-tile: 0 1px 2px rgba(40, 30, 20, 0.08), 0 2px 6px rgba(40, 30, 20, 0.05); --tk-elev-sheet: 0 -8px 32px rgba(30, 20, 10, 0.12);
+  --tk-elev-go: 0 6px 18px rgba(20, 16, 12, 0.25); --tk-elev-float: 0 8px 24px rgba(0, 0, 0, 0.2);
 }
 @media (prefers-color-scheme: dark) { :root {
   --tk-canvas: #131210; --tk-card: #1E1D1A; --tk-raised: #2A2825; --tk-on: #34322E; --tk-inset: #262421;
   --tk-ink: #F4F2EE; --tk-text: #E9E6E1; --tk-text-secondary: #A9A49D; --tk-text-tertiary: #827D76; --tk-idle: #6C6863;
-  --tk-track: #2F2D2A; --tk-fill: #ECE9E4; --tk-line: #2E2C29;
-  --tk-link: #0A84FF; --tk-success: #30D158; --tk-warning: #FF9F0A; --tk-critical: #FF6B5E; --tk-teal: #40C8E0;
+  --tk-track: #2F2D2A; --tk-fill: #ECE9E4; --tk-mid: #55514C; --tk-light: #2B2926; --tk-line: #2E2C29;
+  --tk-critical: #FF6B5E; --tk-go: var(--tk-ink); --tk-on-go: var(--tk-canvas);
+  --tk-scrim: rgba(0, 0, 0, 0.5); --tk-on-ink-press: rgba(0, 0, 0, 0.1);
   --tk-p0: rgba(255, 107, 94, 0.16); --tk-p0-text: #FF8E84; --tk-p1: rgba(242, 166, 72, 0.15); --tk-p1-text: #F2B262; --tk-p2: #34322E; --tk-p2-text: #CFCAC3; --tk-p3: #2C2A27; --tk-p3-text: #9C978F;
   --tk-hl: rgba(255, 255, 255, 0.05);
-  --tk-elev-card: 0 1px 2px rgba(0, 0, 0, 0.3); --tk-elev-raised: 0 1px 3px rgba(0, 0, 0, 0.45); --tk-elev-dock: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --tk-elev-card: 0 1px 2px rgba(0, 0, 0, 0.3); --tk-elev-raised: 0 1px 3px rgba(0, 0, 0, 0.45); --tk-elev-dock: 0 8px 24px rgba(0, 0, 0, 0.5); --tk-elev-tile: none;
 } }
