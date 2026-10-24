@@ -181,9 +181,11 @@ The older guided plan: the board draws it, in the shape of a schema 3 report wit
 
 Proof the person gives a verdict on. Shows in Evidence. Its options are fixed and not in the message: `pass` (Pass), `fail` (Fail) and `needs-work` (Needs work).
 
-- Required: the common fields (`key` is optional), `about`, and at least one of `media` or `run`.
+- Required: the common fields (`key` is optional), `about`, and at least one of `media`, `run` or `status`. A card with only a `status` shows "Frame pending" where its capture would be.
 - `media`: 1 to 12 relative file paths, with no `..`, resolved from the message file's folder (from the current folder for `--from -`). Symlinks are followed: the real path must stay inside that folder, else the message is refused with a fix line naming the file. Each path ends in `.png`, `.jpg`, `.jpeg`, `.webp`, `.mp4` or `.webm` (any case), each 50,000,000 bytes or fewer. `post` copies them into `evidence/<number>/` and records each `sha256` and `bytes`. A missing or oversized file refuses the message. `validate` checks the same and copies nothing.
 - `run`: a done-done run, exactly `run_id` (a key-set id), `commit` (40 lowercase hex) and the four Checks lines `outcome`, `repro`, `proof` and `evidence` (text, 1-1000 each). The board stores it in the item's `evidence` field ([file-formats.md](file-formats.md)); `link` stays its own field.
+- `status`: optional, where the work stands, one of `Fixed`, `In progress` or `Waiting on you`. The board shows it first in the proof's row and in a Status line of its panel. A message without it reads as before.
+- `captions`: optional, one short caption (40 characters or fewer, such as `Before, phone`) for each file in `media`, in the same order. The board shows each under its capture, so a pair reads as before and after. It needs `media`.
 - Without `key`, `post` sets `update-<number>`, where `<number>` is the next free `evidence/<number>/` folder next to the board. A key already on the board takes the same message again only when its media also match by file hash (section 4). Its media and run are part of the question, as a gate's run is: under the key other media or another run is a different message in a `--from` feed too, and an answered evidence item cannot take other media or another run, not even in a `--replace` feed.
 
 ### gate, schema 1

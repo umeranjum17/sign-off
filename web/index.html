@@ -425,6 +425,7 @@
   .ev-hero { display: grid; gap: 0.5rem; margin-top: 1rem; }
   .ev-hero a, .ev-hero video { display: block; overflow: hidden; border-radius: 1rem; background: var(--tk-inset); }
   .ev-hero img, .ev-hero video { display: block; width: 100%; max-height: 26.25rem; object-fit: contain; }
+  .ev-hero figure.cap { display: grid; gap: 0.375rem; margin: 0; } .ev-hero figcaption { color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); }
   .ev-hero.none { display: flex; align-items: center; justify-content: center; gap: 0.5rem; height: 6rem; border-radius: 1rem; background: var(--tk-inset); color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); }
   .ev-hero .gone { margin: 0; color: var(--tk-critical); font-size: var(--tk-fs-row); }
   .ev-item > .files { margin-top: 0.5rem; }
@@ -2448,7 +2449,7 @@
       const node = video ? el('video', { src: url, controls: '', playsinline: '', preload: 'metadata', 'aria-label': name })
         : el('a', { href: pageHref(d) || url, ...(!pageHref(d) && { target: '_blank', rel: 'noopener' }), 'aria-label': `Open ${name}` }, shot(light, name));
       (node.tagName === 'A' ? node.querySelector('img') : node).onerror = () => node.replaceWith(el('p', { class: 'gone' }, `${name} can't be shown: the file is missing, changed since it was posted, or in a format this browser can't play.`));
-      return node;
+      return d.captions?.[i] ? el('figure', { class: 'cap' }, node, el('figcaption', { dir: 'auto' }, d.captions[i])) : node;
     }));
   }
   const proof = (d) => captures(d, 'media proof');
@@ -2632,10 +2633,10 @@
   /** One proof as a row: its project's tile with done-done's check, its title and P0-P3 chip, done-done's word with its project and time, and its first capture.
    *  On a phone a tap opens it in place: its captures in a strip to swipe, what it says in full, done-done's word, its ticket and pull request, and Open proof. */
   function evRow(d) {
-    const project = projectName(d), meta = [project, evWhen(d)].filter(Boolean).join(' · '), title = plain(headline(d)), first = evStills(d)[0], desk = !phone(), open = !desk && evOpen === d.key;
+    const project = projectName(d), meta = [d.status, project, evWhen(d)].filter(Boolean).join(' · '), title = plain(headline(d)), first = evStills(d)[0], desk = !phone(), open = !desk && evOpen === d.key;
     const th = first ? el('span', { class: 'ev-th', 'aria-hidden': 'true' }, lazyImg(src(first[4])))
       : evRich ? el('span', { class: 'ev-th none', 'aria-hidden': 'true' }, projectTile(project)) : '';
-    const parts = uiRow({ tile: evTile(project, judgedMark(d)), title, priority: prio(d), meta: frag(evVerdict(d), meta ? ` · ${meta}` : '') });
+    const parts = uiRow({ tile: evTile(project, judgedMark(d)), title, priority: prio(d), meta: d.status && !judged(d) && !d.evidenceCard ? meta : frag(evVerdict(d), meta ? ` · ${meta}` : '') });
     const label = [title, judgedWord(d), prio(d), meta].filter(Boolean).join(', ');
     const row = desk ? el('a', { class: `ui-row ev-card${evRich ? ' rich' : ''}`, href: `#evidence/${d.key}`, id: `item-${d.key}`, 'data-row': '', 'aria-label': label }, ...parts, th)
       : el('button', { class: `ui-row ev-card${evRich ? ' rich' : ''}`, id: `item-${d.key}`, 'data-row': '', 'aria-expanded': String(open), 'aria-label': label }, ...parts, th);
@@ -2647,7 +2648,7 @@
     const stills = evStills(d), said = plain((d.about ?? '').replace(HELD, '').replace(UNCONFIRMED, '')), name = plain(headline(d));
     const strip = stills.length ? el('div', { class: 'ev-strip', role: 'group', 'aria-label': `${plural(stills.length, 'capture')}, swipe for the next` },
       ...stills.map(([path, , light], i) => el('a', { href: src(path), target: '_blank', rel: 'noopener', 'aria-label': `Open capture ${i + 1} of ${stills.length} full size` }, el('img', { src: src(light), alt: '', loading: 'lazy', decoding: 'async' }))))
-      : el('div', { class: 'ev-hero none' }, evGlyph('image'), 'Text only: no capture was filed');
+      : el('div', { class: 'ev-hero none' }, evGlyph('image'), (d.status ? 'Frame pending' : 'Text only: no capture was filed'));
     const dots = stills.length > 1 ? el('div', { class: 'ev-dots-n', 'aria-hidden': 'true' }, ...stills.map((_, i) => el('i', { class: i ? '' : 'on' }))) : '';
     if (dots) strip.onscroll = () => { const kids = [...strip.children], at = kids.reduce((b, k, i) => (Math.abs(k.offsetLeft - strip.scrollLeft) < Math.abs(kids[b].offsetLeft - strip.scrollLeft) ? i : b), 0); [...dots.children].forEach((x, i) => x.classList.toggle('on', i === at)); };
     const go = el('a', { class: 'ev-go', href: `#evidence/${d.key}` }, el('span', {}, 'Open proof'), el('span', { class: 'ev-go-s' }, 'Verdict and activity'), glyph('right'));
@@ -2724,7 +2725,7 @@
     return el('div', { class: 'ev-verdict' }, el('div', { class: 'choices', role: 'group', 'aria-label': `Your verdict, ${headline(d)}` }, ...buttons), err, other(d, saved, err), xBtn(d, 'Discard'));
   }
   /** A proof's panel (ui.css): done-done's word, its priority, the ask it serves with its progress, and its pull request. */
-  const evProps = (d) => { const p = uiProps(uiProp({ mark: 'shield', name: 'done-done', value: el('span', { class: `ev-word ${judged(d)}` }, judgedWord(d)) }), priorityProp(prio(d)), ticketProp(ticketOf(d), 'Its ask'), changeProp(d)); p.classList.add('ev-props'); return p; };
+  const evProps = (d) => { const p = uiProps(d.status && uiProp({ mark: 'dot', name: 'Status', value: el('span', { class: 'ev-status' }, d.status) }), !d.status || judged(d) || d.evidenceCard ? uiProp({ mark: 'shield', name: 'done-done', value: el('span', { class: `ev-word ${judged(d)}` }, judgedWord(d)) }) : '', priorityProp(prio(d)), ticketProp(ticketOf(d), 'Its ask'), changeProp(d)); p.classList.add('ev-props'); return p; };
   /** One update as a sheet over the list on a phone: its project and time, its whole title, the capture, then its panel, what it says, its Activity and the verdict. */
   function evidenceItem(d) {
     const project = projectOf(d), said = plain((d.about ?? '').replace(HELD, '').replace(UNCONFIRMED, '')), name = plain(headline(d)), why = plain(unchecked(d));
@@ -2732,7 +2733,7 @@
       el('div', { class: 'ev-shd' }, el('span', { class: 'lab' }, projectTile(project), el('span', { class: 'pt', dir: 'auto' }, [project || 'No project', d.filed && (isToday(d.filed) ? hhmm(d.filed) : stamp(d.filed))].filter(Boolean).join(' · '))),
         el('a', { class: 'ev-x', href: '#evidence', 'aria-label': 'Close' }, glyph('x'))),
       el('h1', { class: 'ev-title', id: 'reader-title', tabindex: '-1', dir: 'auto' }, name),
-      captures(d, 'ev-hero') || el('div', { class: 'ev-hero none' }, evGlyph('image'), 'Text only: no capture was filed'), attachments(d),
+      captures(d, 'ev-hero') || el('div', { class: 'ev-hero none' }, evGlyph('image'), (d.status ? 'Frame pending' : 'Text only: no capture was filed')), attachments(d),
       evProps(d),
       said && said !== name ? el('p', { class: 'ev-about', dir: 'auto' }, said) : '', why ? el('p', { class: 'ev-why', dir: 'auto' }, why) : '', thread(d),
       state.readonly || FROZEN || !(d.options.length || d.reply) ? '' : verdicts(d)));
@@ -2745,7 +2746,7 @@
     return el('section', { class: 'ui-card ui-pane two s8 split-detail', 'aria-labelledby': 'reader-title' },
       el('div', { class: 'ui-shd split-bar' }, projectTile(project), el('span', { class: 'pt', dir: 'auto' }, [project || 'No project', d.filed && (isToday(d.filed) ? hhmm(d.filed) : stamp(d.filed))].filter(Boolean).join(' · '))),
       el('div', { class: 'pmain' }, el('h1', { class: `dt ev-title${name.length > 160 ? ' long' : ''}`, id: 'reader-title', tabindex: '-1', dir: 'auto' }, name),
-        captures(d, 'ev-hero pv-cap') || el('div', { class: 'ev-hero none' }, evGlyph('image'), 'Text only: no capture was filed'), attachments(d)),
+        captures(d, 'ev-hero pv-cap') || el('div', { class: 'ev-hero none' }, evGlyph('image'), (d.status ? 'Frame pending' : 'Text only: no capture was filed')), attachments(d)),
       el('div', { class: 'pside' }, evProps(d), said && said !== name ? el('p', { class: 'dp ev-about', dir: 'auto' }, said) : '', why ? el('p', { class: 'dp ev-why', dir: 'auto' }, why) : '',
         state.readonly || FROZEN || !(d.options.length || d.reply) ? '' : verdicts(d), thread(d)));
   }
