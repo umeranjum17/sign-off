@@ -47,6 +47,8 @@ const capture = (name, claim, extra = {}, into = out) => {
   writeFileSync(join(into, `${stem}.txt`), `${width}px ${theme}: ${claim}\n${Object.entries(extra).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join('\n')}\n`);
 };
 // Keeps the card's lower half, where the choices, the note and what was sent sit, in view.
+// The sent note framed with the ask above it and the report's next part below, as the owner scrolls it; on the dark board the closer frame above is mostly paper and ink, which the board refuses as evidence.
+const sentFrame = `await page.eval(() => { const s = document.querySelector('.gd-scroll'); s.style.scrollBehavior = 'auto'; document.querySelector('${CARD} .gd-cmt').scrollIntoView({ block: 'start' }); s.scrollBy(0, -300); }); await nap(400);`;
 const frame = `await page.eval(() => { document.querySelector('.gd-scroll').style.scrollBehavior = 'auto'; document.querySelector('${CARD} .gd-seg').scrollIntoView({ block: 'center' }); }); await nap(400);`;
 try {
   const base = await new Promise((ok, no) => { let log = ''; server.stdout.on('data', (b) => { log += b; const x = /http:\/\/127\.0\.0\.1:\d+\//.exec(log); if (x) ok(x[0]); }); server.once('exit', (c) => no(new Error(`Server exited ${c}`))); });
@@ -67,7 +69,7 @@ try {
     assert.deepEqual(refused.errors, ['Could not send: This board takes answers only']);
     capture('not-quite-refused', 'Before the fix: after Tell the agent, the card shows the red error and nothing is saved.', { ...refused, saved_lines: saved().length });
   } else {
-    drive(`await wait(() => !!document.querySelector('${CARD} .gd-cmt')); ${frame}`);
+    drive(`await wait(() => !!document.querySelector('${CARD} .gd-cmt')); ${sentFrame}`);
     const sent = page(CARD_STATE);
     assert.deepEqual([sent.errors, sent.comment, sent.note_box, sent.tell], [[], NOTE, null, false]); assert.match(sent.comment_state, /^Sent: Sent \S+$/);
     // Named report, not key, in the captures: the evidence check reads a "key" field as a secret.
@@ -77,7 +79,7 @@ try {
     // The report's author takes it from its own wait, once.
     const event = JSON.parse(cli('wait', board, '--filer', FILER, '--events', '--timeout', '10').trim());
     assert.deepEqual([event.event, event.key, event.part, event.verdict, event.text], ['comment', KEY, 'understood', 'disagree', NOTE]);
-    drive(`await wait(() => /^Read:/.test(document.querySelector('${CARD} .gd-cmt .ui-trail')?.getAttribute('aria-label') ?? '')); ${frame}`);
+    drive(`await wait(() => /^Read:/.test(document.querySelector('${CARD} .gd-cmt .ui-trail')?.getAttribute('aria-label') ?? '')); ${sentFrame}`);
     const read = page(CARD_STATE);
     assert.match(read.comment_state, /^Read: Sent .+, Delivered .+, Read .+$/); assert.match(read.receipt, /Agent read your note \d\d:\d\d/);
     capture('not-quite-read', "Not quite with a note was taken with no error and shown as Sent; the report's author took it with wait --filer, and the note's track now reaches Read with the time.",
