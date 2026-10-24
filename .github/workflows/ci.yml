@@ -42,7 +42,12 @@ jobs:
       - if: steps.changes.outputs.docs_only != 'true'
         run: done-done run install
       - if: steps.changes.outputs.docs_only != 'true'
-        run: done-done run test
+        run: |
+          if done-done run test; then exit 0; fi
+          for log in "$HOME/.done-done/evidence/sign-off"/*/test.log; do
+            if [ -f "$log" ]; then cat "$log"; fi
+          done
+          exit 1
       - if: steps.changes.outputs.docs_only != 'true'
         run: done-done run skill
       # Every card kind x action x tab x width x theme, with done-done's look step. The look step needs done-done-axi 0.6.9, whose
