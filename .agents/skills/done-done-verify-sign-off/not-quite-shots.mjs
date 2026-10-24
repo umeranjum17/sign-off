@@ -1,8 +1,8 @@
 // Not quite with a note on a report, on an answers-only board (how the live board is fed): on an isolated board with this checkout's built CLI
 // (nothing here touches ~/.sign-off, Firstmate or a real board), at 390 px in the theme given.
 // Usage: node .agents/skills/done-done-verify-sign-off/not-quite-shots.mjs <output> light|dark
-// Saves not-quite-read.<theme>.390w.png, the end state, with a .txt of what the card said, the errors shown, the saved line, the author's wait event and the Sent to the agent seen before it.
-// NOT_QUITE_STEPS=<folder> also saves the earlier steps there, outside the run folder the judge reads: not-quite-note (picked and typed) and not-quite-sent (Sent to the agent).
+// Saves not-quite-read.<theme>.390w.png, the end state, with a .txt of what the card said, the errors shown, the saved line, the author's wait event and the track's step seen right after Tell the agent.
+// NOT_QUITE_STEPS=<folder> also saves the earlier steps there, outside the run folder the judge reads: not-quite-note (picked and typed) and not-quite-sent (the track at Sent).
 // NOT_QUITE_BEFORE=1 SIGN_OFF_REPO=<built base checkout> drives the base instead and saves not-quite-refused: the error the base shows after Tell the agent.
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -35,7 +35,7 @@ const saved = () => existsSync(join(dir, 'board.annotations.jsonl')) ? readFileS
 // What the understood card says: its choices, the note box, Tell the agent, the comment under it with its state, the receipt and any error shown.
 const CARD_STATE = `() => { const c = document.querySelector('${CARD}'), q = (s) => c.querySelector(s), shown = (e) => !!e && !e.hidden && e.getClientRects().length > 0;
   return { pressed: [...c.querySelectorAll('.gd-choice[aria-pressed=true]')].map((b) => b.textContent), note_box: shown(q('.gd-note')) ? q('.gd-note').value : null, tell: shown(q('.gd-tell')),
-    comment: q('.gd-cmt p')?.textContent ?? null, comment_state: q('.gd-cmt .gd-st')?.textContent ?? null, receipt: q('.gd-rc')?.textContent ?? null,
+    comment: q('.gd-cmt p')?.textContent ?? null, comment_state: q('.gd-cmt .ui-trail')?.getAttribute('aria-label') ?? null, receipt: q('.gd-rc')?.textContent ?? null,
     errors: [...c.querySelectorAll('.gd-err')].map((e) => e.textContent).filter(Boolean) }; }`;
 const steps = process.env.NOT_QUITE_STEPS && resolve(process.env.NOT_QUITE_STEPS);
 if (steps) mkdirSync(steps, { recursive: true });
@@ -69,24 +69,24 @@ try {
   } else {
     drive(`await wait(() => !!document.querySelector('${CARD} .gd-cmt')); ${frame}`);
     const sent = page(CARD_STATE);
-    assert.deepEqual([sent.errors, sent.comment, sent.comment_state, sent.note_box, sent.tell], [[], NOTE, 'Sent to the agent', null, false]);
+    assert.deepEqual([sent.errors, sent.comment, sent.note_box, sent.tell], [[], NOTE, null, false]); assert.match(sent.comment_state, /^Sent: Sent \S+$/);
     // Named report, not key, in the captures: the evidence check reads a "key" field as a secret.
     const lines = saved().map(({ key, part, verdict, text }) => ({ report: key, part, verdict, text }));
     assert.deepEqual(lines, [{ report: KEY, part: 'understood', verdict: 'disagree', text: NOTE }]);
-    if (steps) capture('not-quite-sent', 'After Tell the agent, no error shows: the note is under the part as Sent to the agent, and the board saved it.', { ...sent, saved: lines }, steps);
+    if (steps) capture('not-quite-sent', 'After Tell the agent, no error shows: the note is under the part with its track at Sent, and the board saved it.', { ...sent, saved: lines }, steps);
     // The report's author takes it from its own wait, once.
     const event = JSON.parse(cli('wait', board, '--filer', FILER, '--events', '--timeout', '10').trim());
     assert.deepEqual([event.event, event.key, event.part, event.verdict, event.text], ['comment', KEY, 'understood', 'disagree', NOTE]);
-    drive(`await wait(() => /^Agent read it/.test(document.querySelector('${CARD} .gd-cmt .gd-st')?.textContent ?? '')); ${frame}`);
+    drive(`await wait(() => /^Read:/.test(document.querySelector('${CARD} .gd-cmt .ui-trail')?.getAttribute('aria-label') ?? '')); ${frame}`);
     const read = page(CARD_STATE);
-    assert.match(read.comment_state, /^Agent read it \d\d:\d\d$/); assert.match(read.receipt, /Agent read your note \d\d:\d\d/);
-    capture('not-quite-read', "Not quite with a note was taken with no error and shown as Sent to the agent; the report's author took it with wait --filer, and the part now says Agent read it with the time.",
+    assert.match(read.comment_state, /^Read: Sent .+, Delivered .+, Read .+$/); assert.match(read.receipt, /Agent read your note \d\d:\d\d/);
+    capture('not-quite-read', "Not quite with a note was taken with no error and shown as Sent; the report's author took it with wait --filer, and the note's track now reaches Read with the time.",
       { ...read, errors_after_tell: sent.errors, state_after_tell: sent.comment_state, saved: lines, wait_event: { event: event.event, report: event.key, part: event.part, verdict: event.verdict, text: event.text } });
   }
   writeFileSync(join(out, before ? 'steps.before.json' : 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board fed by another program (answers only, as the live board is) holding one guided report filed by agent-41.',
     steps: [`The report is opened on a phone, ${theme}.`, 'The person picks Not quite and types a note.', 'The person taps Tell the agent.', ...(before ? [] : ["The report's author runs wait --filer agent-41 --events."])],
     result: before ? 'The card shows Could not send: This board takes answers only, and nothing is saved.'
-      : "On a phone, Not quite with a note is taken on an answers-only board: no error, the note shows as Sent to the agent, the board saves it, the report's author gets it from its wait, and the part then shows Agent read it." }, null, 2) + '\n');
+      : "On a phone, Not quite with a note is taken on an answers-only board: no error, the note shows under the part with its track at Sent, the board saves it, the report's author gets it from its wait, and the track then reaches Read." }, null, 2) + '\n');
 } finally {
   try { browser('stop'); } catch {}
   server.kill();
