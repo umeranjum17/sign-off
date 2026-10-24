@@ -24,3 +24,13 @@ Phone (390) and desk (1280), light and dark.
 `node .agents/skills/done-done-verify-sign-off/trail-shots.mjs <folder> <light|dark> <390|1280>` seeds its own board (HOME and XDG_* in a temp folder), answers in the board as a tap would, hands one answer over with a plain `wait`, lets the agent's own `wait --filer` take two, and replies with `feedback --reply --link`.
 It saves, per cell, `today`, `decide`, `designs`, `sent`, `delivered`, `read`, `replied`, `design` and `today-seen` (`<state>.<theme>.<width>w.png`), each with a `.txt` of what the browser measured (the track's steps on one line inside its card, no word cut, each 20px badge, Today's Replies, the Activity, no sideways overflow, no raw words, no console error), and `trail.<theme>.<width>w.json`, the board's trail. It exits 1 on any failed measure.
 The regression is test/design.test.mjs ("the feedback trail"), with the hook's Delivered in "answer events".
+
+## Before the server answers
+
+Every comment and note sender extends this same trail with an immediate `Sending…` receipt and the existing pressed `aria-busy` control. Success clears the draft and reads `Sent · HH:MM`; a transport or server error keeps the words and reads `Not sent · <cause>` with Retry. Report-section comments and design change notes appear in Activity as soon as the real save returns, without waiting for the poll or reloading.
+
+Regression and captures: `SEND_FEEDBACK_ONLY=1 node .agents/skills/done-done-verify-sign-off/part-comment-shots.mjs <folder> <light|dark> <360|390|445|1280|1440>`. The report captures are `comment-typing`, `comment-sending`, `comment-not-sent`, `comment-receipt` and `comment-sent`, plus the other composers' resulting frames and `send-regression.<theme>.<width>w.json`. The slow/failing connection is held at the browser boundary; Retry releases a real request to the isolated board. No saved server response is fabricated. `comment-send` in `.done-done.yaml` runs all ten cells (360, 390, 445, 1280 and 1440, light and dark). The pre-existing delivery/read/reply journey remains `trail`.
+
+Set `COMMENT_PROTO=<approved prototype index.html>` to save the report, ask and evidence reference at every width and theme, and horizontal pairs under `vs-proto/`. The supplied board prototype has no Designs view and no Sending/Not sent state; design change-note frames therefore document the real app without claiming a missing approved mock.
+
+The comment-send fixture pins a project picture through the real CLI for its report, ask and evidence rows; refreshed list frames must show those project pictures and reject monograms.

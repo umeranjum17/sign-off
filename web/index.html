@@ -1773,9 +1773,10 @@
     const note = drafts.get(words) ?? noteOf(d), before = answerOf(d.key);
     const drop = clearIfSaved(words, drafts.get(words));
     try {
-      await call('/api/answers', {
+      const sent = await sendWithFeedback(`card:${d.key}`, buttons.at(-1), () => call('/api/answers', {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
-      }, async () => { forget(d.key); unfolded.delete(d.key); if (!typed) drop(); await land?.(); });
+      }, async () => { forget(d.key); unfolded.delete(d.key); if (!typed) drop(); await land?.(); }));
+      if (!sent) { buttons.forEach((b) => b.classList.remove('done')); return unlock(); }
     } catch (e) {
       buttons.forEach((b) => b.classList.remove('done'));
       shown(err).textContent = `Couldn't save: ${e.message}`;
@@ -1783,9 +1784,12 @@
     }
     offerUndo(d, before);
     after?.();
-    if (typed) call('/api/messages', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'comment', key: d.key, text: typed }),
-    }, drop).catch(() => say('Could not save your comment', 8000));
+    if (typed) {
+      const sendNote = () => sendWithFeedback(`card:${d.key}`, null, () => call('/api/messages', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'comment', key: d.key, text: typed }),
+      }, drop), sendNote);
+      sendNote();
+    }
   }
 
   const toast = document.getElementById('toast'), toastText = document.getElementById('toast-text'), undoBtn = document.getElementById('undo');
@@ -1849,14 +1853,36 @@
   // A render while a request was out replaced the error line; write to the one on screen.
   const shown = (err) => document.getElementById(err.id) ?? err;
 
+  // The local, in-flight step of the feedback trail. Receipts survive a redraw; the saved trail still owns delivery and read times.
+  const sending = new Map();
+  function sendLine(id) {
+    const line = el('div', { class: 'ui-send', 'data-send-feedback': id, role: 'status', 'aria-live': 'polite' });
+    paintSend(line); return line;
+  }
+  function paintSend(line) {
+    const s = sending.get(line.dataset.sendFeedback);
+    line.hidden = !s;
+    if (!s) return;
+    line.replaceChildren(s.busy ? 'Sending…' : s.error ? `Not sent · ${s.error} ` : `Sent · ${hhmm(s.at)}`);
+    if (s.error) { const retry = el('button', { type: 'button', class: 'gd-lnk' }, 'Retry'); retry.onclick = s.retry; line.append(retry); }
+  }
+  async function sendWithFeedback(id, btn, post, retry = () => btn?.click()) {
+    if (sending.get(id)?.busy) return false;
+    const paint = () => document.querySelectorAll('[data-send-feedback]').forEach((line) => { paintSend(line); if (line.dataset.sendFeedback === id && !line.hidden) line.scrollIntoView({ block: 'nearest', behavior: 'instant' }); });
+    sending.set(id, { busy: true }); btn?.setAttribute('aria-busy', 'true'); paint();
+    try {
+      await post(); sending.set(id, { at: new Date().toISOString() }); return true;
+    } catch (e) {
+      sending.set(id, { error: e.message, retry }); return false;
+    } finally { btn?.removeAttribute('aria-busy'); paint(); }
+  }
+
   /** Sends a comment or a queued prompt for the agent; the typed text stays until the server has it. */
   function send(btn, err, body, draft, text) {
+    if (!text) return;
     const unlock = lock(btn);
-    call('/api/messages', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...body, text }) },
-      clearIfSaved(draft, drafts.get(draft))).catch((e) => {
-      shown(err).textContent = `Couldn't send: ${e.message}`;
-      unlock();
-    });
+    sendWithFeedback(`card:${body.key ?? 'prompt'}`, btn, () => call('/api/messages', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...body, text }) },
+      clearIfSaved(draft, drafts.get(draft)))).finally(unlock);
   }
 
   /** A linked run's result in plain words, for the line over the headline; the third word is the one the Evidence screens use. */
@@ -2141,12 +2167,9 @@
       const unlock = lock(roundBtn);
       const note = (drafts.get(d.key) ?? noteOf(d)).trim();
       const drop = clearIfSaved(d.key, drafts.get(d.key));
-      call('/api/rounds', {
+      sendWithFeedback(`card:${d.key}`, roundBtn, () => call('/api/rounds', {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, note }),
-      }, () => { forget(d.key); drop(); }).catch((e) => {
-        shown(err).textContent = `Couldn't ask: ${e.message}`;
-        unlock();
-      });
+      }, () => { forget(d.key); drop(); })).finally(unlock);
     };
     const commentBtn = el('button', { 'aria-label': `Send without answering, ${name}` }, 'Send without answering');
     commentBtn.onclick = () => send(commentBtn, err, { kind: 'comment', key: d.key }, d.key, box.value.trim());
@@ -2167,7 +2190,7 @@
     fold.ontoggle = () => (fold.open ? unfolded.add(d.key) : unfolded.delete(d.key));
     fold.firstChild.onclick = () => setTimeout(() => fold.open && box.focus());
     return el('div', { class: 'note' }, saved?.answer === 'text' ? el('p', { class: 'meta saved-note', dir: 'auto' }, `Your reply: ${saved.note}`) : '',
-      kept ? el('p', { class: 'meta saved-note', dir: 'auto' }, `Your comment, sent with ${saved.label}: ${kept}`) : '', fold);
+      kept ? el('p', { class: 'meta saved-note', dir: 'auto' }, `Your comment, sent with ${saved.label}: ${kept}`) : '', fold, sendLine(`card:${d.key}`));
   }
 
   /** Free-text prompts for the agent, which it reads with sign-off-axi poll. */
@@ -2181,7 +2204,7 @@
     return el('details', { class: 'note ask', ...(drafts.get('') && { open: '' }) },
       el('summary', {}, ['Ask the agent', queued && `${queued} queued`, prompts.length - queued && `${prompts.length - queued} read by the agent`].filter(Boolean).join(' · ')),
       ...prompts.map((m) => el('p', { class: 'meta saved-note', dir: 'auto' }, `${m.delivered ? 'Read by the agent' : 'Queued'}: ${m.text}`)),
-      el('label', { for: box.id }, 'A prompt the agent reads the next time it checks in'), box, el('div', { class: 'actions' }, btn), err);
+      el('label', { for: box.id }, 'A prompt the agent reads the next time it checks in'), box, el('div', { class: 'actions' }, btn), sendLine('card:prompt'), err);
   }
 
   /** The proof on the card itself: its own captures, or else the media of its linked run.
@@ -2269,13 +2292,14 @@
       was && { at: was.at, text: `Your answer on the earlier round: ${was.label}${wrote.length === 1 && on(wrote[0]) ? ` (${on(wrote[0])})` : ''}`,
         note: wrote.length === 1 ? wrote[0].note : wrote.map((n) => (on(n) ? `${on(n)}: ${n.note}` : n.note)).join(' · ') },
       a?.replaces?.at && { at: a.replaces.at, text: `Your answer: ${said(a.replaces)}`, note: a.replaces.note },
-      a && !d.earlier_answer && { at: a.at, text: `${a.replaces ? 'Changed to' : 'Your answer'}: ${said(a)}`, note: a.note },
+      a && !d.earlier_answer && { at: a.at, text: `${a.replaces ? 'Changed to' : 'Your answer'}: ${said(a)}`, note: a.note || a.notes?.map((n) => n.note).filter(Boolean).join(' · ') },
       ...trailOf(d.key).flatMap((t) => [t.delivered && { at: t.delivered, text: `Delivered to ${by}` }, t.read && { at: t.read, text: `${by} read it` },
         t.reply && !t.reply.acted && { at: t.reply.at, text: `${by} ${t.reply.text ? 'replied' : 'acted on it'}`, note: t.reply.text, link: t.reply.link && [linkName(t.reply.link), t.reply.link] }]),
       ...(state.rounds ?? []).filter((r) => r.key === d.key).map((r) => ({ at: r.at, text: 'You asked for a new round', note: r.note })),
       ...trailOf(d.key, 'discard').map((t) => ({ at: t.at, text: `Discarded: ${reasonOf(t.reason)}` })),
+      ...(state.comments ?? []).filter((c) => c.key === d.key && c.text).map((c) => ({ at: c.at, text: 'Your comment', note: c.text })),
       ...(state.messages ?? []).filter((m) => m.kind === 'comment' && m.key === d.key).map((m) => ({ at: m.at, text: 'Your comment', note: m.text }))]
-      .filter((e, i, all) => e && !Number.isNaN(Date.parse(e.at)) && all.findIndex((x) => x && x.text === e.text && bySecond(x, e) === 0) === i).sort(bySecond);
+      .filter((e, i, all) => e && !Number.isNaN(Date.parse(e.at)) && all.findIndex((x) => x && x.text === e.text && x.note === e.note && bySecond(x, e) === 0) === i).sort(bySecond);
   };
   /** A card's Activity (ui.css): its steps as one sunk group, each in plain words with its time, the note that went with it, and the card it is on where the steps
    *  are a ticket's. A card whose only step is its posting shows none (its time is already on it). */
@@ -3515,11 +3539,12 @@
       el('h3', {}, 'Whole-plan comment'), el('label', { for: commentBox.id }, 'Comment for the agent on the whole plan (optional)', commentBox)));
     send.onclick = () => {
       send.disabled = true; err.textContent = '';
-      call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, note: comment,
+      sendWithFeedback(`plan:${d.key}`, send, () => call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, note: comment,
         notes: d.sections.map((s) => notes.get(s.id)), decisions: Object.fromEntries([...picks].map(([k, v]) => [k, v.trim()])) }) }, () => {
         drafts.delete(draftKey); keep(); location.hash = `#answered/${d.key}`;
-      }).catch((e) => { err.textContent = `Couldn't send back: ${e.message}`; update(); });
+      })).then((ok) => { if (!ok) update(); });
     };
+    main.append(sendLine(`plan:${d.key}`));
     panel.append(el('h2', {}, 'Your answers'), progress, el('div', { class: 'plan-next-row' }, status, next), send, err); panel.hidden = !!saved; update();
     return el('div', { class: `plan-scroll${saved ? ' sent' : ''}` }, el('div', { class: `plan-layout${saved ? ' sent' : ''}` }, main, panel));
   }
@@ -3590,15 +3615,15 @@
       const notes = roundNotes().filter((n) => (!n.journey || live.has(`${n.journey}/${n.screen}`)) && (n.journey !== selected?.journey.id || n.screen !== selected?.screen.id));
       if (writes) notes.push({ ...(selected && { journey: selected.journey.id, screen: selected.screen.id }), verdict, note: text });
       saving = true; approve.disabled = change.disabled = true;
-      return call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, ...(!screen && { verdict }), ...(screen && { requested: verdict === 'change' }),
-        notes, ...(pick.value && { pick: pick.value }) }) }, () => session.drafts.delete(screenKey(selected)))
+      return sendWithFeedback(`design:${d.key}`, verdict === 'approve' ? approve : change, () => call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, ...(!screen && { verdict }), ...(screen && { requested: verdict === 'change' }),
+        notes, ...(pick.value && { pick: pick.value }) }) }, () => { session.drafts.set(screenKey(selected), ''); note.value = ''; }))
         .finally(() => { saving = false; approve.disabled = change.disabled = state.readonly; if (session.open) { screenStatus.textContent = screenLine(); stamp(true); } });
     };
     const approve = el('button', { class: 'open-link dz-ink' }, 'Approve'), change = el('button', { class: 'dz-change' }, 'Change');
     approve.disabled = change.disabled = state.readonly;
     approve.onclick = () => save('approve').catch((e) => { err.textContent = `Couldn't save: ${e.message}`; });
     change.onclick = () => { if (!note.value.trim()) { err.textContent = 'Add a note describing what should change.'; note.focus(); return; } save('change').catch((e) => { err.textContent = `Couldn't save: ${e.message}`; }); };
-    const foot = el('div', { class: 'foot' }, approve, change);
+    const foot = el('div', { class: 'foot' }, approve, change, sendLine(`design:${d.key}`));
     const controls = el('div', { class: 'dz-ctl' }, d.options?.length ? el('label', {}, 'Pick a direction', pick) : '', el('label', {}, screens.length ? 'Screen note' : 'Design note', note));
     const open = el('button', { class: 'open-link dz-full', 'aria-haspopup': 'dialog', 'data-design': d.key }, 'Review full screen');
     // Where it stands: its state, the direction picked and when it was answered, then what was said on this round.
@@ -3858,12 +3883,12 @@
       const s = same(part, action, q, selection), prior = sentAs(s);
       if (prior) { already(part, prior); return prior; }
       if (outbox.has(s)) { outbox.set(s, true); return; }
-      outbox.set(s, false); btn?.setAttribute('aria-busy', 'true');
-      try { await post(); sync(); const a = sentAs(s); if (a) (outbox.get(s) ? already(part, a) : showAsk(part, a.id)); return a; }
-      finally { outbox.delete(s); btn?.removeAttribute('aria-busy'); }
+      outbox.set(s, false);
+      try { if (!await sendWithFeedback(`ask:${key}:${part}`, btn, post)) throw new Error(sending.get(`ask:${key}:${part}`).error); sync(); const a = sentAs(s); if (a) (outbox.get(s) ? already(part, a) : showAsk(part, a.id)); return a; }
+      finally { outbox.delete(s); }
     }
     async function ask(part, q, btn) {
-      try { await sendAsk(part, 'deeper', q, undefined, btn, () => postJson('/api/deeper', { key, part, ...(q && { q }) })); } catch (e) { panels.get(part).hidden = false; panels.get(part).append(E('p', 'gd-err', `Could not ask: ${e.message}`)); }
+      try { await sendAsk(part, 'deeper', q, undefined, btn, () => postJson('/api/deeper', { key, part, ...(q && { q }) })); } catch { panels.get(part).hidden = false; }
     }
     const deepBtn = (part) => {
       const b = el('button', { class: 'gd-lnk deep', type: 'button', 'aria-expanded': 'false', 'aria-controls': `gd-a-${part.replace(/\W/g, '-')}` }, gic('deeper'), 'Go deeper');
@@ -3885,19 +3910,14 @@
     };
     async function engage(part, action, q, id = crypto.randomUUID(), selection, btn) {
       try { return await sendAsk(part, action, q, selection, btn, () => postJson('/api/engagement', { version: 1, id, key, ...d.engagement, part, action, ...(q !== undefined && { q }), ...(selection && { selection }) })); }
-      catch (e) {
-        const retry = el('button', { type: 'button', class: 'gd-lnk' }, 'Retry');
-        const error = E('p', 'gd-err', `Could not ask: ${e.message} `, retry);
-        retry.onclick = () => { error.remove(); engage(part, action, q, id, selection, retry); };
-        panels.get(part).hidden = false; panels.get(part).append(error);
-      }
+      catch { panels.get(part).hidden = false; }
     }
     // The presets and the composer for one part. With a selection they ask about those words, through this same engage().
     const controls = (part, selection) => {
       const form = el('form', { class: 'gd-fu' }), input = el('input', { 'aria-label': selection ? 'Ask about the selected text' : 'Ask about this part', placeholder: selection ? 'Ask about these words' : 'Ask about this' }), send = el('button', { type: 'submit' }, 'Send');
       let action = 'custom';
       form.append(input, send); form.hidden = !!selection;
-      form.onsubmit = (e) => { e.preventDefault(); if (input.value.trim()) { const sent = engage(part, action, input.value, undefined, selection, send); input.value = ''; action = 'custom'; input.placeholder = 'Ask a follow-up'; if (selection) asked(part, sent); } };
+      form.onsubmit = async (e) => { e.preventDefault(); if (input.value.trim()) { const sent = engage(part, action, input.value, undefined, selection, send); if (selection) asked(part, sent); if (await sent) { input.value = ''; action = 'custom'; input.placeholder = 'Ask a follow-up'; } } };
       const buttons = Object.entries(actionLabels).filter(([a]) => a !== 'custom').map(([a, label]) => {
         const b = el('button', { class: `gd-lnk ${a === 'deeper' ? 'deep' : a}`, type: 'button' }, label);
         b.onclick = () => { if (a === 'question') { action = a; form.hidden = false; input.focus(); } else { const sent = engage(part, a, undefined, undefined, selection, b); if (selection) asked(part, sent); } };
@@ -3935,11 +3955,12 @@
       const close = () => { box.hidden = true; ta.value = ''; lean = undefined; comment.setAttribute('aria-expanded', 'false'); paint(); };
       comment.onclick = () => (box.hidden || mode !== 'comment' ? open('comment') : close());
       cancel.onclick = close; ta.oninput = paint; ta.onkeydown = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
-      const post = async (body) => { try { await postJson('/api/annotations', { key, part, ...body }); sync(); return true; } catch (e) { err.textContent = 'Could not send: ' + e.message; box.hidden = false; return false; } };
+      const post = (body) => sendWithFeedback(`part:${key}:${part}`, send, async () => { await postJson('/api/annotations', { key, part, ...body }); sync(); });
       box.onsubmit = async (e) => {
-        e.preventDefault(); const text = ta.value.trim(); if (!text) return;
-        send.disabled = true;
-        if (mode === 'question') { await engage(part, 'question', text, undefined, undefined, send); close(); } else if (await post({ text, ...(lean && { verdict: lean }) })) close(); else send.disabled = false;
+        e.preventDefault(); const text = ta.value.trim(); if (!text || sending.get(`part:${key}:${part}`)?.busy) return;
+        send.disabled = ta.disabled = cancel.disabled = comment.disabled = true;
+        if (mode === 'question') { if (await engage(part, 'question', text, undefined, undefined, send)) close(); } else if (await post({ text, ...(lean && { verdict: lean }) })) close();
+        ta.disabled = cancel.disabled = comment.disabled = false; paint();
       };
       const vote = (name, label, icon) => el('button', { type: 'button', class: 'gd-v ' + name + (inItem ? ' icon-only' : ''), 'aria-pressed': 'false', title: label }, gic(icon), E('span', '', label));
       const agree = vote('agree', 'Agree', 'up'), disagree = vote('disagree', 'Disagree', 'down');
@@ -3960,7 +3981,7 @@
         ask = [E('div', 'gd-menuwrap', more, menu)];
       } else if (live) ask = [deepBtn(part)];
       queueMicrotask(() => paintTalk(part));
-      return [...(dp ? [dp] : []), thread, box, E('div', 'gd-acts gd-foot' + (d.engagement ? '' : ' legacy'), agree, disagree, comment, E('span', 'sp'), ...(db ? [db] : []), ...ask), panel];
+      return [...(dp ? [dp] : []), thread, box, sendLine(`part:${key}:${part}`), sendLine(`ask:${key}:${part}`), E('div', 'gd-acts gd-foot' + (d.engagement ? '' : ' legacy'), agree, disagree, comment, E('span', 'sp'), ...(db ? [db] : []), ...ask), panel];
     };
 
     // ---- selected words: native selection of one authored field, offered the same presets right under that field
@@ -4085,8 +4106,7 @@
     noteBox.oninput = () => { S.note = noteBox.value; if (!plan) syncU(); };
     // Said as a comment on the understood part, so the author's wait --filer takes it and the part shows Sent to the agent, then Agent read it.
     async function sayU(body, btn) {
-      tell.parentElement.querySelector(':scope > .gd-err')?.remove(); btn.disabled = true;
-      try { await postJson('/api/annotations', { key, part: 'understood', ...body }); sync(); return true; } catch (e) { tell.after(E('p', 'gd-err', `Could not send: ${e.message}`)); btn.disabled = false; return false; }
+      return sendWithFeedback(`tell:${key}`, btn, async () => { await postJson('/api/annotations', { key, part: 'understood', ...body }); sync(); });
     }
     tell.onclick = async () => { if (await sayU({ verdict: 'disagree', text: S.note.trim() }, tell)) { S.told = true; S.note = noteBox.value = ''; syncU(); } };
     function syncU() {
@@ -4097,7 +4117,7 @@
     }
     const understood = card('understood', 'understood', head('Check that I have this right', 'This is your ask in my words. If it is off, say what is off. That is the only correction that matters.'),
       el('dl', { class: 'gd-uq' }, ...d.understood.map((u, n) => E('div', '', fld('understood', `understood.${n}.label`, el('dt', {}, u.label)), fld('understood', `understood.${n}.text`, mdSpan('dd', '', u.text))))),
-      E('div', 'gd-seg', ...choices), noteBox, tell, ...(live ? acts('understood') : []), rc('understood'));
+      E('div', 'gd-seg', ...choices), noteBox, tell, sendLine(`tell:${key}`), ...(live ? acts('understood') : []), rc('understood'));
 
     // A comparison: every item's detail is the same "Axis: value" lines in the same order, so the section is one table.
     // The detail stays plain lines, so a board that predates the table still reads it as text.
@@ -4154,12 +4174,12 @@
     // ---- next step and Go ahead
     const sendSlot = E('div', ''), err = E('p', 'gd-err');
     err.setAttribute('role', 'alert');
-    const nextCard = card('next', 'next', head(d.next.heading, undefined, undefined, 'next', 'heading'), E('ul', 'gd-checks', ...d.next.lines.map((l, n) => E('li', '', E('span', 'tk', gic('check')), fld('next', `lines.${n}`, mdSpan('span', '', l))))), ...(plan ? [sendSlot, err] : []), ...(d.engagement || live ? acts('next') : []), rc('next'));
+    const nextCard = card('next', 'next', head(d.next.heading, undefined, undefined, 'next', 'heading'), E('ul', 'gd-checks', ...d.next.lines.map((l, n) => E('li', '', E('span', 'tk', gic('check')), fld('next', `lines.${n}`, mdSpan('span', '', l))))), ...(plan ? [sendSlot, sendLine(`plan:${key}`), err] : []), ...(d.engagement || live ? acts('next') : []), rc('next'));
     async function go(b) {
       if (S.understood === 'no' && !S.note.trim()) { noteBox.focus(); noteBox.scrollIntoView({ block: 'center' }); err.textContent = 'Say what is off first, or choose That is right.'; return; }
       err.textContent = ''; b.disabled = true;
       const notes = S.understood ? [{ section: 'understood', verdict: S.understood === 'yes' ? 'approve' : 'change', ...(S.note.trim() && { note: S.note.trim() }) }] : [];
-      try { await postJson('/api/answers', { key, note: '', notes, decisions: S.picks }); sync(); } catch (e) { err.textContent = `Couldn't send: ${e.message}`; b.disabled = false; }
+      if (!await sendWithFeedback(`plan:${key}`, b, async () => { await postJson('/api/answers', { key, note: '', notes, decisions: S.picks }); S.note = noteBox.value = ''; sync(); })) b.disabled = false;
     }
     const goBtn = () => { const b = el('button', { class: 'gd-btn block', type: 'button' }, gic('send'), changes() ? `Send ${plural(changes(), 'change')}` : 'Go ahead'); b.onclick = () => go(b); return b; };
 
@@ -4216,7 +4236,7 @@
       stageBlocks.push(c);
     }
     const who = plan ? 'Planning agent' : d.asked_by ?? 'Reporting agent';
-    const top = E('div', 'gd-top', E('p', 'geye', kindChip(d, true), E('span', '', [plan ? d.project : d.group, [who, d.filed && when(d.filed)].filter(Boolean).join(', ')].filter(Boolean).join(' · '))), fld('this', 'title', E('h1', '', d.title)), purposeLine(d), fld('this', 'about', mdSpan('p', 'sub', d.about)), ticketRow(d), thread(d),
+    const top = E('div', 'gd-top', E('p', 'geye', kindChip(d, true), E('span', '', [plan ? d.project : d.group, [who, d.filed && when(d.filed)].filter(Boolean).join(', ')].filter(Boolean).join(' · '))), fld('this', 'title', E('h1', '', d.title)), purposeLine(d), fld('this', 'about', mdSpan('p', 'sub', d.about)), ticketRow(d), el('div', { class: 'gd-activity' }, thread(d)),
       E('div', 'howto', gic('info'), E('span', '', `A few short parts, in order. Tap Details for the numbers and Go deeper to ask me more.${plan ? ' Nothing is required: Go ahead accepts my picks.' : ''}`)));
     const rail = el('aside', { class: 'gd-rail' }, E('h4', '', plan ? 'This plan' : 'This report'), nav, ...(plan ? [sumHost] : []));
     const progress = E('div', 'gd-progress', now, segs);
@@ -4249,6 +4269,7 @@
     let timer;
     function sync() {
       if (!root.isConnected && timer) { clearInterval(timer); timer = undefined; return; }
+      root.querySelector('.gd-activity')?.replaceChildren(thread(d));
       syncU(); paintOpts(); paintSummary(); paintRc(); paintRail(); votes.forEach((_, part) => paintTalk(part));
       panels.forEach((_, part) => { paintAns(part); if (asksOf(part).length && (d.engagement || (deeps.get(part).getAttribute('aria-expanded') === 'false' && !deeps.get(part).dataset.shut))) { deeps.get(part)?.setAttribute('aria-expanded', 'true'); panels.get(part).hidden = false; } });
       const need = live && (unfinished() || (state.comments ?? []).some((c) => c.key === key && c.text && !c.reply) || (plan && sent() && !state.seen_at?.[key]));
@@ -4924,8 +4945,8 @@
     // pinned under a hairline at the foot, as cards side by side over one line of the note, Ask me later and Answer.
     const page = desk ? el('section', { class: `${kind} ui-card ui-pane ask2 s8 split-detail`, 'aria-labelledby': 'ask-title' },
       el('div', { class: 'pbody' }, askHead(d, sink), el('div', { class: 'pmain' }, lead, ...about, ...said, quietLine), el('div', { class: 'pside' }, ...askReport(d), thread(d))),
-      el('div', { class: 'ppin' }, ...picks, ...words, err, bar(noteField)))
-      : el('section', { class: kind }, lead, ...about, ...said, ...picks, ...words, noteField, quietLine, thread(d), err, bar());
+      el('div', { class: 'ppin' }, ...picks, ...words, sendLine(`card:${d.key}`), err, bar(noteField)))
+      : el('section', { class: kind }, lead, ...about, ...said, ...picks, ...words, noteField, quietLine, thread(d), sendLine(`card:${d.key}`), err, bar());
     return page;
   }
   const kc = (k) => el('kbd', { class: 'kc' }, k);
