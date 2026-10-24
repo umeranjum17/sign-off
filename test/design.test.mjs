@@ -4745,6 +4745,19 @@ test('detail sequence follows the originating list across phone sheets, desk pan
       assert.equal(await evaluate('document.querySelector(".detail-sequence button:last-child").disabled'), true);
       await key('ArrowRight'); assert.equal(await evaluate('location.hash'), routes[2]);
       await key('k'); await until(async () => (await evaluate('location.hash')) === routes[1]);
+      if (width === 390) {
+        // Next and previous swap what is inside the open sheet: the same elements, no new open animation, and the top of the sheet.
+        await evaluate('new Promise((ok) => setTimeout(ok, 500))'); // let the first open finish
+        await evaluate(`(() => { const o = document.querySelector('.ask-over'), s = document.querySelector('.ask-sheet'); window.__sheet = { o, s, opens: 0 };
+                    document.querySelector('#board').addEventListener('animationstart', (e) => { if (e.animationName === 'sheet-up') window.__sheet.opens++; }, true);
+          s.scrollTop = 40; })()`);
+        for (const [nav, to] of [['last-child', 2], ['first-child', 1], ['last-child', 2], ['first-child', 1]]) {
+          await evaluate(`document.querySelector('.ask-sheet').scrollTop = 40; document.querySelector('.detail-sequence button:${nav}').click()`);
+          await until(async () => (await evaluate('location.hash')) === routes[to]);
+          await evaluate('new Promise((ok) => setTimeout(ok, 250))');
+          assert.deepEqual(await evaluate('({ same: document.querySelector(".ask-over") === window.__sheet.o && document.querySelector(".ask-sheet") === window.__sheet.s, opens: window.__sheet.opens, top: document.querySelector(".ask-sheet").scrollTop })'), { same: true, opens: 0, top: 0 }, 'the sheet swaps its content in place');
+        }
+      }
       await evaluate('location.reload()');
       await until(async () => (await evaluate('document.querySelector(".detail-sequence .position")?.textContent')) === '2 of 3');
       await evaluate('document.querySelector(".decide .note-box").focus()');

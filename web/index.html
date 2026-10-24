@@ -3415,9 +3415,9 @@
   /** On a phone the ticket rises over the list as a sheet: a grab handle, its project and state with a close, then the ticket. Close (or Escape, or a tap above it) goes back. */
   let tkUp = '';
   function tkSheet(t) {
-    const rise = tkUp !== t.id, x = el('a', { class: 'x', href: ticketBack || '#tickets', 'aria-label': 'Close' }, glyph('x'));
+    const rise = !tkUp, x = el('a', { class: 'x', href: ticketBack || '#tickets', 'aria-label': 'Close' }, glyph('x'));
     tkUp = t.id;
-    return el('div', { class: `tk-over${rise ? ' up' : ''}` }, el('a', { class: 'tk-scrim', href: ticketBack || '#tickets', tabindex: '-1', 'aria-label': 'Close' }),
+    return el('div', { class: `tk-over${rise ? ' up' : ''}`, 'data-key': t.id }, el('a', { class: 'tk-scrim', href: ticketBack || '#tickets', tabindex: '-1', 'aria-label': 'Close' }),
       el('section', { class: 'tk-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': t.title }, el('div', { class: 'grab', 'aria-hidden': 'true' }), ...ticketPage(t, x)));
   }
   addEventListener('keydown', (e) => e.key === 'Escape' && !e.defaultPrevented && document.querySelector('.tk-sheet') && !document.querySelector('dialog[open]') && (location.hash = ticketBack || '#tickets'));
@@ -4849,6 +4849,7 @@
     document.querySelector('main').inert = !!d;
     document.getElementById('nav').inert = !!d && !inline;
     document.getElementById('tabs').inert = !!d;
+    const swapped = !reader.hidden && !!d && !!reader.dataset.key && reader.dataset.key !== d.key;
     reader.hidden = !d;
     // A report opened from Reports (and not beside a desk's list) reads as a sheet over the list. A guided one tapped in the list shows its parts there until
     // Read the report opens it in full; reached by a link (Today's card, the CLI's open) it opens in full at once.
@@ -4875,6 +4876,7 @@
       : sheet ? reportSheet(d, h1, el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }))
       : [el('header', {}, back), el('div', { class: 'read' }, el('p', { class: 'eyebrow' }, kindChip(d, true), el('span', {}, [d.asked_by, d.filed ? when(d.filed) : ''].filter(Boolean).join(' · '))), h1, purposeLine(d),
         d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided(d), ticketRow(d), thread(d), el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }), dismissReport(d))]));
+    if (swapped) swapIn([...reader.children].filter((n) => !n.matches('.rp-scrim')));
   }
   /** A guided report opened in full from its sheet (its key), else ''; and the report last tapped in the list, whose sheet stays until another opens. */
   let rpGuide = '', rpListed = '';
@@ -5398,9 +5400,9 @@
   /** An ask on a phone, as the prototype's sheet draws it over Decide's list: a grab handle, its tile with whose it is and when, More and Close, then the ask.
    *  A tap on the dimmed list, Close or Escape goes back to the list. */
   function askSheet(d) {
-    const bar = {}, page = decidePage(d, undefined, false, bar), rise = sheetUp !== d.key;
+    const bar = {}, page = decidePage(d, undefined, false, bar), rise = !sheetUp;
     sheetUp = d.key;
-    return el('div', { class: `ask-over${rise ? ' up' : ''}` }, el('a', { class: 'ask-scrim', href: '#waiting', tabindex: '-1', 'aria-hidden': 'true' }),
+    return el('div', { class: `ask-over${rise ? ' up' : ''}`, 'data-key': d.key }, el('a', { class: 'ask-scrim', href: '#waiting', tabindex: '-1', 'aria-hidden': 'true' }),
       el('section', { class: 'ask-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'ask-title' }, el('div', { class: 'grab', 'aria-hidden': 'true' }),
         el('header', { class: 'sh-head' }, cardTile(d), el('span', { class: 'sh-lab', dir: 'auto' }, `${whoOf(d)}${d.filed ? ` · ${filedAt(d.filed)}` : ''}`), bar.more,
           el('a', { class: 'sh-x', href: '#waiting', 'aria-label': 'Close' }, glyph('x'))), page));
@@ -5627,6 +5629,30 @@
   const detailScope = '.split-detail, .ask-sheet, .tk-sheet, .tk-pane, .dz-open, #reader:not([hidden])';
   const detailHeaders = '#reader:not([hidden]) .ev-shd, #reader:not([hidden]) .rp-shd, #reader:not([hidden]) .reader-head, #reader:not([hidden]) > header, .ask-sheet .sh-head, .split-detail .split-bar, .tk-shd, .dz-oh';
   let sequence = history.state?.detailSequence ?? null;
+  /** Which way the last Next or Previous moved (0 for a link or Back), so the content that swaps in slides from that side. */
+  let swapDir = 0;
+  /** Content swapped inside a sheet that stays open: a short cross-fade, sliding from the side it moved. Nothing plays under reduced motion. */
+  const swapIn = (nodes) => {
+    if (calm.matches) return;
+    for (const n of nodes) n.animate?.([{ opacity: 0, transform: `translateX(${swapDir * 1.5}rem)` }, { opacity: 1, transform: 'none' }], { duration: 160, easing: 'ease-out' });
+  };
+  /** A sheet that Next, Previous, J, K or a swipe moves on to another item keeps its element (moving it would replay its open animation): only what is in it changes, and it starts at the top.
+   *  It is the last thing on the board, so the rest is drawn before it. Returns the kept sheet. */
+  const keepSheet = (content) => {
+    for (const [over, sheet] of [['.ask-over', '.ask-sheet'], ['.tk-over', '.tk-sheet']]) {
+      const fresh = content.find((n) => n.matches?.(over)), old = document.querySelector(`#board > ${over}`);
+      if (!fresh || !old) continue;
+      const was = old.querySelector(sheet), now = fresh.querySelector(sheet), moved = old.dataset.key !== fresh.dataset.key, top = was.scrollTop;
+      old.dataset.key = fresh.dataset.key;
+      old.querySelector('a[class$="scrim"]').setAttribute('href', fresh.querySelector('a[class$="scrim"]').getAttribute('href'));
+      for (const a of ['aria-label', 'aria-labelledby']) now.hasAttribute(a) ? was.setAttribute(a, now.getAttribute(a)) : was.removeAttribute(a);
+      was.replaceChildren(...now.childNodes);
+      was.scrollTop = moved ? 0 : top;
+      if (moved) swapIn([...was.children].filter((n) => !n.matches('.grab')));
+      content.splice(content.indexOf(fresh), 1);
+      return old;
+    }
+  };
   const visibleRoutes = (root) => [...new Set([...root.querySelectorAll('a[href]')]
     .filter((a) => detailRoute.test(a.hash) && a.getClientRects().length && !a.closest(detailScope + ', .detail-sequence, .dl-menu'))
     .map((a) => a.hash))];
@@ -5640,6 +5666,7 @@
     const at = sequence?.routes.indexOf(location.hash) ?? -1, next = sequence?.routes[at + step];
     if (at < 0 || !next) return;
     rpPicked = true;
+    swapDir = step;
     location.hash = next;
   };
   function detailSequence() {
@@ -5854,7 +5881,11 @@
     if (keptRead && newRead && keptRead.dataset.sig === newRead.dataset.sig) {
       // The page stays; the head, the list, the report's head line and its parts beside it are drawn again.
       for (const part of ['.ui-dhead', '.split-list', '.split-detail > .split-bar', '.split-detail > .pside']) document.querySelector(`#board ${part}`).replaceWith(content[0].querySelector(part));
-    } else board.replaceChildren(...content);
+    } else {
+      const kept = swapDir && keepSheet(content);
+      if (kept) { for (const n of [...board.children]) if (n !== kept) n.remove(); kept.before(...content); }
+      else board.replaceChildren(...content);
+    }
     // A redraw keeps the desk list where it was scrolled, with the selected row in view.
     const listEl = document.querySelector('.split-list');
     if (listEl && listTop) listEl.scrollTop = listTop;
@@ -5897,6 +5928,7 @@
     // On a desk the new detail slides in from the side the selection moved.
     const rowsOf = () => [...document.querySelectorAll('.split-list [data-row]')], order = rowsOf().map((r) => r.getAttribute('href')), was = rowsOf().findIndex((r) => r.matches('[aria-current]'));
     render();
+    swapDir = 0;
     rpPicked = false;
     if (!phone()) {
       const detail = document.querySelector('.split-detail'), now = document.querySelector('.split-list [data-row][aria-current]')?.getAttribute('href');
