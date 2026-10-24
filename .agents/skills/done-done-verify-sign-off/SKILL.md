@@ -71,3 +71,5 @@ Capture terminal transcripts, exit codes and side effects (files written, rows i
 Stop the instances this run started and remove scratch state. Evidence survives cleanup: never delete the run folder.
 
 The `report-rows` journey also captures Today, Search and Tickets at 390/1280 in both themes and rejects monogram tiles in every list. The palette integration journey gates the same seven lists, including populated Search, without relaxing its approved-colour floor.
+
+For the Reports-only merge claim, set `REPORT_ROWS_REVIEW_ROOT` to an evidence folder outside the sealed run, then run `done-done verify report-rows` with the Reports-only outcome. The journey still drives and asserts all 56 cells, writes the full matrix and DOM companions there, and copies only the four fresh Reports PNGs (390/1280, light/dark) into the sealed run. Keep the four Reports frames in Checks; cite the other list frames separately in PR text, so the judge does not compare another screen against a Reports claim.
