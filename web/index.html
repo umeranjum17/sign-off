@@ -1735,7 +1735,17 @@
       try { for (const [k, v] of JSON.parse(localStorage.getItem(stored())) ?? []) drafts.set(k, v); } catch {}
     }
     await sent?.();
+    renderKeepingFocus();
+  }
+
+  // A response can arrive after the person has started typing on the next card.
+  // Keep the active editor and its selection across that redraw, just as a poll does.
+  function renderKeepingFocus() {
+    const typing = (document.activeElement?.tagName === 'TEXTAREA' || document.activeElement?.id === 'find') && document.activeElement;
+    const start = typing && typing.selectionStart, end = typing && typing.selectionEnd, direction = typing && typing.selectionDirection;
     render();
+    const box = typing && document.getElementById(typing.id);
+    if (box) box.focus(), box.setSelectionRange(start, end, direction);
   }
 
   const clearIfSaved = (key, sent) => () => { if (drafts.get(key) === sent) drafts.delete(key); keep(); };
@@ -5220,12 +5230,8 @@
       if (!res.ok) throw new Error(body.error);
       banner.hidden = true;
       if (JSON.stringify(body) === JSON.stringify(state)) return;
-      // A redraw keeps the reply box or search being typed in focused, with its caret where it was.
-      const typing = (document.activeElement?.tagName === 'TEXTAREA' || document.activeElement?.id === 'find') && document.activeElement, at = typing && typing.selectionStart;
       state = body;
-      render();
-      const box = typing && document.getElementById(typing.id);
-      if (box) box.focus(), box.setSelectionRange(at, at);
+      renderKeepingFocus();
     } catch (e) { failed(e); }
   }
   if (FROZEN) (state = FROZEN), render();
