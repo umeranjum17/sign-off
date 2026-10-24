@@ -1356,6 +1356,19 @@ test('a guided report acts from one place: the parts carry no buttons or receipt
     assert.deepEqual(saved().map(({ part, verdict, text }) => [part, verdict, text]).at(-1), ['steps', undefined, 'Pin it to 2.4.']);
     // Activity lists both, newest first, each naming its part.
     await until(async () => (await evaluate(`[...document.querySelectorAll('.gd-act .ra-e')].filter((e) => e.querySelector('.ra-chip')?.textContent === 'Two steps').map((e) => e.querySelector('.ra-eh b').textContent).join('|')`)) === 'You commented|You agreed');
+    // Nothing sits under the bar at 390, and at 1280 and 1440 with Activity open as a column: it sits under the scroll, never over it; and no track label in Activity is cut.
+    const clear = `(() => { const sc = document.querySelector('.gd-scroll').getBoundingClientRect(), bar = document.querySelector('.ra-bar').getBoundingClientRect(), fit = [...document.querySelectorAll('.gd-act .ui-trail b')].filter((b) => b.getClientRects().length).map((b) => { const r = document.createRange(); r.selectNodeContents(b); return r.getBoundingClientRect().width <= b.getBoundingClientRect().width + 0.5; });
+      document.querySelector('.gd-scroll').scrollTop = 1e6; return [bar.top >= sc.bottom - 0.5, fit.length > 0 && fit.every(Boolean)].join(); })()`;
+    assert.equal(await evaluate(`(() => { document.querySelector('.ra-actb').click(); return true; })()`), true);
+    assert.equal(await evaluate(clear), 'true,true', '390');
+    for (const width of [1280, 1440]) {
+      const desk = await browse(join(dir, `b${width}`), width, 800);
+      try {
+        await desk.evaluate(`location.href = ${JSON.stringify(`${url}#reports/${report.key}`)}`);
+        await until(() => desk.evaluate(`!!document.querySelector('.gd-act .ui-trail b')?.getClientRects().length`));
+        assert.equal(await desk.evaluate(clear), 'true,true', String(width));
+      } finally { desk.close(); }
+    }
   } finally { close(); }
   proc.kill();
 });
