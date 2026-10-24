@@ -14,7 +14,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, appendPromoted, appendSendBack, appendTicket, readTickets, rollUp, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, appendDesignAnswer, answerLines, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, appendPromoted, appendSendBack, appendTicket, readTickets, rollUp, appendTicketComment, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, appendDesignAnswer, answerLines, appendMark, readTrail, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -35,7 +35,7 @@ const AGENTS: Record<string, { bin: string; dir: string; home: string }> = {
 };
 const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
 commands[26]:
-  (none)=list, raise, post, answers, wait, poll, deeper, owner, open, status, stop, serve, export, init, report, signin, dismiss, restore, promote, ticket, project, refile, doctor, notify, validate, help
+  (none)=list, raise, post, answers, wait, poll, deeper, owner, open, status, stop, serve, export, init, report, signin, dismiss, restore, promote, feedback, ticket, project, refile, doctor, notify, validate, help
 board: the nearest .sign-off/ board (the walk's bounds and SIGN_OFF_HOME: README, "Test runs never touch your board"), else ~/.sign-off/decisions.json; a board file given always wins
 flags: --full and --json on list, answers and wait, --events on wait, --json on status, ticket and project, --filer on post, raise and wait, --ticket and --priority on post and raise, --help on every command, -v/--version
 examples:
@@ -302,6 +302,7 @@ Brings back a card that dismiss hid. See \`sign-off-axi dismiss --help\`.
   ticket: `usage: sign-off-axi ticket [board.json] [--json]
        sign-off-axi ticket [board.json] --id <id> [--json]
        sign-off-axi ticket [board.json] --id <id> [--title <text>] [--progress <0-100>] [--parent <id>] [--priority P0-P3] [--project <name>] [--hold yes|no] [--asked yes|no]
+       sign-off-axi ticket [board.json] --id <id> --comment '<json>'
 A ticket is one piece of work: its id, title, percent done and, optionally, the ticket it sits under, its priority, its project (whose icon its rows show),
 whether it is on hold and whether you asked for it (the board's Tickets tab then lists it under Your asks). It stands alone: nothing else needs it.
 An epic is a ticket with tickets under it, and those may have sub-tasks under them (--parent): a ticket with tickets under it is as far along as they are on average.
@@ -311,6 +312,9 @@ A card names its ticket with --ticket <id> on raise and post (every --type and -
 its screen then shows a Ticket row, the title and progress, that opens the ticket, which lists its asks, designs, proof and reports.
 A card whose ticket is not on the board shows no row; a ticket with no cards shows an empty page.
 It writes one line to <board>.tickets.jsonl beside the board (${FORMAT}).
+--comment hands over a comment the person made on the ticket elsewhere (the fleet dashboard), in that dashboard's thread record: {"id","at","text","error","picked","replies":[{"at","text","by"}]},
+times in whole seconds since 1970. Send it again as it moves: the board shows it Sent, Delivered (no error), Read (picked) and Replied (the last reply) on the ticket, and a reply in Today.
+It writes one line to <board>.ticket-comments.jsonl; the latest line for a comment id wins.
 examples:
   sign-off-axi ticket --id T-9 --title "The new settings page" --priority P1 --project Settings --asked yes
   sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40 --parent T-9 --priority P0
@@ -340,6 +344,17 @@ It writes one line to <board>.promoted.jsonl beside the board; no post, feed or 
 examples:
   sign-off-axi promote fleet-dashboard-prototype
   sign-off-axi promote fleet-dashboard-prototype --undo
+`,
+  feedback: `usage: sign-off-axi feedback <key> [board.json] (--read | --reply <text> [--link <url>] | --acted --link <url>) [--filer <id>]
+Tells the person how far their answer, notes, new round or comment on a card got: the board shows each one as Sent, Delivered, Read and then Replied, on the card, in its Activity,
+as a badge in the lists, and a reply in Today. A wait hands an answer over and marks it (read when it is the filer's own wait, else delivered), and an on_answer hook that ran marks it delivered.
+--read: the agent has read what was sent. --reply: what the agent did or says back, 500 characters or fewer, with --link to the new version or the pull request.
+--acted --link: the agent acted, and the link shows what changed (the merge hook uses this). Posting the card again marks what was sent before it as acted on too.
+A mark covers everything sent on that card up to now. --filer refuses a card that filer did not post. It writes one line to <board>.trail.jsonl beside the board.
+examples:
+  sign-off-axi feedback fleet-dashboard-full --read
+  sign-off-axi feedback fleet-dashboard-full --reply "The colours now come from the new tokens." --link https://github.com/owner/repo/pull/245
+  sign-off-axi feedback fleet-dashboard-full --acted --link https://github.com/owner/repo/pull/245
 `,
   report: `usage: sign-off-axi report init <folder> [--plan] [--page]
 Writes the guided template to fill: <folder>/report.json, or <folder>/plan.json with --plan. A file already there is kept.
@@ -821,6 +836,8 @@ async function wait(args: string[]) {
           return left;
         }, 'another wait is still taking answers');
       }
+      // What a wait hands over is on its way: the filer's own wait is the agent taking it (read), any other wait passes it on (delivered).
+      for (const d of found) appendMark(file, { op: filer !== undefined ? 'read' : 'delivered', key: d.key });
       if (found.length && values.events) return eventLines(file, found, given, asked.filter((r) => fresh.some((d) => d.key === r.key)));
       if (found.length) {
         return printAnswers(file, found, waiting, values,
@@ -1115,12 +1132,35 @@ function promote(args: string[]) {
   });
 }
 
+/** feedback <key> [board.json] (--read | --reply <text> [--link <url>] | --acted --link <url>): the agent tells the person how far what they sent on a card got. */
+function feedback(args: string[]) {
+  const at = args.findIndex((a, i) => !a.startsWith('-') && !existsSync(a) && !a.endsWith('.json') && !['--reply', '--link', '--filer'].includes(args[i - 1])), key = args[at];
+  if (at < 0 || !isKey(key)) throw fail('feedback needs the key of a card', 'VALIDATION_ERROR', 'sign-off-axi feedback <key> [board.json] --read');
+  const { file, values, on } = parse('feedback', args.filter((_, i) => i !== at), { read: { type: 'boolean' }, reply: { type: 'string' }, acted: { type: 'boolean' }, link: { type: 'string' }, filer: { type: 'string' } });
+  const ops = [values.read && 'read', values.reply !== undefined && 'reply', values.acted && 'acted'].filter(Boolean);
+  if (ops.length !== 1) throw fail('feedback takes one of --read, --reply <text> or --acted --link <url>', 'VALIDATION_ERROR', `sign-off-axi feedback ${key}${on} --read`);
+  const text = typeof values.reply === 'string' ? values.reply.trim() : undefined, link = values.link;
+  if (text !== undefined && (!text || [...text].length > NOTE_MAX)) throw fail(`--reply must be text of ${NOTE_MAX} characters or fewer`, 'VALIDATION_ERROR', `sign-off-axi feedback ${key}${on} --reply "<what you did>"`);
+  if (link !== undefined && (values.read || !/^https?:\/\/[^\s]{1,500}$/.test(link))) throw fail(values.read ? '--link goes with --reply or --acted' : '--link must be an http(s) address, such as the pull request', 'VALIDATION_ERROR', `sign-off-axi feedback ${key}${on} --acted --link <url>`);
+  if (values.acted && !link) throw fail('--acted needs --link <url> to what changed', 'VALIDATION_ERROR', `sign-off-axi feedback ${key}${on} --acted --link <url>`);
+  ready(file, on);
+  const d = board(file).find((x) => x.key === key), filer = filerOf(values);
+  if (!d) throw fail(`no card with key ${key} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi list${on} --full\` to see the keys`);
+  if (filer !== undefined && d.filer !== filer) throw fail(`${key} was not posted by ${filer}`, 'VALIDATION_ERROR', 'Mark only the cards you posted');
+  const sent = readTrail(file, loadDecisions(file)).filter((t) => t.key === key && t.kind !== 'ticket');
+  if (!sent.length) throw fail(`nothing was sent on ${key} yet`, 'NOT_FOUND', `Run \`sign-off-axi answers${on} --key ${key}\` to see its answer`);
+  appendMark(file, { op: values.read ? 'read' : 'reply', key, ...(text && { text }), ...(link && { link }) });
+  const now = readTrail(file, loadDecisions(file)).filter((t) => t.key === key && t.kind !== 'ticket').at(-1)!;
+  return toon({ board: tilde(file), key, shows: now.reply ? 'Replied' : 'Read', covers: sent.length }, [values.read ? `Run \`sign-off-axi feedback ${key}${on} --reply "<what you did>"\` once you act on it` : `Run \`sign-off-axi wait${on}${filer ? ` --filer ${filer}` : ''}\` for the next answer`]);
+}
+
 /** ticket [board.json] [--id <id> [--title <text>] [--progress <0-100>] [--parent <id>] [--priority P0-P3] [--project <name>] [--hold yes|no] [--asked yes|no]]: lists the tickets,
  * shows one with the cards that name it, or writes one. A ticket stands alone in <board>.tickets.jsonl: cards name it with --ticket, and nothing else reads it.
  * What it prints carries the roll-up: a ticket with tickets under it is as far along as they are on average. */
 function ticket(args: string[]) {
   const { file, values, on } = parse('ticket', args, { id: { type: 'string' }, title: { type: 'string' }, progress: { type: 'string' }, parent: { type: 'string' }, priority: { type: 'string' },
-    project: { type: 'string' }, hold: { type: 'string' }, asked: { type: 'string' }, json: { type: 'boolean' } });
+    project: { type: 'string' }, hold: { type: 'string' }, asked: { type: 'string' }, comment: { type: 'string' }, json: { type: 'boolean' } });
+  if (values.comment !== undefined) return ticketComment(file, values, on);
   const { id, title, parent } = values, write = [title, values.progress, parent, values.priority, values.project, values.hold, values.asked].some((v) => v !== undefined);
   if (id === undefined && write) throw fail('--title, --progress, --parent, --priority, --project, --hold and --asked need --id <ticket id>', 'VALIDATION_ERROR', 'sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40');
   const cardsOf = (t: Ticket) => board(file).filter((d) => d.ticket === t.id && !d.dismissed).reverse().sort((x, y) => (Date.parse(y.filed ?? '') || 0) - (Date.parse(x.filed ?? '') || 0));
@@ -1155,6 +1195,24 @@ function ticket(args: string[]) {
     const same = had && JSON.stringify(row(had)) === JSON.stringify(row(next));
     if (!same) appendTicket(file, next);
     return toon({ board: tilde(file), ticket: row(next), status: same ? 'unchanged' : had ? 'updated' : 'created' }, [`Pass --ticket ${id} to raise or post, so the card shows this ticket`, `Run \`sign-off-axi ticket${on} --id ${id} --progress <0-100>\` as the work moves`]);
+  });
+}
+
+/** ticket --id <id> --comment '<json>': the fleet dashboard hands over a comment the person made on a ticket, in its own thread record, again each time it moves
+ * (picked up, answered), so the board shows how far it got and a reply lands in Today. */
+function ticketComment(file: string, values: Record<string, any>, on: string) {
+  const { id } = values, EXAMPLE = `sign-off-axi ticket${on} --id T-29 --comment '{"id":"3f9a1c2e7b6d4a10","at":1792820000,"text":"Is the export in this?","error":null,"picked":1792820300,"replies":[]}'`;
+  if (id === undefined || !isKey(id)) throw fail('--comment needs --id <ticket id>, 1-128 of A-Z a-z 0-9 . _ -', 'VALIDATION_ERROR', EXAMPLE);
+  if (['title', 'progress', 'parent', 'priority', 'project', 'hold', 'asked'].some((k) => values[k] !== undefined)) throw fail('--comment is written on its own, with no other ticket field', 'VALIDATION_ERROR', EXAMPLE);
+  let c;
+  try { c = JSON.parse(values.comment); } catch { throw fail('--comment must be one JSON object', 'VALIDATION_ERROR', EXAMPLE); }
+  const fault = ticketCommentFault(c);
+  if (fault) throw fail(`--comment: ${fault}`, 'VALIDATION_ERROR', EXAMPLE);
+  return locked(`${file}.lock`, () => {
+    if (!readTickets(file, warn).some((t) => t.id === id)) throw fail(`no ticket ${id} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi ticket${on} --id ${id} --title "<what the work is>"\` to add it`);
+    appendTicketComment(file, id, c);
+    const t = readTrail(file, loadDecisions(file)).find((x) => x.kind === 'ticket' && x.id === c.id)!;
+    return toon({ board: tilde(file), ticket: id, comment: c.id, shows: t.reply ? 'Replied' : t.read ? 'Read' : t.delivered ? 'Delivered' : 'Sent' }, ['Send the comment again with --comment as the lead picks it up and answers']);
   });
 }
 
@@ -2422,7 +2480,7 @@ const state = () => {
     reads: readReads(file),
     opened: readOpened(file),
     deeper: readDeeper(file),
-    delivery: deliveries(file),
+    ...((delivery) => ({ delivery, trail: readTrail(file, items, delivery) }))(deliveries(file)),
     rounds,
     messages: readMessages(file, warn),
     annotations: fed ? [] : ((sent) => readAnnotations(file, warn).map((a) => (sent.has(a.id) ? { ...a, sent: true } : a)))(sentIds(file)),
@@ -2625,10 +2683,11 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     clearTimeout(timer);
     return [200, state()];
   }
-  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/signin', '/api/leash', '/api/deeper', '/api/reads', '/api/engagement', '/api/engagement/seen'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
+  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/signin', '/api/leash', '/api/deeper', '/api/reads', '/api/trail', '/api/engagement', '/api/engagement/seen'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
   if (readOnly()) return [403, { error: 'This board is read-only' }];
-  // Dismiss only hides an item on this page and sends nothing to the feeding program, and Go deeper only asks for an explanation, so an answers-only board takes both.
-  if (!['/api/answers', '/api/dismiss', '/api/signin', '/api/reads', '/api/deeper', '/api/engagement', '/api/engagement/seen'].includes(req.url!) && answersOnly()) return [403, { error: 'This board takes answers only' }];
+  // Dismiss only hides an item on this page and sends nothing to the feeding program, and Go deeper only asks for an explanation, so an answers-only board takes both;
+  // a reply opened (/api/trail) is only the person's own mark.
+  if (!['/api/answers', '/api/dismiss', '/api/signin', '/api/reads', '/api/trail', '/api/deeper', '/api/engagement', '/api/engagement/seen'].includes(req.url!) && answersOnly()) return [403, { error: 'This board takes answers only' }];
   if (!req.headers['content-type']?.startsWith('application/json')) return [415, { error: 'Send JSON' }];
   let body = '';
   for await (const chunk of req) body += chunk;
@@ -2707,6 +2766,13 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     else askEngagement(file, input);
     return [200, state()];
   }
+  if (req.url === '/api/trail') {
+    // The person opened a card with a reply on it: the reply leaves Today.
+    const { key } = JSON.parse(body) ?? {};
+    if (!readTrail(file, loadDecisions(file)).some((t) => t.key === key && t.reply)) return [404, { error: 'No reply on this card' }];
+    appendMark(file, { op: 'seen', key });
+    return [200, state()];
+  }
   if (req.url === '/api/reads' && Array.isArray(JSON.parse(body)?.keys)) {
     // A whole report opened, or marked read or unread from Reports: keys and read, no part.
     const { keys, read } = JSON.parse(body), have = new Set(board(file).map((x) => x.key));
@@ -2775,7 +2841,7 @@ function answered(a?: Answer, d?: Decision) {
   const [cmd, ...rest] = onAnswer;
   const child = spawn(cmd, rest, { cwd: dirname(file), stdio: ['pipe', 'ignore', 'inherit'] });
   child.on('error', (e) => warn(`on_answer ${cmd} did not run: ${e.message}`));
-  child.on('exit', (code, signal) => (code || signal) && warn(`on_answer ${cmd} exited with ${code ?? signal}`));
+  child.on('exit', (code, signal) => (code || signal ? warn(`on_answer ${cmd} exited with ${code ?? signal}`) : appendMark(file, { op: 'delivered', key: a.key })));
   child.stdin.on('error', () => {});
   child.stdin.end(`${JSON.stringify({ event: 'answer', ...kindOf(file)(a.key), ...a, ...(d && { title: d.title }), ...(d?.filer && { filer: d.filer }) })}\n`);
 }
@@ -2932,7 +2998,7 @@ await runAxiCli({
   topLevelHelp: TOP_HELP,
   getCommandHelp: (cmd) => HELP[cmd],
   home: axi('list', list),
-  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), report: axi('report', report), owner: axi('owner', owner), deeper: axi('deeper', deeper), signin: axi('signin', signin), dismiss: axi('dismiss', dismiss(false)), restore: axi('restore', dismiss(true)), promote: axi('promote', promote), ticket: axi('ticket', ticket), project: axi('project', project), refile: axi('refile', refile), doctor: axi('doctor', doctor), notify: axi('notify', notify), validate, help: ([name, ...rest]) => {
+  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), report: axi('report', report), owner: axi('owner', owner), deeper: axi('deeper', deeper), signin: axi('signin', signin), dismiss: axi('dismiss', dismiss(false)), restore: axi('restore', dismiss(true)), promote: axi('promote', promote), feedback: axi('feedback', feedback), ticket: axi('ticket', ticket), project: axi('project', project), refile: axi('refile', refile), doctor: axi('doctor', doctor), notify: axi('notify', notify), validate, help: ([name, ...rest]) => {
     if (rest.length || (name && !HELP[name])) throw fail(`unknown command or argument: ${[name, ...rest].join(' ')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi --help` to see the commands');
     return name ? HELP[name] : TOP_HELP;
   } },

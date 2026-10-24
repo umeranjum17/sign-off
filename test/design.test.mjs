@@ -1233,6 +1233,13 @@ test('an ask on a guided report answers the tap on a phone: the Ask control is p
     assert.equal(replied.code, 0, replied.out);
     await until(async () => /^Agent replied \d\d:\d\d(New)?\|true\|false$/.test(await evaluate(head)));
     assert.match(await evaluate(`document.querySelector('${ans} .gask').textContent`), /The code now comes with the password/);
+    // The feedback trail: under the ask its track reads Sent, Read and Replied with their times (a wait handed it over, so Delivered is the same moment),
+    // and once the report is left the reply waits in Today, the report's row on Reports carrying its badge until the report is opened again.
+    const track = `[...document.querySelectorAll('${ans} .gask .ui-trail li')].map((l) => l.querySelector('b').textContent + (l.classList.contains('on') ? '+' : '')).join(' ')`;
+    await until(async () => (await evaluate(track)) === 'Sent+ Delivered+ Read+ Replied+');
+    assert.equal(await evaluate(`!!document.querySelector('${ans} .gask .ui-trail .tr-said')`), false, 'the reply is in the ask already, not twice');
+    await evaluate(`location.href = ${JSON.stringify(url)}`);
+    await until(async () => (await evaluate('[...document.querySelectorAll(".t-replies .ui-row .t")].map((t) => t.textContent).join()')) === report.title);
   } finally { close(); }
   proc.kill();
 });
@@ -1712,7 +1719,7 @@ test('Decide on a phone: an ask is a sheet over the list with its bar at the foo
   await evaluate('document.querySelector(".g-done .dl-face").click()');
   await until(async () => (await evaluate('location.hash + "|" + document.querySelector(".decide .ans-card b")?.textContent')) === '#decide/alpha|A');
   // There it shows the answer, when and that the agent has not read it, with Change answer as its one button and no ask's More.
-  assert.equal(await evaluate('[document.querySelector(".decide .ans-meta").textContent.split(" · ")[0], document.querySelector(".decide .ans-card > div > span").textContent, document.querySelector(".decide-bar .answer").textContent, !!document.querySelector(".sh-head .dl-more")].join("|")'), 'Answered|Agent has not read it yet|Change answer|false');
+  assert.equal(await evaluate('[document.querySelector(".decide .ans-meta").textContent.split(" · ")[0], document.querySelector(".decide .ui-trail").getAttribute("aria-label").replace(/\\d\\d:\\d\\d/, "hh:mm"), document.querySelector(".decide-bar .answer").textContent, !!document.querySelector(".sh-head .dl-more")].join("|")'), 'Answered|Sent: Sent hh:mm|Change answer|false');
   // Change answer brings the cards back with nothing picked and the answer given tagged; the button is off until another answer, then names the change.
   await evaluate('document.querySelector(".decide-bar .answer").click()');
   await until(async () => (await evaluate('document.querySelectorAll(".decide .pick-option").length')) === 4);
@@ -3657,6 +3664,9 @@ test('answer events: a filer takes only its own answers, once, the card shows it
   assert.ok(hooked().every((h) => h.event === 'answer' && h.contract === 1 && h.kind === 'ask' && h.schema === 1), JSON.stringify(hooked()));
   assert.deepEqual(hooked().filter((h) => h.key === 'a').map((h) => h.replaces?.answer ?? '').sort(), ['', 'yes']);
   assert.equal(statSync(join(dir, 'board.seen.jsonl')).mode & 0o777, 0o600);
+  // An on_answer hook that ran hands the answer over: the card no filer took shows it delivered, not read.
+  for (let i = 0; i < 50 && !(await read()).trail.filter((t) => t.key === 'none').every((t) => t.delivered); i++) await new Promise((ok) => setTimeout(ok, 100));
+  assert.deepEqual((await read()).trail.filter((t) => t.key === 'none').map((t) => [!!t.delivered, !!t.read]), [[true, false]]);
   // Undone back to no answer after the agent took it, the next answer still names the one the agent had; an undone answer no agent took is not named.
   for (const [key, answer] of [['a', ''], ['a', 'yes'], ['none', ''], ['none', 'no']]) assert.equal((await post(url, 'api/answers', { key, answer })).status, 200);
   const again = JSON.parse(as({}, 'answers', file, '--json').out);
@@ -3930,13 +3940,94 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     assert.equal((await post(url, 'api/rounds', { key: 'ask-linked', note: 'Show it on a phone first.' })).status, 200);
     await evaluate('window.old = true, location.reload()');
     await until(() => evaluate('!window.old'));
-    const steps = ['Your answer: No “Not this week.”', 'Changed to: Yes “After the Friday stand-up.”', 'Agent picked it up', 'You asked for a new round “Show it on a phone first.”'];
+    const steps = ['Your answer: No “Not this week.”', 'Changed to: Yes “After the Friday stand-up.”', 'Delivered to Agent', 'Agent read it', 'You asked for a new round “Show it on a phone first.”'];
     await until(async () => (await evaluate(thread('#decide/ask-linked'))) === ['Posted by Agent', ...steps].join(' | '));
     // The ticket shows its cards' steps newest first, each naming its card.
     const tkThread = `(async () => { location.hash = '#ticket/T-29'; await new Promise((ok) => setTimeout(ok, 50));
       return [...document.querySelectorAll('.tk-act li')].map((li) => [li.querySelector('b').textContent, li.querySelector('.th-n')?.textContent, li.querySelector('.tk-on').textContent].filter(Boolean).join(' ')).join(' | '); })()`;
     assert.equal(await evaluate(tkThread), [...steps].reverse().map((x) => `${x} Ship the settings page on Friday?`).join(' | '));
     assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
+  } finally { close(); }
+  proc.kill();
+});
+
+test('the feedback trail: what the person sends on a card goes Sent, Delivered, Read, then Replied with the agent\'s words and link, on the card, in its Activity, as a badge in the lists and in Today until opened', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'trail'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  // Two agents: the release agent's answers are only ever handed over, the settings agent takes its own.
+  for (const [key, title, filer] of [['digest', 'Keep the weekly digest?', 'release-agent'], ['export', 'Turn on the CSV export?', 'release-agent'], ['beta', 'Open the beta to every team?', 'settings-agent']]) {
+    assert.equal(run('raise', file, '--key', key, '--title', title, '--filer', filer).code, 0);
+  }
+  // The agent's command refuses what it cannot mark, and writes nothing.
+  for (const [args, why] of [[['digest'], /one of --read, --reply/], [['digest', '--read', '--acted'], /one of --read, --reply/], [['digest', '--read'], /nothing was sent on digest yet/],
+    [['digest', '--acted'], /--acted needs --link/], [['digest', '--reply', 'Done.', '--link', 'not a link'], /http\(s\) address/], [['nope', '--read'], /no card with key nope/]]) {
+    const r = run('feedback', ...args.slice(0, 1), file, ...args.slice(1));
+    assert.notEqual(r.code, 0, args.join(' ')); assert.match(r.out, why, args.join(' '));
+  }
+  assert.equal(existsSync(join(dir, 'board.trail.jsonl')), false);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const trail = async (key) => (await (await fetch(`${url}api/decisions`)).json()).trail.filter((x) => x.key === key).at(-1);
+  // Sent: answered, and nothing has taken it.
+  assert.equal((await post(url, 'api/answers', { key: 'digest', answer: 'yes' })).status, 200);
+  // Delivered: a wait that is not the agent's own (a hook's poller) hands the answer over.
+  const handing = spawn(process.execPath, [cli, 'wait', file, '--key', 'export', '--timeout', '20'], { env, stdio: 'ignore' });
+  await new Promise((ok) => setTimeout(ok, 700));
+  assert.equal((await post(url, 'api/answers', { key: 'export', answer: 'yes', note: 'Only the admin role.' })).status, 200);
+  assert.equal(await new Promise((ok) => handing.once('exit', ok)), 0);
+  // Read, then Replied: the agent's own wait takes the beta answer, and it replies with what it did and the pull request; another filer may not mark it.
+  assert.equal((await post(url, 'api/answers', { key: 'beta', answer: 'no', note: 'Wait for the import fix.' })).status, 200);
+  assert.equal(run('wait', file, '--filer', 'settings-agent', '--timeout', '5').code, 0);
+  const steps = async (key) => { const t = await trail(key); return [t.at, t.delivered, t.read, t.reply?.at].map(Boolean).join(); };
+  assert.deepEqual([await steps('digest'), await steps('export'), await steps('beta')], ['true,false,false,false', 'true,true,false,false', 'true,true,true,false']);
+  assert.match(run('feedback', 'beta', file, '--reply', 'Kept it to ten teams.', '--filer', 'other-agent').out, /was not posted by other-agent/);
+  assert.match(run('feedback', 'beta', file, '--reply', 'Kept it to ten teams until the import fix lands.', '--link', 'https://github.com/example/settings/pull/245', '--filer', 'settings-agent').out, /shows: Replied/);
+  assert.deepEqual((await trail('beta')).reply, { at: (await trail('beta')).reply.at, text: 'Kept it to ten teams until the import fix lands.', link: 'https://github.com/example/settings/pull/245' });
+  // A comment the person made on a ticket in the fleet dashboard arrives in the dashboard's own thread record, again as it moves: delivered, then picked up and answered.
+  assert.equal(run('ticket', file, '--id', 'T-1', '--title', 'Ship the CSV export').code, 0);
+  const sec = Math.floor(Date.now() / 1000), said = { id: '3f9a1c2e7b6d4a10', at: sec - 600, text: 'Is the export in this release?', to: 'release-agent', error: null, picked: null, replies: [] };
+  for (const [args, why] of [[['--id', 'T-2', '--comment', JSON.stringify(said)], /no ticket T-2/], [['--id', 'T-1', '--comment', '{'], /one JSON object/], [['--id', 'T-1', '--comment', JSON.stringify({ ...said, at: 'now' })], /at must be/],
+    [['--id', 'T-1', '--title', 'x', '--comment', JSON.stringify(said)], /on its own/]]) { const r = run('ticket', file, ...args); assert.notEqual(r.code, 0, args.join(' ')); assert.match(r.out, why, args.join(' ')); }
+  assert.match(run('ticket', file, '--id', 'T-1', '--comment', JSON.stringify(said)).out, /shows: Delivered/);
+  assert.match(run('ticket', file, '--id', 'T-1', '--comment', JSON.stringify({ ...said, picked: sec - 500, replies: [{ at: sec - 60, text: 'Yes, it ships Friday with the release.', by: 'release-agent' }] })).out, /shows: Replied/);
+  assert.deepEqual(Object.fromEntries(Object.entries((await (await fetch(`${url}api/decisions`)).json()).trail.find((t) => t.kind === 'ticket')).map(([k, v]) => [k, typeof v === 'string' && /^\d{4}-/.test(v) ? 'time' : v])),
+    { id: '3f9a1c2e7b6d4a10', key: 'T-1', kind: 'ticket', said: 'Is the export in this release?', at: 'time', delivered: 'time', read: 'time', reply: { at: (await (await fetch(`${url}api/decisions`)).json()).trail.find((t) => t.kind === 'ticket').reply.at, text: 'Yes, it ships Friday with the release.' } });
+  const { evaluate, close } = await browse(join(dir, 'b'), 390, 844, true);
+  try {
+    // Today: the reply above Waiting on you, its words as the row's second line.
+    await evaluate(`location.href = ${JSON.stringify(url)}`);
+    await until(() => evaluate('!!document.querySelector(".t-replies")'));
+    assert.equal(await evaluate('[...document.querySelectorAll(".t-replies .ui-row")].map((r) => r.querySelector(".t").textContent + " / " + r.querySelector(".meta").textContent.replace(/^\\d\\d:\\d\\d · /, "")).join(" | ")'),
+      'Open the beta to every team? / Kept it to ten teams until the import fix lands. | Ship the CSV export / Yes, it ships Friday with the release.');
+    // Decide: each answered row carries its badge, four marks and the step's word; the reply not opened yet is ink.
+    await evaluate('location.hash = "#waiting"');
+    await until(async () => (await evaluate('document.querySelectorAll(".ui-tb").length')) === 3);
+    assert.deepEqual(JSON.parse(await evaluate('JSON.stringify([...document.querySelectorAll(".ui-row")].filter((r) => r.querySelector(".ui-tb")).map((r) => [r.querySelector(".t").textContent, r.querySelector(".ui-tb").textContent, r.querySelectorAll(".ui-tb i.on").length, r.querySelector(".ui-tb").classList.contains("new")]).sort())')),
+      [['Keep the weekly digest?', 'Sent', 1, false], ['Open the beta to every team?', 'Replied', 4, true], ['Turn on the CSV export?', 'Delivered', 2, false]]);
+    // The card: the track's reached steps with their times, then the reply and its link; the Activity names each step.
+    const card = async (key) => { await evaluate(`location.hash = "#decide/${key}"`); await until(() => evaluate(`!!document.querySelector(".decide .ui-trail") && location.hash === "#decide/${key}"`));
+      return JSON.parse(await evaluate('JSON.stringify({ track: [...document.querySelectorAll(".decide .ui-trail li")].map((l) => l.querySelector("b").textContent + (l.classList.contains("on") && /^\\d\\d:\\d\\d$/.test(l.querySelector("time").textContent) ? "+" : "")).join(" "), said: document.querySelector(".decide .tr-said")?.innerText.replace(/\\s+/g, " ") ?? "", link: document.querySelector(".decide .tr-said a")?.getAttribute("href") ?? "", act: [...document.querySelectorAll(".decide .th-list li .th-t")].map((b) => b.textContent).filter((t) => !/^(Posted|Your answer)/.test(t)) })')); };
+    assert.deepEqual(await card('digest'), { track: 'Sent+ Delivered Read Replied', said: '', link: '', act: [] });
+    assert.deepEqual(await card('export'), { track: 'Sent+ Delivered+ Read Replied', said: '', link: '', act: ['Delivered to release-agent'] });
+    assert.deepEqual(await card('beta'), { track: 'Sent+ Delivered+ Read+ Replied+', said: 'Kept it to ten teams until the import fix lands. Pull request 245', link: 'https://github.com/example/settings/pull/245',
+      act: ['Delivered to settings-agent', 'settings-agent read it', 'settings-agent replied · Pull request 245'] });
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
+    // Opened, the reply is seen: it leaves Today, and its badge is no longer ink. The ticket shows the comment with its track and the lead's reply, and opening it is seeing that reply.
+    await until(async () => !!(await trail('beta')).seen);
+    await evaluate('location.hash = "#ticket/T-1"');
+    await until(() => evaluate('!!document.querySelector(".tk-said .ui-trail")'));
+    assert.equal(await evaluate('[document.querySelector(".tk-said > p").textContent, [...document.querySelectorAll(".tk-said .ui-trail li.on b")].map((b) => b.textContent).join(" "), document.querySelector(".tk-said .tr-said").innerText.trim()].join(" | ")'),
+      'Is the export in this release? | Sent Delivered Read Replied | Yes, it ships Friday with the release.');
+    await evaluate(`location.href = ${JSON.stringify(url)}`);
+    await until(() => evaluate('!!document.querySelector(".t-up") && !document.querySelector(".t-replies")'));
+    // Posting the card again after the answer is acting on it: the track reads Acted, with Posted a new version.
+    assert.equal(run('feedback', 'export', file, '--read').code, 0);
+    const items = JSON.parse(readFileSync(file, 'utf8'));
+    items.items.find((d) => d.key === 'export').filed = new Date(Date.now() + 2000).toISOString().replace(/\.\d+Z$/, 'Z');
+    writeFileSync(file, JSON.stringify(items));
+    await evaluate('location.reload()');
+    assert.deepEqual(await card('export'), { track: 'Sent+ Delivered+ Read+ Acted+', said: 'Posted a new version', link: '', act: ['Delivered to release-agent', 'release-agent read it'] });
   } finally { close(); }
   proc.kill();
 });

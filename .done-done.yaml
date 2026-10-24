@@ -37,6 +37,10 @@ journeys:
   # Open full screen on a design pick and an interactive page, at 390 and 1280 in light and dark: the prototype's own tab and link, the other size, Reference, Close.
   fullscreen:
     command: 'npm run build > /dev/null && for w in 390 1280; do for t in light dark; do FULL_WIDTH=$w node .agents/skills/done-done-verify-sign-off/fullscreen-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t || exit 1; done; done'
+  # The feedback trail at 390 and 1280, light and dark: answers sent, handed over by a wait, taken by the agent's own wait and replied to with feedback --reply --link, then
+  # Today's Replies, Decide's badges, the Designs row, each step's card with its track, reply and Activity, a design's change notes replied to, and Today once the reply is opened.
+  trail:
+    command: 'npm run build > /dev/null && for w in 390 1280; do for t in light dark; do node .agents/skills/done-done-verify-sign-off/trail-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t $w || exit 1; done; done'
   # A design's new round and its preview at 390 and 1280, light and dark: a screen note typed and sent, the screen drawn again, then the empty note box with the earlier note folded under it, the screen filling the preview, and a design whose page is gone showing its preview picture.
   design-round:
     command: 'npm run build > /dev/null && for w in 390 1280; do for t in light dark; do ROUND_WIDTH=$w node .agents/skills/done-done-verify-sign-off/design-round-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t || exit 1; done; done'

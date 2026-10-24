@@ -363,6 +363,19 @@ again until the filer takes it too.
 {"key":"keep-the-weekly-digest","answer":"yes","at":"2026-10-12T15:40:03Z","seen":"2026-10-12T15:40:04Z"}
 ```
 
+**The feedback trail**, next to the questions (`decisions.trail.jsonl`, mode 600, oldest first): how far each thing the person sent on a card got.
+What they sent is in its own file (an answer with its note, a design's notes or a plan's send-back, a new round, a comment); this file holds the steps after it, one line each:
+`delivered` (a wait that is not the filer's own handed the answer over, or the `on_answer` hook ran and exited 0), `read` (the filer's own `wait --filer`, or `feedback <key> --read`),
+`reply` (`feedback <key> --reply <text>` or `--acted`, with an optional `link`) and `seen` (the person opened the card with the reply). A line names the card's `key` and covers
+everything sent on it up to its time (to the second). A send taken by the filer's `wait` (a `decisions.seen.jsonl` line) is read, a comment `poll` handed over is delivered, and
+a card posted again after a send counts as acted on. The board's state (`/api/decisions`) carries `trail`: one entry per send with `at`, and `delivered`, `read`, `reply`
+(`at`, `text`, `link` or `acted`) and `seen` once reached. The page marks a reply seen with `POST /api/trail` (`{"key"}`), which an answers-only board takes too.
+
+```json
+{"op":"read","key":"keep-the-weekly-digest","at":"2026-10-12T15:41:00Z"}
+{"op":"reply","key":"keep-the-weekly-digest","text":"It keeps going out; the next one is Monday.","link":"https://github.com/owner/repo/pull/12","at":"2026-10-12T16:02:10Z"}
+```
+
 **Comments and queued prompts**, written by sign-off next to the questions
 (`decisions.messages.jsonl`, mode 600, oldest first). A comment names its item's `key`; a prompt has none.
 `poll` hands each one over once and marks it with a `delivered` line:

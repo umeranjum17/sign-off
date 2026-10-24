@@ -99,11 +99,11 @@ try {
   assert.deepEqual([seen.ticket.kicker, seen.ticket.done, seen.ticket.lists[0].head, seen.ticket.lists[0].rows.length], ['In progress', 'Progress 60%', 'Linked', 6], JSON.stringify(seen.ticket));
   // The answered ask's thread in the order it happened, with its notes; the proof's verdict and comment; the ticket's page has its cards' steps together.
   const steps = (state) => seen[state].thread.map((t) => t.replace(/ (Today|\d+ \w+), \d\d:\d\d$/, ''));
-  assert.deepEqual(steps('ask-thread'), ['Posted by verify', 'Your answer: No “Not this week.”', 'Changed to: Yes “After the Friday stand-up.”', 'verify picked it up', 'You asked for a new round “Show it on a phone first.”'], JSON.stringify(seen['ask-thread'].thread));
+  assert.deepEqual(steps('ask-thread'), ['Posted by verify', 'Your answer: No “Not this week.”', 'Changed to: Yes “After the Friday stand-up.”', 'Delivered to verify', 'verify read it', 'You asked for a new round “Show it on a phone first.”'], JSON.stringify(seen['ask-thread'].thread));
   assert.deepEqual(steps('proof-thread'), ['Posted by verify', 'Your answer: Pass “The theme switch works.”', 'Your comment “Add the dark theme next.”'], JSON.stringify(seen['proof-thread'].thread));
   // The ticket's Activity: its cards' steps newest first, each naming its card.
   assert.deepEqual(seen['ticket-activity'].thread, ['Turn on search in the settings page? Your answer: No', 'Turn on search in the settings page? Changed to: Yes',
-    'Turn on search in the settings page? verify picked it up', 'Turn on search in the settings page? You asked for a new round', 'Update 3 · The settings page on a phone Your answer: Pass', 'Update 3 · The settings page on a phone Your comment'].reverse(), JSON.stringify(seen['ticket-activity'].thread));
+    'Turn on search in the settings page? Delivered to verify', 'Turn on search in the settings page? verify read it', 'Turn on search in the settings page? You asked for a new round', 'Update 3 · The settings page on a phone Your answer: Pass', 'Update 3 · The settings page on a phone Your comment'].reverse(), JSON.stringify(seen['ticket-activity'].thread));
   for (const state of ['ask-unlinked', 'ask-linked', 'design-unlinked']) assert.equal(seen[state].thread.length, 0, `${state} has only its posting: no thread`);
   assert.deepEqual([seen['ticket-parent'].done, ...seen['ticket-parent'].lists.map((l) => `${l.head} ${l.rows.length}`)], ['Progress 80%', 'Tickets in this epic · 1 of 2 done 2', 'Linked 0'], JSON.stringify(seen['ticket-parent']));
   // A tap on the ask's Ticket row opens the ticket; Close (a phone) or the browser's Back (a desk) returns to the ask.

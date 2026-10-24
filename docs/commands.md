@@ -28,6 +28,7 @@ Guided plan 3 / report 4 add **Simplify this**. Inspect version-1 action/target 
 | `dismiss` | hide a card, like its Dismiss button; `--filer <id>` hides every card of a finished task |
 | `restore` | bring a dismissed card back |
 | `promote` | Main only: put a design review it passed in Decide (`--undo` takes it back to Designs); a lead's design never counts as an ask without it |
+| `feedback` | tell the person how far what they sent on a card got: `--read`, or `--reply <text>` / `--acted` with `--link` to the new version; the board shows Sent, Delivered, Read, Replied |
 | `ticket` | list tickets, show one with its cards, or write one (`--id`, `--title`, `--progress`, `--parent`, `--priority`, `--project`, `--hold`, `--asked`) |
 | `project` | list projects, or set or clear a project's own icon (`--name`, `--icon`, `--clear-icon`) |
 | `doctor` | check the setup; each failure names its fix |
