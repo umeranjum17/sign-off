@@ -29,6 +29,17 @@ export function copiesOf(bytes: Buffer, ext: string): { light?: Copy; thumb?: Co
   return { ...(light && { light }), ...(thumb && { thumb }), ...(tile && { tile }) };
 }
 
+/** How much of two pictures differs: the share of pixels where a channel moves by more than 24 of 255, 1 when their sizes differ,
+ * and undefined when either cannot be read. A design's frames that differ by a few stray pixels show no change a person can see. */
+export function differs(a: Buffer, aExt: string, b: Buffer, bExt: string): number | undefined {
+  let x: Picture, y: Picture;
+  try { x = decode(a, aExt.toLowerCase()); y = decode(b, bExt.toLowerCase()); } catch { return undefined; }
+  if (x.width !== y.width || x.height !== y.height) return 1;
+  let moved = 0;
+  for (let i = 0; i < x.data.length; i += 4) if (Math.abs(x.data[i] - y.data[i]) > 24 || Math.abs(x.data[i + 1] - y.data[i + 1]) > 24 || Math.abs(x.data[i + 2] - y.data[i + 2]) > 24) moved++;
+  return moved / (x.width * x.height);
+}
+
 function shrink(pic: Picture, size: Size, against: number): Copy | undefined {
   if (size !== 'light' && pic.height > pic.width * 2) {
     const height = pic.width * 2;

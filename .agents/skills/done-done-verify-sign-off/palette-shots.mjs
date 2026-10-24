@@ -121,9 +121,9 @@ try {
         for (const t of [tap].flat().filter(Boolean)) { await ev(`document.querySelector(${JSON.stringify(t)})?.click()`); await wait(400); }
         await shot(join(dest, `${name}.png`));
         const drawn = await ev(DRAWN), off = drawn.filter(([c, where]) => c === 'accent-color auto' || !(allowed(channels(c), theme) || onLogo(channels(c), where)));
-        // The place lit in the sidebar (a desk: Designs on Designs) or the dock (a phone: Today on Designs), whose colours are among those read.
+        // The place lit in the sidebar (a desk: Designs on Designs) or the dock (a phone: Decide on Designs, its second list), whose colours are among those read.
         const lit = await ev('[...document.querySelectorAll(".side [aria-current], .tabs [aria-current]")].filter((a) => a.getClientRects().length).map((a) => a.getAttribute("href")).join()');
-        if (state.startsWith('design') && lit !== (metrics.mobile ? '#' : '#designs')) problems.push(`${name}: lit ${lit}`);
+        if (state.startsWith('design') && lit !== (metrics.mobile ? '#waiting' : '#designs')) problems.push(`${name}: lit ${lit}`);
         await go(`file://${proto}#${protoHash}&theme=${theme}`);
         await shot(join(dest, 'vs-proto', `${name}.proto.png`));
         const protoDrawn = await ev(DRAWN), protoOff = protoDrawn.filter(([c]) => !allowed(channels(c), theme));

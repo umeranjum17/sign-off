@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Fills a new board with the approved feel prototype's Today, posted through the real CLI, then serves it: a sign-in with 12 minutes left,
-# three asks with a recommended answer, a six-screen design to review, five updates (three passed, one with no run, one failed run) and two new reports.
+# three asks with a recommended answer, a three-screen design asked as one question, five updates (three passed, one with no run, one failed run) and two new reports.
 # Nothing is answered, so Today reads 5 waiting and 0 cleared, as the mock does (data/signoff-feel-v2/shots/today.*).
 # Usage, from the repo root after `npm run build`: feel-board.sh <empty folder>. Prints the board URL; stop it with node dist/cli.js stop <folder>/board.json.
 # It sets HOME and XDG_* to that folder, so your own board (~/.sign-off) is never read or written.
@@ -18,11 +18,15 @@ cp "$media/phone-decide.webp" "$dir/code.webp"; cp "$media/phone-report.webp" "$
 so post "$board" --ask-ref message-feel --key export --filer design-agent --title "What should the export button say?" --why "In the last test, people looked for “Download” twice as often as “Export”." \
   --option export=Export --option download=Download --option copy="Save a copy" --outcome export="The label stays as it is." --outcome download="The word people looked for." \
   --outcome copy="Longer, but says what happens." --recommend download --recommend-reason "The word people looked for." --default export
-cp "$f/design.v1/design/welcome.png" "$dir/design/welcome.png"; cp "$f/design.v1/design/preview.png" "$dir/design/preview.png"
+cp "$f/design.v2/design/"*.png "$dir/design/"
+# A design asked as one question (design 2): each screen's frames side by side, the changed area outlined and named, Yes approving the built frame.
 node -e '
-const screens = ["Welcome", "Create account", "Enter the code", "Add a photo", "Chats", "First message"].map((title, i) => ({ id: `s${i + 1}`, title, views: { phone_light: "design/welcome.png" } }));
-process.stdout.write(JSON.stringify({ contract: 1, kind: "design", schema: 1, key: "onboarding", title: "Chat app onboarding", filer: "design-agent", group: "Chat app", filed: new Date().toISOString().replace(/\.\d+Z$/, "Z"),
-  about: "Six screens, from the first open to the first message. Approve each one, or say what should change.", status: "in_review", preview: "design/preview.png", journeys: [{ id: "onboarding", title: "Onboarding", screens }] }));
+const frame = (role, view, y, caption) => ({ role, views: { phone_light: `design/${view}.png` }, area: { x: 0.05, y, w: 0.9, h: 0.1 }, caption });
+const screens = [["Welcome", 0.72], ["Create account", 0.6], ["First message", 0.5]].map(([title, y], i) => ({ id: `s${i + 1}`, title,
+  frames: [frame("today", "today", y, "Today the last line runs under the tab bar"), frame("built", "built", y, "One line of actions, clear of the tab bar")] }));
+process.stdout.write(JSON.stringify({ contract: 1, kind: "design", schema: 2, key: "onboarding", title: "Approve the new chat app onboarding?", filer: "design-agent", group: "Chat app", filed: new Date().toISOString().replace(/\.\d+Z$/, "Z"),
+  about: "Three screens, from the first open to the first message: each keeps its last line clear of the tab bar.", status: "in_review", preview: "design/preview.png", accepts: "built",
+  journeys: [{ id: "onboarding", title: "Onboarding", screens }] }));
 ' > "$dir/design.json"
 so post "$board" --kind design --from "$dir/design.json"
 # The prototype's screen design is the one card per product that Main passed and promoted, so it waits in Decide.

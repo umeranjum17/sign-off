@@ -629,6 +629,29 @@
   .dz-said { margin: 0.5rem 0 0; padding: 1rem 1.25rem; border-radius: 1rem; background: var(--tk-inset); color: var(--tk-ink); font-size: 0.9375rem; line-height: 1.5rem; }
   .dz-said cite { display: block; margin-bottom: 0.25rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: 1rem; font-style: normal; }
   .dz-said .q::before { content: "“"; } .dz-said .q::after { content: "”"; }
+  /* A design asked as one question: the screen's name (and which of how many) with Previous and Next, then its frames side by side, each picture's top, label and caption on shared lines,
+     the frame Yes approves ringed in ink with a check by its label, and the changed area outlined in ink on a light edge with the rest of the picture dimmed. Three frames on a phone scroll sideways, the third showing its edge. */
+  .dzf-wrap { margin: 1rem 0 0; }
+  .dzf-head { display: flex; align-items: center; gap: 0.5rem; min-height: 2.75rem; }
+  .dzf-t { flex: 1; min-width: 0; margin: 0; color: var(--tk-ink); font-size: var(--tk-fs-row); line-height: 1.25rem; font-weight: 500; }
+  .dzf-t .n { margin-right: 0.5rem; color: var(--tk-text-tertiary); font-weight: 400; }
+  .dzf-head .ui-rb { flex: none; width: 2.75rem; height: 2.75rem; }
+  .dzf-head .ui-rb:disabled { opacity: 0.4; }
+  .dzf-row { display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - 0.75rem) / 2); grid-template-rows: auto auto auto; gap: 0.5rem 0.75rem; margin: 0.375rem -0.125rem 0; padding: 0.125rem; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .dzf-row::-webkit-scrollbar { display: none; }
+  .dzf-row[data-n="1"] { grid-auto-columns: min(100%, 20rem); justify-content: center; }
+  .dzf-row[data-n="3"] { grid-auto-columns: 42%; }
+  .dzf { display: grid; grid-row: span 3; grid-template-rows: subgrid; min-width: 0; margin: 0; scroll-snap-align: start; }
+  .dzf-l { display: flex; align-items: center; gap: 0.25rem; min-width: 0; margin: 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); line-height: 1.25rem; font-weight: 500; white-space: nowrap; }
+  .dzf[data-yes] .dzf-l { color: var(--tk-ink); font-weight: 600; }
+  .dzf-l .glyph { flex: none; width: 1rem; height: 1rem; stroke-width: 2.5; }
+  .dzf-box { min-width: 0; min-height: 0; }
+  .dzf-pic { position: relative; display: block; overflow: hidden; aspect-ratio: var(--aw) / var(--ah); border-radius: 0.75rem; background: var(--tk-inset); box-shadow: 0 0 0 1px var(--tk-line); }
+  .dzf[data-yes] .dzf-pic { box-shadow: 0 0 0 2px var(--tk-ink); }
+  .dzf-pic img { display: block; width: 100%; height: 100%; }
+  .dzf-area { position: absolute; border: 2px solid var(--tk-ink); border-radius: 0.375rem; box-shadow: 0 0 0 2px var(--tk-raised), 0 0 0 100vmax var(--tk-scrim); pointer-events: none; }
+  .dzf figcaption { color: var(--tk-text); font-size: var(--tk-fs-meta); line-height: 1.125rem; }
+  .dz-yes { margin: 0.75rem 0 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); line-height: 1.125rem; }
   :is(.design-review, .dz-ib) label { display: grid; gap: 0.5rem; margin: 0.75rem 0 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: 1.25rem; }
   :is(.design-review, .dz-ib) .ui-dl + label { margin-top: 0.5rem; }
   :is(.design-review, .dz-ib) :is(select, textarea) { width: 100%; max-width: none; min-height: 3rem; margin: 0; padding: 0.75rem 1rem; border: 0; border-radius: 1rem; background: var(--tk-inset); color: var(--tk-ink); font: inherit; font-size: 0.9375rem; line-height: 1.5rem; }
@@ -839,6 +862,16 @@
     .dz-fill > .design-preview-window { width: 100%; height: 100%; max-height: none; margin: 0; overflow: hidden; }
     .dz-fill > .design-preview-window > img { width: 100%; height: 100%; object-fit: contain; object-position: top center; }
     .dz-fill > .design-preview-window.device-fit { width: min(100cqw, 100cqh * var(--vw) / var(--vh)); height: auto; }
+    /* A design asked as one question fills the open card with its frames: each picture as large as its column and the card's height allow. */
+    .dz-fill > .dzf-wrap { display: grid; grid-template-rows: auto minmax(0, 1fr); width: 100%; height: 100%; margin: 0; }
+    .dz-fill .dzf-row { grid-auto-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; overflow: hidden; }
+    .dz-fill .dzf-box { display: grid; place-items: start; container-type: size; }
+    .dz-fill .dzf-pic { width: min(100cqw, 100cqh * var(--aw) / var(--ah)); }
+    .dz-fill .dzf-head { min-height: 2rem; }
+    /* With a question open, the cards across the top keep their words and leave their pictures to the frames. */
+    .dz-grid:has(.dzf-wrap) .dz-shot { display: none; }
+    .dz-info > .dz-yes { flex: none; margin: 0; padding: 0.75rem 1.5rem 0; border-top: 1px solid var(--tk-line); }
+    .dz-info > .dz-yes + .foot { padding-top: 0.75rem; border-top: 0; }
     .dz-info { display: flex; grid-column: span 4; flex-direction: column; min-height: 0; overflow: hidden; }
     .dz-ib { flex: 1; min-height: 0; padding: 1.25rem 1.5rem 1rem; overflow: auto; scrollbar-width: none; }
     .dz-ib::-webkit-scrollbar { display: none; }
@@ -2708,7 +2741,9 @@
 
   /** A mock or view is served from inside its own folder, so the files beside it load by their relative names. */
   const mockUrl = (key, value, path) => `${state.mockBase}${key}~${value}/${encodeURIComponent(path.split('?')[0].split('/').pop())}`;
-  const designFrame = (d) => Object.values(d.journeys?.[0]?.screens?.[0]?.views ?? {}).find(p => /\.(png|jpe?g|webp|svg)$/i.test(p)) || d.preview;
+  /** A screen's views: its own (design 1), or on design 2 those of the frame Yes approves. */
+  const viewsOf = (d, screen) => screen?.views ?? screen?.frames?.find((f) => f.role === d.accepts)?.views ?? {};
+  const designFrame = (d) => Object.values(viewsOf(d, d.journeys?.[0]?.screens?.[0])).find(p => /\.(png|jpe?g|webp|svg)$/i.test(p)) || d.preview;
   const designUrl = (d, path) => `${state.mockBase.replace('/mock/', '/design/')}${d.key}/${encodeURIComponent(path)}`;
   /** A diagram shows inline at card width; an interactive page runs in a sandboxed frame. A tap or the link opens either full size. */
   function rung(d) {
@@ -3761,23 +3796,26 @@
     if (viewer && e.source === viewer.querySelector('iframe')?.contentWindow && e.data?.['sign-off'] === 'viewer-nav') viewer.dispatchEvent(new KeyboardEvent('keydown', { key: e.data.key }));
   });
   /** A design's review. On a phone (in the reader) one column: its project and day, the whole title, what it shows, the screen, Review full screen, where it stands and what you said,
-   *  then the note with Approve in ink beside Change. On a desk two cards: the open design (its picture filling the card) and Where it stands, the note in it and its buttons pinned at its foot. */
+   *  then the note with Approve in ink beside Change. On a desk two cards: the open design (its picture filling the card) and Where it stands, the note in it and its buttons pinned at its foot.
+   *  A design asked as one plain question (design 2, which names the frame Yes approves) shows each screen's frames side by side instead, the changed area outlined on each and named
+   *  under it, and is answered once: Yes with an optional note, or Change with what to change. */
   function designReview(d, h1, desk = false) {
+    const asked = !!d.accepts;
     // Notes given on an earlier round of the design are history (the card's Activity shows them): the note box and each screen's state start from this round's.
     const now = () => state.decisions.find((x) => x.key === d.key) ?? d;
     const roundNotes = () => (now().earlier_answer ? [] : state.answers[d.key]?.notes ?? []);
     const saved = state.answers[d.key], screens = (d.journeys ?? []).flatMap((journey) => journey.screens.map((screen) => ({ journey, screen }))), savedNote = roundNotes()[0];
     const screenKey = (target) => target && `${target.journey.id}/${target.screen.id}`, screenFor = (key) => screens.find((target) => screenKey(target) === key);
-    const note = el('textarea', { maxlength: '500', placeholder: 'What should change? (optional for approval)' });
+    const note = el('textarea', { maxlength: '500', placeholder: asked ? 'A note: optional with Yes, needed for Change' : 'What should change? (optional for approval)' });
     const pick = el('select', { 'aria-label': 'Pick a direction' }, el('option', { value: '' }, 'Choose a direction'));
     for (const option of d.options ?? []) pick.append(el('option', { value: option.value }, option.label));
     pick.value = saved?.pick ?? '';
-    const screenSelect = screens.length > 1 ? el('select', { 'aria-label': 'Screen for note' }, ...screens.map((target) => el('option', { value: screenKey(target) }, `${target.journey.title} — ${target.screen.title}`))) : '';
-    if (designSession?.key !== d.key) designSession = { key: d.key, open: false, selected: '', drafts: new Map() };
+    const screenSelect = screens.length > 1 && !asked ? el('select', { 'aria-label': 'Screen for note' }, ...screens.map((target) => el('option', { value: screenKey(target) }, `${target.journey.title} — ${target.screen.title}`))) : '';
+    if (designSession?.key !== d.key) designSession = { key: d.key, open: false, selected: '', drafts: new Map(), at: 0 };
     const session = designSession;
     const selectedKey = session.selected || (savedNote?.journey && savedNote?.screen ? `${savedNote.journey}/${savedNote.screen}` : screenKey(screens[0]));
     if (screenSelect) screenSelect.value = screenFor(selectedKey) ? selectedKey : screenKey(screens[0]);
-    const target = () => screenSelect ? screenFor(screenSelect.value) : screens[0];
+    const target = () => asked ? screens[session.at] ?? screens[0] : screenSelect ? screenFor(screenSelect.value) : screens[0];
     const currentNote = () => roundNotes().find((n) => n.journey === target()?.journey.id && n.screen === target()?.screen.id);
     const screenLine = () => (currentNote() ? (currentNote().verdict === 'approve' ? 'Screen approved' : 'Changes requested') : 'Not reviewed yet');
     note.value = session.drafts.get(screenKey(target())) ?? currentNote()?.note ?? '';
@@ -3800,9 +3838,31 @@
       if (path !== d.preview) img.onerror = () => img.replaceWith(fallback());
       return boxed(img);
     };
-    let preview = previewPath() ? previewElement(previewView(), 'design-preview-window') : '';
     const fullHref = (path) => src(designUrl(d, d.missing?.includes(path) ? d.preview : path));
-    const fullPreview = previewPath() ? el('a', { class: 'design-preview-full', href: fullHref(previewPath()), target: '_blank', rel: 'noopener noreferrer' }, 'Open full preview') : '';
+    // Design 2: the screen's frames in role order, labelled Before and After when they are today and the new look, else by role; each picture opens full size.
+    const ROLE = { today: 'Today', proposed: 'New (proposed)', built: 'New (built)', target: 'Target design' };
+    const yesLine = asked ? el('p', { class: 'dz-yes', 'aria-live': 'polite' }) : '';
+    const frameView = () => {
+      const i = screens.indexOf(target()), frames = target()?.screen.frames ?? [], names = frames.length === 2 && frames[0].role === 'today' ? ['Before', 'After'] : frames.map((f) => ROLE[f.role]);
+      const figure = (f, n) => {
+        const keys = Object.keys(f.views), view = keys.find((k) => k.endsWith(isDark() ? '_dark' : '_light')) ?? keys[0], path = f.views[view];
+        const img = el('img', { src: src(designUrl(d, path)), alt: `${names[n]}: ${target().screen.title}` });
+        const pic = el('a', { class: 'dzf-pic', href: fullHref(path), target: '_blank', rel: 'noopener noreferrer', style: view.startsWith('phone') ? '--aw: 390; --ah: 844' : '--aw: 1280; --ah: 800' }, img,
+          f.area ? el('span', { class: 'dzf-area', 'aria-hidden': 'true', style: `left: ${f.area.x * 100}%; top: ${f.area.y * 100}%; width: ${f.area.w * 100}%; height: ${f.area.h * 100}%` }) : '');
+        img.onload = () => { pic.style.setProperty('--aw', img.naturalWidth); pic.style.setProperty('--ah', img.naturalHeight); };
+        return el('figure', { class: 'dzf', ...(f.role === d.accepts && { 'data-yes': '' }) }, el('p', { class: 'dzf-l' }, f.role === d.accepts ? glyph('check') : '', names[n]),
+          el('div', { class: 'dzf-box' }, pic), f.caption ? el('figcaption', { dir: 'auto' }, f.caption) : '');
+      };
+      const step = (delta) => () => { session.at = i + delta; const next = frameView(); preview.replaceWith(next); preview = next; };
+      const move = (label, delta, icon) => Object.assign(el('button', { class: 'ui-rb', 'aria-label': label }, glyph(icon)), { disabled: !screens[i + delta], onclick: step(delta) });
+      const head = el('div', { class: 'dzf-head' }, el('p', { class: 'dzf-t', dir: 'auto' }, screens.length > 1 ? el('span', { class: 'n' }, `${i + 1} of ${screens.length}`) : '', target().screen.title),
+        ...(screens.length > 1 ? [move('Previous screen', -1, 'left'), move('Next screen', 1, 'right')] : []));
+      const yes = names[frames.findIndex((f) => f.role === d.accepts)];
+      yesLine.textContent = `Yes approves “${yes}”, the frame with the check${screens.length > 1 ? `, on all ${screens.length} screens` : ''}.`;
+      return el('section', { class: 'dzf-wrap', 'aria-label': 'What changed' }, head, el('div', { class: 'dzf-row', 'data-n': frames.length }, ...frames.map(figure)));
+    };
+    let preview = asked ? frameView() : previewPath() ? previewElement(previewView(), 'design-preview-window') : '';
+    const fullPreview = previewPath() && !asked ? el('a', { class: 'design-preview-full', href: fullHref(previewPath()), target: '_blank', rel: 'noopener noreferrer' }, 'Open full preview') : '';
     if (screenSelect) screenSelect.onchange = () => {
       const path = previewPath();
       if (preview) { const next = previewElement(previewView(), 'design-preview-window'); preview.replaceWith(next); preview = next; }
@@ -3817,7 +3877,7 @@
       const screen = session.open;
       if (!screen && d.options?.length && !pick.value) { err.textContent = 'Choose a direction before sending your review.'; pick.focus(); return Promise.resolve(); }
       // A screen save (the viewer) sends no design-wide verdict; a note carries the verdict of the button that saved it, on a screen or at design level.
-      const selected = target(), text = note.value.trim(), writes = (selected && screen) || text, live = new Set(screens.map(screenKey));
+      const selected = asked ? null : target(), text = note.value.trim(), writes = (selected && screen) || text, live = new Set(screens.map(screenKey));
       const notes = roundNotes().filter((n) => (!n.journey || live.has(`${n.journey}/${n.screen}`)) && (n.journey !== selected?.journey.id || n.screen !== selected?.screen.id));
       if (writes) notes.push({ ...(selected && { journey: selected.journey.id, screen: selected.screen.id }), verdict, note: text });
       saving = true; approve.disabled = change.disabled = true;
@@ -3825,12 +3885,12 @@
         notes, ...(pick.value && { pick: pick.value }) }) }, () => { session.drafts.set(screenKey(selected), ''); note.value = ''; }))
         .finally(() => { saving = false; approve.disabled = change.disabled = state.readonly; if (session.open) { screenStatus.textContent = screenLine(); stamp(true); } });
     };
-    const approve = el('button', { class: 'open-link dz-ink' }, 'Approve'), change = el('button', { class: 'dz-change' }, 'Change');
+    const approve = el('button', { class: 'open-link dz-ink' }, asked ? 'Yes' : 'Approve'), change = el('button', { class: 'dz-change' }, 'Change');
     approve.disabled = change.disabled = state.readonly;
     approve.onclick = () => save('approve').catch((e) => { err.textContent = `Couldn't save: ${e.message}`; });
-    change.onclick = () => { if (!note.value.trim()) { err.textContent = 'Add a note describing what should change.'; note.focus(); return; } save('change').catch((e) => { err.textContent = `Couldn't save: ${e.message}`; }); };
+    change.onclick = () => { if (!note.value.trim()) { err.textContent = asked ? 'Say in the note what should change, then tap Change.' : 'Add a note describing what should change.'; note.focus(); return; } save('change').catch((e) => { err.textContent = `Couldn't save: ${e.message}`; }); };
     const foot = el('div', { class: 'foot' }, approve, change, sendLine(`design:${d.key}`));
-    const controls = el('div', { class: 'dz-ctl' }, d.options?.length ? el('label', {}, 'Pick a direction', pick) : '', el('label', {}, screens.length ? 'Screen note' : 'Design note', note));
+    const controls = el('div', { class: 'dz-ctl' }, d.options?.length ? el('label', {}, 'Pick a direction', pick) : '', el('label', {}, asked ? 'Your note' : screens.length ? 'Screen note' : 'Design note', note));
     const open = el('button', { class: 'open-link dz-full', 'aria-haspopup': 'dialog', 'data-design': d.key }, 'Review full screen');
     // Where it stands: its state, the direction picked and when it was answered, then what was said on this round.
     const mark = (path) => { const m = el('span', { class: 'dz-mk', 'aria-hidden': 'true' }); m.innerHTML = `<svg viewBox="0 0 20 20">${path}</svg>`; return m; };
@@ -3838,6 +3898,7 @@
     const option = d.options?.find((o) => o.value === saved?.pick)?.label ?? saved?.pick;
     const stands = el('div', { class: 'ui-props dz-props' }, prop('<circle cx="10" cy="10" r="6.5"/><path d="M10 3.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/>', 'State', status),
       option ? prop('<path d="M5 10.4l3.2 3.1L15 6.6"/>', 'Your pick', el('span', { dir: 'auto' }, option)) : '',
+      d.reviewed ? prop('<path d="M5 10.4l3.2 3.1L15 6.6"/>', 'Main reviewed', el('span', { dir: 'auto' }, d.reviewed)) : '',
       saved?.at && saved.answer !== 'screens' ? prop('<circle cx="10" cy="10" r="7"/><path d="M10 6.2V10l2.6 1.8"/>', 'Answered', el('span', {}, day(saved.at))) : '');
     const said = roundNotes().filter((n) => n.note);
     const screenName = (n) => screens.length > 1 && screenFor(`${n.journey}/${n.screen}`)?.screen.title;
@@ -3849,14 +3910,22 @@
     const about = d.about ? el('p', { class: 'about dz-about', dir: 'auto' }, d.about) : '', original = d.link ? el('a', { class: 'dz-link', href: d.link, target: '_blank', rel: 'noopener noreferrer' }, 'Open original design') : '';
     const screenPick = screenSelect ? el('label', {}, 'Screen for note', screenSelect) : '';
     let root;
-    if (desk) {
+    if (asked && desk) {
+      h1.id = 'dz-open-title';
+      root = [el('section', { class: 'dz-open', 'aria-labelledby': h1.id }, el('div', { class: 'dz-oh' }, lab), h1, el('div', { class: 'dz-fill' }, preview)),
+        el('section', { class: 'dz-info', 'aria-label': 'Your answer' }, el('div', { class: 'dz-ib' }, el('h2', {}, 'Your answer'), controls, err, about ? el('p', { class: 'ui-dl' }, 'What changed') : '', about,
+          el('p', { class: 'ui-dl' }, 'Where it stands'), stands, ticketRow(d), ...told,
+          thread(d), original, xBtn(d, 'Discard')), yesLine, foot)];
+    } else if (asked) root = el('div', { class: 'design-review' }, lab, h1, about, preview, el('p', { class: 'ui-dl' }, 'Your answer'), controls, foot, yesLine, err,
+      el('p', { class: 'ui-dl' }, 'Where it stands'), stands, ticketRow(d), ...told, thread(d), original, xBtn(d, 'Discard'));
+    else if (desk) {
       h1.id = 'dz-open-title';
       root = [el('section', { class: 'dz-open', 'aria-labelledby': h1.id }, el('div', { class: 'dz-oh' }, lab, fullPreview, screens.length ? open : ''), h1, el('div', { class: 'dz-fill' }, preview || '')),
         el('section', { class: 'dz-info', 'aria-label': 'Where it stands' }, el('div', { class: 'dz-ib' }, el('h2', {}, 'Where it stands'), stands, ticketRow(d), ...told,
           el('p', { class: 'ui-dl' }, 'Your review'), screenPick, controls, err, about ? el('p', { class: 'ui-dl' }, 'What it shows') : '', about, thread(d), original, xBtn(d, 'Discard')), foot)];
     } else root = el('div', { class: 'design-review' }, lab, h1, about, preview, fullPreview, screens.length ? open : '', el('p', { class: 'ui-dl' }, 'Where it stands'), stands, ticketRow(d), ...told,
       el('p', { class: 'ui-dl' }, 'Your review'), screenPick, controls, foot, err, thread(d), original, xBtn(d, 'Discard'));
-    if (!screens.length) return root;
+    if (!screens.length || asked) return root;
     const heading = el('h2', { id: 'design-screen-title', dir: 'auto' }), count = el('p', { class: 'meta', 'aria-live': 'polite' });
     const stage = el('div', { class: 'design-stage' }), screenStatus = el('p', { class: 'meta', role: 'status' });
     const previous = el('button', { 'aria-label': 'Previous screen' }, '‹ Previous'), next = el('button', { 'aria-label': 'Next screen' }, 'Next ›');

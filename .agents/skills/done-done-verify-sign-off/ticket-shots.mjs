@@ -57,7 +57,7 @@ try {
   writeFileSync(join(dir, 'proof.json'), JSON.stringify({ contract: 1, kind: 'evidence', schema: 1, key: 'settings-proof', title: 'The settings page on a phone', filer: 'verify', about: 'Umer opens settings and changes the theme in one tap.', media: ['shot.webp'] }));
   so('post', board, '--kind', 'evidence', '--from', join(dir, 'proof.json'), '--ticket', 'T-29');
   const design = JSON.parse(readFileSync(join(dir, 'design-message.json'), 'utf8'));
-  writeFileSync(join(dir, 'design-settings.json'), JSON.stringify({ ...design, key: 'settings-screens', title: 'Settings page screens', about: 'Review the settings screens on a phone and a desk.', group: 'Settings', filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') }));
+  writeFileSync(join(dir, 'design-settings.json'), JSON.stringify({ ...design, key: 'settings-screens', title: 'Approve the settings page screens?', about: 'Review the settings screens on a phone and a desk.', group: 'Settings', filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') }));
   so('post', board, '--kind', 'design', '--from', join(dir, 'design-settings.json'), '--ticket', 'T-29');
   const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z'), report = JSON.parse(readFileSync(join(repo, 'fixtures/contract/report.v4/valid-minimal.json'), 'utf8'));
   writeFileSync(join(dir, 'report-settings.json'), JSON.stringify({ ...report, key: 'settings-saves', title: 'How the settings page saves', about: 'Each change saves at once, so nothing is lost when Umer leaves the page.', filed: now, filer: 'verify', ticket: 'T-29' }));
