@@ -732,6 +732,29 @@
     .pf-ref { margin-left: 0; }
     .pf-name { display: inline-flex; } .pf-size .glyph { display: none; } .pf-size button { padding: 0 0.75rem; }
   }
+  /* A gallery of design output: options as a swipeable strip on a phone and a row on a desk, each a card with its phone and desktop frame side by side and a caption under each; a tap opens it full size. */
+  .gl-strip { display: flex; gap: 0.75rem; margin: 0.25rem -0.25rem 1rem; padding: 0.25rem 0.25rem 0.5rem; list-style: none; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding: 0 0.25rem; }
+  .gl-opt { display: grid; flex: 0 0 min(92%, 26rem); align-content: start; gap: 0.625rem; min-width: 0; padding: 0.75rem; border: 1px solid var(--hair2); border-radius: 1rem; background: var(--tile); scroll-snap-align: start; }
+  @media (min-width: 43.75rem) { .gl-opt { flex: 1 1 21rem; min-width: 21rem; max-width: 30rem; } }
+  .gl-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+  .gl-name { min-width: 0; overflow: hidden; font-size: 1rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+  .gl-n { flex: none; color: var(--muted); font-size: 0.8125rem; }
+  .gl-pair { display: grid; grid-template-columns: 5fr 7fr; gap: 0.625rem; align-items: start; }
+  .gl-pair.one { grid-template-columns: 1fr; } .gl-pair.one .gl-f:has(.phone) { max-width: 55%; }
+  .gl-f { min-width: 0; margin: 0; }
+  .gl-frame { position: relative; display: block; width: 100%; min-height: 0; aspect-ratio: var(--ar); padding: 0; overflow: hidden; border: 1px solid var(--hair2); border-radius: 0.625rem; background: #fff; cursor: zoom-in; }
+  .gl-frame img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+  .gl-frame iframe { position: absolute; top: 0; left: 0; width: var(--vw); height: var(--vh); border: 0; background: #fff; transform: scale(var(--s, 0.2)); transform-origin: 0 0; pointer-events: none; }
+  .gl-f figcaption { display: grid; gap: 0.125rem; margin-top: 0.375rem; font-size: 0.875rem; line-height: 1.25; }
+  .gl-cap { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; color: var(--text); }
+  .gl-f small { color: var(--muted); font-size: 0.8125rem; }
+  .gl-nav { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; border-radius: 999px; background: var(--sunk); color: var(--text); }
+  .gl-nav:disabled { opacity: 0.4; }
+  .gl-count { flex: none; min-width: 3.5rem; text-align: center; color: var(--muted); font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+  .gl-full .pf-tools { justify-content: flex-start; }
+  .gl-full .pf-size { margin-left: auto; }
+  .gl-full-cap { display: grid; gap: 0.125rem; margin: 0; padding: 0.625rem max(1rem, env(safe-area-inset-right)) max(0.75rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); background: var(--card); border-top: 0.5px solid var(--hairline); font-size: 1.0625rem; }
+  .gl-full-cap small { color: var(--muted); font-size: 0.9375rem; }
   /* The asks dismissed from Waiting on you: one muted row that opens to a list, each with Restore. */
   .gone-asks { margin-top: 0.5rem; } .gone-asks summary { color: var(--muted); }
   .gone-asks .rows { padding: 0; } .gone-asks li { justify-content: space-between; gap: 0.75rem; min-height: 2.75rem; }
@@ -4398,6 +4421,67 @@
       paint();
       return fig;
     }
+    // ---- galleries: a design output's options, each with its phone and desktop frame. glAll counts the frames in the order the server's ~gallery.<n> route does.
+    const glAll = sections.flatMap((s) => (s.gallery ?? []).flatMap((o) => o.frames));
+    const glUrl = (f, light) => src(`${mockUrl(d.key, `gallery.${glAll.indexOf(f)}`, f.src)}${light ? '?v=light' : ''}`);
+    const DEVICES = { phone: [390, 844, 'Phone'], desktop: [1280, 800, 'Desktop'] };
+    const stamp = (o) => `${o.model} · ${day(o.ran)} ${hhmm(o.ran)}`;
+    const frameView = (f, title, light) => /\.html?$/i.test(f.src) ? el('iframe', { src: glUrl(f), title, sandbox: 'allow-scripts', loading: 'lazy', tabindex: '-1' })
+      : el('img', { src: glUrl(f, light), alt: title, loading: 'lazy', decoding: 'async' });
+    /** The options as a swipeable strip (a row on a desk), each with its frames side by side and a caption under each; a tap opens the sequence full size at that option. */
+    function galleryFig(opts) {
+      const fit = new ResizeObserver((rows) => rows.forEach((r) => r.target.style.setProperty('--s', r.contentRect.width / r.target.dataset.vw)));
+      return E('ul', 'gl-strip', ...opts.map((o, i) => E('li', 'gl-opt', E('div', 'gl-head', E('b', 'gl-name', o.label), E('span', 'gl-n', `${i + 1} of ${opts.length}`)),
+        E('div', `gl-pair${o.frames.length === 1 ? ' one' : ''}`, ...[...o.frames].sort((a, b) => (b.device === 'phone') - (a.device === 'phone')).map((f) => {
+          const [w, h, name] = DEVICES[f.device], page = /\.html?$/i.test(f.src);
+          const b = el('button', { class: `gl-frame ${f.device}`, type: 'button', 'aria-label': `Open ${o.label}, ${name.toLowerCase()}, full size`, 'data-gl': `${d.key}~${glAll.indexOf(f)}`, style: `--ar:${w} / ${h};--vw:${w}px;--vh:${h}px` }, frameView(f, `${o.label}, ${name.toLowerCase()}: ${f.caption}`, true));
+          if (page) { b.dataset.vw = w; fit.observe(b); }
+          b.onclick = () => openGallery(opts, i, f.device, b.dataset.gl);
+          return E('figure', 'gl-f', b, E('figcaption', '', E('span', 'gl-cap', f.caption), E('small', '', stamp(o))));
+        })))));
+    }
+    /** The options full screen, one at a time: Previous and Next (or a swipe, or the arrow keys) move between options, Phone and Desktop switch the frame. `seq` is the order to walk, so another list can plug in. */
+    function openGallery(seq, start, device, from) {
+      let at = start, dev = device;
+      const frameOf = () => seq[at].frames.find((f) => f.device === dev) ?? seq[at].frames[0];
+      const title = el('h2', { id: 'gl-title', tabindex: '-1', autofocus: '', dir: 'auto' }), count = el('span', { class: 'gl-count', 'aria-live': 'polite' }), cap = el('p', { class: 'gl-full-cap' });
+      const close = el('button', { class: 'pf-close', 'aria-label': 'Close full size' }, glyph('x'), 'Close');
+      const prev = el('button', { class: 'gl-nav', 'aria-label': 'Previous option' }, glyph('left')), next = el('button', { class: 'gl-nav', 'aria-label': 'Next option' }, glyph('right'));
+      const sizes = Object.entries(DEVICES).map(([k, [w, , name]]) => el('button', { 'aria-pressed': 'false', 'aria-label': `${name}, ${w} wide`, 'data-size': k }, glyph(k), el('span', { class: 'pf-name', 'aria-hidden': 'true' }, name, el('span', { class: 'pf-w' }, String(w)))));
+      const port = el('div', { class: 'pf-port' }), stage = el('div', { class: 'pf-stage', 'data-mode': 'one' }, el('figure', { class: 'pf-frame pf-main framed' }, port));
+      const dialog = el('dialog', { class: 'proto-full gl-full', 'aria-labelledby': 'gl-title' },
+        el('header', { class: 'pf-bar' }, el('div', { class: 'pf-top' }, close, title), el('div', { class: 'pf-tools' }, prev, count, next, el('div', { class: 'seg pf-size', role: 'group', 'aria-label': 'Size' }, ...sizes))), stage, cap);
+      const lay = () => {
+        const [w, h] = DEVICES[frameOf().device], box = stage.getBoundingClientRect(), pad = 16, scale = Math.min(1, (box.width - pad * 2) / w, (box.height - pad * 2) / h);
+        Object.entries({ '--w': w * scale, '--h': h * scale, '--vw': w, '--vh': h, '--s': scale }).forEach(([k, v]) => port.style.setProperty(k, k === '--s' ? v : `${v}px`));
+      };
+      const paint = () => {
+        const o = seq[at], f = frameOf();
+        dev = f.device;
+        title.textContent = o.label; count.textContent = `${at + 1} of ${seq.length}`;
+        cap.replaceChildren(el('span', {}, f.caption), el('small', {}, stamp(o)));
+        const t = `${o.label}: ${f.caption}`;
+        port.replaceChildren(/\.html?$/i.test(f.src) ? frameView(f, t) : el('div', { class: 'pf-img' }, frameView(f, t)));
+        prev.disabled = at === 0; next.disabled = at === seq.length - 1;
+        sizes.forEach((b) => { b.setAttribute('aria-pressed', String(b.dataset.size === dev)); b.disabled = !o.frames.some((x) => x.device === b.dataset.size); });
+        lay();
+      };
+      const go = (n) => { if (n >= 0 && n < seq.length) { at = n; paint(); } };
+      prev.onclick = () => go(at - 1); next.onclick = () => go(at + 1);
+      sizes.forEach((b) => (b.onclick = () => { dev = b.dataset.size; paint(); }));
+      dialog.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft') go(at - 1); else if (e.key === 'ArrowRight') go(at + 1); });
+      let x0, y0;
+      stage.addEventListener('pointerdown', (e) => { x0 = e.clientX; y0 = e.clientY; });
+      stage.addEventListener('pointerup', (e) => { const dx = e.clientX - x0, dy = e.clientY - y0; if (x0 !== undefined && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) go(at + (dx < 0 ? 1 : -1)); x0 = undefined; });
+      const fit = new ResizeObserver(lay);
+      const shut = () => {
+        if (!dialog.isConnected) return;
+        fit.disconnect(); dialog.close(); dialog.remove();
+        document.querySelector(`[data-gl="${CSS.escape(from)}"]`)?.focus({ preventScroll: true });
+      };
+      close.onclick = shut; dialog.onclose = shut;
+      document.body.append(dialog); dialog.showModal(); fit.observe(stage); paint();
+    }
     function visual(v) {
       let body;
       if (v.type === 'bars') {
@@ -4476,7 +4560,7 @@
         b.onclick = () => { const open = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(open)); body.hidden = !open; };
         return E('li', '', b, ...srcLink(it), body);
       });
-      return card(s.id, s.stage, head(s.heading, s.body, undefined, s.id, 'heading', 'body'), ...(s.diagram ? [diagramFig(s.diagram)] : []), ...(cmp ? [cmpTable(s.items, cmp)] : items.length ? [E('ul', 'gd-rows', ...items)] : []), ...acts(s.id, s.details), rc(s.id));
+      return card(s.id, s.stage, head(s.heading, s.body, undefined, s.id, 'heading', 'body'), ...(s.diagram ? [diagramFig(s.diagram)] : []), ...(s.gallery ? [galleryFig(s.gallery)] : []), ...(cmp ? [cmpTable(s.items, cmp)] : items.length ? [E('ul', 'gd-rows', ...items)] : []), ...acts(s.id, s.details), rc(s.id));
     };
 
     const optBtns = new Map();

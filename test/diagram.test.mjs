@@ -115,3 +115,51 @@ test('a diagram is pinned like media: the board serves only the file that was po
   assert.equal(bad.status, 2);
   assert.match(bad.stdout, /visual\.diagram\[0\]\.sha256/);
 });
+
+test('a gallery on a report: post pins each frame, the board serves it (and a light copy of an image), and a frame with no caption or device, a missing file or a changed one is refused', async () => {
+  const dir = join(scratch, 'gallery'), board = join(dir, 'board.json'), env = { ...process.env, HOME: join(scratch, 'home') };
+  mkdirSync(join(dir, 'gallery'), { recursive: true });
+  const shot = readFileSync(new URL('../fixtures/evidence/product-board.png', import.meta.url));
+  writeFileSync(join(dir, 'gallery', 'a-phone.png'), shot);
+  writeFileSync(join(dir, 'gallery', 'a-desk.html'), '<!doctype html><title>desk</title><p>A desk page</p>');
+  const report = JSON.parse(readFileSync(join(fixtures, 'report.v5', 'valid-full.json')));
+  const frame = (device, src, caption = 'A frame') => ({ device, src, ...(caption && { caption }) });
+  const withGallery = (frames, extra = {}) => ({ ...report, sections: report.sections.map((s, n) => n ? s : { ...s, gallery: [{ label: 'Option A', model: 'Sonnet 5.5', ran: '2026-10-24T09:30:00Z', frames, ...extra }] }) });
+  const post = (m) => spawnSync('node', [cli, 'post', board, '--kind', 'report', '--from', '-'], { encoding: 'utf8', env, cwd: dir, input: JSON.stringify(m) });
+  for (const [m, error] of [
+    [withGallery([frame('phone', 'gallery/a-phone.png', null)]), /gallery\[0\]\.frames\[0\]\.caption must be text/],
+    [withGallery([{ src: 'gallery/a-phone.png', caption: 'A frame' }]), /frames\[0\]\.device is required/],
+    [withGallery([frame('tablet', 'gallery/a-phone.png')]), /frames\[0\]\.device \\"tablet\\" is not one of phone, desktop/],
+    [withGallery([frame('phone', 'gallery/a-phone.png'), frame('phone', 'gallery/a-phone.png')]), /frames\[1\]\.device repeats phone/],
+    [withGallery([frame('phone', 'gallery/gone.png')]), /gallery\/gone\.png\\" is not there/],
+    [withGallery([frame('phone', '../x.png')]), /frames\[0\]\.src/], [withGallery([frame('phone', 'gallery/a-phone.gif')]), /frames\[0\]\.src/],
+    [withGallery([frame('phone', 'gallery/a-phone.png')], { model: undefined }), /gallery\[0\]\.model must be text/], [withGallery([frame('phone', 'gallery/a-phone.png')], { ran: 'yesterday' }), /gallery\[0\]\.ran/],
+  ]) {
+    const refused = post(m);
+    assert.equal(refused.status, 2, refused.stdout);
+    assert.match(refused.stdout, error);
+  }
+  const posted = post(withGallery([frame('phone', 'gallery/a-phone.png'), frame('desktop', 'gallery/a-desk.html')]));
+  assert.equal(posted.status, 0, posted.stdout);
+  const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: tmpdir(), env });
+  try {
+    const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+    const whole = await fetch(new URL(`/mock/local/${report.key}~gallery.0/a-phone.png`, url));
+    assert.equal(whole.status, 200); assert.equal(whole.headers.get('content-type'), 'image/png');
+    assert.deepEqual(Buffer.from(await whole.arrayBuffer()), shot);
+    const light = await fetch(new URL(`/mock/local/${report.key}~gallery.0/a-phone.png?v=light`, url));
+    assert.equal(light.status, 200); assert.ok(Number(light.headers.get('content-length')) <= shot.length);
+    const page = await fetch(new URL(`/mock/local/${report.key}~gallery.1/a-desk.html`, url));
+    assert.equal(page.status, 200); assert.match(page.headers.get('content-security-policy'), /sandbox allow-scripts/);
+    assert.equal((await fetch(new URL(`/mock/local/${report.key}~gallery.2/a-phone.png`, url))).status, 404);
+    // The pin: a frame changed after posting is refused, not shown.
+    writeFileSync(join(dir, 'gallery', 'a-phone.png'), Buffer.concat([shot, Buffer.from([0])]));
+    assert.equal((await fetch(new URL(`/mock/local/${report.key}~gallery.0/a-phone.png`, url))).status, 404);
+  } finally { proc.kill(); }
+  // report init --gallery writes a gallery of FILL: lines that post refuses until they are filled.
+  const init = spawnSync('node', [cli, 'report', 'init', 'rep', '--purpose', 'research', '--gallery'], { encoding: 'utf8', env, cwd: dir });
+  assert.equal(init.status, 0, init.stdout);
+  const made = JSON.parse(readFileSync(join(dir, 'rep', 'report.json'), 'utf8'));
+  assert.deepEqual(made.sections[0].gallery[0].frames.map((f) => f.device), ['phone', 'desktop']);
+  assert.match(post(made).stdout, /FILL:/);
+});

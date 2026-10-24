@@ -16,9 +16,9 @@ import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner
 import { AxiError, runAxiCli } from 'axi-sdk-js';
 import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendSendBack, appendTicket, readTickets, rollUp, appendTicketComment, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
-import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
+import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, galleryFrames, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
-import { copiesOf, differs } from './images.js';
+import { copiesOf, differs, type Copy } from './images.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
 
 /** The version this copy runs, read from package.json once: a pre-release version says so, and a git checkout whose HEAD carries no tag
@@ -381,7 +381,7 @@ examples:
   sign-off-axi feedback fleet-dashboard-full --reply "The colours now come from the new tokens." --link https://github.com/owner/repo/pull/245
   sign-off-axi feedback fleet-dashboard-full --acted --link https://github.com/owner/repo/pull/245
 `,
-  report: `usage: sign-off-axi report init <folder> [--purpose research|plan|decision|audit|incident|status|other] [--plan] [--page]
+  report: `usage: sign-off-axi report init <folder> [--purpose research|plan|decision|audit|incident|status|other] [--plan] [--page] [--gallery]
 Writes the guided template to fill: <folder>/report.json, or <folder>/plan.json with --plan. A file already there is kept.
 Every report names what it is for in "purpose", its kind: research (research and discovery), plan (implementation plan), decision (decision and recommendation),
 audit, incident (incident and retro), status, or other. --purpose fills it in and writes that kind's parts to fill, one section each, which post then requires
@@ -392,6 +392,7 @@ The board draws it as one scroll: what this is (the answer and one picture), wha
 Numbers sit behind a Details tap; every part has a Go deeper button that asks you (see \`sign-off-axi deeper --help\`) and a read receipt that shows when the person read it.
 Replace every FILL: line, then post it: post --kind report --from <folder>/report.json, or post --kind plan --from <folder>/plan.json --filer <your id>.
 A report is for an explanation the user asked for, or a concept, design or trade-off they must understand. Proof that something works is evidence.
+--gallery adds a gallery to the first section: a design output's options, each with its model, run time and a phone and a desktop frame (an image or page, as a path from the board file's folder), which the board draws as a swipeable strip with each frame opening full size.
 --page writes the older scaffold page instead, for a report that needs a page of its own (report schema 2). It is:
 Writes a report page to fill: <folder>/index.html and its card picture <folder>/preview.svg. A file already there is kept.
 The page is one self-contained file, phone first, light and dark, in four parts, each one idea:
@@ -2161,8 +2162,9 @@ const kindSections = (purpose: string) => REPORT_PARTS[purpose].map(([part, name
 /** report init <folder>: the guided template (report.json, or plan.json with --plan) to fill in, or with --page the older scaffold page and its picture. */
 function report(args: string[]) {
   let parsed;
-  try { parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { plan: { type: 'boolean' }, page: { type: 'boolean' }, purpose: { type: 'string' } } }); } catch (e: any) { throw fail(e.message, 'VALIDATION_ERROR', 'Run `sign-off-axi report --help`'); }
-  const [sub, dir, extra] = parsed.positionals, { plan, page, purpose } = parsed.values;
+  try { parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { plan: { type: 'boolean' }, page: { type: 'boolean' }, purpose: { type: 'string' }, gallery: { type: 'boolean' } } }); } catch (e: any) { throw fail(e.message, 'VALIDATION_ERROR', 'Run `sign-off-axi report --help`'); }
+  const [sub, dir, extra] = parsed.positionals, { plan, page, purpose, gallery } = parsed.values;
+  if (gallery && (plan || page)) throw fail(`--gallery does not go with --${plan ? 'plan' : 'page'}: a gallery is a section of a guided report`, 'VALIDATION_ERROR', 'sign-off-axi report init <folder> --gallery');
   if (purpose !== undefined && (plan || page)) throw fail(`--purpose does not go with --${plan ? 'plan' : 'page'}: ${plan ? 'a plan is always an implementation plan' : 'a page report has no purpose field'}`, 'VALIDATION_ERROR', 'sign-off-axi report init <folder> --purpose research');
   if (purpose !== undefined && !REPORT_PURPOSES.includes(purpose)) throw fail(`--purpose ${purpose} must be one of ${REPORT_PURPOSES.join(', ')}`, 'VALIDATION_ERROR', 'sign-off-axi report init <folder> --purpose research');
   if (sub !== 'init' || dir === undefined || extra !== undefined || (plan && page)) {
@@ -2180,13 +2182,18 @@ function report(args: string[]) {
       const template = readFileSync(new URL(`../web/${kind}-template.json`, import.meta.url), 'utf8').replace('"FILL: UTC time"', JSON.stringify(filed));
       // With --purpose the template holds that kind's parts, one section each; with none, the general shape and purpose to fill.
       const kinded = purpose && { ...JSON.parse(template), purpose, ...(REPORT_PARTS[purpose].length && { sections: kindSections(purpose) }) };
-      writeFileSync(path, kinded ? `${JSON.stringify(kinded, null, 2)}\n` : template, { flag: 'wx' });
+      // With --gallery the first section also holds a gallery to fill: one option, its phone and desktop frame.
+      const doc = gallery ? { ...(kinded || JSON.parse(template)) } : kinded;
+      if (gallery) doc.sections = doc.sections.map((sec: any, n: number) => n ? sec : { ...sec, gallery: [{ label: 'FILL: Option A', model: 'FILL: the model that made it', ran: 'FILL: UTC time it ran', frames: [
+        { device: 'phone', src: 'FILL: path from the board file\'s folder, such as gallery/a-phone.png, 390 wide', caption: 'FILL: what the phone frame shows' }, { device: 'desktop', src: 'FILL: path from the board file\'s folder, such as gallery/a-desktop.png, 1280 wide', caption: 'FILL: what the desktop frame shows' }] }] });
+      writeFileSync(path, doc ? `${JSON.stringify(doc, null, 2)}\n` : template, { flag: 'wx' });
       created.push(shellPath(path));
     }
     return toon({ folder: shellPath(out), created: created.length ? created : 'nothing new (re-run is a no-op)', kept }, [
       ...(plan || purpose ? [] : [`Set "purpose" to what the report is for: ${REPORT_PURPOSES.join(', ')} (or run report init again with --purpose <kind> in a new folder)`]),
       `Replace every FILL: line in ${kind}.json with your own words: the answer first, one picture (bars, steps or tiles), what you understood, then the sections${plan ? ' and the decisions' : ''}`,
       `${plan ? 'A plan' : 'A design or architecture report'} needs one real diagram: a flow or architecture drawing as inline SVG, in light and dark, as "diagram" on the visual (see the skill)`,
+      ...(gallery ? ['Save each option\'s screenshots (or pages) under the board file\'s folder, a phone frame 390 wide and a desktop frame 1280 wide, and fill the gallery: its label, model, run time (UTC), and per frame its path from that folder and a caption'] : []),
       'Keep each line short: the board shows it in one scroll, the numbers behind a Details tap and the long answer behind Go deeper',
       `Run \`sign-off-axi post --kind ${kind} --from ${shellPath(path)}\` to put it on the board`,
     ]);
@@ -2699,6 +2706,12 @@ const mockTypes: Record<string, string> = { '.html': 'text/html', '.svg': 'image
 const attachTypes: Record<string, string> = { '.apk': 'application/vnd.android.package-archive', '.zip': 'application/zip', '.pdf': 'application/pdf', '.txt': 'text/plain; charset=utf-8', '.json': 'application/json', '.csv': 'text/csv', '.gz': 'application/gzip' };
 const assetTypes: Record<string, string> = { ...mediaTypes, ...mockTypes, '.css': 'text/css', '.js': 'text/javascript', '.mjs': 'text/javascript', '.gif': 'image/gif', '.woff2': 'font/woff2' };
 const MOCK_BYTES = 5_000_000;
+/** The lighter copy of a gallery frame's image, made once per file and kept for the board's life: the frame shows at most 1280 px wide, so a larger still is sent smaller. */
+const lights = new Map<string, Copy | undefined>();
+const galleryLight = (key: string, bytes: Buffer, ext: string) => {
+  if (!lights.has(key)) lights.set(key, copiesOf(bytes, ext).light);
+  return lights.get(key);
+};
 /** A sandboxed mock frame sends no cookie, so beyond loopback its URLs carry this pass in the path: made from the token, it opens mock folders only. */
 const mockPass = (token: string) => sha256(Buffer.from(`mock ${token}`));
 /** Every served file is its own sandboxed page, even opened full size: no fetch, no remote files, no frames, and no reach into the dashboard or its tab. */
@@ -2782,7 +2795,9 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     // A guided document's diagram views: ~diagram.<n>, n counting them in the order visual, then each section and its items.
     const dgs = d?.guided ? diagramViews(d) : [];
     const diagram = value?.startsWith('diagram.') ? dgs[Number(value.slice(8))] : undefined;
-    const mock = diagram ? diagram.src : value ? d?.mocks?.find((m) => m.value === value)?.path : value === '' && d?.view;
+    // A gallery frame is served the same way, pinned to the file posted; an image can be asked for as ?v=light, a copy that is no wider than the board shows it.
+    const frame = value?.startsWith('gallery.') && d?.guided ? galleryFrames(d)[Number(value.slice(8))] : undefined;
+    const mock = diagram || frame ? (diagram ?? frame)!.src : value ? d?.mocks?.find((m) => m.value === value)?.path : value === '' && d?.view;
     try {
       const path = rest.map(decodeURIComponent).join('/'), type = assetTypes[extname(path).toLowerCase()];
       if (!mock || !type) return [404, { error: 'Mock is unavailable' }];
@@ -2790,7 +2805,12 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
       if (statSync(actual).size > MOCK_BYTES) return [404, { error: 'Mock is unavailable' }];
       const bytes = readFileSync(actual);
       // A diagram is its one pinned page: the file the plan posted, or nothing. A plan posted before the pin carries none and is served as it was.
-      if (diagram?.sha256 && (actual !== under(dirname(file), mockFile(mock)) || bytes.length !== diagram.bytes || sha256(bytes) !== diagram.sha256)) return [404, { error: 'Diagram file changed since it was posted' }];
+      const pinned = diagram ?? frame;
+      if (pinned?.sha256 && (actual !== under(dirname(file), mockFile(mock)) || bytes.length !== pinned.bytes || sha256(bytes) !== pinned.sha256)) return [404, { error: 'Diagram file changed since it was posted' }];
+      if (frame && new URL(req.url, 'http://localhost').searchParams.get('v') === 'light' && type.startsWith('image/')) {
+        const light = galleryLight(pinned!.sha256 ?? sha256(bytes), bytes, extname(path));
+        if (light) return [200, { media: light.bytes, type: mediaTypes[light.ext] }];
+      }
       // Every HTML view gets the bridge: document readers need its size handshake too. A diagram also gets its way back.
       return [200, { media: bytes, type, point: type === 'text/html', ...(diagram && type === 'text/html' && d && { page: diagramPage(`/#${d.type === 'plan' && !reading(d) ? 'waiting' : 'reports'}/${d.key}`, `Back to the ${d.type === 'plan' ? 'plan' : 'report'}`) }) }];
     } catch { return [404, { error: 'Mock is unavailable' }]; }

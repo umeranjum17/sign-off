@@ -43,6 +43,9 @@ const ACTIONS: Record<string, Record<string, string>> = {
   gate: { approve: 'Approve', skip: 'Skip the judge', fix: 'Fix first' },
   finding: { apply: 'Apply', skip: 'Skip' },
 };
+/** The screens a gallery frame shows, and the files it may be. */
+export const GALLERY_DEVICES = ['phone', 'desktop'];
+const GALLERY_FILE = /\.(png|jpe?g|webp|html?)$/i;
 export const MEDIA_BYTES = 50_000_000;
 /** The command that makes a report's page, named in every refusal of a report without one. */
 export const REPORT_INIT = 'sign-off-axi report init <folder>';
@@ -184,6 +187,25 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
     text(`${field}[${n}].src`, o.src, 256, 'a page path from the board file\'s folder, such as "diagrams/flow.html"');
     if (/^([\\/]|[A-Za-z]:)/.test(o.src) || o.src.split(/[\\/]/).includes('..') || /[?#\\]/.test(o.src) || !/\.html?$/i.test(o.src)) throw bad(`${field}[${n}].src`, `${show(o.src)} must be a relative .html path with no .., ?, # or \\`, 'Draw the diagram as inline SVG in an .html page (by hand or with the archify skill), then set "src" to that file next to the message');
   });
+  /** A gallery: 1 to 6 options of a design output, each with its model, the time it ran and 1 or 2 frames (a phone's, a desktop's), every frame an image or page with the device it shows and a caption. Post pins each frame's file like a diagram's. */
+  const gallery = (field: string, v: any) => list(field, 1, 6, ['label', 'model', 'ran', 'frames'], '{"label":"Option A","model":"Haiku 5.5","ran":"2026-10-24T09:30:00Z","frames":[{"device":"phone","src":"gallery/a-phone.png","caption":"Sign-in on a phone"}]}', v).forEach((o, n) => {
+    const at = `${field}[${n}]`;
+    text(`${at}.label`, o.label, 40, 'the option\'s name, such as "Option A", in 40 characters or fewer');
+    text(`${at}.model`, o.model, 40, 'the model that made it, such as "Haiku 5.5", in 40 characters or fewer');
+    const ran = typeof o.ran === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(o.ran) ? new Date(o.ran) : undefined;
+    if (!ran || Number.isNaN(ran.getTime()) || ran.toISOString().replace('.000', '') !== o.ran) throw bad(`${at}.ran`, Object.hasOwn(o, 'ran') ? `${show(o.ran)} is not a UTC time such as 2026-10-13T07:19:00Z` : 'is required', 'Set "ran" to when the model made it, exactly YYYY-MM-DDTHH:MM:SSZ in UTC');
+    list(`${at}.frames`, 1, 2, ['device', 'src', 'caption', 'sha256', 'bytes'], '{"device":"phone","src":"gallery/a-phone.png","caption":"Sign-in on a phone"}', o.frames).forEach((f, k) => {
+      const fa = `${at}.frames[${k}]`, DEVICE = 'Set "device" to "phone" (390 wide) or "desktop" (1280 wide)';
+      if (!Object.hasOwn(f, 'device')) throw bad(`${fa}.device`, 'is required: the screen the frame shows', DEVICE);
+      if (!GALLERY_DEVICES.includes(f.device)) throw bad(`${fa}.device`, `${show(f.device)} is not one of ${GALLERY_DEVICES.join(', ')}`, DEVICE);
+      if (o.frames.slice(0, k).some((p: any) => p.device === f.device)) throw bad(`${fa}.device`, `repeats ${f.device}`, 'Give an option one phone frame and one desktop frame at most');
+      text(`${fa}.caption`, f.caption, 120, 'what the frame shows, in 120 characters or fewer');
+      text(`${fa}.src`, f.src, 256, 'an image or page path from the board file\'s folder, such as "gallery/a-phone.png"');
+      if (/^([\\/]|[A-Za-z]:)/.test(f.src) || f.src.split(/[\\/]/).includes('..') || /[?#\\]/.test(f.src) || !GALLERY_FILE.test(f.src)) throw bad(`${fa}.src`, `${show(f.src)} must be a relative .png, .jpg, .jpeg, .webp or .html path with no .., ?, # or \\`, 'Set "src" to the frame\'s file next to the message, such as "gallery/a-phone.png"');
+      if (Object.hasOwn(f, 'sha256') && !/^[a-f0-9]{64}$/.test(f.sha256)) throw bad(`${fa}.sha256`, 'must be 64 lowercase hex digits', 'Leave "sha256" and "bytes" out; post pins the file');
+      if (Object.hasOwn(f, 'bytes') && !(Number.isInteger(f.bytes) && f.bytes >= 0)) throw bad(`${fa}.bytes`, 'must be a whole number of bytes', 'Leave "sha256" and "bytes" out; post pins the file');
+    });
+  });
   /** A report 5's parts: each part of its kind once, in a section naming it, with what that part needs (a source's link, a finding's confidence, a slice's size, a design's diagram). */
   const kindParts = (parts: [string, string][]) => {
     const init = `Run \`${REPORT_INIT.replace('<folder>', '<new folder>')} --purpose ${m.purpose}\` for a template with every part, or add the section`;
@@ -239,7 +261,7 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
     if (Object.hasOwn(v, 'diagram')) diagrams('visual.diagram', v.diagram);
     // A report 5 is built of its kind's parts: up to 10 sections, each naming the part it is, and items that carry a source's link, a finding's confidence or a slice's size.
     const v5 = m.kind === 'report' && m.schema >= 5, parts = v5 ? REPORT_PARTS[m.purpose] ?? [] : [];
-    const ids = list('sections', minSections, v5 ? 10 : 6, ['id', 'stage', 'heading', 'body', 'items', 'details', 'diagram', ...(v5 ? ['part'] : [])], '{"id":"steps","stage":"recommend","heading":"Eight steps, 22 to 31 Oct","body":"..."}').map((o, n) => {
+    const ids = list('sections', minSections, v5 ? 10 : 6, ['id', 'stage', 'heading', 'body', 'items', 'details', 'diagram', 'gallery', ...(v5 ? ['part'] : [])], '{"id":"steps","stage":"recommend","heading":"Eight steps, 22 to 31 Oct","body":"..."}').map((o, n) => {
       const at = `sections[${n}]`;
       if (!(typeof o.id === 'string' && /^[a-z0-9-]{1,40}$/.test(o.id))) throw bad(`${at}.id`, 'must be 1-40 of a-z 0-9 -', 'Set "id" to a short slug such as "steps"');
       if (!['found', 'recommend'].includes(o.stage)) throw bad(`${at}.stage`, `${show(o.stage)} is not found or recommend`, 'Set "stage" to "found" (what I found) or "recommend" (what I recommend)');
@@ -261,6 +283,7 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
       });
       if (Object.hasOwn(o, 'details')) details(`${at}.details`, o.details);
       if (Object.hasOwn(o, 'diagram')) diagrams(`${at}.diagram`, o.diagram);
+      if (Object.hasOwn(o, 'gallery')) gallery(`${at}.gallery`, o.gallery);
       return o.id;
     });
     const twice = ids.findIndex((id, n) => ids.indexOf(id) < n);
@@ -605,6 +628,8 @@ export function mediaFiles(m: any, base: string): string[] {
 
 /** The diagram views of a guided plan or report, in the order the board counts them for `diagram.<n>`: the picture's, then each section's and its items'. */
 export const diagramViews = (m: any): { label: string; src: string; sha256?: string; bytes?: number }[] => [m?.visual?.diagram, ...(m?.sections ?? []).flatMap((s: any) => [s.diagram, ...(s.items ?? []).map((i: any) => i.diagram)])].filter(Boolean).flat();
+/** The gallery frames of a guided report or plan, in the order the board counts them for `gallery.<n>`: each section's options, each option's frames. */
+export const galleryFrames = (m: any): { device: string; src: string; sha256?: string; bytes?: number }[] => (m?.sections ?? []).flatMap((s: any) => (s.gallery ?? []).flatMap((o: any) => o.frames));
 /** The text size a diagram must keep on a phone: its smallest text, drawn as wide as Full size draws it on a 390 px screen (the chrome-free page, 8 px of margin each side). */
 const DIAGRAM_MIN_PX = 12;
 const PHONE_PX = 390, PHONE_DRAW_PX = PHONE_PX - 16;
@@ -632,6 +657,20 @@ export function diagramPages(m: any, base: string): void {
     if (sizes.length && real12 < DIAGRAM_MIN_PX) throw bad(`has text of ${Math.round(real12 * 10) / 10} px at ${PHONE_PX} (${small} in a ${svg[1]} wide drawing), under ${DIAGRAM_MIN_PX}`, `Draw it narrower, an architecture viewBox 320 to 340 wide with no sublabels and the legend hidden ("legend": {"mode": "hidden"} in "meta"), so every text is ${DIAGRAM_MIN_PX} px or more on a phone`);
     v.sha256 = createHash('sha256').update(file).digest('hex');
     v.bytes = file.length;
+  }
+  // A gallery frame is an image or a page of 5 MB or less, inside the folder; it is pinned the same way.
+  for (const f of galleryFrames(m)) {
+    const bad = (rule: string, help: string) => new ContractError(`${at}gallery frame ${show(f.src)} ${rule}`, help);
+    let real;
+    try { real = realpathSync(resolve(root, f.src)); } catch { throw bad('is not there', `Put the file at ${f.src} from the board file's folder, or fix the path`); }
+    const rel = relative(root, real);
+    if (!rel || rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel)) throw bad('leads outside the board file\'s folder', 'Copy the file into the board file\'s folder, such as under gallery/');
+    const info = statSync(real);
+    if (!info.isFile() || info.size > 5_000_000) throw bad('must be a file of 5 MB or less', 'Save the screenshot again at the device\'s own width (390 or 1280)');
+    try { accessSync(real, constants.R_OK); } catch { throw bad('cannot be read', 'Make the file readable, then post again'); }
+    const file = readFileSync(real);
+    f.sha256 = createHash('sha256').update(file).digest('hex');
+    f.bytes = file.length;
   }
 }
 

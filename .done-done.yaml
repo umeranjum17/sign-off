@@ -34,6 +34,10 @@ journeys:
   # Archify diagrams on a plan, per theme and width: needs DIAGRAM_DIR, a folder of pages the archify skill drew (slices.html, today.html, after.html). DIAGRAM_BEFORE=1 SIGN_OFF_REPO=<base checkout> records the no-diagram before.
   diagram:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/diagram-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${DIAGRAM_THEME:-light}" "${DIAGRAM_WIDTH:-390}"'
+  # A design-output gallery in a guided report (report init --gallery): options as a strip (phone) or a row (desk), phone and desktop frames side by side with caption, model and run time,
+  # tap to open full size, Previous/Next/swipe between options, at 360, 390, 445, 1280 and 1440, light and dark. GALLERY_DIR is a folder of a-phone.png, a-desktop.png, b-phone.png, b-desktop.png (real board frames).
+  gallery:
+    command: 'npm run build > /dev/null && for w in 360 390 445 1280 1440; do for t in light dark; do node .agents/skills/done-done-verify-sign-off/gallery-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t $w || exit 1; done; done'
   # An ask on a guided report answers the tap at 390, light and dark: the Ask control pressed, Sent to the agent with the time, Already sent on a repeat with one ask saved,
   # Agent replied; and a design report's inline-SVG flow diagram at the column's width, following the board's own light-or-dark pick (diagram-sample/flow.html).
   comment-send:
