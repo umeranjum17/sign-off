@@ -3046,6 +3046,17 @@
     see.onclick = () => { all ? tkMore.delete(key) : tkMore.add(key); render(); };
     return el('section', { 'aria-label': name }, el('h2', { class: 'ui-sec' }, name, el('small', {}, String(list.length)), list.length > 3 ? see : ''), el('ul', { class: 'ui-card ui-list' }, ...(all ? list : list.slice(0, 3)).map(tkRow)));
   }
+  // A tap is aimed where the finger went down. When the list moves under it before the tap lands (a redraw, an image, the page settling), the tap lands on the row that slid under
+  // the finger and opens a ticket; a tap that began on a section's See all or Show fewer does that button's work instead.
+  let tkSeeDown = null;
+  addEventListener('pointerdown', (e) => { const b = e.target.closest?.('body.tickets .ui-sec button.see'); tkSeeDown = b && { label: b.closest('section')?.getAttribute('aria-label'), at: e.timeStamp }; }, true);
+  addEventListener('click', (e) => {
+    const down = tkSeeDown;
+    tkSeeDown = null;
+    if (!down || e.timeStamp - down.at > 1000 || e.target.closest?.('.ui-sec button.see')) return;
+    e.preventDefault(), e.stopPropagation();
+    [...document.querySelectorAll('main section[aria-label]')].find((s) => s.getAttribute('aria-label') === down.label)?.querySelector('.ui-sec button.see')?.click();
+  }, true);
   /** The Tickets screen. On a phone: the title row, Your asks or System, the hero, then In progress, On hold, To do and Done, and two tiles, with the open ticket as a sheet over them.
    * On a desk: one filled screen, the head across, then the hero over In progress, On hold over To do, and the open ticket (the first one moving when none is picked). */
   function tickets(by, id) {

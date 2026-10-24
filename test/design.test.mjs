@@ -4108,6 +4108,55 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
   proc.kill();
 });
 
+test('Tickets on a phone: with one section expanded, See all on each other section expands it, and a list that moves under the finger before the tap lands does not open a ticket', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'see-all'), file = join(dir, 'board.json');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [] }));
+  for (const [list, n, flags] of [['mv', 7, ['--progress', '30']], ['hold', 8, ['--hold', 'yes']], ['todo', 6, []], ['done', 7, ['--progress', '100']]])
+    for (let i = 0; i < n; i++) assert.equal(run('ticket', file, '--id', `${list}${i}`, '--title', `${list} ticket ${i}`, '--asked', 'yes', ...flags).code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, tap, send, close } = await browse(dir, 390, 844, true);
+  try {
+    const names = ['In progress', 'On hold', 'To do', 'Done'];
+    const see = (name) => `main section[aria-label="${name}"] .ui-sec .see`;
+    const where = (name) => evaluate(`(() => { const e = document.querySelector(${JSON.stringify(see(name))}); e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+    const lists = () => evaluate(`JSON.stringify({ hash: location.hash, rows: Object.fromEntries([...document.querySelectorAll('main section[aria-label]')].map((s) => [s.getAttribute('aria-label'), s.querySelectorAll('a.tk-row').length])) })`).then((v) => JSON.parse(v));
+    await evaluate(`location.href = ${JSON.stringify(`${url}#tickets`)}`);
+    const fresh = async () => { await until(async () => (await evaluate('!!document.querySelector("main section[aria-label] .see")')) === true); await evaluate('window.old = true, location.reload()'); await until(async () => (await evaluate('!window.old && document.querySelectorAll("main section[aria-label] .see").length')) === 4); };
+    const sizes = { 'In progress': 7, 'On hold': 8, 'To do': 6, Done: 7 };
+    // Each section expanded in turn, then See all on every other one: it expands, and no ticket opens.
+    for (const open of names) for (const other of names.filter((n) => n !== open)) {
+      await fresh();
+      await tap(await where(open));
+      await until(async () => (await lists()).rows[open] === sizes[open]);
+      await tap(await where(other));
+      await until(async () => (await lists()).rows[other] === sizes[other]);
+      const now = await lists();
+      assert.equal(now.hash, '#tickets', `${open} expanded, See all on ${other} opened ${now.hash}`);
+      assert.deepEqual(now.rows, { 'In progress': 3, 'On hold': 3, 'To do': 3, Done: 3, ...{ [open]: sizes[open], [other]: sizes[other] } });
+    }
+    // The list moves under the finger between touchstart and the tap (the board redraws, the page settles): the tap still does what its See all does.
+    for (const shift of [-30, 30, 60, 120]) {
+      await fresh();
+      await tap(await where('On hold'));
+      await until(async () => (await lists()).rows['On hold'] === 8);
+      const [x, y] = await where('To do');
+      await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+      await evaluate(`document.querySelector('main').style.paddingTop = 'calc(' + getComputedStyle(document.querySelector('main')).paddingTop + ' + ${shift}px)'`);
+      await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await until(async () => (await lists()).rows['To do'] === 6);
+      assert.equal((await lists()).hash, '#tickets', `a ${shift}px shift opened a ticket`);
+    }
+    // A tap on a row still opens its ticket.
+    await fresh();
+    await tap(await evaluate(`(() => { const e = document.querySelector('main a.tk-row'); e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`));
+    await until(async () => /^#ticket\//.test(await evaluate('location.hash')));
+  } finally { close(); }
+  proc.kill();
+});
+
 test('the feedback trail: what the person sends on a card goes Sent, Delivered, Read, then Replied with the agent\'s words and link, on the card, in its Activity, as a badge in the lists and in Today until opened', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'trail'), file = join(dir, 'board.json');
   mkdirSync(dir);
