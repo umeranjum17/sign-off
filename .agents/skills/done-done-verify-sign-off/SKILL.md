@@ -23,7 +23,7 @@ Read-only: is this instance worth driving? The URL answers with the page titled 
 
 ## Drive
 
-Harness: a browser (chrome-devtools-axi, one CHROME_DEVTOOLS_AXI_SESSION per run) for the board, a terminal for the CLI. Prefer the repo's real handles (hash routes, button labels) over coordinates:
+Harness: a browser (chrome-devtools-axi, one CHROME_DEVTOOLS_AXI_SESSION per capture for sequence proof, per run otherwise) for the board, a terminal for the CLI. Prefer the repo's real handles (hash routes, button labels) over coordinates:
 
 - Core journey (`done-done run core`): the installed CLI files a card, the person answers it in the board, and the agent reads the answer with `wait --filer`; the board then shows the read receipt. `done-done run upgrade` runs the same journey over the previous published version, upgraded in place. It brings its own clean home and its own install, so it never touches the board above. See [Core journey](features/core-journey.md)
 - Decide ask reference (CLI only, screen: none): `npm run build && node --test --test-global-setup=./test/temp-folder.mjs --test-name-pattern='new Decide cards' test/question.test.mjs` drives the built CLI on isolated boards: new flag, contract-message and feed posts without a reference fail without writing a card; captain-message and hold references succeed and persist; malformed references fail; existing cards still re-post. Capture the TAP output as text. Plans, reports, evidence and engagement remain covered by their existing journeys.
