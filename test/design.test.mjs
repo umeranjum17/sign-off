@@ -3899,7 +3899,7 @@ const focusColours = `(() => { const el = document.activeElement; if (!el || el 
   if (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0) out.push([s.outlineColor, 'outline']); if (s.boxShadow !== 'none') out.push([s.boxShadow, 'shadow']);
   return out.map(([v, p]) => v + '|' + el.tagName.toLowerCase() + [...el.classList].slice(0, 2).map((c) => '.' + c).join('') + ':focus-visible ' + p); })()`;
 
-test('the new look draws only the approved prototype\'s colours: Today, Decide, Designs, Reports and Tickets, their sheets and keyboard focus, at 390 and 1280, light and dark', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('the new look draws only the approved prototype\'s colours: Today, Decide, Designs, Reports, Evidence and Tickets, their sheets and keyboard focus, at 390 and 1280, light and dark', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'palette'), file = join(dir, 'board.json'), fx = new URL('../fixtures/contract/', import.meta.url).pathname, now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   mkdirSync(join(dir, 'design'), { recursive: true });
   for (const f of readdirSync(join(fx, 'design.v1/design'))) writeFileSync(join(dir, 'design', f), readFileSync(join(fx, 'design.v1/design', f)));
@@ -3926,10 +3926,10 @@ test('the new look draws only the approved prototype\'s colours: Today, Decide, 
   // Each state: its address and what is tapped on it, on a phone and on a desk.
   const states = {
     390: [['#', ''], ['#', '.t-more-line'], ['#find', ''], ['#answered', ''], ['#waiting', ''], ['#decide/release-day', '.decide [role="radio"], .decide input[type="radio"]'], ['#decide/npm', ''],
-      ['#reports', ''], [`#reports/${keys.report}`, ''], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#tickets', ''], ['#ticket/T-29', ''],
+      ['#reports', ''], [`#reports/${keys.report}`, ''], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#evidence', ''], ['#evidence', '.ev-more'], [`#evidence/${keys.evidence}`, ''], ['#tickets', ''], ['#ticket/T-29', ''],
       // Last, an answer and the toast it raises: a yes/no in light, the pick-one in dark.
       [(theme) => (theme === 'light' ? '#decide/ask-plain' : '#decide/release-day'), ['.decide .pick-option', '.decide-bar .answer']]],
-    1280: [['#', ''], ['#waiting', ''], ['#decide/ask-linked', ''], ['#reports', ''], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#tickets', ''], ['#ticket/T-29', '']],
+    1280: [['#', ''], ['#waiting', ''], ['#decide/ask-linked', ''], ['#reports', ''], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#evidence', ''], ['#tickets', ''], ['#ticket/T-29', '']],
   };
   const off = [];
   for (const width of [390, 1280]) for (const theme of ['light', 'dark']) {

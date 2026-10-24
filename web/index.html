@@ -421,7 +421,7 @@
   /* On a desk the list sits in the desk shell's column, the row shown on the sunk fill; the proof opens beside it under the change link, with no close. */
   @media (min-width: 64rem) {
     .split-list > :is(.ev-seg, .ev-held, .ev-pill, .ev-sec, .ev-list) { flex: none; }
-    .split-list .ev-list .ev-card:hover { background: color-mix(in srgb, var(--tk-inset) 55%, transparent); }
+    .split-list .ev-list .ev-card:hover:not([aria-current]) { opacity: 0.85; }
     .split-list .ev-list .ev-card[aria-current] { background: var(--tk-inset); outline: none; }
     /* A desk has the room for a long title: it wraps to two lines, and the row grows with it. */
     .split-list .ev-list .ev-card { height: auto; min-height: 4.25rem; padding-block: 0.75rem; }
