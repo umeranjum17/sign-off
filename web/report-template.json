@@ -1,9 +1,10 @@
 {
   "contract": 1,
   "kind": "report",
-  "schema": 4,
+  "schema": 5,
   "key": "FILL: short-id",
   "title": "FILL: the answer in one line",
+  "purpose": "FILL: what this report is for: research, plan, decision, audit, incident, status or other",
   "filed": "FILL: UTC time",
   "about": "FILL: why it matters, in 2 sentences",
   "group": "FILL: section name",

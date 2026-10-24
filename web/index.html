@@ -1176,6 +1176,52 @@
   .rp-list details > :not(summary) { margin: 0 0.75rem 1rem 4rem; }
   .rp-list .dl-act { color: var(--tk-canvas); }
   .rp-page > .notes, .rp-page > .gone-asks { margin-top: 1.5rem; }
+  /* A report's kind: a chip of its icon and name, each kind a neutral treatment from the palette, told apart by icon and shape (ink filled, ink outline,
+     white with a hairline, a mid fill, a grey fill, a soft round fill, a hairline round outline); red and amber stay for priority. Its tile, in the filter and its pill, takes the same treatment. */
+  .rkc { display: inline-flex; flex: none; align-items: center; gap: 0.25rem; height: 1.25rem; padding: 0 0.375rem 0 0.3125rem; border-radius: 0.375rem; font-size: 0.6875rem; line-height: 1.25rem; font-weight: 600;
+    letter-spacing: 0.01em; white-space: nowrap; font-style: normal; }
+  .rkg { display: inline-grid; flex: none; place-items: center; }
+  .rkg svg { width: 0.75rem; height: 0.75rem; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  :is(.rkc, .rkt).k-research { background: var(--tk-raised); color: var(--tk-ink); box-shadow: inset 0 0 0 1px var(--tk-line); }
+  :is(.rkc, .rkt).k-plan { background: var(--tk-ink); color: var(--tk-raised); }
+  :is(.rkc, .rkt).k-decision { background: none; color: var(--tk-ink); box-shadow: inset 0 0 0 1px var(--tk-ink); }
+  :is(.rkc, .rkt).k-audit { background: var(--tk-mid); color: var(--tk-ink); }
+  :is(.rkc, .rkt).k-incident { background: var(--tk-text-secondary); color: var(--tk-raised); }
+  :is(.rkc, .rkt).k-status { border-radius: 0.625rem; background: var(--tk-inset); color: var(--tk-text-secondary); }
+  :is(.rkc, .rkt).k-other { border-radius: 0.625rem; background: none; color: var(--tk-text-tertiary); box-shadow: inset 0 0 0 1px var(--tk-mid); }
+  .rkt { display: grid; flex: none; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 0.5rem; }
+  .rkt.k-status, .rkt.k-other { border-radius: 0.875rem; } .rkt.k-all { background: var(--tk-raised); color: var(--tk-ink); box-shadow: var(--tk-elev-tile); }
+  .rkt .rkg svg, .rkt .ev-g svg { width: 1rem; height: 1rem; stroke-width: 1.8; }
+  /* The row's second line: the kind, then the bar of how much is read (a plan's bar is its parts), then the percent. */
+  .rp-list .ui-row .l2 { gap: 0.5rem; }
+  .rp-strip { display: flex; flex: 1; gap: 2px; height: 0.25rem; }
+  .rp-strip > i { flex: 1; min-width: 0; border-radius: 2px; background: var(--tk-track); font-style: normal; }
+  .rp-strip > i.on { background: var(--tk-fill); }
+  /* What the report is for, one line under its title. */
+  .rp-for { display: flex; align-items: flex-start; gap: 0.375rem; margin: 0.25rem 0 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: 1.25rem; }
+  .rp-for .rkg { height: 1.25rem; } .rp-for .rkg svg { width: 0.875rem; height: 0.875rem; stroke-width: 2; }
+  /* Over a report's parts, the strip of them and the next to read. */
+  .rp-strip-row { margin-top: 0.5rem; }
+  .rp-strip-row .rp-strip { height: 0.375rem; gap: 3px; } .rp-strip-row .rp-strip > i { border-radius: 3px; } .split-detail .rp-strip-row { margin-bottom: 1rem; }
+  .rp-strip-row .rp-next { margin: 0.375rem 0 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-small); line-height: 1rem; font-weight: 500; text-align: right; }
+  /* The kind filter's sheet: Evidence's (ev-pick), each row the kind's tile, its full name over what it is for, and how many. */
+  .rp-pick .ui-pr { min-height: 3.5rem; padding: 0.5rem 0; }
+  .rp-pick .k { flex: 1; min-width: 0; gap: 0.75rem; } .rp-pick .kn { min-width: 0; } .rp-pick .v { flex: none; }
+  .rp-pick .kn small { display: block; color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); line-height: 1rem; }
+  .rp-pill .rkt { width: 2.5rem; height: 2.5rem; border-radius: var(--tk-r-icon); } .rp-pill .rkt.k-status, .rp-pill .rkt.k-other { border-radius: 1.25rem; }
+  .rp-pill .rkt .rkg svg, .rp-pill .rkt .ev-g svg { width: 1.25rem; height: 1.25rem; }
+  .rp-pill small { margin-left: 0.375rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); font-weight: 400; }
+  .rp-top .rp-fb { position: relative; }
+  .ui-pane .ui-shd > span.rkc { flex: none; overflow: visible; }
+  /* A research report's Sources panel, and in the guided page an item's tags (a user report, a finding's confidence, a slice's size) and its source's link. */
+  #reader .rp-src, .split-detail .rp-src { width: 100%; min-height: 3rem; padding: 0; border: 0; border-radius: 0; background: none; font: inherit; font-size: var(--tk-fs-row); text-align: left; }
+  .rp-src .k { color: var(--tk-text-secondary); } .rp-src .k .glyph { width: 1rem; height: 1rem; } .rp-src .v .glyph { width: 1rem; height: 1rem; color: var(--tk-text-tertiary); }
+  .gd-tags { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.25rem; }
+  .gd-tag { padding: 0 0.375rem; border-radius: 0.375rem; background: var(--tk-inset); color: var(--tk-text-secondary); font-size: 0.6875rem; line-height: 1.25rem; font-weight: 500; }
+  .gd-src { position: relative; display: inline-block; margin: -0.25rem 0.875rem 0.75rem; color: var(--tk-ink); font-size: var(--tk-fs-meta); line-height: 1.25rem; text-decoration: underline; text-underline-offset: 2px; }
+  .gd-src::after { content: ''; position: absolute; inset: -0.75rem 0; }
+  /* A page report's head and the full guided page's: the kind's chip, then who asked and when. */
+  :is(.read > .eyebrow, .gd-top .geye) { display: flex; align-items: center; } :is(.read > .eyebrow, .gd-top .geye) > .rkc { margin-right: 0.5rem; }
   /* Decide's list: More in a round button at the title's right edge, then the rows in cards (ui.css). Each row's face spans its card, so a swipe shows its action edge to edge:
      the recommended answer green under a right swipe, Later indigo under a left one. With nothing waiting the card says All clear. The last row clears the dock. */
   #d-more .ui-pr { width: 100%; min-height: 3rem; padding: 0; border-radius: 0; background: none; color: var(--tk-ink); font: inherit; font-size: var(--tk-fs-row); font-weight: 400; text-align: left; }
@@ -1216,7 +1262,7 @@
   #reader.rp-sheet .rp-grab { display: block; width: 2.25rem; height: 0.25rem; margin: 0 auto; border-radius: 2px; background: var(--tk-line); }
   #reader.rp-sheet .rp-shd { display: flex; align-items: center; gap: 0.5rem; height: 2.5rem; margin-top: 0.5rem; }
   #reader.rp-sheet .rp-what { display: flex; flex: 1; align-items: center; gap: 0.5rem; min-width: 0; margin: 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: 1.5rem; white-space: nowrap; }
-  #reader.rp-sheet .rp-what > span { overflow: hidden; text-overflow: ellipsis; }
+  #reader.rp-sheet .rp-what > .rp-when { overflow: hidden; text-overflow: ellipsis; }
   #reader.rp-sheet .rp-what > :is(img, .mono) { flex: none; width: 1.25rem; height: 1.25rem; border-radius: 0.3125rem; object-fit: cover; }
   #reader.rp-sheet .rp-what > .mono { background: var(--tk-ink); color: var(--tk-raised); font-size: 0.5rem; font-style: normal; line-height: 1.25rem; font-weight: 600; text-align: center; }
   #reader.rp-sheet .rp-x { position: relative; display: grid; flex: none; place-items: center; width: 2rem; height: 2rem; border-radius: 1rem; background: var(--tk-inset); color: var(--tk-text-secondary); }
@@ -2603,7 +2649,8 @@
     'tab-tickets': 'M4.2 5.4h15.6A1.8 1.8 0 0 1 21.6 7.2v2.76a2.16 2.16 0 0 0 0 4.08V16.8a1.8 1.8 0 0 1-1.8 1.8h-15.6A1.8 1.8 0 0 1 2.4 16.8v-2.76a2.16 2.16 0 0 0 0-4.08V7.2a1.8 1.8 0 0 1 1.8-1.8zm10.44 2.4v2.4h1.92v-2.4zm0 6v2.4h1.92v-2.4z' };
   // The drawings are fixed strings from this page, never text from the board file.
   // Small stroke drawings the plan page puts beside a button label or in a section badge; fixed strings from this page.
-  const GLYPHS = { left: '<path d="m15 18-6-6 6-6"/>', up: '<path d="m18 15-6-6-6 6"/>', down: '<path d="m6 9 6 6 6-6"/>', more: '<path d="M5 12h.01M12 12h.01M19 12h.01"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', right: '<path d="m9 18 6-6-6-6"/>', check: '<path d="M20 6 9 17l-5-5"/>', pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
+  const GLYPHS = { link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+    users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>', left: '<path d="m15 18-6-6 6-6"/>', up: '<path d="m18 15-6-6-6 6"/>', down: '<path d="m6 9 6 6 6-6"/>', more: '<path d="M5 12h.01M12 12h.01M19 12h.01"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', right: '<path d="m9 18 6-6-6-6"/>', check: '<path d="M20 6 9 17l-5-5"/>', pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
     archive: '<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/>', dot: '<circle cx="12" cy="12" r="4.5" fill="currentColor"/>',
     send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.112z"/><path d="m21.854 2.147-10.94 10.939"/>',
     sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>', msg: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
@@ -2616,10 +2663,10 @@
   /** The new look's icon tile (ui.css): a project's own picture when the board holds one, else one of this page's line drawings. */
   const uiIcon = ({ src, draw }) => { const s = el('span', { class: 'ui-icon', 'aria-hidden': 'true' }); if (src) s.append(el('img', { src, alt: '' })); else s.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[draw]}"/></svg>`; return s; };
   /** The new look's row (ui.css), as the parts of a link or button: the icon tile, the title with what follows it and a P0-P3 chip only when one is set,
-   * then one second line (project and time) or, where there is progress, a bar with its percent. */
-  const uiRow = ({ tile, title, after = '', priority, meta, progress, badge = '' }) => [tile, el('span', { class: 'rm' },
+   * then one second line (project and time) or, where there is progress, a bar with its percent (and what leads it, such as a report's kind, or a bar of its own). */
+  const uiRow = ({ tile, title, after = '', priority, meta, progress, badge = '', lead = '', bar }) => [tile, el('span', { class: 'rm' },
     el('span', { class: 'l1' }, el('span', { class: 't', dir: 'auto' }, title), after, progress === undefined ? '' : badge, priority ? el('span', { class: `ui-pc ${priority.toLowerCase()}` }, priority) : ''),
-    progress === undefined ? (badge ? el('span', { class: 'l2' }, el('span', { class: 'meta', dir: 'auto' }, meta), badge) : el('span', { class: 'l2 meta', dir: 'auto' }, meta)) : el('span', { class: 'l2' }, el('span', { class: 'ui-bar' }, el('i', { style: `width: ${progress}%` })), el('span', { class: 'pct' }, `${progress}%`)))];
+    progress === undefined ? (badge ? el('span', { class: 'l2' }, el('span', { class: 'meta', dir: 'auto' }, meta), badge) : el('span', { class: 'l2 meta', dir: 'auto' }, meta)) : el('span', { class: 'l2' }, lead, bar ?? el('span', { class: 'ui-bar' }, el('i', { style: `width: ${progress}%` })), el('span', { class: 'pct' }, `${progress}%`)))];
   /** The property panel (ui.css): one sunk group whose rows are each a mark and a name at the left and a value at the right; a row with an address opens it.
    *  A panel with no row is left out, as a card with no priority, ticket or change shows nothing more. */
   const uiProps = (...rows) => ((rows = rows.filter(Boolean)).length ? el('div', { class: 'ui-props' }, ...rows) : '');
@@ -3116,6 +3163,30 @@
     tile.innerHTML = `<svg viewBox="0 0 48 48">${FORMS[d.form]?.[1] ?? BOOK}</svg>`;
     return tile;
   }
+  /** What a report is for, its kind: a line icon, a short name for the row's chip, its full name for the head and the filter, and one line on what it is for.
+   *  Each kind's chip is a neutral treatment from the palette (ink, an outline, a soft fill), told apart by its icon and shape: red and amber stay for priority. */
+  const KINDS = {
+    research: ['Research', 'Research and discovery', 'What we found out, with sources, so you can choose.', '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.4-4.4"/>'],
+    plan: ['Plan', 'Implementation plan', 'How the work gets built, step by step, before it starts.', '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 5.5 5 5v3M3.8 11.2a1.2 1.2 0 1 1 1.7 1.5L3.8 14h2.4M3.8 17h1.8l-1 1.3a1.1 1.1 0 1 1-.8 1.7"/>'],
+    decision: ['Decision', 'Decision and recommendation', 'One choice, the options weighed, and what I recommend.', '<path d="M12 3v18M12 6h6l2 2.5-2 2.5h-6M12 13H6l-2 2.5L6 18h6"/>'],
+    audit: ['Audit', 'Audit', 'What was checked against a standard, and what to fix.', '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M8.5 13l2.5 2.5 4.5-5"/>'],
+    incident: ['Incident', 'Incident and retro', 'What went wrong, why, and what changes so it does not repeat.', '<path d="M12 4 3 20h18z"/><path d="M12 10v4M12 17v.01"/>'],
+    status: ['Status', 'Status', 'Where the work stands now and what comes next.', '<path d="M3 12h4l3-7 4 14 3-7h4"/>'],
+    other: ['Report', 'Other report', 'An explainer of one idea.', '<path d="M12 7v13M4 18a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h4.5A3.5 3.5 0 0 1 12 7.5 3.5 3.5 0 0 1 15.5 4H20a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-5a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>'],
+  };
+  /** A best guess at an older report's kind from its words, first match wins; it is never written back. */
+  const GUESS = [['incident', /\b(incident|outage|retro|post-?mortem|went wrong|broke|regression)/i], ['audit', /\b(audit|checked against|compliance|conform)/i],
+    ['plan', /\b(plan|slices?|roll ?out|migrat|step by step)/i], ['status', /\b(status|stands|progress|this week|weekly|so far)\b/i],
+    ['decision', /\b(should we|recommend|decid|decision|instead of|versus|vs\.)/i], ['research', /\b(research|compar|which|survey|options|study|discover|benchmark)/i]];
+  /** A report's kind: the one it was posted with; a plan is always an implementation plan; an older report gets the best guess from its title, what it says and its section heads. */
+  const kindOf = (d) => (KINDS[d.purpose] ? d.purpose : d.type === 'plan' ? 'plan' : GUESS.find(([, re]) => re.test([d.title, d.about, ...(d.sections ?? []).map((s) => s.heading)].join(' ')))?.[0] ?? 'other');
+  const kindSvg = (k) => { const s = el('span', { class: 'rkg', 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24">${KINDS[k][3]}</svg>`; return s; };
+  /** The kind's chip: its icon and its short name on a row, its full name on a report's head. */
+  const kindChip = (d, full) => { const k = kindOf(d); return el('span', { class: `rkc k-${k}`, 'data-kind': k }, kindSvg(k), full ? KINDS[k][1] : KINDS[k][0]); };
+  /** The kind's tile in the filter and its pill: its icon on the same treatment as its chip; Every kind is the filter's own drawing. */
+  const kindTile = (k) => (k ? el('span', { class: `rkt k-${k}` }, kindSvg(k)) : el('span', { class: 'rkt k-all' }, evGlyph('filter')));
+  /** One line under a report's title: what this kind of report is for. */
+  const purposeLine = (d) => el('p', { class: 'rp-for', dir: 'auto' }, kindSvg(kindOf(d)), KINDS[kindOf(d)][2]);
   /* Reports, as the approved prototype draws them: Newest (or By project), a row each with its project's icon, its title and a bar of how much of it is read. A tap opens it;
      a swipe right marks it read or unread (the row springs home and its bar fills or empties, as in Mail), a swipe left archives it, with Undo. */
   // Read state is kept beside the board, so a phone and a desk agree: one filed today is new until it is opened; read and unread marks override that.
@@ -3123,8 +3194,17 @@
   /** A guided report's parts, as its page reads them: what this is, what I understood, each section, the next step. A page report has none. */
   const rpParts = (d) => (d.guided ? [['this', GSTAGES.this], ['understood', GSTAGES.understood], ...(d.sections ?? []).map((s) => [s.id, s.heading]), ['next', GSTAGES.next]] : []);
   const partRead = (d, part) => !!state.reads?.[`${d.key}/${part}`];
-  /** How much of a report is read: all of it once read; one not read yet, by the parts of it read (a page report has none). */
-  const readPct = (d) => { if (!unread(d)) return 100; const ps = rpParts(d); return ps.length ? Math.round((100 * ps.filter(([p]) => partRead(d, p)).length) / ps.length) : 0; };
+  /** A report's parts as its strip and its sheet list them: a report 5's kind parts (the sections naming one), else every part of its guided page; each [id, name]. */
+  const kindParts = (d) => { const own = (d.sections ?? []).filter((x) => x.part); return own.length ? own.map((x) => [x.id, x.heading]) : rpParts(d); };
+  /** A research report's sources: the items of its sources part with a link, and how many are what users report. */
+  const sourcesOf = (d) => { const x = (d.sections ?? []).find((y) => y.part === 'sources'), its = (x?.items ?? []).filter((it) => it.link); return x && its.length ? { id: x.id, n: its.length, users: its.filter((it) => it.source === 'user').length } : null; };
+  /** How much of a report is read: all of it once read; one not read yet, by the parts of it read (a report 5's kind parts; a page report has none). */
+  /** A report's parts as a strip, one segment each, filled once read (all of it once the report is read); on a desk's head each segment names its part. */
+  // On a row a read report's strip is full, as its percent is; over its parts (a sheet, a desk's head) each segment is its part, filled once that part is read.
+  const partsStrip = (d, parts = false) => el('span', { class: 'rp-strip', 'aria-hidden': 'true' }, ...kindParts(d).map(([p]) => el('i', { class: (!parts && !unread(d)) || partRead(d, p) ? 'on' : '' })));
+  /** Over a report's parts: the strip of them, and the next part to read. */
+  const stripRow = (d) => { const next = kindParts(d).find(([p]) => !partRead(d, p)); return el('div', { class: 'rp-strip-row' }, partsStrip(d, true), next ? el('p', { class: 'rp-next', dir: 'auto' }, `Next: ${next[1]}`) : ''); };
+  const readPct = (d) => { if (!unread(d)) return 100; const ps = kindParts(d); return ps.length ? Math.round((100 * ps.filter(([p]) => partRead(d, p)).length) / ps.length) : 0; };
   /** A title or line in plain words: no ticket code ("6198 ", "RL-02: ", "P1 ") ahead of it, and no file path in it ("the report" or "the plan" for one, else "the file"). */
   const plain = (t) => {
     const s = String(t ?? '').replace(/^[\w.-]+ #\d+:\s*/, '').replace(/^\d{3,5}\s+/, '').replace(/^(?:audit\s+)?[A-Z]{2,3}-\d{1,3}:\s*/i, '').replace(/^P[0-3]:?\s+/, '')
@@ -3178,7 +3258,8 @@
    *  A tap opens its page; an explainer with no page opens in place, to its numbered steps or its video card. */
   function report(d, i = 0) {
     const n = d.steps?.length;
-    const face = uiRow({ tile: projectTile(d.group), title: plain(title(d)), priority: d.priority, progress: readPct(d), badge: trailBadge(d.key) });
+    // The second line leads with the report's kind; a plan's bar is its parts, one segment each, filled once read.
+    const face = uiRow({ tile: projectTile(d.group), title: plain(title(d)), priority: d.priority, progress: readPct(d), badge: trailBadge(d.key), lead: kindChip(d), bar: kindOf(d) === 'plan' && kindParts(d).length ? partsStrip(d) : undefined });
     const sel = rpSel === d.key;
     const li = (...kids) => el('li', { class: `report dl-row${flash === d.key ? ' returned' : ''}${sel ? ' sel' : ''}`, style: `--n:${i}`, ...(reads(d) && { 'data-key': d.key, 'data-list': 'reports' }) }, ...kids);
     const act = (cls, mark, words) => el('div', { class: `dl-act ${cls}`, 'aria-hidden': 'true' }, glyph(mark), el('span', {}, words));
@@ -3941,16 +4022,20 @@
         el('thead', {}, el('tr', {}, el('td', {}), ...items.map((it) => el('th', { scope: 'col' }, opt(it))))),
         el('tbody', {}, row('In short', items.map((it) => it.text)), ...axes.map((a, k) => row(a, values.map((v) => v[k]))))));
     };
+    /** What a report 5 item carries beside its words: a source (from what users report, or primary), how sure a finding is, a slice's size; and the source's link, under it. */
+    const tags = (it) => { const t = [it.source === 'user' ? 'User report' : it.source === 'primary' ? 'Primary source' : '', it.confidence ? `${it.confidence[0].toUpperCase()}${it.confidence.slice(1)} confidence` : '', it.size ?? ''].filter(Boolean);
+      return t.length ? [E('span', 'gd-tags', ...t.map((x) => E('span', 'gd-tag', x)))] : []; };
+    const srcLink = (it) => { if (!it.link) return []; let host = it.link; try { host = new URL(it.link).host.replace(/^www\./, ''); } catch {} return [el('a', { class: 'gd-src', href: it.link, target: '_blank', rel: 'noopener noreferrer' }, `Open on ${host}`)]; };
     const secCard = (s) => {
       const cmp = compared(s.items ?? []);
       const items = cmp ? [] : (s.items ?? []).map((it, i) => {
         const part = `${s.id}:${i}`;
-        if (!it.more && !it.diagram) return E('li', '', E('div', 'rowstat', E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), fld(part, 'title', mdSpan('span', '', it.title))), fld(part, 'text', mdSpan('span', 'sm', it.text)))), ...(d.engagement || live ? [E('div', 'body', ...acts(part, undefined, true))] : []));
+        if (!it.more && !it.diagram) return E('li', '', E('div', 'rowstat', E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), fld(part, 'title', mdSpan('span', '', it.title))), fld(part, 'text', mdSpan('span', 'sm', it.text)), ...tags(it))), ...srcLink(it), ...(d.engagement || live ? [E('div', 'body', ...acts(part, undefined, true))] : []));
         const body = E('div', 'body', ...(it.more ? [fld(part, 'more', mdDiv(it.more))] : []), ...(it.diagram ? [diagramFig(it.diagram)] : []), ...acts(part, undefined, true));
         body.hidden = true;
-        const b = el('button', { class: 'rowbtn', type: 'button', 'aria-expanded': 'false' }, E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), mdSpan('span', '', it.title, NOLINK)), mdSpan('span', 'sm', it.text, NOLINK)), gic('chev', 'gchev'));
+        const b = el('button', { class: 'rowbtn', type: 'button', 'aria-expanded': 'false' }, E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), mdSpan('span', '', it.title, NOLINK)), mdSpan('span', 'sm', it.text, NOLINK), ...tags(it)), gic('chev', 'gchev'));
         b.onclick = () => { const open = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(open)); body.hidden = !open; };
-        return E('li', '', b, body);
+        return E('li', '', b, ...srcLink(it), body);
       });
       return card(s.id, s.stage, head(s.heading, s.body, undefined, s.id, 'heading', 'body'), ...(s.diagram ? [diagramFig(s.diagram)] : []), ...(cmp ? [cmpTable(s.items, cmp)] : items.length ? [E('ul', 'gd-rows', ...items)] : []), ...acts(s.id, s.details), rc(s.id));
     };
@@ -4036,8 +4121,8 @@
       if (st !== last) { last = st; const s = el('div', { class: 'gd-stage', id: `gd-st-${st}`, 'data-stage': st }, E('i', '', String(stages.indexOf(st) + 1)), GSTAGES[st]); stageEl.set(st, s); stageBlocks.push(s); }
       stageBlocks.push(c);
     }
-    const word = plan ? 'Plan' : 'Report', who = plan ? 'Planning agent' : d.asked_by ?? 'Reporting agent';
-    const top = E('div', 'gd-top', E('p', 'geye', [word, plan ? d.project : d.group, [who, d.filed && when(d.filed)].filter(Boolean).join(', ')].filter(Boolean).join(' · ')), fld('this', 'title', E('h1', '', d.title)), fld('this', 'about', mdSpan('p', 'sub', d.about)), ticketRow(d), thread(d),
+    const who = plan ? 'Planning agent' : d.asked_by ?? 'Reporting agent';
+    const top = E('div', 'gd-top', E('p', 'geye', kindChip(d, true), E('span', '', [plan ? d.project : d.group, [who, d.filed && when(d.filed)].filter(Boolean).join(', ')].filter(Boolean).join(' · '))), fld('this', 'title', E('h1', '', d.title)), purposeLine(d), fld('this', 'about', mdSpan('p', 'sub', d.about)), ticketRow(d), thread(d),
       E('div', 'howto', gic('info'), E('span', '', `A few short parts, in order. Tap Details for the numbers and Go deeper to ask me more.${plan ? ' Nothing is required: Go ahead accepts my picks.' : ''}`)));
     const rail = el('aside', { class: 'gd-rail' }, E('h4', '', plan ? 'This plan' : 'This report'), nav, ...(plan ? [sumHost] : []));
     const progress = E('div', 'gd-progress', now, segs);
@@ -4112,7 +4197,7 @@
     if (rpListed !== d?.key) rpListed = '';
     const sheet = !!d && from === 'reports' && !inline, summary = sheet && d.guided && rpListed === d.key && rpGuide !== d.key;
     reader.classList.toggle('rp-sheet', sheet && (summary || !d.guided));
-    const url = summary ? `sheet:${d.key}:${unread(d)}:${rpParts(d).filter(([p]) => partRead(d, p)).length}` : d?.guided ? `guide:${d.key}` : d?.kind === 'design' ? `design:${d.key}` : d?.type === 'evidence' ? `evidence:${d.key}` : d ? src(mockUrl(d.key, '', d.view)) : '';
+    const url = summary ? `sheet:${d.key}:${unread(d)}:${kindParts(d).filter(([p]) => partRead(d, p)).length}` : d?.guided ? `guide:${d.key}` : d?.kind === 'design' ? `design:${d.key}` : d?.type === 'evidence' ? `evidence:${d.key}` : d ? src(mockUrl(d.key, '', d.view)) : '';
     const answer = d?.guided ? '' : d?.type === 'plan' || d?.kind === 'design' || d?.type === 'evidence' ? JSON.stringify(state.answers[d.key] ?? null) : '';
     const plan = d?.type === 'plan' || d?.guided ? JSON.stringify(d) : '';
     const evidence = d?.type === 'evidence' ? JSON.stringify([d, (state.messages ?? []).filter((m) => m.key === d.key), (state.rounds ?? []).filter((r) => r.key === d.key)]) : '', ticket = JSON.stringify([ticketOf(d) ?? null, d ? threadOf(d) : null]);
@@ -4129,7 +4214,7 @@
     reader.replaceChildren(...(summary ? reportSheet(d, h1) : d.guided ? [el('header', {}, back), (reader._guide = guideView(d))] : d.type === 'plan' ? [el('header', {}, back, Object.assign(h1, { className: 'plan-name' })), planReview(d, url)] : d.kind === 'design' ? [el('header', {}, back), designReview(d, h1)]
       : d.type === 'evidence' ? [evidenceItem(d)]
       : sheet ? reportSheet(d, h1, el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }))
-      : [el('header', {}, back), el('div', { class: 'read' }, el('p', { class: 'eyebrow' }, [FORMS[d.form]?.[0] ?? (kind(d) || 'Report'), d.asked_by, d.filed ? when(d.filed) : ''].filter(Boolean).join(' · ')), h1,
+      : [el('header', {}, back), el('div', { class: 'read' }, el('p', { class: 'eyebrow' }, kindChip(d, true), el('span', {}, [d.asked_by, d.filed ? when(d.filed) : ''].filter(Boolean).join(' · '))), h1, purposeLine(d),
         d.about ? el('p', { class: 'about', dir: 'auto' }, d.about) : '', decided(d), ticketRow(d), thread(d), el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }), dismissReport(d))]));
   }
   /** A guided report opened in full from its sheet (its key), else ''; and the report last tapped in the list, whose sheet stays until another opens. */
@@ -4140,21 +4225,30 @@
   function reportSheet(d, h1, page) {
     seeReply(d.key);
     const x = el('a', { class: 'rp-x', href: '#reports', 'aria-label': 'Close' }, glyph('x')), scrim = el('a', { class: 'rp-scrim', href: '#reports', tabindex: '-1', 'aria-hidden': 'true' });
-    const what = [d.guided ? 'Guided report' : FORMS[d.form]?.[0] ?? 'Report', d.group, d.filed ? day(d.filed) : ''].filter(Boolean).join(' · ');
-    const found = d.guided ? d.visual?.heading : d.decided;
+    const what = [d.group, d.filed ? day(d.filed) : ''].filter(Boolean).join(' · ');
+    const found = d.guided ? d.visual?.heading : d.decided, src = sourcesPanel(d, (p) => full(p));
     const full = (part) => { rpGuide = d.key; readPage(d, 'reports'); const at = part && document.getElementById(`gd-${part.replace(/\W/g, '-')}`); at ? at.scrollIntoView({ block: 'start' }) : reader.querySelector('h1')?.focus({ preventScroll: true }); };
-    return [scrim, el('div', { class: 'read rp-sheet-body' }, el('span', { class: 'rp-grab', 'aria-hidden': 'true' }), el('div', { class: 'rp-shd' }, el('p', { class: 'rp-what', dir: 'auto' }, projectMark(d.group), el('span', {}, what)), x),
-      h1, d.about ? el('p', { class: 'about', dir: 'auto' }, plain(d.about)) : '', found ? el('p', { class: 'ui-dl' }, d.guided ? 'What it found' : 'What it decided') : '', found ? el('div', { class: 'ui-props rp-found', dir: 'auto' }, plain(found)) : '',
+    // Its head names its kind, then the project and day; under the title, what this kind of report is for; over its parts, a strip of them and the next to read.
+    return [scrim, el('div', { class: 'read rp-sheet-body' }, el('span', { class: 'rp-grab', 'aria-hidden': 'true' }), el('div', { class: 'rp-shd' }, el('p', { class: 'rp-what', dir: 'auto' }, kindChip(d, true), el('span', { class: 'rp-when' }, what)), x),
+      h1, purposeLine(d), d.about ? el('p', { class: 'about', dir: 'auto' }, plain(d.about)) : '', found ? el('p', { class: 'ui-dl' }, d.guided ? 'What it found' : 'What it decided') : '', found ? el('div', { class: 'ui-props rp-found', dir: 'auto' }, plain(found)) : '', ...src,
       ...reportParts(d, full), ticketRow(d), thread(d), page ?? '', dismissReport(d))];
   }
-  /** A report's parts as one panel, each with a check once read, then for a guided report Read the report: a part or the button opens it in full (at that part). */
+  /** A report's parts as one panel, each with a check once read, under a strip of them and the next one to read, then for a guided report Read the report:
+   *  a part or the button opens it in full (at that part). A report 5's parts are its kind's. */
   function reportParts(d, full) {
-    const ps = rpParts(d), n = ps.filter(([p]) => partRead(d, p)).length;
+    const ps = kindParts(d), n = ps.filter(([p]) => partRead(d, p)).length;
     const parts = ps.map(([p, name]) => { const b = el('button', { class: 'ui-pr rp-part', 'aria-label': `${name}, ${partRead(d, p) ? 'read' : 'not read yet'}` }, el('span', { class: 'k', dir: 'auto' }, name),
       el('span', { class: `rp-check${partRead(d, p) ? ' on' : ''}`, 'aria-hidden': 'true' }, partRead(d, p) ? glyph('check') : '')); b.onclick = () => full(p); return b; });
     const open = d.guided ? el('button', { class: 'rp-open-full rp-open', 'data-kbd': '↵', 'aria-keyshortcuts': 'Enter' }, 'Read the report') : '';
     if (open) open.onclick = () => full();
-    return ps.length ? [el('p', { class: 'ui-dl' }, `Read ${n} of ${plural(ps.length, 'part')}`), el('div', { class: 'ui-props rp-parts' }, ...parts), open] : [];
+    return ps.length ? [el('p', { class: 'ui-dl' }, `Read ${n} of ${plural(ps.length, 'part')}`), stripRow(d), el('div', { class: 'ui-props rp-parts' }, ...parts), open] : [];
+  }
+  /** A research report's Sources: how many sources it links and how many are what users report, each opening the report at its sources part. */
+  function sourcesPanel(d, open) {
+    const c = sourcesOf(d);
+    if (!c) return [];
+    const row = (name, n, glyphName) => { const b = el('button', { class: 'ui-pr rp-src' }, el('span', { class: 'k' }, glyph(glyphName), name), el('span', { class: 'v' }, el('span', { class: 'n' }, String(n)), glyph('right'))); b.onclick = () => open(c.id); return b; };
+    return [el('p', { class: 'ui-dl' }, 'Sources'), el('div', { class: 'ui-props rp-sources' }, row('Linked sources', c.n, 'link'), row('What users report', c.users, 'users'))];
   }
   /** Dismiss moved from the list row to the report's own page; once it is dismissed the page closes back to the list. */
   function dismissReport(d) {
@@ -4174,13 +4268,39 @@
 
   /** Newest or By project, this browser's choice; Newest shows six on a phone until See all. */
   let rpBy = (() => { try { return localStorage.getItem('sign-off-reports-by') === 'project' ? 'project' : 'new'; } catch { return 'new'; } })(), rpAll = false;
-  /** Reports' head under the title: Newest or By project, then how many are still to read of all listed, and how many were filed this week (the archived ones too). */
-  function reportsHead(items) {
+  /** The kind Reports lists, '' for every kind; kept while the board is open, as Evidence keeps its project. */
+  let rpKind = '';
+  /** Reports listed under the kind picked (all of them with none). */
+  const ofKind = (items) => (rpKind ? items.filter((d) => kindOf(d) === rpKind) : items);
+  /** The title's filter button, beside the light-or-dark one, while more than one kind is listed (or one is picked): a sheet of Every kind and each kind listed,
+   *  its tile, full name, what it is for and how many; a kind picked shows a 1 on the button and its pill in the hero's place. */
+  function kindFilter(items) {
+    const counts = new Map();
+    for (const d of items) counts.set(kindOf(d), (counts.get(kindOf(d)) ?? 0) + 1);
+    if (counts.size < 2 && !rpKind) return '';
+    const b = el('button', { class: 'ui-rb ev-fb rp-fb', 'aria-haspopup': 'dialog', 'aria-label': rpKind ? `Filter by kind, ${KINDS[rpKind][1]} shown` : 'Filter by kind' }, evGlyph('filter'), rpKind ? el('b', { 'aria-hidden': 'true' }, '1') : '');
+    b.onclick = () => openSheet('Filter by kind', el('div', { class: 'ui-props ev-pick rp-pick' }, ...['', ...Object.keys(KINDS).filter((k) => counts.has(k))].map((k) => {
+      const on = k === rpKind, x = el('button', { class: 'ui-pr', 'aria-pressed': String(on), 'data-kind': k || 'all' },
+        el('span', { class: 'k' }, kindTile(k), el('span', { class: 'kn' }, k ? KINDS[k][1] : 'Every kind', k ? el('small', {}, KINDS[k][2]) : '')),
+        el('span', { class: 'v' }, el('span', { class: 'n' }, String(k ? counts.get(k) : items.length)), on ? evGlyph('check') : el('i')));
+      x.onclick = () => { rpKind = k; rpAll = false; sheet.close(); render(); document.querySelector('.rp-fb')?.focus({ preventScroll: true }); };
+      return x;
+    })));
+    return b;
+  }
+  /** Reports' head under the title: Newest or By project, then how many are still to read of all listed, and how many were filed this week (the archived ones too);
+   *  with a kind picked, its pill in the hero's place: its tile, its name, how many of all, and a close that shows every kind again. */
+  function reportsHead(items, all = items) {
     const seg = el('div', { class: 'ui-seg rp-seg', role: 'group', 'aria-label': 'Order' }, ...[['new', 'Newest'], ['project', 'By project']].map(([v, name]) => {
       const b = el('button', { 'aria-pressed': String(rpBy === v) }, name);
       b.onclick = () => { rpBy = v; try { localStorage.setItem('sign-off-reports-by', v); } catch {} buzz('tick'); render(); };
       return b;
     }));
+    if (rpKind) {
+      const x = el('button', { class: 'ev-unpick', 'aria-label': 'Show every kind' }, glyph('x'));
+      x.onclick = () => { rpKind = ''; render(); document.querySelector('.rp-fb')?.focus({ preventScroll: true }); };
+      return [seg, el('div', { class: 'ui-card ev-pill rp-pill' }, kindTile(rpKind), el('span', { dir: 'auto' }, KINDS[rpKind][1], el('small', {}, `${items.length} of ${all.length}`)), x)];
+    }
     const week = state.decisions.filter((d) => area(d) === 'reports' && d.filed && Date.now() - Date.parse(d.filed) < 7 * 864e5).length;
     return [seg, el('section', { class: 'ui-card ui-hero rp-hero' }, el('div', { class: 'hl' }, el('span', { class: 'lab' }, 'Still to read')),
       el('div', { class: 'hv' }, el('span', { class: 'big' }, String(items.filter(unread).length), el('small', {}, ` of ${items.length}`)), el('span', { class: 'vs' }, `${week} filed this week`)))];
@@ -4728,7 +4848,7 @@
     const gone = canDismiss() ? el('button', { class: 'rp-archive', 'data-kbd': 'E', 'aria-keyshortcuts': 'E' }, glyph('archive'), 'Archive') : '';
     if (gone) gone.onclick = () => archiveReport(d);
     const url = d.guided ? '' : src(mockUrl(d.key, '', d.view)), found = d.guided ? d.visual?.heading : d.decided;
-    const what = [d.guided ? 'Guided report' : FORMS[d.form]?.[0] ?? (kind(d) || 'Report'), d.group, d.filed ? day(d.filed) : ''].filter(Boolean).join(' · ');
+    const what = [d.group, d.filed ? day(d.filed) : ''].filter(Boolean).join(' · ');
     const full = (part) => { rpFull = d.key; render(); const at = part && document.getElementById(`gd-${part.replace(/\W/g, '-')}`); at ? at.scrollIntoView({ block: 'start' }) : reader.querySelector('h1')?.focus({ preventScroll: true }); };
     // A guided report's key points, as the prototype's open report shows them: what you asked and when it is done, its own chart (a bar per row, longest full), and what it found
     // item by item, each with a dot by its tone; its next step sits beside its parts.
@@ -4740,12 +4860,14 @@
         x.items?.length ? el('ul', { class: 'rp-kp' }, ...x.items.map((i) => el('li', { class: i.tone ?? '' }, el('b', { dir: 'auto' }, plain(i.title)), i.text ? el('span', { dir: 'auto' }, plain(i.text)) : ''))) : ''])];
     const next = d.guided && d.next ? [el('p', { class: 'ui-dl' }, 'Next step'), el('div', { class: 'ui-props rp-next' }, el('b', { dir: 'auto' }, plain(d.next.heading)), ...(d.next.lines ?? []).map((l) => el('p', { dir: 'auto' }, plain(l))))] : [];
     return split(top, sub, [page], el('section', { class: `ui-card ui-pane s8 split-detail${d.guided ? ' two' : ''}`, 'aria-labelledby': 'report-title' },
-      el('div', { class: 'ui-shd split-bar rp-bar' }, cardTile(d), el('span', { dir: 'auto' }, what), read, gone),
+      // The bar names the report's kind beside its project and day; under the title, what this kind of report is for.
+      el('div', { class: 'ui-shd split-bar rp-bar' }, cardTile(d), kindChip(d, true), el('span', { dir: 'auto' }, what), read, gone),
       // The page is kept across redraws while this signature holds, so marking it read or a change elsewhere on the board does not load its frame again.
-      el('div', { class: 'pmain read', 'data-sig': JSON.stringify([d.key, url, d.title, d.about, found]) }, el('h1', { id: 'report-title', class: 'dt', dir: 'auto' }, plain(d.title)),
+      el('div', { class: 'pmain read', 'data-sig': JSON.stringify([d.key, url, d.title, d.about, found]) }, el('h1', { id: 'report-title', class: 'dt', dir: 'auto' }, plain(d.title)), purposeLine(d),
         d.about ? el('p', { class: 'dp', dir: 'auto' }, plain(d.about)) : '', found ? el('p', { class: 'ui-dl' }, d.guided ? 'What it found' : 'What it decided') : '', found ? el('div', { class: 'ui-props rp-found', dir: 'auto' }, plain(found)) : '',
         ...keys, url ? el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }) : ''),
-      el('div', { class: 'pside' }, ...reportParts(d, full), ...next, ticketRow(d), thread(d))));
+      // A research report's Sources, then its parts.
+      el('div', { class: 'pside' }, ...sourcesPanel(d, full), ...reportParts(d, full), ...next, ticketRow(d), thread(d))));
   }
   /** Every key, in one sheet behind ?. A desk hints each where it works; they work at any width with a keyboard. */
   const MOD = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
@@ -4830,7 +4952,9 @@
     const deskSplit = !phone() && ((at === 'waiting' || at === 'decide' || at === 'reports') && !state.readonly || at === 'evidence'), head = at === 'decide' ? 'waiting' : at;
     deskSel = null;
     // A report in the address is shown (and read) beside the list; with none, the newest is shown, not yet marked read.
-    const newest = [...by.reports].filter(reads).sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0))[0];
+    // A kind that no longer lists anything is let go; the newest shown is the newest of the kind listed.
+    if (rpKind && !by.reports.some((d) => kindOf(d) === rpKind)) rpKind = '';
+    const newest = ofKind(by.reports).filter(reads).sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0))[0];
     const shownReport = deskSplit && at === 'reports' ? (key && by.reports.find((d) => d.key === key && reads(d))) || newest : undefined;
     rpSel = deskSplit && at === 'reports' ? shownReport?.key ?? '' : null;
     // It is read once per visit, so Mark unread on it holds through the redraws that follow.
@@ -4876,15 +5000,16 @@
     ro ? el('p', { class: 'meta' }, ro) : '',
     head === 'answered' && by.answered.length ? el('p', { class: 'lede' }, (() => { const n = by.answered.filter((d) => isToday(state.answers[d.key].at)).length; return `${n} ${n === 1 ? 'answer' : 'answers'} today. Each one has gone back to its agent.`; })())
       : head === 'designs' && by.designs.length ? el('p', { class: 'lede' }, 'Designs to look over. Approve one, or say what should change.') : '',
-    head === 'reports' && !selecting && !state.readonly && !FROZEN ? themeButton() : bulkBar(bulk));
+    head === 'reports' && !selecting && !state.readonly ? kindFilter(by.reports) : '', head === 'reports' && !selecting && !state.readonly && !FROZEN ? themeButton() : bulkBar(bulk));
     const board = document.getElementById('board');
     board.removeAttribute('aria-busy');
     const listTop = document.querySelector('.split-list')?.scrollTop;
     // An update in the address opens even when the list leaves it off (a failed run); with none, the newest is selected.
     // Reports' list: Newest or By project and what is still to read, the legend (only while a report with no page lists its steps in place), the lists, Notes and Archived;
     // on a desk an empty board says so in the pane beside it.
-    const rpPage = () => el('div', { class: `rp-page${rpRisen ? '' : ' rise'}` }, ...(by.reports.length ? reportsHead(by.reports) : []), by.reports.some((d) => d.steps && !reads(d)) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
-      ...(by.reports.length ? reportGroups(by.reports) : rpSel !== null ? [] : [el('div', { class: 'all-clear-big' }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, 'Nothing to read'), el('p', {}, EMPTY.reports))]),
+    const listed = ofKind(by.reports);
+    const rpPage = () => el('div', { class: `rp-page${rpRisen ? '' : ' rise'}` }, ...(by.reports.length ? reportsHead(listed, by.reports) : []), listed.some((d) => d.steps && !reads(d)) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
+      ...(by.reports.length ? reportGroups(listed) : rpSel !== null ? [] : [el('div', { class: 'all-clear-big' }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, 'Nothing to read'), el('p', {}, EMPTY.reports))]),
       notes(by.notes), dismissed(state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && ['reports', 'notes'].includes(area(d))), 'Archived'),
       !selecting && !state.readonly && !FROZEN && bulk.length ? reportsMore(by.reports, bulk) : '');
     const update = at === 'evidence' && ((key && state.decisions.find((d) => d.key === key && !gone.has(d.key) && d.type === 'evidence')) || by.evidence.find((d) => d.type === 'evidence'));

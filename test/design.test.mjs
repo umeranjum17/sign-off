@@ -936,7 +936,7 @@ test('each card has one place to type: Add a comment holds the note sent with th
   assert.doesNotMatch(reports, /aria-label="Dismiss, How it ships"/);
   // Newest heads one card of rows; the row is a link that opens it, with its project's initials (it has no icon), its title, then a bar of how much of it is read with its percent.
   assert.match(reports, /<h2 class="dl-head ui-sec" style="--n:0">Newest<\/h2><ul class="dl-list rp-list ui-card ui-list" aria-label="Newest">/);
-  assert.match(reports, /<a class="dl-face ui-row" href="#reports\/how" draggable="false" id="item-how" data-row=""><span class="ui-icon" aria-hidden="true"><i class="mono">HW<\/i><\/span>.*?<span class="t" dir="auto">How it ships<\/span>.*?<span class="l2"><span class="ui-bar"><i style="width: 0%"><\/i><\/span><span class="pct">0%<\/span><\/span>/s);
+  assert.match(reports, /<a class="dl-face ui-row" href="#reports\/how" draggable="false" id="item-how" data-row=""><span class="ui-icon" aria-hidden="true"><i class="mono">HW<\/i><\/span>.*?<span class="t" dir="auto">How it ships<\/span>.*?<span class="l2"><span class="rkc k-\w+" data-kind="\w+">.*?<\/span><span class="ui-bar"><i style="width: 0%"><\/i><\/span><span class="pct">0%<\/span><\/span>/s);
   // Under the row, a swipe right marks it read and a swipe left archives it.
   assert.match(reports, /<div class="dl-act yes" aria-hidden="true">.*?<span>Read<\/span><\/div><div class="dl-act later" aria-hidden="true">.*?<span>Archive<\/span><\/div>/s);
   // Only the report is a row and counted; the text-only one is folded under Notes, a short row with no page to open.
@@ -960,9 +960,9 @@ test('each card has one place to type: Add a comment holds the note sent with th
       inert: document.querySelector('main').inert, src: reader.querySelector('iframe').getAttribute('src'), sandbox: reader.querySelector('iframe').getAttribute('sandbox'),
       frame: [f.x, Math.round(f.width) === reader.querySelector('.read').clientWidth - 32], back: reader.querySelector('.rp-x').getAttribute('aria-label'), what: reader.querySelector('.rp-what').textContent,
       decided: [...reader.querySelectorAll('.ui-dl, .rp-found')].map((e) => e.textContent) }; })()`))?.src === '/mock/local/how~/index.html');
-    // The page sits in a tile inside the sheet's 16px gutters, under what it is, its title and what it decided.
+    // The page sits in a tile inside the sheet's 16px gutters, under its kind (an older report's, guessed), its title and what it decided.
     assert.deepEqual(open, { hidden: false, title: 'How it ships', inert: true, src: '/mock/local/how~/index.html', sandbox: 'allow-scripts', frame: [16, true], back: 'Close',
-      what: `HWDiagram · How it works · ${new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(new Date())}`, decided: ['What it decided', 'Ships only when the check passes.'] });
+      what: `Other reportHow it works · ${new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(new Date())}`, decided: ['What it decided', 'Ships only when the check passes.'] });
     // The page itself is served: the filled scaffold, with its steps to tap.
     assert.match(await (await fetch(new URL('/mock/local/how~/index.html', url))).text(), /<button type="button" class="next">Next<\/button>/);
     await tap(await at('#reader .rp-x'));
@@ -1960,7 +1960,8 @@ test('Reports on a desk: the list beside the newest report, J moves and reads, U
   await evaluate(`location.href = ${JSON.stringify(`${url}#reports`)}`);
   // The newest report is shown beside the list, not yet marked read; its head line says what it is and the day, beside Mark read and Archive.
   await until(async () => (await seen()) === `#reports|alpha|Alpha report|4`);
-  assert.match(await evaluate('document.querySelector(".rp-bar > span[dir]").textContent'), /^Before and after · \d{1,2} [A-Z][a-z]{2}$/);
+  // The bar names the report's kind (an older report's, guessed from its words), then its day.
+  assert.match(await evaluate('[document.querySelector(".rp-bar .rkc").textContent, document.querySelector(".rp-bar > span[dir]").textContent].join("|")'), /^Other report\|\d{1,2} [A-Z][a-z]{2}$/);
   assert.equal(await evaluate('[...document.querySelectorAll(".rp-bar button")].map((b) => b.textContent).join(",") + "|" + !!document.querySelector(".split-detail .read iframe")'), 'Mark read,Archive|true');
   assert.equal(await rows(), `alpha,beta,${guided.key},gamma`);
   assert.equal(reads(), '');
@@ -1992,6 +1993,73 @@ test('Reports on a desk: the list beside the newest report, J moves and reads, U
   await until(() => narrow.evaluate('!document.getElementById("reader").hidden && document.querySelector("#reader h1")?.textContent === "Gamma report"'));
   assert.equal(await narrow.evaluate('!!document.querySelector(".split") + "|" + getComputedStyle(document.querySelector(".tabs")).display'), 'false|flex');
   narrow.close();
+  proc.kill();
+});
+
+test('report kinds and their workflows: post names what a report is for and holds it to its kind\'s parts, report init writes them, each row leads with its kind (an older report\'s guessed, a plan\'s bar its parts), Filter by kind lists only that kind under its pill, a report\'s head names its kind over a line on what it is for, its parts strip and the next one, and research shows its sources, on a phone and a desk', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'report-kinds'), file = join(dir, 'board.json');
+  mkdirSync(join(dir, 'diagrams'), { recursive: true });
+  writeFileSync(join(dir, 'diagrams', 'flow.html'), readFileSync(new URL('../.agents/skills/done-done-verify-sign-off/diagram-sample/flow.html', import.meta.url)));
+  const at = (m) => new Date(Date.now() - m * 60e3).toISOString().replace(/\.\d+Z$/, 'Z'), base = JSON.parse(readFileSync(new URL('../fixtures/contract/report.v5/valid-full.json', import.meta.url), 'utf8'));
+  const post = (name, m) => { writeFileSync(join(dir, `${name}.json`), JSON.stringify(m)); return run('post', file, '--kind', 'report', '--from', join(dir, `${name}.json`)); };
+  // A report 5 must say what it is for, one of the seven kinds, and have each part of its kind; nothing is written when it does not.
+  const { purpose, ...none } = { ...base, key: 'no-kind', filed: at(9) };
+  for (const [m, rule] of [[none, /purpose is required[^]*research, plan, decision, audit, incident, status, other/], [{ ...none, purpose: 'Research' }, /purpose \\?"Research\\?" is not one of research, plan/],
+    [{ ...base, key: 'no-plan', purpose: 'plan', sections: base.sections.map(({ part, ...x }) => x) }, /sections has no \\?"goal\\?" part \(Goal and non-goals\): a plan report needs goal, current, design, slices, tests, risks, rollout, estimate, owner-calls[^]*report init <new folder> --purpose plan/]]) {
+    const r = post('bad', m);
+    assert.equal(r.code, 2, r.out); assert.match(r.out, rule);
+  }
+  assert.ok(!existsSync(file) || !/no-kind|no-plan/.test(readFileSync(file, 'utf8')));
+  // report init --purpose writes the kind's parts to fill, each a section naming its part; posted as it is, it is refused for its FILL lines.
+  assert.equal(run('report', 'init', join(dir, 'tmpl'), '--purpose', 'plan').code, 0);
+  const tmpl = JSON.parse(readFileSync(join(dir, 'tmpl', 'report.json'), 'utf8'));
+  assert.deepEqual([tmpl.schema, tmpl.purpose, tmpl.sections.map((x) => x.part).join(',')], [5, 'plan', 'goal,current,design,slices,tests,risks,rollout,estimate,owner-calls']);
+  assert.match(run('post', file, '--kind', 'report', '--from', join(dir, 'tmpl', 'report.json')).out, /still has FILL: lines/);
+  // A full plan: every part, the design with its diagram, each slice sized, each tested.
+  const sec = (part, heading, more = {}) => ({ id: part, part, stage: 'found', heading, body: `${heading}, in a line.`, ...more });
+  const plan = { ...base, key: 'k-plan', purpose: 'plan', title: 'Move settings into the profile page', filed: at(1), sections: [sec('goal', 'Goal and non-goals'), sec('current', 'How it works today'),
+    sec('design', 'Design', { diagram: [{ label: 'Flow', src: 'diagrams/flow.html' }] }), sec('slices', 'Slices', { items: [{ title: 'Move the page', text: 'Settings open from the profile.', size: 'S, half a day' }] }),
+    sec('tests', 'Tests and proof', { items: [{ title: 'Move the page', text: 'A browser test opens it from the profile.' }] }), sec('risks', 'Risks and rollback'), sec('rollout', 'Rollout'), sec('estimate', 'Time'), sec('owner-calls', 'Your calls')] };
+  assert.equal(post('plan', plan).code, 0);
+  assert.equal(post('research', { ...base, key: 'k-research', filed: at(2) }).code, 0);
+  assert.equal(post('retro', { ...JSON.parse(readFileSync(new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url), 'utf8')), key: 'k-retro', title: 'Why messages were sent twice: a retro', filed: at(3) }).code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  for (const part of ['goal', 'current', 'design']) await fetch(`${url}api/reads`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: 'k-plan', part }) });
+  const { evaluate, close } = await browse(join(dir, 'b'), 390, 844, true);
+  const rows = () => evaluate('[...document.querySelectorAll(".rp-list .ui-row")].map((r) => [r.querySelector(".t").textContent, r.querySelector(".l2 .rkc")?.textContent, r.querySelector(".l2 .rp-strip") ? [...r.querySelectorAll(".rp-strip > i")].map((i) => +i.classList.contains("on")).join("") : "bar", r.querySelector(".pct").textContent].join(" ")).join("|")');
+  await evaluate(`location.href = ${JSON.stringify(`${url}#reports`)}`);
+  // Each row leads its second line with its kind; the plan's bar is its nine parts, three read; the older report's kind is the board's guess.
+  await until(async () => (await rows()) === `Move settings into the profile page Plan 111000000 33%|${base.title} Research bar 0%|Why messages were sent twice: a retro Incident bar 0%`);
+  // Filter by kind lists each kind with its count; a kind picked leaves only its reports under its pill, and the pill's close lists them all again.
+  await evaluate('document.querySelector(".rp-fb").click()');
+  await until(async () => (await evaluate('[...document.querySelectorAll("#sheet[open] .rp-pick .ui-pr")].map((b) => b.dataset.kind + " " + b.querySelector(".n").textContent).join(",")')) === 'all 3,research 1,plan 1,incident 1');
+  await evaluate('document.querySelector("#sheet .rp-pick [data-kind=\\"incident\\"]").click()');
+  await until(async () => (await rows()) === 'Why messages were sent twice: a retro Incident bar 0%' && (await evaluate('document.querySelector(".rp-pill").textContent + "|" + document.querySelector(".rp-fb b").textContent + "|" + !document.querySelector(".rp-hero")')) === 'Incident and retro1 of 3|1|true');
+  await evaluate('document.querySelector(".rp-pill .ev-unpick").click()');
+  await until(async () => (await rows()).split('|').length === 3 && !(await evaluate('!!document.querySelector(".rp-pill, .rp-fb b")')));
+  // A report's sheet heads with its kind's full name, then a line on what it is for, and over its kind's parts a strip of them with the next one to read.
+  await evaluate('document.querySelector("#item-k-plan").click()');
+  await until(async () => (await evaluate('[".rp-what .rkc", ".rp-for", ".rp-next"].map((s) => document.querySelector("#reader " + s)?.textContent).join("|") + "|" + [...document.querySelectorAll("#reader .rp-strip-row .rp-strip > i")].map((i) => +i.classList.contains("on")).join("") + "|" + document.querySelectorAll("#reader .rp-part").length'))
+    === 'Implementation plan|How the work gets built, step by step, before it starts.|Next: Slices|111000000|9');
+  // Research shows its sources, how many link out and how many are what users report; a tap opens the report at its sources, each with its tag and link.
+  await evaluate(`location.href = ${JSON.stringify(`${url}#reports`)}`);
+  await until(() => evaluate('!!document.querySelector("#item-k-research")'));
+  await evaluate('document.querySelector("#item-k-research").click()');
+  await until(async () => (await evaluate('[...document.querySelectorAll("#reader .rp-src")].map((b) => b.textContent).join("|")')) === 'Linked sources3|What users report1');
+  await evaluate('document.querySelector("#reader .rp-src").click()');
+  await until(async () => (await evaluate('[...document.querySelectorAll("#gd-sources .gd-tag")].map((t) => t.textContent).join(",") + "|" + [...document.querySelectorAll("#gd-sources .gd-src")].map((a) => a.textContent + " " + a.target).join(",")'))
+    === 'Primary source,Primary source,User report|Open on docs.ntfy.sh _blank,Open on pushover.net _blank,Open on github.com _blank');
+  close();
+  // On a desk the bar names the kind, the line on what it is for sits under the title, and beside the report the strip, the next part and its kind's parts each with its check.
+  const desk = await browse(join(dir, 'd'), 1280, 800);
+  await desk.evaluate(`location.href = ${JSON.stringify(`${url}#reports`)}`);
+  await until(() => desk.evaluate('!!document.querySelector(".split-list #item-k-plan")'));
+  await desk.evaluate('document.querySelector(".split-list #item-k-plan").click()');
+  await until(async () => (await desk.evaluate('document.querySelector(".rp-bar .rkc")?.textContent + "|" + document.querySelector(".split-detail .rp-for")?.textContent + "|" + [...document.querySelectorAll(".split-detail .rp-strip-row .rp-strip > i")].map((i) => +i.classList.contains("on")).join("") + "|" + document.querySelector(".split-detail .rp-next")?.textContent + "|" + document.querySelectorAll(".split-detail .rp-part").length'))
+    === 'Implementation plan|How the work gets built, step by step, before it starts.|111000000|Next: Slices|9');
+  desk.close();
   proc.kill();
 });
 
@@ -4153,7 +4221,9 @@ test('the new look draws only the approved prototype\'s colours: Today, Decide, 
     ['post', file, '--kind', 'ask', '--from', fileOf('pick.json', { ...JSON.parse(readFileSync(join(fx, 'ask.v1/valid-pick-one.json'), 'utf8')), merges: undefined })],
     ['post', file, '--type', 'evidence', '--ticket', 'T-29', '--title', 'Settings on a phone', '--about', 'Umer changes the theme in one tap.', '--media', join(dir, 'shot.png')],
     ['post', file, '--kind', 'design', '--from', fileOf('design.json', { ...JSON.parse(readFileSync(join(fx, 'design.v1/valid-basic.json'), 'utf8')), filed: now }), '--ticket', 'T-40'],
-    ['post', file, '--kind', 'report', '--priority', 'P2', '--from', fileOf('report.json', { ...JSON.parse(readFileSync(join(fx, 'report.v4/valid-full.json'), 'utf8')), filed: now })],
+    // An older report whose kind the board guesses, then a research report (its sheet shows its Sources), so Reports draws its kind filter and two kinds' chips.
+    ['post', file, '--kind', 'report', '--from', fileOf('report-old.json', { ...JSON.parse(readFileSync(join(fx, 'report.v4/valid-minimal.json'), 'utf8')), title: 'Where the weekly digest stands', filed: now })],
+    ['post', file, '--kind', 'report', '--priority', 'P2', '--from', fileOf('report.json', { ...JSON.parse(readFileSync(join(fx, 'report.v5/valid-full.json'), 'utf8')), filed: now })],
     ['post', file, '--kind', 'plan', '--from', join(fx, 'plan.v3/valid-full.json')],
     ['post', file, '--type', 'signin', '--key', 'npm', '--service', 'npm', '--link', 'https://example.com/login', '--unlocks', 'Publishing the release', '--waits', 'Release agent'],
   ]) { const r = run(...args); assert.equal(r.code, 0, `${args.join(' ')}\n${r.out}`); }
@@ -4166,7 +4236,7 @@ test('the new look draws only the approved prototype\'s colours: Today, Decide, 
   // Each state: its address and what is tapped on it, on a phone and on a desk; a report tapped in its list opens its own screen (a sheet on a phone, beside the list on a desk).
   const states = {
     390: [['#', ''], ['#', '.t-more-line'], ['#find', ''], ['#answered', ''], ['#waiting', ''], ['#decide/release-day', '.decide [role="radio"], .decide input[type="radio"]'], ['#decide/npm', ''],
-      ['#reports', ''], [`#reports/${keys.report}`, ''], ['#reports', `.rp-list a[data-row][href="#reports/${keys.report}"]`], ['#decide/ask-linked', ''], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#evidence', ''], ['#evidence', '.ev-more'], [`#evidence/${keys.evidence}`, ''], ['#tickets', ''], ['#ticket/T-29', ''],
+      ['#reports', ''], ['#reports', '.rp-fb'], [`#reports/${keys.report}`, ''], ['#reports', `.rp-list a[data-row][href="#reports/${keys.report}"]`], ['#decide/ask-linked', ''], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#evidence', ''], ['#evidence', '.ev-more'], [`#evidence/${keys.evidence}`, ''], ['#tickets', ''], ['#ticket/T-29', ''],
       // Last, an answer and the toast it raises: a yes/no in light, the pick-one in dark.
       [(theme) => (theme === 'light' ? '#decide/ask-plain' : '#decide/release-day'), ['.decide .pick-option', '.decide-bar .answer']]],
     1280: [['#', ''], ['#waiting', ''], ['#decide/ask-linked', ''], ['#reports', ''], ['#reports', `.rp-list a[data-row][href="#reports/${keys.report}"]`], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#evidence', ''], ['#tickets', ''], ['#ticket/T-29', '']],

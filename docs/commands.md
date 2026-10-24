@@ -6,7 +6,7 @@ Every command takes `--help`. Output is compact, with next-step hints.
 `--version` prints the version this copy runs, and the help header and the board (the sidebar's foot, Today's More) show it: run from a git checkout whose HEAD carries no tag for that version it is `<version>-dev`, a pre-release version says `pre-release`, and an installed copy shows its version as published.
 The CLI is driven from a shell with no setup. Ordinary commands call no model;
 the opt-in `owner --dispatch` resumes an installed Claude Code author session.
-Guided plan 3 / report 4 add **Simplify this**. Inspect version-1 action/target fields with `deeper --json --all`; active replies require the matching `--filer`, while registered owners acknowledge before answering. Keep listening after reports and sent plans. See [the engagement contract](contract.md#report-schema-4-and-plan-schema-3-engagement-v1).
+Guided plan 3 / report 4 and 5 add **Simplify this**. Inspect version-1 action/target fields with `deeper --json --all`; active replies require the matching `--filer`, while registered owners acknowledge before answering. Keep listening after reports and sent plans. See [the engagement contract](contract.md#report-schema-4-and-plan-schema-3-engagement-v1).
 
 | Command | In a few words |
 |---|---|

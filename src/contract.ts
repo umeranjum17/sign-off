@@ -2,18 +2,20 @@
 import { createHash } from 'node:crypto';
 import { accessSync, constants, readFileSync, realpathSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
-import { isKey, MEDIA_MAX, PRIORITIES, REPORT_FORMS } from './store.js';
+import { isKey, MEDIA_MAX, PRIORITIES, REPORT_FORMS, REPORT_PARTS, REPORT_PURPOSES } from './store.js';
 
 /** A message that does not match: what is wrong, and the one line that says how to fix it. */
 export class ContractError extends Error {
   constructor(message: string, readonly help: string) { super(message); }
 }
 /** The kinds, with the schema number of each. */
-export const SCHEMAS: Record<string, number> = { ask: 1, report: 4, evidence: 1, gate: 1, finding: 1, plan: 3, design: 1 };
-/** Older schemas this sign-off-axi still takes, so a board that holds them loads and re-posts: the page-based report 2 and plan 1. */
-const OLDER: Record<string, number[]> = { report: [2, 3], plan: [1, 2] };
+export const SCHEMAS: Record<string, number> = { ask: 1, report: 5, evidence: 1, gate: 1, finding: 1, plan: 3, design: 1 };
+/** Older schemas this sign-off-axi still takes, so a board that holds them loads and re-posts: the page-based report 2, the guided report 3 and 4 (4 with no purpose), and plan 1 and 2. */
+const OLDER: Record<string, number[]> = { report: [2, 3, 4], plan: [1, 2] };
 /** The guided schemas: a report 3 and a plan 2 are fields the board draws as one guided page, not a page the agent draws. */
-export const guided = (m: any) => (m?.kind === 'report' && [3, 4].includes(m.schema)) || (m?.kind === 'plan' && [2, 3].includes(m.schema));
+export const guided = (m: any) => (m?.kind === 'report' && [3, 4, 5].includes(m.schema)) || (m?.kind === 'plan' && [2, 3].includes(m.schema));
+/** The schemas with versioned engagement, whose owning filer is required: report 4 and 5, plan 3. */
+export const engaged = (m: any) => (m?.kind === 'report' && [4, 5].includes(m.schema)) || (m?.kind === 'plan' && m.schema === 3);
 export const KINDS = Object.keys(SCHEMAS);
 const COMMON = ['contract', 'kind', 'schema', 'key', 'title', 'filer', 'ticket', 'priority', 'link', 'about'];
 const FIELDS: Record<string, string[]> = {
@@ -27,7 +29,7 @@ const FIELDS: Record<string, string[]> = {
 };
 const GUIDE = ['understood', 'visual', 'sections', 'next'];
 const GUIDE_FIELDS: Record<string, string[]> = {
-  report: [...COMMON, 'filed', 'group', 'decided', 'asked_by', ...GUIDE],
+  report: [...COMMON, 'filed', 'group', 'decided', 'asked_by', 'purpose', ...GUIDE],
   plan: [...COMMON, 'project', 'decisions', ...GUIDE],
 };
 /** A done-done run: its id, full commit and the four Checks lines. */
@@ -177,6 +179,29 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
     text(`${field}[${n}].src`, o.src, 256, 'a page path from the board file\'s folder, such as "diagrams/flow.html"');
     if (/^([\\/]|[A-Za-z]:)/.test(o.src) || o.src.split(/[\\/]/).includes('..') || /[?#\\]/.test(o.src) || !/\.html?$/i.test(o.src)) throw bad(`${field}[${n}].src`, `${show(o.src)} must be a relative .html path with no .., ?, # or \\`, 'Draw the diagram as inline SVG in an .html page (by hand or with the archify skill), then set "src" to that file next to the message');
   });
+  /** A report 5's parts: each part of its kind once, in a section naming it, with what that part needs (a source's link, a finding's confidence, a slice's size, a design's diagram). */
+  const kindParts = (parts: [string, string][]) => {
+    const init = `Run \`${REPORT_INIT.replace('<folder>', '<new folder>')} --purpose ${m.purpose}\` for a template with every part, or add the section`;
+    const of = (part: string) => m.sections.findIndex((o: any) => o.part === part), items = (part: string) => m.sections[of(part)].items ?? [];
+    for (const [part, name] of parts) {
+      const at = of(part), twice = m.sections.findIndex((o: any, n: number) => o.part === part && n > at);
+      if (at < 0) throw bad('sections', `has no ${show(part)} part (${name}): a ${m.purpose} report needs ${parts.map(([p]) => p).join(', ')}`, `Add a section with "part": ${show(part)}, ${name.toLowerCase()}. ${init}`);
+      if (twice >= 0) throw bad(`sections[${twice}].part`, `repeats ${part}`, 'Give each part one section');
+    }
+    const need = (part: string, ok: boolean, rule: string, help: string) => { if (!ok) throw bad(`sections[${of(part)}]`, `(${part}) ${rule}`, help); };
+    if (m.purpose === 'research') {
+      need('sources', items('sources').length >= 3 && items('sources').every((it: any) => it.link && it.source), 'must list at least 3 sources, each with its "link" and "source"', 'List each source as an item with "link" (where to read it) and "source": "primary" (docs, code, a maintainer) or "user" (what users report)');
+      need('sources', items('sources').some((it: any) => it.source === 'user'), 'must hold at least one user report ("source": "user")', 'Add what users report, with its link: a GitHub issue, a forum thread, Reddit, Hacker News or X; if a site blocked you, say so in "not-checked"');
+      need('options', items('options').length >= 2, 'must compare at least 2 options, one item each', 'Give each option an item with the same axes in "more", one "Axis: value." per line, so the board draws one table');
+      need('findings', items('findings').length >= 1 && items('findings').every((it: any) => it.confidence), 'must list each finding with its "confidence"', 'Give each finding an item with "confidence": "high", "medium" or "low"');
+    }
+    if (m.purpose === 'plan') {
+      const d = m.sections[of('design')];
+      need('design', !!(d.diagram || (d.items ?? []).some((it: any) => it.diagram) || m.visual?.diagram), 'needs a diagram (on the section, an item or the visual)', 'Draw the design as inline SVG in an .html page and add "diagram": [{"label": "Flow", "src": "diagrams/flow.html"}] (see the skill)');
+      need('slices', items('slices').length >= 1 && items('slices').every((it: any) => it.size), 'must list each slice with its "size"', 'Give each slice an item with "size", such as "S, half a day"');
+      need('tests', items('tests').length >= 1, 'must list how each slice is tested and proven', 'Add an item per slice: the test and the proof that it works');
+    }
+  };
   /** The guided page every plan 2 and report 3 is: what I understood, one picture, sections with expandable items, and the next step. Returns the section ids. */
   const guide = (minSections: number): string[] => {
     list('understood', 1, 6, ['label', 'text'], '{"label":"You asked","text":"Make the first start smooth."}').forEach((o, n) => {
@@ -207,18 +232,27 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
     });
     if (Object.hasOwn(v, 'details')) details('visual.details', v.details);
     if (Object.hasOwn(v, 'diagram')) diagrams('visual.diagram', v.diagram);
-    const ids = list('sections', minSections, 6, ['id', 'stage', 'heading', 'body', 'items', 'details', 'diagram'], '{"id":"steps","stage":"recommend","heading":"Eight steps, 22 to 31 Oct","body":"..."}').map((o, n) => {
+    // A report 5 is built of its kind's parts: up to 10 sections, each naming the part it is, and items that carry a source's link, a finding's confidence or a slice's size.
+    const v5 = m.kind === 'report' && m.schema >= 5, parts = v5 ? REPORT_PARTS[m.purpose] ?? [] : [];
+    const ids = list('sections', minSections, v5 ? 10 : 6, ['id', 'stage', 'heading', 'body', 'items', 'details', 'diagram', ...(v5 ? ['part'] : [])], '{"id":"steps","stage":"recommend","heading":"Eight steps, 22 to 31 Oct","body":"..."}').map((o, n) => {
       const at = `sections[${n}]`;
       if (!(typeof o.id === 'string' && /^[a-z0-9-]{1,40}$/.test(o.id))) throw bad(`${at}.id`, 'must be 1-40 of a-z 0-9 -', 'Set "id" to a short slug such as "steps"');
       if (!['found', 'recommend'].includes(o.stage)) throw bad(`${at}.stage`, `${show(o.stage)} is not found or recommend`, 'Set "stage" to "found" (what I found) or "recommend" (what I recommend)');
       text(`${at}.heading`, o.heading, 80, 'the section heading, in 80 characters or fewer');
       text(`${at}.body`, o.body, 300, 'the section\'s lead, in 300 characters or fewer');
-      if (Object.hasOwn(o, 'items')) list(`${at}.items`, 1, 8, ['title', 'text', 'more', 'tone', 'diagram'], '{"title":"Ship 0.2.5","text":"You test it.","more":"..."}', o.items).forEach((it, k) => {
+      if (Object.hasOwn(o, 'part') && !parts.some(([p]) => p === o.part)) {
+        throw bad(`${at}.part`, parts.length ? `${show(o.part)} is not a part of a ${m.purpose} report: ${parts.map(([p]) => p).join(', ')}` : `is not used by a report whose purpose is ${m.purpose}`, parts.length ? `Set "part" to the part this section is, one of ${parts.map(([p]) => p).join(', ')}` : 'Remove "part"');
+      }
+      if (Object.hasOwn(o, 'items')) list(`${at}.items`, 1, 8, ['title', 'text', 'more', 'tone', 'diagram', ...(v5 ? ['link', 'source', 'confidence', 'size'] : [])], '{"title":"Ship 0.2.5","text":"You test it.","more":"..."}', o.items).forEach((it, k) => {
         text(`${at}.items[${k}].title`, it.title, 80, 'the item, in 80 characters or fewer');
         text(`${at}.items[${k}].text`, it.text, 160, 'one line under it, in 160 characters or fewer');
         if (Object.hasOwn(it, 'more')) text(`${at}.items[${k}].more`, it.more, 600, 'what opens when it is tapped, in 600 characters or fewer, or leave it out');
         tone(`${at}.items[${k}]`, it);
         if (Object.hasOwn(it, 'diagram')) diagrams(`${at}.items[${k}].diagram`, it.diagram);
+        if (Object.hasOwn(it, 'link') && !(typeof it.link === 'string' && /^https?:\/\/[^\s\p{Cc}\p{Cs}]{1,500}$/u.test(it.link))) throw bad(`${at}.items[${k}].link`, 'must be an http(s) link with no spaces', 'Set "link" to where the source can be read, such as "https://github.com/owner/repo/issues/12"');
+        if (Object.hasOwn(it, 'source') && !['user', 'primary'].includes(it.source)) throw bad(`${at}.items[${k}].source`, `${show(it.source)} is not user or primary`, 'Set "source" to "user" (what users report: an issue, a forum, Reddit, Hacker News) or "primary" (docs, code, a maintainer\'s answer, your own check)');
+        if (Object.hasOwn(it, 'confidence') && !['high', 'medium', 'low'].includes(it.confidence)) throw bad(`${at}.items[${k}].confidence`, `${show(it.confidence)} is not high, medium or low`, 'Set "confidence" to how sure you are of the finding: "high", "medium" or "low"');
+        if (Object.hasOwn(it, 'size')) text(`${at}.items[${k}].size`, it.size, 24, 'how big the slice is, such as "S, half a day", in 24 characters or fewer');
       });
       if (Object.hasOwn(o, 'details')) details(`${at}.details`, o.details);
       if (Object.hasOwn(o, 'diagram')) diagrams(`${at}.diagram`, o.diagram);
@@ -226,6 +260,7 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
     });
     const twice = ids.findIndex((id, n) => ids.indexOf(id) < n);
     if (twice >= 0) throw bad(`sections[${twice}].id`, `repeats ${ids[twice]}`, 'Give every section its own id');
+    if (parts.length) kindParts(parts);
     if (!Object.hasOwn(m, 'next')) throw bad('next', 'is required', 'Add "next": {"heading":"Go ahead, and I start on 22 Oct","lines":["..."]}');
     one('next', m.next, ['heading', 'lines'], '{"heading":"...","lines":["..."]}');
     text('next.heading', m.next.heading, 80, 'the next step, in 80 characters or fewer');
@@ -243,14 +278,15 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
   if (m.kind === 'report' && m.schema === 1) throw bad('schema', '1 of report is text only: a report must be a page to tap through, with "view" and "preview"', GUIDE_HELP);
   if (m.schema !== SCHEMAS[m.kind] && !OLDER[m.kind]?.includes(m.schema)) throw bad('schema', `${m.schema} of ${m.kind} is not in this sign-off-axi`, `Upgrade sign-off-axi, or post ${m.kind} schema ${SCHEMAS[m.kind]}`);
   if (g && /FILL:/.test(JSON.stringify(m))) throw bad('message', 'still has FILL: lines from the template', 'Replace every FILL: line with your own words, then post again');
-  const fields = guided(m) ? GUIDE_FIELDS[m.kind] : FIELDS[m.kind], extra = Object.keys(m).find((f) => !fields.includes(f));
+  // A guided report 5 names what it is for; report 4 and older have no purpose field.
+  const fields = (guided(m) ? GUIDE_FIELDS[m.kind] : FIELDS[m.kind]).filter((f) => f !== 'purpose' || (m.kind === 'report' && m.schema >= 5)), extra = Object.keys(m).find((f) => !fields.includes(f));
   if (extra === 'options' && m.kind === 'report') throw bad('options', 'is not a field of report: a report takes no answer', 'Remove "options", or post an ask to get an answer');
   if (extra === 'options' && m.kind === 'plan') throw bad('options', 'is not a field of plan: its answers come from its sections and decisions', 'Remove "options"; put each question in "decisions", with its options and "recommend"');
   if (extra !== undefined) throw bad(escaped(extra) || '""', `is not a field of ${m.kind} schema ${m.schema}`, `Remove ${show(extra)}; ${m.kind} takes ${fields.slice(3).join(', ')}`);
   if (!(m.kind === 'evidence' && !Object.hasOwn(m, 'key')) && !isKey(m.key)) throw bad('key', Object.hasOwn(m, 'key') ? `${show(m.key)} must be 1-128 of A-Z a-z 0-9 . _ -` : 'is required', 'Set "key" to a short id such as "ship-signin-2"');
   if (!Object.hasOwn(m, 'title')) throw bad('title', 'is required', 'Add "title": the question, in 160 characters or fewer');
   text('title', m.title, 160, 'the question, in 160 characters or fewer');
-  if (g && m.schema === SCHEMAS[m.kind] && !isKey(m.filer)) throw bad('filer', 'is required', 'Set "filer" to the owning agent id');
+  if (engaged(m) && !isKey(m.filer)) throw bad('filer', 'is required', 'Set "filer" to the owning agent id');
   if (Object.hasOwn(m, 'filer') && !isKey(m.filer)) throw bad('filer', 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "filer" to your agent session id or tool name, or leave it out');
   if (Object.hasOwn(m, 'ticket') && !isKey(m.ticket)) throw bad('ticket', 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "ticket" to the id of the ticket this card belongs to, or leave it out');
   if (Object.hasOwn(m, 'priority') && !PRIORITIES.includes(m.priority)) throw bad('priority', `${show(m.priority)} is not one of ${PRIORITIES.join(', ')}`, `Set ${named('priority', flags)} to how urgent the card is, P0 (most) to P3 (least), or leave it out`);
@@ -287,6 +323,11 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
     if (Object.hasOwn(m, 'form') && !REPORT_FORMS.includes(m.form)) throw bad('form', `${show(m.form)} is not one of ${REPORT_FORMS.join(', ')}`, `Set "form" to ${REPORT_FORMS.join(', ')}, or leave it out`);
     if (Object.hasOwn(m, 'video')) text('video', m.video, 10, 'the video length such as "0:28", in 10 characters or fewer, or leave it out');
     if (Object.hasOwn(m, 'asked_by')) text('asked_by', m.asked_by, 40, 'who asked for it, such as "You asked" or "Docs agent", in 40 characters or fewer, or leave it out');
+    if (m.schema >= 5) {
+      const set = `Set "purpose" to what this report is for, one of ${REPORT_PURPOSES.join(', ')}`;
+      if (!Object.hasOwn(m, 'purpose')) throw bad('purpose', 'is required: the kind of report, which the board shows on its row and head', set);
+      if (!REPORT_PURPOSES.includes(m.purpose)) throw bad('purpose', `${show(m.purpose)} is not one of ${REPORT_PURPOSES.join(', ')}`, set);
+    }
     // A report is a page to tap through and a picture of it for the card: text alone is a status note, not a report.
     if (g) { guide(1); return { kind: m.kind, schema: m.schema }; }
     const need = 'a report is a page to tap through, not text';

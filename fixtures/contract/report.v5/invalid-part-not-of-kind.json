@@ -1,0 +1,24 @@
+{
+  "contract": 1,
+  "kind": "report",
+  "schema": 5,
+  "filer": "agent-41",
+  "filed": "2026-10-19T09:30:00Z",
+  "understood": [
+    {"label": "You asked", "text": "Pick a push service for the phone app."},
+    {"label": "Done when", "text": "One service is picked, with the reasons and a runner-up."}
+  ],
+  "visual": {"type": "bars", "heading": "Four of five parts are done", "unit": "parts", "rows": [{"label": "Done", "value": 4, "tone": "ok"}, {"label": "Left", "value": 1, "tone": "warn"}]},
+  "next": {"heading": "Say go and I wire ntfy in", "lines": ["The first slice sends one test push to Umer's phone.", "The proof lands as an update under Evidence."]},
+  "key": "release-stands",
+  "title": "Where the 0.6 release stands",
+  "purpose": "status",
+  "group": "Release",
+  "about": "Four of five parts are done; the last waits on one review.",
+  "sections": [
+    {"id": "done", "part": "goal", "stage": "found", "heading": "Four parts shipped", "body": "Today, Decide, Evidence and Reports are in the new look."},
+    {"id": "in-progress", "part": "in-progress", "stage": "found", "heading": "Designs is in review", "body": "One review left."},
+    {"id": "blocked", "part": "blocked", "stage": "found", "heading": "Nothing is held up", "body": "No part waits on anyone."},
+    {"id": "up-next", "part": "up-next", "stage": "recommend", "heading": "The release goes out Friday", "body": "Once the review passes."}
+  ]
+}
