@@ -23,7 +23,8 @@ try {
   cpSync(join(repo, 'docs/logo.svg'), join(dir, 'project.svg'));
   cpSync(join(repo, 'fixtures/contract/design.v1/design'), join(dir, 'design'), { recursive: true });
   so('project', board, '--name', 'sign-off', '--icon', 'project.svg');
-  so('ticket', board, '--id', 'T-29', '--title', 'Make report rows useful', '--project', 'sign-off', '--progress', '40');
+  so('ticket', board, '--id', 'T-9', '--title', 'Clear project identity everywhere', '--project', 'sign-off');
+  so('ticket', board, '--id', 'T-29', '--title', 'Make report rows useful', '--project', 'sign-off', '--progress', '40', '--parent', 'T-9');
   const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   post('report', { ...fx('report.v5/valid-full.json'), key: 'research', title: 'Which notification service fits a small team?', group: 'sign-off', ticket: 'T-29', filed: now });
   post('report', { ...fx('report.v4/valid-minimal.json'), key: 'retro', title: 'Why messages were sent twice: a retro', group: 'sign-off', filed: now });
@@ -42,7 +43,7 @@ try {
   const measures = [];
   for (const width of [360, 390, 445, 1280, 1440]) for (const theme of ['light', 'dark']) {
     axi('emulate', '--viewport', `${width}x${width < 1024 ? 844 : 800}x1${width < 1024 ? ',mobile,touch' : ''}`);
-    for (const area of ['reports', 'waiting', 'designs', 'evidence']) {
+    for (const area of ['reports', 'waiting', 'designs', 'evidence', ...([390, 1280].includes(width) ? ['tickets', 'ticket/T-9'] : [])]) {
       run(`await page.open(${JSON.stringify(url + '#' + area)}); await page.eval(() => { localStorage.setItem('so-theme', '${theme}'); location.reload(); });`);
       sh('sleep', ['0.5']); axi('snapshot');
       const result = JSON.parse(run(`console.log(JSON.stringify(await page.eval(async () => {
@@ -52,11 +53,11 @@ try {
           icon: r.querySelector('.ui-icon img')?.getAttribute('src'), loaded: !!r.querySelector('.ui-icon img')?.naturalWidth, mono: !!r.querySelector('.mono'),
           progress: r.querySelector('.rp-progress')?.getAttribute('aria-valuenow') ?? null, progressGap: r.querySelector('.rp-progress') && r.querySelector('.rp-meta') ? r.querySelector('.rp-progress').getBoundingClientRect().top - r.querySelector('.rp-meta').getBoundingClientRect().bottom : null, oldBar: !!r.querySelector('.l2 .ui-bar, .l2 .rp-strip') }));
         const w = document.documentElement.clientWidth;
-        return { url: location.href, width: innerWidth, colorScheme: getComputedStyle(document.documentElement).colorScheme, canvas: getComputedStyle(document.body).backgroundColor, rows: data, designCards: document.querySelectorAll('.dz-card').length, overflow: document.documentElement.scrollWidth > w,
+        return { url: location.href, width: innerWidth, colorScheme: getComputedStyle(document.documentElement).colorScheme, canvas: getComputedStyle(document.body).backgroundColor, rows: data, ticketHeaderIcon: !!document.querySelector('.tk-shd .ui-icon img')?.naturalWidth, ticketTreeIcon: !!document.querySelector('.tk-in .tk-row .ui-icon img')?.naturalWidth, designCards: document.querySelectorAll('.dz-card').length, overflow: document.documentElement.scrollWidth > w,
           overflowing: [...document.querySelectorAll('main .ui-row *')].filter(e => e.getBoundingClientRect().right > w + 1).map(e => e.className),
           squashed_text: (() => { const ctx = document.createElement('canvas').getContext('2d'); const out = []; for (const e of document.querySelectorAll('body *')) { const nodes = [...e.childNodes].filter((n) => n.nodeType === 3 && n.data.trim()); const text = nodes.map((n) => n.data).join(' ').replace(/\\s+/g, ' ').trim(); const s = getComputedStyle(e); const w = e.offsetWidth; const h = e.offsetHeight; if (!(e instanceof HTMLElement) || !text || !e.getClientRects().length || ((w <= 1 || h <= 1) && s.overflow !== 'visible') || s.visibility !== 'visible') continue; ctx.font = s.fontStyle + ' ' + s.fontWeight + ' ' + s.fontSize + ' ' + s.fontFamily; const chars = w / (ctx.measureText('abcdefghijklmnopqrstuvwxyz').width / 26); const words = text.split(' ').length; const tops = new Set(); for (const n of nodes) { const r = document.createRange(); r.selectNodeContents(n); for (const b of r.getClientRects()) if (b.width) tops.add(Math.round(b.top)); } if ((chars < 8 && ctx.measureText(text).width > w + 1) || tops.size > words) out.push({ element: e.tagName.toLowerCase() + (e.id ? '#' + e.id : e.classList[0] ? '.' + e.classList[0] : ''), text: text.slice(0, 40), chars: Math.round(chars * 10) / 10, lines: tops.size, words }); } return out; })() };
       })));`).trim());
-      const name = `${area === 'waiting' ? 'decide' : area}.${theme}.${width}w`;
+      const name = `${area === 'waiting' ? 'decide' : area === 'ticket/T-9' ? 'epic' : area}.${theme}.${width}w`;
       axi('screenshot', join(dest, name + '.png'));
       result.console = axi('console', '--type', 'error'); const network = axi('network');
       result.console_errors = result.console.includes('<no console messages found>') ? [] : [result.console];
@@ -65,6 +66,7 @@ try {
       if (!before) {
         assert.deepEqual(result.console_errors, []); assert.deepEqual(result.failed_requests, []); assert.equal(result.overflow, false); assert.deepEqual(result.overflowing, []); assert.deepEqual(result.squashed_text.filter(x => /rp-ticket|rkc|ui-icon/.test(x.element)), []);
         assert.ok(result.rows.length || (area === 'designs' && width >= 1024 && result.designCards > 0)); assert.ok(result.rows.every(r => r.loaded && !r.mono), name + ': real project icons');
+        if (area === 'ticket/T-9') assert.ok(result.ticketHeaderIcon && result.ticketTreeIcon, name + ': shared header and inherited epic-tree icons');
         if (area === 'reports') {
           assert.ok(result.rows.every(r => r.kind && r.ticket && !r.oldBar));
           assert.ok(result.rows.every(r => r.progressGap === null || r.progressGap >= 6), name + ': six pixels below metadata');
@@ -75,7 +77,7 @@ try {
       }
     }
   }
-  writeFileSync(join(dest, 'steps.json'), JSON.stringify({ commit: process.env.REPORT_ROWS_COMMIT ?? sh('git', ['rev-parse', 'HEAD'], { cwd: repo }).trim(), before, target: { version: so('--version').trim() }, start: 'An empty isolated board for Umer.', steps: ['Post reports, plan, ask, design and proof via CLI.', 'Pin the project icon and link ticket T-29.', 'Mark one report read and one report part read.', 'Open Reports, Decide, Designs and Evidence at 360, 390, 445, 1280 and 1440 in light and dark with chrome-devtools-axi.', 'Read project, kind, ticket and unread progress, measuring its six-pixel gap.'], result: `${measures.length} frames and DOM records; ${before ? 'baseline recorded' : 'shared icons, kind guessed, ticket metadata, unread-only progress and no overflow passed'}` }, null, 2));
+  writeFileSync(join(dest, 'steps.json'), JSON.stringify({ commit: process.env.REPORT_ROWS_COMMIT ?? sh('git', ['rev-parse', 'HEAD'], { cwd: repo }).trim(), before, target: { version: so('--version').trim() }, start: 'An empty isolated board for Umer.', steps: ['Post reports, plan, ask, design and proof via CLI.', 'Pin the project icon and link ticket T-29.', 'Mark one report read and one report part read.', 'Open Reports, Decide, Designs and Evidence at 360, 390, 445, 1280 and 1440 in light and dark with chrome-devtools-axi.', 'Read project, kind, ticket and unread progress, measuring its six-pixel gap.', 'Open Tickets and its epic at 390 and 1280 in both themes to read the shared icons on rows, inherited tree rows and the ticket header.'], result: `${measures.length} frames and DOM records; ${before ? 'baseline recorded' : 'shared icons, kind guessed, ticket metadata, unread-only progress and no overflow passed'}` }, null, 2));
   console.log(`${dest}: ${measures.length} frames recorded`);
 } finally {
   try { axi('stop'); } catch {}
