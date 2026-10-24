@@ -1858,6 +1858,9 @@ test('Decide on a desk: the list beside its ask, J and K move the selection, a n
   // One screen as the prototype's desk: the head across, then the list in four of 12 columns beside the first ask in eight, 16px apart and 24px over the foot.
   await until(async () => (await evaluate('document.querySelector(".split-detail #ask-title")?.textContent')) === 'Alpha question?');
   assert.equal(await evaluate('document.querySelector(".split-list .sel").dataset.key + "|" + (document.scrollingElement.scrollHeight <= innerHeight) + "|" + document.querySelector(".ui-dhead h1").textContent'), 'alpha|true|Decide');
+  // The asks' card carries its own head and count inside it, as the prototype's list card: Asks 4, then its rows.
+  const asksHead = () => evaluate('(() => { const h = document.querySelector(".split-list .decide-list .ui-sec"); return [h.textContent, h.parentElement.classList.contains("dl-asks"), h.parentElement.querySelectorAll(".dl-row").length].join("|"); })()');
+  assert.equal(await asksHead(), 'Asks4|true|4');
   assert.equal(await evaluate('(() => { const l = document.querySelector(".split-list").getBoundingClientRect(), d = document.querySelector(".split-detail").getBoundingClientRect(), s = document.querySelector(".side").getBoundingClientRect(); return s.right <= l.left && Math.abs(d.left - l.right - 16) < 0.5 && Math.abs(innerWidth - 24 - d.right) < 0.5 && Math.abs(innerHeight - 24 - d.bottom) < 0.5 && l.width >= 320; })()'), true);
   await key('j');
   await until(async () => (await seen()) === '#decide/beta|beta|Beta question?|true');
@@ -1879,7 +1882,7 @@ test('Decide on a desk: the list beside its ask, J and K move the selection, a n
   await evaluate('location.hash = "#decide/gamma"');
   await until(async () => (await seen()) === '#decide/gamma|gamma|Gamma question?|true');
   await key('l');
-  await until(async () => (await seen()) === '#decide/delta|delta|Delta question?|true' && (await evaluate('[...document.querySelectorAll(".decide-list .ui-sec")].map((h) => h.textContent).join("|")')) === 'Asks|Later1');
+  await until(async () => (await seen()) === '#decide/delta|delta|Delta question?|true' && (await evaluate('[...document.querySelectorAll(".decide-list .ui-sec")].map((h) => h.textContent).join("|")')) === 'Asks3|Later1');
   // C goes to the note under the answers, and Cmd+Enter answers the pick from it with the note.
   await key('3');
   await key('c');

@@ -106,6 +106,10 @@ const MEASURE = `(async () => {
     if (!/106, 147, 255.*44, 72, 211/.test(sideM?.logo ?? '')) fail.push('the mark is not the blue check ' + sideM?.logo);
     // The report an ask is about, beside it: what it says, its numbers and Open report.
     const rp = open.querySelector('.ask-rp'), askReport = rp && { says: rp.querySelector('.cx')?.textContent, tiles: [...rp.querySelectorAll('.cxn span')].map((t) => t.innerText.replace(/\s+/g, ' ').trim()), open: rp.querySelector('a.see')?.getAttribute('href') };
+    // Decide's asks card carries its own head and count inside it, as the prototype's list card: 24px in, 20px down, the count its rows.
+    const ac = document.querySelector('.split-list .dl-asks'), ah = ac?.querySelector(':scope > .ui-sec'), asksHead = ac && { text: ah?.textContent, rows: ac.querySelectorAll('.dl-row').length,
+      inset: ah && [r2(box(ah).left + parseFloat(getComputedStyle(ah).paddingLeft) - box(ac).left), r2(box(ah).top - box(ac).top)] };
+    if (location.hash.match(/#(waiting|decide)/) && (!asksHead || asksHead.text !== 'Asks' + asksHead.rows || asksHead.inset?.[0] !== 24 || asksHead.inset?.[1] !== 20)) fail.push('the asks head is not inside its card with its count ' + JSON.stringify(asksHead));
     const ps = getComputedStyle(open.matches('.ask2') ? open.querySelector('.pbody') : open), pad = [ps.paddingTop, ps.paddingRight, ps.paddingBottom, ps.paddingLeft].join(' ');
     const parts = [...open.querySelectorAll(':scope > .pmain, :scope > .pside, :scope > .pbody > .pmain, :scope > .pbody > .pside')].filter(vis).map((e) => r2(box(e).width));
     const split2 = parts.length === 2 ? { main: parts[0], side: parts[1], ratio: r2(parts[0] / parts[1]) } : { one: parts[0] ?? null };
@@ -122,7 +126,7 @@ const MEASURE = `(async () => {
       for (const d of e.querySelectorAll('*')) { const z = box(d); if (z.width && z.height) last = Math.max(last, Math.min(z.bottom, q.bottom)); }
       return { left: q.left, top: q.top, right: q.right, bottom: e.matches('.ui-card') ? Math.min(q.bottom, last + parseFloat(getComputedStyle(e).paddingBottom) + 4) : q.bottom }; });
     let all = 0, empty = 0; for (let py = 2; py < H; py += 4) for (let px = 2; px < innerWidth; px += 4) { all++; if (!content.some((b) => px >= b.left && px < b.right && py >= b.top && py < b.bottom)) empty++; }
-    deskM = { cols, head: headM, side: sideM, askReport, pad, split: split2, pin: pinM, areas, emptyShare: r2((empty / all) * 100) };
+    deskM = { cols, head: headM, side: sideM, asksHead, askReport, pad, split: split2, pin: pinM, areas, emptyShare: r2((empty / all) * 100) };
     // The rule holds a board in use to it: while a scroll area holds more than it shows, at most 15% may be empty. A board with a few cards leaves room under its list, and is reported.
     if (deskM.emptyShare > 15 && areas.some((a) => a.more && a.el === 'ui-col')) fail.push('empty share ' + deskM.emptyShare + '%');
   }
@@ -197,7 +201,7 @@ try {
     writeFileSync(join(out, `${name(state)}.measure.json`), JSON.stringify(m, null, 2) + '\n');
     report.push(`${name(state)}: title ${m.title?.size} ${m.title?.lines} lines; panel ${m.props.map((p) => `${p.name} ${p.height}px${p.bar ? ' bar ' + p.bar : ''}`).join(' | ')}; activity ${m.act.length} steps`
       + `${m.phone ? `; edges ${m.phone.edges}; under 44px ${m.phone.under.length}` : ''}`
-      + `${m.desk ? `; list ${m.desk.cols.list} open ${m.desk.cols.pane}; split ${JSON.stringify(m.desk.split)}; pad ${m.desk.pad}${m.desk.pin ? `; answers ${m.desk.pin.top}-${m.desk.pin.bottom} in view ${m.desk.pin.inView}, cards ${m.desk.pin.cards}` : ''}; fades ${m.desk.areas.map((a) => `${a.el} ${a.more ? (a.fades ? 'fades' : 'NO FADE') : 'fits'}`).join(', ')}; empty ${m.desk.emptyShare}%` : ''}`
+      + `${m.desk ? `${m.desk.asksHead ? `; asks head ${m.desk.asksHead.text} at ${m.desk.asksHead.inset}` : ''}; list ${m.desk.cols.list} open ${m.desk.cols.pane}; split ${JSON.stringify(m.desk.split)}; pad ${m.desk.pad}${m.desk.pin ? `; answers ${m.desk.pin.top}-${m.desk.pin.bottom} in view ${m.desk.pin.inView}, cards ${m.desk.pin.cards}` : ''}; fades ${m.desk.areas.map((a) => `${a.el} ${a.more ? (a.fades ? 'fades' : 'NO FADE') : 'fits'}`).join(', ')}; empty ${m.desk.emptyShare}%` : ''}`
       + `; failures ${m.fail.length}${m.fail.length ? ': ' + m.fail.join('; ') : ''}`);
     if ([m.fail, errors, failed].some((x) => x.length)) problems.push(`${name(state)}: ${JSON.stringify({ fail: m.fail, errors, failed })}`);
     errors.length = 0; failed.length = 0;

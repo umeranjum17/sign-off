@@ -20,7 +20,7 @@ It is built on web/ui.css's shared parts.
 - **Desk:** the open item takes eight of the shell's 12 columns beside the list (board-shell.md). It is padded 20/24/24, with the title at 24/32 (18/26 past 160 characters), never cut.
   - **An ask:** its head line (its kind, who asked and when, More holding Dismiss), then the ask and what it carries (Priority, Its ask, why, its preview and its proof) beside Its report and its Activity, split 3 : 2 with 24px between, scrolling.
     - **Its report** shows when the ask names a report on the board (the ask's `report`, `--report` on `raise` and `post`): what the report says, up to four of the numbers its picture shows, each with its label, as tiles two across, and Open report.
-    - Decide's count is the head's line, so the list goes straight to the asks with no Waiting on you card.
+    - Decide's count is the head's line, so the list goes straight to the asks with no Waiting on you card. The asks' card carries its head and count inside it (Asks 4), 24px in and 20px down, as the prototype's list card.
     - Under a hairline at its foot the answers stay pinned in view: cards side by side (each 160px or wider, the picked one ringed in ink), then one 48px line of the note, Ask me later and Answer <pick>.
     - Ask me later (L) moves it to Later and steps on to the next ask.
   - **A proof:** its project and time, then its title and what it says with its capture filling the column on the left. On the right:
@@ -62,6 +62,7 @@ Each capture is measured in the browser:
   - one screen with no page scroll and the head 32/40 with the light-or-dark button;
   - the list on columns 1 to 4 and the open item on 5 to 12, on one top and one bottom 24px over the foot;
   - the sidebar's foot with whose board it is and the light-or-dark button, none in the head, and the mark's blue check;
+  - on Decide, the asks' head inside its card, 24px in and 20px down, its count the card's rows;
   - the ask's Its report with at least two numbers and Open report to its report;
   - the 3 : 2 split;
   - the answers in view as cards of 160px or more over one 48px line;
@@ -71,5 +72,5 @@ Each capture is measured in the browser:
 `DETAIL_PROTO=<the v3 prototype's index.html>` saves each state beside the prototype's frame in `vs-proto/`. `DETAIL_SIDE=before SIGN_OFF_REPO=<built base checkout>` records the base.
 
 Regressions:
-- `test/design.test.mjs`: "Decide on a desk", "Decide on a pick-one ask", "Reports on a desk", "Evidence: a card per proof", "a card names its ticket" and "report and plan documents use one page scroll".
+- `test/design.test.mjs`: "Decide on a desk" (the asks' head and count inside the card), "Decide on a pick-one ask", "Reports on a desk", "Evidence: a card per proof", "a card names its ticket" and "report and plan documents use one page scroll".
 - The latter also covers the exported copy at 1280.

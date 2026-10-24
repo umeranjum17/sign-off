@@ -1441,7 +1441,11 @@
     .split-list .decide-list .ui-row .l1 .t { display: -webkit-box; white-space: normal; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
     .split-list > .rp-page > .ui-hero:first-child { margin-top: 0; }
     /* Decide's count is the head's line on a desk, so its list goes straight to the asks. */
-    .split-list > .decide-list > .ui-hero { display: none; } .split-list > .decide-list > .ui-hero + .ui-sec { margin-top: 0; }
+    .split-list > .decide-list > .ui-hero { display: none; }
+    /* The asks' card: its head 24px in and 20px down, as the prototype's list card, the rows under it on the card's own 12px. */
+    .split-list .dl-asks { padding: 1.25rem 0.75rem 1rem; }
+    .split-list .dl-asks > .ui-sec { height: 2rem; margin: 0; padding: 0 0.75rem; }
+    .split-list .dl-asks > .dl-list.ui-list { border-radius: 0.75rem; }
     main .theme { display: none; }
     /* The toast, as the prototype sets it on a desk: 440px wide, centred over the list and its open item together. */
     body:has(.ui-desk) #toast { left: calc(50% + 7.5rem - 13.75rem); right: auto; width: 27.5rem; }
@@ -4359,9 +4363,11 @@
     const hero = el('section', { class: 'ui-card ui-hero' }, el('div', { class: 'hl' }, el('span', { class: 'lab' }, 'Waiting on you'), today ? el('span', { class: 'chip' }, `${today} answered today`) : ''),
       el('div', { class: 'hv' }, el('span', { class: 'big' }, String(n)), later ? el('span', { class: 'vs' }, `${later} for later`) : ''));
     const sec = (name, k) => el('h2', { class: 'ui-sec' }, name, k === undefined ? '' : el('span', { class: 'n' }, String(k)));
-    const card = (name, list) => el('ul', { class: 'ui-card ui-list dl-list', 'aria-label': name }, ...list);
-    return el('div', { class: `waiting-page decide-list${fresh ? ' rise' : ''}` }, seg, hero, sec('Asks'),
-      rows.now.length ? card('Asks', rows.now) : el('div', { class: 'ui-card dl-clear' }, el('b', {}, 'All clear'), el('span', {}, `Nothing is waiting on you${state.name ? `, ${state.name}` : ''}.`)),
+    const card = (name, list, bare) => el('ul', { class: `${bare ? '' : 'ui-card '}ui-list dl-list`, 'aria-label': name }, ...list);
+    // On a phone the asks' head sits over their card; on a desk, where the hero is hidden, the card carries its head and count inside it, as the prototype's list card.
+    const desk = deskSel !== null, asks = rows.now.length ? card('Asks', rows.now, desk)
+      : el('div', { class: `${desk ? '' : 'ui-card '}dl-clear` }, el('b', {}, 'All clear'), el('span', {}, `Nothing is waiting on you${state.name ? `, ${state.name}` : ''}.`));
+    return el('div', { class: `waiting-page decide-list${fresh ? ' rise' : ''}` }, seg, hero, ...(desk ? [el('section', { class: 'ui-card dl-asks' }, sec('Asks', n), asks)] : [sec('Asks'), asks]),
       ...(rows.later.length ? [sec('Later', later), card('Later', rows.later)] : []),
       // Every answer given, newest first.
       ...(done.length ? [sec('Answered', done.length), card('Answered', done.map(doneRow))] : []), items.length ? decideMoreLine(items) : '', dismissed(hidden));
