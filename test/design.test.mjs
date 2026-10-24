@@ -1356,11 +1356,15 @@ test('a guided report acts from one place: the parts carry no buttons or receipt
     assert.deepEqual(saved().map(({ part, verdict, text }) => [part, verdict, text]).at(-1), ['steps', undefined, 'Pin it to 2.4.']);
     // Activity lists both, newest first, each naming its part.
     await until(async () => (await evaluate(`[...document.querySelectorAll('.gd-act .ra-e')].filter((e) => e.querySelector('.ra-chip')?.textContent === 'Two steps').map((e) => e.querySelector('.ra-eh b').textContent).join('|')`)) === 'You commented|You agreed');
-    // Nothing sits under the bar at 390, and at 1280 and 1440 with Activity open as a column: it sits under the scroll, never over it; and no track label in Activity is cut.
-    const clear = `(() => { const sc = document.querySelector('.gd-scroll').getBoundingClientRect(), bar = document.querySelector('.ra-bar').getBoundingClientRect(), fit = [...document.querySelectorAll('.gd-act .ui-trail b')].filter((b) => b.getClientRects().length).map((b) => { const r = document.createRange(); r.selectNodeContents(b); return r.getBoundingClientRect().width <= b.getBoundingClientRect().width + 0.5; });
+    // Nothing sits under the bar at 390, and at 1280 and 1440 with Activity open as a column: it sits under the scroll, never over it; and every track label in Activity is whole, under its own dot, clear of the next.
+    const clear = `(() => { const sc = document.querySelector('.gd-scroll').getBoundingClientRect(), bar = document.querySelector('.ra-bar').getBoundingClientRect(), fit = [...document.querySelectorAll('.gd-act .ui-trail ol')].filter((o) => o.getClientRects().length).flatMap((o) => { const li = [...o.children], at = (b) => { const r = document.createRange(); r.selectNodeContents(b); return r.getBoundingClientRect(); };
+        // Each label is whole, starts under its own dot and ends clear of the next label.
+        return li.map((l, i) => { const t = at(l.querySelector('b')), dot = l.querySelector('i').getBoundingClientRect(), next = li[i + 1] && at(li[i + 1].querySelector('b')); return t.width <= l.querySelector('b').getBoundingClientRect().width + 0.5 && Math.abs(t.left - dot.left) <= 2 && (!next || next.left - t.right >= 4); }); });
       document.querySelector('.gd-scroll').scrollTop = 1e6; return [bar.top >= sc.bottom - 0.5, fit.length > 0 && fit.every(Boolean)].join(); })()`;
     assert.equal(await evaluate(`(() => { document.querySelector('.ra-actb').click(); return true; })()`), true);
     assert.equal(await evaluate(clear), 'true,true', '390');
+    // On a phone the sticky head names the part in view, as the bar does.
+    assert.equal(await evaluate(`document.querySelector('.gd-progress .now-part').textContent === document.querySelector('.ra-ont').textContent && document.querySelector('.now-part').getClientRects().length > 0 && document.querySelector('.now-part').textContent.length > 3`), true);
     for (const width of [1280, 1440]) {
       const desk = await browse(join(dir, `b${width}`), width, 800);
       try {

@@ -69,7 +69,8 @@ try {
   const bar = page(MEASURE('.ra-bar button'));
   assert.deepEqual(bar.map((c) => c.name), ['Agree', 'Disagree', 'Comment', 'Ask']);
   assert.ok(bar.every((c) => c.hit44 && c.h >= 44), JSON.stringify(bar));
-  capture('bar', 'One bar under the reading scroll acts on the part in view: Agree, Disagree, Comment, Ask; the part carries no buttons.', { on: one.on, controls: bar });
+  if (mobile) assert.equal(page(`() => document.querySelector('.gd-progress .now-part').textContent === document.querySelector('.ra-ont').textContent && document.querySelector('.now-part').getClientRects().length > 0`), true, 'the sticky head names the part in view');
+  capture('bar', 'One bar under the reading scroll acts on the part in view: Agree, Disagree, Comment, Ask; the part carries no buttons, and on a phone the head names the part.', { on: one.on, controls: bar });
   // Agree acts on the part in view and shows Agreed.
   click('.ra-b.agree'); drive(`await wait('.ra-b.agree[aria-pressed="true"]');`);
   assert.equal(page(`() => document.querySelector('.ra-b.agree').textContent`), 'Agreed');
@@ -94,10 +95,11 @@ try {
   if (mobile) click('.ra-actb');
   drive(`await wait('.gd-act .ra-e');`);
   const act = page(`() => ({ first: document.querySelector('.gd-act .ra-e .ra-eh b').textContent, titles: [...document.querySelectorAll('.gd-act .ra-e .ra-eh b')].map((b) => b.textContent),
-    fit: [...document.querySelectorAll('.gd-act .ui-trail b')].every((b) => { const r = document.createRange(); r.selectNodeContents(b); return r.getBoundingClientRect().width <= b.getBoundingClientRect().width + 0.5; }) })`);
+    fit: [...document.querySelectorAll('.gd-act .ui-trail ol')].flatMap((o) => { const li = [...o.children], at = (b) => { const r = document.createRange(); r.selectNodeContents(b); return r.getBoundingClientRect(); };
+      return li.map((l, i) => { const t = at(l.querySelector('b')), dot = l.querySelector('i').getBoundingClientRect(), next = li[i + 1] && at(li[i + 1].querySelector('b')); return t.width <= l.querySelector('b').getBoundingClientRect().width + 0.5 && Math.abs(t.left - dot.left) <= 2 && (!next || next.left - t.right >= 4); }); }).every(Boolean) })`);
   assert.equal(act.first, 'You disagreed'); assert.ok(act.titles.includes('You agreed') && act.titles.includes('Agent wrote this'), JSON.stringify(act));
-  assert.equal(act.fit, true, 'every track label fits');
-  capture('activity', 'Activity lists the note with its track, the Agree, what was read and when the agent wrote it, newest first.', act);
+  assert.equal(act.fit, true, 'every track label is whole, under its own dot and clear of the next');
+  capture('activity', 'Activity lists the note with its track (Sent, Delivered, Read, Replied each under its own dot), the Agree, what was read and when the agent wrote it, newest first.', act);
   if (mobile) click('.ra-x');
   // View: once for the report.
   click('.ra-tool[aria-label="View"]'); drive(`await wait('#sheet .gd-seg');`);
