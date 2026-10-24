@@ -16,7 +16,7 @@ Guided plans and reports now offer **Simplify this** under each part (and for an
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/media/desk-today-dark.webp">
-    <img src="docs/media/desk-today.webp" alt="The board at desk width: Today with what needs you, what was proven and a list of waiting asks">
+    <img src="docs/media/desk-today.webp" alt="The board at desk width: Today with the next ask, what waits, designs to review and what was proven">
   </picture>
 </p>
 
@@ -43,26 +43,42 @@ You need Node 22.5 or newer. `init` installs the skill for each coding agent it 
 
 ## The board
 
-Four places, in the bar at the bottom of a phone and the sidebar on a desk.
-
-The board installs as an app (More, then Install app; on an iPad, Share, then Add to Home Screen) and, once opened, reads offline: with the board unreachable it shows the last update under "Offline, showing the last update", and sends fail rather than queue. A phone needs the board on HTTPS or localhost to install it.
+Five places, in the dock at the bottom of a phone and the sidebar on a desk: **Today**, **Decide**, **Evidence**, **Reports** and **Tickets**.
 
 <table>
   <tr>
-    <td align="center" width="25%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-today-dark.webp"><img src="docs/media/phone-today.webp" alt="Today: counts of what needs you, what was proven and new reports, then the waiting asks"></picture><br><b>Today</b><br>What needs you, what was proven, what is new.</td>
-    <td align="center" width="25%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-decide-dark.webp"><img src="docs/media/phone-decide.webp" alt="Decide: one card per ask that waits on you, filtered by type"></picture><br><b>Decide</b><br>Every ask that waits on you, one tap each.</td>
-    <td align="center" width="25%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-evidence-dark.webp"><img src="docs/media/phone-evidence.webp" alt="Evidence: a capture of the finished work with its result, newest first"></picture><br><b>Evidence</b><br>Proof that a change works, with its honest result.</td>
-    <td align="center" width="25%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-reports-dark.webp"><img src="docs/media/phone-reports.webp" alt="Reports: explainer pages you asked for"></picture><br><b>Reports</b><br>Explainers you asked for, to read.</td>
+    <td align="center" width="25"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-today-dark.webp"><img src="docs/media/phone-today.webp" alt="Today: the next ask with its answer buttons, what waits, designs to review and what was cleared and proven"></picture><br><b>Today</b><br>What needs you, what was proven.</td>
+    <td align="center" width="25"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-decide-dark.webp"><img src="docs/media/phone-decide.webp" alt="Decide: asks with their priority and ticket progress, and Taken without you with Change"></picture><br><b>Decide</b><br>Every ask that waits, one tap each.</td>
+    <td align="center" width="25"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-reader-dark.webp"><img src="docs/media/phone-reader.webp" alt="A report in the reader: its answer first, and the one action bar with Agree, Disagree, Comment and Ask"></picture><br><b>Reader</b><br>One action bar on the part in view.</td>
+    <td align="center" width="25"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-evidence-dark.webp"><img src="docs/media/phone-evidence.webp" alt="Evidence with Previews on: each proof with its first capture and the check's result"></picture><br><b>Evidence</b><br>Proof, with its first capture inline.</td>
   </tr>
 </table>
+
+<table>
+  <tr>
+    <td align="center" width="33"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-tickets-dark.webp"><img src="docs/media/phone-tickets.webp" alt="A ticket: its progress, the epic it is part of, its sub-tasks and a linked pull request"></picture><br><b>Tickets</b><br>Epics, tickets and tasks that roll up.</td>
+    <td align="center" width="33"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-designs-dark.webp"><img src="docs/media/phone-designs.webp" alt="Designs: the design waiting for review, with a thumbnail of its first screen"></picture><br><b>Designs</b><br>Frames to review, one question each.</td>
+    <td align="center" width="33"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-install-dark.webp"><img src="docs/media/phone-install.webp" alt="Today's More: the leash, Install app and the version the board runs"></picture><br><b>Install</b><br>An app on your home screen.</td>
+  </tr>
+</table>
+
+Every card opens to its own screen with the same parts: one **action bar** (the answer, or Agree, Disagree, Comment and Ask on a report), one **Activity** (who posted it, each answer, note, comment and reply, and how far each got), and **Previous** and **Next** through the list you opened it from (swipe on a phone, `J` and `K` on a desk). The board names its own version (`--version`, the sidebar's foot, Today's More), and a reply links the new version of the work.
+
+The board installs as an app (More, then Install app; on an iPad, Share, then Add to Home Screen) and, once opened, reads offline: with the board unreachable it shows the last update under "Offline, showing the last update", and sends fail rather than queue. A phone needs the board on HTTPS or localhost to install it.
 
 On a phone, larger Decide lists open quickly and **Show more** brings in the next asks, Later items or answers. The counts always include the whole board.
 
 ### Evidence is not a decision
 
-**Decide** holds only real asks: things an agent cannot do without your answer. **Evidence** holds proof (screenshots or a short recording of the running product) with the result of the check that made it: Passed, Not run, Failed, Did not finish or Could not check. A proof update is never counted as something that needs you; you can give it a verdict (Pass, Fail or Needs work) or dismiss it. **Today** counts the two separately: what needs you, and what was proven today.
+**Decide** holds only real asks: things an agent cannot do without your answer. **Evidence** holds proof (screenshots or a short recording of the running product) with the result of the check that made it: Passed, Not run, Failed, Did not finish or Could not check. Each row shows its first capture and the check's word; tap one and it opens in place with every capture in a strip, and **Previews** shows every row large. A proof update is never counted as something that needs you; you can give it a verdict (Pass, Fail or Needs work) or dismiss it. **Today** counts the two separately: what needs you, and what was proven today.
+
+### You see how far each word got
+
+What you send on a card (an answer, a note, a new round, a comment) shows its trail: **Sent**, **Delivered** (the agent's wait or hook got it), **Read** and **Replied**, with the agent's words and a link to the pull request or new version. It shows on the card, in its Activity, as a badge in the lists, and a reply waits in Today until you open it. An agent closes the loop with `sign-off-axi feedback <key> --reply "..." --link <url>`; `--read`, `--delivered` and `--acted --link` mark the other steps, and `--at <epoch seconds>` replays a step that happened earlier without turning a later real one back.
 
 ### Plans and reports, on their own pages
+
+<!-- MARKER: report-writing and the report gallery for design output are not described here yet; they land with the report kit PRs. -->
 
 <table>
   <tr>
@@ -85,10 +101,11 @@ A board that fills up with noise stops being read, so the rules sit at the door.
 
 ### One ticket ties a task's cards together
 
-A ticket is one piece of work, with a title and how far along it is, and optionally its priority, its project and whether it is on hold. Tickets nest: an epic has tickets, a ticket has sub-tasks, and each is as far along as what is under it. The **Tickets** tab shows your asks (and the system's own work) done, in progress, on hold and to do. Post any card with `--ticket <id>` (an ask, a design, proof, a report or a plan) and its screen shows a **Ticket** row (on an ask, **Its ask** in the panel under the question) with the ticket's title and progress; tap it for the ticket, which lists the tickets under it and every card on it, newest first, with their Activity. It is optional and only a link: a card without one, or naming a ticket the board has not got, works exactly as before.
+A ticket is one piece of work, with a title and how far along it is, and optionally its priority, its project, its release, its state and its pull requests. Tickets nest as **epics > tickets > tasks**, and each is as far along as the average of what is under it (a roll-up from the tasks up). The **Tickets** tab shows your asks (and the system's own work) done, in progress, on hold and to do; a ticket's page shows its release, its state, each linked pull request and every card on it. Post any card with `--ticket <id>` (an ask, a design, proof, a report or a plan) and its screen shows a **Ticket** row (on an ask, **Its ask** in the panel under the question) with the ticket's title and progress; tap it for the ticket, which lists the tickets under it and every card on it, newest first, with their Activity. It is optional and only a link: a card without one, or naming a ticket the board has not got, works exactly as before.
 
 ```sh
-sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40
+sign-off-axi ticket --id E-1 --title "Settings, start to finish" --release 0.6.5
+sign-off-axi ticket --id T-29 --title "Ship the new settings page" --parent E-1 --progress 40 --state "in progress" --pr https://github.com/owner/repo/pull/241
 sign-off-axi post --type evidence --ticket T-29 --title "Settings on a phone" --about "Umer changes the theme in one tap." --media shot.png
 ```
 
@@ -119,13 +136,7 @@ Both kinds wait under **Taken without you** in Decide until you open them, each 
 
 Some asks are never answered for you, whatever the leash: an ask raised with `--guard destructive|irreversible|money|credential|security`, and an ask whose words talk of spending money, deleting, what can't be undone, passwords and keys, or access. Designs, plans and sign-ins always wait too. Such an ask says **Always waits for you** and why.
 
-<table>
-  <tr>
-    <td align="center" width="33%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-leash-decide-dark.webp"><img src="docs/media/phone-leash-decide.webp" alt="Decide: the asks that wait, then Taken without you with a default taken and an agent's pick, each with Change, and the Leash chip by the count"></picture><br><b>Taken without you</b><br>What the leash answered, with Change.</td>
-    <td align="center" width="33%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-leash-agent-dark.webp"><img src="docs/media/phone-leash-agent.webp" alt="An ask the agent picked: Agent picked B: Friday, tell me if wrong, its reason, its trail from Picked to Read, and Change"></picture><br><b>Agent picked</b><br>On Act, then tell me: its pick, and Change.</td>
-    <td align="center" width="33%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-leash-guard-dark.webp"><img src="docs/media/phone-leash-guard.webp" alt="An ask that spends money: Always waits for you, so no default or agent pick is ever taken"></picture><br><b>Always waits for you</b><br>Money, deletes, keys and access.</td>
-  </tr>
-</table>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/desk-decide-dark.webp"><img src="docs/media/desk-decide.webp" alt="Decide on a desk: the Leash chip by the count, the asks that wait, Taken without you, and a money ask that always waits for you"></picture></p>
 
 ## What you can ask
 
