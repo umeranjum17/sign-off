@@ -27,8 +27,8 @@ const MEASURE = `(async () => {
   await Promise.all(document.getAnimations().filter((a) => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime)).map((a) => a.finished.catch(() => {})));
   const w = document.documentElement.clientWidth, phone = innerWidth < 1024, box = (e) => e.getBoundingClientRect(), vis = (e) => { const r = box(e), c = getComputedStyle(e); return r.width > 0 && r.height > 0 && c.visibility !== 'hidden' && c.display !== 'none'; };
   const r2 = (n) => Math.round(n * 100) / 100, fail = [], txt = (e) => e?.textContent.replace(/\\s+/g, ' ').trim() ?? '';
-  const rows = [...document.querySelectorAll('.rp-list .ui-row')].filter(vis).map((e) => { const chip = e.querySelector('.l2 .rkc'), strip = e.querySelector('.l2 .rp-strip'), bar = e.querySelector('.l2 .ui-bar'), pct = e.querySelector('.pct');
-    const c = chip && box(chip), next = (strip ?? bar) && box(strip ?? bar);
+  const rows = [...document.querySelectorAll('.rp-list .ui-row')].filter(vis).map((e) => { const chip = e.querySelector('.l2 .rkc'), strip = e.querySelector('.rp-progress .rp-strip'), bar = e.querySelector('.rp-progress .ui-bar'), pct = e.querySelector('.pct');
+    const c = chip && box(chip), next = e.querySelector('.rp-ticket') && box(e.querySelector('.rp-ticket'));
     return { title: txt(e.querySelector('.t')), kind: chip?.dataset.kind ?? '', chip: txt(chip), chipH: c ? r2(c.height) : 0, gap: c && next ? r2(next.left - c.right) : null, strip: strip ? [...strip.children].map((i) => (i.classList.contains('on') ? 1 : 0)).join('') : '', pct: txt(pct), p: txt(e.querySelector('.ui-pc')) }; });
   rows.forEach((x, i) => { if (!x.kind || x.chipH !== 20 || x.gap !== 8) fail.push('row ' + i + ' ' + JSON.stringify(x)); });
   const pick = [...document.querySelectorAll('#sheet[open] .rp-pick .ui-pr')].map((b) => ({ kind: b.dataset.kind, name: txt(b.querySelector('.kn')), n: txt(b.querySelector('.n')), on: b.getAttribute('aria-pressed') === 'true' }));
@@ -179,7 +179,7 @@ try {
       txt.push(`filtered: pill "${only.pill}", button "${only.filter.label}" (${only.filter.count}), rows ${only.rows.map((r) => r.title).join(' | ')}`);
       assert.deepEqual([only.rows.map((r) => r.kind), only.pill.replace(/(?<=\D)(?=\d)/, ' '), only.filter.count], [['research'], 'Research and discovery 1 of 7', '1']);
       for (const [s, key, chip, read, next] of [['kinds-plan', 'kinds-plan', 'Implementation plan', 'Read 3 of 9 parts', 'Next: Slices'], ['kinds-research', 'kinds-research', 'Research and discovery', 'Read 4 of 9 parts', 'Next: Options compared'],
-        ['kinds-old', 'kinds-incident', 'Incident and retro', '', '']]) {
+        ['kinds-old', 'kinds-incident', 'Incident and retro · kind guessed', '', '']]) {
         const m = await state(s, () => tap(`#item-${key}`));
         txt.push(`${s} sheet: [${m.head.chip}] ${m.head.when} / "${m.head.title}" / for "${m.head.for}" / ${m.head.read} ${m.head.strip} "${m.head.next}" / sources ${m.head.sources || 'none'}`);
         if (key === 'kinds-research') assert.equal(m.head.sources, 'Linked sources3|What users report1');
