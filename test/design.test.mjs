@@ -2466,7 +2466,7 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Approved');
   await evaluate('document.querySelector("[aria-label=\\"Screen for note\\"]").value = "account-setup/security"');
   await evaluate('document.querySelector(".design-review textarea").value = "Make the title clearer"');
-  await evaluate('document.querySelector(".design-review .foot button:last-child").click()');
+  await evaluate('document.querySelector(".design-review .foot .dz-change").click()');
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Changes requested');
   assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-design'].notes, [{ journey: 'account-setup', screen: 'security', verdict: 'change', note: 'Make the title clearer' }]);
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
@@ -2525,7 +2525,7 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-design'].notes, [legacy, { journey: 'account-setup', screen: 'screen-4', verdict: 'approve', note: '' }]);
   await evaluate('document.querySelector("[aria-label=\\"Next screen\\"]").click()');
   await evaluate('document.querySelector(".design-viewer textarea").value = "Give the next action more space"');
-  await evaluate('document.querySelector(".design-viewer .foot button:last-child:not([aria-label])").click()');
+  await evaluate('document.querySelector(".design-viewer .foot .dz-change").click()');
   await until(async () => (await evaluate('document.querySelector(".design-viewer[open] [role=status]")?.textContent')) === 'Changes requested');
   await evaluate('document.querySelector("[aria-label=\\"Close viewer\\"]").click()');
   await until(() => evaluate('!document.querySelector(".design-viewer[open]")'));
@@ -2713,7 +2713,7 @@ test('an empty inline save clears the selected screen note', { skip: !chrome && 
   await evaluate('document.querySelector("[aria-label=\\"Screen for note\\"]").value = "flow/b"');
   await evaluate('document.querySelector("[aria-label=\\"Pick a direction\\"]").value = "a"');
   await evaluate('document.querySelector(".design-review textarea").value = "Fix the title"');
-  await evaluate('document.querySelector(".design-review .foot button:last-child").click()');
+  await evaluate('document.querySelector(".design-review .foot .dz-change").click()');
   await until(async () => saved()?.notes?.length === 1);
   await evaluate('document.querySelector(".design-review textarea").value = ""');
   await evaluate('document.querySelector(".design-review .foot button").click()');
@@ -2950,7 +2950,7 @@ test('a design-level inline Approve or Change stores its verdict with the note, 
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d3-plain`)}`);
   await until(async () => (await evaluate('document.querySelector(".design-review .foot button")?.textContent')) === 'Approve');
   await evaluate('document.querySelector(".design-review textarea").value = "Fix spacing"');
-  await evaluate('document.querySelector(".design-review .foot button:last-child").click()');
+  await evaluate('document.querySelector(".design-review .foot .dz-change").click()');
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Changes requested');
   assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d3-plain'].notes, [{ verdict: 'change', note: 'Fix spacing' }]);
   await evaluate('document.querySelector(".design-review textarea").value = ""');

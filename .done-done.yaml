@@ -30,7 +30,7 @@ journeys:
   # An ask on a guided report answers the tap at 390, light and dark: the Ask control pressed, Sent to the agent with the time, Already sent on a repeat with one ask saved,
   # Agent replied; and a design report's inline-SVG flow diagram at the column's width, following the board's own light-or-dark pick (diagram-sample/flow.html).
   comment-send:
-    command: 'npm run build > /dev/null && for w in 390 1280; do for t in light dark; do SEND_FEEDBACK_ONLY=1 node .agents/skills/done-done-verify-sign-off/part-comment-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t $w || exit 1; done; done'
+    command: 'npm run build > /dev/null && for w in 360 390 445 1280 1440; do for t in light dark; do COMMENT_PROTO="$COMMENT_PROTO" SEND_FEEDBACK_ONLY=1 node .agents/skills/done-done-verify-sign-off/part-comment-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t $w || exit 1; done; done'
   ask-feedback:
     command: 'npm run build > /dev/null && for t in light dark; do node .agents/skills/done-done-verify-sign-off/ask-feedback-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t || exit 1; done'
   # Report kinds at 390 and 1280, light and dark: each row's kind chip (a plan's parts bar), Filter by kind and a kind picked, a report's head with its kind, the line on what it is for

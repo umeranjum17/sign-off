@@ -1,6 +1,6 @@
 // Agree, Disagree and Comment on a part, and its Ask menu: on a guided report, then a comment reaching the author agent's `wait --filer`
 // and its reply coming back under the part. An isolated board and this checkout's built CLI; nothing here touches ~/.sign-off, Firstmate or a real board.
-// Usage: node .agents/skills/done-done-verify-sign-off/part-comment-shots.mjs <output> [light|dark] [390|1280]
+// Usage: node .agents/skills/done-done-verify-sign-off/part-comment-shots.mjs <output> [light|dark] [360|390|445|1280|1440]
 // PART_COMMENT_BEFORE=1 SIGN_OFF_REPO=<base checkout, built> records only the same page without the new controls, under the same names.
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -11,7 +11,8 @@ import assert from 'node:assert/strict';
 import { recordsDir } from './records.mjs';
 const out = resolve(process.argv[2] ?? process.env.DONE_DONE_EVIDENCE_ROOT);
 const theme = process.argv[3] ?? process.env.DONE_DONE_THEME ?? 'light', width = +(process.argv[4] ?? process.env.DONE_DONE_WIDTH ?? 390);
-assert.ok(['light', 'dark'].includes(theme) && [390, 1280].includes(width));
+assert.ok(['light', 'dark'].includes(theme) && [360, 390, 445, 1280, 1440].includes(width));
+const mobile = width < 960;
 const before = process.env.PART_COMMENT_BEFORE === '1';
 mkdirSync(out, { recursive: true });
 const records = recordsDir(out);
@@ -50,7 +51,7 @@ const drive = (script) => run('chrome-devtools-axi', ['run'], { env: browserEnv,
 const page = (fn) => JSON.parse(drive(`console.log(JSON.stringify(await page.eval(${fn})));`));
 const click = (sel, i = 0) => drive(`await page.eval(() => document.querySelectorAll(${JSON.stringify(sel)})[${i}].click()); await nap(400);`);
 // Scroll one part so its heading sits under the progress bar, the same place in every capture.
-const show = (sel) => drive(`await page.eval(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.scrollIntoView({ block: 'start' }); document.querySelector('.gd-scroll').scrollBy(0, -${width === 390 ? 64 : 24}); }); await nap(300);`);
+const show = (sel) => drive(`await page.eval(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.scrollIntoView({ block: 'start' }); document.querySelector('.gd-scroll').scrollBy(0, -${mobile ? 64 : 24}); }); await nap(300);`);
 // Where a control is, and whether the 44 px square around its centre lands on it: the tap target, not the drawn size.
 const MEASURE = (sel) => `() => [...document.querySelectorAll(${JSON.stringify(sel)})].filter(e => e.getClientRects().length).map(e => { const r = e.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, hit = [[-21, -21], [21, -21], [-21, 21], [21, 21]].filter(([dx, dy]) => e.contains(document.elementFromPoint(cx + dx, cy + dy))).length;
   return { name: (e.getAttribute('aria-label') || e.title || e.textContent).trim().slice(0, 24), x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), hit44: hit === 4 }; })`;
@@ -59,7 +60,7 @@ const capture = (name, claim, extra = {}) => {
   browser('screenshot', join(out, `${stem}.png`));
   const dom = page(`() => { const w = document.documentElement.clientWidth; return { overflow: document.documentElement.scrollWidth > w, overflowing: [...document.querySelectorAll('#reader *')].filter(e => e.getClientRects().length && e.getBoundingClientRect().right > w + 1).slice(0, 10).map(e => e.tagName.toLowerCase() + '.' + e.className) }; }`);
   assert.equal(dom.overflow, false); assert.deepEqual(dom.overflowing, []);
-  const squashed = page(`() => { const ctx = document.createElement('canvas').getContext('2d'), out = []; for (const e of document.querySelectorAll('#reader *')) { const nodes = [...e.childNodes].filter(n => n.nodeType === 3 && n.data.trim()), text = nodes.map(n => n.data).join(' ').trim(), s = getComputedStyle(e); if (!(e instanceof HTMLElement) || !text || !e.getClientRects().length || e.offsetWidth <= 1 || s.visibility !== 'visible') continue; ctx.font = s.font; const chars = e.offsetWidth / (ctx.measureText('abcdefghijklmnopqrstuvwxyz').width / 26), tops = new Set(); for (const n of nodes) { const r = document.createRange(); r.selectNodeContents(n); for (const b of r.getClientRects()) if (b.width) tops.add(Math.round(b.top)); } if ((chars < 8 && ctx.measureText(text).width > e.offsetWidth + 1) || tops.size > text.split(/\\s+/).length) out.push({element: e.tagName.toLowerCase(), text, chars, lines: tops.size, words: text.split(/\\s+/).length}); } return out; }`);
+  const squashed = page(`() => { const ctx = document.createElement('canvas').getContext('2d'), out = []; for (const e of document.querySelectorAll('#reader *')) { const nodes = [...e.childNodes].filter(n => n.nodeType === 3 && n.data.trim()), text = nodes.map(n => n.data).join(' ').trim(), s = getComputedStyle(e); if (!(e instanceof HTMLElement) || !text || !e.getClientRects().length || e.offsetWidth <= 1 || s.visibility !== 'visible') continue; ctx.font = s.fontStyle + ' ' + s.fontWeight + ' ' + s.fontSize + ' ' + s.fontFamily; const chars = e.offsetWidth / (ctx.measureText('abcdefghijklmnopqrstuvwxyz').width / 26), tops = new Set(); for (const n of nodes) { const r = document.createRange(); r.selectNodeContents(n); for (const b of r.getClientRects()) if (b.width) tops.add(Math.round(b.top)); } if ((chars < 8 && ctx.measureText(text).width > e.offsetWidth + 1) || tops.size > text.split(/\\s+/).length) out.push({element: e.tagName.toLowerCase(), text, chars, lines: tops.size, words: text.split(/\\s+/).length}); } return out; }`);
   writeFileSync(join(out, `${stem}.dom.json`), JSON.stringify({ url: page('() => location.href'), ...dom, console_errors: [], failed_requests: [], squashed_text: squashed }, null, 2));
 
   writeFileSync(join(records, `${stem}.network.txt`), browser('network'));
@@ -72,7 +73,7 @@ let base;
 const ready = () => drive("await wait('.gd-sec'); await page.eval(() => { document.querySelector('.gd-scroll').style.scrollBehavior = 'auto'; });");
 try {
   base = await new Promise((ok, no) => { let log = ''; server.stdout.on('data', (b) => { log += b; const x = /http:\/\/127\.0\.0\.1:\d+\//.exec(log); if (x) ok(x[0]); }); server.once('exit', (c) => no(new Error(`Server exited ${c}`))); });
-  browser('open', base); browser('emulate', '--viewport', width === 390 ? '390x844x2,mobile,touch' : '1280x860x1', '--color-scheme', theme);
+  browser('open', base); browser('emulate', '--viewport', mobile ? `${width}x844x2,mobile,touch` : `${width}x${width === 1440 ? 900 : 860}x1`, '--color-scheme', theme);
   browser('open', `${base}#reports/${KEY}`);
   ready();
   show(`[data-part="${FOOT}"]`);
@@ -87,7 +88,7 @@ try {
   capture('part-foot', 'A part ends with one quiet row: Agree, Disagree, Comment, then Details and Ask.', { controls: foot });
 
   // The sticky step header with the first intro box scrolled under it: opaque, nothing reads through. A desk has no sticky header, so this is the phone's.
-  if (width === 390) {
+  if (mobile) {
 
   show('[data-part="this"]'); drive(`await page.eval(() => { const h = document.querySelector('.gd-progress').getBoundingClientRect().bottom, t = document.querySelector('[data-part="this"] h2').getBoundingClientRect(); document.querySelector('.gd-scroll').scrollBy(0, t.top + t.height / 2 - h); }); await nap(300);`);
   const hdr = page(`() => { const h = document.querySelector('.gd-progress'), c = getComputedStyle(h); return { background: c.backgroundColor, backdrop: c.backdropFilter, display: c.display }; }`);
@@ -177,6 +178,32 @@ try {
       writeFileSync(list, ['comment-typing', 'comment-sending', 'comment-not-sent', 'comment-receipt'].map(n => `file '${join(out, `${n}.${theme}.${width}w.png`)}'\nduration 1\n`).join(''));
       run('ffmpeg', ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', list, '-vf', 'scale=390:-2', '-pix_fmt', 'yuv420p', '-c:v', 'libx264', '-movflags', '+faststart', join(out, `comment-send.${theme}.mp4`)]);
     }
+    // Pair the existing report, ask and proof surfaces with the supplied approved design. It has no Designs view or send-state mock.
+    if (process.env.COMMENT_PROTO && !process.env.SEND_FEEDBACK_BEFORE) {
+      const pairs = join(out, 'vs-proto'); mkdirSync(pairs, { recursive: true });
+      const height = mobile ? 844 : width === 1440 ? 900 : 860;
+      for (const [view, action, frames] of [
+        ['reports', 'report', ['comment-typing', 'comment-sending', 'comment-not-sent', 'comment-receipt']],
+        ['decide', 'ask', ['answer-note']], ['evidence', 'proof', ['card-comment']]
+      ]) {
+        browser('emulate', '--viewport', mobile ? `${width}x844x2,mobile,touch` : `${width}x${height}x1`, '--color-scheme', theme);
+        browser('open', `file://${resolve(process.env.COMMENT_PROTO)}#v=${view}&theme=${theme}`);
+        drive(`await wait('#app .row[data-act="${action}"]');`);
+        if (mobile) click(`.row[data-act="${action}"]`);
+        const ref = join(pairs, `${view}.${theme}.${width}w.approved.png`); browser('screenshot', ref);
+        for (const frame of frames) {
+          const html = '<body style="margin:0;padding:24px;display:flex;gap:24px;background:#888;color:white;font:20px system-ui">' +
+            [['Approved design: ' + view, ref], ['This build: ' + frame, join(out, `${frame}.${theme}.${width}w.png`)]].map(([label, file]) =>
+              `<figure style="margin:0"><figcaption style="height:40px">${label} · ${width}px · ${theme}</figcaption><img style="display:block;width:${width}px" src="data:image/png;base64,${readFileSync(file).toString('base64')}"></figure>`).join('') + '</body>';
+          writeFileSync(join(dir, 'pair.html'), html);
+          browser('emulate', '--viewport', `${width * 2 + 72}x${height + 88}x1`);
+          browser('open', `file://${join(dir, 'pair.html')}`);
+          drive('await nap(250);');
+          browser('screenshot', join(pairs, `${frame}.${theme}.${width}w.pair.png`));
+        }
+      }
+      writeFileSync(join(pairs, `reference.${theme}.${width}w.txt`), 'Approved source: ' + resolve(process.env.COMMENT_PROTO) + '\nPaired report, ask and evidence. The supplied prototype has no Designs view and no Sending/Not sent state.\n');
+    }
     writeFileSync(join(out, `send-regression.${theme}.${width}w.json`), JSON.stringify({ report: 'Sending in same frame; failure preserves text; Retry saves exactly once; clears box; Activity updates', composers: cases.map(c => c[0]), result: process.env.SEND_FEEDBACK_BEFORE ? 'BEFORE' : 'PASS' }, null, 2));
   }
   if (!process.env.SEND_FEEDBACK_ONLY) {
@@ -224,7 +251,7 @@ try {
   }
   }
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board holding one guided report, filed by agent-41.',
-    steps: [`The report is opened at ${width} px wide, ${theme}, and a part is scrolled into view.`, ...(width === 390 ? ['The page is scrolled so body text passes under the sticky step header: the header is opaque and no text reads through it.'] : []), 'The part ends with one row: Agree, Disagree, Comment, Details and Ask, each a 44 px tap target.', 'The person taps Ask: the Ask menu lists Ask a question, Go deeper, Simplify this, Show an example and Why?.',
+    steps: [`The report is opened at ${width} px wide, ${theme}, and a part is scrolled into view.`, ...(mobile ? ['The page is scrolled so body text passes under the sticky step header: the header is opaque and no text reads through it.'] : []), 'The part ends with one row: Agree, Disagree, Comment, Details and Ask, each a 44 px tap target.', 'The person taps Ask: the Ask menu lists Ask a question, Go deeper, Simplify this, Show an example and Why?.',
       'The person taps Disagree: the comment box opens asking What is off?, with Cancel and Send.', 'The person types a comment and taps Send: it sits under the part with Sent to the agent.', 'The author agent takes it with wait --filer: the line reads Agent read it.', 'The agent replies with deeper: the reply shows under the comment.', 'The person opens an item and taps Agree: it stays chosen and is saved.'],
     result: 'Each part ends with Agree, Disagree, Comment, Details and Ask, every control a 44 px tap target; the Ask menu lists the five asks; Disagree asks What is off?; a sent comment shows Sent to the agent, then Agent read it and the reply; an item has the same row and Agree is saved at once; the sticky step header is opaque.' }, null, 2) + '\n');
   }
