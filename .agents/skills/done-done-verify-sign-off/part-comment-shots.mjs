@@ -26,6 +26,8 @@ const FILER = 'agent-41', KEY = 'part-report', REC = 'part-report-2', PART = 'fo
 
 const m = JSON.parse(readFileSync(join(resolve(import.meta.dirname, '../../..'), 'fixtures/contract/report.v4/valid-full.json')));
 m.key = KEY; m.filed = new Date().toISOString().replace(/\.\d+Z$/, 'Z'); m.filer = FILER;
+// The part's own row shows only while its last item shows none (never two rows stacked), so that item opens in place here and stays closed.
+m.sections.find((s) => s.id === PART).items.at(-1).more = 'The second screen asked for the password again.';
 writeFileSync(join(dir, 'report.json'), JSON.stringify(m));
 cli('post', board, '--kind', 'report', '--from', join(dir, 'report.json'), '--filer', FILER);
 // A second report, untouched, for the short recording of scrolling and tapping on a phone.
