@@ -92,6 +92,9 @@ journeys:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/designs-access-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   # The leash acting at 360, 390, 445, 1280 and 1440, light and dark: Decide's Taken without you and its Leash chip and sheet, the default taken at silent_by, the agent's pick on Act, then tell me,
   # a money ask that always waits, Ask me first set from the sheet, and Change reaching the agent. LEASH_ICONS=<folder of the projects' real icons>, LEASH_REVIEW_ROOT=<folder outside the run> keeps every state there and only Decide's frames in the run.
+  # The README's pictures from the real board for Umer at 390 and 1280, light and dark: Today, Decide with the Leash chip, a report in the reader with its action bar, Evidence with Previews, a ticket of an epic, Designs and the Install app row; no letter tile, token, overflow or console error.
+  readme-shots:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/readme-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   leash:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/leash-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   # A design asked as one plain question (design 2), on the owner's real card (DESIGN_ASK_FRAMES=<folder of today, built and target .light/.dark.webp>): the card as first written
