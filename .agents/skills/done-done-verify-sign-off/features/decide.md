@@ -32,9 +32,15 @@ The Decide tab (`#waiting`) and an ask (`#decide/<key>`), phone (390) first, bui
 
 7. The leash: `LEASH_ICONS=<folder with crewhouse.svg and first-draft.svg, each project's real icon> LEASH_REVIEW_ROOT=<folder outside the run> done-done run leash` (`leash-shots.mjs`) raises on Act, then tell me, serves on When it matters until the board takes a default, and captures decide and leash (the chip's sheet) before any card is opened, then the default, agent and guard cards, then picks Ask first in the sheet and opens an ask that only waits (ask), at 360, 390, 445, 1280 and 1440 in light and dark, each with `.dom.json`, asserting the rows, icons, chip, sheet, card words and marks; at 390 light it taps Change on the agent's pick and reads the agent's wait (`wait-changed.json`, `replaces.taken: agent`). The CLI side is in `raise-act.txt`, `wait-default.txt`, `wait-agent.txt` and `answers-log.jsonl`. The paths per leash and every guard: `node --test test/leash.test.mjs`.
 
+## Large phone boards
+
+Decide constructs the first 24 Asks, Later and Answered rows on a phone. Show more adds the next 24 and focuses the first new ask; totals and bulk Select all include the full set. The desktop keeps every row for keyboard navigation. The extended "Decide on a phone" integration journey covers expansion, answering the last ask, bulk selection, Later and Answered expansion, and the full desktop list.
+
+For before/after proof on a task-owned 500-card/3000-ticket loopback board, run `node .agents/skills/done-done-verify-sign-off/decide-load-shots.mjs <BASE> <OUT> before|after` through the host memory gate. It uses an isolated chrome-devtools-axi session for light/dark frames at 390 and 1280, records row/DOM counts, captures Show more and the loaded rows on phones, and closes its browser. The after journey records `show-more.mp4` with `decide-record.mjs ... load`: scroll to Show more, load, open and close a new ask. `DECIDE_PERF_BASE=<BASE> done-done run decide-load` records this in default evidence storage. BASE must be a newly seeded task board, never an installed user's board. Inspect every still and motion contact sheet; keep scratch under the run's tmp directory. The profiling journey separately captures all five Lighthouse routes.
+
 ## Gotchas
 
 - A hash change alone keeps the page's old state; reload after changing the board through the API.
 - Pointer events sent from the page (or a real CDP touch) drive the swipe; a single fast move counts as a fling.
 - The page receives an item's filer as `by` (left out when it is a session id); asks carry no project, so their tile is a drawing unless the filer is a project on the board.
-- Chrome under a long TMPDIR fails to start its DevTools socket: run the scripts with `TMPDIR=/tmp`.
+- Chrome under a long absolute TMPDIR can exceed its Unix socket limit: run from the evidence directory with relative `TMPDIR=tmp`, keeping scratch under that directory.

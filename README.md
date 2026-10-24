@@ -56,6 +56,8 @@ The board installs as an app (More, then Install app; on an iPad, Share, then Ad
   </tr>
 </table>
 
+On a phone, larger Decide lists open quickly and **Show more** brings in the next asks, Later items or answers. The counts always include the whole board.
+
 ### Evidence is not a decision
 
 **Decide** holds only real asks: things an agent cannot do without your answer. **Evidence** holds proof (screenshots or a short recording of the running product) with the result of the check that made it: Passed, Not run, Failed, Did not finish or Could not check. A proof update is never counted as something that needs you; you can give it a verdict (Pass, Fail or Needs work) or dismiss it. **Today** counts the two separately: what needs you, and what was proven today.

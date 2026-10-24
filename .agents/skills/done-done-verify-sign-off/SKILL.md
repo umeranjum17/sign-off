@@ -23,6 +23,8 @@ Read-only: is this instance worth driving? The URL answers with the page titled 
 
 ## Drive
 
+- Performance baseline (`done-done run pwa-profile`): set `LIGHTHOUSE_CLI` to a locally installed Lighthouse CLI and `CHROME_PATH` to installed Chromium. `scripts/profile-board.mjs` serves an isolated board with 500 synthetic CLI-authored cards and 3000 tickets (300 roots), then audits Today, Decide, Evidence, Reports and Tickets with Lighthouse mobile simulated Slow 4G/4x CPU. Each screen writes JSON/HTML and its final frame, plus `summary.json` (commit, counts, decoded payload and metrics) and `steps.json`. Inspect all five frames to confirm their routes. This measures list loads with shared fixture media, not the live board, image-heavy details, installation or offline support. Keep Lighthouse and browser scratch outside the checkout, clean the run's `tmp/` after capture, and retain the reports. See `docs/pwa-performance-plan.md` for setup and release gates.
+
 Harness: a browser (chrome-devtools-axi, one CHROME_DEVTOOLS_AXI_SESSION per capture for sequence proof, per run otherwise) for the board, a terminal for the CLI. Prefer the repo's real handles (hash routes, button labels) over coordinates:
 
 - Core journey (`done-done run core`): the installed CLI files a card, the person answers it in the board, and the agent reads the answer with `wait --filer`; the board then shows the read receipt. `done-done run upgrade` runs the same journey over the previous published version, upgraded in place. It brings its own clean home and its own install, so it never touches the board above. See [Core journey](features/core-journey.md)

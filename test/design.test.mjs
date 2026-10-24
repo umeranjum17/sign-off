@@ -1837,7 +1837,7 @@ test('Decide on a phone: an ask is a sheet over the list with its bar at the foo
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
-  const { evaluate, swipe, close } = await browse(join(dir, 'b'), 390, 844);
+  const { evaluate, swipe, send, close } = await browse(join(dir, 'b'), 390, 844);
   await evaluate(`location.href = ${JSON.stringify(`${url}#decide/alpha`)}`);
   await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'Alpha question?');
   await evaluate('document.getElementById("board").getAnimations({ subtree: true }).forEach((a) => a.finish())'); // the sheet has risen
@@ -1928,6 +1928,47 @@ test('Decide on a phone: an ask is a sheet over the list with its bar at the foo
   ({ y } = await row('gamma'));
   await swipe({ x: 360, y }, { x: 30, y });
   await until(async () => (await heads()) === 'Asks|Answered2');
+  // A large phone list keeps its full count and queue without constructing every row.
+  const large = Array.from({ length: 60 }, (_, i) => ({ key: `large-${i}`, title: `Umer's question ${i}?`, options: abc, recommend_value: 'a' }));
+  writeFileSync(file, JSON.stringify({ schema: 2, items: large }));
+  await evaluate('location.reload()');
+  await until(async () => (await evaluate('document.querySelector(".decide-list .ui-hero .big")?.textContent')) === '60');
+  const rows = () => evaluate('document.querySelectorAll(".decide-list ul[aria-label=Asks] .dl-row").length');
+  assert.equal(await rows(), 24);
+  await evaluate('document.getElementById("decide-more-now").click()');
+  assert.equal(await rows(), 48);
+  assert.equal(await evaluate('document.activeElement.id'), 'item-large-35');
+  await evaluate('document.getElementById("decide-more-now").click()');
+  assert.equal(await rows(), 60);
+  assert.equal(await evaluate('!!document.getElementById("decide-more-now")'), false);
+  await evaluate('document.querySelector(".decide-list ul[aria-label=Asks] li:last-child a").click()');
+  await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === "Umer's question 0?");
+  await evaluate('document.querySelector(".decide .pick-option").click(); document.querySelector(".decide-bar .answer").click()');
+  await until(async () => /large-0,a,/.test(run('answers', file).out) && (await evaluate('location.hash === "#waiting" && !document.querySelector(".ask-sheet")')));
+  // The selected set still includes asks beyond the first batch; desk J/K still gets every row.
+  await evaluate('location.reload()');
+  await until(async () => (await evaluate('location.hash + "|" + document.querySelector(".decide-list .ui-hero .big")?.textContent')) === '#waiting|59');
+  await evaluate('document.querySelector(".decide-list .t-more-line").click(); document.querySelector("#d-more [data-act=select]").click()');
+  await until(() => evaluate('!!document.querySelector(".sel-bar")'));
+  await evaluate('document.querySelector(".sel-all").click()');
+  assert.equal(await evaluate('document.querySelector(".sel-go").textContent'), 'Discard 59');
+  await evaluate('document.querySelector(".sel-cancel").click()');
+  const history = Array.from({ length: 90 }, (_, i) => ({ key: `large-${i}`, title: `Umer's question ${i}?`, options: abc, recommend_value: 'a' }));
+  writeFileSync(file, JSON.stringify({ schema: 2, items: history }));
+  writeFileSync(file.replace('.json', '.answers.jsonl'), history.slice(0, 30).map((d) => JSON.stringify({ key: d.key, answer: 'a', label: 'A', close: 'done', at: new Date().toISOString() })).join('\n') + '\n');
+  await evaluate(`(async () => { const s = await (await fetch('/api/decisions')).json(); localStorage.setItem('sign-off-later ' + s.file, JSON.stringify(${JSON.stringify(history.slice(30, 60).map((d) => d.key))})); location.reload(); })()`);
+  await until(async () => (await evaluate('document.querySelector(".decide-list .ui-hero .vs")?.textContent')) === '30 for later');
+  for (const [group, name] of [['now', 'Asks'], ['later', 'Later'], ['done', 'Answered']]) {
+    assert.equal(await evaluate(`document.querySelectorAll('.decide-list ul[aria-label="${name}"] .dl-row').length`), 24);
+    await evaluate(`document.getElementById('decide-more-${group}').click()`);
+    assert.equal(await evaluate(`document.querySelectorAll('.decide-list ul[aria-label="${name}"] .dl-row').length`), 30);
+    assert.equal(await evaluate(`!!document.getElementById('decide-more-${group}')`), false);
+  }
+  await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+  await evaluate('location.reload()');
+  await until(() => evaluate('!!document.querySelector(".split-list")'));
+  assert.equal(await evaluate('document.querySelectorAll(".split-list .dl-row").length'), 90);
+  assert.equal(await evaluate('!!document.querySelector(".decide-more")'), false);
   close();
   proc.kill();
 });

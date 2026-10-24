@@ -14,6 +14,7 @@
 // With both, it records the desk's Reports by keys: J and K moving the selection (each report read as it is shown), U twice, a row's hover actions,
 // E archiving the report shown (the row folds, the next is selected), Cmd+Z, Enter opening a guided report over the board and Escape, and the ? sheet.
 // Usage: node decide-record.mjs <board url> <light|dark> <out.mp4> [desk] [reports]
+// With `load` it records Show more and opens a newly loaded ask on a large isolated board.
 // With `today` it records Today at phone size on a board feel-board.sh seeded: See all opening Decide (the pill sliding), the sign-in swiped to Later, the Today tab (Up next is now
 // the next ask), Answer turning into a check (Cleared today counting it, Decide's badge counting down, the next ask rising in), Undo, the light-or-dark button tapped twice, More opened from the line under the tiles and closed,
 // the dock's Search with words typed and closed, and a Waiting on you row opening its ask.
@@ -74,7 +75,8 @@ try {
   const type = (words) => inPage(`const t = document.activeElement; if (!['TEXTAREA', 'INPUT'].includes(t?.tagName)) return 'missing'; for (const c of ${JSON.stringify(words)}) { t.value += c; t.dispatchEvent(new Event('input')); await s(45); } return 'ok';`);
   await send('Page.startScreencast', { format: 'jpeg', quality: 90, everyNthFrame: 1 });
   await send('Page.navigate', { url: `${url}${{ reports: '#reports', decide: '#waiting', today: '' }[screen]}` });
-  const steps = screen === 'reports' && desk ? [[2600], [() => key('j'), 1100], [() => key('j'), 1100], [() => key('k'), 1100], [() => key('u'), 1600], [() => key('u'), 1400],
+  const steps = modes.includes('load') ? [[2600], [() => inPage("document.getElementById('decide-more-now').scrollIntoView({ block: 'center', behavior: 'smooth' }); return 'ok';"), 1000],
+    [() => tap('#decide-more-now'), 1600], [() => tap('.decide-list ul[aria-label=Asks] li:nth-child(25) a'), 1600], [() => tap('.sh-x'), 1000]] : screen === 'reports' && desk ? [[2600], [() => key('j'), 1100], [() => key('j'), 1100], [() => key('k'), 1100], [() => key('u'), 1600], [() => key('u'), 1400],
     [() => inPage("const b = document.querySelector('.split-list .dl-row:not(.sel) .dl-hover .read-q'); if (!b) return 'missing'; b.focus(); return 'ok';"), 1400],
     [() => inPage("document.querySelector('.split-list [data-row][aria-current]').focus(); return 'ok';"), 300], [() => key('e'), 1800], [() => key('z', true), 1600],
     [() => key('j'), 1100], [() => key('Enter'), 1800], [() => key('Escape'), 1200], [() => key('?'), 1800], [() => tap('#keys header button'), 900]]
