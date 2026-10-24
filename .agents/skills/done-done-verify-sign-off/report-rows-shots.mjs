@@ -31,9 +31,9 @@ try {
   so('ticket', board, '--id', 'T-30', '--title', 'Check inherited project icons', '--parent', 'T-29', '--progress', '40');
   if (process.env.REPORT_ROWS_MUXR_ICON) { cpSync(process.env.REPORT_ROWS_MUXR_ICON, join(dir, 'muxr.svg')); so('project', board, '--name', 'Muxr', '--icon', 'muxr.svg'); so('ticket', board, '--id', 'T-39', '--title', 'Make Muxr notifications clear', '--project', 'Muxr', '--progress', '20'); }
   const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
-  post('report', { ...fx('report.v5/valid-full.json'), key: 'research', title: 'Which notification service fits a small team?', group: process.env.REPORT_ROWS_MUXR_ICON ? 'Muxr' : 'sign-off', ticket: process.env.REPORT_ROWS_MUXR_ICON ? 'T-39' : 'T-29', filed: now });
-  post('report', { ...fx('report.v4/valid-minimal.json'), key: 'retro', title: 'Why messages were sent twice: a retro', group: 'sign-off', filed: now });
-  post('report', { ...fx('report.v4/valid-minimal.json'), key: 'read', title: 'Where the weekly digest stands', group: 'sign-off', ticket: 'T-29', filed: now });
+  post('report', { ...fx('report.v5/valid-full.json'), key: 'research', title: 'Which notification service fits a small team?', project: process.env.REPORT_ROWS_MUXR_ICON ? 'Muxr' : 'sign-off', ticket: process.env.REPORT_ROWS_MUXR_ICON ? 'T-39' : 'T-29', filed: now });
+  post('report', { ...fx('report.v4/valid-minimal.json'), key: 'retro', title: 'Why messages were sent twice: a retro', purpose: 'incident', project: 'Beacon', filed: now });
+  post('report', { ...fx('report.v4/valid-minimal.json'), key: 'read', title: 'Where the weekly digest stands', purpose: 'status', project: 'sign-off', ticket: 'T-29', filed: now });
   post('plan', { ...fx('plan.v3/valid-full.json'), key: 'plan', project: 'sign-off' }, '--ticket', 'T-29');
   const design = fx('design.v1/valid-basic.json'); design.journeys[0].screens[0].views = { phone_light: 'design/first-frame.webp' };
   cpSync(join(repo, 'docs/media/phone-light.webp'), join(dir, 'design/first-frame.webp'));
@@ -64,7 +64,7 @@ try {
         await document.fonts.ready; await Promise.all([...document.images].map(i => i.decode().catch(() => {})));
         const rows = [...document.querySelectorAll('main .ui-row, dialog[open] .ui-row')], report = location.hash === '#reports';
         const data = rows.map(r => ({ title: r.querySelector('.t')?.textContent, kind: r.querySelector('.rkc')?.textContent, ticket: r.querySelector('.rp-ticket')?.textContent,
-          icon: r.querySelector('.ui-icon img')?.getAttribute('src'), loaded: !!r.querySelector('.ui-icon img')?.naturalWidth, mono: !!r.querySelector('.mono'),
+          icon: r.querySelector('.ui-icon img')?.getAttribute('src'), loaded: !!r.querySelector('.ui-icon img')?.naturalWidth, neutral: !r.querySelector('.ui-icon img') && !!r.querySelector('.ui-icon svg') && !r.querySelector('.ui-icon .rkg'), kindGlyph: !!r.querySelector('.ui-icon .rkg'), mono: !!r.querySelector('.mono'),
           progress: r.querySelector('.rp-progress')?.getAttribute('aria-valuenow') ?? null, progressGap: r.querySelector('.rp-progress') && r.querySelector('.rp-meta') ? r.querySelector('.rp-progress').getBoundingClientRect().top - r.querySelector('.rp-meta').getBoundingClientRect().bottom : null, oldBar: !!r.querySelector('.l2 .ui-bar, .l2 .rp-strip') }));
         const w = document.documentElement.clientWidth;
         return { thumbnailOverflow: [...document.querySelectorAll('.ui-icon img.design-thumb')].filter(i => i.getBoundingClientRect().height > i.parentElement.getBoundingClientRect().height + 1).length, monograms: [...document.querySelectorAll('.ui-row .ui-icon, .dz-shot, .t-up .meta')].filter(e => e.querySelector('.mono') || (!e.querySelector('img,svg') && /^[A-Z]{2}$/.test(e.textContent.trim()))).map(e => e.textContent), url: location.href, width: innerWidth, colorScheme: getComputedStyle(document.documentElement).colorScheme, canvas: getComputedStyle(document.body).backgroundColor, rows: data, ticketHeaderIcon: !!document.querySelector('.tk-shd .ui-icon img')?.naturalWidth, ticketTreeIcon: !!document.querySelector('.tk-in .tk-row .ui-icon img')?.naturalWidth, designCards: document.querySelectorAll('.dz-card').length, overflow: document.documentElement.scrollWidth > w,
@@ -73,27 +73,28 @@ try {
       })));`).trim());
       const name = `${area === 'waiting' ? 'decide' : area === 'ticket/T-29' ? 'epic' : area === '' ? 'today' : area === 'find' ? 'search' : area}.${theme}.${width}w`;
       axi('screenshot', join(review, name + '.png'));
-      if (review !== dest && area === 'reports' && [390, 1280].includes(width)) cpSync(join(review, name + '.png'), join(dest, name + '.png'));
+      if (review !== dest && area === 'reports' && (process.env.REPORT_ROWS_JUDGED ?? '360,390,445,1280,1440').split(',').includes(String(width))) cpSync(join(review, name + '.png'), join(dest, name + '.png'));
       result.console = axi('console', '--type', 'error'); const network = axi('network');
       result.console_errors = result.console.includes('<no console messages found>') ? [] : [result.console];
       result.failed_requests = network.split('\n').filter(l => /\[(?:[45]\d\d|failed)\]/i.test(l));
       writeFileSync(join(review, name + '.dom.json'), JSON.stringify(result, null, 2)); measures.push(result);
       if (!before) {
         assert.equal(result.thumbnailOverflow, 0); assert.deepEqual(result.monograms, []); assert.deepEqual(result.console_errors, []); assert.deepEqual(result.failed_requests, []); assert.equal(result.overflow, false); assert.deepEqual(result.overflowing, []); assert.deepEqual(result.squashed_text.filter(x => /rp-ticket|rkc|ui-icon/.test(x.element)), []);
-        assert.ok(result.rows.length || (area === 'designs' && width >= 1024 && result.designCards > 0)); assert.ok(result.rows.every(r => r.loaded && !r.mono), name + ': real project icons');
+        assert.ok(result.rows.length || (area === 'designs' && width >= 1024 && result.designCards > 0)); assert.ok(result.rows.every(r => !r.mono && !r.kindGlyph && (r.loaded || (r.neutral && /retro/.test(r.title)))), name + ': the project icon on every tile, the neutral mark only for a project with no icon, never a kind glyph');
         if (area === 'ticket/T-29') assert.ok(result.ticketHeaderIcon && result.ticketTreeIcon, name + ': shared header and inherited epic-tree icons');
         if (area === 'designs' && width < 1024) assert.ok(result.rows.some(r => r.icon?.includes('first-frame.webp')), name + ': first real design frame');
         if (area === 'reports') {
-          assert.ok(result.rows.every(r => r.kind && r.ticket && !r.oldBar));
+          assert.ok(result.rows.every(r => r.kind && !r.oldBar && (r.title.includes('retro') ? r.ticket === undefined : r.ticket)), name + ': the ticket chip only where a ticket is linked');
           assert.ok(result.rows.every(r => r.progressGap === null || r.progressGap >= 6), name + ': six pixels below metadata');
-          assert.match(result.rows.find(r => r.title.includes('retro')).kind, /kind guessed/);
+          assert.equal(result.rows.find(r => r.title.includes('retro')).kind, 'Incident');
+          assert.ok(result.rows.every(r => !/guess/.test(r.kind)));
           assert.equal(result.rows.find(r => r.title.includes('weekly')).progress, null);
           assert.ok(result.rows.some(r => r.progress !== null));
         }
       }
     }
   }
-  writeFileSync(join(dest, 'steps.json'), JSON.stringify({ commit: process.env.REPORT_ROWS_COMMIT ?? sh('git', ['rev-parse', 'HEAD'], { cwd: repo }).trim(), before, target: { version: so('--version').trim() }, start: 'An empty isolated board for Umer.', steps: ['Post reports, plan, ask, design and proof via CLI.', 'Pin the project icon and link ticket T-29.', 'Mark one report read and one report part read.', 'Open Reports, Decide, Designs and Evidence at 360, 390, 445, 1280 and 1440 in light and dark with chrome-devtools-axi.', 'Read project, kind, ticket and unread progress, measuring its six-pixel gap.', 'Open Tickets at 390 and 1280 in both themes; the desktop initially shows the separate release ticket.', 'Click the epic row, then its child ticket, to read the shared project icons on the ticket header and its inherited sub-task rows.', 'Open Today and search for o at 390/1280 in both themes; every list forbids monogram tiles and Designs shows its first real screen thumbnail.'], result: `${measures.length} real frames and DOM records${review !== dest ? '; four Reports PNGs selected for the sealed claim, full matrix retained separately' : ''}; ${before ? 'baseline recorded' : 'shared icons, kind guessed, ticket metadata, unread-only progress and no overflow passed'}` }, null, 2));
+  writeFileSync(join(dest, 'steps.json'), JSON.stringify({ commit: process.env.REPORT_ROWS_COMMIT ?? sh('git', ['rev-parse', 'HEAD'], { cwd: repo }).trim(), before, target: { version: so('--version').trim() }, start: 'An empty isolated board for Umer.', steps: ['Post reports, plan, ask, design and proof via CLI.', 'Pin the project icon and link ticket T-29.', 'Mark one report read and one report part read.', 'Open Reports, Decide, Designs and Evidence at 360, 390, 445, 1280 and 1440 in light and dark with chrome-devtools-axi.', 'Read project, kind, ticket and unread progress, measuring its six-pixel gap.', 'Open Tickets at 390 and 1280 in both themes; the desktop initially shows the separate release ticket.', 'Click the epic row, then its child ticket, to read the shared project icons on the ticket header and its inherited sub-task rows.', 'Open Today and search for o at 390/1280 in both themes; every list forbids monogram tiles and Designs shows its first real screen thumbnail.'], result: `${measures.length} real frames and DOM records${review !== dest ? '; four Reports PNGs selected for the sealed claim, full matrix retained separately' : ''}; ${before ? 'baseline recorded' : 'shared icons, neutral mark with no icon, ticket chip only when linked, kind chip, unread-only progress and no overflow passed'}` }, null, 2));
   console.log(`${dest}: ${measures.length} frames recorded`);
 } finally {
   try { axi('stop'); } catch {}

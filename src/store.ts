@@ -53,7 +53,7 @@ export type Decision = {
   group?: string; filed?: string; decided?: string;
   /** Reports: what it explains with (an icon), the length of its narrated video, and who asked for it. */
   form?: string; video?: string; asked_by?: string;
-  /** A guided report 5: what it is for, one of REPORT_PURPOSES. An older report has none, and the board guesses one. */
+  /** A guided report 5: what it is for, one of REPORT_PURPOSES. An older report has none until report kind sets it. */
   purpose?: string;
   /** Sign-ins: what the sign-in unlocks, who waits on it, and when its link stops working (ISO date-time). */
   unlocks?: string; waits?: string; expires?: string;
@@ -320,7 +320,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       ...(d.kind === 'gate' && d.run && { run: { run_id: d.run.run_id, commit: d.run.commit } }),
       // So is a finding's proposal, with the counts and records behind it.
       ...(d.kind === 'finding' && { finding: { cause: d.cause, incidents: d.incidents, days: d.days, evidence_ids: d.evidence_ids, change_kind: d.change_kind, proposal: d.proposal } }),
-      ...(plan && { sections: d.sections, decisions: d.decisions, ...(d.project && { project: d.project }) }),
+      ...(plan && { sections: d.sections, decisions: d.decisions }), ...((plan || report) && d.project && { project: d.project }),
       ...(engagement && { engagement: { kind: d.kind, schema: d.schema, filer: d.filer, revision: documentRevision(d) } }),
       ...(guided && { guided: true, understood: d.understood, visual: d.visual, next: d.next, ...(report && { sections: d.sections }) }),
       ...(design && { kind: 'design', type: 'design', group: d.group, filed: d.filed, status: d.status, preview: d.preview, journeys: d.journeys, ...(d.accepts && { accepts: d.accepts }), ...(d.reviewed && { reviewed: d.reviewed }), ...(d.options && { options: d.options, recommend_value: d.recommend }) }),
@@ -537,6 +537,28 @@ export function readDiscards(decisionsPath: string): { key: string; reason: Disc
     return x.dismissed === true && Object.hasOwn(DISCARD_REASONS, x.reason) && !after.some((y) => y.dismissed === false && Date.parse(y.at) - Date.parse(x.at) < UNDO_MS)
       ? [{ key: x.key, reason: x.reason, at: x.at, last: !after.length }] : [];
   });
+}
+/** The kind and project an agent read an older report's words and set for it, one line per key and change: who set it and when. The report's own file is never rewritten. */
+export const kindsPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.kinds.jsonl';
+export type SetKind = { key: string; purpose: string; project: string; by: string; at: string };
+export function appendKind(decisionsPath: string, key: string, purpose: string, project: string, by: string): SetKind {
+  const line = { key, purpose, project, by, at: now() };
+  appendLine(kindsPath(decisionsPath), line);
+  return line;
+}
+/** Every report's set kind as its latest line says. A torn or unknown line is skipped and reported through warn. */
+export function readKinds(decisionsPath: string, warn: (msg: string) => void = () => {}): Map<string, SetKind> {
+  const kinds = new Map<string, SetKind>();
+  readRaw(kindsPath(decisionsPath)).split('\n').forEach((line, n) => {
+    try {
+      const x = line && JSON.parse(line);
+      if (x && typeof x.key === 'string' && REPORT_PURPOSES.includes(x.purpose) && isText(x.project) && typeof x.by === 'string') kinds.set(x.key, x);
+      else if (x) throw new Error('not a kind');
+    } catch {
+      warn(`skipped unreadable line ${n + 1} in ${kindsPath(decisionsPath)}`);
+    }
+  });
+  return kinds;
 }
 /** Design reviews Main has put to the user, one line per key and change. A design a lead posts is reviewed under Designs and is no ask of the user's
  *  until the promote command names it here; no post, feed or board request writes this log. */

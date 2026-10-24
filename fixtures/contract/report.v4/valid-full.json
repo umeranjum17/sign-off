@@ -4,6 +4,8 @@
   "schema": 4,
   "key": "sign-in-faster",
   "title": "Sign-in now takes 2.8 minutes",
+  "purpose": "other",
+  "project": "Beacon",
   "group": "Beacon",
   "filer": "agent-41",
   "ticket": "T-29",

@@ -12,6 +12,7 @@
   "next": {"heading": "Say go and I wire ntfy in", "lines": ["The first slice sends one test push to Umer's phone.", "The proof lands as an update under Evidence."]},
   "key": "release-stands",
   "title": "Where the 0.6 release stands",
+  "project": "Beacon",
   "purpose": "status",
   "group": "Release",
   "about": "Four of five parts are done; the last waits on one review.",

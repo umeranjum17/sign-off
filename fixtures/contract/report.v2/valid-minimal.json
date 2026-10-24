@@ -4,6 +4,8 @@
   "schema": 2,
   "key": "why-two-step-sign-in",
   "title": "Why sign-in takes two steps",
+  "purpose": "other",
+  "project": "Beacon",
   "about": "A stolen password alone no longer opens the account.\nUmer has nothing to do.",
   "filed": "2026-10-12T23:59:59Z",
   "view": "page/index.html",

@@ -923,7 +923,7 @@ test('each card has one place to type: Add a comment holds the note sent with th
   const abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l }));
   const nine = new Date(new Date().setHours(9, 15, 0, 0)).toISOString();
   // A report is the page report init writes, filled in; a text-only report stored before reports had pages is a note, never a report card.
-  assert.equal(run('report', 'init', join(dir, 'mocks', 'how'), '--page').code, 0);
+  assert.equal(run('report', 'init', join(dir, 'mocks', 'how'), '--page', '--purpose', 'other').code, 0);
   for (const f of ['index.html', 'preview.svg']) writeFileSync(join(dir, 'mocks', 'how', f), readFileSync(join(dir, 'mocks', 'how', f), 'utf8').replace(/FILL: [^<"']*/g, 'Umer taps through it'));
   writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key: 'ship', title: 'When should it ship?', options: abc, recommend_value: 'b', filed: nine },
     { key: 'look', type: 'design', title: 'Pick the look', options: abc, recommend_value: 'b', filed: nine },
@@ -979,7 +979,7 @@ test('each card has one place to type: Add a comment holds the note sent with th
   assert.doesNotMatch(reports, /aria-label="Discard, How it ships"/);
   // Newest heads one card of rows; the row is a link that opens it, with its project's initials (it has no icon), its title, then a bar of how much of it is read with its percent.
   assert.match(reports, /<h2 class="dl-head ui-sec" style="--n:0">Newest<\/h2><ul class="dl-list rp-list ui-card ui-list" aria-label="Newest">/);
-  assert.match(reports, /id="item-how" data-row=""><span class="ui-icon" role="img" aria-label="How it works">.*?<svg.*?<span class="t" dir="auto">How it ships<\/span>.*?kind guessed.*?class="rp-ticket" title="No ticket">No ticket.*?role="progressbar".*?aria-valuenow="0"/s);
+  assert.match(reports, /id="item-how" data-row=""><span class="ui-icon" role="img" aria-label="How it works">.*?<svg.*?<span class="t" dir="auto">How it ships<\/span>(?:(?!rp-ticket).)*?role="progressbar".*?aria-valuenow="0"/s);
   // Under the row, a swipe right marks it read and a swipe left archives it.
   assert.match(reports, /<div class="dl-act yes" aria-hidden="true">.*?<span>Read<\/span><\/div><div class="dl-act later" aria-hidden="true">.*?<span>Archive<\/span><\/div>/s);
   // Only the report is a row and counted; the text-only one is folded under Notes, a short row with no page to open.
@@ -1003,9 +1003,9 @@ test('each card has one place to type: Add a comment holds the note sent with th
       inert: document.querySelector('main').inert, src: reader.querySelector('iframe').getAttribute('src'), sandbox: reader.querySelector('iframe').getAttribute('sandbox'),
       frame: [f.x, Math.round(f.width) === reader.querySelector('.read').clientWidth - 32], back: reader.querySelector('.rp-x').getAttribute('aria-label'), what: reader.querySelector('.rp-what').textContent,
       decided: [...reader.querySelectorAll('.ui-dl, .rp-found')].map((e) => e.textContent) }; })()`))?.src === '/mock/local/how~/index.html');
-    // The page sits in a tile inside the sheet's 16px gutters, under its kind (an older report's, guessed), its title and what it decided.
+    // The page sits in a tile inside the sheet's 16px gutters, under its kind (an older report's, other), its title and what it decided.
     assert.deepEqual(open, { hidden: false, title: 'How it ships', inert: true, src: '/mock/local/how~/index.html', sandbox: 'allow-scripts', frame: [16, true], back: 'Close',
-      what: `Other report · kind guessedHow it works · ${new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(new Date())}`, decided: ['What it decided', 'Ships only when the check passes.'] });
+      what: `Other reportHow it works · ${new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(new Date())}`, decided: ['What it decided', 'Ships only when the check passes.'] });
     // The page itself is served: the filled scaffold, with its steps to tap.
     assert.match(await (await fetch(new URL('/mock/local/how~/index.html', url))).text(), /<button type="button" class="next">Next<\/button>/);
     await tap(await at('#reader .rp-x'));
@@ -2092,8 +2092,8 @@ test('Reports on a desk: the list beside the newest report, J moves and reads, U
   await evaluate(`location.href = ${JSON.stringify(`${url}#reports`)}`);
   // The newest report is shown beside the list, not yet marked read; its head line says what it is and the day, beside Mark read and Archive.
   await until(async () => (await seen()) === `#reports|alpha|Alpha report|4`);
-  // The bar names the report's kind (an older report's, guessed from its words), then its day.
-  assert.match(await evaluate('[document.querySelector(".rp-bar .rkc").textContent, document.querySelector(".rp-bar > span[dir]").textContent].join("|")'), /^Other report · kind guessed\|\d{1,2} [A-Z][a-z]{2}$/);
+  // The bar names the report's kind (an older report's, other), then its day.
+  assert.match(await evaluate('[document.querySelector(".rp-bar .rkc").textContent, document.querySelector(".rp-bar > span[dir]").textContent].join("|")'), /^Other report\|\d{1,2} [A-Z][a-z]{2}$/);
   assert.equal(await evaluate('[...document.querySelectorAll(".rp-bar > button")].map((b) => b.textContent).join(",") + "|" + !!document.querySelector(".split-detail .read iframe")'), 'Mark read,Archive|true');
   assert.equal(await rows(), `alpha,beta,${guided.key},gamma`);
   assert.equal(reads(), '');
@@ -2128,7 +2128,7 @@ test('Reports on a desk: the list beside the newest report, J moves and reads, U
   proc.kill();
 });
 
-test('report kinds and their workflows: post names what a report is for and holds it to its kind\'s parts, report init writes them, each row leads with its kind (an older report\'s guessed, a plan\'s bar its parts), Filter by kind lists only that kind under its pill, a report\'s head names its kind over a line on what it is for, its parts strip and the next one, and research shows its sources, on a phone and a desk', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('report kinds and their workflows: post names what a report is for and holds it to its kind\'s parts, report init writes them, each row leads with its kind (an older report\'s other, a plan\'s bar its parts), Filter by kind lists only that kind under its pill, a report\'s head names its kind over a line on what it is for, its parts strip and the next one, and research shows its sources, on a phone and a desk', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'report-kinds'), file = join(dir, 'board.json');
   mkdirSync(join(dir, 'diagrams'), { recursive: true });
   writeFileSync(join(dir, 'diagrams', 'flow.html'), readFileSync(new URL('../.agents/skills/done-done-verify-sign-off/diagram-sample/flow.html', import.meta.url)));
@@ -2155,10 +2155,10 @@ test('report kinds and their workflows: post names what a report is for and hold
   writeFileSync(join(dir, 'muxr.svg'), readFileSync(new URL('../docs/logo.svg', import.meta.url)));
   assert.equal(run('project', file, '--name', 'Muxr', '--icon', 'muxr.svg').code, 0);
   assert.equal(run('ticket', file, '--id', 'T-29', '--title', 'Move settings', '--project', 'Muxr').code, 0);
-  plan.group = 'Muxr'; plan.ticket = 'T-29';
+  plan.group = plan.project = 'Muxr'; plan.ticket = 'T-29';
   assert.equal(post('plan', plan).code, 0);
   assert.equal(post('research', { ...base, key: 'k-research', filed: at(2) }).code, 0);
-  assert.equal(post('retro', { ...JSON.parse(readFileSync(new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url), 'utf8')), key: 'k-retro', title: 'Why messages were sent twice: a retro', filed: at(3) }).code, 0);
+  assert.equal(post('retro', { ...JSON.parse(readFileSync(new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url), 'utf8')), key: 'k-retro', purpose: 'incident', title: 'Why messages were sent twice: a retro', filed: at(3) }).code, 0);
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
@@ -2167,19 +2167,19 @@ test('report kinds and their workflows: post names what a report is for and hold
   const { evaluate, close } = await browse(join(dir, 'b'), 390, 844, true);
   const rows = () => evaluate('[...document.querySelectorAll(".rp-list .ui-row")].map((r) => [r.querySelector(".t").textContent, r.querySelector(".l2 .rkc")?.textContent, r.querySelector(".rp-progress .rp-strip") ? [...r.querySelectorAll(".rp-strip > i")].map((i) => +i.classList.contains("on")).join("") : "bar", r.querySelector(".pct").textContent].join(" ")).join("|")');
   await evaluate(`location.href = ${JSON.stringify(`${url}#reports`)}`);
-  // Each row leads its second line with its kind; the plan's bar is its nine parts, three read; the older report's kind is the board's guess.
-  await until(async () => (await rows()) === `Move settings into the profile page Plan 111000000 33%|${base.title} Research bar 0%|Why messages were sent twice: a retro Incident · kind guessed bar 0%`);
-  assert.equal(await evaluate('document.querySelector("#item-k-retro .rkc").textContent'), 'Incident · kind guessed');
+  // Each row leads its second line with its kind; the plan's bar is its nine parts, three read; the older report's kind is other.
+  await until(async () => (await rows()) === `Move settings into the profile page Plan 111000000 33%|${base.title} Research bar 0%|Why messages were sent twice: a retro Incident bar 0%`);
+  assert.equal(await evaluate('document.querySelector("#item-k-retro .rkc").textContent'), 'Incident');
   assert.ok(await evaluate('(() => { const r = document.querySelector("#item-k-retro"); return r.querySelector(".rp-progress").getBoundingClientRect().top - r.querySelector(".rp-meta").getBoundingClientRect().bottom >= 6; })()'), "unread progress leaves six pixels below the kind and ticket");
   assert.equal(await evaluate('document.querySelector("#item-k-plan .rp-ticket").textContent'), 'T-29');
   assert.equal(await evaluate('!!document.querySelector("#item-k-plan .l1 .ui-tb") && !!document.querySelector("#item-k-plan .l2 .rkc")'), true);
   assert.equal(await evaluate('document.querySelector("#item-k-plan .ui-icon img").naturalWidth > 0'), true);
-  assert.equal(await evaluate('document.querySelector("#item-k-research .rp-ticket").textContent'), 'No ticket');
+  assert.equal(await evaluate('!!document.querySelector("#item-k-research .rp-ticket")'), false);
   // Filter by kind lists each kind with its count; a kind picked leaves only its reports under its pill, and the pill's close lists them all again.
   await evaluate('document.querySelector(".rp-fb").click()');
   await until(async () => (await evaluate('[...document.querySelectorAll("#sheet[open] .rp-pick .ui-pr")].map((b) => b.dataset.kind + " " + b.querySelector(".n").textContent).join(",")')) === 'all 3,research 1,plan 1,incident 1');
   await evaluate('document.querySelector("#sheet .rp-pick [data-kind=\\"incident\\"]").click()');
-  await until(async () => (await rows()) === 'Why messages were sent twice: a retro Incident · kind guessed bar 0%' && (await evaluate('document.querySelector(".rp-pill").textContent + "|" + document.querySelector(".rp-fb b").textContent + "|" + !document.querySelector(".rp-hero")')) === 'Incident and retro1 of 3|1|true');
+  await until(async () => (await rows()) === 'Why messages were sent twice: a retro Incident bar 0%' && (await evaluate('document.querySelector(".rp-pill").textContent + "|" + document.querySelector(".rp-fb b").textContent + "|" + !document.querySelector(".rp-hero")')) === 'Incident and retro1 of 3|1|true');
   await evaluate('document.querySelector(".rp-pill .ev-unpick").click()');
   await until(async () => (await rows()).split('|').length === 3 && !(await evaluate('!!document.querySelector(".rp-pill, .rp-fb b")')));
   // A report's sheet heads with its kind's full name, then a line on what it is for, and over its kind's parts a strip of them with the next one to read.
@@ -2189,7 +2189,7 @@ test('report kinds and their workflows: post names what a report is for and hold
   await evaluate(`location.href = ${JSON.stringify(`${url}#reports`)}`);
   await until(() => evaluate('!!document.querySelector("#item-k-plan") && !document.querySelector("#item-k-plan .rp-progress")'));
   await evaluate('document.querySelector("#item-k-retro").click()');
-  await until(async () => (await evaluate('document.querySelector("#reader .rkc")?.textContent')) === 'Incident and retro · kind guessed');
+  await until(async () => (await evaluate('document.querySelector("#reader .rkc")?.textContent')) === 'Incident and retro');
   // Research shows its sources, how many link out and how many are what users report; a tap opens the report at its sources, each with its tag and link.
   await evaluate(`location.href = ${JSON.stringify(`${url}#reports`)}`);
   await until(() => evaluate('!!document.querySelector("#item-k-research")'));

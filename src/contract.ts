@@ -20,7 +20,7 @@ export const KINDS = Object.keys(SCHEMAS);
 const COMMON = ['contract', 'kind', 'schema', 'key', 'title', 'filer', 'ticket', 'priority', 'link', 'about'];
 const FIELDS: Record<string, string[]> = {
   ask: [...COMMON, 'ask_ref', 'detail', 'why', 'options', 'recommend_value', 'recommend_reason', 'default_if_silent', 'silent_by', 'guard', 'close', 'merges', 'proof', 'report'],
-  report: [...COMMON, 'filed', 'group', 'decided', 'form', 'video', 'asked_by', 'view', 'preview'],
+  report: [...COMMON, 'filed', 'group', 'decided', 'form', 'video', 'asked_by', 'purpose', 'project', 'view', 'preview'],
   evidence: [...COMMON, 'media', 'run', 'status', 'captions'],
   gate: [...COMMON, 'run', 'options', 'recommend_value', 'close'],
   finding: [...COMMON, 'cause', 'incidents', 'days', 'evidence_ids', 'change_kind', 'proposal', 'options', 'recommend_value'],
@@ -33,7 +33,7 @@ const DESIGN_1 = [...COMMON, 'group', 'filed', 'status', 'preview', 'journeys', 
 export const FRAME_ROLES = ['today', 'proposed', 'built', 'target'];
 const GUIDE = ['understood', 'visual', 'sections', 'next'];
 const GUIDE_FIELDS: Record<string, string[]> = {
-  report: [...COMMON, 'filed', 'group', 'decided', 'asked_by', 'purpose', ...GUIDE],
+  report: [...COMMON, 'filed', 'group', 'decided', 'asked_by', 'purpose', 'project', ...GUIDE],
   plan: [...COMMON, 'project', 'decisions', ...GUIDE],
 };
 /** A done-done run: its id, full commit and the four Checks lines. */
@@ -425,15 +425,15 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
       throw bad('filed', Object.hasOwn(m, 'filed') ? `${show(m.filed)} is not a UTC time such as 2026-10-13T07:19:00Z` : 'is required', 'Set "filed" to when it happened, exactly YYYY-MM-DDTHH:MM:SSZ in UTC, such as "2026-10-13T07:19:00Z"');
     }
     if (Object.hasOwn(m, 'group')) text('group', m.group, 40, 'the section it belongs to, in 40 characters or fewer, or leave it out');
+    if (Object.hasOwn(m, 'project')) text('project', m.project, 40, 'the project it is about, in 40 characters or fewer');
     if (Object.hasOwn(m, 'decided')) text('decided', m.decided, 200, 'what was decided, in 200 characters or fewer, or leave it out');
     if (Object.hasOwn(m, 'form') && !REPORT_FORMS.includes(m.form)) throw bad('form', `${show(m.form)} is not one of ${REPORT_FORMS.join(', ')}`, `Set "form" to ${REPORT_FORMS.join(', ')}, or leave it out`);
     if (Object.hasOwn(m, 'video')) text('video', m.video, 10, 'the video length such as "0:28", in 10 characters or fewer, or leave it out');
     if (Object.hasOwn(m, 'asked_by')) text('asked_by', m.asked_by, 40, 'who asked for it, such as "You asked" or "Docs agent", in 40 characters or fewer, or leave it out');
-    if (m.schema >= 5) {
-      const set = `Set "purpose" to what this report is for, one of ${REPORT_PURPOSES.join(', ')}`;
-      if (!Object.hasOwn(m, 'purpose')) throw bad('purpose', 'is required: the kind of report, which the board shows on its row and head', set);
-      if (!REPORT_PURPOSES.includes(m.purpose)) throw bad('purpose', `${show(m.purpose)} is not one of ${REPORT_PURPOSES.join(', ')}`, set);
-    }
+    // A report 5 must name what it is for; an older one may, and a new post of one must (newReportKind).
+    const set = `Set "purpose" to what this report is for, one of ${REPORT_PURPOSES.join(', ')}`;
+    if (m.schema >= 5 && !Object.hasOwn(m, 'purpose')) throw bad('purpose', 'is required: the kind of report, which the board shows on its row and head', set);
+    if (Object.hasOwn(m, 'purpose') && !REPORT_PURPOSES.includes(m.purpose)) throw bad('purpose', `${show(m.purpose)} is not one of ${REPORT_PURPOSES.join(', ')}`, set);
     // A report is a page to tap through and a picture of it for the card: text alone is a status note, not a report.
     if (g) { guide(1); return { kind: m.kind, schema: m.schema }; }
     const need = 'a report is a page to tap through, not text';
