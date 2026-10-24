@@ -130,7 +130,7 @@ const MEASURE = `(async () => { await document.fonts.ready; const fail = [], w =
   if (document.documentElement.scrollWidth > w) fail.push('sideways overflow');
   const words = document.body.innerText, bad = words.match(/\\b(?:answer|round):[\\w.-]+:|\\btrail\\.jsonl\\b|undefined|NaN/g) ?? [];
   if (bad.length) fail.push('raw words: ' + bad.join(', '));
-  return { url: location.href, tracks, badges, replies, activity, fail }; })()`;
+  return { url: location.href, viewport_width: window.innerWidth, tracks, badges, replies, activity, fail }; })()`;
 const results = [];
 const capture = async (state, hash, before) => {
   errors.length = 0;
