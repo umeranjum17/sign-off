@@ -58,6 +58,12 @@ jobs:
         env:
           CHROME_DEVTOOLS_AXI_CHROME_ARGS: --no-sandbox
         run: PATH="$RUNNER_TEMP/dd/bin:$PATH" done-done run board-actions
+      - name: Install comment capture encoder
+        if: steps.changes.outputs.docs_only != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ffmpeg
+          ffmpeg -version
       - name: Report section comment and note send regression
         if: steps.changes.outputs.docs_only != 'true'
         env:
