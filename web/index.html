@@ -1165,7 +1165,8 @@
   .rp-page > .ui-seg { margin-top: 0.75rem; }
   .rp-page .ui-sec .see { min-height: 0; padding: 0; border-radius: 0; background: none; font: inherit; font-size: var(--tk-fs-row); line-height: 1.5rem; font-weight: 500; }
   .rp-list.ui-list { margin: 0; padding: 0.25rem 0; border-radius: var(--tk-r-card); }
-  .rp-list .ui-icon .mono { font-style: normal; }
+  .t-sheet:focus-visible { outline: 2px solid var(--tk-ink); outline-offset: 2px; }
+  .ui-icon img.design-thumb { width: 2.5rem; height: 2.5rem; object-position: top; }
   .rp-list.ui-list > li + li::before { right: 0.75rem; left: 0.75rem; }
   .rp-list .dl-face.ui-row { gap: 0.75rem; min-height: 0; padding: 0 0.75rem; background: var(--tk-card); }
   .rp-list .dl-face.ui-row.down { background: var(--tk-inset); }
@@ -1189,8 +1190,15 @@
   .rkt { display: grid; flex: none; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 0.5rem; }
   .rkt.k-status, .rkt.k-other { border-radius: 0.875rem; } .rkt.k-all { background: var(--tk-raised); color: var(--tk-ink); box-shadow: var(--tk-elev-tile); }
   .rkt .rkg svg, .rkt .ev-g svg { width: 1rem; height: 1rem; stroke-width: 1.8; }
-  /* The row's second line: the kind, then the bar of how much is read (a plan's bar is its parts), then the percent. */
-  .rp-list .ui-row .l2 { gap: 0.5rem; }
+  /* The row's second line: kind and ticket; only unread rows have a progress track below. */
+  .rp-list .ui-row .l2 { gap: 0.5rem; height: 1.25rem; }
+  .rp-list .ui-row .rm { position: relative; overflow: visible; }
+  .rp-list .ui-row .l2.meta { overflow: visible; }
+  .rp-meta { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+  .rp-ticket { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rp-progress { display: flex; margin-top: 0.125rem; }
+  .rp-progress .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+
   .rp-strip { display: flex; flex: 1; gap: 2px; height: 0.25rem; }
   .rp-strip > i { flex: 1; min-width: 0; border-radius: 2px; background: var(--tk-track); font-style: normal; }
   .rp-strip > i.on { background: var(--tk-fill); }
@@ -1620,7 +1628,8 @@
   .tk-fpill .glyph { width: 0.875rem; height: 0.875rem; color: var(--tk-text-tertiary); }
   .tk-pt { display: inline-grid; flex: none; place-items: center; width: 1.25rem; height: 1.25rem; }
   .tk-pt img, .tk-pt .mono { width: 1.25rem; height: 1.25rem; border-radius: 0.3125rem; object-fit: cover; }
-  .tk-pt .mono { background: var(--tk-ink); color: var(--tk-raised); font-size: 0.5rem; line-height: 1.25rem; font-weight: 600; text-align: center; }
+  .tk-shd .ui-icon { width: 1.25rem; height: 1.25rem; border-radius: 0.3125rem; box-shadow: none; }
+  .tk-shd .ui-icon :is(img, svg) { width: 1.25rem; height: 1.25rem; }
   /* The hero: its label and how many were done this week, the big count, how many move, and one square per ticket. */
   .tk-hero { container-type: inline-size; }
   /* The shared hero chip (ui.css), with the prototype's green rise before its count. */
@@ -2353,7 +2362,7 @@
     check: '<path d="M5 10.4l3.2 3.1L15 6.6"/>', cross: '<path d="M6.5 6.5l7 7M13.5 6.5l-7 7"/>' };
   const evGlyph = (a) => { const s = el('span', { class: 'ev-g', 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 20 20">${EV_ICONS[a]}</svg>`; return s; };
   /** A proof's tile: its project's mark (the Reports tile), with done-done's check at its corner. */
-  const evTile = (name, mark = '') => { const t = projectTile(name); t.append(mark); return t; };
+  const evTile = (name, mark = '') => { const t = projectTile(name, () => icon('evidence')); t.append(mark); return t; };
   const judgedMark = (d) => (judged(d) ? el('span', { class: `ev-ok ${judged(d)}` }, evGlyph(judged(d) === 'held' ? 'check' : 'cross')) : '');
   const prio = (d) => (/^P[0-3]$/.test(d.priority ?? '') ? d.priority : '');
   const evWhen = (d) => (d.filed ? (isToday(d.filed) ? hhmm(d.filed) : day(d.filed)) : '');
@@ -2361,7 +2370,7 @@
   const begun = (t) => !!t && t.progress > 0;
   /** One proof as a row: its project's tile with done-done's check, its title and P0-P3 chip, then its ticket's progress once begun, or its project and time. */
   function evRow(d) {
-    const t = begun(ticketOf(d)) && ticketOf(d), project = projectOf(d), meta = [project, evWhen(d)].filter(Boolean).join(' · '), title = plain(headline(d));
+    const t = begun(ticketOf(d)) && ticketOf(d), project = projectName(d), meta = [project, evWhen(d)].filter(Boolean).join(' · '), title = plain(headline(d));
     return el('li', {}, el('a', { class: 'ui-row ev-card', href: `#evidence/${d.key}`, id: `item-${d.key}`, 'data-row': '',
       'aria-label': [title, judgedWord(d), prio(d), t ? `${t.title}, ${t.progress}% done` : meta].filter(Boolean).join(', ') },
     ...uiRow({ tile: evTile(project, judgedMark(d)), title, priority: prio(d), ...(t ? { progress: t.progress } : { meta }) })));
@@ -2489,6 +2498,7 @@
 
   /** A mock or view is served from inside its own folder, so the files beside it load by their relative names. */
   const mockUrl = (key, value, path) => `${state.mockBase}${key}~${value}/${encodeURIComponent(path.split('?')[0].split('/').pop())}`;
+  const designFrame = (d) => Object.values(d.journeys?.[0]?.screens?.[0]?.views ?? {}).find(p => /\.(png|jpe?g|webp|svg)$/i.test(p)) || d.preview;
   const designUrl = (d, path) => `${state.mockBase.replace('/mock/', '/design/')}${d.key}/${encodeURIComponent(path)}`;
   /** A diagram shows inline at card width; an interactive page runs in a sandboxed frame. A tap or the link opens either full size. */
   function rung(d) {
@@ -2819,7 +2829,7 @@
   const stamp = (at) => (isToday(at) ? `Today, ${hhmm(at)}` : `${day(at)}, ${hhmm(at)}`);
   const pic = (d) => {
     const i = d.media?.findIndex((m) => !/\.(mp4|webm)$/i.test(m.path)), m = d.mocks?.find((x) => !/\.html?$/i.test(x.path));
-    return d.kind === 'design' && d.preview ? designUrl(d, d.preview) : i >= 0 ? filesOf(d)[i][3] : d.preview ? mockUrl(d.key, '', d.preview) : d.type === 'diagram' ? mockUrl(d.key, '', d.view)
+    return d.kind === 'design' && designFrame(d) ? designUrl(d, designFrame(d)) : i >= 0 ? filesOf(d)[i][3] : d.preview ? mockUrl(d.key, '', d.preview) : d.type === 'diagram' ? mockUrl(d.key, '', d.view)
       : m ? mockUrl(d.key, m.value, m.path) : d.evidenceCard?.media.find((x) => x.type.startsWith('image/'))?.url;
   };
   const thumb = (a, url) => { if (!url) return icon(a); const img = el('img', { class: 'thumb', src: src(url), alt: '', loading: 'lazy', decoding: 'async' }); img.onerror = () => img.replaceWith(icon(a)); return img; };
@@ -2852,18 +2862,22 @@
   /** The project a card is for: a plan names it, a report or design names its group, proof names the app its done-done check verified, and an ask takes the project of the proof it rests on,
    *  or, filed by a tool that is itself a project on the board (its icon set with project --icon), that project. */
   const projectName = (d) => d.project || d.group || (d.type === 'evidence' ? projectOf(d) : d.proof && projectOf(state.decisions.find((x) => x.key === d.proof) ?? {}))
-    || (d.by && (state.projects ?? []).find((p) => p.name.toLowerCase() === d.by.toLowerCase())?.name) || undefined;
-  /** A project's picture: the icon the board serves for it (set with sign-off-axi project --icon), else its initials, as also when the icon cannot be served. */
-  function projectPic(name) {
-    const parts = name.split(/[-\s_]+/).filter(Boolean), mono = el('span', { class: 'mono' }, (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : name.slice(0, 2)).toUpperCase());
-    if (!(state.projects ?? []).some((p) => p.icon && p.name.toLowerCase() === name.toLowerCase())) return mono;
-    const img = el('img', { src: `/api/project-icon?name=${encodeURIComponent(name)}`, alt: '' });
-    img.onerror = () => img.replaceWith(mono);
+    || (ticketOf(d) && tkProject(ticketOf(d))) || (d.by && (state.projects ?? []).find((p) => p.name.toLowerCase() === d.by.toLowerCase())?.name) || undefined;
+  /** One project picture and tile for every list; use the pinned record, with a kind icon when the project picture is unavailable. */
+  function projectPic(name, fallback = () => glyph('layers')) {
+    const p = name && (state.projects ?? []).find((p) => p.name.toLowerCase() === name.toLowerCase());
+    if (!p?.icon) return fallback();
+    const img = el('img', { src: `/api/project-icon?name=${encodeURIComponent(p.name)}&h=${p.icon.sha256.slice(0, 16)}`, alt: '' });
+    img.onerror = () => img.replaceWith(fallback());
     return img;
   }
-  /** A card's 40px tile: its project's picture, else the line drawing of what it is. */
-  const cardTile = (d) => { const name = projectName(d), a = area(d); if (!name) return uiIcon({ draw: a === 'waiting' ? askIcon(d) : { evidence: 'evidence', answered: 'done', designs: 'phone' }[a] ?? 'plan' });
-    const t = el('span', { class: 'ui-icon', 'aria-hidden': 'true' }, projectPic(name)); return t; };
+  const projectTile = (name, fallback) => el('span', { class: 'ui-icon', role: 'img', 'aria-label': name || 'No project' }, projectPic(name, fallback));
+  const cardTile = (d) => {
+    const design = d.kind === 'design' || d.type === 'design', tile = projectTile(projectName(d), () => design ? icon('designs') : d.type === 'plan' ? icon('plan') : d.kind === 'report' || d.type === 'explainer' ? kindSvg(kindOf(d)) : icon(d.type === 'evidence' ? 'evidence' : d.reply ? 'reply' : 'yesno'));
+    const frame = design && designFrame(d);
+    if (frame) { const img = el('img', { class: 'design-thumb', src: src(designUrl(d, frame)), alt: '' }); img.onerror = () => img.replaceWith(projectPic(projectName(d), () => icon('designs'))); tile.replaceChildren(img); }
+    return tile;
+  };
   /** A card as the new look's row, a link to where it opens: its tile, its title and priority, then its ticket's progress once it has some (a full bar when done), or else its project (or what it is) and when. */
   const progressOf = (n) => (n > 0 ? Math.min(n, 100) : undefined);
   function cardRow(d) {
@@ -2951,7 +2965,7 @@
       const q = query.trim().toLowerCase(), gone = new Set(state.dismissed ?? []), hit = (...s) => s.join(' ').toLowerCase().includes(q);
       const cards = q ? state.decisions.filter((d) => !gone.has(d.key) && hit(title(d), d.about ?? '', projectName(d) ?? '')).reverse() : [];
       const group = (name, ...as) => [name, cards.filter((d) => as.includes(area(d))).slice(0, 4).map(cardRow)];
-      const tickets = q ? (state.tickets ?? []).filter((t) => hit(t.title, t.id)).slice(0, 4).map((t) => el('li', {}, el('a', { class: 'ui-row', href: `#ticket/${t.id}` }, ...uiRow({ tile: uiIcon({ draw: 'pick' }), title: t.title, progress: progressOf(t.progress), meta: 'Not started' })))) : [];
+      const tickets = q ? (state.tickets ?? []).filter((t) => hit(t.title, t.id)).slice(0, 4).map((t) => el('li', {}, el('a', { class: 'ui-row', href: `#ticket/${t.id}` }, ...uiRow({ tile: tkTile(t), title: t.title, progress: progressOf(t.progress), meta: 'Not started' })))) : [];
       const groups = [group('Asks', 'waiting'), group('Proof', 'evidence'), group('Reports', 'reports', 'notes'), group('Answered', 'answered'), group('Designs', 'designs'), ['Tickets', tickets]].filter(([, rows]) => rows.length);
       out.replaceChildren(...(!q ? [el('p', { class: 't-grp' }, 'Type to search the whole board.')] : groups.length ? groups.flatMap(([name, rows]) => [el('p', { class: 't-grp' }, name), el('ul', { class: 'ui-card ui-list' }, ...rows)])
         : [el('p', { class: 't-grp' }, `Nothing matches “${query.trim()}”.`)]));
@@ -2990,8 +3004,8 @@
   const tkWhen = (at) => (isToday(at) ? hhmm(at) : day(at));
   /** Under an epic its tickets; under a ticket its sub-tasks. */
   const tkKids = (t) => (tkAbove(t).length ? 'sub-task' : 'ticket');
-  /** A ticket's 40px tile: its project's picture or initials, else the list drawing. */
-  const tkTile = (t) => (tkProject(t) ? el('span', { class: 'ui-icon', 'aria-hidden': 'true' }, projectPic(tkProject(t))) : uiIcon({ draw: 'pick' }));
+  /** A ticket uses the same project tile as every card list. */
+  const tkTile = (t) => projectTile(tkProject(t), () => icon('pick'));
   /** A ticket's row: its tile, its title and priority, then a bar with its percent once it has progress (a full bar when done), or else where it stands and when it last moved,
    * with how many of what sits under it are done. On a desk the open ticket is marked. */
   function tkRow(t) {
@@ -3114,7 +3128,7 @@
     // Its cards' steps after their postings (Linked shows those), newest first, each naming its card.
     const steps = cards.flatMap((d) => threadOf(d).filter((e) => !e.posted).map((e) => ({ ...e, card: d }))).sort(bySecond).reverse(), said = trailOf(t.id, 'ticket');
     seeReply(t.id, 'ticket');
-    return [el('div', { class: 'tk-shd' }, el('p', {}, proj ? el('span', { class: 'tk-pt', 'aria-hidden': 'true' }, projectPic(proj)) : '', el('span', {}, [proj, TK_WORDS[s]].filter(Boolean).join(' · '))), close),
+    return [el('div', { class: 'tk-shd' }, el('p', {}, tkTile(t), el('span', {}, [proj, TK_WORDS[s]].filter(Boolean).join(' · '))), close),
       el('h2', { class: 'tk-dt', tabindex: '-1', dir: 'auto' }, t.title),
       t.release ? el('span', { class: 'ui-pc tk-release', title: t.release }, t.release) : '',
       el('div', { class: 'ui-props' }, t.priority ? prop('flag', 'Priority', el('span', { class: `ui-pc ${t.priority.toLowerCase()}` }, t.priority)) : '',
@@ -3268,7 +3282,7 @@
   const kindOf = (d) => (KINDS[d.purpose] ? d.purpose : d.type === 'plan' ? 'plan' : GUESS.find(([, re]) => re.test([d.title, d.about, ...(d.sections ?? []).map((s) => s.heading)].join(' ')))?.[0] ?? 'other');
   const kindSvg = (k) => { const s = el('span', { class: 'rkg', 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24">${KINDS[k][3]}</svg>`; return s; };
   /** The kind's chip: its icon and its short name on a row, its full name on a report's head. */
-  const kindChip = (d, full) => { const k = kindOf(d); return el('span', { class: `rkc k-${k}`, 'data-kind': k }, kindSvg(k), full ? KINDS[k][1] : KINDS[k][0]); };
+  const kindChip = (d, full) => { const k = kindOf(d); return el('span', { class: `rkc k-${k}`, 'data-kind': k }, kindSvg(k), (full ? KINDS[k][1] : KINDS[k][0]) + (!KINDS[d.purpose] && d.type !== 'plan' ? ' · kind guessed' : '')); };
   /** The kind's tile in the filter and its pill: its icon on the same treatment as its chip; Every kind is the filter's own drawing. */
   const kindTile = (k) => (k ? el('span', { class: `rkt k-${k}` }, kindSvg(k)) : el('span', { class: 'rkt k-all' }, evGlyph('filter')));
   /** One line under a report's title: what this kind of report is for. */
@@ -3286,7 +3300,7 @@
   const sourcesOf = (d) => { const x = (d.sections ?? []).find((y) => y.part === 'sources'), its = (x?.items ?? []).filter((it) => it.link); return x && its.length ? { id: x.id, n: its.length, users: its.filter((it) => it.source === 'user').length } : null; };
   /** How much of a report is read: all of it once read; one not read yet, by the parts of it read (a report 5's kind parts; a page report has none). */
   /** A report's parts as a strip, one segment each, filled once read (all of it once the report is read); on a desk's head each segment names its part. */
-  // On a row a read report's strip is full, as its percent is; over its parts (a sheet, a desk's head) each segment is its part, filled once that part is read.
+  // On an unread row, each segment is a part; over its parts (a sheet, a desk's head), each segment records that part's read state.
   const partsStrip = (d, parts = false) => el('span', { class: 'rp-strip', 'aria-hidden': 'true' }, ...kindParts(d).map(([p]) => el('i', { class: (!parts && !unread(d)) || partRead(d, p) ? 'on' : '' })));
   /** Over a report's parts: the strip of them, and the next part to read. */
   const stripRow = (d) => { const next = kindParts(d).find(([p]) => !partRead(d, p)); return el('div', { class: 'rp-strip-row' }, partsStrip(d, true), next ? el('p', { class: 'rp-next', dir: 'auto' }, `Next: ${next[1]}`) : ''); };
@@ -3297,18 +3311,6 @@
       .replace(/(?:~|\/home)\/\S+/g, '').replace(/\b(?:[\w.-]+\/)+([\w.-]+)\.(?:md|json|png|jpe?g|html|sh|mjs|js|ts|py|yaml)\b/g, (m, b) => (/^(report|plan)$/i.test(b) ? `the ${b.toLowerCase()}` : 'the file')).replace(/\s{2,}/g, ' ').trim();
     return s && s[0].toUpperCase() + s.slice(1);
   };
-  /** A project's mark: the icon the board pins for it, else its initials; a report with no project gets the page drawing. */
-  const initials = (name) => { const ps = name.split(/[-\s_]+/).filter(Boolean); return (ps.length > 1 ? ps[0][0] + ps.at(-1)[0] : name.slice(0, 2)).toUpperCase(); };
-  function projectMark(name) {
-    const p = name && (state.projects ?? []).find((x) => x.name.toLowerCase() === name.toLowerCase());
-    const mono = name ? el('i', { class: 'mono' }, initials(name)) : '';
-    if (!p?.icon) return mono;
-    // A file changed or moved since it was pinned answers 404; the initials stand in.
-    const img = el('img', { src: `/api/project-icon?name=${encodeURIComponent(p.name)}&h=${p.icon.sha256.slice(0, 16)}`, alt: '' });
-    img.onerror = () => img.replaceWith(mono);
-    return img;
-  }
-  const projectTile = (name) => { const m = projectMark(name); return m ? el('span', { class: 'ui-icon', 'aria-hidden': 'true' }, m) : uiIcon({ draw: 'plan' }); };
   let rpRisen = false;
   function markRead(keys, read, text) {
     keys.forEach((k) => ((state.opened ??= {})[k] = read));
@@ -3340,12 +3342,16 @@
     await archive(d);
     if (next && location.hash === `#reports/${d.key}`) rpPicked = true, location.hash = next;
   }
-  /** A report: a row with its project's icon, its title (and its priority when it has one), then a bar of how much of it is read with its percent, as the prototype draws every row.
+  /** A report: a row with its project's icon, its title (and its priority when it has one), then its kind and ticket, with a quiet progress track only while unread.
    *  A tap opens its page; an explainer with no page opens in place, to its numbered steps or its video card. */
   function report(d, i = 0) {
     const n = d.steps?.length;
-    // The second line leads with the report's kind; a plan's bar is its parts, one segment each, filled once read.
-    const face = uiRow({ tile: projectTile(d.group), title: plain(title(d)), priority: d.priority, progress: readPct(d), badge: trailBadge(d.key), lead: kindChip(d), bar: kindOf(d) === 'plan' && kindParts(d).length ? partsStrip(d) : undefined });
+    // Keep the kind and ticket readable on line two; read progress sits quietly below while unread.
+    const t = ticketOf(d), ticket = d.ticket || t?.title || 'No ticket';
+    const meta = el('span', { class: 'rp-meta' }, kindChip(d), el('span', { class: 'rp-ticket', title: t ? `${t.id}: ${t.title}` : ticket }, ticket));
+    const face = uiRow({ tile: cardTile(d), title: plain(title(d)), priority: d.priority, after: trailBadge(d.key), meta });
+    if (unread(d)) face[1].append(el('span', { class: 'rp-progress', role: 'progressbar', 'aria-label': 'Report read', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(readPct(d)) },
+      kindOf(d) === 'plan' && kindParts(d).length ? partsStrip(d) : el('span', { class: 'ui-bar' }, el('i', { style: `width: ${readPct(d)}%` })), el('span', { class: 'pct sr-only' }, `${readPct(d)}%`)));
     const sel = rpSel === d.key;
     const li = (...kids) => el('li', { class: `report dl-row${flash === d.key ? ' returned' : ''}${sel ? ' sel' : ''}`, style: `--n:${i}`, ...(reads(d) && { 'data-key': d.key, 'data-list': 'reports' }) }, ...kids);
     const act = (cls, mark, words) => el('div', { class: `dl-act ${cls}`, 'aria-hidden': 'true' }, glyph(mark), el('span', {}, words));

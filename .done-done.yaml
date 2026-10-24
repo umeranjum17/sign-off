@@ -33,6 +33,9 @@ journeys:
     command: 'npm run build > /dev/null && for t in light dark; do node .agents/skills/done-done-verify-sign-off/ask-feedback-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t || exit 1; done'
   # Report kinds at 390 and 1280, light and dark: each row's kind chip (a plan's parts bar), Filter by kind and a kind picked, a report's head with its kind, the line on what it is for
   # and its kind parts' strip and list, research's Sources and its sources' tags and links on the guided page, an older report's guessed kind; KINDS_MOCK=<the approved mock's shots folder> saves each beside the mock's frame.
+  # Shared pinned project tiles and report kind/ticket rows; unread-only progress, five widths and both themes.
+  report-rows:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/report-rows-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   report-kinds:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/report-kinds-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $KINDS_MOCK'
   # Go deeper on an answers-only (fed) board: accepted at 390 and 1280, one ask saved, no error shown.

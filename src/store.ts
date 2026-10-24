@@ -582,7 +582,7 @@ export function rollUp(tickets: Ticket[]): Ticket[] {
 }
 /** A project's own icon: a picture in the board's folder, pinned by its hash so the board serves only the file that was set. */
 export type IconRef = { path: string; sha256: string; bytes: number };
-/** A project as the board draws it: its name and, optionally, its icon. A project with no icon shows a monogram tile. */
+/** A project as the board draws it: its name and, optionally, its icon. A project with no icon shows a project outline. */
 export type Project = { name: string; icon?: IconRef; at: string };
 /** Projects, one line per write (`project --name`), the latest line per name wins, names matched without regard to case. A board without the file has none. */
 export const projectsPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.projects.jsonl';

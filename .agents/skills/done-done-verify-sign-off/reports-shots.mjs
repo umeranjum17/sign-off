@@ -39,8 +39,8 @@ const MEASURE = `(async () => {
     return { title: title.textContent, pct: pct?.textContent ?? '', fill: bar ? r2(box(bar.firstChild).width / box(bar).width * 100) : null, chip: e.querySelector('.ui-pc')?.textContent ?? '', icon: e.querySelector('.ui-icon img') ? 'icon' : e.querySelector('.ui-icon .mono')?.textContent ?? 'drawing',
       height: r2(r.height), tile: r2(t.width) + 'x' + r2(t.height), tileIn: r2(t.left - card.left), titleGap: r2(box(title).left - t.right), rightIn: r2(card.right - box(e.querySelector('.rm')).right), pctW: pct ? r2(box(pct).width) : null, titleLines: Math.round(box(title).height / parseFloat(getComputedStyle(title).lineHeight)), lineGap: r2(box(e.querySelector('.l2')).top - box(e.querySelector('.l1')).bottom) }; });
   // Every row has a bar with its percent; a phone's rows are 68px on one line, a desk's take two lines for a long title.
-  rows.forEach((x, i) => { if ((phone ? x.height !== 68 : x.height < 68) || x.tile !== '40x40' || x.tileIn !== 12 || x.titleGap !== 12 || x.rightIn !== 12 || x.lineGap !== 4 || x.pctW !== 40) fail.push('row ' + i + ' ' + JSON.stringify(x));
-    if (!x.pct || Math.abs(x.fill - parseFloat(x.pct)) > 1) fail.push('row ' + i + ' bar ' + x.fill + ' against ' + x.pct); });
+  rows.forEach((x, i) => { if ((phone ? x.height !== 68 : x.height < 68) || x.tile !== '40x40' || x.tileIn !== 12 || x.titleGap !== 12 || x.rightIn !== 12 || x.lineGap !== 4 || (x.pct && x.pctW !== 1)) fail.push('row ' + i + ' ' + JSON.stringify(x));
+    if ((x.pct && Math.abs(x.fill - parseFloat(x.pct)) > 1) || (!x.pct && x.fill !== null)) fail.push('row ' + i + ' bar ' + x.fill + ' against ' + x.pct); });
   // A helper line or label cut short: one that holds less than its text.
   const cut = [...document.querySelectorAll('.rp-hero .lab, .rp-hero .vs, .rp-hero .big, .ui-sec, .rp-what span, #reader.rp-sheet h1, #reader.rp-sheet .about, .rp-part .k, .rp-seg button')].filter(vis).filter((e) => { const rg = document.createRange(); rg.selectNodeContents(e); const t = rg.getBoundingClientRect(), b = box(e), c = getComputedStyle(e);
     return t.right > b.right + 1 || t.bottom > b.bottom + 1 || t.left < b.left - 1 || (c.textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth + 1); }).map((e) => e.className + ': ' + e.textContent.trim().slice(0, 40));
@@ -129,7 +129,7 @@ try {
   const drag = (key, dx, release) => ev(`new Promise(async (ok) => { const f = document.querySelector('.dl-row[data-key="${key}"] .dl-face'); if (!f) return ok('none'); const r = f.getBoundingClientRect(), y = r.top + r.height / 2, x0 = r.left + 60;
     const o = (x) => ({ bubbles: true, pointerId: 7, isPrimary: true, pointerType: 'touch', clientX: x, clientY: y }); f.dispatchEvent(new PointerEvent('pointerdown', o(x0)));
     for (let i = 1; i <= 8; i++) { await new Promise((w) => setTimeout(w, 16)); f.dispatchEvent(new PointerEvent('pointermove', o(x0 + ${dx} * i / 8))); } if (${release}) f.dispatchEvent(new PointerEvent('pointerup', o(x0 + ${dx}))); ok('ok'); })`);
-  const pctOf = (key) => ev(`document.querySelector('.dl-row[data-key="${key}"] .pct')?.textContent ?? 'gone'`);
+  const pctOf = (key) => ev(`document.querySelector('.dl-row[data-key="${key}"] .pct')?.textContent ?? (document.querySelector('.dl-row[data-key=\"${key}\"]') ? '' : 'gone')`);
   const measure = async (name) => {
     const m = await ev(MEASURE);
     writeFileSync(join(out, `${name}.dom.json`), JSON.stringify({ ...m.dom, console_errors: [...errors], failed_requests: [...failed] }, null, 2) + '\n');
@@ -174,7 +174,7 @@ try {
         `edges ${list.edges.join('-')}; rows (${list.rows.length}): ${list.rows.map((r) => `${r.title} [${r.icon}${r.chip ? ', ' + r.chip : ''}] ${r.pct}`).join(' | ')}`,
         `rows ${list.rows[0]?.height}px, tile ${list.rows[0]?.tile}, title ${list.rows[0]?.titleGap}px after it, percent column ${list.rows[0]?.pctW}px, second line ${list.rows[0]?.lineGap}px under the title; last row ${list.clear}px over the dock at the end of the scroll; controls under 44px ${list.under.length}`);
       assert.equal(list.rows.length, 6, 'Newest shows six'); assert.match(list.head.hero, /^Still to read \| 5 of 8 \| \d+ filed this week$/);
-      assert.deepEqual(list.rows.map((r) => r.pct), ['0%', '0%', '40%', '0%', '100%', '0%'], 'newest first, each with a bar of how much of it is read');
+      assert.deepEqual(list.rows.map((r) => r.pct), ['0%', '0%', '40%', '0%', '', '0%'], 'newest first, each with a bar of how much of it is read');
       const all = await state('reports-all', '#reports', () => ev(`(document.querySelector('.rp-page .ui-sec .see').click(), 1)`));
       assert.equal(all.rows.length, 8, 'See all shows every report');
       txt.push(`See all: ${all.rows.length} rows, last row ${all.clear}px over the dock`);
@@ -196,7 +196,7 @@ try {
       const full = await ev(`!!document.querySelector('#reader:not(.rp-sheet) .gd-scroll')`);
       await go(`${url}#reports`); const afterOpen = await pctOf(guided.key);
       txt.push(`by its link the guided report opens in full ${linked ? 'yes' : 'no'}; Read the report opens it in full ${full ? 'yes' : 'no'}; its row then reads ${afterOpen}`);
-      assert.ok(linked && full); assert.equal(afterOpen, '100%');
+      assert.ok(linked && full); assert.equal(afterOpen, '');
       // Swipes: right marks unread (its bar empties), left archives with Undo, More holds Mark all as read.
       await go(`${url}#reports`); await drag('settings-move', 150, false); await wait(300); await shot(join(out, `reports-swipe-right.${cell}.png`));
       await go(`${url}#reports`); await drag('settings-move', 320, true); await wait(900); const unreadNow = await pctOf('settings-move');
@@ -223,7 +223,7 @@ try {
       await key('u'); await wait(700); const unreadU = await pctOf('settings-speed');
       await shot(join(out, `reports-desk-next.${cell}.png`));
       txt.push(`J: ${sel}, its row ${readJ}; U: ${unreadU}`);
-      assert.deepEqual([sel, readJ, unreadU], ['#reports/settings-speed', '100%', '0%']);
+      assert.deepEqual([sel, readJ, unreadU], ['#reports/settings-speed', '', '0%']);
       await go(`${url}#reports/${guided.key}`); await wait(300); await shot(join(out, `reports-guided-open.${cell}.png`));
       const over = await ev(`!document.getElementById('reader').hidden`);
       txt.push(`a guided report by its link opens over the board ${over ? 'yes' : 'no'}`); assert.ok(over);
