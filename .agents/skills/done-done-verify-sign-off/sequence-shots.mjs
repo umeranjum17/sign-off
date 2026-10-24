@@ -82,7 +82,7 @@ try {
     }
   }
   writeFileSync(join(out, 'sequence-checks.json'), JSON.stringify(records, null, 2));
-  writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(resolve('package.json'), 'utf8')).version }, start: 'The originating filtered list', steps: ['Open each detail kind from its list at five phone/desk widths in both themes', 'Use J/K to move in the captured list order', 'Reload and confirm the same sequence and position', 'Read header position and disabled end arrows'], result: 'All detail kinds retain their list sequence with visible header navigation', captures: records }, null, 2));
+  writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(resolve('package.json'), 'utf8')).version }, start: 'The originating filtered list', steps: before ? ['Open each detail kind and the Evidence list in both themes at five widths', 'Read the existing headers before detail navigation'] : ['Open each detail kind from its list at five phone/desk widths in both themes', 'Use J/K to move in the captured list order', 'Reload and confirm the same sequence and position', 'Read header position and disabled end arrows'], result: before ? 'Baseline detail headers and list rows captured before navigation changes' : 'All detail kinds retain their list sequence with visible header navigation', captures: records }, null, 2));
 } finally {
   browser('stop');
   cli('stop', join(dir, 'board.json'));
