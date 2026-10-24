@@ -2,18 +2,20 @@
 import { createHash } from 'node:crypto';
 import { accessSync, constants, readFileSync, realpathSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
-import { isKey, MEDIA_MAX, PRIORITIES, REPORT_FORMS } from './store.js';
+import { isKey, MEDIA_MAX, PRIORITIES, REPORT_FORMS, REPORT_PURPOSES } from './store.js';
 
 /** A message that does not match: what is wrong, and the one line that says how to fix it. */
 export class ContractError extends Error {
   constructor(message: string, readonly help: string) { super(message); }
 }
 /** The kinds, with the schema number of each. */
-export const SCHEMAS: Record<string, number> = { ask: 1, report: 4, evidence: 1, gate: 1, finding: 1, plan: 3, design: 1 };
-/** Older schemas this sign-off-axi still takes, so a board that holds them loads and re-posts: the page-based report 2 and plan 1. */
-const OLDER: Record<string, number[]> = { report: [2, 3], plan: [1, 2] };
+export const SCHEMAS: Record<string, number> = { ask: 1, report: 5, evidence: 1, gate: 1, finding: 1, plan: 3, design: 1 };
+/** Older schemas this sign-off-axi still takes, so a board that holds them loads and re-posts: the page-based report 2, the guided report 3 and 4 (4 with no purpose), and plan 1 and 2. */
+const OLDER: Record<string, number[]> = { report: [2, 3, 4], plan: [1, 2] };
 /** The guided schemas: a report 3 and a plan 2 are fields the board draws as one guided page, not a page the agent draws. */
-export const guided = (m: any) => (m?.kind === 'report' && [3, 4].includes(m.schema)) || (m?.kind === 'plan' && [2, 3].includes(m.schema));
+export const guided = (m: any) => (m?.kind === 'report' && [3, 4, 5].includes(m.schema)) || (m?.kind === 'plan' && [2, 3].includes(m.schema));
+/** The schemas with versioned engagement, whose owning filer is required: report 4 and 5, plan 3. */
+export const engaged = (m: any) => (m?.kind === 'report' && [4, 5].includes(m.schema)) || (m?.kind === 'plan' && m.schema === 3);
 export const KINDS = Object.keys(SCHEMAS);
 const COMMON = ['contract', 'kind', 'schema', 'key', 'title', 'filer', 'ticket', 'priority', 'link', 'about'];
 const FIELDS: Record<string, string[]> = {
@@ -27,7 +29,7 @@ const FIELDS: Record<string, string[]> = {
 };
 const GUIDE = ['understood', 'visual', 'sections', 'next'];
 const GUIDE_FIELDS: Record<string, string[]> = {
-  report: [...COMMON, 'filed', 'group', 'decided', 'asked_by', ...GUIDE],
+  report: [...COMMON, 'filed', 'group', 'decided', 'asked_by', 'purpose', ...GUIDE],
   plan: [...COMMON, 'project', 'decisions', ...GUIDE],
 };
 /** A done-done run: its id, full commit and the four Checks lines. */
@@ -243,14 +245,15 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
   if (m.kind === 'report' && m.schema === 1) throw bad('schema', '1 of report is text only: a report must be a page to tap through, with "view" and "preview"', GUIDE_HELP);
   if (m.schema !== SCHEMAS[m.kind] && !OLDER[m.kind]?.includes(m.schema)) throw bad('schema', `${m.schema} of ${m.kind} is not in this sign-off-axi`, `Upgrade sign-off-axi, or post ${m.kind} schema ${SCHEMAS[m.kind]}`);
   if (g && /FILL:/.test(JSON.stringify(m))) throw bad('message', 'still has FILL: lines from the template', 'Replace every FILL: line with your own words, then post again');
-  const fields = guided(m) ? GUIDE_FIELDS[m.kind] : FIELDS[m.kind], extra = Object.keys(m).find((f) => !fields.includes(f));
+  // A guided report 5 names what it is for; report 4 and older have no purpose field.
+  const fields = (guided(m) ? GUIDE_FIELDS[m.kind] : FIELDS[m.kind]).filter((f) => f !== 'purpose' || (m.kind === 'report' && m.schema >= 5)), extra = Object.keys(m).find((f) => !fields.includes(f));
   if (extra === 'options' && m.kind === 'report') throw bad('options', 'is not a field of report: a report takes no answer', 'Remove "options", or post an ask to get an answer');
   if (extra === 'options' && m.kind === 'plan') throw bad('options', 'is not a field of plan: its answers come from its sections and decisions', 'Remove "options"; put each question in "decisions", with its options and "recommend"');
   if (extra !== undefined) throw bad(escaped(extra) || '""', `is not a field of ${m.kind} schema ${m.schema}`, `Remove ${show(extra)}; ${m.kind} takes ${fields.slice(3).join(', ')}`);
   if (!(m.kind === 'evidence' && !Object.hasOwn(m, 'key')) && !isKey(m.key)) throw bad('key', Object.hasOwn(m, 'key') ? `${show(m.key)} must be 1-128 of A-Z a-z 0-9 . _ -` : 'is required', 'Set "key" to a short id such as "ship-signin-2"');
   if (!Object.hasOwn(m, 'title')) throw bad('title', 'is required', 'Add "title": the question, in 160 characters or fewer');
   text('title', m.title, 160, 'the question, in 160 characters or fewer');
-  if (g && m.schema === SCHEMAS[m.kind] && !isKey(m.filer)) throw bad('filer', 'is required', 'Set "filer" to the owning agent id');
+  if (engaged(m) && !isKey(m.filer)) throw bad('filer', 'is required', 'Set "filer" to the owning agent id');
   if (Object.hasOwn(m, 'filer') && !isKey(m.filer)) throw bad('filer', 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "filer" to your agent session id or tool name, or leave it out');
   if (Object.hasOwn(m, 'ticket') && !isKey(m.ticket)) throw bad('ticket', 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "ticket" to the id of the ticket this card belongs to, or leave it out');
   if (Object.hasOwn(m, 'priority') && !PRIORITIES.includes(m.priority)) throw bad('priority', `${show(m.priority)} is not one of ${PRIORITIES.join(', ')}`, `Set ${named('priority', flags)} to how urgent the card is, P0 (most) to P3 (least), or leave it out`);
@@ -287,6 +290,11 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
     if (Object.hasOwn(m, 'form') && !REPORT_FORMS.includes(m.form)) throw bad('form', `${show(m.form)} is not one of ${REPORT_FORMS.join(', ')}`, `Set "form" to ${REPORT_FORMS.join(', ')}, or leave it out`);
     if (Object.hasOwn(m, 'video')) text('video', m.video, 10, 'the video length such as "0:28", in 10 characters or fewer, or leave it out');
     if (Object.hasOwn(m, 'asked_by')) text('asked_by', m.asked_by, 40, 'who asked for it, such as "You asked" or "Docs agent", in 40 characters or fewer, or leave it out');
+    if (m.schema >= 5) {
+      const set = `Set "purpose" to what this report is for, one of ${REPORT_PURPOSES.join(', ')}`;
+      if (!Object.hasOwn(m, 'purpose')) throw bad('purpose', 'is required: the kind of report, which the board shows on its row and head', set);
+      if (!REPORT_PURPOSES.includes(m.purpose)) throw bad('purpose', `${show(m.purpose)} is not one of ${REPORT_PURPOSES.join(', ')}`, set);
+    }
     // A report is a page to tap through and a picture of it for the card: text alone is a status note, not a report.
     if (g) { guide(1); return { kind: m.kind, schema: m.schema }; }
     const need = 'a report is a page to tap through, not text';

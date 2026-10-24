@@ -1,6 +1,6 @@
 # File formats
 
-New guided defaults use plan schema 3 / report schema 4, contract 1, with a required owning `filer`. Older schemas still load. Engagement v1 records share the deeper sidecar without changing legacy records: immutable document revision/owner/part/action, optional authored-field selection, streamed replies and a persisted answer-revision seen cursor. See [the exact contract](contract.md#report-schema-4-and-plan-schema-3-engagement-v1).
+New guided defaults use plan schema 3 / report schema 5, contract 1, with a required owning `filer`; a report 5 also names its kind in `purpose` (see [report schema 5](contract.md#report-schema-5-the-reports-kind)). Older schemas still load. Engagement v1 records share the deeper sidecar without changing legacy records: immutable document revision/owner/part/action, optional authored-field selection, streamed replies and a persisted answer-revision seen cursor. See [the exact contract](contract.md#report-schema-4-and-plan-schema-3-engagement-v1).
 
 **Questions**, written by the agent (`decisions.json`). `sign-off-axi raise` writes them into the board it names, or the default board when none is named (see the board rule in [Test runs never touch your board](../README.md#test-runs-never-touch-your-board)); a file in this format can be raised with `raise --from` or served as its own board:
 

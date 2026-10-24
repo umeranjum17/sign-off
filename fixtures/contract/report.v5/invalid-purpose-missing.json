@@ -1,0 +1,46 @@
+{
+  "contract": 1,
+  "kind": "report",
+  "schema": 5,
+  "key": "digest-ran",
+  "title": "The weekly digest ran",
+  "filed": "2026-10-19T08:00:00Z",
+  "about": "Sent to 412 readers with no failures.",
+  "understood": [
+    {
+      "label": "You asked",
+      "text": "Send the weekly digest."
+    }
+  ],
+  "visual": {
+    "type": "tiles",
+    "heading": "412 sent, 0 failed",
+    "rows": [
+      {
+        "label": "Sent",
+        "text": "412 readers",
+        "tone": "ok"
+      },
+      {
+        "label": "Failed",
+        "text": "None",
+        "tone": "ok"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "sent",
+      "stage": "found",
+      "heading": "Every reader got it",
+      "body": "No address bounced and none was skipped."
+    }
+  ],
+  "next": {
+    "heading": "Nothing needs you",
+    "lines": [
+      "The next digest goes out Monday."
+    ]
+  },
+  "filer": "umer"
+}

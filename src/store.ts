@@ -46,6 +46,8 @@ export type Decision = {
   group?: string; filed?: string; decided?: string;
   /** Reports: what it explains with (an icon), the length of its narrated video, and who asked for it. */
   form?: string; video?: string; asked_by?: string;
+  /** A guided report 5: what it is for, one of REPORT_PURPOSES. An older report has none, and the board guesses one. */
+  purpose?: string;
   /** Sign-ins: what the sign-in unlocks, who waits on it, and when its link stops working (ISO date-time). */
   unlocks?: string; waits?: string; expires?: string;
   /** A sign-in's start command, an argv run with no shell on the board's host when Open is tapped: the first https link it prints is the live sign-in link. */
@@ -109,6 +111,8 @@ const ONE_OF: Record<string, unknown[]> = { close: ['done', 'release'], area: ['
 /** What a step uses or can stop on: an AI model, a store, a gate, a hard fail. */
 /** What a report explains with: the board draws one line icon per form. */
 export const REPORT_FORMS = ['diagram', 'chart', 'before-after'];
+/** What a report is for, its kind: the board shows each with its own icon and chip, and filters by it. `other` is the fallback. */
+export const REPORT_PURPOSES = ['research', 'plan', 'decision', 'audit', 'incident', 'status', 'other'];
 const MARKS = ['ai', 'store', 'gate', 'fail'];
 export const NOTE_MAX = 500;
 const TRADEOFF_MAX = 1000;
@@ -200,6 +204,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     if (d.group !== undefined && !(isText(d.group) && d.group.trim() && [...d.group].length <= 40)) throw bad('group', 'must be text of 40 characters or fewer');
     if (d.filed !== undefined && !(isText(d.filed) && /^\d{4}-\d{2}-\d{2}T/.test(d.filed) && !Number.isNaN(Date.parse(d.filed)))) throw bad('filed', 'must be an ISO 8601 date-time such as 2026-10-13T07:19:00Z');
     if (d.form !== undefined && !REPORT_FORMS.includes(d.form)) throw bad('form', `must be one of ${REPORT_FORMS.join(', ')}`);
+    if (d.purpose !== undefined && !REPORT_PURPOSES.includes(d.purpose)) throw bad('purpose', `must be one of ${REPORT_PURPOSES.join(', ')}`);
     if (d.video !== undefined && !(isText(d.video) && d.video.trim() && [...d.video].length <= 10)) throw bad('video', 'must be text of 10 characters or fewer');
     if (d.asked_by !== undefined && !(isText(d.asked_by) && d.asked_by.trim() && [...d.asked_by].length <= 40)) throw bad('asked_by', 'must be text of 40 characters or fewer');
     if (d.decided !== undefined && !(isText(d.decided) && d.decided.trim() && [...d.decided].length <= 200)) throw bad('decided', 'must be text of 200 characters or fewer');
@@ -225,8 +230,8 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     }
     // A ladder rung: a diagram image, or an interactive page the board frames in a sandbox.
     // A report is a page and its picture; one stored before reports had pages still loads, as a note with neither.
-    const report = d.kind === 'report', plan = d.kind === 'plan', design = d.kind === 'design', guided = (report && [3, 4].includes(d.schema)) || (plan && [2, 3].includes(d.schema));
-    const engagement = (report && d.schema === 4) || (plan && d.schema === 3);
+    const report = d.kind === 'report', plan = d.kind === 'plan', design = d.kind === 'design', guided = (report && [3, 4, 5].includes(d.schema)) || (plan && [2, 3].includes(d.schema));
+    const engagement = (report && [4, 5].includes(d.schema)) || (plan && d.schema === 3);
     if (engagement && !isKey(d.filer)) throw bad('filer', 'is required for engagement');
     if (d.type === 'plan' && !plan) throw bad('type', 'plan needs "kind": "plan": post it with sign-off-axi post --kind plan');
     const views = guided ? undefined : report ? (d.view !== undefined || d.preview !== undefined ? VIEWS.interactive : undefined) : plan ? VIEWS.interactive : Object.hasOwn(VIEWS, d.type ?? '') ? VIEWS[d.type] : undefined;
@@ -269,7 +274,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       ...(views && { view: d.view }), ...(report && views && { preview: d.preview }), ...(d.reply && { reply: true }), ...(d.filer && { filer: d.filer }), ...(d.ticket && { ticket: d.ticket }), ...(d.priority && { priority: d.priority }), ...(d.area && { area: d.area }),
       ...(signin && { unlocks: d.unlocks, waits: d.waits, ...(d.expires && { expires: d.expires }), ...(d.start && { start: [...d.start] }) }),
       ...(d.group && { group: d.group }), ...(d.filed && { filed: d.filed }), ...(d.decided && { decided: d.decided }),
-      ...(d.form && { form: d.form }), ...(d.video && { video: d.video }), ...(d.asked_by && { asked_by: d.asked_by }),
+      ...(d.form && { form: d.form }), ...(d.video && { video: d.video }), ...(d.asked_by && { asked_by: d.asked_by }), ...(d.purpose && { purpose: d.purpose }),
       ...(d.steps && { steps: d.steps.map(({ title, marks, text }: Step) => ({ title, ...(text && { text }), ...(marks?.length && { marks }) })) }),
       ...(stored && d.media && { media: d.media.map(({ path, sha256, bytes, light, thumb }: MediaRef) => ({ path, sha256, bytes, ...(light && { light: copyRef(light) }), ...(thumb && { thumb: copyRef(thumb) }) })) }),
       ...(d.attachments && { attachments: d.attachments.map(({ path, name, sha256, bytes }: AttachRef) => ({ path, name, sha256, bytes })) }),
@@ -747,7 +752,7 @@ export const answerDeeper = (decisionsPath: string, id: string, text: string, mo
 /** Hash only authored fields, independent of JSON property order and board-added metadata. */
 const canonical = (v: any): any => Array.isArray(v) ? v.map(canonical) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canonical(v[k])])) : v;
 export function documentRevision(m: any): string {
-  const fields = ['contract', 'kind', 'schema', 'key', 'filer', 'title', 'link', 'about', 'filed', 'group', 'decided', 'asked_by', 'project', 'understood', 'visual', 'sections', 'decisions', 'next'];
+  const fields = ['contract', 'kind', 'schema', 'key', 'filer', 'title', 'link', 'about', 'filed', 'group', 'decided', 'asked_by', 'purpose', 'project', 'understood', 'visual', 'sections', 'decisions', 'next'];
   return createHash('sha256').update(JSON.stringify(canonical(Object.fromEntries(fields.filter(k => m[k] !== undefined).map(k => [k, m[k]]))))).digest('hex');
 }
 /** Target field paths are relative to exactly one authored part, never UI/control text. */

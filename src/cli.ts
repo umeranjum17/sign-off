@@ -14,7 +14,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, appendPromoted, appendSendBack, appendTicket, readTickets, rollUp, appendTicketComment, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, appendDesignAnswer, answerLines, appendMark, readTrail, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, appendPromoted, appendSendBack, appendTicket, readTickets, rollUp, appendTicketComment, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -55,7 +55,7 @@ examples:
   sign-off-axi post .sign-off/decisions.json --type design --title "Pick the sign-in layout" --option a=A --option b=B --mock a=mocks/a.html --mock b=mocks/b.html --recommend b
   sign-off-axi post .sign-off/decisions.json --type diagram --title "Is this the sign-in flow?" --view mocks/sign-in/flow.svg
   sign-off-axi post --type explainer --title "Is the new sign-in clear?" --about "The new sign-in has 2 steps." --media explainer.mp4 --chapter 0:00=Start
-  sign-off-axi report init .sign-off/reports/sign-in-flow
+  sign-off-axi report init .sign-off/reports/sign-in-flow --purpose research
   sign-off-axi post --kind report --from .sign-off/reports/sign-in-flow/report.json
   sign-off-axi report init .sign-off/plans/sign-in --plan
   sign-off-axi post --kind plan --from .sign-off/plans/sign-in/plan.json --filer my-session-id
@@ -118,8 +118,8 @@ examples:
 `,
   validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>] [--expect-invalid]
 Checks message files against the communication contract without posting them: ${CONTRACT}
-A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate, finding and design at schema 1, report at schema 3 (schema 2 still passes) and plan at schema 2 (schema 1 still passes).
-A report 3 and a plan 2 are guided pages: fields the board draws as one scroll, no page of your own (see report init).
+A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate, finding and design at schema 1, report at schema 5 (schemas 2 to 4 still pass) and plan at schema 3 (schemas 1 and 2 still pass).
+A report 3 to 5 and a plan 2 or 3 are guided pages: fields the board draws as one scroll, no page of your own (see report init). A report 5 names what it is for in "purpose".
 An evidence message's media paths read from the message file's folder: each file must be there, inside it, and 50 MB or less.
 A report is a page to tap through: its "view" (.html) and "preview" (its picture, beside it) are checked for their shape here; the files themselves are checked at post, from the board file's folder, filled with no FILL: lines left (see report init).
 A plan's "view" (.html) is checked for its shape here; the file itself is checked at post, from the board file's folder.
@@ -366,8 +366,10 @@ examples:
   sign-off-axi feedback fleet-dashboard-full --reply "The colours now come from the new tokens." --link https://github.com/owner/repo/pull/245
   sign-off-axi feedback fleet-dashboard-full --acted --link https://github.com/owner/repo/pull/245
 `,
-  report: `usage: sign-off-axi report init <folder> [--plan] [--page]
+  report: `usage: sign-off-axi report init <folder> [--purpose research|plan|decision|audit|incident|status|other] [--plan] [--page]
 Writes the guided template to fill: <folder>/report.json, or <folder>/plan.json with --plan. A file already there is kept.
+Every report names what it is for in "purpose", its kind: research (research and discovery), plan (implementation plan), decision (decision and recommendation),
+audit, incident (incident and retro), status, or other. --purpose fills it in. The board shows the kind on the report's row and head, and filters by it.
 The board draws it as one scroll: what this is (the answer and one picture), what I understood, what I found and recommend, what you decide (plans), and the next step.
 Numbers sit behind a Details tap; every part has a Go deeper button that asks you (see \`sign-off-axi deeper --help\`) and a read receipt that shows when the person read it.
 Replace every FILL: line, then post it: post --kind report --from <folder>/report.json, or post --kind plan --from <folder>/plan.json --filer <your id>.
@@ -2049,8 +2051,10 @@ function init(args: string[]) {
 /** report init <folder>: the guided template (report.json, or plan.json with --plan) to fill in, or with --page the older scaffold page and its picture. */
 function report(args: string[]) {
   let parsed;
-  try { parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { plan: { type: 'boolean' }, page: { type: 'boolean' } } }); } catch (e: any) { throw fail(e.message, 'VALIDATION_ERROR', 'Run `sign-off-axi report --help`'); }
-  const [sub, dir, extra] = parsed.positionals, { plan, page } = parsed.values;
+  try { parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { plan: { type: 'boolean' }, page: { type: 'boolean' }, purpose: { type: 'string' } } }); } catch (e: any) { throw fail(e.message, 'VALIDATION_ERROR', 'Run `sign-off-axi report --help`'); }
+  const [sub, dir, extra] = parsed.positionals, { plan, page, purpose } = parsed.values;
+  if (purpose !== undefined && (plan || page)) throw fail(`--purpose does not go with --${plan ? 'plan' : 'page'}: ${plan ? 'a plan is always an implementation plan' : 'a page report has no purpose field'}`, 'VALIDATION_ERROR', 'sign-off-axi report init <folder> --purpose research');
+  if (purpose !== undefined && !REPORT_PURPOSES.includes(purpose)) throw fail(`--purpose ${purpose} must be one of ${REPORT_PURPOSES.join(', ')}`, 'VALIDATION_ERROR', 'sign-off-axi report init <folder> --purpose research');
   if (sub !== 'init' || dir === undefined || extra !== undefined || (plan && page)) {
     throw fail(sub !== 'init' ? `unknown report command ${sub ?? '(none)'}` : extra !== undefined ? `unexpected argument ${extra}: report init takes one folder` : plan && page ? '--plan and --page do not go together' : 'report init needs the folder to write the template in', 'VALIDATION_ERROR', 'sign-off-axi report init <folder> [--plan]');
   }
@@ -2063,10 +2067,12 @@ function report(args: string[]) {
     if (existsSync(path)) kept.push(shellPath(path));
     else {
       const filed = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
-      writeFileSync(path, readFileSync(new URL(`../web/${kind}-template.json`, import.meta.url), 'utf8').replace('"FILL: UTC time"', JSON.stringify(filed)), { flag: 'wx' });
+      const template = readFileSync(new URL(`../web/${kind}-template.json`, import.meta.url), 'utf8').replace('"FILL: UTC time"', JSON.stringify(filed));
+      writeFileSync(path, purpose ? template.replace(/"FILL: what this report is for[^"]*"/, JSON.stringify(purpose)) : template, { flag: 'wx' });
       created.push(shellPath(path));
     }
     return toon({ folder: shellPath(out), created: created.length ? created : 'nothing new (re-run is a no-op)', kept }, [
+      ...(plan || purpose ? [] : [`Set "purpose" to what the report is for: ${REPORT_PURPOSES.join(', ')} (or run report init again with --purpose <kind> in a new folder)`]),
       `Replace every FILL: line in ${kind}.json with your own words: the answer first, one picture (bars, steps or tiles), what you understood, then the sections${plan ? ' and the decisions' : ''}`,
       `${plan ? 'A plan' : 'A design or architecture report'} needs one real diagram: a flow or architecture drawing as inline SVG, in light and dark, as "diagram" on the visual (see the skill)`,
       'Keep each line short: the board shows it in one scroll, the numbers behind a Details tap and the long answer behind Go deeper',
