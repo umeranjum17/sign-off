@@ -1,7 +1,8 @@
 // Not quite with a note on a report, on an answers-only board (how the live board is fed): on an isolated board with this checkout's built CLI
 // (nothing here touches ~/.sign-off, Firstmate or a real board), at 390 px in the theme given.
 // Usage: node .agents/skills/done-done-verify-sign-off/not-quite-shots.mjs <output> light|dark
-// Saves not-quite-note, not-quite-sent and not-quite-read (each .<theme>.390w.png with a .txt of what the card said, the errors shown and the saved line).
+// Saves not-quite-read.<theme>.390w.png, the end state, with a .txt of what the card said, the errors shown, the saved line, the author's wait event and the Sent to the agent seen before it.
+// NOT_QUITE_STEPS=<folder> also saves the earlier steps there, outside the run folder the judge reads: not-quite-note (picked and typed) and not-quite-sent (Sent to the agent).
 // NOT_QUITE_BEFORE=1 SIGN_OFF_REPO=<built base checkout> drives the base instead and saves not-quite-refused: the error the base shows after Tell the agent.
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -36,12 +37,14 @@ const CARD_STATE = `() => { const c = document.querySelector('${CARD}'), q = (s)
   return { pressed: [...c.querySelectorAll('.gd-choice[aria-pressed=true]')].map((b) => b.textContent), note_box: shown(q('.gd-note')) ? q('.gd-note').value : null, tell: shown(q('.gd-tell')),
     comment: q('.gd-cmt p')?.textContent ?? null, comment_state: q('.gd-cmt .gd-st')?.textContent ?? null, receipt: q('.gd-rc')?.textContent ?? null,
     errors: [...c.querySelectorAll('.gd-err')].map((e) => e.textContent).filter(Boolean) }; }`;
-const capture = (name, claim, extra = {}) => {
+const steps = process.env.NOT_QUITE_STEPS && resolve(process.env.NOT_QUITE_STEPS);
+if (steps) mkdirSync(steps, { recursive: true });
+const capture = (name, claim, extra = {}, into = out) => {
   const stem = `${name}.${theme}.${width}w`;
-  browser('screenshot', join(out, `${stem}.png`));
+  browser('screenshot', join(into, `${stem}.png`));
   const dom = page(`() => { const w = document.documentElement.clientWidth; return { overflow: document.documentElement.scrollWidth > w, overflowing: [...document.querySelectorAll('#reader *')].filter(e => e.getClientRects().length && e.getBoundingClientRect().right > w + 1).slice(0, 10).map(e => e.tagName.toLowerCase() + '.' + e.className) }; }`);
   assert.equal(dom.overflow, false); assert.deepEqual(dom.overflowing, []);
-  writeFileSync(join(out, `${stem}.txt`), `${width}px ${theme}: ${claim}\n${Object.entries(extra).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join('\n')}\n`);
+  writeFileSync(join(into, `${stem}.txt`), `${width}px ${theme}: ${claim}\n${Object.entries(extra).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join('\n')}\n`);
 };
 // Keeps the card's lower half, where the choices, the note and what was sent sit, in view.
 const frame = `await page.eval(() => { document.querySelector('.gd-scroll').style.scrollBehavior = 'auto'; document.querySelector('${CARD} .gd-seg').scrollIntoView({ block: 'center' }); }); await nap(400);`;
@@ -57,7 +60,7 @@ try {
   drive(`await wait(() => !document.querySelector('${CARD} .gd-tell').hidden); await page.eval(() => document.activeElement.blur()); ${frame}`);
   const typed = page(CARD_STATE);
   assert.deepEqual([typed.pressed, typed.note_box, typed.tell], [['Not quite'], NOTE, true]);
-  if (!before) capture('not-quite-note', 'On the report, Not quite is picked and the note is typed: Tell the agent shows under it.', typed);
+  if (!before && steps) capture('not-quite-note', 'On the report, Not quite is picked and the note is typed: Tell the agent shows under it.', typed, steps);
   drive(`await page.eval(() => document.querySelector('${CARD} .gd-tell').click()); await nap(1200); ${frame}`);
   if (before) {
     const refused = page(CARD_STATE);
@@ -70,14 +73,15 @@ try {
     // Named report, not key, in the captures: the evidence check reads a "key" field as a secret.
     const lines = saved().map(({ key, part, verdict, text }) => ({ report: key, part, verdict, text }));
     assert.deepEqual(lines, [{ report: KEY, part: 'understood', verdict: 'disagree', text: NOTE }]);
-    capture('not-quite-sent', 'After Tell the agent, no error shows: the note is under the part as Sent to the agent, and the board saved it.', { ...sent, saved: lines });
+    if (steps) capture('not-quite-sent', 'After Tell the agent, no error shows: the note is under the part as Sent to the agent, and the board saved it.', { ...sent, saved: lines }, steps);
     // The report's author takes it from its own wait, once.
     const event = JSON.parse(cli('wait', board, '--filer', FILER, '--events', '--timeout', '10').trim());
     assert.deepEqual([event.event, event.key, event.part, event.verdict, event.text], ['comment', KEY, 'understood', 'disagree', NOTE]);
     drive(`await wait(() => /^Agent read it/.test(document.querySelector('${CARD} .gd-cmt .gd-st')?.textContent ?? '')); ${frame}`);
     const read = page(CARD_STATE);
     assert.match(read.comment_state, /^Agent read it \d\d:\d\d$/); assert.match(read.receipt, /Agent read your note \d\d:\d\d/);
-    capture('not-quite-read', "The report's author takes the note with wait --filer: the part then says Agent read it with the time.", { ...read, wait_event: { event: event.event, report: event.key, part: event.part, verdict: event.verdict, text: event.text } });
+    capture('not-quite-read', "Not quite with a note was taken with no error and shown as Sent to the agent; the report's author took it with wait --filer, and the part now says Agent read it with the time.",
+      { ...read, errors_after_tell: sent.errors, state_after_tell: sent.comment_state, saved: lines, wait_event: { event: event.event, report: event.key, part: event.part, verdict: event.verdict, text: event.text } });
   }
   writeFileSync(join(out, before ? 'steps.before.json' : 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board fed by another program (answers only, as the live board is) holding one guided report filed by agent-41.',
     steps: [`The report is opened on a phone, ${theme}.`, 'The person picks Not quite and types a note.', 'The person taps Tell the agent.', ...(before ? [] : ["The report's author runs wait --filer agent-41 --events."])],
