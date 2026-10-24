@@ -2483,8 +2483,17 @@ const squeeze = (req: IncomingMessage, bytes: Buffer): { bytes: Buffer; encoding
 const ICONS: Record<string, { type: string; bytes: Buffer }> = Object.fromEntries(
   [['tokens.css', 'text/css; charset=utf-8'], ['ui.css', 'text/css; charset=utf-8'], ['inter.woff2', 'font/woff2'], ['icon.svg', 'image/svg+xml'], ['apple-touch-icon.png', 'image/png'], ['icon-192.png', 'image/png'], ['icon-512.png', 'image/png'], ['icon-maskable-512.png', 'image/png'], ['manifest.webmanifest', 'application/manifest+json']]
     .map(([name, type]) => [`/${name}`, { type, bytes: readFileSync(new URL(`../web/${name}`, import.meta.url)) }]));
+/** The board as an app: pwa.js (the install row and the offline line, named by its content like the stylesheets) and sw.js (the service worker, which must sit at the root and is asked again each time). */
+const APP = { pwa: readFileSync(new URL('../web/pwa.js', import.meta.url)), worker: readFileSync(new URL('../web/sw.js', import.meta.url)) };
+/** The iPad launch images (see scripts/make-splash.mjs), named <width>x<height>-<theme> in points, each linked for its own device, orientation and theme. */
+const SPLASH = readdirSync(new URL('../web/', import.meta.url)).flatMap((f) => { const m = /^splash-(\d+)x(\d+)-(light|dark)\.png$/.exec(f); return m ? [{ file: f, w: +m[1]!, h: +m[2]!, theme: m[3]! }] : []; });
+for (const { file } of SPLASH) ICONS[`/${file}`] = { type: 'image/png', bytes: readFileSync(new URL(`../web/${file}`, import.meta.url)) };
+const splashLinks = SPLASH.map(({ file, w, h, theme }) => `<link rel="apple-touch-startup-image" href="${file}" media="(device-width: ${w}px) and (device-height: ${h}px) and (-webkit-device-pixel-ratio: 2) and (orientation: ${w < h ? 'portrait' : 'landscape'}) and (prefers-color-scheme: ${theme})">`).join('\n');
 /** The page names its two stylesheets by their content, so a phone holding an older copy (kept a day) fetches the new one with the new page: a row's badge is never drawn by half of an upgrade. */
-const served = Buffer.from(page.toString().replace(/href="(tokens|ui)\.css"/g, (_, name) => `href="${name}.css?v=${createHash('sha256').update(ICONS[`/${name}.css`]!.bytes).digest('hex').slice(0, 12)}"`));
+const served = Buffer.from(page.toString().replace(/href="(tokens|ui)\.css"/g, (_, name) => `href="${name}.css?v=${createHash('sha256').update(ICONS[`/${name}.css`]!.bytes).digest('hex').slice(0, 12)}"`)
+  .replace('</head>', () => `${splashLinks}\n<script src="pwa.js?v=${createHash('sha256').update(APP.pwa).digest('hex').slice(0, 12)}" defer></script>\n</head>`));
+/** The worker's cache is named by the whole build, so a changed page, stylesheet or worker replaces the kept copy at the next visit and never mixes two. */
+const worker = Buffer.from(`const BUILD = ${JSON.stringify(createHash('sha256').update(served).update(APP.worker).update(APP.pwa).digest('hex').slice(0, 16))};\n${APP.worker}`);
 const pageTag = `"${createHash('sha256').update(served).digest('hex').slice(0, 32)}"`;
 // Level 9 takes about 50 ms and level 11 over half a second for 7% less, so the page is squeezed at 9.
 const squeezed: Record<string, Buffer> = {};
@@ -3046,6 +3055,8 @@ const server = createServer(async (req, res) => {
     }
     if (given !== null) return res.writeHead(303, { location: '/', 'set-cookie': `${cookie}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000` }).end();
   }
+  if (req.method === 'GET' && req.url === '/sw.js') return res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' }).end(worker);
+  if (req.method === 'GET' && (req.url ?? '').split('?')[0] === '/pwa.js') return res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=86400' }).end(APP.pwa);
   const icon = req.method === 'GET' ? ICONS[(req.url ?? '').split('?')[0]!] : undefined;
   if (icon) return res.writeHead(200, { 'content-type': icon.type, 'cache-control': 'public, max-age=86400' }).end(icon.bytes);
   if (req.method === 'GET' && req.url === '/favicon.ico') return res.writeHead(204).end();

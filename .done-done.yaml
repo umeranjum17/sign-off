@@ -103,6 +103,9 @@ journeys:
   # --version and the help header from this build packed and installed as npm installs it (the version as published).
   version:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/version-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
+  # The board as an installable app: the manifest and worker as Chrome reads them, Today's More with its Install app row at 360, 390, 445, 1280 and 1440 in light and dark (and Add to Home Screen as Safari on an iPad has it), and the board with its server stopped.
+  pwa:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/pwa-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   markdown:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/markdown-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${GUIDE_THEME:-light}" "${GUIDE_WIDTH:-390}"'
   # A capture's tap stays on the board on a phone, and the 4-option comparison table reads at 16 px at 390; PHONE_PART=link|table drives one part per run.
