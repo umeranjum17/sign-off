@@ -238,4 +238,4 @@
 .ui-send button { color: var(--tk-ink); background: none; border: 0; min-height: 2.75rem; text-decoration: underline; }
 [aria-busy="true"] { opacity: 0.65; }
 .foot:has(> .ui-send) { flex-wrap: wrap; }
-.foot > .ui-send { flex-basis: 100%; }
+:is(.design-review, .dz-info, .design-viewer-panel) .foot > .ui-send { flex: 0 0 100%; }
