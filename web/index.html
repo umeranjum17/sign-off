@@ -4976,7 +4976,7 @@
     const selected = document.querySelector('.split-list a[aria-current], .dz-strip a[aria-current], .tk-row[aria-current]');
     const route = detailRoute.test(location.hash) ? location.hash : selected?.hash;
     if (!route) return;
-    if (!sequence?.routes.includes(route)) {
+    if (!detailRoute.test(location.hash) || !sequence?.routes.includes(route)) {
       const routes = visibleRoutes(document.querySelector('.split-list, .dz-strip') ?? document.getElementById('board'));
       sequence = { routes: routes.includes(route) ? routes : [route], from: location.hash };
     }
@@ -4993,7 +4993,7 @@
       };
       return b;
     };
-    nav.append(move(-1, 'Previous item (K or Left arrow)'), el('span', { role: 'status', 'aria-live': 'polite' }, `${at + 1} of ${sequence.routes.length}`), move(1, 'Next item (J or Right arrow)'));
+    nav.append(move(-1, 'Previous item (K or Left arrow)'), el('span', { class: 'position', 'aria-live': 'polite', 'aria-atomic': 'true' }, `${at + 1} of ${sequence.routes.length}`), move(1, 'Next item (J or Right arrow)'));
     header.append(nav);
   }
   addEventListener('popstate', () => { if (history.state?.detailSequence) sequence = history.state.detailSequence; });

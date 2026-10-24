@@ -234,8 +234,8 @@
 
 /* Shared detail navigation uses the same ink and surface as the existing header. */
 .detail-sequence { display:flex; align-items:center; gap:2px; margin-inline-start:auto; flex-shrink:0; }
-.detail-sequence button { display:grid; place-items:center; width:44px; height:44px; padding:0; border:0; border-radius:var(--tk-r-sm, 8px); background:transparent; color:inherit; cursor:pointer; font-size:28px; }
+.detail-sequence button { display:grid; place-items:center; width:44px; height:44px; padding:0; border:0; border-radius:var(--tk-r-ctl); background:transparent; color:inherit; cursor:pointer; font-size:28px; }
 .detail-sequence button:hover:not(:disabled) { background:var(--tk-inset); }
 .detail-sequence button:disabled { opacity:.3; cursor:default; }
-.detail-sequence span[role=status] { white-space:nowrap; font-size:12px; font-variant-numeric:tabular-nums; }
+.detail-sequence .position { white-space:nowrap; font-size:12px; font-variant-numeric:tabular-nums; }
 @media(max-width:639px) { :is(.sh-head,.ev-shd,.rp-shd,.tk-shd,.dz-oh):has(.detail-sequence) { flex-wrap:wrap; } }
