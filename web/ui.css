@@ -118,6 +118,8 @@
   .side .me { display: flex; align-items: center; gap: 0.75rem; min-height: 2.5rem; margin-top: auto; padding: 0 0 0 0.75rem; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); }
   .side .me > i { display: grid; flex: none; place-items: center; width: 1.25rem; height: 1.25rem; border-radius: 50%; background: var(--tk-ink); color: var(--tk-canvas); font-size: 0.625rem; font-style: normal; font-weight: 600; }
   .side .me > span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  /* The version under the name, on the name's left edge. */
+  .side .ver { margin: 0; padding: 0 0.75rem 0 2.75rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); line-height: var(--tk-lh-small); }
   .side a:not(.sfind) { display: flex; align-items: center; gap: 0.75rem; min-height: 2.75rem; padding: 0 0.75rem; border-radius: 1.375rem; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); font-weight: 500; text-decoration: none; }
   .side a:not(.sfind):hover:not([aria-current]) { background: var(--tk-card); }
   .side a[aria-current] { background: var(--tk-on); color: var(--tk-ink); box-shadow: var(--tk-elev-raised); }

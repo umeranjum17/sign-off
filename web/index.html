@@ -2807,15 +2807,16 @@
     return s;
   }
   const sheetHead = (id, name) => { const x = el('button', { class: 'x', 'aria-label': 'Close' }, glyph('x')); x.onclick = () => x.closest('dialog').close(); return el('div', { class: 't-shd' }, el('h2', { id: `${id}-h`, tabindex: '-1' }, name), x); };
-  /** More: what Today leaves off, Answered and Designs with their counts, the Leash and Ask the agent. */
+  /** More: what Today leaves off, Answered and Designs with their counts, the Leash and Ask the agent, and last the version the board runs. */
   const todayMore = sheetOf('t-more');
   function fillMore(by) {
     const go = (href, name, n) => el('a', { class: 'ui-pr', href }, el('span', { class: 'k' }, name), el('span', { class: 'v' }, el('span', { class: 'n' }, String(n)), glyph('right')));
     const links = [['#answered', 'Answered', by.answered], ['#designs', 'Designs', by.designs]].filter(([, , l]) => l.length);
     todayMore.replaceChildren(el('div', {}, sheetHead('t-more', 'More'), links.length ? el('div', { class: 'ui-props' }, ...links.map(([h, name, l]) => go(h, name, l.length))) : '',
-      ...(state.leash ? leash() : []), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()])));
+      ...(state.leash ? leash() : []), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()]),
+      state.version ? el('div', { class: 'ui-props' }, el('div', { class: 'ui-pr' }, el('span', { class: 'k' }, 'Version'), el('span', { class: 'v' }, el('span', {}, state.version)))) : ''));
   }
-  const hasMore = (by) => by.answered.length || by.designs.length || state.leash || !(FROZEN || state.readonly || state.answers_only);
+  const hasMore = (by) => by.answered.length || by.designs.length || state.leash || state.version || !(FROZEN || state.readonly || state.answers_only);
   /** Search: each card's title and what it says, matched as typed, in groups (Asks, Proof, Reports, Answered, Designs, Tickets) of the first four rows each. */
   const searchSheet = sheetOf('t-search');
   let query = '';
@@ -3051,7 +3052,9 @@
   /** The one quiet line under the tiles into More, naming what it holds. */
   function moreLine(by) {
     if (!hasMore(by)) return '';
-    const names = [by.answered.length && 'Answered', by.designs.length && 'Designs', state.leash && 'Leash', !(FROZEN || state.readonly || state.answers_only) && 'Ask the agent'].filter(Boolean);
+    const held = [by.answered.length && 'Answered', by.designs.length && 'Designs', state.leash && 'Leash', !(FROZEN || state.readonly || state.answers_only) && 'Ask the agent'].filter(Boolean);
+    // The version is named only when More holds nothing else.
+    const names = held.length ? held : ['Version'];
     const b = el('button', { class: 't-more-line', 'aria-haspopup': 'dialog' }, el('span', {}, names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]), glyph('right'));
     b.onclick = () => { fillMore(by); todayMore.showModal(); todayMore.querySelector('h2').focus(); };
     return b;
@@ -4846,11 +4849,12 @@
     const link = ([a, name]) => el('a', { href: `#${a}`, ...(a === active && { 'aria-current': 'page' }) }, icon(`tab-${a || 'today'}`), name,
       count(a) === undefined || (badge(a) && !count(a)) ? '' : el('span', { class: `n ${badge(a)}`.trim() }, String(count(a))));
     // The sidebar as the prototype draws it: the board's mark and name, Search, the areas, and at its foot whose board it is with the light-or-dark button
-    // (on a desk the one place it sits). Every key stays in the ? sheet.
+    // (on a desk the one place it sits), then the version the board runs (0.6.1-dev on a dev build). Every key stays in the ? sheet.
     const who = state.name || 'You';
     document.getElementById('nav').replaceChildren(el('p', { class: 'brand' }, el('span', { class: 'logo', 'aria-hidden': 'true' }, glyph('check')), el('span', {}, 'Sign-off')),
       el('a', { class: 'sfind', href: '#find' }, document.getElementById('dock-find').firstChild.cloneNode(true), 'Search'), ...SIDE.map(link),
-      el('div', { class: 'me' }, el('i', { 'aria-hidden': 'true' }, [...who][0].toUpperCase()), el('span', { dir: 'auto' }, who), themeButton()));
+      el('div', { class: 'me' }, el('i', { 'aria-hidden': 'true' }, [...who][0].toUpperCase()), el('span', { dir: 'auto' }, who), themeButton()),
+      state.version ? el('p', { class: 'ver' }, `Version ${state.version}`) : '');
     paintTabs(active === 'designs' ? '' : active, count, badge);
     const ro = state.readonly ? 'Read only' : FROZEN ? `Read-only copy, ${FROZEN.exported}` : '';
     const pageTitle = head === 'decide' || head === 'waiting' ? 'Decide' : head === 'reports' ? 'Reports' : AREAS[head];

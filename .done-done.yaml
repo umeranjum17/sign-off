@@ -81,6 +81,10 @@ journeys:
   today:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/today-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${TODAY_THEME:-light}" "${TODAY_WIDTH:-390}"'
   # Markdown in authored text, one part per run: MD_PART=heading|item|table|plan-code, per theme and width. SIGN_OFF_REPO=<built base checkout> records the before.
+  # The version the board and the CLI run: the sidebar's foot at 1280 and Today's More at 390, light and dark, from this checkout (<version>-dev), then the sidebar,
+  # --version and the help header from this build packed and installed as npm installs it (the version as published).
+  version:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/version-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   markdown:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/markdown-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${GUIDE_THEME:-light}" "${GUIDE_WIDTH:-390}"'
   # A capture's tap stays on the board on a phone, and the 4-option comparison table reads at 16 px at 390; PHONE_PART=link|table drives one part per run.

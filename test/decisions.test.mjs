@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { appendFileSync, chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { get } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -354,7 +354,20 @@ test('the skill and README command checklist runs as written on a fresh install'
     assert.match(ok(axi(cmd, '--help'), `${cmd} --help`), /^usage: sign-off-axi/, `${cmd} --help prints its usage`);
   }
   assert.match(ok(axi('--help'), '--help'), /sign-off-axi/);
-  assert.equal(axi('-v').out.trim(), JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version);
+  // The version: this git checkout is a dev build (no tag for its version at HEAD, and no git on this PATH to say otherwise), a copy with
+  // no .git, as npm installs it, shows its version as published, and a pre-release version says so; the help header leads with it.
+  const version = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
+  assert.equal(axi('-v').out.trim(), `${version}-dev`);
+  assert.match(ok(axi('--help'), '--help'), new RegExp(`^version: ${version.replaceAll('.', '\\.')}-dev\nusage: sign-off-axi`));
+  for (const [as, printed, header] of [[version, version, version], ['0.6.1-rc.1', '0.6.1-rc.1', '0.6.1-rc.1, pre-release']]) {
+    const copy = mkdtempSync(join(home, 'installed-'));
+    cpSync(new URL('../dist', import.meta.url), join(copy, 'dist'), { recursive: true });
+    for (const part of ['web', 'fixtures', 'skills', 'node_modules']) symlinkSync(new URL(`../${part}`, import.meta.url).pathname, join(copy, part));
+    writeFileSync(join(copy, 'package.json'), JSON.stringify({ name: 'sign-off-axi', version: as, type: 'module' }));
+    const run = (flag) => execFileSync(process.execPath, [join(copy, 'dist/cli.js'), flag], { cwd: app, env, encoding: 'utf8' });
+    assert.equal(run('-v').trim(), printed);
+    assert.equal(run('--help').split('\n')[0], `version: ${header}`);
+  }
   // README: init writes the repo setup; doctor checks it and exits 0 clean.
   assert.match(ok(axi('init', app), 'init'), /\.sign-off\/config\.yaml/);
   writeFileSync(join(so, 'config.yaml'), 'board: decisions.json\nport: 0\n');

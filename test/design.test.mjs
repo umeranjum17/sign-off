@@ -2264,7 +2264,7 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   await evaluate(`location.href = ${JSON.stringify(url)}`);
   await until(async () => await evaluate('!!document.querySelector(".t-more-line")'));
   await evaluate('document.querySelector(".t-more-line").click()');
-  await until(async () => (await evaluate('[...document.querySelectorAll("#t-more .ui-pr")].map((a) => a.getAttribute("href") + " " + a.textContent).join("|")')) === '#designs Designs1');
+  await until(async () => (await evaluate('[...document.querySelectorAll("#t-more a.ui-pr")].map((a) => a.getAttribute("href") + " " + a.textContent).join("|")')) === '#designs Designs1');
   assert.equal(await evaluate('document.querySelector(".t-up .q").textContent + "|" + document.querySelector(".t-tiles .ui-stat").getAttribute("aria-label")'), 'Nothing waits on you|Cleared today: 0 of 0');
   await evaluate('document.getElementById("t-more").close()');
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
@@ -2316,7 +2316,7 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   await evaluate(`location.href = ${JSON.stringify(url)}`);
   await until(async () => await evaluate('!!document.querySelector(".t-more-line")'));
   await evaluate('document.querySelector(".t-more-line").click()');
-  await until(async () => (await evaluate('[...document.querySelectorAll("#t-more .ui-pr")].map((a) => a.getAttribute("href") + " " + a.textContent).join("|")')) === '#designs Designs1');
+  await until(async () => (await evaluate('[...document.querySelectorAll("#t-more a.ui-pr")].map((a) => a.getAttribute("href") + " " + a.textContent).join("|")')) === '#designs Designs1');
   assert.equal(await evaluate('document.querySelector(".t-tiles .ui-stat").getAttribute("aria-label")'), 'Cleared today: 0 of 0');
   await evaluate('document.getElementById("t-more").close()');
   const desktop = await browse(join(dir, 'desktop-browser'), 1280);
