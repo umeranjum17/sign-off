@@ -1436,7 +1436,7 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   assert.equal(await evaluate('document.querySelector(".decide .why")?.textContent'), 'No new bugs in three weeks, and support is fully staffed on Friday.');
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-preview .mock")].map((f) => [f.querySelector(".label").textContent, f.querySelector(".shot.none")?.textContent ?? null])'),
     [['B', null], ['A', 'No mock for this option'], ['C', 'No mock for this option']]);
-  assert.equal(await evaluate('document.querySelector(".silent-line")?.textContent'), 'If you stay quiet, the agent goes with C.');
+  assert.equal(await evaluate('document.querySelector(".silent-line")?.textContent'), 'If you stay quiet, the agent waits for your answer.');
   assert.equal(await evaluate('getComputedStyle(document.querySelector(".pick-option"), "::before").content'), 'none');
   // The bar sits under the last card and the quiet line once the sheet scrolls to its end.
   await evaluate('document.querySelector(".ask-sheet").scrollTop = 1e5');
@@ -4617,7 +4617,7 @@ test('the new look draws only the approved prototype\'s colours: Today, Decide, 
   for (const args of [
     ['raise', file, '--ticket', 'T-29', '--priority', 'P0', '--key', 'ask-linked', '--title', 'Ship the settings page on Friday?'],
     ['raise', file, '--priority', 'P1', '--key', 'ask-plain', '--title', 'Keep the old settings link for a week?'],
-    ['post', file, '--kind', 'ask', '--from', fileOf('pick.json', { ...JSON.parse(readFileSync(join(fx, 'ask.v1/valid-pick-one.json'), 'utf8')), merges: undefined })],
+    ['post', file, '--kind', 'ask', '--from', fileOf('pick.json', { ...JSON.parse(readFileSync(join(fx, 'ask.v1/valid-pick-one.json'), 'utf8')), merges: undefined, silent_by: undefined })],
     ['post', file, '--type', 'evidence', '--ticket', 'T-29', '--title', 'Settings on a phone', '--about', 'Umer changes the theme in one tap.', '--media', join(dir, 'shot.png')],
     ['post', file, '--kind', 'design', '--from', fileOf('design.json', { ...JSON.parse(readFileSync(join(fx, 'design.v1/valid-basic.json'), 'utf8')), filed: now }), '--ticket', 'T-40'],
     // An older report whose kind the board guesses, then a research report (its sheet shows its Sources), so Reports draws its kind filter and two kinds' chips.

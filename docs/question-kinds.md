@@ -21,10 +21,14 @@ new question needs and when it is refused. Its flags:
   for every option (yes and no too).
 - `--recommend <value>` with `--recommend-reason <text>`: the option you would
   pick, and why.
-- `--default <value>`: what happens if the user stays silent. The board shows
-  it and never applies it; the asking agent takes it after `--silent-by`.
+- `--default <value>`: what happens if the user stays silent. On the leash
+  When it matters (the default) the open board takes it at `--silent-by`; on
+  Ask me first it is only shown. See [contract.md](contract.md) section 5.
 - `--silent-by <ISO UTC time>`: optional, when that happens, such as
   `2026-10-19T09:00Z`.
+- `--guard <why>`: optional, `destructive`, `irreversible`, `money`,
+  `credential` or `security`: only the user may answer it, so no default or
+  agent pick is ever taken for it.
 - `--merge <key>`: up to 10 other cards that ask the same thing. They are
   hidden while this one waits, and its answer closes them too.
 
