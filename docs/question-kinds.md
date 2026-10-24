@@ -82,7 +82,7 @@ mock, or whose file is gone, says "No mock for this option".
 `.jpeg`, `.webp`, `.mp4`, `.webm`, up to 50 MB each), a short note and an
 optional commit or PR link. The files are copied into `evidence/<number>/`
 next to the board, so the board is the store: no hosted service. Each
-still also gets a lighter copy and a thumbnail beside it, which the page
+still also gets a lighter copy, a thumbnail and a small tile beside it, which the page
 shows and loads as they near the screen; the original stays as posted and
 opens full size. The page
 shows the updates newest first; each file is served only while its size and

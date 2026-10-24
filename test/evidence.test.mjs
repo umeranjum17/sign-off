@@ -61,15 +61,16 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
   assert.match(evidence('--title', 'Sign-in screen', '--about', 'The screen loads.', '--media', capture, '--media', sparseScreen).out, /update-1,1,2/);
   assert.match(evidence('--title', 'Sign-in flow', '--about', 'Umer signs in on a phone.', '--media', capture, '--media', rec,
     '--link', 'https://github.com/acme/app/pull/12').out, /update-2,2,2/);
-  // A still gets a light copy and a thumb beside its original; a recording is copied as it is.
-  assert.deepEqual(readdirSync(join(so, 'evidence', '2')).sort(), ['1-light.jpg', '1-thumb.jpg', '1.png', '2.webm']);
+  // A still gets a light copy, a thumb and a tile beside its original; a recording is copied as it is.
+  assert.deepEqual(readdirSync(join(so, 'evidence', '2')).sort(), ['1-light.jpg', '1-thumb.jpg', '1-tile.jpg', '1.png', '2.webm']);
   assert.deepEqual(readFileSync(join(so, 'evidence', '2', '2.webm')), clip);
   const [shrunk, tall] = JSON.parse(readFileSync(board, 'utf8')).items[0].media, sha = (p) => createHash('sha256').update(readFileSync(join(so, p))).digest('hex');
   assert.deepEqual([shrunk.light.width, shrunk.light.height, shrunk.thumb.width, shrunk.thumb.height], [1280, 860, 720, 484]);
+  assert.deepEqual([shrunk.tile.width, shrunk.tile.height, tall.tile.width, tall.tile.height], [264, 177, 264, 528]);
   // A phone capture taller than twice its width keeps a thumb of its top at full width, and the light copy whole.
   assert.deepEqual([tall.light.width, tall.light.height, tall.thumb.width, tall.thumb.height], [1170, 2532, 720, 1440]);
-  for (const c of [shrunk.light, shrunk.thumb, tall.light, tall.thumb]) assert.deepEqual([sha(c.path), readFileSync(join(so, c.path)).length], [c.sha256, c.bytes]);
-  assert.ok(shrunk.light.bytes < shrunk.bytes && shrunk.thumb.bytes < shrunk.light.bytes, 'each copy weighs less than what it stands in for');
+  for (const c of [shrunk.light, shrunk.thumb, shrunk.tile, tall.light, tall.thumb, tall.tile]) assert.deepEqual([sha(c.path), readFileSync(join(so, c.path)).length], [c.sha256, c.bytes]);
+  assert.ok(shrunk.light.bytes < shrunk.bytes && shrunk.thumb.bytes < shrunk.light.bytes && shrunk.tile.bytes < shrunk.thumb.bytes, 'each copy weighs less than what it stands in for');
   // The same capture posted twice gives the same copies, byte for byte.
   const again = JSON.parse(readFileSync(board, 'utf8')).items[1].media[0];
   assert.deepEqual([again.light.sha256, again.thumb.sha256], [shrunk.light.sha256, shrunk.thumb.sha256]);
@@ -134,7 +135,7 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
   assert.equal((await fetch(`${url}api/media?key=update-2&i=9`)).status, 404);
   assert.equal((await fetch(`${url}api/media?key=update-2`)).status, 404);
   // The light copy and the thumb are served as posted, hash-checked like the original; a clip has none, and no other size is served.
-  for (const [v, ref] of [['light', again.light], ['thumb', again.thumb]]) {
+  for (const [v, ref] of [['light', again.light], ['thumb', again.thumb], ['tile', again.tile]]) {
     const copy = await fetch(`${url}api/media?key=update-2&i=0&v=${v}`);
     assert.deepEqual([copy.status, copy.headers.get('content-type'), (await copy.arrayBuffer()).byteLength], [200, 'image/jpeg', ref.bytes]);
   }
@@ -143,7 +144,7 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
   appendFileSync(join(so, again.thumb.path), 'x');
   assert.equal((await fetch(`${url}api/media?key=update-2&i=0&v=thumb`)).status, 404);
   // The export carries each copy under the URL the page asks for.
-  assert.ok(['', '&v=light', '&v=thumb'].every((v) => frozen.files[`/api/media?key=update-2&i=0${v}`]?.startsWith(v ? 'data:image/jpeg;base64,' : 'data:image/png;base64,')));
+  assert.ok(['', '&v=light', '&v=thumb', '&v=tile'].every((v) => frozen.files[`/api/media?key=update-2&i=0${v}`]?.startsWith(v ? 'data:image/jpeg;base64,' : 'data:image/png;base64,')));
   // A file changed after posting is refused, never served as the posted proof.
   appendFileSync(join(so, 'evidence', '1', '1.png'), 'x');
   assert.equal((await fetch(`${url}api/media?key=update-1&i=0`)).status, 404);

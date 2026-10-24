@@ -5,8 +5,8 @@ import { createHash, randomBytes } from 'node:crypto';
 export type Option = { value: string; label: string; outcome?: string };
 /** An option's mock file, and an optional http(s) link to open that option live (drawn under the mock, outside its sandboxed frame). */
 export type MockRef = { value: string; path: string; link?: string };
-export type MediaRef = { path: string; sha256: string; bytes: number; light?: CopyRef; thumb?: CopyRef };
-/** A smaller copy of a still that post made beside it (evidence/<number>/<n>-light.jpg or -thumb.png): the board shows it in place of the original. */
+export type MediaRef = { path: string; sha256: string; bytes: number; light?: CopyRef; thumb?: CopyRef; tile?: CopyRef };
+/** A smaller copy of a still that post made beside it (evidence/<number>/<n>-light.jpg, -thumb.png or -tile.jpg): the board shows it in place of the original. */
 export type CopyRef = { path: string; sha256: string; bytes: number; width: number; height: number };
 /** A file attached to an evidence update for download: stored as evidence/<number>/attach-<n>.<ext>, offered under `name`. */
 export type AttachRef = { path: string; sha256: string; bytes: number; name: string };
@@ -199,8 +199,8 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       }
       const copy = (c: any, m: any, size: string) => c === undefined || (isText(c?.path) && c.path.startsWith(m.path.replace(/[^/]+$/, '')) && new RegExp(`^evidence/\\d+/\\d+-${size}\\.(jpg|png)$`).test(c.path)
         && /^[a-f0-9]{64}$/.test(c.sha256 ?? '') && [c.bytes, c.width, c.height].every((n) => Number.isInteger(n) && n > 0));
-      if (!d.media.every((m: any) => copy(m.light, m, 'light') && copy(m.thumb, m, 'thumb'))) {
-        throw bad('media', 'light and thumb copies must sit beside their file as <n>-light or <n>-thumb .jpg or .png, each with its sha256, bytes, width and height');
+      if (!d.media.every((m: any) => copy(m.light, m, 'light') && copy(m.thumb, m, 'thumb') && copy(m.tile, m, 'tile'))) {
+        throw bad('media', 'light, thumb and tile copies must sit beside their file as <n>-light, <n>-thumb or <n>-tile .jpg or .png, each with its sha256, bytes, width and height');
       }
     }
     if (d.type === 'explainer' && d.chapters !== undefined && (!Array.isArray(d.chapters) || !d.chapters.length || d.chapters.length > CHAPTERS_MAX
@@ -287,7 +287,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       ...(d.group && { group: d.group }), ...(d.filed && { filed: d.filed }), ...(d.decided && { decided: d.decided }),
       ...(d.form && { form: d.form }), ...(d.video && { video: d.video }), ...(d.asked_by && { asked_by: d.asked_by }), ...(d.purpose && { purpose: d.purpose }),
       ...(d.steps && { steps: d.steps.map(({ title, marks, text }: Step) => ({ title, ...(text && { text }), ...(marks?.length && { marks }) })) }),
-      ...(stored && d.media && { media: d.media.map(({ path, sha256, bytes, light, thumb }: MediaRef) => ({ path, sha256, bytes, ...(light && { light: copyRef(light) }), ...(thumb && { thumb: copyRef(thumb) }) })) }),
+      ...(stored && d.media && { media: d.media.map(({ path, sha256, bytes, light, thumb, tile }: MediaRef) => ({ path, sha256, bytes, ...(light && { light: copyRef(light) }), ...(thumb && { thumb: copyRef(thumb) }), ...(tile && { tile: copyRef(tile) }) })) }),
       ...(d.attachments && { attachments: d.attachments.map(({ path, name, sha256, bytes }: AttachRef) => ({ path, name, sha256, bytes })) }),
       ...(d.type === 'evidence' && { number: d.number }),
       // A gate's run is part of its question: the same key with another run is a different question.

@@ -188,7 +188,11 @@ const PAGES = [
   { name: 'evidence', hash: '#evidence', ready: '[id="item-update-2"]', stages: [{ run: async (h) => {
     const bar = () => h.board().querySelector('.bulk'), sheet = () => document.getElementById('sheet');
     const item = async (name) => { h.board().querySelector('.ev-more').click(); await h.until('the Select or clear all sheet', () => sheet().open); return h.find(new RegExp(`^${name}$`), sheet(), 'button'); };
-    await h.nav('Open update', h.card('update-2'), /^#evidence\/update-2$/);
+    // On a phone a tap opens the row in place, with Open proof going on to the sheet; on a desk the row itself is the link.
+    if (h.card('update-2')?.tagName === 'BUTTON') {
+      await h.press('Open update in its row', h.card('update-2'), () => h.card('update-2').getAttribute('aria-expanded') === 'true' && h.find(/^Open proof/, h.board(), 'a'));
+      await h.nav('Open proof', h.find(/^Open proof/, h.board(), 'a'), /^#evidence\/update-2$/);
+    } else await h.nav('Open update', h.card('update-2'), /^#evidence\/update-2$/);
     await h.press('More: Select', await item('Select'), () => h.find(/^Cancel$/, bar()));
     await h.press('pick update-2', h.card('update-2'), () => h.box(h.card('update-2')).classList.contains('picked'));
     await h.cycle('Dismiss 1 selected', h.find(/^Dismiss 1$/, bar()), () => !h.card('update-2'), () => h.card('update-2'), /1 dismissed/);
