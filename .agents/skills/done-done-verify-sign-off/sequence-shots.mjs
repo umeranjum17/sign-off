@@ -1,5 +1,5 @@
 // Real-board sequence proof through chrome-devtools-axi. Usage: node sequence-shots.mjs <out> [before]
-// Four cells, all five detail kinds, list order, history/reload and keyboard; trace filmstrip records navigation.
+// Five widths in both themes, all detail kinds, list order, history/reload and keyboard; trace filmstrip records navigation.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -24,9 +24,9 @@ try {
   cli('post', join(dir, 'board.json'), '--kind', 'design', '--from', join(dir, 'second-design.json'));
   cli('post', join(dir, 'board.json'), '--type', 'report', '--key', 'release-notes', '--title', 'Release notes', '--about', 'Umer can review the next report.', '--view', 'page/index.html', '--preview', 'page/preview.svg');
   browser('open', base);
-  for (const width of [390, 1280]) for (const theme of ['light', 'dark']) {
-    const cell = `${theme}.${width}w`;
-    browser('emulate', '--viewport', `${width}x844x2${width === 390 ? ',mobile,touch' : ''}`, '--color-scheme', theme);
+  for (const width of (process.env.SEQUENCE_WIDTHS ?? '360,390,445,1280,1440').split(',').map(Number)) for (const theme of ['light', 'dark']) {
+    const cell = `${theme}.${width}w`, height = width >= 1440 ? 900 : width >= 1024 ? 800 : 844;
+    browser('emulate', '--viewport', `${width}x${height}x2${width < 1024 ? ',mobile,touch' : ''}`, '--color-scheme', theme);
     browser('open', base + '#waiting'); settle();
     browser('eval', '() => { document.querySelector("#item-ship").click(); return 1; }'); settle();
     const check = read(`() => { const n = document.querySelector('.detail-sequence'), b = n?.getBoundingClientRect(); return JSON.stringify({ position: n?.querySelector('.position')?.textContent ?? null, overflow: document.documentElement.scrollWidth > innerWidth, headerFits: !b || b.left >= 0 && b.right <= innerWidth, routes: history.state?.detailSequence?.routes }); }`);
