@@ -40,8 +40,8 @@ try {
   await mark({ key: 'research', part: 'question' });
   axi('open', url + '#reports');
   const measures = [];
-  for (const width of [390, 1280]) for (const theme of ['light', 'dark']) {
-    axi('emulate', '--viewport', `${width}x${width === 390 ? 844 : 800}x1${width === 390 ? ',mobile,touch' : ''}`);
+  for (const width of [360, 390, 445, 1280, 1440]) for (const theme of ['light', 'dark']) {
+    axi('emulate', '--viewport', `${width}x${width < 1024 ? 844 : 800}x1${width < 1024 ? ',mobile,touch' : ''}`);
     for (const area of ['reports', 'waiting', 'designs', 'evidence']) {
       run(`await page.open(${JSON.stringify(url + '#' + area)}); await page.eval(() => { localStorage.setItem('so-theme', '${theme}'); location.reload(); });`);
       sh('sleep', ['0.5']); axi('snapshot');
@@ -64,7 +64,7 @@ try {
       writeFileSync(join(dest, name + '.dom.json'), JSON.stringify(result, null, 2)); measures.push(result);
       if (!before) {
         assert.deepEqual(result.console_errors, []); assert.deepEqual(result.failed_requests, []); assert.equal(result.overflow, false); assert.deepEqual(result.overflowing, []); assert.deepEqual(result.squashed_text.filter(x => /rp-ticket|rkc|ui-icon/.test(x.element)), []);
-        assert.ok(result.rows.length || (area === 'designs' && width === 1280 && result.designCards > 0)); assert.ok(result.rows.every(r => r.loaded && !r.mono), name + ': real project icons');
+        assert.ok(result.rows.length || (area === 'designs' && width >= 1024 && result.designCards > 0)); assert.ok(result.rows.every(r => r.loaded && !r.mono), name + ': real project icons');
         if (area === 'reports') {
           assert.ok(result.rows.every(r => r.kind && r.ticket && !r.oldBar));
           assert.match(result.rows.find(r => r.title.includes('retro')).kind, /kind guessed/);
@@ -74,7 +74,7 @@ try {
       }
     }
   }
-  writeFileSync(join(dest, 'steps.json'), JSON.stringify({ commit: process.env.REPORT_ROWS_COMMIT ?? sh('git', ['rev-parse', 'HEAD'], { cwd: repo }).trim(), before, steps: 'Post reports, plan, ask, design and proof via CLI; pin project icon; link ticket; mark one report read and one part read; open four lists at 390 and 1280 in light and dark with chrome-devtools-axi.', result: `${measures.length} frames and DOM records; ${before ? 'baseline recorded' : 'shared icons, kind guessed, ticket metadata, unread-only progress and no overflow passed'}` }, null, 2));
+  writeFileSync(join(dest, 'steps.json'), JSON.stringify({ commit: process.env.REPORT_ROWS_COMMIT ?? sh('git', ['rev-parse', 'HEAD'], { cwd: repo }).trim(), before, steps: 'Post reports, plan, ask, design and proof via CLI; pin project icon; link ticket; mark one report read and one part read; open four lists at 360, 390, 445, 1280 and 1440 in light and dark with chrome-devtools-axi.', result: `${measures.length} frames and DOM records; ${before ? 'baseline recorded' : 'shared icons, kind guessed, ticket metadata, unread-only progress and no overflow passed'}` }, null, 2));
   console.log(`${dest}: ${measures.length} frames recorded`);
 } finally {
   try { axi('stop'); } catch {}
