@@ -976,6 +976,20 @@
   #sheet .ra-on { padding: 0.5rem 0 0; align-items: center; }
   #sheet .ra-send { min-height: 2.75rem; border: 0; border-radius: 999px; background: var(--tk-go); color: var(--tk-on-go); font: inherit; font-weight: 600; cursor: pointer; }
   #sheet .ra-send:disabled { opacity: 0.4; cursor: default; }
+  /* The report composer's send states: Send itself shows Sending with a spinner and the words stay, locked; Not sent is a red line in the box with Retry as a button. */
+  #sheet .ra-send[aria-busy=true] { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; cursor: progress; }
+  #sheet .ra-send[aria-busy=true]:disabled { opacity: 1; }
+  .ra-spin { width: 1rem; height: 1rem; box-sizing: border-box; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: ra-spin 0.8s linear infinite; }
+  @keyframes ra-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .ra-spin { animation: none; border-right-color: currentColor; opacity: 0.6; } }
+  #sheet .ra-form textarea[readonly] { opacity: 0.7; cursor: progress; }
+  #sheet .ra-form .ui-send[data-state=busy] { display: none; }
+  #sheet .ra-form .ui-send[data-state=error] { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; margin: 0; padding: 0.625rem 0.75rem; border-radius: var(--tk-r-icon); background: var(--tk-p0); color: var(--tk-p0-text); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
+  #sheet .ra-form .ui-send[data-state=error] button { min-height: 2.25rem; padding: 0 1rem; border: 1.5px solid currentColor; border-radius: 999px; background: none; color: inherit; font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; }
+  /* A comment sent from the bar is a bubble under its part: its words, and Sent (then Delivered, Read, Replied) under them. */
+  .ra-root .gd-cmt { grid-template-columns: 1fr; padding: 0.75rem 0.875rem; border-radius: var(--tk-r-icon) var(--tk-r-icon) var(--tk-r-icon) 0.25rem; background: var(--tk-inset); }
+  .ra-root .gd-cmt .av { display: none; }
+  .ra-root .gd-cmt.agent { background: var(--tk-card); box-shadow: inset 0 0 0 1px var(--tk-line); border-radius: var(--tk-r-icon) var(--tk-r-icon) 0.25rem var(--tk-r-icon); }
   #sheet .ra-pres { display: flex; flex-direction: column; gap: 0.375rem; margin-top: 0.5rem; }
   #sheet .ra-pre { display: flex; align-items: center; gap: 0.75rem; min-height: 3rem; padding: 0.5rem 0.75rem; border: 0; border-radius: 1rem; background: var(--tk-inset); color: var(--tk-text); font: inherit; text-align: left; cursor: pointer; }
   #sheet .ra-pre .ic { width: 1.25rem; height: 1.25rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -2043,6 +2057,7 @@
     const s = sending.get(line.dataset.sendFeedback);
     line.hidden = !s;
     if (!s) return;
+    line.dataset.state = s.busy ? 'busy' : s.error ? 'error' : 'sent';
     line.replaceChildren(s.busy ? 'Sending…' : s.error ? `Not sent · ${s.error} ` : `Sent · ${hhmm(s.at)}`);
     if (s.error) { const retry = el('button', { type: 'button', class: 'gd-lnk' }, 'Retry'); retry.onclick = s.retry; line.append(retry); }
   }
@@ -4229,7 +4244,7 @@
     }
     const acts = (part, rows, inItem) => {
       // A report's parts carry no buttons: its one bar and its Activity do the acting (reportBar). What stays is content, the numbers.
-      if (!plan) return rows?.length ? [el('table', { class: 'gd-dt gd-nums' }, el('caption', { style: 'position:absolute;width:1px;height:1px;overflow:hidden' }, 'The numbers'), ...rows.map((r) => el('tr', {}, el('th', { scope: 'row' }, r.label), el('td', {}, r.value))))] : [];
+      if (!plan) { const thread = E('div', 'gd-thread'); threads.set(part, thread); queueMicrotask(() => paintTalk(part)); return [...(rows?.length ? [el('table', { class: 'gd-dt gd-nums' }, el('caption', { style: 'position:absolute;width:1px;height:1px;overflow:hidden' }, 'The numbers'), ...rows.map((r) => el('tr', {}, el('th', { scope: 'row' }, r.label), el('td', {}, r.value))))] : []), thread]; }
       const [db, dp] = rows?.length ? detailsBtn(part, rows) : [];
       const panel = live ? ansPanel(part) : null;
       if (!live) return [E('div', 'gd-acts', ...(db ? [db] : [])), ...(dp ? [dp] : [])];
@@ -4583,9 +4598,12 @@
       form.append(E('label', 'ra-on', 'On ', sel), ta, err, sendLine(id), send);
       form.onsubmit = async (e) => {
         e.preventDefault(); const text = ta.value.trim(); if (!text || sending.get(id)?.busy) return;
-        send.disabled = ta.disabled = true; err.textContent = '';
-        // Sending…, Not sent with Retry, or Sent shows in the form (the board's one send line); on success the sheet closes and the bar says it.
-        if (await sendWithFeedback(id, send, () => say(sel.value, { text, ...(mode === 'disagree' && { verdict: 'disagree' }) }))) { sheet.close(); flash(sentLine(new Date())); } else { ta.disabled = false; paint(); }
+        // Send itself answers at once: a spinner and Sending inside it, the words kept in view but locked. Not sent shows a red line in the box with Retry; Sent closes the box and the comment is a bubble under its part.
+        const part = sel.value;
+        err.textContent = ''; ta.readOnly = true; send.replaceChildren(E('i', 'ra-spin'), 'Sending');
+        const sent = await sendWithFeedback(id, send, () => say(part, { text, ...(mode === 'disagree' && { verdict: 'disagree' }) }));
+        if (sent) { sheet.close(); flash(sentLine(new Date())); threads.get(part)?.lastElementChild?.scrollIntoView({ block: 'center', behavior: quick ? 'auto' : 'smooth' }); }
+        else { ta.readOnly = false; send.replaceChildren('Send to the agent'); paint(); }
       };
       openSheet(mode === 'disagree' ? (curPart === 'understood' ? 'Not quite' : 'Disagree') : 'Comment', form);
       ta.focus({ preventScroll: true });
@@ -4710,7 +4728,7 @@
     function sync() {
       if (!root.isConnected && timer) { clearInterval(timer); timer = undefined; return; }
       root.querySelector('.gd-activity')?.replaceChildren(thread(d));
-      syncU(); paintOpts(); paintSummary(); paintRc(); paintRail(); if (!plan) { paintBar(); paintAct(); } votes.forEach((_, part) => paintTalk(part));
+      syncU(); paintOpts(); paintSummary(); paintRc(); paintRail(); if (!plan) { paintBar(); paintAct(); } threads.forEach((_, part) => paintTalk(part));
       panels.forEach((_, part) => { paintAns(part); if (asksOf(part).length && (d.engagement || (deeps.get(part).getAttribute('aria-expanded') === 'false' && !deeps.get(part).dataset.shut))) { deeps.get(part)?.setAttribute('aria-expanded', 'true'); panels.get(part).hidden = false; } });
       const need = live && (unfinished() || (state.comments ?? []).some((c) => c.key === key && c.text && !c.reply) || (plan && sent() && !state.seen_at?.[key]));
       if (need && !timer) timer = setInterval(async () => {
