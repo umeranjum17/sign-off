@@ -91,7 +91,7 @@ try {
     [() => drag('screen-on', -280), 1600], [() => tap('#undo'), 1300], [() => tap('a.dl-face[href="#decide/mac-screen"]'), 1100],
     [() => tap('.pick-list li:nth-child(2) .pick-option'), 900], [() => tap('.pick-list li:nth-child(1) .pick-option'), 900],
     [() => tap('.decide-bar .answer'), 2000], [() => tap('#undo'), 1400], [() => tap('a.dl-face[href="#decide/fix-plan"]'), 1600], [() => tap('.sh-x'), 1200],
-    [() => tap('.ui-seg button:nth-child(2)'), 1400], [() => tap('.ui-seg button:nth-child(1)'), 1000], [() => inPage("document.querySelector('.decide-list .t-more-line').scrollIntoView({ block: 'center', behavior: 'smooth' }); return 'ok';"), 1000], [() => tap('.decide-list .t-more-line'), 1400], [() => tap('#d-more [data-act="answer-all"]'), 2000], [() => tap('#undo'), 1500]];
+    [() => tap('.dl-rb'), 900], [() => tap('#dl-sort .dl-pick:nth-child(2)'), 1400], [() => tap('.dl-rb'), 900], [() => tap('#dl-sort .dl-pick:nth-child(1)'), 1000], [() => inPage("document.querySelector('.decide-list .t-more-line').scrollIntoView({ block: 'center', behavior: 'smooth' }); return 'ok';"), 1000], [() => tap('.decide-list .t-more-line'), 1400], [() => tap('#d-more [data-act="answer-all"]'), 2000], [() => tap('#undo'), 1500]];
   for (const [i, [act, ms]] of steps.map((s) => (s.length === 1 ? [null, s[0]] : s)).entries()) {
     const r = act && (await act());
     if (r === 'missing') throw new Error(`step ${i + 1} found nothing to tap at ${await evaluate('location.hash')}: ${act}`);

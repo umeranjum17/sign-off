@@ -129,9 +129,11 @@ try {
   const go = async (address, ms = 1200) => { await cdp('Page.navigate', { url: 'about:blank' }); await wait(150); await cdp('Page.navigate', { url: address }); await wait(ms); };
   // Each state: the board's address, what is done on it by hand (a tap on the page's own control), and the prototype's address for the same state (none where it has no frame).
   const tap = (sel) => `(async () => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) throw new Error('no ' + ${JSON.stringify(sel)}); e.click(); await new Promise((ok) => setTimeout(ok, 600)); })()`;
+  // On a phone the order is the round button in Decide's head, opening a sheet of Newest (1) and By priority (2).
+  const order = (n) => `(async () => { await ${tap('#board .dl-rb')}; await ${tap(`#dl-sort .dl-pick:nth-child(${n})`)}; })()`;
   const STATES = [
     ['decide', '#waiting', '', 'v=decide'],
-    ['decide-priority', '#waiting', tap('.decide-list .ui-seg button:nth-child(2)'), 'v=decide&dsort=prio'],
+    ['decide-priority', '#waiting', order(2), 'v=decide&dsort=prio'],
     ['ask', '#decide/mac-screen', '', 'v=decide&o=ask-mac-screen-grant'],
     ['ask-picked', '#decide/mac-screen', tap('.decide .pick-option'), 'v=decide&o=ask-mac-screen-grant&pick=done'],
     ['ask-ticket', '#decide/fix-plan', '', ''],
@@ -158,7 +160,7 @@ try {
         report.push(`${name}: edges ${m.edges.join('-')}, seg ${m.seg.join(' | ')}, hero "${m.hero}", ${m.rows.length} rows (${m.rows.map((r) => `${r.height}px ${r.tileKind}${r.chip ? ' ' + r.chip : ''}${r.bar ? ' bar ' + r.bar : ''}`).join('; ')})${m.ask ? `, sheet ${m.ask.edges.join('-')} title "${m.ask.title}" in ${m.ask.titleLines} lines, button "${m.ask.button}", panel [${m.ask.panel.join(' / ')}]` : ''}${m.clears !== null ? `, last card ${m.clears}px over the dock` : ''}, Inter ${m.inter}`);
         if ([m.fail, m.under, errors, failed].some((x) => x.length)) problems.push(`${name}: ${JSON.stringify({ fail: m.fail, under: m.under, errors, failed })}`);
         // By priority is kept in the browser: put Newest back for the next state.
-        if (state === 'decide-priority' && side === 'after') await run(tap('.decide-list .ui-seg button:nth-child(1)'));
+        if (state === 'decide-priority' && side === 'after') await run(order(1));
         if (!proto || !protoHash) continue;
         await go(`file://${proto}#${protoHash}&theme=${theme}`);
         await shot(join(dest, 'vs-proto', `${name}.proto.png`));

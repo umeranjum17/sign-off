@@ -24,6 +24,8 @@
 .dock-find { position: fixed; z-index: 2; left: calc(var(--dock-at) + var(--dock-w) + 0.75rem); bottom: calc(1.5rem + env(safe-area-inset-bottom)); display: grid; place-items: center;
   width: 3.5rem; height: 3.5rem; border-radius: 1.75rem; background: var(--tk-go); color: var(--tk-on-go); box-shadow: var(--tk-elev-go); -webkit-tap-highlight-color: transparent; }
 .dock-find:active { transform: scale(0.94); }
+/* Under the dock the page fades to its ground, so a row or a line never reads half hidden behind it; scrolled to its end, a list clears it by the body's room. */
+body::after { content: ''; position: fixed; z-index: 1; left: 0; right: 0; bottom: 0; height: calc(6.5rem + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--bg) calc(5rem + env(safe-area-inset-bottom)), transparent); pointer-events: none; }
 .dock-find svg, .sfind svg { width: 1.5rem; height: 1.5rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* The page's title row: 8px from the top (24px on a desk), a 24px medium title in a 44px row, round 40px buttons at its right edge. */
@@ -105,7 +107,7 @@
    The mark, Search's glass and every area's icon are 20px on one left edge, and the name, Search and every label start on the next one;
    the mark sits on the name's line, centred on it; at the foot, whose board it is with the light-or-dark button. */
 @media (min-width: 64rem) {
-  .tabs, .dock-find { display: none; }
+  .tabs, .dock-find, body::after { display: none; }
   .ui-top { margin-top: 1.5rem; }
   .side { display: flex; flex-direction: column; gap: 0.25rem; position: sticky; top: 0; height: 100vh; padding: 1.5rem 1rem; background: none; }
   .brand { display: flex; align-items: center; gap: 0.75rem; min-height: 2.5rem; margin: 0; padding: 0 0.75rem; color: var(--tk-ink); font-size: var(--tk-fs-body); line-height: 1.25rem; font-weight: 600; letter-spacing: -0.01em; }

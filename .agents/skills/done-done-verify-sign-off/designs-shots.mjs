@@ -7,7 +7,7 @@
 // more (the title row's More), full (Review full screen). At 1280 and 1440: designs (the newest open beside where it stands), design-picked (another card clicked) and full.
 // Each capture is measured in the browser: on a phone every block on the 16px gutter's two edges and the 4px grid, 68px rows, the last row clear of the dock, no control under 44px;
 // on a desk every card on the 12-column grid's lines, shared tops, the 4px grid, no page scroll, the empty share of the viewport, no text cut but a card title past two lines,
-// the sidebar's places in the prototype's order with Designs lit and the Evidence and Designs counts the board's (a phone: the dock's five with Today lit, as the prototype's dock maps Designs),
+// the sidebar's places in the prototype's order with Designs lit and the Evidence and Designs counts the board's (a phone: the dock's five with Decide lit, Designs being Decide's second list there),
 // no words drawn over other words; everywhere no file path or internal code in the words on screen, no sideways overflow and no console error.
 // Usage: node .agents/skills/done-done-verify-sign-off/designs-shots.mjs <output> [light|dark|light,dark] [390|1280|1440]
 // DESIGNS_PROTO=<the approved prototype's index.html (v3)> also captures the prototype at the same size and theme and saves each pair (vs-proto/): on a desk its Designs,
@@ -59,7 +59,7 @@ const MEASURE = `(async () => {
   if (desk && nav.length && nav.map((x) => x.name).join(',') !== 'Today,Decide,Evidence,Reports,Designs,Tickets') fail.push('sidebar places ' + nav.map((x) => x.name));
   if (desk && nav.length && lit !== 'Designs') fail.push('sidebar lights ' + lit);
   if (desk && nav.length && (nav.find((x) => x.name === 'Designs')?.n !== '3' || nav.find((x) => x.name === 'Evidence')?.n !== '3')) fail.push('sidebar counts ' + JSON.stringify(nav));
-  if (!desk && (nav.length !== 5 || (!open && !sheet && lit !== 'Today'))) fail.push('dock ' + JSON.stringify(nav));
+  if (!desk && (nav.length !== 5 || (!open && !sheet && lit !== 'Decide'))) fail.push('dock ' + JSON.stringify(nav));
   if (sheet) {}
   else if (!desk) {
     // A phone: every block on the gutter's two edges and the 4px grid.
@@ -244,7 +244,7 @@ try {
   facts.designs = await js(`document.querySelector('main').innerText.replace(/\\s+/g, ' ').trim()`);
   await capture('designs');
   await pair('designs', phone ? 'v=reports' : 'v=designs');
-  // The prototype's phone keeps its five tabs and draws Designs' address as Today with Today lit: the board's dock on Designs beside it.
+  // The prototype's phone keeps its five tabs and draws Designs' address as Today; the board's dock on Designs (Decide lit) beside it.
   if (phone) await pair('designs-dock', 'v=designs', 0, 'designs');
   if (phone) {
     // A row tapped opens its review over the list.
@@ -312,9 +312,9 @@ try {
       ...(phone ? ['Tap the Today on a phone row: its review opens; read and measure it, then scroll it to its end.', 'Tap Review full screen: the screen viewer opens over the page.', 'Tap More in the title row and read it.',
         'Open the Reports list design, type a note, tap Change; the board\'s answers file holds it and the list reads Changes requested; scroll the list to its end and measure it against the dock.']
         : ['Click the Today on a desk card: it opens beside where it stands, its pick and answer shown.', 'Click Review full screen: the screen viewer opens over the page.']),
-      ...(proto ? [`Capture the approved prototype at the same size and theme (${phone ? 'its Reports list, an open report and the filter sheet, the look Designs follows on a phone, and its Designs address, Today lit in its dock' : 'its Designs, the first and second design open'}) and save each beside the board.`] : [])],
+      ...(proto ? [`Capture the approved prototype at the same size and theme (${phone ? 'its Reports list, an open report and the filter sheet, the look Designs follows on a phone, and its Designs address' : 'its Designs, the first and second design open'}) and save each beside the board.`] : [])],
     result: phone
-      ? `${theme}, 390px: the dock keeps its five tabs with Today lit on Designs, as the prototype's dock maps it; Designs is drawn in the new look as Reports' list: the title row with More and the round light-or-dark button, a To review card, and the designs as 68px rows in one card, each with its project's icon or initials, its title on one line (cut with an ellipsis when long) and its state and day, or a finished ticket's full bar; a row opens its review with the project and day, the whole title, what it shows, the screen in its device's viewport, Review full screen, Where it stands (state, your pick, when answered) and what you said, then the note with Approve in ink beside Change; Change with a note saves the answer and the row reads Changes requested; More holds Select and Clear all; every block on one gutter, the last row clear of the dock, no control under 44px, no file path or code in the words, no sideways overflow, no console error.`
+      ? `${theme}, 390px: the dock keeps its five tabs with Decide lit on Designs, Decide's second list on a phone; Designs is drawn in the new look as Reports' list: the title Decide with More and the round light-or-dark button, Asks and Designs with their counts (Designs pressed), a To review card, and the designs as 68px rows in one card, each with a thumbnail of its first screen, its title on one line (cut with an ellipsis when long) and its state and day, or a finished ticket's full bar; a row opens its review with the project and day, the whole title, what it shows, the screen in its device's viewport, Review full screen, Where it stands (state, your pick, when answered) and what you said, then the note with Approve in ink beside Change; Change with a note saves the answer and the row reads Changes requested; More holds Select and Clear all; every block on one gutter, the last row clear of the dock, no control under 44px, no file path or code in the words, no sideways overflow, no console error.`
       : `${theme}, ${metrics.width}px: the sidebar lists Today, Decide, Evidence 3, Reports, Designs 3 (lit) and Tickets, the prototype's places in its order; Designs fills the window as the approved prototype's desk draws it: the crumb, the 32px title and what is on the board, then the designs as picture cards across the top (title, project and day, state) and the open design (its picture filling the card) beside Where it stands (state, your pick, when answered, what you said, what it shows; the newest open shows its pick, as the prototype's does) with the note and Approve in ink beside Change; a card clicked opens that design; every card on the 12-column lines and the 4px grid, no page scroll, under 15% of the window empty, no text cut but a card title past two lines, no words over words, no console error.` }, null, 2) + '\n');
   console.log(report.join('\n'));
   console.log(JSON.stringify(facts, null, 2));
