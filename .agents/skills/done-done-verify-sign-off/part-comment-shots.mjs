@@ -35,8 +35,10 @@ cli('post', board, '--kind', 'report', '--from', join(dir, 'report.json'), '--fi
 writeFileSync(join(dir, 'report2.json'), JSON.stringify({ ...m, key: REC }));
 cli('post', board, '--kind', 'report', '--from', join(dir, 'report2.json'), '--filer', FILER);
 if (process.env.SEND_FEEDBACK_ONLY) {
-  cli('post', board, '--key', 'send-answer', '--title', 'Ship the settings page?', '--ask-ref', 'message-demo', '--why', 'Umer needs the settings checked.', '--outcome', 'yes=The page ships.', '--outcome', 'no=The page waits.', '--recommend', 'yes', '--recommend-reason', 'The checks passed.', '--default', 'no');
-  cli('post', board, '--type', 'evidence', '--title', 'Umer checks the settings page', '--about', 'The settings fit.', '--media', join(repo, 'fixtures/evidence/product-small.png'));
+  writeFileSync(join(dir, 'project.png'), readFileSync(join(repo, 'web/icon-192.png')));
+  for (const name of ['Beacon', 'Umer', 'Chat app']) cli('project', board, '--name', name, '--icon', 'project.png');
+  cli('post', board, '--filer', 'Umer', '--key', 'send-answer', '--title', 'Ship the settings page?', '--ask-ref', 'message-demo', '--why', 'Umer needs the settings checked.', '--outcome', 'yes=The page ships.', '--outcome', 'no=The page waits.', '--recommend', 'yes', '--recommend-reason', 'The checks passed.', '--default', 'no');
+  cli('post', board, '--filer', 'Umer', '--type', 'evidence', '--title', 'Umer checks the settings page', '--about', 'The settings fit.', '--media', join(repo, 'fixtures/evidence/product-small.png'));
   mkdirSync(join(dir, 'design'));
   for (const f of readdirSync(join(repo, 'fixtures/contract/design.v1/design'))) writeFileSync(join(dir, 'design', f), readFileSync(join(repo, 'fixtures/contract/design.v1/design', f)));
   writeFileSync(join(dir, 'design.json'), JSON.stringify({ ...JSON.parse(readFileSync(join(repo, 'fixtures/contract/design.v1/valid-basic.json'))), filer: 'Umer' }));
@@ -57,6 +59,7 @@ const MEASURE = (sel) => `() => [...document.querySelectorAll(${JSON.stringify(s
   return { name: (e.getAttribute('aria-label') || e.title || e.textContent).trim().slice(0, 24), x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), hit44: hit === 4 }; })`;
 const capture = (name, claim, extra = {}) => {
   const stem = `${name}.${theme}.${width}w`;
+  if (process.env.SEND_FEEDBACK_ONLY && !process.env.SEND_FEEDBACK_BEFORE) assert.equal(page(`() => document.querySelectorAll('.ui-row .ui-icon .mono').length`), 0, 'List rows use project pictures or kind icons, never monograms');
   browser('screenshot', join(out, `${stem}.png`));
   const dom = page(`() => { const w = document.documentElement.clientWidth; return { overflow: document.documentElement.scrollWidth > w, overflowing: [...document.querySelectorAll('#reader *')].filter(e => e.getClientRects().length && e.getBoundingClientRect().right > w + 1).slice(0, 10).map(e => e.tagName.toLowerCase() + '.' + e.className) }; }`);
   assert.equal(dom.overflow, false); assert.deepEqual(dom.overflowing, []);
