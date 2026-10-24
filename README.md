@@ -78,7 +78,18 @@ What you send on a card (an answer, a note, a new round, a comment) shows its tr
 
 ### Plans and reports, on their own pages
 
-<!-- MARKER: report-writing and the report gallery for design output are not described here yet; they land with the report kit PRs. -->
+An agent writes a report as data and the board draws it: `sign-off-axi report init <folder> --purpose <kind>` writes `report.json`, and each section takes `blocks` to show a point rather than tell it.
+
+| Block | What it draws |
+| --- | --- |
+| `callout` | a note, warning or question set apart |
+| `beats` | a stepper of pictures, each with a time, title and words |
+| `video` | a short film with its poster |
+| `table` | the same measures for each option |
+| `compare` | before and after |
+| `evidence` | captures, each marked Fixed, In progress or Waiting on you |
+
+Design output (screens a model made) goes in a `gallery` on the section: `report init --gallery`. Every picture and film is a file beside `report.json`, and post pins it. A page an agent writes itself (`report init --page`) is refused when it brings its own colours, three or more, or a card inside a card; reports already on the board stay as filed.
 
 <table>
   <tr>

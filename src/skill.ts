@@ -150,9 +150,33 @@ npx -y sign-off-axi raise --ask-ref <captain-message-id-or-hold-id> --title "Whi
 - Open the board at 390 px wide and look before you tell the person it is there: the first screen must give the answer and the picture.
 - A report about design output (screens, mocks or options a model made) always carries a gallery, never a pasted picture: run \`report init <folder> --purpose <kind> --gallery\`, save each option's screenshots under the board file's folder (a phone frame 390 wide, a desktop frame 1280 wide, light copies not needed), and fill the gallery on the first section: per option its \`label\`, the \`model\` that made it and \`ran\` (UTC), and per frame its \`device\` (\`phone\` or \`desktop\`), \`src\` and a \`caption\` saying what it shows. Post refuses a frame with no caption or device. The board draws the options as a strip to swipe (a row on a desk) with both frames side by side and a tap to open full size.
 - Show a report's parts with the board's own blocks, never your own HTML or CSS: add \`blocks\` to a section: \`callout\` (a note, warning or question set apart), \`beats\` (a stepper of pictures, each with a time, title and words), \`video\` (a film with its poster), \`table\`, \`compare\` (before and after) and \`evidence\` rows (a status of \`fixed\`, \`progress\` or \`waiting\`). Name the files next to the board file; post pins them. Post warns when your first paragraph repeats \`about\`: say something new there.
-- Only if you must keep an HTML page of your own (a demo to tap), run \`report init <folder> --page --purpose <kind>\` and post it with \`--type report --purpose <kind> --view --preview\`.
+- Write a report with the board's kit (next chapter), never as a page of your own. A page is only for a demo the reader must tap that no block can show (see \`report init <folder> --page --purpose <kind>\`).
 
-<!-- MARKER: report-writing chapter and the report gallery for design output are not described here yet; they land with the report kit PRs. -->
+## Write a report with the board's kit
+
+You hand the board words, files and rows; the board draws them in its own type and colours, light and dark, full width in one gutter. Never write HTML, CSS, a colour or a card for a report: a page of your own will not match the board, and a plan or report you want read has to look like the rest of it.
+
+1. \`npx -y sign-off-axi report init .sign-off/reports/<key> --purpose <kind>\` (add \`--gallery\` for design output), then fill every \`FILL:\` line. A report with nothing in it to show needs no blocks.
+2. Show a part with a block instead of a paragraph: add \`blocks\` (1 to 12, in the order given) to the section. Save each picture or film next to \`report.json\` and name it by path; post pins the files.
+3. Post: \`post --kind report --from .sign-off/reports/<key>/report.json --filer <id>\`. Open the board at 390 px wide, light and dark, and look before you say it is there.
+
+Pick the block by what the reader must see:
+
+| Block | Use it for | Fields |
+| --- | --- | --- |
+| \`callout\` | one thing set apart: a caveat, a warning, a question | \`tone\` (\`note\`, \`warn\` or \`ask\`), \`title\` (60), \`text\` (280) |
+| \`beats\` | a sequence the reader steps through: a film's scenes, a flow | \`beats\`, 2 to 12, each \`image\`, \`time\`, \`title\` (80), \`text\` (280) |
+| \`video\` | a short film | \`src\` (.mp4 or .webm, 50 MB), \`poster\`, \`length\`, \`caption\` |
+| \`table\` | the same measures for 2 or more options | \`columns\` (2 to 5), \`rows\` (up to 30, one cell per column, 120 each) |
+| \`compare\` | before and after | \`before\` and \`after\`, each \`image\` and \`caption\` (80) |
+| \`evidence\` | captures with a state for each | \`rows\`, each \`image\`, \`title\`, \`note\`, \`status\` (\`fixed\`, \`progress\` or \`waiting\`) |
+
+- One idea per block, one block per point; a table beats three paragraphs of numbers, and a stepper beats a numbered list of screens.
+- Say something new in each part. Post warns, and does not refuse, when a section's first paragraph repeats \`about\`.
+- Options a model made are a gallery, not a row of pictures: see the design-output rule above. \`gallery\` and \`blocks\` can share a section, the gallery first.
+- Images are .png, .jpg, .jpeg or .webp; a path has no \`..\`, \`?\`, \`#\` or backslash.
+- Sentence case in every heading and label; no capitals shouted, no colour words, no markup in any field.
+- A page of your own (\`report init --page\`) is held to the board's look at its first post: post refuses one that writes out three or more colours of its own or draws a card inside a card, and says to use blocks. The scaffold already draws neither; keep to the system colours (Canvas, CanvasText, GrayText). A report already on the board stays as it was filed.
 
 ## Follow your report kind's workflow
 
