@@ -74,3 +74,9 @@ Each capture is measured in the browser:
 Regressions:
 - `test/design.test.mjs`: "Decide on a desk" (the asks' head and count inside the card), "Decide on a pick-one ask", "Reports on a desk", "Evidence: a card per proof", "a card names its ticket" and "report and plan documents use one page scroll".
 - The latter also covers the exported copy at 1280.
+
+## Previous and next items
+
+Every detail header (ask, ticket, proof, report and design; phone sheet and desk pane) has 44px Previous / Next arrows and a position. Ends stop with a disabled arrow. The sequence is the originating rendered list, including its filters and sort, saved in history state across reload and Back. J / K and arrow keys use that same sequence; typing, dialogs and screenshot viewers keep their own keys. Swipe horizontally on a phone's detail text to navigate; vertical scrolling, screenshots, horizontal strips and form fields keep their gestures.
+
+Drive `node .agents/skills/done-done-verify-sign-off/sequence-shots.mjs <folder>` through chrome-devtools-axi on an isolated seeded board: all five detail kinds in both themes and at 360 / 390 / 445 / 1280 / 1440, fifty header frames, next/previous checks on every kind, sequence/history assertions and a navigation performance recording with filmstrip. Pass `before` to capture the same fifty frames on the base. There is no separate approved navigation mock; pair these controls with the shipped main UI. `SEQUENCE_WIDTHS=360` narrows a diagnostic drive. Run `node --test --test-global-setup=./test/temp-folder.mjs --test-name-pattern='detail sequence|the new look draws only' test/design.test.mjs` for real Chrome key/touch regression (wait for both the sheet animation and native scroll momentum to settle before measuring a touch; check its hit target, prove native vertical scrolling and an overflowing four-picture screenshot strip separately), filtered report sequence, and the palette gate.

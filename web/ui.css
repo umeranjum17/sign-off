@@ -231,3 +231,13 @@
   .ui-pane.ask2 > .pbody { flex: 1 1 auto; min-height: 0; padding: 1.25rem 1.5rem 1rem; overflow: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: none; }
   .ui-pane.ask2 > .ppin { flex: none; max-height: 65%; padding: 1rem 1.5rem 1.25rem; overflow: auto; overscroll-behavior: contain; scrollbar-width: none; border-top: 1px solid var(--tk-line); }
 }
+
+/* Shared detail navigation uses the same ink and surface as the existing header. */
+.detail-sequence { display:flex; align-items:center; gap:2px; margin-inline-start:auto; flex-shrink:0; }
+.detail-sequence button { display:grid; place-items:center; width:44px; height:44px; padding:0; border:0; border-radius:var(--tk-r-ctl); background:transparent; color:inherit; cursor:pointer; font-size:28px; }
+.detail-sequence button:hover:not(:disabled) { background:var(--tk-inset); }
+.detail-sequence button:disabled { opacity:.3; cursor:default; }
+.detail-sequence .position { white-space:nowrap; font-size:12px; font-variant-numeric:tabular-nums; }
+@media(max-width:639px) { :is(.sh-head,.ev-shd,.rp-shd,.tk-shd,.dz-oh):has(.detail-sequence) { flex-wrap:wrap; } }
+
+@media(max-width:374px) { .ask-sheet .sh-head:has(.detail-sequence) { height:auto; min-height:44px; } .ask-sheet .sh-head .detail-sequence { flex-basis:100%; justify-content:flex-end; } }
