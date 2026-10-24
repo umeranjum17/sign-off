@@ -231,3 +231,11 @@
   .ui-pane.ask2 > .pbody { flex: 1 1 auto; min-height: 0; padding: 1.25rem 1.5rem 1rem; overflow: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: none; }
   .ui-pane.ask2 > .ppin { flex: none; max-height: 65%; padding: 1rem 1.5rem 1.25rem; overflow: auto; overscroll-behavior: contain; scrollbar-width: none; border-top: 1px solid var(--tk-line); }
 }
+
+/* The pending step and receipt beside a composer share the feedback trail's new-look tokens. */
+.ui-send { margin: 0.5rem 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); line-height: var(--tk-lh-meta); }
+.ui-send[hidden] { display: none; }
+.ui-send button { color: var(--tk-ink); background: none; border: 0; min-height: 2.75rem; text-decoration: underline; }
+[aria-busy="true"] { opacity: 0.65; }
+.foot:has(> .ui-send) { flex-wrap: wrap; }
+.foot > .ui-send { flex-basis: 100%; }
