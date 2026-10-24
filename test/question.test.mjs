@@ -214,7 +214,9 @@ test('--proof names an evidence update and --report a report on the board: an as
   const notReport = run('raise', board, ...good, '--report', 'release-day');
   assert.equal(notReport.status, 2, notReport.stdout);
   assert.match(notReport.stdout, /is about release-day, which is not a report on the board/);
-  assert.equal(run('post', board, '--kind', 'report', '--from', new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url).pathname).status, 0);
+  const reportFile = join(scratch, 'report.json');
+  writeFileSync(reportFile, JSON.stringify({ ...JSON.parse(readFileSync(new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url))), purpose: 'other', project: 'Umer' }));
+  assert.equal(run('post', board, '--kind', 'report', '--from', reportFile).status, 0);
   assert.equal(run('raise', board, ...good, '--report', 'sign-in-faster').status, 0);
   assert.equal(JSON.parse(readFileSync(board, 'utf8')).items.find((d) => d.report).report, 'sign-in-faster');
 });

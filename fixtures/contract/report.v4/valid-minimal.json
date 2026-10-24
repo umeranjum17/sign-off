@@ -4,6 +4,8 @@
   "schema": 4,
   "key": "digest-ran",
   "title": "The weekly digest ran",
+  "purpose": "other",
+  "project": "Beacon",
   "filed": "2026-10-19T08:00:00Z",
   "about": "Sent to 412 readers with no failures.",
   "understood": [

@@ -12,6 +12,7 @@
   "next": {"heading": "Say go and I wire ntfy in", "lines": ["The first slice sends one test push to Umer's phone.", "The proof lands as an update under Evidence."]},
   "key": "push-service",
   "title": "Which push service fits a team of two",
+  "project": "Beacon",
   "purpose": "research",
   "group": "Beacon",
   "about": "Five services compared on cost, delivery on a phone and setup time. Two fit; one is free up to our size.",

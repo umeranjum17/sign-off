@@ -26,9 +26,9 @@ const gate = JSON.parse(readFileSync(join(fixtures, 'gate.v1', 'valid-three-acti
 const finding = JSON.parse(readFileSync(join(fixtures, 'finding.v1', 'valid-apply.json')));
 // A report is a page and its picture: the scaffold report init writes, filled in, beside the boards these tests write.
 const fill = (file) => writeFileSync(file, readFileSync(file, 'utf8').replace(/FILL: [^<"']*/g, 'Umer taps through it'));
-spawnSync('node', [cli, 'report', 'init', join(scratch, 'page'), '--page'], { env: { ...process.env, HOME: join(scratch, 'home') } });
+spawnSync('node', [cli, 'report', 'init', join(scratch, 'page'), '--page', '--purpose', 'other'], { env: { ...process.env, HOME: join(scratch, 'home') } });
 for (const f of ['index.html', 'preview.svg']) fill(join(scratch, 'page', f));
-const report = { contract: 1, kind: 'report', schema: 2, key: 'slice-5-live', title: 'How the new cards work', about: 'Umer can see the new cards.', filed: '2026-10-13T07:19:00Z',
+const report = { contract: 1, kind: 'report', schema: 2, purpose: 'other', project: 'Umer', key: 'slice-5-live', title: 'How the new cards work', about: 'Umer can see the new cards.', filed: '2026-10-13T07:19:00Z',
   view: 'page/index.html', preview: 'page/preview.svg' };
 
 test('design review posts journeys and returns change notes through answers --json', async () => {
@@ -582,18 +582,35 @@ test('post --kind: one message from a file or stdin, checked against its kind, r
   assert.equal(readFileSync(board, 'utf8'), before);
   assert.equal(post('', '--kind', 'ask', '--from', join(scratch, 'missing.json')).status, 1);
   // A report is a page: text alone is refused with what is missing and the command that makes the page, and nothing is written.
-  const text = post('', '--type', 'report', '--title', 'Merged #12', '--about', 'Checks passed.');
+  const text = post('', '--type', 'report', '--purpose', 'other', '--project', 'Umer', '--title', 'Merged #12', '--about', 'Checks passed.');
   assert.equal(text.status, 2, text.stdout);
   assert.match(text.stdout, /a report is a page to tap through, not text: --view and --preview are missing/);
+  // A report names its kind: refused with the seven named, on a flag post, in a file, and from report init, before anything is written.
+  const kindless = post('', '--type', 'report', '--project', 'Umer', '--title', 'Merged #12', '--about', 'Checks passed.', '--view', 'page/index.html', '--preview', 'page/preview.svg');
+  assert.equal(kindless.status, 2, kindless.stdout);
+  assert.match(kindless.stdout, /a report needs --purpose <kind>, what it is for: research, plan, decision, audit, incident, status, other/);
+  const unnamed = post(JSON.stringify({ ...report, key: 'slice-5-kindless', purpose: undefined }), '--kind', 'report', '--from', '-');
+  assert.equal(unnamed.status, 2, unnamed.stdout);
+  assert.match(unnamed.stdout, /stdin: report slice-5-kindless has no kind: \\"purpose\\" is required[^]*research, plan, decision, audit, incident, status, other/);
+  const homeless = post('', '--type', 'report', '--purpose', 'other', '--title', 'Merged #12', '--about', 'Checks passed.', '--view', 'page/index.html', '--preview', 'page/preview.svg');
+  assert.equal(homeless.status, 2, homeless.stdout);
+  assert.match(homeless.stdout, /a report needs --project <name>, the project it is about; no project is registered/);
+  const noProject = post(JSON.stringify({ ...report, key: 'slice-5-homeless', project: undefined }), '--kind', 'report', '--from', '-');
+  assert.equal(noProject.status, 2, noProject.stdout);
+  assert.match(noProject.stdout, /report slice-5-homeless has no project/);
+  const bare = spawnSync('node', [cli, 'report', 'init', join(scratch, 'bare')], { encoding: 'utf8', env });
+  assert.equal(bare.status, 2, bare.stdout);
+  assert.match(bare.stdout, /report init needs --purpose <kind>, what the report is for: research, plan, decision, audit, incident, status, other/);
+  assert.equal(existsSync(join(scratch, 'bare')), false);
   assert.match(text.stdout, /help\[1\]: "Run `sign-off-axi report init <folder> --page` to make the page and its picture/);
   assert.match(post(JSON.stringify({ ...report, schema: 1, view: undefined, preview: undefined }), '--kind', 'report', '--from', '-').stdout,
     /stdin: key slice-5-live: schema 1 of report is text only[^]*report init <folder>/);
   // report init writes the page; posted unfilled, or as text with nothing to tap, or with a block longer than a phone shows, it is refused.
-  const made = spawnSync('node', [cli, 'report', 'init', join(scratch, 'draft'), '--page'], { encoding: 'utf8', env });
+  const made = spawnSync('node', [cli, 'report', 'init', join(scratch, 'draft'), '--page', '--purpose', 'other'], { encoding: 'utf8', env });
   assert.equal(made.status, 0, made.stdout);
   assert.match(made.stdout, /created\[2\]:.*draft\/index\.html,.*draft\/preview\.svg/);
   assert.match(made.stdout, /390 px wide and look before posting: mostly text means it is not ready/);
-  const draft = ['--type', 'report', '--title', 'How sign-in works', '--about', 'Two steps now.', '--view', 'draft/index.html', '--preview', 'draft/preview.svg'];
+  const draft = ['--type', 'report', '--purpose', 'other', '--project', 'Umer', '--title', 'How sign-in works', '--about', 'Two steps now.', '--view', 'draft/index.html', '--preview', 'draft/preview.svg'];
   assert.match(post('', ...draft).stdout, /--type report: key how-sign-in-works: view \\"draft\/index\.html\\" still has FILL: lines/);
   fill(join(scratch, 'draft', 'index.html'));
   assert.match(post('', ...draft).stdout, /preview \\"draft\/preview\.svg\\" still has FILL: lines/);
@@ -718,7 +735,7 @@ test('a guided plan and report: report init writes them to fill, post refuses FI
   mkdirSync(dir, { recursive: true });
   const run = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env, cwd: dir });
   // report init writes the guided template; posted as it is, it is refused for its FILL lines, and a view is not a field.
-  for (const [flag, kind] of [[[], 'report'], [['--plan'], 'plan']]) {
+  for (const [flag, kind] of [[['--purpose', 'research'], 'report'], [['--plan'], 'plan']]) {
     const made = run('report', 'init', join(dir, kind), ...flag);
     assert.equal(made.status, 0, made.stdout);
     assert.match(made.stdout, new RegExp('post --kind ' + kind + ' --from [^ ]*' + kind + '\\.json'));
@@ -726,7 +743,7 @@ test('a guided plan and report: report init writes them to fill, post refuses FI
     assert.equal(raw.status, 2);
     assert.match(raw.stdout, /still has FILL: lines/);
   }
-  const plan = JSON.parse(readFileSync(join(fixtures, 'plan.v2', 'valid-full.json'))), guide = JSON.parse(readFileSync(join(fixtures, 'report.v3', 'valid-full.json')));
+  const plan = JSON.parse(readFileSync(join(fixtures, 'plan.v2', 'valid-full.json'))), guide = { ...JSON.parse(readFileSync(join(fixtures, 'report.v3', 'valid-full.json'))), purpose: 'other', project: 'Umer' };
   for (const [m, error] of [[{ ...plan, view: 'page/index.html' }, /view is not a field of plan schema 2/], [{ ...guide, preview: 'p.svg' }, /preview is not a field of report schema 3/],
     [{ ...plan, visual: { ...plan.visual, rows: [{ label: 'A' }, { label: 'B', value: 1 }] } }, /visual\.rows\[0\]\.value/], [{ ...plan, sections: [{ ...plan.sections[0], items: [] }] }, /items must list 1 to 8/]]) {
     const { out: { files: [row] } } = validate(message('guide-bad.json', JSON.stringify(m)));
@@ -780,7 +797,7 @@ test('a guided plan and report: report init writes them to fill, post refuses FI
     // New schemas reuse the same real server/CLI journey, without modifying legacy answers.
     for (const [kind, schema] of [['plan', 3], ['report', 4]]) {
       const m = JSON.parse(readFileSync(join(fixtures, `${kind}.v${schema}/valid-full.json`)));
-      const key = `simplify-${kind}`; m.key = key;
+      const key = `simplify-${kind}`; m.key = key; if (kind === 'report') Object.assign(m, { purpose: 'other', project: 'Umer' });
       m.understood[0].text = 'Ask 🙂 once, then ask 🙂 again, and ask 🙂 a third time.';
       const posted = spawnSync('node', [cli, 'post', board, '--kind', kind, '--from', '-'], { env, encoding: 'utf8', input: JSON.stringify(m) });
       assert.equal(posted.status, 0, posted.stdout);
@@ -851,7 +868,7 @@ test('engagement listeners survive report-only boards, sent plans, timeouts and 
   delete env.SIGN_OFF_FILER; delete env.CLAUDE_CODE_SESSION_ID;
   const run = (...args) => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8', env });
   const postItem = (kind, filer, key) => {
-    const item = { ...JSON.parse(readFileSync(join(fixtures, kind === 'plan' ? 'plan.v2/valid-full.json' : 'report.v3/valid-full.json'))), filer, key };
+    const item = { ...JSON.parse(readFileSync(join(fixtures, kind === 'plan' ? 'plan.v2/valid-full.json' : 'report.v3/valid-full.json'))), filer, key, ...(kind === 'report' && { purpose: 'other', project: 'Umer' }) };
     const p = spawnSync(process.execPath, [cli, 'post', board, '--kind', kind, '--from', '-'], { env, encoding: 'utf8', input: JSON.stringify(item) });
     assert.equal(p.status, 0, p.stdout + p.stderr);
   };
@@ -935,7 +952,7 @@ test('engagement listeners survive report-only boards, sent plans, timeouts and 
 
 test('an answers-only board takes Go deeper on a report part and still refuses rounds', async () => {
   const dir = join(scratch, 'fed-deeper'), board = join(dir, 'board.json'), env = { ...process.env, SIGN_OFF_HOME: dir, HOME: join(dir, 'home') };
-  const report = { ...JSON.parse(readFileSync(join(fixtures, 'report.v4/valid-full.json'))), key: 'fed-report' };
+  const report = { ...JSON.parse(readFileSync(join(fixtures, 'report.v4/valid-full.json'))), key: 'fed-report', purpose: 'other', project: 'Umer' };
   assert.equal(spawnSync(process.execPath, [cli, 'post', board, '--kind', 'report', '--from', '-'], { env, encoding: 'utf8', input: JSON.stringify(report) }).status, 0);
   writeFileSync(board, JSON.stringify({ ...JSON.parse(readFileSync(board, 'utf8')), answers_only: true }));
   const server = spawn(process.execPath, [cli, 'serve', board, '--port', '0'], { env });
@@ -953,7 +970,7 @@ test('a comment on a report part reaches the author agent through wait --filer, 
   const dir = join(scratch, 'part-comment'), board = join(dir, 'board.json'), env = { ...process.env, SIGN_OFF_HOME: dir, HOME: join(dir, 'home') };
   delete env.SIGN_OFF_FILER; delete env.CLAUDE_CODE_SESSION_ID;
   const run = (...args) => spawnSync(process.execPath, [cli, ...args], { env, encoding: 'utf8' });
-  const report = { ...JSON.parse(readFileSync(join(fixtures, 'report.v4/valid-full.json'))), key: 'comment-report', filer: 'agent-41' };
+  const report = { ...JSON.parse(readFileSync(join(fixtures, 'report.v4/valid-full.json'))), key: 'comment-report', purpose: 'other', project: 'Umer', filer: 'agent-41' };
   assert.equal(spawnSync(process.execPath, [cli, 'post', board, '--kind', 'report', '--from', '-'], { env, encoding: 'utf8', input: JSON.stringify(report) }).status, 0);
   const server = spawn(process.execPath, [cli, 'serve', board, '--port', '0'], { env });
   try {
@@ -1582,4 +1599,32 @@ test('post --kind evidence: a concern card with a status and no frame posts and 
   const item = JSON.parse(readFileSync(board, 'utf8')).items[0];
   assert.equal(item.status, 'In progress');
   assert.equal(item.media, undefined);
+});
+
+test('report kind names the reports posted before every report had a kind: all lines checked first, who set it recorded, the report itself unchanged, a re-run changes nothing', () => {
+  const dir = join(scratch, 'kinds'), board = join(dir, 'board.json'), env = { ...process.env, HOME: join(scratch, 'kinds-home') };
+  mkdirSync(dir, { recursive: true });
+  const { purpose: _purpose, project: _project, ...older } = JSON.parse(readFileSync(join(fixtures, 'report.v4/valid-full.json'))), old = { ...older, key: 'old-incident', title: 'Why messages were sent twice: a retro' };
+  writeFileSync(board, JSON.stringify({ schema: 2, items: [old, { ...old, key: 'old-weekly', title: 'Where the digest stands' }, { ...old, key: 'has-kind', purpose: 'audit', project: 'Muxr' }, JSON.parse(readFileSync(join(fixtures, 'plan.v3/valid-full.json')))] }));
+  const before = readFileSync(board, 'utf8'), run = (...args) => spawnSync('node', [cli, 'report', 'kind', ...args], { encoding: 'utf8', env });
+  const replay = message('kinds.tsv', '# key\tkind\tproject\nold-incident\tincident\tMuxr\nold-weekly\tstatus\tFleet\n');
+  for (const [args, error] of [[['old-incident', 'incident', '--project', 'Muxr'], /report kind needs --by/], [['old-incident', 'guess', '--project', 'Muxr', '--by', 'agent-41', '--board', board], /guess is not a report kind: use one of research, plan/],
+    [['nope', 'status', '--project', 'Muxr', '--by', 'agent-41', '--board', board], /nope is not a report on/], [['--from', message('bad.tsv', 'old-incident\tincident\tMuxr\nold-weekly\tnone\tFleet\n'), '--by', 'agent-41', '--board', board], /bad\.tsv line 2: none is not a report kind/]]) {
+    const refused = run(...args);
+    assert.equal(refused.status, /is not a report on/.test(error.source) ? 1 : 2, refused.stdout);
+    assert.match(refused.stdout, error);
+  }
+  assert.match(run('old-weekly', 'status', '--by', 'agent-41', '--board', board).stdout, /expected <key> <kind> <project>/);
+  assert.equal(existsSync(join(dir, 'board.kinds.jsonl')), false, 'a bad line writes nothing');
+  const set = run('--from', replay, '--by', 'agent-41', '--board', board);
+  assert.equal(set.status, 0, set.stdout);
+  assert.match(set.stdout, /changed: 2/);
+  const lines = readFileSync(join(dir, 'board.kinds.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  assert.deepEqual(lines.map(({ key, purpose, project, by }) => [key, purpose, project, by]), [['old-incident', 'incident', 'Muxr', 'agent-41'], ['old-weekly', 'status', 'Fleet', 'agent-41']]);
+  assert.equal(readFileSync(board, 'utf8'), before, 'the report is not rewritten');
+  assert.match(run('--from', replay, '--by', 'agent-41', '--board', board).stdout, /changed: 0[^]*unchanged: 2/);
+  const stored = run('has-kind', 'status', '--project', 'Muxr', '--by', 'agent-41', '--board', board);
+  assert.equal(stored.status, 2, stored.stdout);
+  assert.match(stored.stdout, /has-kind already has its kind audit in the report itself/);
+  assert.equal(run('plan-key', 'status', '--project', 'Muxr', '--by', 'agent-41', '--board', board).status, 1);
 });

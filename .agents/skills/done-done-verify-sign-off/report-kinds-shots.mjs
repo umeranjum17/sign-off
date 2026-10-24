@@ -1,5 +1,5 @@
-// Report kinds on a fresh board: seven guided reports, one of each kind (six posted as report 5 with their purpose, and an older report 4 whose kind the
-// board guesses), at 390x844 and 1280x800 (2x), light and dark, in a headless Chromium of its own over the DevTools protocol, measured in the browser.
+// Report kinds on a fresh board: seven guided reports, one of each kind (six posted as report 5 with their purpose, and an older report 4 posted with its purpose
+// ), at 390x844 and 1280x800 (2x), light and dark, in a headless Chromium of its own over the DevTools protocol, measured in the browser.
 // Usage: node .agents/skills/done-done-verify-sign-off/report-kinds-shots.mjs <output> [<approved mock's shots folder>]   (KINDS_WIDTHS="390" keeps one width)
 // Saves <state>.<theme>.<width>w.png with its .dom.json and .measure.json, and kinds.<theme>.<width>w.txt; with the mock's shots folder (the design pass's
 // mock-shots/), each state is also saved beside the approved mock's frame as vs-mock/<state>.<theme>.<width>w.pair.png. Asserts each state.
@@ -65,7 +65,7 @@ const errors = [], failed = [], problems = [], lines = [];
 try {
   // Seven guided reports filed in the last hours, one of each kind, as the approved mock lists them: six report 5s, each with every part of its kind (a research report's
   // sources with links and a user report, its options and findings with their confidence; a plan's design with its diagram, its slices sized and tested); the incident is an
-  // older report 4 with no purpose, so its kind is the board's guess.
+  // older report 4 posted with its purpose.
   const base = JSON.parse(readFileSync(join(repo, 'fixtures/contract/report.v5/valid-full.json'), 'utf8')), old = JSON.parse(readFileSync(join(repo, 'fixtures/contract/report.v4/valid-full.json'), 'utf8'));
   const { REPORT_PARTS } = await import(join(repo, 'dist/store.js')), ago = (h) => new Date(Date.now() - h * 3600e3).toISOString().replace(/\.\d+Z$/, 'Z');
   mkdirSync(join(dir, 'diagrams'), { recursive: true });
@@ -89,17 +89,18 @@ try {
     { key: 'kinds-other', purpose: 'other', title: 'How the release train works', about: 'Build, check and publish each have one owner.', found: 'Each stage has one owner' },
   ];
   reports.forEach((r, i) => {
-    const m = r.purpose ? { ...base, purpose: r.purpose, sections: r.purpose === 'other' ? base.sections.map(({ part, ...x }) => ({ ...x, items: x.items?.map(({ link, source, confidence, ...it }) => it) })) : sections(r.purpose) } : { ...old };
+    const m = r.purpose ? { ...base, purpose: r.purpose, sections: r.purpose === 'other' ? base.sections.map(({ part, ...x }) => ({ ...x, items: x.items?.map(({ link, source, confidence, ...it }) => it) })) : sections(r.purpose) } : { ...old, purpose: 'incident' };
     // Each report's picture heads with its own finding, which its sheet shows as What it found.
     Object.assign(m, { key: r.key, title: r.title, about: r.about, filed: ago(0.2 + i * 0.4), visual: { ...m.visual, heading: r.found } });
     for (const f of ['ticket', 'asked_by', 'group', 'priority']) delete m[f];
+    m.project = r.group ?? 'Beacon';
     if (r.group) m.group = r.group;
     if (r.priority) m.priority = r.priority;
     writeFileSync(join(dir, `${r.key}.json`), JSON.stringify(m)); so('post', board, '--kind', 'report', '--from', join(dir, `${r.key}.json`));
   });
   // Post holds a report 5 to its kind's parts: a plan whose sections name no part, and a research report with no user report, are each refused with one fix line, and nothing is written.
-  const refusals = [['a plan with none of its parts', { ...base, key: 'kinds-bad-plan', purpose: 'plan', sections: base.sections.map(({ part, ...x }) => x) }],
-    ['a research report with no user report', { ...base, key: 'kinds-bad-research', sections: base.sections.map((x) => (x.part === 'sources' ? { ...x, items: x.items.map((it) => ({ ...it, source: 'primary' })) } : x)) }]].map(([what, m]) => {
+  const refusals = [['a plan with none of its parts', { ...base, key: 'kinds-bad-plan', project: 'Beacon', purpose: 'plan', sections: base.sections.map(({ part, ...x }) => x) }],
+    ['a research report with no user report', { ...base, key: 'kinds-bad-research', project: 'Beacon', sections: base.sections.map((x) => (x.part === 'sources' ? { ...x, items: x.items.map((it) => ({ ...it, source: 'primary' })) } : x)) }]].map(([what, m]) => {
     writeFileSync(join(dir, `${m.key}.json`), JSON.stringify(m));
     const r = spawnSync(process.execPath, [join(repo, 'dist/cli.js'), 'post', board, '--kind', 'report', '--from', join(dir, `${m.key}.json`)], { encoding: 'utf8', env });
     assert.equal(r.status, 2, r.stdout); assert.ok(!readFileSync(board, 'utf8').includes(m.key), `${what} is not written`);
@@ -168,7 +169,7 @@ try {
     const list = await state('kinds-list');
     txt.push(`rows: ${list.rows.map((r) => `${r.title} [${r.chip}${r.p ? ', ' + r.p : ''}] ${r.strip ? 'strip ' + r.strip : 'bar'} ${r.pct}`).join(' | ')}`, `filter button: "${list.filter?.label}"`);
     const kinds = list.rows.map((r) => r.kind);
-    assert.deepEqual(kinds.slice(0, 6), ['plan', 'research', 'incident', 'decision', 'audit', 'status'], 'each row names its kind, the incident by the board\'s guess');
+    assert.deepEqual(kinds.slice(0, 6), ['plan', 'research', 'incident', 'decision', 'audit', 'status'], 'each row names its kind, the incident from an older report 4');
     assert.equal(list.rows[0].strip, '111000000', 'a plan\'s bar is its nine parts, three read'); assert.equal(list.rows[0].pct, '33%');
     assert.ok(list.rows.slice(1).every((r) => !r.strip), 'every other kind keeps the bar');
     if (metrics.mobile) {
@@ -179,7 +180,7 @@ try {
       txt.push(`filtered: pill "${only.pill}", button "${only.filter.label}" (${only.filter.count}), rows ${only.rows.map((r) => r.title).join(' | ')}`);
       assert.deepEqual([only.rows.map((r) => r.kind), only.pill.replace(/(?<=\D)(?=\d)/, ' '), only.filter.count], [['research'], 'Research and discovery 1 of 7', '1']);
       for (const [s, key, chip, read, next] of [['kinds-plan', 'kinds-plan', 'Implementation plan', 'Read 3 of 9 parts', 'Next: Slices'], ['kinds-research', 'kinds-research', 'Research and discovery', 'Read 4 of 9 parts', 'Next: Options compared'],
-        ['kinds-old', 'kinds-incident', 'Incident and retro · kind guessed', '', '']]) {
+        ['kinds-old', 'kinds-incident', 'Incident and retro', '', '']]) {
         const m = await state(s, () => tap(`#item-${key}`));
         txt.push(`${s} sheet: [${m.head.chip}] ${m.head.when} / "${m.head.title}" / for "${m.head.for}" / ${m.head.read} ${m.head.strip} "${m.head.next}" / sources ${m.head.sources || 'none'}`);
         if (key === 'kinds-research') assert.equal(m.head.sources, 'Linked sources3|What users report1');
@@ -202,10 +203,10 @@ try {
     lines.push(...txt);
   }
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
-    start: 'A throwaway board with seven guided reports filed in the last hours, one of each kind: six posted as report 5 with their purpose and every part of their kind (the research report with three linked sources, one of them a user report, its options and findings; the plan with its nine parts from Goal and non-goals to Your calls), and an older report 4 with none (a retro, so the board guesses Incident). The decision and the status read; the plan with three of its nine parts read and the research with four.',
+    start: 'A throwaway board with seven guided reports filed in the last hours, one of each kind: six posted as report 5 with their purpose and every part of their kind (the research report with three linked sources, one of them a user report, its options and findings; the plan with its nine parts from Goal and non-goals to Your calls), and an older report 4 posted with its purpose (a retro, Incident). The decision and the status read; the plan with three of its nine parts read and the research with four.',
     steps: ['Post a plan whose sections name none of its parts, and a research report with no user report, through the CLI (kinds-refusal.txt).', 'Open Reports on a phone at 390x844 (2x) in light and dark and read every row.', 'Tap the filter button, then pick Research and discovery.',
       'Tap the plan, the research and the older report in the list, each opening its sheet.', 'On the research sheet tap What users report: the guided page opens at its sources.', 'At 1280: pick the plan, then the research, in the list.'],
-    result: 'Post refuses the plan with none of its parts (sections has no "goal" part) and the research report with no user report, each with its fix line, and writes neither. On a phone every report row leads with its kind (Plan, Research, Incident, Decision, Audit, Status, Report); the plan\'s bar is its nine parts with three filled; the filter sheet lists Every kind (7) and each kind with what it is for and its count; picking Research lists the one research report under its pill (1 of 7). The plan\'s sheet heads Implementation plan, says how the work gets built, and lists its nine parts from Goal and non-goals to Your calls under Read 3 of 9 parts and Next: Slices. The research sheet heads Research and discovery and counts its sources: 3 linked sources, 1 of them what users report; tapping it opens the guided page at its sources, each tagged Primary source or User report with a link out (Open on docs.ntfy.sh, pushover.net, github.com) in a new tab. The older report reads Incident and retro by the board\'s guess. On a desk the bar names the kind; beside the report, its Sources (research), then the strip, the next part and its kind\'s parts listed with a check on each one read.' }, null, 2) + '\n');
+    result: 'Post refuses the plan with none of its parts (sections has no "goal" part) and the research report with no user report, each with its fix line, and writes neither. On a phone every report row leads with its kind (Plan, Research, Incident, Decision, Audit, Status, Report); the plan\'s bar is its nine parts with three filled; the filter sheet lists Every kind (7) and each kind with what it is for and its count; picking Research lists the one research report under its pill (1 of 7). The plan\'s sheet heads Implementation plan, says how the work gets built, and lists its nine parts from Goal and non-goals to Your calls under Read 3 of 9 parts and Next: Slices. The research sheet heads Research and discovery and counts its sources: 3 linked sources, 1 of them what users report; tapping it opens the guided page at its sources, each tagged Primary source or User report with a link out (Open on docs.ntfy.sh, pushover.net, github.com) in a new tab. The older report reads Incident and retro. On a desk the bar names the kind; beside the report, its Sources (research), then the strip, the next part and its kind\'s parts listed with a check on each one read.' }, null, 2) + '\n');
   console.log(lines.join('\n'));
   assert.deepEqual(problems, [], 'every capture measures clean');
 } finally {

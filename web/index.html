@@ -3231,7 +3231,7 @@
    *  or, filed by a tool that is itself a project on the board (its icon set with project --icon), that project. */
   const projectName = (d) => d.project || d.group || (d.type === 'evidence' ? projectOf(d) : d.proof && projectOf(state.decisions.find((x) => x.key === d.proof) ?? {}))
     || (ticketOf(d) && tkProject(ticketOf(d))) || (d.by && (state.projects ?? []).find((p) => p.name.toLowerCase() === d.by.toLowerCase())?.name) || undefined;
-  /** One project picture and tile for every list; use the pinned record, with a kind icon when the project picture is unavailable. */
+  /** One project picture and tile for every list; use the pinned record, with a neutral project icon when the project has none. */
   function projectPic(name, fallback = () => glyph('layers')) {
     const p = name && (state.projects ?? []).find((p) => p.name.toLowerCase() === name.toLowerCase());
     if (!p?.icon) return fallback();
@@ -3241,7 +3241,7 @@
   }
   const projectTile = (name, fallback) => el('span', { class: 'ui-icon', role: 'img', 'aria-label': name || 'No project' }, projectPic(name, fallback));
   const cardTile = (d) => {
-    const design = d.kind === 'design' || d.type === 'design', tile = projectTile(projectName(d), () => design ? icon('designs') : d.type === 'plan' ? icon('plan') : d.kind === 'report' || d.type === 'explainer' ? kindSvg(kindOf(d)) : icon(d.type === 'evidence' ? 'evidence' : d.reply ? 'reply' : 'yesno'));
+    const design = d.kind === 'design' || d.type === 'design', tile = projectTile(projectName(d), () => design ? icon('designs') : d.type === 'plan' ? icon('plan') : d.kind === 'report' || d.type === 'explainer' ? glyph('layers') : icon(d.type === 'evidence' ? 'evidence' : d.reply ? 'reply' : 'yesno'));
     const frame = design && designFrame(d);
     if (frame) { const img = el('img', { class: 'design-thumb', src: src(designUrl(d, frame)), alt: '' }); img.onerror = () => img.replaceWith(projectPic(projectName(d), () => icon('designs'))); tile.replaceChildren(img); }
     return tile;
@@ -3645,15 +3645,11 @@
     status: ['Status', 'Status', 'Where the work stands now and what comes next.', '<path d="M3 12h4l3-7 4 14 3-7h4"/>'],
     other: ['Report', 'Other report', 'An explainer of one idea.', '<path d="M12 7v13M4 18a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h4.5A3.5 3.5 0 0 1 12 7.5 3.5 3.5 0 0 1 15.5 4H20a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-5a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>'],
   };
-  /** A best guess at an older report's kind from its words, first match wins; it is never written back. */
-  const GUESS = [['incident', /\b(incident|outage|retro|post-?mortem|went wrong|broke|regression)/i], ['audit', /\b(audit|checked against|compliance|conform)/i],
-    ['plan', /\b(plan|slices?|roll ?out|migrat|step by step)/i], ['status', /\b(status|stands|progress|this week|weekly|so far)\b/i],
-    ['decision', /\b(should we|recommend|decid|decision|instead of|versus|vs\.)/i], ['research', /\b(research|compar|which|survey|options|study|discover|benchmark)/i]];
-  /** A report's kind: the one it was posted with; a plan is always an implementation plan; an older report gets the best guess from its title, what it says and its section heads. */
-  const kindOf = (d) => (KINDS[d.purpose] ? d.purpose : d.type === 'plan' ? 'plan' : GUESS.find(([, re]) => re.test([d.title, d.about, ...(d.sections ?? []).map((s) => s.heading)].join(' ')))?.[0] ?? 'other');
+  /** A report's kind: the one it was posted with or an agent set; a plan is always an implementation plan. A report with none shows as other. */
+  const kindOf = (d) => (KINDS[d.purpose] ? d.purpose : d.type === 'plan' ? 'plan' : 'other');
   const kindSvg = (k) => { const s = el('span', { class: 'rkg', 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24">${KINDS[k][3]}</svg>`; return s; };
   /** The kind's chip: its icon and its short name on a row, its full name on a report's head. */
-  const kindChip = (d, full) => { const k = kindOf(d); return el('span', { class: `rkc k-${k}`, 'data-kind': k }, kindSvg(k), (full ? KINDS[k][1] : KINDS[k][0]) + (!KINDS[d.purpose] && d.type !== 'plan' ? ' · kind guessed' : '')); };
+  const kindChip = (d, full) => { const k = kindOf(d); return el('span', { class: `rkc k-${k}`, 'data-kind': k }, kindSvg(k), (full ? KINDS[k][1] : KINDS[k][0])); };
   /** The kind's tile in the filter and its pill: its icon on the same treatment as its chip; Every kind is the filter's own drawing. */
   const kindTile = (k) => (k ? el('span', { class: `rkt k-${k}` }, kindSvg(k)) : el('span', { class: 'rkt k-all' }, evGlyph('filter')));
   /** One line under a report's title: what this kind of report is for. */
@@ -3718,8 +3714,8 @@
   function report(d, i = 0) {
     const n = d.steps?.length;
     // Keep the kind and ticket readable on line two; read progress sits quietly below while unread.
-    const t = ticketOf(d), ticket = d.ticket || t?.title || 'No ticket';
-    const meta = el('span', { class: 'rp-meta' }, kindChip(d), el('span', { class: 'rp-ticket', title: t ? `${t.id}: ${t.title}` : ticket }, ticket));
+    const t = ticketOf(d), ticket = d.ticket || t?.title;
+    const meta = el('span', { class: 'rp-meta' }, kindChip(d), ticket ? el('span', { class: 'rp-ticket', title: t ? `${t.id}: ${t.title}` : ticket }, ticket) : '');
     const face = uiRow({ tile: cardTile(d), title: plain(title(d)), priority: d.priority, after: trailBadge(d.key), meta });
     if (unread(d)) face[1].append(el('span', { class: 'rp-progress', role: 'progressbar', 'aria-label': 'Report read', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(readPct(d)) },
       kindOf(d) === 'plan' && kindParts(d).length ? partsStrip(d) : el('span', { class: 'ui-bar' }, el('i', { style: `width: ${readPct(d)}%` })), el('span', { class: 'pct sr-only' }, `${readPct(d)}%`)));

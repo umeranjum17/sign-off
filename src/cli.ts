@@ -14,7 +14,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendSendBack, appendTicket, readTickets, rollUp, appendTicketComment, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendKind, readKinds, appendSendBack, appendTicket, readTickets, rollUp, appendTicketComment, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, galleryFrames, guided, kitWarnings, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -125,7 +125,7 @@ examples:
   validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>] [--expect-invalid]
 Checks message files against the communication contract without posting them: ${CONTRACT}
 A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate and finding at schema 1, design at schema 2 (schema 1 still passes), report at schema 5 (schemas 2 to 4 still pass) and plan at schema 3 (schemas 1 and 2 still pass).
-A report 3 to 5 and a plan 2 or 3 are guided pages: fields the board draws as one scroll, no page of your own (see report init). A report 5 names what it is for in "purpose".
+A report 3 to 5 and a plan 2 or 3 are guided pages: fields the board draws as one scroll, no page of your own (see report init). Every report names what it is for in "purpose", required on a report 5 and on any new report, and so is its "project".
 An evidence message's media paths read from the message file's folder: each file must be there, inside it, and 50 MB or less.
 A report is a page to tap through: its "view" (.html) and "preview" (its picture, beside it) are checked for their shape here; the files themselves are checked at post, from the board file's folder, filled with no FILL: lines left (see report init).
 A plan's "view" (.html) is checked for its shape here; the file itself is checked at post, from the board file's folder.
@@ -381,8 +381,10 @@ examples:
   sign-off-axi feedback fleet-dashboard-full --reply "The colours now come from the new tokens." --link https://github.com/owner/repo/pull/245
   sign-off-axi feedback fleet-dashboard-full --acted --link https://github.com/owner/repo/pull/245
 `,
-  report: `usage: sign-off-axi report init <folder> [--purpose research|plan|decision|audit|incident|status|other] [--plan] [--page] [--gallery]
-Writes the guided template to fill: <folder>/report.json, or <folder>/plan.json with --plan. A file already there is kept.
+  report: `usage: sign-off-axi report init <folder> --purpose research|plan|decision|audit|incident|status|other [--page] [--gallery]
+       sign-off-axi report init <folder> --plan
+       sign-off-axi report kind <key> <kind> --project <name> --by <who> [--board board.json]   (or --from <file> of key<TAB>kind<TAB>project lines)
+Writes the guided template to fill: <folder>/report.json (--purpose is required), or <folder>/plan.json with --plan. A file already there is kept.
 Every report names what it is for in "purpose", its kind: research (research and discovery), plan (implementation plan), decision (decision and recommendation),
 audit, incident (incident and retro), status, or other. --purpose fills it in and writes that kind's parts to fill, one section each, which post then requires
 (research: question, scope, method, sources with links and a user report, options, findings with their confidence, not-checked, recommendation, open-questions;
@@ -393,7 +395,7 @@ Numbers sit behind a Details tap; every part has a Go deeper button that asks yo
 Replace every FILL: line, then post it: post --kind report --from <folder>/report.json, or post --kind plan --from <folder>/plan.json --filer <your id>.
 A report is for an explanation the user asked for, or a concept, design or trade-off they must understand. Proof that something works is evidence.
 --gallery adds a gallery to the first section: a design output's options, each with its model, run time and a phone and a desktop frame (an image or page, as a path from the board file's folder), which the board draws as a swipeable strip with each frame opening full size.
---page writes the older scaffold page instead, for a report that needs a page of its own (report schema 2). It is:
+--page (with --purpose) writes the older scaffold page instead, for a report that needs a page of its own (report schema 2); post it with --type report --purpose <kind>. It is:
 Writes a report page to fill: <folder>/index.html and its card picture <folder>/preview.svg. A file already there is kept.
 The page is one self-contained file, phone first, light and dark, in four parts, each one idea:
   1. the answer in one plain sentence and a picture of it   2. a diagram of how it works
@@ -401,8 +403,10 @@ The page is one self-contained file, phone first, light and dark, in four parts,
 Replace every FILL: line, open the page in a browser 390 px wide and look: mostly text means it is not ready.
 Then post it with the command it prints; the paths are from the board file's folder, so make the folder under it, such as .sign-off/mocks/<key>.
 A report is for an explanation the user asked for, or a concept, design or trade-off they must understand. Proof that something works is evidence.
+report kind sets the kind and the project of a report posted before every report had them, and records --by, who set it; the board itself is not changed, only <board>.kinds.jsonl. All the lines of --from are checked before the first is written.
 examples:
-  sign-off-axi report init .sign-off/mocks/sign-in-flow
+  sign-off-axi report init .sign-off/reports/sign-in-flow --purpose research
+  sign-off-axi report kind sign-in-flow research --project Beacon --by agent-41
 `,
   init: `usage: sign-off-axi init [dir] [--agent auto|<name>[,<name>]...]
 Writes a repo's sign-off setup under <dir>/.sign-off/ (config, an empty board, mocks/ and evidence/ folders, and a .gitignore keeping media and answer files out of git). A file that is already there is kept, never changed, except that a given --agent replaces the config's agent: line; a re-run adds what is missing.
@@ -512,6 +516,16 @@ const CONTRACT_TYPES = ['decision', 'ask', 'evidence', 'report', 'plan', 'design
 const asSent = ({ filed: _filed, announced: _announced, ...rest }: any) => rest;
 /** A report names its own `filed` time, so only the notice record goes. */
 const asReport = ({ announced: _announced, ...rest }: any) => rest;
+/** The projects the board knows, for a refusal that names them. */
+const knownProjects = (file: string) => { const all = existsSync(file) ? readProjects(file).map((p) => p.name) : []; return all.length ? `known projects: ${all.join(', ')}` : 'no project is registered on this board yet (sign-off-axi project --name <project> --icon <picture>), so name the one the report is about'; };
+/** A new report names its kind and its project, whatever its schema; one already on the board stays a re-post of its own key (an older one is named with report kind). */
+function newReportFields(m: any, file: string) {
+  if (m?.kind !== 'report') return;
+  if (!Object.hasOwn(m, 'purpose')) {
+    throw new ContractError(`report ${m.key} has no kind: "purpose" is required, what the report is for`, `Set "purpose" to one of ${REPORT_PURPOSES.join(', ')}; ${REPORT_INIT} --purpose <kind> writes a report with it filled in`);
+  }
+  if (!Object.hasOwn(m, 'project')) throw new ContractError(`report ${m.key} has no project: "project" is required, so its row shows the project's icon`, `Set "project" to the project the report is about; ${knownProjects(file)}`);
+}
 /** Items of a --from file that carry contract or kind are contract messages: each is checked against its kind's rules before anything is stored.
  * A new item of a contract kind must carry them (contract section 2). A --replace feed replaces the stored item, so an item under an existing key
  * that changed is checked again; an unchanged item, a board-format one and every item outside a --replace feed are not checked again. */
@@ -548,6 +562,7 @@ function contractItems(items: any[], from: string, file: string, replace = false
     }
     try {
       checkMessage(check);
+      if (!held) newReportFields(check, file);
       if ((check.kind === 'report' || check.kind === 'plan') && !guided(check)) reportPage(check, dirname(file));
       if (guided(check)) diagramPages(check, dirname(file));
       if (check.kind === 'design') designFiles(check, dirname(file));
@@ -1020,12 +1035,12 @@ async function locked<T>(lock: string, fn: () => T | Promise<T>, busy = 'another
 const mockFile = (path: string) => path.split('?')[0];
 /** Posts an item. `raise` is the alias for `post --type decision`: same flags as before, same output. */
 function post(args: string[], cmd = 'post') {
-  const typed: Flags = cmd === 'post' ? { replace: { type: 'boolean' }, kind: { type: 'string' }, type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
+  const typed: Flags = cmd === 'post' ? { replace: { type: 'boolean' }, kind: { type: 'string' }, purpose: { type: 'string' }, project: { type: 'string' }, type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
     media: { type: 'string', multiple: true }, attach: { type: 'string', multiple: true }, link: { type: 'string', multiple: true }, view: { type: 'string' }, preview: { type: 'string' }, chapter: { type: 'string', multiple: true },
     ...Object.fromEntries(SIGNIN_FIELDS.map((f) => [f, { type: 'string' as const }])) } : {};
   const { file, named, values, on } = parse(cmd, args, { from: { type: 'string' }, filer: { type: 'string' }, 'ask-ref': { type: 'string' }, ticket: { type: 'string' }, priority: { type: 'string' }, ...typed,
     ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: MANY.includes(f) }])) });
-  const given = [...RAISE_FIELDS, 'type', 'tradeoff', 'mock', 'media', 'attach', 'link', 'view', 'preview', 'chapter', ...SIGNIN_FIELDS].filter((f) => values[f] !== undefined);
+  const given = [...RAISE_FIELDS, 'type', 'purpose', 'project', 'tradeoff', 'mock', 'media', 'attach', 'link', 'view', 'preview', 'chapter', ...SIGNIN_FIELDS].filter((f) => values[f] !== undefined);
   // Only a design takes --link more than once (one per option); any other type keeps its one item link, the last given.
   const optionLinks: string[] = values.link ?? [];
   if (values.type !== 'design' && optionLinks.length) values.link = optionLinks.at(-1);
@@ -1567,16 +1582,19 @@ function postMedia(file: string, named: string, on: string, values: Record<strin
 function postReport(file: string, named: string, on: string, values: Record<string, any>) {
   const odd = ['option', 'recommend', 'default', 'close', 'detail', 'mock', 'tradeoff', 'media', 'chapter'].find((f) => values[f] !== undefined);
   if (odd) throw fail(`--${odd} does not apply to --type report: a report takes no answer`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
+  if (values.purpose === undefined) throw fail(`a report needs --purpose <kind>, what it is for: ${REPORT_PURPOSES.join(', ')}`, 'VALIDATION_ERROR', 'sign-off-axi post --type report --purpose research --title "<the answer>" --about "<why it matters>" --view <page>.html --preview <picture>.svg');
+  if (!REPORT_PURPOSES.includes(values.purpose)) throw fail(`--purpose ${values.purpose} must be one of ${REPORT_PURPOSES.join(', ')}`, 'VALIDATION_ERROR', 'sign-off-axi post --type report --purpose research --title "<the answer>" ...');
+  if (values.project === undefined) throw fail(`a report needs --project <name>, the project it is about; ${knownProjects(file)}`, 'VALIDATION_ERROR', 'sign-off-axi post --type report --purpose research --project Beacon --title "<the answer>" ...');
   const missing = ['title', 'about', 'view', 'preview'].filter((f) => values[f] === undefined).map((f) => `--${f}`);
   if (missing.length) {
     throw fail(`a report is a page to tap through, not text: ${missing.join(' and ').replace(/ and (?=.* and )/g, ', ')} ${missing.length > 1 ? 'are' : 'is'} missing`, 'VALIDATION_ERROR',
-      `Run \`${REPORT_INIT} --page\` to make the page and its picture, fill them, then post --type report --title "<the answer>" --about "<why it matters>" --view <folder>/index.html --preview <folder>/preview.svg`);
+      `Run \`${REPORT_INIT} --page\` to make the page and its picture, fill them, then post --type report --purpose <kind> --project <name> --title "<the answer>" --about "<why it matters>" --view <folder>/index.html --preview <folder>/preview.svg`);
   }
   const key = values.key ?? slug(values.title), had = existsSync(file) ? readItems(file).items.find((i) => i?.key === key) : undefined;
   // Posting the same report again is a no-op, so it keeps the time it was first filed.
   const filed = (had?.kind === 'report' && had.filed) || new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   const { title, about, view, preview, link } = values;
-  return postKind(file, named, on, values, { contract: 1, kind: 'report', schema: 2, key, title, about, view, preview, ...(link !== undefined && { link }), filed });
+  return postKind(file, named, on, values, { contract: 1, kind: 'report', schema: 2, key, title, about, view, preview, purpose: values.purpose, project: values.project, ...(link !== undefined && { link }), filed });
 }
 
 /** Posts one contract message (docs/contract.md), from a file or from stdin with --from -: checked against --kind, then stored like a raised item.
@@ -1600,6 +1618,7 @@ async function postKind(file: string, named: string, on: string, values: Record<
     // A new ask is held to the question standard, and so is a new design's title; a card already on the board still re-posts as it was.
     const existing = !built && ['ask', 'design'].includes(kind) && existsSync(file) && readItems(file).items.some((i: any) => i?.key === m.key);
     checkMessage(m, built ? 'report' : kind, !built && kind === 'ask' && !existing, !built && kind === 'design' && !existing);
+    if (!(existsSync(file) && readItems(file).items.some((i: any) => i?.key === m.key))) newReportFields(m, file);
     // Media paths read from the message file's folder, or from the current folder for stdin.
     if (m.kind === 'evidence') sources = mediaFiles(m, from === '-' ? process.cwd() : dirname(resolve(from)));
     // A report's or plan's page is served from the board file's folder, as --view is.
@@ -2162,11 +2181,17 @@ const kindSections = (purpose: string) => REPORT_PARTS[purpose].map(([part, name
 /** report init <folder>: the guided template (report.json, or plan.json with --plan) to fill in, or with --page the older scaffold page and its picture. */
 function report(args: string[]) {
   let parsed;
-  try { parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { plan: { type: 'boolean' }, page: { type: 'boolean' }, purpose: { type: 'string' }, gallery: { type: 'boolean' } } }); } catch (e: any) { throw fail(e.message, 'VALIDATION_ERROR', 'Run `sign-off-axi report --help`'); }
+  try { parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { plan: { type: 'boolean' }, page: { type: 'boolean' }, purpose: { type: 'string' }, gallery: { type: 'boolean' }, project: { type: 'string' }, board: { type: 'string' }, by: { type: 'string' }, from: { type: 'string' } } }); } catch (e: any) { throw fail(e.message, 'VALIDATION_ERROR', 'Run `sign-off-axi report --help`'); }
   const [sub, dir, extra] = parsed.positionals, { plan, page, purpose, gallery } = parsed.values;
-  if (gallery && (plan || page)) throw fail(`--gallery does not go with --${plan ? 'plan' : 'page'}: a gallery is a section of a guided report`, 'VALIDATION_ERROR', 'sign-off-axi report init <folder> --gallery');
-  if (purpose !== undefined && (plan || page)) throw fail(`--purpose does not go with --${plan ? 'plan' : 'page'}: ${plan ? 'a plan is always an implementation plan' : 'a page report has no purpose field'}`, 'VALIDATION_ERROR', 'sign-off-axi report init <folder> --purpose research');
+  if (parsed.values.project !== undefined && sub !== 'kind') throw fail('--project belongs to report kind; a new report carries its project in report.json', 'VALIDATION_ERROR', 'sign-off-axi report kind <key> <kind> --project <name> --by <who>');
+  if (sub === 'kind') return reportKind(parsed.positionals.slice(1), parsed.values);
+  if (parsed.values.board !== undefined || parsed.values.by !== undefined || parsed.values.from !== undefined) throw fail('--board, --by and --from belong to report kind', 'VALIDATION_ERROR', 'sign-off-axi report kind <key> <kind> --by <who>');
+  if (purpose !== undefined && plan) throw fail('--purpose does not go with --plan: a plan is always an implementation plan', 'VALIDATION_ERROR', 'sign-off-axi report init <folder> --plan');
+  if (gallery && (plan || page)) throw fail(`--gallery does not go with --${plan ? 'plan' : 'page'}: a gallery is a section of a guided report`, 'VALIDATION_ERROR', 'sign-off-axi report init <folder> --purpose research --gallery');
   if (purpose !== undefined && !REPORT_PURPOSES.includes(purpose)) throw fail(`--purpose ${purpose} must be one of ${REPORT_PURPOSES.join(', ')}`, 'VALIDATION_ERROR', 'sign-off-axi report init <folder> --purpose research');
+  if (sub === 'init' && !plan && purpose === undefined) {
+    throw fail(`report init needs --purpose <kind>, what the report is for: ${REPORT_PURPOSES.join(', ')}`, 'VALIDATION_ERROR', 'sign-off-axi report init <folder> --purpose research');
+  }
   if (sub !== 'init' || dir === undefined || extra !== undefined || (plan && page)) {
     throw fail(sub !== 'init' ? `unknown report command ${sub ?? '(none)'}` : extra !== undefined ? `unexpected argument ${extra}: report init takes one folder` : plan && page ? '--plan and --page do not go together' : 'report init needs the folder to write the template in', 'VALIDATION_ERROR', 'sign-off-axi report init <folder> [--plan]');
   }
@@ -2190,7 +2215,6 @@ function report(args: string[]) {
       created.push(shellPath(path));
     }
     return toon({ folder: shellPath(out), created: created.length ? created : 'nothing new (re-run is a no-op)', kept }, [
-      ...(plan || purpose ? [] : [`Set "purpose" to what the report is for: ${REPORT_PURPOSES.join(', ')} (or run report init again with --purpose <kind> in a new folder)`]),
       `Replace every FILL: line in ${kind}.json with your own words: the answer first, one picture (bars, steps or tiles), what you understood, then the sections${plan ? ' and the decisions' : ''}`,
       `${plan ? 'A plan' : 'A design or architecture report'} needs one real diagram: a flow or architecture drawing as inline SVG, in light and dark, as "diagram" on the visual (see the skill)`,
       ...(gallery ? ['Save each option\'s screenshots (or pages) under the board file\'s folder, a phone frame 390 wide and a desktop frame 1280 wide, and fill the gallery: its label, model, run time (UTC), and per frame its path from that folder and a caption'] : []),
@@ -2209,9 +2233,38 @@ function report(args: string[]) {
   return toon({ folder: shellPath(out), created: created.length ? created : 'nothing new (re-run is a no-op)', kept }, [
     'Replace every FILL: line: the answer and its picture first, then the diagram, the steps to tap, and the folded detail',
     'Open index.html in a browser 390 px wide and look before posting: mostly text means it is not ready',
-    served ? `Run \`sign-off-axi post ${shellPath(board)} --type report --title "<the answer>" --about "<why it matters>" --view ${rel}/index.html --preview ${rel}/preview.svg\``
-      : `Run \`sign-off-axi post <board.json> --type report --title "<the answer>" --about "<why it matters>" --view <path>/index.html --preview <path>/preview.svg\`, both paths from the board file's folder, which must hold this folder`,
+    served ? `Run \`sign-off-axi post ${shellPath(board)} --type report --purpose ${purpose} --project <name> --title "<the answer>" --about "<why it matters>" --view ${rel}/index.html --preview ${rel}/preview.svg\``
+      : `Run \`sign-off-axi post <board.json> --type report --purpose ${purpose} --project <name> --title "<the answer>" --about "<why it matters>" --view <path>/index.html --preview <path>/preview.svg\`, both paths from the board file's folder, which must hold this folder`,
   ]);
+}
+
+/** report kind <key> <kind> --by <who>, or --from <file>: one `key<TAB>kind<TAB>project` line each, with a note after if you like. Sets the kind and the project of reports posted before every report had one, and records who set it.
+ *  Every key is checked before the first is written, so a bad line changes nothing. */
+function reportKind(given: string[], values: Record<string, any>) {
+  const example = 'sign-off-axi report kind sign-in-flow research --project Beacon --by agent-41', { by, from, project } = values;
+  if (by === undefined || !by.trim() || by.length > 80) throw fail('report kind needs --by <who set it>, in 80 characters or fewer', 'VALIDATION_ERROR', example);
+  if (from !== undefined === given.length > 0) throw fail(from !== undefined ? '--from takes the place of <key> <kind>' : 'report kind needs <key> <kind> --project <name>, or --from <file> with one `key<TAB>kind<TAB>project` line each', 'VALIDATION_ERROR', example);
+  let pairs: string[][] = [[...given, project]];
+  if (from !== undefined) {
+    let text: string;
+    try { text = readFileSync(from, 'utf8'); } catch (e: any) { throw fail(`${from} ${reasonOf(e.code)}`, 'NOT_FOUND', 'Check the path names a readable file'); }
+    pairs = text.split('\n').filter((l) => l.trim() && !l.startsWith('#')).map((l) => l.split('\t').map((x) => x.trim()));
+  }
+  const file = values.board === undefined ? boardHere() : resolve(values.board), items = readItems(file).items, reports = new Map(items.filter((i: any) => i?.kind === 'report').map((i: any) => [i.key, i]));
+  const set = readKinds(file, warn), rows = pairs.map(([key, kind, name, _why, ...rest], n) => {
+    const at = from === undefined ? '' : `${from} line ${n + 1}: `;
+    if (key === undefined || kind === undefined || !name || rest.length) throw fail(`${at}expected <key> <kind> <project>`, 'VALIDATION_ERROR', example);
+    if (!REPORT_PURPOSES.includes(kind)) throw fail(`${at}${kind} is not a report kind: use one of ${REPORT_PURPOSES.join(', ')}`, 'VALIDATION_ERROR', example);
+    if (name.length > 40) throw fail(`${at}project ${name} is over 40 characters`, 'VALIDATION_ERROR', example);
+    const d: any = reports.get(key);
+    if (!d) throw fail(`${at}${key} is not a report on ${tilde(file)}`, 'NOT_FOUND', 'Run `sign-off-axi list` for the keys; a plan is always an implementation plan and needs no kind');
+    for (const [what, has, now] of [['kind', d.purpose, kind], ['project', d.project, name]]) if (has !== undefined && has !== now) throw fail(`${at}${key} already has its ${what} ${has} in the report itself`, 'VALIDATION_ERROR', 'Only a report posted without one is named with report kind');
+    return { key, kind, project: name, same: (d.purpose ?? set.get(key)?.purpose) === kind && (d.project ?? set.get(key)?.project) === name };
+  });
+  const changed = rows.filter((r) => !r.same);
+  for (const r of changed) appendKind(file, r.key, r.kind, r.project, by);
+  return toon({ board: tilde(file), by, changed: changed.length, unchanged: rows.length - changed.length, reports: changed.map(({ key, kind, project }) => ({ key, kind, project })) },
+    [changed.length ? 'The board shows each kind and project on its row and head now' : 'Every report named already had that kind and project']);
 }
 
 /** `notify check|test`: whether device notifications can work from this setup, and one real test notice. Never prints the token. */
@@ -2637,13 +2690,13 @@ const state = () => {
   const rounds = readRounds(file, warn).map(({ comments: _, ...r }) => r);
   // The board file is read once for the whole state: it can hold thousands of items.
   const { extra } = readItems(file), fed = extra.readonly === true || extra.answers_only === true, items = loadDecisions(file);
-  const lines = items.some((d) => d.type === 'design') ? answerLines(file) : [];
+  const lines = items.some((d) => d.type === 'design') ? answerLines(file) : [], kinds = readKinds(file, warn);
   return {
     file,
     mockBase: `/mock/${loopback(bind) ? 'local' : mockPass(tokenOf(file))}/`,
     // Who filed an item stays in the file, except as `by`, the name a card's thread says posted it and took its answer: never a bare session id, which names nobody.
     // A sign-in's start command stays on this host too: the page only learns that a tap makes a new link, and how the last run went.
-    decisions: items.filter((d) => !fakeEvidence(d)).map(({ filer, start, ...d }) => ({ ...d, ...(filer && !SESSION_ID.test(filer) && { by: filer }), ...(plainAsk(d) && guardOf(d) && { guard: guardOf(d) }), ...(d.type === 'design' && answers[d.key]?.answer === 'approve' && { status: 'approved' }), ...(d.type === 'design' && designState(d, answers[d.key], lines)), ...(start && { start: true, run: signinState(d.key) }), evidenceCard: d.evidence ? evidenceCard(d.evidence) : null,
+    decisions: items.filter((d) => !fakeEvidence(d)).map(({ filer, start, ...d }) => ({ ...d, ...(d.kind === 'report' && kinds.has(d.key) && { purpose: d.purpose ?? kinds.get(d.key)!.purpose, project: d.project ?? kinds.get(d.key)!.project, kind_by: kinds.get(d.key)!.by }), ...(filer && !SESSION_ID.test(filer) && { by: filer }), ...(plainAsk(d) && guardOf(d) && { guard: guardOf(d) }), ...(d.type === 'design' && answers[d.key]?.answer === 'approve' && { status: 'approved' }), ...(d.type === 'design' && designState(d, answers[d.key], lines)), ...(start && { start: true, run: signinState(d.key) }), evidenceCard: d.evidence ? evidenceCard(d.evidence) : null,
       ...(d.mocks && { mocks: d.mocks.map((m) => ({ ...m, hash: mockHash(m.path) })) }) })),
     readonly: extra.readonly === true,
     answers_only: extra.answers_only === true,
