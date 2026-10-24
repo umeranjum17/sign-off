@@ -49,6 +49,13 @@ const sized = (w, h) => {
 const procs = [];
 after(async () => {
   // A dying serve removes its own run record; removing the scratch folder under it leaves the folder behind.
+  // Let Chrome flush its profile before deleting it; killing its parent can leave children writing into the removed folder.
+  if (shared?.proc.exitCode === null) {
+    const exited = new Promise((ok) => shared.proc.once('exit', ok));
+    await shared.call('Browser.close');
+    await exited;
+    shared.ws.close();
+  }
   await Promise.all(procs.map((p) => p.exitCode ?? p.signalCode ?? new Promise((ok) => p.once('exit', ok).kill())));
   rmSync(scratch, { recursive: true, force: true });
 });
