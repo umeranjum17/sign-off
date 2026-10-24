@@ -4671,7 +4671,15 @@ test('detail sequence follows the originating list across phone sheets, desk pan
       await key('ArrowLeft'); assert.equal(await evaluate('location.hash'), routes[1]);
       await evaluate('document.activeElement.blur()');
       if (width === 390) {
-        const settled = () => evaluate(`Promise.all(document.getAnimations().filter(a => a.playState === 'running' && a.effect.getTiming().iterations !== Infinity).map(a => a.finished.catch(() => {})))`);
+        const settled = () => evaluate(`(async () => {
+          await Promise.all(document.getAnimations().filter(a => a.playState === 'running' && a.effect.getTiming().iterations !== Infinity).map(a => a.finished.catch(() => {})));
+          // Native fling momentum is not a CSS animation: wait for scroll position to stop changing too.
+          const sheet = document.querySelector('.ask-sheet'); let top = sheet.scrollTop, quiet = performance.now();
+          await new Promise(resolve => { const frame = now => {
+            if (sheet.scrollTop !== top) { top = sheet.scrollTop; quiet = now; }
+            if (now - quiet >= 120) resolve(); else requestAnimationFrame(frame);
+          }; requestAnimationFrame(frame); });
+        })()`);
         await settled();
         await evaluate('document.querySelector("#ask-title").scrollIntoView({ block: "center" })');
         await settled();
@@ -4683,9 +4691,12 @@ test('detail sequence follows the originating list across phone sheets, desk pan
         await swipe({ x: 200, y: 550 }, { x: 205, y: 300 });
         await until(async () => (await evaluate('document.querySelector(".ask-sheet").scrollTop')) > top);
         assert.equal(await evaluate('location.hash'), routes[1]);
+        await settled(); // Let the native vertical fling end before resetting the position for another gesture.
         await evaluate('document.querySelector("#ask-title").scrollIntoView({ block: "center" })');
         await settled();
+        await evaluate('new Promise(requestAnimationFrame)');
         const sy = await evaluate('document.querySelector("#ask-title").getBoundingClientRect().top + 12');
+        assert.equal(await evaluate(`!!document.elementFromPoint(320, ${sy})?.closest('.ask-sheet')`), true, 'the post-scroll swipe starts on the sheet');
         await swipe({ x: 320, y: sy }, { x: 70, y: sy });
         await until(async () => (await evaluate('location.hash')) === routes[2]);
         await settled();
