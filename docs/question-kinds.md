@@ -121,7 +121,7 @@ answer like a decision.
 `post --type report` posts an explainer page the user reads, with no answer:
 something they asked to have explained, or a concept, design or trade-off
 they must understand. `sign-off-axi report init <folder> --page` writes the older HTML page to
-fill (the default `report init` writes a guided `report.json` the board draws itself: see the contract's report schema 3), one self-contained `.html` file, phone first, light and dark: the
+fill (the default `report init` writes a guided `report.json` the board draws itself, with the kit's `blocks`: see the contract's report schema 5; a page of your own is refused at its first post when it draws its own palette or a card inside a card), one self-contained `.html` file, phone first, light and dark: the
 answer in one plain sentence with a picture and an as-of line naming the
 date the facts were true, then a diagram, then steps the reader taps
 through, then the detail folded. Reports lists each one as a row of a

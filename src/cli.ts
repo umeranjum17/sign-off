@@ -395,7 +395,7 @@ Numbers sit behind a Details tap; every part has a Go deeper button that asks yo
 Replace every FILL: line, then post it: post --kind report --from <folder>/report.json, or post --kind plan --from <folder>/plan.json --filer <your id>.
 A report is for an explanation the user asked for, or a concept, design or trade-off they must understand. Proof that something works is evidence.
 --gallery adds a gallery to the first section: a design output's options, each with its model, run time and a phone and a desktop frame (an image or page, as a path from the board file's folder), which the board draws as a swipeable strip with each frame opening full size.
---page (with --purpose) writes the older scaffold page instead, for a report that needs a page of its own (report schema 2); post it with --type report --purpose <kind>. It is:
+--page (with --purpose) writes the older scaffold page instead, for a demo to tap that no block of the kit can show (report schema 2); post it with --type report --purpose <kind>. The board owns the colours: post refuses a page that writes out three or more colours of its own, or draws a card inside a card, on its first post. It is:
 Writes a report page to fill: <folder>/index.html and its card picture <folder>/preview.svg. A file already there is kept.
 The page is one self-contained file, phone first, light and dark, in four parts, each one idea:
   1. the answer in one plain sentence and a picture of it   2. a diagram of how it works
@@ -1622,7 +1622,7 @@ async function postKind(file: string, named: string, on: string, values: Record<
     // Media paths read from the message file's folder, or from the current folder for stdin.
     if (m.kind === 'evidence') sources = mediaFiles(m, from === '-' ? process.cwd() : dirname(resolve(from)));
     // A report's or plan's page is served from the board file's folder, as --view is.
-    if ((m.kind === 'report' || m.kind === 'plan') && !guided(m)) reportPage(m, dirname(file));
+    if ((m.kind === 'report' || m.kind === 'plan') && !guided(m)) reportPage(m, dirname(file), !(existsSync(file) && readItems(file).items.some((i: any) => i?.key === m.key)));
     if (guided(m)) { diagramPages(m, dirname(file)); for (const w of kitWarnings(m)) process.stderr.write(`warning: ${name}: ${w}\n`); }
     if (m.kind === 'design') designFiles(m, dirname(file));
   } catch (e) { throw e instanceof ContractError ? fail(`${name}: ${e.message}`, 'VALIDATION_ERROR', e.help) : e; }

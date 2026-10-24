@@ -1628,3 +1628,33 @@ test('report kind names the reports posted before every report had a kind: all l
   assert.match(stored.stdout, /has-kind already has its kind audit in the report itself/);
   assert.equal(run('plan-key', 'status', '--project', 'Muxr', '--by', 'agent-41', '--board', board).status, 1);
 });
+
+test('a page report is held to the board\'s look at its first post: its own palette or a card inside a card is refused, a report already on the board is not', () => {
+  const env = { ...process.env, HOME: join(scratch, 'home') };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.SIGN_OFF_FILER;
+  const dir = join(scratch, 'page-look'), board = join(dir, 'board.json'), page = join(dir, 'how', 'index.html');
+  const cli2 = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  assert.equal(cli2('report', 'init', join(dir, 'how'), '--page', '--purpose', 'other').status, 0);
+  for (const f of ['index.html', 'preview.svg']) fill(join(dir, 'how', f));
+  const flags = ['--type', 'report', '--purpose', 'other', '--project', 'Muxr', '--title', 'How sign-in works', '--about', 'Two steps now.', '--view', 'how/index.html', '--preview', 'how/preview.svg'];
+  const scaffold = readFileSync(page, 'utf8');
+  // The scaffold draws no colour of its own and no card in a card, so it posts as it is.
+  const palette = scaffold.replace('</style>', '.x { color: #0066CC; background: #E6F1FC; border-color: #17702F; } </style>');
+  const nested = scaffold.replace('</style>', '.pane { border: 1px solid; border-radius: 12px; } .tile { background: Canvas; border-radius: 1rem; } </style>').replace('<main>', '<main><div class="pane"><div class="tile"></div></div>');
+  for (const [html, error] of [[palette, /draws its own colour palette \(#0066cc, #e6f1fc, #17702f\)/], [nested, /puts a card inside a card \(\.tile in \.pane\)/]]) {
+    writeFileSync(page, html);
+    const refused = cli2('post', board, ...flags);
+    assert.equal(refused.status, 2, refused.stdout);
+    assert.match(refused.stdout, error);
+    assert.match(refused.stdout, /Draw the report with the board's own blocks instead/);
+    assert.equal(existsSync(board), false);
+  }
+  writeFileSync(page, scaffold);
+  assert.equal(cli2('post', board, ...flags).status, 0);
+  // A report filed before the rule stays filed: the same report posts again as already posted, and the board loads it.
+  writeFileSync(page, palette);
+  const again = cli2('post', board, ...flags);
+  assert.equal(again.status, 0, again.stdout);
+  assert.match(again.stdout, /how-sign-in-works,already posted/);
+});

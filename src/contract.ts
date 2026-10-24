@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { accessSync, constants, readFileSync, realpathSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { CAPTION_MAX, EVIDENCE_STATUSES, GUARDS, isKey, MEDIA_MAX, PRIORITIES, REPORT_FORMS, REPORT_PARTS, REPORT_PURPOSES } from './store.js';
+import { nestedCard, ownColours } from './pagestyle.js';
 
 /** A message that does not match: what is wrong, and the one line that says how to fix it. */
 export class ContractError extends Error {
@@ -54,6 +55,7 @@ const KIT_TONES = ['note', 'warn', 'ask'];
 export const MEDIA_BYTES = 50_000_000;
 /** The command that makes a report's page, named in every refusal of a report without one. */
 export const REPORT_INIT = 'sign-off-axi report init <folder>';
+const KIT_HELP = `Draw the report with the board's own blocks instead: run \`${REPORT_INIT} --purpose <kind>\` and add \`blocks\` to a section (callout, beats, video, table, compare, evidence). A page of your own may use the system colours (Canvas, CanvasText, GrayText) and no cards`;
 const PAGE_HELP = `Run \`${REPORT_INIT} --page\` to make the page, fill it, then post it with "view" and "preview"`;
 const GUIDE_HELP = `Run \`${REPORT_INIT}\` to write report.json, fill every FILL: line, then post it with \`post --kind report --from <folder>/report.json\``;
 
@@ -770,7 +772,7 @@ export function diagramPages(m: any, base: string): void {
 const BLOCK_CHARS = 240;
 /** A report's or plan's page, and a report's picture, from `base`, the board file's folder: each a file of 5 MB or less
  * whose real path stays inside that folder, and a page filled in the ladder shape the scaffold gives. The first broken rule throws. */
-export function reportPage(m: any, base: string): void {
+export function reportPage(m: any, base: string, fresh = false): void {
   const at = isKey(m.key) ? `key ${m.key}: ` : '';
   // A board not made yet has no folder, so its page is not there either.
   let root = resolve(base);
@@ -797,6 +799,13 @@ export function reportPage(m: any, base: string): void {
   if (m.kind !== 'plan' && !/<(button|input|select)\b/i.test(html)) throw bad(`${page} has nothing to tap or slide, so it is text, not a report`, 'Add a demo the reader can tap through, such as the scaffold\'s steps with Back and Next');
   if (m.kind !== 'plan' && !/<details\b/i.test(html)) throw bad(`${page} has no folded detail`, 'Fold the detail into <details><summary>Details</summary>...</details> at the end');
   if (/<(script|img|iframe|link|video|audio|source)\b[^>]*\b(src|href)\s*=\s*["']?\s*(https?:)?\/\//i.test(html)) throw bad(`${page} loads something from the web, which the board blocks`, 'Put scripts, styles and pictures in the page or beside it');
+  // The look rules bind a report posted for the first time: one already on the board is shown as it was filed, and is re-rendered through the kit instead.
+  if (fresh) {
+    const colours = ownColours(html);
+    if (colours.length > 2) throw bad(`${page} draws its own colour palette (${colours.slice(0, 4).join(', ')}${colours.length > 4 ? ', ...' : ''}), but the board owns the colours`, KIT_HELP);
+    const nested = nestedCard(html);
+    if (nested) throw bad(`${page} puts a card inside a card (${nested}), but the board draws one level of card at most`, KIT_HELP);
+  }
   // A block is one paragraph or list item; about five lines on a phone is the most a reader takes in at once.
   const long = [...html.matchAll(/<(p|li|dd|blockquote)\b[^>]*>([\s\S]*?)<\/\1>/gi)].map((b) => b[2].replace(/<[^>]*>/g, '').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim())
     .find((t) => [...t].length > BLOCK_CHARS);
