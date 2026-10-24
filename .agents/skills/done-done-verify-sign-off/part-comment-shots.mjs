@@ -64,7 +64,7 @@ const capture = (name, claim, extra = {}) => {
   const dom = page(`() => { const w = document.documentElement.clientWidth; return { overflow: document.documentElement.scrollWidth > w, overflowing: [...document.querySelectorAll('#reader *')].filter(e => e.getClientRects().length && e.getBoundingClientRect().right > w + 1).slice(0, 10).map(e => e.tagName.toLowerCase() + '.' + e.className) }; }`);
   assert.equal(dom.overflow, false); assert.deepEqual(dom.overflowing, []);
   const squashed = page(`() => { const ctx = document.createElement('canvas').getContext('2d'), out = []; for (const e of document.querySelectorAll('#reader *')) { const nodes = [...e.childNodes].filter(n => n.nodeType === 3 && n.data.trim()), text = nodes.map(n => n.data).join(' ').trim(), s = getComputedStyle(e); if (!(e instanceof HTMLElement) || !text || !e.getClientRects().length || e.offsetWidth <= 1 || s.visibility !== 'visible') continue; ctx.font = s.fontStyle + ' ' + s.fontWeight + ' ' + s.fontSize + ' ' + s.fontFamily; const chars = e.offsetWidth / (ctx.measureText('abcdefghijklmnopqrstuvwxyz').width / 26), tops = new Set(); for (const n of nodes) { const r = document.createRange(); r.selectNodeContents(n); for (const b of r.getClientRects()) if (b.width) tops.add(Math.round(b.top)); } if ((chars < 8 && ctx.measureText(text).width > e.offsetWidth + 1) || tops.size > text.split(/\\s+/).length) out.push({element: e.tagName.toLowerCase(), text, chars, lines: tops.size, words: text.split(/\\s+/).length}); } return out; }`);
-  writeFileSync(join(out, `${stem}.dom.json`), JSON.stringify({ url: page('() => location.href'), ...dom, console_errors: [], failed_requests: [], squashed_text: squashed }, null, 2));
+  writeFileSync(join(out, `${stem}.dom.json`), JSON.stringify({ state: name, url: page('() => location.href'), ...dom, console_errors: [], failed_requests: [], squashed_text: squashed }, null, 2));
 
   writeFileSync(join(records, `${stem}.network.txt`), browser('network'));
   const errors = browser('console', '--type', 'error');
@@ -123,25 +123,30 @@ try {
   // Hold the real request at the browser boundary, as on a slow connection. The first attempt loses its connection.
   drive(`await page.eval(() => { const real = window.realCommentFetch ??= window.fetch; window.fetch = (url, options) => url === '/api/annotations' ? new Promise((ok, no) => { window.releaseComment = () => ok(real(url, options)); window.failComment = () => no(new Error('Connection interrupted')); }) : real(url, options); });`);
   const feedback = `[data-send-feedback="bar:${KEY}"]`;
-  const instant = page(`() => { document.querySelector('#sheet .ra-send').click(); return document.querySelector('${feedback}')?.textContent; }`);
-  assert.equal(instant, 'Sending…', 'Send must answer in the same frame');
-  capture('comment-sending', 'Send answers immediately with Sending…, before the real request completes.');
+  // Send itself changes in the frame it is tapped: a spinner and Sending inside it; the words stay in view, locked; no grey line outside the box.
+  const instant = page(`() => { const b = document.querySelector('#sheet .ra-send'); b.click(); const t = document.querySelector('#sheet .ra-form textarea'); return { label: b.textContent, spin: !!b.querySelector('.ra-spin'), busy: b.getAttribute('aria-busy'), locked: t.readOnly, kept: t.value, line: getComputedStyle(document.querySelector('${feedback}')).display }; }`);
+  assert.deepEqual(instant, { label: 'Sending', spin: true, busy: 'true', locked: true, kept: TEXT, line: 'none' }, 'Send must answer in the same frame');
+  capture('comment-sending', 'Send answers at once: a spinner and Sending inside the button, the words kept in view but locked.');
   drive(`await page.eval(() => window.failComment()); await nap(200);`);
-  assert.match(page(`() => document.querySelector('${feedback}').textContent`), /Not sent · Connection interrupted.*Retry/);
-  assert.equal(page(`() => document.querySelector('#sheet .ra-form textarea').value`), TEXT);
-  capture('comment-not-sent', 'Not sent gives the connection error and Retry, keeping all the words.');
+  // Not sent: a red-tinted line in the box with the cause, and Retry is a button (not an underlined link); the words are kept and editable.
+  const failed = page(`() => { const l = document.querySelector('${feedback}'), r = l.querySelector('button'), t = document.querySelector('#sheet .ra-form textarea'); return { text: l.textContent, retry: r?.tagName, underline: r && getComputedStyle(r).textDecorationLine, tint: getComputedStyle(l).backgroundColor, kept: t.value, locked: t.readOnly, label: document.querySelector('#sheet .ra-send').textContent }; }`);
+  assert.match(failed.text, /Not sent · Connection interrupted.*Retry/); assert.equal(failed.retry, 'BUTTON'); assert.equal(failed.underline, 'none');
+  assert.ok(failed.tint !== 'rgba(0, 0, 0, 0)', 'the line is tinted'); assert.deepEqual([failed.kept, failed.locked, failed.label], [TEXT, false, 'Send to the agent']);
+  capture('comment-not-sent', 'Not sent: a red-tinted line in the box with the cause and Retry as a button, the words kept.');
   click(`${feedback} button`);
-  assert.equal(page(`() => document.querySelector('${feedback}').textContent`), 'Sending…');
-  drive(`await page.eval(() => window.releaseComment()); await wait('.gd-act .ra-e'); await nap(300);`);
+  assert.equal(page(`() => document.querySelector('#sheet .ra-send').textContent`), 'Sending');
+  drive(`await page.eval(() => window.releaseComment()); await wait('[data-part="${PART}"] .gd-thread .gd-cmt'); await nap(400);`);
+  // Sent: the box closes and the comment is a bubble under its part, in view, with Sent under it; Activity has it too.
+  const bubble = page(`() => { const c = document.querySelector('[data-part="${PART}"] .gd-thread .gd-cmt'), r = c.getBoundingClientRect(); return { text: c.querySelector('p').textContent, track: [...c.querySelectorAll('.ui-trail li.on b')].map((b) => b.textContent).join(), inView: r.top >= 0 && r.bottom <= innerHeight, boxOpen: !!document.querySelector('#sheet[open]') }; }`);
+  assert.deepEqual(bubble, { text: TEXT, track: 'Sent', inView: true, boxOpen: false });
   assert.ok(page(`() => document.querySelector('.gd-act').textContent.includes(${JSON.stringify(TEXT)})`), 'The report Activity updates immediately');
-  assert.match(page(`() => document.querySelector('.ra-note').textContent`), /^Sent to the agent \d\d:\d\d/);
-  capture('comment-receipt', 'Sent: the box closes, the bar says Sent to the agent with the time, and the comment is already in the report Activity.');
+  capture('comment-receipt', 'Sent: the box closes and the comment sits in place under its part as a bubble with Sent.');
   const raw = readFileSync(join(dir, 'board.annotations.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
   assert.equal(raw.length, 1); assert.deepEqual([raw[0].key, raw[0].part, raw[0].verdict, raw[0].text], [KEY, PART, 'disagree', TEXT]);
   assert.equal(page(`() => document.querySelector('.ra-b.disagree').getAttribute('aria-pressed')`), 'true');
   if (mobile) click('.ra-actb');
   drive(`await wait('.gd-act .ra-e');`);
-  capture('comment-sent', 'Activity shows the comment with its track at Sent, and Disagree shows as chosen.', { saved_line: raw[0] });
+  capture('comment-sent', 'Activity shows the comment with its track at Sent, and Disagree shows as chosen.', { saved_line: { part: raw[0].part, about: raw[0].about, verdict: raw[0].verdict, text: raw[0].text } });
   }
   if (process.env.SEND_FEEDBACK_ONLY) {
     // Every composer uses the same pending/receipt/retry path; transport faults never reach the real server.
@@ -201,7 +206,7 @@ try {
       }
       writeFileSync(join(pairs, `reference.${theme}.${width}w.txt`), 'Approved source: ' + resolve(process.env.COMMENT_PROTO) + '\nPaired report, ask and evidence. The supplied prototype has no Designs view and no Sending/Not sent state.\n');
     }
-    writeFileSync(join(out, `send-regression.${theme}.${width}w.json`), JSON.stringify({ report: 'Sending in same frame; failure preserves text; Retry saves exactly once; clears box; Activity updates', composers: cases.map(c => c[0]), result: process.env.SEND_FEEDBACK_BEFORE ? 'BEFORE' : 'PASS' }, null, 2));
+    writeFileSync(join(out, `send-regression.${theme}.${width}w.json`), JSON.stringify({ theme, width, report: 'Sending in same frame; failure preserves text; Retry saves exactly once; clears box; Activity updates', composers: cases.map(c => c[0]), result: process.env.SEND_FEEDBACK_BEFORE ? 'BEFORE' : 'PASS' }, null, 2));
   }
   if (!process.env.SEND_FEEDBACK_ONLY) {
   // The author agent takes it with wait --filer, then replies; the page follows.

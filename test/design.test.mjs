@@ -1354,6 +1354,9 @@ test('a guided report acts from one place: the parts carry no buttons or receipt
     await evaluate(`(() => { const t = document.querySelector('#sheet textarea'); t.value = 'Pin it to 2.4.'; t.dispatchEvent(new Event('input')); document.querySelector('#sheet .ra-send').click(); })()`);
     await until(() => saved().length === 2);
     assert.deepEqual(saved().map(({ part, verdict, text }) => [part, verdict, text]).at(-1), ['steps', undefined, 'Pin it to 2.4.']);
+    // The comment is a bubble in place under its part with Sent under it, not only a line in Activity; the box is closed and Send is itself again.
+    await until(async () => (await evaluate(`(() => { const c = document.querySelector('[data-part="steps"] .gd-thread .gd-cmt'); return c ? c.querySelector('p').textContent + '|' + [...c.querySelectorAll('.ui-trail li.on b')].map((b) => b.textContent).join() : ''; })()`)) === 'Pin it to 2.4.|Sent');
+    assert.equal(await evaluate(`!document.querySelector('#sheet[open]')`), true);
     // Activity lists both, newest first, each naming its part.
     await until(async () => (await evaluate(`[...document.querySelectorAll('.gd-act .ra-e')].filter((e) => e.querySelector('.ra-chip')?.textContent === 'Two steps').map((e) => e.querySelector('.ra-eh b').textContent).join('|')`)) === 'You commented|You agreed');
     // Nothing sits under the bar at 390, and at 1280 and 1440 with Activity open as a column: it sits under the scroll, never over it; and every track label in Activity is whole, under its own dot, clear of the next.
