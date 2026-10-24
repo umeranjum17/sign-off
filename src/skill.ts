@@ -167,13 +167,16 @@ Pick the block by what the reader must see:
 | \`callout\` | one thing set apart: a caveat, a warning, a question | \`tone\` (\`note\`, \`warn\` or \`ask\`), \`title\` (60), \`text\` (280) |
 | \`beats\` | a sequence the reader steps through: a film's scenes, a flow | \`beats\`, 2 to 12, each \`image\`, \`time\`, \`title\` (80), \`text\` (280) |
 | \`video\` | a short film | \`src\` (.mp4 or .webm, 50 MB), \`poster\`, \`length\`, \`caption\` |
-| \`table\` | the same measures for 2 or more options | \`columns\` (2 to 5), \`rows\` (up to 30, one cell per column, 120 each) |
+| \`image\` | a neutral reference image, without a verdict | \`src\`, \`caption\` (280), optional \`alt\` (280); the whole image keeps its aspect ratio |
+| \`file\` | a local file to download | \`src\` (any file up to 5 MB), \`caption\` (280), pinned like media; downloaded as an attachment |
+| \`table\` | original measures, including irregular tables | \`columns\` (1 to 20), \`rows\` (up to 30); cells are text (120) or \`{text, colspan, rowspan}\`; keep empty cells and ragged rows as authored. Wide or irregular tables scroll inside the block on a phone |
 | \`compare\` | before and after | \`before\` and \`after\`, each \`image\` and \`caption\` (80) |
 | \`evidence\` | captures with a state for each | \`rows\`, each \`image\`, \`title\`, \`note\`, \`status\` (\`fixed\`, \`progress\` or \`waiting\`) |
 
 - One idea per block, one block per point; a table beats three paragraphs of numbers, and a stepper beats a numbered list of screens.
 - Say something new in each part. Post warns, and does not refuse, when a section's first paragraph repeats \`about\`.
 - Options a model made are a gallery, not a row of pictures: see the design-output rule above. \`gallery\` and \`blocks\` can share a section, the gallery first.
+- File paths stay inside the board folder, with no \`..\`, \`?\`, \`#\` or backslash. Posting pins their bytes; a changed file is unavailable until re-posted.
 - Images are .png, .jpg, .jpeg or .webp; a path has no \`..\`, \`?\`, \`#\` or backslash.
 - Sentence case in every heading and label; no capitals shouted, no colour words, no markup in any field.
 - A page of your own (\`report init --page\`) is held to the board's look at its first post: post refuses one that writes out three or more colours of its own or draws a card inside a card, and says to use blocks. The scaffold already draws neither; keep to the system colours (Canvas, CanvasText, GrayText). A report already on the board stays as it was filed.
