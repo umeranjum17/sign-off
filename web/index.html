@@ -1624,7 +1624,7 @@
   @keyframes tk-fade { from { opacity: 0; } }
   body:has(.tk-sheet) { overflow: hidden; }
   .tk-sheet .grab { width: 2.25rem; height: 0.25rem; margin: 0.5rem auto; border-radius: 2px; background: var(--tk-line); }
-  .tk-release { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tk-release { display: inline-block; width: auto; max-width: 110px; padding: 0 6px; background: var(--tk-sunk); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* The ticket: its project and state (with Close on a phone), its title in full, its properties, the tickets under it, Linked and Activity. */
   .tk-shd { display: flex; align-items: center; gap: 0.5rem; min-height: 2.5rem; }
   .tk-shd p { display: flex; flex: 1; align-items: center; gap: 0.5rem; min-width: 0; margin: 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: 1.5rem; }
@@ -3039,7 +3039,7 @@
         up ? prop('layers', 'Part of', el('a', { href: `#ticket/${up.id}`, dir: 'auto' }, up.title)) : '',
         prop('clock', 'Last update', el('span', {}, stamp(t.at)))),
       ...(kids.length ? [el('p', { class: 'ui-dl' }, `${tkAbove(t).length ? 'Sub-tasks' : 'Tickets in this epic'} · ${done} of ${kids.length} done`), el('ul', { class: 'ui-list tk-in' }, ...kids.map(tkRow))] : []),
-      el('p', { class: 'ui-dl' }, 'Linked'), cards.length || t.prs?.length ? el('ul', { class: 'ui-list tk-in' }, ...(t.prs ?? []).map((url) => el('li', {}, el('a', { class: 'ui-row', href: url, target: '_blank', rel: 'noopener noreferrer' }, ...uiRow({ tile: el('span', { class: 'ui-icon', 'aria-hidden': 'true' }, glyph('link')), title: url, meta: 'Pull request' })))), ...cards.map(linked)) : el('p', { class: 'tk-none' }, 'No card names this ticket yet.'),
+      el('p', { class: 'ui-dl' }, 'Linked'), cards.length || t.prs?.length ? el('ul', { class: 'ui-list tk-in' }, ...(t.prs ?? []).map((url) => { const pr = /\/pull\/(\d+)\/?$/.exec(new URL(url).pathname); return el('li', {}, el('a', { class: 'ui-row', href: url, title: url, target: '_blank', rel: 'noopener noreferrer' }, ...uiRow({ tile: el('span', { class: 'ui-icon', 'aria-hidden': 'true' }, glyph('link')), title: pr ? `Pull request #${pr[1]}` : url, meta: pr ? new URL(url).pathname.replace(/\/pull\/.*$/, '').slice(1) : 'Pull request' }))); }), ...cards.map(linked)) : el('p', { class: 'tk-none' }, 'No card names this ticket yet.'),
       // The person's comments on it (made in the fleet dashboard), oldest first, each with how far it got and the lead's reply.
       ...(said.length ? [el('p', { class: 'ui-dl' }, 'Your comments'), ...said.map((c) => el('div', { class: 'tk-said' }, el('p', { dir: 'auto' }, c.said), trailTrack(c)))] : []),
       thread(t, steps, 1)];

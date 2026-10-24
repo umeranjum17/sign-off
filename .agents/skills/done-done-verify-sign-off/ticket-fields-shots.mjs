@@ -25,9 +25,12 @@ try {
     browser('open', `${base}#ticket/release`);
     browser('resize', String(width), width === 390 ? '844' : '800');
     browser('eval', `() => { localStorage.setItem('so-theme', '${theme}'); location.reload(); }`);
-    browser('wait', '1000');
+    browser('wait', 'Ship the owner board sync');
     const facts = browser('eval', `() => { const pane = document.querySelector('.tk-sheet, .tk-pane'); return { release: pane.querySelector('.tk-release')?.textContent, prs: [...pane.querySelectorAll('.tk-in a[target]')].map(a => a.href), overflow: document.documentElement.scrollWidth > innerWidth, text: pane.innerText }; }`);
     writeFileSync(join(out, `ticket.${theme}.${width}.txt`), facts);
+    const measured = JSON.parse(JSON.parse(facts.split('\n')[0].slice('result: '.length)));
+    assert.equal(measured.overflow, false, 'no sideways overflow');
+    writeFileSync(join(out, `ticket.${theme}.${width}.dom.json`), JSON.stringify(measured, null, 2));
     if (side === 'after') { assert.ok(facts.includes('0.6.1')); assert.ok(facts.includes('https://github.com/umeranjum17/sign-off/pull/2')); }
     browser('screenshot', join(out, `ticket.${theme}.${width}.png`));
     writeFileSync(join(out, `console.${theme}.${width}.txt`), browser('console', '--type', 'error'));
