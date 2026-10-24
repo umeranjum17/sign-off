@@ -113,7 +113,8 @@ try {
     assert.equal(await download.text(), '# The original report\n');
     documentState.href = 'pinned local file (download verified)';
     writeFileSync(join(records, `documents.${theme}.${width}w.json`), JSON.stringify(documentState));
-    capture('documents', 'The original image and caption, a link to the pinned full report, and the original ragged table with spans; the table scrolls inside the block on a phone.');
+    if (!phone) toTop('.kt-file');
+    capture('documents', phone ? 'A neutral reference image with its caption and a pinned file link, above an original ragged table that scrolls inside its block.' : 'The reference caption and pinned file link, above the original ragged table with spans.');
     if (phone) {
       drive('await page.eval(() => { const e = document.querySelector(".kt-scroll"); e.scrollLeft = e.scrollWidth; });');
       assert.ok(ask(() => document.querySelector('.kt-scroll').scrollLeft) > 0);
