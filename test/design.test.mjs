@@ -941,9 +941,9 @@ test('each card has one place to type: Add a comment holds the note sent with th
   assert.match(reports, /<div class="dl-act yes" aria-hidden="true">.*?<span>Read<\/span><\/div><div class="dl-act later" aria-hidden="true">.*?<span>Archive<\/span><\/div>/s);
   // Only the report is a row and counted; the text-only one is folded under Notes, a short row with no page to open.
   assert.deepEqual([...reports.matchAll(/<li class="report dl-row" style="--n:\d+" data-key="(\w+)"/g)].map((m) => m[1]), ['how']);
-  // The sidebar counts what is new under its short name; the phone's tab bar marks Reports as the area on screen and carries a blue count.
-  assert.match(reports, /<\/svg><\/span>Reports<span class="n blue">1<\/span>/);
-  assert.match(reports, /<a href="#reports" aria-label="Reports, 1 new" aria-current="page"><span class="icon i-tab-reports" aria-hidden="true">.*?<\/span><span class="bd blue" aria-hidden="true">1<\/span><\/a>/);
+  // The sidebar counts what is new under its short name; the phone's tab bar marks Reports as the area on screen and carries an ink count.
+  assert.match(reports, /<\/svg><\/span>Reports<span class="n ink">1<\/span>/);
+  assert.match(reports, /<a href="#reports" aria-label="Reports, 1 new" aria-current="page"><span class="icon i-tab-reports" aria-hidden="true">.*?<\/span><span class="bd ink" aria-hidden="true">1<\/span><\/a>/);
   assert.match(reports, /<details class="other notes"><summary>Notes \(1\)<\/summary>.*<strong dir="auto">Merged: the sign-in fix<\/strong>/s);
   // On a phone, a tap on the card opens the report in a sheet over the list with the focus on its title; the board under it takes no taps.
   // Close goes back to the card with the focus on its link, and Escape closes it too.
@@ -974,12 +974,12 @@ test('each card has one place to type: Add a comment holds the note sent with th
     await until(async () => (await evaluate('location.hash + reader.hidden')) === '#reportstrue');
     // Opening it read it, beside the board: back on the list its row reads 100%, nothing is still to read and the tab bar's count is gone.
     const reads = () => readFileSync(file.replace(/\.json$/, '.reads.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).map(({ key, read }) => [key, read]);
-    await until(async () => (await evaluate('[document.querySelector("#item-how .pct").textContent, document.querySelector(".rp-hero .big").textContent, !!document.querySelector(".tabs .bd.blue")].join()')) === '100%,0 of 1,false');
+    await until(async () => (await evaluate('[document.querySelector("#item-how .pct").textContent, document.querySelector(".rp-hero .big").textContent, !!document.querySelector(".tabs .bd.ink")].join()')) === '100%,0 of 1,false');
     assert.deepEqual(reads(), [['how', true]]);
     // A swipe right marks it unread again (its bar empties and the count comes back); a swipe left archives it, and Undo puts it back.
     const y = await evaluate('(() => { const r = document.querySelector("#item-how").getBoundingClientRect(); return r.y + 30; })()');
     await swipe({ x: 40, y }, { x: 360, y });
-    await until(async () => (await evaluate('[document.querySelector("#item-how .pct").textContent, document.querySelector(".tabs .bd.blue")?.textContent, document.getElementById("toast-text").textContent].join()')) === '0%,1,Marked unread: How it ships');
+    await until(async () => (await evaluate('[document.querySelector("#item-how .pct").textContent, document.querySelector(".tabs .bd.ink")?.textContent, document.getElementById("toast-text").textContent].join()')) === '0%,1,Marked unread: How it ships');
     assert.deepEqual(reads(), [['how', true], ['how', false]]);
     await swipe({ x: 360, y }, { x: 30, y });
     await until(async () => (await evaluate('[!document.querySelector("#item-how"), document.getElementById("toast-text").textContent].join()')) === 'true,Archived: How it ships');
@@ -3813,5 +3813,121 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     assert.equal(await evaluate(tkThread), [...steps].reverse().map((x) => `${x} Ship the settings page on Friday?`).join(' | '));
     assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
   } finally { close(); }
+  proc.kill();
+});
+
+// The approved prototype's palette (mocks/signoff-proto-3/index.html): every colour its :root and dark blocks define, and the few it writes in place
+// (the dock's Search, a count's white, the toast button's tint, the up arrow's green, the warn amber), each theme its own.
+const PROTO = {
+  light: ['#E8E4E0', '#F3F3F0', '#FFFFFF', '#FBFBFA', '#EAE7E3', '#121210', '#21211E', '#6E6E6B', '#8A8A86', '#AAAAAA', '#E5E3DE', '#2D2D2A', '#D3CCC9', '#E6E2DE', '#DCD8D4',
+    'rgba(255,255,255,0.75)', '#D7372B', '#F6DCD8', '#B42318', '#F5E6CF', '#8F4E08', '#E6E3DE', '#4F4B46', '#ECEAE6', '#85817B', 'rgba(30,24,18,0.28)',
+    'rgba(60,40,20,0.05)', 'rgba(60,40,20,0.045)', 'rgba(40,30,20,0.1)', 'rgba(40,30,20,0.06)', 'rgba(40,30,20,0.08)', 'rgba(40,30,20,0.05)', 'rgba(30,20,10,0.12)',
+    'rgba(20,16,12,0.25)', 'rgba(0,0,0,0.2)', 'rgba(255,255,255,0.14)', '#262624', '#2BB673', '#C8841A'],
+  dark: ['#131210', '#1E1D1A', '#2A2825', '#34322E', '#262421', '#F4F2EE', '#E9E6E1', '#A9A49D', '#827D76', '#6C6863', '#2F2D2A', '#ECE9E4', '#55514C', '#2B2926', '#2E2C29',
+    'rgba(255,255,255,0.05)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.45)', 'rgba(0,0,0,0.5)', '#FF6B5E', 'rgba(255,107,94,0.16)', '#FF8E84', 'rgba(242,166,72,0.15)', '#F2B262', '#CFCAC3',
+    '#2C2A27', '#9C978F', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.2)', 'rgba(30,20,10,0.12)', 'rgba(20,16,12,0.25)', '#FFFFFF', '#2BB673', '#C8841A'],
+};
+/** Every colour the page draws, as `colour  where`, read from each shown element's computed style (and its ::before, ::after and placeholder):
+ * text that has words, a ground, a drawn border or outline, a shadow, a gradient, an icon's fill and stroke, a native control's accent. A colour with no alpha left is skipped. */
+const drawnColours = `(() => {
+  const seen = new Map();
+  // A computed colour as its rgb channels (0-255) and alpha: rgb(), rgba() and a color-mix()'s color(srgb ...).
+  const norm = (c) => { const n = c.match(/-?[\\d.]+(e-?\\d+)?/g).map(Number), srgb = c.startsWith('color('), [r, g, b] = n.slice(0, 3).map((x) => Math.round(srgb ? x * 255 : x)), a = n[3] ?? 1;
+    return a === 0 ? null : a === 1 ? '#' + [r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('').toUpperCase() : 'rgba(' + [r, g, b, +a.toFixed(3)].join(',') + ')'; };
+  const name = (el) => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + [...el.classList].slice(0, 3).map((c) => '.' + c).join('');
+  // A gradient's stops fade a colour toward clear, so a stop counts by its colour alone.
+  const add = (value, where, fade) => { for (const c of value.match(/rgba?\\([^)]*\\)|color\\([^)]*\\)/g) ?? []) { const n = norm(c), k = n && fade ? n.replace(/^rgba\\((\\d+),(\\d+),(\\d+),.*$/, (_, ...rgb) => '#' + rgb.slice(0, 3).map((x) => (+x).toString(16).padStart(2, '0')).join('').toUpperCase()) : n; if (k && !seen.has(k)) seen.set(k, where); } };
+  const box = (s, where, text) => {
+    if (text) add(s.color, where + ' color');
+    add(s.backgroundColor, where + ' background');
+    if (s.backgroundImage !== 'none') add(s.backgroundImage, where + ' gradient', true);
+    for (const side of ['Top', 'Right', 'Bottom', 'Left']) if (parseFloat(s['border' + side + 'Width']) > 0 && !/none|hidden/.test(s['border' + side + 'Style'])) add(s['border' + side + 'Color'], where + ' border');
+    if (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0) add(s.outlineColor, where + ' outline');
+    if (s.boxShadow !== 'none') add(s.boxShadow, where + ' shadow');
+    if (s.textShadow !== 'none' && text) add(s.textShadow, where + ' text-shadow');
+    if (text && s.textDecorationLine !== 'none') add(s.textDecorationColor, where + ' underline');
+  };
+  for (const el of document.querySelectorAll('body *')) {
+    if (!el.getClientRects().length || el.closest('[hidden], template, iframe')) continue;
+    const s = getComputedStyle(el);
+    if (s.visibility === 'hidden') continue;
+    const text = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()) || (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && el.value);
+    box(s, name(el), text);
+    if (el instanceof SVGGeometryElement || el instanceof SVGTextElement) for (const p of ['fill', 'stroke']) if (s[p] !== 'none') add(s[p], name(el.closest('svg').parentElement) + ' svg ' + p);
+    if (/^(checkbox|radio|range)$/.test(el.type) && s.appearance !== 'none') s.accentColor === 'auto' ? seen.set('accent-color auto', name(el)) : add(s.accentColor, name(el) + ' accent');
+    if (el.placeholder && !el.value) add(getComputedStyle(el, '::placeholder').color, name(el) + ' placeholder');
+    for (const pseudo of ['::before', '::after']) { const p = getComputedStyle(el, pseudo); if (p.content !== 'none' && p.content !== 'normal') box(p, name(el) + pseudo, p.content.length > 2); }
+  }
+  return [...seen].map(([c, where]) => c + '  ' + where);
+})()`;
+// A colour written as #RRGGBB, rgb(), rgba() or color(srgb ...), as [r, g, b, alpha]; the gate matches within one step a channel, as a colour-mix rounds.
+const channels = (c) => { if (c.startsWith('#')) return [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)).concat(1);
+  const n = c.match(/-?[\d.]+(e-?\d+)?/g)?.map(Number); if (!n || n.length < 3) return null; const srgb = c.startsWith('color('); return [...n.slice(0, 3).map((x) => (srgb ? x * 255 : x)), n[3] ?? 1]; };
+const normColour = (c) => { const [r, g, b, a] = channels(c); return a === 0 ? null : a === 1 ? `#${[r, g, b].map((x) => Math.round(x).toString(16).padStart(2, '0')).join('').toUpperCase()}` : `rgba(${[r, g, b].map(Math.round).join(',')},${+a.toFixed(3)})`; };
+// The focused control's ring and fill after each Tab, as a keyboard user sees them.
+const focusColours = `(() => { const el = document.activeElement; if (!el || el === document.body) return []; const s = getComputedStyle(el), out = [];
+  if (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0) out.push([s.outlineColor, 'outline']); if (s.boxShadow !== 'none') out.push([s.boxShadow, 'shadow']);
+  return out.map(([v, p]) => v + '|' + el.tagName.toLowerCase() + [...el.classList].slice(0, 2).map((c) => '.' + c).join('') + ':focus-visible ' + p); })()`;
+
+test('the new look draws only the approved prototype\'s colours: Today, Decide, Designs, Reports and Tickets, their sheets and keyboard focus, at 390 and 1280, light and dark', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'palette'), file = join(dir, 'board.json'), fx = new URL('../fixtures/contract/', import.meta.url).pathname, now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  for (const f of readdirSync(join(fx, 'design.v1/design'))) writeFileSync(join(dir, 'design', f), readFileSync(join(fx, 'design.v1/design', f)));
+  writeFileSync(join(dir, 'shot.png'), png);
+  const fileOf = (name, m) => (writeFileSync(join(dir, name), JSON.stringify(m)), join(dir, name));
+  // A board with every kind of card on it: asks with and without a priority, a pick-one, a plan, a guided report, a design on a ticket, a proof and a sign-in,
+  // an epic with a ticket under it, a ticket on hold and a system one, so each screen draws its chips, bars, dots and rows.
+  for (const args of [['--id', 'T-9', '--title', 'The new settings page', '--priority', 'P1', '--project', 'Settings', '--asked', 'yes'], ['--id', 'T-29', '--title', 'Ship the new settings page', '--progress', '60', '--parent', 'T-9', '--priority', 'P0'],
+    ['--id', 'T-31', '--title', 'Write the release notes', '--priority', 'P2', '--hold', 'yes', '--asked', 'yes'], ['--id', 'T-40', '--title', 'Rotate the nightly logs', '--priority', 'P3', '--progress', '100']]) assert.equal(run('ticket', file, ...args).code, 0, args.join(' '));
+  for (const args of [
+    ['raise', file, '--ticket', 'T-29', '--priority', 'P0', '--key', 'ask-linked', '--title', 'Ship the settings page on Friday?'],
+    ['raise', file, '--priority', 'P1', '--key', 'ask-plain', '--title', 'Keep the old settings link for a week?'],
+    ['post', file, '--kind', 'ask', '--from', fileOf('pick.json', { ...JSON.parse(readFileSync(join(fx, 'ask.v1/valid-pick-one.json'), 'utf8')), merges: undefined })],
+    ['post', file, '--type', 'evidence', '--ticket', 'T-29', '--title', 'Settings on a phone', '--about', 'Umer changes the theme in one tap.', '--media', join(dir, 'shot.png')],
+    ['post', file, '--kind', 'design', '--from', fileOf('design.json', { ...JSON.parse(readFileSync(join(fx, 'design.v1/valid-basic.json'), 'utf8')), filed: now }), '--ticket', 'T-40'],
+    ['post', file, '--kind', 'report', '--priority', 'P2', '--from', fileOf('report.json', { ...JSON.parse(readFileSync(join(fx, 'report.v4/valid-full.json'), 'utf8')), filed: now })],
+    ['post', file, '--kind', 'plan', '--from', join(fx, 'plan.v3/valid-full.json')],
+    ['post', file, '--type', 'signin', '--key', 'npm', '--service', 'npm', '--link', 'https://example.com/login', '--unlocks', 'Publishing the release', '--waits', 'Release agent'],
+  ]) { const r = run(...args); assert.equal(r.code, 0, `${args.join(' ')}\n${r.out}`); }
+  const keys = Object.fromEntries(JSON.parse(readFileSync(file, 'utf8')).items.map((i) => [i.kind ?? i.type, i.key]));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  // Each state: its address and what is tapped on it, on a phone and on a desk.
+  const states = {
+    390: [['#', ''], ['#', '.t-more-line'], ['#find', ''], ['#answered', ''], ['#waiting', ''], ['#decide/release-day', '.decide [role="radio"], .decide input[type="radio"]'], ['#decide/npm', ''],
+      ['#reports', ''], [`#reports/${keys.report}`, ''], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#tickets', ''], ['#ticket/T-29', ''],
+      // Last, an answer and the toast it raises: a yes/no in light, the pick-one in dark.
+      [(theme) => (theme === 'light' ? '#decide/ask-plain' : '#decide/release-day'), ['.decide .pick-option', '.decide-bar .answer']]],
+    1280: [['#', ''], ['#waiting', ''], ['#decide/ask-linked', ''], ['#reports', ''], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#tickets', ''], ['#ticket/T-29', '']],
+  };
+  const off = [];
+  for (const width of [390, 1280]) for (const theme of ['light', 'dark']) {
+    const { evaluate, send, close } = await browse(dir, width, width === 390 ? 844 : 800, width === 390);
+    await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] });
+    const allowed = PROTO[theme].map(channels);
+    const check = (list, at) => { for (const line of list) { const c = channels(line.split('  ')[0]); if (!c || !allowed.some((p) => p.every((x, i) => Math.abs(x - c[i]) <= (i < 3 ? 1 : 0.005)))) off.push(`${theme} ${width} ${at}: ${line}`); } };
+    try {
+      for (const [hashOf, tap] of states[width]) {
+        const hash = typeof hashOf === 'function' ? hashOf(theme) : hashOf;
+        await evaluate(`location.href = ${JSON.stringify(url + hash)}`);
+        await until(() => evaluate(`location.hash === ${JSON.stringify(hash === '#' ? '' : hash)} && !!document.querySelector('#board h1, #reader:not([hidden]) h1, dialog[open]')`));
+        for (const t of [tap].flat().filter(Boolean)) await evaluate(`document.querySelector(${JSON.stringify(t)})?.click(), new Promise((ok) => setTimeout(ok, 300))`);
+        if (Array.isArray(tap)) await until(() => evaluate('!document.getElementById("toast").hidden'));
+        await evaluate('new Promise((ok) => setTimeout(ok, 400))');
+        const at = hash + (tap ? ` (${[tap].flat().map((t) => t.split(',')[0]).join(' then ')} tapped)` : '');
+        // On Designs the colours read include the sidebar's own Designs place, lit, on a desk, and the dock with Today lit on a phone.
+        if (hash.startsWith('#designs')) assert.deepEqual(await evaluate('[...document.querySelectorAll(".side [aria-current], .tabs [aria-current]")].filter((a) => a.getClientRects().length).map((a) => a.getAttribute("href"))'), [width === 390 ? '#' : '#designs'], at);
+        check(await evaluate(drawnColours), at);
+        // A keyboard user's first dozen stops on the screen.
+        for (let i = 0; i < 12; i++) {
+          for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+          const ring = await evaluate(focusColours);
+          for (const line of ring ?? []) { const [v, where] = line.split('|'); check((v.match(/rgba?\([^)]*\)|color\([^)]*\)/g) ?? []).map((c) => `${normColour(c)}  ${where}`).filter((l) => !l.startsWith('null')), at); }
+        }
+      }
+    } finally { close(); }
+  }
+  assert.deepEqual([...new Set(off)], []);
   proc.kill();
 });

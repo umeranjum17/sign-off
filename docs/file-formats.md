@@ -124,7 +124,7 @@ New guided defaults use plan schema 3 / report schema 4, contract 1, with a requ
   newest first in each, with no × on a row (Dismiss is on the report's page). `form` (`diagram`, `chart` or `before-after`) picks the row's line icon; with none the row shows a book.
   `video` (10 characters or fewer, such as `0:28`) and `asked_by` (40 or fewer, such as `You asked`) fill the row's line, `Diagram · Interactive · Video 0:28 · You asked, 07:19`;
   with none of `form`, `video` and `asked_by` it reads `Report · 07:19`. `group` (40 characters or fewer) is kept but the list does not show it.
-  A blue dot marks a report filed today. `decided`
+  A dot marks a report filed today. `decided`
   (200 characters or fewer) shows under the label `What it decided` on the report's page, or in the opened row of an explainer with no page.
   An item without these keeps its kind and its about line.
 - `type`: optional, `decision` (default), `design`, `evidence`, `diagram`,

@@ -10,31 +10,26 @@
 <link rel="preload" href="inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="ui.css">
-<meta name="theme-color" content="#F5F5F7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#E8E4E0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131210" media="(prefers-color-scheme: dark)">
 <style>
   /* Spacious, Apple grade. A phone reads white tiles on a grey grouped page; a desk reads grey tiles on a white page (the 64rem block swaps them).
-     The board's own names below are all mapped onto tokens.css, where every raw value lives. --accent is the blue for text, links and focus; --action is the blue a button is filled with.
-     Meaning colours are the token mixed toward black where they set text on a light ground, so they keep 4.5:1. */
+     The board's own names below are all mapped onto tokens.css, where every raw value lives, and draw only the approved prototype's palette: --accent (a link, a focus ring)
+     and --action (a main button's fill) are ink with the canvas's colour on it, done is the bar's ink fill, a warning is amber and red is for what failed or waits on you. */
   :root {
     --page: var(--tk-grouped); --tile: var(--tk-surface); --desk: var(--tk-canvas); --desk-tile: var(--tk-card); --bar: var(--tk-surface-high); --sunk: var(--tk-surface-selected); --line: var(--tk-rail);
-    --text: var(--tk-text); --muted: var(--tk-text-secondary); --border: var(--tk-text-tertiary); --accent: color-mix(in srgb, var(--tk-link) 80%, #000); --action: color-mix(in srgb, var(--tk-link) 90%, #000); --on-accent: #FFFFFF; --danger: color-mix(in srgb, var(--tk-critical) 75%, #000); --bezel: var(--tk-text);
-    --c-waiting: var(--action); --c-evidence: color-mix(in srgb, var(--tk-success) 55%, #000); --c-reports: color-mix(in srgb, var(--tk-warning) 62%, #000); --c-answered: var(--muted); --c-gate: #8A6100;
-    --ok: var(--c-evidence); --warn: var(--c-reports); --badge: color-mix(in srgb, var(--tk-critical) 80%, #000); --faint: var(--tk-text-tertiary);
-    --bg: var(--page); --surface: var(--tile); --seg-on: var(--tk-on); --teal: var(--tk-teal); --gutter: var(--tk-gutter); }
+    --text: var(--tk-text); --muted: var(--tk-text-secondary); --border: var(--tk-text-tertiary); --accent: var(--tk-ink); --action: var(--tk-ink); --on-accent: var(--tk-canvas); --danger: var(--tk-critical); --bezel: var(--tk-text);
+    --c-waiting: var(--action); --c-evidence: var(--tk-fill); --c-reports: var(--tk-warn); --c-answered: var(--muted); --c-gate: var(--tk-warn);
+    --ok: var(--c-evidence); --warn: var(--c-reports); --badge: var(--tk-critical); --faint: var(--tk-text-tertiary);
+    --bg: var(--page); --surface: var(--tile); --seg-on: var(--tk-on); --gutter: var(--tk-gutter); }
   /* One type scale (28/20/17/16/15/13/12, 32 and 22 on a desk), one 4px spacing grid, one control size per role: 44px for a main action and every tap target, 10px corners.
      The sizes of a title, body, secondary line and footnote, the card corner and the raised shadow come from tokens.css; the display sizes are the board's own. */
   :root { --t-xl: 1.75rem; --t-l: 1.25rem; --t-m: var(--tk-fs-title); --t-b: var(--tk-fs-body); --t-s: var(--tk-fs-secondary); --t-xs: var(--tk-fs-footnote); --t-xxs: 0.75rem; --r-ctl: var(--tk-r-ctl); --r-card: var(--tk-r-card); --ctl: 2.75rem; }
   @media (min-width: 64rem) { :root { --t-xl: 2rem; --t-l: 1.375rem; } }
-  /* The approved feel's surfaces: Today's ground and raised cards, the glass tab bar and its pill, an iOS hairline, a second fill, and the lift of a card and of a capture. */
-  :root { --ground: var(--tk-grouped); --card: var(--tk-surface); --side: var(--tk-canvas); --tabbar: var(--tk-card); --tab-on: var(--tk-on); --hairline: rgba(60, 60, 67, 0.29); --fill-2: rgba(118, 118, 128, 0.2);
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.05); --shot-edge: 0 0 0 0.5px rgba(0, 0, 0, 0.14), 0 12px 32px rgba(0, 0, 0, 0.12); }
-  @media (prefers-color-scheme: dark) { :root { --ground: var(--tk-canvas); --side: var(--tk-canvas); --tabbar: var(--tk-card); --tab-on: var(--tk-on); --hairline: rgba(255, 255, 255, 0.1); --fill-2: rgba(118, 118, 128, 0.34);
-    --shadow-card: 0 0 0 0.5px rgba(255, 255, 255, 0.06); --shot-edge: 0 0 0 0.5px rgba(255, 255, 255, 0.16), 0 16px 40px rgba(0, 0, 0, 0.55); } }
-  @media (prefers-color-scheme: dark) { :root {
-    --page: var(--tk-grouped); --tile: var(--tk-surface); --desk: var(--tk-canvas); --desk-tile: var(--tk-card); --bar: var(--tk-surface-high); --sunk: var(--tk-input); --line: var(--tk-rail);
-    --accent: var(--tk-link); --danger: var(--tk-critical); --bezel: var(--tk-rail);
-    --c-waiting: var(--tk-link); --c-evidence: var(--tk-success); --c-reports: var(--tk-warning); --c-gate: #FFD60A; --badge: var(--tk-critical); --seg-on: var(--tk-on); } }
+  /* The approved feel's surfaces: Today's ground and raised cards, the tab bar and its pill, a hairline, a second fill, and the lift of a card and of a capture. */
+  :root { --ground: var(--tk-grouped); --card: var(--tk-surface); --side: var(--tk-canvas); --tabbar: var(--tk-card); --tab-on: var(--tk-on); --hairline: var(--tk-line); --fill-2: var(--tk-track);
+    --shadow-card: var(--tk-elev-card); --shot-edge: 0 0 0 1px var(--tk-line), var(--tk-elev-card); }
+  @media (prefers-color-scheme: dark) { :root { --ground: var(--tk-canvas); --sunk: var(--tk-input); --bezel: var(--tk-rail); } }
   * { box-sizing: border-box; }
   /* A phone keeps 140px at the bottom, so the last row scrolls fully clear of the floating tab bar. */
   /* A phone keeps the text size it was given on every screen, so the tab bar never grows or shrinks. */
@@ -91,10 +86,9 @@
   .t-tiles .ui-stat { -webkit-tap-highlight-color: transparent; transition: transform 120ms var(--ease); } .t-tiles .ui-stat:active { transform: scale(0.97); }
   /* More (the line under the tiles) and Search (the dock's round button) open a sheet from the bottom: its handle, its name and a round close, then its rows on a sunk ground. */
   .t-sheet { width: 100%; max-width: 26.875rem; max-height: calc(100dvh - 3rem); margin: auto auto 0; padding: 0; border: 0; border-radius: 1.75rem 1.75rem 0 0; background: var(--tk-card); color: var(--tk-text);
-    box-shadow: 0 -8px 32px rgba(30, 20, 10, 0.12); overscroll-behavior: contain; }
+    box-shadow: var(--tk-elev-sheet); overscroll-behavior: contain; }
   .t-sheet[open] { animation: sheet-up 250ms var(--ease); }
-  .t-sheet::backdrop { background: rgba(30, 24, 18, 0.28); }
-  @media (prefers-color-scheme: dark) { .t-sheet::backdrop { background: rgba(0, 0, 0, 0.5); } }
+  .t-sheet::backdrop { background: var(--tk-scrim); }
   .t-sheet::before { content: ""; display: block; width: 2.25rem; height: 0.25rem; margin: 0.5rem auto 0; border-radius: 2px; background: var(--tk-line); }
   .t-sheet > div { padding: 0.5rem 1rem calc(1.5rem + env(safe-area-inset-bottom)); }
   .t-shd { display: flex; align-items: center; gap: 0.5rem; height: 2.5rem; }
@@ -127,23 +121,23 @@
     background: none; color: var(--tk-text-tertiary); font: inherit; font-size: var(--tk-fs-meta); line-height: 1.25rem; -webkit-tap-highlight-color: transparent; }
   .t-more-line > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .t-more-line .glyph { width: 1rem; height: 1rem; }
-  .t-more-line:active { background: color-mix(in srgb, var(--tk-ink) 6%, transparent); }
+  .t-more-line:active { background: var(--tk-inset); }
   /* Cards, a run's result mark and its check badge (Decide's answered ask), and the small segmented control (the full screen's sizes). */
   .card { background: var(--surface); border-radius: var(--r-card); }
   .card { padding: var(--tk-sp-4); }
   .res { display: inline-flex; align-items: center; gap: 0.3125rem; font-weight: 600; }
   .res::before { content: ""; width: 0.4375rem; height: 0.4375rem; border-radius: 50%; background: currentColor; }
   .res.ok { color: var(--ok); } .res.bad { color: var(--danger); } .res.warn { color: var(--warn); } .res.none::before { display: none; }
-  .donek { display: grid; flex: none; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 50%; background: color-mix(in srgb, var(--tk-success) 16%, transparent); color: var(--tk-success); }
+  .donek { display: grid; flex: none; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 50%; background: var(--tk-fill); color: var(--tk-card); }
   .donek .glyph { width: 1.125rem; height: 1.125rem; stroke-width: 2.6; }
-  .donek.bad { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); } .donek:is(.warn, .none) { background: var(--sunk); color: var(--muted); }
+  .donek.bad { background: var(--tk-p0); color: var(--tk-p0-text); } .donek:is(.warn, .none) { background: var(--sunk); color: var(--muted); }
   .seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--sunk); border-radius: 0.5625rem; padding: 2px; }
   .seg button { min-height: var(--ctl); border: 0; border-radius: 0.4375rem; background: none; color: var(--text); font: inherit; font-size: var(--t-xs); line-height: 1.2; padding: 0.25rem 0.375rem; }
   .seg button[aria-pressed="true"] { background: var(--seg-on); box-shadow: var(--tk-elev-raised); color: var(--text); font-weight: var(--tk-fw-semibold); }
   .seg button[aria-pressed="true"]::before { content: none; }
 
   /* Reports: a grouped list under small section heads, a row per report: its picture, title, what it says, then its kind, steps and date.
-     A blue dot marks one filed today. A row with steps draws them as numbered nodes on a line, with only the marks that matter under each. */
+     A dot marks one filed today. A row with steps draws them as numbered nodes on a line, with only the marks that matter under each. */
   .report { scroll-margin-top: 4.5rem; }
   .rows.reports > li, .rows.reports .compact { align-items: start; }
   .rows.reports .when { margin-top: 0.1875rem; line-height: 1.3571; color: var(--muted); font-size: 0.875rem; }
@@ -230,8 +224,8 @@
   .glyph { width: 1.125rem; height: 1.125rem; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .plan-section h3 { display: flex; align-items: center; gap: 0.75rem; }
   .plan-section .num { width: 2rem; height: 2rem; border-radius: 50%; background: var(--sunk); display: grid; place-items: center; flex: none; font-size: 1rem; font-weight: 600; }
-  .plan-section[data-verdict="approve"] .num { background: color-mix(in srgb, var(--ok) 14%, var(--surface)); color: var(--ok); }
-  .plan-section[data-verdict="change"] .num { background: color-mix(in srgb, var(--warn) 14%, var(--surface)); color: var(--warn); }
+  .plan-section[data-verdict="approve"] .num { background: var(--tk-track); color: var(--ok); }
+  .plan-section[data-verdict="change"] .num { background: var(--tk-p1); color: var(--tk-p1-text); }
   .plan-send button { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; }
   .plan-verdicts button[aria-pressed="true"] { box-shadow: inset 0 0 0 1.5px currentColor; background: var(--surface); }
   .plan-verdicts button[aria-pressed="true"]::before, .plan-decision button[aria-pressed="true"]::before { content: none; }
@@ -246,7 +240,7 @@
   .plan-decision .choices button { text-align: left; border-radius: 0.875rem; padding: 0.875rem; gap: 0.25rem; }
   .plan-decision .choices button .tag { margin: 0; text-transform: none; letter-spacing: normal; color: var(--accent); }
   .plan-decision .choices button .tag::before { content: none; }
-  .plan-decision .choices button[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); color: var(--text); border: 2px solid var(--accent); }
+  .plan-decision .choices button[aria-pressed="true"] { background: var(--tk-inset); color: var(--text); border: 2px solid var(--accent); }
   .plan-decision .tag { display: block; color: var(--accent); font-size: 0.875rem; }
   .plan-explain .foot { justify-content: space-between; }
   /* The plan page as designed: the diagram alone in a tile, the explainer inside its section, each decision under the section it follows. */
@@ -270,7 +264,7 @@
   .plan-decision .choices button > :not(.rd):not(.lbl) { grid-column: 2; }
   .plan-decision .choices .rd { display: grid; place-items: center; width: 1.375rem; height: 1.375rem; margin-top: 0.125rem; border-radius: 50%; border: 1.5px solid var(--muted); color: transparent; }
   .plan-decision .choices .rd .glyph { width: 0.875rem; height: 0.875rem; stroke-width: 3; }
-  .plan-decision .choices button[aria-pressed="true"] .rd { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .plan-decision .choices button[aria-pressed="true"] .rd { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   .plan-decision .choices .lbl .tag { order: 2; display: inline; } .plan-decision .choices .lbl { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 0.5rem; }
   .plan-other { margin-top: 0.75rem; } .plan-other summary { cursor: pointer; color: var(--muted); font-weight: 600; }
   .plan-send { position: absolute; bottom: 0; left: 0; right: 0; padding: 0.625rem 1rem calc(0.75rem + env(safe-area-inset-bottom)); background: var(--bar); border-top: 1px solid var(--line); }
@@ -326,12 +320,12 @@
   .rows.reports .compact strong { font-weight: 600; }
   .compact .meta { margin: 0.125rem 0 0; font-size: 0.9375rem; }
   .thumb, .compact .icon { width: 3.5rem; height: 3.5rem; border-radius: 0.625rem; }
-  .compact .icon { background: color-mix(in srgb, var(--area) 14%, var(--surface)); }
+  .compact .icon { background: var(--tk-inset); }
   .compact .icon svg { stroke: var(--area); }
   /* An answered row with no picture leads with a small check badge, so the row stays short. */
-  .compact .icon.sent { background: var(--ok); } .compact .icon.sent svg { stroke: #FFFFFF; }
+  .compact .icon.sent { background: var(--ok); } .compact .icon.sent svg { stroke: var(--tk-card); }
   .sent-line { display: flex; align-items: center; gap: 0.25rem; color: var(--ok); font-weight: 600; font-size: 0.9375rem; } .sent-line .glyph { width: 1rem; height: 1rem; stroke: currentColor; fill: none; }
-  .compact .icon.i-answered { width: 2rem; height: 2rem; border-radius: 0.5rem; background: var(--c-answered); } .compact .icon.i-answered svg { width: 1.125rem; height: 1.125rem; stroke: #FFFFFF; }
+  .compact .icon.i-answered { width: 2rem; height: 2rem; border-radius: 0.5rem; background: var(--c-answered); } .compact .icon.i-answered svg { width: 1.125rem; height: 1.125rem; stroke: var(--tk-card); }
   .done .thumb { width: 3rem; height: 3rem; border-radius: 0.75rem; }
   .thumb { flex: none; object-fit: cover; object-position: top; border: 1px solid var(--line); background: var(--sunk); }
   .list { display: grid; gap: 0.75rem; }
@@ -489,7 +483,7 @@
   .more-menu .menu button, .more-menu .menu a { display: flex; align-items: center; justify-content: start; min-height: 2.75rem; padding: 0 0.75rem; color: var(--text); text-align: left; text-decoration: none; background: transparent; }
   /* On Decide it opens upward over the page, from the bar at the foot. */
   /* In dark the menu sits a step above the page, with a clear rim, so it never reads as part of what it covers. */
-  @media (prefers-color-scheme: dark) { .more-menu .menu { background: var(--tk-input); border-color: #4A4A4E; box-shadow: 0 12px 32px rgb(0 0 0 / 0.6); } }
+  @media (prefers-color-scheme: dark) { .more-menu .menu { background: var(--tk-input); border-color: var(--tk-line); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5); } }
   @media (prefers-reduced-motion: reduce) { .more-menu .menu { animation: none; } }
   @media (prefers-reduced-motion: reduce) { .comment > summary, .comment > summary::after { transition: none; } .comment[open] > :not(summary) { animation: none; } }
   /* After a tap: what was saved, and an Undo for a few seconds. */
@@ -498,13 +492,13 @@
     background: var(--text); color: var(--bg); font-size: 1rem; }
   #toast[hidden] { display: none; }
   #toast #toast-text { flex: 1; min-width: 0; }
-  #toast button { flex: none; min-height: var(--ctl); padding: 0 0.875rem; background: color-mix(in srgb, currentColor 16%, transparent); color: inherit; font-weight: 600; }
+  #toast button { flex: none; min-height: var(--ctl); padding: 0 0.875rem; background: var(--tk-on-ink-press); color: inherit; font-weight: 600; }
   #toast button:focus-visible { outline-color: var(--bg); }
-  /* Buttons: grey for the plain ones, filled blue once picked, solid grey when off. 44px everywhere, 10px corners. */
+  /* Buttons: grey for the plain ones, filled with ink once picked, solid grey when off. 44px everywhere, 10px corners. */
   button { min-height: var(--ctl); padding: 0 1rem; border: 0; border-radius: var(--r-ctl); cursor: pointer;
     background: var(--sunk); color: var(--text); font: inherit; font-size: var(--t-s); font-weight: 500; }
   /* Recommended is a dashed accent outline and a tag; picked is filled with a check. They never look alike. */
-  button.rec { border: 1.5px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+  button.rec { border: 1.5px solid var(--accent); background: var(--tk-inset); }
   .tag::before { content: "★ " / ""; }
   .tag { display: inline-block; white-space: nowrap; margin-left: 0.375rem; color: var(--accent); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
   button[aria-pressed="true"] { background: var(--action); color: var(--on-accent); font-weight: 600; }
@@ -642,7 +636,7 @@
   .pf-name { display: none; gap: 0.3125rem; } .pf-size .pf-w { color: var(--muted); font-size: var(--t-xxs); font-weight: var(--tk-fw-regular); font-variant-numeric: tabular-nums; }
   .pf-ref { display: inline-flex; flex: none; align-items: center; gap: 0.375rem; margin-left: auto; padding: 0 0.75rem; border: 1px solid var(--line); background: none; color: var(--text); font-size: var(--t-xs); }
   .pf-ref .glyph { width: 1rem; height: 1rem; }
-  .proto-full .pf-ref[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--card)); color: var(--accent); font-weight: var(--tk-fw-semibold); }
+  .proto-full .pf-ref[aria-pressed="true"] { border-color: var(--accent); background: var(--tk-inset); color: var(--accent); font-weight: var(--tk-fw-semibold); }
   .proto-full .pf-ref[aria-pressed="true"]::before { content: none; }
   .pf-stage { display: grid; flex: 1; min-height: 0; justify-content: center; align-content: center; gap: 1rem; padding: var(--pad, 0); overflow: hidden; }
   .pf-stage[data-mode="beside"] { grid-template-columns: auto auto; }
@@ -674,7 +668,7 @@
   .bulk button { padding: 0 0.5rem; }
   .picked { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 1rem; }
   .has-x { position: relative; }
-  .has-x > .x { position: absolute; top: 0.25rem; right: 0.25rem; margin: 0; background: color-mix(in srgb, var(--surface) 88%, transparent); }
+  .has-x > .x { position: absolute; top: 0.25rem; right: 0.25rem; margin: 0; background: var(--surface); }
   .chip { padding: 0 0.5rem; border: 1px solid currentColor; border-radius: 999px; color: var(--accent);
     font-size: 0.875rem; font-weight: 600; line-height: 1.25rem; letter-spacing: 0.04em; text-transform: uppercase; }
   /* Each option is a tall phone frame, side by side; on a phone the row swipes, one frame at a time, and the next one peeks in.
@@ -711,7 +705,7 @@
   .rung .gone { color: var(--danger); margin: 0; }
   .rung > .meta { color: var(--accent); margin: 0; }
   .badge { padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.875rem; font-weight: 600; color: var(--accent); border: 1.5px solid var(--accent);
-    background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+    background: var(--tk-inset); }
   .round { margin-top: 0.5rem; }
   .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
   .ask { margin: 1rem 0 0; padding: 0 1rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); }
@@ -848,16 +842,15 @@
     .split-list .ev-grid > .row, .split-list .ev-grid > .empty { margin: 0 1.5rem; }
     .split-list .ev-card { position: relative; padding-left: 1.5rem; }
     .split-list .ev-card::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: var(--action); transform: scaleY(0); transition: transform 260ms var(--spring); }
-    .split-list .ev-card[aria-current] { background: color-mix(in srgb, var(--action) 12%, transparent); outline: none; }
+    .split-list .ev-card[aria-current] { background: var(--tk-inset); outline: none; }
     .split-list .ev-card[aria-current]::before { transform: scaleY(1); }
     .split-detail > .ev-scroll { padding: 2rem 2.5rem 4rem; }
     .split-detail .ev-item { max-width: 40rem; }
   }
   /* The guided plan and report: one scroll with a rail and Your answers on a desk, a progress bar and a Go ahead bar on a phone. */
   #reader .gd-scroll { flex: 1; min-height: 0; overflow: auto; padding: 0 1rem 7rem; scroll-behavior: smooth; }
-  #reader .gd, #reader .gd-bar { --hair: color-mix(in srgb, var(--text) 12%, transparent); --hair2: color-mix(in srgb, var(--text) 7%, transparent); --tint: color-mix(in srgb, var(--action) 11%, transparent);
-    --ok-bg: color-mix(in srgb, var(--ok) 13%, transparent); --warn-bg: color-mix(in srgb, var(--warn) 13%, transparent); --bad: var(--danger); --bad-bg: color-mix(in srgb, var(--danger) 11%, transparent); --well: var(--page); }
-  @media (prefers-color-scheme: dark) { #reader .gd, #reader .gd-bar { --well: #0C0C0D; } }
+  #reader .gd, #reader .gd-bar { --hair: var(--tk-line); --hair2: var(--tk-line); --tint: var(--tk-inset);
+    --ok-bg: var(--tk-track); --warn-bg: var(--tk-p1); --bad: var(--danger); --bad-bg: var(--tk-p0); --well: var(--page); }
   #reader .gd { max-width: 72rem; margin: 0 auto; font-size: var(--t-b); line-height: 1.6; }
   :where(#reader .gd, #reader .gd-bar) :where(button, input, textarea) { font: inherit; color: inherit; letter-spacing: inherit; }
   :where(#reader .gd, #reader .gd-bar) button { cursor: pointer; border: 0; background: none; padding: 0; }
@@ -871,7 +864,7 @@
   .gd-segs { display: flex; gap: 0.25rem; }
   .gd-segs button { flex: 1; min-height: 0; height: 0.375rem; border-radius: 0.1875rem; background: var(--sunk); position: relative; }
   .gd-segs button::after { content: ""; position: absolute; inset: -0.875rem 0; }
-  .gd-segs button.on { background: color-mix(in srgb, var(--action) 40%, var(--sunk)); }
+  .gd-segs button.on { background: var(--tk-fill); }
   .gd-segs button.cur { background: var(--action); height: 0.5rem; margin-top: -0.0625rem; }
   .gd-main { min-width: 0; max-width: 45rem; margin: 0 auto; }
   @media (min-width: 62.5rem) {
@@ -972,7 +965,7 @@
   /* A page without the Ask menu keeps its Go deeper button in the row, so Comment drops its word too. */
   @container (max-width: 24rem) { .gd-v:is(.agree, .disagree) > span:not([aria-hidden]), .gd-foot.legacy .gd-v.cmt > span:not([aria-hidden]) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); } .gd-v:is(.agree, .disagree), .gd-foot.legacy .gd-v.cmt { min-width: 2.75rem; padding: 0; } }
   .gd-menuwrap { position: relative; display: flex; }
-  .gd-menu { position: absolute; z-index: 30; right: 0; bottom: calc(100% + 0.375rem); width: 15.5rem; padding: 0.3125rem; border-radius: var(--tk-r-card); background: var(--tile); border: 1px solid var(--hair); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.08); }
+  .gd-menu { position: absolute; z-index: 30; right: 0; bottom: calc(100% + 0.375rem); width: 15.5rem; padding: 0.3125rem; border-radius: var(--tk-r-card); background: var(--tile); border: 1px solid var(--hair); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2); }
   .gd-menu.down { bottom: auto; top: calc(100% + 0.375rem); }
   .gd-menu button { display: grid; grid-template-columns: 1.125rem 1fr; gap: 0 0.625rem; align-items: center; width: 100%; min-height: 2.75rem; padding: 0.3125rem 0.625rem; border-radius: var(--tk-r-ctl); text-align: left; font-size: var(--tk-fs-secondary); font-weight: 500; color: var(--text); }
   .gd-menu button:hover, .gd-menu button:focus-visible { background: var(--sunk); outline: none; }
@@ -980,7 +973,7 @@
   .gd-menu button small { grid-column: 2; color: var(--muted); font-size: var(--tk-fs-footnote); line-height: 1.3; font-weight: 400; }
   /* The comment box and the thread under the part: it goes to the agent that wrote the part, like a note on a design. */
   .gd-cbox { margin: 0.375rem 0 0.5rem; padding: 0.5rem 0.5rem 0.375rem 0.75rem; border-radius: var(--tk-r-card); border: 1px solid var(--hair); background: var(--tile); }
-  .gd-cbox:focus-within { border-color: color-mix(in srgb, var(--action) 55%, var(--hair)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--action) 14%, transparent); }
+  .gd-cbox:focus-within { border-color: var(--action); box-shadow: 0 0 0 3px var(--tk-track); }
   .gd-cbox textarea { display: block; width: 100%; min-height: 2.75rem; margin: 0; padding: 0.25rem 0 0; border: 0; background: none; resize: none; font-size: var(--tk-fs-secondary); line-height: 1.5; outline: none !important; box-shadow: none; }
   .gd-cbar { display: flex; align-items: center; gap: 0.25rem; }
   .gd-cbar .gd-hint { flex: 1; min-width: 0; color: var(--faint); font-size: var(--tk-fs-footnote); line-height: 1.3; }
@@ -992,7 +985,7 @@
   .gd-thread:empty { display: none; }
   .gd-thread { display: grid; gap: 0.5rem; margin: 0.5rem 0 0.375rem; }
   .gd-cmt { display: grid; grid-template-columns: 1.5rem 1fr; gap: 0 0.625rem; font-size: var(--tk-fs-secondary); line-height: 1.5; }
-  .gd-cmt .av { grid-row: span 3; width: 1.5rem; height: 1.5rem; border-radius: 50%; display: grid; place-items: center; font-size: 0.6875rem; font-weight: 700; color: #fff; background: var(--action); margin-top: 0.0625rem; }
+  .gd-cmt .av { grid-row: span 3; width: 1.5rem; height: 1.5rem; border-radius: 50%; display: grid; place-items: center; font-size: 0.6875rem; font-weight: 700; color: var(--on-accent); background: var(--action); margin-top: 0.0625rem; }
   .gd-cmt.agent .av { background: var(--c-reports); }
   .gd-cmt .hd { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 0.5rem; font-size: 0.875rem; color: var(--muted); }
   .gd-cmt .hd b { color: var(--text); font-weight: var(--tk-fw-semibold); }
@@ -1127,15 +1120,14 @@
   .gd-sent h3 { margin: 0 0 0.25rem; font-size: 1.25rem; }
   .gd-sent p { margin: 0 0 0.25rem; }
   .gd-err { color: var(--danger); font-size: 0.9375rem; margin: 0.5rem 0 0; }
-  .gd-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: 0.625rem 1rem calc(0.625rem + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--page) 90%, transparent); -webkit-backdrop-filter: saturate(180%) blur(16px); backdrop-filter: saturate(180%) blur(16px); border-top: 1px solid var(--hair2); display: flex; align-items: center; gap: 0.75rem; }
+  .gd-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: 0.625rem 1rem calc(0.625rem + env(safe-area-inset-bottom)); background: var(--page); -webkit-backdrop-filter: saturate(180%) blur(16px); backdrop-filter: saturate(180%) blur(16px); border-top: 1px solid var(--hair2); display: flex; align-items: center; gap: 0.75rem; }
   .gd-bar .txt { flex: 1; min-width: 0; font-size: 0.9375rem; line-height: 1.3; color: var(--muted); }
   .gd-bar .txt b { display: block; color: var(--text); font-weight: 600; }
   .gd-bar .gd-btn { min-height: 3rem; padding: 0 1.25rem; white-space: nowrap; }
   @media (prefers-reduced-motion: reduce) { #reader .gd *, #reader .gd-scroll { animation: none !important; transition: none !important; scroll-behavior: auto; } }
   /* ---- Decide, in the approved new look (ui.css): Newest or By priority, the hero, the asks as rows in one card, and an ask as a sheet over them on a phone.
      Every tap answers at once: rows tint on press, buttons shrink a little, and pops settle on a spring (--spring, set by the script). ---- */
-  :root { --ease: cubic-bezier(0.22, 1, 0.36, 1); --spring: var(--ease); --c-indigo: #5E5CE6; --skel: rgba(118, 118, 128, 0.12); --skel-hi: rgba(118, 118, 128, 0.04); }
-  @media (prefers-color-scheme: dark) { :root { --c-indigo: #7D7AFF; --skel: rgba(255, 255, 255, 0.07); --skel-hi: rgba(255, 255, 255, 0.02); } }
+  :root { --ease: cubic-bezier(0.22, 1, 0.36, 1); --spring: var(--ease); --skel: var(--tk-track); --skel-hi: var(--tk-light); }
   main { overflow-x: clip; }
   .date-kicker { margin: 0; color: var(--muted); font-size: var(--t-xs); line-height: 1.25rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
   .top > .dl-more { position: absolute; top: 2.75rem; right: -0.5rem; }
@@ -1149,7 +1141,7 @@
   .dl-more > summary .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 3; }
   .dl-more:not([open]) > .dl-menu { display: none; }
   .dl-menu { position: absolute; z-index: 4; top: calc(100% + 0.25rem); right: 0.25rem; min-width: 15rem; padding: 0.375rem 0; border-radius: 0.875rem; background: var(--tile);
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.16), 0 0 0 0.5px var(--line); transform-origin: top right; animation: menu-in 260ms var(--spring); }
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2), 0 0 0 0.5px var(--line); transform-origin: top right; animation: menu-in 260ms var(--spring); }
   .decide-bar .dl-menu { top: auto; bottom: calc(100% + 0.25rem); transform-origin: bottom right; }
   @keyframes menu-in { from { opacity: 0; transform: scale(0.6); } }
   .dl-menu > button { display: flex; align-items: center; justify-content: space-between; gap: 1.125rem; width: 100%; min-height: 2.75rem; padding: 0 1rem; border-radius: 0;
@@ -1166,22 +1158,21 @@
   .dl-row { position: relative; overflow: hidden; }
   .dl-face { position: relative; z-index: 1; display: flex; align-items: center; gap: 0.875rem; min-height: 4.75rem; padding: 0.75rem 1.25rem; background: var(--bg); color: inherit; text-decoration: none;
     touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; transition: background-color 120ms linear; }
-  .dl-face.down { background: color-mix(in srgb, var(--text) 6%, var(--bg)); transition: none; }
+  .dl-face.down { background: var(--sunk); transition: none; }
   /* The actions under a row show only while it is swiped, so a press tint never lets them through. */
-  .dl-act { position: absolute; inset: 0; display: none; flex-direction: column; justify-content: center; gap: 0.1875rem; padding: 0 1.625rem; color: #FFFFFF; font-size: var(--t-s); line-height: 1.25rem; font-weight: 600; }
-  .dl-act.yes { align-items: flex-start; background: var(--tk-success); }
-  .dl-act.later { align-items: flex-end; background: var(--c-indigo); }
+  .dl-act { position: absolute; inset: 0; display: none; flex-direction: column; justify-content: center; gap: 0.1875rem; padding: 0 1.625rem; color: var(--tk-canvas); font-size: var(--t-s); line-height: 1.25rem; font-weight: 600; }
+  .dl-act.yes { align-items: flex-start; background: var(--tk-ink); }
+  .dl-act.later { align-items: flex-end; background: var(--tk-ink); }
   .dl-act > * { transition: transform 240ms var(--spring), opacity 120ms linear; opacity: 0.85; }
   .dl-act .glyph { width: 1.5rem; height: 1.5rem; stroke-width: 2.2; }
   .dl-row.armed .dl-act > * { transform: scale(1.18); opacity: 1; }
   .dl-row.swiping[data-side="yes"] .yes, .dl-row.swiping[data-side="later"] .later, .leaving[data-side="yes"] .yes, .leaving[data-side="later"] .later { display: flex; }
   .leaving[data-side="yes"] .dl-face { transform: translateX(100%); } .leaving[data-side="later"] .dl-face { transform: translateX(-100%); }
-  /* Answered: the row tints green and its icon pops green, then it folds away; a row taken back flashes blue. */
-  .leaving.answered:not([data-side]) .dl-face { background: color-mix(in srgb, var(--tk-success) 9%, var(--bg)); }
-  .leaving.later:not([data-side]) .dl-face { background: color-mix(in srgb, var(--c-indigo) 12%, var(--bg)); }
-  .leaving.answered .ui-icon { background: var(--tk-success); color: #FFFFFF; transform: scale(1.08); transition: transform 300ms var(--spring); }
+  /* Answered: the row sinks and its icon pops in ink, then it folds away; a row taken back flashes. */
+  .leaving.answered:not([data-side]) .dl-face, .leaving.later:not([data-side]) .dl-face { background: var(--tk-inset); }
+  .leaving.answered .ui-icon { background: var(--tk-fill); color: var(--tk-card); transform: scale(1.08); transition: transform 300ms var(--spring); }
   .dl-row.returned .dl-face { animation: row-back 600ms var(--ease); }
-  @keyframes row-back { from { background: color-mix(in srgb, var(--accent) 14%, var(--bg)); } }
+  @keyframes row-back { from { background: var(--tk-inset); } }
   .rise .dl-row, .rise .dl-head { animation: rise 280ms var(--ease) both; animation-delay: calc(min(var(--n, 0), 12) * 28ms); }
   @keyframes rise { from { opacity: 0; transform: translateY(0.625rem); } }
   .decide-list > .gone-asks { margin-top: 1.5rem; }
@@ -1200,11 +1191,10 @@
   .rp-list .ui-icon .mono { font-style: normal; }
   .rp-list.ui-list > li + li::before { right: 0.75rem; left: 0.75rem; }
   .rp-list .dl-face.ui-row { gap: 0.75rem; min-height: 0; padding: 0 0.75rem; background: var(--tk-card); }
-  .rp-list .dl-face.ui-row.down { background: color-mix(in srgb, var(--tk-ink) 6%, var(--tk-card)); }
+  .rp-list .dl-face.ui-row.down { background: var(--tk-inset); }
   .rp-list details > summary.dl-face { list-style: none; cursor: pointer; } .rp-list details > summary.dl-face::-webkit-details-marker { display: none; }
   .rp-list details > :not(summary) { margin: 0 0.75rem 1rem 4rem; }
   .rp-list .dl-act { color: var(--tk-canvas); }
-  .rp-list .dl-act.yes, .rp-list .dl-act.later { background: var(--tk-ink); }
   .rp-page > .notes, .rp-page > .gone-asks { margin-top: 1.5rem; }
   /* Decide's list: More in a round button at the title's right edge, then the rows in cards (ui.css). Each row's face spans its card, so a swipe shows its action edge to edge:
      the recommended answer green under a right swipe, Later indigo under a left one. With nothing waiting the card says All clear. The last row clears the dock. */
@@ -1215,9 +1205,8 @@
   .decide-list .dl-list.ui-list { margin: 0; padding: 0.25rem 0; border-radius: var(--tk-r-card); }
   .decide-list .dl-list.ui-list > li + li::before { right: 0.75rem; left: 0.75rem; }
   .decide-list .dl-face.ui-row { gap: 0.75rem; min-height: 0; padding: 0 0.75rem; background: var(--tk-card); }
-  .decide-list .dl-face.ui-row.down { background: color-mix(in srgb, var(--tk-ink) 6%, var(--tk-card)); }
-  .decide-list .leaving.answered:not([data-side]) .dl-face.ui-row { background: color-mix(in srgb, var(--tk-success) 10%, var(--tk-card)); }
-  .decide-list .leaving.later:not([data-side]) .dl-face.ui-row { background: color-mix(in srgb, var(--c-indigo) 10%, var(--tk-card)); }
+  .decide-list .dl-face.ui-row.down { background: var(--tk-inset); }
+  .decide-list .leaving:not([data-side]) .dl-face.ui-row { background: var(--tk-inset); }
   .decide-list .dl-row.returned .dl-face.ui-row { animation: row-flash 900ms var(--ease); }
   @keyframes row-flash { from, 30% { background: var(--tk-inset); } }
   /* The page's older .meta rule gives a second line a top margin; the shared row's has none. */
@@ -1238,9 +1227,9 @@
   /* A report opened from the list: a sheet over it, as the prototype's draws it. A 28px top corner and a handle; its project's mark, what it is and the day, with a round Close;
      the title in full at 20px and what it says; what it found (or decided) and its parts in sunk panels, each part with a check once read; then its page or Read the report. */
   #reader.rp-sheet { z-index: 3; background: none; }
-  #reader.rp-sheet .rp-scrim { position: absolute; inset: 0; background: rgba(30, 24, 18, 0.28); }
+  #reader.rp-sheet .rp-scrim { position: absolute; inset: 0; background: var(--tk-scrim); }
   #reader.rp-sheet .rp-sheet-body { position: absolute; right: 0; bottom: 0; left: 0; max-width: 26.875rem; max-height: calc(100% - 3rem); margin: 0 auto; padding: 0.5rem 1rem calc(1.5rem + env(safe-area-inset-bottom));
-    border-radius: 1.75rem 1.75rem 0 0; background: var(--tk-card); box-shadow: 0 -8px 32px rgba(30, 20, 10, 0.12); color: var(--tk-text); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); letter-spacing: -0.006em; }
+    border-radius: 1.75rem 1.75rem 0 0; background: var(--tk-card); box-shadow: var(--tk-elev-sheet); color: var(--tk-text); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); letter-spacing: -0.006em; }
   /* A page loads into its frame after the sheet opens; the sheet holds its top 48px down, so nothing moves under a finger while the page grows. */
   #reader.rp-sheet .rp-sheet-body:has(> iframe) { top: 3rem; }
   #reader.rp-sheet .rp-sheet-body > * { max-width: none; margin-right: 0; margin-left: 0; }
@@ -1258,7 +1247,7 @@
   #reader.rp-sheet .rp-found { padding: 0.75rem 1rem; color: var(--tk-ink); }
   #reader.rp-sheet .rp-part { width: 100%; min-height: 3rem; padding: 0; border-radius: 0; background: none; font: inherit; text-align: left; }
   #reader.rp-sheet .rp-part .k { flex: 1; min-width: 0; color: var(--tk-ink); font-weight: 500; }
-  #reader.rp-sheet .rp-check { display: grid; flex: none; place-items: center; width: 1.25rem; height: 1.25rem; border-radius: 0.625rem; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--tk-text-tertiary) 55%, transparent); }
+  #reader.rp-sheet .rp-check { display: grid; flex: none; place-items: center; width: 1.25rem; height: 1.25rem; border-radius: 0.625rem; box-shadow: inset 0 0 0 1.5px var(--tk-mid); }
   #reader.rp-sheet .rp-check.on { background: var(--tk-ink); box-shadow: none; color: var(--tk-canvas); }
   #reader.rp-sheet .rp-check .glyph { width: 0.875rem; height: 0.875rem; stroke-width: 2.6; }
   #reader.rp-sheet .rp-open-full { width: 100%; min-height: 3rem; margin-top: 1rem; border-radius: 1.5rem; background: var(--tk-ink); color: var(--tk-canvas); font: inherit; font-size: 0.9375rem; font-weight: 500; }
@@ -1269,15 +1258,14 @@
   #reader.rp-sheet .tk-mark { background: var(--tk-raised); color: var(--tk-ink); }
   #reader.rp-sheet .tk-bar { background: var(--tk-track); } #reader.rp-sheet .tk-bar i, #reader.rp-sheet .th-list li:last-child .th-dot { background: var(--tk-fill); }
   #reader.rp-sheet .read > .dis { display: block; min-height: 2.75rem; margin-top: 1rem; padding: 0; border: 0; background: none; color: var(--tk-text-tertiary); font: inherit; }
-  @media (prefers-color-scheme: dark) { #reader.rp-sheet .rp-scrim { background: rgba(0, 0, 0, 0.5); } }
   /* On a desk the sheet sits in the middle of the window, with all four corners rounded. */
   @media (min-width: 64rem) { #reader.rp-sheet .rp-sheet-body { top: 50%; bottom: auto; max-height: calc(100% - 6rem); border-radius: 1.75rem; transform: translateY(-50%); }
     #reader.rp-sheet .rp-sheet-body:has(> iframe) { top: 3rem; bottom: 3rem; transform: none; } #reader.rp-sheet .rp-grab { visibility: hidden; } }
-  .tabs .bd.blue { background: var(--action); }
+  .tabs .bd.ink { background: var(--tk-ink); color: var(--tk-canvas); }
   /* All clear: a green check pops in. */
   .all-clear-big { padding: 4rem 1.5rem 1rem; text-align: center; }
-  .all-clear-big .big { display: grid !important; place-items: center; width: 4.5rem; height: 4.5rem; margin: 0 auto 1.125rem; border-radius: 50%; color: #FFFFFF;
-    background: var(--tk-success); box-shadow: 0 10px 28px -8px color-mix(in srgb, var(--tk-success) 70%, transparent); animation: pop 520ms var(--spring); }
+  .all-clear-big .big { display: grid !important; place-items: center; width: 4.5rem; height: 4.5rem; margin: 0 auto 1.125rem; border-radius: 50%; color: var(--tk-card);
+    background: var(--tk-fill); box-shadow: var(--tk-elev-raised); animation: pop 520ms var(--spring); }
   .all-clear-big .glyph { width: 2.125rem; height: 2.125rem; stroke-width: 2.6; }
   .all-clear-big h2 { margin: 0 0 0.375rem; font-size: var(--t-l); line-height: 1.75rem; }
   .all-clear-big p { margin: 0; color: var(--muted); font-size: var(--t-s); }
@@ -1300,10 +1288,9 @@
      then the question in full, since when it has waited, why, its preview, one panel of what it carries (priority, its ticket), the proof it rests on,
      Your answer as one inset group of rows with a radio each (Recommended a white tag, Your own answer last), one note, and Ask me later beside one ink button that names the pick. */
   .ask-over { position: fixed; z-index: 30; inset: 0; }
-  .ask-scrim { position: absolute; inset: 0; background: rgba(30, 24, 18, 0.28); }
+  .ask-scrim { position: absolute; inset: 0; background: var(--tk-scrim); }
   .ask-sheet { position: absolute; left: 0; right: 0; bottom: 0; max-width: 30rem; max-height: calc(100% - 3rem); margin: 0 auto; overflow: auto; overscroll-behavior: contain;
-    padding: 0 1rem; border-radius: 1.75rem 1.75rem 0 0; background: var(--tk-card); box-shadow: 0 -8px 32px rgba(30, 20, 10, 0.12); }
-  @media (prefers-color-scheme: dark) { .ask-scrim { background: rgba(0, 0, 0, 0.5); } }
+    padding: 0 1rem; border-radius: 1.75rem 1.75rem 0 0; background: var(--tk-card); box-shadow: var(--tk-elev-sheet); }
   .ask-over.up .ask-scrim { animation: scrim-in 250ms var(--ease); } .ask-over.up .ask-sheet { animation: sheet-up 300ms var(--ease); }
   @keyframes scrim-in { from { opacity: 0; } }
   body:has(.ask-sheet) { overflow: hidden; }
@@ -1319,8 +1306,7 @@
   .sh-x { position: relative; display: grid; flex: none; place-items: center; width: 2rem; height: 2rem; border-radius: 1rem; background: var(--tk-inset); color: var(--tk-text-secondary); }
   .sh-x::after { content: ''; position: absolute; inset: -0.375rem; }
   .sh-x .glyph { width: 1.125rem; height: 1.125rem; stroke-width: 2; }
-  .decide { --ring: #D3CCC9; max-width: 42.5rem; margin: 0 auto; color: var(--tk-text); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
-  @media (prefers-color-scheme: dark) { .decide { --ring: #55514C; } }
+  .decide { --ring: var(--tk-mid); max-width: 42.5rem; margin: 0 auto; color: var(--tk-text); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
   .decide .lead h2 { margin: 0.5rem 0 0; color: var(--tk-ink); font-size: 1.25rem; line-height: 1.75rem; font-weight: 500; letter-spacing: -0.017em; text-wrap: pretty; outline: none; }
   .decide .since, .decide .why { margin: 0.5rem 0 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 400; }
   .decide .lead .st { display: inline-block; margin-top: 0.5rem; }
@@ -1348,8 +1334,8 @@
   .tk-label { margin: 0 0 0.5rem; color: var(--muted); font-size: 0.875rem; line-height: 1.1875rem; font-weight: 600; letter-spacing: 0; text-transform: none; }
   .ticket-row { display: flex; align-items: center; gap: 0.75rem; min-height: 3.75rem; padding: 0.625rem 0.875rem; border-radius: 1rem; background: var(--opt, var(--surface)); box-shadow: 0 0 0 0.5px var(--line);
     color: var(--text); text-decoration: none; transition: background-color 120ms linear; }
-  .ticket-row:active { background: color-mix(in srgb, var(--text) 6%, var(--opt, var(--surface))); }
-  .tk-mark { flex: none; display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 0.625rem; background: color-mix(in srgb, var(--action) 14%, transparent); color: var(--action); }
+  .ticket-row:active { background: var(--tk-inset); }
+  .tk-mark { flex: none; display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 0.625rem; background: var(--tk-inset); color: var(--tk-ink); }
   .tk-mark .glyph { width: 1.25rem; height: 1.25rem; }
   .tk-t { display: grid; flex: 1; min-width: 0; gap: 0.125rem; }
   .tk-t b { overflow: hidden; font-size: 1rem; line-height: 1.375rem; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
@@ -1358,7 +1344,7 @@
   .tk-bar i { display: block; height: 100%; border-radius: inherit; background: var(--action); }
   .tk-n { font-variant-numeric: tabular-nums; }
   .ticket-row > :last-child .glyph { width: 1.25rem; height: 1.25rem; color: var(--muted); }
-  /* A card's thread: one grouped list, oldest first, a dot per step (the newest blue), its words, the note in quotes and the time. */
+  /* A card's thread: one grouped list, oldest first, a dot per step (the newest in ink), its words, the note in quotes and the time. */
   .thread { margin-top: 1.25rem; } .ev-item .thread { margin: 0; }
   .th-list { margin: 0; padding: 0.125rem 1rem; list-style: none; border-radius: 1rem; background: var(--opt, var(--surface)); box-shadow: 0 0 0 0.5px var(--line); }
   .ev-item .th-list { border-radius: 0.75rem; box-shadow: none; } @media (min-width: 64rem) { .ev-item .th-list { border-radius: 1.125rem; } }
@@ -1446,21 +1432,21 @@
   .decide-bar :is(.answer, .open-link, .later-btn):active { transform: scale(0.97); transition-duration: 90ms; }
   .decide-bar .answer:disabled:not(.done) { background: var(--tk-ink); color: var(--tk-canvas); opacity: 0.35; cursor: default; }
   .decide-bar .hint { flex-basis: 100%; margin: 0.25rem 0 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: 1.125rem; text-align: center; white-space: normal; }
-  .open-link .spin { width: 1.25rem; height: 1.25rem; border: 2.2px solid color-mix(in srgb, var(--tk-canvas) 35%, transparent); border-top-color: var(--tk-canvas); border-radius: 50%; animation: spin 700ms linear infinite; }
+  .open-link .spin { width: 1.25rem; height: 1.25rem; border: 2.2px solid var(--tk-on-ink-press); border-top-color: var(--tk-canvas); border-radius: 50%; animation: spin 700ms linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .answer .lbl { display: inline-block; overflow: hidden; text-overflow: ellipsis; } .answer .lbl.swap { animation: lbl-in 200ms var(--ease); }
   @keyframes lbl-in { from { opacity: 0; transform: translateY(0.5rem); } }
   .answer .okmark { position: absolute; inset: 0; display: none !important; place-items: center; }
-  .decide-bar .answer.done, .decide-bar .answer.done:disabled { background: var(--tk-success); color: #FFFFFF; opacity: 1; }
+  .decide-bar .answer.done, .decide-bar .answer.done:disabled { background: var(--tk-fill); color: var(--tk-card); opacity: 1; }
   .answer.done .lbl { animation: lbl-out 140ms var(--ease) forwards; }
   @keyframes lbl-out { to { opacity: 0; transform: translateY(-0.5rem); } }
   .answer.done .okmark { display: grid !important; }
   .answer .okmark .glyph { width: 1.75rem; height: 1.75rem; stroke-width: 2.6; stroke-dasharray: 24; stroke-dashoffset: 24; animation: draw 260ms 90ms var(--ease) forwards; }
   @keyframes draw { to { stroke-dashoffset: 0; } }
   /* A sheet: the proof's capture, from the bottom on a phone. */
-  #sheet { width: 100%; max-width: none; max-height: 92dvh; margin: auto 0 0; padding: 0; border: 0; border-radius: 1.375rem 1.375rem 0 0; background: var(--bg); color: var(--text); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.16); }
+  #sheet { width: 100%; max-width: none; max-height: 92dvh; margin: auto 0 0; padding: 0; border: 0; border-radius: 1.375rem 1.375rem 0 0; background: var(--bg); color: var(--text); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); }
   #sheet[open] { animation: sheet-up 250ms var(--ease); }
-  #sheet::backdrop { background: rgba(0, 0, 0, 0.22); }
+  #sheet::backdrop { background: var(--tk-scrim); }
   @keyframes sheet-up { from { transform: translateY(100%); } }
   #sheet > div { padding: 0 1.25rem calc(1.5rem + env(safe-area-inset-bottom)); }
   #sheet > div::before { content: ""; display: block; width: 2.375rem; height: 0.3125rem; margin: 0.5625rem auto 0.625rem; border-radius: 0.1875rem; background: var(--sunk); }
@@ -1470,25 +1456,22 @@
   #sheet header button { flex: none; width: 2.75rem; padding: 0; border-radius: 50%; background: none; color: var(--accent); }
   #sheet header button .glyph { width: 1.125rem; height: 1.125rem; padding: 0.4375rem; box-sizing: content-box; border-radius: 50%; background: var(--sunk); }
   #sheet .sheet-shot { display: grid; place-items: center; margin-top: 1rem; } #sheet .sheet-shot .phone { width: min(13.75rem, 60%); }
-  /* The toast rises on a spring with its mark: dark on a light page and light on a dark one, the words, Undo in blue, and a hairline that counts down to when it goes. */
-  #toast { overflow: hidden; gap: 0.75rem; min-height: 3.375rem; padding: 0 0.375rem 0 0.875rem; border-radius: 1.125rem; background: rgba(28, 28, 30, 0.94); color: #FFFFFF; font-size: var(--t-s); line-height: 1.25rem;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); animation: toast-in 300ms var(--spring); --toast-accent: #64B5FF; }
-  @media (prefers-color-scheme: dark) { #toast { background: rgba(242, 242, 244, 0.96); color: #0B0B0D; --toast-accent: #0066D6; } }
+  /* The toast rises on a spring with its mark: an ink pill with the canvas's colour on it, as the prototype's, the words, Undo on a lighter pill, and a hairline that counts down to when it goes. */
+  #toast { overflow: hidden; gap: 0.75rem; min-height: 3.375rem; padding: 0 0.375rem 0 0.875rem; border-radius: 1.125rem; background: var(--tk-ink); color: var(--tk-canvas); font-size: var(--t-s); line-height: 1.25rem;
+    box-shadow: var(--tk-elev-float); animation: toast-in 300ms var(--spring); }
   #toast #toast-text b { font-weight: 600; }
-  #toast button { min-height: var(--ctl); padding: 0 0.875rem; border-radius: 0.8125rem; background: none; color: var(--toast-accent); font-size: var(--t-b); font-weight: 600; }
-  #toast button:active { background: rgba(127, 127, 127, 0.18); }
+  #toast button { min-height: var(--ctl); padding: 0 0.875rem; border-radius: 0.8125rem; background: var(--tk-on-ink-press); color: inherit; font-size: var(--t-b); font-weight: 600; }
   @keyframes toast-in { from { opacity: 0; transform: translateY(calc(100% + 2rem)); } }
-  #toast .tk { display: none; flex: none; place-items: center; width: 1.625rem; height: 1.625rem; border-radius: 50%; color: #FFFFFF; }
+  #toast .tk { display: none; flex: none; place-items: center; width: 1.625rem; height: 1.625rem; border-radius: 50%; color: var(--tk-ink); }
   #toast[data-mark] .tk { display: grid; }
-  #toast[data-mark="ok"] .tk { background: var(--tk-success); } #toast[data-mark="later"] .tk { background: var(--faint); }
-  #toast[data-mark="undo"] .tk, #toast[data-mark="dismiss"] .tk { background: var(--action); } #toast[data-mark="error"] .tk { background: var(--danger); }
+  #toast[data-mark] .tk { background: var(--tk-canvas); } #toast[data-mark="error"] .tk { background: var(--danger); color: var(--tk-on-critical); }
   #toast .tk svg { display: none; width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
   #toast[data-mark="ok"] .tk .ok, #toast[data-mark="later"] .tk .later, #toast[data-mark="undo"] .tk .undo, #toast[data-mark="dismiss"] .tk .dismiss, #toast[data-mark="error"] .tk .error { display: block; }
-  #toast .bar { position: absolute; left: 0; bottom: 0; width: 100%; height: 2px; background: var(--toast-accent); opacity: 0.5; transform-origin: left; animation: countdown var(--tms, 5s) linear forwards; }
+  #toast .bar { position: absolute; left: 0; bottom: 0; width: 100%; height: 2px; background: var(--tk-canvas); opacity: 0.5; transform-origin: left; animation: countdown var(--tms, 5s) linear forwards; }
   @keyframes countdown { to { transform: scaleX(0); } }
-  /* An approved screen in the viewer carries a green check stamp in its corner. */
+  /* An approved screen in the viewer carries an ink check stamp in its corner. */
   .design-stage .stamp { position: absolute; z-index: 1; top: 1rem; right: 1rem; display: grid !important; place-items: center; width: 3.5rem; height: 3.5rem; border-radius: 50%; pointer-events: none;
-    background: color-mix(in srgb, var(--tk-success) 82%, #000); color: #FFFFFF; box-shadow: 0 10px 28px -8px rgba(0, 0, 0, 0.45); }
+    background: var(--tk-fill); color: var(--tk-card); box-shadow: var(--tk-elev-raised); }
   .design-stage .stamp .glyph { width: 1.875rem; height: 1.875rem; stroke-width: 2.6; }
   .design-stage .stamp.pop { animation: stamp 520ms var(--spring); }
   @keyframes stamp { from { opacity: 0; transform: scale(1.8) rotate(-12deg); } }
@@ -1499,9 +1482,9 @@
     box-shadow: inset 0 -1px 0 var(--line); color: var(--muted); font: 600 0.75rem/1 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; letter-spacing: 0; }
   .split-hints, .split-bar, .dl-hover, .side .keys { display: none; }
   #keys { width: min(44rem, calc(100vw - 2rem)); max-height: calc(100dvh - 3rem); padding: 0; border: 0; border-radius: 1.25rem; background: var(--tile); color: var(--text);
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28), 0 0 0 0.5px var(--line); }
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2), 0 0 0 0.5px var(--line); }
   #keys[open] { animation: sheet-in 260ms var(--spring); }
-  #keys::backdrop { background: rgba(0, 0, 0, 0.32); }
+  #keys::backdrop { background: var(--tk-scrim); }
   @keyframes sheet-in { from { opacity: 0; transform: scale(0.94); } }
   #keys > div { padding: 1.5rem 1.75rem 1.75rem; }
   #keys header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
@@ -1520,7 +1503,7 @@
     .split-list .dl-list { margin: 0 -1.5rem; border-radius: 0; }
     .split-list .rp-list.ui-list { margin: 0; border-radius: var(--tk-r-card); }
     .split-list .dl-face { min-height: 4.5rem; padding: 0.75rem 1.5rem; }
-    .dl-row.sel .dl-face { background: color-mix(in srgb, var(--action) 11%, var(--bg)); box-shadow: inset 3px 0 0 var(--action); outline: none; }
+    .dl-row.sel .dl-face { background: var(--tk-inset); box-shadow: inset 3px 0 0 var(--action); outline: none; }
     .dl-row.sel + .dl-row .dl-face::before, .dl-row.sel .dl-face::before { border-color: transparent; }
     /* The report shown sits on the sunk fill, as the prototype marks the open item. */
     .rp-list .dl-row.sel .dl-face.ui-row { background: var(--tk-inset); box-shadow: none; }
@@ -1557,7 +1540,7 @@
     .split-detail .decide-bar .hint { flex: 1 1 12rem; max-width: 18.75rem; margin: 0; text-align: left; }
     .split-detail .decide-bar .bar-hint { display: inline-flex; align-items: center; gap: 0.375rem; margin-left: auto; color: var(--faint); font-size: var(--t-xs); }
     .split-detail [data-kbd]::after { content: attr(data-kbd); display: inline-grid; place-items: center; min-width: 1.375rem; height: 1.375rem; margin-left: 0.625rem; padding: 0 0.3125rem; border-radius: 0.375rem;
-      background: rgb(255 255 255 / 0.22); color: inherit; font-size: 0.75rem; font-weight: 600; line-height: 1; vertical-align: 0.0625rem; }
+      background: var(--tk-on-ink-press); color: inherit; font-size: 0.75rem; font-weight: 600; line-height: 1; vertical-align: 0.0625rem; }
     .split-bar [data-kbd]::after { background: var(--sunk); color: var(--muted); }
     .split-detail .answer.done::after { opacity: 0; }
     .split-detail > .empty, .split-detail > .all-clear-big { margin: auto; padding: 2rem; color: var(--muted); }
@@ -1566,16 +1549,16 @@
     @keyframes detail-in { from { opacity: 0; transform: translateY(var(--dy, 1rem)); } }
     .split-detail[data-dir="up"] { --dy: -1rem; }
     /* Hovering a row shows its quick actions over its time: answer with the recommended pick, or Later. */
-    .split-list .dl-hover { position: absolute; z-index: 2; top: 50%; right: 1rem; transform: translateY(-50%); display: flex; gap: 0.25rem; opacity: 0; pointer-events: none; transition: opacity 120ms linear; padding: 0.125rem; border-radius: 0.75rem; background: var(--tile); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12), 0 0 0 0.5px var(--line); }
+    .split-list .dl-hover { position: absolute; z-index: 2; top: 50%; right: 1rem; transform: translateY(-50%); display: flex; gap: 0.25rem; opacity: 0; pointer-events: none; transition: opacity 120ms linear; padding: 0.125rem; border-radius: 0.75rem; background: var(--tile); box-shadow: var(--tk-elev-raised), 0 0 0 0.5px var(--line); }
     .split-list .dl-row:not(.leaving):hover .dl-hover, .split-list .dl-row:focus-within .dl-hover { opacity: 1; pointer-events: auto; }
     .dl-hover button { display: inline-flex; align-items: center; gap: 0.375rem; min-height: 2rem; padding: 0 0.625rem; border-radius: 0.5rem; background: none; color: var(--text); font-size: var(--t-xs); font-weight: 600; }
     .dl-hover button::after { content: ""; position: absolute; inset: -0.375rem 0; }
     .dl-hover button { position: relative; } .dl-hover .glyph { width: 1rem; height: 1rem; stroke-width: 2.2; }
-    .dl-hover .yes .glyph { color: color-mix(in srgb, var(--tk-success) 82%, #000); } .dl-hover .later-q .glyph { color: var(--c-indigo); }
+    .dl-hover .yes .glyph { color: var(--tk-ink); } .dl-hover .later-q .glyph { color: var(--tk-text-secondary); }
     /* Reports: the bar says what the report is, who asked and when, beside Mark read and Archive; the page reads under it at the pane's width. */
     .dl-hover .read-q .glyph { color: var(--tk-ink); }
     .rp-bar .eyebrow { display: block; flex: 1; min-width: 0; margin: 0 0 0 0.5rem; overflow: hidden; color: var(--muted); font-size: var(--t-s); font-weight: 400; white-space: nowrap; text-overflow: ellipsis; }
-    .rp-bar .eyebrow b { color: var(--teal); font-weight: 600; }
+    .rp-bar .eyebrow b { color: var(--tk-ink); font-weight: 600; }
     .split-bar :is(.rp-read, .rp-archive) { display: inline-flex; flex: none; align-items: center; gap: 0.5rem; min-height: var(--ctl); padding: 0 0.75rem; border-radius: var(--r-ctl); background: none; color: var(--text); font-weight: 400;
       transition: background-color 120ms linear, transform 120ms var(--ease); }
     .split-bar :is(.rp-read, .rp-archive):hover { background: var(--sunk); }
@@ -1589,7 +1572,7 @@
     #board .split-detail > .read iframe { border: 0; }
     #board .split-detail > .read .rp-open { display: inline-flex; align-items: center; margin-left: 0; padding: 0 1.5rem; }
     .side .keys { display: flex; align-items: center; gap: 0.75rem; width: 100%; min-height: var(--ctl); padding: 0 0.625rem; border-radius: 0.625rem; background: none; color: var(--text); font-size: var(--t-s); font-weight: 500; text-align: left; white-space: nowrap; }
-    .side .keys:hover { background: color-mix(in srgb, var(--sunk) 50%, transparent); }
+    .side .keys:hover { background: var(--tk-card); }
     .side .keys .kc { margin-left: auto; }
     .side .go { display: flex; align-items: center; gap: 0.5rem; margin: auto 0.625rem 0.25rem; color: var(--faint); font-size: var(--t-xs); }
   }
@@ -1619,10 +1602,8 @@
   .tk-hero { container-type: inline-size; }
   /* The shared hero chip (ui.css), with the prototype's green rise before its count. */
   .tk-hero .chip { display: inline-flex; align-items: center; gap: 0.25rem; }
-  .tk-hero .chip .up { width: 0; height: 0; border-right: 4.5px solid transparent; border-bottom: 7px solid #2BB673; border-left: 4.5px solid transparent; }
+  .tk-hero .chip .up { width: 0; height: 0; border-right: 4.5px solid transparent; border-bottom: 7px solid var(--tk-up); border-left: 4.5px solid transparent; }
   .tk-hero .vs i { display: inline-block; width: 0.5rem; height: 0.5rem; margin-right: 0.375rem; border-radius: 2px; background: var(--tk-mid); }
-  .tk-hero, .tk-dots { --tk-mid: #D3CCC9; }
-  @media (prefers-color-scheme: dark) { .tk-hero, .tk-dots { --tk-mid: #55514C; } }
   .tk-dots { --cell: calc((100cqw - (var(--cols) - 1) * 2px) / var(--cols)); display: grid; grid-template-columns: repeat(var(--cols), var(--cell)); grid-auto-rows: var(--cell); gap: 2px; align-content: start;
     height: round(up, calc(var(--rows) * (var(--cell) + 2px) - 2px), 4px); margin-top: 0.75rem; }
   .tk-dots i { border-radius: 2px; background: var(--tk-track); } .tk-dots i.d { background: var(--tk-fill); } .tk-dots i.m { background: var(--tk-mid); }
@@ -1638,10 +1619,9 @@
   .tk-pick .k { color: var(--tk-ink); } .tk-pick:active { background: none; } .tk-pick .glyph { width: 1rem; height: 1rem; color: var(--tk-ink); }
   /* A ticket over the list, on a phone: a sheet from the bottom over a dimmed list, up to 48px from the top, scrolling inside. */
   .tk-over { position: fixed; z-index: 30; inset: 0; }
-  .tk-scrim { position: absolute; inset: 0; background: rgba(30, 24, 18, 0.28); }
-  @media (prefers-color-scheme: dark) { .tk-scrim { background: rgba(0, 0, 0, 0.5); } }
+  .tk-scrim { position: absolute; inset: 0; background: var(--tk-scrim); }
   .tk-sheet { position: absolute; right: 0; bottom: 0; left: 0; max-width: 30rem; max-height: calc(100% - 3rem); margin: 0 auto; padding: 0 1rem calc(2rem + env(safe-area-inset-bottom)); overflow: auto;
-    overscroll-behavior: contain; border-radius: 1.75rem 1.75rem 0 0; background: var(--tk-card); color: var(--tk-text); box-shadow: 0 -8px 32px rgba(30, 20, 10, 0.12); }
+    overscroll-behavior: contain; border-radius: 1.75rem 1.75rem 0 0; background: var(--tk-card); color: var(--tk-text); box-shadow: var(--tk-elev-sheet); }
   .tk-over.up .tk-sheet { animation: sheet-up 300ms var(--ease); } .tk-over.up .tk-scrim { animation: tk-fade 250ms var(--ease); }
   @keyframes tk-fade { from { opacity: 0; } }
   body:has(.tk-sheet) { overflow: hidden; }
@@ -2652,7 +2632,7 @@
       const n = badged(TABS[i][0]) ? count(TABS[i][0]) : 0;
       let bd = t.querySelector('.bd');
       if (!n) return bd?.remove();
-      if (!bd) t.append(bd = el('span', { class: `bd${TABS[i][0] === 'reports' ? ' blue' : ''}`, 'aria-hidden': 'true' }));
+      if (!bd) t.append(bd = el('span', { class: `bd${TABS[i][0] === 'reports' ? ' ink' : ''}`, 'aria-hidden': 'true' }));
       if (bd.textContent && bd.textContent !== String(n) && !calm.matches) { bd.classList.remove('bump'); void bd.offsetWidth; bd.classList.add('bump'); }
       bd.textContent = String(n);
     });
@@ -4769,8 +4749,8 @@
     const active = at === 'decide' ? 'waiting' : at === 'answered' ? '' : at === 'ticket' ? 'tickets' : at ?? '';
     // Tickets, as the prototype draws its place, carries no count.
     const count = (a) => (a === 'reports' && !state.readonly ? by.reports.filter(unread).length : a && a !== 'tickets' ? by[a].length : undefined);
-    // Decide's count is a red badge and new Reports' a blue one, in the sidebar and the tab bar alike; Evidence's is a plain number.
-    const badge = (a) => (a === 'waiting' ? 'red' : a === 'reports' && !state.readonly ? 'blue' : '');
+    // Decide's count is a red badge and new Reports' an ink one, in the sidebar and the tab bar alike; Evidence's is a plain number.
+    const badge = (a) => (a === 'waiting' ? 'red' : a === 'reports' && !state.readonly ? 'ink' : '');
     const link = ([a, name]) => el('a', { href: `#${a}`, ...(a === active && { 'aria-current': 'page' }) }, icon(`tab-${a || 'today'}`), name,
       count(a) === undefined || (badge(a) && !count(a)) ? '' : el('span', { class: `n ${badge(a)}`.trim() }, String(count(a))));
     document.getElementById('nav').replaceChildren(el('p', { class: 'brand' }, el('span', { class: 'logo', 'aria-hidden': 'true' }, glyph('check')), el('span', {}, 'Sign-off', state.name ? el('small', {}, state.name) : '')),
