@@ -48,6 +48,9 @@ journeys:
   # Today's Replies, Decide's badges, the Designs row, each step's card with its track, reply and Activity, a design's change notes replied to, and Today once the reply is opened.
   trail:
     command: 'npm run build > /dev/null && for w in 390 1280; do for t in light dark; do node .agents/skills/done-done-verify-sign-off/trail-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t $w || exit 1; done; done'
+  # Decide's answered rows with long titles and notes at 360, 390, 445, 1280 and 1440, light and dark: each row's badge (four marks and the step's word) is one 20px line at the end of the second line, the words before it take the ellipsis.
+  trail-badge:
+    command: 'npm run build > /dev/null && for w in 360 390 445 1280 1440; do for t in light dark; do TRAIL_LONG=1 node .agents/skills/done-done-verify-sign-off/trail-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t $w || exit 1; done; done'
   # Discard at 390 and 1280, light and dark: an ask's Discard sheet of three reasons, an Undo inside 10 seconds that never reaches the agent, Select in Decide and in Designs,
   # Discard 2 with the toast's 10-second Undo, the agent's own wait handing the reasons over, and Archived with each reason, Read and Restore.
   discard:

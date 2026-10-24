@@ -9,6 +9,7 @@ Phone (390) and desk (1280), light and dark.
   - Under it, once the agent replied: its words and its link (Pull request N, or Open the new version). With a link and no words the last step reads Acted; a card posted again after the send reads Acted with Posted a new version.
 - **In its Activity:** Delivered to <agent>, <agent> read it, <agent> replied · Pull request N with the reply quoted. One step per word and second.
 - **In the lists** (`trailBadge`, `.ui-tb`): at the end of a row's second line, four 4px marks and the step's word; a reply not opened yet is ink. On Decide's Answered rows, Designs' rows, Today's rows and a ticket's Linked rows.
+- **The badge keeps its look on every phone:** the page names `tokens.css` and `ui.css` by content (`?v=<hash>`), so a phone that kept an older stylesheet for a day never draws the badge unstyled (a large word over the row). One 20px line, the words before it take the ellipsis, at 360, 390 and 445: `TRAIL_LONG=1 trail-shots.mjs <folder> <theme> <360|390|445>` (journey `trail-badge`); the regression is test/design.test.mjs ("the feedback trail").
 - **In Today:** Replies, the cards with a reply not opened yet, newest first, the reply's words as the second line; above Waiting on you on a phone, at the top of the right column on a desk. Opening the card marks the reply seen and it leaves Today.
 
 ## Where each step comes from

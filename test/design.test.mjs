@@ -4116,7 +4116,7 @@ test('the feedback trail: what the person sends on a card goes Sent, Delivered, 
     assert.equal(run('raise', file, '--key', key, '--title', title, '--filer', filer).code, 0);
   }
   // The agent's command refuses what it cannot mark, and writes nothing.
-  for (const [args, why] of [[['digest'], /one of --read, --reply/], [['digest', '--read', '--acted'], /one of --read, --reply/], [['digest', '--read'], /nothing was sent on digest yet/],
+  for (const [args, why] of [[['digest'], /one of --delivered, --read, --reply/], [['digest', '--read', '--acted'], /one of --delivered, --read, --reply/], [['digest', '--read'], /nothing was sent on digest yet/],
     [['digest', '--acted'], /--acted needs --link/], [['digest', '--reply', 'Done.', '--link', 'not a link'], /http\(s\) address/], [['nope', '--read'], /no card with key nope/]]) {
     const r = run('feedback', ...args.slice(0, 1), file, ...args.slice(1));
     assert.notEqual(r.code, 0, args.join(' ')); assert.match(r.out, why, args.join(' '));
@@ -4150,7 +4150,7 @@ test('the feedback trail: what the person sends on a card goes Sent, Delivered, 
   assert.match(run('ticket', file, '--id', 'T-1', '--comment', JSON.stringify({ ...said, picked: sec - 500, replies: [{ at: sec - 60, text: 'Yes, it ships Friday with the release.', by: 'release-agent' }] })).out, /shows: Replied/);
   assert.deepEqual(Object.fromEntries(Object.entries((await (await fetch(`${url}api/decisions`)).json()).trail.find((t) => t.kind === 'ticket')).map(([k, v]) => [k, typeof v === 'string' && /^\d{4}-/.test(v) ? 'time' : v])),
     { id: '3f9a1c2e7b6d4a10', key: 'T-1', kind: 'ticket', said: 'Is the export in this release?', at: 'time', delivered: 'time', read: 'time', reply: { at: (await (await fetch(`${url}api/decisions`)).json()).trail.find((t) => t.kind === 'ticket').reply.at, text: 'Yes, it ships Friday with the release.' } });
-  const { evaluate, close } = await browse(join(dir, 'b'), 390, 844, true);
+  const { evaluate, send, close } = await browse(join(dir, 'b'), 390, 844, true);
   try {
     // Today: the reply above Waiting on you, its words as the row's second line.
     await evaluate(`location.href = ${JSON.stringify(url)}`);
@@ -4162,6 +4162,24 @@ test('the feedback trail: what the person sends on a card goes Sent, Delivered, 
     await until(async () => (await evaluate('document.querySelectorAll(".ui-tb").length')) === 3);
     assert.deepEqual(JSON.parse(await evaluate('JSON.stringify([...document.querySelectorAll(".ui-row")].filter((r) => r.querySelector(".ui-tb")).map((r) => [r.querySelector(".t").textContent, r.querySelector(".ui-tb").textContent, r.querySelectorAll(".ui-tb i.on").length, r.querySelector(".ui-tb").classList.contains("new")]).sort())')),
       [['Keep the weekly digest?', 'Sent', 1, false], ['Open the beta to every team?', 'Replied', 4, true], ['Turn on the CSV export?', 'Delivered', 2, false]]);
+    // The badge is one 20px line at the end of the second line at 360, 390 and 445, whatever the title and the line before it say: the words before it take the ellipsis.
+    // The page names its stylesheets by their content, so a phone holding the stylesheet of an older version (kept a day) never draws the badge without its rules.
+    const hrefs = [...(await (await fetch(url)).text()).matchAll(/<link rel="stylesheet" href="(\S+\.css)\?v=[0-9a-f]{12}">/g)].map((m) => m[1]);
+    assert.deepEqual(hrefs, ['tokens.css', 'ui.css']);
+    assert.equal(await evaluate('[...document.querySelectorAll("link[rel=stylesheet]")].map((l) => l.getAttribute("href").replace(/[?]v=[0-9a-f]{12}$/, "")).join()'), 'tokens.css,ui.css');
+    assert.match((await (await fetch(`${url}ui.css?v=0123456789ab`)).text()), /\.ui-tb \{ display: inline-flex/);
+    const wrap = () => evaluate(`JSON.stringify([...document.querySelectorAll(".ui-row")].filter((r) => r.querySelector(".ui-tb")).map((r) => { const b = r.querySelector(".ui-tb"), m = r.querySelector(".meta"), t = r.querySelector(".t");
+      const x = b.getBoundingClientRect(), y = m.getBoundingClientRect(), z = r.getBoundingClientRect(); return { word: b.textContent, h: Math.round(x.height), lines: b.getClientRects().length, clear: y.right <= x.left + 0.5, inside: x.right <= z.right + 0.5 && x.bottom <= z.bottom, cut: m.scrollWidth > m.clientWidth, t: t.scrollWidth > t.clientWidth }; }))`);
+    for (const w of [360, 390, 445]) {
+      await send('Emulation.setDeviceMetricsOverride', { width: w, height: 844, deviceScaleFactor: 1, mobile: true });
+      await evaluate(`document.querySelectorAll(".ui-row .meta").forEach((m) => (m.textContent = "Yes · “" + "A long note about why the answer is what it is, to the whole team. ".repeat(3) + "” · 14:42")); document.querySelectorAll(".ui-row .t").forEach((t) => (t.textContent += " and a title long enough to need its own ellipsis before the priority chip"))`);
+      const rows = JSON.parse(await wrap());
+      assert.equal(rows.length, 3, `${w}`);
+      for (const r of rows) assert.deepEqual({ h: r.h, lines: r.lines, clear: r.clear, inside: r.inside, cut: r.cut, t: r.t }, { h: 20, lines: 1, clear: true, inside: true, cut: true, t: true }, `${w} ${r.word}`);
+    }
+    await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    await evaluate('location.reload()');
+    await until(async () => (await evaluate('document.querySelectorAll(".ui-tb").length')) === 3);
     // The card: the track's reached steps with their times, then the reply and its link; the Activity names each step.
     const card = async (key) => { await evaluate(`location.hash = "#decide/${key}"`); await until(() => evaluate(`!!document.querySelector(".decide .ui-trail") && location.hash === "#decide/${key}"`));
       return JSON.parse(await evaluate('JSON.stringify({ track: [...document.querySelectorAll(".decide .ui-trail li")].map((l) => l.querySelector("b").textContent + (l.classList.contains("on") && /^\\d\\d:\\d\\d$/.test(l.querySelector("time").textContent) ? "+" : "")).join(" "), said: document.querySelector(".decide .tr-said")?.innerText.replace(/\\s+/g, " ") ?? "", link: document.querySelector(".decide .tr-said a")?.getAttribute("href") ?? "", act: [...document.querySelectorAll(".decide .ui-act li .aw b")].map((b) => b.textContent).filter((t) => !/^(Posted|Your answer)/.test(t)) })')); };
@@ -4186,6 +4204,39 @@ test('the feedback trail: what the person sends on a card goes Sent, Delivered, 
     await evaluate('location.reload()');
     assert.deepEqual(await card('export'), { track: 'Sent+ Delivered+ Read+ Acted+', said: 'Posted a new version', link: '', act: ['Delivered to release-agent', 'release-agent read it'] });
   } finally { close(); }
+  proc.kill();
+});
+
+test('feedback --at replays a step that happened earlier: Delivered, Read and Acted take their own past times, never before the send or in the future, and never turn a later real state back into an older one', async () => {
+  const dir = join(scratch, 'replay'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  assert.equal(run('raise', file, '--key', 'old', '--title', 'Ship the export?', '--filer', 'release-agent').code, 0);
+  // An answer from three days ago, as an older board holds it: the board has no step after it.
+  const sent = Math.floor(Date.now() / 1000) - 3 * 86400, iso = (n) => new Date(n * 1000).toISOString().replace(/\.\d+Z$/, 'Z');
+  writeFileSync(join(dir, 'board.answers.jsonl'), JSON.stringify({ key: 'old', answer: 'yes', label: 'Yes', close: 'done', at: iso(sent) }) + '\n');
+  const board = JSON.parse(readFileSync(file, 'utf8'));
+  board.items.find((d) => d.key === 'old').filed = iso(sent - 3600);
+  writeFileSync(file, JSON.stringify(board));
+  const step = () => JSON.parse(readFileSync(join(dir, 'board.trail.jsonl'), 'utf8').trim().split('\n').at(-1));
+  for (const [args, why] of [[['--read', '--at', String(sent - 60)], /before what was sent/], [['--read', '--at', String(Math.floor(Date.now() / 1000) + 600)], /not in the future/], [['--read', '--at', 'yesterday'], /whole seconds/]]) {
+    const r = run('feedback', 'old', file, ...args); assert.notEqual(r.code, 0, args.join(' ')); assert.match(r.out, why, args.join(' '));
+  }
+  assert.equal(existsSync(join(dir, 'board.trail.jsonl')), false);
+  assert.match(run('feedback', 'old', file, '--delivered', '--at', String(sent + 5)).out, /shows: Delivered/);
+  assert.equal(step().at, iso(sent + 5));
+  assert.match(run('feedback', 'old', file, '--read', '--at', String(sent + 60)).out, /shows: Read/);
+  assert.match(run('feedback', 'old', file, '--acted', '--link', 'https://github.com/example/settings/pull/9', '--at', String(sent + 3600)).out, /shows: Replied/);
+  // Run again, or with an older time, nothing is written and the later state stays.
+  const lines = readFileSync(join(dir, 'board.trail.jsonl'), 'utf8');
+  for (const args of [['--delivered', '--at', String(sent + 5)], ['--read', '--at', String(sent + 30)], ['--acted', '--link', 'https://github.com/example/settings/pull/9', '--at', String(sent + 3600)], ['--reply', 'Done.', '--at', String(sent + 7200)]]) {
+    assert.match(run('feedback', 'old', file, ...args).out, /already shows that step/, args.join(' '));
+  }
+  assert.equal(readFileSync(join(dir, 'board.trail.jsonl'), 'utf8'), lines);
+  // The board shows each step at the time given.
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1], t = (await (await fetch(`${url}api/decisions`)).json()).trail.find((x) => x.key === 'old');
+  assert.deepEqual([t.delivered, t.read, t.reply], [iso(sent + 5), iso(sent + 60), { at: iso(sent + 3600), link: 'https://github.com/example/settings/pull/9' }]);
   proc.kill();
 });
 

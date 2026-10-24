@@ -371,7 +371,7 @@ again until the filer takes it too.
 What they sent is in its own file (an answer with its note, a design's notes or a plan's send-back, a new round, a comment, a discard with its reason); this file holds the steps after it, one line each:
 `delivered` (a wait that is not the filer's own handed the answer over, or the `on_answer` hook ran and exited 0), `read` (the filer's own `wait --filer`, or `feedback <key> --read`),
 `reply` (`feedback <key> --reply <text>` or `--acted`, with an optional `link`) and `seen` (the person opened the card with the reply). A line names the card's `key` and covers
-everything sent on it up to its time (to the second). A send taken by the filer's `wait` (a `decisions.seen.jsonl` line) is read, a comment `poll` handed over is delivered, and
+everything sent on it up to its time (to the second). `feedback <key> --delivered|--read|--reply|--acted --at <epoch seconds>` writes a step that happened earlier, with that time (never before the send or in the future; a step the card already shows is not written again). A send taken by the filer's `wait` (a `decisions.seen.jsonl` line) is read, a comment `poll` handed over is delivered, and
 a card posted again after a send counts as acted on. The board's state (`/api/decisions`) carries `trail`: one entry per send with `at`, and `delivered`, `read`, `reply`
 (`at`, `text`, `link` or `acted`) and `seen` once reached. The page marks a reply seen with `POST /api/trail` (`{"key"}`), which an answers-only board takes too.
 

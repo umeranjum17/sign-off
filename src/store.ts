@@ -833,7 +833,7 @@ export function markEngagementSeen(file: string, id: string, revision: number) {
 export type TrailMark = { op: 'delivered' | 'read' | 'reply' | 'seen'; key: string; id?: string; text?: string; link?: string; at: string };
 export type Trail = { id: string; key: string; kind: 'answer' | 'round' | 'comment' | 'ask' | 'part' | 'ticket' | 'discard'; part?: string; reason?: DiscardReason; /** A ticket comment's words: the board keeps them nowhere else. */ said?: string; at: string; delivered?: string; read?: string; reply?: { at: string; text?: string; link?: string; acted?: true }; seen?: string };
 export const trailPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.trail.jsonl';
-export const appendMark = (decisionsPath: string, mark: Omit<TrailMark, 'at'>) => appendLine(trailPath(decisionsPath), { ...mark, at: now() });
+export const appendMark = (decisionsPath: string, mark: Omit<TrailMark, 'at'>, at = now()) => appendLine(trailPath(decisionsPath), { ...mark, at });
 /** `delivery` is the owner dispatch's record per Go deeper ask (src/owner.ts deliveries): handed to the author's session, then acknowledged by it. */
 export function readTrail(decisionsPath: string, items: Decision[], delivery: Record<string, { state: string; at: string }> = {}): Trail[] {
   const marks: TrailMark[] = readRaw(trailPath(decisionsPath)).split('\n').flatMap((line) => {
@@ -861,7 +861,7 @@ export function readTrail(decisionsPath: string, items: Decision[], delivery: Re
   return sends.map((s) => {
     // A mark covers a send made at or before it (to the second: a post's time may carry milliseconds, a send's does not).
     const mark = (...ops: string[]) => marks.find((m) => ops.includes(m.op) && m.key === s.key && (!m.id || m.id === s.id) && second(m.at) >= second(s.at));
-    const said = s.reply ? undefined : mark('reply'), again = filed.get(s.key), posted = again && second(again) > second(s.at) ? again : undefined;
+    const said = s.reply ? undefined : marks.filter((m) => m.op === 'reply' && m.key === s.key && (!m.id || m.id === s.id) && second(m.at) >= second(s.at)).sort((x, y) => second(y.at) - second(x.at))[0], again = filed.get(s.key), posted = again && second(again) > second(s.at) ? again : undefined;
     const reply = s.reply ?? (said ? { at: said.at, ...(said.text && { text: said.text }), ...(said.link && { link: said.link }) } : posted ? { at: posted, acted: true as const } : undefined);
     const read = first(mark('read')?.at, s.read, reply?.at), delivered = first(mark('delivered')?.at, s.delivered, read);
     const seen = reply && marks.find((m) => m.op === 'seen' && m.key === s.key && second(m.at) >= second(reply.at))?.at;
