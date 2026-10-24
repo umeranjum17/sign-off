@@ -22,7 +22,7 @@ const env = { ...process.env, HOME: dir, XDG_CONFIG_HOME: join(dir, 'config'), X
 for (const k of Object.keys(env)) if (/^(FM_|FIRSTMATE|SIGN_OFF_)/.test(k)) delete env[k];
 const run = (bin, args, options = {}) => { const r = spawnSync(bin, args, { encoding: 'utf8', timeout: 120000, ...options }); assert.equal(r.status, 0, `${bin} ${args.join(' ')}\n${r.stdout}${r.stderr}`); return r.stdout; };
 const cli = (...args) => run(process.execPath, [cliJs, ...args], { env });
-const FILER = 'agent-41', KEY = 'part-report', REC = 'part-report-2', PART = 'found', FOOT = 'this', ITEM = 'found:0';
+const FILER = process.env.SEND_FEEDBACK_ONLY ? 'Umer' : 'agent-41', KEY = 'part-report', REC = 'part-report-2', PART = 'found', FOOT = 'this', ITEM = 'found:0';
 
 const m = JSON.parse(readFileSync(join(resolve(import.meta.dirname, '../../..'), 'fixtures/contract/report.v4/valid-full.json')));
 m.key = KEY; m.filed = new Date().toISOString().replace(/\.\d+Z$/, 'Z'); m.filer = FILER;
@@ -38,7 +38,7 @@ if (process.env.SEND_FEEDBACK_ONLY) {
   cli('post', board, '--type', 'evidence', '--title', 'Umer checks the settings page', '--about', 'The settings fit.', '--media', join(repo, 'fixtures/evidence/product-small.png'));
   mkdirSync(join(dir, 'design'));
   for (const f of readdirSync(join(repo, 'fixtures/contract/design.v1/design'))) writeFileSync(join(dir, 'design', f), readFileSync(join(repo, 'fixtures/contract/design.v1/design', f)));
-  writeFileSync(join(dir, 'design.json'), readFileSync(join(repo, 'fixtures/contract/design.v1/valid-basic.json')));
+  writeFileSync(join(dir, 'design.json'), JSON.stringify({ ...JSON.parse(readFileSync(join(repo, 'fixtures/contract/design.v1/valid-basic.json'))), filer: 'Umer' }));
   cli('post', board, '--kind', 'design', '--from', join(dir, 'design.json'));
 }
 const server = spawn(process.execPath, [cliJs, 'serve', board, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'inherit'] });
