@@ -1209,7 +1209,15 @@ function ticket(args: string[]) {
   if (values.comment !== undefined) return ticketComment(file, values, on);
   const { id, title, parent } = values, write = [title, values.progress, parent, values.priority, values.project, values.hold, values.asked, values.release, values.state, values.pr].some((v) => v !== undefined);
   if (id === undefined && write) throw fail('--title, --progress, --parent, --priority, --project, --hold, --asked, --release, --state and --pr need --id <ticket id>', 'VALIDATION_ERROR', 'sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40');
-  const cardsOf = (t: Ticket) => board(file).filter((d) => d.ticket === t.id && !d.dismissed).reverse().sort((x, y) => (Date.parse(y.filed ?? '') || 0) - (Date.parse(x.filed ?? '') || 0));
+  // The board is read once per command, and its warnings print once, however many tickets name cards.
+  let byTicket: Map<string, ReturnType<typeof board>> | undefined;
+  const cardsOf = (t: Ticket) => {
+    if (!byTicket) {
+      byTicket = new Map();
+      for (const d of board(file)) if (d.ticket !== undefined && !d.dismissed) byTicket.set(d.ticket, [...(byTicket.get(d.ticket) ?? []), d]);
+    }
+    return [...(byTicket.get(t.id) ?? [])].reverse().sort((x, y) => (Date.parse(y.filed ?? '') || 0) - (Date.parse(x.filed ?? '') || 0));
+  };
   const row = (t: Ticket) => ({ id: t.id, title: t.title, progress: t.progress, parent: t.parent ?? '', priority: t.priority ?? '', project: t.project ?? '', hold: t.hold ? 'yes' : 'no', asked: t.asked ? 'yes' : 'no', release: t.release ?? '', state: t.state ?? '', prs: t.prs ?? [] });
   if (id === undefined) {
     const all = rollUp(readTickets(file, warn));
