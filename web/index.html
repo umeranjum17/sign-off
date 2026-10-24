@@ -834,7 +834,9 @@
   #reader header .ra-lab { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   #reader header .ra-n { position: absolute; top: -0.25rem; right: -0.125rem; min-width: 1.125rem; height: 1.125rem; padding: 0 0.25rem; border-radius: 999px; background: var(--tk-ink); color: var(--tk-canvas); font-size: var(--tk-fs-small); line-height: 1.125rem; font-weight: 600; text-align: center; }
   #reader header .ra-n[hidden] { display: none; }
-  .ra-bar { position: sticky; bottom: calc(1rem + env(safe-area-inset-bottom)); z-index: 10; margin: 1.5rem 0 0; padding: 0.5rem 0.5rem 0.5rem; border-radius: 1.5rem; background: var(--tk-raised); box-shadow: var(--tk-elev-dock); }
+  /* The bar sits under the scroll, never over it: no text is ever beneath it, at any width. */
+  #reader .ra-root .gd-scroll { padding-bottom: 1.5rem; }
+  .ra-bar { flex: none; box-sizing: border-box; width: calc(100% - 2rem); max-width: 26rem; margin: 0.5rem auto calc(1rem + env(safe-area-inset-bottom)); padding: 0.5rem; border-radius: 1.5rem; background: var(--tk-raised); box-shadow: var(--tk-elev-dock); }
   .ra-on { margin: 0; padding: 0.125rem 0.625rem 0.5rem; display: flex; gap: 0.375rem; min-width: 0; white-space: nowrap; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
   .ra-on b { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .ra-ont { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tk-ink); font-weight: 500; }
@@ -877,6 +879,7 @@
   .ra-e blockquote:not(.ra-say) { margin: 0; padding-left: 0.625rem; border-left: 2px solid var(--tk-line); color: var(--tk-text-secondary); }
   .ra-show { padding: 0.25rem 0; border: 0; background: none; color: var(--tk-ink); font: inherit; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
   .ra-e .ui-trail { align-self: stretch; margin-top: 0.25rem; }
+  .gd-act .ui-trail b { overflow: visible; font-size: var(--tk-fs-small); text-overflow: clip; }
   .ra-none { margin: 0.5rem 0; color: var(--tk-text-secondary); }
   /* Phone: Activity is a sheet from under the head; a desk keeps it as the third column. */
   @media (max-width: 62.4375rem) {
@@ -891,7 +894,7 @@
     #reader header .ra-lab { position: static; width: auto; height: auto; clip-path: none; overflow: visible; }
     #reader header .ra-n { position: static; min-width: 0; height: auto; padding: 0; background: none; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); font-weight: 500; }
     #reader header .ra-tool[aria-expanded=true] .ra-n { color: var(--tk-canvas); }
-    .ra-bar { margin-left: auto; margin-right: auto; max-width: 36rem; }
+    .ra-bar { max-width: 36rem; }
   }
   /* The composer, Ask and View sheets. */
   #sheet .ra-form { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem; }
@@ -4429,10 +4432,10 @@
       E('div', 'howto', gic('info'), E('span', '', plan ? 'A few short parts, in order. Tap Details for the numbers and Go deeper to ask me more. Nothing is required: Go ahead accepts my picks.' : `A few short parts, in order. The bar at the foot acts on the part you are reading${live ? '' : '.'}${live ? ': Agree, Disagree, Comment or Ask.' : ''}`)));
     const rail = el('aside', { class: 'gd-rail' }, E('h4', '', plan ? 'This plan' : 'This report'), nav, ...(plan ? [sumHost] : []));
     const progress = E('div', 'gd-progress', now, segs);
-    const main = el('div', { class: 'gd-main' }, top, ...stageBlocks, ...(plan || !live ? [] : [reportBar]));
+    const main = el('div', { class: 'gd-main' }, top, ...stageBlocks);
     cols.append(rail, main, ...(plan ? [] : [actBox]));
     const scroll = E('div', 'gd-scroll', E('div', 'gd', progress, cols));
-    const root = E('div', '', scroll, ...(plan ? [bar] : []));
+    const root = E('div', plan ? '' : 'ra-root', scroll, ...(plan ? [bar] : live ? [reportBar] : []));
     if (!plan) root.tools = [viewBtn, actBtn];
     root.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
     const answerTimers = new WeakMap();
