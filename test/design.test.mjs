@@ -1195,6 +1195,80 @@ test('a guided report: item detail keeps its line breaks, same-axis options read
 });
 
 // A capture of a report is a desktop screenshot: on a phone its tap stays on the board's own live page, never the raw file shrunk in a tab.
+test('an ask on a guided report answers the tap on a phone: the Ask control is pressed at once, Sent to the agent shows with the time in view, a repeated tap says Already sent and sends nothing more, and Agent replied shows once the agent answers', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'ask-feedback'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  const report = { ...JSON.parse(readFileSync(new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url))), filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+  writeFileSync(join(dir, 'report.json'), JSON.stringify(report));
+  const posted = run('post', file, '--kind', 'report', '--from', join(dir, 'report.json'));
+  assert.equal(posted.code, 0, posted.out);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const asks = () => { try { return readFileSync(join(dir, 'board.deeper.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).filter((l) => l.op === 'ask'); } catch { return []; } };
+  const { evaluate, close } = await browse(join(dir, 'b'), 390, 844, true);
+  try {
+    await evaluate(`location.href = ${JSON.stringify(`${url}#reports/${report.key}`)}`);
+    // The found section's last item shows its own row in the card, so its Ask is the one on screen there.
+    const foot = '[data-part="found"] > .gd-rows > li:last-child .gd-foot', ans = '[data-part="found"] > .gd-rows > li:last-child .gd-ans';
+    await until(() => evaluate(`!!document.querySelector('${foot} .gd-more')?.getClientRects().length`));
+    await evaluate(`document.querySelector('.gd-scroll').style.scrollBehavior = 'auto'; document.querySelector('${foot}').scrollIntoView({ block: 'end' })`);
+    // The tap on Go deeper presses the Ask control at once, in ink, before the board has answered.
+    const pressed = await evaluate(`(() => { const more = document.querySelector('${foot} .gd-more'); more.click(); document.querySelector('${foot} .gd-menu button.deep').click();
+      const ink = getComputedStyle(document.body).getPropertyValue('--action').trim(), probe = document.createElement('i'); probe.style.color = ink; document.body.append(probe); const want = getComputedStyle(probe).color; probe.remove();
+      return [more.getAttribute('aria-busy'), getComputedStyle(more).backgroundColor === want].join('|'); })()`);
+    assert.equal(pressed, 'true|true');
+    // Then the ask shows under the part, on screen, as Sent to the agent with the time, and the Ask control is itself again.
+    const head = `(() => { const b = document.querySelector('${ans} .gask'), r = b?.getBoundingClientRect(); return b ? [b.querySelector('.hd').textContent, r.top >= 0 && r.bottom <= innerHeight, document.querySelector('${foot} .gd-more').hasAttribute('aria-busy')].join('|') : ''; })()`;
+    await until(async () => /^Sent to the agent \d\d:\d\d\|true\|false$/.test(await evaluate(head)));
+    assert.equal(asks().length, 1);
+    // The same tap again sends nothing and says so on the ask already sent.
+    await evaluate(`document.querySelector('${foot} .gd-more').click(), document.querySelector('${foot} .gd-menu button.deep').click()`);
+    await until(async () => /^Already sent \d\d:\d\d\|true\|false$/.test(await evaluate(head)));
+    await evaluate('new Promise((ok) => setTimeout(ok, 300))');
+    assert.equal(asks().length, 1);
+    assert.equal(await evaluate(`document.querySelectorAll('${ans} .gask').length`), 1);
+    // The author agent answers it: the ask reads Agent replied with the time, and the answer is in place.
+    const replied = run('deeper', file, '--filer', report.filer, '--id', asks()[0].id, '--text', 'The code now comes with the password, so one screen is gone.');
+    assert.equal(replied.code, 0, replied.out);
+    await until(async () => /^Agent replied \d\d:\d\d(New)?\|true\|false$/.test(await evaluate(head)));
+    assert.match(await evaluate(`document.querySelector('${ans} .gask').textContent`), /The code now comes with the password/);
+  } finally { close(); }
+  proc.kill();
+});
+
+test('a guided report on a phone never stacks two action rows: every item keeps its one row in its card, and a section\'s own row shows once at its end unless its last item already shows a row, with its Details kept', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'one-row'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  const report = { ...JSON.parse(readFileSync(new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url))), filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+  // A third section whose last item opens in place, and which has numbers behind Details.
+  report.sections.push({ id: 'steps', stage: 'found', heading: 'Two steps', body: 'The second one opens.', items: [{ title: 'Close the input', text: 'One line.' }, { title: 'Pin the version', text: 'Tap for why.', more: 'The newer one hangs.' }],
+    details: [{ label: 'Hangs', value: '3 of 40 runs' }] });
+  writeFileSync(join(dir, 'report.json'), JSON.stringify(report));
+  const posted = run('post', file, '--kind', 'report', '--from', join(dir, 'report.json'));
+  assert.equal(posted.code, 0, posted.out);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'b'), 390, 844, true);
+  // Per section: how many rows each shown item has, whether the last item shows one, whether the section's own row shows its actions, and its Details.
+  const rows = `JSON.stringify([...document.querySelectorAll('.gd-sec')].map((s) => { const shown = (e) => !!e && e.getClientRects().length > 0, acting = (f) => shown(f) && shown(f.querySelector('.gd-v.agree'));
+    const items = [...s.querySelectorAll(':scope > .gd-rows > li')], open = items.filter((li) => shown(li.querySelector(':scope > .body'))), own = s.querySelector(':scope > .gd-foot');
+    return [s.dataset.part, open.map((li) => [...li.querySelectorAll('.gd-foot')].filter(acting).length).join(''), items.length > 0 && acting(items.at(-1).querySelector(':scope > .body > .gd-foot')), acting(own), shown(own?.querySelector('.gd-lnk:not(.deep)'))].join(':'); }))`;
+  try {
+    await evaluate(`location.href = ${JSON.stringify(`${url}#reports/${report.key}`)}`);
+    await until(() => evaluate('!!document.querySelector(\'[data-part="steps"] > .gd-foot\')'));
+    // The found and limits sections end with an item that shows its row, so the section's own row is not drawn under it; the steps section's last item is closed, so its own row shows, Details in it.
+    assert.deepEqual(JSON.parse(await evaluate(rows)), ['this::false:true:true', 'understood::false:true:false', 'found:1:true:false:false', 'limits:1:true:false:false', 'steps:1:false:true:true', 'next::false:true:false']);
+    // Opening the last item draws its row inside the card; the section's own row then keeps only its Details, and closing it brings the row back.
+    await evaluate('document.querySelector(\'[data-part="steps"] > .gd-rows > li:last-child > .rowbtn\').click()');
+    assert.equal(JSON.parse(await evaluate(rows))[4], 'steps:11:true:false:true');
+    await evaluate('document.querySelector(\'[data-part="steps"] > .gd-rows > li:last-child > .rowbtn\').click()');
+    assert.equal(JSON.parse(await evaluate(rows))[4], 'steps:1:false:true:true');
+  } finally { close(); }
+  proc.kill();
+});
+
 test('a capture opens the raw file on a desk and its own live screen on a phone', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'raw-capture'), file = join(dir, '.sign-off', 'decisions.json');
   mkdirSync(dir);

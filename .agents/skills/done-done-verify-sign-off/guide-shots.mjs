@@ -161,7 +161,7 @@ try {
   writeFileSync(join(records, 'plan-deeper.responder.txt'), deeperLog.log);
   writeFileSync(join(records, 'plan-deeper.json'), cli('deeper', board, '--all', '--json'));
   show('found', `document.querySelector('[data-part="found"] > .gd-ans').scrollIntoView({ block: 'start' }); s.scrollTop -= ${width === 390 ? 250 : 90};`);
-  capture('plan-deeper', 'Go deeper on the found part shows the agent\'s answer in place, with Agent answered and the time, and a follow-up box.');
+  capture('plan-deeper', 'Go deeper on the found part shows the agent\'s answer in place, with Agent replied and the time, and a follow-up box.');
 
   // The decision: one per screen, my pick marked; changing it and Go ahead sends the structured answer.
   show('d:rollout');
@@ -192,7 +192,7 @@ try {
   const reportLog = await reportDeeper; assert.equal(reportLog.code, 0, reportLog.log);
   writeFileSync(join(records, 'report-deeper.responder.txt'), reportLog.log);
   show('limits', `document.querySelector('[data-part="limits"] > .gd-ans').scrollIntoView({ block: 'start' }); s.scrollTop -= ${width === 390 ? 250 : 90};`);
-  capture('report-deeper', 'Go deeper on the report part shows the agent\'s answer in place with Agent answered and the time, beside Read by you.');
+  capture('report-deeper', 'Go deeper on the report part shows the agent\'s answer in place with Agent replied and the time, beside Read by you.');
   }
   if (simplify && theme === 'light' && width === 390) {
     // A timestamped sampled-frame recording through the same isolated browser CLI, not a synthetic animation.

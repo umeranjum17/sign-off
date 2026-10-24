@@ -175,7 +175,7 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
     if (Object.hasOwn(o, 'bytes') && !(Number.isInteger(o.bytes) && o.bytes >= 0)) throw bad(`${field}[${n}].bytes`, 'must be a whole number of bytes', 'Leave "sha256" and "bytes" out; post pins the file');
     text(`${field}[${n}].label`, o.label, 40, 'the view name, such as "Today", in 40 characters or fewer');
     text(`${field}[${n}].src`, o.src, 256, 'a page path from the board file\'s folder, such as "diagrams/flow.html"');
-    if (/^([\\/]|[A-Za-z]:)/.test(o.src) || o.src.split(/[\\/]/).includes('..') || /[?#\\]/.test(o.src) || !/\.html?$/i.test(o.src)) throw bad(`${field}[${n}].src`, `${show(o.src)} must be a relative .html path with no .., ?, # or \\`, 'Draw the diagram with the archify skill, then set "src" to its .html file next to the message');
+    if (/^([\\/]|[A-Za-z]:)/.test(o.src) || o.src.split(/[\\/]/).includes('..') || /[?#\\]/.test(o.src) || !/\.html?$/i.test(o.src)) throw bad(`${field}[${n}].src`, `${show(o.src)} must be a relative .html path with no .., ?, # or \\`, 'Draw the diagram as inline SVG in an .html page (by hand or with the archify skill), then set "src" to that file next to the message');
   });
   /** The guided page every plan 2 and report 3 is: what I understood, one picture, sections with expandable items, and the next step. Returns the section ids. */
   const guide = (minSections: number): string[] => {
@@ -512,7 +512,7 @@ export function diagramPages(m: any, base: string): void {
     if (!info.isFile() || info.size > 5_000_000) throw bad('must be a file of 5 MB or less', 'Render it again as a narrow architecture diagram');
     try { accessSync(real, constants.R_OK); } catch { throw bad('cannot be read', 'Make the file readable, then post again'); }
     const file = readFileSync(real), html = file.toString('utf8'), svg = html.match(/<svg\b[^>]*\bviewBox\s*=\s*["']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+[\d.]+[^>]*>([\s\S]*?)<\/svg>/i);
-    if (!svg) throw bad('has no <svg> drawing with a viewBox', 'Render it with the archify skill: an architecture diagram with a viewBox 320 to 340 wide and its legend hidden');
+    if (!svg) throw bad('has no <svg> drawing with a viewBox', 'Draw it as inline <svg> with a viewBox 320 to 340 wide (by hand or with the archify skill), its legend hidden');
     if (/data-brand-mark/i.test(html)) throw bad('uses brand marks, whose licenses differ', 'Draw it again without "brand" on any component');
     const sizes = [...svg[2].matchAll(/<text\b[^>]*?\bfont-size\s*=\s*["']([\d.]+)/gi)].map((t) => Number(t[1]));
     const small = Math.min(...sizes), real12 = small * PHONE_DRAW_PX / Number(svg[1]);

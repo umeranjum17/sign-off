@@ -895,14 +895,15 @@
   .gd-sec > .gh:not(:has(.gd-lead)) h2 { margin-bottom: 0.875rem; }
   .gd-lead { margin: 0 0 1rem; }
   /* A diagram: a framed picture, its views as tabs, and Show me opening the interactive viewer in place. On a phone the open viewer's toolbar is wider than the card, so Full size is the way in there. */
-  .gd-dg { padding: 0.5rem; }
+  .gd-fig.gd-dg { padding: 0.5rem; }
   .gd-dgbox { border-radius: 0.75rem; overflow: hidden; border: 1px solid var(--hair2); background: var(--tile); }
   .gd-dgbox iframe { display: block; width: 100%; height: 6rem; border: 0; }
   .gd-dgbox.full iframe { height: min(36rem, 78vh); }
   .gd-dgbar { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin: 0.625rem 0.25rem 0.125rem; }
   .gd-dg .gd-seg { margin: 0 0.25rem 0.625rem; }
   .gd-dg a.gd-lnk { text-decoration: none; }
-  @media (max-width: 43.6875rem) { .gd-dg .gd-show { display: none; } }
+  /* On a phone the drawing takes the column's whole width, with no well around it: its words stay as large as its post-time check reads them. */
+  @media (max-width: 43.6875rem) { .gd-dg .gd-show { display: none; } .gd-fig.gd-dg { padding: 0; background: none; } }
   .gd-fig { margin: 0.25rem 0 1rem; border-radius: 1rem; background: var(--well); padding: 1rem; }
   .gd-cap { margin: 0.625rem 0 0; font-size: 0.875rem; color: var(--muted); line-height: 1.4; }
   .gd-acts { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.125rem 0 0.25rem; }
@@ -935,6 +936,9 @@
   /* The foot of a part: Agree, Disagree, Comment, then Details and Ask. Each looks 2rem tall and is a 2.75rem tap target. */
   .gd-foot { display: flex; align-items: center; gap: 0.125rem; margin: 0.25rem -0.375rem 0; padding-top: 0.375rem; border-top: 1px solid var(--hair2); container-type: inline-size; }
   .gd-rows .body .gd-foot { border-top: 0; margin: 0; padding-top: 0; }
+  /* A section's own row shows once, at its end, but never right under a last item that already shows its own row: then only the section's Details stays, or no row at all. */
+  .gd-sec:has(> .gd-rows > li:last-child > .body:not([hidden]) > .gd-foot) > .gd-foot:not(:has(> .gd-lnk:not(.deep))) { display: none; }
+  .gd-sec:has(> .gd-rows > li:last-child > .body:not([hidden]) > .gd-foot) > .gd-foot > :not(.gd-lnk:not(.deep), .sp) { display: none; }
   .gd-foot .sp { flex: 1; }
   .gd-v, .gd-more, .gd-foot .gd-lnk { position: relative; flex: none; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 0.3125rem; min-height: 2rem; padding: 0 0.5rem; border-radius: var(--tk-r-ctl); background: none; color: var(--muted); font-size: 0.875rem; font-weight: 500; }
   .gd-v::after, .gd-more::after, .gd-foot .gd-lnk::after { content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, 2.75rem); height: 2.75rem; transform: translate(-50%, -50%); }
@@ -956,6 +960,11 @@
   .gd-menu.down { bottom: auto; top: calc(100% + 0.375rem); }
   .gd-menu button { display: grid; grid-template-columns: 1.125rem 1fr; gap: 0 0.625rem; align-items: center; width: 100%; min-height: 2.75rem; padding: 0.3125rem 0.625rem; border-radius: var(--tk-r-ctl); text-align: left; font-size: var(--tk-fs-secondary); font-weight: 500; color: var(--text); }
   .gd-menu button:hover, .gd-menu button:focus-visible { background: var(--sunk); outline: none; }
+  /* An ask's control answers the finger at once: ink while it is held, and ink until the ask is saved (Sent to the agent then shows under the part). */
+  :is(.gd-more, .gd-lnk, .gd-menu button, .gd-fu button, .gd-send):is(:active, [aria-busy=true]) { background: var(--action); color: var(--on-accent); transition: none; }
+  :is(.gd-more, .gd-lnk, .gd-menu button):is(:active, [aria-busy=true]) .ic { color: inherit; }
+  .gd-ans .gask { scroll-margin: 1rem 0 1.5rem; }
+  .gd-ans .gask.again .hd { color: var(--text); }
   .gd-menu button .ic { width: 1.0625rem; height: 1.0625rem; color: var(--muted); }
   .gd-menu button small { grid-column: 2; color: var(--muted); font-size: var(--tk-fs-footnote); line-height: 1.3; font-weight: 400; }
   /* The comment box and the thread under the part: it goes to the agent that wrote the part, like a note on a design. */
@@ -3623,14 +3632,14 @@
     const asksOf = (part) => (state.deeper ?? []).filter((x) => x.key === key && x.part === part);
     const unfinished = () => (state.deeper ?? []).some((x) => x.key === key && !x.done);
     function paintAns(part) {
-      const panel = panels.get(part), asks = asksOf(part), sig = JSON.stringify([asks, asks.map(a => state.delivery?.[a.id])]);
+      const panel = panels.get(part), asks = asksOf(part), sig = JSON.stringify([asks, asks.map(a => [state.delivery?.[a.id], again.get(a.id) > Date.now()])]);
       if (!panel || panel.dataset.sig === sig) return;
       panel.dataset.sig = sig;
       const blocks = asks.map((a) => {
         const delivery = state.delivery?.[a.id];
         const waiting = !a.read, writing = !!a.text && !a.done, late = waiting && Date.now() - Date.parse(a.at) > 60_000;
-        const head = a.done ? [E('i', 'dot'), `Agent answered ${hhmm(a.answered)}`] : writing ? [E('i', 'dot'), 'Agent is answering'] : waiting ? [E('i', 'dot'), a.version === 1 ? delivery?.state === 'delivered' ? 'Delivered; waiting for the owner to read it' : 'Pending: waiting for the owner' : 'Waiting for the agent to read it'] : [E('i', 'dot'), `Agent read it ${hhmm(a.read)}, working on it`];
-        const block = E('div', `gask${a.done ? '' : ' live'}`, E('div', 'hd', ...head, ...(a.version === 1 && a.text && a.seen !== a.answerRevision ? [E('b', 'gd-chip', 'New')] : [])), E('p', 'q', `${actionLabels[a.action] ?? 'Go deeper'}: ${a.q ?? a.about}`),
+        const head = [E('i', 'dot'), again.get(a.id) > Date.now() ? `Already sent ${hhmm(a.at)}` : a.done ? `Agent replied ${hhmm(a.answered)}` : writing ? 'Agent is answering' : waiting ? `Sent to the agent ${hhmm(a.at)}` : `Agent got it ${hhmm(a.read)}, working on it`];
+        const block = el('div', { class: `gask${a.done ? '' : ' live'}${again.get(a.id) > Date.now() ? ' again' : ''}`, 'data-ask': a.id }, E('div', 'hd', ...head, ...(a.version === 1 && a.text && a.seen !== a.answerRevision ? [E('b', 'gd-chip', 'New')] : [])), E('p', 'q', `${actionLabels[a.action] ?? 'Go deeper'}: ${a.q ?? a.about}`),
           ...(a.selection ? [E('blockquote', '', a.selection.quote)] : []),
           ...(a.version === 1 && delivery?.error ? [E('p', 'gd-err', `Delivery pending: ${delivery.error}`)] : []),
           ...(a.text ? a.text.split(/\n+/).map((t, i, all) => E('p', '', t, ...(writing && i === all.length - 1 ? [E('span', 'caret')] : []))) : [E('div', 'shim', ''), E('div', 'shim', '')]),
@@ -3642,12 +3651,26 @@
       const done = asks.length && asks.every((a) => a.done);
       const form = el('form', { class: 'gd-fu' }), input = el('input', { 'aria-label': 'Ask a follow-up', placeholder: 'Ask a follow-up', maxlength: '500' }), go = el('button', { type: 'submit' }, 'Ask');
       form.append(input, go);
-      form.onsubmit = (e) => { e.preventDefault(); const q = input.value.trim(); if (q) ask(part, q); };
+      form.onsubmit = (e) => { e.preventDefault(); const q = input.value.trim(); if (q) ask(part, q, go); };
       panel.replaceChildren(...blocks, ...(done && live && !d.engagement ? [form] : []));
     }
-    async function ask(part, q) {
-      const panel = panels.get(part);
-      try { await postJson('/api/deeper', { key, part, ...(q && { q }) }); sync(); } catch (e) { panel.append(E('p', 'gd-err', `Could not ask: ${e.message}`)); }
+    // ---- Every ask answers the tap: the control pressed at once, then Sent to the agent with the time in view, then Agent replied.
+    // The same ask again (same part, action, words and selection) sends nothing and says Already sent on the first one.
+    const outbox = new Map(), again = new Map(); // an ask on its way, by sameness -> tapped again meanwhile; an ask id -> when its Already sent ends
+    const same = (part, action, q, sel) => JSON.stringify([part, action ?? 'deeper', q ?? null, sel ? [sel.field, sel.start, sel.end] : null]);
+    const sentAs = (s) => (state.deeper ?? []).find((a) => a.key === key && same(a.part, a.action, a.q, a.selection) === s);
+    const showAsk = (part, id) => { panels.get(part).hidden = false; panels.get(part).querySelector(`[data-ask="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'nearest', behavior: quick ? 'auto' : 'smooth' }); };
+    const already = (part, a) => { again.set(a.id, Date.now() + 4000); paintAns(part); showAsk(part, a.id); setTimeout(() => paintAns(part), 4100); };
+    async function sendAsk(part, action, q, selection, btn, post) {
+      const s = same(part, action, q, selection), prior = sentAs(s);
+      if (prior) { already(part, prior); return prior; }
+      if (outbox.has(s)) { outbox.set(s, true); return; }
+      outbox.set(s, false); btn?.setAttribute('aria-busy', 'true');
+      try { await post(); sync(); const a = sentAs(s); if (a) (outbox.get(s) ? already(part, a) : showAsk(part, a.id)); return a; }
+      finally { outbox.delete(s); btn?.removeAttribute('aria-busy'); }
+    }
+    async function ask(part, q, btn) {
+      try { await sendAsk(part, 'deeper', q, undefined, btn, () => postJson('/api/deeper', { key, part, ...(q && { q }) })); } catch (e) { panels.get(part).hidden = false; panels.get(part).append(E('p', 'gd-err', `Could not ask: ${e.message}`)); }
     }
     const deepBtn = (part) => {
       const b = el('button', { class: 'gd-lnk deep', type: 'button', 'aria-expanded': 'false', 'aria-controls': `gd-a-${part.replace(/\W/g, '-')}` }, gic('deeper'), 'Go deeper');
@@ -3655,7 +3678,7 @@
       b.onclick = () => {
         const p = panels.get(part), open = b.getAttribute('aria-expanded') === 'true';
         b.setAttribute('aria-expanded', String(!open)); p.hidden = open;
-        if (!open && !asksOf(part).length) ask(part);
+        if (!open && !asksOf(part).length) ask(part, undefined, b);
       };
       return b;
     };
@@ -3667,15 +3690,13 @@
       b.onclick = () => { const open = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(open)); p.hidden = !open; };
       return [b, p];
     };
-    async function engage(part, action, q, id = crypto.randomUUID(), selection) {
-      const p = panels.get(part);
-      p.hidden = false;
-      try { await postJson('/api/engagement', { version: 1, id, key, ...d.engagement, part, action, ...(q !== undefined && { q }), ...(selection && { selection }) }); sync(); }
+    async function engage(part, action, q, id = crypto.randomUUID(), selection, btn) {
+      try { return await sendAsk(part, action, q, selection, btn, () => postJson('/api/engagement', { version: 1, id, key, ...d.engagement, part, action, ...(q !== undefined && { q }), ...(selection && { selection }) })); }
       catch (e) {
         const retry = el('button', { type: 'button', class: 'gd-lnk' }, 'Retry');
         const error = E('p', 'gd-err', `Could not ask: ${e.message} `, retry);
-        retry.onclick = () => { error.remove(); engage(part, action, q, id, selection); };
-        p.append(error);
+        retry.onclick = () => { error.remove(); engage(part, action, q, id, selection, retry); };
+        panels.get(part).hidden = false; panels.get(part).append(error);
       }
     }
     // The presets and the composer for one part. With a selection they ask about those words, through this same engage().
@@ -3683,10 +3704,10 @@
       const form = el('form', { class: 'gd-fu' }), input = el('input', { 'aria-label': selection ? 'Ask about the selected text' : 'Ask about this part', placeholder: selection ? 'Ask about these words' : 'Ask about this' }), send = el('button', { type: 'submit' }, 'Send');
       let action = 'custom';
       form.append(input, send); form.hidden = !!selection;
-      form.onsubmit = (e) => { e.preventDefault(); if (input.value.trim()) { engage(part, action, input.value, undefined, selection); input.value = ''; action = 'custom'; input.placeholder = 'Ask a follow-up'; if (selection) asked(part); } };
+      form.onsubmit = (e) => { e.preventDefault(); if (input.value.trim()) { const sent = engage(part, action, input.value, undefined, selection, send); input.value = ''; action = 'custom'; input.placeholder = 'Ask a follow-up'; if (selection) asked(part, sent); } };
       const buttons = Object.entries(actionLabels).filter(([a]) => a !== 'custom').map(([a, label]) => {
         const b = el('button', { class: `gd-lnk ${a === 'deeper' ? 'deep' : a}`, type: 'button' }, label);
-        b.onclick = () => { if (a === 'question') { action = a; form.hidden = false; input.focus(); } else { engage(part, a, undefined, undefined, selection); if (selection) asked(part); } };
+        b.onclick = () => { if (a === 'question') { action = a; form.hidden = false; input.focus(); } else { const sent = engage(part, a, undefined, undefined, selection, b); if (selection) asked(part, sent); } };
         return b;
       });
       return [E('div', 'gd-acts', ...buttons), form];
@@ -3726,7 +3747,7 @@
       box.onsubmit = async (e) => {
         e.preventDefault(); const text = ta.value.trim(); if (!text) return;
         send.disabled = true;
-        if (mode === 'question') { await engage(part, 'question', text); close(); } else if (await post({ text, ...(lean && { verdict: lean }) })) close(); else send.disabled = false;
+        if (mode === 'question') { await engage(part, 'question', text, undefined, undefined, send); close(); } else if (await post({ text, ...(lean && { verdict: lean }) })) close(); else send.disabled = false;
       };
       const vote = (name, label, icon) => el('button', { type: 'button', class: 'gd-v ' + name + (inItem ? ' icon-only' : ''), 'aria-pressed': 'false', title: label }, gic(icon), E('span', '', label));
       const agree = vote('agree', 'Agree', 'up'), disagree = vote('disagree', 'Disagree', 'down');
@@ -3740,7 +3761,7 @@
         const more = el('button', { type: 'button', class: 'gd-more', 'aria-haspopup': 'menu', 'aria-expanded': 'false' }, gic('spark'), E('span', '', 'Ask'), gic('chev', 'gchev'));
         const menu = el('div', { class: 'gd-menu', role: 'menu', hidden: '' }, ...MENU.map(([a, icon, sub]) => {
           const b = el('button', { type: 'button', role: 'menuitem', class: a === 'deeper' ? 'deep' : a }, gic(icon), E('span', '', actionLabels[a]), E('small', '', sub));
-          b.onclick = () => { shutMenus(); if (a === 'question') open('question'); else engage(part, a); };
+          b.onclick = () => { shutMenus(); if (a === 'question') open('question'); else engage(part, a, undefined, undefined, undefined, more); };
           return b;
         }));
         more.onclick = () => { const o = menu.hidden; shutMenus(); menu.hidden = !o; more.setAttribute('aria-expanded', String(o)); menu.classList.toggle('down', more.getBoundingClientRect().top < 340); };
@@ -3775,12 +3796,16 @@
       tray.hidden = true; tray.replaceChildren(); delete tray.dataset.sig;
       if (clear) getSelection().removeAllRanges();
     }
-    // After a send from the tray the answer lands at the end of the part; say so, and offer to go there.
-    function asked(part) {
-      const show = el('button', { type: 'button', class: 'gd-lnk' }, 'Show');
+    // After a send from the tray the answer lands at the end of the part; say it was sent and when, and offer to go there.
+    async function asked(part, sending) {
+      const show = el('button', { type: 'button', class: 'gd-lnk' }, 'Show'), line = E('p', 'gd-selt', 'Sending… ');
       show.onclick = () => { panels.get(part).scrollIntoView({ block: 'center' }); drop(); };
       getSelection().removeAllRanges();
-      tray.replaceChildren(E('p', 'gd-selt', 'Asked. The answer appears under this part. ', show)); tray.dataset.sig = 'asked';
+      tray.replaceChildren(line); tray.dataset.sig = 'asked';
+      const a = await sending;
+      if (tray.dataset.sig !== 'asked') return;
+      if (!a) { drop(); return; }
+      line.replaceChildren(`${again.get(a.id) > Date.now() ? 'Already sent' : 'Sent to the agent'} ${hhmm(a.at)}. The answer appears under this part. `, show);
       setTimeout(() => tray.dataset.sig === 'asked' && drop(), 8000);
     }
     function follow() {
@@ -3812,7 +3837,7 @@
       const frame = el('iframe', { sandbox: 'allow-scripts', loading: 'lazy' }), box = E('div', 'gd-dgbox', frame);
       const panel = list ? E('div', 'gd-panel', list) : null;
       const paint = () => {
-        const v = views[cur], url = `${mockUrl(d.key, `diagram.${dgAll.indexOf(v)}`, v.src)}?theme=${night.matches ? 'dark' : 'light'}`;
+        const v = views[cur], url = `${mockUrl(d.key, `diagram.${dgAll.indexOf(v)}`, v.src)}?theme=${(() => { try { return isDark(); } catch { return night.matches; } })() ? 'dark' : 'light'}`;
         box.classList.toggle('full', full);
         frame.style.height = ''; // a height the picture's own size handshake set must not outlive its mode
         frame.title = `${full ? 'Interactive diagram' : 'Diagram'}: ${v.label}`;

@@ -115,7 +115,7 @@ npx -y sign-off-axi raise --ask-ref <captain-message-id-or-hold-id> --title "Whi
 - Report: an in-depth explainer, only when the user asked for an explanation, or a concept, design or trade-off must be understood. A merge, a PR outcome, a receipt, a verdict or a status note is never a report.
 - A report is fields the board draws as one scroll, never a text card and never a page you build. Run `npx -y sign-off-axi report init .sign-off/reports/<key>`, replace every `FILL:` line in `report.json`, then `npx -y sign-off-axi post --kind report --from .sign-off/reports/<key>/report.json --filer <id>`. Text you leave as `FILL:` is refused.
 - A plan is the same, with the questions the person decides: `report init .sign-off/plans/<key> --plan`, fill `plan.json`, `post --kind plan --from <file> --filer <id>`, then `wait --filer <id>`. The person can press **Go ahead** and accept every pick you recommended, so recommend what you would do and say in `quiet` what happens if they stay quiet.
-- Write each part for the reader, in the order the board shows it: *What this is* (the answer and one picture: bars, steps or tiles), *What I understood* (the request in your words, so they can say it is off), *What I found*, *What I recommend* (plans), *What you decide* (plans, at most five questions, each with your pick and why), *Next step*.
+- Write each part for the reader, in the order the board shows it: *What this is* (the answer and one picture: bars, steps or tiles, or the diagram a design, architecture or plan report needs), *What I understood* (the request in your words, so they can say it is off), *What I found*, *What I recommend* (plans), *What you decide* (plans, at most five questions, each with your pick and why), *Next step*.
   - Answer first: the heading of the picture is the answer, one plain sentence.
   - One picture per point; the numbers go in `details`, behind a tap, never in the sentence.
   - Short lines: `text` one line, `more` the part that opens in place, with a line break between points; never a paragraph the reader must scroll.
@@ -133,15 +133,16 @@ npx -y sign-off-axi raise --ask-ref <captain-message-id-or-hold-id> --title "Whi
 - Open the board at 390 px wide and look before you tell the person it is there: the first screen must give the answer and the picture.
 - Only if you must keep an HTML page of your own (a demo to tap), run `report init <folder> --page` and post it with `--type report --view --preview`.
 
-## Draw a diagram with Archify
+## Draw a real diagram in every design, architecture or plan report
 
-Only where structure, order or dependency is the point: how a change flows, what depends on what, a today and after. When the point is a number, keep the bars or tiles; a diagram that hides the numbers is the wrong picture. Archify is a separate skill you install yourself (`npx skills add tt-a1i/archify -g`); sign-off ships none of it. Then:
+A plan, and a report that explains a design or an architecture, needs at least one real diagram: a drawing of the thing itself, as an architecture diagram (the parts and what talks to what) or a flow (the steps in order, with their arrows). Bars, tiles or a numbered list are not a diagram. Other reports add one only where structure, order or dependency is the point; when the point is a number, keep the bars or tiles.
 
-- Add `"diagram": [{"label": "Today", "src": "diagrams/flow.html"}]` (1 to 3 views, shown as tabs) to the `visual`, a section or an item, beside the rows, which stay as the list. `src` is a page next to the plan or report file, as `view` is.
-- Draw an `architecture` diagram with a `viewBox` 320 to 340 wide (320 is Archify's smallest): two columns, labels under about 16 characters, no sublabels, `"legend": {"mode": "hidden"}` in `meta`. Sequence, workflow and `compare` pages are too wide for a phone; show the same flow as a numbered column instead, and draw Today and After as two pages, one per tab.
-- Post refuses a diagram whose smallest text is under 12 px on a 390 px phone, one with brand marks (never set `brand`), or one that is not there. Post pins each page (its `sha256` and `bytes`, written for you): a page changed after posting is not shown, so draw a changed page again and post the plan again.
-- Run `ARCHIFY_UPDATE_CHECK_DISABLED=1 archify finalize` with `--quality showcase`, so it makes no network call. Archify draws in its own mono type; sign-off cannot change it.
-- On a phone the board shows the picture and **Full size**, which opens the drawing alone at the full width of the screen; on a desk **Show me** opens the interactive page in place. Look at both at 390 before you say it is posted.
+- Draw it as inline `<svg>` in an `.html` page next to the plan or report file (by hand, or with the separately installed Archify skill: `npx skills add tt-a1i/archify -g`, then `ARCHIFY_UPDATE_CHECK_DISABLED=1 archify finalize --quality showcase`). Never a picture of a diagram, an `<img>` or a page that loads from the web.
+- Add `"diagram": [{"label": "Flow", "src": "diagrams/flow.html"}]` (1 to 3 views, shown as tabs) to the `visual`, a section or an item; the rows beside it stay as the same answer in a list. Put the main one on the `visual`, so it is the first picture the reader sees.
+- Make it read on a phone: a `viewBox` 320 to 340 wide, at most two columns, labels under about 16 characters, text 12 px or larger in the drawing, no legend. Wide sequence or compare drawings do not fit: draw the same flow down the page, and Today and After as two views.
+- Make it read in light and dark: every colour a CSS variable, with a `@media (prefers-color-scheme: dark)` block that swaps them (ink on a light ground, light ink on a dark ground). The board tells the page its own light or dark and turns those rules on or off, so the drawing follows the board. Never draw with black or white fixed in place.
+- Post refuses a diagram whose smallest text is under 12 px on a 390 px phone, one with brand marks (never set `brand`), or one with no `<svg>` drawing. Post pins each page (its `sha256` and `bytes`, written for you): a page changed after posting is not shown, so post the plan or report again after a change.
+- On a phone the board shows the drawing at the column's full width and **Full size**, which opens the drawing alone; on a desk **Show me** opens it in place. Open it at 390 px in light and in dark before you say it is posted.
 
 ## Ask the user to sign in
 

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How an ask reaches the agent</title>
+<style>
+  /* One drawing, light and dark: every colour is a variable, and the dark block swaps them. */
+  :root { --page: #F3F3F0; --box: #FFFFFF; --edge: #D3CCC9; --ink: #21211E; --soft: #6E6E6B; --line: #8A8A86; --key: #121210; --on-key: #F3F3F0; }
+  @media (prefers-color-scheme: dark) { :root { --page: #1E1D1A; --box: #2A2825; --edge: #55514C; --ink: #E9E6E1; --soft: #A9A49D; --line: #827D76; --key: #F4F2EE; --on-key: #1E1D1A; } }
+  html, body { margin: 0; background: var(--page); }
+  svg { display: block; width: 100%; height: auto; font-family: Inter, system-ui, sans-serif; }
+  .box { fill: var(--box); stroke: var(--edge); stroke-width: 1; }
+  .key { fill: var(--key); }
+  .t { fill: var(--ink); font-size: 13px; font-weight: 600; }
+  .s { fill: var(--soft); font-size: 12px; }
+  .k { fill: var(--on-key); font-size: 13px; font-weight: 600; }
+  .ln { stroke: var(--line); stroke-width: 1.5; fill: none; marker-end: url(#a); }
+  .lane { fill: var(--soft); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; }
+</style>
+</head>
+<body>
+<svg viewBox="0 0 340 404" role="img" aria-labelledby="t d">
+  <title id="t">How an ask reaches the agent</title>
+  <desc id="d">You tap an ask on a report part. The board saves it and shows Sent to the agent. The agent's wait wakes and the board shows Agent got it. The agent answers and the board shows Agent replied under the part.</desc>
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10z" fill="var(--line)"/></marker></defs>
+  <text class="lane" x="16" y="20">ON YOUR PHONE</text>
+  <text class="lane" x="196" y="20">ON THE BOARD</text>
+  <rect class="key" x="16" y="32" width="140" height="56" rx="12"/>
+  <text class="k" x="30" y="56">You tap Go deeper</text>
+  <text class="k" x="30" y="75" style="font-weight:400">Ask pressed at once</text>
+  <rect class="box" x="196" y="32" width="128" height="56" rx="12"/>
+  <text class="t" x="210" y="56">Board saves it</text>
+  <text class="s" x="210" y="75">one ask, kept</text>
+  <path class="ln" d="M156 60h36"/>
+  <rect class="box" x="16" y="132" width="140" height="56" rx="12"/>
+  <text class="t" x="30" y="156">Sent to the agent</text>
+  <text class="s" x="30" y="175">with the time</text>
+  <path class="ln" d="M260 88v22H86v18"/>
+  <rect class="box" x="196" y="232" width="128" height="56" rx="12"/>
+  <text class="t" x="210" y="256">Agent's wait</text>
+  <text class="s" x="210" y="275">wakes, reads it</text>
+  <path class="ln" d="M156 160h104v68"/>
+  <rect class="box" x="16" y="232" width="140" height="56" rx="12"/>
+  <text class="t" x="30" y="256">Agent got it</text>
+  <text class="s" x="30" y="275">working on it</text>
+  <path class="ln" d="M196 260h-36"/>
+  <rect class="box" x="196" y="332" width="128" height="56" rx="12"/>
+  <text class="t" x="210" y="356">Agent answers</text>
+  <text class="s" x="210" y="375">in a few lines</text>
+  <path class="ln" d="M260 288v40"/>
+  <rect class="key" x="16" y="332" width="140" height="56" rx="12"/>
+  <text class="k" x="30" y="356">Agent replied</text>
+  <text class="k" x="30" y="375" style="font-weight:400">under the part</text>
+  <path class="ln" d="M196 360h-36"/>
+</svg>
+</body>
+</html>

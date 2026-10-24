@@ -1999,6 +1999,7 @@ function report(args: string[]) {
     }
     return toon({ folder: shellPath(out), created: created.length ? created : 'nothing new (re-run is a no-op)', kept }, [
       `Replace every FILL: line in ${kind}.json with your own words: the answer first, one picture (bars, steps or tiles), what you understood, then the sections${plan ? ' and the decisions' : ''}`,
+      `${plan ? 'A plan' : 'A design or architecture report'} needs one real diagram: a flow or architecture drawing as inline SVG, in light and dark, as "diagram" on the visual (see the skill)`,
       'Keep each line short: the board shows it in one scroll, the numbers behind a Details tap and the long answer behind Go deeper',
       `Run \`sign-off-axi post --kind ${kind} --from ${shellPath(path)}\` to put it on the board`,
     ]);
