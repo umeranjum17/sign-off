@@ -945,7 +945,7 @@ test('each card has one place to type: Add a comment holds the note sent with th
   assert.doesNotMatch(reports, /aria-label="Discard, How it ships"/);
   // Newest heads one card of rows; the row is a link that opens it, with its project's initials (it has no icon), its title, then a bar of how much of it is read with its percent.
   assert.match(reports, /<h2 class="dl-head ui-sec" style="--n:0">Newest<\/h2><ul class="dl-list rp-list ui-card ui-list" aria-label="Newest">/);
-  assert.match(reports, /<a class="dl-face ui-row" href="#reports\/how" draggable="false" id="item-how" data-row=""><span class="ui-icon" aria-hidden="true"><i class="mono">HW<\/i><\/span>.*?<span class="t" dir="auto">How it ships<\/span>.*?<span class="l2"><span class="rkc k-\w+" data-kind="\w+">.*?<\/span><span class="ui-bar"><i style="width: 0%"><\/i><\/span><span class="pct">0%<\/span><\/span>/s);
+  assert.match(reports, /id="item-how" data-row=""><span class="ui-icon" role="img" aria-label="How it works">.*?<svg.*?<span class="t" dir="auto">How it ships<\/span>.*?kind guessed.*?class="rp-ticket" title="No ticket">No ticket.*?role="progressbar".*?aria-valuenow="0"/s);
   // Under the row, a swipe right marks it read and a swipe left archives it.
   assert.match(reports, /<div class="dl-act yes" aria-hidden="true">.*?<span>Read<\/span><\/div><div class="dl-act later" aria-hidden="true">.*?<span>Archive<\/span><\/div>/s);
   // Only the report is a row and counted; the text-only one is folded under Notes, a short row with no page to open.
@@ -971,7 +971,7 @@ test('each card has one place to type: Add a comment holds the note sent with th
       decided: [...reader.querySelectorAll('.ui-dl, .rp-found')].map((e) => e.textContent) }; })()`))?.src === '/mock/local/how~/index.html');
     // The page sits in a tile inside the sheet's 16px gutters, under its kind (an older report's, guessed), its title and what it decided.
     assert.deepEqual(open, { hidden: false, title: 'How it ships', inert: true, src: '/mock/local/how~/index.html', sandbox: 'allow-scripts', frame: [16, true], back: 'Close',
-      what: `Other reportHow it works · ${new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(new Date())}`, decided: ['What it decided', 'Ships only when the check passes.'] });
+      what: `Other report · kind guessedHow it works · ${new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(new Date())}`, decided: ['What it decided', 'Ships only when the check passes.'] });
     // The page itself is served: the filled scaffold, with its steps to tap.
     assert.match(await (await fetch(new URL('/mock/local/how~/index.html', url))).text(), /<button type="button" class="next">Next<\/button>/);
     await tap(await at('#reader .rp-x'));
@@ -981,9 +981,9 @@ test('each card has one place to type: Add a comment holds the note sent with th
     await until(async () => (await evaluate('reader.hidden')) === false);
     await evaluate('dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))');
     await until(async () => (await evaluate('location.hash + reader.hidden')) === '#reportstrue');
-    // Opening it read it, beside the board: back on the list its row reads 100%, nothing is still to read and the tab bar's count is gone.
+    // Opening it read it, beside the board: back on the list its progress track is gone, nothing is still to read and the tab bar's count is gone.
     const reads = () => readFileSync(file.replace(/\.json$/, '.reads.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).map(({ key, read }) => [key, read]);
-    await until(async () => (await evaluate('[document.querySelector("#item-how .pct").textContent, document.querySelector(".rp-hero .big").textContent, !!document.querySelector(".tabs .bd.ink")].join()')) === '100%,0 of 1,false');
+    await until(async () => (await evaluate('[document.querySelector("#item-how .pct")?.textContent ?? "read", document.querySelector(".rp-hero .big").textContent, !!document.querySelector(".tabs .bd.ink")].join()')) === 'read,0 of 1,false');
     assert.deepEqual(reads(), [['how', true]]);
     // A swipe right marks it unread again (its bar empties and the count comes back); a swipe left archives it, and Undo puts it back.
     const y = await evaluate('(() => { const r = document.querySelector("#item-how").getBoundingClientRect(); return r.y + 30; })()');
@@ -1381,8 +1381,8 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await until(async () => (await askTitles()) === 'Pick the look|Which day for release?|Keep the weekly digest?');
   assert.equal(await evaluate('document.querySelector(".decide-list .ui-hero .big").textContent'), '3');
   assert.equal(await heads(), 'Asks');
-  // Each kind has its mark in its tile: a phone for a design to look over, a checklist for a pick, a question for yes or no.
-  assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-list .ui-icon path")].map((p) => p.getAttribute("d"))'), await evaluate('[ICONS.phone, ICONS.pick, ICONS.yesno]'));
+  // Every row uses the shared project tile; an unlinked ask labels its project as absent.
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-list .ui-icon")].map((p) => p.getAttribute("aria-label"))'), ["No project", "No project", "No project"]);
   // With no project and no filed time, a row's second line says who asked.
   assert.equal(await evaluate('[...document.querySelectorAll(".decide-list .ui-row .meta")].map((s) => s.textContent).join("|")'), 'Agent|Agent|Agent');
   await evaluate('document.querySelector("#item-look").click()');
@@ -1584,7 +1584,7 @@ test('Waiting on you: a board with no filed times lists newest first as the file
 
 // Fed boards arrive with shapes the poster chose: a stored type-ask keeps its stored type but shows the type its shape answers as,
 // and one shared classifier names every ask, so a row with no recommended pick says the type its shape answers as.
-test('Waiting on you: a reply-only ask draws a bubble, a type-ask yes/no a question, and a decision with mocks but no design type a pick list', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Waiting on you: asks share project tiles while a reply-only ask, a yes/no and a decision with mocks keep their own answer flows', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'fed-types'), file = join(dir, 'board.json');
   mkdirSync(join(dir, 'mocks', 'a'), { recursive: true });
   mkdirSync(join(dir, 'mocks', 'b'));
@@ -1604,7 +1604,7 @@ test('Waiting on you: a reply-only ask draws a bubble, a type-ask yes/no a quest
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
   const titles = () => evaluate('[...document.querySelectorAll(".decide-list .dl-row:not(.g-done) .dl-face .t")].map((s) => s.textContent).join("|")');
   await until(async () => (await titles()) === 'Pick a cover|Ship it?|Say ready when you are');
-  assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-list .ui-icon path")].map((p) => p.getAttribute("d"))'), await evaluate('[ICONS.pick, ICONS.yesno, ICONS.reply]'));
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-list .ui-icon")].map((p) => p.getAttribute("aria-label"))'), ["No project", "No project", "No project"]);
   await evaluate('document.querySelector("#item-ship").click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/ship');
   assert.equal(await evaluate('document.querySelector(".decide .eyebrow")'), null); // no kind eyebrow on Decide
@@ -1971,11 +1971,11 @@ test('Reports on a desk: the list beside the newest report, J moves and reads, U
   // The newest report is shown beside the list, not yet marked read; its head line says what it is and the day, beside Mark read and Archive.
   await until(async () => (await seen()) === `#reports|alpha|Alpha report|4`);
   // The bar names the report's kind (an older report's, guessed from its words), then its day.
-  assert.match(await evaluate('[document.querySelector(".rp-bar .rkc").textContent, document.querySelector(".rp-bar > span[dir]").textContent].join("|")'), /^Other report\|\d{1,2} [A-Z][a-z]{2}$/);
+  assert.match(await evaluate('[document.querySelector(".rp-bar .rkc").textContent, document.querySelector(".rp-bar > span[dir]").textContent].join("|")'), /^Other report · kind guessed\|\d{1,2} [A-Z][a-z]{2}$/);
   assert.equal(await evaluate('[...document.querySelectorAll(".rp-bar button")].map((b) => b.textContent).join(",") + "|" + !!document.querySelector(".split-detail .read iframe")'), 'Mark read,Archive|true');
   assert.equal(await rows(), `alpha,beta,${guided.key},gamma`);
   assert.equal(reads(), '');
-  // J selects the next report and reads it: its row reads 100% and the read is saved beside the board.
+  // J selects the next report and reads it: its progress track disappears and the read is saved beside the board.
   await key('j');
   await until(async () => (await seen()) === '#reports/beta|beta|Beta report|3' && reads() === 'beta:true');
   // U marks it unread; the page beside the list is not loaded again, and the mark holds.
@@ -2030,6 +2030,10 @@ test('report kinds and their workflows: post names what a report is for and hold
   const plan = { ...base, key: 'k-plan', purpose: 'plan', title: 'Move settings into the profile page', filed: at(1), sections: [sec('goal', 'Goal and non-goals'), sec('current', 'How it works today'),
     sec('design', 'Design', { diagram: [{ label: 'Flow', src: 'diagrams/flow.html' }] }), sec('slices', 'Slices', { items: [{ title: 'Move the page', text: 'Settings open from the profile.', size: 'S, half a day' }] }),
     sec('tests', 'Tests and proof', { items: [{ title: 'Move the page', text: 'A browser test opens it from the profile.' }] }), sec('risks', 'Risks and rollback'), sec('rollout', 'Rollout'), sec('estimate', 'Time'), sec('owner-calls', 'Your calls')] };
+  writeFileSync(join(dir, 'muxr.svg'), readFileSync(new URL('../docs/logo.svg', import.meta.url)));
+  assert.equal(run('project', file, '--name', 'Muxr', '--icon', 'muxr.svg').code, 0);
+  assert.equal(run('ticket', file, '--id', 'T-29', '--title', 'Move settings', '--project', 'Muxr').code, 0);
+  plan.group = 'Muxr'; plan.ticket = 'T-29';
   assert.equal(post('plan', plan).code, 0);
   assert.equal(post('research', { ...base, key: 'k-research', filed: at(2) }).code, 0);
   assert.equal(post('retro', { ...JSON.parse(readFileSync(new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url), 'utf8')), key: 'k-retro', title: 'Why messages were sent twice: a retro', filed: at(3) }).code, 0);
@@ -2037,22 +2041,33 @@ test('report kinds and their workflows: post names what a report is for and hold
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   for (const part of ['goal', 'current', 'design']) await fetch(`${url}api/reads`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: 'k-plan', part }) });
+  assert.equal((await fetch(url + 'api/messages', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'comment', key: 'k-plan', text: 'Umer: keep its ticket visible.' }) })).status, 200);
   const { evaluate, close } = await browse(join(dir, 'b'), 390, 844, true);
-  const rows = () => evaluate('[...document.querySelectorAll(".rp-list .ui-row")].map((r) => [r.querySelector(".t").textContent, r.querySelector(".l2 .rkc")?.textContent, r.querySelector(".l2 .rp-strip") ? [...r.querySelectorAll(".rp-strip > i")].map((i) => +i.classList.contains("on")).join("") : "bar", r.querySelector(".pct").textContent].join(" ")).join("|")');
+  const rows = () => evaluate('[...document.querySelectorAll(".rp-list .ui-row")].map((r) => [r.querySelector(".t").textContent, r.querySelector(".l2 .rkc")?.textContent, r.querySelector(".rp-progress .rp-strip") ? [...r.querySelectorAll(".rp-strip > i")].map((i) => +i.classList.contains("on")).join("") : "bar", r.querySelector(".pct").textContent].join(" ")).join("|")');
   await evaluate(`location.href = ${JSON.stringify(`${url}#reports`)}`);
   // Each row leads its second line with its kind; the plan's bar is its nine parts, three read; the older report's kind is the board's guess.
-  await until(async () => (await rows()) === `Move settings into the profile page Plan 111000000 33%|${base.title} Research bar 0%|Why messages were sent twice: a retro Incident bar 0%`);
+  await until(async () => (await rows()) === `Move settings into the profile page Plan 111000000 33%|${base.title} Research bar 0%|Why messages were sent twice: a retro Incident · kind guessed bar 0%`);
+  assert.equal(await evaluate('document.querySelector("#item-k-retro .rkc").textContent'), 'Incident · kind guessed');
+  assert.ok(await evaluate('(() => { const r = document.querySelector("#item-k-retro"); return r.querySelector(".rp-progress").getBoundingClientRect().top - r.querySelector(".rp-meta").getBoundingClientRect().bottom >= 6; })()'), "unread progress leaves six pixels below the kind and ticket");
+  assert.equal(await evaluate('document.querySelector("#item-k-plan .rp-ticket").textContent'), 'T-29');
+  assert.equal(await evaluate('!!document.querySelector("#item-k-plan .l1 .ui-tb") && !!document.querySelector("#item-k-plan .l2 .rkc")'), true);
+  assert.equal(await evaluate('document.querySelector("#item-k-plan .ui-icon img").naturalWidth > 0'), true);
+  assert.equal(await evaluate('document.querySelector("#item-k-research .rp-ticket").textContent'), 'No ticket');
   // Filter by kind lists each kind with its count; a kind picked leaves only its reports under its pill, and the pill's close lists them all again.
   await evaluate('document.querySelector(".rp-fb").click()');
   await until(async () => (await evaluate('[...document.querySelectorAll("#sheet[open] .rp-pick .ui-pr")].map((b) => b.dataset.kind + " " + b.querySelector(".n").textContent).join(",")')) === 'all 3,research 1,plan 1,incident 1');
   await evaluate('document.querySelector("#sheet .rp-pick [data-kind=\\"incident\\"]").click()');
-  await until(async () => (await rows()) === 'Why messages were sent twice: a retro Incident bar 0%' && (await evaluate('document.querySelector(".rp-pill").textContent + "|" + document.querySelector(".rp-fb b").textContent + "|" + !document.querySelector(".rp-hero")')) === 'Incident and retro1 of 3|1|true');
+  await until(async () => (await rows()) === 'Why messages were sent twice: a retro Incident · kind guessed bar 0%' && (await evaluate('document.querySelector(".rp-pill").textContent + "|" + document.querySelector(".rp-fb b").textContent + "|" + !document.querySelector(".rp-hero")')) === 'Incident and retro1 of 3|1|true');
   await evaluate('document.querySelector(".rp-pill .ev-unpick").click()');
   await until(async () => (await rows()).split('|').length === 3 && !(await evaluate('!!document.querySelector(".rp-pill, .rp-fb b")')));
   // A report's sheet heads with its kind's full name, then a line on what it is for, and over its kind's parts a strip of them with the next one to read.
   await evaluate('document.querySelector("#item-k-plan").click()');
   await until(async () => (await evaluate('[".rp-what .rkc", ".rp-for", ".rp-next"].map((s) => document.querySelector("#reader " + s)?.textContent).join("|") + "|" + [...document.querySelectorAll("#reader .rp-strip-row .rp-strip > i")].map((i) => +i.classList.contains("on")).join("") + "|" + document.querySelectorAll("#reader .rp-part").length'))
     === 'Implementation plan|How the work gets built, step by step, before it starts.|Next: Slices|111000000|9');
+  await evaluate(`location.href = ${JSON.stringify(`${url}#reports`)}`);
+  await until(() => evaluate('!!document.querySelector("#item-k-plan") && !document.querySelector("#item-k-plan .rp-progress")'));
+  await evaluate('document.querySelector("#item-k-retro").click()');
+  await until(async () => (await evaluate('document.querySelector("#reader .rkc")?.textContent')) === 'Incident and retro · kind guessed');
   // Research shows its sources, how many link out and how many are what users report; a tap opens the report at its sources, each with its tag and link.
   await evaluate(`location.href = ${JSON.stringify(`${url}#reports`)}`);
   await until(() => evaluate('!!document.querySelector("#item-k-research")'));
@@ -2069,7 +2084,13 @@ test('report kinds and their workflows: post names what a report is for and hold
   await desk.evaluate('document.querySelector(".split-list #item-k-plan").click()');
   await until(async () => (await desk.evaluate('document.querySelector(".rp-bar .rkc")?.textContent + "|" + document.querySelector(".split-detail .rp-for")?.textContent + "|" + [...document.querySelectorAll(".split-detail .rp-strip-row .rp-strip > i")].map((i) => +i.classList.contains("on")).join("") + "|" + document.querySelector(".split-detail .rp-next")?.textContent + "|" + document.querySelectorAll(".split-detail .rp-part").length'))
     === 'Implementation plan|How the work gets built, step by step, before it starts.|111000000|Next: Slices|9');
+  // An icon removed after pinning falls back to the shared project outline, never initials or a broken image.
+  rmSync(join(dir, 'muxr.svg'));
   desk.close();
+  const missingIcon = await browse(join(dir, 'missing-icon'), 1280, 800);
+  await missingIcon.evaluate(`location.href = ${JSON.stringify(`${url}#reports`)}`);
+  await until(() => missingIcon.evaluate('!!document.querySelector("#item-k-plan .ui-icon svg") && !document.querySelector("#item-k-plan .ui-icon img, #item-k-plan .mono")'));
+  missingIcon.close();
   proc.kill();
 });
 
@@ -2366,7 +2387,7 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
   // On a phone a design is a row: its project's initials, its title, and its state and day.
   await until(async () => (await evaluate('document.querySelector(".dz-list .t")?.textContent')) === message.title);
-  assert.equal(await evaluate('document.querySelector(".dz-list .ui-icon .mono")?.textContent'), 'SI');
+  assert.equal(await evaluate('!!document.querySelector(".dz-list .ui-icon svg") && !document.querySelector(".dz-list .mono")'), true);
   assert.equal(await evaluate('document.querySelector(".dz-list .meta")?.textContent'), 'In review · 18 Oct');
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
   await until(async () => (await evaluate('document.querySelector(".design-review .foot button")?.textContent')) === 'Approve');
@@ -3178,9 +3199,9 @@ test('Decide: a diagram, an interactive page, an explainer and a free-form fed t
   const { evaluate, close } = await browse(join(dir, 'b'), 390);
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
   const titles = () => evaluate('[...document.querySelectorAll(".decide-list .dl-row:not(.g-done) .dl-face .t")].map((e) => e.textContent)');
-  // All four take a yes or a no, so each row draws the question mark, never its content type.
+  // All four use the same project tile; their answer choices still determine each detail flow.
   await until(async () => (await titles()).length === 4);
-  assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-list .ui-icon path")].map((p) => p.getAttribute("d") === ICONS.yesno)'), [true, true, true, true]);
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-list .ui-icon")].map((p) => p.getAttribute("aria-label"))'), ["No project", "No project", "No project", "No project"]);
   for (const [name, key] of [['Check the site?', 'site'], ['Take the tour?', 'tour'], ['Walk through the new flow?', 'walk'], ['Is this the sign-in flow?', 'flow']]) {
     // A click is retried while the list is still drawing: a card that is not there yet is not a missed tap.
     await until(async () => (await evaluate(`document.querySelector("#item-${key}")?.click() ?? true`))
@@ -3962,6 +3983,8 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
   mkdirSync(join(dir, 'design'), { recursive: true });
   for (const f of readdirSync(join(fx, 'design.v1/design'))) writeFileSync(join(dir, 'design', f), readFileSync(join(fx, 'design.v1/design', f)));
   writeFileSync(join(dir, 'shot.png'), png);
+  writeFileSync(join(dir, 'settings.svg'), readFileSync(new URL('../docs/logo.svg', import.meta.url)));
+  assert.equal(run('project', file, '--name', 'Settings', '--icon', 'settings.svg').code, 0);
   // A ticket stands alone: a new one needs a title, a later write changes only what it gives, and a bad value is refused before anything is written.
   assert.equal(run('ticket', file, '--id', 'T-29', '--progress', '20').code, 2);
   assert.equal(existsSync(join(dir, 'board.tickets.jsonl')), false);
@@ -4078,11 +4101,13 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     await evaluate(`location.href = ${JSON.stringify(`${url}#ticket/T-9`)}`);
     await until(async () => (await evaluate('[...document.querySelectorAll(".tk-sheet a.tk-row")].map((a) => a.getAttribute("href")).join()')) === '#ticket/T-29');
     assert.equal(await evaluate('[...document.querySelectorAll(".tk-sheet .ui-dl, .tk-sheet .tk-none")].map((p) => p.textContent).join(" | ")'), 'Tickets in this epic · 0 of 1 done | Linked | No card names this ticket yet.');
+    assert.equal(await evaluate('!!document.querySelector(".tk-sheet .tk-shd .ui-icon img")?.naturalWidth && !!document.querySelector(".tk-sheet .tk-in .tk-row .ui-icon img")?.naturalWidth && !document.querySelector(".tk-sheet .mono")'), true);
     // The Tickets tab lists the tickets under no other: Your asks (T-9, which the user asked for, moving) or System (T-31, on hold). T-29 sits under T-9, so it is not listed on its own.
     const tab = `JSON.stringify({ seg: [...document.querySelectorAll('.tk-seg button')].map((b) => b.textContent + (b.getAttribute('aria-pressed') === 'true' ? ' on' : '')), hero: document.querySelector('.tk-hero').innerText.replace(/\\s+/g, ' ').trim(),
       lists: [...document.querySelectorAll('main section[aria-label]')].map((x) => x.getAttribute('aria-label') + ' ' + [...x.querySelectorAll('a.tk-row')].map((a) => a.getAttribute('href')).join()) })`;
     await evaluate(`location.href = ${JSON.stringify(`${url}#tickets`)}`);
     await until(() => evaluate('!!document.querySelector(".tk-hero")'));
+    assert.equal(await evaluate('!!document.querySelector("main .tk-row .ui-icon img")?.naturalWidth && !document.querySelector("main .tk-row .mono")'), true);
     assert.deepEqual(JSON.parse(await evaluate(tab)), { seg: ['Your asks1 on', 'System1'], hero: 'Your asks done 0 of 1 1 moving', lists: ['In progress #ticket/T-9'] });
     await evaluate('document.querySelector(".tk-seg button:last-child").click()');
     await until(async () => JSON.parse(await evaluate(tab)).lists.join() === 'On hold #ticket/T-31');
