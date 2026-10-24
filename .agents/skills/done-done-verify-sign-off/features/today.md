@@ -12,7 +12,7 @@ The board's first screen, in the new look as the approved prototype draws it (`s
   - nothing waiting: `Nothing waits on you`.
 - Waiting on you: the next three asks after Up next as 68px rows (the project's own icon, else its initials, else the line drawing of what the ask is; the title on one line on a phone, up to two on a desk; the chip only where set; then project or kind and time, or, for a card on a ticket that is partly done, the ticket's bar and percent once it has progress, a full bar at 100%; none at 0%), with See all into Decide.
 - Two tiles: **Cleared today** (answered today, of that and what still waits) opening Answered, and **Proofs today** (updates filed today) opening Evidence.
-- Under the tiles, one quiet line naming what More holds opens it (a sheet from the bottom, in the middle on a desk): Answered and Designs with their counts, the Leash, and Ask the agent.
+- Under the tiles, one quiet line naming what More holds opens it (a sheet from the bottom, in the middle on a desk): Answered and Designs with their counts, the Leash, Ask the agent, and last a Version row with the version the board runs (named on the line only when More holds nothing else; `version-shots.mjs`, journey `version`).
 - Search: the dock's round button (the sidebar's on a desk; the address `#find` too) opens a sheet over the screen it is on, its field in hand; what is typed lists in groups (Asks, Proof, Reports, Answered, Designs, Tickets), four rows each, each opening where the card lives. Escape, the close button or a tap outside closes it.
 - On a desk (1024px and wider): the title row across, then a 400px column of Up next and the tiles beside Waiting on you.
 

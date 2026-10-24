@@ -21,6 +21,15 @@ import { type Fault, faults, isStill } from './evidence-text.js';
 import { copiesOf } from './images.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
 
+/** The version this copy runs, read from package.json once: a pre-release version says so, and a git checkout whose HEAD carries no tag
+ * for that version is a dev build ahead of its release, `<version>-dev`. An installed copy has no .git, so it shows its version as published.
+ * --version prints `version`; the help header and the board (the sidebar's foot, Today's More) show `label`. */
+const VERSION = ((version: string) => {
+  if (version.includes('-')) return { version, label: `${version}, pre-release` };
+  const root = new URL('..', import.meta.url);
+  const tags = existsSync(new URL('.git', root)) && (spawnSync('git', ['tag', '--points-at', 'HEAD'], { cwd: root, encoding: 'utf8', timeout: 5000 }).stdout ?? '').split('\n');
+  return tags && !tags.some((t) => t === version || t === `v${version}`) ? { version: `${version}-dev`, label: `${version}-dev` } : { version, label: version };
+})(JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version);
 const FORMAT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/file-formats.md';
 const CONTRACT = 'https://github.com/umeranjum17/sign-off/blob/main/docs/contract.md';
 /** Coding agents init installs the skill for: the `npx skills add -a` name, the command that shows it is installed,
@@ -33,7 +42,8 @@ const AGENTS: Record<string, { bin: string; dir: string; home: string }> = {
   pi: { bin: 'pi', dir: '.agents/skills', home: join(homedir(), '.agents', 'skills') },
   'gemini-cli': { bin: 'gemini', dir: '.agents/skills', home: join(homedir(), '.gemini', 'skills') },
 };
-const TOP_HELP = `usage: sign-off-axi [command] [board.json] [flags]
+const TOP_HELP = `version: ${VERSION.label}
+usage: sign-off-axi [command] [board.json] [flags]
 commands[26]:
   (none)=list, raise, post, answers, wait, poll, deeper, owner, open, status, stop, serve, export, init, report, signin, dismiss, restore, promote, feedback, ticket, project, refile, doctor, notify, validate, help
 board: the nearest .sign-off/ board (the walk's bounds and SIGN_OFF_HOME: README, "Test runs never touch your board"), else ~/.sign-off/decisions.json; a board file given always wins
@@ -2477,6 +2487,7 @@ const state = () => {
     readonly: extra.readonly === true,
     answers_only: extra.answers_only === true,
     ...profile(),
+    version: VERSION.label,
     answers,
     seen: Object.values(answers).filter(taken).map((a) => a.key),
     seen_at: Object.fromEntries(Object.values(answers).flatMap((a) => { const t = seenAt(file)(a); return t ? [[a.key, t]] : []; })),
@@ -2997,7 +3008,7 @@ const argv = process.argv.slice(2);
 if (argv[0]?.startsWith('-') && !['--help', '-v', '-V', '--version'].includes(argv[0])) argv.unshift('list');
 await runAxiCli({
   description: 'Ask the user yes/no or pick-one questions on one local board and read their answers back',
-  version: JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version,
+  version: VERSION.version,
   argv,
   topLevelHelp: TOP_HELP,
   getCommandHelp: (cmd) => HELP[cmd],
