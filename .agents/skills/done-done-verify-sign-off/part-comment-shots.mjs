@@ -169,6 +169,7 @@ try {
       assert.match(page(`() => document.querySelector('${line}')?.textContent`), /^Sent · [0-9]{2}:[0-9]{2}$/, name);
       if (name !== 'answer-note') assert.equal(page(`() => document.querySelector('${field}').value`), '', name + ' clears the box');
       assert.ok(page(`() => document.querySelector('.thread')?.textContent.includes('Umer needs the settings checked')`), name + ' Activity');
+      drive(`await page.eval(() => document.querySelector('${line}').scrollIntoView({ block: 'center', behavior: 'instant' }));`);
       capture(name, name + ': Sending immediately, failure retains the note with Retry, success reaches Activity.');
     }
     if (width === 390 && !process.env.SEND_FEEDBACK_BEFORE) {

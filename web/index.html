@@ -1868,7 +1868,7 @@
   }
   async function sendWithFeedback(id, btn, post, retry = () => btn?.click()) {
     if (sending.get(id)?.busy) return false;
-    const paint = () => document.querySelectorAll('[data-send-feedback]').forEach(paintSend);
+    const paint = () => document.querySelectorAll('[data-send-feedback]').forEach((line) => { paintSend(line); if (line.dataset.sendFeedback === id && !line.hidden) line.scrollIntoView({ block: 'nearest', behavior: 'instant' }); });
     sending.set(id, { busy: true }); btn?.setAttribute('aria-busy', 'true'); paint();
     try {
       await post(); sending.set(id, { at: new Date().toISOString() }); return true;
