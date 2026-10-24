@@ -68,7 +68,7 @@ try {
   draw(22);
   browser('open', 'about:blank'); browser('open', `${base}#designs/fleet-dashboard`); ready(); settle(1500);
   const facts = `() => JSON.stringify((() => { const w = document.querySelector('.design-preview-window'), f = w?.firstElementChild, box = (e) => { const r = e?.getBoundingClientRect(); return r && [Math.round(r.width), Math.round(r.height)]; };
-    const steps = [...document.querySelectorAll('.design-review .thread li')].map((li) => [li.querySelector('.th-t')?.textContent, li.querySelector('.th-n')?.textContent ?? '']);
+    const steps = [...document.querySelectorAll('.design-review .thread li')].map((li) => [li.querySelector('.aw b')?.textContent, li.querySelector('.th-n')?.textContent ?? '']);
     return { note: document.querySelector('.design-review textarea').value, activity: steps, status: document.querySelector('.design-review [role=status]')?.textContent,
       preview: f?.tagName.toLowerCase(), src: decodeURIComponent(f?.getAttribute('src') ?? ''), frame: box(f), window: box(w), area: box(document.querySelector('.dz-fill')) }; })())`;
   record.round2 = read(facts);

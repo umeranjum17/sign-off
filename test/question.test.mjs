@@ -203,7 +203,7 @@ test('a merge names a card on the board that offers every option of this ask, an
   assert.match(loop.stdout, /key ship-x merges others, but ship-y already merges ship-x/);
 });
 
-test('--proof names an evidence update on the board: an ask resting on anything else is refused', () => {
+test('--proof names an evidence update and --report a report on the board: an ask naming anything else is refused, and one about a report keeps it', () => {
   const board = join(scratch, 'proof-refuse.json');
   assert.equal(run('raise', board, '--key', 'release-day', ...pick('Which day should it ship?')).status, 0);
   const refused = run('raise', board, ...good, '--proof', 'release-day');
@@ -211,6 +211,12 @@ test('--proof names an evidence update on the board: an ask resting on anything 
   assert.match(refused.stdout, /rests on release-day, which is not an evidence update on the board/);
   const missing = run('raise', board, ...good, '--proof', 'update-1');
   assert.equal(missing.status, 2, missing.stdout);
+  const notReport = run('raise', board, ...good, '--report', 'release-day');
+  assert.equal(notReport.status, 2, notReport.stdout);
+  assert.match(notReport.stdout, /is about release-day, which is not a report on the board/);
+  assert.equal(run('post', board, '--kind', 'report', '--from', new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url).pathname).status, 0);
+  assert.equal(run('raise', board, ...good, '--report', 'sign-in-faster').status, 0);
+  assert.equal(JSON.parse(readFileSync(board, 'utf8')).items.find((d) => d.report).report, 'sign-in-faster');
 });
 
 test('a merged card merges nothing itself: a chain of merges is refused at post time, in either order', () => {

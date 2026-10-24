@@ -64,6 +64,7 @@ A message file holds one JSON object, in any layout. The validator reads it with
 | `silent_by` | `ask`, optional | an ISO 8601 UTC time, `YYYY-MM-DDTHH:MM[:SS]Z`: when the asking agent takes the silent default; the board only shows it |
 | `close` | `ask`, `gate`, optional | `done` (default) or `release`; copied into the answer |
 | `proof` | `ask`, optional | the key of an evidence update on the same board that this ask rests on, never its own; `post` refuses a key that is not an evidence update there. Decide shows that update's capture and result at the top, with a way into the whole proof |
+| `report` | `ask`, optional | the key of a report on the same board that this ask is about, never its own; `post` refuses a key that is not a report there (`--report` on `raise` and `post`). On a desk the open ask shows that report beside it under Its report: what it says, up to four of its picture's numbers and Open report. |
 | `merges` | `ask`, optional | 1-10 distinct keys of other items on the same board that this ask replaces, never its own; each must offer every option of this ask and merge nothing itself; a key named by an ask not yet answered, open or dismissed, cannot be named again, and an answered or dismissed card cannot be named |
 
 When `filer` is missing, `post` takes it from `--filer`, else `SIGN_OFF_FILER` (empty means unset), else the agent session id. A `filer` in the message that differs from `--filer` is refused. Only `post` checks this; `validate` checks `filer` only when the message has one.
@@ -78,7 +79,7 @@ A key already on the board takes only the same message again (the same fields an
 
 A question the person answers by picking an option. Shows in Waiting on you.
 
-- Fields: the common ones, `about`, `detail`, `why`, `options` (each with an `outcome`), `recommend_value`, `recommend_reason`, `default_if_silent`, `silent_by`, `close`, `merges`, `proof`.
+- Fields: the common ones, `about`, `detail`, `why`, `options` (each with an `outcome`), `recommend_value`, `recommend_reason`, `default_if_silent`, `silent_by`, `close`, `merges`, `proof`, `report`.
 - A yes/no ask lists `yes` (Yes) and `no` (No) as its options, labelled exactly so.
 - Posting a new Decide question (`raise`, default `post`, `post --type decision`, `post --kind ask`, or a feed including `--replace`) requires `--ask-ref <captain-message-id-or-hold-id>`, saved as `ask_ref`. A message or feed may carry `ask_ref` directly. Use the actual captain message or hold id: 1-256 characters, no whitespace or control characters. Posting checks the reference's shape, not whether another tool owns that id. Follow-ups belong in the backlog, not the board. This is new-card admission, not a new required field when reading or validating older messages: already-posted cards, plan/report posts, evidence posts and engagement records keep working.
 - Asking a good question. One decision is one card, and the card passes a 10-second read on a phone:

@@ -30,6 +30,8 @@ const channels = (c) => { if (c.startsWith('#')) { const h = c.length === 4 ? [.
   const n = c.match(/-?[\d.]+(e-?\d+)?/g).map(Number), srgb = c.startsWith('color('); return [...n.slice(0, 3).map((x) => (srgb ? x * 255 : x)), n[3] ?? 1]; };
 const PALETTE = { light: [...colours(block(':root {')), ...inPlace].map(channels), dark: [...colours(block(':root[data-theme="dark"] {')), ...inPlace].map(channels) };
 const allowed = (c, theme) => PALETTE[theme].some((p) => p.every((x, i) => Math.abs(x - c[i]) <= (i < 3 ? 1 : 0.005)));
+// The board's mark keeps the prototype's blue check (web/icon.svg's gradient): those two blues count on the mark alone.
+const LOGO = ['#6A93FF', '#2C48D3'].map((h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).concat(1)), onLogo = (c, where) => /^span\.logo\b/.test(where) && LOGO.some((p) => p.every((x, i) => Math.abs(x - c[i]) <= (i < 3 ? 1 : 0.005)));
 // Every colour the page draws, each with the first place it is drawn (as test/design.test.mjs reads them).
 const DRAWN = `(() => {
   const seen = new Map();
@@ -76,6 +78,8 @@ try {
   so('post', board, '--ask-ref', 'message-feel', '--ticket', 'T-29', '--priority', 'P0', '--key', 'friday', '--title', 'Ship the settings page on Friday?', '--why', 'Support is fully staffed on Friday.', '--outcome', 'yes=It ships Friday.', '--outcome', 'no=It waits a week.',
     '--recommend', 'yes', '--recommend-reason', 'Support is on hand.', '--default', 'no');
   const reportKey = JSON.parse(readFileSync(board, 'utf8')).items.filter((i) => i.kind === 'report').at(-1).key;
+  // A comment on the P0 ask, a report and a proof, so each card's own screen draws its Activity beside its property panel.
+  for (const key of ['friday', reportKey, 'ev1']) assert.ok((await fetch(new URL('api/messages', url), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'comment', key, text: 'Looks right on my phone.' }) })).ok);
   let port; for (let i = 0; i < 100 && !port; i++) { await wait(100); const f = join(prof, 'DevToolsActivePort'); if (existsSync(f)) port = readFileSync(f, 'utf8').split('\n')[0]; }
   assert.ok(port, 'Chromium opened its DevTools port');
   const target = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT' })).json();
@@ -95,10 +99,14 @@ try {
     390: [['today', '#', '', 'v=today'], ['search', '#find', '', 'v=today&s'], ['decide', '#waiting', '', 'v=decide'], ['ask', '#decide/ship', '.decide .pick-option', `v=decide&o=${pq}`],
       ['reports', '#reports', '', 'v=reports'], ['report', `#reports/${reportKey}`, '', `v=reports&rep=${pq}`], ['designs', '#designs', '', 'v=designs'], ['design', '#designs/onboarding', '', 'v=designs&d=epics-prototype-redesign-2'],
       ['tickets', '#tickets', '', 'v=tickets'], ['ticket', '#ticket/T-29', '', 'v=tickets&t=firstmate-addons/addons-epics-prototype'], ['evidence', '#evidence', '', 'v=evidence', 'listed'],
+      // A card's own screen: the P0 ask's sheet (its panel and Activity) and a report's sheet opened from the list (its parts, Ticket row and Activity).
+      ['ask-detail', '#decide/friday', '', `v=decide&o=${pq}`], ['report-detail', '#reports', `.rp-list a[data-row][href="#reports/${reportKey}"]`, 'v=reports'],
       // Last, an answer and the toast it raises over Decide: the yes/no in light, the pick-one in dark.
       ['toast', (theme) => (theme === 'light' ? '#decide/digest' : '#decide/export'), ['.decide .pick-option', '.decide-bar .answer'], 'v=decide']],
     1280: [['today', '#', '', 'v=today'], ['decide', '#decide/friday', '', 'v=decide'], ['reports', '#reports', '', 'v=reports'], ['designs', '#designs', '', 'v=designs'],
-      ['tickets', '#tickets', '', 'v=tickets'], ['ticket', '#ticket/T-29', '', 'v=tickets&t=firstmate-addons/addons-epics-prototype'], ['evidence', '#evidence', '', 'v=evidence', 'listed']],
+      ['tickets', '#tickets', '', 'v=tickets'], ['ticket', '#ticket/T-29', '', 'v=tickets&t=firstmate-addons/addons-epics-prototype'], ['evidence', '#evidence', '', 'v=evidence', 'listed'],
+      // A card's own screen on the desk: a report opened from the list beside it, and a proof (listed, as Evidence's list is not yet in the new look).
+      ['report-detail', '#reports', `.rp-list a[data-row][href="#reports/${reportKey}"]`, 'v=reports'], ['proof-detail', '#evidence/ev1', '', 'v=evidence', 'listed']],
   };
   for (const [width, metrics] of [[390, { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }], [1280, { width: 1280, height: 800, deviceScaleFactor: 2, mobile: false }]]) {
     for (const theme of ['light', 'dark']) {
@@ -112,7 +120,7 @@ try {
         await go(`${url}${hash}`);
         for (const t of [tap].flat().filter(Boolean)) { await ev(`document.querySelector(${JSON.stringify(t)})?.click()`); await wait(400); }
         await shot(join(dest, `${name}.png`));
-        const drawn = await ev(DRAWN), off = drawn.filter(([c]) => c === 'accent-color auto' || !allowed(channels(c), theme));
+        const drawn = await ev(DRAWN), off = drawn.filter(([c, where]) => c === 'accent-color auto' || !(allowed(channels(c), theme) || onLogo(channels(c), where)));
         // The place lit in the sidebar (a desk: Designs on Designs) or the dock (a phone: Today on Designs), whose colours are among those read.
         const lit = await ev('[...document.querySelectorAll(".side [aria-current], .tabs [aria-current]")].filter((a) => a.getClientRects().length).map((a) => a.getAttribute("href")).join()');
         if (state.startsWith('design') && lit !== (metrics.mobile ? '#' : '#designs')) problems.push(`${name}: lit ${lit}`);

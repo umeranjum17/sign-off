@@ -161,7 +161,7 @@ test('refusals: strict at every level, in contract order, with one fix line each
 test('a field name holding a newline is refused on one help line, shown escaped', () => {
   const unknown = validate(message('newline-unknown.json', JSON.stringify({ ...ask, 'a\nb': 'x' })));
   assert.equal(unknown.status, 2, unknown.raw);
-  assert.equal(unknown.out.files[0].help, 'Remove "a\\nb"; ask takes key, title, filer, ticket, priority, link, about, ask_ref, detail, why, options, recommend_value, recommend_reason, default_if_silent, silent_by, close, merges, proof');
+  assert.equal(unknown.out.files[0].help, 'Remove "a\\nb"; ask takes key, title, filer, ticket, priority, link, about, ask_ref, detail, why, options, recommend_value, recommend_reason, default_if_silent, silent_by, close, merges, proof, report');
   const repeated = validate(message('newline-twice.json', JSON.stringify(ask).slice(0, -1) + ',"a\\nb":1,"a\\nb":2}'));
   assert.equal(repeated.status, 2, repeated.raw);
   assert.equal(repeated.out.files[0].error, 'field "a\\nb" is written twice');

@@ -5,6 +5,7 @@ The repo's maintained verification map; a proof that drives one entry point is i
 - [Core journey](core-journey.md): the agent files a card, the person answers it in the board, the agent reads the answer, and the same journey over the previous published version upgraded in place (`done-done run core`, `done-done run upgrade`)
 - [Board shell](board-shell.md): the board's areas, tokens and shell at 390 and 1280, light and dark
 - [Feedback trail](feedback-trail.md): what the person sends on a card goes Sent, Delivered, Read, Replied: the track on the card, its Activity, the list badge and Today's Replies, `feedback --read/--reply/--acted`, 390 and 1280, light and dark
+- [Card detail](card-detail.md): one property panel (Priority, Its ask or Ticket, Pull request) and one Activity on every card; the open ask, proof and report on a phone and, on the desk shell, beside the list (the ask's answers pinned in view), 390, 1280 and 1440, light and dark, each beside the approved prototype
 - [Decide](decide.md): the grouped list with swipes, More and Later, the ask with one Answer and More, the answer's check and fold, Undo, skeleton, all clear and the viewer's approve stamp, 390 light and dark, stills and a recording
 - [Plan review](plan-review.md): section verdicts, Change notes, decisions and structured Send back at both widths and themes
 - [Guided plan and report](guide.md): clean install and authoring, the one-scroll Guide view with read receipts and a real Go deeper, 390 and 1280, light and dark

@@ -92,8 +92,8 @@ const MEASURE = `(async () => {
   // A desk: one screen with no page scroll, the head, then three columns sharing one top and one bottom; every list ends on a whole row or fades its next one; the panel's foot.
   let deskM;
   if (desk && document.querySelector('.tk-desk')) {
-    const cols = [...document.querySelectorAll('.tk-grid > *')].map((c) => { const r = box(c); return { left: r2(r.left), right: r2(r.right), top: r2(r.top), bottom: r2(r.bottom), width: r2(r.width) }; });
-    const cards = [...document.querySelectorAll('.tk-grid .ui-card')].map((c) => { const r = box(c); return { el: tag(c), head: c.querySelector('.tk-ch, .lab')?.textContent ?? '', top: r2(r.top), height: r2(r.height), bottom: r2(r.bottom), left: r2(r.left), right: r2(r.right) }; });
+    const cols = [...document.querySelectorAll('.tk-desk .ui-dgrid > *')].map((c) => { const r = box(c); return { left: r2(r.left), right: r2(r.right), top: r2(r.top), bottom: r2(r.bottom), width: r2(r.width) }; });
+    const cards = [...document.querySelectorAll('.tk-desk .ui-dgrid .ui-card')].map((c) => { const r = box(c); return { el: tag(c), head: c.querySelector('.tk-ch, .lab')?.textContent ?? '', top: r2(r.top), height: r2(r.height), bottom: r2(r.bottom), left: r2(r.left), right: r2(r.right) }; });
     if (document.documentElement.scrollHeight > innerHeight + 1) fail.push('the desk page scrolls');
     if (new Set(cols.map((c) => c.top)).size !== 1) fail.push('columns start on different tops ' + JSON.stringify(cols));
     if (cols.some((c) => Math.abs(c.bottom - (innerHeight - 24)) > 0.5)) fail.push('a column does not reach 24px over the foot ' + JSON.stringify(cols));
@@ -111,7 +111,7 @@ const MEASURE = `(async () => {
     if (paneM?.more && !paneM.fades) fail.push('the open ticket holds more than it shows with no fade');
     // The empty share, as the approved prototype's own check counts it: viewport points (every 4px) outside the sidebar, the head and each card, a card counted down to
     // its last content and its bottom padding, so a card's blank tail is empty too.
-    const content = [...document.querySelectorAll('nav.side, .tk-dhead, .tk-grid .ui-card')].filter(vis).map((e) => { const q = box(e); let last = q.top;
+    const content = [...document.querySelectorAll('nav.side, .tk-dhead, .tk-desk .ui-dgrid .ui-card')].filter(vis).map((e) => { const q = box(e); let last = q.top;
       for (const d of e.querySelectorAll('*')) { const z = box(d); if (z.width && z.height) last = Math.max(last, Math.min(z.bottom, q.bottom)); }
       return { left: q.left, top: q.top, right: q.right, bottom: e.matches('.ui-card') ? Math.min(q.bottom, last + parseFloat(getComputedStyle(e).paddingBottom) + 4) : q.bottom }; });
     let all = 0, empty = 0; for (let py = 2; py < innerHeight; py += 4) for (let px = 2; px < innerWidth; px += 4) { all++; if (!content.some((b) => px >= b.left && px < b.right && py >= b.top && py < b.bottom)) empty++; }
@@ -124,7 +124,7 @@ const MEASURE = `(async () => {
   if (bad.length) fail.push('raw words: ' + bad.join(', '));
   const hit = (e) => { const r = box(e), a = getComputedStyle(e, '::after'), o = (v) => Math.max(0, -parseFloat(v) || 0), wide = a.content !== 'none' && a.position === 'absolute';
     return { top: r.top, bottom: r.bottom, height: r.height + (wide ? o(a.top) + o(a.bottom) : 0), width: r.width + (wide ? o(a.left) + o(a.right) : 0) }; };
-  const under = !desk ? [...(dialog ?? sheet ?? document).querySelectorAll('button, a[href], summary, input')].filter(vis).filter((e) => !e.closest('.tk-act')).filter((e) => { const r = hit(e); return r.top < innerHeight && r.bottom > 0 && (r.height < 43.5 || r.width < 43.5); })
+  const under = !desk ? [...(dialog ?? sheet ?? document).querySelectorAll('button, a[href], summary, input')].filter(vis).filter((e) => !e.closest('.ui-act')).filter((e) => { const r = hit(e); return r.top < innerHeight && r.bottom > 0 && (r.height < 43.5 || r.width < 43.5); })
     .map((e) => (e.getAttribute('aria-label') || e.textContent).trim().slice(0, 24) + ' ' + Math.round(box(e).width) + 'x' + Math.round(box(e).height)) : [];
   const overflowing = [...document.querySelectorAll('body *')].filter((e) => vis(e) && box(e).right > w + 1).slice(0, 10).map((e) => e.tagName.toLowerCase() + '.' + (e.classList[0] ?? ''));
   return { viewport: innerWidth + 'x' + innerHeight, edges: [r2(edgeL), r2(edgeR)], blocks, rows, title, rounds, dock, clear, desk: deskM, under, fail,

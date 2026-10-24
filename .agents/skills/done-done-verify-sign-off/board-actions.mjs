@@ -130,13 +130,13 @@ const PAGES = [
       // Nothing is picked until a pick: the one button waits, off, then names the pick.
       if (options.length) h.has('Pick an answer (off until a pick)', bar()?.querySelector('.answer:disabled'));
       for (const o of options) await h.press(`option ${o}`, h.find(new RegExp(o), h.board().querySelector('.pick-list, .choices, .decide')), () => true);
-      // One button in the bar, and one More over the ask (on a phone Ask me later is a button beside the answer, and More holds Dismiss).
+      // One button in the bar with Ask me later beside it (a sign-in keeps Ask me later in its More), and one More over the ask holding Dismiss.
       h.has('More', more()?.querySelector('summary'));
       if (options.length) {
         await h.press('Your own answer', h.find(/^Your own answer/, h.board().querySelector('.pick-list')), () => bar().querySelector('.answer').textContent === 'Send answer');
         await h.press(`option ${options[0]} again`, h.find(new RegExp(options[0]), h.board().querySelector('.pick-list')), () => /^Answer /.test(bar().querySelector('.answer').textContent));
       }
-      await h.cycle('Ask me later', h.find(/^Ask me later$/, h.board().querySelector('.ask-sheet') ?? more()), () => location.hash === '#waiting' && h.board().querySelector('.dl-row[data-group=later]'), () => h.board().querySelector('.decide'), /moved to later/);
+      await h.cycle('Ask me later', h.find(/^Ask me later$/, h.board().querySelector('.ask-sheet') ?? (bar()?.querySelector('.later-btn') ? bar() : more())), () => !!h.board().querySelector('.dl-row[data-group=later]'), () => h.board().querySelector('.decide'), /moved to later/);
       if (options.length) {
         await h.press(`option ${options[0]} once more`, h.find(new RegExp(options[0]), h.board().querySelector('.pick-list')), () => /^Answer /.test(bar().querySelector('.answer').textContent));
         await h.cycle(`Answer ${key}`, h.find(/^Answer /, bar()), () => location.hash !== `#decide/${key}` || !h.board().querySelector('.decide-bar .answer'), () => h.board().querySelector('.decide-bar .answer'), /\? · /);
