@@ -31,6 +31,10 @@ journeys:
   # Agent replied; and a design report's inline-SVG flow diagram at the column's width, following the board's own light-or-dark pick (diagram-sample/flow.html).
   comment-send:
     command: 'npm run build > /dev/null && for w in 360 390 445 1280 1440; do for t in light dark; do COMMENT_PROTO="$COMMENT_PROTO" SEND_FEEDBACK_ONLY=1 node .agents/skills/done-done-verify-sign-off/part-comment-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t $w || exit 1; done; done'
+  # A report acts from one place at 360, 390, 445, 1280 and 1440, light and dark: the one bar under the scroll (Agree shown Agreed, Ask, Disagree's composer and its send), Activity with the note's track whole,
+  # View, and the end of the report with nothing under the bar.
+  report-bar:
+    command: 'npm run build > /dev/null && for w in 360 390 445 1280 1440; do for t in light dark; do node .agents/skills/done-done-verify-sign-off/report-bar-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t $w || exit 1; done; done'
   ask-feedback:
     command: 'npm run build > /dev/null && for t in light dark; do node .agents/skills/done-done-verify-sign-off/ask-feedback-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t || exit 1; done'
   # Report kinds at 390 and 1280, light and dark: each row's kind chip (a plan's parts bar), Filter by kind and a kind picked, a report's head with its kind, the line on what it is for

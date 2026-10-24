@@ -111,43 +111,37 @@ try {
   click(`[data-part="${PART}"] > .gd-cbox .gd-cbar .gd-q`);
 
   }
-  // Disagree opens the comment box: What is off?
-  click(`[data-part="${PART}"] > .gd-foot .disagree`);
-  assert.equal(page(`() => document.querySelector('[data-part="${PART}"] > .gd-cbox textarea').placeholder`), 'What is off?');
-  drive(`await page.eval(() => document.querySelector('[data-part="${PART}"] > .gd-cbox').scrollIntoView({ block: 'center' })); await nap(300);`);
-  const box = page(MEASURE(`[data-part="${PART}"] > .gd-cbox .gd-cbar button`));
-  assert.ok(box.every((c) => c.hit44), JSON.stringify(box));
-  const empty = page(`() => document.querySelector('[data-part="${PART}"] > .gd-cbox').getBoundingClientRect().top`);
-  capture('disagree-box', 'Tapping Disagree opens the comment box asking What is off?, with Cancel and Send.', { question: 'What is off?', controls: box, box_top: Math.round(empty) });
+  // Disagree opens the report's one composer, on the part in view, asking What is off?
+  show(`[data-part="${PART}"]`);
+  drive(`await page.eval(() => { const t = document.querySelector('.ra-bar'); t.scrollIntoView({ block: 'end' }); }); await nap(300);`);
+  click('.ra-b.disagree'); drive(`await wait('#sheet .ra-form textarea');`);
+  assert.equal(page(`() => document.querySelector('#sheet .ra-form textarea').placeholder`), 'What is off?');
   const TEXT = 'The 6-second limit is short for a cold start. Did it also hang with 30 seconds?';
-  drive(`await page.eval(() => { const t = document.querySelector('[data-part="${PART}"] > .gd-cbox textarea'); t.value = ${JSON.stringify(TEXT)}; t.dispatchEvent(new Event('input', { bubbles: true })); }); await nap(200);`);
-
-  capture('comment-typing', 'The report section keeps the typed comment beside Send.');
+  drive(`await page.eval(() => { const t = document.querySelector('#sheet .ra-form textarea'); t.value = ${JSON.stringify(TEXT)}; t.dispatchEvent(new Event('input', { bubbles: true })); }); await nap(200);`);
+  capture('comment-typing', 'The composer keeps the typed comment beside Send to the agent.');
   if (!process.env.SEND_FEEDBACK_BEFORE) {
   // Hold the real request at the browser boundary, as on a slow connection. The first attempt loses its connection.
   drive(`await page.eval(() => { const real = window.realCommentFetch ??= window.fetch; window.fetch = (url, options) => url === '/api/annotations' ? new Promise((ok, no) => { window.releaseComment = () => ok(real(url, options)); window.failComment = () => no(new Error('Connection interrupted')); }) : real(url, options); });`);
-  const feedback = `[data-send-feedback="part:${KEY}:${PART}"]`;
-  const instant = page(`() => { document.querySelector('[data-part="${PART}"] > .gd-cbox .gd-send').click(); return document.querySelector('${feedback}')?.textContent; }`);
+  const feedback = `[data-send-feedback="bar:${KEY}"]`;
+  const instant = page(`() => { document.querySelector('#sheet .ra-send').click(); return document.querySelector('${feedback}')?.textContent; }`);
   assert.equal(instant, 'Sending…', 'Send must answer in the same frame');
   capture('comment-sending', 'Send answers immediately with Sending…, before the real request completes.');
   drive(`await page.eval(() => window.failComment()); await nap(200);`);
   assert.match(page(`() => document.querySelector('${feedback}').textContent`), /Not sent · Connection interrupted.*Retry/);
-  assert.equal(page(`() => document.querySelector('[data-part="${PART}"] > .gd-cbox textarea').value`), TEXT);
+  assert.equal(page(`() => document.querySelector('#sheet .ra-form textarea').value`), TEXT);
   capture('comment-not-sent', 'Not sent gives the connection error and Retry, keeping all the words.');
   click(`${feedback} button`);
   assert.equal(page(`() => document.querySelector('${feedback}').textContent`), 'Sending…');
-  drive(`await page.eval(() => window.releaseComment()); await wait('.gd-cmt'); await nap(200);`);
-  assert.match(page(`() => document.querySelector('${feedback}').textContent`), /^Sent · [0-9]{2}:[0-9]{2}$/);
-  assert.equal(page(`() => document.querySelector('[data-part="${PART}"] > .gd-cbox textarea').value`), '');
-  assert.ok(page(`() => document.querySelector('.gd-top .thread')?.textContent.includes(${JSON.stringify(TEXT)})`), 'The report Activity updates immediately');
-  capture('comment-receipt', 'Sent gives the time, clears the box, and the comment is already in the report Activity.');
+  drive(`await page.eval(() => window.releaseComment()); await wait('.gd-act .ra-e'); await nap(300);`);
+  assert.ok(page(`() => document.querySelector('.gd-act').textContent.includes(${JSON.stringify(TEXT)})`), 'The report Activity updates immediately');
+  assert.match(page(`() => document.querySelector('.ra-note').textContent`), /^Sent to the agent \d\d:\d\d/);
+  capture('comment-receipt', 'Sent: the box closes, the bar says Sent to the agent with the time, and the comment is already in the report Activity.');
   const raw = readFileSync(join(dir, 'board.annotations.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
   assert.equal(raw.length, 1); assert.deepEqual([raw[0].key, raw[0].part, raw[0].verdict, raw[0].text], [KEY, PART, 'disagree', TEXT]);
-  assert.match(page(`() => document.querySelector('[data-part="${PART}"] > .gd-thread').innerText`), /Sent\s+[0-9]{2}:[0-9]{2}/);
-  assert.equal(page(`() => document.querySelector('[data-part="${PART}"] > .gd-foot .disagree').getAttribute('aria-pressed')`), 'true');
-  show(`[data-part="${PART}"]`);
-  capture('comment-sent', 'A sent comment shows under its part with Sent to the agent, and Disagree shows as chosen.', { page_shows: page(`() => document.querySelector('[data-part="${PART}"] > .gd-thread').innerText.replace(/\\s+/g, ' ')`), disagree_pressed: true, saved_line: raw[0] });
-
+  assert.equal(page(`() => document.querySelector('.ra-b.disagree').getAttribute('aria-pressed')`), 'true');
+  if (mobile) click('.ra-actb');
+  drive(`await wait('.gd-act .ra-e');`);
+  capture('comment-sent', 'Activity shows the comment with its track at Sent, and Disagree shows as chosen.', { saved_line: raw[0] });
   }
   if (process.env.SEND_FEEDBACK_ONLY) {
     // Every composer uses the same pending/receipt/retry path; transport faults never reach the real server.
