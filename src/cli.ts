@@ -313,7 +313,7 @@ Brings back a card that dismiss hid. See \`sign-off-axi dismiss --help\`.
 `,
   ticket: `usage: sign-off-axi ticket [board.json] [--json]
        sign-off-axi ticket [board.json] --id <id> [--json]
-       sign-off-axi ticket [board.json] --id <id> [--title <text>] [--progress <0-100>] [--parent <id>] [--priority P0-P3] [--project <name>] [--hold yes|no] [--asked yes|no]
+       sign-off-axi ticket [board.json] --id <id> [--title <text>] [--progress <0-100>] [--parent <id>] [--priority P0-P3] [--project <name>] [--hold yes|no] [--asked yes|no] [--release <text>] [--state <state>] [--pr <url>]...
        sign-off-axi ticket [board.json] --id <id> --comment '<json>'
 A ticket is one piece of work: its id, title, percent done and, optionally, the ticket it sits under, its priority, its project (whose icon its rows show),
 whether it is on hold and whether you asked for it (the board's Tickets tab then lists it under Your asks). It stands alone: nothing else needs it.
@@ -323,6 +323,9 @@ With any other flag, writes it: a new ticket needs --title (progress starts at 0
 A card names its ticket with --ticket <id> on raise and post (every --type and --kind), or "ticket" in a message or --from item:
 its screen then shows a Ticket row, the title and progress, that opens the ticket, which lists its asks, designs, proof and reports.
 A card whose ticket is not on the board shows no row; a ticket with no cards shows an empty page.
+--release labels the release (up to 40 characters). --state is queued, "in progress", "on hold" or done; it takes precedence over progress/hold for grouping.
+--pr takes full HTTP(S) URLs, repeatable or comma separated; it replaces the linked PR list. Empty --release, --state or --pr clears that field.
+Without --state, grouping stays Done at 100%, else On hold with --hold yes, else In progress above 0%, else To do.
 It writes one line to <board>.tickets.jsonl beside the board (${FORMAT}).
 --comment hands over a comment the person made on the ticket elsewhere (the fleet dashboard), in that dashboard's thread record: {"id","at","text","error","picked","replies":[{"at","text","by"}]},
 times in whole seconds since 1970. Send it again as it moves: the board shows it Sent, Delivered (no error), Read (picked) and Replied (the last reply) on the ticket, and a reply in Today.
@@ -1202,12 +1205,12 @@ function feedback(args: string[]) {
  * What it prints carries the roll-up: a ticket with tickets under it is as far along as they are on average. */
 function ticket(args: string[]) {
   const { file, values, on } = parse('ticket', args, { id: { type: 'string' }, title: { type: 'string' }, progress: { type: 'string' }, parent: { type: 'string' }, priority: { type: 'string' },
-    project: { type: 'string' }, hold: { type: 'string' }, asked: { type: 'string' }, comment: { type: 'string' }, json: { type: 'boolean' } });
+    project: { type: 'string' }, hold: { type: 'string' }, asked: { type: 'string' }, release: { type: 'string' }, state: { type: 'string' }, pr: { type: 'string', multiple: true }, comment: { type: 'string' }, json: { type: 'boolean' } });
   if (values.comment !== undefined) return ticketComment(file, values, on);
-  const { id, title, parent } = values, write = [title, values.progress, parent, values.priority, values.project, values.hold, values.asked].some((v) => v !== undefined);
-  if (id === undefined && write) throw fail('--title, --progress, --parent, --priority, --project, --hold and --asked need --id <ticket id>', 'VALIDATION_ERROR', 'sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40');
+  const { id, title, parent } = values, write = [title, values.progress, parent, values.priority, values.project, values.hold, values.asked, values.release, values.state, values.pr].some((v) => v !== undefined);
+  if (id === undefined && write) throw fail('--title, --progress, --parent, --priority, --project, --hold, --asked, --release, --state and --pr need --id <ticket id>', 'VALIDATION_ERROR', 'sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40');
   const cardsOf = (t: Ticket) => board(file).filter((d) => d.ticket === t.id && !d.dismissed).reverse().sort((x, y) => (Date.parse(y.filed ?? '') || 0) - (Date.parse(x.filed ?? '') || 0));
-  const row = (t: Ticket) => ({ id: t.id, title: t.title, progress: t.progress, parent: t.parent ?? '', priority: t.priority ?? '', project: t.project ?? '', hold: t.hold ? 'yes' : 'no', asked: t.asked ? 'yes' : 'no' });
+  const row = (t: Ticket) => ({ id: t.id, title: t.title, progress: t.progress, parent: t.parent ?? '', priority: t.priority ?? '', project: t.project ?? '', hold: t.hold ? 'yes' : 'no', asked: t.asked ? 'yes' : 'no', release: t.release ?? '', state: t.state ?? '', prs: t.prs ?? [] });
   if (id === undefined) {
     const all = rollUp(readTickets(file, warn));
     if (values.json) return JSON.stringify({ board: file, tickets: all.map((t) => ({ ...t, cards: cardsOf(t).map((d) => d.key) })) });
@@ -1232,9 +1235,9 @@ function ticket(args: string[]) {
     if (!had && title === undefined) throw fail(`no ticket ${id} on ${tilde(file)} yet: a new ticket needs --title`, 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id ${id} --title "<what the work is>" --progress 0`);
     // A later write changes only what it gives; an empty --parent, --priority, --project, --hold or --asked takes that field off.
     const next: any = { ...had, id, title: title ?? had!.title, progress: progress ?? had?.progress ?? 0 };
-    for (const [k, v] of Object.entries({ parent, priority: values.priority, project: values.project, hold: yesNo(values.hold), asked: yesNo(values.asked) })) if (v === '') delete next[k]; else if (v !== undefined) next[k] = v;
+    for (const [k, v] of Object.entries({ parent, priority: values.priority, project: values.project, hold: yesNo(values.hold), asked: yesNo(values.asked), release: values.release, state: values.state, prs: values.pr === undefined ? undefined : values.pr.every((v: string) => v === '') ? '' : [...new Set(values.pr.flatMap((v: string) => v.split(',').map((u: string) => u.trim())))] })) if (v === '') delete next[k]; else if (v !== undefined) next[k] = v;
     const fault = ticketFault(next);
-    if (fault) throw fail(`ticket ${id}: ${fault.replace(/^(title|progress|parent|priority|project|hold|asked)/, '--$1').replace('must be true or false', 'must be yes or no')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi ticket --help`');
+    if (fault) throw fail(`ticket ${id}: ${fault.replace(/^(title|progress|parent|priority|project|hold|asked|release|state|prs)/, '--$1').replace(/^--prs\b/, '--pr').replace('must be true or false', 'must be yes or no')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi ticket --help`');
     const same = had && JSON.stringify(row(had)) === JSON.stringify(row(next));
     if (!same) appendTicket(file, next);
     return toon({ board: tilde(file), ticket: row(next), status: same ? 'unchanged' : had ? 'updated' : 'created' }, [`Pass --ticket ${id} to raise or post, so the card shows this ticket`, `Run \`sign-off-axi ticket${on} --id ${id} --progress <0-100>\` as the work moves`]);
@@ -1246,7 +1249,7 @@ function ticket(args: string[]) {
 function ticketComment(file: string, values: Record<string, any>, on: string) {
   const { id } = values, EXAMPLE = `sign-off-axi ticket${on} --id T-29 --comment '{"id":"3f9a1c2e7b6d4a10","at":1792820000,"text":"Is the export in this?","error":null,"picked":1792820300,"replies":[]}'`;
   if (id === undefined || !isKey(id)) throw fail('--comment needs --id <ticket id>, 1-128 of A-Z a-z 0-9 . _ -', 'VALIDATION_ERROR', EXAMPLE);
-  if (['title', 'progress', 'parent', 'priority', 'project', 'hold', 'asked'].some((k) => values[k] !== undefined)) throw fail('--comment is written on its own, with no other ticket field', 'VALIDATION_ERROR', EXAMPLE);
+  if (['title', 'progress', 'parent', 'priority', 'project', 'hold', 'asked', 'release', 'state', 'pr'].some((k) => values[k] !== undefined)) throw fail('--comment is written on its own, with no other ticket field', 'VALIDATION_ERROR', EXAMPLE);
   let c;
   try { c = JSON.parse(values.comment); } catch { throw fail('--comment must be one JSON object', 'VALIDATION_ERROR', EXAMPLE); }
   const fault = ticketCommentFault(c);
