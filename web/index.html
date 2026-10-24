@@ -826,6 +826,90 @@
   #reader .gd .ic { width: 1.25rem; height: 1.25rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
   #reader .gd :focus-visible { outline: 2px solid var(--action); outline-offset: 2px; border-radius: 0.5rem; }
   .gd-rail { display: none; }
+  /* A report's one bar, its head's View and Activity, and its Activity: the parts carry no buttons (see reportBar in guideView). */
+  #reader header .ra-tool { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem; width: 2.75rem; height: 2.75rem; padding: 0; border: 0; border-radius: 999px; background: var(--tk-raised); color: var(--tk-ink); box-shadow: var(--tk-elev-raised); font: inherit; font-size: var(--tk-fs-row); font-weight: 500; cursor: pointer; }
+  #reader header .back + .ra-tool, #reader header .close + .ra-tool { margin-left: auto; }
+  #reader header .ra-tool .ic { width: 1.25rem; height: 1.25rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  #reader header .ra-tool[aria-expanded=true] { background: var(--tk-ink); color: var(--tk-canvas); }
+  #reader header .ra-lab { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  #reader header .ra-n { position: absolute; top: -0.25rem; right: -0.125rem; min-width: 1.125rem; height: 1.125rem; padding: 0 0.25rem; border-radius: 999px; background: var(--tk-ink); color: var(--tk-canvas); font-size: var(--tk-fs-small); line-height: 1.125rem; font-weight: 600; text-align: center; }
+  #reader header .ra-n[hidden] { display: none; }
+  .ra-bar { position: sticky; bottom: calc(1rem + env(safe-area-inset-bottom)); z-index: 10; margin: 1.5rem 0 0; padding: 0.5rem 0.5rem 0.5rem; border-radius: 1.5rem; background: var(--tk-raised); box-shadow: var(--tk-elev-dock); }
+  .ra-on { margin: 0; padding: 0.125rem 0.625rem 0.5rem; display: flex; gap: 0.375rem; min-width: 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
+  .ra-ont { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tk-ink); font-weight: 500; }
+  .ra-bs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.375rem; }
+  .ra-b { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.25rem; min-height: 3.5rem; padding: 0.375rem 0.25rem; border: 0; border-radius: 1rem; background: var(--tk-inset); color: var(--tk-text); font: inherit; font-size: var(--tk-fs-meta); line-height: 1rem; font-weight: 500; cursor: pointer; }
+  .ra-b .ic { width: 1.25rem; height: 1.25rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .ra-b[aria-pressed=true] { background: var(--tk-raised); box-shadow: inset 0 0 0 1.5px var(--tk-ink); }
+  .ra-b[aria-pressed=true] .ic { fill: currentColor; fill-opacity: 0.18; }
+  .ra-b.asks { background: var(--tk-go); color: var(--tk-on-go); }
+  .ra-b:focus-visible, .ra-x:focus-visible, .ra-show:focus-visible, .ra-pre:focus-visible, .ra-send:focus-visible { outline: 2px solid var(--tk-ink); outline-offset: 2px; }
+  .ra-note { margin: 0; padding: 0.125rem 0.625rem 0.5rem; color: var(--tk-text); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
+  .ra-note[hidden] { display: none; }
+  .ra-nonums .gd-nums { display: none; }
+  .gd-corner { position: absolute; inset: 0; display: block; color: var(--tk-ink); }
+  .gd-corner .ic { position: absolute; top: 0.5rem; right: 0.5rem; box-sizing: content-box; width: 1rem; height: 1rem; padding: 0.375rem; border-radius: 999px; background: var(--tk-raised); box-shadow: var(--tk-elev-raised); fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .gd-corner .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .gd-dg .gd-dgbox { position: relative; }
+  .gd-act { color: var(--tk-text); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
+  .gd-act[hidden] { display: none; }
+  .gd-act h2 { margin: 0; font-size: var(--tk-fs-head); line-height: var(--tk-lh-head); font-weight: 600; }
+  .gd-act h2 span { color: var(--tk-text-tertiary); font-weight: 500; }
+  .ra-ah { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-bottom: 0.5rem; }
+  .ra-x { display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; height: 2.25rem; padding: 0; border: 0; border-radius: 999px; background: var(--tk-inset); color: var(--tk-text-secondary); cursor: pointer; }
+  .ra-x .ic { width: 1rem; height: 1rem; }
+  .ra-day { margin: 0.5rem 0 0.375rem; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); }
+  .ra-list { list-style: none; margin: 0 0 0.75rem; padding: 0.25rem 0.875rem; border-radius: var(--tk-r-card); background: var(--tk-inset); }
+  .ra-e { display: flex; gap: 0.75rem; padding: 0.75rem 0; border-top: 1px solid var(--tk-line); }
+  .ra-e:first-child { border-top: 0; }
+  .ra-i { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: 999px; background: var(--tk-raised); color: var(--tk-ink); }
+  .ra-e.agent .ra-i { background: var(--tk-ink); color: var(--tk-canvas); }
+  .ra-i .ic { width: 1rem; height: 1rem; }
+  .ra-eb { min-width: 0; flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; }
+  .ra-eh { align-self: stretch; display: flex; align-items: baseline; gap: 0.5rem; }
+  .ra-eh b { flex: 1; min-width: 0; font-weight: 500; }
+  .ra-eh time { flex: none; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); }
+  .ra-chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0.125rem 0.5rem; border-radius: 0.5rem; background: var(--tk-raised); color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); line-height: 1.125rem; }
+  .ra-tx, .ra-say, .ra-q, .ra-st { margin: 0; color: var(--tk-text-secondary); overflow-wrap: anywhere; }
+  .ra-say { color: var(--tk-text); font-style: normal; }
+  .ra-q { color: var(--tk-text); }
+  .ra-e blockquote:not(.ra-say) { margin: 0; padding-left: 0.625rem; border-left: 2px solid var(--tk-line); color: var(--tk-text-secondary); }
+  .ra-show { padding: 0.25rem 0; border: 0; background: none; color: var(--tk-ink); font: inherit; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .ra-e .ui-trail { align-self: stretch; margin-top: 0.25rem; }
+  .ra-none { margin: 0.5rem 0; color: var(--tk-text-secondary); }
+  /* Phone: Activity is a sheet from under the head; a desk keeps it as the third column. */
+  @media (max-width: 62.4375rem) {
+    .gd-act:not([hidden]) { position: fixed; z-index: 30; left: 0; right: 0; bottom: 0; top: 3.5rem; overflow: auto; padding: 0.5rem 1rem calc(1.5rem + env(safe-area-inset-bottom)); border-radius: 1.75rem 1.75rem 0 0; background: var(--tk-card); box-shadow: 0 0 0 100vmax var(--tk-scrim); }
+    .gd-act:not([hidden])::before { content: ''; display: block; width: 2.25rem; height: 0.25rem; margin: 0 auto 0.75rem; border-radius: 2px; background: var(--tk-line); }
+  }
+  @media (min-width: 62.5rem) {
+    #reader .gd:has(.gd-cols.act) { max-width: 78rem; }
+    .gd-cols.act { grid-template-columns: 13rem minmax(0, 40rem) 20rem; gap: 2rem; }
+    .gd-act:not([hidden]) { position: sticky; top: 1rem; align-self: start; max-height: calc(100vh - 2rem); overflow: auto; padding: 0.75rem; border-radius: var(--tk-r-card); background: var(--tk-card); box-shadow: var(--tk-elev-card); }
+    #reader header .ra-tool { width: auto; padding: 0 0.875rem; }
+    #reader header .ra-lab { position: static; width: auto; height: auto; clip-path: none; overflow: visible; }
+    #reader header .ra-n { position: static; min-width: 0; height: auto; padding: 0; background: none; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); font-weight: 500; }
+    #reader header .ra-tool[aria-expanded=true] .ra-n { color: var(--tk-canvas); }
+    .ra-bar { margin-left: auto; margin-right: auto; max-width: 36rem; }
+  }
+  /* The composer, Ask and View sheets. */
+  #sheet .ra-form { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem; }
+  #sheet .ra-form textarea, #sheet .ra-form input, #sheet .ra-part { width: 100%; box-sizing: border-box; padding: 0.75rem; border: 0; border-radius: var(--tk-r-icon); background: var(--tk-inset); color: var(--tk-text); font: inherit; font-size: var(--tk-fs-body); }
+  #sheet .ra-form textarea { resize: vertical; }
+  #sheet .ra-part { width: auto; max-width: 100%; padding: 0.375rem 0.625rem; font-size: var(--tk-fs-row); }
+  #sheet .ra-on { padding: 0.5rem 0 0; align-items: center; }
+  #sheet .ra-send { min-height: 2.75rem; border: 0; border-radius: 999px; background: var(--tk-go); color: var(--tk-on-go); font: inherit; font-weight: 600; cursor: pointer; }
+  #sheet .ra-send:disabled { opacity: 0.4; cursor: default; }
+  #sheet .ra-pres { display: flex; flex-direction: column; gap: 0.375rem; margin-top: 0.5rem; }
+  #sheet .ra-pre { display: flex; align-items: center; gap: 0.75rem; min-height: 3rem; padding: 0.5rem 0.75rem; border: 0; border-radius: 1rem; background: var(--tk-inset); color: var(--tk-text); font: inherit; text-align: left; cursor: pointer; }
+  #sheet .ra-pre .ic { width: 1.25rem; height: 1.25rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  #sheet .ra-pre small { display: block; color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); }
+  #sheet .ra-vg { margin-top: 1rem; }
+  #sheet .ra-vl { margin: 0 0 0.5rem; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); }
+  #sheet .gd-seg { display: flex; gap: 0.5rem; }
+  #sheet .gd-choice { min-height: 2.75rem; padding: 0 1.125rem; border: 1.5px solid var(--tk-line); border-radius: 999px; background: var(--tk-inset); color: var(--tk-text); font: inherit; font-weight: 600; cursor: pointer; }
+  #sheet .gd-choice[aria-pressed=true] { border-color: var(--tk-ink); background: var(--tk-raised); }
+  #sheet .gd-err { color: var(--tk-critical); margin: 0; }
   .gd-progress { position: sticky; top: 0; z-index: 20; margin: 0 -1rem; padding: 0.625rem 1rem 0.5rem; background: var(--page); border-bottom: 1px solid var(--hair2); }
   .gd-progress .now { display: flex; justify-content: space-between; font-size: 0.875rem; color: var(--muted); margin-bottom: 0.5rem; }
   .gd-progress .now b { color: var(--text); font-weight: 600; }
@@ -3677,6 +3761,7 @@
     cmt: '<path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 4v-4h0A1.5 1.5 0 0 1 4 14.5z"/>',
     spark: '<path d="M12 3.5l1.6 4.9 4.9 1.6-4.9 1.6L12 16.5l-1.6-4.9L5.5 10l4.9-1.6zM18.5 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/>',
     q: '<circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/>', layers: '<path d="M12 4 3.5 8.5 12 13l8.5-4.5zM3.5 12.5 12 17l8.5-4.5M3.5 16.5 12 21l8.5-4.5"/>',
+    x: '<path d="M18 6 6 18M6 6l12 12"/>', eye: '<path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>', hist: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2"/>', view: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>', full: '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>',
     simple: '<path d="M5 7h14M5 12h9M5 17h5"/>', bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5.9 1.1.9 1.8V16h5.4v-.4c0-.7.3-1.3.9-1.8A6 6 0 0 0 12 3z"/>' };
   const MENU = [['question', 'q', 'Type your own question'], ['deeper', 'layers', 'More detail on this part'], ['simplify', 'simple', 'The same, in plainer words'], ['example', 'bulb', 'One worked case'], ['why', 'info', 'The reason behind it']];
   const shutMenus = () => document.querySelectorAll('.gd-menu:not([hidden])').forEach((m) => { m.hidden = true; m.previousElementSibling?.setAttribute('aria-expanded', 'false'); });
@@ -3749,9 +3834,13 @@
   const mdDiv = (t) => { const n = E('div', 'gd-md'); n.innerHTML = mdBlock(t); return n; };
   // END markdown
 
+  const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
   function guideView(d) {
     const plan = d.type === 'plan', key = d.key, sections = d.sections ?? [], decisions = plan ? d.decisions ?? [] : [], by = (stage) => sections.filter((s) => s.stage === stage);
     const live = !FROZEN && !state.readonly;
+    // View, this browser's choice: a report's pictures Drawn or As lists, and its numbers shown under the parts or not.
+    const view = { lists: lsGet('sign-off-view-lists') === '1', nums: lsGet('sign-off-view-nums') !== '0' }, viewHooks = new Set();
     const stages = ['this', 'understood', by('found').length && 'found', by('recommend').length && 'recommend', decisions.length && 'decide', 'next'].filter(Boolean);
     const saved0 = answerOf(key);
     const sentNote = (saved0?.notes ?? []).find((n) => n.section === 'understood');
@@ -3782,7 +3871,7 @@
       return [you, agent];
     }
     const sentNoteNow = () => (answerOf(key)?.notes ?? []).some((n) => n.section === 'understood' && n.note);
-    const rc = (part, small) => { const box = E('div', `gd-rc${small ? ' s' : ''}`); rcs.set(part + (small ? '~s' : ''), box); return box; };
+    const rc = (part, small) => { if (!plan) return ''; const box = E('div', `gd-rc${small ? ' s' : ''}`); rcs.set(part + (small ? '~s' : ''), box); return box; };
     const paintRc = () => rcs.forEach((box, k) => box.replaceChildren(...receipt(k.replace(/~s$/, ''))));
 
     const actionLabels = { question: 'Ask a question', deeper: 'Go deeper', simplify: 'Simplify this', example: 'Show an example', why: 'Why?', custom: 'Your ask' };
@@ -3820,8 +3909,10 @@
     const outbox = new Map(), again = new Map(); // an ask on its way, by sameness -> tapped again meanwhile; an ask id -> when its Already sent ends
     const same = (part, action, q, sel) => JSON.stringify([part, action ?? 'deeper', q ?? null, sel ? [sel.field, sel.start, sel.end] : null]);
     const sentAs = (s) => (state.deeper ?? []).find((a) => a.key === key && same(a.part, a.action, a.q, a.selection) === s);
-    const showAsk = (part, id) => { panels.get(part).hidden = false; panels.get(part).querySelector(`[data-ask="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'nearest', behavior: quick ? 'auto' : 'smooth' }); };
-    const already = (part, a) => { again.set(a.id, Date.now() + 4000); paintAns(part); showAsk(part, a.id); setTimeout(() => paintAns(part), 4100); };
+    const showAsk = (part, id) => { if (!plan) { openAct(); actBox.querySelector(`[data-ask="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'nearest', behavior: quick ? 'auto' : 'smooth' }); return; } panels.get(part).hidden = false; panels.get(part).querySelector(`[data-ask="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'nearest', behavior: quick ? 'auto' : 'smooth' }); };
+    const already = (part, a) => { again.set(a.id, Date.now() + 4000); paintAns(part); if (!plan) setTimeout(paintAct, 4100); showAsk(part, a.id); setTimeout(() => paintAns(part), 4100); };
+    /** An error with the part's ask: under the part on a plan, in the bar on a report. */
+    const fail = (part, node) => { if (plan) { panels.get(part).hidden = false; panels.get(part).append(node); } else flash(node); };
     async function sendAsk(part, action, q, selection, btn, post) {
       const s = same(part, action, q, selection), prior = sentAs(s);
       if (prior) { already(part, prior); return prior; }
@@ -3831,7 +3922,7 @@
       finally { outbox.delete(s); btn?.removeAttribute('aria-busy'); }
     }
     async function ask(part, q, btn) {
-      try { await sendAsk(part, 'deeper', q, undefined, btn, () => postJson('/api/deeper', { key, part, ...(q && { q }) })); } catch (e) { panels.get(part).hidden = false; panels.get(part).append(E('p', 'gd-err', `Could not ask: ${e.message}`)); }
+      try { await sendAsk(part, 'deeper', q, undefined, btn, () => postJson('/api/deeper', { key, part, ...(q && { q }) })); } catch (e) { fail(part, E('p', 'gd-err', `Could not ask: ${e.message}`)); }
     }
     const deepBtn = (part) => {
       const b = el('button', { class: 'gd-lnk deep', type: 'button', 'aria-expanded': 'false', 'aria-controls': `gd-a-${part.replace(/\W/g, '-')}` }, gic('deeper'), 'Go deeper');
@@ -3857,7 +3948,7 @@
         const retry = el('button', { type: 'button', class: 'gd-lnk' }, 'Retry');
         const error = E('p', 'gd-err', `Could not ask: ${e.message} `, retry);
         retry.onclick = () => { error.remove(); engage(part, action, q, id, selection, retry); };
-        panels.get(part).hidden = false; panels.get(part).append(error);
+        fail(part, error);
       }
     }
     // The presets and the composer for one part. With a selection they ask about those words, through this same engage().
@@ -3889,6 +3980,8 @@
         ...(c.reply ? [E('div', 'gd-cmt agent', E('span', 'av', 'A'), E('div', 'hd', E('b', '', 'Agent'), E('span', '', hhmm(c.replied))), E('p', '', c.reply))] : [])]));
     }
     const acts = (part, rows, inItem) => {
+      // A report's parts carry no buttons: its one bar and its Activity do the acting (reportBar). What stays is content, the numbers.
+      if (!plan) return rows?.length ? [el('table', { class: 'gd-dt gd-nums' }, el('caption', { style: 'position:absolute;width:1px;height:1px;overflow:hidden' }, 'The numbers'), ...rows.map((r) => el('tr', {}, el('th', { scope: 'row' }, r.label), el('td', {}, r.value))))] : [];
       const [db, dp] = rows?.length ? detailsBtn(part, rows) : [];
       const panel = live ? ansPanel(part) : null;
       if (!live) return [E('div', 'gd-acts', ...(db ? [db] : [])), ...(dp ? [dp] : [])];
@@ -3959,13 +4052,13 @@
     // After a send from the tray the answer lands at the end of the part; say it was sent and when, and offer to go there.
     async function asked(part, sending) {
       const show = el('button', { type: 'button', class: 'gd-lnk' }, 'Show'), line = E('p', 'gd-selt', 'Sending… ');
-      show.onclick = () => { panels.get(part).scrollIntoView({ block: 'center' }); drop(); };
+      show.onclick = () => { if (plan) panels.get(part).scrollIntoView({ block: 'center' }); else openAct(); drop(); };
       getSelection().removeAllRanges();
       tray.replaceChildren(line); tray.dataset.sig = 'asked';
       const a = await sending;
       if (tray.dataset.sig !== 'asked') return;
       if (!a) { drop(); return; }
-      line.replaceChildren(`${again.get(a.id) > Date.now() ? 'Already sent' : 'Sent to the agent'} ${hhmm(a.at)}. The answer appears under this part. `, show);
+      line.replaceChildren(`${again.get(a.id) > Date.now() ? 'Already sent' : 'Sent to the agent'} ${hhmm(a.at)}. ${plan ? 'The answer appears under this part.' : 'The answer comes in Activity.'} `, show);
       setTimeout(() => tray.dataset.sig === 'asked' && drop(), 8000);
     }
     function follow() {
@@ -3992,7 +4085,27 @@
     const dgAll = [d.visual?.diagram, ...sections.flatMap((s) => [s.diagram, ...(s.items ?? []).map((i) => i.diagram)])].filter(Boolean).flat();
     const night = matchMedia('(prefers-color-scheme: dark)'), phone = matchMedia('(max-width: 43.6875rem)');
     /** The picture in a sandboxed frame, its views as tabs; Show me opens the interactive viewer in place, Full size in a tab. */
+    /** A report's picture: its views as tabs, the picture opening full size by a tap on it (a corner mark says so); its rows as a list under it when View says As lists. */
+    function pictureFig(views, list) {
+      let cur = 0;
+      const frame = el('iframe', { sandbox: 'allow-scripts', loading: 'lazy' }), wide = el('a', { class: 'gd-corner', target: '_blank', rel: 'noopener' }, gic('full'), E('span', 'vh', 'Full size'));
+      const box = E('div', 'gd-dgbox', frame, wide), panel = list ? E('div', 'gd-panel', list) : null;
+      const paint = () => {
+        const v = views[cur], url = `${mockUrl(d.key, `diagram.${dgAll.indexOf(v)}`, v.src)}?theme=${(() => { try { return isDark(); } catch { return night.matches; } })() ? 'dark' : 'light'}`;
+        frame.style.height = ''; frame.title = `Diagram: ${v.label}`; frame.src = `${url}&embed=1`;
+        wide.href = src(phone.matches ? `${url}&embed=1` : url); wide.setAttribute('aria-label', `Full size: ${v.label}`);
+        tabs.forEach((b, i) => b.setAttribute('aria-pressed', String(i === cur)));
+        if (panel) panel.hidden = !view.lists;
+      };
+      const tabs = views.length > 1 ? views.map((v, i) => { const b = el('button', { class: 'gd-choice', type: 'button', 'aria-pressed': 'false' }, v.label); b.onclick = () => { cur = i; paint(); }; return b; }) : [];
+      const fig = E('figure', 'gd-fig gd-dg', ...(tabs.length ? [E('div', 'gd-seg', ...tabs)] : []), box, ...(panel ? [panel] : []));
+      for (const q of [night, phone]) q.addEventListener('change', () => { if (fig.isConnected) paint(); });
+      viewHooks.add(() => fig.isConnected && paint());
+      paint();
+      return fig;
+    }
     function diagramFig(views, list) {
+      if (!plan) return pictureFig(views, list);
       let cur = 0, full = false, listOpen = false;
       const frame = el('iframe', { sandbox: 'allow-scripts', loading: 'lazy' }), box = E('div', 'gd-dgbox', frame);
       const panel = list ? E('div', 'gd-panel', list) : null;
@@ -4183,14 +4296,142 @@
       if (st !== last) { last = st; const s = el('div', { class: 'gd-stage', id: `gd-st-${st}`, 'data-stage': st }, E('i', '', String(stages.indexOf(st) + 1)), GSTAGES[st]); stageEl.set(st, s); stageBlocks.push(s); }
       stageBlocks.push(c);
     }
+    const cols = E('div', 'gd-cols');
+    // ---- A report's one bar, one View and one Activity (a plan keeps its parts' own rows until its slice). Each acts on the part in view.
+    const unmd = (t) => String(t ?? '').replace(/[*`]/g, '').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
+    const names = new Map([['this', unmd(d.visual.heading)], ['understood', 'What I understood'], ...sections.map((x) => [x.id, unmd(x.heading)]), ...decisions.map((q) => [`d:${q.key}`, unmd(q.question)]), ['next', unmd(d.next.heading)]]);
+    const partName = (part) => names.get(part) ?? names.get(String(part).replace(/:\d+$/, '')) ?? part;
+    let curPart = 'this';
+    const note = E('div', 'ra-note'); note.hidden = true; note.setAttribute('role', 'status');
+    /** One line over the bar: what was sent, or what went wrong. */
+    function flash(what) { note.replaceChildren(what); note.hidden = false; clearTimeout(flash.t); flash.t = setTimeout(() => { note.hidden = true; }, 7000); }
+    const sentLine = (at) => `Sent to the agent ${hhmm(at)}. What it says comes in Activity.`;
+    async function say(part, body) {
+      await postJson('/api/annotations', { key, part, ...body });
+      if (part === 'understood' && body.verdict) { S.understood = body.verdict === 'agree' ? 'yes' : 'no'; S.told = !!body.text; syncU(); }
+      sync();
+    }
+    const raBtn = (cls, icon, label, fn) => { const b = el('button', { type: 'button', class: `ra-b ${cls}` }, gic(icon), E('span', '', label)); b.onclick = fn; return b; };
+    const onTxt = E('span', 'ra-ont');
+    const agreeB = raBtn('agree', 'up', 'Agree', () => { if (verdictOf(curPart) !== 'agree') say(curPart, { verdict: 'agree' }).then(() => flash(sentLine(new Date()))).catch((e) => flash(E('span', 'gd-err', `Could not send: ${e.message}`))); });
+    const disagreeB = raBtn('disagree', 'down', 'Disagree', () => openComposer('disagree'));
+    const commentB = raBtn('cmt', 'cmt', 'Comment', () => openComposer('comment'));
+    const askB = raBtn('asks', 'spark', 'Ask', () => (d.engagement ? openAsk() : ask(curPart, undefined, askB)));
+    const reportBar = el('div', { class: 'ra-bar', role: 'group', 'aria-label': 'About the part in view' }, note, E('p', 'ra-on', 'On ', onTxt), E('div', 'ra-bs', agreeB, disagreeB, commentB, askB));
+    function paintBar() {
+      onTxt.textContent = partName(curPart);
+      const on = verdictOf(curPart) === 'agree';
+      agreeB.setAttribute('aria-pressed', String(on)); agreeB.lastChild.textContent = on ? 'Agreed' : 'Agree';
+      disagreeB.setAttribute('aria-pressed', String(verdictOf(curPart) === 'disagree'));
+    }
+    /** Disagree and Comment: one composer on the part, which can be changed here. */
+    function openComposer(mode) {
+      const sel = el('select', { class: 'ra-part', 'aria-label': 'The part this is about' }, ...[...parts.keys()].map((p) => el('option', { value: p }, partName(p)))), form = el('form', { class: 'ra-form' });
+      sel.value = curPart;
+      const ta = el('textarea', { rows: '4', maxlength: '500', 'aria-label': mode === 'disagree' ? 'What is off' : 'Comment for the agent' }), send = el('button', { type: 'submit', class: 'ra-send', disabled: '' }, 'Send to the agent'), err = E('p', 'gd-err');
+      const paint = () => { ta.placeholder = mode === 'disagree' ? (sel.value === 'understood' ? 'What is off? One line is enough.' : 'What is off?') : 'Your comment, for the agent that wrote this'; send.disabled = !ta.value.trim(); };
+      sel.onchange = paint; ta.oninput = paint; paint();
+      form.append(E('label', 'ra-on', 'On ', sel), ta, err, send);
+      form.onsubmit = async (e) => {
+        e.preventDefault(); const text = ta.value.trim(); if (!text) return;
+        send.disabled = true; err.textContent = '';
+        try { await say(sel.value, { text, ...(mode === 'disagree' && { verdict: 'disagree' }) }); sheet.close(); flash(sentLine(new Date())); } catch (x) { err.textContent = `Could not send: ${x.message}`; send.disabled = false; }
+      };
+      openSheet(mode === 'disagree' ? (curPart === 'understood' ? 'Not quite' : 'Disagree') : 'Comment', form);
+      ta.focus({ preventScroll: true });
+    }
+    /** Ask: the presets and a question of your own, on the part in view. */
+    function openAsk() {
+      const part = curPart, form = el('form', { class: 'ra-form' }), input = el('input', { 'aria-label': 'Your own question', placeholder: 'Type your own question', maxlength: '500' }), go = el('button', { type: 'submit', class: 'ra-send', disabled: '' }, 'Send to the agent');
+      const sentTo = async (p) => { sheet.close(); const a = await p; if (a) flash(sentLine(a.at)); };
+      const presets = MENU.filter(([a]) => a !== 'question').map(([a, icon, sub]) => { const b = el('button', { type: 'button', class: 'ra-pre' }, gic(icon), E('span', '', actionLabels[a], E('small', '', sub))); b.onclick = () => sentTo(engage(part, a, undefined, undefined, undefined, b)); return b; });
+      input.oninput = () => { go.disabled = !input.value.trim(); };
+      form.append(input, go); form.onsubmit = (e) => { e.preventDefault(); if (input.value.trim()) sentTo(engage(part, 'question', input.value.trim(), undefined, undefined, go)); };
+      openSheet('Ask', E('p', 'ra-on', 'On ', E('b', '', partName(part))), E('div', 'ra-pres', ...presets), form);
+    }
+    /** View: the pictures Drawn or As lists, and the numbers under each part shown or not. */
+    function openView() {
+      const seg = (label, opts, get, set) => E('div', 'ra-vg', E('p', 'ra-vl', label), E('div', 'gd-seg', ...opts.map(([v, name]) => { const b = el('button', { type: 'button', class: 'gd-choice', 'aria-pressed': String(get() === v) }, name); b.onclick = () => { set(v); b.parentElement.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); }; return b; })));
+      openSheet('View', seg('Pictures', [[false, 'Drawn'], [true, 'As lists']], () => view.lists, (v) => { view.lists = v; lsSet('sign-off-view-lists', v ? '1' : '0'); viewHooks.forEach((f) => f()); }),
+        seg('The numbers under each part', [[true, 'Shown'], [false, 'Hidden']], () => view.nums, (v) => { view.nums = v; lsSet('sign-off-view-nums', v ? '1' : '0'); paintView(); }));
+    }
+    const paintView = () => root.classList.toggle('ra-nonums', !view.nums);
+
+    // Activity: every note, ask and reply, what was read and when the agent wrote it, newest first by day, from the board's own records.
+    const actBox = el('aside', { class: 'gd-act', 'aria-label': 'Activity', hidden: '' }), deskMq = matchMedia('(min-width: 62.5rem)');
+    const lastOpen = () => Date.parse(lsGet(`sign-off-act-${key}`)) || 0;
+    let actOn = false, actSeen = lastOpen();
+    const actCount = E('span', 'ra-n');
+    const entriesOf = () => {
+      const out = [], mine = (state.comments ?? []).filter((c) => c.key === key);
+      for (const c of mine) {
+        const u = c.part === 'understood', what = c.verdict === 'agree' ? 'You agreed' : c.verdict === 'disagree' ? (u ? 'You said Not quite' : 'You disagreed') : 'You commented';
+        out.push({ at: c.at, icon: c.verdict === 'agree' ? 'up' : c.verdict === 'disagree' ? 'down' : 'cmt', title: what, part: c.part, text: c.text ? [c.text] : [], quote: !!c.text, trail: sentOf(c.id), you: true });
+        if (c.reply) out.push({ at: c.replied ?? c.at, icon: 'spark', title: 'Agent replied to your note', part: c.part, text: c.reply.split(/\n+/), agent: true });
+      }
+      for (const a of (state.deeper ?? []).filter((x) => x.key === key)) {
+        const label = actionLabels[a.action] ?? 'Go deeper', writing = !!a.text && !a.done, waiting = !a.read, again1 = again.get(a.id) > Date.now(), delivery = state.delivery?.[a.id];
+        out.push({ at: a.done ? a.answered ?? a.at : a.at, icon: 'spark', agent: a.done || writing, title: a.done ? `Agent replied to your ${label}` : writing ? `Agent is answering your ${label}` : `You asked ${label}`, part: a.part,
+          status: again1 ? `Already sent ${hhmm(a.at)}` : a.done || writing ? '' : waiting ? `Sent to the agent ${hhmm(a.at)}` : `Agent got it ${hhmm(a.read)}, working on it`,
+          ask: a.q ?? (a.action === 'custom' ? a.about : ''), selection: a.selection?.quote, text: a.text ? a.text.split(/\n+/) : [], writing, shim: !a.text, id: a.id, fresh: a.version === 1 && !!a.text && a.seen !== a.answerRevision, rev: a.answerRevision,
+          err: a.version === 1 && delivery?.error ? `Delivery pending: ${delivery.error}` : '', slow: waiting && !a.done && Date.now() - Date.parse(a.at) > 60_000, trail: sentOf(a.id) });
+      }
+      const reads = Object.entries(state.reads ?? {}).filter(([k]) => k.startsWith(`${key}/`)).map(([k, at]) => [k.slice(key.length + 1), at]).sort((x, y) => Date.parse(x[1]) - Date.parse(y[1]));
+      let sit = [];
+      const flush = () => { if (sit.length) out.push({ at: sit.at(-1)[1], icon: 'eye', title: `You read ${plural(sit.length, 'part')}`, text: [sit.map(([p]) => partName(p)).join(', ')], read: true }); sit = []; };
+      for (const r of reads) { if (sit.length && Date.parse(r[1]) - Date.parse(sit.at(-1)[1]) > 600_000) flush(); sit.push(r); }
+      flush();
+      if (d.filed) out.push({ at: d.filed, icon: 'hist', title: 'Agent wrote this', text: [[who, when(d.filed)].filter(Boolean).join(', ')], posted: true });
+      // Within one second (the board stores answers to the second) the later record is the newer.
+      return out.map((e, i) => ({ ...e, i })).filter((e) => !Number.isNaN(Date.parse(e.at))).sort((x, y) => Math.floor(Date.parse(y.at) / 1000) - Math.floor(Date.parse(x.at) / 1000) || y.i - x.i);
+    };
+    const toPart = (part) => { if (!deskMq.matches) shutAct(); parts.get(part)?.scrollIntoView({ block: 'start', behavior: quick ? 'auto' : 'smooth' }); };
+    function paintAct() {
+      const es = entriesOf(), news = es.filter((e) => !e.posted && !e.read && Date.parse(e.at) > actSeen).length, total = es.filter((e) => !e.posted).length;
+      actCount.textContent = deskMq.matches ? (total ? String(total) : '') : actOn || !news ? '' : String(news);
+      actCount.hidden = !actCount.textContent; actCount.dataset.new = String(news);
+      const sig = JSON.stringify(es);
+      if (actBox.dataset.sig === sig) return;
+      actBox.dataset.sig = sig;
+      const x = el('button', { type: 'button', class: 'ra-x', 'aria-label': 'Close Activity' }, gic('x'));
+      x.onclick = shutAct;
+      const days = [];
+      for (const e of es) { const g = isToday(e.at) ? 'Today' : day(e.at); (days.at(-1)?.[0] === g ? days.at(-1)[1] : days[days.push([g, []]) - 1][1]).push(e); }
+      const item = (e) => {
+        const li = el('li', { class: `ra-e${e.agent ? ' agent' : ''}`, ...(e.id && { 'data-ask': e.id }) }, E('span', 'ra-i', gic(e.icon)), E('div', 'ra-eb', E('div', 'ra-eh', E('b', '', e.title), E('time', '', hhmm(e.at)), ...(e.fresh ? [E('span', 'gd-chip', 'New')] : [])),
+          ...(e.part ? [E('span', 'ra-chip', partName(e.part))] : []), ...(e.status ? [E('p', 'ra-st', e.status)] : []), ...(e.ask ? [E('p', 'ra-q', e.ask)] : []), ...(e.selection ? [E('blockquote', '', e.selection)] : []),
+          ...(e.err ? [E('p', 'gd-err', e.err)] : []),
+          ...(e.shim && e.id ? [E('div', 'shim', ''), E('div', 'shim', '')] : e.text.map((t, i, all) => E(e.quote ? 'blockquote' : 'p', e.quote ? 'ra-say' : 'ra-tx', e.quote ? `“${t}”` : t, ...(e.writing && i === all.length - 1 ? [E('span', 'caret')] : [])))),
+          ...(e.trail ? [trailTrack(e.trail, false)] : []), ...(e.slow ? [E('p', 'slow', 'The agent has not picked this up yet. It answers the next time it checks the board.')] : []),
+          ...(e.agent && e.part && parts.has(e.part) ? [(() => { const b = el('button', { type: 'button', class: 'ra-show' }, 'Show in the report'); b.onclick = () => toPart(e.part); return b; })()] : [])));
+        if (e.fresh) { li.dataset.answerId = e.id; li.dataset.answerRevision = e.rev; answerIO.observe(li); }
+        return li;
+      };
+      actBox.replaceChildren(E('div', 'ra-ah', E('h2', '', 'Activity', ...(total ? [E('span', '', ` ${total}`)] : [])), x),
+        ...(days.length ? days.flatMap(([g, list]) => [E('p', 'ra-day', g), el('ol', { class: 'ra-list' }, ...list.map(item))]) : [E('p', 'ra-none', 'Nothing yet. Your notes, asks and the agent’s replies show here.')]));
+    }
+    function paintActOpen() {
+      actBox.hidden = !actOn; cols.classList.toggle('act', actOn); actBtn.setAttribute('aria-expanded', String(actOn)); root.classList.toggle('ra-actopen', actOn);
+      if (actOn) { actSeen = Date.now(); lsSet(`sign-off-act-${key}`, new Date().toISOString()); }
+      paintAct();
+    }
+    function openAct() { actOn = true; paintActOpen(); }
+    function shutAct() { actOn = false; paintActOpen(); actBtn.focus({ preventScroll: true }); }
+    const viewBtn = el('button', { type: 'button', class: 'ra-tool', 'aria-label': 'View', 'aria-haspopup': 'dialog' }, gic('view'));
+    const actBtn = el('button', { type: 'button', class: 'ra-tool ra-actb', 'aria-label': 'Activity', 'aria-expanded': 'false' }, gic('hist'), E('span', 'ra-lab', 'Activity'), actCount);
+    viewBtn.onclick = openView; actBtn.onclick = () => (actOn ? shutAct() : openAct());
+    deskMq.addEventListener('change', () => { if (root.isConnected) { actOn = deskMq.matches; paintActOpen(); } });
+
     const who = plan ? 'Planning agent' : d.asked_by ?? 'Reporting agent';
     const top = E('div', 'gd-top', E('p', 'geye', kindChip(d, true), E('span', '', [plan ? d.project : d.group, [who, d.filed && when(d.filed)].filter(Boolean).join(', ')].filter(Boolean).join(' · '))), fld('this', 'title', E('h1', '', d.title)), purposeLine(d), fld('this', 'about', mdSpan('p', 'sub', d.about)), ticketRow(d), thread(d),
-      E('div', 'howto', gic('info'), E('span', '', `A few short parts, in order. Tap Details for the numbers and Go deeper to ask me more.${plan ? ' Nothing is required: Go ahead accepts my picks.' : ''}`)));
+      E('div', 'howto', gic('info'), E('span', '', plan ? 'A few short parts, in order. Tap Details for the numbers and Go deeper to ask me more. Nothing is required: Go ahead accepts my picks.' : `A few short parts, in order. The bar at the foot acts on the part you are reading${live ? '' : '.'}${live ? ': Agree, Disagree, Comment or Ask.' : ''}`)));
     const rail = el('aside', { class: 'gd-rail' }, E('h4', '', plan ? 'This plan' : 'This report'), nav, ...(plan ? [sumHost] : []));
     const progress = E('div', 'gd-progress', now, segs);
-    const main = el('div', { class: 'gd-main' }, top, ...stageBlocks);
-    const scroll = E('div', 'gd-scroll', E('div', 'gd', progress, E('div', 'gd-cols', rail, main)));
+    const main = el('div', { class: 'gd-main' }, top, ...stageBlocks, ...(plan || !live ? [] : [reportBar]));
+    cols.append(rail, main, ...(plan ? [] : [actBox]));
+    const scroll = E('div', 'gd-scroll', E('div', 'gd', progress, cols));
     const root = E('div', '', scroll, ...(plan ? [bar] : []));
+    if (!plan) root.tools = [viewBtn, actBtn];
     root.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
     const answerTimers = new WeakMap();
     const answerIO = new IntersectionObserver(es => es.forEach(en => {
@@ -4200,7 +4441,7 @@
         try { await postJson('/api/engagement/seen', { id: en.target.dataset.answerId, answerRevision: +en.target.dataset.answerRevision }); sync(); }
         catch (e) { en.target.append(E('p', 'gd-err', `Could not mark read: ${e.message}`)); }
       }, 1400));
-    }), { root: scroll, threshold: 0.35 });
+    }), { threshold: 0.35 });
 
     // ---- reading: a part on screen for a moment is read
     const mark = (part) => { if (!live || readAt(part) !== undefined) return; (state.reads ??= {})[`${key}/${part}`] = new Date().toISOString(); paintRc(); paintRail(); postJson('/api/reads', { key, part }).then(sync).catch(() => {}); };
@@ -4208,7 +4449,7 @@
     const quick = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const io = new IntersectionObserver((es) => es.forEach((en) => { const p = en.target.dataset.part; if (en.isIntersecting) timers.set(p, setTimeout(() => mark(p), 1400)); else clearTimeout(timers.get(p)); }), { root: scroll, threshold: 0.35 });
     parts.forEach((c) => io.observe(c));
-    const io2 = new IntersectionObserver((es) => es.forEach((en) => { if (en.isIntersecting) setStage(en.target.dataset.stage); }), { root: scroll, rootMargin: '-30% 0px -60% 0px' });
+    const io2 = new IntersectionObserver((es) => es.forEach((en) => { if (en.isIntersecting) { setStage(en.target.dataset.stage); if (!plan && en.target.dataset.part) { curPart = en.target.dataset.part; paintBar(); } } }), { root: scroll, rootMargin: '-30% 0px -60% 0px' });
     stageEl.forEach((s) => io2.observe(s));
     parts.forEach((c) => c.dataset.stage = stageOf.get(c.dataset.part));
     parts.forEach((c) => io2.observe(c));
@@ -4217,7 +4458,7 @@
     let timer;
     function sync() {
       if (!root.isConnected && timer) { clearInterval(timer); timer = undefined; return; }
-      syncU(); paintOpts(); paintSummary(); paintRc(); paintRail(); votes.forEach((_, part) => paintTalk(part));
+      syncU(); paintOpts(); paintSummary(); paintRc(); paintRail(); if (!plan) { paintBar(); paintAct(); } votes.forEach((_, part) => paintTalk(part));
       panels.forEach((_, part) => { paintAns(part); if (asksOf(part).length && (d.engagement || (deeps.get(part).getAttribute('aria-expanded') === 'false' && !deeps.get(part).dataset.shut))) { deeps.get(part)?.setAttribute('aria-expanded', 'true'); panels.get(part).hidden = false; } });
       const need = live && (unfinished() || (state.comments ?? []).some((c) => c.key === key && c.text && !c.reply) || (plan && sent() && !state.seen_at?.[key]));
       if (need && !timer) timer = setInterval(async () => {
@@ -4229,6 +4470,7 @@
     root.sync = sync;
     deeps.forEach((b) => b.addEventListener('click', () => { b.dataset.shut = b.getAttribute('aria-expanded') === 'true' ? '' : '1'; }));
     setStage(stages[0]);
+    if (!plan) { actOn = deskMq.matches; paintView(); paintActOpen(); }
     queueMicrotask(sync);
     return root;
   }
@@ -4273,7 +4515,7 @@
     // A report's page reads under its own head: what it is and when, its title, what it says and decided; a plan or a design keeps its title in the bar;
     // an update is a sheet of its own, with its own head and close.
     reader._guide = undefined;
-    reader.replaceChildren(...(summary ? reportSheet(d, h1) : d.guided ? [el('header', {}, back), (reader._guide = guideView(d))] : d.type === 'plan' ? [el('header', {}, back, Object.assign(h1, { className: 'plan-name' })), planReview(d, url)] : d.kind === 'design' ? [el('header', {}, back), designReview(d, h1)]
+    reader.replaceChildren(...(summary ? reportSheet(d, h1) : d.guided ? (reader._guide = guideView(d), [el('header', {}, back, ...(reader._guide.tools ?? [])), reader._guide]) : d.type === 'plan' ? [el('header', {}, back, Object.assign(h1, { className: 'plan-name' })), planReview(d, url)] : d.kind === 'design' ? [el('header', {}, back), designReview(d, h1)]
       : d.type === 'evidence' ? [evidenceItem(d)]
       : sheet ? reportSheet(d, h1, el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }))
       : [el('header', {}, back), el('div', { class: 'read' }, el('p', { class: 'eyebrow' }, kindChip(d, true), el('span', {}, [d.asked_by, d.filed ? when(d.filed) : ''].filter(Boolean).join(' · '))), h1, purposeLine(d),

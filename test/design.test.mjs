@@ -1144,7 +1144,7 @@ test('Decide on the page: a guided plan with no decisions is read under Reports,
   proc.kill();
 });
 
-test('a guided report: item detail keeps its line breaks, same-axis options read as one comparison table at 390 and 1280, and an item with no detail keeps its buttons inside its padding', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('a guided report: item detail keeps its line breaks, same-axis options read as one comparison table at 390 and 1280', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'compare'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const report = JSON.parse(readFileSync(new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url)));
@@ -1188,17 +1188,13 @@ test('a guided report: item detail keeps its line breaks, same-axis options read
         for (let n; (n = walk.nextNode());) if (n.data.trim()) { r.selectNodeContents(n); for (const b of r.getClientRects()) tops.add(Math.round(b.top)); }
         return { text: f.textContent, lines: [...f.querySelectorAll('p')].map((p) => p.textContent), tops: tops.size }; })()`);
       assert.deepEqual(lines, { text: 'Close the input.\nPin the version.\nReady the backup.', lines: ['Close the input.', 'Pin the version.', 'Ready the backup.'], tops: 3 }, `${width}`);
-      // An item with no detail draws its buttons inside the item's own padding, as an opened item does.
-      const pad = await evaluate(`(() => { const li = [...document.querySelectorAll('#gd-found .gd-rows > li')].find((l) => l.textContent.startsWith('One password entry')), box = li.getBoundingClientRect(), text = li.querySelector('.rowstat .sm').getBoundingClientRect();
-        const shown = [...li.querySelectorAll('button, input')].filter((b) => b.getClientRects().length); return { buttons: shown.length, outside: shown.filter((b) => { const r = b.getBoundingClientRect(); return r.left < text.left - 0.5 || r.right > box.right - 8; }).length }; })()`);
-      assert.ok(pad.buttons >= 4 && pad.outside === 0, `${width}: ${JSON.stringify(pad)}`);
     } finally { close(); }
   }
   proc.kill();
 });
 
 // A capture of a report is a desktop screenshot: on a phone its tap stays on the board's own live page, never the raw file shrunk in a tab.
-test('an ask on a guided report answers the tap on a phone: the Ask control is pressed at once, Sent to the agent shows with the time in view, a repeated tap says Already sent and sends nothing more, and Agent replied shows once the agent answers', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('an ask on a guided report answers the tap on a phone: the bar\'s Ask sends the part in view, Activity shows Sent to the agent with the time, a repeated tap says Already sent and sends nothing more, and Agent replied shows once the agent answers', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'ask-feedback'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const report = { ...JSON.parse(readFileSync(new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url))), filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
@@ -1210,44 +1206,38 @@ test('an ask on a guided report answers the tap on a phone: the Ask control is p
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const asks = () => { try { return readFileSync(join(dir, 'board.deeper.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).filter((l) => l.op === 'ask'); } catch { return []; } };
   const { evaluate, close } = await browse(join(dir, 'b'), 390, 844, true);
+  const goDeeper = () => evaluate(`document.querySelector('.ra-b.asks').click(), document.querySelector('#sheet .ra-pre').click()`);
+  const entry = `(() => { const e = document.querySelector('.gd-act .ra-e[data-ask]'); return e ? [e.querySelector('.ra-eh b').textContent, e.querySelector('.ra-st')?.textContent ?? '', document.querySelectorAll('.gd-act .ra-e[data-ask]').length].join('|') : ''; })()`;
   try {
     await evaluate(`location.href = ${JSON.stringify(`${url}#reports/${report.key}`)}`);
-    // The found section's last item shows its own row in the card, so its Ask is the one on screen there.
-    const foot = '[data-part="found"] > .gd-rows > li:last-child .gd-foot', ans = '[data-part="found"] > .gd-rows > li:last-child .gd-ans';
-    await until(() => evaluate(`!!document.querySelector('${foot} .gd-more')?.getClientRects().length`));
-    await evaluate(`document.querySelector('.gd-scroll').style.scrollBehavior = 'auto'; document.querySelector('${foot}').scrollIntoView({ block: 'end' })`);
-    // The tap on Go deeper presses the Ask control at once, in ink, before the board has answered.
-    const pressed = await evaluate(`(() => { const more = document.querySelector('${foot} .gd-more'); more.click(); document.querySelector('${foot} .gd-menu button.deep').click();
-      const ink = getComputedStyle(document.body).getPropertyValue('--action').trim(), probe = document.createElement('i'); probe.style.color = ink; document.body.append(probe); const want = getComputedStyle(probe).color; probe.remove();
-      return [more.getAttribute('aria-busy'), getComputedStyle(more).backgroundColor === want].join('|'); })()`);
-    assert.equal(pressed, 'true|true');
-    // Then the ask shows under the part, on screen, as Sent to the agent with the time, and the Ask control is itself again.
-    const head = `(() => { const b = document.querySelector('${ans} .gask'), r = b?.getBoundingClientRect(); return b ? [b.querySelector('.hd').textContent, r.top >= 0 && r.bottom <= innerHeight, document.querySelector('${foot} .gd-more').hasAttribute('aria-busy')].join('|') : ''; })()`;
-    await until(async () => /^Sent to the agent \d\d:\d\d\|true\|false$/.test(await evaluate(head)));
+    await until(() => evaluate(`!!document.querySelector('.ra-bar .ra-b.asks')?.getClientRects().length`));
+    // One bar for the report: the part in view is named in it, and no part carries a row of its own.
+    assert.equal(await evaluate(`document.querySelectorAll('.ra-bar').length + ':' + document.querySelectorAll('.gd-sec .gd-v, .gd-sec .gd-more, .gd-rc').length`), '1:0');
+    await goDeeper();
+    await until(async () => /^You asked Go deeper\|Sent to the agent \d\d:\d\d\|1$/.test(await evaluate(entry)));
+    assert.match(await evaluate(`document.querySelector('.ra-note').textContent`), /^Sent to the agent \d\d:\d\d\./);
     assert.equal(asks().length, 1);
     // The same tap again sends nothing and says so on the ask already sent.
-    await evaluate(`document.querySelector('${foot} .gd-more').click(), document.querySelector('${foot} .gd-menu button.deep').click()`);
-    await until(async () => /^Already sent \d\d:\d\d\|true\|false$/.test(await evaluate(head)));
+    await goDeeper();
+    await until(async () => /^You asked Go deeper\|Already sent \d\d:\d\d\|1$/.test(await evaluate(entry)));
     await evaluate('new Promise((ok) => setTimeout(ok, 300))');
     assert.equal(asks().length, 1);
-    assert.equal(await evaluate(`document.querySelectorAll('${ans} .gask').length`), 1);
-    // The author agent answers it: the ask reads Agent replied with the time, and the answer is in place.
+    // The author agent answers it: the entry reads Agent replied with the time, and the answer is in it.
     const replied = run('deeper', file, '--filer', report.filer, '--id', asks()[0].id, '--text', 'The code now comes with the password, so one screen is gone.');
     assert.equal(replied.code, 0, replied.out);
-    await until(async () => /^Agent replied \d\d:\d\d(New)?\|true\|false$/.test(await evaluate(head)));
-    assert.match(await evaluate(`document.querySelector('${ans} .gask').textContent`), /The code now comes with the password/);
-    // The feedback trail: under the ask its track reads Sent, Read and Replied with their times (a wait handed it over, so Delivered is the same moment),
+    await until(async () => /^Agent replied to your Go deeper\|\|1$/.test(await evaluate(entry)));
+    assert.match(await evaluate(`document.querySelector('.gd-act .ra-e[data-ask]').textContent`), /The code now comes with the password/);
+    // The feedback trail: under the entry its track reads Sent, Delivered, Read and Replied (a wait handed it over, so Delivered is the same moment),
     // and once the report is left the reply waits in Today, the report's row on Reports carrying its badge until the report is opened again.
-    const track = `[...document.querySelectorAll('${ans} .gask .ui-trail li')].map((l) => l.querySelector('b').textContent + (l.classList.contains('on') ? '+' : '')).join(' ')`;
+    const track = `[...document.querySelectorAll('.gd-act .ra-e[data-ask] .ui-trail li')].map((l) => l.querySelector('b').textContent + (l.classList.contains('on') ? '+' : '')).join(' ')`;
     await until(async () => (await evaluate(track)) === 'Sent+ Delivered+ Read+ Replied+');
-    assert.equal(await evaluate(`!!document.querySelector('${ans} .gask .ui-trail .tr-said')`), false, 'the reply is in the ask already, not twice');
     await evaluate(`location.href = ${JSON.stringify(url)}`);
     await until(async () => (await evaluate('[...document.querySelectorAll(".t-replies .ui-row .t")].map((t) => t.textContent).join()')) === report.title);
   } finally { close(); }
   proc.kill();
 });
 
-test('Not quite with a note and Tell the agent, on a phone on an answers-only board: the note is taken, saved, handed to the report\'s author by wait --filer, its track at Sent, then Read', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Not quite with a note and Tell the agent, on a phone on an answers-only board: the note is taken, saved, handed to the report\'s author by wait --filer, its track at Sent, then Read in Activity', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'fed-not-quite'), file = join(dir, 'board.json'), note = 'It is VMs, not containers: each agent gets its own machine.';
   mkdirSync(dir);
   const report = { ...JSON.parse(readFileSync(new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url))), key: 'mx-agents-on-vms-v2', filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
@@ -1260,8 +1250,9 @@ test('Not quite with a note and Tell the agent, on a phone on an answers-only bo
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const { evaluate, tap, insertText, close } = await browse(join(dir, 'b'), 390, 844, true);
   const centre = (sel) => evaluate(`(() => { const b = document.querySelector(${JSON.stringify(sel)}); b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`);
-  // Each comment under the part: who and when, the words, and the step its track has reached (Sent, Delivered, Read, Replied).
-  const card = '[data-part="understood"]', status = `[...document.querySelectorAll('${card} .gd-cmt')].map((c) => c.querySelector('.hd').textContent + c.querySelector('p').textContent + c.querySelector('.ui-trail')?.getAttribute('aria-label').split(':')[0]).join('|') + '#' + [...document.querySelectorAll('${card} .gd-err')].filter((e) => e.textContent).length`;
+  const card = '[data-part="understood"]';
+  // Each note in Activity: what was said, its part, the words, and the step its track has reached (Sent, Delivered, Read, Replied).
+  const status = `[...document.querySelectorAll('.gd-act .ra-e')].filter((e) => e.querySelector('.ra-say')).map((c) => c.querySelector('.ra-eh b').textContent + '|' + c.querySelector('.ra-chip').textContent + '|' + c.querySelector('.ra-say').textContent + '|' + c.querySelector('.ui-trail')?.getAttribute('aria-label').split(':')[0]).join('#')`;
   try {
     await evaluate(`location.href = ${JSON.stringify(`${url}#reports/${report.key}`)}`);
     await until(() => evaluate(`!!document.querySelector('${card} .gd-choice[data-u="no"]')?.getClientRects().length`));
@@ -1272,9 +1263,9 @@ test('Not quite with a note and Tell the agent, on a phone on an answers-only bo
     await insertText(note);
     await until(() => evaluate(`!document.querySelector('${card} .gd-tell').hidden`));
     await tap(await centre(`${card} .gd-tell`));
-    // Accepted, no "takes answers only": the note shows under the part as sent, and the note box and Tell the agent make way for it.
-    const shown = (state) => new RegExp(`^YouDisagree\\d\\d:\\d\\d${note.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}${state}#0$`);
-    await until(async () => shown('Sent').test(await evaluate(status)));
+    // Accepted, no "takes answers only": the note is in Activity as sent, and the note box and Tell the agent make way for it.
+    const shown = (state) => `You said Not quite|What I understood|“${note}”|${state}`;
+    await until(async () => (await evaluate(status)) === shown('Sent'));
     assert.equal(await evaluate(`[document.querySelector('${card} .gd-note').hidden, document.querySelector('${card} .gd-tell').hidden].join()`), 'true,true');
     const saved = readFileSync(join(dir, 'board.annotations.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
     assert.deepEqual(saved.map(({ key, part, verdict, text }) => [key, part, verdict, text]), [[report.key, 'understood', 'disagree', note]]);
@@ -1282,8 +1273,7 @@ test('Not quite with a note and Tell the agent, on a phone on an answers-only bo
     const taken = execFileSync(process.execPath, [cli, 'wait', file, '--filer', report.filer, '--events', '--timeout', '10'], { encoding: 'utf8', env });
     const event = JSON.parse(taken.trim());
     assert.deepEqual([event.event, event.key, event.part, event.verdict, event.text], ['comment', report.key, 'understood', 'disagree', note]);
-    await until(async () => shown('Read').test(await evaluate(status)));
-    assert.match(await evaluate(`document.querySelector('${card} .gd-rc').textContent`), /Agent read your note \d\d:\d\d/);
+    await until(async () => (await evaluate(status)) === shown('Read'));
     // That is right is the same part's Agree, saved and taken the same way.
     await tap(await centre(`${card} .gd-choice[data-u="yes"]`));
     await until(() => readFileSync(join(dir, 'board.annotations.jsonl'), 'utf8').includes('"verdict":"agree"'));
@@ -1292,11 +1282,10 @@ test('Not quite with a note and Tell the agent, on a phone on an answers-only bo
   proc.kill();
 });
 
-test('a guided report on a phone never stacks two action rows:every item keeps its one row in its card, and a section\'s own row shows once at its end unless its last item already shows a row, with its Details kept', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
-  const dir = join(scratch, 'one-row'), file = join(dir, 'board.json');
+test('a guided report acts from one place: the parts carry no buttons or receipts, the bar acts on the part in view (Agree is saved and shows Agreed, Comment sends one note), and Activity lists both, with the numbers kept under their part', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'one-bar'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const report = { ...JSON.parse(readFileSync(new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url))), filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
-  // A third section whose last item opens in place, and which has numbers behind Details.
   report.sections.push({ id: 'steps', stage: 'found', heading: 'Two steps', body: 'The second one opens.', items: [{ title: 'Close the input', text: 'One line.' }, { title: 'Pin the version', text: 'Tap for why.', more: 'The newer one hangs.' }],
     details: [{ label: 'Hangs', value: '3 of 40 runs' }] });
   writeFileSync(join(dir, 'report.json'), JSON.stringify(report));
@@ -1305,21 +1294,27 @@ test('a guided report on a phone never stacks two action rows:every item keeps i
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const saved = () => { try { return readFileSync(join(dir, 'board.annotations.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)); } catch { return []; } };
   const { evaluate, close } = await browse(join(dir, 'b'), 390, 844, true);
-  // Per section: how many rows each shown item has, whether the last item shows one, whether the section's own row shows its actions, and its Details.
-  const rows = `JSON.stringify([...document.querySelectorAll('.gd-sec')].map((s) => { const shown = (e) => !!e && e.getClientRects().length > 0, acting = (f) => shown(f) && shown(f.querySelector('.gd-v.agree'));
-    const items = [...s.querySelectorAll(':scope > .gd-rows > li')], open = items.filter((li) => shown(li.querySelector(':scope > .body'))), own = s.querySelector(':scope > .gd-foot');
-    return [s.dataset.part, open.map((li) => [...li.querySelectorAll('.gd-foot')].filter(acting).length).join(''), items.length > 0 && acting(items.at(-1).querySelector(':scope > .body > .gd-foot')), acting(own), shown(own?.querySelector('.gd-lnk:not(.deep)'))].join(':'); }))`;
   try {
     await evaluate(`location.href = ${JSON.stringify(`${url}#reports/${report.key}`)}`);
-    await until(() => evaluate('!!document.querySelector(\'[data-part="steps"] > .gd-foot\')'));
-    // The found and limits sections end with an item that shows its row, so the section's own row is not drawn under it; the steps section's last item is closed, so its own row shows, Details in it.
-    assert.deepEqual(JSON.parse(await evaluate(rows)), ['this::false:true:true', 'understood::false:true:false', 'found:1:true:false:false', 'limits:1:true:false:false', 'steps:1:false:true:true', 'next::false:true:false']);
-    // Opening the last item draws its row inside the card; the section's own row then keeps only its Details, and closing it brings the row back.
-    await evaluate('document.querySelector(\'[data-part="steps"] > .gd-rows > li:last-child > .rowbtn\').click()');
-    assert.equal(JSON.parse(await evaluate(rows))[4], 'steps:11:true:false:true');
-    await evaluate('document.querySelector(\'[data-part="steps"] > .gd-rows > li:last-child > .rowbtn\').click()');
-    assert.equal(JSON.parse(await evaluate(rows))[4], 'steps:1:false:true:true');
+    await until(() => evaluate(`!!document.querySelector('.ra-bar .ra-b.agree')?.getClientRects().length`));
+    // No part has a button row, a Details or Go deeper button, or a receipt; the numbers are plain content under their part.
+    assert.equal(await evaluate(`[document.querySelectorAll('.gd-main .gd-foot, .gd-main .gd-lnk.deep, .gd-main .gd-rc').length, [...document.querySelectorAll('.gd-main button.gd-lnk')].filter((b) => b.getClientRects().length).length, [...document.querySelectorAll('[data-part="steps"] > .gd-nums td')].map((t) => t.textContent).join()].join('|')`), '0|0|3 of 40 runs');
+    // Agree acts on the part in view and shows Agreed there.
+    await evaluate(`document.querySelector('.gd-scroll').style.scrollBehavior = 'auto'; document.querySelector('[data-part="steps"]').scrollIntoView({ block: 'center' })`);
+    await until(async () => (await evaluate(`document.querySelector('.ra-ont').textContent`)) === 'Two steps');
+    await evaluate(`document.querySelector('.ra-b.agree').click()`);
+    await until(async () => saved().length === 1 && (await evaluate(`document.querySelector('.ra-b.agree').getAttribute('aria-pressed') + document.querySelector('.ra-b.agree').textContent`)) === 'trueAgreed');
+    assert.deepEqual(saved().map(({ part, verdict }) => [part, verdict]), [['steps', 'agree']]);
+    // Comment opens one composer on that part and sends one note.
+    await evaluate(`document.querySelector('.ra-b.cmt').click()`);
+    await until(() => evaluate(`document.querySelector('#sheet .ra-part')?.value === 'steps'`));
+    await evaluate(`(() => { const t = document.querySelector('#sheet textarea'); t.value = 'Pin it to 2.4.'; t.dispatchEvent(new Event('input')); document.querySelector('#sheet .ra-send').click(); })()`);
+    await until(() => saved().length === 2);
+    assert.deepEqual(saved().map(({ part, verdict, text }) => [part, verdict, text]).at(-1), ['steps', undefined, 'Pin it to 2.4.']);
+    // Activity lists both, newest first, each naming its part.
+    await until(async () => (await evaluate(`[...document.querySelectorAll('.gd-act .ra-e')].filter((e) => e.querySelector('.ra-chip')?.textContent === 'Two steps').map((e) => e.querySelector('.ra-eh b').textContent).join('|')`)) === 'You commented|You agreed');
   } finally { close(); }
   proc.kill();
 });
