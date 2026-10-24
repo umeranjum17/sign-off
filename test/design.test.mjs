@@ -2373,12 +2373,13 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   const says = '<script>const say = (load) => parent.postMessage({ vp: [innerWidth, innerHeight], load }, "*"); say(true); addEventListener("resize", () => say(false))</script>';
   writeFileSync(join(dir, 'design', 'security.html'), `<!doctype html><title>Security view</title><h1>Security preview</h1>${says}`);
   writeFileSync(join(dir, 'design', 'security-desk.html'), `<!doctype html><title>Security on a desk</title><h1>Security preview</h1>${says}`);
+  writeFileSync(join(dir, 'design', 'welcome.webp'), readFileSync(new URL('../docs/media/phone-light.webp', import.meta.url)));
   const message = { contract: 1, kind: 'design', schema: 1, key: 'd1-design', title: 'Review the welcome screen',
     about: 'Check the welcome screen before release.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review',
     preview: 'design/preview.png', link: 'https://example.test/design/original',
     options: [{ value: 'quick', label: 'Quick' }, { value: 'guided', label: 'Guided' }], recommend: 'guided',
     journeys: [{ id: 'account-setup', title: 'Account setup', screens: [
-      { id: 'welcome', title: 'Welcome', views: { phone_light: 'design/welcome.png' } },
+      { id: 'welcome', title: 'Welcome', views: { phone_light: 'design/welcome.webp' } },
       { id: 'security', title: 'Security', views: { phone_light: 'design/security.html', computer_light: 'design/security-desk.html' } },
       ...Array.from({ length: 15 }, (_, i) => ({ id: `screen-${i + 3}`, title: `Journey screen ${i + 3}`, views: { phone_light: 'design/welcome.png' } })),
     ] }] };
@@ -2414,12 +2415,13 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
   // On a phone the design row leads with its first frame, its title, and its state and day.
   await until(async () => (await evaluate('document.querySelector(".dz-list .t")?.textContent')) === message.title);
-  assert.equal(await evaluate('document.querySelector(".dz-list .ui-icon img")?.getAttribute("src")?.includes("welcome.png") && !document.querySelector(".dz-list .mono")'), true);
+  assert.equal(await evaluate('document.querySelector(".dz-list .ui-icon img")?.getAttribute("src")?.includes("welcome.webp") && !document.querySelector(".dz-list .mono")'), true);
+  assert.equal(await evaluate('(async () => { const i = document.querySelector(".dz-list .design-thumb"); await i.decode(); return i.getBoundingClientRect().height <= i.parentElement.getBoundingClientRect().height; })()'), true, 'portrait thumbnail fits its tile');
   assert.equal(await evaluate('document.querySelector(".dz-list .meta")?.textContent'), 'In review · 18 Oct');
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
   await until(async () => (await evaluate('document.querySelector(".design-review .foot button")?.textContent')) === 'Approve');
   assert.equal(await evaluate('document.querySelector(".design-preview-full")?.getAttribute("target")'), '_blank');
-  assert.equal(await evaluate('document.querySelector(".design-review-preview")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent('design/welcome.png')}`);
+  assert.equal(await evaluate('document.querySelector(".design-review-preview")?.getAttribute("src")'), `/design/local/d1-design/${encodeURIComponent('design/welcome.webp')}`);
   assert.equal(await evaluate('document.querySelector("[aria-label=\\"Screen for note\\"]")?.options.length'), 17);
   await evaluate('window.vp = [], window.loads = 0, addEventListener("message", (e) => { if (!e.data?.vp) return; loads += e.data.load; vp.push(e.data.vp.join("x")); })');
   await evaluate('(() => { const s = document.querySelector("[aria-label=\\"Screen for note\\"]"); s.value = "account-setup/security"; s.dispatchEvent(new Event("change")); })()');
@@ -4538,7 +4540,7 @@ test('the new look draws only the approved prototype\'s colours: Today, Decide, 
         if (Array.isArray(tap)) await until(() => evaluate('!document.getElementById("toast").hidden'));
         await evaluate('new Promise((ok) => setTimeout(ok, 400))');
         if (hash === '#find') await evaluate('document.querySelector("#find").value = "settings", document.querySelector("#find").dispatchEvent(new Event("input"))');
-        assert.deepEqual(await evaluate('[...document.querySelectorAll(".ui-row .ui-icon, .dz-card, .t-up .meta")].filter(e => e.querySelector(".mono") || /^[A-Z]{2}$/.test(e.textContent.trim())).map(e => e.textContent)'), [], 'no monogram tiles in any list');
+        assert.deepEqual(await evaluate('[...document.querySelectorAll(".ui-row .ui-icon, .dz-shot, .t-up .meta")].filter(e => e.querySelector(".mono") || (!e.querySelector("img,svg") && /^[A-Z]{2}$/.test(e.textContent.trim()))).map(e => e.textContent)'), [], 'no monogram tiles in any list');
         const at = hash + (tap ? ` (${[tap].flat().map((t) => t.split(',')[0]).join(' then ')} tapped)` : '');
         // On Designs the colours read include the sidebar's own Designs place, lit, on a desk, and the dock with Today lit on a phone.
         if (hash.startsWith('#designs')) assert.deepEqual(await evaluate('[...document.querySelectorAll(".side [aria-current], .tabs [aria-current]")].filter((a) => a.getClientRects().length).map((a) => a.getAttribute("href"))'), [width === 390 ? '#' : '#designs'], at);

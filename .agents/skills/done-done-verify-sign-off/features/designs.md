@@ -35,3 +35,5 @@ Each capture is measured in the browser (`<state>.*.measure.json`, `measure.<sid
 The regressions are `test/design.test.mjs` ("listed under Designs only", "a design without journey screens", the viewer and round tests) and `board-actions.mjs` (the `designs` and `design-review` pages: More's Select, a pick, Discard 1 with a reason and Undo, Cancel, Discard all with Undo, Discard on the design's page, Review full screen, Change without and with a note, Approve).
 
 Design row tiles and desktop picture cards use the first journey screen’s image (preview picture when that screen has no still), with a project/kind fallback only if it cannot load. `report-rows` uses a real sign-off screen capture as that first frame.
+
+The portrait thumbnail must fit the 40 px tile: the integration journey uses a real portrait image, and `report-rows` measures thumbnail bounds in every captured list.
