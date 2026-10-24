@@ -21,15 +21,18 @@ delete env.SIGN_OFF_FILER;
 const cli = (...args) => { const r = spawnSync(process.execPath, [join(repo, 'dist/cli.js'), ...args], { encoding: 'utf8', timeout: 120000, env }); assert.equal(r.status, 0, r.stdout + r.stderr); return r.stdout; };
 const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
 const name = (state) => `${state}.${theme}.${width}w`;
+// TRAIL_LONG=1: long titles and notes, the case a badge must survive (journey trail-badge captures only Decide's answered rows, at 360, 390 and 445).
+const long = process.env.TRAIL_LONG === '1', more = (t) => (long ? { 'Keep the weekly digest?': 'Keep sending the weekly digest to every reader of every project?', 'Turn on the CSV export?': 'Turn on the CSV export for all the teams that asked?',
+  'Ship the new settings page Friday?': 'Ship the new settings page on Friday with every setting in place?', 'Open the beta to every team?': 'Open the beta to every team, including the ones who left?' }[t] : t);
 
 // The board: four asks from two agents and a design, each sent something by the person and left at another step.
 writeFileSync(join(dir, 'config.yaml'), 'board: board.json\nname: Umer\n');
 const ask = (filer, key, title, why, yes, no, ...more) => cli('post', board, '--filer', filer, '--ask-ref', 'message-demo', '--key', key, '--title', title, '--why', why,
   '--outcome', `yes=${yes}`, '--outcome', `no=${no}`, '--recommend', 'yes', '--recommend-reason', 'It is the safer pick.', '--default', 'yes', ...more);
-ask('release-agent', 'digest', 'Keep the weekly digest?', 'The paid plan renews Monday.', 'It keeps going out.', 'It stops this week.');
-ask('release-agent', 'export', 'Turn on the CSV export?', 'Two teams asked for it this month.', 'It ships Friday.', 'It waits a release.');
-ask('settings-agent', 'ship', 'Ship the new settings page Friday?', 'No new bug reports for three weeks.', 'The page ships Friday.', 'It waits a week.');
-ask('settings-agent', 'beta', 'Open the beta to every team?', 'The first ten teams found no blockers.', 'Every team gets it Monday.', 'It stays with ten teams.');
+ask('release-agent', 'digest', more('Keep the weekly digest?'), 'The paid plan renews Monday.', 'It keeps going out.', 'It stops this week.');
+ask('release-agent', 'export', more('Turn on the CSV export?'), 'Two teams asked for it this month.', 'It ships Friday.', 'It waits a release.');
+ask('settings-agent', 'ship', more('Ship the new settings page Friday?'), 'No new bug reports for three weeks.', 'The page ships Friday.', 'It waits a week.');
+ask('settings-agent', 'beta', more('Open the beta to every team?'), 'The first ten teams found no blockers.', 'Every team gets it Monday.', 'It stays with ten teams.');
 ask('release-agent', 'waiting', 'Move the release to Thursday?', 'The store review takes two days this week.', 'It ships Thursday.', 'It ships Friday as planned.');
 mkdirSync(join(dir, 'design'));
 // The design's screen is the README's own phone shot of the board, so the review shows a picture a person can read.
@@ -51,14 +54,14 @@ for (let i = 0; i < 100 && !base; i++) await wait(100);
 assert.ok(base, 'the board did not start');
 const api = async (path, body) => { const r = await fetch(base + path.slice(1), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); assert.equal(r.status, 200, await r.text()); };
 // Sent: answered, and nothing has taken it.
-await api('/api/answers', { key: 'digest', answer: 'yes', note: '' });
+await api('/api/answers', { key: 'digest', answer: 'yes', note: long ? 'It is the only thing most of the readers open on a Monday, so it stays.' : '' });
 // Delivered: a wait (a hook or a poller, not the agent's own) hands the answer over.
 const handing = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'wait', board, '--key', 'export', '--timeout', '30'], { env, stdio: 'ignore' });
 await wait(800);
 await api('/api/answers', { key: 'export', answer: 'yes', note: 'Only the admin role should see it.' });
 await new Promise((ok) => handing.once('exit', ok));
 // Read: the agent's own wait takes it.
-await api('/api/answers', { key: 'ship', answer: 'yes', note: '' });
+await api('/api/answers', { key: 'ship', answer: 'yes', note: long ? 'Three quiet weeks are enough, so ship it.' : '' });
 cli('wait', board, '--filer', 'settings-agent', '--timeout', '5');
 // Replied: the agent took it, then says what it did, with the pull request.
 await api('/api/answers', { key: 'beta', answer: 'no', note: 'Wait until the import bug is fixed.' });
@@ -120,8 +123,8 @@ const MEASURE = `(async () => { await document.fonts.ready; const fail = [], w =
     return { steps: [...t.querySelectorAll('li')].map((l) => (l.classList.contains('on') ? '+' : '-') + l.querySelector('b').textContent + ' ' + l.querySelector('time').textContent).join(' | '), oneLine: new Set(li.map((x) => Math.round(x.top))).size === 1,
       inside: li.every((x) => x.left >= r.left - 0.5 && x.right <= r.right + 0.5), cut: [...t.querySelectorAll('b')].some((b) => b.scrollWidth > b.clientWidth + 1), said: t.querySelector('.tr-said')?.innerText ?? '' }; });
   tracks.forEach((t, i) => { if (!t.oneLine || !t.inside || t.cut) fail.push('track ' + i + ' ' + JSON.stringify(t)); });
-  const badges = [...document.querySelectorAll('.ui-tb')].filter(vis).map((b) => ({ row: b.closest('.ui-row')?.querySelector('.t')?.textContent ?? '', badge: b.textContent, ink: b.classList.contains('new'), h: b.getBoundingClientRect().height }));
-  badges.forEach((b) => { if (b.h !== 20) fail.push('badge ' + JSON.stringify(b)); });
+  const badges = [...document.querySelectorAll('.ui-tb')].filter(vis).map((b) => ({ row: b.closest('.ui-row')?.querySelector('.t')?.textContent ?? '', badge: b.textContent, ink: b.classList.contains('new'), h: Math.round(b.getBoundingClientRect().height), lines: b.getClientRects().length, clear: (() => { const m = b.closest('.ui-row')?.querySelector('.meta'); return !m || m.getBoundingClientRect().right <= b.getBoundingClientRect().left + 0.5; })() }));
+  badges.forEach((b) => { if (b.h !== 20 || b.lines !== 1 || !b.clear) fail.push('badge ' + JSON.stringify(b)); });
   const replies = [...document.querySelectorAll('.t-replies .ui-row')].map((r) => r.innerText.replace(/\\n+/g, ' / '));
   const activity = [...document.querySelectorAll('.thread li')].filter(vis).map((p) => p.innerText.replace(/\\n+/g, ' / '));
   if (document.documentElement.scrollWidth > w) fail.push('sideways overflow');
@@ -146,8 +149,9 @@ const toTrack = `(() => { const t = document.querySelector('.ui-trail'); let h =
   if (h === t && t?.closest('.decide')) h = [...t.closest('.decide').querySelectorAll('.ui-dl')].find((e) => e.textContent === 'Your answer') ?? t;
   h?.scrollIntoView({ block: 'start' }); })()`;
 try {
-  await capture('today', '#');
+  if (!long) await capture('today', '#');
   await capture('decide', '#waiting', `(() => { const h = [...document.querySelectorAll('h2, .ui-sec, .dl-h')].find((x) => /Answered/.test(x.textContent)); h?.scrollIntoView({ block: 'start' }); })()`);
+  if (!long) {
   await capture('designs', '#designs');
   await capture('sent', '#decide/digest', toTrack);
   await capture('delivered', '#decide/export', toTrack);
@@ -157,6 +161,7 @@ try {
   await capture('report', `#reports/${report.key}`, `(() => { const g = document.querySelector('.gask'); const panel = g?.closest('[hidden]'); if (panel) panel.hidden = false; g?.scrollIntoView({ block: 'center' }); })()`);
   await capture('ticket', '#ticket/T-1', `document.querySelector('.tk-said')?.scrollIntoView({ block: 'center' })`);
   await capture('today-seen', '#');
+  }
 } finally {
   ws.close(); chrome.kill(); server.kill(); await wait(300);
   rmSync(prof, { recursive: true, force: true }); rmSync(dir, { recursive: true, force: true });
@@ -164,12 +169,15 @@ try {
 // The step record: each cell adds its steps to the run's steps.json, so one run over four cells keeps all of them.
 const prior = existsSync(join(out, 'steps.json')) ? JSON.parse(readFileSync(join(out, 'steps.json'), 'utf8')) : null, cell = `On a ${phone ? 'phone' : `${width} px desk`} in ${theme}`;
 writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
-  start: 'A new board with four answered asks from two agents, a design with change notes, a guided report and a ticket, served by sign-off-axi serve',
-  steps: [...(prior?.steps ?? []), ...[
+  start: long ? 'A new board with four answered asks with long titles and notes, served by sign-off-axi serve' : 'A new board with four answered asks from two agents, a design with change notes, a guided report and a ticket, served by sign-off-axi serve',
+  steps: [...(prior?.steps ?? []), ...(long ? [
+    'The person answers four asks in the board, each with a long title and some with a long note; a plain wait hands one answer over; the agents own waits take two; the settings agent replies with feedback --reply and a pull request link',
+    'The person opens Decide and scrolls to Answered'] : [
     'The person answers four asks in the board; a plain wait hands one answer over; the agents own waits take two; the settings agent replies with feedback --reply and a pull request link',
     'The person sends change notes on the design; its agent runs feedback --read, then feedback --reply with the new version pull request',
     'The person taps Go deeper on the report; its author takes it with wait --filer and answers it; the fleet dashboard hands over a ticket comment with the lead pickup and reply',
-    'The person opens Today, Decide, Designs, each answered ask, the design, the report and the ticket, then Today again'].map((x) => `${cell}: ${x}`)],
-  result: [prior?.result, `${cell}: Today lists the replies above Waiting on you; each answered row carries its badge (Sent, Delivered, Read, Replied); each card shows its four-step track with times, the reply and its link, and its Activity; the report ask and the ticket comment show the same track; once opened, the replies leave Today.`].filter(Boolean).join(' ') }, null, 2) + '\n');
+    'The person opens Today, Decide, Designs, each answered ask, the design, the report and the ticket, then Today again']).map((x) => `${cell}: ${x}`)],
+  result: [prior?.result, `${cell}: ` + (long ? 'each answered row in Decide ends its second line with its badge (four small marks and Sent, Delivered, Read or Replied) on one line, and the long words before it end in an ellipsis; nothing wraps or overlaps.'
+    : 'Today lists the replies above Waiting on you; each answered row carries its badge (Sent, Delivered, Read, Replied); each card shows its four-step track with times, the reply and its link, and its Activity; the report ask and the ticket comment show the same track; once opened, the replies leave Today.')].filter(Boolean).join(' ') }, null, 2) + '\n');
 const failed = results.filter((r) => r.fail.length || r.console_errors.length);
 if (failed.length) { console.error(JSON.stringify(failed.map(({ state, fail, console_errors }) => ({ state, fail, console_errors })), null, 2)); process.exit(1); }

@@ -360,11 +360,12 @@ examples:
   sign-off-axi promote fleet-dashboard-prototype
   sign-off-axi promote fleet-dashboard-prototype --undo
 `,
-  feedback: `usage: sign-off-axi feedback <key> [board.json] (--read | --reply <text> [--link <url>] | --acted --link <url>) [--filer <id>]
+  feedback: `usage: sign-off-axi feedback <key> [board.json] (--delivered | --read | --reply <text> [--link <url>] | --acted --link <url>) [--at <epoch seconds>] [--filer <id>]
 Tells the person how far their answer, notes, new round or comment on a card got: the board shows each one as Sent, Delivered, Read and then Replied, on the card, in its Activity,
 as a badge in the lists, and a reply in Today. A wait hands an answer over and marks it (read when it is the filer's own wait, else delivered), and an on_answer hook that ran marks it delivered.
 --read: the agent has read what was sent. --reply: what the agent did or says back, 500 characters or fewer, with --link to the new version or the pull request.
---acted --link: the agent acted, and the link shows what changed (the merge hook uses this). Posting the card again marks what was sent before it as acted on too.
+--delivered: it was handed to the agent. --acted --link: the agent acted, and the link shows what changed (the merge hook uses this).
+--at <epoch seconds>: the step happened then (replaying history). It cannot come before the send or lie in the future, a step the card already shows is left alone (nothing is written, and a reply never replaces one), so a replay never turns a later real state back into an older one and can be run twice. Posting the card again marks what was sent before it as acted on too.
 A mark covers everything sent on that card up to now. --filer refuses a card that filer did not post. It writes one line to <board>.trail.jsonl beside the board.
 examples:
   sign-off-axi feedback fleet-dashboard-full --read
@@ -1180,14 +1181,14 @@ function promote(args: string[]) {
 
 /** feedback <key> [board.json] (--read | --reply <text> [--link <url>] | --acted --link <url>): the agent tells the person how far what they sent on a card got. */
 function feedback(args: string[]) {
-  const at = args.findIndex((a, i) => !a.startsWith('-') && !existsSync(a) && !a.endsWith('.json') && !['--reply', '--link', '--filer'].includes(args[i - 1])), key = args[at];
+  const at = args.findIndex((a, i) => !a.startsWith('-') && !existsSync(a) && !a.endsWith('.json') && !['--reply', '--link', '--filer', '--at'].includes(args[i - 1])), key = args[at];
   if (at < 0 || !isKey(key)) throw fail('feedback needs the key of a card', 'VALIDATION_ERROR', 'sign-off-axi feedback <key> [board.json] --read');
-  const { file, values, on } = parse('feedback', args.filter((_, i) => i !== at), { read: { type: 'boolean' }, reply: { type: 'string' }, acted: { type: 'boolean' }, link: { type: 'string' }, filer: { type: 'string' } });
-  const ops = [values.read && 'read', values.reply !== undefined && 'reply', values.acted && 'acted'].filter(Boolean);
-  if (ops.length !== 1) throw fail('feedback takes one of --read, --reply <text> or --acted --link <url>', 'VALIDATION_ERROR', `sign-off-axi feedback ${key}${on} --read`);
+  const { file, values, on } = parse('feedback', args.filter((_, i) => i !== at), { read: { type: 'boolean' }, delivered: { type: 'boolean' }, reply: { type: 'string' }, acted: { type: 'boolean' }, link: { type: 'string' }, filer: { type: 'string' }, at: { type: 'string' } });
+  const ops = [values.read && 'read', values.delivered && 'delivered', values.reply !== undefined && 'reply', values.acted && 'acted'].filter(Boolean);
+  if (ops.length !== 1) throw fail('feedback takes one of --delivered, --read, --reply <text> or --acted --link <url>', 'VALIDATION_ERROR', `sign-off-axi feedback ${key}${on} --read`);
   const text = typeof values.reply === 'string' ? values.reply.trim() : undefined, link = values.link;
   if (text !== undefined && (!text || [...text].length > NOTE_MAX)) throw fail(`--reply must be text of ${NOTE_MAX} characters or fewer`, 'VALIDATION_ERROR', `sign-off-axi feedback ${key}${on} --reply "<what you did>"`);
-  if (link !== undefined && (values.read || !/^https?:\/\/[^\s]{1,500}$/.test(link))) throw fail(values.read ? '--link goes with --reply or --acted' : '--link must be an http(s) address, such as the pull request', 'VALIDATION_ERROR', `sign-off-axi feedback ${key}${on} --acted --link <url>`);
+  if (link !== undefined && (values.read || values.delivered || !/^https?:\/\/[^\s]{1,500}$/.test(link))) throw fail(values.read || values.delivered ? '--link goes with --reply or --acted' : '--link must be an http(s) address, such as the pull request', 'VALIDATION_ERROR', `sign-off-axi feedback ${key}${on} --acted --link <url>`);
   if (values.acted && !link) throw fail('--acted needs --link <url> to what changed', 'VALIDATION_ERROR', `sign-off-axi feedback ${key}${on} --acted --link <url>`);
   ready(file, on);
   const d = board(file).find((x) => x.key === key), filer = filerOf(values);
@@ -1195,9 +1196,19 @@ function feedback(args: string[]) {
   if (filer !== undefined && d.filer !== filer) throw fail(`${key} was not posted by ${filer}`, 'VALIDATION_ERROR', 'Mark only the cards you posted');
   const sent = readTrail(file, loadDecisions(file)).filter((t) => t.key === key && t.kind !== 'ticket');
   if (!sent.length) throw fail(`nothing was sent on ${key} yet`, 'NOT_FOUND', `Run \`sign-off-axi answers${on} --key ${key}\` to see its answer`);
-  appendMark(file, { op: values.read ? 'read' : 'reply', key, ...(text && { text }), ...(link && { link }) });
+  // --at <epoch seconds> records a step that happened earlier (replaying history). It cannot precede the send, a step the card already shows is left as it is, and it
+  // never writes a reply over one that exists, so a replay never turns a later real state back into an older one; run twice it writes once.
+  const op = values.read ? 'read' : values.delivered ? 'delivered' : 'reply';
+  if (values.at !== undefined) {
+    const secs = /^\d{9,11}$/.test(values.at) ? +values.at : NaN, first = Math.min(...sent.map((t) => Math.floor(Date.parse(t.at) / 1000)));
+    if (!Number.isFinite(secs) || secs > Math.floor(Date.now() / 1000)) throw fail('--at must be whole seconds since 1970, not in the future', 'VALIDATION_ERROR', `sign-off-axi feedback ${key}${on} --read --at 1792800000`);
+    if (secs < first) throw fail(`--at ${values.at} is before what was sent on ${key} (${first}): a step cannot come before its send`, 'VALIDATION_ERROR', 'Use the time the step happened');
+    const have = sent.some((t) => op === 'reply' ? t.reply : (t[op] ?? t.reply?.at) !== undefined);
+    if (have) return toon({ board: tilde(file), key, shows: sent.at(-1)!.reply ? 'Replied' : sent.at(-1)!.read ? 'Read' : 'Delivered', covers: sent.length, unchanged: 'yes' }, [`${key} already shows that step; nothing was written`]);
+  }
+  appendMark(file, { op, key, ...(text && { text }), ...(link && { link }) }, values.at !== undefined ? new Date(+values.at * 1000).toISOString().replace(/\.\d+Z$/, 'Z') : undefined);
   const now = readTrail(file, loadDecisions(file)).filter((t) => t.key === key && t.kind !== 'ticket').at(-1)!;
-  return toon({ board: tilde(file), key, shows: now.reply ? 'Replied' : 'Read', covers: sent.length }, [values.read ? `Run \`sign-off-axi feedback ${key}${on} --reply "<what you did>"\` once you act on it` : `Run \`sign-off-axi wait${on}${filer ? ` --filer ${filer}` : ''}\` for the next answer`]);
+  return toon({ board: tilde(file), key, shows: now.reply ? 'Replied' : now.read ? 'Read' : 'Delivered', covers: sent.length }, [values.read || values.delivered ? `Run \`sign-off-axi feedback ${key}${on} --reply "<what you did>"\` once you act on it` : `Run \`sign-off-axi wait${on}${filer ? ` --filer ${filer}` : ''}\` for the next answer`]);
 }
 
 /** ticket [board.json] [--id <id> [--title <text>] [--progress <0-100>] [--parent <id>] [--priority P0-P3] [--project <name>] [--hold yes|no] [--asked yes|no]]: lists the tickets,
@@ -2460,17 +2471,19 @@ const squeeze = (req: IncomingMessage, bytes: Buffer): { bytes: Buffer; encoding
   if (/\bgzip\b/.test(takes)) return { bytes: gzipSync(bytes, { level: 6 }), encoding: 'gzip' };
   return { bytes };
 };
-const pageTag = `"${createHash('sha256').update(page).digest('hex').slice(0, 32)}"`;
-// Level 9 takes about 50 ms and level 11 over half a second for 7% less, so the page is squeezed at 9.
-const squeezed: Record<string, Buffer> = {};
-const pageAs = (encoding: 'br' | 'gzip') => (squeezed[encoding] ??= encoding === 'br'
-  ? brotliCompressSync(page, { params: { [zlib.BROTLI_PARAM_QUALITY]: 9, [zlib.BROTLI_PARAM_SIZE_HINT]: page.length } }) : gzipSync(page, { level: 9 }));
-/** The browser keeps a reply and asks again with its tag, so an unchanged page, state or file costs a 304 and no body. */
-const unchanged = (req: IncomingMessage, tag: string) => req.headers['if-none-match']?.split(/\s*,\s*/).includes(tag) ?? false;
 /** The board's design tokens, shared parts and typeface, favicon, home-screen icon and install manifest, served beside the page; see web/tokens.css, web/ui.css and web/icon.svg. */
 const ICONS: Record<string, { type: string; bytes: Buffer }> = Object.fromEntries(
   [['tokens.css', 'text/css; charset=utf-8'], ['ui.css', 'text/css; charset=utf-8'], ['inter.woff2', 'font/woff2'], ['icon.svg', 'image/svg+xml'], ['apple-touch-icon.png', 'image/png'], ['icon-192.png', 'image/png'], ['icon-512.png', 'image/png'], ['icon-maskable-512.png', 'image/png'], ['manifest.webmanifest', 'application/manifest+json']]
     .map(([name, type]) => [`/${name}`, { type, bytes: readFileSync(new URL(`../web/${name}`, import.meta.url)) }]));
+/** The page names its two stylesheets by their content, so a phone holding an older copy (kept a day) fetches the new one with the new page: a row's badge is never drawn by half of an upgrade. */
+const served = Buffer.from(page.toString().replace(/href="(tokens|ui)\.css"/g, (_, name) => `href="${name}.css?v=${createHash('sha256').update(ICONS[`/${name}.css`]!.bytes).digest('hex').slice(0, 12)}"`));
+const pageTag = `"${createHash('sha256').update(served).digest('hex').slice(0, 32)}"`;
+// Level 9 takes about 50 ms and level 11 over half a second for 7% less, so the page is squeezed at 9.
+const squeezed: Record<string, Buffer> = {};
+const pageAs = (encoding: 'br' | 'gzip') => (squeezed[encoding] ??= encoding === 'br'
+  ? brotliCompressSync(served, { params: { [zlib.BROTLI_PARAM_QUALITY]: 9, [zlib.BROTLI_PARAM_SIZE_HINT]: served.length } }) : gzipSync(served, { level: 9 }));
+/** The browser keeps a reply and asks again with its tag, so an unchanged page, state or file costs a 304 and no body. */
+const unchanged = (req: IncomingMessage, tag: string) => req.headers['if-none-match']?.split(/\s*,\s*/).includes(tag) ?? false;
 /** Added to each design mock page and plan page so the person can point at a part of it; see web/point.js. */
 const pointer = Buffer.from(`<script>${readFileSync(new URL('../web/point.js', import.meta.url), 'utf8')}</script>`);
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
@@ -3025,13 +3038,13 @@ const server = createServer(async (req, res) => {
     }
     if (given !== null) return res.writeHead(303, { location: '/', 'set-cookie': `${cookie}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000` }).end();
   }
-  const icon = req.method === 'GET' ? ICONS[req.url ?? ''] : undefined;
+  const icon = req.method === 'GET' ? ICONS[(req.url ?? '').split('?')[0]!] : undefined;
   if (icon) return res.writeHead(200, { 'content-type': icon.type, 'cache-control': 'public, max-age=86400' }).end(icon.bytes);
   if (req.method === 'GET' && req.url === '/favicon.ico') return res.writeHead(204).end();
   if (req.method === 'GET' && req.url === '/') {
     const headers = { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'self' 'unsafe-inline'", etag: pageTag, 'cache-control': 'no-cache', vary: 'accept-encoding' };
     if (unchanged(req, pageTag)) return res.writeHead(304, headers).end();
-    const takes = String(req.headers['accept-encoding'] ?? ''), encoding = /\bbr\b/.test(takes) ? 'br' : /\bgzip\b/.test(takes) ? 'gzip' : undefined, bytes = encoding ? pageAs(encoding) : page;
+    const takes = String(req.headers['accept-encoding'] ?? ''), encoding = /\bbr\b/.test(takes) ? 'br' : /\bgzip\b/.test(takes) ? 'gzip' : undefined, bytes = encoding ? pageAs(encoding) : served;
     return res.writeHead(200, { ...headers, ...(encoding && { 'content-encoding': encoding }), 'content-length': bytes.length }).end(bytes);
   }
   let status: number, body: unknown;
