@@ -379,8 +379,7 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
   if (m.kind === 'report' && m.schema === 1) throw bad('schema', '1 of report is text only: a report must be a page to tap through, with "view" and "preview"', GUIDE_HELP);
   if (m.schema !== SCHEMAS[m.kind] && !OLDER[m.kind]?.includes(m.schema)) throw bad('schema', `${m.schema} of ${m.kind} is not in this sign-off-axi`, `Upgrade sign-off-axi, or post ${m.kind} schema ${SCHEMAS[m.kind]}`);
   if (g && /FILL:/.test(JSON.stringify(m))) throw bad('message', 'still has FILL: lines from the template', 'Replace every FILL: line with your own words, then post again');
-  // A guided report 5 names what it is for; report 4 and older have no purpose field.
-  const fields = (guided(m) ? GUIDE_FIELDS[m.kind] : m.kind === 'design' && m.schema === 1 ? DESIGN_1 : FIELDS[m.kind]).filter((f) => f !== 'purpose' || (m.kind === 'report' && m.schema >= 5)), extra = Object.keys(m).find((f) => !fields.includes(f));
+  const fields = (guided(m) ? GUIDE_FIELDS[m.kind] : m.kind === 'design' && m.schema === 1 ? DESIGN_1 : FIELDS[m.kind]), extra = Object.keys(m).find((f) => !fields.includes(f));
   if (extra === 'options' && m.kind === 'report') throw bad('options', 'is not a field of report: a report takes no answer', 'Remove "options", or post an ask to get an answer');
   if (extra === 'options' && m.kind === 'plan') throw bad('options', 'is not a field of plan: its answers come from its sections and decisions', 'Remove "options"; put each question in "decisions", with its options and "recommend"');
   if (extra !== undefined) throw bad(escaped(extra) || '""', `is not a field of ${m.kind} schema ${m.schema}`, `Remove ${show(extra)}; ${m.kind} takes ${fields.slice(3).join(', ')}`);
