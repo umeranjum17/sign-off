@@ -4660,7 +4660,7 @@ test('detail sequence follows the originating list across phone sheets, desk pan
       const routes = await evaluate('[...document.querySelectorAll(".dl-face[data-row]")].map(a => a.hash)');
       await evaluate('document.querySelector("#item-beta").click()');
       await until(async () => (await evaluate('document.querySelector(".detail-sequence .position")?.textContent')) === '2 of 3');
-      const metadataFits = () => evaluate('[...document.querySelectorAll(".ask-sheet .sh-lab, .rp-bar > span[dir]")].every(n => n.scrollWidth <= n.clientWidth + 1)');
+      const metadataFits = () => evaluate('[...document.querySelectorAll(".ask-sheet .sh-lab, .rp-bar > span[dir], .rp-shd .rp-when")].every(n => n.scrollWidth <= n.clientWidth + 1)');
       assert.equal(await metadataFits(), true, 'the full who/when label fits beside navigation');
       const key = (key) => send('Input.dispatchKeyEvent', { type: 'keyDown', key });
       await key('j'); await until(async () => (await evaluate('location.hash')) === routes[2]);
@@ -4724,6 +4724,7 @@ test('detail sequence follows the originating list across phone sheets, desk pan
       assert.equal(await metadataFits(), true, 'report metadata fits beside its controls');
       await evaluate(`document.querySelector('.rp-page a.dl-face, .split-list a.dl-face').click()`);
       await until(async () => (await evaluate('document.querySelector(".detail-sequence .position")?.textContent')) === '1 of 2');
+      assert.equal(await metadataFits(), true, 'phone report metadata fits beside navigation');
       await key('j'); await until(async () => (await evaluate('location.hash')) === filtered[1]);
       assert.equal(await evaluate('document.querySelector(".detail-sequence button:last-child").disabled'), true);
     } finally { await close(); }
