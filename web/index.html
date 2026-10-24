@@ -359,7 +359,9 @@
   .ev-unpick::after { content: ''; position: absolute; inset: -2px; } .ev-unpick .glyph { width: 1rem; height: 1rem; }
   .ev-sec .see { min-height: 0; padding: 0; border: 0; border-radius: 0; background: none; font: inherit; font-size: var(--tk-fs-row); line-height: 1.5rem; font-weight: 500; color: var(--tk-ink); cursor: pointer; }
   .ev-list.ui-list { padding: 0.25rem 0; } .ev-list.ui-list > li + li::before { right: 0.75rem; left: 0.75rem; }
-  .ev-list .ev-card { padding: 0 0.75rem; transition: background-color 120ms linear; -webkit-tap-highlight-color: transparent; }
+  .ev-list .ev-card { height: auto; min-height: 4.25rem; padding: 0.75rem; transition: background-color 120ms linear; -webkit-tap-highlight-color: transparent; }
+  .ev-list .ev-card .l1 { align-items: flex-start; height: auto; }
+  .ev-list .ev-card .l1 .t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; }
   .ev-list .ev-card:active { background: var(--tk-inset); }
   .ev-list .ev-card .meta { margin: 0; }
   .ev-list > li.picked { outline: none; border-radius: 0; background: var(--tk-inset); } .ev-list > li.picked .ui-icon { box-shadow: 0 0 0 2px var(--tk-ink); }
@@ -452,9 +454,6 @@
     .split-list .ev-list .ev-card:hover:not([aria-current]) { opacity: 0.85; }
     .split-list .ev-list .ev-card[aria-current] { background: var(--tk-inset); outline: none; }
     /* A desk has the room for a long title: it wraps to two lines, and the row grows with it. */
-    .split-list .ev-list .ev-card { height: auto; min-height: 4.25rem; padding-block: 0.75rem; }
-    .split-list .ev-list .ev-card .l1 { align-items: flex-start; height: auto; }
-    .split-list .ev-list .ev-card .l1 .t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; }
     .split-detail > .ev-scroll { padding: 1.5rem 2.5rem 4rem; }
     .split-detail .ev-x { display: none; }
     #board .split-detail:has(> .ev-scroll) .change-link { color: var(--tk-ink); }
@@ -5354,6 +5353,83 @@
       // A research report's Sources, then its parts.
       el('div', { class: 'pside' }, ...sourcesPanel(d, full), ...reportParts(d, full), ...next, ticketRow(d), thread(d))));
   }
+  // Capture the actual visible list, after its filters and sorting, before opening any detail.
+  // History owns the sequence so Back, reload and a change between sheet and desk keep it.
+  const detailRoute = /^#(?:decide|waiting|designs|evidence|reports|answered|ticket)\/[\w.-]+$/;
+  const detailScope = '.split-detail, .ask-sheet, .tk-sheet, .tk-pane, .dz-open, #reader:not([hidden])';
+  const detailHeaders = '#reader:not([hidden]) .ev-shd, #reader:not([hidden]) .rp-shd, #reader:not([hidden]) .reader-head, #reader:not([hidden]) > header, .ask-sheet .sh-head, .split-detail .split-bar, .tk-shd, .dz-oh';
+  let sequence = history.state?.detailSequence ?? null;
+  const visibleRoutes = (root) => [...new Set([...root.querySelectorAll('a[href]')]
+    .filter((a) => detailRoute.test(a.hash) && a.getClientRects().length && !a.closest(detailScope + ', .detail-sequence, .dl-menu'))
+    .map((a) => a.hash))];
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest?.('a[href]');
+    if (!a || !detailRoute.test(a.hash) || a.closest(detailScope)) return;
+    const routes = visibleRoutes(a.closest('.split-list, .dz-strip') ?? document.getElementById('board'));
+    if (routes.includes(a.hash)) sequence = { routes, from: location.hash };
+  }, true);
+  const sequenceStep = (step) => {
+    const at = sequence?.routes.indexOf(location.hash) ?? -1, next = sequence?.routes[at + step];
+    if (at < 0 || !next) return;
+    rpPicked = true;
+    location.hash = next;
+  };
+  function detailSequence() {
+    document.querySelectorAll('.detail-sequence').forEach((n) => n.remove());
+    const header = [...document.querySelectorAll(detailHeaders)].find((n) => n.getClientRects().length);
+    if (!header) return;
+    // Desk lists may select their first item before there is an item in the address.
+    const selected = document.querySelector('.split-list a[aria-current], .dz-strip a[aria-current], .tk-row[aria-current]');
+    const route = detailRoute.test(location.hash) ? location.hash : selected?.hash;
+    if (!route) return;
+    if (!detailRoute.test(location.hash) || !sequence?.routes.includes(route)) {
+      const routes = visibleRoutes(document.querySelector('.split-list, .dz-strip') ?? document.getElementById('board'));
+      sequence = { routes: routes.includes(route) ? routes : [route], from: location.hash };
+    }
+    const at = sequence.routes.indexOf(route);
+    history.replaceState({ ...history.state, detailSequence: sequence }, '');
+    const nav = el('nav', { class: 'detail-sequence', 'aria-label': 'Browse items' });
+    const move = (step, label) => {
+      const b = el('button', { type: 'button', 'aria-label': label, title: label }, el('span', { 'aria-hidden': 'true' }, step < 0 ? '‹' : '›'));
+      b.disabled = at + step < 0 || at + step >= sequence.routes.length;
+      b.onclick = () => {
+        // A desk's implicit selection must first acquire its route.
+        if (!detailRoute.test(location.hash)) history.replaceState(history.state, '', route);
+        sequenceStep(step);
+      };
+      return b;
+    };
+    nav.append(move(-1, 'Previous item (K or Left arrow)'), el('span', { class: 'position', 'aria-live': 'polite', 'aria-atomic': 'true' }, `${at + 1} of ${sequence.routes.length}`), move(1, 'Next item (J or Right arrow)'));
+    header.append(nav);
+  }
+  addEventListener('popstate', () => { if (history.state?.detailSequence) sequence = history.state.detailSequence; });
+  addEventListener('keydown', (e) => {
+    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.target.closest?.('input, textarea, select, [contenteditable], iframe') || document.querySelector('dialog[open]') || designSession?.open || protoFull) return;
+    const step = { j: 1, k: -1, ArrowRight: 1, ArrowLeft: -1, ArrowDown: 1, ArrowUp: -1 }[e.key];
+    const nav = document.querySelector('.detail-sequence');
+    if (!step || !nav) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    nav.querySelectorAll('button')[step > 0 ? 1 : 0].click();
+  }, true);
+  let detailTouch;
+  document.addEventListener('touchstart', (e) => {
+    detailTouch = null;
+    if (!phone() || e.touches.length !== 1 || !e.target.closest?.(detailScope) || e.target.closest('button, a, input, textarea, select, iframe, img, canvas, [contenteditable], .captures, .mock, .rung') || document.querySelector('dialog[open]') || protoFull) return;
+    // Leave horizontal screenshot strips and other scrollers to their own gestures.
+    for (let n = e.target; n && n !== document.body; n = n.parentElement) if (n.scrollWidth > n.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(n).overflowX)) return;
+    detailTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY, at: location.hash };
+  }, { passive: true });
+  document.addEventListener('touchmove', (e) => {
+    if (!detailTouch) return;
+    if (e.touches.length !== 1 || Math.abs(e.touches[0].clientY - detailTouch.y) > 30) detailTouch = null;
+  }, { passive: true });
+  document.addEventListener('touchcancel', () => { detailTouch = null; }, { passive: true });
+  document.addEventListener('touchend', (e) => {
+    const start = detailTouch; detailTouch = null;
+    if (!start || start.at !== location.hash || !e.changedTouches.length) return;
+    const dx = e.changedTouches[0].clientX - start.x, dy = e.changedTouches[0].clientY - start.y;
+    if (Math.abs(dx) >= 70 && Math.abs(dx) > Math.abs(dy) * 2) sequenceStep(dx < 0 ? 1 : -1);
+  }, { passive: true });
   /** Every key, in one sheet behind ?. A desk hints each where it works; they work at any width with a keyboard. */
   const MOD = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
   const KEYS = [['Anywhere', [['Go to Today', 'G', 'T'], ['Go to Decide', 'G', 'D'], ['Go to Evidence', 'G', 'E'], ['Go to Reports', 'G', 'R'], ['Undo', MOD, 'Z'], ['This list', '?']]],
@@ -5519,6 +5595,7 @@
     if (at === 'reports' && !key) rpRisen = true;
     if (rpSel !== null) rpRisen = true;
     readPage(rpFull ? shownReport : key && !(deskSplit && (at === 'evidence' || at === 'reports')) && !(at === 'designs' && !phone()) ? state.decisions.find((d) => d.key === key && !gone.has(d.key) && (at === 'reports' && reads(d) || at === 'designs' && d.kind === 'design' || at === 'evidence' && d.type === 'evidence' || d.type === 'plan' && (area(d) === at || (d.guided && (at === 'waiting' || at === 'answered'))))) : undefined, rpFull ? location.hash.slice(1) : at);
+    detailSequence();
     fold();
     applyPicks();
     if (FROZEN) freeze();

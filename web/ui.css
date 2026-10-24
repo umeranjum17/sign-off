@@ -241,3 +241,15 @@ body::after { content: ''; position: fixed; z-index: 1; left: 0; right: 0; botto
 [aria-busy="true"] { opacity: 0.65; }
 .foot:has(> .ui-send) { flex-wrap: wrap; }
 :is(.design-review, .dz-info, .design-viewer-panel) .foot > .ui-send { flex: 0 0 100%; }
+
+/* Shared detail navigation uses the same ink and surface as the existing header. */
+.detail-sequence { display:flex; align-items:center; gap:2px; margin-inline-start:auto; flex-shrink:0; }
+.detail-sequence button { display:grid; place-items:center; width:44px; height:44px; padding:0; border:0; border-radius:var(--tk-r-ctl); background:transparent; color:inherit; cursor:pointer; font-size:28px; }
+.detail-sequence button:hover:not(:disabled) { background:var(--tk-inset); }
+.detail-sequence button:disabled { opacity:.3; cursor:default; }
+.detail-sequence .position { white-space:nowrap; font-size:12px; font-variant-numeric:tabular-nums; }
+@media(max-width:639px) { :is(.sh-head,.ev-shd,.rp-shd,.tk-shd,.dz-oh):has(.detail-sequence) { flex-wrap:wrap; } }
+
+:is(.sh-head,.ui-pane .ui-shd,#reader .rp-shd):has(.detail-sequence) { height:auto; min-height:44px; flex-wrap:wrap; }
+.sh-head:has(.detail-sequence) .sh-lab, .ui-pane .ui-shd:has(.detail-sequence) > span:not(.ui-icon), #reader .rp-shd:has(.detail-sequence) .rp-what { flex:1 0 auto; flex-wrap:wrap; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+@media(max-width:374px) { .ask-sheet .sh-head .detail-sequence { flex-basis:100%; justify-content:flex-end; } }

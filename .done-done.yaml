@@ -6,6 +6,8 @@ app: "sign-off"
 # Every check the CI gate enforces, as a re-runnable journey. Each command
 # proves itself by writing its log under $DONE_DONE_EVIDENCE_ROOT and exiting 0.
 journeys:
+  detail-sequence:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/sequence-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   # Supporting checks, not proof: a test, typecheck or build run shows the code checks pass, never that the product works, so the
   # proof is the core and upgrade journeys below. CI and release call install, test and skill by name, so those stay.
   serve-stop:

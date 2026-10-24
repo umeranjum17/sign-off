@@ -83,11 +83,11 @@ const MEASURE = `(async () => {
     if (!(grid(b.top) && grid(b.height))) fail.push('off the 4px grid ' + b.el + ' top ' + b.top + ' height ' + b.height);
   }
   const rows = [...document.querySelectorAll('main .ev-card')].filter(vis).map((e) => { const r = box(e), t = box(e.querySelector('.ui-icon')), title = box(e.querySelector('.t')), card = box(e.closest('.ui-card')), chip = e.querySelector('.ui-pc'), pct = e.querySelector('.pct');
-    return { id: e.id, height: r4(r.height), tile: r4(t.width) + 'x' + r4(t.height), tileIn: r4(t.left - card.left), titleGap: r4(title.left - t.right), rightIn: r4(card.right - box(e.querySelector('.rm')).right),
+    return { id: e.id, height: r4(r.height), titleHeight: r4(title.height), tile: r4(t.width) + 'x' + r4(t.height), tileIn: r4(t.left - card.left), titleGap: r4(title.left - t.right), rightIn: r4(card.right - box(e.querySelector('.rm')).right),
       chipIn: chip ? r4(card.right - box(chip).right) : null, pctIn: pct ? r4(card.right - box(pct).right) : null, chip: chip?.textContent ?? '', line2: (e.querySelector('.l2').textContent || '').trim(), check: e.querySelector('.ev-ok')?.className ?? '' }; });
   const onRows = [...document.querySelectorAll('main .ev-list :is(img:not(.ui-icon img), video, .x, .ev-x, [aria-label=Close])')].filter(vis).length;
   if (onRows) fail.push(onRows + ' pictures or closes on the rows');
-  rows.forEach((x) => { if ((phone ? x.height !== 68 : x.height < 68) || x.tile !== '40x40' || x.tileIn !== 12 || x.titleGap !== 12 || x.rightIn !== 12 || (x.chipIn !== null && x.chipIn !== 12) || (x.pctIn !== null && x.pctIn !== 12)) fail.push('row ' + JSON.stringify(x)); });
+  rows.forEach((x) => { if ((phone ? x.height !== (x.titleHeight > 20 ? 84 : 68) : x.height < 68) || x.tile !== '40x40' || x.tileIn !== 12 || x.titleGap !== 12 || x.rightIn !== 12 || (x.chipIn !== null && x.chipIn !== 12) || (x.pctIn !== null && x.pctIn !== 12)) fail.push('row ' + JSON.stringify(x)); });
   const dots = document.querySelector('.ev-dots'), dot = dots && [...dots.children].map(box);
   const held = dots ? { box: r4(box(dots).width) + 'x' + r4(box(dots).height), cells: dot.length, cell: r4(dot[0].width) + 'x' + r4(dot[0].height), ink: dots.querySelectorAll('.held').length, red: dots.querySelectorAll('.not').length, columns: getComputedStyle(dots).getPropertyValue('--cols'),
     right: r4(box(dots).right - Math.max(...dot.map((d) => d.right))), words: document.querySelector('.ev-held').innerText.replace(/\\s+/g, ' ').trim() } : null;

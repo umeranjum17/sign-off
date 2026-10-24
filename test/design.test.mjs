@@ -2046,7 +2046,7 @@ test('Reports on a desk: the list beside the newest report, J moves and reads, U
   await until(async () => (await seen()) === `#reports|alpha|Alpha report|4`);
   // The bar names the report's kind (an older report's, guessed from its words), then its day.
   assert.match(await evaluate('[document.querySelector(".rp-bar .rkc").textContent, document.querySelector(".rp-bar > span[dir]").textContent].join("|")'), /^Other report · kind guessed\|\d{1,2} [A-Z][a-z]{2}$/);
-  assert.equal(await evaluate('[...document.querySelectorAll(".rp-bar button")].map((b) => b.textContent).join(",") + "|" + !!document.querySelector(".split-detail .read iframe")'), 'Mark read,Archive|true');
+  assert.equal(await evaluate('[...document.querySelectorAll(".rp-bar > button")].map((b) => b.textContent).join(",") + "|" + !!document.querySelector(".split-detail .read iframe")'), 'Mark read,Archive|true');
   assert.equal(await rows(), `alpha,beta,${guided.key},gamma`);
   assert.equal(reads(), '');
   // J selects the next report and reads it: its progress track disappears and the read is saved beside the board.
@@ -3553,7 +3553,7 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length === 6')));
   assert.deepEqual(await evaluate(SQUASH), []);
-  assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-card")].map((a) => { const r = a.getBoundingClientRect(), t = a.querySelector(".ui-icon").getBoundingClientRect(), l = a.closest(".ev-list").getBoundingClientRect(); return [Math.round(r.height), Math.round(t.width), Math.round(l.right - r.right), Math.round(r.left - l.left)].join(); }).filter((x) => x !== "68,40,0,0")'), []);
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-card")].map((a) => { const r = a.getBoundingClientRect(), t = a.querySelector(".ui-icon").getBoundingClientRect(), l = a.closest(".ev-list").getBoundingClientRect(); return [Math.round(r.height) - (a.querySelector(".t").getBoundingClientRect().height > 20 ? 84 : 68), Math.round(t.width), Math.round(l.right - r.right), Math.round(r.left - l.left)].join(); }).filter((x) => x !== "0,40,0,0")'), []);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'));
   // The shared light or dark button (Today's) sits in Evidence's title row too: a tap turns the board to the other theme and keeps the pick in this browser; a second tap turns it back.
   const look = '(() => [getComputedStyle(document.body).backgroundColor, document.querySelector(".ev-top .ui-rb[aria-label^=Switch] circle") ? "sun" : "moon", localStorage.getItem("so-theme")])()';
@@ -4669,4 +4669,94 @@ test('the new look draws only the approved prototype\'s colours: Today, Decide, 
   }
   assert.deepEqual([...new Set(off)], []);
   proc.kill();
+});
+
+test('detail sequence follows the originating list across phone sheets, desk panes, reload, keys and swipes', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'detail-sequence'), file = join(dir, 'board.json'); mkdirSync(dir);
+  const options = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
+  writeFileSync(join(dir, 'report.html'), '<!doctype html><p>A report for Umer.</p>');
+  writeFileSync(join(dir, 'screen.png'), sized(300, 650));
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    ...['alpha', 'beta', 'gamma'].map((key) => ({ key, title: `${key} question?`, group: 'Release agent', filed: new Date().toISOString(), options, ...(key === 'alpha' && { options: ['a','b','c','d'].map(value => ({ value, label: value.toUpperCase() })), mocks: ['a','b','c','d'].map(value => ({ value, path: 'screen.png' })) }), ...(key === 'beta' && { about: 'Umer can scroll this detailed explanation without leaving the question. '.repeat(30) }) })),
+    ...['research', 'other', 'research'].map((report_kind, i) => ({ contract: 1, kind: 'report', schema: 2, key: `r${i}`, title: `Report ${i}`, group: 'Sign-in', view: 'report.html', preview: 'preview.svg', purpose: report_kind, filed: new Date().toISOString() })),
+  ] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] }); procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  for (const width of [390, 1280]) {
+    const { evaluate, send, swipe, close } = await browse(dir, width, 844, width === 390);
+    try {
+      await evaluate(`location.href = ${JSON.stringify(url + '#waiting')}`);
+      await until(async () => await evaluate('!!document.querySelector("#item-beta")'));
+      const routes = await evaluate('[...document.querySelectorAll(".dl-face[data-row]")].map(a => a.hash)');
+      await evaluate('document.querySelector("#item-beta").click()');
+      await until(async () => (await evaluate('document.querySelector(".detail-sequence .position")?.textContent')) === '2 of 3');
+      const metadataFits = () => evaluate('[...document.querySelectorAll(".ask-sheet .sh-lab, .rp-bar > span[dir], .rp-shd .rp-when")].every(n => n.scrollWidth <= n.clientWidth + 1)');
+      assert.equal(await metadataFits(), true, 'the full who/when label fits beside navigation');
+      const key = (key) => send('Input.dispatchKeyEvent', { type: 'keyDown', key });
+      await key('j'); await until(async () => (await evaluate('location.hash')) === routes[2]);
+      assert.equal(await evaluate('document.querySelector(".detail-sequence button:last-child").disabled'), true);
+      await key('ArrowRight'); assert.equal(await evaluate('location.hash'), routes[2]);
+      await key('k'); await until(async () => (await evaluate('location.hash')) === routes[1]);
+      await evaluate('location.reload()');
+      await until(async () => (await evaluate('document.querySelector(".detail-sequence .position")?.textContent')) === '2 of 3');
+      await evaluate('document.querySelector(".decide .note-box").focus()');
+      await key('ArrowLeft'); assert.equal(await evaluate('location.hash'), routes[1]);
+      await evaluate('document.activeElement.blur()');
+      if (width === 390) {
+        const settled = () => evaluate(`(async () => {
+          await Promise.all(document.getAnimations().filter(a => a.playState === 'running' && a.effect.getTiming().iterations !== Infinity).map(a => a.finished.catch(() => {})));
+          // Native fling momentum is not a CSS animation: wait for scroll position to stop changing too.
+          const sheet = document.querySelector('.ask-sheet'); let top = sheet.scrollTop, quiet = performance.now();
+          await new Promise(resolve => { const frame = now => {
+            if (sheet.scrollTop !== top) { top = sheet.scrollTop; quiet = now; }
+            if (now - quiet >= 120) resolve(); else requestAnimationFrame(frame);
+          }; requestAnimationFrame(frame); });
+        })()`);
+        await settled();
+        await evaluate('document.querySelector("#ask-title").scrollIntoView({ block: "center" })');
+        await settled();
+        const y = await evaluate('document.querySelector("#ask-title").getBoundingClientRect().top + 12');
+        assert.ok(y > 0 && y < 844, 'the real finger lands inside the viewport');
+        assert.equal(await evaluate(`!!document.elementFromPoint(320, ${y})?.closest('.ask-sheet')`), true);
+        // Native vertical scrolling must move the sheet, without changing which question is open.
+        const top = await evaluate('document.querySelector(".ask-sheet").scrollTop');
+        await swipe({ x: 200, y: 550 }, { x: 205, y: 300 });
+        await until(async () => (await evaluate('document.querySelector(".ask-sheet").scrollTop')) > top);
+        assert.equal(await evaluate('location.hash'), routes[1]);
+        await settled(); // Let the native vertical fling end before resetting the position for another gesture.
+        await evaluate('document.querySelector("#ask-title").scrollIntoView({ block: "center" })');
+        await settled();
+        await evaluate('new Promise(requestAnimationFrame)');
+        const sy = await evaluate('document.querySelector("#ask-title").getBoundingClientRect().top + 12');
+        assert.equal(await evaluate(`!!document.elementFromPoint(320, ${sy})?.closest('.ask-sheet')`), true, 'the post-scroll swipe starts on the sheet');
+        await swipe({ x: 320, y: sy }, { x: 70, y: sy });
+        await until(async () => (await evaluate('location.hash')) === routes[2]);
+        await settled();
+        // A screenshot strip scrolls its pictures, keeping the current card and sequence intact.
+        await evaluate('document.querySelector(".mock figcaption").scrollIntoView({ block: "center" })');
+        await settled();
+        assert.equal(await evaluate('document.querySelector(".mocks").scrollWidth > document.querySelector(".mocks").clientWidth'), true, 'the fixture has a swipeable strip');
+        const my = await evaluate('document.querySelector(".mock figcaption").getBoundingClientRect().top + 12');
+        assert.ok(my > 0 && my < 844);
+        await swipe({ x: 320, y: my }, { x: 70, y: my });
+        await until(async () => (await evaluate('document.querySelector(".mocks").scrollLeft')) > 0);
+        assert.equal(await evaluate('location.hash'), routes[2], 'the screenshot strip owns its gesture');
+      }
+      await evaluate('document.querySelector(".detail-sequence button:first-child").click()');
+      await until(async () => (await evaluate('location.hash')) === routes[width === 390 ? 1 : 0]);
+      await evaluate('location.hash = "#reports"');
+      await until(async () => await evaluate('!!document.querySelector(".rp-fb")'));
+      await evaluate('document.querySelector(".rp-fb").click()');
+      await evaluate('document.querySelector(".rp-pick button[data-kind=research]").click()');
+      if (width === 1280) assert.equal(await evaluate('document.querySelector(".detail-sequence .position")?.textContent'), '1 of 2', 'a desk filter updates its implicit selection sequence');
+      const filtered = await evaluate(`[...document.querySelectorAll('.rp-page a.dl-face, .split-list a.dl-face')].map(a => a.hash)`);
+      assert.equal(filtered.length, 2);
+      assert.equal(await metadataFits(), true, 'report metadata fits beside its controls');
+      await evaluate(`document.querySelector('.rp-page a.dl-face, .split-list a.dl-face').click()`);
+      await until(async () => (await evaluate('document.querySelector(".detail-sequence .position")?.textContent')) === '1 of 2');
+      assert.equal(await metadataFits(), true, 'phone report metadata fits beside navigation');
+      await key('j'); await until(async () => (await evaluate('location.hash')) === filtered[1]);
+      assert.equal(await evaluate('document.querySelector(".detail-sequence button:last-child").disabled'), true);
+    } finally { await close(); }
+  }
 });
