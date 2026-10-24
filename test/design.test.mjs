@@ -3316,8 +3316,8 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   const at = (i) => new Date(doc.items[i - 1].filed), when = (i) => (at(i).toDateString() === new Date().toDateString() ? clock(at(i)) : at(i).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }));
   // Evidence lists every proof in one list, newest first, however old: the plain update (5), the passed ones (4, 3, 2), the unchecked one (6) and last week's (7); only the failed run (1) is left off.
   // Both proof-prefix forms name one project, a capture with no run takes its linked repository, and a proof with neither names none.
-  assert.deepEqual(await evaluate(cards), [['item-update-5', 'Sign-in, plain update', '', `sign-off · ${when(5)}`, 0], ['item-update-4', outcome, 'ev-ok held', `sign-off · ${when(4)}`, 0],
-    ['item-update-3', outcome, 'ev-ok held', `sign-off · ${when(3)}`, 0], ['item-update-2', outcome, 'ev-ok held', when(2), 0], ['item-update-6', outcome, '', `sign-off · ${when(6)}`, 0], ['item-update-7', 'Sign-in, last week', '', when(7), 0]]);
+  assert.deepEqual(await evaluate(cards), [['item-update-5', 'Sign-in, plain update', '', `Not checked · sign-off · ${when(5)}`, 0], ['item-update-4', outcome, 'ev-ok held', `Holds up · sign-off · ${when(4)}`, 0],
+    ['item-update-3', outcome, 'ev-ok held', `Holds up · sign-off · ${when(3)}`, 0], ['item-update-2', outcome, 'ev-ok held', `Holds up · ${when(2)}`, 0], ['item-update-6', outcome, '', `Could not check · sign-off · ${when(6)}`, 0], ['item-update-7', 'Sign-in, last week', '', `Not checked · ${when(7)}`, 0]]);
   // One head over the list, Latest proof; no project or day headings break it.
   assert.deepEqual(await evaluate('[...document.querySelectorAll("#board h2, #board h3")].map((h) => h.firstChild.textContent)'), ['Latest proof']);
   assert.equal(await evaluate('document.querySelector(\'#nav a[href="#evidence"] .n\').textContent'), '6');
@@ -3465,7 +3465,27 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   assert.equal(await evaluate('location.hash'), '#evidence');
   await evaluate('[...document.querySelectorAll("#board .bulk button")].find((b) => b.textContent === "Cancel").click()');
   await until(async () => (await evaluate('!document.querySelector("#board .bulk") && !!document.querySelector(".ev-more")')));
+  // A tap on a row opens it in place: its captures in a strip with a dot each, then Open proof; the list and the address stay as they were, and a second tap closes it.
   await evaluate('document.getElementById("item-update-2").click()');
+  await until(async () => await evaluate('!!document.querySelector("#item-update-2 + .ev-open")'));
+  assert.deepEqual(await evaluate('[location.hash, document.getElementById("item-update-2").getAttribute("aria-expanded"), document.querySelectorAll(".ev-open .ev-strip a").length, document.querySelectorAll(".ev-open .ev-dots-n i").length, document.querySelector(".ev-open .ev-go").getAttribute("href"), document.querySelectorAll(".ev-card").length]'),
+    ['#evidence', 'true', 2, 2, '#evidence/update-2', 6]);
+  await evaluate('document.getElementById("item-update-2").click()');
+  await until(async () => await evaluate('!document.querySelector(".ev-open")'));
+  // Previews: every row shows its first capture large beside its title; the pick is kept in this browser and a reload keeps it.
+  const views = '[document.querySelector(".ev-pv").getAttribute("aria-pressed"), document.querySelectorAll(".ev-card.rich").length, localStorage.getItem("so-ev-view")]';
+  assert.deepEqual(await evaluate(views), ['false', 0, null]);
+  await evaluate('document.querySelector(".ev-pv").click()');
+  await until(async () => (await evaluate(views))[1] === 6);
+  assert.deepEqual(await evaluate(views), ['true', 6, 'rich']);
+  await evaluate('location.reload()');
+  await until(async () => (await evaluate(views))?.[1] === 6);
+  await evaluate('document.querySelector(".ev-pv").click()');
+  await until(async () => (await evaluate(views))[1] === 0);
+  assert.equal((await evaluate(views))[2], 'compact');
+  await evaluate('document.getElementById("item-update-2").click()');
+  await until(async () => await evaluate('!!document.querySelector(".ev-open .ev-go")'));
+  await evaluate('document.querySelector(".ev-open .ev-go").click()');
   await until(async () => (await evaluate('!!document.querySelector(".ev-item") && document.querySelectorAll(".ev-hero img").length === 2')));
   // A proof with no project says so in its head, and a link that is not a full URL is no Pull request row.
   assert.deepEqual(await evaluate(`[document.querySelector(".ev-shd .pt").textContent, ${props}, Math.round(document.getElementById("reader").getBoundingClientRect().top)]`), [`No project · ${clock(at(2))}`, [['done-done', 'Holds up']], 48]);
@@ -3481,8 +3501,10 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   await iphone.send('Emulation.setSafeAreaInsetsOverride', { insets: { bottom: 34 } });
   await iphone.evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
   await until(async () => (await iphone.evaluate('document.querySelectorAll(".ev-card").length')) === 6);
-  assert.equal(await iphone.evaluate('document.querySelectorAll(".ev-list img:not(.ui-icon img), .ev-list video, .ev-list :is(.x, .ev-x, [aria-label=Close])").length'), 0);
+  assert.equal(await iphone.evaluate('document.querySelectorAll(".ev-list img:not(.ui-icon img):not(.ev-th img), .ev-list video, .ev-list :is(.x, .ev-x, [aria-label=Close])").length'), 0);
   await iphone.evaluate('document.getElementById("item-update-2").click()');
+  await until(() => iphone.evaluate('!!document.querySelector(".ev-open .ev-go")'));
+  await iphone.evaluate('document.querySelector(".ev-open .ev-go").click()');
   await until(() => iphone.evaluate('[...document.querySelectorAll(".ev-hero img")].filter((i) => i.naturalWidth).length === 2'));
   assert.deepEqual(await iphone.evaluate(`(() => { const x = document.querySelector("#reader .ev-x").getBoundingClientRect(), shots = [...document.querySelectorAll("#reader .ev-hero img")].map((i) => i.getBoundingClientRect());
     return [x.bottom <= Math.min(...shots.map((s) => s.top)), shots.filter((s) => x.left < s.right && s.left < x.right && x.top < s.bottom && s.top < x.bottom).length]; })()`), [true, 0]);
@@ -4040,10 +4062,10 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     await evaluate(`location.href = ${JSON.stringify(`${url}#evidence/update-1`)}`);
     await until(async () => (await evaluate('(() => { const r = [...document.querySelectorAll("#reader:not([hidden]) .ev-props a.ui-pr")].filter((a) => a.getAttribute("href").startsWith("#ticket/")); return r.length + "|" + r.map((x) => x.getAttribute("href") + " " + x.innerText.replace(/\\s+/g, " ").trim() + " " + !!x.querySelector(".ui-bar")).join(); })()')) === '1|#ticket/T-29 Its ask Ship the new settings page 60% true');
     assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
-    // On Evidence the proof's row carries the same bar; a finished ticket shows a full bar at 100%, and one not begun shows no bar: its row shows the project and time, and its panel reads Not started.
+    // On Evidence the proof's row shows done-done's word, not a bar (the opened row's panel and the proof's sheet carry it); a finished ticket shows a full bar at 100%, and one not begun shows no bar: its row shows the project and time, and its panel reads Not started.
     const bars = `(() => { const row = document.querySelector("#item-update-1 .l2"), sheet = [...document.querySelectorAll("#reader:not([hidden]) .ev-props a.ui-pr")].find((a) => a.getAttribute("href").startsWith("#ticket/"));
       return JSON.stringify([row?.querySelector(".ui-bar i")?.style.width ?? "none", row?.querySelector(".pct")?.textContent ?? "", sheet?.querySelector(".ui-bar i")?.style.width ?? "none", sheet?.querySelector(".n").textContent]); })()`;
-    for (const [progress, want] of [[100, ['100%', '100%', '100%', '100%']], [0, ['none', '', 'none', 'Not started']], [60, ['60%', '60%', '60%', '60%']]]) {
+    for (const [progress, want] of [[100, ['none', '', '100%', '100%']], [0, ['none', '', 'none', 'Not started']], [60, ['none', '', '60%', '60%']]]) {
       assert.equal(run('ticket', file, '--id', 'T-29', '--progress', String(progress)).code, 0);
       await evaluate('refresh()');
       await until(async () => (await evaluate(bars)) === JSON.stringify(want));
