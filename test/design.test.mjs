@@ -1972,7 +1972,7 @@ test('Reports on a desk: the list beside the newest report, J moves and reads, U
   await until(async () => (await seen()) === `#reports|alpha|Alpha report|4`);
   // The bar names the report's kind (an older report's, guessed from its words), then its day.
   assert.match(await evaluate('[document.querySelector(".rp-bar .rkc").textContent, document.querySelector(".rp-bar > span[dir]").textContent].join("|")'), /^Other report\|\d{1,2} [A-Z][a-z]{2}$/);
-  assert.equal(await evaluate('[...document.querySelectorAll(".rp-bar button")].map((b) => b.textContent).join(",") + "|" + !!document.querySelector(".split-detail .read iframe")'), 'Mark read,Archive|true');
+  assert.equal(await evaluate('[...document.querySelectorAll(".rp-bar > button")].map((b) => b.textContent).join(",") + "|" + !!document.querySelector(".split-detail .read iframe")'), 'Mark read,Archive|true');
   assert.equal(await rows(), `alpha,beta,${guided.key},gamma`);
   assert.equal(reads(), '');
   // J selects the next report and reads it: its row reads 100% and the read is saved beside the board.
@@ -4394,4 +4394,56 @@ test('the new look draws only the approved prototype\'s colours: Today, Decide, 
   }
   assert.deepEqual([...new Set(off)], []);
   proc.kill();
+});
+
+test('detail sequence follows the originating list across phone sheets, desk panes, reload, keys and swipes', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'detail-sequence'), file = join(dir, 'board.json'); mkdirSync(dir);
+  const options = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
+  writeFileSync(join(dir, 'report.html'), '<!doctype html><p>A report for Umer.</p>');
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    ...['alpha', 'beta', 'gamma'].map((key) => ({ key, title: `${key} question?`, options })),
+    ...['research', 'other', 'research'].map((report_kind, i) => ({ contract: 1, kind: 'report', schema: 2, key: `r${i}`, title: `Report ${i}`, view: 'report.html', preview: 'preview.svg', purpose: report_kind, filed: new Date().toISOString() })),
+  ] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] }); procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  for (const width of [390, 1280]) {
+    const { evaluate, send, swipe, close } = await browse(dir, width, 844, width === 390);
+    try {
+      await evaluate(`location.href = ${JSON.stringify(url + '#waiting')}`);
+      await until(async () => await evaluate('!!document.querySelector("#item-beta")'));
+      const routes = await evaluate('[...document.querySelectorAll(".dl-face[data-row]")].map(a => a.hash)');
+      await evaluate('document.querySelector("#item-beta").click()');
+      await until(async () => (await evaluate('document.querySelector(".detail-sequence [role=status]")?.textContent')) === '2 of 3');
+      const key = (key) => send('Input.dispatchKeyEvent', { type: 'keyDown', key });
+      await key('j'); await until(async () => (await evaluate('location.hash')) === routes[2]);
+      assert.equal(await evaluate('document.querySelector(".detail-sequence button:last-child").disabled'), true);
+      await key('ArrowRight'); assert.equal(await evaluate('location.hash'), routes[2]);
+      await key('k'); await until(async () => (await evaluate('location.hash')) === routes[1]);
+      await evaluate('location.reload()');
+      await until(async () => (await evaluate('document.querySelector(".detail-sequence [role=status]")?.textContent')) === '2 of 3');
+      await evaluate('document.querySelector(".decide .note-box").focus()');
+      await key('ArrowLeft'); assert.equal(await evaluate('location.hash'), routes[1]);
+      await evaluate('document.activeElement.blur()');
+      if (width === 390) {
+        await evaluate('document.querySelector("#ask-title").scrollIntoView({ block: "center" })');
+        const y = await evaluate('document.querySelector("#ask-title").getBoundingClientRect().top + 12');
+        await swipe({ x: 320, y }, { x: 70, y });
+        await until(async () => (await evaluate('location.hash')) === routes[2]);
+        await swipe({ x: 70, y }, { x: 320, y: y + 100 });
+        assert.equal(await evaluate('location.hash'), routes[2], 'vertical movement keeps the item');
+      }
+      await evaluate('document.querySelector(".detail-sequence button:first-child").click()');
+      await until(async () => (await evaluate('location.hash')) === routes[width === 390 ? 1 : 0]);
+      await evaluate('location.hash = "#reports"');
+      await until(async () => await evaluate('!!document.querySelector(".rp-fb")'));
+      await evaluate('document.querySelector(".rp-fb").click()');
+      await evaluate('document.querySelector("[data-kind=research]").click()');
+      const filtered = await evaluate(`[...document.querySelectorAll('.rp-page a.dl-face, .split-list a.dl-face')].map(a => a.hash)`);
+      assert.equal(filtered.length, 2);
+      await evaluate(`document.querySelector('.rp-page a.dl-face, .split-list a.dl-face').click()`);
+      await until(async () => (await evaluate('document.querySelector(".detail-sequence [role=status]")?.textContent')) === '1 of 2');
+      await key('j'); await until(async () => (await evaluate('location.hash')) === filtered[1]);
+      assert.equal(await evaluate('document.querySelector(".detail-sequence button:last-child").disabled'), true);
+    } finally { await close(); }
+  }
 });
