@@ -168,16 +168,21 @@ test('the report kit: a section\'s blocks are checked, post pins their files aft
   const dir = join(scratch, 'kit'), board = join(dir, 'board.json'), env = { ...process.env, HOME: join(scratch, 'home') };
   mkdirSync(join(dir, 'kit'), { recursive: true });
   const shot = readFileSync(new URL('../fixtures/evidence/product-board.png', import.meta.url)), film = Buffer.alloc(3000, 7);
-  for (const f of ['a.png', 'b.png', 'poster.png', 'g.png']) writeFileSync(join(dir, 'kit', f), shot);
+  for (const f of ['a.png', 'b.png', 'poster.png', 'g.png', 'neutral.png']) writeFileSync(join(dir, 'kit', f), shot);
   writeFileSync(join(dir, 'kit', 'film.mp4'), film);
+  writeFileSync(join(dir, 'kit', 'report.md'), '# The same report');
+  writeFileSync(join(scratch, 'kit-outside.html'), 'Outside');
+  symlinkSync(join(scratch, 'kit-outside.html'), join(dir, 'kit', 'escape.html'));
   const report = JSON.parse(readFileSync(join(fixtures, 'report.v5', 'valid-full.json')));
   const blocks = [
     { type: 'callout', tone: 'warn', title: 'Not measured', text: 'How much of the plan\'s window this took.' },
     { type: 'beats', beats: [{ image: 'kit/a.png', time: '0:00', title: 'The pain', text: 'One line.' }, { image: 'kit/b.png', title: 'The fix', text: 'Another line.' }] },
     { type: 'video', src: 'kit/film.mp4', poster: 'kit/poster.png', length: '0:10', caption: 'The film.' },
-    { type: 'table', columns: ['Measured', 'A', 'B'], rows: [['Calls', '3', '1']] },
+    { type: 'table', columns: ['Measured', 'A', 'B', 'C', 'D', 'E', 'F'], rows: [[{ text: 'Calls', rowspan: 2 }, { text: '3', colspan: 2 }, '1'], ['4', '5', '6', '7', '8', '9']] },
     { type: 'compare', before: { image: 'kit/a.png', caption: 'As filed' }, after: { image: 'kit/b.png', caption: 'In the kit' } },
     { type: 'evidence', rows: [{ image: 'kit/a.png', title: 'Line wrapped', note: 'Version 1', status: 'fixed' }, { title: 'Sound missing', status: 'waiting' }] },
+    { type: 'image', src: 'kit/neutral.png', caption: 'The original reference', alt: 'A board screen' },
+    { type: 'file', src: 'kit/report.md', caption: 'The full report' },
   ];
   const gallery = [{ label: 'Option A', model: 'Sonnet 5.5', ran: '2026-10-24T09:30:00Z', frames: [{ device: 'phone', src: 'kit/g.png', caption: 'A frame' }] }];
   const withBlocks = (b, extra = {}, about) => ({ ...report, ...(about && { about }), sections: report.sections.map((s, n) => n ? s : { ...s, blocks: b, ...extra }) });
@@ -189,7 +194,10 @@ test('the report kit: a section\'s blocks are checked, post pins their files aft
     [withBlocks(swap(0, { colour: 'blue' })), /blocks\[0\]\.colour is not a field there/],
     [withBlocks(swap(1, { beats: [blocks[1].beats[0]] })), /blocks\[1\]\.beats must list 2 to 12/],
     [withBlocks(swap(2, { src: 'kit/film.mov' })), /blocks\[2\]\.src .* must be a relative a \.mp4 or \.webm path/],
-    [withBlocks(swap(3, { rows: [['Calls', '3']] })), /blocks\[3\]\.rows\[0\] must have 3 cells/],
+    [withBlocks(swap(3, { rows: [[{ text: 'Calls', colspan: 21 }]] })), /colspan must be an integer from 1 to 20/],
+    [withBlocks(swap(3, { rows: [[{ text: 'Calls', rowspan: 2 }]] })), /rowspan must be an integer from 1 to 1/],
+    [withBlocks(swap(6, { src: '../outside.png' })), /must be a relative/],
+    [withBlocks(swap(7, { src: 'kit/escape.html' })), /leads outside/],
     [withBlocks(swap(4, { after: undefined })), /blocks\[4\]\.after is required/],
     [withBlocks(swap(5, { rows: [{ title: 'No status' }] })), /blocks\[5\]\.rows\[0\]\.status is required/],
     [withBlocks(swap(1, { beats: [{ image: 'kit/gone.png', title: 'x', text: 'y' }, blocks[1].beats[1]] })), /kit\/gone\.png\\" is not there/],
@@ -210,7 +218,14 @@ test('the report kit: a section\'s blocks are checked, post pins their files aft
     for (const [n, name] of [[1, 'a.png'], [2, 'b.png'], [3, 'poster.png']]) assert.deepEqual(Buffer.from(await (await get(n, name)).arrayBuffer()), shot, name);
     const range = await get(4, 'film.mp4', { headers: { range: 'bytes=0-9' } });
     assert.equal(range.status, 206); assert.equal(range.headers.get('content-type'), 'video/mp4'); assert.equal((await range.arrayBuffer()).byteLength, 10);
-    assert.equal((await get(5, 'a.png')).status, 404);
+    assert.deepEqual(Buffer.from(await (await get(5, 'neutral.png')).arrayBuffer()), shot);
+    const download = await get(6, 'report.md');
+    assert.equal(download.status, 200); assert.match(download.headers.get('content-disposition'), /attachment/);
+    assert.equal(download.headers.get('x-content-type-options'), 'nosniff'); assert.equal(await download.text(), '# The same report');
+    assert.equal((await get(6, 'neutral.png')).status, 404);
+    writeFileSync(join(dir, 'kit', 'report.md'), '# Changed');
+    assert.equal((await get(6, 'report.md')).status, 404);
+    assert.equal((await get(7, 'a.png')).status, 404);
     writeFileSync(join(dir, 'kit', 'a.png'), Buffer.concat([shot, Buffer.from([0])]));
     assert.equal((await get(1, 'a.png')).status, 404);
   } finally { proc.kill(); }

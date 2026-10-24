@@ -48,14 +48,14 @@ const ACTIONS: Record<string, Record<string, string>> = {
 export const GALLERY_DEVICES = ['phone', 'desktop'];
 const GALLERY_FILE = /\.(png|jpe?g|webp|html?)$/i;
 /** The report kit's blocks, the files a block may name, and the words a status may take. */
-export const KIT_BLOCKS = ['callout', 'beats', 'video', 'table', 'compare', 'evidence'];
+export const KIT_BLOCKS = ['callout', 'beats', 'video', 'table', 'compare', 'evidence', 'image', 'file'];
 const KIT_IMAGE = /\.(png|jpe?g|webp)$/i, KIT_VIDEO = /\.(mp4|webm)$/i;
 export const KIT_STATUS: Record<string, string> = { fixed: 'Fixed', progress: 'In progress', waiting: 'Waiting on you' };
 const KIT_TONES = ['note', 'warn', 'ask'];
 export const MEDIA_BYTES = 50_000_000;
 /** The command that makes a report's page, named in every refusal of a report without one. */
 export const REPORT_INIT = 'sign-off-axi report init <folder>';
-const KIT_HELP = `Draw the report with the board's own blocks instead: run \`${REPORT_INIT} --purpose <kind>\` and add \`blocks\` to a section (callout, beats, video, table, compare, evidence). A page of your own may use the system colours (Canvas, CanvasText, GrayText) and no cards`;
+const KIT_HELP = `Draw the report with the board's own blocks instead: run \`${REPORT_INIT} --purpose <kind>\` and add \`blocks\` to a section (callout, beats, video, table, compare, evidence, image, file). A page of your own may use the system colours (Canvas, CanvasText, GrayText) and no cards`;
 const PAGE_HELP = `Run \`${REPORT_INIT} --page\` to make the page, fill it, then post it with "view" and "preview"`;
 const GUIDE_HELP = `Run \`${REPORT_INIT}\` to write report.json, fill every FILL: line, then post it with \`post --kind report --from <folder>/report.json\``;
 
@@ -245,14 +245,41 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
         kitFile(`${at}.poster`, o.poster, KIT_IMAGE, 'a .png, .jpg, .jpeg or .webp', 'film.jpg');
         if (Object.hasOwn(o, 'length')) text(`${at}.length`, o.length, 12, 'the film\'s length, such as "0:10", in 12 characters or fewer');
         text(`${at}.caption`, o.caption, 280, 'what the film shows, in 280 characters or fewer');
+      } else if (o.type === 'image' || o.type === 'file') {
+        only(['src', 'caption', ...(o.type === 'image' ? ['alt'] : [])], '{"type":"image","src":"frame.png","caption":"The reference"}');
+        kitFile(`${at}.src`, o.src, o.type === 'image' ? KIT_IMAGE : /./, o.type === 'image' ? 'a .png, .jpg, .jpeg or .webp' : 'file', 'report.md');
+        text(`${at}.caption`, o.caption, 280, 'the original caption or link text, in 280 characters or fewer');
+        if (Object.hasOwn(o, 'alt')) text(`${at}.alt`, o.alt, 280, 'what the image shows, in 280 characters or fewer');
       } else if (o.type === 'table') {
-        only(['columns', 'rows'], '{"type":"table","columns":["Measured","App promo","Cinematic"],"rows":[["AI calls","3","1"]]}');
-        if (!Array.isArray(o.columns) || o.columns.length < 2 || o.columns.length > 5) throw bad(`${at}.columns`, 'must list 2 to 5 column names', 'Set "columns" to 2-5 short names, such as ["Measured","App promo","Cinematic"]');
-        o.columns.forEach((c: any, k: number) => text(`${at}.columns[${k}]`, c, 40, 'the column\'s name, in 40 characters or fewer'));
-        if (!Array.isArray(o.rows) || o.rows.length < 1 || o.rows.length > 30) throw bad(`${at}.rows`, 'must list 1 to 30 rows', 'Set "rows" to arrays of text, one per column');
+        only(['columns', 'rows'], '{"type":"table","columns":["Measured","App promo"],"rows":[["AI calls","3"]]}');
+        if (!Array.isArray(o.columns) || o.columns.length < 1 || o.columns.length > 20) throw bad(`${at}.columns`, 'must list 1 to 20 column names', 'Set "columns" to the original headings');
+        if (!Array.isArray(o.rows) || o.rows.length < 1 || o.rows.length > 30) throw bad(`${at}.rows`, 'must list 1 to 30 rows', 'Set "rows" to arrays of cells, preserving ragged rows');
+        const occupied: boolean[][] = o.rows.map(() => []);
+        const cell = (c: any, field: string, remaining: number) => {
+          if (typeof c === 'string') { if (c !== '') text(field, c, 120, 'the original cell text'); return [1, 1]; }
+          one(field, c, ['text', 'colspan', 'rowspan'], '{"text":"Calls","colspan":2}');
+          if (c.text !== '') text(`${field}.text`, c.text, 120, 'the original cell text');
+          for (const [f, max] of [['colspan', 20], ['rowspan', remaining]] as const) {
+            if (Object.hasOwn(c, f) && (!Number.isInteger(c[f]) || c[f] < 1 || c[f] > max)) throw bad(`${field}.${f}`, `must be an integer from 1 to ${max}`, 'Keep the span inside the table');
+          }
+          return [c.colspan ?? 1, c.rowspan ?? 1];
+        };
+        let headWidth = 0;
+        o.columns.forEach((c: any, k: number) => { headWidth += cell(c, `${at}.columns[${k}]`, 1)[0]; });
+        if (headWidth > 20) throw bad(`${at}.columns`, 'spans more than 20 columns', 'Keep the table within 20 columns');
         o.rows.forEach((r: any, k: number) => {
-          if (!Array.isArray(r) || r.length !== o.columns.length) throw bad(`${at}.rows[${k}]`, `must have ${o.columns.length} cells, one per column`, 'Write each row as an array of text with one cell for every column');
-          r.forEach((c: any, j: number) => text(`${at}.rows[${k}][${j}]`, c, 120, 'the cell\'s words, in 120 characters or fewer'));
+          if (!Array.isArray(r) || r.length > 20) throw bad(`${at}.rows[${k}]`, 'must be an array of at most 20 cells', 'Write the original cells without padding ragged rows');
+          let col = 0;
+          r.forEach((c: any, j: number) => {
+            while (occupied[k][col]) col++;
+            const [w, h] = cell(c, `${at}.rows[${k}][${j}]`, o.rows.length - k);
+            if (col + w > 20) throw bad(`${at}.rows[${k}][${j}]`, 'extends beyond 20 columns', 'Keep the table within 20 columns');
+            for (let y = k; y < k + h; y++) for (let x = col; x < col + w; x++) {
+              if (occupied[y][x]) throw bad(`${at}.rows[${k}][${j}]`, 'overlaps another span', 'Keep spans from overlapping');
+              occupied[y][x] = true;
+            }
+            col += w;
+          });
         });
       } else if (o.type === 'compare') {
         only(['before', 'after'], '{"type":"compare","before":{"image":"old.png","caption":"As filed"},"after":{"image":"new.png","caption":"In the kit"}}');
@@ -710,7 +737,7 @@ export const diagramViews = (m: any): { label: string; src: string; sha256?: str
 /** The gallery frames of a guided report or plan, in the order the board counts them for `gallery.<n>`: each section's options, each option's frames. */
 export const galleryFrames = (m: any): { device?: string; src: string; sha256?: string; bytes?: number }[] => [...(m?.sections ?? []).flatMap((s: any) => (s.gallery ?? []).flatMap((o: any) => o.frames)), ...(m?.sections ?? []).flatMap((s: any) => s.pins ?? [])];
 /** The files a section's blocks name, each once, in the order the blocks use them. */
-export const blockFiles = (s: any): string[] => [...new Set<string>((s?.blocks ?? []).flatMap((b: any) => b.type === 'beats' ? b.beats.map((x: any) => x.image) : b.type === 'video' ? [b.poster, b.src] : b.type === 'compare' ? [b.before.image, b.after.image] : b.type === 'evidence' ? b.rows.map((r: any) => r.image).filter(Boolean) : []))];
+export const blockFiles = (s: any): string[] => [...new Set<string>((s?.blocks ?? []).flatMap((b: any) => ['image', 'file'].includes(b.type) ? [b.src] : b.type === 'beats' ? b.beats.map((x: any) => x.image) : b.type === 'video' ? [b.poster, b.src] : b.type === 'compare' ? [b.before.image, b.after.image] : b.type === 'evidence' ? b.rows.map((r: any) => r.image).filter(Boolean) : []))];
 const SAME_WORDS = 0.75;
 /** What the kit warns about, never refuses: a lead whose first sentence says again (most of its words are in) what the report's summary already said, so the reader reads it twice. */
 export function kitWarnings(m: any): string[] {

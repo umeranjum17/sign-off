@@ -3,7 +3,7 @@
 // It posts the report, then checks what a reader sees: one gutter and no card inside a card, the stepper's Back and Next and their labels for a screen reader, a film's poster that becomes the player on a tap,
 // a table that stacks on a phone, and on a desk a video and gallery that run wider than the reading column. SIGN_OFF_REPO names another built checkout to run.
 import { spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import assert from 'node:assert/strict';
@@ -30,6 +30,7 @@ mkdirSync(join(dir, 'kit'), { recursive: true });
 const shot = new URL('../../../fixtures/evidence/product-board.png', import.meta.url);
 for (const f of ['one', 'two', 'three', 'poster']) copyFileSync(shot, join(dir, 'kit', `${f}.png`));
 writeFileSync(join(dir, 'kit', 'film.mp4'), Buffer.alloc(2000, 1));
+writeFileSync(join(dir, 'kit', 'report.md'), '# The original report\n');
 const report = JSON.parse(readFileSync(new URL('../../../fixtures/contract/report.v5/valid-full.json', import.meta.url), 'utf8'));
 const beat = (n, time, title, text) => ({ image: `kit/${n}.png`, time, title, text });
 const blocks = [
@@ -40,8 +41,17 @@ const blocks = [
   { type: 'compare', before: { image: 'kit/one.png', caption: 'A line wrapped badly' }, after: { image: 'kit/two.png', caption: 'Clean after two fix rounds' } },
   { type: 'evidence', rows: [{ image: 'kit/one.png', title: 'Line wrapped, notch hid a heading', note: 'Version 1', status: 'fixed' }, { image: 'kit/two.png', title: 'Words on the floating cards', note: 'Version 2', status: 'progress' }, { title: 'Sound is still missing', note: 'Version 3', status: 'waiting' }] },
 ];
+const documents = process.env.KIT_DOCUMENTS === '1';
+if (documents) blocks.push(
+  { type: 'image', src: 'kit/one.png', caption: 'The original reference screen', alt: 'The board with example questions' },
+  { type: 'file', src: 'kit/report.md', caption: 'Read the full report' },
+  { type: 'table', columns: ['Repo', 'Score', 'R1–R10', 'Top 3 gaps', 'First screen'], rows: [
+    [{ text: 'sign-off', rowspan: 2 }, '7', { text: 'The original cells, with their span', colspan: 2 }, 'Desktop', 'Phone', 'Light'],
+    ['6', '1–10', 'The original ragged row'],
+  ] },
+);
 const sample = { ...report, key: 'sample-kit', title: 'TakeOne can already render launch films like these', about: 'A sample report with every block of the kit, drawn by the board.', filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z'),
-  sections: report.sections.map((s, n) => n ? s : { ...s, blocks, gallery: [{ label: 'App promo', model: 'Sonnet 5.5', ran: '2026-10-24T20:12:00Z', frames: [{ device: 'phone', src: 'kit/one.png', caption: 'Today on a phone' }, { device: 'desktop', src: 'kit/two.png', caption: 'The promo on a desk' }] }] }) };
+  sections: report.sections.map((s, n) => n ? s : documents ? { ...s, heading: 'Original reference, file and table', body: 'The source image, its document and its original table.', blocks: blocks.slice(-3) } : { ...s, blocks, gallery: [{ label: 'App promo', model: 'Sonnet 5.5', ran: '2026-10-24T20:12:00Z', frames: [{ device: 'phone', src: 'kit/one.png', caption: 'Today on a phone' }, { device: 'desktop', src: 'kit/two.png', caption: 'The promo on a desk' }] }] }) };
 const post = (m) => spawnSync(process.execPath, [join(repo, 'dist/cli.js'), 'post', board, '--kind', 'report', '--from', '-'], { encoding: 'utf8', env, cwd: dir, input: JSON.stringify(m) });
 // Colour, CSS and an unknown block are refused with the field named.
 for (const [what, patch, error] of [['css', { colour: 'blue' }, /blocks\[1\]\.colour is not a field there/], ['type', { type: 'banner' }, /blocks\[1\]\.type \\"banner\\" is not one of callout, beats/]]) {
@@ -56,8 +66,8 @@ try {
   const base = await new Promise((ok, no) => { let log = ''; server.stdout.on('data', (b) => { log += b; const m = /http:\/\/127\.0\.0\.1:\d+\//.exec(log); if (m) ok(m[0]); }); server.once('exit', (code) => no(new Error(`serve exited ${code}`))); });
   browser('open', `${base}#reports/${sample.key}`);
   browser('emulate', '--viewport', phone ? `${width}x${height}x2,mobile,touch` : `${width}x${height}x1`, '--color-scheme', theme);
-  drive('await wait(".kt-beats"); await new Promise(r => setTimeout(r, 1500));');
-  const measure = () => { const w = document.documentElement.clientWidth; return { url: location.href, overflow: document.documentElement.scrollWidth > w, overflowing: [...document.querySelectorAll('body *')].filter((e) => !e.closest('.gl-strip, .gd-scroll') && e.getBoundingClientRect().right > w + 1).slice(0, 5).map((e) => e.className) }; };
+  drive(`await wait("${documents ? '.kt-image' : '.kt-beats'}"); await new Promise(r => setTimeout(r, 1500));`);
+  const measure = () => { const w = document.documentElement.clientWidth; return { url: location.href, overflow: document.documentElement.scrollWidth > w, overflowing: [...document.querySelectorAll('body *')].filter((e) => !e.closest('.gl-strip, .gd-scroll, .kt-scroll') && e.getBoundingClientRect().right > w + 1).slice(0, 5).map((e) => e.className) }; };
   const capture = (name, claim) => {
     const stem = `${name}.${theme}.${width}w`;
     browser('screenshot', join(out, `${stem}.png`));
@@ -74,7 +84,7 @@ try {
   const toTop = (sel) => drive(`await page.eval(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.style.scrollMarginTop = "120px"; e.scrollIntoView({ block: "start" }); }); await new Promise(r => setTimeout(r, 1000));`);
   // The shape: content in one gutter, only the callout a card, and nothing in a card that is a card.
   const shape = ask(() => {
-    const sec = document.querySelector('.kt-beats').closest('.gd-sec'), vw = document.documentElement.clientWidth, r = (e) => e.getBoundingClientRect(), main = r(document.querySelector('.gd-main'));
+    const sec = document.querySelector('.kt-beats, .kt-image').closest('.gd-sec'), vw = document.documentElement.clientWidth, r = (e) => e.getBoundingClientRect(), main = r(document.querySelector('.gd-main'));
     const card = (e) => { const c = getComputedStyle(e); return c.boxShadow !== 'none' && parseFloat(c.borderTopLeftRadius) >= 16; };
     const nested = [...document.querySelectorAll('.kt, .kt *')].filter((e) => card(e) && e.parentElement.closest('.kt-callout, .gl-opt') && !e.classList.contains('tile'));
     return { gutterLeft: Math.round(r(sec).left), gutterRight: Math.round(vw - r(sec).right), main: Math.round(main.width), nested: nested.map((e) => e.className),
@@ -83,6 +93,32 @@ try {
   assert.deepEqual(shape.nested, [], 'no card inside a card'); assert.deepEqual(shape.uppercase, [], 'no uppercase label');
   if (phone) { assert.ok(shape.gutterLeft <= 17 && shape.gutterRight <= 17, `one 16 px gutter, got ${shape.gutterLeft} and ${shape.gutterRight}`); }
   writeFileSync(join(records, `shape.${theme}.${width}w.json`), JSON.stringify(shape));
+  if (documents) {
+    toTop('.kt-image');
+    const documentState = ask(() => {
+      const img = document.querySelector('.kt-image img'), table = document.querySelector('.kt-wide'), box = table.parentElement;
+      return { caption: document.querySelector('.kt-image figcaption').textContent, loaded: img.complete && img.naturalWidth > 0,
+        ratio: img.clientWidth / img.clientHeight, naturalRatio: img.naturalWidth / img.naturalHeight,
+        link: document.querySelector('.kt-file').textContent, href: document.querySelector('.kt-file').href,
+        cells: [...table.querySelectorAll('tbody tr')].map((r) => r.children.length), colspan: table.querySelector('[colspan="2"]')?.colSpan,
+        rowspan: table.querySelector('[rowspan="2"]')?.rowSpan, head: getComputedStyle(table.querySelector('thead')).display,
+        scroll: getComputedStyle(box).overflowX, wide: box.scrollWidth > box.clientWidth, scrollContainers: [...document.querySelectorAll('body *')].filter((e) => e.scrollHeight > e.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(e).overflowY)).length };
+    });
+    assert.ok(documentState.loaded); assert.ok(Math.abs(documentState.ratio - documentState.naturalRatio) < 0.02, 'the whole image, no crop');
+    assert.deepEqual(documentState.cells, [6, 3]); assert.equal(documentState.colspan, 2); assert.equal(documentState.rowspan, 2);
+    assert.equal(documentState.head, 'table-header-group'); assert.equal(documentState.scroll, 'auto');
+    if (phone) assert.ok(documentState.wide, 'the table scrolls inside its block');
+    const download = await fetch(documentState.href);
+    assert.equal(download.status, 200); assert.match(download.headers.get('content-disposition'), /attachment/);
+    assert.equal(await download.text(), '# The original report\n');
+    documentState.href = 'pinned local file (download verified)';
+    writeFileSync(join(records, `documents.${theme}.${width}w.json`), JSON.stringify(documentState));
+    capture('documents', 'The original image and caption, a link to the pinned full report, and the original ragged table with spans; the table scrolls inside the block on a phone.');
+    if (phone) {
+      drive('await page.eval(() => { const e = document.querySelector(".kt-scroll"); e.scrollLeft = e.scrollWidth; });');
+      assert.ok(ask(() => document.querySelector('.kt-scroll').scrollLeft) > 0);
+    }
+  } else {
   // The film: a poster with one play control; a tap hands over to the native player.
   toTop('.kt-video');
   const film = ask(() => { const f = document.querySelector('.kt-video .frame'), w = f.getBoundingClientRect().width, col = document.querySelector('.gd-main').getBoundingClientRect().width;
@@ -118,9 +154,14 @@ try {
   const evid = ask(() => ({ rows: document.querySelectorAll('.kt-evid li').length, status: [...document.querySelectorAll('.kt-status')].map((s) => s.textContent), thumb: Math.round(document.querySelector('.kt-evid img').getBoundingClientRect().width) }));
   assert.deepEqual(evid.status, ['Fixed', 'In progress', 'Waiting on you']); assert.equal(evid.thumb, 48);
   capture('evidence', 'Evidence rows: a 48 px thumbnail, what it shows, and a status word with its dot (Fixed, In progress, Waiting on you), flat rows with hairlines.');
+  }
   const head = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: repo, encoding: 'utf8' }).stdout.trim();
   const pkg = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version;
-  writeFileSync(join(out, 'steps.json'), JSON.stringify({
+  writeFileSync(join(out, 'steps.json'), JSON.stringify(documents ? {
+    target: { version: `${pkg} at ${head}` }, start: 'A sample report posted through the CLI, with an original reference image, local document and ragged table.',
+    steps: ['Open the reference image and its original caption.', 'Download the pinned local document and compare its bytes.', 'Read the original table cells, spans and ragged rows; on a phone scroll horizontally inside the table.'],
+    result: 'A neutral image with its caption, the pinned file link and unchanged table content, in the board style, with no page overflow.',
+  } : {
     target: { version: `${pkg} at ${head}` },
     start: 'A clean board holding one report whose first section carries a film, a callout, a stepper, a table, a before and after, evidence rows and a gallery, all named as data.',
     steps: ['The person opens the report: the film shows as a poster at the column\'s full width with one play control.', 'They scroll to the stepper and tap Next: the beat, its time and its label move on, and the last beat offers Start again.',
@@ -128,6 +169,12 @@ try {
     result: 'Every block is drawn by the board in one gutter, in its own type and colours, light and dark, with no all-caps label and no blue.',
   }));
 } finally {
-  browser('stop'); server.kill();
-  console.log(`Scratch for cleanup: ${dir}`);
+  browser('stop');
+  await new Promise((ok, no) => {
+    const stop = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'stop', board], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    let log = ''; stop.stdout.on('data', (b) => { log += b; }); stop.stderr.on('data', (b) => { log += b; });
+    stop.once('error', no); stop.once('exit', (code) => code === 0 ? ok() : no(new Error(log)));
+  });
+  rmSync(dir, { recursive: true, force: true });
+  console.log('Isolated board stopped and scratch removed.');
 }
