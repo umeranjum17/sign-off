@@ -26,11 +26,12 @@ try {
   for (const width of (process.env.SEQUENCE_WIDTHS ?? '360,390,445,1280,1440').split(',').map(Number)) for (const theme of ['light', 'dark']) {
     const cell = `${theme}.${width}w`, height = width >= 1440 ? 900 : width >= 1024 ? 800 : 844;
     const capture = (area, drive) => { for (let attempt = 1; attempt <= 2; attempt++) {
-      try { browser('stop'); browserEnv.CHROME_DEVTOOLS_AXI_SESSION = `so-sequence-${process.pid}-${width}-${theme}-${records.length}-${attempt}`;
+      try { browserEnv.CHROME_DEVTOOLS_AXI_SESSION = `so-sequence-${process.pid}-${width}-${theme}-${records.length}-${attempt}`;
+        browserEnv.CHROME_DEVTOOLS_AXI_PORT = run(process.execPath, ['--input-type=module', '-e', "import {createServer} from 'node:net'; const s=createServer(); s.listen(0,'127.0.0.1',()=>{process.stdout.write(String(s.address().port));s.close()});"]);
         browser('open', base);
         browser('emulate', '--viewport', `${width}x${height}x2${width < 1024 ? ',mobile,touch' : ''}`, '--color-scheme', theme);
         drive(); return;
-      } catch (error) { if (!String(error).includes('BROWSER_ERROR')) throw error; if (attempt === 2) { records.push({ cell, area, missing: String(error) }); console.error(cell, area, String(error)); } }
+      } catch (error) { if (!/BROWSER_ERROR|BRIDGE_NOT_READY/.test(String(error))) throw error; if (attempt === 2) { records.push({ cell, area, missing: String(error) }); console.error(cell, area, String(error)); } }
       finally { browser('stop'); }
     } };
     capture('sequence', () => {
