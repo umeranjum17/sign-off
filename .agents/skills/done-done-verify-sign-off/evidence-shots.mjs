@@ -3,7 +3,7 @@
 // with no evidence root as the fleet's board is. Each state is captured at 390x844 (2x) in light and dark over the DevTools protocol with exact device metrics
 // (a headless Chromium of its own) and measured in the browser: one left and right edge, the 4px grid, 68px rows with 40px tiles, the priority chip and the
 // percent on one right edge, square dots on the grid, the last row clear of the dock, the proof's sheet 48px down with its whole title, its verdicts on one row,
-// no file path in what the owner reads, no control under 44px and no sideways overflow. The desk (1280x800) is captured too, to show it still works.
+// no picture or close on a row, the proof's Close above its captures and over none, no file path in what the owner reads, no control under 44px and no sideways overflow. The desk (1280x800) is captured too, to show it still works.
 // Usage: node .agents/skills/done-done-verify-sign-off/evidence-shots.mjs <output> <prototype index.html>
 // Each phone state is also captured from the prototype at the same size and theme and saved beside the board's (vs-proto/<state>.<theme>.390w.pair.png).
 import assert from 'node:assert/strict';
@@ -84,6 +84,8 @@ const MEASURE = `(async () => {
   const rows = [...document.querySelectorAll('main .ev-card')].filter(vis).map((e) => { const r = box(e), t = box(e.querySelector('.ui-icon')), title = box(e.querySelector('.t')), card = box(e.closest('.ui-card')), chip = e.querySelector('.ui-pc'), pct = e.querySelector('.pct');
     return { id: e.id, height: r4(r.height), tile: r4(t.width) + 'x' + r4(t.height), tileIn: r4(t.left - card.left), titleGap: r4(title.left - t.right), rightIn: r4(card.right - box(e.querySelector('.rm')).right),
       chipIn: chip ? r4(card.right - box(chip).right) : null, pctIn: pct ? r4(card.right - box(pct).right) : null, chip: chip?.textContent ?? '', line2: (e.querySelector('.l2').textContent || '').trim(), check: e.querySelector('.ev-ok')?.className ?? '' }; });
+  const onRows = [...document.querySelectorAll('main .ev-list :is(img:not(.ui-icon img), video, .x, .ev-x, [aria-label=Close])')].filter(vis).length;
+  if (onRows) fail.push(onRows + ' pictures or closes on the rows');
   rows.forEach((x) => { if ((phone ? x.height !== 68 : x.height < 68) || x.tile !== '40x40' || x.tileIn !== 12 || x.titleGap !== 12 || x.rightIn !== 12 || (x.chipIn !== null && x.chipIn !== 12) || (x.pctIn !== null && x.pctIn !== 12)) fail.push('row ' + JSON.stringify(x)); });
   const dots = document.querySelector('.ev-dots'), dot = dots && [...dots.children].map(box);
   const held = dots ? { box: r4(box(dots).width) + 'x' + r4(box(dots).height), cells: dot.length, cell: r4(dot[0].width) + 'x' + r4(dot[0].height), ink: dots.querySelectorAll('.held').length, red: dots.querySelectorAll('.not').length, columns: getComputedStyle(dots).getPropertyValue('--cols'),
@@ -94,7 +96,7 @@ const MEASURE = `(async () => {
   // At the scroll end the last row and the Archived row clear the dock (measured with the page scrolled to its end, then put back).
   const open = !document.getElementById('reader')?.hidden || document.getElementById('sheet')?.open;
   const end = dock && !open && last ? (() => { const y = scrollY; scrollTo(0, document.documentElement.scrollHeight); const fold = document.querySelector('main .gone-asks > summary');
-    const r = { dockTop: r4(box(tabs).top), lastRowBottom: r4(box(last).bottom), archivedBottom: fold ? r4(box(fold).bottom) : null }; scrollTo(0, y); return r; })() : null;
+    const r = { dockTop: r4(box(tabs).top), dockBottom: r4(box(tabs).bottom), lastRowBottom: r4(box(last).bottom), archivedBottom: fold ? r4(box(fold).bottom) : null }; scrollTo(0, y); return r; })() : null;
   if (end && (end.lastRowBottom > end.dockTop || (end.archivedBottom ?? 0) > end.dockTop)) fail.push('under the dock at the scroll end ' + JSON.stringify(end));
   // The light or dark button in the title row: a moon on a light page, a sun on a dark one.
   const tb = document.querySelector('main .ev-top .ui-rb[aria-label^=Switch]'), canvas = getComputedStyle(document.documentElement).getPropertyValue('--tk-canvas').trim().toLowerCase();
@@ -103,7 +105,9 @@ const MEASURE = `(async () => {
   const reader = document.getElementById('reader'), sheet = reader && !reader.hidden && reader.querySelector('.ev-scroll') ? (() => { const r = box(reader), t = document.querySelector('.ev-title'), v = [...document.querySelectorAll('.ev-verdict .choices button')];
     return { top: r4(r.top), title: t.textContent, titleLines: Math.round(box(t).height / parseFloat(getComputedStyle(t).lineHeight)), titleWhole: t.scrollHeight <= t.clientHeight + 1 && getComputedStyle(t).webkitLineClamp === 'none',
       verdicts: v.map((b) => b.textContent), verdictRows: new Set(v.map((b) => Math.round(box(b).top))).size, props: [...document.querySelectorAll('.ev-props .ui-pr')].map((p) => p.innerText.replace(/\\s+/g, ' ').trim()),
-      activity: [...document.querySelectorAll('.ev-item .th-list li')].map((l) => l.innerText.replace(/\\s+/g, ' ').trim()) }; })() : null;
+      activity: [...document.querySelectorAll('.ev-item .th-list li')].map((l) => l.innerText.replace(/\\s+/g, ' ').trim()), close: (() => { const x = reader.querySelector('.ev-x'), shots = [...reader.querySelectorAll('.ev-hero :is(img, video)')].map(box);
+        if (!x || !vis(x)) return null; const c = box(x); return { bottom: r4(c.bottom), firstCapture: shots.length ? r4(Math.min(...shots.map((s) => s.top))) : null, over: shots.filter((s) => c.left < s.right && s.left < c.right && c.top < s.bottom && s.top < c.bottom).length }; })() }; })() : null;
+  if (sheet?.close && (sheet.close.over || (sheet.close.firstCapture !== null && sheet.close.bottom > sheet.close.firstCapture))) fail.push('the close over a capture ' + JSON.stringify(sheet.close));
   if (sheet && phone && (sheet.top !== 48 || !sheet.titleWhole || (sheet.verdicts.length && sheet.verdictRows !== 1))) fail.push('sheet ' + JSON.stringify(sheet));
   const words = document.body.innerText, paths = words.match(/(?:~|\\/home)\\/\\S+|\\b[\\w.-]+\\/[\\w./-]+\\.(?:md|json|mjs|sh|ts|html)\\b/g) ?? [];
   if (paths.length) fail.push('a file path shows: ' + paths.slice(0, 3).join(', '));
@@ -155,6 +159,7 @@ try {
     ['evidence-crewhouse', 'Evidence, one project', '#evidence', 'crewhouse', 'v=evidence&eproj=crewhouse'],
     ['evidence-toggled', 'Evidence, the other theme picked with the light or dark button', '#evidence', "document.querySelector('.ev-top .ui-rb[aria-label^=Switch]').click()", 'v=evidence&theme=OTHER'],
     ['evidence-all', 'Evidence, See all, at its end', '#evidence', "(async () => { document.querySelector('.ev-sec .see').click(); await new Promise((r) => setTimeout(r, 300)); scrollTo(0, document.documentElement.scrollHeight); })()", ''],
+    ['evidence-end-iphone', 'Evidence, See all, at its end, on an iPhone with its 34px home bar', '#evidence', "(async () => { document.querySelector('.ev-sec .see').click(); await new Promise((r) => setTimeout(r, 300)); scrollTo(0, document.documentElement.scrollHeight); })()", '', 34],
     ['proof', 'A proof, open', `#evidence/${takeone}`, '', `v=evidence&o=${takeone}`],
     ['proof-end', 'A proof, open, at its end', `#evidence/${takeone}`, "document.querySelector('.ev-scroll').scrollTo(0, 1e5)", ''],
   ];
@@ -165,9 +170,11 @@ try {
     [...document.querySelectorAll('.ev-verdict button')].find((b) => b.textContent === 'Send without answering').click(); for (let i = 0; i < 50 && !document.querySelector('.ev-item .th-list'); i++) await new Promise((r) => setTimeout(r, 100)); })()`);
   for (const [wd, metrics] of [['390w', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }], ['1280w', { width: 1280, height: 800, deviceScaleFactor: 2, mobile: false }]]) {
     for (const theme of ['light', 'dark']) {
-      for (const [state, what, hash, act, protoHash] of metrics.mobile ? STATES : [['evidence', 'Evidence on a desk, the newest proof beside the list', '#evidence', '', ''], ['evidence-priority', 'Evidence on a desk, by priority', '#evidence', "document.querySelector('.ev-seg button:nth-child(2)').click()", '']]) {
+      for (const [state, what, hash, act, protoHash, homeBar = 0] of metrics.mobile ? STATES : [['evidence', 'Evidence on a desk, the newest proof beside the list', '#evidence', '', ''], ['evidence-priority', 'Evidence on a desk, by priority', '#evidence', "document.querySelector('.ev-seg button:nth-child(2)').click()", '']]) {
         const name = `${state}.${theme}.${wd}`;
         await cdp('Emulation.setDeviceMetricsOverride', metrics);
+        // The phone's bottom safe area: none, as a browser window has it, or an iPhone's home bar.
+        await cdp('Emulation.setSafeAreaInsetsOverride', { insets: { bottom: homeBar } });
         await cdp('Emulation.setTouchEmulationEnabled', metrics.mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
         await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] });
         errors.length = 0; failed.length = 0;
@@ -181,8 +188,8 @@ try {
         writeFileSync(join(out, `${name}.measure.json`), JSON.stringify({ state: what, ...m }, null, 2) + '\n');
         report.push(`${name} (${what}): edges ${m.edges.join('-')}, ${m.blocks.length} blocks, ${m.rows.length} rows${m.rows[0] ? ` (${m.rows[0].height}px, tile ${m.rows[0].tile}, title ${m.rows[0].titleGap}px after it)` : ''}`
           + `${m.held ? `, Held up today "${m.held.words}" ${m.held.cells} squares of ${m.held.cell} in ${m.held.columns} columns` : ''}${m.dock?.lastRowBottom ? `, last row ends ${m.dock.lastRowBottom} with the dock at ${m.dock.top}` : ''}`
-          + `${m.end ? `, at the scroll end the last row ends ${m.end.lastRowBottom}${m.end.archivedBottom ? ` and Archived ${m.end.archivedBottom}` : ''} with the dock at ${m.end.dockTop}` : ''}${m.theme ? `, ${m.theme.icon} button on a ${m.theme.page} page` : ''}`
-          + `${m.sheet ? `, sheet at ${m.sheet.top}px, title in ${m.sheet.titleLines} lines${m.sheet.titleWhole ? ' whole' : ' CUT'}, verdicts ${m.sheet.verdicts.join('/')} on ${m.sheet.verdictRows} row, Activity ${m.sheet.activity.length}` : ''}, under 44px ${m.under.length}, failures ${m.fail.length}${m.fail.length ? ': ' + m.fail.join('; ') : ''}`);
+          + `${m.end ? `, at the scroll end the last row ends ${m.end.lastRowBottom}${m.end.archivedBottom ? ` and Archived ${m.end.archivedBottom}` : ''} with the dock at ${m.end.dockTop}-${m.end.dockBottom}` : ''}${m.theme ? `, ${m.theme.icon} button on a ${m.theme.page} page` : ''}`
+          + `${m.sheet ? `, sheet at ${m.sheet.top}px, title in ${m.sheet.titleLines} lines${m.sheet.titleWhole ? ' whole' : ' CUT'}, verdicts ${m.sheet.verdicts.join('/')} on ${m.sheet.verdictRows} row, Activity ${m.sheet.activity.length}${m.sheet.close ? `, Close ends at ${m.sheet.close.bottom}, the capture starts at ${m.sheet.close.firstCapture}, Close over ${m.sheet.close.over} captures` : ''}` : ''}, under 44px ${m.under.length}, failures ${m.fail.length}${m.fail.length ? ': ' + m.fail.join('; ') : ''}`);
         if ([m.fail, m.under, errors, failed].some((x) => x.length) || !m.inter) problems.push(`${name}: ${JSON.stringify({ fail: m.fail, under: m.under, errors, failed, inter: m.inter })}`);
         // A pick of light or dark stays in this browser: each state starts back on the system's theme.
         await js("localStorage.removeItem('so-theme')");
@@ -206,7 +213,7 @@ try {
       'Evidence newest first: the title row with the project filter, Newest and By priority, Held up today with a square per proof filed today, and the six latest proofs as rows.',
       'Tap the light or dark button: the board turns to the other theme and the button to its other icon (a sun on a dark page, a moon on a light one).',
       'Tap By priority: the P0 proofs lead, each row with its chip and its ticket\'s progress.', 'Tap the filter: the sheet lists each project with its icon and count.',
-      'Pick crewhouse: a pill with its icon replaces the hero and only its proofs are listed.', 'Tap See all and scroll to the end: the last row clears the dock.',
+      'Pick crewhouse: a pill with its icon replaces the hero and only its proofs are listed.', 'Tap See all and scroll to the end: the last row clears the dock, and with an iPhone\'s 34px home bar the dock rises and the last row and Archived still end above it.',
       'Open the takeone proof: a sheet over the list with its project and time, its whole title, its capture, done-done\'s word, its priority, its ticket and its pull request; scroll it to its end: its Activity (posted, then the comment sent from the sheet) and Fail, Needs work and Pass on one row.',
       'Measure each in the browser: edges, the 4px grid, rows, the dots, the last row and the Archived row against the dock at the scroll end, the light or dark button, the sheet, file paths and controls under 44px.', 'Open Evidence at 1280x800 in both themes: the list beside the newest proof.'],
     result: 'On a phone, in light and dark, Evidence matches the approved prototype: a 24px title with the round filter button and the light or dark button (a moon on a light page, a sun on a dark one, a tap turns the board to the other theme), Newest and By priority, the Held up today card (the count, how many are not checked, and one square per proof filed today, ink where done-done says it holds up), and the latest proof as 68px rows (at the scroll end the last row and the Archived row clear the dock), each its project\'s icon with done-done\'s check at its corner, the title, a P0-P3 chip only where a priority is set, and its ticket\'s bar and percent or its project and time; one project picked shows as a pill; a proof opens as a sheet with its whole title, its capture, its done-done, Priority, Ticket and Pull request rows, its Activity and Fail, Needs work and Pass in ink; every block on one 16px gutter and the 4px grid, no file path, nothing under 44px, no sideways overflow.' }, null, 2) + '\n');
