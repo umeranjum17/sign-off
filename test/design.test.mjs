@@ -4016,6 +4016,8 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
   mkdirSync(join(dir, 'design'), { recursive: true });
   for (const f of readdirSync(join(fx, 'design.v1/design'))) writeFileSync(join(dir, 'design', f), readFileSync(join(fx, 'design.v1/design', f)));
   writeFileSync(join(dir, 'shot.png'), png);
+  writeFileSync(join(dir, 'settings.svg'), readFileSync(new URL('../docs/logo.svg', import.meta.url)));
+  assert.equal(run('project', file, '--name', 'Settings', '--icon', 'settings.svg').code, 0);
   // A ticket stands alone: a new one needs a title, a later write changes only what it gives, and a bad value is refused before anything is written.
   assert.equal(run('ticket', file, '--id', 'T-29', '--progress', '20').code, 2);
   assert.equal(existsSync(join(dir, 'board.tickets.jsonl')), false);
@@ -4132,11 +4134,13 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     await evaluate(`location.href = ${JSON.stringify(`${url}#ticket/T-9`)}`);
     await until(async () => (await evaluate('[...document.querySelectorAll(".tk-sheet a.tk-row")].map((a) => a.getAttribute("href")).join()')) === '#ticket/T-29');
     assert.equal(await evaluate('[...document.querySelectorAll(".tk-sheet .ui-dl, .tk-sheet .tk-none")].map((p) => p.textContent).join(" | ")'), 'Tickets in this epic · 0 of 1 done | Linked | No card names this ticket yet.');
+    assert.equal(await evaluate('!!document.querySelector(".tk-sheet .tk-shd .ui-icon img")?.naturalWidth && !!document.querySelector(".tk-sheet .tk-in .tk-row .ui-icon img")?.naturalWidth && !document.querySelector(".tk-sheet .mono")'), true);
     // The Tickets tab lists the tickets under no other: Your asks (T-9, which the user asked for, moving) or System (T-31, on hold). T-29 sits under T-9, so it is not listed on its own.
     const tab = `JSON.stringify({ seg: [...document.querySelectorAll('.tk-seg button')].map((b) => b.textContent + (b.getAttribute('aria-pressed') === 'true' ? ' on' : '')), hero: document.querySelector('.tk-hero').innerText.replace(/\\s+/g, ' ').trim(),
       lists: [...document.querySelectorAll('main section[aria-label]')].map((x) => x.getAttribute('aria-label') + ' ' + [...x.querySelectorAll('a.tk-row')].map((a) => a.getAttribute('href')).join()) })`;
     await evaluate(`location.href = ${JSON.stringify(`${url}#tickets`)}`);
     await until(() => evaluate('!!document.querySelector(".tk-hero")'));
+    assert.equal(await evaluate('!!document.querySelector("main .tk-row .ui-icon img")?.naturalWidth && !document.querySelector("main .tk-row .mono")'), true);
     assert.deepEqual(JSON.parse(await evaluate(tab)), { seg: ['Your asks1 on', 'System1'], hero: 'Your asks done 0 of 1 1 moving', lists: ['In progress #ticket/T-9'] });
     await evaluate('document.querySelector(".tk-seg button:last-child").click()');
     await until(async () => JSON.parse(await evaluate(tab)).lists.join() === 'On hold #ticket/T-31');

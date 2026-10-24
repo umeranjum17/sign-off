@@ -1627,7 +1627,8 @@
   .tk-fpill .glyph { width: 0.875rem; height: 0.875rem; color: var(--tk-text-tertiary); }
   .tk-pt { display: inline-grid; flex: none; place-items: center; width: 1.25rem; height: 1.25rem; }
   .tk-pt img, .tk-pt .mono { width: 1.25rem; height: 1.25rem; border-radius: 0.3125rem; object-fit: cover; }
-  .tk-pt .mono { background: var(--tk-ink); color: var(--tk-raised); font-size: 0.5rem; line-height: 1.25rem; font-weight: 600; text-align: center; }
+  .tk-shd .ui-icon { width: 1.25rem; height: 1.25rem; border-radius: 0.3125rem; box-shadow: none; }
+  .tk-shd .ui-icon :is(img, svg) { width: 1.25rem; height: 1.25rem; }
   /* The hero: its label and how many were done this week, the big count, how many move, and one square per ticket. */
   .tk-hero { container-type: inline-size; }
   /* The shared hero chip (ui.css), with the prototype's green rise before its count. */
@@ -3121,7 +3122,7 @@
     // Its cards' steps after their postings (Linked shows those), newest first, each naming its card.
     const steps = cards.flatMap((d) => threadOf(d).filter((e) => !e.posted).map((e) => ({ ...e, card: d }))).sort(bySecond).reverse(), said = trailOf(t.id, 'ticket');
     seeReply(t.id, 'ticket');
-    return [el('div', { class: 'tk-shd' }, el('p', {}, proj ? el('span', { class: 'tk-pt', 'aria-hidden': 'true' }, projectPic(proj)) : '', el('span', {}, [proj, TK_WORDS[s]].filter(Boolean).join(' · '))), close),
+    return [el('div', { class: 'tk-shd' }, el('p', {}, tkTile(t), el('span', {}, [proj, TK_WORDS[s]].filter(Boolean).join(' · '))), close),
       el('h2', { class: 'tk-dt', tabindex: '-1', dir: 'auto' }, t.title),
       t.release ? el('span', { class: 'ui-pc tk-release', title: t.release }, t.release) : '',
       el('div', { class: 'ui-props' }, t.priority ? prop('flag', 'Priority', el('span', { class: `ui-pc ${t.priority.toLowerCase()}` }, t.priority)) : '',
