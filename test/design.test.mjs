@@ -3263,6 +3263,24 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   // Nothing was dismissed, so no log line was written beyond the restore the test itself made.
   assert.deepEqual(readFileSync(file.replace(/\.json$/, '.dismissed.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).key), ['update-1']);
   close();
+  // On a phone as it is held (390x844 with an iPhone's 34px home bar): no row carries a picture or a close, and a proof's Close sits in its sheet's head, above its captures and over none of them.
+  const iphone = await browse(join(dir, 'i'), 390, 844, true);
+  await iphone.send('Emulation.setSafeAreaInsetsOverride', { insets: { bottom: 34 } });
+  await iphone.evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
+  await until(async () => (await iphone.evaluate('document.querySelectorAll(".ev-card").length')) === 6);
+  assert.equal(await iphone.evaluate('document.querySelectorAll(".ev-list img:not(.ui-icon img), .ev-list video, .ev-list :is(.x, .ev-x, [aria-label=Close])").length'), 0);
+  await iphone.evaluate('document.getElementById("item-update-2").click()');
+  await until(() => iphone.evaluate('[...document.querySelectorAll(".ev-hero img")].filter((i) => i.naturalWidth).length === 2'));
+  assert.deepEqual(await iphone.evaluate(`(() => { const x = document.querySelector("#reader .ev-x").getBoundingClientRect(), shots = [...document.querySelectorAll("#reader .ev-hero img")].map((i) => i.getBoundingClientRect());
+    return [x.bottom <= Math.min(...shots.map((s) => s.top)), shots.filter((s) => x.left < s.right && s.left < x.right && x.top < s.bottom && s.top < x.bottom).length]; })()`), [true, 0]);
+  // Dismissed from its sheet, the proof goes under Archived; at the list's scroll end the last row, Select or clear all and Archived all end above the dock, which rises over the home bar.
+  await iphone.evaluate('document.querySelector(".ev-verdict > .dis").click()');
+  await until(async () => (await iphone.evaluate('document.querySelector("main .gone-asks > summary")?.textContent')) === 'Archived (1)' && (await iphone.evaluate('document.getElementById("reader").hidden && document.querySelectorAll(".ev-card").length')) === 5);
+  const end = await iphone.evaluate(`(() => { scrollTo(0, document.documentElement.scrollHeight); const bottom = (s) => Math.round(document.querySelector(s).getBoundingClientRect().bottom), dock = document.querySelector(".tabs").getBoundingClientRect();
+    return { dockTop: Math.round(dock.top), dockBottom: Math.round(dock.bottom), lastRow: bottom(".ev-list > li:last-child"), more: bottom(".ev-more"), archived: bottom("main .gone-asks > summary") }; })()`);
+  assert.equal(end.dockBottom, 844 - 24 - 34, JSON.stringify(end));
+  assert.ok([end.lastRow, end.more, end.archived].every((b) => b <= end.dockTop), `under the dock at the scroll end: ${JSON.stringify(end)}`);
+  iphone.close();
   proc.kill();
 });
 
