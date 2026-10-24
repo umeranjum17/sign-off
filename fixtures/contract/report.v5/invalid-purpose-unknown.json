@@ -2,46 +2,23 @@
   "contract": 1,
   "kind": "report",
   "schema": 5,
-  "key": "digest-ran",
-  "title": "The weekly digest ran",
-  "purpose": "Research",
-  "filed": "2026-10-19T08:00:00Z",
-  "about": "Sent to 412 readers with no failures.",
+  "filer": "agent-41",
+  "filed": "2026-10-19T09:30:00Z",
   "understood": [
-    {
-      "label": "You asked",
-      "text": "Send the weekly digest."
-    }
+    {"label": "You asked", "text": "Pick a push service for the phone app."},
+    {"label": "Done when", "text": "One service is picked, with the reasons and a runner-up."}
   ],
-  "visual": {
-    "type": "tiles",
-    "heading": "412 sent, 0 failed",
-    "rows": [
-      {
-        "label": "Sent",
-        "text": "412 readers",
-        "tone": "ok"
-      },
-      {
-        "label": "Failed",
-        "text": "None",
-        "tone": "ok"
-      }
-    ]
-  },
+  "visual": {"type": "bars", "heading": "Four of five parts are done", "unit": "parts", "rows": [{"label": "Done", "value": 4, "tone": "ok"}, {"label": "Left", "value": 1, "tone": "warn"}]},
+  "next": {"heading": "Say go and I wire ntfy in", "lines": ["The first slice sends one test push to Umer's phone.", "The proof lands as an update under Evidence."]},
+  "key": "release-stands",
+  "title": "Where the 0.6 release stands",
+  "purpose": "Research",
+  "group": "Release",
+  "about": "Four of five parts are done; the last waits on one review.",
   "sections": [
-    {
-      "id": "sent",
-      "stage": "found",
-      "heading": "Every reader got it",
-      "body": "No address bounced and none was skipped."
-    }
-  ],
-  "next": {
-    "heading": "Nothing needs you",
-    "lines": [
-      "The next digest goes out Monday."
-    ]
-  },
-  "filer": "umer"
+    {"id": "done", "part": "done", "stage": "found", "heading": "Four parts shipped", "body": "Today, Decide, Evidence and Reports are in the new look."},
+    {"id": "in-progress", "part": "in-progress", "stage": "found", "heading": "Designs is in review", "body": "One review left."},
+    {"id": "blocked", "part": "blocked", "stage": "found", "heading": "Nothing is held up", "body": "No part waits on anyone."},
+    {"id": "up-next", "part": "up-next", "stage": "recommend", "heading": "The release goes out Friday", "body": "Once the review passes."}
+  ]
 }

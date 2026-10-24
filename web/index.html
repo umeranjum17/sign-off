@@ -1213,6 +1213,13 @@
   .rp-pill small { margin-left: 0.375rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); font-weight: 400; }
   .rp-top .rp-fb { position: relative; }
   .ui-pane .ui-shd > span.rkc { flex: none; overflow: visible; }
+  /* A research report's Sources panel, and in the guided page an item's tags (a user report, a finding's confidence, a slice's size) and its source's link. */
+  #reader .rp-src, .split-detail .rp-src { width: 100%; min-height: 3rem; padding: 0; border: 0; border-radius: 0; background: none; font: inherit; font-size: var(--tk-fs-row); text-align: left; }
+  .rp-src .k { color: var(--tk-text-secondary); } .rp-src .k .glyph { width: 1rem; height: 1rem; } .rp-src .v .glyph { width: 1rem; height: 1rem; color: var(--tk-text-tertiary); }
+  .gd-tags { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.25rem; }
+  .gd-tag { padding: 0 0.375rem; border-radius: 0.375rem; background: var(--tk-inset); color: var(--tk-text-secondary); font-size: 0.6875rem; line-height: 1.25rem; font-weight: 500; }
+  .gd-src { position: relative; display: inline-block; margin: -0.25rem 0.875rem 0.75rem; color: var(--tk-ink); font-size: var(--tk-fs-meta); line-height: 1.25rem; text-decoration: underline; text-underline-offset: 2px; }
+  .gd-src::after { content: ''; position: absolute; inset: -0.75rem 0; }
   /* A page report's head and the full guided page's: the kind's chip, then who asked and when. */
   :is(.read > .eyebrow, .gd-top .geye) { display: flex; align-items: center; } :is(.read > .eyebrow, .gd-top .geye) > .rkc { margin-right: 0.5rem; }
   /* Decide's list: More in a round button at the title's right edge, then the rows in cards (ui.css). Each row's face spans its card, so a swipe shows its action edge to edge:
@@ -2642,7 +2649,8 @@
     'tab-tickets': 'M4.2 5.4h15.6A1.8 1.8 0 0 1 21.6 7.2v2.76a2.16 2.16 0 0 0 0 4.08V16.8a1.8 1.8 0 0 1-1.8 1.8h-15.6A1.8 1.8 0 0 1 2.4 16.8v-2.76a2.16 2.16 0 0 0 0-4.08V7.2a1.8 1.8 0 0 1 1.8-1.8zm10.44 2.4v2.4h1.92v-2.4zm0 6v2.4h1.92v-2.4z' };
   // The drawings are fixed strings from this page, never text from the board file.
   // Small stroke drawings the plan page puts beside a button label or in a section badge; fixed strings from this page.
-  const GLYPHS = { left: '<path d="m15 18-6-6 6-6"/>', up: '<path d="m18 15-6-6-6 6"/>', down: '<path d="m6 9 6 6 6-6"/>', more: '<path d="M5 12h.01M12 12h.01M19 12h.01"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', right: '<path d="m9 18 6-6-6-6"/>', check: '<path d="M20 6 9 17l-5-5"/>', pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
+  const GLYPHS = { link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+    users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>', left: '<path d="m15 18-6-6 6-6"/>', up: '<path d="m18 15-6-6-6 6"/>', down: '<path d="m6 9 6 6 6-6"/>', more: '<path d="M5 12h.01M12 12h.01M19 12h.01"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', right: '<path d="m9 18 6-6-6-6"/>', check: '<path d="M20 6 9 17l-5-5"/>', pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
     archive: '<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/>', dot: '<circle cx="12" cy="12" r="4.5" fill="currentColor"/>',
     send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.112z"/><path d="m21.854 2.147-10.94 10.939"/>',
     sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>', msg: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
@@ -3186,13 +3194,17 @@
   /** A guided report's parts, as its page reads them: what this is, what I understood, each section, the next step. A page report has none. */
   const rpParts = (d) => (d.guided ? [['this', GSTAGES.this], ['understood', GSTAGES.understood], ...(d.sections ?? []).map((s) => [s.id, s.heading]), ['next', GSTAGES.next]] : []);
   const partRead = (d, part) => !!state.reads?.[`${d.key}/${part}`];
-  /** How much of a report is read: all of it once read; one not read yet, by the parts of it read (a page report has none). */
+  /** A report's parts as its strip and its sheet list them: a report 5's kind parts (the sections naming one), else every part of its guided page; each [id, name]. */
+  const kindParts = (d) => { const own = (d.sections ?? []).filter((x) => x.part); return own.length ? own.map((x) => [x.id, x.heading]) : rpParts(d); };
+  /** A research report's sources: the items of its sources part with a link, and how many are what users report. */
+  const sourcesOf = (d) => { const x = (d.sections ?? []).find((y) => y.part === 'sources'), its = (x?.items ?? []).filter((it) => it.link); return x && its.length ? { id: x.id, n: its.length, users: its.filter((it) => it.source === 'user').length } : null; };
+  /** How much of a report is read: all of it once read; one not read yet, by the parts of it read (a report 5's kind parts; a page report has none). */
   /** A report's parts as a strip, one segment each, filled once read (all of it once the report is read); on a desk's head each segment names its part. */
   // On a row a read report's strip is full, as its percent is; over its parts (a sheet, a desk's head) each segment is its part, filled once that part is read.
-  const partsStrip = (d, parts = false) => el('span', { class: 'rp-strip', 'aria-hidden': 'true' }, ...rpParts(d).map(([p]) => el('i', { class: (!parts && !unread(d)) || partRead(d, p) ? 'on' : '' })));
+  const partsStrip = (d, parts = false) => el('span', { class: 'rp-strip', 'aria-hidden': 'true' }, ...kindParts(d).map(([p]) => el('i', { class: (!parts && !unread(d)) || partRead(d, p) ? 'on' : '' })));
   /** Over a report's parts: the strip of them, and the next part to read. */
-  const stripRow = (d) => { const next = rpParts(d).find(([p]) => !partRead(d, p)); return el('div', { class: 'rp-strip-row' }, partsStrip(d, true), next ? el('p', { class: 'rp-next', dir: 'auto' }, `Next: ${next[1]}`) : ''); };
-  const readPct = (d) => { if (!unread(d)) return 100; const ps = rpParts(d); return ps.length ? Math.round((100 * ps.filter(([p]) => partRead(d, p)).length) / ps.length) : 0; };
+  const stripRow = (d) => { const next = kindParts(d).find(([p]) => !partRead(d, p)); return el('div', { class: 'rp-strip-row' }, partsStrip(d, true), next ? el('p', { class: 'rp-next', dir: 'auto' }, `Next: ${next[1]}`) : ''); };
+  const readPct = (d) => { if (!unread(d)) return 100; const ps = kindParts(d); return ps.length ? Math.round((100 * ps.filter(([p]) => partRead(d, p)).length) / ps.length) : 0; };
   /** A title or line in plain words: no ticket code ("6198 ", "RL-02: ", "P1 ") ahead of it, and no file path in it ("the report" or "the plan" for one, else "the file"). */
   const plain = (t) => {
     const s = String(t ?? '').replace(/^[\w.-]+ #\d+:\s*/, '').replace(/^\d{3,5}\s+/, '').replace(/^(?:audit\s+)?[A-Z]{2,3}-\d{1,3}:\s*/i, '').replace(/^P[0-3]:?\s+/, '')
@@ -3247,7 +3259,7 @@
   function report(d, i = 0) {
     const n = d.steps?.length;
     // The second line leads with the report's kind; a plan's bar is its parts, one segment each, filled once read.
-    const face = uiRow({ tile: projectTile(d.group), title: plain(title(d)), priority: d.priority, progress: readPct(d), badge: trailBadge(d.key), lead: kindChip(d), bar: kindOf(d) === 'plan' && rpParts(d).length ? partsStrip(d) : undefined });
+    const face = uiRow({ tile: projectTile(d.group), title: plain(title(d)), priority: d.priority, progress: readPct(d), badge: trailBadge(d.key), lead: kindChip(d), bar: kindOf(d) === 'plan' && kindParts(d).length ? partsStrip(d) : undefined });
     const sel = rpSel === d.key;
     const li = (...kids) => el('li', { class: `report dl-row${flash === d.key ? ' returned' : ''}${sel ? ' sel' : ''}`, style: `--n:${i}`, ...(reads(d) && { 'data-key': d.key, 'data-list': 'reports' }) }, ...kids);
     const act = (cls, mark, words) => el('div', { class: `dl-act ${cls}`, 'aria-hidden': 'true' }, glyph(mark), el('span', {}, words));
@@ -4010,16 +4022,20 @@
         el('thead', {}, el('tr', {}, el('td', {}), ...items.map((it) => el('th', { scope: 'col' }, opt(it))))),
         el('tbody', {}, row('In short', items.map((it) => it.text)), ...axes.map((a, k) => row(a, values.map((v) => v[k]))))));
     };
+    /** What a report 5 item carries beside its words: a source (from what users report, or primary), how sure a finding is, a slice's size; and the source's link, under it. */
+    const tags = (it) => { const t = [it.source === 'user' ? 'User report' : it.source === 'primary' ? 'Primary source' : '', it.confidence ? `${it.confidence[0].toUpperCase()}${it.confidence.slice(1)} confidence` : '', it.size ?? ''].filter(Boolean);
+      return t.length ? [E('span', 'gd-tags', ...t.map((x) => E('span', 'gd-tag', x)))] : []; };
+    const srcLink = (it) => { if (!it.link) return []; let host = it.link; try { host = new URL(it.link).host.replace(/^www\./, ''); } catch {} return [el('a', { class: 'gd-src', href: it.link, target: '_blank', rel: 'noopener noreferrer' }, `Open on ${host}`)]; };
     const secCard = (s) => {
       const cmp = compared(s.items ?? []);
       const items = cmp ? [] : (s.items ?? []).map((it, i) => {
         const part = `${s.id}:${i}`;
-        if (!it.more && !it.diagram) return E('li', '', E('div', 'rowstat', E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), fld(part, 'title', mdSpan('span', '', it.title))), fld(part, 'text', mdSpan('span', 'sm', it.text)))), ...(d.engagement || live ? [E('div', 'body', ...acts(part, undefined, true))] : []));
+        if (!it.more && !it.diagram) return E('li', '', E('div', 'rowstat', E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), fld(part, 'title', mdSpan('span', '', it.title))), fld(part, 'text', mdSpan('span', 'sm', it.text)), ...tags(it))), ...srcLink(it), ...(d.engagement || live ? [E('div', 'body', ...acts(part, undefined, true))] : []));
         const body = E('div', 'body', ...(it.more ? [fld(part, 'more', mdDiv(it.more))] : []), ...(it.diagram ? [diagramFig(it.diagram)] : []), ...acts(part, undefined, true));
         body.hidden = true;
-        const b = el('button', { class: 'rowbtn', type: 'button', 'aria-expanded': 'false' }, E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), mdSpan('span', '', it.title, NOLINK)), mdSpan('span', 'sm', it.text, NOLINK)), gic('chev', 'gchev'));
+        const b = el('button', { class: 'rowbtn', type: 'button', 'aria-expanded': 'false' }, E('span', '', E('span', 'ti', ...(it.tone ? [E('i', `dotk ${it.tone}`)] : []), mdSpan('span', '', it.title, NOLINK)), mdSpan('span', 'sm', it.text, NOLINK), ...tags(it)), gic('chev', 'gchev'));
         b.onclick = () => { const open = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(open)); body.hidden = !open; };
-        return E('li', '', b, body);
+        return E('li', '', b, ...srcLink(it), body);
       });
       return card(s.id, s.stage, head(s.heading, s.body, undefined, s.id, 'heading', 'body'), ...(s.diagram ? [diagramFig(s.diagram)] : []), ...(cmp ? [cmpTable(s.items, cmp)] : items.length ? [E('ul', 'gd-rows', ...items)] : []), ...acts(s.id, s.details), rc(s.id));
     };
@@ -4181,7 +4197,7 @@
     if (rpListed !== d?.key) rpListed = '';
     const sheet = !!d && from === 'reports' && !inline, summary = sheet && d.guided && rpListed === d.key && rpGuide !== d.key;
     reader.classList.toggle('rp-sheet', sheet && (summary || !d.guided));
-    const url = summary ? `sheet:${d.key}:${unread(d)}:${rpParts(d).filter(([p]) => partRead(d, p)).length}` : d?.guided ? `guide:${d.key}` : d?.kind === 'design' ? `design:${d.key}` : d?.type === 'evidence' ? `evidence:${d.key}` : d ? src(mockUrl(d.key, '', d.view)) : '';
+    const url = summary ? `sheet:${d.key}:${unread(d)}:${kindParts(d).filter(([p]) => partRead(d, p)).length}` : d?.guided ? `guide:${d.key}` : d?.kind === 'design' ? `design:${d.key}` : d?.type === 'evidence' ? `evidence:${d.key}` : d ? src(mockUrl(d.key, '', d.view)) : '';
     const answer = d?.guided ? '' : d?.type === 'plan' || d?.kind === 'design' || d?.type === 'evidence' ? JSON.stringify(state.answers[d.key] ?? null) : '';
     const plan = d?.type === 'plan' || d?.guided ? JSON.stringify(d) : '';
     const evidence = d?.type === 'evidence' ? JSON.stringify([d, (state.messages ?? []).filter((m) => m.key === d.key), (state.rounds ?? []).filter((r) => r.key === d.key)]) : '', ticket = JSON.stringify([ticketOf(d) ?? null, d ? threadOf(d) : null]);
@@ -4210,21 +4226,29 @@
     seeReply(d.key);
     const x = el('a', { class: 'rp-x', href: '#reports', 'aria-label': 'Close' }, glyph('x')), scrim = el('a', { class: 'rp-scrim', href: '#reports', tabindex: '-1', 'aria-hidden': 'true' });
     const what = [d.group, d.filed ? day(d.filed) : ''].filter(Boolean).join(' · ');
-    const found = d.guided ? d.visual?.heading : d.decided;
+    const found = d.guided ? d.visual?.heading : d.decided, src = sourcesPanel(d, (p) => full(p));
     const full = (part) => { rpGuide = d.key; readPage(d, 'reports'); const at = part && document.getElementById(`gd-${part.replace(/\W/g, '-')}`); at ? at.scrollIntoView({ block: 'start' }) : reader.querySelector('h1')?.focus({ preventScroll: true }); };
     // Its head names its kind, then the project and day; under the title, what this kind of report is for; over its parts, a strip of them and the next to read.
     return [scrim, el('div', { class: 'read rp-sheet-body' }, el('span', { class: 'rp-grab', 'aria-hidden': 'true' }), el('div', { class: 'rp-shd' }, el('p', { class: 'rp-what', dir: 'auto' }, kindChip(d, true), el('span', { class: 'rp-when' }, what)), x),
-      h1, purposeLine(d), d.about ? el('p', { class: 'about', dir: 'auto' }, plain(d.about)) : '', found ? el('p', { class: 'ui-dl' }, d.guided ? 'What it found' : 'What it decided') : '', found ? el('div', { class: 'ui-props rp-found', dir: 'auto' }, plain(found)) : '',
+      h1, purposeLine(d), d.about ? el('p', { class: 'about', dir: 'auto' }, plain(d.about)) : '', found ? el('p', { class: 'ui-dl' }, d.guided ? 'What it found' : 'What it decided') : '', found ? el('div', { class: 'ui-props rp-found', dir: 'auto' }, plain(found)) : '', ...src,
       ...reportParts(d, full), ticketRow(d), thread(d), page ?? '', dismissReport(d))];
   }
-  /** A report's parts as one panel, each with a check once read, under a strip of them and the next one to read, then for a guided report Read the report: a part or the button opens it in full (at that part). */
+  /** A report's parts as one panel, each with a check once read, under a strip of them and the next one to read, then for a guided report Read the report:
+   *  a part or the button opens it in full (at that part). A report 5's parts are its kind's. */
   function reportParts(d, full) {
-    const ps = rpParts(d), n = ps.filter(([p]) => partRead(d, p)).length;
+    const ps = kindParts(d), n = ps.filter(([p]) => partRead(d, p)).length;
     const parts = ps.map(([p, name]) => { const b = el('button', { class: 'ui-pr rp-part', 'aria-label': `${name}, ${partRead(d, p) ? 'read' : 'not read yet'}` }, el('span', { class: 'k', dir: 'auto' }, name),
       el('span', { class: `rp-check${partRead(d, p) ? ' on' : ''}`, 'aria-hidden': 'true' }, partRead(d, p) ? glyph('check') : '')); b.onclick = () => full(p); return b; });
     const open = d.guided ? el('button', { class: 'rp-open-full rp-open', 'data-kbd': '↵', 'aria-keyshortcuts': 'Enter' }, 'Read the report') : '';
     if (open) open.onclick = () => full();
     return ps.length ? [el('p', { class: 'ui-dl' }, `Read ${n} of ${plural(ps.length, 'part')}`), stripRow(d), el('div', { class: 'ui-props rp-parts' }, ...parts), open] : [];
+  }
+  /** A research report's Sources: how many sources it links and how many are what users report, each opening the report at its sources part. */
+  function sourcesPanel(d, open) {
+    const c = sourcesOf(d);
+    if (!c) return [];
+    const row = (name, n, glyphName) => { const b = el('button', { class: 'ui-pr rp-src' }, el('span', { class: 'k' }, glyph(glyphName), name), el('span', { class: 'v' }, el('span', { class: 'n' }, String(n)), glyph('right'))); b.onclick = () => open(c.id); return b; };
+    return [el('p', { class: 'ui-dl' }, 'Sources'), el('div', { class: 'ui-props rp-sources' }, row('Linked sources', c.n, 'link'), row('What users report', c.users, 'users'))];
   }
   /** Dismiss moved from the list row to the report's own page; once it is dismissed the page closes back to the list. */
   function dismissReport(d) {
@@ -4842,7 +4866,8 @@
       el('div', { class: 'pmain read', 'data-sig': JSON.stringify([d.key, url, d.title, d.about, found]) }, el('h1', { id: 'report-title', class: 'dt', dir: 'auto' }, plain(d.title)), purposeLine(d),
         d.about ? el('p', { class: 'dp', dir: 'auto' }, plain(d.about)) : '', found ? el('p', { class: 'ui-dl' }, d.guided ? 'What it found' : 'What it decided') : '', found ? el('div', { class: 'ui-props rp-found', dir: 'auto' }, plain(found)) : '',
         ...keys, url ? el('iframe', { src: url, title: `Report: ${d.title}`, sandbox: 'allow-scripts' }) : ''),
-      el('div', { class: 'pside' }, ...reportParts(d, full), ...next, ticketRow(d), thread(d))));
+      // A research report's Sources, then its parts.
+      el('div', { class: 'pside' }, ...sourcesPanel(d, full), ...reportParts(d, full), ...next, ticketRow(d), thread(d))));
   }
   /** Every key, in one sheet behind ?. A desk hints each where it works; they work at any width with a keyboard. */
   const MOD = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';

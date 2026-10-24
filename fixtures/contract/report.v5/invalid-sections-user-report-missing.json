@@ -1,0 +1,29 @@
+{
+  "contract": 1,
+  "kind": "report",
+  "schema": 5,
+  "filer": "agent-41",
+  "filed": "2026-10-19T09:30:00Z",
+  "understood": [
+    {"label": "You asked", "text": "Pick a push service for the phone app."},
+    {"label": "Done when", "text": "One service is picked, with the reasons and a runner-up."}
+  ],
+  "visual": {"type": "tiles", "heading": "ntfy fits: free, self-hosted, under 2 seconds", "rows": [{"label": "ntfy", "text": "Free, self-hosted", "tone": "ok"}, {"label": "Pushover", "text": "$5 once per platform", "tone": "warn"}]},
+  "next": {"heading": "Say go and I wire ntfy in", "lines": ["The first slice sends one test push to Umer's phone.", "The proof lands as an update under Evidence."]},
+  "key": "push-service",
+  "title": "Which push service fits a team of two",
+  "purpose": "research",
+  "group": "Beacon",
+  "about": "Five services compared on cost, delivery on a phone and setup time. Two fit; one is free up to our size.",
+  "sections": [
+    {"id": "question", "part": "question", "stage": "found", "heading": "Which push service, and why now", "body": "The app needs a push for new answers before the beta on 1 Nov."},
+    {"id": "scope", "part": "scope", "stage": "found", "heading": "Phones only, under 100 people", "body": "In: Android and iOS pushes for a team of two. Out: email and SMS."},
+    {"id": "method", "part": "method", "stage": "found", "heading": "Docs, issues and one test push each", "body": "I read each service's docs and open issues, and sent one test push to a phone."},
+    {"id": "sources", "part": "sources", "stage": "found", "heading": "Five sources, one of them users", "body": "Three primary sources and two user reports.", "items": [{"title": "ntfy docs: self-hosting", "text": "One binary, no account needed.", "link": "https://docs.ntfy.sh/install/", "source": "primary"}, {"title": "Pushover pricing", "text": "A one-time licence per platform.", "link": "https://pushover.net/pricing", "source": "primary"}, {"title": "ntfy issue: iOS delivery", "text": "Users report delays on iOS without the relay.", "link": "https://github.com/binwiederhier/ntfy/issues/1", "source": "primary"}]},
+    {"id": "options", "part": "options", "stage": "found", "heading": "Two options on the same axes", "body": "Both deliver in under 2 seconds on Android.", "items": [{"title": "ntfy", "text": "Free, self-hosted.", "more": "Cost: free.\nSetup: one hour."}, {"title": "Pushover", "text": "Paid once, hosted.", "more": "Cost: $5 per platform.\nSetup: ten minutes."}]},
+    {"id": "findings", "part": "findings", "stage": "found", "heading": "ntfy is free and fast enough", "body": "Two findings back the pick.", "items": [{"title": "Delivery under 2 seconds", "text": "Timed on one Android phone, 10 pushes.", "confidence": "high"}, {"title": "iOS needs the relay", "text": "Reported in an open issue; not timed by me.", "confidence": "medium"}]},
+    {"id": "not-checked", "part": "not-checked", "stage": "found", "heading": "iOS was not timed", "body": "I had no iPhone; Reddit blocked fetching."},
+    {"id": "recommendation", "part": "recommendation", "stage": "recommend", "heading": "Use ntfy; Pushover is the runner-up", "body": "ntfy is free at our size; Pushover if self-hosting is too much."},
+    {"id": "open-questions", "part": "open-questions", "stage": "recommend", "heading": "Who runs the server", "body": "Self-hosting needs an owner for updates."}
+  ]
+}

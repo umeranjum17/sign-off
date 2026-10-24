@@ -14,7 +14,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, appendPromoted, appendSendBack, appendTicket, readTickets, rollUp, appendTicketComment, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, appendPromoted, appendSendBack, appendTicket, readTickets, rollUp, appendTicketComment, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -369,7 +369,10 @@ examples:
   report: `usage: sign-off-axi report init <folder> [--purpose research|plan|decision|audit|incident|status|other] [--plan] [--page]
 Writes the guided template to fill: <folder>/report.json, or <folder>/plan.json with --plan. A file already there is kept.
 Every report names what it is for in "purpose", its kind: research (research and discovery), plan (implementation plan), decision (decision and recommendation),
-audit, incident (incident and retro), status, or other. --purpose fills it in. The board shows the kind on the report's row and head, and filters by it.
+audit, incident (incident and retro), status, or other. --purpose fills it in and writes that kind's parts to fill, one section each, which post then requires
+(research: question, scope, method, sources with links and a user report, options, findings with their confidence, not-checked, recommendation, open-questions;
+plan: goal, current, design with a diagram, slices with their size, tests, risks, rollout, estimate, owner-calls; see the skill for the others).
+The board shows the kind on the report's row and head, its parts as a strip, and filters by it.
 The board draws it as one scroll: what this is (the answer and one picture), what I understood, what I found and recommend, what you decide (plans), and the next step.
 Numbers sit behind a Details tap; every part has a Go deeper button that asks you (see \`sign-off-axi deeper --help\`) and a read receipt that shows when the person read it.
 Replace every FILL: line, then post it: post --kind report --from <folder>/report.json, or post --kind plan --from <folder>/plan.json --filer <your id>.
@@ -2048,6 +2051,37 @@ function init(args: string[]) {
       `Run \`sign-off-axi doctor ${shellPath(dir)}\` to check the setup`, `Run \`sign-off-axi open ${shellPath(board)}\` to show the board to the user`]);
 }
 
+/** What each part of a report 5 asks for, as its template's FILL lines, and whether it reads as what was found or what is recommended; the items a part needs come with it. */
+const PART_FILL: Record<string, [string, 'found' | 'recommend', object[]?]> = {
+  question: ['the question, and why it matters now', 'found'], scope: ['what is in and what is out', 'found'], method: ['how you looked: what you read, ran and asked', 'found'],
+  sources: ['where the answers come from', 'found', [
+    { title: 'FILL: a primary source (docs, code, a maintainer)', text: 'FILL: what it says, in one line', link: 'FILL: https link', source: 'primary' },
+    { title: 'FILL: another primary source', text: 'FILL: what it says', link: 'FILL: https link', source: 'primary' },
+    { title: 'FILL: what users report (an issue, a forum, Reddit, Hacker News)', text: 'FILL: what they say, with how many', link: 'FILL: https link', source: 'user' }]],
+  options: ['the options, on the same axes', 'found', [
+    { title: 'FILL: option A', text: 'FILL: its pros and cons in one line', more: 'FILL: Cost: value.\nFILL: Setup: value.' },
+    { title: 'FILL: option B', text: 'FILL: its pros and cons in one line', more: 'FILL: Cost: value.\nFILL: Setup: value.' }]],
+  findings: ['what you found', 'found', [{ title: 'FILL: one finding', text: 'FILL: one line, with its source', confidence: 'medium' }]],
+  'not-checked': ['what you did not check, and what you could not read', 'found'],
+  recommendation: ['what you recommend, and the runner-up', 'recommend'], 'open-questions': ['what is still open', 'recommend'],
+  goal: ['the goal, and what is not a goal', 'found'], current: ['how it works today', 'found'],
+  design: ['the design, with its diagram', 'recommend'], slices: ['the slices, in order, each with its size', 'recommend', [{ title: 'FILL: slice 1', text: 'FILL: what ships in it', size: 'FILL: S, half a day' }]],
+  tests: ['how each slice is tested and proven', 'recommend', [{ title: 'FILL: slice 1', text: 'FILL: the test, and the proof that it works' }]],
+  risks: ['each risk, and how you roll back', 'recommend'], rollout: ['how it reaches people', 'recommend'], estimate: ['how long it takes, as a range', 'recommend'],
+  'owner-calls': ['what you need the user to decide', 'recommend'], context: ['the forces at play, said plainly', 'found'],
+  consequences: ['what follows from the choice, good and bad', 'recommend'], standard: ['the standard checked against, with its link', 'found'],
+  fixes: ['what to fix, most urgent first', 'recommend'], impact: ['who was hurt, how much and for how long', 'found'],
+  timeline: ['what happened, in order, with times', 'found', [{ title: 'FILL: 09:12', text: 'FILL: what happened' }]], 'root-cause': ['why it happened (the system, not a person)', 'found'],
+  actions: ['what changes so it does not happen again', 'recommend'], done: ['what is done', 'found'], 'in-progress': ['what is in progress', 'found'],
+  blocked: ['what is held up, and on what', 'found'], 'up-next': ['what comes next', 'recommend'],
+};
+/** A report 5's sections for its kind: one per part, each a FILL line naming what it asks for; the plan's design carries a diagram to draw. */
+const kindSections = (purpose: string) => REPORT_PARTS[purpose].map(([part, name]) => {
+  const [ask, stage, items] = PART_FILL[part];
+  return { id: part, part, stage, heading: `FILL: ${name}: ${ask}`, body: `FILL: ${ask}, in a line or two`, ...(items && { items }),
+    ...(purpose === 'plan' && part === 'design' && { diagram: [{ label: 'Flow', src: 'FILL: diagrams/flow.html, inline SVG in light and dark' }] }) };
+});
+
 /** report init <folder>: the guided template (report.json, or plan.json with --plan) to fill in, or with --page the older scaffold page and its picture. */
 function report(args: string[]) {
   let parsed;
@@ -2068,7 +2102,9 @@ function report(args: string[]) {
     else {
       const filed = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
       const template = readFileSync(new URL(`../web/${kind}-template.json`, import.meta.url), 'utf8').replace('"FILL: UTC time"', JSON.stringify(filed));
-      writeFileSync(path, purpose ? template.replace(/"FILL: what this report is for[^"]*"/, JSON.stringify(purpose)) : template, { flag: 'wx' });
+      // With --purpose the template holds that kind's parts, one section each; with none, the general shape and purpose to fill.
+      const kinded = purpose && { ...JSON.parse(template), purpose, ...(REPORT_PARTS[purpose].length && { sections: kindSections(purpose) }) };
+      writeFileSync(path, kinded ? `${JSON.stringify(kinded, null, 2)}\n` : template, { flag: 'wx' });
       created.push(shellPath(path));
     }
     return toon({ folder: shellPath(out), created: created.length ? created : 'nothing new (re-run is a no-op)', kept }, [

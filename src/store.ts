@@ -113,6 +113,17 @@ const ONE_OF: Record<string, unknown[]> = { close: ['done', 'release'], area: ['
 export const REPORT_FORMS = ['diagram', 'chart', 'before-after'];
 /** What a report is for, its kind: the board shows each with its own icon and chip, and filters by it. `other` is the fallback. */
 export const REPORT_PURPOSES = ['research', 'plan', 'decision', 'audit', 'incident', 'status', 'other'];
+/** The parts each kind of report 5 must have, in order, each one section naming it as its `part`: the workflow strong teams use for that kind of document
+ *  (research: a discovery brief; plan: a design doc or RFC; decision: an ADR; audit: a finding's criteria, condition, cause and effect; incident: a blameless postmortem; status: done, doing, held up, next). */
+export const REPORT_PARTS: Record<string, [string, string][]> = {
+  research: [['question', 'The question and why it matters'], ['scope', 'Scope'], ['method', 'Method'], ['sources', 'Sources'], ['options', 'Options compared'], ['findings', 'Findings'], ['not-checked', 'What we did not check'], ['recommendation', 'Recommendation'], ['open-questions', 'Open questions']],
+  plan: [['goal', 'Goal and non-goals'], ['current', 'How it works today'], ['design', 'Design'], ['slices', 'Slices'], ['tests', 'Tests and proof'], ['risks', 'Risks and rollback'], ['rollout', 'Rollout'], ['estimate', 'Time'], ['owner-calls', 'Your calls']],
+  decision: [['context', 'Context'], ['options', 'Options'], ['recommendation', 'Recommendation'], ['consequences', 'What follows']],
+  audit: [['scope', 'Scope'], ['standard', 'Standard'], ['findings', 'Findings'], ['fixes', 'Fixes']],
+  incident: [['impact', 'Impact'], ['timeline', 'Timeline'], ['root-cause', 'Root cause'], ['actions', 'What changes']],
+  status: [['done', 'Done'], ['in-progress', 'In progress'], ['blocked', 'Held up'], ['up-next', 'Next']],
+  other: [],
+};
 const MARKS = ['ai', 'store', 'gate', 'fail'];
 export const NOTE_MAX = 500;
 const TRADEOFF_MAX = 1000;

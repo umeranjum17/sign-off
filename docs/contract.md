@@ -109,6 +109,19 @@ An explainer the person reads: made when they asked for an explanation, or when 
 
 The new `report init` default. Every field and rule of report 4 below, plus one required field, `purpose`: what the report is for, its kind, one of `research` (research and discovery), `plan` (implementation plan), `decision` (decision and recommendation), `audit`, `incident` (incident and retro), `status`, or `other`. A report 5 without it, or with another value, is refused with the fix line naming the seven. `report init <folder> --purpose <kind>` writes it filled in. The board shows the kind on the report's row (a chip with its icon) and its head (its full name), with one line under the title on what that kind of report is for, and Reports filters by kind. A report 4 or older has no `purpose`: the board shows its best guess from its title, what it says and its section heads (`other` when nothing fits), and never writes it back. A guided plan is always an implementation plan.
 
+Each kind but `other` has its parts, in order: one section each, naming it in `"part"` (up to 10 sections). A part missing, repeated or not of the report's kind is refused, naming the part and `report init <new folder> --purpose <kind>`, which writes every part to fill.
+
+| Kind | Parts | What a part needs |
+|---|---|---|
+| `research` | `question`, `scope`, `method`, `sources`, `options`, `findings`, `not-checked`, `recommendation`, `open-questions` | `sources`: at least 3 items, each with `link` (an http(s) link) and `source` (`primary`, or `user` for what users report), and at least one `user`; `options`: at least 2 items; `findings`: each item with `confidence` (`high`, `medium`, `low`) |
+| `plan` | `goal`, `current`, `design`, `slices`, `tests`, `risks`, `rollout`, `estimate`, `owner-calls` | `design`: a `diagram` on the section, one of its items or the `visual`; `slices`: each item with `size` (text, 1-24); `tests`: at least one item |
+| `decision` | `context`, `options`, `recommendation`, `consequences` | |
+| `audit` | `scope`, `standard`, `findings`, `fixes` | |
+| `incident` | `impact`, `timeline`, `root-cause`, `actions` | |
+| `status` | `done`, `in-progress`, `blocked`, `up-next` | |
+
+An item of a report 5 may also carry `link`, `source`, `confidence` and `size` in any part. The board draws a report 5's kind parts as its strip and its parts list, counts a research report's linked sources and user reports on its head, and shows each item's source, confidence or size, and its link.
+
 ### report schema 4 and plan schema 3: engagement v1
 
 The new `report init` defaults retain every field and limit of report 3 / plan 2 below, but **require `filer`**, using the existing key syntax. Contract stays 1. No routing commands or session paths belong in the authored message. Every guided part gains **Simplify this**, alongside the unchanged legacy Go deeper path. Original documents and plan decisions are never rewritten by explanatory replies.

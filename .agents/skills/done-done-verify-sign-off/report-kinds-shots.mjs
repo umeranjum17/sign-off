@@ -23,6 +23,8 @@ const board = join(dir, 'board.json'), so = (...args) => sh(process.execPath, [j
 // a desk's head, strip and next part; and the checks every capture gets (overflow, words cut short, controls under 44px on a phone, console errors).
 const MEASURE = `(async () => {
   await document.fonts.ready;
+  // Rows rise in and sheets slide up; a busy host can still be running that motion after the fixed wait, so measure once it has settled.
+  await Promise.all(document.getAnimations().filter((a) => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime)).map((a) => a.finished.catch(() => {})));
   const w = document.documentElement.clientWidth, phone = innerWidth < 1024, box = (e) => e.getBoundingClientRect(), vis = (e) => { const r = box(e), c = getComputedStyle(e); return r.width > 0 && r.height > 0 && c.visibility !== 'hidden' && c.display !== 'none'; };
   const r2 = (n) => Math.round(n * 100) / 100, fail = [], txt = (e) => e?.textContent.replace(/\\s+/g, ' ').trim() ?? '';
   const rows = [...document.querySelectorAll('.rp-list .ui-row')].filter(vis).map((e) => { const chip = e.querySelector('.l2 .rkc'), strip = e.querySelector('.l2 .rp-strip'), bar = e.querySelector('.l2 .ui-bar'), pct = e.querySelector('.pct');
@@ -33,21 +35,25 @@ const MEASURE = `(async () => {
   const fb = document.querySelector('.rp-fb'), pill = document.querySelector('.rp-pill');
   const rd = document.querySelector('#reader:not([hidden])'), sheet = rd?.querySelector('.rp-sheet-body'), deskRead = document.querySelector('.split-detail');
   const head = sheet ? { chip: txt(sheet.querySelector('.rp-what .rkc')), when: txt(sheet.querySelector('.rp-what .rp-when')), title: txt(sheet.querySelector('h1')), for: txt(sheet.querySelector('.rp-for')),
-    strip: [...sheet.querySelectorAll('.rp-strip-row .rp-strip > i')].map((i) => (i.classList.contains('on') ? 1 : 0)).join(''), next: txt(sheet.querySelector('.rp-next')), parts: sheet.querySelectorAll('.rp-part').length, read: txt([...sheet.querySelectorAll('.ui-dl')].find((e) => /^Read /.test(e.textContent))) }
+    strip: [...sheet.querySelectorAll('.rp-strip-row .rp-strip > i')].map((i) => (i.classList.contains('on') ? 1 : 0)).join(''), next: txt(sheet.querySelector('.rp-next')), parts: sheet.querySelectorAll('.rp-part').length, sources: [...sheet.querySelectorAll('.rp-src')].map((b) => txt(b)).join('|'), read: txt([...sheet.querySelectorAll('.ui-dl')].find((e) => /^Read /.test(e.textContent))) }
     : deskRead && !phone ? { chip: txt(deskRead.querySelector('.rp-bar .rkc')), title: txt(deskRead.querySelector('h1')), for: txt(deskRead.querySelector('.rp-for')), read: txt(deskRead.querySelector('.rp-parts-h')),
-      strip: [...deskRead.querySelectorAll('.rp-strip-row .rp-strip > i')].map((i) => (i.classList.contains('on') ? 1 : 0)).join(''), next: txt(deskRead.querySelector('.rp-next')) } : null;
+      strip: [...deskRead.querySelectorAll('.rp-strip-row .rp-strip > i')].map((i) => (i.classList.contains('on') ? 1 : 0)).join(''), next: txt(deskRead.querySelector('.rp-next')),
+      parts: [...deskRead.querySelectorAll('.rp-part .k')].map((k) => txt(k)).join(','), sources: [...deskRead.querySelectorAll('.rp-src')].map((b) => txt(b)).join('|') } : null;
   // Words cut short: a chip, the purpose line, a part's name on the desk's strip (its full name stays in the parts list) is allowed to end in an ellipsis only there.
-  const cut = [...document.querySelectorAll('.rkc, .rp-for, .rp-pick .kn, .rp-pill span[dir], .rp-next, #reader h1')].filter(vis).filter((e) => { const rg = document.createRange(); rg.selectNodeContents(e); const t = rg.getBoundingClientRect(), b = box(e);
+  const cut = [...document.querySelectorAll('.rkc, .rp-for, .rp-pick .kn, .rp-pill span[dir], .rp-next, #reader.rp-sheet h1, .gd-tag, .gd-src')].filter(vis).filter((e) => { const rg = document.createRange(); rg.selectNodeContents(e); const t = rg.getBoundingClientRect(), b = box(e);
     return t.right > b.right + 1 || t.bottom > b.bottom + 1 || e.scrollWidth > e.clientWidth + 1; }).map((e) => e.className + ': ' + txt(e).slice(0, 40));
   if (cut.length) fail.push('cut short: ' + cut.join('; '));
   const hit = (e) => { const r = box(e), a = getComputedStyle(e, '::after'), o = (v) => Math.max(0, -parseFloat(v) || 0), wide = a.content !== 'none' && a.position === 'absolute'; return { top: r.top, bottom: r.bottom, height: r.height + (wide ? o(a.top) + o(a.bottom) : 0), width: r.width + (wide ? o(a.left) + o(a.right) : 0) }; };
-  const scope = document.querySelector('#sheet[open]') ?? sheet ?? document;
+  // A sheet's own controls; on the guided page opened at its sources, that part's.
+  const scope = document.querySelector('#sheet[open]') ?? sheet ?? (rd && document.getElementById('gd-sources')) ?? document;
   const under = phone ? [...scope.querySelectorAll('button, a[href], summary')].filter(vis).filter((e) => !e.closest('.dl-hover, .rp-scrim, .tabs')).filter((e) => { const r = hit(e); return r.top < innerHeight && r.bottom > 0 && (r.height < 43.5 || r.width < 43.5); })
     .map((e) => (e.getAttribute('aria-label') || e.textContent).trim().slice(0, 24) + ' ' + Math.round(box(e).width) + 'x' + Math.round(box(e).height)) : [];
   if (under.length) fail.push('under 44px: ' + under.join(', '));
   const overflowing = [...document.querySelectorAll('body *')].filter((e) => box(e).right > w + 1).slice(0, 10).map((e) => e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (e.classList[0] ? '.' + e.classList[0] : ''));
   if (overflowing.length) fail.push('overflow: ' + overflowing.join(', '));
-  return { viewport: innerWidth + 'x' + innerHeight, rows, pick, filter: fb ? { label: fb.getAttribute('aria-label'), count: txt(fb.querySelector('b')) } : null, pill: txt(pill), head, under, fail,
+  // The guided page opened at a research report's sources: each source's tag and its link out.
+  const gdSources = document.getElementById('gd-sources'), sources = gdSources ? { tags: [...gdSources.querySelectorAll('.gd-tag')].map(txt), links: [...gdSources.querySelectorAll('.gd-src')].map((a) => txt(a) + ' ' + a.target) } : null;
+  return { viewport: innerWidth + 'x' + innerHeight, rows, sources, pick, filter: fb ? { label: fb.getAttribute('aria-label'), count: txt(fb.querySelector('b')) } : null, pill: txt(pill), head, under, fail,
     dom: { url: location.href, overflow: document.documentElement.scrollWidth > w, overflowing } };
 })()`;
 
@@ -57,28 +63,50 @@ let server, ws;
 process.on('exit', () => { try { chrome.kill(); } catch {} try { server?.kill(); } catch {} });
 const errors = [], failed = [], problems = [], lines = [];
 try {
-  // Seven guided reports filed in the last hours, one of each kind, as the approved mock lists them; the incident is an older report 4 with no purpose, so its kind is the board's guess.
-  const base = JSON.parse(readFileSync(join(repo, 'fixtures/contract/report.v5/valid-full.json'), 'utf8')), ago = (h) => new Date(Date.now() - h * 3600e3).toISOString().replace(/\.\d+Z$/, 'Z');
-  const sec = (id, heading, stage = 'found') => ({ id, stage, heading, body: `${heading}, in a line or two.` });
+  // Seven guided reports filed in the last hours, one of each kind, as the approved mock lists them: six report 5s, each with every part of its kind (a research report's
+  // sources with links and a user report, its options and findings with their confidence; a plan's design with its diagram, its slices sized and tested); the incident is an
+  // older report 4 with no purpose, so its kind is the board's guess.
+  const base = JSON.parse(readFileSync(join(repo, 'fixtures/contract/report.v5/valid-full.json'), 'utf8')), old = JSON.parse(readFileSync(join(repo, 'fixtures/contract/report.v4/valid-full.json'), 'utf8'));
+  const { REPORT_PARTS } = await import(join(repo, 'dist/store.js')), ago = (h) => new Date(Date.now() - h * 3600e3).toISOString().replace(/\.\d+Z$/, 'Z');
+  mkdirSync(join(dir, 'diagrams'), { recursive: true });
+  writeFileSync(join(dir, 'diagrams', 'flow.html'), readFileSync(join(repo, '.agents/skills/done-done-verify-sign-off/diagram-sample/flow.html')));
+  const NEEDS = {
+    sources: [{ title: 'ntfy docs: self-hosting', text: 'One binary, no account needed.', link: 'https://docs.ntfy.sh/install/', source: 'primary' }, { title: 'Pushover pricing', text: 'A one-time licence per platform.', link: 'https://pushover.net/pricing', source: 'primary' },
+      { title: 'ntfy issue: iOS delivery', text: 'Users report delays on iOS without the relay.', link: 'https://github.com/binwiederhier/ntfy/issues/1', source: 'user' }],
+    options: [{ title: 'ntfy', text: 'Free, self-hosted.', more: 'Cost: free.\nSetup: one hour.' }, { title: 'Pushover', text: 'Paid once, hosted.', more: 'Cost: $5 per platform.\nSetup: ten minutes.' }],
+    findings: [{ title: 'Delivery under 2 seconds', text: 'Timed on one Android phone.', confidence: 'high' }],
+    slices: [{ title: 'Move the page', text: 'Settings open from the profile.', size: 'S, half a day' }], tests: [{ title: 'Move the page', text: 'A browser test opens it from the profile.' }],
+  };
+  const sections = (purpose) => REPORT_PARTS[purpose].map(([part, heading]) => ({ id: part, part, stage: 'found', heading, body: `${heading}, in a line or two.`,
+    ...(purpose !== 'decision' && NEEDS[part] && { items: NEEDS[part] }), ...(purpose === 'plan' && part === 'design' && { diagram: [{ label: 'Flow', src: 'diagrams/flow.html' }] }) }));
   const reports = [
-    { key: 'kinds-plan', purpose: 'plan', group: 'Settings', priority: 'P1', title: 'Move settings into the profile page in four slices', about: 'Settings leave the menu and open from the profile. Four slices, each shipped and proven on its own.',
-      sections: [sec('goal', 'Goal and non-goals'), sec('today', 'How it works today'), sec('design', 'Design'), sec('slices', 'Slices', 'recommend'), sec('tests', 'Tests and proof', 'recommend'), sec('risks', 'Risks and rollback', 'recommend')], read: ['this', 'understood', 'goal'] },
-    { key: 'kinds-research', purpose: 'research', group: 'Beacon', title: 'Which push service fits a team of two', about: 'Five services compared on cost, delivery on a phone and setup time. Two fit; one is free up to our size.',
-      sections: [sec('scope', 'Scope'), sec('method', 'Method'), sec('sources', 'Sources'), sec('options', 'Options compared'), sec('not-checked', 'What I did not check'), sec('pick', 'Recommendation', 'recommend')], read: ['this', 'understood', 'scope', 'method'] },
-    { key: 'kinds-incident', schema: 4, group: 'Chat app', priority: 'P0', title: 'Why messages were sent twice on Tuesday: a retro', about: 'A retry ran after a slow answer had already arrived. One change stops it.' },
-    { key: 'kinds-decision', purpose: 'decision', group: 'Sign-in', title: 'Keep the code step after the password', about: 'Two ways compared; the code step stays, with the reasons and what it costs.', opened: true },
-    { key: 'kinds-audit', purpose: 'audit', group: 'Settings', title: 'Every screen checked against the contrast rules', about: 'Twelve screens checked; two fall short in dark, with the fix for each.' },
-    { key: 'kinds-status', purpose: 'status', group: 'Release', title: 'Where the 0.6 release stands', about: 'Four of five parts are done; the last waits on one review.', opened: true },
-    { key: 'kinds-other', purpose: 'other', title: 'How the release train works', about: 'Build, check and publish each have one owner.' },
+    { key: 'kinds-plan', purpose: 'plan', group: 'Settings', priority: 'P1', title: 'Move settings into the profile page in four slices', about: 'Settings leave the menu and open from the profile. Four slices, each shipped and proven on its own.', found: 'Four slices over six days; the old link stays for a week', read: ['goal', 'current', 'design'] },
+    { key: 'kinds-research', purpose: 'research', group: 'Beacon', title: 'Which push service fits a team of two', about: 'Five services compared on cost, delivery on a phone and setup time. Two fit; one is free up to our size.', found: 'ntfy fits: free, self-hosted, under 2 seconds', read: ['question', 'scope', 'method', 'sources'] },
+    { key: 'kinds-incident', group: 'Chat app', priority: 'P0', title: 'Why messages were sent twice on Tuesday: a retro', about: 'A retry ran after a slow answer had already arrived. One change stops it.', found: 'A retry ran after the answer had arrived' },
+    { key: 'kinds-decision', purpose: 'decision', group: 'Sign-in', title: 'Keep the code step after the password', about: 'Two ways compared; the code step stays, with the reasons and what it costs.', found: 'The code step stays: it stops a stolen password alone', opened: true },
+    { key: 'kinds-audit', purpose: 'audit', group: 'Settings', title: 'Every screen checked against the contrast rules', about: 'Twelve screens checked; two fall short in dark, with the fix for each.', found: 'Two of twelve screens fall short in dark' },
+    { key: 'kinds-status', purpose: 'status', group: 'Release', title: 'Where the 0.6 release stands', about: 'Four of five parts are done; the last waits on one review.', found: 'Four of five parts are done', opened: true },
+    { key: 'kinds-other', purpose: 'other', title: 'How the release train works', about: 'Build, check and publish each have one owner.', found: 'Each stage has one owner' },
   ];
   reports.forEach((r, i) => {
-    const m = { ...base, key: r.key, title: r.title, about: r.about, purpose: r.purpose, filed: ago(0.2 + i * 0.4), ...(r.sections && { sections: r.sections }) };
+    const m = r.purpose ? { ...base, purpose: r.purpose, sections: r.purpose === 'other' ? base.sections.map(({ part, ...x }) => ({ ...x, items: x.items?.map(({ link, source, confidence, ...it }) => it) })) : sections(r.purpose) } : { ...old };
+    // Each report's picture heads with its own finding, which its sheet shows as What it found.
+    Object.assign(m, { key: r.key, title: r.title, about: r.about, filed: ago(0.2 + i * 0.4), visual: { ...m.visual, heading: r.found } });
     for (const f of ['ticket', 'asked_by', 'group', 'priority']) delete m[f];
     if (r.group) m.group = r.group;
     if (r.priority) m.priority = r.priority;
-    if (r.schema) { m.schema = r.schema; delete m.purpose; }
     writeFileSync(join(dir, `${r.key}.json`), JSON.stringify(m)); so('post', board, '--kind', 'report', '--from', join(dir, `${r.key}.json`));
   });
+  // Post holds a report 5 to its kind's parts: a plan whose sections name no part, and a research report with no user report, are each refused with one fix line, and nothing is written.
+  const refusals = [['a plan with none of its parts', { ...base, key: 'kinds-bad-plan', purpose: 'plan', sections: base.sections.map(({ part, ...x }) => x) }],
+    ['a research report with no user report', { ...base, key: 'kinds-bad-research', sections: base.sections.map((x) => (x.part === 'sources' ? { ...x, items: x.items.map((it) => ({ ...it, source: 'primary' })) } : x)) }]].map(([what, m]) => {
+    writeFileSync(join(dir, `${m.key}.json`), JSON.stringify(m));
+    const r = spawnSync(process.execPath, [join(repo, 'dist/cli.js'), 'post', board, '--kind', 'report', '--from', join(dir, `${m.key}.json`)], { encoding: 'utf8', env });
+    assert.equal(r.status, 2, r.stdout); assert.ok(!readFileSync(board, 'utf8').includes(m.key), `${what} is not written`);
+    return `$ sign-off-axi post --kind report --from ${m.key}.json   (${what})\nexit ${r.status}\n${r.stdout.replaceAll(dir, '<board folder>')}`;
+  });
+  assert.match(refusals[0], /sections has no \\?"goal\\?" part/); assert.match(refusals[1], /must hold at least one user report/);
+  writeFileSync(join(out, 'kinds-refusal.txt'), refusals.join('\n'));
   // A config.yaml beside the board names the user, as seed-board.sh does, so the sidebar's foot reads Umer.
   writeFileSync(join(dir, 'config.yaml'), 'board: board.json\nname: Umer\n');
   server = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'serve', board, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
@@ -150,27 +178,34 @@ try {
       const only = await state('kinds-filtered', async () => { await tap('.rp-fb'); await tap('#sheet .rp-pick [data-kind="research"]'); });
       txt.push(`filtered: pill "${only.pill}", button "${only.filter.label}" (${only.filter.count}), rows ${only.rows.map((r) => r.title).join(' | ')}`);
       assert.deepEqual([only.rows.map((r) => r.kind), only.pill.replace(/(?<=\D)(?=\d)/, ' '), only.filter.count], [['research'], 'Research and discovery 1 of 7', '1']);
-      for (const [s, key, chip, read, next] of [['kinds-plan', 'kinds-plan', 'Implementation plan', 'Read 3 of 9 parts', 'Next: How it works today'], ['kinds-research', 'kinds-research', 'Research and discovery', 'Read 4 of 9 parts', 'Next: Sources'],
+      for (const [s, key, chip, read, next] of [['kinds-plan', 'kinds-plan', 'Implementation plan', 'Read 3 of 9 parts', 'Next: Slices'], ['kinds-research', 'kinds-research', 'Research and discovery', 'Read 4 of 9 parts', 'Next: Options compared'],
         ['kinds-old', 'kinds-incident', 'Incident and retro', '', '']]) {
         const m = await state(s, () => tap(`#item-${key}`));
-        txt.push(`${s} sheet: [${m.head.chip}] ${m.head.when} / "${m.head.title}" / for "${m.head.for}" / ${m.head.read} ${m.head.strip} "${m.head.next}"`);
+        txt.push(`${s} sheet: [${m.head.chip}] ${m.head.when} / "${m.head.title}" / for "${m.head.for}" / ${m.head.read} ${m.head.strip} "${m.head.next}" / sources ${m.head.sources || 'none'}`);
+        if (key === 'kinds-research') assert.equal(m.head.sources, 'Linked sources3|What users report1');
         assert.equal(m.head.chip, chip); assert.ok(m.head.for.length > 10, 'a line on what it is for');
         if (read) assert.deepEqual([m.head.read, m.head.next, m.head.strip.length], [read, next, 9]);
       }
+      // Tapping What users report opens the guided page at its sources: each with its tag, and a link out that opens in a new tab.
+      const src = await state('kinds-sources', async () => { await tap('#item-kinds-research'); await tap('#reader .rp-src:last-child'); await ev(`(document.getElementById('gd-sources')?.scrollIntoView({ block: 'start' }), new Promise((ok) => setTimeout(ok, 400)))`); });
+      txt.push(`kinds-sources: tags ${src.sources?.tags.join(', ')}; links ${src.sources?.links.join(', ')}`);
+      assert.deepEqual(src.sources, { tags: ['Primary source', 'Primary source', 'User report'], links: ['Open on docs.ntfy.sh _blank', 'Open on pushover.net _blank', 'Open on github.com _blank'] });
     } else {
-      for (const [s, key, chip, strip, next] of [['kinds-desk-plan', 'kinds-plan', 'Implementation plan', '111000000', 'Next: How it works today'], ['kinds-desk-research', 'kinds-research', 'Research and discovery', '111100000', 'Next: Sources']]) {
+      for (const [s, key, chip, strip, next, parts, sources] of [['kinds-desk-plan', 'kinds-plan', 'Implementation plan', '111000000', 'Next: Slices', 'Goal and non-goals,How it works today,Design,Slices,Tests and proof,Risks and rollback,Rollout,Time,Your calls', ''],
+        ['kinds-desk-research', 'kinds-research', 'Research and discovery', '111100000', 'Next: Options compared', 'The question and why it matters,Scope,Method,Sources,Options compared,Findings,What we did not check,Recommendation,Open questions', 'Linked sources3|What users report1']]) {
         const m = await state(s, () => tap(`.split-list #item-${key}`));
-        txt.push(`${s}: [${m.head.chip}] "${m.head.title}" / for "${m.head.for}" / ${m.head.read} ${m.head.strip} "${m.head.next}"`);
-        assert.deepEqual([m.head.chip, m.head.strip, m.head.next], [chip, strip, next]);
+        txt.push(`${s}: [${m.head.chip}] "${m.head.title}" / for "${m.head.for}" / ${m.head.read} ${m.head.strip} "${m.head.next}" / parts ${m.head.parts} / sources ${m.head.sources || 'none'}`);
+        assert.deepEqual([m.head.chip, m.head.strip, m.head.next, m.head.parts, m.head.sources], [chip, strip, next, parts, sources]);
       }
     }
     writeFileSync(join(out, `kinds.${cell}.txt`), txt.join('\n') + '\n');
     lines.push(...txt);
   }
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
-    start: 'A throwaway board with seven guided reports filed in the last hours, one of each kind: six posted as report 5 with their purpose, and an older report 4 with none (a retro, so the board guesses Incident). The decision and the status read; the plan with three of its nine parts read and the research with four.',
-    steps: ['Open Reports at 390x844 (2x) in light and dark and read every row.', 'Tap the filter button, then pick Research and discovery.', 'Tap the plan, the research and the older report in the list, each opening its sheet.', 'At 1280: pick the plan, then the research, in the list.'],
-    result: 'Every report row leads its second line with its kind (Plan, Research, Incident, Decision, Audit, Status, Report), each chip a neutral treatment with its own icon; the plan\'s bar is its nine parts with three filled; the filter sheet lists Every kind (7) and each kind with what it is for and its count; picking Research lists the one research report under its pill (1 of 7) with a 1 on the button; a report\'s sheet heads with its kind\'s full name, then a line on what it is for, then Read k of 9 parts over a strip and the next part; the older report reads Incident and retro by the board\'s guess; on a desk the head names the kind over the same strip and next part.' }, null, 2) + '\n');
+    start: 'A throwaway board with seven guided reports filed in the last hours, one of each kind: six posted as report 5 with their purpose and every part of their kind (the research report with three linked sources, one of them a user report, its options and findings; the plan with its nine parts from Goal and non-goals to Your calls), and an older report 4 with none (a retro, so the board guesses Incident). The decision and the status read; the plan with three of its nine parts read and the research with four.',
+    steps: ['Post a plan whose sections name none of its parts, and a research report with no user report, through the CLI (kinds-refusal.txt).', 'Open Reports on a phone at 390x844 (2x) in light and dark and read every row.', 'Tap the filter button, then pick Research and discovery.',
+      'Tap the plan, the research and the older report in the list, each opening its sheet.', 'On the research sheet tap What users report: the guided page opens at its sources.', 'At 1280: pick the plan, then the research, in the list.'],
+    result: 'Post refuses the plan with none of its parts (sections has no "goal" part) and the research report with no user report, each with its fix line, and writes neither. On a phone every report row leads with its kind (Plan, Research, Incident, Decision, Audit, Status, Report); the plan\'s bar is its nine parts with three filled; the filter sheet lists Every kind (7) and each kind with what it is for and its count; picking Research lists the one research report under its pill (1 of 7). The plan\'s sheet heads Implementation plan, says how the work gets built, and lists its nine parts from Goal and non-goals to Your calls under Read 3 of 9 parts and Next: Slices. The research sheet heads Research and discovery and counts its sources: 3 linked sources, 1 of them what users report; tapping it opens the guided page at its sources, each tagged Primary source or User report with a link out (Open on docs.ntfy.sh, pushover.net, github.com) in a new tab. The older report reads Incident and retro by the board\'s guess. On a desk the bar names the kind; beside the report, its Sources (research), then the strip, the next part and its kind\'s parts listed with a check on each one read.' }, null, 2) + '\n');
   console.log(lines.join('\n'));
   assert.deepEqual(problems, [], 'every capture measures clean');
 } finally {

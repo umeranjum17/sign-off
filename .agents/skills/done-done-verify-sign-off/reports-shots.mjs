@@ -23,6 +23,8 @@ const chromium = ['/usr/lib/chromium/chromium', '/usr/bin/chromium', '/usr/bin/g
 // at the scroll's end, helper lines cut short, raw codes or paths, controls under 44px, overflow and squashed text.
 const MEASURE = `(async () => {
   await document.fonts.ready;
+  // The rows rise in when the tab opens; a busy host can still be running that motion after the fixed wait, so measure once it has settled.
+  await Promise.all(document.getAnimations().filter((a) => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime)).map((a) => a.finished.catch(() => {})));
   const w = document.documentElement.clientWidth, phone = innerWidth < 1024, box = (e) => e.getBoundingClientRect(), vis = (e) => { const r = box(e), c = getComputedStyle(e); return r.width > 0 && r.height > 0 && c.visibility !== 'hidden' && c.display !== 'none'; };
   const r2 = (n) => Math.round(n * 100) / 100, grid = (n) => Math.abs(n / 4 - Math.round(n / 4)) < 0.02, fail = [];
   const sheet = document.querySelector('#reader.rp-sheet:not([hidden]) .rp-sheet-body'), scope = sheet ?? document.querySelector('.split-list') ?? document.querySelector('main');
