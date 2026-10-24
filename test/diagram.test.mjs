@@ -163,3 +163,59 @@ test('a gallery on a report: post pins each frame, the board serves it (and a li
   assert.deepEqual(made.sections[0].gallery[0].frames.map((f) => f.device), ['phone', 'desktop']);
   assert.match(post(made).stdout, /FILL:/);
 });
+
+test('the report kit: a section\'s blocks are checked, post pins their files after the gallery frames, the board serves them (a film by range), and a repeated summary is warned about', async () => {
+  const dir = join(scratch, 'kit'), board = join(dir, 'board.json'), env = { ...process.env, HOME: join(scratch, 'home') };
+  mkdirSync(join(dir, 'kit'), { recursive: true });
+  const shot = readFileSync(new URL('../fixtures/evidence/product-board.png', import.meta.url)), film = Buffer.alloc(3000, 7);
+  for (const f of ['a.png', 'b.png', 'poster.png', 'g.png']) writeFileSync(join(dir, 'kit', f), shot);
+  writeFileSync(join(dir, 'kit', 'film.mp4'), film);
+  const report = JSON.parse(readFileSync(join(fixtures, 'report.v5', 'valid-full.json')));
+  const blocks = [
+    { type: 'callout', tone: 'warn', title: 'Not measured', text: 'How much of the plan\'s window this took.' },
+    { type: 'beats', beats: [{ image: 'kit/a.png', time: '0:00', title: 'The pain', text: 'One line.' }, { image: 'kit/b.png', title: 'The fix', text: 'Another line.' }] },
+    { type: 'video', src: 'kit/film.mp4', poster: 'kit/poster.png', length: '0:10', caption: 'The film.' },
+    { type: 'table', columns: ['Measured', 'A', 'B'], rows: [['Calls', '3', '1']] },
+    { type: 'compare', before: { image: 'kit/a.png', caption: 'As filed' }, after: { image: 'kit/b.png', caption: 'In the kit' } },
+    { type: 'evidence', rows: [{ image: 'kit/a.png', title: 'Line wrapped', note: 'Version 1', status: 'fixed' }, { title: 'Sound missing', status: 'waiting' }] },
+  ];
+  const gallery = [{ label: 'Option A', model: 'Sonnet 5.5', ran: '2026-10-24T09:30:00Z', frames: [{ device: 'phone', src: 'kit/g.png', caption: 'A frame' }] }];
+  const withBlocks = (b, extra = {}, about) => ({ ...report, ...(about && { about }), sections: report.sections.map((s, n) => n ? s : { ...s, blocks: b, ...extra }) });
+  const post = (m) => spawnSync('node', [cli, 'post', board, '--kind', 'report', '--from', '-'], { encoding: 'utf8', env, cwd: dir, input: JSON.stringify(m) });
+  const swap = (n, o) => blocks.map((b, i) => (i === n ? { ...b, ...o } : b));
+  for (const [m, error] of [
+    [withBlocks([{ type: 'gallery' }]), /blocks\[0\]\.type \\"gallery\\" is not one of callout, beats/],
+    [withBlocks(swap(0, { tone: 'loud' })), /blocks\[0\]\.tone \\"loud\\" is not one of note, warn, ask/],
+    [withBlocks(swap(0, { colour: 'blue' })), /blocks\[0\]\.colour is not a field there/],
+    [withBlocks(swap(1, { beats: [blocks[1].beats[0]] })), /blocks\[1\]\.beats must list 2 to 12/],
+    [withBlocks(swap(2, { src: 'kit/film.mov' })), /blocks\[2\]\.src .* must be a relative a \.mp4 or \.webm path/],
+    [withBlocks(swap(3, { rows: [['Calls', '3']] })), /blocks\[3\]\.rows\[0\] must have 3 cells/],
+    [withBlocks(swap(4, { after: undefined })), /blocks\[4\]\.after is required/],
+    [withBlocks(swap(5, { rows: [{ title: 'No status' }] })), /blocks\[5\]\.rows\[0\]\.status is required/],
+    [withBlocks(swap(1, { beats: [{ image: 'kit/gone.png', title: 'x', text: 'y' }, blocks[1].beats[1]] })), /kit\/gone\.png\\" is not there/],
+  ]) {
+    const refused = post(m);
+    assert.equal(refused.status, 2, refused.stdout);
+    assert.match(refused.stdout, error);
+  }
+  const posted = post(withBlocks(blocks, { gallery }, 'A different summary that shares nothing with the opening of the section below it.'));
+  assert.equal(posted.status, 0, posted.stdout);
+  assert.doesNotMatch(posted.stderr, /says again/);
+  const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: tmpdir(), env });
+  try {
+    const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+    // The gallery's one frame is gallery.0; the section's files follow it in the order the blocks name them: a, b, poster, film.
+    const get = (n, name, init) => fetch(new URL(`/mock/local/${report.key}~gallery.${n}/${name}`, url), init);
+    assert.deepEqual(Buffer.from(await (await get(0, 'g.png')).arrayBuffer()), shot);
+    for (const [n, name] of [[1, 'a.png'], [2, 'b.png'], [3, 'poster.png']]) assert.deepEqual(Buffer.from(await (await get(n, name)).arrayBuffer()), shot, name);
+    const range = await get(4, 'film.mp4', { headers: { range: 'bytes=0-9' } });
+    assert.equal(range.status, 206); assert.equal(range.headers.get('content-type'), 'video/mp4'); assert.equal((await range.arrayBuffer()).byteLength, 10);
+    assert.equal((await get(5, 'a.png')).status, 404);
+    writeFileSync(join(dir, 'kit', 'a.png'), Buffer.concat([shot, Buffer.from([0])]));
+    assert.equal((await get(1, 'a.png')).status, 404);
+  } finally { proc.kill(); }
+  // A first paragraph that repeats the summary is warned about, never refused.
+  const echo = post({ ...withBlocks(blocks), key: 'echo', about: 'The app needs a push for new answers before the beta on 1 Nov.', sections: report.sections.map((s) => ({ ...s })) });
+  assert.equal(echo.status, 0, echo.stdout);
+  assert.match(echo.stderr, /warning: .*sections\[0\]\.body says again what "about" already says/);
+});
