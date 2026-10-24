@@ -359,20 +359,18 @@
   .ev-unpick::after { content: ''; position: absolute; inset: -2px; } .ev-unpick .glyph { width: 1rem; height: 1rem; }
   .ev-sec .see { min-height: 0; padding: 0; border: 0; border-radius: 0; background: none; font: inherit; font-size: var(--tk-fs-row); line-height: 1.5rem; font-weight: 500; color: var(--tk-ink); cursor: pointer; }
   .ev-list.ui-list { padding: 0.25rem 0; } .ev-list.ui-list > li + li::before { right: 0.75rem; left: 0.75rem; }
-  .ev-list .ev-card { height: auto; min-height: 4.25rem; padding: 0.75rem; transition: background-color 120ms linear; -webkit-tap-highlight-color: transparent; }
-  .ev-list .ev-card .l1 { align-items: flex-start; height: auto; }
-  .ev-list .ev-card .l1 .t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; }
+  .ev-list .ev-card { padding: 0 0.75rem; transition: background-color 120ms linear; -webkit-tap-highlight-color: transparent; }
   .ev-list .ev-card:active { background: var(--tk-inset); }
   .ev-list .ev-card .meta { margin: 0; }
   .ev-list > li.picked { outline: none; border-radius: 0; background: var(--tk-inset); } .ev-list > li.picked .ui-icon { box-shadow: 0 0 0 2px var(--tk-ink); }
   /* A row's first capture: 40 by 52 at its end, cropped from the top; with Previews on, 88 by 120 in place of the tile, the title over three lines beside it. */
-  .ev-list button.ev-card { border: 0; border-radius: 0; background: none; font: inherit; text-align: left; box-shadow: none; }
-  .ev-th { position: relative; display: grid; flex: none; place-items: center; width: 2.5rem; height: 3.25rem; margin-block: -0.25rem; overflow: hidden; border-radius: 0.5rem; background: var(--tk-inset); box-shadow: inset 0 0 0 1px var(--tk-line); }
+  .ev-list button.ev-card { min-height: 0; border: 0; border-radius: 0; background: none; font: inherit; text-align: left; box-shadow: none; }
+  .ev-th { position: relative; display: grid; flex: none; place-items: center; width: 2.5rem; height: 3.25rem; overflow: hidden; border-radius: 0.5rem; background: var(--tk-inset); box-shadow: inset 0 0 0 1px var(--tk-line); }
   .ev-th img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
   .ev-th::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--tk-line); }
   .ev-v { color: var(--tk-ink); font-weight: 500; } .ev-v.not { color: var(--tk-critical); } .ev-v.none { color: inherit; font-weight: 400; }
   .ev-list .ev-card.rich { align-items: flex-start; height: auto; padding-block: 0.75rem; }
-  .ev-card.rich > .ui-icon { display: none; } .ev-card.rich .ev-th { order: -1; width: 5.5rem; height: 7.5rem; margin-block: 0; border-radius: 0.75rem; }
+  .ev-card.rich > .ui-icon { display: none; } .ev-card.rich .ev-th { order: -1; width: 5.5rem; height: 7.5rem; border-radius: 0.75rem; }
   .ev-card.rich .l1 { align-items: flex-start; height: auto; } .ev-card.rich .l1 .t { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; white-space: normal; }
   .ev-card.rich .rm { gap: 0.5rem; padding-top: 0.25rem; }
   .ev-sec { gap: 0.75rem; } .ev-sec .ev-st { flex: 1; min-width: 0; }
@@ -454,6 +452,9 @@
     .split-list .ev-list .ev-card:hover:not([aria-current]) { opacity: 0.85; }
     .split-list .ev-list .ev-card[aria-current] { background: var(--tk-inset); outline: none; }
     /* A desk has the room for a long title: it wraps to two lines, and the row grows with it. */
+    .split-list .ev-list .ev-card { height: auto; min-height: 4.25rem; padding-block: 0.75rem; }
+    .split-list .ev-list .ev-card .l1 { align-items: flex-start; height: auto; }
+    .split-list .ev-list .ev-card .l1 .t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; }
     .split-detail > .ev-scroll { padding: 1.5rem 2.5rem 4rem; }
     .split-detail .ev-x { display: none; }
     #board .split-detail:has(> .ev-scroll) .change-link { color: var(--tk-ink); }
