@@ -29,8 +29,8 @@ try {
     browser('emulate', '--viewport', `${width}x${height}x2${width < 1024 ? ',mobile,touch' : ''}`, '--color-scheme', theme);
     browser('open', base + '#waiting'); settle();
     browser('eval', '() => { document.querySelector("#item-ship").click(); return 1; }'); settle();
-    const check = read(`() => { const n = document.querySelector('.detail-sequence'), b = n?.getBoundingClientRect(); return JSON.stringify({ position: n?.querySelector('.position')?.textContent ?? null, overflow: document.documentElement.scrollWidth > innerWidth, headerFits: !b || b.left >= 0 && b.right <= innerWidth, routes: history.state?.detailSequence?.routes }); }`);
-    assert.equal(check.overflow, false); assert.equal(check.headerFits, true);
+    const check = read(`() => { const n = document.querySelector('.detail-sequence'), b = n?.getBoundingClientRect(), label = document.querySelector('.ask-sheet .sh-lab'), header = label?.closest('.sh-head'), title = document.querySelector('.ask-sheet #ask-title'); return JSON.stringify({ position: n?.querySelector('.position')?.textContent ?? null, overflow: document.documentElement.scrollWidth > innerWidth, headerFits: !b || b.left >= 0 && b.right <= innerWidth, metadataFits: !label || label.scrollWidth <= label.clientWidth + 1, titleClear: !header || header.getBoundingClientRect().bottom <= title.getBoundingClientRect().top, routes: history.state?.detailSequence?.routes }); }`);
+    assert.equal(check.overflow, false); assert.equal(check.headerFits, true); assert.equal(check.metadataFits, true); assert.equal(check.titleClear, true);
     if (!before) {
       assert.ok(check.routes.length > 1); assert.ok(check.position.startsWith('2 of '));
       browser('press', 'j'); settle();
