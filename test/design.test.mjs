@@ -2388,7 +2388,7 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Approved');
   await evaluate('document.querySelector("[aria-label=\\"Screen for note\\"]").value = "account-setup/security"');
   await evaluate('document.querySelector(".design-review textarea").value = "Make the title clearer"');
-  await evaluate('document.querySelector(".design-review .foot button:last-child").click()');
+  await evaluate('document.querySelector(".design-review .foot .dz-change").click()');
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Changes requested');
   assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-design'].notes, [{ journey: 'account-setup', screen: 'security', verdict: 'change', note: 'Make the title clearer' }]);
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
@@ -2447,7 +2447,7 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-design'].notes, [legacy, { journey: 'account-setup', screen: 'screen-4', verdict: 'approve', note: '' }]);
   await evaluate('document.querySelector("[aria-label=\\"Next screen\\"]").click()');
   await evaluate('document.querySelector(".design-viewer textarea").value = "Give the next action more space"');
-  await evaluate('document.querySelector(".design-viewer .foot button:last-child:not([aria-label])").click()');
+  await evaluate('document.querySelector(".design-viewer .foot .dz-change").click()');
   await until(async () => (await evaluate('document.querySelector(".design-viewer[open] [role=status]")?.textContent')) === 'Changes requested');
   await evaluate('document.querySelector("[aria-label=\\"Close viewer\\"]").click()');
   await until(() => evaluate('!document.querySelector(".design-viewer[open]")'));
@@ -2635,7 +2635,7 @@ test('an empty inline save clears the selected screen note', { skip: !chrome && 
   await evaluate('document.querySelector("[aria-label=\\"Screen for note\\"]").value = "flow/b"');
   await evaluate('document.querySelector("[aria-label=\\"Pick a direction\\"]").value = "a"');
   await evaluate('document.querySelector(".design-review textarea").value = "Fix the title"');
-  await evaluate('document.querySelector(".design-review .foot button:last-child").click()');
+  await evaluate('document.querySelector(".design-review .foot .dz-change").click()');
   await until(async () => saved()?.notes?.length === 1);
   await evaluate('document.querySelector(".design-review textarea").value = ""');
   await evaluate('document.querySelector(".design-review .foot button").click()');
@@ -2872,7 +2872,7 @@ test('a design-level inline Approve or Change stores its verdict with the note, 
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d3-plain`)}`);
   await until(async () => (await evaluate('document.querySelector(".design-review .foot button")?.textContent')) === 'Approve');
   await evaluate('document.querySelector(".design-review textarea").value = "Fix spacing"');
-  await evaluate('document.querySelector(".design-review .foot button:last-child").click()');
+  await evaluate('document.querySelector(".design-review .foot .dz-change").click()');
   await until(async () => (await evaluate('document.querySelector(".design-review [role=status]")?.textContent')) === 'Changes requested');
   assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d3-plain'].notes, [{ verdict: 'change', note: 'Fix spacing' }]);
   await evaluate('document.querySelector(".design-review textarea").value = ""');
@@ -2913,8 +2913,8 @@ test('a design posted again is a new round: the note box starts empty, the earli
     // The note box, and the card's Activity: each answer step and the notes it shows.
     return evaluate('({ note: document.querySelector(".design-review textarea").value, steps: [...document.querySelectorAll(".design-review .thread .aw b")].map((e) => e.textContent).filter((t) => t.startsWith("Your answer")), notes: [...document.querySelectorAll(".design-review .thread .th-n")].map((e) => e.textContent) })');
   };
-  // The same round: the note is the one being written, nothing earlier.
-  assert.deepEqual(await open(), { note: 'Round one: bigger title', steps: ['Your answer: Changes requested'], notes: [] });
+  // The same round: its saved note appears in Activity as well as the editor; nothing is from an earlier round.
+  assert.deepEqual(await open(), { note: 'Round one: bigger title', steps: ['Your answer: Changes requested'], notes: ['“Round one: bigger title”'] });
   // The agent draws the screen again in place: same key, same fields, new bytes. That is a new round.
   writeFileSync(join(dir, 'design', 'a.png'), sized(4, 4));
   assert.deepEqual(await open(), { note: '', steps: ['Your answer on the earlier round: Changes requested (First)'], notes: ['“Round one: bigger title”'] });
@@ -2931,7 +2931,7 @@ test('a design posted again is a new round: the note box starts empty, the earli
   const answers = join(dir, 'board.answers.jsonl'), old = (at) => appendFileSync(answers, `${JSON.stringify({ key: 'd6-round', answer: 'change', label: 'Changes requested', close: 'done', at, notes: [{ journey: 'flow', screen: 'a', verdict: 'change', note: 'Older note' }] })}\n`);
   old('2026-10-19T08:00:00Z');
   // The Activity is in time order, and this older answer is dated before round one's.
-  assert.deepEqual(await open(), { note: 'Older note', steps: ['Your answer: Changes requested', 'Your answer on the earlier round: Changes requested (First)'], notes: ['“Round one: bigger title”'] });
+  assert.deepEqual(await open(), { note: 'Older note', steps: ['Your answer: Changes requested', 'Your answer on the earlier round: Changes requested (First)'], notes: ['“Older note”', '“Round one: bigger title”'] });
   old('2026-10-17T08:00:00Z');
   assert.deepEqual(await open(), { note: '', steps: ['Your answer on the earlier round: Changes requested (First)'], notes: ['“Older note”'] });
   close();

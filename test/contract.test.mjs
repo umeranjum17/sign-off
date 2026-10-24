@@ -819,15 +819,15 @@ test('engagement listeners survive report-only boards, sent plans, timeouts and 
   mkdirSync(dir);
   const env = { ...process.env, HOME: join(dir, 'home'), SIGN_OFF_HOME: dir, XDG_CONFIG_HOME: dir, XDG_STATE_HOME: dir };
   delete env.SIGN_OFF_FILER; delete env.CLAUDE_CODE_SESSION_ID;
-  const run = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const run = (...args) => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8', env });
   const postItem = (kind, filer, key) => {
     const item = { ...JSON.parse(readFileSync(join(fixtures, kind === 'plan' ? 'plan.v2/valid-full.json' : 'report.v3/valid-full.json'))), filer, key };
-    const p = spawnSync('node', [cli, 'post', board, '--kind', kind, '--from', '-'], { env, encoding: 'utf8', input: JSON.stringify(item) });
+    const p = spawnSync(process.execPath, [cli, 'post', board, '--kind', kind, '--from', '-'], { env, encoding: 'utf8', input: JSON.stringify(item) });
     assert.equal(p.status, 0, p.stdout + p.stderr);
   };
   const children = new Set();
   const startWait = (filer, timeout = '3') => {
-    const p = spawn('node', [cli, 'wait', board, ...(filer ? ['--filer', filer] : []), '--events', '--timeout', timeout], { env });
+    const p = spawn(process.execPath, [cli, 'wait', board, ...(filer ? ['--filer', filer] : []), '--events', '--timeout', timeout], { env });
     children.add(p);
     let stdout = ''; p.stdout.on('data', b => { stdout += b; });
     const result = new Promise(resolve => p.on('close', status => { children.delete(p); resolve({ status, stdout }); }));
@@ -835,7 +835,7 @@ test('engagement listeners survive report-only boards, sent plans, timeouts and 
   };
   let server, url;
   const serve = async () => {
-    server = spawn('node', [cli, 'serve', board, '--port', '0'], { env });
+    server = spawn(process.execPath, [cli, 'serve', board, '--port', '0'], { env });
     url = await new Promise(ok => server.stdout.once('data', b => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
   };
   const stop = p => new Promise(ok => p.once('close', ok).kill());

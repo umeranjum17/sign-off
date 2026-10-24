@@ -42,7 +42,12 @@ jobs:
       - if: steps.changes.outputs.docs_only != 'true'
         run: done-done run install
       - if: steps.changes.outputs.docs_only != 'true'
-        run: done-done run test
+        run: |
+          if done-done run test; then exit 0; fi
+          for log in "$HOME/.done-done/evidence/sign-off"/*/test.log; do
+            if [ -f "$log" ]; then cat "$log"; fi
+          done
+          exit 1
       - if: steps.changes.outputs.docs_only != 'true'
         run: done-done run skill
       # Every card kind x action x tab x width x theme, with done-done's look step. The look step needs done-done-axi 0.6.9, whose
@@ -53,3 +58,8 @@ jobs:
         env:
           CHROME_DEVTOOLS_AXI_CHROME_ARGS: --no-sandbox
         run: PATH="$RUNNER_TEMP/dd/bin:$PATH" done-done run board-actions
+      - name: Report section comment and note send regression
+        if: steps.changes.outputs.docs_only != 'true'
+        env:
+          CHROME_DEVTOOLS_AXI_CHROME_ARGS: --no-sandbox
+        run: SEND_FEEDBACK_ONLY=1 node .agents/skills/done-done-verify-sign-off/part-comment-shots.mjs "$RUNNER_TEMP/comment-send" light 390
