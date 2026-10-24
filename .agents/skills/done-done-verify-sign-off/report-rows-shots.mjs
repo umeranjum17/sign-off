@@ -37,7 +37,7 @@ try {
   post('plan', { ...fx('plan.v3/valid-full.json'), key: 'plan', project: 'sign-off' }, '--ticket', 'T-29');
   const design = fx('design.v1/valid-basic.json'); design.journeys[0].screens[0].views = { phone_light: 'design/first-frame.webp' };
   cpSync(join(repo, 'docs/media/phone-light.webp'), join(dir, 'design/first-frame.webp'));
-  post('design', { ...design, title: 'Sign-off on a phone', group: 'sign-off', filed: now }, '--ticket', 'T-29');
+  post('design', { ...design, title: 'Approve sign-off on a phone?', group: 'sign-off', filed: now }, '--ticket', 'T-29');
   so('post', board, '--ask-ref', 'message-report-rows', '--key', 'ask', '--title', 'Ship the clearer report rows?', '--filer', 'sign-off', '--ticket', 'T-29', '--why', 'Umer wants to see the project and ticket.', '--outcome', 'yes=The rows ship.', '--outcome', 'no=The rows wait.', '--recommend', 'yes', '--recommend-reason', 'The links are visible.', '--default', 'no');
   cpSync(join(repo, 'docs/media/phone-light.webp'), join(dir, 'capture.webp'));
   so('post', board, '--type', 'evidence', '--title', 'The report fits a phone', '--about', 'Umer can read its kind and linked ticket.', '--media', join(dir, 'capture.webp'), '--ticket', 'T-29', '--link', 'https://github.com/umeranjum17/sign-off/pull/1');
