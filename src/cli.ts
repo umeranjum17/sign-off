@@ -16,7 +16,7 @@ import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner
 import { AxiError, runAxiCli } from 'axi-sdk-js';
 import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendSendBack, appendTicket, readTickets, rollUp, appendTicketComment, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
-import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, galleryFrames, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
+import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, galleryFrames, guided, kitWarnings, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
 import { copiesOf, differs, type Copy } from './images.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
@@ -1604,7 +1604,7 @@ async function postKind(file: string, named: string, on: string, values: Record<
     if (m.kind === 'evidence') sources = mediaFiles(m, from === '-' ? process.cwd() : dirname(resolve(from)));
     // A report's or plan's page is served from the board file's folder, as --view is.
     if ((m.kind === 'report' || m.kind === 'plan') && !guided(m)) reportPage(m, dirname(file));
-    if (guided(m)) diagramPages(m, dirname(file));
+    if (guided(m)) { diagramPages(m, dirname(file)); for (const w of kitWarnings(m)) process.stderr.write(`warning: ${name}: ${w}\n`); }
     if (m.kind === 'design') designFiles(m, dirname(file));
   } catch (e) { throw e instanceof ContractError ? fail(`${name}: ${e.message}`, 'VALIDATION_ERROR', e.help) : e; }
   if (m.filer !== undefined && values.filer !== undefined && m.filer !== values.filer) {
@@ -2802,7 +2802,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
       const path = rest.map(decodeURIComponent).join('/'), type = assetTypes[extname(path).toLowerCase()];
       if (!mock || !type) return [404, { error: 'Mock is unavailable' }];
       const actual = under(dirname(under(dirname(file), mockFile(mock))), path);
-      if (statSync(actual).size > MOCK_BYTES) return [404, { error: 'Mock is unavailable' }];
+      if (statSync(actual).size > (type.startsWith('video/') && frame ? MEDIA_BYTES : MOCK_BYTES)) return [404, { error: 'Mock is unavailable' }];
       const bytes = readFileSync(actual);
       // A diagram is its one pinned page: the file the plan posted, or nothing. A plan posted before the pin carries none and is served as it was.
       const pinned = diagram ?? frame;

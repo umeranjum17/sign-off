@@ -46,6 +46,11 @@ const ACTIONS: Record<string, Record<string, string>> = {
 /** The screens a gallery frame shows, and the files it may be. */
 export const GALLERY_DEVICES = ['phone', 'desktop'];
 const GALLERY_FILE = /\.(png|jpe?g|webp|html?)$/i;
+/** The report kit's blocks, the files a block may name, and the words a status may take. */
+export const KIT_BLOCKS = ['callout', 'beats', 'video', 'table', 'compare', 'evidence'];
+const KIT_IMAGE = /\.(png|jpe?g|webp)$/i, KIT_VIDEO = /\.(mp4|webm)$/i;
+export const KIT_STATUS: Record<string, string> = { fixed: 'Fixed', progress: 'In progress', waiting: 'Waiting on you' };
+const KIT_TONES = ['note', 'warn', 'ask'];
 export const MEDIA_BYTES = 50_000_000;
 /** The command that makes a report's page, named in every refusal of a report without one. */
 export const REPORT_INIT = 'sign-off-axi report init <folder>';
@@ -206,6 +211,72 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
       if (Object.hasOwn(f, 'bytes') && !(Number.isInteger(f.bytes) && f.bytes >= 0)) throw bad(`${fa}.bytes`, 'must be a whole number of bytes', 'Leave "sha256" and "bytes" out; post pins the file');
     });
   });
+  /** A kit block's file: a path from the board file's folder to an image (or, for a video, a .mp4 or .webm), pinned by post like a gallery frame. */
+  const kitFile = (field: string, v: any, re: RegExp, kinds: string, example: string) => {
+    text(field, v, 256, `${kinds} path from the board file's folder, such as "${example}"`);
+    if (/^([\\/]|[A-Za-z]:)/.test(v) || v.split(/[\\/]/).includes('..') || /[?#\\]/.test(v) || !re.test(v)) throw bad(field, `${show(v)} must be a relative ${kinds} path with no .., ?, # or \\`, `Set "${field.replace(/^.*\./, '')}" to the file next to the message, such as "${example}"`);
+  };
+  /** The report kit: 1 to 12 blocks a section draws in the board's own style, in the order given. A block is data (words, files, rows); it never carries markup or colour. */
+  const blocks = (field: string, v: any) => {
+    if (!Array.isArray(v) || v.length < 1 || v.length > 12) throw bad(field, 'must list 1 to 12 blocks', `Set "${field}" to blocks such as {"type":"callout","title":"Read this first","text":"..."}; the types are ${KIT_BLOCKS.join(', ')}`);
+    v.forEach((o: any, n: number) => {
+      const at = `${field}[${n}]`;
+      if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad(at, 'must be an object', `Write each block as {"type":"callout",...}; the types are ${KIT_BLOCKS.join(', ')}`);
+      if (!KIT_BLOCKS.includes(o.type)) throw bad(`${at}.type`, `${show(o.type)} is not one of ${KIT_BLOCKS.join(', ')}`, `Set "type" to ${KIT_BLOCKS.join(', ')}; a gallery is the section's "gallery", not a block`);
+      const only = (fields: string[], example: string) => one(at, o, ['type', ...fields], example);
+      if (o.type === 'callout') {
+        only(['tone', 'title', 'text'], '{"type":"callout","tone":"warn","title":"Not measured","text":"How much of the plan\'s window this took."}');
+        if (Object.hasOwn(o, 'tone') && !KIT_TONES.includes(o.tone)) throw bad(`${at}.tone`, `${show(o.tone)} is not one of ${KIT_TONES.join(', ')}`, `Set "tone" to ${KIT_TONES.join(', ')}, or leave it out`);
+        text(`${at}.title`, o.title, 60, 'the callout\'s bold first line, in 60 characters or fewer');
+        text(`${at}.text`, o.text, 280, 'the callout\'s words, in 280 characters or fewer');
+      } else if (o.type === 'beats') {
+        only(['beats'], '{"type":"beats","beats":[{"image":"beats/1.png","time":"0:00","title":"The pain","text":"..."}]}');
+        list(`${at}.beats`, 2, 12, ['image', 'time', 'title', 'text'], '{"image":"beats/1.png","time":"0:00","title":"The pain","text":"One line."}', o.beats).forEach((b, k) => {
+          kitFile(`${at}.beats[${k}].image`, b.image, KIT_IMAGE, 'a .png, .jpg, .jpeg or .webp', 'beats/1.png');
+          if (Object.hasOwn(b, 'time')) text(`${at}.beats[${k}].time`, b.time, 12, 'the beat\'s time, such as "0:11", in 12 characters or fewer');
+          text(`${at}.beats[${k}].title`, b.title, 80, 'the beat\'s title, in 80 characters or fewer');
+          text(`${at}.beats[${k}].text`, b.text, 280, 'the beat\'s words, in 280 characters or fewer');
+        });
+      } else if (o.type === 'video') {
+        only(['src', 'poster', 'length', 'caption'], '{"type":"video","src":"film.mp4","poster":"film.jpg","length":"0:10","caption":"The promo, 10 seconds."}');
+        kitFile(`${at}.src`, o.src, KIT_VIDEO, 'a .mp4 or .webm', 'film.mp4');
+        kitFile(`${at}.poster`, o.poster, KIT_IMAGE, 'a .png, .jpg, .jpeg or .webp', 'film.jpg');
+        if (Object.hasOwn(o, 'length')) text(`${at}.length`, o.length, 12, 'the film\'s length, such as "0:10", in 12 characters or fewer');
+        text(`${at}.caption`, o.caption, 280, 'what the film shows, in 280 characters or fewer');
+      } else if (o.type === 'table') {
+        only(['columns', 'rows'], '{"type":"table","columns":["Measured","App promo","Cinematic"],"rows":[["AI calls","3","1"]]}');
+        if (!Array.isArray(o.columns) || o.columns.length < 2 || o.columns.length > 5) throw bad(`${at}.columns`, 'must list 2 to 5 column names', 'Set "columns" to 2-5 short names, such as ["Measured","App promo","Cinematic"]');
+        o.columns.forEach((c: any, k: number) => text(`${at}.columns[${k}]`, c, 40, 'the column\'s name, in 40 characters or fewer'));
+        if (!Array.isArray(o.rows) || o.rows.length < 1 || o.rows.length > 30) throw bad(`${at}.rows`, 'must list 1 to 30 rows', 'Set "rows" to arrays of text, one per column');
+        o.rows.forEach((r: any, k: number) => {
+          if (!Array.isArray(r) || r.length !== o.columns.length) throw bad(`${at}.rows[${k}]`, `must have ${o.columns.length} cells, one per column`, 'Write each row as an array of text with one cell for every column');
+          r.forEach((c: any, j: number) => text(`${at}.rows[${k}][${j}]`, c, 120, 'the cell\'s words, in 120 characters or fewer'));
+        });
+      } else if (o.type === 'compare') {
+        only(['before', 'after'], '{"type":"compare","before":{"image":"old.png","caption":"As filed"},"after":{"image":"new.png","caption":"In the kit"}}');
+        for (const side of ['before', 'after']) {
+          if (!Object.hasOwn(o, side)) throw bad(`${at}.${side}`, 'is required', `Add "${side}": {"image":"${side}.png","caption":"what it shows"}`);
+          one(`${at}.${side}`, o[side], ['image', 'caption'], `{"image":"${side}.png","caption":"what it shows"}`);
+          kitFile(`${at}.${side}.image`, o[side].image, KIT_IMAGE, 'a .png, .jpg, .jpeg or .webp', `${side}.png`);
+          text(`${at}.${side}.caption`, o[side].caption, 80, 'what the frame shows, in 80 characters or fewer');
+        }
+      } else {
+        only(['rows'], '{"type":"evidence","rows":[{"image":"a.png","title":"Line wrapped","note":"Version 1","status":"fixed"}]}');
+        list(`${at}.rows`, 1, 12, ['image', 'title', 'note', 'status'], '{"image":"a.png","title":"Line wrapped","note":"Version 1","status":"fixed"}', o.rows).forEach((r, k) => {
+          if (Object.hasOwn(r, 'image')) kitFile(`${at}.rows[${k}].image`, r.image, KIT_IMAGE, 'a .png, .jpg, .jpeg or .webp', 'a.png');
+          text(`${at}.rows[${k}].title`, r.title, 80, 'what the capture shows, in 80 characters or fewer');
+          if (Object.hasOwn(r, 'note')) text(`${at}.rows[${k}].note`, r.note, 80, 'a second line, in 80 characters or fewer');
+          if (!Object.hasOwn(r, 'status') || !(r.status in KIT_STATUS)) throw bad(`${at}.rows[${k}].status`, Object.hasOwn(r, 'status') ? `${show(r.status)} is not one of ${Object.keys(KIT_STATUS).join(', ')}` : 'is required', `Set "status" to ${Object.keys(KIT_STATUS).join(', ')}`);
+        });
+      }
+    });
+  };
+  /** The files a section's blocks name, pinned like gallery frames: each path once, with the hash and size post adds. */
+  const pinList = (field: string, v: any) => list(field, 1, 60, ['src', 'sha256', 'bytes'], '{"src":"beats/1.png"}', v).forEach((o, n) => {
+    text(`${field}[${n}].src`, o.src, 256, 'a path from the board file\'s folder');
+    if (Object.hasOwn(o, 'sha256') && !/^[a-f0-9]{64}$/.test(o.sha256)) throw bad(`${field}[${n}].sha256`, 'must be 64 lowercase hex digits', 'Leave "pins" out; post pins the files');
+    if (Object.hasOwn(o, 'bytes') && !(Number.isInteger(o.bytes) && o.bytes >= 0)) throw bad(`${field}[${n}].bytes`, 'must be a whole number of bytes', 'Leave "pins" out; post pins the files');
+  });
   /** A report 5's parts: each part of its kind once, in a section naming it, with what that part needs (a source's link, a finding's confidence, a slice's size, a design's diagram). */
   const kindParts = (parts: [string, string][]) => {
     const init = `Run \`${REPORT_INIT.replace('<folder>', '<new folder>')} --purpose ${m.purpose}\` for a template with every part, or add the section`;
@@ -261,7 +332,7 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
     if (Object.hasOwn(v, 'diagram')) diagrams('visual.diagram', v.diagram);
     // A report 5 is built of its kind's parts: up to 10 sections, each naming the part it is, and items that carry a source's link, a finding's confidence or a slice's size.
     const v5 = m.kind === 'report' && m.schema >= 5, parts = v5 ? REPORT_PARTS[m.purpose] ?? [] : [];
-    const ids = list('sections', minSections, v5 ? 10 : 6, ['id', 'stage', 'heading', 'body', 'items', 'details', 'diagram', 'gallery', ...(v5 ? ['part'] : [])], '{"id":"steps","stage":"recommend","heading":"Eight steps, 22 to 31 Oct","body":"..."}').map((o, n) => {
+    const ids = list('sections', minSections, v5 ? 10 : 6, ['id', 'stage', 'heading', 'body', 'items', 'details', 'diagram', 'gallery', 'blocks', 'pins', ...(v5 ? ['part'] : [])], '{"id":"steps","stage":"recommend","heading":"Eight steps, 22 to 31 Oct","body":"..."}').map((o, n) => {
       const at = `sections[${n}]`;
       if (!(typeof o.id === 'string' && /^[a-z0-9-]{1,40}$/.test(o.id))) throw bad(`${at}.id`, 'must be 1-40 of a-z 0-9 -', 'Set "id" to a short slug such as "steps"');
       if (!['found', 'recommend'].includes(o.stage)) throw bad(`${at}.stage`, `${show(o.stage)} is not found or recommend`, 'Set "stage" to "found" (what I found) or "recommend" (what I recommend)');
@@ -284,6 +355,8 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
       if (Object.hasOwn(o, 'details')) details(`${at}.details`, o.details);
       if (Object.hasOwn(o, 'diagram')) diagrams(`${at}.diagram`, o.diagram);
       if (Object.hasOwn(o, 'gallery')) gallery(`${at}.gallery`, o.gallery);
+      if (Object.hasOwn(o, 'blocks')) blocks(`${at}.blocks`, o.blocks);
+      if (Object.hasOwn(o, 'pins')) pinList(`${at}.pins`, o.pins);
       return o.id;
     });
     const twice = ids.findIndex((id, n) => ids.indexOf(id) < n);
@@ -629,7 +702,19 @@ export function mediaFiles(m: any, base: string): string[] {
 /** The diagram views of a guided plan or report, in the order the board counts them for `diagram.<n>`: the picture's, then each section's and its items'. */
 export const diagramViews = (m: any): { label: string; src: string; sha256?: string; bytes?: number }[] => [m?.visual?.diagram, ...(m?.sections ?? []).flatMap((s: any) => [s.diagram, ...(s.items ?? []).map((i: any) => i.diagram)])].filter(Boolean).flat();
 /** The gallery frames of a guided report or plan, in the order the board counts them for `gallery.<n>`: each section's options, each option's frames. */
-export const galleryFrames = (m: any): { device: string; src: string; sha256?: string; bytes?: number }[] => (m?.sections ?? []).flatMap((s: any) => (s.gallery ?? []).flatMap((o: any) => o.frames));
+export const galleryFrames = (m: any): { device?: string; src: string; sha256?: string; bytes?: number }[] => [...(m?.sections ?? []).flatMap((s: any) => (s.gallery ?? []).flatMap((o: any) => o.frames)), ...(m?.sections ?? []).flatMap((s: any) => s.pins ?? [])];
+/** The files a section's blocks name, each once, in the order the blocks use them. */
+export const blockFiles = (s: any): string[] => [...new Set<string>((s?.blocks ?? []).flatMap((b: any) => b.type === 'beats' ? b.beats.map((x: any) => x.image) : b.type === 'video' ? [b.poster, b.src] : b.type === 'compare' ? [b.before.image, b.after.image] : b.type === 'evidence' ? b.rows.map((r: any) => r.image).filter(Boolean) : []))];
+const SAME_WORDS = 0.75;
+/** What the kit warns about, never refuses: a lead whose first sentence says again (most of its words are in) what the report's summary already said, so the reader reads it twice. */
+export function kitWarnings(m: any): string[] {
+  if (!guided(m)) return [];
+  const words = (t: unknown) => new Set(String(t ?? '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean));
+  const first = (t: unknown) => String(t ?? '').split(/(?<=[.!?])\s/)[0];
+  const same = (a: unknown, b: unknown) => { const x = words(first(a)), y = words(first(b)); return x.size >= 5 && y.size >= 5 && [...x].filter((w) => y.has(w)).length / Math.min(x.size, y.size) >= SAME_WORDS; };
+  const leads: [string, string][] = [['visual.text', m.visual?.text], ...(m.sections ?? []).slice(0, 1).map((s: any, n: number): [string, string] => [`sections[${n}].body`, s.body])].filter(([, t]) => t);
+  return leads.filter(([, t]) => same(m.about, t)).map(([f]) => `${f} says again what "about" already says; the reader reads it twice. Keep "about" as the summary and start ${f} with what it does not say`);
+}
 /** The text size a diagram must keep on a phone: its smallest text, drawn as wide as Full size draws it on a 390 px screen (the chrome-free page, 8 px of margin each side). */
 const DIAGRAM_MIN_PX = 12;
 const PHONE_PX = 390, PHONE_DRAW_PX = PHONE_PX - 16;
@@ -658,7 +743,9 @@ export function diagramPages(m: any, base: string): void {
     v.sha256 = createHash('sha256').update(file).digest('hex');
     v.bytes = file.length;
   }
-  // A gallery frame is an image or a page of 5 MB or less, inside the folder; it is pinned the same way.
+  // The files a section's blocks name are pinned as a section's "pins", each path once; they are checked and pinned below with the gallery frames.
+  for (const sec of m.sections ?? []) { const files = blockFiles(sec); if (files.length) sec.pins = files.map((src) => ({ src })); else delete sec.pins; }
+  // A gallery frame or block file is an image or a page of 5 MB or less (a video, 50 MB), inside the folder; it is pinned the same way.
   for (const f of galleryFrames(m)) {
     const bad = (rule: string, help: string) => new ContractError(`${at}gallery frame ${show(f.src)} ${rule}`, help);
     let real;
@@ -666,7 +753,8 @@ export function diagramPages(m: any, base: string): void {
     const rel = relative(root, real);
     if (!rel || rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel)) throw bad('leads outside the board file\'s folder', 'Copy the file into the board file\'s folder, such as under gallery/');
     const info = statSync(real);
-    if (!info.isFile() || info.size > 5_000_000) throw bad('must be a file of 5 MB or less', 'Save the screenshot again at the device\'s own width (390 or 1280)');
+    const video = KIT_VIDEO.test(f.src);
+    if (!info.isFile() || info.size > (video ? MEDIA_BYTES : 5_000_000)) throw bad(video ? 'must be a file of 50 MB or less' : 'must be a file of 5 MB or less', video ? 'Render the film smaller' : 'Save the screenshot again at the device\'s own width (390 or 1280)');
     try { accessSync(real, constants.R_OK); } catch { throw bad('cannot be read', 'Make the file readable, then post again'); }
     const file = readFileSync(real);
     f.sha256 = createHash('sha256').update(file).digest('hex');
