@@ -45,6 +45,8 @@ You need Node 22.5 or newer. `init` installs the skill for each coding agent it 
 
 Four places, in the bar at the bottom of a phone and the sidebar on a desk.
 
+The board installs as an app (More, then Install app; on an iPad, Share, then Add to Home Screen) and, once opened, reads offline: with the board unreachable it shows the last update under "Offline, showing the last update", and sends fail rather than queue. A phone needs the board on HTTPS or localhost to install it.
+
 <table>
   <tr>
     <td align="center" width="25%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-today-dark.webp"><img src="docs/media/phone-today.webp" alt="Today: counts of what needs you, what was proven and new reports, then the waiting asks"></picture><br><b>Today</b><br>What needs you, what was proven, what is new.</td>

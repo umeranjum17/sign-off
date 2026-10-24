@@ -6,7 +6,10 @@
 <title>Dashboard · sign-off</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="manifest" href="manifest.webmanifest">
+<link rel="manifest" href="manifest.webmanifest" crossorigin="use-credentials">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="sign-off">
 <link rel="preload" href="inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="ui.css">
@@ -2976,6 +2979,7 @@
     const links = [['#answered', 'Answered', by.answered], ['#designs', 'Designs', by.designs]].filter(([, , l]) => l.length);
     todayMore.replaceChildren(el('div', {}, sheetHead('t-more', 'More'), links.length ? el('div', { class: 'ui-props' }, ...links.map(([h, name, l]) => go(h, name, l.length))) : '',
       ...(state.leash ? leash() : []), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()]),
+      FROZEN ? '' : window.signOffInstall?.() ?? '',
       state.version ? el('div', { class: 'ui-props' }, el('div', { class: 'ui-pr' }, el('span', { class: 'k' }, 'Version'), el('span', { class: 'v' }, el('span', {}, state.version)))) : ''));
   }
   const hasMore = (by) => by.answered.length || by.designs.length || state.leash || state.version || !(FROZEN || state.readonly || state.answers_only);

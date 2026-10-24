@@ -4021,8 +4021,11 @@ test('load budget: a board of 60 updates opens Evidence on a phone with at most 
   assert.equal(media.headers['cache-control'], 'private, max-age=31536000, immutable');
   assert.equal((await raw('/api/media?key=update-1&i=0', { 'if-none-match': media.headers.etag })).status, 304);
 
-  const { evaluate, close } = await browse(join(dir, 'b'), 390, 844, true);
+  const { evaluate, send, close } = await browse(join(dir, 'b'), 390, 844, true);
   try {
+    // The service worker hands the page back as a body it holds, which the page cannot tell from a download: this test measures the network, so the page goes round it.
+    await send('Network.enable');
+    await send('Network.setBypassServiceWorker', { bypass: true });
     // What the page fetched, settled: no new request for a second.
     const fetched = async () => {
       let last = -1;
@@ -4057,6 +4060,40 @@ test('load budget: a board of 60 updates opens Evidence on a phone with at most 
     console.log(`Evidence on a phone: ${first.captures} of 60 captures, ${first.kb} KB; reload ${again.kb} KB`);
   } finally { close(); }
   proc.kill();
+});
+
+test('installable app: a valid manifest, a service worker that keeps the page and the last state, and the board read offline with a clear line, nothing written', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const file = join(scratch, 'installable.json');
+  assert.equal(run('raise', file, '--key', 'offline-x', '--title', 'Keep the old login screen?').code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const manifest = await (await fetch(`${url}manifest.webmanifest`)).json();
+  assert.deepEqual([manifest.name, manifest.short_name, manifest.display, manifest.start_url, manifest.scope, manifest.id], ['sign-off', 'sign-off', 'standalone', '/', '/', '/']);
+  assert.deepEqual(manifest.icons.map((i) => [i.sizes, i.purpose]), [['192x192', 'any'], ['512x512', 'any'], ['512x512', 'maskable']]);
+  for (const icon of manifest.icons) assert.equal((await fetch(`${url}${icon.src}`)).headers.get('content-type'), 'image/png');
+  const worker = await fetch(`${url}sw.js`);
+  assert.deepEqual([worker.status, worker.headers.get('content-type'), worker.headers.get('cache-control')], [200, 'text/javascript; charset=utf-8', 'no-cache']);
+  assert.match(await worker.text(), /^const BUILD = "[0-9a-f]{16}";/);
+  const { evaluate, send, close } = await browse(scratch, 390, 844, true);
+  try {
+    await evaluate(`location.href = ${JSON.stringify(url)}`);
+    await until(() => evaluate('!!document.querySelector("#board .t-wait, #board .t-up, #board h1")'));
+    // The worker takes over the page, and a read of the state through it is the copy kept for later.
+    await until(() => evaluate('navigator.serviceWorker.ready.then(() => !!navigator.serviceWorker.controller)'));
+    assert.equal(await evaluate('fetch("/api/decisions").then((r) => r.status)'), 200);
+    // The test's browser context is private, which Chrome alone refuses an install for: no manifest, icon, worker or origin error.
+    assert.deepEqual((await send('Page.getInstallabilityErrors')).installabilityErrors.map((e) => e.errorId), ['in-incognito']);
+    assert.equal(await evaluate('document.getElementById("offline").hidden'), true);
+    // The board goes away. A reload still draws it from the kept page and state, says so, and a send fails and leaves nothing kept.
+    proc.kill();
+    await new Promise((ok) => proc.once('exit', ok));
+    await evaluate('window.before = true; location.reload()');
+    await until(() => evaluate('!window.before && !document.getElementById("offline").hidden && document.body.innerText.includes("Keep the old login screen?")'));
+    assert.equal(await evaluate('document.getElementById("offline").textContent'), 'Offline, showing the last update');
+    assert.equal(await evaluate('fetch("/api/answers", { method: "POST", body: "{}" }).then(() => "sent", () => "failed")'), 'failed');
+    assert.deepEqual(await evaluate('caches.open("state").then((c) => c.keys()).then((k) => k.map((r) => new URL(r.url).pathname))'), ['/api/decisions']);
+  } finally { await close(); proc.kill(); }
 });
 
 test('a card names its ticket: --ticket on every post, a Ticket row that opens the ticket, the ticket lists its cards newest first, each card shows its Activity, and the Tickets tab lists the tickets', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
