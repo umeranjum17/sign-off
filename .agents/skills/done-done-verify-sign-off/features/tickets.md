@@ -29,7 +29,9 @@ test/design.test.mjs ("a card names its ticket": the CLI's fields, refusals and 
 
 Drive `node .agents/skills/done-done-verify-sign-off/ticket-fields-shots.mjs <folder> [before|after]` after building. It seeds an isolated real board, writes through the public CLI, opens the ticket with chrome-devtools-axi, checks release/PRs and captures the ticket in both themes at 390 and 1280. Pass `before` on the base build for matching frames. Inspect all eight frames; confirm the row/page release chips, existing state groups and Linked PRs. The extended "a card names its ticket" integration journey covers preservation, no-op, clear, invalid inputs, repeat/comma PRs and all state labels in the real browser.
 
-Shared project tile proof: `done-done verify report-rows` pins a project image through the CLI, links an epic and its ticket, and captures Tickets and the open epic at 390 and 1280 in both themes. It checks that list rows, inherited epic-tree rows and the ticket page header load the pinned image through `projectTile`; missing project icons use the same outline as the other lists. The existing “a card names its ticket” integration journey checks these three surfaces.
+Shared project tile proof: `done-done verify report-rows` pins a project image through the CLI, links an epic, ticket and sub-task, and captures Tickets and the child ticket opened through the epic row at 390 and 1280 in both themes. It checks that list rows, inherited epic-tree rows and the ticket page header load the pinned image through `projectTile`; missing project icons use the same outline as the other lists. The existing “a card names its ticket” integration journey checks these three surfaces.
+
+The default desktop Tickets frame opens a separate P0 release ticket; clicking the epic then its child opens a different page with an inherited sub-task icon. Capture each visible state once (no Tickets captures at 1440; Reports retains that width).
 
 ## See all on a phone (0.6.2)
 
