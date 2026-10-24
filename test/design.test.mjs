@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { execFile, execFileSync, spawn, spawnSync } from 'node:child_process';
 import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { createServer as createHttpServer, get } from 'node:http';
+import { createServer as createHttpServer, get, request } from 'node:http';
 import { createServer } from 'node:net';
 import { networkInterfaces, tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -803,7 +803,13 @@ test('comments on mock elements: one per element, kept across a reload, edited a
   };
   // The design ask's mocks show on its Decide card.
   const at = JSON.stringify(`${url}#decide/look`);
-  const reload = async () => { await evaluate(`window.old = true, location.href === ${at} ? location.reload() : (location.href = ${at})`); await until(() => evaluate(`!window.old && !!${frame}`)); };
+  const reload = async () => {
+    await evaluate(`window.old = true, location.href === ${at} ? location.reload() : (location.href = ${at})`);
+    await until(() => evaluate(`!window.old && !!${frame}`));
+    // Coordinates taken during sheet-up can land on the toggle after the sheet moves,
+    // switching pointing off and opening full screen instead of the comment editor.
+    await evaluate(`Promise.all((document.querySelector('.ask-sheet')?.getAnimations() ?? []).map((a) => a.finished))`);
+  };
   await reload();
   assert.deepEqual(await evaluate("[...document.querySelectorAll('.shot.none')].map((n) => n.textContent)"), ['No mock for this option']);
   assert.equal(await write('Make this button green, Umer'), '');
@@ -1623,7 +1629,7 @@ test('Waiting on you: a reply-only ask draws a bubble, a type-ask yes/no a quest
   proc.kill();
 });
 
-test('Decide on a pick-one ask: nothing is picked until you pick and the button then names the pick, Your own answer is the last card and opens one box whose words Send answer sends, one note goes with any pick, More holds only Ask me later and Discard, and E moves to the next ask', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Decide on a pick-one ask: nothing is picked until you pick and the button then names the pick, Your own answer is the last card and opens one box whose words Send answer sends, one note goes with any pick, More holds only Ask me later and Discard, and E moves to the next ask', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async (t) => {
   const dir = join(scratch, 'decide-option-box'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l }));
@@ -1634,8 +1640,22 @@ test('Decide on a pick-one ask: nothing is picked until you pick and the button 
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  // Hold the real comment response until the next ask is being typed in. The answer has
+  // already navigated there, but its follow-up comment request can still redraw the board.
+  const comment = Promise.withResolvers();
+  let arrived = false;
+  const proxy = createHttpServer((req, res) => {
+    const forward = request(new URL(req.url, url), { method: req.method, headers: { ...req.headers, host: new URL(url).host } }, async (upstream) => {
+      if (req.url === '/api/messages') { arrived = true; await comment.promise; }
+      res.writeHead(upstream.statusCode, upstream.headers); upstream.pipe(res);
+    });
+    forward.on('error', (error) => res.destroy(error));
+    req.pipe(forward);
+  });
+  await new Promise((ok) => proxy.listen(0, '127.0.0.1', ok));
+  t.after(async () => { comment.resolve(); proxy.closeAllConnections(); await new Promise((ok) => proxy.close(ok)); });
   const { evaluate, close } = await browse(join(dir, 'b'), 1280);
-  await evaluate(`location.href = ${JSON.stringify(`${url}#decide/beta`)}`);
+  await evaluate(`location.href = ${JSON.stringify(`http://127.0.0.1:${proxy.address().port}/#decide/beta`)}`);
   await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'Beta question?');
   const cards = () => evaluate('[...document.querySelectorAll(".decide .pick-option")].map((b) => b.querySelector(".label").textContent + (b.querySelector(".recommend") ? "*" : "") + ":" + b.getAttribute("aria-pressed")).join("|")');
   const button = () => evaluate('(() => { const a = document.querySelector(".decide-bar .answer"); return a.textContent + "|" + a.disabled; })()');
@@ -1667,8 +1687,15 @@ test('Decide on a pick-one ask: nothing is picked until you pick and the button 
   assert.equal(await button(), 'Send answer|true');
   await until(async () => (await evaluate('document.querySelector(".decide .own-field").getBoundingClientRect().height')) > 60);
   assert.equal(await evaluate('[document.activeElement === document.querySelector(".decide .own-box"), getComputedStyle(document.querySelector(".decide .note-field")).display].join("|")'), 'true|none');
-  await evaluate('(() => { const t = document.querySelector(".decide .own-box"); t.value = "Ship it Thursday"; t.dispatchEvent(new Event("input")); })()');
+  await evaluate('(() => { const t = document.querySelector(".decide .own-box"); t.value = "Ship it Thursday"; t.dispatchEvent(new Event("input")); t.setSelectionRange(5, 13, "backward"); })()');
   assert.equal(await button(), 'Send answer|false');
+  await until(() => arrived);
+  comment.resolve();
+  await until(() => evaluate("state.messages?.some((m) => m.key === 'beta' && m.text === 'Only after the release')"));
+  assert.deepEqual(await evaluate(`(() => {
+    const box = document.querySelector('.decide .own-box');
+    return [document.activeElement === box, box.value, box.selectionStart, box.selectionEnd, box.selectionDirection];
+  })()`), [true, 'Ship it Thursday', 5, 13, 'backward']);
   await evaluate('document.querySelector(".decide-bar .answer").click()');
   await until(async () => /alpha,text,/.test(run('answers', file).out));
   assert.equal(JSON.parse(run('answers', file, '--json').out).alpha.note, 'Ship it Thursday');
@@ -3123,7 +3150,13 @@ test('Today on a phone: the floating tab bar with its pill on Today, Up next wit
   await until(async () => (await evaluate('[location.hash, document.getElementById("t-search").open, document.activeElement?.id, document.querySelector("#board h1")?.textContent].join("|")')) === '#designs|true|find|Designs');
   await evaluate('(() => { const b = document.getElementById("find"); b.value = "update"; b.dispatchEvent(new Event("input")); })()');
   assert.deepEqual(await evaluate('[[...document.querySelectorAll("#t-search .t-grp")].map((g) => g.textContent).join(), [...document.querySelectorAll("#t-search .ui-row")].map((a) => a.getAttribute("href")).join()]'), ['Proof', '#evidence/u3,#evidence/u2,#evidence/u1']);
-  await evaluate('document.getElementById("t-search").dispatchEvent(new Event("cancel")); document.getElementById("t-search").close()');
+  // close() clears .open immediately, but its close event (and the route cleanup) is queued.
+  // Finish that event before opening #find, so the previous close cannot clear the new address.
+  await evaluate(`new Promise((ok) => {
+    const sheet = document.getElementById('t-search');
+    sheet.addEventListener('close', () => ok(true), { once: true });
+    sheet.dispatchEvent(new Event('cancel')); sheet.close();
+  })`);
   assert.equal(await evaluate('location.hash + "|" + document.getElementById("t-search").open'), '#designs|false');
   // The address #find opens Today with Search over it; closing it leaves Today at its own address.
   await evaluate('location.hash = "#find"');

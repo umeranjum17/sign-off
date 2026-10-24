@@ -10,7 +10,8 @@ const cli = new URL('../dist/cli.js', import.meta.url).pathname;
 const worker = `import { writeFileSync } from 'node:fs';
 import { createVault, depositVault, inspectVault, refuseVault, readVaultExpiry, waitVaultExpiry, deliverVault } from ${JSON.stringify(new URL('../dist/vault.js', import.meta.url).href)};
 let input=''; for await (const chunk of process.stdin) input+=chunk;
-const {op,meta,value,raw,board,key,started,filer,timeoutMs,into,fail}=JSON.parse(input);
+const {op,meta,value,raw,board,key,started,filer,timeoutMs,into,fail,expiresIn}=JSON.parse(input);
+if(expiresIn!==undefined) meta.expires=Date.now()+expiresIn;
 if(started) writeFileSync(started,'started');
 try { const out=await ({create:()=>createVault(meta,value===undefined?undefined:Buffer.from(value,raw?'base64':'utf8')),deposit:()=>depositVault(board,key,Buffer.from(value)),inspect:()=>inspectVault(board,key),refuse:()=>refuseVault(board,key),expiry:async()=>({event:await readVaultExpiry(board,key,filer)}),waitExpiry:async()=>({event:await waitVaultExpiry(board,key,filer,timeoutMs)}),deliver:()=>deliverVault(board,key,filer,into,fail==='kill'?()=>process.kill(process.pid,'SIGKILL'):fail==='plant'?()=>writeFileSync(into,'planted',{mode:0o600}):fail?()=>{throw new Error('synthetic');}:undefined)})[op](); console.log(JSON.stringify(out ?? {status:'pending'})); }
 catch(e) { console.log(JSON.stringify({code:e.code,error:e.message})); process.exitCode=1; }`;
@@ -534,7 +535,11 @@ test('disabled vault custody across real processes: encryption, racing deposits,
     const expiredKeys = (r) => { assert.equal(r.code, 1); assert.ok(r.json, 'EXPIRED prints JSON metadata.'); for (const v of Object.values(r.json)) assert.deepEqual(Object.keys(v), ['answer', 'label', 'close', 'at']); return Object.keys(r.json).sort(); };
     const vaultOf = (key) => readdirSync(join(waitState, 'sign-off', 'vault')).filter((n) => n.endsWith('.json')).map((n) => join(waitState, 'sign-off', 'vault', n)).find((p) => JSON.parse(readFileSync(p)).meta.key === key);
     const wmeta = (key, mode, filer, expires, b = wb) => ({ ...meta(key, mode), board: b, filer, expires });
-    const create = (key, mode, filer, expires, b) => run({ op: 'create', meta: wmeta(key, mode, filer, expires, b), ...(mode === 'receive' && { value: url }) });
+    const create = async (key, mode, filer, expires, b, expiresIn) => {
+      const r = await run({ op: 'create', meta: wmeta(key, mode, filer, expires, b), expiresIn, ...(mode === 'receive' && { value: url }) });
+      assert.equal(r.exit, 0, `Expiry fixture ${key}: ${r.code ?? r.status}`);
+      return r.expires;
+    };
     env.XDG_STATE_HOME = join(home, 'wait-gone-state');
     await create('identity-only', 'receive', 'filer-f', Date.now() + 3_600_000, ob);
     env.XDG_STATE_HOME = waitState;
@@ -580,10 +585,15 @@ test('disabled vault custody across real processes: encryption, racing deposits,
       assert.match(readFileSync(refusedMarker, 'utf8'), /^[a-f0-9]{64}:refused$/); assert.equal(statSync(refusedMarker).mode & 0o777, 0o600);
       assert.match((await waitCli(wb, 'filer-q', ['--timeout', '0'])).out, /^code: NOT_FOUND$/m);
       // No server: the wait expires its own filer's elapsed items; other filers' records stay as they are.
-      const late = Date.now() + 1_500;
+      // Each real child starts its short lifetime when it creates the fixture. A shared parent
+      // deadline could expire while nine Node processes were still starting, silently refusing
+      // later fixtures. With no server yet, wait until every successfully created item is due.
+      const deadlines = [];
       for (const [key, mode, filer] of [['e-late', 'give', 'filer-e'], ['s-late', 'give', 'filer-s'], ['g-late', 'give', 'filer-g'], ['p-prio', 'receive', 'filer-p'], ['m-good', 'receive', 'filer-m'], ['m-corrupt', 'receive', 'filer-m'], ['r-a', 'receive', 'filer-r'], ['r-b', 'receive', 'filer-r'], ['f-held', 'give', 'filer-f']]) {
-        await create(key, mode, filer, key === 'f-held' ? Date.now() + 3_600_000 : late);
+        const expires = await create(key, mode, filer, undefined, undefined, key === 'f-held' ? 3_600_000 : 1_500);
+        if (key !== 'f-held') deadlines.push(expires);
       }
+      const late = Math.max(...deadlines);
       await waitFor(() => Date.now() >= late, late + 5_000);
       const untouched = ['g-late', 'm-good'].map(vaultOf).map((p) => [p, readFileSync(p)]);
       assert.deepEqual(expiredKeys(await waitCli(wb, undefined, ['--json'], { SIGN_OFF_FILER: 'filer-s' })), ['s-late']);
@@ -620,7 +630,8 @@ test('disabled vault custody across real processes: encryption, racing deposits,
       const first = await waitCli(wb, 'filer-p', ['--json']); assert.equal(first.code, 0); assert.deepEqual(Object.keys(first.json), ['ordinary-p']);
       assert.deepEqual(expiredKeys(await waitCli(wb, 'filer-p', ['--json'])), ['p-prio']);
       // Unreadable siblings and a corrupt filer expiry are skipped with one warning; valid events still arrive.
-      const corruptPath = vaultOf('m-corrupt'), corrupt = Buffer.from(JSON.stringify({ ...JSON.parse(readFileSync(corruptPath)), sealed: undefined, status: 'expired', at: late - 1 }));
+      const corruptPath = vaultOf('m-corrupt'), corruptRecord = JSON.parse(readFileSync(corruptPath));
+      const corrupt = Buffer.from(JSON.stringify({ ...corruptRecord, sealed: undefined, status: 'expired', at: corruptRecord.meta.expires - 1 }));
       const sibling = join(waitState, 'sign-off', 'vault', `${'e'.repeat(64)}.json`);
       writeFileSync(corruptPath, corrupt); writeFileSync(sibling, '{"corrupt":', { mode: 0o600 });
       try {
