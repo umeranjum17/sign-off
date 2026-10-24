@@ -33,6 +33,14 @@ cli('post', board, '--kind', 'report', '--from', join(dir, 'report.json'), '--fi
 // A second report, untouched, for the short recording of scrolling and tapping on a phone.
 writeFileSync(join(dir, 'report2.json'), JSON.stringify({ ...m, key: REC }));
 cli('post', board, '--kind', 'report', '--from', join(dir, 'report2.json'), '--filer', FILER);
+if (process.env.SEND_FEEDBACK_ONLY) {
+  cli('post', board, '--key', 'send-answer', '--title', 'Ship the settings page?', '--ask-ref', 'message-demo', '--why', 'Umer needs the settings checked.', '--outcome', 'yes=The page ships.', '--outcome', 'no=The page waits.', '--recommend', 'yes', '--recommend-reason', 'The checks passed.', '--default', 'no');
+  cli('post', board, '--type', 'evidence', '--title', 'Umer checks the settings page', '--about', 'The settings fit.', '--media', join(repo, 'fixtures/evidence/product-small.png'));
+  mkdirSync(join(dir, 'design'));
+  for (const f of readdirSync(join(repo, 'fixtures/contract/design.v1/design'))) writeFileSync(join(dir, 'design', f), readFileSync(join(repo, 'fixtures/contract/design.v1/design', f)));
+  writeFileSync(join(dir, 'design.json'), readFileSync(join(repo, 'fixtures/contract/design.v1/valid-basic.json')));
+  cli('post', board, '--kind', 'design', '--from', join(dir, 'design.json'));
+}
 const server = spawn(process.execPath, [cliJs, 'serve', board, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'inherit'] });
 // A free port of its own, so another lane's browser bridge on the hashed one never blocks this run.
 const port = await new Promise((ok) => { const s = createServer().listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => ok(port)); }); });
@@ -67,6 +75,7 @@ try {
   if (before) {
     capture('part-foot-before', 'Before: a part ends with its Details and preset pills; no Agree, Disagree or Comment.', { controls: page(MEASURE(`[data-part="${FOOT}"] > .gd-acts button`)) });
   } else {
+  if (!process.env.SEND_FEEDBACK_ONLY) {
   const foot = page(MEASURE(`[data-part="${FOOT}"] > .gd-foot button`));
   assert.deepEqual(foot.map((c) => c.name), ['Agree', 'Disagree', 'Comment', 'Details', 'Ask']);
   assert.ok(foot.every((c) => c.hit44 && c.h >= 32), JSON.stringify(foot));
@@ -93,6 +102,7 @@ try {
   assert.equal(page(`() => document.querySelector('[data-part="${PART}"] > .gd-cbox textarea').placeholder`), 'Ask about this part');
   click(`[data-part="${PART}"] > .gd-cbox .gd-cbar .gd-q`);
 
+  }
   // Disagree opens the comment box: What is off?
   click(`[data-part="${PART}"] > .gd-foot .disagree`);
   assert.equal(page(`() => document.querySelector('[data-part="${PART}"] > .gd-cbox textarea').placeholder`), 'What is off?');
@@ -104,16 +114,56 @@ try {
   const TEXT = 'The 6-second limit is short for a cold start. Did it also hang with 30 seconds?';
   drive(`await page.eval(() => { const t = document.querySelector('[data-part="${PART}"] > .gd-cbox textarea'); t.value = ${JSON.stringify(TEXT)}; t.dispatchEvent(new Event('input', { bubbles: true })); }); await nap(200);`);
 
-  // Send: it is saved on the board through /api/annotations and shows Sent to the agent.
-  click(`[data-part="${PART}"] > .gd-cbox .gd-cbar .gd-send`);
-  drive("await wait('.gd-cmt');");
+  capture('comment-typing', 'The report section keeps the typed comment beside Send.');
+  // Hold the real request at the browser boundary, as on a slow connection. The first attempt loses its connection.
+  drive(`await page.eval(() => { const real = window.fetch; window.fetch = (url, options) => url === '/api/annotations' ? new Promise((ok, no) => { window.releaseComment = () => ok(real(url, options)); window.failComment = () => no(new Error('Connection interrupted')); }) : real(url, options); });`);
+  const feedback = `[data-send-feedback="part:${KEY}:${PART}"]`;
+  const instant = page(`() => { document.querySelector('[data-part="${PART}"] > .gd-cbox .gd-send').click(); return document.querySelector('${feedback}')?.textContent; }`);
+  assert.equal(instant, 'Sending…', 'Send must answer in the same frame');
+  capture('comment-sending', 'Send answers immediately with Sending…, before the real request completes.');
+  drive(`await page.eval(() => window.failComment()); await nap(200);`);
+  assert.match(page(`() => document.querySelector('${feedback}').textContent`), /Not sent · Connection interrupted.*Retry/);
+  assert.equal(page(`() => document.querySelector('[data-part="${PART}"] > .gd-cbox textarea').value`), TEXT);
+  capture('comment-not-sent', 'Not sent gives the connection error and Retry, keeping all the words.');
+  click(`${feedback} button`);
+  assert.equal(page(`() => document.querySelector('${feedback}').textContent`), 'Sending…');
+  drive(`await page.eval(() => window.releaseComment()); await wait('.gd-cmt'); await nap(200);`);
+  assert.match(page(`() => document.querySelector('${feedback}').textContent`), /^Sent · [0-9]{2}:[0-9]{2}$/);
+  assert.equal(page(`() => document.querySelector('[data-part="${PART}"] > .gd-cbox textarea').value`), '');
+  assert.ok(page(`() => document.querySelector('.gd-top .thread')?.textContent.includes(${JSON.stringify(TEXT)})`), 'The report Activity updates immediately');
+  capture('comment-receipt', 'Sent gives the time, clears the box, and the comment is already in the report Activity.');
   const raw = readFileSync(join(dir, 'board.annotations.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
   assert.equal(raw.length, 1); assert.deepEqual([raw[0].key, raw[0].part, raw[0].verdict, raw[0].text], [KEY, PART, 'disagree', TEXT]);
-  assert.match(page(`() => document.querySelector('[data-part="${PART}"] > .gd-thread').innerText`), /Sent to the agent/);
+  assert.match(page(`() => document.querySelector('[data-part="${PART}"] > .gd-thread').innerText`), /Sent\s+[0-9]{2}:[0-9]{2}/);
   assert.equal(page(`() => document.querySelector('[data-part="${PART}"] > .gd-foot .disagree').getAttribute('aria-pressed')`), 'true');
   show(`[data-part="${PART}"]`);
   capture('comment-sent', 'A sent comment shows under its part with Sent to the agent, and Disagree shows as chosen.', { page_shows: page(`() => document.querySelector('[data-part="${PART}"] > .gd-thread').innerText.replace(/\\s+/g, ' ')`), disagree_pressed: true, saved_line: raw[0] });
 
+  if (process.env.SEND_FEEDBACK_ONLY) {
+    // Every composer uses the same pending/receipt/retry path; transport faults never reach the real server.
+    const cases = [
+      ['card-comment', '#evidence/update-1', '.other.comment textarea', '.other.comment button[aria-label^="Send without answering"]', 'card:update-1', '/api/messages'],
+      ['change-note', '#designs/chat-journeys', '.dz-ctl textarea', '.dz-change', 'design:chat-journeys', '/api/answers'],
+      ['answer-note', '#decide/send-answer', '.note-box', '.decide-bar .answer', 'card:send-answer', '/api/answers']
+    ];
+    for (const [name, hash, field, button, id, path] of cases) {
+      browser('open', `${base}${hash}`);
+      drive(`await wait('${field}'); await page.eval(() => { document.querySelectorAll('details.other.comment, details.more-menu').forEach(e => e.open = true); document.querySelector('.pick-option')?.click(); const t = document.querySelector('${field}'); t.value = 'Umer needs the settings checked'; t.dispatchEvent(new Event('input', { bubbles: true })); t.scrollIntoView({ block: 'center' }); const real = window.fetch; window.fetch = (url, options) => url === '${path}' ? new Promise((ok, no) => { window.releaseComment = () => ok(real(url, options)); window.failComment = () => no(new Error('Connection interrupted')); }) : real(url, options); });`);
+      const line = `[data-send-feedback="${id}"]`;
+      assert.equal(page(`() => { document.querySelector('${button}').click(); return document.querySelector('${line}').textContent; }`), 'Sending…', name);
+      drive('await page.eval(() => window.failComment()); await nap(200);');
+      assert.match(page(`() => document.querySelector('${line}').textContent`), /Not sent.*Retry/, name);
+      assert.equal(page(`() => document.querySelector('${field}').value`), 'Umer needs the settings checked', name);
+      click(`${line} button`);
+      assert.equal(page(`() => document.querySelector('${line}').textContent`), 'Sending…', name);
+      drive(`await page.eval(() => window.releaseComment()); await nap(800);`);
+      assert.match(page(`() => document.querySelector('${line}')?.textContent`), /^Sent · [0-9]{2}:[0-9]{2}$/, name);
+      assert.ok(page(`() => document.querySelector('.thread')?.textContent.includes('Umer needs the settings checked')`), name + ' Activity');
+      capture(name, name + ': Sending immediately, failure retains the note with Retry, success reaches Activity.');
+    }
+    writeFileSync(join(out, `send-regression.${theme}.${width}w.json`), JSON.stringify({ report: 'Sending in same frame; failure preserves text; Retry saves exactly once; clears box; Activity updates', composers: cases.map(c => c[0]), result: 'PASS' }, null, 2));
+  }
+  if (!process.env.SEND_FEEDBACK_ONLY) {
   // The author agent takes it with wait --filer, then replies; the page follows.
   const event = JSON.parse(cli('wait', board, '--filer', FILER, '--events', '--timeout', '20').trim().split('\n')[0]);
   assert.deepEqual([event.event, event.key, event.part, event.verdict, event.text], ['comment', KEY, PART, 'disagree', TEXT]);
@@ -156,6 +206,7 @@ try {
     writeFileSync(list, readdirSync(rec).filter((f) => /^\d+\.png$/.test(f)).sort().map((f) => `file '${join(rec, f)}'\nduration 0.9\n`).join(''));
     run('ffmpeg', ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', list, '-vf', 'scale=390:-2', '-pix_fmt', 'yuv420p', '-c:v', 'libx264', '-movflags', '+faststart', join(out, 'scroll-and-tap.mp4')]);
   }
+  }
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board holding one guided report, filed by agent-41.',
     steps: [`The report is opened at ${width} px wide, ${theme}, and a part is scrolled into view.`, ...(width === 390 ? ['The page is scrolled so body text passes under the sticky step header: the header is opaque and no text reads through it.'] : []), 'The part ends with one row: Agree, Disagree, Comment, Details and Ask, each a 44 px tap target.', 'The person taps Ask: the Ask menu lists Ask a question, Go deeper, Simplify this, Show an example and Why?.',
       'The person taps Disagree: the comment box opens asking What is off?, with Cancel and Send.', 'The person types a comment and taps Send: it sits under the part with Sent to the agent.', 'The author agent takes it with wait --filer: the line reads Agent read it.', 'The agent replies with deeper: the reply shows under the comment.', 'The person opens an item and taps Agree: it stays chosen and is saved.'],
@@ -163,6 +214,6 @@ try {
   }
 } finally {
   try { browser('stop'); } catch {}
-  server.kill();
+  cli('stop', board);
   rmSync(dir, { recursive: true, force: true }); // its own mkdtemp board and nothing else
 }
