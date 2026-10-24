@@ -2412,9 +2412,9 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   // Only a design is promoted, and only a key on the board.
   assert.equal(run('promote', 'nope', file).code, 1);
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
-  // On a phone a design is a row: its project's initials, its title, and its state and day.
+  // On a phone the design row leads with its first frame, its title, and its state and day.
   await until(async () => (await evaluate('document.querySelector(".dz-list .t")?.textContent')) === message.title);
-  assert.equal(await evaluate('!!document.querySelector(".dz-list .ui-icon svg") && !document.querySelector(".dz-list .mono")'), true);
+  assert.equal(await evaluate('document.querySelector(".dz-list .ui-icon img")?.getAttribute("src")?.includes("welcome.png") && !document.querySelector(".dz-list .mono")'), true);
   assert.equal(await evaluate('document.querySelector(".dz-list .meta")?.textContent'), 'In review · 18 Oct');
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
   await until(async () => (await evaluate('document.querySelector(".design-review .foot button")?.textContent')) === 'Approve');
@@ -4519,7 +4519,7 @@ test('the new look draws only the approved prototype\'s colours: Today, Decide, 
       ['#reports', ''], ['#reports', '.rp-fb'], [`#reports/${keys.report}`, ''], ['#reports', `.rp-list a[data-row][href="#reports/${keys.report}"]`], ['#decide/ask-linked', ''], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#evidence', ''], ['#evidence', '.ev-more'], [`#evidence/${keys.evidence}`, ''], ['#tickets', ''], ['#ticket/T-29', ''],
       // Last, an answer and the toast it raises: a yes/no in light, the pick-one in dark.
       [(theme) => (theme === 'light' ? '#decide/ask-plain' : '#decide/release-day'), ['.decide .pick-option', '.decide-bar .answer']]],
-    1280: [['#', ''], ['#waiting', ''], ['#decide/ask-linked', ''], ['#reports', ''], ['#reports', `.rp-list a[data-row][href="#reports/${keys.report}"]`], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#evidence', ''], ['#tickets', ''], ['#ticket/T-29', '']],
+    1280: [['#', ''], ['#find', ''], ['#waiting', ''], ['#decide/ask-linked', ''], ['#reports', ''], ['#reports', `.rp-list a[data-row][href="#reports/${keys.report}"]`], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#evidence', ''], ['#tickets', ''], ['#ticket/T-29', '']],
   };
   const off = [];
   for (const width of [390, 1280]) for (const theme of ['light', 'dark']) {
@@ -4537,6 +4537,8 @@ test('the new look draws only the approved prototype\'s colours: Today, Decide, 
         for (const t of [tap].flat().filter(Boolean)) await evaluate(`document.querySelector(${JSON.stringify(t)})?.click(), new Promise((ok) => setTimeout(ok, 300))`);
         if (Array.isArray(tap)) await until(() => evaluate('!document.getElementById("toast").hidden'));
         await evaluate('new Promise((ok) => setTimeout(ok, 400))');
+        if (hash === '#find') await evaluate('document.querySelector("#find").value = "settings", document.querySelector("#find").dispatchEvent(new Event("input"))');
+        assert.deepEqual(await evaluate('[...document.querySelectorAll(".ui-row .ui-icon, .dz-card, .t-up .meta")].filter(e => e.querySelector(".mono") || /^[A-Z]{2}$/.test(e.textContent.trim())).map(e => e.textContent)'), [], 'no monogram tiles in any list');
         const at = hash + (tap ? ` (${[tap].flat().map((t) => t.split(',')[0]).join(' then ')} tapped)` : '');
         // On Designs the colours read include the sidebar's own Designs place, lit, on a desk, and the dock with Today lit on a phone.
         if (hash.startsWith('#designs')) assert.deepEqual(await evaluate('[...document.querySelectorAll(".side [aria-current], .tabs [aria-current]")].filter((a) => a.getClientRects().length).map((a) => a.getAttribute("href"))'), [width === 390 ? '#' : '#designs'], at);
