@@ -14,11 +14,11 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendSendBack, appendTicket, readTickets, rollUp, appendTicketComment, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendSendBack, appendTicket, readTickets, rollUp, appendTicketComment, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
-import { copiesOf } from './images.js';
+import { copiesOf, differs } from './images.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
 
 /** The version this copy runs, read from package.json once: a pre-release version says so, and a git checkout whose HEAD carries no tag
@@ -124,7 +124,7 @@ examples:
 `,
   validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>] [--expect-invalid]
 Checks message files against the communication contract without posting them: ${CONTRACT}
-A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate, finding and design at schema 1, report at schema 5 (schemas 2 to 4 still pass) and plan at schema 3 (schemas 1 and 2 still pass).
+A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate and finding at schema 1, design at schema 2 (schema 1 still passes), report at schema 5 (schemas 2 to 4 still pass) and plan at schema 3 (schemas 1 and 2 still pass).
 A report 3 to 5 and a plan 2 or 3 are guided pages: fields the board draws as one scroll, no page of your own (see report init). A report 5 names what it is for in "purpose".
 An evidence message's media paths read from the message file's folder: each file must be there, inside it, and 50 MB or less.
 A report is a page to tap through: its "view" (.html) and "preview" (its picture, beside it) are checked for their shape here; the files themselves are checked at post, from the board file's folder, filled with no FILL: lines left (see report init).
@@ -280,7 +280,10 @@ examples:
   sign-off-axi post --kind finding --from finding.json --filer learn-from-mistakes
   sign-off-axi post --kind plan --from plan.json --filer agent-41
   sign-off-axi post --kind design --from design.json --filer agent-41
-A design message lists project journeys, per-screen image or HTML view variants, and a card preview; post checks every asset stays under the board folder.
+A design (schema 2) asks one plain question Yes answers: its title, 12 words or fewer, ending in "?". Each screen shows 1-3 frames side by side (today, built or proposed, target),
+each with the changed area as fractions of its picture and a one-line caption, and "accepts" names the frame Yes approves. Post refuses a new design without a plain question title,
+words for agents in what the person reads (task or branch names, PR or #number, slice, agent or ticket codes, file names, commits), and two frames that look the same;
+it checks every asset stays under the board folder. See docs/contract.md (design, schema 2) and fixtures/contract/design.v2.
 A design shows under Designs for Main to review, never in the user's Decide or any count of asks, until Main runs promote (see promote --help).
   sign-off-axi post .sign-off/decisions.json --type interactive --title "Does the sign-in flow feel right?" --view mocks/sign-in/demo.html --option yes=Yes --option no="Needs work" --recommend yes
   sign-off-axi post --type evidence --title "Sign-in screen on a phone" --about "The new screen loads in 1 second." --media phone.png --media flow.mp4 --link https://github.com/acme/app/pull/12
@@ -359,7 +362,7 @@ examples:
 `,
   promote: `usage: sign-off-axi promote <key> [board.json] [--undo]
 For Main only, never a lead. A design review a lead posts (post --kind design) shows under Designs, where Main reviews it; it never waits in Decide or counts as the user's ask.
-Once Main has passed every screen, the lead posts one design per product that opens all its screens, phone and desktop, and Main promotes that one card:
+Once Main has passed a design, Main promotes that one card (a design 2 asks the user one plain question, with Yes or Change):
 it then waits in Decide, counts there and notifies like any ask until the user answers it. --undo puts it back under Designs only.
 It writes one line to <board>.promoted.jsonl beside the board; no post, feed or board request writes that file.
 examples:
@@ -553,7 +556,7 @@ function contractItems(items: any[], from: string, file: string, replace = false
   });
 }
 function designFiles(m: any, base: string) {
-  const paths = [m.preview, ...m.journeys.flatMap((j: any) => j.screens.flatMap((s: any) => Object.values(s.views)))];
+  const paths = [m.preview, ...m.journeys.flatMap((j: any) => j.screens.flatMap(screenViews))];
   for (const path of paths) {
     let actual: string;
     try { actual = realpathSync(resolve(base, path as string)); } catch { throw new ContractError(`design path ${JSON.stringify(path)} is not there`, `Put ${path} in the board folder or fix its path`); }
@@ -563,6 +566,15 @@ function designFiles(m: any, base: string) {
     if (!info.isFile() || info.size > 5_000_000) throw new ContractError(`design path ${JSON.stringify(path)} must be a file of 5 MB or less`, 'Shrink the design view');
     try { accessSync(actual, constants.R_OK); } catch { throw new ContractError(`design path ${JSON.stringify(path)} cannot be read`, 'Make the design view readable'); }
   }
+  // Two frames of a screen that look the same compare nothing: the person would look for a change that is not there. Under 0.1% of pixels moved is the same look.
+  for (const j of m.journeys) for (const s of j.screens) (s.frames ?? []).forEach((f: any, i: number, frames: any[]) => {
+    for (const g of frames.slice(0, i)) for (const [v, p] of Object.entries(f.views)) {
+      if (g.views[v] === undefined) continue;
+      const share = differs(readFileSync(resolve(base, g.views[v])), extname(g.views[v]), readFileSync(resolve(base, p as string)), extname(p as string));
+      if (share !== undefined && share < 0.001) throw new ContractError(`screen ${s.id}: the ${g.role} and ${f.role} frames look the same (${v}: ${+(share * 100).toPrecision(2)}% of pixels differ)`,
+        `Drop the ${g.role === 'today' ? 'today' : f.role} frame, or capture the screen in the state that shows the change`);
+    }
+  });
 }
 const RAISE_FIELDS = ['title', 'key', 'about', 'detail', 'option', 'recommend', 'default', 'close', ...ASK_FLAGS];
 
@@ -1584,8 +1596,9 @@ async function postKind(file: string, named: string, on: string, values: Record<
       if (m[f] !== undefined && m[f] !== values[f]) throw new ContractError(`${f} ${typeof m[f] === 'string' ? m[f] : JSON.stringify(m[f])} is not --${f} ${values[f]}`, `Leave "${f}" out of the message, or pass the same --${f}`);
       m[f] = values[f];
     }
-    const existingAsk = !built && kind === 'ask' && existsSync(file) && readItems(file).items.some((i: any) => i?.key === m.key);
-    checkMessage(m, built ? 'report' : kind, !built && kind === 'ask' && !existingAsk);
+    // A new ask is held to the question standard, and so is a new design's title; a card already on the board still re-posts as it was.
+    const existing = !built && ['ask', 'design'].includes(kind) && existsSync(file) && readItems(file).items.some((i: any) => i?.key === m.key);
+    checkMessage(m, built ? 'report' : kind, !built && kind === 'ask' && !existing, !built && kind === 'design' && !existing);
     // Media paths read from the message file's folder, or from the current folder for stdin.
     if (m.kind === 'evidence') sources = mediaFiles(m, from === '-' ? process.cwd() : dirname(resolve(from)));
     // A report's or plan's page is served from the board file's folder, as --view is.
@@ -2660,7 +2673,7 @@ const mockHash = (path: string) => {
   } catch { return null; }
 };
 /** A design's files as the board serves them: its preview and every screen view. */
-const designPaths = (d: Decision) => [...new Set([d.preview, ...(d.journeys ?? []).flatMap((j) => j.screens.flatMap((s) => Object.values(s.views)))])].filter((p): p is string => !!p);
+const designPaths = (d: Decision) => [...new Set([d.preview, ...(d.journeys ?? []).flatMap((j) => j.screens.flatMap(screenViews))])].filter((p): p is string => !!p);
 /** A design's round: its time, screens and options and the bytes of its files, so the same key posted again with a new time or a changed screen is a new round. */
 const designRound = (d: Decision) => sha256(Buffer.from(JSON.stringify([d.filed, d.journeys, d.options, designPaths(d).map((p) => [p, mockHash(p)])])));
 /** What the page needs to know of a design beyond its fields: whether its answer is from an earlier round, the last answer given on an earlier round
@@ -2752,7 +2765,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   if (req.method === 'GET' && req.url?.startsWith('/design/')) {
     const [, , , key, ...parts] = new URL(req.url, 'http://localhost').pathname.split('/');
     const path = parts.map(decodeURIComponent).join('/'), d = loadDecisions(file).find(x => x.key === key && x.type === 'design');
-    const allowed = d?.preview === path || d?.journeys?.some(j => j.screens.some(s => Object.values(s.views).includes(path)));
+    const allowed = d?.preview === path || d?.journeys?.some(j => j.screens.some(s => screenViews(s).includes(path)));
     const type = assetTypes[extname(path).toLowerCase()];
     try {
       if (!allowed || !type) return [404, { error: 'Design view is unavailable' }];

@@ -42,10 +42,10 @@ const design = (key, title, min, shot) => {
     filer: 'dashboard-agent', group: 'Dashboard', filed: ago(min) }));
   cli('post', board, '--kind', 'design', '--from', join(dir, `${key}.json`));
 };
-design('dash-sketch', 'Fleet dashboard, the first sketch', 5 * 24 * 60, 'reports');
-design('dash-v1', 'Fleet dashboard, first look', 3 * 24 * 60, 'evidence');
-design('dash-v2', 'Fleet dashboard, the whole redesign', 26 * 60, 'decide');
-design('today-v3', 'Today in the new look', 90, 'today');
+design('dash-sketch', 'Ship the fleet dashboard sketch?', 5 * 24 * 60, 'reports');
+design('dash-v1', 'Ship the first fleet dashboard?', 3 * 24 * 60, 'evidence');
+design('dash-v2', 'Ship the fleet dashboard redesign?', 26 * 60, 'decide');
+design('today-v3', 'Ship Today in the new look?', 90, 'today');
 copyFileSync(join(repo, 'docs/media/phone-evidence.webp'), join(dir, 'shot.webp'));
 cli('post', board, '--filer', 'settings-agent', '--type', 'evidence', '--title', 'The settings page fits a phone', '--about', 'Umer sees the whole page without scrolling sideways.', '--media', join(dir, 'shot.webp'), '--link', 'https://example.com/pr/4');
 writeFileSync(join(dir, 'report.json'), JSON.stringify({ ...JSON.parse(readFileSync(join(repo, 'fixtures/contract/report.v4/valid-full.json'), 'utf8')), filed: ago(150) }));
@@ -152,7 +152,7 @@ try {
   else { await tap('.dz-more'); await evaluate(`[...document.querySelectorAll('#dz-sheet .ui-pr')].find((b) => b.textContent.startsWith('Archived')).click()`); await wait(450); }
   await capture('archived', (m) => { assert.equal(m.archived.length, 3); assert.ok(m.archived.every((r) => /Replaced by newer/.test(r) && /Read/.test(r) && /Restore/.test(r)), m.archived.join(' | ')); });
   // Restore brings one back to Designs.
-  await tap('#ar-sheet [aria-label="Restore, Fleet dashboard, the whole redesign"]');
+  await tap('#ar-sheet [aria-label="Restore, Ship the fleet dashboard redesign?"]');
   assert.ok(await evaluate(`!!document.getElementById('item-dash-v2')`), 'Restore did not bring the design back');
   const trail = JSON.parse(await (await fetch(base + 'api/decisions')).text()).trail.filter((t) => t.kind === 'discard');
   agent.push('The board\'s trail of discards:', JSON.stringify(trail, null, 2));

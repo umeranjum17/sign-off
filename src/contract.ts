@@ -9,9 +9,9 @@ export class ContractError extends Error {
   constructor(message: string, readonly help: string) { super(message); }
 }
 /** The kinds, with the schema number of each. */
-export const SCHEMAS: Record<string, number> = { ask: 1, report: 5, evidence: 1, gate: 1, finding: 1, plan: 3, design: 1 };
-/** Older schemas this sign-off-axi still takes, so a board that holds them loads and re-posts: the page-based report 2, the guided report 3 and 4 (4 with no purpose), and plan 1 and 2. */
-const OLDER: Record<string, number[]> = { report: [2, 3, 4], plan: [1, 2] };
+export const SCHEMAS: Record<string, number> = { ask: 1, report: 5, evidence: 1, gate: 1, finding: 1, plan: 3, design: 2 };
+/** Older schemas this sign-off-axi still takes, so a board that holds them loads and re-posts: the page-based report 2, the guided report 3 and 4 (4 with no purpose), plan 1 and 2, and design 1 (screens of one view each). */
+const OLDER: Record<string, number[]> = { report: [2, 3, 4], plan: [1, 2], design: [1] };
 /** The guided schemas: a report 3 and a plan 2 are fields the board draws as one guided page, not a page the agent draws. */
 export const guided = (m: any) => (m?.kind === 'report' && [3, 4, 5].includes(m.schema)) || (m?.kind === 'plan' && [2, 3].includes(m.schema));
 /** The schemas with versioned engagement, whose owning filer is required: report 4 and 5, plan 3. */
@@ -25,8 +25,12 @@ const FIELDS: Record<string, string[]> = {
   gate: [...COMMON, 'run', 'options', 'recommend_value', 'close'],
   finding: [...COMMON, 'cause', 'incidents', 'days', 'evidence_ids', 'change_kind', 'proposal', 'options', 'recommend_value'],
   plan: [...COMMON, 'project', 'sections', 'decisions', 'steps', 'view'],
-  design: [...COMMON, 'group', 'filed', 'status', 'preview', 'journeys', 'options', 'recommend'],
+  design: [...COMMON, 'group', 'filed', 'status', 'preview', 'journeys', 'accepts', 'reviewed'],
 };
+/** Design 1: screens of one view each and an optional pick between directions, with no question of its own. */
+const DESIGN_1 = [...COMMON, 'group', 'filed', 'status', 'preview', 'journeys', 'options', 'recommend'];
+/** A design 2 frame's role, in the order its columns show: what ships today, the new look (proposed or built) and the approved target design. */
+export const FRAME_ROLES = ['today', 'proposed', 'built', 'target'];
 const GUIDE = ['understood', 'visual', 'sections', 'next'];
 const GUIDE_FIELDS: Record<string, string[]> = {
   report: [...COMMON, 'filed', 'group', 'decided', 'asked_by', 'purpose', ...GUIDE],
@@ -88,8 +92,9 @@ const flagOf = (field: string) => { const f = field.replace(/^options\[\d+\]\./,
 const named = (field: string, flags: boolean) => (flags ? flagOf(field) : `"${field}"`);
 
 /** Checks one message against its kind's rules and returns its kind and schema; the first broken rule throws, in the order docs/contract.md gives.
- * `want` is the kind the caller expects, so the wrong file is refused before its fields are read. */
-export function checkMessage(m: any, want?: string, flags = false): { kind: string; schema: number } {
+ * `want` is the kind the caller expects, so the wrong file is refused before its fields are read. `fresh` is a new design posted by post --kind design,
+ * whose title must be one plain question whatever its schema. */
+export function checkMessage(m: any, want?: string, flags = false, fresh = false): { kind: string; schema: number } {
   if (!m || typeof m !== 'object' || Array.isArray(m)) throw new ContractError('the message must be one JSON object', 'Write the message as one JSON object, such as {"contract":1,"kind":"ask",...}');
   const at = isKey(m.key) ? `key ${m.key}: ` : '';
   const bad = (field: string, rule: string, help: string) => new ContractError(`${at}${flags ? flagOf(field) : field} ${rule}`, help);
@@ -279,7 +284,7 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
   if (m.schema !== SCHEMAS[m.kind] && !OLDER[m.kind]?.includes(m.schema)) throw bad('schema', `${m.schema} of ${m.kind} is not in this sign-off-axi`, `Upgrade sign-off-axi, or post ${m.kind} schema ${SCHEMAS[m.kind]}`);
   if (g && /FILL:/.test(JSON.stringify(m))) throw bad('message', 'still has FILL: lines from the template', 'Replace every FILL: line with your own words, then post again');
   // A guided report 5 names what it is for; report 4 and older have no purpose field.
-  const fields = (guided(m) ? GUIDE_FIELDS[m.kind] : FIELDS[m.kind]).filter((f) => f !== 'purpose' || (m.kind === 'report' && m.schema >= 5)), extra = Object.keys(m).find((f) => !fields.includes(f));
+  const fields = (guided(m) ? GUIDE_FIELDS[m.kind] : m.kind === 'design' && m.schema === 1 ? DESIGN_1 : FIELDS[m.kind]).filter((f) => f !== 'purpose' || (m.kind === 'report' && m.schema >= 5)), extra = Object.keys(m).find((f) => !fields.includes(f));
   if (extra === 'options' && m.kind === 'report') throw bad('options', 'is not a field of report: a report takes no answer', 'Remove "options", or post an ask to get an answer');
   if (extra === 'options' && m.kind === 'plan') throw bad('options', 'is not a field of plan: its answers come from its sections and decisions', 'Remove "options"; put each question in "decisions", with its options and "recommend"');
   if (extra !== undefined) throw bad(escaped(extra) || '""', `is not a field of ${m.kind} schema ${m.schema}`, `Remove ${show(extra)}; ${m.kind} takes ${fields.slice(3).join(', ')}`);
@@ -337,33 +342,88 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
     return { kind: m.kind, schema: m.schema };
   }
   if (m.kind === 'design') {
+    const two = m.schema === 2;
+    // What the person reads on a design 2, and the title of any new design, is plain words: never an id, a pull request, a slice or a file name.
+    const plain = (field: string, v: string) => {
+      const hit = jargon(v);
+      if (hit) throw bad(field, `has ${show(hit)}, words for agents that the person does not know`, `Say what changed in plain words; put ids, pull requests and file names in "link" (${JARGON_HELP})`);
+    };
+    if (two || fresh) {
+      const title = m.title.trim(), words = title.split(/\s+/).length, ASK = 'Make the title the one plain question Yes answers, in 12 words or fewer, such as "Approve this new phone end of list for Reports?"';
+      plain('title', title);
+      if (!title.endsWith('?') || title.indexOf('?') !== title.length - 1) throw bad('title', 'must be one question, ending in its only "?"', ASK);
+      if (words > 12) throw bad('title', `is ${words} words, over 12`, `${ASK}; put the rest in "about"`);
+    }
+    if (two) {
+      text('about', m.about, 280, 'what changed and why, in one or two plain sentences (280 characters or fewer)');
+      plain('about', m.about);
+      if (Object.hasOwn(m, 'reviewed')) { text('reviewed', m.reviewed, 200, 'the reviewer\'s note, in 200 characters or fewer, or leave it out'); plain('reviewed', m.reviewed); }
+    }
     text('group', m.group, 40, 'the project name, in 40 characters or fewer');
     const at = typeof m.filed === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(m.filed) ? new Date(m.filed) : undefined;
     if (!at || Number.isNaN(at.getTime()) || at.toISOString().replace('.000', '') !== m.filed) throw bad('filed', 'must be a real UTC time with seconds', 'Set "filed" to YYYY-MM-DDTHH:MM:SSZ');
     if (!['draft', 'in_review'].includes(m.status)) throw bad('status', 'must be draft or in_review', 'Set "status" to "draft" or "in_review"');
     page('preview', /\.(png|jpe?g|webp)$/i, '.png, .jpg, .jpeg or .webp', '"design/preview.png"', 'a design preview');
-    const journeys = list('journeys', 0, 40, ['id', 'title', 'screens'], '{"id":"signup","title":"Sign up","screens":[...]}');
-    const ids: string[] = [];
+    const SCREEN = two ? '{"id":"list-end","title":"Reports, scrolled to its end","frames":[...]}' : '{"id":"welcome","title":"Welcome","views":{...}}';
+    const journeys = list('journeys', two ? 1 : 0, 40, ['id', 'title', 'screens'], `{"id":"phone","title":"On a phone","screens":[${SCREEN}]}`);
+    if (two) {
+      if (!FRAME_ROLES.slice(1).includes(m.accepts)) throw bad('accepts', Object.hasOwn(m, 'accepts') ? `${show(m.accepts)} is not proposed, built or target` : 'is required: the frame Yes approves', 'Set "accepts" to the role of the frame Yes approves: "built", "proposed" or "target"');
+      const count = journeys.reduce((n, j) => n + (Array.isArray(j?.screens) ? j.screens.length : 0), 0);
+      if (count > 8) throw bad('journeys', `hold ${count} screens, over 8`, 'Show only the screens that changed, one per state that changed: 8 at most');
+    }
+    const ids: string[] = [], variants = ['phone_light', 'phone_dark', 'computer_light', 'computer_dark'];
+    /** A frame's or a design 1 screen's views: phone_light, phone_dark, computer_light or computer_dark, each a board-relative picture or page; on a design 2 all of one device. */
+    const views = (p: string, v: any) => {
+      if (!v || typeof v !== 'object' || Array.isArray(v) || Object.keys(v).some(k => !variants.includes(k)) || !Object.keys(v).length) throw bad(p, 'must map at least one supported view to a path', 'Add a phone_light, phone_dark, computer_light or computer_dark path');
+      if (two && new Set(Object.keys(v).map(k => k.split('_')[0])).size > 1) throw bad(p, 'mixes phone and computer views', 'Give a phone and a computer their own screen: the changed area differs between them');
+      for (const [variant, path] of Object.entries(v)) {
+        text(`${p}.${variant}`, path, 256, 'a board-relative image or HTML path');
+        if (/^([\\/]|[A-Za-z]:)/.test(path as string) || (path as string).split(/[\\/]/).includes('..') || /[?#\\]/.test(path as string) || !/\.(png|jpe?g|webp|html)$/i.test(path as string)) throw bad(`${p}.${variant}`, 'must be a relative .png, .jpg, .jpeg, .webp or .html path without ..', 'Put the view under the board folder');
+        if (two && !/\.(png|jpe?g|webp)$/i.test(path as string)) throw bad(`${p}.${variant}`, 'must be a .png, .jpg, .jpeg or .webp picture', 'Capture the screen as a picture, so its changed area can be outlined on it');
+      }
+      return Object.keys(v)[0].split('_')[0];
+    };
     journeys.forEach((j, n) => {
       if (typeof j.id !== 'string' || !/^[a-z0-9-]{1,40}$/.test(j.id)) throw bad(`journeys[${n}].id`, 'must be a short lowercase id', 'Set it to a slug such as "signup"');
       if (ids.includes(j.id)) throw bad(`journeys[${n}].id`, `repeats ${j.id}`, 'Give each journey its own id'); ids.push(j.id);
       text(`journeys[${n}].title`, j.title, 120, 'the journey title');
+      if (two) plain(`journeys[${n}].title`, j.title);
       if (!Array.isArray(j.screens) || !j.screens.length || j.screens.length > 80) throw bad(`journeys[${n}].screens`, 'must list 1 to 80 screens', 'Add at least one screen with a view');
       const screenIds: string[] = [];
       j.screens.forEach((s: any, k: number) => {
-        const p = `journeys[${n}].screens[${k}]`;
-        if (!s || typeof s !== 'object' || Array.isArray(s) || Object.keys(s).some(x => !['id','title','views'].includes(x))) throw bad(p, 'must have only id, title and views', 'Use {"id":"welcome","title":"Welcome","views":{...}}');
+        const p = `journeys[${n}].screens[${k}]`, own = two ? ['id', 'title', 'frames'] : ['id', 'title', 'views'];
+        if (!s || typeof s !== 'object' || Array.isArray(s) || Object.keys(s).some(x => !own.includes(x))) throw bad(p, `must have only ${own.join(', ')}`, `Use ${SCREEN}`);
         if (typeof s.id !== 'string' || !/^[a-z0-9-]{1,40}$/.test(s.id)) throw bad(`${p}.id`, 'must be a short lowercase id', 'Set it to a slug such as "welcome"');
         if (screenIds.includes(s.id)) throw bad(`${p}.id`, `repeats ${s.id}`, 'Give each screen its own id'); screenIds.push(s.id);
-        text(`${p}.title`, s.title, 120, 'the screen title');
-        const views = s.views, variants = ['phone_light','phone_dark','computer_light','computer_dark'];
-        if (!views || typeof views !== 'object' || Array.isArray(views) || Object.keys(views).some(v => !variants.includes(v)) || !Object.keys(views).length) throw bad(`${p}.views`, 'must map at least one supported view to a path', 'Add a phone_light, phone_dark, computer_light or computer_dark path');
-        for (const [variant, path] of Object.entries(views)) {
-          text(`${p}.views.${variant}`, path, 256, 'a board-relative image or HTML path');
-          if (/^([\\/]|[A-Za-z]:)/.test(path as string) || (path as string).split(/[\\/]/).includes('..') || /[?#\\]/.test(path as string) || !/\.(png|jpe?g|webp|html)$/i.test(path as string)) throw bad(`${p}.views.${variant}`, 'must be a relative .png, .jpg, .jpeg, .webp or .html path without ..', 'Put the view under the board folder');
-        }
+        text(`${p}.title`, s.title, two ? 80 : 120, 'the screen title');
+        if (!two) { views(`${p}.views`, s.views); return; }
+        plain(`${p}.title`, s.title);
+        // A design 2 screen: one to three frames in role order, each changed area outlined and named in one line whenever there is something to compare.
+        const FRAME = '{"role":"built","views":{"phone_light":"design/after.light.png"},"area":{"x":0,"y":0.8,"w":1,"h":0.12},"caption":"More now sits clear of the dock"}';
+        const frames = list(`${p}.frames`, 1, 3, ['role', 'views', 'area', 'caption'], FRAME, s.frames), roles = frames.map((f) => f.role);
+        frames.forEach((f, i) => {
+          const at = `${p}.frames[${i}]`;
+          if (!FRAME_ROLES.includes(f.role)) throw bad(`${at}.role`, Object.hasOwn(f, 'role') ? `${show(f.role)} is not today, proposed, built or target` : 'is required', 'Set "role" to "today" (what ships now), "proposed" or "built" (the new look) or "target" (the approved design)');
+          if (i && FRAME_ROLES.indexOf(f.role) <= FRAME_ROLES.indexOf(roles[i - 1])) throw bad(`${at}.role`, `${f.role} comes after ${roles[i - 1]}`, 'List the frames once each, in the order today, proposed or built, target');
+          if (f.role === 'built' && roles.includes('proposed')) throw bad(`${at}.role`, 'is built beside proposed', 'Show one new look: built once it is built, else proposed');
+          if (views(`${at}.views`, f.views) !== views(`${p}.frames[0].views`, frames[0].views)) throw bad(`${at}.views`, 'is another device than the first frame', 'Compare frames of one device in a screen');
+          const compare = frames.length > 1;
+          if (compare || Object.hasOwn(f, 'area')) {
+            const r = f.area, AREA = 'Set "area" to the changed part as fractions of the picture, such as {"x":0,"y":0.8,"w":1,"h":0.12}';
+            if (!r) throw bad(`${at}.area`, 'is required: outline what changed on each frame', AREA);
+            one(`${at}.area`, r, ['x', 'y', 'w', 'h'], '{"x":0,"y":0.8,"w":1,"h":0.12}');
+            if (!['x', 'y', 'w', 'h'].every((c) => typeof r[c] === 'number' && r[c] >= 0 && r[c] <= 1) || !(r.w > 0 && r.h > 0) || r.x + r.w > 1.001 || r.y + r.h > 1.001) throw bad(`${at}.area`, 'must be x, y, w and h from 0 to 1 that stay inside the picture', AREA);
+          }
+          if (compare || Object.hasOwn(f, 'caption')) {
+            text(`${at}.caption`, f.caption, 90, 'what changed in this frame, in one line of 90 characters or fewer');
+            if (/\n/.test(f.caption)) throw bad(`${at}.caption`, 'has more than one line', 'Name what changed in one line');
+            plain(`${at}.caption`, f.caption);
+          }
+        });
+        if (!roles.includes(m.accepts)) throw bad(`${p}.frames`, `has no ${m.accepts} frame, which Yes approves`, `Add the ${m.accepts} frame to every screen, or set "accepts" to a role every screen has`);
       });
     });
+    if (two) return { kind: m.kind, schema: m.schema };
     if (m.options !== undefined) {
       if (!Array.isArray(m.options) || m.options.length < 2 || m.options.length > 6) throw bad('options', 'must list 2 to 6 options', 'Set options to 2-6 {"value":"...","label":"..."} choices');
       checkOptions('options', m.options);
@@ -479,6 +539,13 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
 
 /** An id or task name, never a word a person says: a lowercase token with an underscore or slash, or a letter-first token with a digit, such as slice-5, ship_1 or ch/cloud. */
 const idWord = (w: string) => /^[a-z0-9]+(?:[-_/][a-z0-9]+)+$/.test(w) && (/[_/]/.test(w) || (/^[a-z]/.test(w) && /\d/.test(w)));
+/** Words for agents in a text a person reads, the first one found: an id word (above), a long hyphened slug (a task or branch name such as
+ * signoff-phone-designs-access), a pull request (PR, #265), a slice, an agent or ticket code (Lead4821, RL-02), a file name or a commit. */
+export function jargon(text: string): string | undefined {
+  const word = text.split(/\s+/).map((w) => w.replace(/^[^\w#]+|[^\w]+$/g, '')).find((w) => idWord(w) || /^[a-z0-9]+(?:-[a-z0-9]+){3,}$/.test(w));
+  return word || text.match(/\bPRs?\b|#\d+\b|\b[Ss]lices?\b|\b[A-Z][a-z]+\d{3,}\b|\b[A-Z]{2,}-\d+\b|[\w.-]+\.(?:png|jpe?g|webp|svg|html?|jsonl?|[mc]js|ts|md|ya?ml)\b|\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b/)?.[0];
+}
+const JARGON_HELP = 'refused: task and branch names, PR or #number, slice, agent or ticket codes such as Lead4821 or RL-02, file names and commits';
 /** Buttons that close a card but answer no question. */
 const NOT_ANSWERS = /^(done|not now|ok|okay|got it|noted|seen|acknowledged?|dismiss)$/i;
 /** The lettered choices a text names: "Option A", "A)", "(A)" or "A:" anywhere, and "A." only at a line start, so initials such as "D. A. Brown" are not choices. */

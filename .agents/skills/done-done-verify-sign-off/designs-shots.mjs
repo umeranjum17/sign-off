@@ -150,14 +150,14 @@ try {
     copyFileSync(join(media, `${f}.webp`), join(dir, 'design', `${f}.webp`));
   const post = (msg) => { writeFileSync(join(dir, `${msg.key}.json`), JSON.stringify({ contract: 1, kind: 'design', schema: 1, filer: 'design-agent', status: 'in_review', ...msg })); cli('post', board, '--kind', 'design', '--from', join(dir, `${msg.key}.json`)); };
   const views = (f, form = 'phone') => ({ [`${form}_light`]: `design/${f}.webp`, [`${form}_dark`]: `design/${f}-dark.webp` });
-  post({ key: 'reports-phone', title: 'Reports list that reads well on a phone', group: 'Reports', filed: day(2), preview: 'design/phone-reports.webp',
+  post({ key: 'reports-phone', title: 'Reports list that reads well on a phone?', group: 'Reports', filed: day(2), preview: 'design/phone-reports.webp',
     about: 'The reports list at phone width: each title on one line with its form and day, the newest first, and the last row clear of the dock.',
     journeys: [{ id: 'reports', title: 'Reports', screens: [{ id: 'list', title: 'The list', views: views('phone-reports') }] }] });
-  post({ key: 'today-desk', title: 'Today on a desk in one column or two', group: 'Board desk', filed: day(1), preview: 'design/desk-today.webp',
+  post({ key: 'today-desk', title: 'Today on a desk in one column or two?', group: 'Board desk', filed: day(1), preview: 'design/desk-today.webp',
     about: 'Two ways to lay out Today on a computer. One column reads top to bottom; two columns keep Up next beside what else waits.',
     options: [{ value: 'one', label: 'One column' }, { value: 'two', label: 'Two columns' }], recommend: 'two',
     journeys: [{ id: 'today', title: 'Today', screens: [{ id: 'desk', title: 'On a desk', views: views('desk-today', 'computer') }] }] });
-  post({ key: 'today-phone', title: 'Today on a phone, with Up next first and then what waits on you', group: 'Sign-off', filed: day(0), preview: 'design/phone-today.webp',
+  post({ key: 'today-phone', title: 'Today on a phone, with Up next first?', group: 'Sign-off', filed: day(0), preview: 'design/phone-today.webp',
     about: 'Three screens a person sees each morning: Today with Up next, the ask it opens, and a sign-in that waits.',
     options: [{ value: 'up-next', label: 'Up next first' }, { value: 'waits', label: 'What waits first' }], recommend: 'up-next',
     journeys: [{ id: 'morning', title: 'Morning', screens: [['today', 'Today', 'phone-today'], ['ask', 'The ask', 'phone-decide'], ['signin', 'A sign-in', 'phone-signin']]

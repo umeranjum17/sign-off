@@ -85,6 +85,10 @@ journeys:
   # a money ask that always waits, Ask me first set from the sheet, and Change reaching the agent. LEASH_ICONS=<folder of the projects' real icons>, LEASH_REVIEW_ROOT=<folder outside the run> keeps every state there and only Decide's frames in the run.
   leash:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/leash-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
+  # A design asked as one plain question (design 2), on the owner's real card (DESIGN_ASK_FRAMES=<folder of today, built and target .light/.dark.webp>): the card as first written
+  # refused rule by rule (refusals.txt), then the question, its frames with the changed area outlined and captioned, a note beside Yes and Yes saved as approve, at 390 and 1280, light and dark.
+  design-ask:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/design-ask-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "$DESIGN_ASK_FRAMES"'
   # A screen note typed in the design viewer on an answers-only (fed) board and Request change sent, one width per run: REQUEST_WIDTH=390|1280.
   request-change:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/request-change-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${REQUEST_THEME:-light}"'

@@ -1,6 +1,6 @@
 // Today in the new look, as the approved prototype draws it, at one theme and width per run (so a run's steps.json holds one claim), driven and measured in a headless
 // Chromium of its own over the DevTools protocol with exact device metrics (390x844 or 1280x800, 2x).
-// The board is feel-board.sh's (a sign-in, three asks with a pick, a six-screen design to review, five updates, two reports), then: a P0 on the ship ask and a P2 on the
+// The board is feel-board.sh's (a sign-in, three asks with a pick, a three-screen design asked as one question, five updates, two reports), then: a P0 on the ship ask and a P2 on the
 // digest ask, the export ask and the design on tickets (60% and 100%), the ship ask resting on the settings proof (so it takes that proof's project), and the settings and Chat app projects given their own icons with
 // sign-off-axi project --icon, so Up next and the rows show a priority chip, a project's name and its icon where they exist.
 // States: today-signin (the sign-in up next, as seeded), today (after signin done: the ship ask up next), today-answered (its Answer tapped), theme (the round

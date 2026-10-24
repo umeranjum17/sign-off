@@ -34,9 +34,9 @@ try {
   // Three designs of real board screens, newest last; each one's first screen is what its row's thumbnail shows.
   const design = (key, title, about, views) => post('design', { contract: 1, kind: 'design', schema: 1, key, title, about, group: 'sign-off', filed: now, status: 'in_review', preview: Object.values(views)[0],
     journeys: [{ id: 'screens', title: 'Screens', screens: [{ id: 'main', title, views }] }] });
-  design('today-desk', 'Today on a desk, one filled screen', 'Up next, Waiting on you and the day in one window.', { computer_light: 'media/desk-today.webp', computer_dark: 'media/desk-today-dark.webp' });
-  design('reports-list', 'Reports as rows with how much is read', 'A row per report with its kind and progress.', { phone_light: 'media/phone-reports.webp', phone_dark: 'media/phone-reports-dark.webp' });
-  design('decide-list', 'Decide: every ask in one card', 'The asks as rows, the hero and Answered.', { phone_light: 'media/phone-decide.webp', phone_dark: 'media/phone-decide-dark.webp' });
+  design('today-desk', 'Today on a desk, one filled screen?', 'Up next, Waiting on you and the day in one window.', { computer_light: 'media/desk-today.webp', computer_dark: 'media/desk-today-dark.webp' });
+  design('reports-list', 'Reports as rows with how much is read?', 'A row per report with its kind and progress.', { phone_light: 'media/phone-reports.webp', phone_dark: 'media/phone-reports-dark.webp' });
+  design('decide-list', 'Decide: every ask in one card?', 'The asks as rows, the hero and Answered.', { phone_light: 'media/phone-decide.webp', phone_dark: 'media/phone-decide-dark.webp' });
   for (const [key, title] of [['ship', 'Ship Designs on the phone in 0.6.2?'], ['digest', 'Keep the weekly digest?'], ['icons', 'Pin the project icons for every list?']])
     so('post', board, '--ask-ref', 'message-designs-access', '--key', key, '--title', title, '--filer', 'sign-off', ...(key === 'ship' ? ['--ticket', 'T-1'] : []), '--why', 'Umer decides what ships.', '--outcome', 'yes=It goes ahead.', '--outcome', 'no=It waits.', '--recommend', 'yes', '--recommend-reason', 'It is ready.', '--default', 'no');
   so('post', board, '--type', 'evidence', '--title', 'Designs open from Decide on a phone', '--about', 'Umer reaches Designs in one tap.', '--media', join(dir, 'media/phone-decide.webp'), '--ticket', 'T-1');

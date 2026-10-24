@@ -2425,7 +2425,7 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   writeFileSync(join(dir, 'design', 'security.html'), `<!doctype html><title>Security view</title><h1>Security preview</h1>${says}`);
   writeFileSync(join(dir, 'design', 'security-desk.html'), `<!doctype html><title>Security on a desk</title><h1>Security preview</h1>${says}`);
   writeFileSync(join(dir, 'design', 'welcome.webp'), readFileSync(new URL('../docs/media/phone-light.webp', import.meta.url)));
-  const message = { contract: 1, kind: 'design', schema: 1, key: 'd1-design', title: 'Review the welcome screen',
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd1-design', title: 'Approve the welcome screen?',
     about: 'Check the welcome screen before release.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review',
     preview: 'design/preview.png', link: 'https://example.test/design/original',
     options: [{ value: 'quick', label: 'Quick' }, { value: 'guided', label: 'Guided' }], recommend: 'guided',
@@ -2582,7 +2582,7 @@ test('a design without journey screens accepts a design-level change note', { sk
   const dir = join(scratch, 'design-level-note'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
   mkdirSync(join(dir, 'design'), { recursive: true });
   writeFileSync(join(dir, 'design', 'preview.png'), png);
-  const message = { contract: 1, kind: 'design', schema: 1, key: 'd1-no-screens', title: 'Review the settings direction',
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd1-no-screens', title: 'Approve the settings direction?',
     about: 'Check the overall settings direction.', group: 'Settings', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png', journeys: [] };
   writeFileSync(source, JSON.stringify(message));
   const posted = run('post', file, '--kind', 'design', '--from', source);
@@ -2611,7 +2611,7 @@ test('an answers-only board takes a screen review: typing a note in the viewer e
   mkdirSync(join(dir, 'design'), { recursive: true });
   writeFileSync(join(dir, 'design', 'preview.png'), png);
   writeFileSync(join(dir, 'design', 'a.png'), png);
-  const message = { contract: 1, kind: 'design', schema: 1, key: 'd3-fed', title: 'Review the fed screen', about: 'A program feeds this board.', group: 'Sign-in',
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd3-fed', title: 'Approve the fed screen?', about: 'A program feeds this board.', group: 'Sign-in',
     filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
     journeys: [{ id: 'flow', title: 'Flow', screens: [{ id: 'a', title: 'First', views: { phone_light: 'design/a.png' } }] }] };
   writeFileSync(source, JSON.stringify(message));
@@ -2642,7 +2642,7 @@ test('a screen approval on a design with no design verdict keeps the design wait
   writeFileSync(join(dir, 'design', 'preview.png'), png);
   writeFileSync(join(dir, 'design', 'a.png'), png);
   writeFileSync(join(dir, 'design', 'b.png'), png);
-  const message = { contract: 1, kind: 'design', schema: 1, key: 'd2-screens', title: 'Review the flow screens',
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd2-screens', title: 'Approve the flow screens?',
     about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
     journeys: [{ id: 'flow', title: 'Flow', screens: [
       { id: 'a', title: 'First', views: { phone_light: 'design/a.png' } },
@@ -2687,7 +2687,7 @@ test('design screen saves: a screen-only save runs no on_answer, a change on a s
   writeFileSync(join(dir, 'design', 'b.png'), png);
   writeFileSync(join(dir, 'hook.mjs'), `import { appendFileSync, readFileSync } from 'node:fs';\nappendFileSync(${JSON.stringify(out)}, readFileSync(0, 'utf8'));\n`);
   writeFileSync(join(dir, 'config.yaml'), 'board: board.json\non_answer: node hook.mjs\n');
-  const message = { contract: 1, kind: 'design', schema: 1, key: 'd3-verdicts', title: 'Review the flow screens',
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd3-verdicts', title: 'Approve the flow screens?',
     about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
     options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend: 'a',
     journeys: [{ id: 'flow', title: 'Flow', screens: [
@@ -2722,7 +2722,7 @@ test('design screen saves: a screen-only save runs no on_answer, a change on a s
   proc.kill();
 });
 
-const flowMessage = (key, screens) => ({ contract: 1, kind: 'design', schema: 1, key, title: 'Review the flow screens',
+const flowMessage = (key, screens) => ({ contract: 1, kind: 'design', schema: 1, key, title: 'Approve the flow screens?',
   about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
   options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend: 'a', journeys: [{ id: 'flow', title: 'Flow', screens: screens.map((id) => ({ id, title: id, views: { phone_light: 'design/preview.png' } })) }] });
 
@@ -2782,7 +2782,7 @@ test('a design holding only screen notes does not lock its key or its question',
   mkdirSync(join(dir, 'design'), { recursive: true });
   writeFileSync(join(dir, 'design', 'preview.png'), png);
   writeFileSync(join(dir, 'design', 'a.png'), png);
-  const design = { contract: 1, kind: 'design', schema: 1, key: 'd4-relock', title: 'Review the flow screens',
+  const design = { contract: 1, kind: 'design', schema: 1, key: 'd4-relock', title: 'Approve the flow screens?',
     about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
     journeys: [{ id: 'flow', title: 'Flow', screens: [{ id: 'a', title: 'First', views: { phone_light: 'design/a.png' } }] }] };
   writeFileSync(message, JSON.stringify(design));
@@ -2803,7 +2803,7 @@ test('a screen save drops a stored pick that is no longer a listed option', asyn
   mkdirSync(join(dir, 'design'), { recursive: true });
   writeFileSync(join(dir, 'design', 'preview.png'), png);
   writeFileSync(join(dir, 'design', 'a.png'), png);
-  const design = (options) => ({ contract: 1, kind: 'design', schema: 1, key: 'd5-pick', title: 'Look', about: 'Pick a look.', group: 'Sign-in',
+  const design = (options) => ({ contract: 1, kind: 'design', schema: 1, key: 'd5-pick', title: 'Approve this look?', about: 'Pick a look.', group: 'Sign-in',
     filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png', options, recommend: options[0].value,
     journeys: [{ id: 'flow', title: 'Flow', screens: [{ id: 'a', title: 'First', views: { phone_light: 'design/a.png' } }] }] });
   writeFileSync(message, JSON.stringify(design([{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }])));
@@ -2844,7 +2844,7 @@ test('design screen change: a change with new text on a screen that already had 
   writeFileSync(join(dir, 'design', 'preview.png'), png);
   writeFileSync(join(dir, 'design', 'a.png'), png);
   writeFileSync(join(dir, 'design', 'b.png'), png);
-  const message = { contract: 1, kind: 'design', schema: 1, key: 'd3-change-again', title: 'Review the flow screens',
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd3-change-again', title: 'Approve the flow screens?',
     about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
     options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend: 'a',
     journeys: [{ id: 'flow', title: 'Flow', screens: [
@@ -2872,7 +2872,7 @@ test('a viewer request for a change already stored on an approved design still s
   writeFileSync(join(dir, 'design', 'preview.png'), png);
   writeFileSync(join(dir, 'design', 'a.png'), png);
   writeFileSync(join(dir, 'design', 'b.png'), png);
-  const message = { contract: 1, kind: 'design', schema: 1, key: 'd3-rerequest', title: 'Review the flow screens',
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd3-rerequest', title: 'Approve the flow screens?',
     about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
     options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend: 'a',
     journeys: [{ id: 'flow', title: 'Flow', screens: [
@@ -2899,7 +2899,7 @@ test('a plain wait wakes when a viewer request changes an approved design', asyn
   mkdirSync(join(dir, 'design'), { recursive: true });
   writeFileSync(join(dir, 'design', 'preview.png'), png);
   writeFileSync(join(dir, 'design', 'a.png'), png);
-  const message = { contract: 1, kind: 'design', schema: 1, key: 'd5-rewake', title: 'Review the flow screens',
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd5-rewake', title: 'Approve the flow screens?',
     about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
     options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend: 'a',
     journeys: [{ id: 'flow', title: 'Flow', screens: [{ id: 'a', title: 'First', views: { phone_light: 'design/a.png' } }] }] };
@@ -2930,7 +2930,7 @@ test('design review: a viewer approve needs no direction pick, and an inline App
   writeFileSync(join(dir, 'design', 'preview.png'), png);
   writeFileSync(join(dir, 'design', 'a.png'), png);
   writeFileSync(join(dir, 'design', 'b.png'), png);
-  const message = { contract: 1, kind: 'design', schema: 1, key: 'd3-direction', title: 'Review the flow screens',
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd3-direction', title: 'Approve the flow screens?',
     about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
     options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend: 'a',
     journeys: [{ id: 'flow', title: 'Flow', screens: [
@@ -2968,7 +2968,7 @@ test('a design-level inline Approve or Change stores its verdict with the note, 
   const dir = join(scratch, 'design-level-note'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
   mkdirSync(join(dir, 'design'), { recursive: true });
   writeFileSync(join(dir, 'design', 'preview.png'), png);
-  const message = { contract: 1, kind: 'design', schema: 1, key: 'd3-plain', title: 'Review the plain page',
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd3-plain', title: 'Approve the plain page?',
     about: 'One page.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png', journeys: [] };
   writeFileSync(source, JSON.stringify(message));
   assert.equal(run('post', file, '--kind', 'design', '--from', source).code, 0);
@@ -3001,7 +3001,7 @@ test('a design posted again is a new round: the note box starts empty, the earli
   writeFileSync(join(dir, 'design', 'preview.png'), png);
   writeFileSync(join(dir, 'design', 'a.png'), png);
   writeFileSync(join(dir, 'design', 'b.png'), png);
-  const message = { contract: 1, kind: 'design', schema: 1, key: 'd6-round', title: 'Review the flow screens',
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd6-round', title: 'Approve the flow screens?',
     about: 'Approve each screen of the flow.', group: 'Sign-in', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
     journeys: [{ id: 'flow', title: 'Flow', screens: [
       { id: 'a', title: 'First', views: { phone_light: 'design/a.png' } },
@@ -3052,7 +3052,7 @@ test('a design review shows its screen on a phone in light and dark: the page fi
   writeFileSync(join(dir, 'design', 'light.html'), page('#fff', '#111'));
   writeFileSync(join(dir, 'design', 'dark.html'), page('#111', '#eee'));
   writeFileSync(join(dir, 'design', 'gone.html'), page('#fff', '#111'));
-  const message = { contract: 1, kind: 'design', schema: 1, key: 'd7-preview', title: 'Review the fleet screens',
+  const message = { contract: 1, kind: 'design', schema: 1, key: 'd7-preview', title: 'Approve the fleet screens?',
     about: 'The fleet overview.', group: 'Fleet', filed: '2026-10-18T12:00:00Z', status: 'in_review', preview: 'design/preview.png',
     journeys: [{ id: 'fleet', title: 'Fleet', screens: [
       { id: 'home', title: 'Overview', views: { phone_light: 'design/light.html', phone_dark: 'design/dark.html' } },
@@ -4233,7 +4233,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
       rows: [...document.querySelectorAll('.tk-sheet .tk-in a')].map((a) => [a.querySelector('.t').textContent.replace(/^Update \\d+ · /, ''), a.getAttribute('href')]),
       tab: document.querySelector('#tabs a[aria-current]')?.getAttribute('href'), wide: document.documentElement.scrollWidth > 390 })`));
     assert.deepEqual({ ...page, rows: page.rows.map(([t]) => t) }, { head: 'Settings · In progress', title: 'Ship the new settings page', props: ['Progress 60%', 'Part of The new settings page'], rows: shown.cards.map((c) => c.title), tab: '#tickets', wide: false });
-    assert.deepEqual(['Ship the settings page on Friday?', 'Settings on a phone', 'Chat app journeys', 'The weekly digest ran'].map((t) => Object.fromEntries(page.rows)[t]), ['#decide/ask-linked', '#evidence/update-1', '#designs/chat-journeys', '#reports/digest-ran']);
+    assert.deepEqual(['Ship the settings page on Friday?', 'Settings on a phone', 'Approve the chat app journeys?', 'The weekly digest ran'].map((t) => Object.fromEntries(page.rows)[t]), ['#decide/ask-linked', '#evidence/update-1', '#designs/chat-journeys', '#reports/digest-ran']);
     assert.equal(run('ticket', file, '--id', 'T-29', '--release', '0.6.1', '--state', 'on hold', '--pr', prs[0], '--pr', prs[1]).code, 0);
     await evaluate('refresh()');
     await until(() => evaluate('document.querySelector(".tk-sheet .tk-release")?.textContent === "0.6.1"'));
@@ -4472,7 +4472,7 @@ test('Discard: every card offers three reasons, one tap each; the card moves to 
   for (const f of readdirSync(join(fx, 'design.v1/design'))) writeFileSync(join(dir, 'design', f), readFileSync(join(fx, 'design.v1/design', f)));
   for (const [key, title, filer] of [['digest', 'Keep the weekly digest?', 'release-agent'], ['export', 'Turn on the CSV export?', 'release-agent']]) assert.equal(run('raise', file, '--key', key, '--title', title, '--filer', filer).code, 0);
   const design = JSON.parse(readFileSync(join(fx, 'design.v1/valid-basic.json'), 'utf8'));
-  for (const [key, title] of [['dash-v1', 'Fleet dashboard, first look'], ['dash-v2', 'Fleet dashboard, the whole redesign']]) {
+  for (const [key, title] of [['dash-v1', 'Ship the first fleet dashboard?'], ['dash-v2', 'Ship the fleet dashboard redesign?']]) {
     writeFileSync(join(dir, `${key}.json`), JSON.stringify({ ...design, key, title, filer: 'dashboard-agent' }));
     assert.equal(run('post', file, '--kind', 'design', '--from', join(dir, `${key}.json`)).code, 0);
   }
@@ -4522,7 +4522,7 @@ test('Discard: every card offers three reasons, one tap each; the card moves to 
     const started = Date.now(), handed = await new Promise((ok) => execFile(process.execPath, [cli, 'wait', file, '--filer', 'dashboard-agent', '--timeout', '30'], { env }, (e, out) => ok({ code: e?.code ?? 0, out })));
     assert.equal(handed.code, 0, handed.out);
     assert.ok(Date.now() - started >= 7000, 'the wait handed the discards over inside the Undo window');
-    assert.match(handed.out, /discarded\[2\]\{key,reason,at,title\}:\n {2}dash-v1,Replaced by newer,"[^"]+","Fleet dashboard, first look"\n {2}dash-v2,Replaced by newer,/);
+    assert.match(handed.out, /discarded\[2\]\{key,reason,at,title\}:\n {2}dash-v1,Replaced by newer,"[^"]+",(Ship the first fleet dashboard\?|"Ship the first fleet dashboard\?")\n {2}dash-v2,Replaced by newer,/);
     assert.deepEqual((await discards()).map((t) => [t.key, t.reason, !!t.read]).sort(), [['dash-v1', 'replaced', true], ['dash-v2', 'replaced', true]]);
     assert.match(run('list', file, '--full').out, /dash-v1,"discarded: Replaced by newer"/);
     assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['dash-v2'].discarded.label, 'Replaced by newer');
@@ -4531,8 +4531,8 @@ test('Discard: every card offers three reasons, one tap each; the card moves to 
     await until(() => evaluate('!!document.querySelector(".ar-line")'));
     await evaluate('document.querySelector(".ar-line").click()');
     await until(async () => (await evaluate('[...document.querySelectorAll("#ar-sheet .ar-list li")].map((li) => li.querySelector(".t").textContent + " / " + li.querySelector(".meta").textContent + " / " + li.querySelector(".ui-tb").textContent).join(" | ")'))
-      === 'Fleet dashboard, first look / Replaced by newer / Read | Fleet dashboard, the whole redesign / Replaced by newer / Read');
-    await evaluate('document.querySelector("#ar-sheet [aria-label=\'Restore, Fleet dashboard, the whole redesign\']").click()');
+      === 'Ship the first fleet dashboard? / Replaced by newer / Read | Ship the fleet dashboard redesign? / Replaced by newer / Read');
+    await evaluate('document.querySelector("#ar-sheet [aria-label=\'Restore, Ship the fleet dashboard redesign?\']").click()');
     await until(() => evaluate('!!document.getElementById("item-dash-v2") && document.querySelectorAll("#ar-sheet .ar-list li").length === 1'));
     await evaluate('document.getElementById("ar-sheet").close(); location.hash = "#designs/dash-v2"');
     await until(async () => (await evaluate('[...document.querySelectorAll(".thread .ui-act b")].map((t) => t.textContent).join("|")'))?.includes('Discarded: Replaced by newer|Delivered to dashboard-agent|dashboard-agent read it'));

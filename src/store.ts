@@ -19,7 +19,12 @@ export type GuideSection = { stage: 'found' | 'recommend'; items: { title: strin
 export type GuideVisual = { type: 'bars' | 'steps' | 'tiles'; heading: string; text?: string; unit?: string; rows: { label: string; text?: string; note?: string; tone?: string; value?: number; before?: number }[]; details?: { label: string; value: string }[] };
 export type PlanDecision = { key: string; question: string; why: string; options: (Option & { outcome: string })[]; recommend: string; reason?: string; after?: string; quiet?: string };
 export type DesignNote = { journey?: string; screen?: string; verdict?: 'approve' | 'change'; note?: string };
-export type DesignJourney = { id: string; title: string; screens: { id: string; title: string; views: Record<string, string> }[] };
+/** A design 2 frame: one role's views of a screen, with the changed area as fractions of the picture and its one-line caption. */
+export type DesignFrame = { role: string; views: Record<string, string>; area?: { x: number; y: number; w: number; h: number }; caption?: string };
+/** A design's screens: one view each on design 1, side-by-side frames on design 2. */
+export type DesignJourney = { id: string; title: string; screens: { id: string; title: string; views?: Record<string, string>; frames?: DesignFrame[] }[] };
+/** Every file a design screen shows: its views, or each frame's. */
+export const screenViews = (s: DesignJourney['screens'][number]): string[] => [...Object.values(s.views ?? {}), ...(s.frames ?? []).flatMap((f) => Object.values(f.views))];
 /** One section in a plan's send-back: approved, or changed with a note on what to change. */
 export type PlanNote = { section: string; verdict: 'approve' | 'change'; note?: string };
 export type EvidenceLink = { run_id: string; commit: string; outcome: string; repro: string; proof: string; evidence: string };
@@ -60,6 +65,8 @@ export type Decision = {
   engagement?: { kind: string; schema: number; filer: string; revision: string }; guided?: boolean; understood?: { label: string; text: string }[]; visual?: GuideVisual; next?: { heading: string; lines: string[] };
   /** Designs: project, date, review status, preview and screen views. */
   status?: 'draft' | 'in_review' | 'approved'; journeys?: DesignJourney[]; recommend?: string;
+  /** Design 2: the frame role Yes approves, and the reviewer's note shown as Main reviewed. */
+  accepts?: string; reviewed?: string;
 };
 export type Answer = { key: string; answer: string; label: string; close: string; at: string; note?: string; comments?: Sent[]; merged_by?: string;
   /** A plan's send-back: every section's verdict, and the option picked for each decision key. */
@@ -307,7 +314,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       ...(plan && { sections: d.sections, decisions: d.decisions, ...(d.project && { project: d.project }) }),
       ...(engagement && { engagement: { kind: d.kind, schema: d.schema, filer: d.filer, revision: documentRevision(d) } }),
       ...(guided && { guided: true, understood: d.understood, visual: d.visual, next: d.next, ...(report && { sections: d.sections }) }),
-      ...(design && { kind: 'design', type: 'design', group: d.group, filed: d.filed, status: d.status, preview: d.preview, journeys: d.journeys, ...(d.options && { options: d.options, recommend_value: d.recommend }) }),
+      ...(design && { kind: 'design', type: 'design', group: d.group, filed: d.filed, status: d.status, preview: d.preview, journeys: d.journeys, ...(d.accepts && { accepts: d.accepts }), ...(d.reviewed && { reviewed: d.reviewed }), ...(d.options && { options: d.options, recommend_value: d.recommend }) }),
       ...(d.type === 'explainer' && d.chapters && { chapters: d.chapters.map(({ at, title }: Chapter) => ({ at, title })) }),
     };
   });

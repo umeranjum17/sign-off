@@ -49,9 +49,9 @@ try {
   draw(17);
   writeFileSync(join(dir, 'design/moved.html'), page(false, 17));
   const views = { phone_light: 'design/overview.html', phone_dark: 'design/overview-dark.html', computer_light: 'design/overview.html', computer_dark: 'design/overview-dark.html' };
-  writeFileSync(join(dir, 'fleet.json'), JSON.stringify(design('fleet-dashboard', 'Fleet dashboard', views)));
+  writeFileSync(join(dir, 'fleet.json'), JSON.stringify(design('fleet-dashboard', 'Approve the fleet dashboard?', views)));
   so('post', board, '--kind', 'design', '--from', join(dir, 'fleet.json'));
-  writeFileSync(join(dir, 'lanes.json'), JSON.stringify(design('fleet-lanes', 'Fleet lanes', { phone_light: 'design/moved.html', computer_light: 'design/moved.html' })));
+  writeFileSync(join(dir, 'lanes.json'), JSON.stringify(design('fleet-lanes', 'Approve the fleet lanes?', { phone_light: 'design/moved.html', computer_light: 'design/moved.html' })));
   so('post', board, '--kind', 'design', '--from', join(dir, 'lanes.json'));
   rmSync(join(dir, 'design/moved.html')); // moved away after it was posted: the board cannot draw that screen
   server = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'serve', board, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'inherit'] });

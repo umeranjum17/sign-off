@@ -83,6 +83,36 @@ test('design review posts journeys and returns change notes through answers --js
   } finally { proc.kill(); }
 });
 
+test('a design asked as one question: post takes the plain question with its frames, and refuses an internal title, words for agents and frames that look the same', () => {
+  const dir = join(scratch, 'design-ask'), board = join(dir, 'board.json'), env = { ...process.env, HOME: join(scratch, 'design-ask-home') };
+  mkdirSync(join(dir, 'design'), { recursive: true });
+  for (const f of readdirSync(join(fixtures, 'design.v2', 'design'))) copyFileSync(join(fixtures, 'design.v2', 'design', f), join(dir, 'design', f));
+  const run = (...args) => spawnSync('node', [cli, ...args], { encoding: 'utf8', env });
+  const post = (m, name) => run('post', board, '--kind', 'design', '--from', message(`${name}.json`, JSON.stringify(m)));
+  const three = JSON.parse(readFileSync(join(fixtures, 'design.v2', 'valid-three.json')));
+  const posted = post(three, 'design-three');
+  assert.equal(posted.status, 0, posted.stdout + posted.stderr);
+  const stored = JSON.parse(readFileSync(board, 'utf8')).items.find((d) => d.key === three.key);
+  assert.deepEqual([stored.title, stored.accepts, stored.reviewed, stored.journeys[0].screens[0].frames.map((f) => f.role)], [three.title, 'target', three.reviewed, ['today', 'built', 'target']]);
+  // A today frame that is the built picture again, in other bytes, looks the same and is refused; so are an internal title and a pull request in the about.
+  copyFileSync(join(dir, 'design', 'built.png'), join(dir, 'design', 'today-again.png'));
+  appendFileSync(join(dir, 'design', 'today-again.png'), Buffer.alloc(8));
+  const same = structuredClone(three); same.key = 'same-frames'; same.journeys[0].screens[0].frames[0].views = { phone_light: 'design/today-again.png' };
+  const refused = post(same, 'design-same');
+  assert.equal(refused.status, 2); assert.match(refused.stdout, /screen list-end: the today and built frames look the same \(phone_light: 0% of pixels differ\)/);
+  for (const [field, value, rule] of [['title', 'Built: the chat list, slice 2', /title has \\"slice\\"/], ['title', 'The new end of the chat list', /title must be one question/], ['about', 'Built in PR 41.', /about has \\"PR\\"/]]) {
+    const m = { ...three, key: `bad-${field}`, [field]: value }, r = post(m, `design-bad-${field}`);
+    assert.equal(r.status, 2, value); assert.match(r.stdout, rule);
+  }
+  // A new design 1 is held to the question too; one already on the board (fed by a program) re-posts as it was.
+  const old = { ...JSON.parse(readFileSync(join(fixtures, 'design.v1', 'valid-basic.json'))), key: 'old-design', title: 'Chat app journeys' };
+  for (const f of readdirSync(join(fixtures, 'design.v1', 'design'))) copyFileSync(join(fixtures, 'design.v1', 'design', f), join(dir, 'design', f));
+  const fresh = post(old, 'design-old');
+  assert.equal(fresh.status, 2); assert.match(fresh.stdout, /title must be one question/);
+  assert.equal(run('post', board, '--from', message('design-feed.json', JSON.stringify({ schema: 2, items: [old] }))).status, 0);
+  assert.equal(post(old, 'design-old-again').status, 0);
+});
+
 test('every shipped fixture: valid files pass, each invalid file is refused on the field its name gives', () => {
   for (const folder of readdirSync(fixtures).filter((f) => !f.endsWith('.md'))) {
     const files = readdirSync(join(fixtures, folder)).map((f) => join(fixtures, folder, f));

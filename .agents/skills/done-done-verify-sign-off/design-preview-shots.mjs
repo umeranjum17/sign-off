@@ -43,7 +43,7 @@ try {
   copyFileSync(join(import.meta.dirname, 'design-preview-sample', 'dash.html'), join(dir, 'design', 'dash.html'));
   copyFileSync(join(repo, 'docs/media/phone-light.webp'), join(dir, 'design', 'preview.webp'));
   const views = Object.fromEntries(['phone_light', 'phone_dark', 'computer_light', 'computer_dark'].map((v) => [v, 'design/dash.html']));
-  writeFileSync(join(dir, 'design-message.json'), JSON.stringify({ contract: 1, kind: 'design', schema: 1, key: 'dash', title: 'Review the fleet dashboard',
+  writeFileSync(join(dir, 'design-message.json'), JSON.stringify({ contract: 1, kind: 'design', schema: 1, key: 'dash', title: 'Approve the fleet dashboard?',
     about: 'One screen for Umer to check lanes and runs.', group: 'Fleet', filed: '2026-10-23T10:00:00Z', status: 'in_review', preview: 'design/preview.webp',
     journeys: [{ id: 'fleet', title: 'Fleet', screens: [{ id: 'home', title: 'Home', views }] }] }));
   so('post', board, '--kind', 'design', '--from', join(dir, 'design-message.json'));
