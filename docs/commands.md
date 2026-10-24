@@ -26,8 +26,8 @@ Guided plan 3 / report 4 and 5 add **Simplify this**. Inspect version-1 action/t
 | `deeper` | answer a Go deeper tap on a plan or report |
 | `owner` | register a Claude author session, dispatch Go deeper or inspect delivery |
 | `signin` | close a sign-in card as done |
-| `dismiss` | hide a card, like its Dismiss button; `--filer <id>` hides every card of a finished task |
-| `restore` | bring a dismissed card back |
+| `dismiss` | hide a card; `--reason not-relevant\|replaced\|done-elsewhere` discards it like its Discard button and tells its agent; `--filer <id>` hides every card of a finished task |
+| `restore` | bring a dismissed or discarded card back |
 | `promote` | Main only: put a design review it passed in Decide (`--undo` takes it back to Designs); a lead's design never counts as an ask without it |
 | `feedback` | tell the person how far what they sent on a card got: `--read`, or `--reply <text>` / `--acted` with `--link` to the new version; the board shows Sent, Delivered, Read, Replied |
 | `ticket` | list tickets, show one with its cards, or write one (`--id`, `--title`, `--progress`, `--parent`, `--priority`, `--project`, `--hold`, `--asked`) |

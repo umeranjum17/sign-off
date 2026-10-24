@@ -85,7 +85,7 @@ sign-off refuses a question that breaks these rules, naming the field and one fi
 - `--outcome <value>=<text>`: what happens next if that answer is picked, one line each, on every option.
 - `--recommend` the answer you would pick, with `--recommend-reason` in one line.
 - `--default`: what happens if the user stays quiet, and `--silent-by <ISO UTC time>` when.
-- A card you posted by mistake: `npx -y sign-off-axi dismiss <key>` hides it, `restore <key>` brings it back. When the user dismisses a card, you are not told: `answers` still returns a dismissed answer.
+- A card you posted by mistake: `npx -y sign-off-axi dismiss <key>` hides it, `restore <key>` brings it back. When the user discards a card (Not relevant, Replaced by newer or Done elsewhere), your `wait --filer` hands it over 10 seconds later under `discarded` with the reason (an `--events` line `"event":"discarded"`): stop the work it asked for. `answers` lists it under `discarded` too.
 - When your task ends (merged, dropped, or answered some other way), run `npx -y sign-off-axi dismiss --filer <id>`: every card you posted that still waits leaves Decide. Reports leave the main view by themselves a day after they were filed; they wait under Archived on their screen and `restore <key>` brings one back. Evidence stays on the Evidence screen until dismissed, and posting it again under the same key with a changed proof replaces the card. Nothing is deleted.
 
 A good yes/no question:

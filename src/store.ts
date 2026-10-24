@@ -492,11 +492,26 @@ export const sentIds = (decisionsPath: string) => new Set([answersPath, roundsPa
   try { const c = line && JSON.parse(line)?.comments; return Array.isArray(c) ? c.map((x) => x?.id) : []; } catch { return []; }
 })));
 
-/** Items hidden from the board, one line per key and change; the agent is not told, and an ask it waits on keeps waiting. */
+/** Items hidden from the board, one line per key and change. A plain dismiss tells the agent nothing, and an ask it waits on keeps waiting;
+ *  a discard carries the person's reason, and its agent is told through the feedback trail (readTrail, the wait command). */
 export const dismissedPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.dismissed.jsonl';
-export function appendDismissed(decisionsPath: string, keys: string[], dismissed: boolean): void {
+export const DISCARD_REASONS = { 'not-relevant': 'Not relevant', replaced: 'Replaced by newer', 'done-elsewhere': 'Done elsewhere' } as const;
+export type DiscardReason = keyof typeof DISCARD_REASONS;
+/** Undo takes a discard back this long after it: until then its agent is not told, so an undone discard never reaches it. */
+export const UNDO_MS = 10_000;
+export function appendDismissed(decisionsPath: string, keys: string[], dismissed: boolean, reason?: DiscardReason): void {
   const at = now();
-  for (const key of keys) appendLine(dismissedPath(decisionsPath), { key, dismissed, at });
+  for (const key of keys) appendLine(dismissedPath(decisionsPath), { key, dismissed, at, ...(dismissed && reason && { reason }) });
+}
+/** Each discard the person made, oldest first, and whether it is still the last word on its card (no restore or dismiss since).
+ *  A discard that a restore took back inside the Undo window never left the board and is left out. */
+export function readDiscards(decisionsPath: string): { key: string; reason: DiscardReason; at: string; last: boolean }[] {
+  const lines = readRaw(dismissedPath(decisionsPath)).split('\n').flatMap((line) => { try { const x = line && JSON.parse(line); return x && typeof x.key === 'string' && typeof x.at === 'string' ? [x] : []; } catch { return []; } });
+  return lines.flatMap((x, i) => {
+    const after = lines.slice(i + 1).filter((y) => y.key === x.key);
+    return x.dismissed === true && Object.hasOwn(DISCARD_REASONS, x.reason) && !after.some((y) => y.dismissed === false && Date.parse(y.at) - Date.parse(x.at) < UNDO_MS)
+      ? [{ key: x.key, reason: x.reason, at: x.at, last: !after.length }] : [];
+  });
 }
 /** Design reviews Main has put to the user, one line per key and change. A design a lead posts is reviewed under Designs and is no ask of the user's
  *  until the promote command names it here; no post, feed or board request writes this log. */
@@ -809,11 +824,11 @@ export function markEngagementSeen(file: string, id: string, revision: number) {
   appendLine(deeperPath(file), { op: 'seen', version: 1, id, answerRevision: revision, at: now() });
 }
 
-/** The trail of what the person sent: each answer (a pick, a note, a design's change notes, a plan's send-back), each new round and each comment, and how far it got:
+/** The trail of what the person sent: each answer (a pick, a note, a design's change notes, a plan's send-back), each new round, each comment and each discard with its reason, and how far it got:
  * delivered (handed over by a wait, a poll or the on_answer hook), read (taken by the agent itself) and replied (its words, a link to what it made, or the card posted again).
  * The agent's marks are one line each in <board>.trail.jsonl: a mark names a key and covers every send on it up to its time. The person opening a reply marks it seen. */
 export type TrailMark = { op: 'delivered' | 'read' | 'reply' | 'seen'; key: string; id?: string; text?: string; link?: string; at: string };
-export type Trail = { id: string; key: string; kind: 'answer' | 'round' | 'comment' | 'ask' | 'part' | 'ticket'; part?: string; /** A ticket comment's words: the board keeps them nowhere else. */ said?: string; at: string; delivered?: string; read?: string; reply?: { at: string; text?: string; link?: string; acted?: true }; seen?: string };
+export type Trail = { id: string; key: string; kind: 'answer' | 'round' | 'comment' | 'ask' | 'part' | 'ticket' | 'discard'; part?: string; reason?: DiscardReason; /** A ticket comment's words: the board keeps them nowhere else. */ said?: string; at: string; delivered?: string; read?: string; reply?: { at: string; text?: string; link?: string; acted?: true }; seen?: string };
 export const trailPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.trail.jsonl';
 export const appendMark = (decisionsPath: string, mark: Omit<TrailMark, 'at'>) => appendLine(trailPath(decisionsPath), { ...mark, at: now() });
 /** `delivery` is the owner dispatch's record per Go deeper ask (src/owner.ts deliveries): handed to the author's session, then acknowledged by it. */
@@ -826,6 +841,7 @@ export function readTrail(decisionsPath: string, items: Decision[], delivery: Re
   const sends: Trail[] = [
     ...answerLines(decisionsPath).filter((a) => a.answer !== '' && !a.merged_by).map((a): Trail => ({ id: `answer:${a.key}:${a.at}`, key: a.key, kind: 'answer', at: a.at, read: taken(a) === '' ? a.at : taken(a) })),
     ...readRounds(decisionsPath).map((r): Trail => ({ id: `round:${r.key}:${r.at}`, key: r.key, kind: 'round', at: r.at })),
+    ...readDiscards(decisionsPath).map((x): Trail => ({ id: `discard:${x.key}:${x.at}`, key: x.key, kind: 'discard', reason: x.reason, at: x.at })),
     ...readMessages(decisionsPath).flatMap((m): Trail[] => (m.kind === 'comment' && m.key ? [{ id: m.id, key: m.key, kind: 'comment', at: m.at, delivered: m.delivered }] : [])),
     // On a guided plan or report: each Go deeper (or other) ask on a part, read when a wait handed it over or its author's session acknowledged it, replied once answered;
     // and each Agree, Disagree or Comment on a part, read when a wait handed it over, replied with the agent's words.

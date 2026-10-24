@@ -1,5 +1,5 @@
 // One journey over every card kind (evidence, design, plan, signin, ask) on every tab: each action is found and clicked
-// in the real board, Dismiss and bulk Select included, at 390 and 1280, light and dark, with done-done's look step on every
+// in the real board, Discard (with a reason) and bulk Select included, at 390 and 1280, light and dark, with done-done's look step on every
 // capture. A missing or disabled action, or a look hit, fails the run.
 // Usage: node .agents/skills/done-done-verify-sign-off/board-actions.mjs <output> [light|dark] [390|1280]   (no theme or width: all four cells)
 import { spawnSync } from 'node:child_process';
@@ -86,10 +86,17 @@ function helpers(home, readySel) {
     await press('Cancel', find(/^Cancel$/, bar()), () => find(/^Select$/, bar()));
     await cycle('Clear all', find(/^Clear all$/, bar()), () => !card(key), () => card(key), /cleared/);
   };
-  // The Dismiss on a card in a list, which a card that is itself a link keeps at its corner.
-  const dismissCard = (key) => cycle(`Dismiss ${key}`, card(key) && find(/^Dismiss,/, box(card(key))), () => !card(key), () => card(key), /Dismissed|dismissed/);
+  // Discard opens the sheet of reasons; one tap on a reason discards, and Undo takes it back.
+  const discard = async (what, button, gone, restored, reason = 'not-relevant') => {
+    const b = need(what, button); if (!b) return;
+    b.click();
+    await until(`the reasons after ${what}`, () => document.getElementById('dc-sheet')?.open);
+    await cycle(what, document.querySelector(`#dc-sheet [data-reason="${reason}"]`), gone, restored, /^Discarded · /);
+  };
+  // The Discard on a card in a list, which a card that is itself a link keeps at its corner.
+  const discardCard = (key) => discard(`Discard ${key}`, card(key) && find(/^Discard,/, box(card(key))), () => !card(key), () => card(key));
   const done = () => ({ missing, did });
-  return { missing, did, has, until, board, reader, label, find, card, box, need, toast, back, cycle, nav, press, type, bulk, dismissCard, done, sleep };
+  return { missing, did, has, until, board, reader, label, find, card, box, need, toast, back, cycle, discard, nav, press, type, bulk, discardCard, done, sleep };
 }
 
 // Every card kind on every tab, with the actions it must offer. A stage with `shot` is captured and looked at before the next one.
@@ -120,6 +127,14 @@ const PAGES = [
       const item = (act) => { h.board().querySelector('.decide-list .t-more-line')?.click(); return document.querySelector(`#d-more[open] [data-act="${act}"]`); };
       await h.cycle('More: Answer all recommended', item('answer-all'), () => !h.card('ship') && !h.card('keep-the-weekly-digest'), () => h.card('ship') && h.card('keep-the-weekly-digest'), /answered with the recommended pick/);
       await h.cycle('More: Move all to later', item('later-all'), () => heads() === 'Asks|Later|Answered', () => !h.board().querySelector('.dl-row[data-group=later]'), /to later/);
+      // More's Select: a row picked, Discard 1 with a reason and Undo; Select all, then Cancel.
+      const sel = () => h.board().querySelector('.sel-bar');
+      await h.press('More: Select', item('select'), () => sel());
+      await h.press('pick ship', h.card('ship'), () => h.box(h.card('ship')).querySelector('.sel-c.on'));
+      await h.discard('Discard 1 selected', h.find(/^Discard 1$/, sel()), () => !h.card('ship'), () => h.card('ship'), 'replaced');
+      await h.press('More: Select again', item('select'), () => sel());
+      await h.press('Select all', h.board().querySelector('.sel-all'), () => /^Discard \d+$/.test(sel().querySelector('.sel-go').textContent));
+      await h.press('Cancel', sel().querySelector('.sel-cancel'), () => !sel());
     } },
     { shot: 'waiting-menu', run: async (h) => { h.board().querySelector('.decide-list .t-more-line').click(); await h.until('menu', () => document.querySelector('#d-more[open] .ui-props')?.getBoundingClientRect().height); } },
   ] },
@@ -130,7 +145,7 @@ const PAGES = [
       // Nothing is picked until a pick: the one button waits, off, then names the pick.
       if (options.length) h.has('Pick an answer (off until a pick)', bar()?.querySelector('.answer:disabled'));
       for (const o of options) await h.press(`option ${o}`, h.find(new RegExp(o), h.board().querySelector('.pick-list, .choices, .decide')), () => true);
-      // One button in the bar with Ask me later beside it (a sign-in keeps Ask me later in its More), and one More over the ask holding Dismiss.
+      // One button in the bar with Ask me later beside it (a sign-in keeps Ask me later in its More), and one More over the ask holding Discard.
       h.has('More', more()?.querySelector('summary'));
       if (options.length) {
         await h.press('Your own answer', h.find(/^Your own answer/, h.board().querySelector('.pick-list')), () => bar().querySelector('.answer').textContent === 'Send answer');
@@ -141,8 +156,8 @@ const PAGES = [
         await h.press(`option ${options[0]} once more`, h.find(new RegExp(options[0]), h.board().querySelector('.pick-list')), () => /^Answer /.test(bar().querySelector('.answer').textContent));
         await h.cycle(`Answer ${key}`, h.find(/^Answer /, bar()), () => location.hash !== `#decide/${key}` || !h.board().querySelector('.decide-bar .answer'), () => h.board().querySelector('.decide-bar .answer'), /\? · /);
       }
-      // Another ask opens after a dismiss; the last sign-in leaves its page saying nothing is left to decide.
-      await h.cycle(`Dismiss ${key}`, h.find(/^Dismiss,/, more()), () => location.hash !== `#decide/${key}` || /Nothing to decide/.test(h.board().textContent), () => h.find(/^Dismiss,/, more()), /Dismissed/);
+      // Another ask opens after a discard; the last sign-in leaves its page saying nothing is left to decide.
+      await h.discard(`Discard ${key}`, h.find(/^Discard,/, more()), () => location.hash !== `#decide/${key}` || /Nothing to decide/.test(h.board().textContent), () => h.find(/^Discard,/, more()));
     } }] })),
   { name: 'plan', hash: '#waiting/plan-kind-board', ready: '.plan-section', stages: [{ run: async (h) => {
     const r = h.reader(), sections = [...r.querySelectorAll('.plan-section')].filter((s) => s.querySelector('.approve'));
@@ -156,20 +171,20 @@ const PAGES = [
   } }] },
   { name: 'designs', hash: '#designs', ready: '[id="item-chat-journeys"]', stages: [{ run: async (h) => {
     await h.nav('Open design', h.find(/^Open design,/), /^#designs\/chat-journeys$/);
-    // Select and Clear all are in the title row's More; Dismiss is on the design's own page.
-    const sheet = () => document.getElementById('dz-sheet'), bar = () => h.board().querySelector('.bulk');
+    // Select and Discard all are in the title row's More; Discard is on the design's own page too. Each Discard asks for a reason and is taken back with Undo.
+    const sheet = () => document.getElementById('dz-sheet'), bar = () => h.board().querySelector('.sel-bar');
     const more = async (re) => { await h.press('More', h.board().querySelector('.dz-more'), () => sheet().open); return h.find(re, sheet(), 'button'); };
-    await h.press('Select', await more(/^Select$/), () => h.find(/^Cancel$/, bar()));
-    await h.press('pick chat-journeys', h.card('chat-journeys'), () => h.box(h.card('chat-journeys')).classList.contains('picked'));
-    await h.cycle('Dismiss 1 selected', h.find(/^Dismiss 1$/, bar()), () => !h.card('chat-journeys'), () => h.card('chat-journeys'), /1 dismissed/);
-    await h.press('Select again', await more(/^Select$/), () => h.find(/^Cancel$/, bar()));
-    await h.press('Cancel', h.find(/^Cancel$/, bar()), () => !bar());
-    await h.cycle('Clear all', await more(/^Clear all$/), () => !h.card('chat-journeys'), () => h.card('chat-journeys'), /cleared/);
+    await h.press('Select', await more(/^Select$/), () => bar());
+    await h.press('pick chat-journeys', h.card('chat-journeys'), () => h.box(h.card('chat-journeys')).querySelector('.sel-c.on'));
+    await h.discard('Discard 1 selected', h.find(/^Discard 1$/, bar()), () => !h.card('chat-journeys'), () => h.card('chat-journeys'), 'replaced');
+    await h.press('Select again', await more(/^Select$/), () => bar());
+    await h.press('Cancel', bar().querySelector('.sel-cancel'), () => !bar());
+    await h.discard('Discard all', await more(/^Discard all$/), () => !h.card('chat-journeys'), () => h.card('chat-journeys'));
     location.hash = '#designs/chat-journeys';
-    await h.until('the design open', () => h.find(/^Dismiss,/, document.body, 'button'));
-    await h.cycle('Dismiss chat-journeys', h.find(/^Dismiss,/, document.body, 'button'), () => !h.card('chat-journeys'), () => h.card('chat-journeys'), /Dismissed/);
+    await h.until('the design open', () => h.find(/^Discard,/, document.body, 'button'));
+    await h.discard('Discard chat-journeys', h.find(/^Discard,/, document.body, 'button'), () => !h.card('chat-journeys'), () => h.card('chat-journeys'), 'done-elsewhere');
   } }] },
-  // A proof's row opens it; Select and Clear all are in the sheet the quiet line under the list opens (Dismiss is on the proof's own sheet).
+  // A proof's row opens it; Select and Clear all are in the sheet the quiet line under the list opens (Discard is on the proof's own sheet).
   { name: 'evidence', hash: '#evidence', ready: '[id="item-update-2"]', stages: [{ run: async (h) => {
     const bar = () => h.board().querySelector('.bulk'), sheet = () => document.getElementById('sheet');
     const item = async (name) => { h.board().querySelector('.ev-more').click(); await h.until('the Select or clear all sheet', () => sheet().open); return h.find(new RegExp(`^${name}$`), sheet(), 'button'); };
@@ -188,7 +203,7 @@ const PAGES = [
       await h.cycle(`${verdict} verdict`, h.find(new RegExp(`^${verdict},`), pane()), () => h.find(new RegExp(`^${verdict},`), pane())?.getAttribute('aria-pressed') === 'true', () => true, / · /);
     }
     if (r === h.reader()) await h.nav('Close the proof', h.find(/^Close$/, r, 'a'), /^#evidence$/);
-    await h.cycle('Dismiss update 2', h.find(/^Dismiss,/, pane()), () => location.hash === '#evidence' || !document.getElementById('err-update-2'), () => h.find(/^Pass,/, pane()), /Dismissed/);
+    await h.discard('Discard update 2', h.find(/^Discard,/, pane()), () => location.hash === '#evidence' || !document.getElementById('err-update-2'), () => h.find(/^Pass,/, pane()));
   } }] },
   { name: 'reports', hash: '#reports', ready: '[id="item-new-sign-in"]', stages: [{ run: async (h) => {
     // More (the quiet line under the list, opening a sheet): Mark all as read while the report is new, then opening it (which reads it), Select (pick, Dismiss 1, Undo; Cancel)
@@ -209,7 +224,7 @@ const PAGES = [
     await h.press('Cancel', h.find(/^Cancel$/, bar()), () => more());
     await h.cycle('More: Archive all', await item('archive-all'), () => !h.card('new-sign-in'), () => h.card('new-sign-in'), /archived/);
   } }] },
-  // On a phone a report opens in a sheet over the list with Close and Dismiss; on a desk it reads beside the list, with Mark read or unread and Archive in its bar.
+  // On a phone a report opens in a sheet over the list with Close and Discard; on a desk it reads beside the list, with Mark read or unread and Archive in its bar.
   { name: 'report', hash: '#reports/new-sign-in', ready: '#reader iframe, .split-detail .read iframe', stages: [{ run: async (h) => {
     const bar = h.board().querySelector('.rp-bar'), dot = () => h.box(h.card('new-sign-in'))?.querySelector('.pct')?.textContent === '0%';
     if (bar) {
@@ -218,12 +233,12 @@ const PAGES = [
       return;
     }
     await h.nav('Close the report', h.find(/^Close$/, h.reader(), 'a'), /^#reports$/);
-    await h.cycle('Dismiss report', h.find(/^Dismiss,/, h.reader()), () => location.hash === '#reports', () => h.reader().querySelector('iframe'), /Dismissed/);
+    await h.discard('Discard report', h.find(/^Discard,/, h.reader()), () => location.hash === '#reports', () => h.reader().querySelector('iframe'));
   } }] },
   { name: 'answered', hash: '#answered', ready: '[id="item-digest-old"]', stages: [{ run: async (h) => {
     const row = h.card('digest-old');
     await h.cycle('Change answer to No', h.find(/^No:/, row), () => h.find(/^No:/, h.card('digest-old'))?.getAttribute('aria-pressed') === 'true', () => true, / · /);
-    await h.dismissCard('digest-old');
+    await h.discardCard('digest-old');
     await h.bulk('digest-old');
   } }] },
   // Last, because these cannot be taken back: a note with a pick, an answer in your own words, and the design's own verdict.

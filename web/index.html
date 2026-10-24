@@ -535,7 +535,7 @@
   .tradeoff { margin: 0; max-width: 70ch; }
   .option-link { display: inline-flex; align-items: center; min-height: 2.75rem; font-size: 0.9375rem; color: var(--accent); }
   .fd-links { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0 1rem; font-size: 0.9375rem; color: var(--muted); } .fd-links a { min-height: 2.75rem; display: inline-flex; align-items: center; color: var(--accent); }
-  /* Dismiss: a quiet round x at the corner of a card or the end of a row. */
+  /* Discard: a quiet round x at the corner of a card or the end of a row. */
   .x { flex: none; display: grid; place-items: center; width: 2.75rem; min-height: 2.75rem; padding: 0; margin: -0.5rem 0 -0.5rem auto; border: 0; border-radius: 50%;
     background: none; color: var(--muted); font-size: 1.5rem; line-height: 1.25; }
   .x:hover { background: var(--sunk); color: var(--text); }
@@ -558,8 +558,6 @@
   :is(.dz-top, .dz-head) .ui-rb .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.6; }
   :is(.dz-top, .dz-head) .dz-more .glyph { stroke-width: 3; }
   .dz-list .ui-row .meta { margin: 0; }
-  :is(.dz-list li, .dz-card).picked { outline: 2px solid var(--tk-ink); outline-offset: -2px; border-radius: 0.875rem; }
-  .dz-bulk .bulk { margin: 0.5rem 0 0; } .dz-bulk .bulk button { min-height: 2.75rem; background: none; color: var(--tk-ink); }
   #dz-sheet .ui-pr { width: 100%; padding: 0; border: 0; border-radius: 0; background: none; color: var(--tk-ink); font: inherit; font-size: var(--tk-fs-row); text-align: left; }
   #dz-sheet .ui-pr .k { color: var(--tk-ink); } #dz-sheet .t-shd .x { min-height: 0; }
   #reader:has(> .design-review) { background: var(--tk-card); }
@@ -606,7 +604,7 @@
   :is(.design-review, .dz-ib) .err:empty { display: none; }
   :is(.design-review, .dz-ib) > .dz-link { margin-top: 0.5rem; }
   :is(.design-review, .dz-ib) > .dis { display: flex; align-items: center; min-height: 2.75rem; margin-top: 0.25rem; padding: 0; background: none; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); font-weight: 400; }
-  :is(.dz-top, .dz-head, .dz-bulk, #dz-sheet, .dz-list, .design-review, .dz-grid) :focus-visible { outline-color: var(--tk-ink); }
+  :is(.dz-top, .dz-head, #dz-sheet, .dz-list, .design-review, .dz-grid) :focus-visible { outline-color: var(--tk-ink); }
   .design-viewer { position: fixed; inset: 0; width: 100%; max-width: none; height: 100dvh; max-height: none; margin: 0; padding: 0; border: 0; background: var(--bg); color: var(--text); }
   .design-viewer[open] { display: flex; flex-direction: column; }
   .design-viewer header { display: flex; gap: 1rem; align-items: center; padding: 0.75rem max(1rem, env(safe-area-inset-right)) 0.75rem max(1rem, env(safe-area-inset-left)); border-bottom: 1px solid var(--line); }
@@ -783,7 +781,6 @@
     .decide-bar { position: static; margin: 1rem 0 0; padding: 0; background: transparent; }
     /* Designs on a desk fill the window, as the approved prototype's desk draws it: 24px around, where it is over a 32px title and what is on the board, then a 12-column grid
        to the foot: the designs as picture cards across the top (four columns each; more scroll sideways, a whole card at a time) and the open design (eight) beside where it stands (four). */
-    .dz-bulk .bulk { margin: 0; }
     .ui-dgrid.dz-grid { grid-template-rows: auto minmax(0, 1fr); }
     .dz-strip { display: grid; grid-column: 1 / -1; grid-auto-flow: column; grid-auto-columns: calc((100% - 2rem) / 3); gap: 1rem; margin: -1.25rem; padding: 1.25rem;
       overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding: 0 1.25rem; scrollbar-width: none; }
@@ -1227,6 +1224,34 @@
   #d-more .ui-pr { width: 100%; min-height: 3rem; padding: 0; border-radius: 0; background: none; color: var(--tk-ink); font: inherit; font-size: var(--tk-fs-row); font-weight: 400; text-align: left; }
   #d-more .ui-pr:disabled { background: none; color: var(--tk-text-tertiary); cursor: default; } #d-more .ui-pr:disabled .k { color: inherit; }
   #d-more .ui-pr .k .glyph { width: 1.125rem; height: 1.125rem; }
+  /* Discard, on every card: its sheet names the card, says where it goes and who is told, then the three reasons as rows, one tap each. */
+  #dc-sheet .ui-pr { width: 100%; min-height: 3rem; padding: 0; border-radius: 0; background: none; color: var(--tk-ink); font: inherit; font-size: var(--tk-fs-row); font-weight: 400; text-align: left; }
+  #dc-sheet .ui-pr .k { color: var(--tk-ink); } #dc-sheet .ui-pr .k .glyph { width: 1.125rem; height: 1.125rem; color: var(--tk-text-secondary); }
+  .dc-t { margin: 0.5rem 0 0; color: var(--tk-ink); font-size: var(--tk-fs-title); line-height: var(--tk-lh-title); font-weight: 500; overflow-wrap: anywhere; }
+  /* Select, on Decide and Designs: a round check at each row's end, ink once picked; Select all in the title row; Cancel and Discard N as the ask's foot draws its two buttons,
+     in the dock's place on a phone (the dock steps aside) and at the title row's right on a desk. */
+  .sel-c { display: grid; flex: none; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--tk-mid); color: transparent; }
+  .sel-c .glyph { width: 0.875rem; height: 0.875rem; stroke-width: 3; }
+  .sel-c.on { background: var(--tk-ink); color: var(--tk-canvas); box-shadow: none; }
+  :is(.dl-list li, .dz-list li, .dz-card).picked { outline: none; }
+  .dz-card:has(.sel-c) { position: relative; } .dz-card .sel-c { position: absolute; right: 1.25rem; bottom: 1.5rem; background: var(--tk-raised); } .dz-card .sel-c.on { background: var(--tk-ink); }
+  .sel-all { flex: none; min-height: 2.5rem; padding: 0 1rem; border: 0; border-radius: 1.25rem; background: var(--tk-card); color: var(--tk-ink); font: inherit; font-size: var(--tk-fs-row); font-weight: 500;
+    box-shadow: var(--tk-elev-card), inset 0 1px 0 var(--tk-hl); }
+  .sel-bar { position: fixed; z-index: 3; right: 1rem; left: 1rem; bottom: calc(1.5rem + env(safe-area-inset-bottom)); display: flex; gap: 0.5rem; }
+  .sel-bar button { flex: 1 1 0; min-height: 3.25rem; padding: 0 1rem; border: 0; border-radius: 1.625rem; font: inherit; font-size: var(--tk-fs-secondary); font-weight: 500; white-space: nowrap; }
+  .sel-bar .sel-cancel { background: var(--tk-raised); color: var(--tk-ink); box-shadow: var(--tk-elev-raised); }
+  .sel-bar .sel-go { background: var(--tk-ink); color: var(--tk-canvas); box-shadow: var(--tk-elev-go); }
+  .sel-bar .sel-go:disabled { opacity: 0.35; cursor: default; box-shadow: none; }
+  .sel-bar button:active:not(:disabled) { transform: scale(0.97); }
+  body:has(.sel-bar) :is(.tabs, .dock-find) { display: none; }
+  /* Archived: one quiet line at a list's end, its rows in a sheet, each with why it went and Restore. */
+  .t-more-line + .ar-line { margin-top: 0; }
+  .ar-list .ui-row { gap: 0.75rem; } .ar-list .ui-row .meta { margin: 0; }
+  .ar-back { position: relative; flex: none; min-height: 2rem; padding: 0 0.625rem; border: 0; border-radius: 1rem; background: var(--tk-raised); color: var(--tk-ink); font: inherit;
+    font-size: var(--tk-fs-meta); font-weight: 500; box-shadow: var(--tk-elev-raised); }
+  .ar-back::after { content: ''; position: absolute; inset: -0.375rem -0.25rem; }
+  @media (prefers-color-scheme: dark) { .sel-bar .sel-cancel, .ar-back { background: var(--tk-on); } }
+  @media (min-width: 64rem) { .ui-top:has(.sel-bar) { flex-wrap: wrap; height: auto; row-gap: 0.75rem; } .ui-top:has(.sel-bar) h1 { flex-basis: 100%; } .sel-bar { position: static; flex: none; } .sel-bar button { flex: none; min-height: 2.5rem; border-radius: 1.25rem; font-size: var(--tk-fs-row); box-shadow: var(--tk-elev-card); } }
   .ui-top > .bulk { margin: 0; }
   .decide-list .dl-list.ui-list { margin: 0; padding: 0.25rem 0; border-radius: var(--tk-r-card); }
   .decide-list .dl-list.ui-list > li + li::before { right: 0.75rem; left: 0.75rem; }
@@ -1838,10 +1863,10 @@
   const headline = (d) => (d.type === 'evidence' && d.evidence?.outcome.length <= 160 ? d.evidence.outcome : d.title);
   const title = (d) => (d.type === 'evidence' ? `Update ${d.number} · ${headline(d)}` : d.title);
 
-  /** Dismiss hides items from this board (the agent is not told, so an ask keeps waiting); Undo puts them back. */
+  /** Dismiss hides items from this board (the agent is not told, so an ask keeps waiting); a discard carries the person's reason, which its agent is told; Undo puts them back. */
   // The server takes at most 200 keys a request; the requests run one after another so the last reply carries every change.
-  const setDismissed = (keys, dismissed) => Array.from({ length: Math.ceil(keys.length / 200) }, (_, i) => keys.slice(i * 200, i * 200 + 200))
-    .reduce((sent, part) => sent.then(() => call('/api/dismiss', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keys: part, dismissed }) })), Promise.resolve());
+  const setDismissed = (keys, dismissed, reason) => Array.from({ length: Math.ceil(keys.length / 200) }, (_, i) => keys.slice(i * 200, i * 200 + 200))
+    .reduce((sent, part) => sent.then(() => call('/api/dismiss', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keys: part, dismissed, ...(reason && { reason }) }) })), Promise.resolve());
   /** back runs before an Undo puts them back; a swipe leaves the focus where it was, as a finger has no use for a ring on Undo. */
   function dismiss(keys, text, back, swiped) {
     return setDismissed(keys, true).then(() => {
@@ -1855,10 +1880,35 @@
     }, (e) => say(`Couldn't dismiss: ${e.message}`, 8000));
   }
   const canDismiss = () => !state.readonly && !FROZEN;
-  function xBtn(d, label) {
+  /** Discard, on every card: a sheet of three reasons, one tap each (src/store.ts DISCARD_REASONS). The cards move to Archived and their agents are told why through the trail,
+   *  once Undo's 10 seconds are over (src/store.ts UNDO_MS), so an undone discard never reaches them. `after` runs once a reason is picked. */
+  const REASONS = [['not-relevant', 'Not relevant', 'slash'], ['replaced', 'Replaced by newer', 'newer'], ['done-elsewhere', 'Done elsewhere', 'check']], UNDO_MS = 10_000;
+  const reasonOf = (r) => REASONS.find(([v]) => v === r)?.[1] ?? '';
+  const dcSheet = sheetOf('dc-sheet');
+  function discardSheet(items, after) {
+    const one = items.length === 1, agents = [...new Set(items.map((d) => d.by).filter(Boolean))];
+    const pick = ([reason, words, mark]) => { const b = el('button', { class: 'ui-pr', type: 'button', 'data-reason': reason }, el('span', { class: 'k' }, glyph(mark), words));
+      b.onclick = () => { dcSheet.close(); after?.(); discard(items, reason); }; return b; };
+    dcSheet.replaceChildren(el('div', {}, sheetHead('dc-sheet', one ? 'Discard' : `Discard ${items.length}`), el('p', { class: 'dc-t', dir: 'auto' }, one ? title(items[0]) : plural(items.length, items.every((d) => area(d) === 'designs') ? 'design' : 'card')),
+      el('p', { class: 't-line' }, `${one ? 'It moves' : 'They move'} to Archived, and ${agents.length === 1 ? agents[0] : 'their agents'} ${agents.length === 1 ? 'is' : 'are'} told why.`), el('div', { class: 'ui-props' }, ...REASONS.map(pick))));
+    dcSheet.showModal();
+    dcSheet.querySelector('h2').focus();
+  }
+  function discard(items, reason) {
+    const keys = items.map((d) => d.key), name = items.length === 1 ? title(items[0]) : plural(items.length, 'card');
+    return setDismissed(keys, true, reason).then(() => {
+      undoBtn.setAttribute('aria-label', `Undo, discard ${name}`);
+      say([el('b', {}, 'Discarded'), ` · ${reasonOf(reason)}`], UNDO_MS, () => {
+        undoBtn.disabled = true;
+        setDismissed(keys, false).then(() => say('Back on the board', 3000), (e) => say(`Couldn't undo: ${e.message}`, 8000));
+      }, 'dismiss');
+      undoBtn.focus({ preventScroll: true });
+    }, (e) => say(`Couldn't discard: ${e.message}`, 8000));
+  }
+  function xBtn(d, label, after) {
     if (!canDismiss()) return '';
-    const b = el('button', { class: label ? 'dis' : 'x', 'aria-label': `Dismiss, ${title(d)}` }, label ?? '×');
-    b.onclick = () => dismiss([d.key], area(d) === 'waiting' ? 'Dismissed · the agent still waits' : `Dismissed: ${title(d)}`);
+    const b = el('button', { class: label ? 'dis' : 'x', 'aria-label': `Discard, ${title(d)}`, 'aria-haspopup': 'dialog' }, label ?? '×');
+    b.onclick = () => discardSheet([d], after);
     return b;
   }
   function clearAll(items) {
@@ -1881,6 +1931,16 @@
       ? [btn('clear', 'Cancel', stop), btn('clear sel-go', n ? `Dismiss ${n}` : 'Dismiss', () => { const ks = [...picked].filter((k) => keys.has(k)); if (ks.length) { dismiss(ks, `${ks.length} dismissed`); stop(); } })]
       : [btn('select', 'Select', () => { selecting = true; render(); }), clearAll(items)]));
   }
+  /** Select on Decide and Designs: a tap picks a row (a round check at its end), the title counts the picks with Select all beside it, and Cancel and Discard N
+   *  sit where the dock is on a phone (the dock steps aside) and in the title row on a desk. Discard N opens the reasons for all of them at once. */
+  function selectHead(items) {
+    const keys = items.map((d) => d.key), n = keys.filter((k) => picked.has(k)).length, all = n === keys.length;
+    const btn = (cls, words, fn, off) => { const b = el('button', { class: cls, type: 'button', ...(off && { disabled: '' }) }, words); b.onclick = fn; return b; };
+    const stop = () => { selecting = false; picked.clear(); render(); };
+    return { title: n ? `${n} selected` : 'Select', all: btn('sel-all', all ? 'Select none' : 'Select all', () => { keys.forEach((k) => (all ? picked.delete(k) : picked.add(k))); render(); }),
+      bar: el('div', { class: 'sel-bar' }, btn('sel-cancel', 'Cancel', stop), btn('sel-go', n ? `Discard ${n}` : 'Discard', () => discardSheet(items.filter((d) => picked.has(d.key)), stop), !n)) };
+  }
+  const selMark = (key) => (selecting ? el('span', { class: `sel-c${picked.has(key) ? ' on' : ''}`, 'aria-hidden': 'true' }, glyph('check')) : '');
   addEventListener('click', (e) => {
     const hit = selecting && !e.target.closest('.bulk') && e.target.closest('#board [id^="item-"]');
     if (!hit) return;
@@ -2193,6 +2253,7 @@
       ...trailOf(d.key).flatMap((t) => [t.delivered && { at: t.delivered, text: `Delivered to ${by}` }, t.read && { at: t.read, text: `${by} read it` },
         t.reply && !t.reply.acted && { at: t.reply.at, text: `${by} ${t.reply.text ? 'replied' : 'acted on it'}`, note: t.reply.text, link: t.reply.link && [linkName(t.reply.link), t.reply.link] }]),
       ...(state.rounds ?? []).filter((r) => r.key === d.key).map((r) => ({ at: r.at, text: 'You asked for a new round', note: r.note })),
+      ...trailOf(d.key, 'discard').map((t) => ({ at: t.at, text: `Discarded: ${reasonOf(t.reason)}` })),
       ...(state.messages ?? []).filter((m) => m.kind === 'comment' && m.key === d.key).map((m) => ({ at: m.at, text: 'Your comment', note: m.text }))]
       .filter((e, i, all) => e && !Number.isNaN(Date.parse(e.at)) && all.findIndex((x) => x && x.text === e.text && bySecond(x, e) === 0) === i).sort(bySecond);
   };
@@ -2358,7 +2419,7 @@
     const opts = [...d.options].sort((x, y) => (order[x.value] ?? 1) - (order[y.value] ?? 1)), lead = saved?.answer ?? 'pass';
     const buttons = opts.map((o) => el('button', { class: `v-${o.value}${o.value === lead ? ' ink' : ''}`, 'aria-pressed': o.value === saved?.answer, 'aria-label': `${o.label}, ${headline(d)}` }, o.label));
     buttons.forEach((b, i) => (b.onclick = () => save(d, opts[i], buttons, err)));
-    return el('div', { class: 'ev-verdict' }, el('div', { class: 'choices', role: 'group', 'aria-label': `Your verdict, ${headline(d)}` }, ...buttons), err, other(d, saved, err), xBtn(d, 'Dismiss'));
+    return el('div', { class: 'ev-verdict' }, el('div', { class: 'choices', role: 'group', 'aria-label': `Your verdict, ${headline(d)}` }, ...buttons), err, other(d, saved, err), xBtn(d, 'Discard'));
   }
   /** A proof's panel (ui.css): done-done's word, its priority, the ask it serves with its progress, and its pull request. */
   const evProps = (d) => { const p = uiProps(uiProp({ mark: 'shield', name: 'done-done', value: el('span', { class: `ev-word ${judged(d)}` }, judgedWord(d)) }), priorityProp(prio(d)), ticketProp(ticketOf(d), 'Its ask'), changeProp(d)); p.classList.add('ev-props'); return p; };
@@ -2655,6 +2716,7 @@
     send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.112z"/><path d="m21.854 2.147-10.94 10.939"/>',
     sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>', msg: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
     x: '<path d="M18 6 6 18M6 6l12 12"/>', bolt: '<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>', lock: '<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>', trash: '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>',
+    slash: '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>', newer: '<path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.7M20 4v4.7h-4.7M20 12a8 8 0 0 1-13.7 5.6L4 15.3M4 20v-4.7h4.7"/>',
     phone: '<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M11 18.5h2"/>', desktop: '<rect x="2.5" y="4" width="19" height="12.5" rx="1.5"/><path d="M8.5 20.5h7M12 16.5v4"/>',
     flag: '<path d="M5 21V4M5 4h12l-2.5 4.5L17 13H5"/>', expand: '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>', layers: '<rect x="3" y="3" width="12" height="12" rx="2"/><path d="M9 21h10a2 2 0 0 0 2-2V9"/>',
     pr: '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M6 8.5V21M13 6h3a2 2 0 0 1 2 2v7.5"/><path d="m15 3.5-2.5 2.5L15 8.5"/>', shield: '<path d="M12 21s7.5-3.5 7.5-9.5V5.5L12 3 4.5 5.5v6C4.5 17.5 12 21 12 21z"/><path d="m9 12 2 2 4-4"/>' };
@@ -3271,7 +3333,7 @@
       el('a', { class: 'dl-face ui-row', href: `#reports/${d.key}`, draggable: 'false', id: `item-${d.key}`, 'data-row': '', ...(sel && { 'aria-current': 'true' }) }, ...face), hover);
     const full = n ? el('ol', { class: 'steps' }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), el('span', { dir: 'auto' }, t.title), marks(t)))) : row(d, { x: false });
     full.removeAttribute('id');
-    const box = el('details', { class: 'done', id: `item-${d.key}`, ...(opened.has(d.key) && { open: '' }) }, el('summary', { class: 'dl-face ui-row' }, ...face), full, decided(d), xBtn(d, 'Dismiss'));
+    const box = el('details', { class: 'done', id: `item-${d.key}`, ...(opened.has(d.key) && { open: '' }) }, el('summary', { class: 'dl-face ui-row' }, ...face), full, decided(d), xBtn(d, 'Discard'));
     box.ontoggle = () => (box.open ? opened.add(d.key) : opened.delete(d.key));
     return li(box);
   }
@@ -3516,7 +3578,7 @@
       saved?.at && saved.answer !== 'screens' ? prop('<circle cx="10" cy="10" r="7"/><path d="M10 6.2V10l2.6 1.8"/>', 'Answered', el('span', {}, day(saved.at))) : '');
     const said = roundNotes().filter((n) => n.note);
     const screenName = (n) => screens.length > 1 && screenFor(`${n.journey}/${n.screen}`)?.screen.title;
-    const sent = trailOf(d.key).at(-1);
+    const sent = trailOf(d.key).filter((t) => t.kind !== 'discard').at(-1);
     const told = [...(said.length ? [el('p', { class: 'ui-dl' }, 'What you said'), ...said.map((n) => el('blockquote', { class: 'dz-said', dir: 'auto' }, screenName(n) ? el('cite', {}, screenName(n)) : '', el('span', { class: 'q' }, n.note)))] : []),
       ...(sent ? [said.length ? '' : el('p', { class: 'ui-dl' }, 'What you sent'), trailTrack(sent)] : [])];
     seeReply(d.key);
@@ -3528,9 +3590,9 @@
       h1.id = 'dz-open-title';
       root = [el('section', { class: 'dz-open', 'aria-labelledby': h1.id }, el('div', { class: 'dz-oh' }, lab, fullPreview, screens.length ? open : ''), h1, el('div', { class: 'dz-fill' }, preview || '')),
         el('section', { class: 'dz-info', 'aria-label': 'Where it stands' }, el('div', { class: 'dz-ib' }, el('h2', {}, 'Where it stands'), stands, ticketRow(d), ...told,
-          el('p', { class: 'ui-dl' }, 'Your review'), screenPick, controls, err, about ? el('p', { class: 'ui-dl' }, 'What it shows') : '', about, thread(d), original, xBtn(d, 'Dismiss')), foot)];
+          el('p', { class: 'ui-dl' }, 'Your review'), screenPick, controls, err, about ? el('p', { class: 'ui-dl' }, 'What it shows') : '', about, thread(d), original, xBtn(d, 'Discard')), foot)];
     } else root = el('div', { class: 'design-review' }, lab, h1, about, preview, fullPreview, screens.length ? open : '', el('p', { class: 'ui-dl' }, 'Where it stands'), stands, ticketRow(d), ...told,
-      el('p', { class: 'ui-dl' }, 'Your review'), screenPick, controls, foot, err, thread(d), original, xBtn(d, 'Dismiss'));
+      el('p', { class: 'ui-dl' }, 'Your review'), screenPick, controls, foot, err, thread(d), original, xBtn(d, 'Discard'));
     if (!screens.length) return root;
     const heading = el('h2', { id: 'design-screen-title', dir: 'auto' }), count = el('p', { class: 'meta', 'aria-live': 'polite' });
     const stage = el('div', { class: 'design-stage' }), screenStatus = el('p', { class: 'meta', role: 'status' });
@@ -4250,11 +4312,9 @@
     const row = (name, n, glyphName) => { const b = el('button', { class: 'ui-pr rp-src' }, el('span', { class: 'k' }, glyph(glyphName), name), el('span', { class: 'v' }, el('span', { class: 'n' }, String(n)), glyph('right'))); b.onclick = () => open(c.id); return b; };
     return [el('p', { class: 'ui-dl' }, 'Sources'), el('div', { class: 'ui-props rp-sources' }, row('Linked sources', c.n, 'link'), row('What users report', c.users, 'users'))];
   }
-  /** Dismiss moved from the list row to the report's own page; once it is dismissed the page closes back to the list. */
+  /** Discard moved from the list row to the report's own page; once a reason is picked the page closes back to the list. */
   function dismissReport(d) {
-    const b = xBtn(d, 'Dismiss');
-    if (b) b.addEventListener('click', () => { location.hash = '#reports'; });
-    return b;
+    return xBtn(d, 'Discard', () => { location.hash = '#reports'; });
   }
   // A guided report opened in full from a desk's Reports keeps the report's address, so closing it redraws the list beside it.
   let rpFull = '';
@@ -4325,37 +4385,39 @@
      A desk fills the window as the approved prototype's desk draws it: the designs as picture cards across the top, the open one large beside where it stands. ---- */
   const designStatus = (d) => { const a = state.answers[d.key]?.answer; return a === 'approve' ? 'Approved' : a === 'change' ? 'Changes requested' : d.status === 'draft' ? 'Draft' : 'In review'; };
   const dzSheet = sheetOf('dz-sheet');
-  /** The title row: the title with More (Select and Clear all) and the round light-or-dark button; on a desk where it is over a 32px title and what is on the board. */
-  function designsHead(items, top) {
-    const h1 = top.querySelector('h1'), ro = top.querySelector(':scope > .meta') ?? '', [, theme] = todayHead(), flip = theme.onclick;
+  /** The title row: the title with More (Select, Discard all and, on a desk, Archived) and the round light-or-dark button; on a desk where it is over a 32px title and what is on the board.
+   *  While selecting, the title counts the picks with Select all, and Cancel and Discard N sit where the dock is (phone) or at the row's right (desk). */
+  function designsHead(items, top, gone) {
+    const h1 = top.querySelector('h1'), ro = top.querySelector(':scope > .meta') ?? '', [, theme] = todayHead(), flip = theme.onclick, sel = selecting && canDismiss() && items.length && selectHead(items);
     theme.classList.add('dz-theme');
     theme.onclick = () => { flip(); document.querySelector('.dz-theme')?.focus({ preventScroll: true }); };
     let more = '';
-    if (canDismiss() && items.length) {
+    if (canDismiss() && (items.length || (!phone() && gone.length))) {
       more = el('button', { class: 'ui-rb dz-more', 'aria-label': 'More', 'aria-haspopup': 'dialog' }, glyph('more'));
-      const act = (words, fn) => { const b = el('button', { class: 'ui-pr' }, el('span', { class: 'k' }, words)); b.onclick = () => { dzSheet.close(); fn(); }; return b; };
+      const act = (words, fn, n) => { const b = el('button', { class: 'ui-pr' }, el('span', { class: 'k' }, words), n ? el('span', { class: 'v' }, el('span', { class: 'n' }, String(n)), glyph('right')) : ''); b.onclick = () => { dzSheet.close(); fn(); }; return b; };
       more.onclick = () => {
-        dzSheet.replaceChildren(el('div', {}, sheetHead('dz-sheet', 'More'), el('div', { class: 'ui-props' }, act('Select', () => { selecting = true; render(); }),
-          act('Clear all', () => dismiss(items.map((d) => d.key), `${plural(items.length, 'design')} cleared`)))));
+        dzSheet.replaceChildren(el('div', {}, sheetHead('dz-sheet', 'More'), el('div', { class: 'ui-props' }, items.length ? act('Select', () => { selecting = true; render(); }) : '',
+          items.length ? act('Discard all', () => discardSheet(items)) : '', !phone() && gone.length ? act('Archived', () => openArchived(gone), gone.length) : '')));
         dzSheet.showModal();
         dzSheet.querySelector('h2').focus();
       };
     }
+    if (sel) h1.textContent = sel.title;
     const changes = items.filter((d) => designStatus(d) === 'Changes requested').length;
-    if (phone()) top.className = 'ui-top dz-top', top.replaceChildren(h1, more, theme);
+    if (phone()) top.className = 'ui-top dz-top', top.replaceChildren(h1, ...(sel ? [sel.all, sel.bar] : [more, theme]));
     else top.className = 'ui-dhead dz-head', top.replaceChildren(el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Designs'), h1,
-      el('p', {}, items.length ? `${plural(items.length, 'design')} on your board${changes ? ` · changes requested on ${changes > 1 && changes === items.length ? `all ${changes}` : changes}` : ''}` : EMPTY.designs), ro), el('div', { class: 'acts' }, more, theme));
-    return [phone() ? ro : '', selecting ? el('div', { class: 'dz-bulk' }, bulkBar(items)) : ''];
+      el('p', {}, items.length ? `${plural(items.length, 'design')} on your board${changes ? ` · changes requested on ${changes > 1 && changes === items.length ? `all ${changes}` : changes}` : ''}` : EMPTY.designs), ro), el('div', { class: 'acts' }, ...(sel ? [sel.all, sel.bar] : [more, theme])));
+    return [phone() ? ro : ''];
   }
-  /** Designs, newest first: on a phone To review and the rows; on a desk the cards and the open design (the one in the address, else the newest). */
-  function designGroups(items, top, key) {
-    const head = designsHead(items, top);
-    if (!items.length) return phone() ? [...head, el('p', { class: 'empty' }, EMPTY.designs)] : head;
+  /** Designs, newest first: on a phone To review and the rows, then Archived; on a desk the cards and the open design (the one in the address, else the newest). */
+  function designGroups(items, top, key, gone = []) {
+    const head = designsHead(items, top, gone);
+    if (!items.length) return phone() ? [...head, el('p', { class: 'empty' }, EMPTY.designs), archived(gone)] : head;
     if (!phone()) {
       const cur = items.find((d) => d.key === key) ?? items[0], [open, info] = designReview(cur, el('h2', { class: 'dz-t', dir: 'auto' }, cur.title), true);
       const card = (d) => el('a', { class: 'dz-card', id: `item-${d.key}`, href: `#designs/${d.key}`, 'aria-label': `Open design, ${d.title}`, ...(d === cur && { 'aria-current': 'true' }) },
         el('span', { class: 'dz-shot' }, pic(d) ? el('img', { src: src(pic(d)), alt: '', loading: 'lazy' }) : ''), el('span', { class: 'dz-ct', dir: 'auto' }, d.title),
-        el('span', { class: 'dz-cm' }, [d.group, d.filed && day(d.filed)].filter(Boolean).join(' · ')), el('span', { class: 'dz-tag' }, designStatus(d)));
+        el('span', { class: 'dz-cm' }, [d.group, d.filed && day(d.filed)].filter(Boolean).join(' · ')), el('span', { class: 'dz-tag' }, designStatus(d)), selMark(d.key));
       // Where it stands fades out at its foot while it holds more than it shows.
       const ib = info.querySelector('.dz-ib'), fade = () => ib.classList.toggle('fades', ib.scrollHeight - ib.scrollTop - ib.clientHeight > 1);
       ib.onscroll = fade; new ResizeObserver(fade).observe(ib);
@@ -4367,20 +4429,31 @@
       el('h2', { class: 'ui-sec' }, 'Newest', el('span', { class: 'n' }, String(items.length))),
       el('ul', { class: 'ui-card ui-list dz-list' }, ...items.map((d) => { const t = ticketOf(d);
         return el('li', { id: `item-${d.key}` }, el('a', { class: 'ui-row', href: `#designs/${d.key}`, 'aria-label': `Open design, ${d.title}${t?.progress > 0 ? `, ticket ${t.title}, ${t.progress}% done` : ''}` },
-          ...uiRow({ tile: cardTile(d), title: d.title, priority: d.priority, badge: trailBadge(d.key), meta: [designStatus(d), d.filed && day(d.filed)].filter(Boolean).join(' · '), progress: progressOf(t?.progress) }))); }))];
+          ...uiRow({ tile: cardTile(d), title: d.title, priority: d.priority, badge: trailBadge(d.key), meta: [designStatus(d), d.filed && day(d.filed)].filter(Boolean).join(' · '), progress: progressOf(t?.progress) }), selMark(d.key))); })), archived(gone)];
   }
 
-  /** The asks dismissed from Waiting on you, or the evidence and reports archived a day after they were filed, folded under one row; Restore puts one back on the board. */
-  function dismissed(items, name = 'Dismissed') {
+  /** Archived: what was discarded or dismissed from a screen, and the evidence and reports archived a day after they were filed. One quiet line at the list's end opens them
+   *  as rows in a sheet, each with why it went (the reason and when) and how far its agent got (the trail's badge), and Restore. Nothing is deleted. */
+  const arSheet = sheetOf('ar-sheet');
+  let arItems = [];
+  function fillArchived() {
+    const live = arItems.filter((d) => (state.dismissed ?? []).includes(d.key));
+    if (!live.length) return arSheet.close();
+    arSheet.replaceChildren(el('div', {}, sheetHead('ar-sheet', 'Archived'), el('ul', { class: 'ui-list ar-list' }, ...live.map((d) => {
+      const x = state.discarded?.[d.key], b = el('button', { class: 'ar-back', type: 'button', 'aria-label': `Restore, ${title(d)}` }, 'Restore');
+      b.onclick = () => setDismissed([d.key], false).then(fillArchived, (e) => say(`Couldn't restore: ${e.message}`, 8000));
+      return el('li', { id: `ar-${d.key}` }, el('div', { class: 'ui-row' }, ...uiRow({ tile: cardTile(d), title: title(d), badge: x ? trailBadge(d.key) : '', meta: x ? reasonOf(x.reason) : d.filed ? `Filed ${trailWhen(d.filed)}` : '' }), b));
+    }))));
+  }
+  const openArchived = (items) => { arItems = items; fillArchived(); arSheet.showModal(); arSheet.querySelector('h2').focus(); };
+  function archived(items) {
     if (!canDismiss() || !items.length) return '';
-    const box = el('details', { class: 'other gone-asks', ...(opened.has(`#${name}`) && { open: '' }) }, el('summary', {}, `${name} (${items.length})`),
-      el('ul', { class: 'rows' }, ...items.map((d) => {
-        const b = el('button', { class: 'dis', 'aria-label': `Restore, ${d.title}` }, 'Restore');
-        b.onclick = () => setDismissed([d.key], false).then(() => say('Back on the board', 3000), (e) => say(`Couldn't restore: ${e.message}`, 8000));
-        return el('li', {}, el('strong', { dir: 'auto' }, title(d)), b);
-      })));
-    box.ontoggle = () => (box.open ? opened.add(`#${name}`) : opened.delete(`#${name}`));
-    return box;
+    // A redraw while the sheet is open (a poll that brings the agent's read) redraws its rows too.
+    arItems = items;
+    if (arSheet.open) fillArchived();
+    const line = el('button', { class: 't-more-line ar-line', type: 'button', 'aria-haspopup': 'dialog' }, el('span', {}, `Archived · ${items.length}`), glyph('right'));
+    line.onclick = () => openArchived(items);
+    return line;
   }
   /** Each kind of ask has its own mark: a key, a plan, a phone for screens or mocks to look over, a question for yes or no, a bubble for a reply, a checklist for any other pick. */
   const askIcon = (d) => (d.type === 'signin' ? 'key' : d.type === 'plan' ? 'plan' : reviewed(d) ? 'phone' : { 'yes-no': 'yesno', reply: 'reply' }[typeOf(d)] ?? 'pick');
@@ -4450,7 +4523,7 @@
     const meta = d.type === 'signin' && d.expires ? el('span', {}, `${whoOf(d)} · `, el('span', { 'data-left': d.expires }, left(d.expires))) : `${whoOf(d)}${d.filed ? ` · ${filedAt(d.filed)}` : ''}`;
     const sel = deskSel === d.key && !gone, opens = askHref(d).startsWith('#decide/');
     const face = el('a', { class: 'dl-face ui-row', href: askHref(d), draggable: 'false', ...(!(gone && gone.how === 'later') && { id: `item-${d.key}` }), ...(opens && { 'data-row': '' }), ...(sel && { 'aria-current': 'true' }) },
-      ...uiRow({ tile: cardTile(d), title: d.type === 'signin' ? `Sign in to ${d.title}` : title(d), priority: priOf(d), badge: trailBadge(d.key), ...(t?.progress > 0 ? { progress: t.progress } : { meta }) }));
+      ...uiRow({ tile: cardTile(d), title: d.type === 'signin' ? `Sign in to ${d.title}` : title(d), priority: priOf(d), badge: trailBadge(d.key), ...(t?.progress > 0 ? { progress: t.progress } : { meta }) }), selMark(d.key));
     const act = (cls, mark, words) => el('div', { class: `dl-act ${cls}`, 'aria-hidden': 'true' }, glyph(mark), el('span', {}, words));
     const quick = (cls, mark, words, tip, fn) => { const b = el('button', { class: cls, 'aria-label': `${words}, ${d.title}`, title: tip }, glyph(mark)); b.onclick = fn; return b; };
     const hover = deskSel === null || gone || state.readonly ? '' : el('span', { class: 'dl-hover' }, rec ? quick('yes', 'check', rec.label, `Answer ${rec.label}`, () => quickAnswer(d.key)) : '',
@@ -4493,7 +4566,7 @@
     return el('div', { class: `waiting-page decide-list${fresh ? ' rise' : ''}` }, seg, hero, ...(desk ? [el('section', { class: 'ui-card dl-asks' }, sec('Asks', n), asks)] : [sec('Asks'), asks]),
       ...(rows.later.length ? [sec('Later', later), card('Later', rows.later)] : []),
       // Every answer given, newest first.
-      ...(done.length ? [sec('Answered', done.length), card('Answered', done.map(doneRow))] : []), items.length ? decideMoreLine(items) : '', dismissed(hidden));
+      ...(done.length ? [sec('Answered', done.length), card('Answered', done.map(doneRow))] : []), items.length ? decideMoreLine(items) : '', archived(hidden));
   }
   /** After a redraw, a row on its way out keeps its height for a moment, then folds to nothing; a redraw midway picks up where it was. */
   function fold() {
@@ -4537,7 +4610,7 @@
   function moreSheet(label, items) {
     const menu = el('details', { class: 'dl-more' }, el('summary', { 'aria-label': label }, glyph('more')), el('div', { class: 'dl-menu', role: 'menu' },
       ...items.filter(Boolean).map((item) => {
-        if (item instanceof Node) return item;
+        if (item instanceof Node) { item.addEventListener('click', () => (menu.open = false)); return item; }
         const [words, fn, act, mark, off] = item, b = el('button', { role: 'menuitem', 'data-act': act, ...(off && { disabled: '' }) }, el('span', {}, words), mark ? glyph(mark) : '');
         b.onclick = () => { menu.open = false; fn(); };
         return b;
@@ -4554,9 +4627,11 @@
     const act = (name, words, mark, list, fn) => { const b = el('button', { class: 'ui-pr', type: 'button', 'data-act': name, ...(!list.length && { disabled: '' }) },
       el('span', { class: 'k' }, glyph(mark), words), el('span', { class: 'v' }, el('span', { class: 'n' }, String(list.length))));
       b.onclick = () => { decideMore.close(); fn(); }; return b; };
-    const line = el('button', { class: 't-more-line', type: 'button', 'aria-haspopup': 'dialog' }, el('span', {}, 'Answer all recommended and Move all to later'), glyph('right'));
+    const line = el('button', { class: 't-more-line', type: 'button', 'aria-haspopup': 'dialog' }, el('span', {}, 'Select, answer all or move all to later'), glyph('right'));
     line.onclick = () => {
-      decideMore.replaceChildren(el('div', {}, sheetHead('d-more', 'More'), el('div', { class: 'ui-props' }, act('answer-all', 'Answer all recommended', 'sparkle', answerable, () => answerAll(answerable)),
+      const select = act('select', 'Select', 'check', items, () => { selecting = true; render(); });
+      select.querySelector('.v').remove();
+      decideMore.replaceChildren(el('div', {}, sheetHead('d-more', 'More'), el('div', { class: 'ui-props' }, select, act('answer-all', 'Answer all recommended', 'sparkle', answerable, () => answerAll(answerable)),
         act('later-all', 'Move all to later', 'clock', now, () => toLater(now.map((d) => d.key), true)))));
       decideMore.showModal(); decideMore.querySelector('h2').focus();
     };
@@ -4689,20 +4764,20 @@
   /** An ask, as the approved prototype lays it out: its kind, who asked and when over the question (on a desk that line is the bar's), why, the proof it rests on, the answers as cards
    *  ending in Your own answer, one optional note, what happens if you stay quiet, and one button. Nothing is picked until the person picks: Recommended is only a tag, and the button
    *  stays off until a pick, then names it (Send answer for their own words). The sink takes the parts of the bar above it:
-   *  the kind line for a desk (crumb), the question for a phone's bar once scrolled (mid), and More (···): Ask me later and Dismiss. */
+   *  the kind line for a desk (crumb), the question for a phone's bar once scrolled (mid), and More (···): Ask me later and Discard. */
   function decidePage(d, next, desk = false, sink = {}) {
     if (!d) return el('p', { class: 'empty' }, EMPTY.waiting);
     const to = next ? `#decide/${next.key}` : '#waiting';
     skipTo = next && !state.readonly ? to : '';
     const who = d.type === 'signin' ? d.waits : d.by || 'Agent', at = d.filed ? ` · ${filedAt(d.filed)}` : '';
     sink.crumb = el('p', { class: 'crumb', dir: 'auto' }, el('b', {}, askKind(d)), ` · ${who}${at}`);
-    const gone = xBtn(d, 'Dismiss');
-    if (gone) { gone.setAttribute('role', 'menuitem'); gone.append(glyph('trash')); gone.addEventListener('click', () => (location.hash = to)); }
+    const gone = xBtn(d, 'Discard', () => (location.hash = to));
+    if (gone) { gone.setAttribute('role', 'menuitem'); gone.append(glyph('trash')); }
     // Ask me later moves it to Later: a phone goes back to the list, a desk steps on to the next ask.
     const later = () => { location.hash = desk ? to : '#waiting'; toLater([d.key], true); };
-    // Ask me later is a button beside the answer, so More keeps only Dismiss; a sign-in's one button opens its link, so its More keeps both.
+    // Ask me later is a button beside the answer, so More keeps only Discard; a sign-in's one button opens its link, so its More keeps both.
     const more = () => { const items = state.readonly ? [] : [d.type === 'signin' && ['Ask me later', later, 'later', 'clock'], gone].filter(Boolean); return items.length ? moreSheet('More', items) : ''; };
-    // A sign-in keeps More too: one started on this host has no expiry, and Dismiss is the way to clear it.
+    // A sign-in keeps More too: one started on this host has no expiry, and Discard is the way to clear it.
     if (d.type === 'signin') {
       sink.more = more();
       return signinPage(d, desk);
@@ -4762,7 +4837,7 @@
     sink.more = given ? '' : more();
     if (done) seeReply(d.key);
     // The answer given: when, what with its note or words, whether the agent has read it, and the answer it replaced. Its one button brings the cards back.
-    const was = given?.replaces, sent = done && trailOf(d.key).at(-1), change = done && el('button', { class: 'answer', 'data-kbd': '↵', 'aria-keyshortcuts': 'Enter' }, el('span', { class: 'lbl' }, 'Change answer'));
+    const was = given?.replaces, sent = done && trailOf(d.key).filter((t) => t.kind !== 'discard').at(-1), change = done && el('button', { class: 'answer', 'data-kbd': '↵', 'aria-keyshortcuts': 'Enter' }, el('span', { class: 'lbl' }, 'Change answer'));
     if (change) change.onclick = () => { changing.add(d.key); selected.delete(d.key); own.delete(d.key); render(); document.querySelector('.decide .pick-list')?.scrollIntoView({ block: 'nearest', behavior: calm.matches ? 'auto' : 'smooth' }); };
     const said = done ? [el('p', { class: 'ui-dl' }, 'Your answer'), el('p', { class: 'ans-meta' }, el('span', { class: 'res ok' }, was ? 'Changed' : 'Answered'), ` · ${when(given.at)}`),
       el('div', { class: 'ans-card' }, el('span', { class: 'donek', 'aria-hidden': 'true' }, glyph('check')), el('div', {}, el('b', { dir: 'auto' }, saidOf(d, { ...given, note: '' })),
@@ -4802,7 +4877,7 @@
     const acts = [...segs, ...[...top.children].filter((e) => !e.matches('h1, .lede, .back'))];
     list = list.filter((n) => !segs.includes(n));
     if (!acts.some((e) => e.matches?.('.ui-rb'))) acts.push(themeButton());
-    return el('div', { class: 'ui-desk' }, el('header', { class: 'ui-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), top.querySelector('h1')?.textContent),
+    return el('div', { class: 'ui-desk' }, el('header', { class: 'ui-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), top.querySelector('h1')?.dataset.crumb ?? top.querySelector('h1')?.textContent),
       el('h1', { tabindex: '-1' }, top.querySelector('h1')?.textContent), el('p', {}, sub)), el('div', { class: 'acts' }, ...acts)),
       el('div', { class: 'ui-dgrid split' }, el('div', { class: 'ui-col s4 split-list' }, ...list), pane));
   }
@@ -4993,7 +5068,8 @@
     const bulk = { waiting: by.waiting, designs: by.designs, evidence: by.evidence, reports: [...by.reports, ...by.notes], answered: by.answered }[at] ?? [];
     const answeredToday = by.answered.filter((d) => isToday(state.answers[d.key].at)).length;
     // Decide's head, as ui.css draws it: the title and the light-or-dark button at its right edge; More sits under the list.
-    const top = head === 'waiting' && !state.readonly ? el('header', { class: 'ui-top' }, el('h1', { tabindex: '-1' }, pageTitle), ro ? el('p', { class: 'meta' }, ro) : '', themeButton(), selecting || FROZEN ? bulkBar(bulk) : '')
+    const sel = selecting && canDismiss() && bulk.length && ['waiting', 'designs'].includes(head) && selectHead(bulk);
+    const top = head === 'waiting' && !state.readonly ? el('header', { class: 'ui-top' }, el('h1', { tabindex: '-1', 'data-crumb': pageTitle }, sel ? sel.title : pageTitle), ro ? el('p', { class: 'meta' }, ro) : '', ...(sel ? [sel.all, sel.bar] : [themeButton()]))
       : el('header', { class: head === 'reports' && !state.readonly ? 'top ui-top rp-top' : head ? 'top' : 'ui-top today-top' }, head && !TABS.some(([a]) => a === head)
       ? el('a', { class: 'back', href: '#' }, '‹ Today') : '',
     ...(head ? [el('h1', { tabindex: '-1' }, pageTitle)] : todayHead()),
@@ -5010,12 +5086,12 @@
     const listed = ofKind(by.reports);
     const rpPage = () => el('div', { class: `rp-page${rpRisen ? '' : ' rise'}` }, ...(by.reports.length ? reportsHead(listed, by.reports) : []), listed.some((d) => d.steps && !reads(d)) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
       ...(by.reports.length ? reportGroups(listed) : rpSel !== null ? [] : [el('div', { class: 'all-clear-big' }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, 'Nothing to read'), el('p', {}, EMPTY.reports))]),
-      notes(by.notes), dismissed(state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && ['reports', 'notes'].includes(area(d))), 'Archived'),
+      notes(by.notes), archived(state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && ['reports', 'notes'].includes(area(d)))),
       !selecting && !state.readonly && !FROZEN && bulk.length ? reportsMore(by.reports, bulk) : '');
     const update = at === 'evidence' && ((key && state.decisions.find((d) => d.key === key && !gone.has(d.key) && d.type === 'evidence')) || by.evidence.find((d) => d.type === 'evidence'));
-    const content = at === 'tickets' || at === 'ticket' ? tickets(by, at === 'ticket' ? key : '') : [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived'), update)
+    const content = at === 'tickets' || at === 'ticket' ? tickets(by, at === 'ticket' ? key : '') : [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, archived(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence')), update)
       : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0, by.reports) : decideDesk(top, by.waiting, hidden, decideQueue, key, decideDone, answeredToday)] : at === 'designs' && !phone() && by.designs.length ? [] : [top]), ...(deskSplit ? [] : (at === 'waiting' || at === 'decide') && !state.readonly ? [at === 'decide' && !shownAsk ? el('p', { class: 'empty' }, 'Nothing to decide for that question.') : '', decideList(by.waiting, hidden, decideDone, answeredToday), at === 'decide' && shownAsk ? askSheet(shownAsk) : '']
-      : at === 'designs' ? designGroups(by.designs, top, key) : at === 'evidence' ? [...evidenceList(by.evidence, top), dismissed(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'), 'Archived')] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
+      : at === 'designs' ? designGroups(by.designs, top, key, state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'designs')) : at === 'evidence' ? [...evidenceList(by.evidence, top), archived(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'))] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : today(by))];
     if (!(at === 'decide' && shownAsk && !deskSplit)) sheetUp = '';
     // The report shown on a desk stays in place under a new list and bar while it is the same report, so its frame is not loaded again.
