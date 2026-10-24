@@ -53,3 +53,8 @@ jobs:
         env:
           CHROME_DEVTOOLS_AXI_CHROME_ARGS: --no-sandbox
         run: PATH="$RUNNER_TEMP/dd/bin:$PATH" done-done run board-actions
+      - name: Report section comment and note send regression
+        if: steps.changes.outputs.docs_only != 'true'
+        env:
+          CHROME_DEVTOOLS_AXI_CHROME_ARGS: --no-sandbox
+        run: SEND_FEEDBACK_ONLY=1 node .agents/skills/done-done-verify-sign-off/part-comment-shots.mjs "$RUNNER_TEMP/comment-send" light 390
