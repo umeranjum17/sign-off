@@ -914,8 +914,9 @@
   .ra-q { color: var(--tk-text); }
   .ra-e blockquote:not(.ra-say) { margin: 0; padding-left: 0.625rem; border-left: 2px solid var(--tk-line); color: var(--tk-text-secondary); }
   .ra-show { padding: 0.25rem 0; border: 0; background: none; color: var(--tk-ink); font: inherit; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-  .ra-e .ui-trail { align-self: stretch; margin-top: 0.25rem; }
-  .gd-act .ui-trail b { overflow: visible; font-size: var(--tk-fs-small); text-overflow: clip; }
+  /* The track spans the whole entry (under the icon too) so its four steps keep room: each label sits under its own dot with a gap before the next. */
+  .ra-e .ui-trail { align-self: stretch; margin: 0.25rem 0 0 -2.75rem; }
+  .gd-act .ui-trail b { overflow: visible; font-size: 0.6875rem; text-overflow: clip; }
   .ra-none { margin: 0.5rem 0; color: var(--tk-text-secondary); }
   /* Phone: Activity is a sheet from under the head; a desk keeps it as the third column. */
   @media (max-width: 62.4375rem) {
@@ -953,6 +954,7 @@
   #sheet .gd-err { color: var(--tk-critical); margin: 0; }
   .gd-progress { position: sticky; top: 0; z-index: 20; margin: 0 -1rem; padding: 0.625rem 1rem 0.5rem; background: var(--page); border-bottom: 1px solid var(--hair2); }
   .gd-progress .now { display: flex; justify-content: space-between; font-size: 0.875rem; color: var(--muted); margin-bottom: 0.5rem; }
+  .gd-progress .now-part { margin-top: 0.5rem; overflow: hidden; color: var(--text); font-size: 0.9375rem; line-height: 1.25rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
   .gd-progress .now b { color: var(--text); font-weight: 600; }
   .gd-segs { display: flex; gap: 0.25rem; }
   .gd-segs button { flex: 1; min-height: 0; height: 0.375rem; border-radius: 0.1875rem; background: var(--sunk); position: relative; }
@@ -4456,7 +4458,7 @@
     const askB = raBtn('asks', 'spark', 'Ask', () => (d.engagement ? openAsk() : ask(curPart, undefined, askB)));
     const reportBar = el('div', { class: 'ra-bar', role: 'group', 'aria-label': 'About the part in view' }, note, E('p', 'ra-on', 'On ', onTxt), E('div', 'ra-bs', agreeB, disagreeB, commentB, askB));
     function paintBar() {
-      onTxt.textContent = partName(curPart);
+      onTxt.textContent = nowPart.textContent = partName(curPart);
       const on = verdictOf(curPart) === 'agree';
       agreeB.setAttribute('aria-pressed', String(on)); agreeB.lastChild.textContent = on ? 'Agreed' : 'Agree';
       disagreeB.setAttribute('aria-pressed', String(verdictOf(curPart) === 'disagree'));
@@ -4565,7 +4567,8 @@
     const top = E('div', 'gd-top', E('p', 'geye', kindChip(d, true), E('span', '', [plan ? d.project : d.group, [who, d.filed && when(d.filed)].filter(Boolean).join(', ')].filter(Boolean).join(' · '))), fld('this', 'title', E('h1', '', d.title)), purposeLine(d), fld('this', 'about', mdSpan('p', 'sub', d.about)), ticketRow(d), el('div', { class: 'gd-activity' }, thread(d)),
       E('div', 'howto', gic('info'), E('span', '', plan ? 'A few short parts, in order. Tap Details for the numbers and Go deeper to ask me more. Nothing is required: Go ahead accepts my picks.' : `A few short parts, in order. The bar at the foot acts on the part you are reading${live ? '' : '.'}${live ? ': Agree, Disagree, Comment or Ask.' : ''}`)));
     const rail = el('aside', { class: 'gd-rail' }, E('h4', '', plan ? 'This plan' : 'This report'), nav, ...(plan ? [sumHost] : []));
-    const progress = E('div', 'gd-progress', now, segs);
+    const nowPart = E('div', 'now-part'); nowPart.hidden = plan;
+    const progress = E('div', 'gd-progress', now, segs, nowPart);
     const main = el('div', { class: 'gd-main' }, top, ...stageBlocks);
     cols.append(rail, main, ...(plan ? [] : [actBox]));
     const scroll = E('div', 'gd-scroll', E('div', 'gd', progress, cols));
