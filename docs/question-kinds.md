@@ -185,7 +185,7 @@ without posting.
   last card is **Your own answer**: it opens one box, and the button becomes
   **Send answer**, which sends the words as the answer. One **Note**, open
   under the cards, goes with any pick. **More** over the ask holds **Ask me
-  later** and **Dismiss**. The button turns into a check and opens the next
+  later** and **Discard**. The button turns into a check and opens the next
   ask, or the list after the last; on a phone that ask's bar reads **Back**,
   which (as a swipe right does) returns to the ask just answered. An answered
   ask opens with its answer, its note and when, and **Change answer**: a new
@@ -208,17 +208,21 @@ without posting.
   as read by the agent. Typed notes that are not sent yet stay in the
   browser across reloads; everything sent is saved next to the board and
   survives a restart.
-- **Dismiss** (the × on an item in a list, **Dismiss** in an ask's **More**,
-  **Select**, or **Clear all** on the other tabs) hides items from the board, Today
-  included; **Undo** in the toast brings them back, and so does **Restore**
-  under **Dismissed (N)** at the end of Decide.
+- **Discard** (the × on an item in a list, **Discard** on a card's own screen or in an ask's **More**,
+  or **Select** then **Discard N** in Decide and Designs) asks for one reason, one tap each:
+  **Not relevant**, **Replaced by newer** or **Done elsewhere**. The items leave the board, Today
+  included, and wait under **Archived** (one line at the end of the list, opening a sheet of them with
+  their reasons and **Restore**); **Undo** in the toast brings them back for 10 seconds. Once those
+  10 seconds are over the agent's `wait --filer` hands each discard over with its reason, and the card's
+  badge and Activity show how far it got (Sent, Delivered, Read). **Select** and **Clear all** on Evidence,
+  Reports and Answered dismiss without a reason, as before.
   `list` counts a dismissed item as neither
   waiting nor answered, as the board does (`list --full` says `dismissed`
   for an unanswered one and still its answer for an answered one), and
   `answers` does not count it as waiting; the agent is not told, so an ask it
   waits on keeps waiting, and `answers` still returns a dismissed answer.
   The storage is in [file-formats.md](file-formats.md).
-  Reports leave the main view by themselves a day after they were filed (nothing is deleted): they wait under **Archived (N)** at the end of Reports, and **Restore** brings one back for good. Evidence is never archived by age: every proof stays on Evidence, in one list, newest first, until it is dismissed. `sign-off-axi dismiss --filer <id>` hides every card of a finished task that still waits.
+  Reports leave the main view by themselves a day after they were filed (nothing is deleted): they wait under **Archived** at the end of Reports, and **Restore** brings one back for good. Evidence is never archived by age: every proof stays on Evidence, in one list, newest first, until it is dismissed. `sign-off-axi dismiss --filer <id>` hides every card of a finished task that still waits.
 
 ## Board, answers, and errors
 

@@ -14,7 +14,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, appendPromoted, appendSendBack, appendTicket, readTickets, rollUp, appendTicketComment, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendSendBack, appendTicket, readTickets, rollUp, appendTicketComment, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -290,15 +290,17 @@ Run it when you see the sign-in worked. A card posted with --start also closes b
 examples:
   sign-off-axi signin done --key npm-login
 `,
-  dismiss: `usage: sign-off-axi dismiss <key> [board.json]
+  dismiss: `usage: sign-off-axi dismiss <key> [board.json] [--reason not-relevant|replaced|done-elsewhere]
        sign-off-axi dismiss --filer <id> [board.json]
-Hides a card from the board, like its Dismiss button. The agent is not told, and an ask it waits on keeps waiting.
+Hides a card from the board. The agent is not told, and an ask it waits on keeps waiting.
+--reason discards it instead, like the board's Discard: the card moves to Archived and its agent's wait hands the reason over (Not relevant, Replaced by newer or Done elsewhere) once Undo's 10 seconds are over.
 --filer <id> closes a finished task: every card that id still has waiting leaves the board. Run it when your work ends, so nothing of yours is left on Decide.
 Evidence and reports leave the main view by themselves a day after they were filed; they stay under Archived on their screen, and restore brings one back for good.
 restore <key> [board.json] brings it back. Find the key with \`sign-off-axi list --full\`.
 examples:
   sign-off-axi dismiss ship-the-new-sign-in-screen-this-week
   sign-off-axi dismiss --filer agent-41
+  sign-off-axi dismiss fleet-dashboard-first-look --reason replaced
   sign-off-axi restore ship-the-new-sign-in-screen-this-week
 `,
   refile: `usage: sign-off-axi refile <key> [board.json] --media <file>... [--link <commit or URL>]
@@ -630,8 +632,9 @@ function board(file: string, say = warn) {
   const decisions = loadDecisions(file), answers = readAnswers(file, say);
   const hidden = new Set(readDismissed(file, answers, readRounds(file), say, archivable(file, decisions)));
   for (const key of Object.keys(answers)) if (!decisions.some((d) => d.key === key)) say(`left out the answer for ${key}: that question is no longer in ${basename(file)}`);
-  const promoted = new Set(readPromoted(file, say));
-  return decisions.map((d) => ({ ...d, answer: Object.hasOwn(answers, d.key) ? answers[d.key] : undefined, dismissed: hidden.has(d.key), ...(promoted.has(d.key) && { promoted: true }) }));
+  // A discard holds while its card is hidden and nothing came after it: no restore, no plain dismiss, no answer or round.
+  const promoted = new Set(readPromoted(file, say)), discards = new Map(readDiscards(file).filter((x) => x.last && hidden.has(x.key)).map(({ key, reason, at }) => [key, { reason, at }]));
+  return decisions.map((d) => ({ ...d, answer: Object.hasOwn(answers, d.key) ? answers[d.key] : undefined, dismissed: hidden.has(d.key), ...(discards.has(d.key) && { discarded: discards.get(d.key) }), ...(promoted.has(d.key) && { promoted: true }) }));
 }
 function ready(file: string, on: string, root?: string) {
   if (!existsSync(file)) throw fail(`no board yet at ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi raise${on} --title "<question>"\` first`);
@@ -654,7 +657,7 @@ function list(args: string[]) {
   ];
   const where = tilde(file) + (existsSync(file) ? '' : ' (no file yet; raise creates it)');
   if (values.full) {
-    return toon({ board: where, decisions: rows.map((d) => ({ key: d.key, status: awaitsVerdict(d.type, d.answer) ? (d.dismissed ? 'dismissed' : d.type === 'evidence' ? 'shown' : d.kind === 'design' && !d.promoted ? 'in review' : 'waiting') : d.answer!.answer, title: d.title, about: d.about ?? '', detail: d.detail ?? '',
+    return toon({ board: where, decisions: rows.map((d) => ({ key: d.key, status: awaitsVerdict(d.type, d.answer) ? (d.discarded ? `discarded: ${DISCARD_REASONS[d.discarded.reason]}` : d.dismissed ? 'dismissed' : d.type === 'evidence' ? 'shown' : d.kind === 'design' && !d.promoted ? 'in review' : 'waiting') : d.answer!.answer, title: d.title, about: d.about ?? '', detail: d.detail ?? '',
       recommend: d.recommend_value ?? '', default_if_silent: d.default_if_silent ?? '', close: d.close })) }, help);
   }
   return toon({
@@ -668,10 +671,13 @@ function list(args: string[]) {
 function printAnswers(file: string, rows: ReturnType<typeof board>, waiting: number, values: Record<string, any>, help: string[]) {
   const done = rows.flatMap((d) => (d.answer ? [{ ...d.answer, title: d.title }] : []));
   const rounds = readRounds(file).filter((r) => rows.some((d) => d.key === r.key));
+  // A card the person discarded, with their reason: it left the board and nothing more will come on it.
+  const gone = rows.flatMap((d) => (d.discarded ? [{ key: d.key, reason: d.discarded.reason, label: DISCARD_REASONS[d.discarded.reason], at: d.discarded.at, title: d.title }] : []));
   if (values.json) {
     const asked = (key: string) => rounds.filter((r) => r.key === key).map(({ note, at, comments }) => ({ note, at, comments }));
     const out: Record<string, any> = Object.fromEntries(done.map(({ key, answer, label, close, at, note, comments, notes, decisions, pick, replaces }) => [key, { answer, label, close, at, note, comments, notes, decisions, pick, replaces, ...(asked(key).length && { rounds: asked(key) }) }]));
     for (const r of rounds) if (!out[r.key]) out[r.key] = { rounds: asked(r.key) };
+    for (const { key, reason, label, at } of gone) out[key] = { ...out[key], discarded: { reason, label, at } };
     return JSON.stringify(out);
   }
   const notes = done.some((a) => a.note), changed = done.some((a) => a.replaces), sent = [...done, ...rounds].flatMap(({ key, comments = [] }) => comments.map(({ mock, ref, tag, words, text }) => ({ key, mock, ref, tag, words, text })));
@@ -688,6 +694,7 @@ function printAnswers(file: string, rows: ReturnType<typeof board>, waiting: num
     ...(sent.length && { comments: sent }),
     // A plan's send-back: each section's verdict and note, and each decision's pick.
     ...(plan.length && { plan }),
+    ...(gone.length && { discarded: gone.map(({ key, label, at }) => ({ key, reason: label, at })) }),
     waiting,
   }, help);
 }
@@ -718,6 +725,14 @@ function eventLines(file: string, rows: Decision[], answers: Answer[], rounds: R
     .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0)).map(({ line }) => JSON.stringify(line)).join('\n');
 }
 
+/** Discarded cards as the agent reads them: each key, the person's reason and when; nothing more will come on them. */
+function discardOut(file: string, gone: ReturnType<typeof board>, on: string, values: Record<string, any>) {
+  const rows = gone.map((d) => ({ key: d.key, title: d.title, reason: d.discarded!.reason, label: DISCARD_REASONS[d.discarded!.reason], at: d.discarded!.at }));
+  if (values.events) { const kind = kindOf(file); return rows.map(({ key, title, reason, label, at }) => JSON.stringify({ event: 'discarded', ...kind(key), key, title, reason, label, at, ...(gone.find((d) => d.key === key)!.filer && { filer: gone.find((d) => d.key === key)!.filer }) })).join('\n'); }
+  if (values.json) return JSON.stringify(Object.fromEntries(rows.map(({ key, reason, label, at }) => [key, { discarded: { reason, label, at } }])));
+  return toon({ board: tilde(file), discarded: rows.map(({ key, title, label, at }) => ({ key, reason: label, at, title })) },
+    ['The person discarded these cards: stop the work they asked for', `Run \`sign-off-axi wait${on}\` for the next answer`]);
+}
 /** Go deeper asks as the agent reads them: what part, what it is about, the question if the person typed one, and how to answer. */
 function deeperOut(file: string, asks: ReturnType<typeof readDeeper>, on: string, events?: boolean) {
   if (events) {
@@ -858,6 +873,16 @@ async function wait(args: string[]) {
         return printAnswers(file, found, waiting, values,
           [waiting ? `Run \`sign-off-axi wait${on}\` for the next of the ${waiting} waiting` : filer !== undefined && rows.some((d) => d.guided) ? `Run \`sign-off-axi wait${on}\` for the next Go deeper ask` : `Run \`sign-off-axi stop${onBoard}\` to close the board`]);
       }
+      // A card the person discarded wakes the wait once its Undo window is over, so an undone discard never reaches the agent:
+      // the filer's own wait takes it (read), any other passes it on (delivered); a keyed wait reads it each time, as it reads an answer.
+      const trail = readTrail(file, loadDecisions(file)), sent = (d: (typeof rows)[number]) => d.discarded && trail.find((t) => t.kind === 'discard' && t.key === d.key && t.at === d.discarded!.at);
+      const untaken = (d: (typeof rows)[number]) => { const t = sent(d); return !!t && (values.key !== undefined ? d.key === values.key : !(filer !== undefined ? t.read : t.delivered)); };
+      const gone = await locked(`${trailPath(file)}.lock`, () => {
+        const got = rows.filter((d) => untaken(d) && Date.now() - Date.parse(d.discarded!.at) >= UNDO_MS);
+        for (const d of got) appendMark(file, { op: filer !== undefined ? 'read' : 'delivered', key: d.key });
+        return got;
+      }, 'another wait is still taking discards');
+      if (gone.length) return discardOut(file, gone, on, values);
       // A Go deeper ask on this filer's guided page wakes the wait once, and is marked read when it is handed over.
       if (filer !== undefined) {
         const asks = await locked(`${deeperPath(file)}.lock`, () => {
@@ -891,8 +916,8 @@ async function wait(args: string[]) {
         }
         if (event) return vaultEvent(file, [{ key: values.key, at: event.at, status: event.status }], values);
       }
-      // A dismissed ask is hidden from the board, not withdrawn: it is not counted as waiting, but the agent still waits on it.
-      if (values.key === undefined && !rows.some((d) => waits({ ...d, dismissed: false }) || (filer !== undefined && d.guided)) && !live && !unknown) {
+      // A dismissed ask is hidden from the board, not withdrawn: it is not counted as waiting, but the agent still waits on it. A discarded one is withdrawn once handed over.
+      if (values.key === undefined && !rows.some((d) => waits({ ...d, dismissed: !!d.discarded && !untaken(d) }) || (filer !== undefined && d.guided)) && !live && !unknown) {
         throw fail(`nothing${filer ? ` posted by ${filer}` : ''} is waiting on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi answers${onBoard}\` to read the saved answers`, `Run \`sign-off-axi raise${on} --title "<question>"\` to ask a new one`);
       }
       const left = deadline - Date.now();
@@ -1113,8 +1138,10 @@ function dismiss(restoring: boolean) {
   const cmd = restoring ? 'restore' : 'dismiss';
   return (args: string[]) => {
     // dismiss --filer <id> closes a finished task: every card that filer still has waiting leaves the board.
-    const f = restoring ? -1 : args.findIndex((a) => a === '--filer'), filer = f < 0 ? undefined : args[f + 1], rest = f < 0 ? args : args.filter((_, i) => i !== f && i !== f + 1);
+    const flag = (name: string) => (restoring ? -1 : args.findIndex((a) => a === name)), f = flag('--filer'), r = flag('--reason');
+    const filer = f < 0 ? undefined : args[f + 1], reason = r < 0 ? undefined : args[r + 1], drop = [f, r].filter((x) => x >= 0).flatMap((x) => [x, x + 1]), rest = args.filter((_, i) => !drop.includes(i));
     if (f >= 0 && !isKey(filer)) throw fail('--filer needs an id of 1-128 of A-Z a-z 0-9 . _ -', 'VALIDATION_ERROR', 'Pass the id you posted with');
+    if (r >= 0 && (f >= 0 || !Object.hasOwn(DISCARD_REASONS, reason ?? ''))) throw fail(f >= 0 ? '--reason discards one card, so it does not take --filer' : `--reason must be one of ${Object.keys(DISCARD_REASONS).join(', ')}`, 'VALIDATION_ERROR', 'sign-off-axi dismiss <key> --reason replaced');
     const at = rest.findIndex((a) => !a.startsWith('-') && !existsSync(a) && !a.endsWith('.json')), key = rest[at];
     if (at < 0 && f < 0) throw fail(`${cmd} needs a card key`, 'VALIDATION_ERROR', `sign-off-axi ${cmd} <key> [board.json]`);
     const { file, on } = parse(cmd, rest.filter((_, i) => i !== at), {});
@@ -1125,8 +1152,9 @@ function dismiss(restoring: boolean) {
         return toon({ board: tilde(file), dismissed: keys.length ? keys : `0 cards of ${filer} were waiting` }, keys.length ? [`Run \`sign-off-axi restore${on} <key>\` to bring one back`] : []);
       }
       if (!isKey(key) || !board(file).some((x) => x.key === key)) throw fail(`no card with key ${key} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi list${on} --full\` to see the keys`);
-      appendDismissed(file, [key], !restoring);
-      return toon({ board: tilde(file), [restoring ? 'restored' : 'dismissed']: [key] }, [`Run \`sign-off-axi ${restoring ? 'dismiss' : 'restore'}${on} ${key}\` to undo`]);
+      appendDismissed(file, [key], !restoring, reason as DiscardReason | undefined);
+      return toon({ board: tilde(file), [restoring ? 'restored' : reason ? 'discarded' : 'dismissed']: [key], ...(reason && { reason: DISCARD_REASONS[reason as DiscardReason] }) },
+        [`Run \`sign-off-axi ${restoring ? 'dismiss' : 'restore'}${on} ${key}\` to undo`]);
     });
   };
 }
@@ -2542,6 +2570,7 @@ const state = () => {
     annotations: fed ? [] : ((sent) => readAnnotations(file, warn).map((a) => (sent.has(a.id) ? { ...a, sent: true } : a)))(sentIds(file)),
     comments: extra.readonly === true ? [] : readPartComments(file),
     dismissed: readDismissed(file, answers, rounds, warn, fed ? [] : items),
+    discarded: Object.fromEntries(readDiscards(file).filter((x) => x.last).map(({ key, reason, at }) => [key, { reason, at }])),
     promoted: readPromoted(file, warn),
     tickets: rollUp(readTickets(file, warn)),
     projects: readProjects(file, warn),
@@ -2810,11 +2839,12 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     return [200, state()];
   }
   if (req.url === '/api/dismiss') {
-    const { keys, dismissed } = JSON.parse(body) ?? {};
+    const { keys, dismissed, reason } = JSON.parse(body) ?? {};
     if (!Array.isArray(keys) || !keys.length || keys.length > 200 || typeof dismissed !== 'boolean') return [400, { error: 'Send 1 to 200 keys and dismissed true or false' }];
+    if (reason !== undefined && (!dismissed || !Object.hasOwn(DISCARD_REASONS, reason))) return [400, { error: `A discard's reason is one of ${Object.keys(DISCARD_REASONS).join(', ')}` }];
     const have = new Map(board(file).map((x) => [x.key, x]));
     if (!keys.every((k) => isKey(k) && have.has(k))) return [404, { error: 'This item is no longer in the file' }];
-    appendDismissed(file, [...new Set<string>(keys)], dismissed);
+    appendDismissed(file, [...new Set<string>(keys)], dismissed, reason);
     return [200, state()];
   }
   if (req.url === '/api/engagement' || req.url === '/api/engagement/seen') {
