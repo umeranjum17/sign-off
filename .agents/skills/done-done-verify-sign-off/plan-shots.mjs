@@ -71,7 +71,9 @@ try {
   capture('home', 'Decide lists the plan as one of its rows, with its icon tile and its title.');
   // The phone tab bar covers the bottom edge, so bring the link clear of it before the real click.
   drive('await page.eval(() => document.querySelector(".dl-row[data-group=review] a[href^=\'#waiting/\']").scrollIntoView({ block: "center" }));');
-  const openRef = new RegExp(`uid=(\\S+) link "${plan.title}`).exec(browser('snapshot'))[1];
+  // The shared project tile contributes its accessible name before the plan's title.
+  const openRef = browser('snapshot').split('\n').find((line) => line.includes(' link "') && line.includes(plan.title))?.match(/uid=(\S+)/)?.[1];
+  assert.ok(openRef, `Decide must expose a link for the posted plan: ${plan.title}`);
   browser('click', `@${openRef}`); drive('await wait(".plan-section"); await wait(".plan-view[style]");');
   assert.equal(JSON.parse(drive('console.log(JSON.stringify(await page.eval(() => getComputedStyle(document.querySelector("#reader h1")).outlineStyle)));')), 'none');
   capture('plan', 'Plan page is open with no title focus box, direction page and Send back disabled.');
