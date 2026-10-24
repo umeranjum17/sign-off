@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import { accessSync, constants, readFileSync, realpathSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
-import { isKey, MEDIA_MAX, PRIORITIES, REPORT_FORMS, REPORT_PARTS, REPORT_PURPOSES } from './store.js';
+import { GUARDS, isKey, MEDIA_MAX, PRIORITIES, REPORT_FORMS, REPORT_PARTS, REPORT_PURPOSES } from './store.js';
 
 /** A message that does not match: what is wrong, and the one line that says how to fix it. */
 export class ContractError extends Error {
@@ -19,7 +19,7 @@ export const engaged = (m: any) => (m?.kind === 'report' && [4, 5].includes(m.sc
 export const KINDS = Object.keys(SCHEMAS);
 const COMMON = ['contract', 'kind', 'schema', 'key', 'title', 'filer', 'ticket', 'priority', 'link', 'about'];
 const FIELDS: Record<string, string[]> = {
-  ask: [...COMMON, 'ask_ref', 'detail', 'why', 'options', 'recommend_value', 'recommend_reason', 'default_if_silent', 'silent_by', 'close', 'merges', 'proof', 'report'],
+  ask: [...COMMON, 'ask_ref', 'detail', 'why', 'options', 'recommend_value', 'recommend_reason', 'default_if_silent', 'silent_by', 'guard', 'close', 'merges', 'proof', 'report'],
   report: [...COMMON, 'filed', 'group', 'decided', 'form', 'video', 'asked_by', 'view', 'preview'],
   evidence: [...COMMON, 'media', 'run'],
   gate: [...COMMON, 'run', 'options', 'recommend_value', 'close'],
@@ -81,7 +81,7 @@ const show = (v: unknown) => JSON.stringify(v);
 /** A field name as it reads inside a sentence: escaped, so a newline or control character shows as \n or \u001b. */
 const escaped = (v: string) => show(v).slice(1, -1);
 /** The raise flag each question field fills: a refusal of a flag post names that flag, not the field. */
-const FLAG_OF: Record<string, string> = { why: 'why', about: 'about', detail: 'detail', title: 'title', default_if_silent: 'default', recommend_reason: 'recommend-reason', recommend_value: 'recommend', silent_by: 'silent-by', merges: 'merge', proof: 'proof', report: 'report', options: 'option', label: 'option', value: 'option', outcome: 'outcome' };
+const FLAG_OF: Record<string, string> = { why: 'why', about: 'about', detail: 'detail', title: 'title', default_if_silent: 'default', recommend_reason: 'recommend-reason', recommend_value: 'recommend', silent_by: 'silent-by', guard: 'guard', merges: 'merge', proof: 'proof', report: 'report', options: 'option', label: 'option', value: 'option', outcome: 'outcome' };
 /** The flag a field fills: options[1].outcome is --outcome, merges[0] is --merge. */
 const flagOf = (field: string) => { const f = field.replace(/^options\[\d+\]\./, '').replace(/\[\d+\]$/, ''); return `--${FLAG_OF[f] ?? f}`; };
 /** A field as a refusal names it: the JSON field, or the raise flag that fills it. */
@@ -432,6 +432,7 @@ export function checkMessage(m: any, want?: string, flags = false): { kind: stri
   // A real UTC time to the minute, seconds optional: Date.parse would roll 2026-02-30 over to March.
   const utc = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?Z$/.test(v) && !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().startsWith(v.slice(0, -1));
   if (Object.hasOwn(m, 'silent_by') && (!ask || flags) && !utc(m.silent_by)) throw bad('silent_by', `${show(m.silent_by)} is not a UTC time such as 2026-10-17T18:00:00Z`, `Set ${named('silent_by', flags)} to when the silent default happens, as YYYY-MM-DDTHH:MM:SSZ in UTC, or leave it out`);
+  if (Object.hasOwn(m, 'guard') && !GUARDS.includes(m.guard)) throw bad('guard', `${show(m.guard)} is not one of ${GUARDS.join(', ')}`, `Set ${named('guard', flags)} to why only the person may answer it (${GUARDS.join(', ')}), or leave it out`);
   if (Object.hasOwn(m, 'close') && m.close !== 'done' && m.close !== 'release') throw bad('close', 'must be done or release', 'Set "close" to "done" or "release", or leave it out');
   if (Object.hasOwn(m, 'merges')) {
     const keys = m.merges, MERGES = `Set ${named('merges', flags)} to the keys of 1 to 10 other cards on the board that ask the same thing, such as ${flags ? '--merge ship-signin' : '["ship-signin"]'}`;

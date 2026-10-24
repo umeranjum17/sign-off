@@ -79,6 +79,10 @@ journeys:
   # and each phone list's end clear of the dock, at 360, 390, 445, 1280 and 1440 in light and dark. DESIGNS_ACCESS_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
   designs-access:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/designs-access-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
+  # The leash acting at 360, 390, 445, 1280 and 1440, light and dark: Decide's Taken without you and its Leash chip and sheet, the default taken at silent_by, the agent's pick on Act, then tell me,
+  # a money ask that always waits, Ask me first set from the sheet, and Change reaching the agent. LEASH_ICONS=<folder of the projects' real icons>, LEASH_REVIEW_ROOT=<folder outside the run> keeps every state there and only Decide's frames in the run.
+  leash:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/leash-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   # A screen note typed in the design viewer on an answers-only (fed) board and Request change sent, one width per run: REQUEST_WIDTH=390|1280.
   request-change:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/request-change-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${REQUEST_THEME:-light}"'

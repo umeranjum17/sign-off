@@ -105,6 +105,26 @@ Agents pass `--priority` when they know it, and set their project's icon when it
 
 Every card's screen also keeps its **Activity**, oldest first, from what the board already saved: who posted it, your answer and note (and the one a change replaced), when the agent picked it up, a new round you asked for and your comments. A ticket's page shows its cards' activity together.
 
+### The leash: what agents may do without you
+
+Every ask says what happens if you stay quiet (`--default`) and when (`--silent-by`). Your leash decides whether it happens. Set it in Today's More, or tap the **Leash** chip by the count on Decide. It is saved as `leash:` in the `config.yaml` beside the board.
+
+- **Ask me first** (`ask`): nothing happens; agents wait for you on every ask.
+- **When it matters** (`matters`, the default): when an ask's `--silent-by` time passes with no answer, the open board takes its default as the answer. Its card says **Taken by default at 13:00**, and the waiting agent gets it at once. A default that fell due while the board was closed is taken when it starts. An ask with no `--silent-by` waits.
+- **Act, then tell me** (`act`): the agent's recommended pick is taken the moment it raises the ask. Its card says **Agent picked B: Friday, tell me if wrong**.
+
+Both kinds wait under **Taken without you** in Decide until you open them, each with a one-tap **Change** on a phone. You can still answer or change them. The change reaches the agent as an answer that replaces the taken one, and the card's trail and Activity say what happened: Taken or Picked, then Delivered and Read.
+
+Some asks are never answered for you, whatever the leash: an ask raised with `--guard destructive|irreversible|money|credential|security`, and an ask whose words talk of spending money, deleting, what can't be undone, passwords and keys, or access. Designs, plans and sign-ins always wait too. Such an ask says **Always waits for you** and why.
+
+<table>
+  <tr>
+    <td align="center" width="33%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-leash-decide-dark.webp"><img src="docs/media/phone-leash-decide.webp" alt="Decide: the asks that wait, then Taken without you with a default taken and an agent's pick, each with Change, and the Leash chip by the count"></picture><br><b>Taken without you</b><br>What the leash answered, with Change.</td>
+    <td align="center" width="33%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-leash-agent-dark.webp"><img src="docs/media/phone-leash-agent.webp" alt="An ask the agent picked: Agent picked B: Friday, tell me if wrong, its reason, its trail from Picked to Read, and Change"></picture><br><b>Agent picked</b><br>On Act, then tell me: its pick, and Change.</td>
+    <td align="center" width="33%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-leash-guard-dark.webp"><img src="docs/media/phone-leash-guard.webp" alt="An ask that spends money: Always waits for you, so no default or agent pick is ever taken"></picture><br><b>Always waits for you</b><br>Money, deletes, keys and access.</td>
+  </tr>
+</table>
+
 ## What you can ask
 
 One line on what the agent runs per kind; the full reference is [docs/question-kinds.md](docs/question-kinds.md) and the message rules are in [docs/contract.md](docs/contract.md).

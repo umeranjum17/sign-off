@@ -14,7 +14,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendSendBack, appendTicket, readTickets, rollUp, appendTicketComment, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendSendBack, appendTicket, readTickets, rollUp, appendTicketComment, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, guided, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -85,7 +85,7 @@ examples:
   sign-off-axi
   sign-off-axi list ./decisions.json --full
 `,
-  raise: `usage: sign-off-axi raise [board.json] --title "<question>" [--key <key>] [--about <text>] [--detail <text>] --why <text> [--option <value>=<label>]... --outcome <value>=<text>... --recommend <value> --recommend-reason <text> --default <value> [--silent-by <ISO time>] [--merge <key>]... [--proof <key>] [--close done|release] [--filer <id>] [--ticket <id>] [--priority P0-P3]
+  raise: `usage: sign-off-axi raise [board.json] --title "<question>" [--key <key>] [--about <text>] [--detail <text>] --why <text> [--option <value>=<label>]... --outcome <value>=<text>... --recommend <value> --recommend-reason <text> --default <value> [--silent-by <ISO time>] [--guard <why>] [--merge <key>]... [--proof <key>] [--close done|release] [--filer <id>] [--ticket <id>] [--priority P0-P3]
        sign-off-axi raise [board.json] --from <decisions.json> [--filer <id>] [--ticket <id>] [--priority P0-P3]
 Adds questions to the board: yes/no, or 2 to 6 choices with one --option each. --key defaults to a slug of the title.
 raise is the alias for post --type decision: same flags, same output.
@@ -97,7 +97,13 @@ Every question meets the question standard (docs/contract.md, "Asking a good que
   --why says what it is about and why it needs an answer now (200 characters or fewer).
   --outcome <value>=<text> says what happens next if that answer is picked (120 or fewer), one for every option: yes and no without --option.
   --recommend names the answer you would pick, --recommend-reason why in one line (160 or fewer).
-  --default is what happens if the user stays quiet, shown and never applied; --silent-by (an ISO UTC time such as 2026-10-18T09:00Z) says when.
+  --default is what happens if the user stays quiet; --silent-by (an ISO UTC time such as 2026-10-18T09:00Z) says when. The leash (leash: in config.yaml, the board's Leash control) says what is applied:
+    ask (Ask me first): nothing; every ask waits for the user.
+    matters (When it matters, the default): at --silent-by with no answer, the open board takes --default as the answer, saved with taken: default; an ask with no --silent-by waits.
+    act (Act, then tell me): raise takes your --recommend at once, saved with taken: agent; go ahead with it. The user sees it on the card and can change it.
+  Either way wait and answers hand it over like an answer, with its taken; the user can still answer or change it, and a change comes back with replaces.
+  --guard destructive|irreversible|money|credential|security marks an ask only the user may answer: no default or pick is ever taken for it, whatever the leash.
+  An ask whose title, why or outcomes talk of deleting, money, passwords, keys, access or what can't be undone is guarded the same way without it; designs, plans, sign-ins, gates and findings always wait.
   The buttons match the text: a title or why that names choices A, B, C needs one --option per letter, each label starting with its letter, never Yes/No.
   yes and no are labelled Yes and No; a question never takes Done, OK or Not now buttons.
 One decision is one card: look at the open cards first. --merge <key> (up to 10) names other cards on the board that ask the same thing and offer every option of this one:
@@ -494,7 +500,7 @@ function fits(title: unknown, key?: string) {
   if (n > TITLE_MAX) throw fail(`${key ? `key ${key}: ` : ''}title is ${n} characters, over ${TITLE_MAX}`, 'VALIDATION_ERROR', `Shorten the title to ${TITLE_MAX} characters and put the rest in about`);
 }
 /** The question standard's flags: a decision's why, each option's outcome, the reason for the recommendation, when silence decides, the cards it merges. */
-const ASK_FLAGS = ['why', 'outcome', 'recommend-reason', 'silent-by', 'merge', 'proof', 'report'];
+const ASK_FLAGS = ['why', 'outcome', 'recommend-reason', 'silent-by', 'guard', 'merge', 'proof', 'report'];
 const MANY = ['option', 'outcome', 'merge'];
 /** Board types that are contract kinds: a decision (the default type) is an ask. */
 const CONTRACT_TYPES = ['decision', 'ask', 'evidence', 'report', 'plan', 'design'];
@@ -679,12 +685,12 @@ function printAnswers(file: string, rows: ReturnType<typeof board>, waiting: num
   const gone = rows.flatMap((d) => (d.discarded ? [{ key: d.key, reason: d.discarded.reason, label: DISCARD_REASONS[d.discarded.reason], at: d.discarded.at, title: d.title }] : []));
   if (values.json) {
     const asked = (key: string) => rounds.filter((r) => r.key === key).map(({ note, at, comments }) => ({ note, at, comments }));
-    const out: Record<string, any> = Object.fromEntries(done.map(({ key, answer, label, close, at, note, comments, notes, decisions, pick, replaces }) => [key, { answer, label, close, at, note, comments, notes, decisions, pick, replaces, ...(asked(key).length && { rounds: asked(key) }) }]));
+    const out: Record<string, any> = Object.fromEntries(done.map(({ key, answer, label, close, at, note, comments, notes, decisions, pick, replaces, taken, reason }) => [key, { answer, label, close, at, note, comments, notes, decisions, pick, replaces, taken, reason, ...(asked(key).length && { rounds: asked(key) }) }]));
     for (const r of rounds) if (!out[r.key]) out[r.key] = { rounds: asked(r.key) };
     for (const { key, reason, label, at } of gone) out[key] = { ...out[key], discarded: { reason, label, at } };
     return JSON.stringify(out);
   }
-  const notes = done.some((a) => a.note), changed = done.some((a) => a.replaces), sent = [...done, ...rounds].flatMap(({ key, comments = [] }) => comments.map(({ mock, ref, tag, words, text }) => ({ key, mock, ref, tag, words, text })));
+  const notes = done.some((a) => a.note), changed = done.some((a) => a.replaces), took = done.some((a) => a.taken), sent = [...done, ...rounds].flatMap(({ key, comments = [] }) => comments.map(({ mock, ref, tag, words, text }) => ({ key, mock, ref, tag, words, text })));
   const plan = done.flatMap(({ key, notes: sections = [], decisions: picks = {} }) => [
     ...sections.map((n: any) => ({ key, section: n.section ?? `${n.journey}/${n.screen}`, verdict: n.verdict ?? 'change', note: n.note ?? '' })),
     ...Object.entries(picks).map(([decision, pick]) => ({ key, decision, pick })),
@@ -692,7 +698,8 @@ function printAnswers(file: string, rows: ReturnType<typeof board>, waiting: num
   return toon({
     board: tilde(file),
     // A changed answer names the one it replaces, which the agent may already have acted on.
-    answers: done.length ? done.map(({ key, answer, at, label, close, title, note = '', replaces }) => ({ key, answer, at, ...(values.full && { label, close, title }), ...(notes && { note }), ...(changed && { replaces: replaces?.answer ?? '' }) })) : '0 saved yet',
+    // An answer the leash took says how: default (the board took the ask's default at its silent_by) or agent (your recommended pick, on Act, then tell me).
+    answers: done.length ? done.map(({ key, answer, at, label, close, title, note = '', replaces, taken = '' }) => ({ key, answer, at, ...(values.full && { label, close, title }), ...(notes && { note }), ...(changed && { replaces: replaces?.answer ?? '' }), ...(took && { taken }) })) : '0 saved yet',
     ...(rounds.length && { rounds: rounds.map(({ key, note, at }) => ({ key, note, at })) }),
     // Comments on mock elements that went with an answer or a round, each with the element it points at.
     ...(sent.length && { comments: sent }),
@@ -700,7 +707,7 @@ function printAnswers(file: string, rows: ReturnType<typeof board>, waiting: num
     ...(plan.length && { plan }),
     ...(gone.length && { discarded: gone.map(({ key, label, at }) => ({ key, reason: label, at })) }),
     waiting,
-  }, help);
+  }, [...(took ? ['taken: default is the default the board took at the ask\'s silent_by, agent your own recommended pick (the leash Act, then tell me): go ahead, and keep waiting, as the person can still change it'] : []), ...help]);
 }
 
 function answers(args: string[]) {
@@ -724,7 +731,7 @@ function eventLines(file: string, rows: Decision[], answers: Answer[], rounds: R
   const kind = kindOf(file), item = new Map(rows.map((d) => [d.key, d]));
   const head = (event: string, key: string) => ({ event, ...kind(key), key, title: item.get(key)?.title });
   const tail = (key: string, comments?: Sent[]) => ({ ...(item.get(key)?.filer && { filer: item.get(key)!.filer }), ...(comments?.length && { comments }) });
-  return [...answers.map(({ key, answer, label, close, at, note, comments, notes, decisions, pick, replaces }) => ({ at, line: { ...head('answer', key), answer, label, close, at, ...(note && { note }), ...(notes && { notes, decisions }), ...(pick !== undefined && { pick }), ...(replaces && { replaces }), ...tail(key, comments) } })),
+  return [...answers.map(({ key, answer, label, close, at, note, comments, notes, decisions, pick, replaces, taken, reason }) => ({ at, line: { ...head('answer', key), answer, label, close, at, ...(note && { note }), ...(notes && { notes, decisions }), ...(pick !== undefined && { pick }), ...(replaces && { replaces }), ...(taken && { taken, reason }), ...tail(key, comments) } })),
     ...rounds.map(({ key, note, at, comments }) => ({ at, line: { ...head('round', key), note, at, ...tail(key, comments) } }))]
     .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0)).map(({ line }) => JSON.stringify(line)).join('\n');
 }
@@ -1682,7 +1689,7 @@ function buildIncoming(values: Record<string, any>, extra: object, filer: string
   try {
     const { title, key = slug(title), about, detail, why, recommend: recommend_value, default: default_if_silent, close } = values;
     const ask = !Object.hasOwn(extra, 'type'), options = ask ? outcomesOf(values) : optionsOf(values);
-    const told = ask && { why, recommend_reason: values['recommend-reason'], silent_by: values['silent-by'], merges: values.merge, proof: values.proof, report: values.report, ask_ref: values['ask-ref'] };
+    const told = ask && { why, recommend_reason: values['recommend-reason'], silent_by: values['silent-by'], guard: values.guard, merges: values.merge, proof: values.proof, report: values.report, ask_ref: values['ask-ref'] };
     writeFileSync(source, JSON.stringify({ schema: 2, items: [{ key, title, about, detail, ...told, options, recommend_value, default_if_silent, close, ticket: values.ticket, priority: values.priority, ...extra, filer }] }));
     const incoming = loadDecisions(source, board), raw = readItems(source).items;
     if (!ask) recommended(raw, true);
@@ -1773,17 +1780,23 @@ function storeIncoming(file: string, named: string, on: string, { incoming, raw 
       }
       return { key: d.key, status: !had ? 'raised' : had.answer && !awaitsVerdict(had.type, had.answer) ? `already answered ${had.answer.answer}` : waits({ ...had, dismissed: false }) ? 'already waiting' : 'already posted', title: d.title };
     });
+    let picked: Answer[] = [];
     if (raised.some((r) => r.status === 'raised')) {
       const before = waitingKeys(file);
       writeItems(file, items);
+      // On the leash Act, then tell me, a new ask takes its agent's recommended pick at once: the person sees it and can still change it.
+      if (leashOf(named) === 'act') picked = leashTake(file, 'act', raised.flatMap((r) => (r.status === 'raised' ? [r.key] : []))).took.map(({ a }) => a);
+      for (const a of picked) raised.find((r) => r.key === a.key)!.status = `picked ${a.answer}`;
       notifyEntered(file, named, before);
     }
     const key = raised.length === 1 ? ` --key ${raised[0].key}` : '';
+    const goAhead = picked.map((a) => `The leash is Act, then tell me: go ahead with ${a.label} on ${a.key}; the person can still change it`);
     // Reports take no answer, so a post with nothing waiting asks the user to read it, never to answer.
-    const anyWaiting = incoming.some((d, i) => waits(d) && !raised[i].status.startsWith('already answered'));
+    const anyWaiting = incoming.some((d, i) => waits(d) && !raised[i].status.startsWith('already answered') && !raised[i].status.startsWith('picked'));
+    if (picked.length && !anyWaiting) return toon({ board: tilde(file), raised }, [...goAhead, ...(filer ? [`Run \`sign-off-axi wait${on} --filer ${filer}\` to hear if the person changes it`] : [`Run \`sign-off-axi answers${on}${key}\` to read ${key ? 'the answer' : 'the answers'}`])]);
     if (incoming.length && !anyWaiting) return toon({ board: tilde(file), raised }, [`Run \`sign-off-axi open${on}\` so the user can read ${incoming.length > 1 ? 'them' : 'it'}`]);
     const open = anyWaiting ? [`Run \`sign-off-axi open${on}\` so the user can answer`] : [];
-    return toon({ board: tilde(file), raised }, [...open, ...(filer ? [waitFor(on, filer)] : []), `Run \`sign-off-axi answers${on}${key}\` to read ${key ? 'the answer' : 'the answers'}`]);
+    return toon({ board: tilde(file), raised }, [...goAhead, ...open, ...(filer ? [waitFor(on, filer)] : []), `Run \`sign-off-axi answers${on}${key}\` to read ${key ? 'the answer' : 'the answers'}`]);
   });
 }
 
@@ -2390,8 +2403,11 @@ async function serve(args: string[]) {
     if (!server.listening) return;
     await sweep('periodic');
     reap();
+    await holdLeash();
     if (server.listening) setTimeout(repeat, 5_000).unref();
   };
+  // Defaults that fell due while the board was closed are taken now; the next is timed to its silent_by, and every pass looks again.
+  await holdLeash();
   setTimeout(repeat, 5_000).unref();
   const url = `http://${urlHost(bind)}:${bound}/`;
   process.on('exit', () => { if (existsSync(record(file)) && readFileSync(record(file), 'utf8').split(' ')[0] === String(process.pid)) rmSync(record(file), { force: true }); });
@@ -2564,12 +2580,34 @@ const warmGuard = () => new Promise<void>((done) => {
  * silent-by time, the default) or act (take the recommended pick now and report it). With the name: line it is the page's only setting. */
 const LEASHES = ['ask', 'matters', 'act'];
 const configLine = (text: string, key: string) => new RegExp(`^[ \\t]*${key}[ \\t]*:([^#\\n]*)`, 'm').exec(text)?.[1].trim() || undefined;
+const leashIn = (text: string) => ((leash) => (LEASHES.includes(leash) ? leash : 'matters'))(configLine(text, 'leash') ?? '');
+/** The leash of the config.yaml beside a board: matters when it has none, or no config.yaml. */
+const leashOf = (named: string) => { try { return leashIn(readFileSync(join(dirname(named), 'config.yaml'), 'utf8')); } catch { return 'matters'; } };
 /** The user's name and leash; none for a board with no config.yaml beside it. */
 function profile() {
   let text: string;
   try { text = readFileSync(config, 'utf8'); } catch { return {}; }
-  const leash = configLine(text, 'leash') ?? '';
-  return { name: configLine(text, 'name')?.slice(0, 40), leash: LEASHES.includes(leash) ? leash : 'matters' };
+  return { name: configLine(text, 'name')?.slice(0, 40), leash: leashIn(text) };
+}
+/** What the leash answers for the person; run under the board lock, so a raise and the board never both take one ask. On Act, then tell me an open plain ask takes its
+ * recommended pick at once (the agent's own pick, made when it is raised); on When it matters, and on Act for an ask with no pick, the board takes its default once its
+ * silent_by has passed. A guarded ask (guardOf), one with neither, an ask a waiting ask merges, and every ask on Ask me first wait for the person.
+ * `raised` limits it to the agent picks of those keys, as a raise takes them. Returns what it took and when the next default falls due. */
+function leashTake(file: string, leash: string, raised?: string[]) {
+  const took: { d: Decision; a: Answer }[] = [];
+  let next: number | undefined;
+  if (leash === 'ask' || !existsSync(file) || readItems(file).extra.readonly === true) return { took };
+  const rows = board(file, () => {}), at = Date.now();
+  for (const d of rows) {
+    if ((raised && !raised.includes(d.key)) || d.answer || d.discarded || !plainAsk(d) || guardOf(d) || rows.some((x) => !x.answer && x.merges?.includes(d.key))) continue;
+    const pick = leash === 'act' ? d.options.find((o) => o.value === d.recommend_value) : undefined, fallback = d.options.find((o) => o.value === d.default_if_silent);
+    const due = d.silent_by ? Date.parse(d.silent_by) : NaN, save = (o: Option, how: Took) => { const a = appendAnswer(file, d, o, '', [], how); if (a) took.push({ d, a }); };
+    if (pick) save(pick, { taken: 'agent', reason: `The leash is Act, then tell me: ${d.filer ?? 'the agent'} took its recommended pick` });
+    else if (raised || !fallback || Number.isNaN(due)) continue;
+    else if (due <= at) save(fallback, { taken: 'default', reason: `No answer by ${d.silent_by}: the leash When it matters took the default` });
+    else next = Math.min(next ?? due, due);
+  }
+  return { took, next };
 }
 const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const state = () => {
@@ -2585,7 +2623,7 @@ const state = () => {
     mockBase: `/mock/${loopback(bind) ? 'local' : mockPass(tokenOf(file))}/`,
     // Who filed an item stays in the file, except as `by`, the name a card's thread says posted it and took its answer: never a bare session id, which names nobody.
     // A sign-in's start command stays on this host too: the page only learns that a tap makes a new link, and how the last run went.
-    decisions: items.filter((d) => !fakeEvidence(d)).map(({ filer, start, ...d }) => ({ ...d, ...(filer && !SESSION_ID.test(filer) && { by: filer }), ...(d.type === 'design' && answers[d.key]?.answer === 'approve' && { status: 'approved' }), ...(d.type === 'design' && designState(d, answers[d.key], lines)), ...(start && { start: true, run: signinState(d.key) }), evidenceCard: d.evidence ? evidenceCard(d.evidence) : null,
+    decisions: items.filter((d) => !fakeEvidence(d)).map(({ filer, start, ...d }) => ({ ...d, ...(filer && !SESSION_ID.test(filer) && { by: filer }), ...(plainAsk(d) && guardOf(d) && { guard: guardOf(d) }), ...(d.type === 'design' && answers[d.key]?.answer === 'approve' && { status: 'approved' }), ...(d.type === 'design' && designState(d, answers[d.key], lines)), ...(start && { start: true, run: signinState(d.key) }), evidenceCard: d.evidence ? evidenceCard(d.evidence) : null,
       ...(d.mocks && { mocks: d.mocks.map((m) => ({ ...m, hash: mockHash(m.path) })) }) })),
     readonly: extra.readonly === true,
     answers_only: extra.answers_only === true,
@@ -2803,9 +2841,10 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   }
   if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/signin', '/api/leash', '/api/deeper', '/api/reads', '/api/trail', '/api/engagement', '/api/engagement/seen'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
   if (readOnly()) return [403, { error: 'This board is read-only' }];
+  // The leash is the person's own setting in config.yaml, which the board applies to the answers it takes, so an answers-only board takes it too.
   // Dismiss only hides an item on this page and sends nothing to the feeding program, a reply opened (/api/trail) is only the person's own mark, and Go deeper and a comment
   // on a part of a guided page go to the page's own author through its wait, so an answers-only board takes them all; a comment on a mock, a round and a prompt are for the feeding program, below.
-  if (!['/api/answers', '/api/dismiss', '/api/signin', '/api/reads', '/api/trail', '/api/deeper', '/api/engagement', '/api/engagement/seen', '/api/annotations'].includes(req.url!) && answersOnly()) return [403, { error: 'This board takes answers only' }];
+  if (!['/api/answers', '/api/dismiss', '/api/signin', '/api/reads', '/api/trail', '/api/deeper', '/api/engagement', '/api/engagement/seen', '/api/annotations', '/api/leash'].includes(req.url!) && answersOnly()) return [403, { error: 'This board takes answers only' }];
   if (!req.headers['content-type']?.startsWith('application/json')) return [415, { error: 'Send JSON' }];
   let body = '';
   for await (const chunk of req) body += chunk;
@@ -2869,6 +2908,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     try { text = readFileSync(config, 'utf8'); } catch { return [409, { error: 'This board has no config.yaml to keep the leash in; run sign-off-axi init' }]; }
     const line = /^[ \t]*leash[ \t]*:.*$/m;
     writeFileSync(config, line.test(text) ? text.replace(line, `leash: ${leash}`) : `${text.replace(/\n?$/, '\n')}leash: ${leash}\n`);
+    await holdLeash();
     return [200, state()];
   }
   if (req.url === '/api/dismiss') {
@@ -2887,9 +2927,9 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     return [200, state()];
   }
   if (req.url === '/api/trail') {
-    // The person opened a card with a reply on it: the reply leaves Today.
+    // The person opened a card with a reply on it, or an answer the leash took: the reply leaves Today, the answer leaves Taken without you.
     const { key } = JSON.parse(body) ?? {};
-    if (!readTrail(file, loadDecisions(file)).some((t) => t.key === key && t.reply)) return [404, { error: 'No reply on this card' }];
+    if (!readTrail(file, loadDecisions(file)).some((t) => t.key === key && (t.reply || t.taken))) return [404, { error: 'No reply on this card' }];
     appendMark(file, { op: 'seen', key });
     return [200, state()];
   }
@@ -2964,6 +3004,22 @@ function answered(a?: Answer, d?: Decision) {
   child.on('exit', (code, signal) => (code || signal ? warn(`on_answer ${cmd} exited with ${code ?? signal}`) : appendMark(file, { op: 'delivered', key: a.key })));
   child.stdin.on('error', () => {});
   child.stdin.end(`${JSON.stringify({ event: 'answer', ...kindOf(file)(a.key), ...a, ...(d && { title: d.title }), ...(d?.filer && { filer: d.filer }) })}\n`);
+}
+
+/** Takes what the leash allows now (leashTake) and times the next default to its silent_by: run when the board starts, every few seconds, and when the leash changes. */
+let leashTimer: NodeJS.Timeout | undefined;
+async function holdLeash() {
+  clearTimeout(leashTimer);
+  if (!server.listening) return;
+  let next: number | undefined;
+  try {
+    ({ next } = await locked(`${file}.lock`, () => {
+      const r = leashTake(file, profile().leash ?? 'matters');
+      for (const { d, a } of r.took) answered(a, d);
+      return r;
+    }, 'another raise is still writing the board'));
+  } catch (e: any) { warn(`The leash took no answers: ${e.message}`); }
+  if (next !== undefined) leashTimer = setTimeout(holdLeash, Math.min(Math.max(0, next - Date.now()), 2 ** 31 - 1)).unref();
 }
 
 /** Live sign-in runs by key, and why the last one failed: kept in memory only, so a captured link is gone once its run ends. */

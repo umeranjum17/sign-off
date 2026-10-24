@@ -40,6 +40,8 @@ export type Decision = {
   priority?: string;
   /** The board area it shows in while it waits for no answer, in place of the one its type gives it. */
   area?: string;
+  /** Why only the person may answer this ask, one of GUARDS: no leash ever takes its default or its agent's pick (see guardOf). */
+  guard?: string;
   /** How it works, step by step: each step's title and the marks for what matters there. */
   steps?: Step[];
   /** Reports: the section it is grouped under and what it decided. `filed` (ISO date-time) is when any item was filed. */
@@ -65,9 +67,13 @@ export type Answer = { key: string; answer: string; label: string; close: string
   /** A changed answer: the one it replaces, or after an Undo back to no answer the one the filer took, which the agent may already have acted on. */
   replaces?: Given;
   /** A design answer: the round of the design it was given on (see sameRound). */
-  round?: string };
+  round?: string;
+  /** An answer the person did not give, from the leash: the ask's default taken by the board at its silent_by, or its agent's recommended pick taken at once; and why. */
+  taken?: Took['taken']; reason?: string };
+/** How the leash answered for the person, and why. */
+export type Took = { taken: 'default' | 'agent'; reason: string };
 /** An earlier answer as a change names it. */
-export type Given = Pick<Answer, 'answer' | 'label' | 'at' | 'note'>;
+export type Given = Pick<Answer, 'answer' | 'label' | 'at' | 'note' | 'taken'>;
 export type Round = { key: string; note: string; at: string; comments?: Sent[] };
 /** A comment on a mock element as it went to the agent with an answer or a round. */
 export type Sent = Pick<Annotation, 'id' | 'mock' | 'hash' | 'ref' | 'tag' | 'words' | 'text'>;
@@ -107,7 +113,9 @@ const HTTP_LINK = /^https?:\/\/\S{1,500}$/u;
 export const isKey = (v: unknown) => isText(v) && /^[A-Za-z0-9._-]{1,128}$/.test(v as string);
 /** A card's priority, most urgent first. */
 export const PRIORITIES = ['P0', 'P1', 'P2', 'P3'];
-const ONE_OF: Record<string, unknown[]> = { close: ['done', 'release'], area: ['waiting', 'evidence', 'reports', 'answered'], priority: PRIORITIES };
+/** What an ask does that only the person may allow: it deletes or overwrites, can't be undone, spends money, touches a password or key, or changes who can get in. */
+export const GUARDS = ['destructive', 'irreversible', 'money', 'credential', 'security'];
+const ONE_OF: Record<string, unknown[]> = { close: ['done', 'release'], area: ['waiting', 'evidence', 'reports', 'answered'], priority: PRIORITIES, guard: GUARDS };
 /** What a step uses or can stop on: an AI model, a store, a gate, a hard fail. */
 /** What a report explains with: the board draws one line icon per form. */
 export const REPORT_FORMS = ['diagram', 'chart', 'before-after'];
@@ -282,7 +290,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       ...(d.ask_ref !== undefined && { ask_ref: d.ask_ref }), ...(d.why && { why: d.why }), ...(d.recommend_reason && { recommend_reason: d.recommend_reason }), ...(d.silent_by && { silent_by: d.silent_by }), ...(d.merges && { merges: [...d.merges] }), ...(d.proof && { proof: d.proof }), ...(d.report && { report: d.report }),
       recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done', evidence: d.evidence,
       type: plan ? 'plan' : d.type ?? 'decision', tradeoff: d.tradeoff, link: d.link, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path, ...(m.link !== undefined && { link: m.link }) })),
-      ...(views && { view: d.view }), ...(report && views && { preview: d.preview }), ...(d.reply && { reply: true }), ...(d.filer && { filer: d.filer }), ...(d.ticket && { ticket: d.ticket }), ...(d.priority && { priority: d.priority }), ...(d.area && { area: d.area }),
+      ...(views && { view: d.view }), ...(report && views && { preview: d.preview }), ...(d.reply && { reply: true }), ...(d.filer && { filer: d.filer }), ...(d.ticket && { ticket: d.ticket }), ...(d.priority && { priority: d.priority }), ...(d.guard && { guard: d.guard }), ...(d.area && { area: d.area }),
       ...(signin && { unlocks: d.unlocks, waits: d.waits, ...(d.expires && { expires: d.expires }), ...(d.start && { start: [...d.start] }) }),
       ...(d.group && { group: d.group }), ...(d.filed && { filed: d.filed }), ...(d.decided && { decided: d.decided }),
       ...(d.form && { form: d.form }), ...(d.video && { video: d.video }), ...(d.asked_by && { asked_by: d.asked_by }), ...(d.purpose && { purpose: d.purpose }),
@@ -339,8 +347,8 @@ function lastTaken(decisionsPath: string, key: string): Answer | undefined {
 export const CLEARED: Option = { value: '', label: '' };
 /** Appends one answer line unless it equals the current answer and note, and returns the saved answer. Starts a new line after a torn fragment.
  * One decision is one card: the answer also goes, as its own line, to each card on the board this ask merges, under that card's close mode. */
-export function appendAnswer(decisionsPath: string, d: Decision, option: Option, note = '', comments: Sent[] = []): Answer | undefined {
-  const answer = saveAnswer(decisionsPath, d, option, note, comments);
+export function appendAnswer(decisionsPath: string, d: Decision, option: Option, note = '', comments: Sent[] = [], took?: Took): Answer | undefined {
+  const answer = saveAnswer(decisionsPath, d, option, note, comments, undefined, took);
   const on = loadDecisions(decisionsPath), answers = readAnswers(decisionsPath);
   // An open ask on the same decision leaves Decide with this one: it takes the answer too (an answered or dismissed one is left alone).
   const hidden = new Set(readDismissed(decisionsPath, answers, readRounds(decisionsPath)));
@@ -368,12 +376,13 @@ export function sameDecision(a: Decision, b: Decision): boolean {
   const x = new Set(a.title.toLowerCase().match(/[a-z0-9]+/g)), y = new Set(b.title.toLowerCase().match(/[a-z0-9]+/g)), both = [...x].filter((w) => y.has(w)).length;
   return both / (x.size + y.size - both) >= 0.8;
 }
-function saveAnswer(decisionsPath: string, d: Decision, option: Option, note: string, comments: Sent[] = [], by?: string): Answer | undefined {
+function saveAnswer(decisionsPath: string, d: Decision, option: Option, note: string, comments: Sent[] = [], by?: string, took?: Took): Answer | undefined {
   const current = readAnswers(decisionsPath)[d.key];
-  if (option === CLEARED ? !current : current?.answer === option.value && (current.note ?? '') === note && !comments.length) return;
+  // The person giving the answer the leash took makes it theirs: a new line.
+  if (option === CLEARED ? !current : current?.answer === option.value && (current.note ?? '') === note && !comments.length && current.taken === took?.taken) return;
   const was = option === CLEARED ? undefined : current ?? lastTaken(decisionsPath, d.key);
-  const answer: Answer = { key: d.key, answer: option.value, label: option.label, close: d.close, at: now(), ...(note && { note }), ...(comments.length && { comments }), ...(by && { merged_by: by }),
-    ...(was && { replaces: { answer: was.answer, label: was.label, at: was.at, ...(was.note && { note: was.note }) } }) };
+  const answer: Answer = { key: d.key, answer: option.value, label: option.label, close: d.close, at: now(), ...(note && { note }), ...(comments.length && { comments }), ...(by && { merged_by: by }), ...took,
+    ...(was && { replaces: { answer: was.answer, label: was.label, at: was.at, ...(was.note && { note: was.note }), ...(was.taken && { taken: was.taken }) } }) };
   appendLine(answersPath(decisionsPath), answer);
   return answer;
 }
@@ -632,6 +641,18 @@ export const asks = (d: Decision) => d.type !== 'evidence' && !reading(d) && (d.
 export const reading = (d: Decision) => d.type === 'plan' && !!d.guided && !d.decisions?.length;
 /** A sign-in whose fixed link has expired has nothing left to open: it is not waiting, here or on the board's page (web/index.html lapsed() says the same). A start command makes a new link per tap and never lapses. */
 export const lapsed = (d: Decision) => d.type === 'signin' && !d.start && !!d.expires && Date.parse(d.expires) <= Date.now();
+/** What an ask's words say it does that only the person may allow, read from its title, what it says and its answers: the first of these that matches. */
+const GUARD_WORDS: [string, RegExp][] = [
+  ['money', /\b(pay|pays|paid|payments?|purchases?|buy|buys|billing|invoices?|charges?|subscriptions?|subscribe|refunds?|pricing|dollars?|euros?|usd|eur|credit cards?|spend(s|ing)? money|pro plan|paid plan)\b|[$€£]\s?\d/i],
+  ['credential', /\b(passwords?|passphrases?|credentials?|secrets?|(api|ssh|private|signing|deploy) keys?|(api|access|auth|npm|github) tokens?|2fa|mfa|one-time codes?)\b/i],
+  ['security', /\b(security|permissions?|access|admins?|firewall|sudo|public(ly)?|expose[sd]?|auth(entication|orization)?|roles?|allowlist|encryption)\b/i],
+  ['destructive', /\b(delete[sd]?|deleting|remove[sd]?|removing|drop(s|ped)?|wipe[sd]?|erase[sd]?|purge[sd]?|destroy(s|ed)?|overwrite[sd]?|truncate[sd]?|force[- ]push(es|ed)?|uninstall(s|ed)?)\b/i],
+  ['irreversible', /\b(irreversible|permanent(ly)?|can'?t be undone|cannot be undone|no undo|for good|publish(es|ed)?)\b/i],
+];
+/** Why only the person may answer an ask, one of GUARDS: the guard it was raised with (--guard), else what its words say it does. */
+export const guardOf = (d: Decision) => d.guard ?? GUARD_WORDS.find(([, words]) => words.test([d.title, d.about, d.detail, d.why, ...d.options.flatMap((o) => [o.label, o.outcome])].filter(Boolean).join('\n')))?.[0];
+/** A plain ask, yes/no or pick-one: the only kind the leash may answer. A design, plan, sign-in, gate or finding always waits for the person. */
+export const plainAsk = (d: Decision) => d.type === 'decision' && (!d.kind || d.kind === 'ask') && !d.run && !d.finding && d.options.length > 0;
 /** Reports (nothing to answer) archive on their own this long after they were filed: dismissed, never deleted. Evidence is kept for good: only a dismiss line hides a proof. */
 export const ARCHIVE_MS = 24 * 3_600_000;
 /** Keys hidden now: the last line for each dismissed it, and no answer or round came after it. A torn line is skipped and reported through warn.
@@ -829,9 +850,9 @@ export function markEngagementSeen(file: string, id: string, revision: number) {
 
 /** The trail of what the person sent: each answer (a pick, a note, a design's change notes, a plan's send-back), each new round, each comment and each discard with its reason, and how far it got:
  * delivered (handed over by a wait, a poll or the on_answer hook), read (taken by the agent itself) and replied (its words, a link to what it made, or the card posted again).
- * The agent's marks are one line each in <board>.trail.jsonl: a mark names a key and covers every send on it up to its time. The person opening a reply marks it seen. */
+ * The agent's marks are one line each in <board>.trail.jsonl: a mark names a key and covers every send on it up to its time. The person opening a reply, or an answer the leash took, marks it seen. */
 export type TrailMark = { op: 'delivered' | 'read' | 'reply' | 'seen'; key: string; id?: string; text?: string; link?: string; at: string };
-export type Trail = { id: string; key: string; kind: 'answer' | 'round' | 'comment' | 'ask' | 'part' | 'ticket' | 'discard'; part?: string; reason?: DiscardReason; /** A ticket comment's words: the board keeps them nowhere else. */ said?: string; at: string; delivered?: string; read?: string; reply?: { at: string; text?: string; link?: string; acted?: true }; seen?: string };
+export type Trail = { id: string; key: string; kind: 'answer' | 'round' | 'comment' | 'ask' | 'part' | 'ticket' | 'discard'; part?: string; /** An answer the leash took: its first step reads Taken or Picked, and `opened` is when the person first opened the card after it. */ taken?: Took['taken']; opened?: string; reason?: DiscardReason; /** A ticket comment's words: the board keeps them nowhere else. */ said?: string; at: string; delivered?: string; read?: string; reply?: { at: string; text?: string; link?: string; acted?: true }; seen?: string };
 export const trailPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.trail.jsonl';
 export const appendMark = (decisionsPath: string, mark: Omit<TrailMark, 'at'>, at = now()) => appendLine(trailPath(decisionsPath), { ...mark, at });
 /** `delivery` is the owner dispatch's record per Go deeper ask (src/owner.ts deliveries): handed to the author's session, then acknowledged by it. */
@@ -842,7 +863,7 @@ export function readTrail(decisionsPath: string, items: Decision[], delivery: Re
   const taken = seenAt(decisionsPath), filed = new Map(items.map((d) => [d.key, d.filed]));
   const first = (...at: (string | undefined)[]) => at.filter((x): x is string => !!x).sort((x, y) => Date.parse(x) - Date.parse(y))[0];
   const sends: Trail[] = [
-    ...answerLines(decisionsPath).filter((a) => a.answer !== '' && !a.merged_by).map((a): Trail => ({ id: `answer:${a.key}:${a.at}`, key: a.key, kind: 'answer', at: a.at, read: taken(a) === '' ? a.at : taken(a) })),
+    ...answerLines(decisionsPath).filter((a) => a.answer !== '' && !a.merged_by).map((a): Trail => ({ id: `answer:${a.key}:${a.at}`, key: a.key, kind: 'answer', at: a.at, read: taken(a) === '' ? a.at : taken(a), ...(a.taken && { taken: a.taken }) })),
     ...readRounds(decisionsPath).map((r): Trail => ({ id: `round:${r.key}:${r.at}`, key: r.key, kind: 'round', at: r.at })),
     ...readDiscards(decisionsPath).map((x): Trail => ({ id: `discard:${x.key}:${x.at}`, key: x.key, kind: 'discard', reason: x.reason, at: x.at })),
     ...readMessages(decisionsPath).flatMap((m): Trail[] => (m.kind === 'comment' && m.key ? [{ id: m.id, key: m.key, kind: 'comment', at: m.at, delivered: m.delivered }] : [])),
@@ -865,7 +886,8 @@ export function readTrail(decisionsPath: string, items: Decision[], delivery: Re
     const reply = s.reply ?? (said ? { at: said.at, ...(said.text && { text: said.text }), ...(said.link && { link: said.link }) } : posted ? { at: posted, acted: true as const } : undefined);
     const read = first(mark('read')?.at, s.read, reply?.at), delivered = first(mark('delivered')?.at, s.delivered, read);
     const seen = reply && marks.find((m) => m.op === 'seen' && m.key === s.key && second(m.at) >= second(reply.at))?.at;
-    return { ...s, ...(delivered && { delivered }), ...(read && { read }), ...(reply && { reply }), ...(seen && { seen }) };
+    const opened = s.taken && marks.find((m) => m.op === 'seen' && m.key === s.key && second(m.at) >= second(s.at))?.at;
+    return { ...s, ...(delivered && { delivered }), ...(read && { read }), ...(reply && { reply }), ...(seen && { seen }), ...(opened && { opened }) };
   });
 }
 

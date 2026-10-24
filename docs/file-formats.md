@@ -230,7 +230,8 @@ New guided defaults use plan schema 3 / report schema 5, contract 1, with a requ
   the note of an answer picked after it. No option may use the value `text`
   then.
 - `options`: optional, 2 to 6 choices, or `[]` on a read-only or answers-only board for an item that is only shown and waits on nothing (unless it has `reply`). Each has a `value` (1-128 of `A-Z a-z 0-9 . _ -`, unique within the question) and a non-empty `label` shown on its button. Leave it out for **Yes** (`yes`) and **No** (`no`); files written before options existed read exactly as before.
-- `recommend_value`, `default_if_silent`: the `value` of one of the question's own options (`yes` or `no` when `options` is left out). Optional on a board item; both are required on a new question (the bullet below). The board shows `default_if_silent` and never applies it.
+- `recommend_value`, `default_if_silent`: the `value` of one of the question's own options (`yes` or `no` when `options` is left out). Optional on a board item; both are required on a new question (the bullet below). The board shows `default_if_silent`, and on the leash When it matters takes it as the answer at `silent_by` ([contract.md](contract.md) section 5).
+- `guard`: optional, `destructive`, `irreversible`, `money`, `credential` or `security`: no leash ever answers the question for the person.
 - `close`: optional, `done` (default) or `release`; copied into the answer.
 - `why`, `recommend_reason`, `silent_by`, an option's `outcome`, `merges`, `proof` (the evidence update an ask rests on) and `report` (the report an ask is about): the question standard, owned by [contract.md](contract.md) section 5. `raise` and `post --type decision` check every new question against it; items already on the board read as before.
 - `link`: optional on any item, an `http(s)` link (shown on its card as **Open on** and the site name) or a 7-40 character commit hash (shown under **Details**); a sign-in's link is its own and shows as its **Open** button (above).
@@ -288,7 +289,8 @@ also copies each file into `evidence/<number>/` next to the board:
   was none, an empty `answer` and `label` (`{"key":"dark-default","answer":"","label":"","close":"done","at":"..."}`), which
   leaves the key unanswered, so the item waits again. An `on_answer:` command gets that line too.
 - `note`: present only when the person typed one. Optional free text, trimmed, up to 500 characters, sent with the click. Picking the same answer again with a changed note adds a new line; clearing the note and clicking again removes it. Lines without `note` (all lines written before notes existed) read as before.
-- `replaces`: present only on a changed answer: the answer this line replaces (`answer`, `label`, `at` and `note`), or, when an Undo had left the key with no answer, the last one its filer took with `wait --filer`. Every earlier line stays in the file.
+- `taken` and `reason`: present only on an answer the leash took for the person: `default` (the board took `default_if_silent` at `silent_by`) or `agent` (the agent's `recommend_value`, on Act, then tell me), and why in one line.
+- `replaces`: present only on a changed answer: the answer this line replaces (`answer`, `label`, `at`, `note` and `taken`), or, when an Undo had left the key with no answer, the last one its filer took with `wait --filer`. Every earlier line stays in the file.
 - `comments`: present only when the answer carried comments on mock elements (below): each as `id`, `mock`, `hash`, `ref`, `tag`, `words` and `text`, as it was sent.
 - `sign-off-axi answers --json` prints the same fields per key, without `key`, and adds `note` only when the latest line has one; `comments` holds every comment sent with any answer line for the key, so a later pick or Undo does not hide them. The default output lists every sent comment in one `comments` table with its `key`.
 
