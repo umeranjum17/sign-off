@@ -169,18 +169,25 @@ const PAGES = [
     await h.until('the design open', () => h.find(/^Dismiss,/, document.body, 'button'));
     await h.cycle('Dismiss chat-journeys', h.find(/^Dismiss,/, document.body, 'button'), () => !h.card('chat-journeys'), () => h.card('chat-journeys'), /Dismissed/);
   } }] },
+  // A proof's row opens it; Select and Clear all are in the sheet the quiet line under the list opens (Dismiss is on the proof's own sheet).
   { name: 'evidence', hash: '#evidence', ready: '[id="item-update-2"]', stages: [{ run: async (h) => {
+    const bar = () => h.board().querySelector('.bulk'), sheet = () => document.getElementById('sheet');
+    const item = async (name) => { h.board().querySelector('.ev-more').click(); await h.until('the Select or clear all sheet', () => sheet().open); return h.find(new RegExp(`^${name}$`), sheet(), 'button'); };
     await h.nav('Open update', h.card('update-2'), /^#evidence\/update-2$/);
-    await h.dismissCard('update-2');
-    await h.bulk('update-2');
+    await h.press('More: Select', await item('Select'), () => h.find(/^Cancel$/, bar()));
+    await h.press('pick update-2', h.card('update-2'), () => h.box(h.card('update-2')).classList.contains('picked'));
+    await h.cycle('Dismiss 1 selected', h.find(/^Dismiss 1$/, bar()), () => !h.card('update-2'), () => h.card('update-2'), /1 dismissed/);
+    await h.press('More: Select again', await item('Select'), () => h.find(/^Cancel$/, bar()));
+    await h.press('Cancel', h.find(/^Cancel$/, bar()), () => h.board().querySelector('.ev-more'));
+    await h.cycle('More: Clear all', await item('Clear all'), () => !h.card('update-2'), () => h.card('update-2'), /cleared/);
   } }] },
-  // On a desk the update opens in the shell's pane beside the list, which needs no way back; on a phone it opens over the board with ‹ Evidence.
+  // On a desk the update opens in the shell's pane beside the list, which needs no way back; on a phone it opens as a sheet over the list with its Close.
   { name: 'evidence-update', hash: '#evidence/update-2', ready: ':is(#reader, .split-detail) :is(.choices, [aria-label^="Pass"])', stages: [{ run: async (h) => {
     const pane = () => document.querySelector('.split-detail') ?? h.reader(), r = pane();
     for (const verdict of ['Pass', 'Fail', 'Needs work']) {
       await h.cycle(`${verdict} verdict`, h.find(new RegExp(`^${verdict},`), pane()), () => h.find(new RegExp(`^${verdict},`), pane())?.getAttribute('aria-pressed') === 'true', () => true, / · /);
     }
-    if (r === h.reader()) await h.nav('Back to Evidence', h.find(/Evidence$/, r, 'a'), /^#evidence$/);
+    if (r === h.reader()) await h.nav('Close the proof', h.find(/^Close$/, r, 'a'), /^#evidence$/);
     await h.cycle('Dismiss update 2', h.find(/^Dismiss,/, pane()), () => location.hash === '#evidence' || !document.getElementById('err-update-2'), () => h.find(/^Pass,/, pane()), /Dismissed/);
   } }] },
   { name: 'reports', hash: '#reports', ready: '[id="item-new-sign-in"]', stages: [{ run: async (h) => {
