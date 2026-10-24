@@ -951,10 +951,12 @@ test('a comment on a report part reaches the author agent through wait --filer, 
     assert.notEqual(run('deeper', board, '--filer', 'someone-else', '--id', saved.id, '--text', 'Not mine').status, 0);
     assert.equal(run('deeper', board, '--filer', 'agent-41', '--id', saved.id, '--text', 'It still hung at 30 s.').status, 0);
     assert.equal((await (await fetch(url + 'api/decisions')).json()).comments[0].reply, 'It still hung at 30 s.');
-    // A comment is not an answer: nothing went to answers or rounds, and an answers-only board takes none.
+    // A comment is not an answer: nothing went to answers or rounds. It goes to the page's author, so an answers-only board takes it too.
     assert.deepEqual(JSON.parse(run('answers', board, '--json').stdout), {});
     writeFileSync(board, JSON.stringify({ ...JSON.parse(readFileSync(board, 'utf8')), answers_only: true }));
-    assert.equal((await send({ key: 'comment-report', part: 'found:0', verdict: 'agree' })).status, 403);
+    const fed = await send({ key: 'comment-report', part: 'found:0', verdict: 'agree' });
+    assert.equal(fed.status, 200);
+    assert.deepEqual((await fed.json()).comments.map((c) => c.verdict), ['disagree', 'agree']);
   } finally { server.kill(); }
 });
 

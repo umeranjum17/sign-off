@@ -2484,7 +2484,7 @@ const state = () => {
     rounds,
     messages: readMessages(file, warn),
     annotations: fed ? [] : ((sent) => readAnnotations(file, warn).map((a) => (sent.has(a.id) ? { ...a, sent: true } : a)))(sentIds(file)),
-    comments: fed ? [] : readPartComments(file),
+    comments: extra.readonly === true ? [] : readPartComments(file),
     dismissed: readDismissed(file, answers, rounds, warn, fed ? [] : items),
     promoted: readPromoted(file, warn),
     tickets: rollUp(readTickets(file, warn)),
@@ -2521,7 +2521,7 @@ const unsent = (d: Decision): Sent[] => {
 };
 /** A board whose file says `"readonly": true` shows its items and takes no answers, rounds or comments: another program feeds it. */
 const readOnly = () => readItems(file).extra.readonly === true;
-/** A board whose file says `"answers_only": true` takes answers and replies but no rounds, comments or prompts: another program feeds it. */
+/** A board whose file says `"answers_only": true` takes answers, replies and what the person says on a guided page, but no rounds, comments on mocks or prompts: another program feeds it. */
 const answersOnly = () => readItems(file).extra.answers_only === true;
 const mediaTypes: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.mp4': 'video/mp4', '.webm': 'video/webm' };
 const mockTypes: Record<string, string> = { '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
@@ -2685,9 +2685,9 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   }
   if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/signin', '/api/leash', '/api/deeper', '/api/reads', '/api/trail', '/api/engagement', '/api/engagement/seen'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
   if (readOnly()) return [403, { error: 'This board is read-only' }];
-  // Dismiss only hides an item on this page and sends nothing to the feeding program, and Go deeper only asks for an explanation, so an answers-only board takes both;
-  // a reply opened (/api/trail) is only the person's own mark.
-  if (!['/api/answers', '/api/dismiss', '/api/signin', '/api/reads', '/api/trail', '/api/deeper', '/api/engagement', '/api/engagement/seen'].includes(req.url!) && answersOnly()) return [403, { error: 'This board takes answers only' }];
+  // Dismiss only hides an item on this page and sends nothing to the feeding program, a reply opened (/api/trail) is only the person's own mark, and Go deeper and a comment
+  // on a part of a guided page go to the page's own author through its wait, so an answers-only board takes them all; a comment on a mock, a round and a prompt are for the feeding program, below.
+  if (!['/api/answers', '/api/dismiss', '/api/signin', '/api/reads', '/api/trail', '/api/deeper', '/api/engagement', '/api/engagement/seen', '/api/annotations'].includes(req.url!) && answersOnly()) return [403, { error: 'This board takes answers only' }];
   if (!req.headers['content-type']?.startsWith('application/json')) return [415, { error: 'Send JSON' }];
   let body = '';
   for await (const chunk of req) body += chunk;
@@ -2711,6 +2711,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
       appendPartComment(file, c.key, c.part, about, c.verdict, c.text?.trim());
       return [200, state()];
     }
+    if (answersOnly()) return [403, { error: 'This board takes answers only' }];
     const { id, deleted, key, mock, ref, tag, words, text, hash: shown } = c, live = readAnnotations(file), sent = sentIds(file);
     // A comment that went with an answer or a round is the agent's now: it stays as it was sent.
     if (id !== undefined && sent.has(id)) return [409, { error: 'This comment was sent' }];
