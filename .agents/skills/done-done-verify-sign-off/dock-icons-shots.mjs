@@ -1,4 +1,4 @@
-// The dock's and the sidebar's filled icons (Today, Decide, Evidence, Reports), beside the approved prototype's: Today at 390x844 and 1280x800, light and dark, captured at 2x
+// The dock's and the sidebar's filled icons (Today, Decide, Evidence, Reports, Tickets; the sidebar's Designs after Reports), beside the approved prototype's: Today at 390x844 and 1280x800, light and dark, captured at 2x
 // over the DevTools protocol with exact device metrics (a headless Chromium of its own), and measured in the browser on the board and on the prototype alike:
 // each icon's box and its drawing's ink box, filled (no stroke) in the link's own colour, the tab on screen in ink and the others quiet grey, the box centred in its
 // 48px tab on a phone, and on a desk one left edge for the icons, one for the labels and each icon centred on its label's line; every tab is opened in turn to
@@ -30,7 +30,8 @@ const MEASURE = `(async () => {
   const icons = links.map((a) => {
     const svg = a.querySelector('svg'), path = svg.querySelector('path'), vb = svg.viewBox.baseVal, s = box(svg), k = s.width / vb.width, b = path.getBBox(), l = box(a), ps = getComputedStyle(path);
     const ink = { left: s.left + (b.x - vb.x) * k, top: s.top + (b.y - vb.y) * k, width: b.width * k, height: b.height * k };
-    const words = [...a.childNodes].find((n) => n.nodeType === 3 && n.data.trim()), rg = words && document.createRange(); if (rg) rg.selectNodeContents(words); const w = rg && rg.getBoundingClientRect();
+    // The label: the link's own words, or a span of words beside the icon (the prototype's v3 sidebar).
+    const words = [...a.childNodes, ...[...a.children].filter((c) => c.tagName === 'SPAN' && !c.querySelector('svg') && !c.matches('.n, .icon')).flatMap((c) => [...c.childNodes])].find((n) => n.nodeType === 3 && n.data.trim()), rg = words && document.createRange(); if (rg) rg.selectNodeContents(words); const w = rg && rg.getBoundingClientRect();
     return { name: (a.getAttribute('aria-label') ?? words.data).split(',')[0].trim(), current: a.getAttribute('aria-current') === 'page', box: r2(s.width) + 'x' + r2(s.height), ink: r2(ink.width) + 'x' + r2(ink.height),
       fill: ps.fill, stroke: ps.stroke, rule: ps.fillRule, colour: getComputedStyle(a).color, boxLeft: r2(s.left),
       boxOffset: [r2(s.left + s.width / 2 - (l.left + l.width / 2)), r2(s.top + s.height / 2 - (l.top + l.height / 2))],
@@ -88,14 +89,13 @@ try {
       }
       await go(`file://${proto}#v=today&theme=${theme}`);
       await end();
-      const p = await measure(`${name} prototype`), tickets = p.icons.filter((q) => q.name === 'Tickets').length;
-      p.icons = p.icons.filter((q) => q.name !== 'Tickets');
+      const p = await measure(`${name} prototype`);
       await shot(join(dir, `${part}.proto.png`), p.clip);
       // The board against the prototype: the same names in the same order, filled and not stroked, the same ink and grey, the drawing's ink box at the size of the box,
       // and the box in its place (centred in a tab, or on one icon edge with each icon on its label's line).
       const fail = [], b = m.icons, scale = parseFloat(b[0].box) / parseFloat(p.icons[0].box);
-      // The prototype's dock and sidebar also hold Tickets, which waits for its own tab here.
-      if (b.map((i) => i.name).join() !== p.icons.map((i) => i.name).join() || tickets !== 1) fail.push(`names ${b.map((i) => i.name)} not ${p.icons.map((i) => i.name)} and Tickets`);
+      // The same places: the dock's five, and on a desk the sidebar's six with Designs after Reports.
+      if (b.map((i) => i.name).join() !== p.icons.map((i) => i.name).join()) fail.push(`names ${b.map((i) => i.name)} not ${p.icons.map((i) => i.name)}`);
       b.forEach((i, n) => { const q = p.icons[n]; if (!q) return;
         if (i.stroke !== 'none' || i.fill !== i.colour || i.rule !== 'evenodd') fail.push(`${i.name} not filled: fill ${i.fill}, stroke ${i.stroke}, colour ${i.colour}, rule ${i.rule}`);
         if (i.current !== q.current || i.fill !== q.fill) fail.push(`${i.name} ${i.current ? 'on screen' : 'idle'} in ${i.fill}, the prototype's ${q.current ? 'on screen' : 'idle'} in ${q.fill}`);

@@ -1,16 +1,17 @@
 // Designs in the new look, at one theme and width per run (so a run's steps.json holds one claim), driven and measured in a headless Chromium of its own over the DevTools
 // protocol with exact device metrics (390x844, 1280x800 or 1440x900, 2x).
 // The board holds three designs posted through the real CLI (Umer's demo data, under Designs, none promoted to Decide; their screens are the board's own docs/media shots):
-// Today on a phone (three screens; changes asked with a note on one), Today on a desk in one column or two (a pick, approved) and the Reports list on a phone (in review).
-// The Sign-off project has its own icon (sign-off-axi project --icon); the others show initials. Today on a desk sits on a finished ticket (its row's full bar).
+// Today on a phone (three screens and two directions; changes asked with a pick and a note on one screen), Today on a desk in one column or two (a pick, approved) and the Reports list on a phone (in review).
+// The Sign-off project has its own icon (sign-off-axi project --icon); the others show initials. Today on a desk sits on a finished ticket (its row's full bar). Three evidence updates give the sidebar's Evidence a count.
 // States at 390: designs (the list), design (a row tapped: its review), design-end (scrolled to its end), change (a note typed and Change tapped: the list reads Changes requested),
 // more (the title row's More), full (Review full screen). At 1280 and 1440: designs (the newest open beside where it stands), design-picked (another card clicked) and full.
 // Each capture is measured in the browser: on a phone every block on the 16px gutter's two edges and the 4px grid, 68px rows, the last row clear of the dock, no control under 44px;
 // on a desk every card on the 12-column grid's lines, shared tops, the 4px grid, no page scroll, the empty share of the viewport, no text cut but a card title past two lines,
+// the sidebar's places in the prototype's order with Designs lit and the Evidence and Designs counts the board's (a phone: the dock's five with Today lit, as the prototype's dock maps Designs),
 // no words drawn over other words; everywhere no file path or internal code in the words on screen, no sideways overflow and no console error.
 // Usage: node .agents/skills/done-done-verify-sign-off/designs-shots.mjs <output> [light|dark|light,dark] [390|1280|1440]
 // DESIGNS_PROTO=<the approved prototype's index.html (v3)> also captures the prototype at the same size and theme and saves each pair (vs-proto/): on a desk its Designs,
-// on a phone its Reports list and an open report (Designs is not in the phone's dock; it follows Reports' look).
+// on a phone its Reports list and an open report (Designs is not in the phone's dock; it follows Reports' look), and its Designs address (Today, lit in the dock) beside the board's dock on Designs.
 // SIGN_OFF_REPO names another built checkout to drive, such as the base for a before (DESIGNS_SIDE=before names its files and keeps its measurements unasserted).
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -51,6 +52,14 @@ const MEASURE = `(async () => {
   const main = document.querySelector('main'), edgeL = box(main).left + parseFloat(getComputedStyle(main).paddingLeft), edgeR = box(main).right - parseFloat(getComputedStyle(main).paddingRight);
   const pick = (sel) => [...scope.querySelectorAll(sel)].filter(vis).map((e) => { const r = box(e); return { el: [...e.classList].find((c) => c.startsWith('dz-')) ?? e.className.split(' ')[0], left: r2(r.left), right: r2(r.right), top: r2(r.top + y), height: r2(r.height), bottom: r2(r.bottom + y) }; });
   let blocks = [], columns = null, empty = null;
+  // The places: the sidebar on a desk (its names, the one lit, its counts), the dock on a phone (its five, the one lit).
+  const nav = desk ? [...document.querySelectorAll('#nav a:not(.sfind)')].filter(vis).map((a) => ({ name: [...a.childNodes].filter((n) => n.nodeType === 3).map((n) => n.data).join('').trim(), current: a.getAttribute('aria-current') === 'page', n: a.querySelector('.n')?.textContent ?? null }))
+    : [...document.querySelectorAll('.tabs a')].map((a) => ({ name: a.getAttribute('aria-label').split(',')[0], current: a.getAttribute('aria-current') === 'page' }));
+  const lit = nav.filter((x) => x.current).map((x) => x.name).join(',');
+  if (desk && nav.length && nav.map((x) => x.name).join(',') !== 'Today,Decide,Evidence,Reports,Designs,Tickets') fail.push('sidebar places ' + nav.map((x) => x.name));
+  if (desk && nav.length && lit !== 'Designs') fail.push('sidebar lights ' + lit);
+  if (desk && nav.length && (nav.find((x) => x.name === 'Designs')?.n !== '3' || nav.find((x) => x.name === 'Evidence')?.n !== '3')) fail.push('sidebar counts ' + JSON.stringify(nav));
+  if (!desk && (nav.length !== 5 || (!open && !sheet && lit !== 'Today'))) fail.push('dock ' + JSON.stringify(nav));
   if (sheet) {}
   else if (!desk) {
     // A phone: every block on the gutter's two edges and the 4px grid.
@@ -122,7 +131,7 @@ const MEASURE = `(async () => {
     .map((e) => (e.getAttribute('aria-label') || e.textContent).trim().slice(0, 24) + ' ' + Math.round(box(e).width) + 'x' + Math.round(box(e).height)) : [];
   const overflowing = [...document.querySelectorAll('body *')].filter((e) => vis(e) && box(e).right > w + 1).slice(0, 10).map((e) => e.tagName.toLowerCase() + '.' + (e.classList[0] ?? ''));
   if (overflowing.length) fail.push('wider than the page: ' + overflowing.join(', '));
-  return { viewport: innerWidth + 'x' + innerHeight, edges: [r2(edgeL), r2(edgeR)], columns, blocks, rows, ink, dock, clear: atEnd ? clear : undefined, empty, under, fail,
+  return { viewport: innerWidth + 'x' + innerHeight, edges: [r2(edgeL), r2(edgeR)], nav, columns, blocks, rows, ink, dock, clear: atEnd ? clear : undefined, empty, under, fail,
     words: words.replace(/\\s+/g, ' ').trim().slice(0, 900), dom: { url: location.href, overflow: document.documentElement.scrollWidth > w, overflowing } };
 })()`;
 
@@ -150,6 +159,7 @@ try {
     journeys: [{ id: 'today', title: 'Today', screens: [{ id: 'desk', title: 'On a desk', views: views('desk-today', 'computer') }] }] });
   post({ key: 'today-phone', title: 'Today on a phone, with Up next first and then what waits on you', group: 'Sign-off', filed: day(0), preview: 'design/phone-today.webp',
     about: 'Three screens a person sees each morning: Today with Up next, the ask it opens, and a sign-in that waits.',
+    options: [{ value: 'up-next', label: 'Up next first' }, { value: 'waits', label: 'What waits first' }], recommend: 'up-next',
     journeys: [{ id: 'morning', title: 'Morning', screens: [['today', 'Today', 'phone-today'], ['ask', 'The ask', 'phone-decide'], ['signin', 'A sign-in', 'phone-signin']]
       .map(([id, title, f]) => ({ id, title, views: views(f) })) }] });
   // Today on a desk sits on a finished ticket, so its row shows the full bar.
@@ -157,6 +167,9 @@ try {
   for (const d of b.items) if (d.key === 'today-desk') d.ticket = 'today-desk';
   writeFileSync(board, JSON.stringify(b, null, 2) + '\n');
   cli('ticket', board, '--id', 'today-desk', '--title', 'Today on a desk', '--progress', '100');
+  // Three proofs filed, so the sidebar's Evidence count is the board's own.
+  for (const [f, title] of [['phone-decide', 'The ask fits a phone'], ['phone-signin', 'A sign-in waits on Today'], ['phone-reports', 'Reports reads well on a phone']])
+    cli('post', board, '--type', 'evidence', '--title', title, '--about', 'Umer checks the screen.', '--media', join(dir, 'design', `${f}.webp`));
   copyFileSync(join(repo, 'web/icon-192.png'), join(dir, 'sign-off.png'));
   cli('project', board, '--name', 'Sign-off', '--icon', 'sign-off.png');
   // The board in the foreground of this run: stopped with sign-off-axi stop at the end, like the seed scripts' boards.
@@ -164,9 +177,9 @@ try {
   let log = ''; server.stdout.on('data', (b) => (log += b)); server.stderr.on('data', (b) => (log += b));
   let base; for (let i = 0; i < 100 && !base; i++) { await wait(100); base = /http:\/\/127\.0\.0\.1:\d+\//.exec(log)?.[0]; }
   assert.ok(base, `the board answers: ${log}`);
-  // Umer has answered two: Change on Today on a phone with a note on one screen, and Approve on Today on a desk with the two-column pick.
+  // Umer has answered two: Change on Today on a phone with the Up next pick and a note on one screen, and Approve on Today on a desk with the two-column pick.
   const answer = async (body) => { const r = await fetch(new URL('/api/answers', base), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); assert.equal(r.status, 200, await r.text()); };
-  await answer({ key: 'today-phone', verdict: 'change', notes: [{ journey: 'morning', screen: 'ask', verdict: 'change', note: 'The ask cuts its last answer at the foot of a small phone; let the answers scroll above the button.' }] });
+  await answer({ key: 'today-phone', verdict: 'change', pick: 'up-next', notes: [{ journey: 'morning', screen: 'ask', verdict: 'change', note: 'The ask cuts its last answer at the foot of a small phone; let the answers scroll above the button.' }] });
   await answer({ key: 'today-desk', verdict: 'approve', pick: 'two', notes: [] });
 
   let port; for (let i = 0; i < 100 && !port; i++) { await wait(100); const f = join(prof, 'DevToolsActivePort'); if (existsSync(f)) port = readFileSync(f, 'utf8').split('\n')[0]; }
@@ -201,19 +214,20 @@ try {
     delete m.dom;
     writeFileSync(join(out, `${name(state)}.measure.json`), JSON.stringify(m, null, 2) + '\n');
     report.push(`${name(state)}: ${m.blocks.map((x) => `${x.el} ${x.left}-${x.right} top ${x.top}+${x.height}`).join(', ')}${m.columns ? `; grid ${JSON.stringify(m.columns)}; empty ${m.empty}%` : ''}`
-      + `${m.rows.length ? `; rows ${m.rows.map((r) => `${r.height}px ${r.icon} "${r.meta}"`).join(' | ')}` : ''}${m.ink.length ? `; ink ${m.ink.map((b) => `${b.words} ${b.h}px ${b.bg}`).join(' | ')}` : ''}`
+      + `; ${phone ? 'dock' : 'sidebar'} ${m.nav.map((x) => `${x.name}${x.n ? ' ' + x.n : ''}${x.current ? ' (lit)' : ''}`).join(', ')}`
+    + `${m.rows.length ? `; rows ${m.rows.map((r) => `${r.height}px ${r.icon} "${r.meta}"`).join(' | ')}` : ''}${m.ink.length ? `; ink ${m.ink.map((b) => `${b.words} ${b.h}px ${b.bg}`).join(' | ')}` : ''}`
       + `${m.clear !== undefined && m.clear !== null ? `; last block ${m.clear}px above the dock` : ''}; under 44px ${m.under.length}; failures ${m.fail.length}${m.fail.length ? ': ' + m.fail.join('; ') : ''}`);
     if ([m.fail, m.under, errors, failed].some((x) => x.length)) problems.push(`${name(state)}: ${JSON.stringify({ fail: m.fail, under: m.under, errors, failed })}`);
     errors.length = 0; failed.length = 0;
     return m;
   };
-  const pair = async (state, protoHash, scroll = 0) => {
+  const pair = async (state, protoHash, scroll = 0, shot = state) => {
     if (!proto) return;
     await go(`file://${proto}#${protoHash}&theme=${theme}`, 900);
     if (scroll) await js(`(document.querySelector('.sheet .sb, .sheet') ?? document.scrollingElement).scrollTop = 1e5`), await wait(300);
     await png(join(out, 'vs-proto', `${name(state)}.proto.png`));
     const img = (f) => `data:image/png;base64,${readFileSync(f).toString('base64')}`;
-    const html = `<body style="margin:0;padding:24px;display:flex;${phone ? '' : 'flex-direction:column;'}gap:24px;background:#888;font:600 26px system-ui;color:#fff">${[['Approved prototype', img(join(out, 'vs-proto', `${name(state)}.proto.png`))], ['Board, this build', img(join(out, `${name(state)}.png`))]]
+    const html = `<body style="margin:0;padding:24px;display:flex;${phone ? '' : 'flex-direction:column;'}gap:24px;background:#888;font:600 26px system-ui;color:#fff">${[['Approved prototype', img(join(out, 'vs-proto', `${name(state)}.proto.png`))], ['Board, this build', img(join(out, `${name(shot)}.png`))]]
       .map(([t, s]) => `<figure style="margin:0"><figcaption style="margin:0 0 12px">${t}: ${state}, ${metrics.width} x ${metrics.height}, ${theme}</figcaption><img src="${s}" style="display:block;width:${metrics.width}px"></figure>`).join('')}</body>`;
     writeFileSync(join(dir, 'pair.html'), html);
     await cdp('Emulation.setDeviceMetricsOverride', { width: phone ? metrics.width * 2 + 72 : metrics.width + 48, height: phone ? metrics.height + 96 : metrics.height * 2 + 144, deviceScaleFactor: 1, mobile: false });
@@ -230,6 +244,8 @@ try {
   facts.designs = await js(`document.querySelector('main').innerText.replace(/\\s+/g, ' ').trim()`);
   await capture('designs');
   await pair('designs', phone ? 'v=reports' : 'v=designs');
+  // The prototype's phone keeps its five tabs and draws Designs' address as Today with Today lit: the board's dock on Designs beside it.
+  if (phone) await pair('designs-dock', 'v=designs', 0, 'designs');
   if (phone) {
     // A row tapped opens its review over the list.
     await go(`${base}#designs`);
@@ -248,8 +264,9 @@ try {
     // Another card clicked opens that design beside where it stands.
     await go(`${base}#designs`);
     await until(`document.querySelectorAll('#board [id^="item-"], #board .dz-card').length === 3`, 'three designs drawn');
-    await tap(after ? '.dz-card[href="#designs/today-desk"]' : '#item-today-desk a');
-    await until(after ? `location.hash === '#designs/today-desk' && document.querySelector('.dz-open h2')?.textContent.startsWith('Today on a desk')` : `!!document.querySelector('#reader h1')`, 'the settings design open');
+    // A base with the desk's cards (or, older, the list that opened the reader) is driven the same way.
+    await tap('.dz-card[href="#designs/today-desk"], #item-today-desk a');
+    await until(`(location.hash === '#designs/today-desk' && document.querySelector('.dz-open h2')?.textContent.startsWith('Today on a desk')) || !!document.querySelector('#reader:not([hidden]) h1')`, 'the settings design open');
     facts.picked = await js(`(document.querySelector('.dz-grid') ?? document.getElementById('reader')).innerText.replace(/\\s+/g, ' ').trim()`);
     await capture('design-picked');
     await pair('design-picked', `v=designs&d=${encodeURIComponent(await protoKey(1))}`);
@@ -290,15 +307,15 @@ try {
   writeFileSync(join(out, `${name('designs')}.facts.json`), JSON.stringify(facts, null, 2) + '\n');
   writeFileSync(join(out, `measure.${side}.${theme}.${width}w.txt`), report.join('\n') + '\n');
   if (after) writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
-    start: 'A throwaway board with three designs posted through sign-off-axi post --kind design (Today on a phone, Today on a desk in one column or two, the Reports list on a phone), the Sign-off project given its own icon, changes asked on Today on a phone with a note and Today on a desk approved with the two-column pick.',
-    steps: [`Open Designs at ${metrics.width}x${metrics.height} (2x), ${theme}, in a headless Chromium of its own, and measure every block in the browser.`,
+    start: 'A throwaway board with three designs posted through sign-off-axi post --kind design (Today on a phone, Today on a desk in one column or two, the Reports list on a phone), three evidence updates posted with sign-off-axi post --type evidence, the Sign-off project given its own icon, changes asked on Today on a phone with the Up next pick and a note and Today on a desk approved with the two-column pick.',
+    steps: [`Open Designs at ${metrics.width}x${metrics.height} (2x), ${theme}, in a headless Chromium of its own, and measure every block in the browser${phone ? ' and the dock' : ' and the sidebar'}.`,
       ...(phone ? ['Tap the Today on a phone row: its review opens; read and measure it, then scroll it to its end.', 'Tap Review full screen: the screen viewer opens over the page.', 'Tap More in the title row and read it.',
         'Open the Reports list design, type a note, tap Change; the board\'s answers file holds it and the list reads Changes requested; scroll the list to its end and measure it against the dock.']
         : ['Click the Today on a desk card: it opens beside where it stands, its pick and answer shown.', 'Click Review full screen: the screen viewer opens over the page.']),
-      ...(proto ? [`Capture the approved prototype at the same size and theme (${phone ? 'its Reports list, an open report and the filter sheet, the look Designs follows on a phone' : 'its Designs, the first and second design open'}) and save each beside the board.`] : [])],
+      ...(proto ? [`Capture the approved prototype at the same size and theme (${phone ? 'its Reports list, an open report and the filter sheet, the look Designs follows on a phone, and its Designs address, Today lit in its dock' : 'its Designs, the first and second design open'}) and save each beside the board.`] : [])],
     result: phone
-      ? `${theme}, 390px: Designs is drawn in the new look as Reports' list: the title row with More and the round light-or-dark button, a To review card, and the designs as 68px rows in one card, each with its project's icon or initials, its title on one line (cut with an ellipsis when long) and its state and day, or a finished ticket's full bar; a row opens its review with the project and day, the whole title, what it shows, the screen in its device's viewport, Review full screen, Where it stands (state, your pick, when answered) and what you said, then the note with Approve in ink beside Change; Change with a note saves the answer and the row reads Changes requested; More holds Select and Clear all; every block on one gutter, the last row clear of the dock, no control under 44px, no file path or code in the words, no sideways overflow, no console error.`
-      : `${theme}, ${metrics.width}px: Designs fills the window as the approved prototype's desk draws it: the crumb, the 32px title and what is on the board, then the designs as picture cards across the top (title, project and day, state) and the open design (its picture filling the card) beside Where it stands (state, your pick, when answered, what you said, what it shows) with the note and Approve in ink beside Change; a card clicked opens that design; every card on the 12-column lines and the 4px grid, no page scroll, under 15% of the window empty, no text cut but a card title past two lines, no words over words, no console error.` }, null, 2) + '\n');
+      ? `${theme}, 390px: the dock keeps its five tabs with Today lit on Designs, as the prototype's dock maps it; Designs is drawn in the new look as Reports' list: the title row with More and the round light-or-dark button, a To review card, and the designs as 68px rows in one card, each with its project's icon or initials, its title on one line (cut with an ellipsis when long) and its state and day, or a finished ticket's full bar; a row opens its review with the project and day, the whole title, what it shows, the screen in its device's viewport, Review full screen, Where it stands (state, your pick, when answered) and what you said, then the note with Approve in ink beside Change; Change with a note saves the answer and the row reads Changes requested; More holds Select and Clear all; every block on one gutter, the last row clear of the dock, no control under 44px, no file path or code in the words, no sideways overflow, no console error.`
+      : `${theme}, ${metrics.width}px: the sidebar lists Today, Decide, Evidence 3, Reports, Designs 3 (lit) and Tickets, the prototype's places in its order; Designs fills the window as the approved prototype's desk draws it: the crumb, the 32px title and what is on the board, then the designs as picture cards across the top (title, project and day, state) and the open design (its picture filling the card) beside Where it stands (state, your pick, when answered, what you said, what it shows; the newest open shows its pick, as the prototype's does) with the note and Approve in ink beside Change; a card clicked opens that design; every card on the 12-column lines and the 4px grid, no page scroll, under 15% of the window empty, no text cut but a card title past two lines, no words over words, no console error.` }, null, 2) + '\n');
   console.log(report.join('\n'));
   console.log(JSON.stringify(facts, null, 2));
   if (after) assert.deepEqual(problems, [], 'every capture measures clean');

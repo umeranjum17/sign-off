@@ -2194,10 +2194,11 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   await evaluate('document.getElementById("t-more").close()');
   const desktop = await browse(join(dir, 'desktop-browser'), 1280);
   await desktop.evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
-  await until(async () => (await desktop.evaluate('document.querySelector("#nav a[href=\\"#waiting\\"][aria-current=page]")?.textContent.trim().startsWith("Decide")')) === true);
+  // The desk's sidebar holds Designs after Reports with its count, lit on Designs; Decide is not.
+  await until(async () => (await desktop.evaluate('[...document.querySelectorAll("#nav a:not(.sfind)")].map((a) => [...a.childNodes].filter((n) => n.nodeType === 3).map((n) => n.data).join("") + (a.hasAttribute("aria-current") ? "*" : "")).join("|") + " " + document.querySelector("#nav a[href=\\"#designs\\"] .n")?.textContent')) === 'Today|Decide|Evidence|Reports|Designs*|Tickets 1');
   await desktop.evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
   await until(async () => (await desktop.evaluate('document.querySelector(".design-review .foot button")?.textContent')) === 'Approve');
-  assert.equal(await desktop.evaluate('document.querySelector("#nav a[href=\\"#waiting\\"][aria-current=page]")?.getClientRects().length > 0'), true);
+  assert.equal(await desktop.evaluate('document.querySelector("#nav a[href=\\"#designs\\"][aria-current=page]")?.getClientRects().length > 0'), true);
   assert.equal(await desktop.evaluate('document.querySelector(".design-review")?.getBoundingClientRect().bottom <= innerHeight'), true);
   // On a desk the design opens in the board, its card marked, beside where it stands; the reader stays shut.
   assert.equal(await desktop.evaluate('document.getElementById("reader").hidden && document.querySelector(".dz-card[aria-current]")?.id === "item-d1-design" && !!document.querySelector(".dz-open .dz-fill .design-preview-window") && !!document.querySelector(".dz-info .foot .dz-ink")'), true);
@@ -2899,11 +2900,11 @@ test('Today on a phone: the floating tab bar with its pill on Today, Up next wit
   await until(async () => await evaluate('!!document.getElementById("item-u3")'));
   assert.deepEqual(await evaluate('(() => { const c = document.getElementById("item-u3"); return [c.classList.contains("ev-text"), c.querySelectorAll(".ev-media").length, c.querySelector(".t").firstChild.textContent, c.querySelector(".m").textContent.startsWith("Passed")]; })()'),
     [true, 0, 'It works.', true]);
-  // With no designs filed, the Designs screen still opens, under the lit Decide tab, and the pill slides to it.
+  // With no designs filed, the Designs screen still opens; the dock keeps its five, and as the prototype's dock has it Designs lights Today, whose More opens it, and the pill slides there.
   await evaluate('location.hash = "#designs"');
   await until(async () => (await evaluate('document.querySelector("#board h1").textContent')) === 'Designs');
-  assert.equal(await evaluate('document.querySelector(".tabs [aria-current]").getAttribute("href")'), '#waiting');
-  await until(async () => (await evaluate(rect('.tabs .hl')))[0] === (await evaluate(rect('.tabs a[href="#waiting"]')))[0]);
+  assert.deepEqual(await evaluate('[document.querySelectorAll(".tabs a").length, document.querySelector(".tabs [aria-current]").getAttribute("href")]'), [5, '#']);
+  await until(async () => (await evaluate(rect('.tabs .hl')))[0] === (await evaluate(rect('.tabs a[href="#"]')))[0]);
   // The dock's round Search opens a sheet over the screen it is tapped on, its box in hand; what is typed lists in groups that open where each card lives, and Escape closes it there.
   await evaluate('document.querySelector(".dock-find").click()');
   await until(async () => (await evaluate('[location.hash, document.getElementById("t-search").open, document.activeElement?.id, document.querySelector("#board h1")?.textContent].join("|")')) === '#designs|true|find|Designs');
