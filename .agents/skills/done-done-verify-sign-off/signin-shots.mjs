@@ -21,6 +21,8 @@ const height = phone ? { 360: 800, 390: 844, 445: 900 }[width] ?? 844 : width ==
 mkdirSync(out, { recursive: true });
 // The board and its CLI live in a temp folder with their own HOME and XDG_*, so no board on this host is read or written.
 const dir = mkdtempSync(join(tmpdir(), 'so-signin-')), board = join(dir, 'board.json');
+// Every folder this run makes is its own, and every one goes when the run ends, whatever it ends with.
+const made = [dir];
 const env = { ...process.env, PATH: dirname(process.execPath) + ':' + process.env.PATH, HOME: dir, XDG_CONFIG_HOME: join(dir, '.config'),
   XDG_DATA_HOME: join(dir, '.local/share'), XDG_STATE_HOME: join(dir, '.local/state'), XDG_CACHE_HOME: join(dir, '.cache') };
 delete env.SIGN_OFF_FILER;
@@ -44,9 +46,13 @@ const url = `${base}#decide/npm-trust`;
 
 // The browser: its own headless Chromium over the DevTools protocol, its profile in a temp folder.
 const prof = mkdtempSync(join(tmpdir(), 'so-signin-cdp-'));
+made.push(prof);
 const chromium = ['/usr/lib/chromium/chromium', '/usr/bin/chromium', '/usr/bin/google-chrome'].find(existsSync);
 const chrome = spawn(chromium, ['--headless=new', '--no-sandbox', `--user-data-dir=${prof}`, '--remote-debugging-port=0', '--hide-scrollbars', 'about:blank'], { stdio: 'ignore' });
-process.on('exit', () => { try { chrome.kill(); server.kill(); } catch {} });
+process.on('exit', () => {
+  try { chrome.kill(); server.kill(); } catch {}
+  for (const folder of made) try { rmSync(folder, { recursive: true, force: true }); } catch {}
+});
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(1));
 let port;
 for (let i = 0; i < 300 && !port; i++) { await wait(100); const f = join(prof, 'DevToolsActivePort'); if (existsSync(f)) port = readFileSync(f, 'utf8').split('\n')[0]; }
@@ -106,10 +112,10 @@ const copy = await (async () => {
 // A plain headless Chromium, no device emulation and no emulated media, on the same page at a 390px window.
 if (width === 390) {
   const plainProf = mkdtempSync(join(tmpdir(), 'so-signin-plain-'));
+  made.push(plainProf);
   const p = spawnSync(chromium, ['--headless', '--no-sandbox', '--disable-gpu', `--user-data-dir=${plainProf}`, '--hide-scrollbars', '--window-size=390,844',
     '--virtual-time-budget=8000', `--screenshot=${join(out, 'plain.390w.png')}`, url], { encoding: 'utf8', timeout: 120000 });
   assert.equal(p.status, 0, p.stderr);
-  rmSync(plainProf, { recursive: true, force: true });
 }
 
 const fail = [];
@@ -131,7 +137,5 @@ writeFileSync(file('txt'), JSON.stringify({ ...m, copy, console_errors: errors, 
 console.log(`${state}.${theme}.${width}w`, fail.length ? `FAIL ${fail.join('; ')}` : 'ok');
 
 ws.close(); chrome.kill(); server.kill(); await wait(300);
-rmSync(prof, { recursive: true, force: true });
 run('stop', board);
-rmSync(dir, { recursive: true, force: true });
 if (fail.length) { console.error(JSON.stringify({ fail }, null, 2)); process.exit(1); }
