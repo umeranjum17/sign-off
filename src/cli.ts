@@ -16,7 +16,7 @@ import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner
 import { AxiError, runAxiCli } from 'axi-sdk-js';
 import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendKind, readKinds, appendSendBack, appendTicket, readTickets, rollUp, appendTicketComment, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
-import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, galleryFrames, guided, kitWarnings, mediaFiles, parseMessage, reportPage } from './contract.js';
+import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, downloadFiles, galleryFrames, guided, kitWarnings, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
 import { copiesOf, differs, type Copy } from './images.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
@@ -2853,8 +2853,10 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     const mock = diagram || frame ? (diagram ?? frame)!.src : value ? d?.mocks?.find((m) => m.value === value)?.path : value === '' && d?.view;
     try {
       const path = rest.map(decodeURIComponent).join('/');
-      const download = frame && d?.sections?.some((s: any) => s.blocks?.some((b: any) => b.type === 'file' && b.src === frame.src));
-      const type = download ? 'application/octet-stream' : assetTypes[extname(path).toLowerCase()];
+      const linked = frame && downloadFiles(d).includes(frame.src);
+      const explicitFile = frame && d?.sections?.some((s: any) => s.blocks?.some((b: any) => b.type === 'file' && b.src === frame.src));
+      const download = explicitFile || linked && new URL(req.url, 'http://localhost').searchParams.get('download') === '1';
+      const type = download ? 'application/octet-stream' : linked && !/\.(png|jpe?g|webp|mp4|webm)$/i.test(path) ? undefined : assetTypes[extname(path).toLowerCase()];
       if (!mock || !type) return [404, { error: 'Mock is unavailable' }];
       const actual = under(dirname(under(dirname(file), mockFile(mock))), path);
       if (statSync(actual).size > (type.startsWith('video/') && frame ? MEDIA_BYTES : MOCK_BYTES)) return [404, { error: 'Mock is unavailable' }];

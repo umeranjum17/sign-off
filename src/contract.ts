@@ -34,7 +34,7 @@ const DESIGN_1 = [...COMMON, 'group', 'filed', 'status', 'preview', 'journeys', 
 export const FRAME_ROLES = ['today', 'proposed', 'built', 'target'];
 const GUIDE = ['understood', 'visual', 'sections', 'next'];
 const GUIDE_FIELDS: Record<string, string[]> = {
-  report: [...COMMON, 'filed', 'group', 'decided', 'asked_by', 'purpose', 'project', ...GUIDE],
+  report: [...COMMON, 'filed', 'group', 'decided', 'asked_by', 'purpose', 'project', 'layout', ...GUIDE],
   plan: [...COMMON, 'project', 'decisions', ...GUIDE],
 };
 /** A done-done run: its id, full commit and the four Checks lines. */
@@ -47,8 +47,11 @@ const ACTIONS: Record<string, Record<string, string>> = {
 /** The screens a gallery frame shows, and the files it may be. */
 export const GALLERY_DEVICES = ['phone', 'desktop'];
 const GALLERY_FILE = /\.(png|jpe?g|webp|html?)$/i;
+/** Local markdown references are pinned downloads, never network or unlisted board paths. */
+export const localLinks = (text: string): string[] => [...text.matchAll(/\[[^\]\n]+\]\(([^\s)]+)\)/g)].map((m) => m[1]).filter((p) => !/^https?:/i.test(p));
+export const downloadFiles = (m: any): string[] => (m?.sections ?? []).flatMap((s: any) => (s.blocks ?? []).flatMap((b: any) => b.type === 'file' ? [b.src] : b.type === 'text' ? localLinks(b.text) : b.type === 'table' ? localLinks(JSON.stringify([b.columns, b.rows])) : []));
 /** The report kit's blocks, the files a block may name, and the words a status may take. */
-export const KIT_BLOCKS = ['callout', 'beats', 'video', 'table', 'compare', 'evidence', 'image', 'file'];
+export const KIT_BLOCKS = ['callout', 'beats', 'video', 'table', 'compare', 'evidence', 'image', 'file', 'text'];
 const KIT_IMAGE = /\.(png|jpe?g|webp)$/i, KIT_VIDEO = /\.(mp4|webm)$/i;
 export const KIT_STATUS: Record<string, string> = { fixed: 'Fixed', progress: 'In progress', waiting: 'Waiting on you' };
 const KIT_TONES = ['note', 'warn', 'ask'];
@@ -226,7 +229,12 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
       if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad(at, 'must be an object', `Write each block as {"type":"callout",...}; the types are ${KIT_BLOCKS.join(', ')}`);
       if (!KIT_BLOCKS.includes(o.type)) throw bad(`${at}.type`, `${show(o.type)} is not one of ${KIT_BLOCKS.join(', ')}`, `Set "type" to ${KIT_BLOCKS.join(', ')}; a gallery is the section's "gallery", not a block`);
       const only = (fields: string[], example: string) => one(at, o, ['type', ...fields], example);
-      if (o.type === 'callout') {
+      if (o.type === 'text') {
+        only(['text', 'level'], '{"type":"text","text":"Original words"}');
+        text(`${at}.text`, o.text, 40000, 'the original markdown text');
+        if (o.level !== undefined && (!Number.isInteger(o.level) || o.level < 1 || o.level > 6)) throw bad(`${at}.level`, 'must be a heading level from 1 to 6', 'Leave level out for paragraphs');
+        for (const src of localLinks(o.text)) kitFile(`${at}.text`, src, /./, 'file', 'report.md');
+      } else if (o.type === 'callout') {
         only(['tone', 'title', 'text'], '{"type":"callout","tone":"warn","title":"Not measured","text":"How much of the plan\'s window this took."}');
         if (Object.hasOwn(o, 'tone') && !KIT_TONES.includes(o.tone)) throw bad(`${at}.tone`, `${show(o.tone)} is not one of ${KIT_TONES.join(', ')}`, `Set "tone" to ${KIT_TONES.join(', ')}, or leave it out`);
         text(`${at}.title`, o.title, 60, 'the callout\'s bold first line, in 60 characters or fewer');
@@ -234,31 +242,32 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
       } else if (o.type === 'beats') {
         only(['beats'], '{"type":"beats","beats":[{"image":"beats/1.png","time":"0:00","title":"The pain","text":"..."}]}');
         list(`${at}.beats`, 2, 12, ['image', 'time', 'title', 'text'], '{"image":"beats/1.png","time":"0:00","title":"The pain","text":"One line."}', o.beats).forEach((b, k) => {
-          kitFile(`${at}.beats[${k}].image`, b.image, KIT_IMAGE, 'a .png, .jpg, .jpeg or .webp', 'beats/1.png');
+          if (b.image !== undefined) kitFile(`${at}.beats[${k}].image`, b.image, KIT_IMAGE, 'a .png, .jpg, .jpeg or .webp', 'beats/1.png');
           if (Object.hasOwn(b, 'time')) text(`${at}.beats[${k}].time`, b.time, 12, 'the beat\'s time, such as "0:11", in 12 characters or fewer');
           text(`${at}.beats[${k}].title`, b.title, 80, 'the beat\'s title, in 80 characters or fewer');
-          text(`${at}.beats[${k}].text`, b.text, 280, 'the beat\'s words, in 280 characters or fewer');
+          if (b.text !== undefined) text(`${at}.beats[${k}].text`, b.text, 280, 'the beat\'s words, in 280 characters or fewer');
         });
       } else if (o.type === 'video') {
         only(['src', 'poster', 'length', 'caption'], '{"type":"video","src":"film.mp4","poster":"film.jpg","length":"0:10","caption":"The promo, 10 seconds."}');
         kitFile(`${at}.src`, o.src, KIT_VIDEO, 'a .mp4 or .webm', 'film.mp4');
         kitFile(`${at}.poster`, o.poster, KIT_IMAGE, 'a .png, .jpg, .jpeg or .webp', 'film.jpg');
         if (Object.hasOwn(o, 'length')) text(`${at}.length`, o.length, 12, 'the film\'s length, such as "0:10", in 12 characters or fewer');
-        text(`${at}.caption`, o.caption, 280, 'what the film shows, in 280 characters or fewer');
+        if (o.caption !== undefined) text(`${at}.caption`, o.caption, 280, 'what the film shows, in 280 characters or fewer');
       } else if (o.type === 'image' || o.type === 'file') {
         only(['src', 'caption', ...(o.type === 'image' ? ['alt'] : [])], '{"type":"image","src":"frame.png","caption":"The reference"}');
         kitFile(`${at}.src`, o.src, o.type === 'image' ? KIT_IMAGE : /./, o.type === 'image' ? 'a .png, .jpg, .jpeg or .webp' : 'file', 'report.md');
-        text(`${at}.caption`, o.caption, 280, 'the original caption or link text, in 280 characters or fewer');
+        if (o.type === 'file' || o.caption !== undefined) text(`${at}.caption`, o.caption, 280, 'the original caption or link text, in 280 characters or fewer');
         if (Object.hasOwn(o, 'alt')) text(`${at}.alt`, o.alt, 280, 'what the image shows, in 280 characters or fewer');
       } else if (o.type === 'table') {
         only(['columns', 'rows'], '{"type":"table","columns":["Measured","App promo"],"rows":[["AI calls","3"]]}');
         if (!Array.isArray(o.columns) || o.columns.length < 1 || o.columns.length > 20) throw bad(`${at}.columns`, 'must list 1 to 20 column names', 'Set "columns" to the original headings');
         if (!Array.isArray(o.rows) || o.rows.length < 1 || o.rows.length > 30) throw bad(`${at}.rows`, 'must list 1 to 30 rows', 'Set "rows" to arrays of cells, preserving ragged rows');
+        for (const src of localLinks(JSON.stringify([o.columns, o.rows]))) kitFile(`${at}.rows`, src, /./, 'file', 'report.md');
         const occupied: boolean[][] = o.rows.map(() => []);
         const cell = (c: any, field: string, remaining: number) => {
-          if (typeof c === 'string') { if (c !== '') text(field, c, 120, 'the original cell text'); return [1, 1]; }
+          if (typeof c === 'string') { if (c !== '') text(field, c, m.layout === 'document' ? 4000 : 120, 'the original cell text'); return [1, 1]; }
           one(field, c, ['text', 'colspan', 'rowspan'], '{"text":"Calls","colspan":2}');
-          if (c.text !== '') text(`${field}.text`, c.text, 120, 'the original cell text');
+          if (c.text !== '') text(`${field}.text`, c.text, m.layout === 'document' ? 4000 : 120, 'the original cell text');
           for (const [f, max] of [['colspan', 20], ['rowspan', remaining]] as const) {
             if (Object.hasOwn(c, f) && (!Number.isInteger(c[f]) || c[f] < 1 || c[f] > max)) throw bad(`${field}.${f}`, `must be an integer from 1 to ${max}`, 'Keep the span inside the table');
           }
@@ -331,6 +340,9 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
   };
   /** The guided page every plan 2 and report 3 is: what I understood, one picture, sections with expandable items, and the next step. Returns the section ids. */
   const guide = (minSections: number): string[] => {
+    const document = m.kind === 'report' && m.layout === 'document';
+    if (m.layout !== undefined && !document) throw bad('layout', 'must be document on a report', 'Leave layout out for the guided workflow');
+    if (!document) {
     list('understood', 1, 6, ['label', 'text'], '{"label":"You asked","text":"Make the first start smooth."}').forEach((o, n) => {
       text(`understood[${n}].label`, o.label, 40, 'what this line is, such as "You asked" or "Done when", in 40 characters or fewer');
       text(`understood[${n}].text`, o.text, 240, 'your reading of it, in 240 characters or fewer');
@@ -360,13 +372,14 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
     if (Object.hasOwn(v, 'details')) details('visual.details', v.details);
     if (Object.hasOwn(v, 'diagram')) diagrams('visual.diagram', v.diagram);
     // A report 5 is built of its kind's parts: up to 10 sections, each naming the part it is, and items that carry a source's link, a finding's confidence or a slice's size.
+    }
     const v5 = m.kind === 'report' && m.schema >= 5, parts = v5 ? REPORT_PARTS[m.purpose] ?? [] : [];
-    const ids = list('sections', minSections, v5 ? 10 : 6, ['id', 'stage', 'heading', 'body', 'items', 'details', 'diagram', 'gallery', 'blocks', 'pins', ...(v5 ? ['part'] : [])], '{"id":"steps","stage":"recommend","heading":"Eight steps, 22 to 31 Oct","body":"..."}').map((o, n) => {
+    const ids = list('sections', minSections, document ? 80 : v5 ? 10 : 6, ['id', 'stage', 'heading', 'body', 'items', 'details', 'diagram', 'gallery', 'blocks', 'pins', ...(v5 ? ['part'] : [])], '{"id":"steps","stage":"recommend","heading":"Eight steps, 22 to 31 Oct","body":"..."}').map((o, n) => {
       const at = `sections[${n}]`;
       if (!(typeof o.id === 'string' && /^[a-z0-9-]{1,40}$/.test(o.id))) throw bad(`${at}.id`, 'must be 1-40 of a-z 0-9 -', 'Set "id" to a short slug such as "steps"');
       if (!['found', 'recommend'].includes(o.stage)) throw bad(`${at}.stage`, `${show(o.stage)} is not found or recommend`, 'Set "stage" to "found" (what I found) or "recommend" (what I recommend)');
-      text(`${at}.heading`, o.heading, 80, 'the section heading, in 80 characters or fewer');
-      text(`${at}.body`, o.body, 300, 'the section\'s lead, in 300 characters or fewer');
+      if (!(document && o.heading === '')) text(`${at}.heading`, o.heading, 80, 'the section heading, in 80 characters or fewer');
+      if (!(document && o.body === '')) text(`${at}.body`, o.body, 300, 'the section\'s lead, in 300 characters or fewer');
       if (Object.hasOwn(o, 'part') && !parts.some(([p]) => p === o.part)) {
         throw bad(`${at}.part`, parts.length ? `${show(o.part)} is not a part of a ${m.purpose} report: ${parts.map(([p]) => p).join(', ')}` : `is not used by a report whose purpose is ${m.purpose}`, parts.length ? `Set "part" to the part this section is, one of ${parts.map(([p]) => p).join(', ')}` : 'Remove "part"');
       }
@@ -390,12 +403,15 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
     });
     const twice = ids.findIndex((id, n) => ids.indexOf(id) < n);
     if (twice >= 0) throw bad(`sections[${twice}].id`, `repeats ${ids[twice]}`, 'Give every section its own id');
+    if (document && !m.sections.some((s: any) => s.diagram?.length || s.gallery?.length || s.blocks?.some((b: any) => b.type !== 'text' && b.type !== 'file' && b.type !== 'callout'))) throw bad('sections', 'needs a picture, diagram or structured block', 'Keep the original visual content with its words');
     if (parts.length) kindParts(parts);
+    if (!document) {
     if (!Object.hasOwn(m, 'next')) throw bad('next', 'is required', 'Add "next": {"heading":"Go ahead, and I start on 22 Oct","lines":["..."]}');
     one('next', m.next, ['heading', 'lines'], '{"heading":"...","lines":["..."]}');
     text('next.heading', m.next.heading, 80, 'the next step, in 80 characters or fewer');
     if (!Array.isArray(m.next.lines) || m.next.lines.length < 1 || m.next.lines.length > 4) throw bad('next.lines', 'must list 1 to 4 lines', 'Set "lines" to 1-4 texts, what happens after the person answers');
     m.next.lines.forEach((l: unknown, n: number) => text(`next.lines[${n}]`, l, 160, 'one line, in 160 characters or fewer'));
+    }
     return ids;
   };
   need('contract');
@@ -737,7 +753,7 @@ export const diagramViews = (m: any): { label: string; src: string; sha256?: str
 /** The gallery frames of a guided report or plan, in the order the board counts them for `gallery.<n>`: each section's options, each option's frames. */
 export const galleryFrames = (m: any): { device?: string; src: string; sha256?: string; bytes?: number }[] => [...(m?.sections ?? []).flatMap((s: any) => (s.gallery ?? []).flatMap((o: any) => o.frames)), ...(m?.sections ?? []).flatMap((s: any) => s.pins ?? [])];
 /** The files a section's blocks name, each once, in the order the blocks use them. */
-export const blockFiles = (s: any): string[] => [...new Set<string>((s?.blocks ?? []).flatMap((b: any) => ['image', 'file'].includes(b.type) ? [b.src] : b.type === 'beats' ? b.beats.map((x: any) => x.image) : b.type === 'video' ? [b.poster, b.src] : b.type === 'compare' ? [b.before.image, b.after.image] : b.type === 'evidence' ? b.rows.map((r: any) => r.image).filter(Boolean) : []))];
+export const blockFiles = (s: any): string[] => [...new Set<string>((s?.blocks ?? []).flatMap((b: any) => b.type === 'text' ? localLinks(b.text) : b.type === 'table' ? localLinks(JSON.stringify([b.columns, b.rows])) : ['image', 'file'].includes(b.type) ? [b.src] : b.type === 'beats' ? b.beats.map((x: any) => x.image).filter(Boolean) : b.type === 'video' ? [b.poster, b.src] : b.type === 'compare' ? [b.before.image, b.after.image] : b.type === 'evidence' ? b.rows.map((r: any) => r.image).filter(Boolean) : []))];
 const SAME_WORDS = 0.75;
 /** What the kit warns about, never refuses: a lead whose first sentence says again (most of its words are in) what the report's summary already said, so the reader reads it twice. */
 export function kitWarnings(m: any): string[] {

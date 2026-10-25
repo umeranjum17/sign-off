@@ -234,3 +234,32 @@ test('the report kit: a section\'s blocks are checked, post pins their files aft
   assert.equal(echo.status, 0, echo.stdout);
   assert.match(echo.stderr, /warning: .*sections\[0\]\.body says again what "about" already says/);
 });
+
+test('document layout preserves authored text, inline local links and block order without a guided intro', async () => {
+  const dir = join(scratch, 'document'), board = join(dir, 'board.json'), env = { ...process.env, HOME: join(scratch, 'home') };
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'original.md'), '# Original words');
+  writeFileSync(join(dir, 'frame.png'), readFileSync(new URL('../fixtures/evidence/product-board.png', import.meta.url)));
+  const base = JSON.parse(readFileSync(join(fixtures, 'report.v5', 'valid-full.json')));
+  const report = { ...base, key: 'original-document', schema: 4, layout: 'document', purpose: 'other', sections: [
+    { id: 'original', stage: 'found', heading: '', body: '', blocks: [{ type: 'text', level: 2, text: 'The answer' }, { type: 'text', text: 'The [full report](original.md), unchanged.' }, { type: 'image', src: 'frame.png' }] },
+  ] };
+  for (const field of ['understood', 'visual', 'next']) delete report[field];
+  const post = (m) => spawnSync('node', [cli, 'post', board, '--kind', 'report', '--from', '-'], { encoding: 'utf8', env, cwd: dir, input: JSON.stringify(m) });
+  assert.equal(post(report).status, 0);
+  const stored = JSON.parse(readFileSync(board)).items[0];
+  assert.equal(stored.sections[0].blocks[1].text, 'The [full report](original.md), unchanged.');
+  assert.equal(stored.sections[0].pins[0].src, 'original.md');
+  const proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: tmpdir(), env });
+  try {
+    const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+    const state = await (await fetch(new URL('/api/decisions', url))).json(), d = state.decisions.find((d) => d.key === report.key);
+    assert.equal(d.layout, 'document'); assert.equal(d.visual, undefined); assert.equal(d.next, undefined);
+    const link = new URL(`/mock/local/${report.key}~gallery.0/original.md?download=1`, url);
+    const downloaded = await fetch(link); assert.match(downloaded.headers.get('content-disposition'), /attachment/);
+    assert.equal(await downloaded.text(), '# Original words');
+    assert.equal((await fetch(new URL(`/mock/local/${report.key}~gallery.0/original.md`, url))).status, 404);
+  } finally { proc.kill(); }
+  const bad = { ...report, key: 'bad-document', sections: [{ ...report.sections[0], blocks: [{ type: 'text', text: '[No](../outside.md)' }] }] };
+  assert.match(post(bad).stdout, /must be a relative file path/);
+});

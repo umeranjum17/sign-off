@@ -779,6 +779,7 @@
   .kb-segs button::after { content: ""; position: absolute; inset: -0.875rem 0; }
   .kb-segs button.on { background: var(--tk-fill); }
   .kb-stage { display: grid; gap: 1rem; }
+  .kb-stage.no-image { grid-template-columns: 1fr; }
   .kb-stage img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 1rem; background: var(--tk-inset); }
   .kb-words { display: grid; gap: 0.25rem; align-content: start; min-width: 0; }
   .kb-words .count { margin: 0; font-size: var(--tk-fs-meta); line-height: var(--tk-lh-meta); color: var(--tk-text-secondary); }
@@ -3665,7 +3666,7 @@
   // Read state is kept beside the board, so a phone and a desk agree: one filed today is new until it is opened; read and unread marks override that.
   const unread = (d) => { const o = state.opened?.[d.key]; return o === undefined ? !!d.filed && isToday(d.filed) : !o; };
   /** A guided report's parts, as its page reads them: what this is, what I understood, each section, the next step. A page report has none. */
-  const rpParts = (d) => (d.guided ? [['this', GSTAGES.this], ['understood', GSTAGES.understood], ...(d.sections ?? []).map((s) => [s.id, s.heading]), ['next', GSTAGES.next]] : []);
+  const rpParts = (d) => (d.guided ? [...(d.visual ? [['this', GSTAGES.this]] : []), ...(d.understood?.length ? [['understood', GSTAGES.understood]] : []), ...(d.sections ?? []).map((s) => [s.id, s.heading || d.title]), ...(d.next ? [['next', GSTAGES.next]] : [])] : []);
   const partRead = (d, part) => !!state.reads?.[`${d.key}/${part}`];
   /** A report's parts as its strip and its sheet list them: a report 5's kind parts (the sections naming one), else every part of its guided page; each [id, name]. */
   const kindParts = (d) => { const own = (d.sections ?? []).filter((x) => x.part); return own.length ? own.map((x) => [x.id, x.heading]) : rpParts(d); };
@@ -4138,7 +4139,7 @@
   const MD_ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   const mdEsc = (s) => s.replace(/[&<>"']/g, (c) => MD_ESC[c]);
   const mdMark = (s) => `<span class="gd-mk">${mdEsc(s)}</span>`;
-  const MD_RE = /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(\*[^*\s][^*\n]*\*)|(\[[^\]\n]+\]\(https?:\/\/[^\s)]+\))|((?:https?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}\/[^\s),;]*[^\s),;.])/gi;
+  const MD_RE = /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(\*[^*\s][^*\n]*\*)|(\[[^\]\n]+\]\([^\s)]+\))|((?:https?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}\/[^\s),;]*[^\s),;.])/gi;
   /** A short label for an address: `repo #12` for an issue or pull request, `HN 123` for Hacker News, else the domain. */
   function mdShort(u) {
     const s = u.replace(/^https?:\/\//, ''); let m;
@@ -4148,7 +4149,7 @@
     return s.split('/')[0].replace(/^www\./, '');
   }
   /** One line of authored text as HTML. links: false inside a button, where a link cannot be pressed. */
-  function mdInline(t, { links = true } = {}) {
+  function mdInline(t, { links = true, local } = {}) {
     const re = new RegExp(MD_RE.source, 'gi'), ref = (url, inner, short) => {
       const attrs = short ? ` data-short="${mdEsc(short)}"` : '';
       return links ? `<a class="gd-ref"${attrs} href="${mdEsc(url)}" target="_blank" rel="noopener noreferrer" title="${mdEsc(url)}">${inner}</a>` : `<span class="gd-ref"${attrs}>${inner}</span>`;
@@ -4160,13 +4161,13 @@
       if (m[1]) out += `${mdMark('`')}<code>${mdEsc(s.slice(1, -1))}</code>${mdMark('`')}`;
       else if (m[2]) out += `${mdMark('**')}<strong>${mdEsc(s.slice(2, -2))}</strong>${mdMark('**')}`;
       else if (m[3]) out += `${mdMark('*')}<em>${mdEsc(s.slice(1, -1))}</em>${mdMark('*')}`;
-      else if (m[4]) { const [, label, url] = /^\[([^\]]+)\]\((.+)\)$/.exec(s); out += ref(url, `${mdMark('[')}${mdEsc(label)}${mdMark(`](${url})`)}`); }
+      else if (m[4]) { const [, label, url] = /^\[([^\]]+)\]\((.+)\)$/.exec(s), target = /^https?:/i.test(url) ? url : local?.(url); out += target ? ref(target, `${mdMark('[')}${mdEsc(label)}${mdMark(`](${url})`)}`) : mdEsc(s); }
       else out += ref(/^https?:/i.test(s) ? s : `https://${s}`, mdMark(s), mdShort(s));
     }
     return out + mdEsc(t.slice(i));
   }
   /** A detail as HTML blocks: a paragraph per line, bullet and numbered lists, fenced code. The newlines stay in the text. */
-  function mdBlock(t) {
+  function mdBlock(t, opts) {
     const ls = t.split('\n'), out = []; let k = 0;
     const item = /^(\s*)([-*]|\d+\.)(\s+)(.*)$/;
     while (k < ls.length) {
@@ -4178,15 +4179,15 @@
         out.push(`<pre class="gd-code">${mdMark(`${l}\n`)}${code.length ? `<code>${mdEsc(code.join('\n'))}</code>` : ''}${close === null ? '' : mdMark(`${code.length ? '\n' : ''}${close}`)}</pre>`);
       } else if (item.test(l)) {
         const first = item.exec(l), tag = /\d/.test(first[2]) ? 'ol' : 'ul', lis = [];
-        while (k < ls.length && item.test(ls[k]) && /\d/.test(item.exec(ls[k])[2]) === (tag === 'ol')) { const [, lead, bullet, gap, rest] = item.exec(ls[k++]); lis.push(`<li>${mdMark(lead + bullet + gap)}${mdInline(rest)}</li>`); }
+        while (k < ls.length && item.test(ls[k]) && /\d/.test(item.exec(ls[k])[2]) === (tag === 'ol')) { const [, lead, bullet, gap, rest] = item.exec(ls[k++]); lis.push(`<li>${mdMark(lead + bullet + gap)}${mdInline(rest, opts)}</li>`); }
         out.push(`<${tag}${tag === 'ol' && parseInt(first[2]) !== 1 ? ` start="${parseInt(first[2])}"` : ''}>${lis.join('\n')}</${tag}>`);
-      } else { out.push(l.trim() ? `<p>${mdInline(l)}</p>` : mdEsc(l)); k++; }
+      } else { out.push(l.trim() ? `<p>${mdInline(l, opts)}</p>` : mdEsc(l)); k++; }
     }
     return out.join('\n');
   }
   const NOLINK = { links: false };
   const mdSpan = (tag, cls, t, opts) => { const n = E(tag, cls); n.innerHTML = mdInline(t, opts); return n; };
-  const mdDiv = (t) => { const n = E('div', 'gd-md'); n.innerHTML = mdBlock(t); return n; };
+  const mdDiv = (t, opts) => { const n = E('div', 'gd-md'); n.innerHTML = mdBlock(t, opts); return n; };
   // END markdown
 
   const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -4196,7 +4197,7 @@
     const live = !FROZEN && !state.readonly;
     // View, this browser's choice: a report's pictures Drawn or As lists, and its numbers shown under the parts or not.
     const view = { lists: lsGet('sign-off-view-lists') === '1', nums: lsGet('sign-off-view-nums') !== '0' }, viewHooks = new Set();
-    const stages = ['this', 'understood', by('found').length && 'found', by('recommend').length && 'recommend', decisions.length && 'decide', 'next'].filter(Boolean);
+    const stages = [d.visual && 'this', d.understood?.length && 'understood', by('found').length && 'found', by('recommend').length && 'recommend', decisions.length && 'decide', d.next && 'next'].filter(Boolean);
     const saved0 = answerOf(key);
     const sentNote = (saved0?.notes ?? []).find((n) => n.section === 'understood');
     // On a report, That is right and Not quite are said to the author as the understood part's Agree and Disagree, so a reload shows what was said.
@@ -4564,10 +4565,10 @@
         at = i; const x = b.beats[i];
         dots.forEach((t, k) => { t.classList.toggle('on', k <= i); if (k === i) t.setAttribute('aria-current', 'step'); else t.removeAttribute('aria-current'); });
         segs.setAttribute('aria-label', `Beat ${i + 1} of ${n}`);
-        img.src = kitUrl(s, x.image, true); img.alt = x.title;
+        img.hidden = !x.image; img.parentElement.classList.toggle('no-image', !x.image); if (x.image) img.src = kitUrl(s, x.image, true); img.alt = x.title;
         count.textContent = `Beat ${i + 1} of ${n}`;
         title.replaceChildren(...(x.time ? [E('span', '', x.time)] : []), document.createTextNode(x.title));
-        words.textContent = x.text;
+        words.textContent = x.text ?? '';
         back.disabled = i === 0; next.textContent = i === n - 1 ? 'Start again' : 'Next';
       }
       back.onclick = () => show(Math.max(0, at - 1)); next.onclick = () => show(at === n - 1 ? 0 : at + 1);
@@ -4575,20 +4576,22 @@
       return E('div', 'kt kt-beats', segs, E('div', 'kb-stage', img, E('div', 'kb-words', count, title, words)), E('div', 'kb-nav', back, next));
     }
     function videoFig(s, b) {
-      const frame = E('div', 'frame'), play = el('button', { class: 'play', type: 'button', 'aria-label': `Play the film: ${b.caption}` }, E('i', '', gic('play')));
+      const frame = E('div', 'frame'), play = el('button', { class: 'play', type: 'button', 'aria-label': b.caption ? `Play the film: ${b.caption}` : 'Play the film' }, E('i', '', gic('play')));
       frame.append(el('img', { src: kitUrl(s, b.poster, true), alt: '', loading: 'lazy', decoding: 'async' }), play, ...(b.length ? [E('span', 'len', b.length)] : []));
-      play.onclick = () => { const v = el('video', { src: kitUrl(s, b.src), controls: '', autoplay: '', playsinline: '', poster: kitUrl(s, b.poster, true), 'aria-label': b.caption }); frame.replaceChildren(v); v.play?.().catch(() => {}); v.focus(); };
-      return E('figure', 'kt kt-video gd-wide', frame, E('figcaption', 'kt-cap', b.caption));
+      play.onclick = () => { const v = el('video', { src: kitUrl(s, b.src), controls: '', autoplay: '', playsinline: '', poster: kitUrl(s, b.poster, true), 'aria-label': b.caption ?? 'Film' }); frame.replaceChildren(v); v.play?.().catch(() => {}); v.focus(); };
+      return E('figure', 'kt kt-video gd-wide', frame, ...(b.caption ? [E('figcaption', 'kt-cap', b.caption)] : []));
     }
     function blockFig(s, b) {
+      const local = (file) => `${kitUrl(s, file)}?download=1`;
+      if (b.type === 'text') return b.level ? mdSpan(`h${b.level}`, 'kt', b.text, { local }) : mdDiv(b.text, { local });
       if (b.type === 'callout') return E('div', `kt kt-callout ${b.tone ?? 'note'}`, E('span', 'tile', gic(b.tone === 'warn' ? 'warn' : b.tone === 'ask' ? 'deeper' : 'info')), E('div', '', mdSpan('b', '', b.title, NOLINK), mdSpan('span', '', b.text)));
       if (b.type === 'beats') return beatsFig(s, b);
       if (b.type === 'video') return videoFig(s, b);
-      if (b.type === 'image') return E('figure', 'kt kt-image', el('img', { src: kitUrl(s, b.src, true), alt: b.alt ?? b.caption, loading: 'lazy', decoding: 'async' }), E('figcaption', 'kt-cap', b.caption));
-      if (b.type === 'file') return el('a', { class: 'kt kt-file', href: kitUrl(s, b.src), download: '' }, b.caption);
+      if (b.type === 'image') return E('figure', 'kt kt-image', el('img', { src: kitUrl(s, b.src, true), alt: b.alt ?? b.caption ?? '', loading: 'lazy', decoding: 'async' }), ...(b.caption ? [E('figcaption', 'kt-cap', b.caption)] : []));
+      if (b.type === 'file') return el('a', { class: 'kt kt-file', href: local(b.src), download: '' }, b.caption);
       if (b.type === 'table') {
         const wide = b.columns.length > 5 || [...b.columns, ...b.rows.flat()].some((c) => typeof c === 'object') || b.rows.some((r) => r.length !== b.columns.length);
-        const cell = (c, tag, i) => el(tag, { ...(tag === 'th' ? { scope: 'col' } : !wide && i ? { 'data-h': b.columns[i] } : {}), ...(typeof c === 'object' ? { colspan: c.colspan ?? 1, rowspan: c.rowspan ?? 1 } : {}) }, typeof c === 'object' ? c.text : c);
+        const cell = (c, tag, i) => el(tag, { ...(tag === 'th' ? { scope: 'col' } : !wide && i ? { 'data-h': b.columns[i] } : {}), ...(typeof c === 'object' ? { colspan: c.colspan ?? 1, rowspan: c.rowspan ?? 1 } : {}) }, mdSpan('span', '', typeof c === 'object' ? c.text : c, { local }));
         const table = el('table', { class: `kt-table${wide ? ' kt-wide' : ''}` }, el('thead', {}, el('tr', {}, ...b.columns.map((c, i) => cell(c, 'th', i)))), el('tbody', {}, ...b.rows.map((r) => el('tr', {}, ...r.map((c, i) => cell(c, 'td', i))))));
         return el('div', { class: `kt${wide ? ' kt-scroll' : ''}`, ...(wide ? { tabindex: '0', role: 'region', 'aria-label': 'Table' } : {}) }, table);
       }
@@ -4615,7 +4618,7 @@
     // ---- cards
     const card = (part, stage, ...kids) => { const c = el('section', { class: 'gd-sec', 'data-part': part, id: `gd-${part.replace(/\W/g, '-')}` }, ...kids); parts.set(part, c); stageOf.set(part, stage); return c; };
     const head = (h, lead, kicker, part, hf, lf) => el('div', { class: 'gh' }, ...(kicker ? [E('span', 'gk', kicker)] : []), fld(part, hf, mdSpan('h2', '', h)), ...(lead ? [fld(part, lf, mdSpan('p', 'gd-lead', lead))] : []));
-    const hero = card('this', 'this', head(d.visual.heading, d.visual.text, undefined, 'this', 'visual.heading', 'visual.text'), visual(d.visual), ...acts('this', d.visual.details), rc('this'));
+    const hero = d.visual ? card('this', 'this', head(d.visual.heading, d.visual.text, undefined, 'this', 'visual.heading', 'visual.text'), visual(d.visual), ...acts('this', d.visual.details), rc('this')) : null;
 
     const noteBox = el('textarea', { class: 'gd-note', 'aria-label': plan ? 'What is off' : 'What is off, for the agent', placeholder: 'What is off? One line is enough.', maxlength: '500', hidden: '' });
     noteBox.value = S.note;
@@ -4637,9 +4640,9 @@
       noteBox.hidden = S.understood !== 'no' || S.told; noteBox.disabled = lock;
       tell.hidden = plan || S.understood !== 'no' || !S.note.trim() || S.told || !live; tell.disabled = false;
     }
-    const understood = card('understood', 'understood', head('Check that I have this right', 'This is your ask in my words. If it is off, say what is off. That is the only correction that matters.'),
+    const understood = d.understood?.length ? card('understood', 'understood', head('Check that I have this right', 'This is your ask in my words. If it is off, say what is off. That is the only correction that matters.'),
       el('dl', { class: 'gd-uq' }, ...d.understood.map((u, n) => E('div', '', fld('understood', `understood.${n}.label`, el('dt', {}, u.label)), fld('understood', `understood.${n}.text`, mdSpan('dd', '', u.text))))),
-      E('div', 'gd-seg', ...choices), noteBox, tell, sendLine(`tell:${key}`), ...(live ? acts('understood') : []), rc('understood'));
+      E('div', 'gd-seg', ...choices), noteBox, tell, sendLine(`tell:${key}`), ...(live ? acts('understood') : []), rc('understood')) : null;
 
     // A comparison: every item's detail is the same "Axis: value" lines in the same order, so the section is one table.
     // The detail stays plain lines, so a board that predates the table still reads it as text.
@@ -4673,7 +4676,7 @@
         b.onclick = () => { const open = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(open)); body.hidden = !open; };
         return E('li', '', b, ...srcLink(it), body);
       });
-      return card(s.id, s.stage, head(s.heading, s.body, undefined, s.id, 'heading', 'body'), ...(s.diagram ? [diagramFig(s.diagram)] : []), ...(s.gallery ? [galleryFig(s.gallery)] : []), ...(s.blocks ?? []).map((b) => blockFig(s, b)), ...(cmp ? [cmpTable(s.items, cmp)] : items.length ? [E('ul', 'gd-rows', ...items)] : []), ...acts(s.id, s.details), rc(s.id));
+      return card(s.id, s.stage, ...(s.heading || s.body ? [head(s.heading, s.body, undefined, s.id, 'heading', 'body')] : []), ...(s.diagram ? [diagramFig(s.diagram)] : []), ...(s.gallery ? [galleryFig(s.gallery)] : []), ...(s.blocks ?? []).map((b) => blockFig(s, b)), ...(cmp ? [cmpTable(s.items, cmp)] : items.length ? [E('ul', 'gd-rows', ...items)] : []), ...acts(s.id, s.details), rc(s.id));
     };
 
     const optBtns = new Map();
@@ -4696,7 +4699,7 @@
     // ---- next step and Go ahead
     const sendSlot = E('div', ''), err = E('p', 'gd-err');
     err.setAttribute('role', 'alert');
-    const nextCard = card('next', 'next', head(d.next.heading, undefined, undefined, 'next', 'heading'), E('ul', 'gd-checks', ...d.next.lines.map((l, n) => E('li', '', E('span', 'tk', gic('check')), fld('next', `lines.${n}`, mdSpan('span', '', l))))), ...(plan ? [sendSlot, sendLine(`plan:${key}`), err] : []), ...(d.engagement || live ? acts('next') : []), rc('next'));
+    const nextCard = d.next ? card('next', 'next', head(d.next.heading, undefined, undefined, 'next', 'heading'), E('ul', 'gd-checks', ...d.next.lines.map((l, n) => E('li', '', E('span', 'tk', gic('check')), fld('next', `lines.${n}`, mdSpan('span', '', l))))), ...(plan ? [sendSlot, sendLine(`plan:${key}`), err] : []), ...(d.engagement || live ? acts('next') : []), rc('next')) : null;
     async function go(b) {
       if (S.understood === 'no' && !S.note.trim()) { noteBox.focus(); noteBox.scrollIntoView({ block: 'center' }); err.textContent = 'Say what is off first, or choose That is right.'; return; }
       err.textContent = ''; b.disabled = true;
@@ -4749,7 +4752,7 @@
     }
 
     // ---- the page
-    const cards = [hero, understood, ...by('found').map(secCard), ...by('recommend').map(secCard), ...decisions.map(decCard), nextCard];
+    const cards = [hero, understood, ...by('found').map(secCard), ...by('recommend').map(secCard), ...decisions.map(decCard), nextCard].filter(Boolean);
     const stageBlocks = [];
     let last = '';
     for (const c of cards) {
@@ -4760,9 +4763,9 @@
     const cols = E('div', 'gd-cols');
     // ---- A report's one bar, one View and one Activity (a plan keeps its parts' own rows until its slice). Each acts on the part in view.
     const unmd = (t) => String(t ?? '').replace(/[*`]/g, '').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
-    const names = new Map([['this', unmd(d.visual.heading)], ['understood', 'What I understood'], ...sections.map((x) => [x.id, unmd(x.heading)]), ...decisions.map((q) => [`d:${q.key}`, unmd(q.question)]), ['next', unmd(d.next.heading)]]);
+    const names = new Map([['this', unmd(d.visual?.heading)], ['understood', 'What I understood'], ...sections.map((x) => [x.id, unmd(x.heading || d.title)]), ...decisions.map((q) => [`d:${q.key}`, unmd(q.question)]), ['next', unmd(d.next?.heading)]]);
     const partName = (part) => names.get(part) ?? names.get(String(part).replace(/:\d+$/, '')) ?? part;
-    let curPart = 'this';
+    let curPart = d.visual ? 'this' : sections[0].id;
     const note = E('div', 'ra-note'); note.hidden = true; note.setAttribute('role', 'status');
     /** One line over the bar: what was sent, or what went wrong. */
     function flash(what) { note.replaceChildren(what); note.hidden = false; clearTimeout(flash.t); flash.t = setTimeout(() => { note.hidden = true; }, 7000); }
