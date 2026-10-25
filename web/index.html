@@ -423,7 +423,8 @@
   .ev-x::after { content: ''; position: absolute; inset: -0.375rem; } .ev-x .glyph { width: 1rem; height: 1rem; }
   .ev-title { margin: 0.5rem 0 0; color: var(--tk-ink); font-size: 1.25rem; line-height: 1.75rem; font-weight: 500; letter-spacing: -0.017em; outline: none; }
   .ev-hero { display: grid; gap: 0.5rem; margin-top: 1rem; }
-  .ev-hero a, .ev-hero video { display: block; overflow: hidden; border-radius: 1rem; background: var(--tk-inset); }
+  .ev-hero a, .ev-hero .media-open, .ev-hero video { display: block; overflow: hidden; border-radius: 1rem; background: var(--tk-inset); }
+  .ev-hero .media-open { width: 100%; padding: 0; border: 0; cursor: zoom-in; }
   .ev-hero img, .ev-hero video { display: block; width: 100%; max-height: 26.25rem; object-fit: contain; }
   .ev-hero figure.cap { display: grid; gap: 0.375rem; margin: 0; } .ev-hero figcaption { color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); }
   .ev-hero.none { display: flex; align-items: center; justify-content: center; gap: 0.5rem; height: 6rem; border-radius: 1rem; background: var(--tk-inset); color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); }
@@ -487,7 +488,7 @@
   .tech { grid-column: 1 / -1; font-size: 0.875rem; } .tech summary { margin: 0; color: var(--muted); font-size: inherit; } .tech p { margin: 0.25rem 0 0; }
   /* Each capture keeps its own shape: the frame is the shot, bounded in height, never letterboxed; two or more share the row. */
   .media { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .75rem; }
-  .media a { display: block; max-width: 100%; color: var(--accent); cursor: zoom-in; }
+  .media .media-open { display: block; max-width: 100%; padding: 0; border: 0; background: none; color: inherit; cursor: zoom-in; text-align: left; }
   .media img, .media video { display: block; width: auto; height: auto; max-width: 100%; max-height: min(24rem, 60vh);
     border: 1px solid var(--line); border-radius: .625rem; background: var(--sunk); }
   .media .gone { color: var(--danger); margin: 0; }
@@ -792,11 +793,14 @@
   .kb-btn:disabled { opacity: 0.6; box-shadow: none; }
   @media (min-width: 43.75rem) { .kb-stage { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 1.5rem; align-items: start; } .kb-nav { grid-template-columns: auto auto; justify-content: start; } }
   .kt-image { margin: 0; display: grid; gap: 0.375rem; }
+  .kt-image .media-open { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; text-align: left; }
   .kt-image img { display: block; width: 100%; height: auto; }
   .kt-file { display: block; padding: 0.75rem 0; color: var(--tk-ink); text-decoration: underline; text-underline-offset: 0.2em; }
-  .kt-scroll { overflow-x: auto; min-width: 0; }
-  .kt-table.kt-wide { min-width: 48rem; }
+  /* A wide table scrolls inside its own box; the first column stays put so rows stay aligned while the rest move. */
+  .kt-scroll { overflow-x: auto; min-width: 0; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+  .kt-table.kt-wide { min-width: 48rem; border-collapse: separate; border-spacing: 0; }
   .kt-wide :is(th, td) { min-width: 7rem; max-width: 20rem; overflow-wrap: anywhere; }
+  .kt-table.kt-wide :is(th, td):first-child { position: sticky; left: 0; z-index: 1; background: var(--page); box-shadow: 1px 0 0 var(--tk-line); }
   .kt-table { width: 100%; border-collapse: collapse; font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
   .kt-table th { padding: 0 0.75rem 0.5rem 0; border-bottom: 1px solid var(--tk-line); color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); font-weight: 500; text-align: left; }
   .kt-table td { padding: 0.75rem 0.75rem 0.75rem 0; border-bottom: 1px solid var(--tk-line); vertical-align: top; font-variant-numeric: tabular-nums; }
@@ -811,6 +815,7 @@
   }
   .kt-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
   .kt-compare figure { display: grid; gap: 0.375rem; align-content: start; margin: 0; }
+  .kt-compare .media-open { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
   .kt-compare img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; object-position: top; border-radius: 0.75rem; background: var(--tk-inset); }
   .kt-compare figcaption { font-size: var(--tk-fs-meta); line-height: 1.125rem; color: var(--tk-text-secondary); }
   .kt-compare figcaption b { margin-right: 0.25rem; color: var(--tk-ink); font-weight: 600; }
@@ -1766,7 +1771,33 @@
   #sheet h2 { margin: 0; font-size: var(--t-m); }
   #sheet header button { flex: none; width: 2.75rem; padding: 0; border-radius: 50%; background: none; color: var(--accent); }
   #sheet header button .glyph { width: 1.125rem; height: 1.125rem; padding: 0.4375rem; box-sizing: content-box; border-radius: 50%; background: var(--sunk); }
-  #sheet .sheet-shot { display: grid; place-items: center; margin-top: 1rem; } #sheet .sheet-shot .phone { width: min(13.75rem, 60%); }
+  #sheet .sheet-shot { display: grid; place-items: center; margin-top: 1rem; padding: 0; border: 0; background: none; cursor: zoom-in; } #sheet .sheet-shot .phone { width: min(13.75rem, 60%); }
+  /* Shared media viewer: full-screen sheet over the board for every image and video on a report, proof or ask. Warm neutrals only. */
+  .media-viewer { position: fixed; inset: 0; width: 100%; max-width: none; height: 100dvh; max-height: none; margin: 0; padding: 0; border: 0; background: var(--tk-canvas); color: var(--tk-text); }
+  .media-viewer[open] { display: flex; flex-direction: column; }
+  .media-viewer::backdrop { background: var(--tk-scrim); }
+  .mv-bar { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem max(1rem, env(safe-area-inset-right)) 0.5rem max(1rem, env(safe-area-inset-left)); padding-top: max(0.5rem, env(safe-area-inset-top)); background: var(--tk-card); border-bottom: 1px solid var(--tk-line); }
+  .mv-bar h2 { flex: 1; min-width: 0; margin: 0; overflow: hidden; font-size: var(--tk-fs-row); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .mv-close { flex: none; display: grid; place-items: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 0; border-radius: 50%; background: var(--tk-inset); color: var(--tk-ink); }
+  .mv-close .glyph { width: 1.125rem; height: 1.125rem; }
+  .mv-stage { position: relative; display: grid; flex: 1; min-height: 0; place-items: center; overflow: hidden; touch-action: none; background: var(--tk-canvas); cursor: grab; }
+  .mv-stage.dragging { cursor: grabbing; }
+  .mv-stage .mv-media { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; transform-origin: center center; user-select: none; -webkit-user-drag: none; }
+  .mv-stage video.mv-media { width: min(100%, 56rem); max-height: 100%; background: #000; }
+  .mv-foot { display: grid; gap: 0.125rem; padding: 0.75rem max(1rem, env(safe-area-inset-right)) max(0.75rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); background: var(--tk-card); border-top: 1px solid var(--tk-line); }
+  .mv-cap { margin: 0; font-size: var(--tk-fs-body); line-height: var(--tk-lh-body); color: var(--tk-text); overflow-wrap: anywhere; }
+  .mv-src { margin: 0; font-size: var(--tk-fs-meta); line-height: var(--tk-lh-meta); color: var(--tk-text-secondary); overflow-wrap: anywhere; }
+  .mv-nav { position: absolute; top: 50%; z-index: 1; display: grid; place-items: center; width: 2.75rem; height: 2.75rem; margin-top: -1.375rem; padding: 0; border: 0; border-radius: 50%; background: var(--tk-raised); color: var(--tk-ink); box-shadow: var(--tk-elev-raised); }
+  .mv-nav[hidden] { display: none; }
+  .mv-nav.prev { left: max(0.5rem, env(safe-area-inset-left)); }
+  .mv-nav.next { right: max(0.5rem, env(safe-area-inset-right)); }
+  .mv-nav .glyph { width: 1.125rem; height: 1.125rem; }
+  /* Phones: swipe only — big prev/next circles sit on the image and hide content. Desk (1280/1440) keeps them. */
+  @media (max-width: 63.999rem) { .mv-nav { display: none; } }
+  .ev-strip .media-open { display: block; height: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; flex: none; scroll-snap-align: start; }
+  .ev-hero .media-open { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; border-radius: 1rem; overflow: hidden; }
+  .kt-evid .media-open { display: block; padding: 0; border: 0; background: none; cursor: zoom-in; border-radius: 0.625rem; }
+  .kb-stage .media-open { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
   /* The toast rises on a spring with its mark: an ink pill with the canvas's colour on it, as the prototype's, the words, Undo on a lighter pill, and a hairline that counts down to when it goes. */
   #toast { overflow: hidden; gap: 0.75rem; min-height: 3.375rem; padding: 0 0.375rem 0 0.875rem; border-radius: 1.125rem; background: var(--tk-ink); color: var(--tk-canvas); font-size: var(--t-s); line-height: 1.25rem;
     box-shadow: var(--tk-elev-float); animation: toast-in 300ms var(--spring); }
@@ -2518,14 +2549,127 @@
     ?? d.evidenceCard?.media.map((m) => [m.url, m.type.startsWith('video/'), m.url, m.url, m.url]) ?? [];
   /** A capture's picture, fetched only as it nears the screen and decoded off the main thread. */
   const shot = (url, alt) => el('img', { src: src(url), alt, loading: 'lazy', decoding: 'async' });
+  /** Media items for the shared viewer from a card's captures (originals, with caption and source). */
+  const mediaItemsOf = (d) => filesOf(d).map(([path, video], i) => ({
+    url: src(path), video: !!video, caption: d.captions?.[i] || '', source: headline(d) || d.title || '',
+  }));
+  /**
+   * Shared full-screen media viewer for every image and video on reports, evidence and asks.
+   * Opens as a sheet over the board (never a raw /api tab). Swipe or arrows move through the set;
+   * pinch and double-tap zoom with pan; swipe down or ✕ closes back to the same scroll spot.
+   */
+  function openMediaViewer(items, start = 0, returnFocus) {
+    if (!items?.length) return;
+    // One viewer at a time: drop any sheet still open from another card or an earlier tap.
+    document.querySelectorAll('dialog.media-viewer').forEach((d) => { d.close(); d.remove(); });
+    let at = Math.max(0, Math.min(start | 0, items.length - 1)), scale = 1, ox = 0, oy = 0, moving = false;
+    const count = el('h2', { id: 'mv-title', tabindex: '-1' }), cap = el('p', { class: 'mv-cap', dir: 'auto' }), srcLine = el('p', { class: 'mv-src', dir: 'auto' });
+    const stage = el('div', { class: 'mv-stage', role: 'group', 'aria-roledescription': 'carousel' });
+    const prev = el('button', { class: 'mv-nav prev', type: 'button', 'aria-label': 'Previous' }, glyph('left'));
+    const next = el('button', { class: 'mv-nav next', type: 'button', 'aria-label': 'Next' }, glyph('right'));
+    const close = el('button', { class: 'mv-close', type: 'button', 'aria-label': 'Close' }, glyph('x'));
+    const dialog = el('dialog', { class: 'media-viewer', 'aria-labelledby': 'mv-title' },
+      el('div', { class: 'mv-bar' }, count, close), stage, prev, next, el('div', { class: 'mv-foot' }, cap, srcLine));
+    const apply = () => { const m = stage.querySelector('.mv-media'); if (m) m.style.transform = `translate(${ox}px, ${oy}px) scale(${scale})`; };
+    const resetZoom = () => { scale = 1; ox = oy = 0; apply(); };
+    const paint = () => {
+      const it = items[at], name = it.caption || it.source || `Item ${at + 1}`;
+      count.textContent = `${at + 1} of ${items.length}`;
+      cap.textContent = it.caption || ''; cap.hidden = !it.caption;
+      srcLine.textContent = it.source || ''; srcLine.hidden = !it.source;
+      prev.hidden = items.length < 2; next.hidden = items.length < 2;
+      prev.disabled = at === 0; next.disabled = at === items.length - 1;
+      stage.setAttribute('aria-label', name);
+      const node = it.video
+        ? el('video', { class: 'mv-media', src: it.url, controls: '', playsinline: '', autoplay: '', preload: 'metadata', 'aria-label': name })
+        : el('img', { class: 'mv-media', src: it.url, alt: name, draggable: 'false' });
+      stage.replaceChildren(node);
+      resetZoom();
+      count.focus({ preventScroll: true });
+    };
+    const go = (n) => { if (n >= 0 && n < items.length && n !== at) { at = n; paint(); } };
+    prev.onclick = () => go(at - 1); next.onclick = () => go(at + 1);
+    const shut = () => {
+      if (!dialog.isConnected) return;
+      dialog.close(); dialog.remove();
+      (returnFocus?.isConnected ? returnFocus : null)?.focus?.({ preventScroll: true });
+    };
+    close.onclick = shut; dialog.onclose = shut;
+    dialog.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); go(at - 1); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); go(at + 1); }
+      else if (e.key === 'Escape') { e.preventDefault(); shut(); }
+    });
+    // One finger: swipe left/right for next/prev, swipe down to close; when zoomed, pan. Pinch and double-tap zoom.
+    let x0, y0, t0, sx, sy, s0, dist0, lastTap = 0;
+    const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    stage.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      try { stage.setPointerCapture?.(e.pointerId); } catch { /* synthetic taps have no active pointer id */ }
+      const pts = stage._pts ??= new Map();
+      pts.set(e.pointerId, e);
+      if (pts.size === 1) { x0 = e.clientX; y0 = e.clientY; t0 = Date.now(); sx = ox; sy = oy; s0 = scale; moving = false; stage.classList.add('dragging'); }
+      else if (pts.size === 2) { const [a, b] = pts.values(); dist0 = dist(a, b); s0 = scale; }
+    });
+    stage.addEventListener('pointermove', (e) => {
+      const pts = stage._pts; if (!pts?.has(e.pointerId)) return;
+      pts.set(e.pointerId, e);
+      if (pts.size === 2) {
+        const [a, b] = pts.values(), d = dist(a, b);
+        if (dist0 > 0) { scale = Math.min(4, Math.max(1, s0 * (d / dist0))); if (scale === 1) ox = oy = 0; apply(); }
+        moving = true; return;
+      }
+      if (x0 === undefined) return;
+      const dx = e.clientX - x0, dy = e.clientY - y0;
+      if (!moving && Math.hypot(dx, dy) > 8) moving = true;
+      if (!moving) return;
+      if (scale > 1) { ox = sx + dx; oy = sy + dy; apply(); }
+      else if (Math.abs(dy) > Math.abs(dx) && dy > 0) { stage.style.transform = `translateY(${dy}px)`; stage.style.opacity = String(Math.max(0.35, 1 - dy / 320)); }
+    });
+    const end = (e) => {
+      const pts = stage._pts; if (!pts?.has(e.pointerId)) return;
+      pts.delete(e.pointerId);
+      if (pts.size) return;
+      stage.classList.remove('dragging');
+      const dx = e.clientX - (x0 ?? e.clientX), dy = e.clientY - (y0 ?? e.clientY), dt = Date.now() - (t0 ?? 0);
+      stage.style.transform = ''; stage.style.opacity = '';
+      if (!moving && dt < 280 && Math.hypot(dx, dy) < 10) {
+        const now = Date.now();
+        if (now - lastTap < 320 && !items[at].video) {
+          if (scale > 1) resetZoom(); else { scale = 2.5; ox = oy = 0; apply(); }
+          lastTap = 0;
+        } else lastTap = now;
+      } else if (scale <= 1 && moving) {
+        if (dy > 100 && Math.abs(dy) > Math.abs(dx) * 1.2) shut();
+        else if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.2) go(at + (dx < 0 ? 1 : -1));
+      }
+      x0 = y0 = undefined; moving = false;
+    };
+    stage.addEventListener('pointerup', end); stage.addEventListener('pointercancel', end);
+    stage.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey && Math.abs(e.deltaY) < 40) return;
+      e.preventDefault();
+      const next = Math.min(4, Math.max(1, scale * (e.deltaY < 0 ? 1.12 : 0.9)));
+      if (next === 1) resetZoom(); else { scale = next; apply(); }
+    }, { passive: false });
+    document.body.append(dialog); dialog.showModal(); paint();
+  }
   function captures(d, cls) {
-    const files = filesOf(d);
+    const files = filesOf(d), items = mediaItemsOf(d);
     if (!files.length) return '';
     return el('div', { class: cls }, ...files.map(([path, video, light], i) => {
       const url = src(path);
       const name = d.type === 'explainer' ? `Explainer video, ${d.title}` : `${d.type === 'evidence' ? `Update ${d.number}` : 'Proof'}, capture ${i + 1} of ${files.length}`;
-      const node = video ? el('video', { src: url, controls: '', playsinline: '', preload: 'metadata', 'aria-label': name })
-        : el('a', { href: pageHref(d) || url, ...(!pageHref(d) && { target: '_blank', rel: 'noopener' }), 'aria-label': `Open ${name}` }, shot(light, name));
+      let node;
+      if (video) {
+        node = el('video', { src: url, controls: '', playsinline: '', preload: 'metadata', 'aria-label': name });
+        node.addEventListener('click', (e) => { if (e.target === node) { e.preventDefault(); openMediaViewer(items, i, node); } });
+      } else {
+        // Keep the pinned link targets (phone: live board hash; desk: raw /api/media in a new tab) and open the shared viewer on tap.
+        const live = pageHref(d);
+        node = el('a', { href: live || url, class: 'media-open', ...(!live && { target: '_blank', rel: 'noopener' }), 'aria-label': `Open ${name}` }, shot(light, name));
+        node.onclick = (e) => { e.preventDefault(); openMediaViewer(items, i, node); };
+      }
       (node.tagName === 'A' ? node.querySelector('img') : node).onerror = () => node.replaceWith(el('p', { class: 'gone' }, `${name} can't be shown: the file is missing, changed since it was posted, or in a format this browser can't play.`));
       return d.captions?.[i] ? el('figure', { class: 'cap' }, node, el('figcaption', { dir: 'auto' }, d.captions[i])) : node;
     }));
@@ -2558,8 +2702,16 @@
     const status = () => el('span', { class: 'pst' }, result ? el('span', { class: `res ${result[0]}` }, result[2]) : '', of.filed ? `${result ? ' · checked ' : 'Filed '}${when(of.filed)}` : '');
     const row = el('button', { class: 'proof-row', 'aria-label': `View proof, ${name}` }, el('span', { class: 'pthumb' }, img), el('span', { class: 'pt' }, el('b', { dir: 'auto' }, name), status()), glyph('right'));
     img.onerror = () => row.parentElement?.remove();
-    row.onclick = () => openSheet(name, status(), el('a', { class: 'sheet-shot', href: update ? `#evidence/${of.key}` : pageHref(of) || src(url), ...(!update && !pageHref(of) && { target: '_blank', rel: 'noopener' }),
-      'aria-label': `Open the proof, ${name}` }, framed(el('img', { src: src(url), alt: name }))));
+    row.onclick = () => {
+      const items = mediaItemsOf(of);
+      if (items.length) {
+        const shotBtn = el('button', { class: 'sheet-shot', type: 'button', 'aria-label': `Open the proof, ${name}` }, framed(el('img', { src: src(url), alt: name })));
+        shotBtn.onclick = (e) => { e.stopPropagation(); openMediaViewer(items, 0, shotBtn); };
+        openSheet(name, status(), shotBtn);
+        return;
+      }
+      openSheet(name, status(), el('button', { class: 'sheet-shot', type: 'button', 'aria-label': `Open the proof, ${name}` }, framed(el('img', { src: src(url), alt: name }))));
+    };
     return el('div', { class: 'proof-block' }, el('p', { class: 'ui-dl' }, 'Proof'), row);
   }
   /** The ticket a card names, when it is on the board: tickets stand alone, so a card without one, or naming one the board has not got, shows nothing. */
@@ -2723,9 +2875,14 @@
   }
   /** A proof opened in its row: its captures in a strip that snaps one to a swipe (each its own shape, as tall as the strip), what it says in full, its panel and Open proof. */
   function evOpened(d) {
-    const stills = evStills(d), said = plain((d.about ?? '').replace(HELD, '').replace(UNCONFIRMED, '')), name = plain(headline(d));
+    const stills = evStills(d), said = plain((d.about ?? '').replace(HELD, '').replace(UNCONFIRMED, '')), name = plain(headline(d)), items = mediaItemsOf(d).filter((m) => !m.video);
     const strip = stills.length ? el('div', { class: 'ev-strip', role: 'group', 'aria-label': `${plural(stills.length, 'capture')}, swipe for the next` },
-      ...stills.map(([path, , light], i) => el('a', { href: src(path), target: '_blank', rel: 'noopener', 'aria-label': `Open capture ${i + 1} of ${stills.length} full size` }, el('img', { src: src(light), alt: '', loading: 'lazy', decoding: 'async' }))))
+      ...stills.map(([path, , light], i) => {
+        // Keep the pinned raw-file link target; a tap opens the shared viewer instead of navigating away.
+        const a = el('a', { href: src(path), target: '_blank', rel: 'noopener', class: 'media-open', 'aria-label': `Open capture ${i + 1} of ${stills.length} full size` }, el('img', { src: src(light), alt: '', loading: 'lazy', decoding: 'async' }));
+        a.onclick = (e) => { e.preventDefault(); e.stopPropagation(); openMediaViewer(items, i, a); };
+        return a;
+      }))
       : el('div', { class: 'ev-hero none' }, evGlyph('image'), (d.status ? 'Frame pending' : 'Text only: no capture was filed'));
     const dots = stills.length > 1 ? el('div', { class: 'ev-dots-n', 'aria-hidden': 'true' }, ...stills.map((_, i) => el('i', { class: i ? '' : 'on' }))) : '';
     if (dots) strip.onscroll = () => { const kids = [...strip.children], at = kids.reduce((b, k, i) => (Math.abs(k.offsetLeft - strip.scrollLeft) < Math.abs(kids[b].offsetLeft - strip.scrollLeft) ? i : b), 0); [...dots.children].forEach((x, i) => x.classList.toggle('on', i === at)); };
@@ -4570,18 +4727,45 @@
     const pinAll = sections.flatMap((s) => s.pins ?? []);
     const kitUrl = (s, file, light) => src(`${mockUrl(d.key, `gallery.${glAll.length + pinAll.indexOf(s.pins.find((p) => p.src === file))}`, file)}${light ? '?v=light' : ''}`);
     const KT_STATUS = { fixed: 'Fixed', progress: 'In progress', waiting: 'Waiting on you' };
+    // Every image and video in this report, in reading order, so the shared viewer can swipe through the whole set.
+    const reportMedia = [];
+    for (const s of sections) {
+      for (const o of s.gallery ?? []) for (const f of o.frames) reportMedia.push({ url: glUrl(f), caption: f.caption || '', source: o.label || s.heading || d.title || '' });
+      for (const b of s.blocks ?? []) {
+        if (b.type === 'image') reportMedia.push({ url: kitUrl(s, b.full || b.src), caption: b.caption || '', source: s.heading || d.title || '' });
+        else if (b.type === 'video') reportMedia.push({ url: kitUrl(s, b.src), video: true, caption: b.caption || '', source: s.heading || d.title || '' });
+        else if (b.type === 'beats') for (const x of b.beats) if (x.image) reportMedia.push({ url: kitUrl(s, x.image), caption: x.title || '', source: s.heading || d.title || '' });
+        else if (b.type === 'compare') {
+          reportMedia.push({ url: kitUrl(s, b.before.image), caption: b.before.caption || '', source: 'Before' });
+          reportMedia.push({ url: kitUrl(s, b.after.image), caption: b.after.caption || '', source: 'After' });
+        } else if (b.type === 'evidence') for (const r of b.rows) if (r.image) reportMedia.push({ url: kitUrl(s, r.image), caption: r.title || '', source: s.heading || d.title || '' });
+      }
+    }
+    const openReportMedia = (url, from) => {
+      const i = reportMedia.findIndex((m) => m.url === url || m.url.split('?')[0] === url.split('?')[0]);
+      openMediaViewer(reportMedia, i < 0 ? 0 : i, from);
+    };
+    const mediaBtn = (preview, full, alt, cls = 'media-open') => {
+      const b = el('button', { type: 'button', class: cls, 'aria-label': `Open ${alt || 'image'}` }, el('img', { src: preview, alt: alt || '', loading: 'lazy', decoding: 'async' }));
+      b.onclick = () => openReportMedia(full, b);
+      return b;
+    };
     function beatsFig(s, b) {
       const n = b.beats.length, img = el('img', { alt: '', decoding: 'async' }), count = E('p', 'count'), title = el('h3'), words = E('p', ''), segs = el('div', { class: 'kb-segs', role: 'group' });
+      const open = el('button', { type: 'button', class: 'media-open', 'aria-label': 'Open beat image' }, img);
+      open.onclick = () => { const x = b.beats[at]; if (x?.image) openReportMedia(kitUrl(s, x.image), open); };
       const dots = b.beats.map((x, i) => { const t = el('button', { type: 'button', 'aria-label': `Beat ${i + 1} of ${n}: ${x.title}` }); t.onclick = () => show(i); return t; });
       segs.append(...dots);
       const back = el('button', { class: 'kb-btn', type: 'button' }, 'Back'), next = el('button', { class: 'kb-btn go', type: 'button' });
-      const stage = E('div', 'kb-stage', img, E('div', 'kb-words', count, title, words));
+      const stage = E('div', 'kb-stage', open, E('div', 'kb-words', count, title, words));
       let at = 0;
       function show(i) {
         at = i; const x = b.beats[i];
         dots.forEach((t, k) => { t.classList.toggle('on', k <= i); if (k === i) t.setAttribute('aria-current', 'step'); else t.removeAttribute('aria-current'); });
         segs.setAttribute('aria-label', `Beat ${i + 1} of ${n}`);
-        img.hidden = !x.image; stage.classList.toggle('no-image', !x.image); if (x.image) img.src = kitUrl(s, x.image, true); img.alt = x.title;
+        img.hidden = !x.image; open.hidden = !x.image; stage.classList.toggle('no-image', !x.image);
+        if (x.image) img.src = kitUrl(s, x.image, true); img.alt = x.title;
+        open.setAttribute('aria-label', `Open beat image: ${x.title}`);
         count.textContent = `Beat ${i + 1} of ${n}`;
         title.replaceChildren(...(x.time ? [E('span', '', x.time)] : []), document.createTextNode(x.title));
         words.textContent = x.text ?? '';
@@ -4594,7 +4778,12 @@
     function videoFig(s, b) {
       const frame = E('div', 'frame'), play = el('button', { class: 'play', type: 'button', 'aria-label': b.caption ? `Play the film: ${b.caption}` : 'Play the film' }, E('i', '', gic('play')));
       frame.append(el('img', { src: kitUrl(s, b.poster, true), alt: '', loading: 'lazy', decoding: 'async' }), play, ...(b.length ? [E('span', 'len', b.length)] : []));
-      play.onclick = () => { const v = el('video', { src: kitUrl(s, b.src), controls: '', autoplay: '', playsinline: '', poster: kitUrl(s, b.poster, true), 'aria-label': b.caption ?? 'Film' }); frame.replaceChildren(v); v.play?.().catch(() => {}); v.focus(); };
+      // Poster play still starts inline; a second tap on the playing video opens the shared viewer so the film sits in the report's media set.
+      play.onclick = () => {
+        const v = el('video', { src: kitUrl(s, b.src), controls: '', autoplay: '', playsinline: '', poster: kitUrl(s, b.poster, true), 'aria-label': b.caption ?? 'Film' });
+        frame.replaceChildren(v); v.play?.().catch(() => {}); v.focus();
+        v.addEventListener('click', (e) => { if (e.target === v) openReportMedia(kitUrl(s, b.src), v); });
+      };
       return E('figure', 'kt kt-video gd-wide', frame, ...(b.caption ? [E('figcaption', 'kt-cap', b.caption)] : []));
     }
     function blockFig(s, b) {
@@ -4604,8 +4793,8 @@
       if (b.type === 'beats') return beatsFig(s, b);
       if (b.type === 'video') return videoFig(s, b);
       if (b.type === 'image') {
-        const img = el('img', { src: kitUrl(s, b.src, true), alt: b.alt ?? b.caption ?? '', loading: 'lazy', decoding: 'async' });
-        return E('figure', 'kt kt-image', b.full ? el('a', { href: kitUrl(s, b.full), target: '_blank', rel: 'noopener' }, img) : img, ...(b.caption ? [E('figcaption', 'kt-cap', b.caption)] : []));
+        const preview = kitUrl(s, b.src, true), full = kitUrl(s, b.full || b.src);
+        return E('figure', 'kt kt-image', mediaBtn(preview, full, b.alt ?? b.caption ?? ''), ...(b.caption ? [E('figcaption', 'kt-cap', b.caption)] : []));
       }
       if (b.type === 'file') return el('a', { class: 'kt kt-file', href: local(b.src), download: '' }, b.caption);
       if (b.type === 'table') {
@@ -4614,8 +4803,8 @@
         const table = el('table', { class: `kt-table${wide ? ' kt-wide' : ''}` }, el('thead', {}, el('tr', {}, ...b.columns.map((c, i) => cell(c, 'th', i)))), el('tbody', {}, ...b.rows.map((r) => el('tr', {}, ...r.map((c, i) => cell(c, 'td', i))))));
         return el('div', { class: `kt${wide ? ' kt-scroll' : ''}`, ...(wide ? { tabindex: '0', role: 'region', 'aria-label': 'Table' } : {}) }, table);
       }
-      if (b.type === 'compare') return E('div', 'kt kt-compare', ...[['Before', b.before], ['After', b.after]].map(([w, x]) => E('figure', '', el('img', { src: kitUrl(s, x.image, true), alt: `${w}: ${x.caption}`, loading: 'lazy', decoding: 'async' }), E('figcaption', '', E('b', '', w), x.caption))));
-      return el('ul', { class: 'kt kt-evid' }, ...b.rows.map((r) => E('li', '', ...(r.image ? [el('img', { src: kitUrl(s, r.image, true), alt: '', loading: 'lazy', decoding: 'async' })] : []), E('div', '', E('b', '', r.title), ...(r.note ? [E('small', '', r.note)] : [])), E('span', `kt-status ${r.status}`, KT_STATUS[r.status]))));
+      if (b.type === 'compare') return E('div', 'kt kt-compare', ...[['Before', b.before], ['After', b.after]].map(([w, x]) => E('figure', '', mediaBtn(kitUrl(s, x.image, true), kitUrl(s, x.image), `${w}: ${x.caption}`), E('figcaption', '', E('b', '', w), x.caption))));
+      return el('ul', { class: 'kt kt-evid' }, ...b.rows.map((r) => E('li', '', ...(r.image ? [mediaBtn(kitUrl(s, r.image, true), kitUrl(s, r.image), r.title || '')] : []), E('div', '', E('b', '', r.title), ...(r.note ? [E('small', '', r.note)] : [])), E('span', `kt-status ${r.status}`, KT_STATUS[r.status]))));
     }
     function visual(v) {
       let body;

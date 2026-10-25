@@ -51,6 +51,9 @@ journeys:
     command: 'npm run build > /dev/null && for w in 390 1280; do for t in light dark; do KIT_DOCUMENTS=1 node .agents/skills/done-done-verify-sign-off/kit-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t $w || exit 1; done; done'
   kit-document-flow:
     command: 'npm run build > /dev/null && for w in 390 1280; do for t in light dark; do KIT_FLOW=1 node .agents/skills/done-done-verify-sign-off/kit-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t $w || exit 1; done; done'
+  # Shared media viewer for every image and video on proofs, reports and asks: full-screen sheet (never /api/), swipe with N of M, pinch/double-tap zoom, sticky score tables; 360/390/445/1280/1440 light and dark plus a 390 swipe+zoom recording.
+  media-viewer:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/media-viewer-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   # A page report held to the board's look (report init --page): no colour of its own, no card in a card; post refuses a palette or a nested card with the kit as the fix, the plain page opens in the board at 390 and 1280, light and dark.
   page-look:
     command: 'npm run build > /dev/null && for w in 390 1280; do for t in light dark; do node .agents/skills/done-done-verify-sign-off/page-look-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t $w || exit 1; done; done'
