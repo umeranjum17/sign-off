@@ -1090,7 +1090,7 @@ test('a sign-in card: posted on top of what waits with its link and time left, t
   // Decide shows the card in focus: the GitHub sign-in is newest, so the npm one is tapped in the queue first.
   await evaluate('document.querySelector("#item-npm-login").click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/npm-login' && (await card('npm-login')) !== null);
-  assert.match(await card('npm-login'), new RegExp(`^Sign in to npm\\|UnlocksPublish npm\\|Expires in1[45]:\\d\\d\\|Whereexample\\.com\\|A ${link.replace(/[.?]/g, '\\$&')} _blank noopener noreferrer $`));
+  assert.match(await card('npm-login'), new RegExp(`^Sign in to npm\\|UnlocksPublish npm\\|Expires\\d\\d:\\d\\d · 1[45]:\\d\\d left\\|Whereexample\\.com\\|A ${link.replace(/[.?]/g, '\\$&')} _blank noopener noreferrer $`));
   assert.match(await evaluate('document.querySelector(".ask-sheet .sh-lab").textContent'), /^Main · \d\d:\d\d$/);
   // A sign-in's More, in its sheet's head, holds Ask me later and Discard (its one button opens the link).
   assert.equal(await evaluate('[...document.querySelectorAll(".sh-head .dl-menu > button")].map((b) => b.textContent).join("|")'), 'Ask me later|Discard');
@@ -1104,17 +1104,16 @@ test('a sign-in card: posted on top of what waits with its link and time left, t
   await evaluate('document.querySelector("#dc-sheet [data-reason=done-elsewhere]").click()');
   await until(async () => (await evaluate('location.hash')) === '#waiting' && !(await queue()).includes('Tmp'));
   assert.equal(await evaluate('document.querySelector("#board .empty")?.textContent'), undefined);
-  // Past its time the link has nothing left to open: its card leaves what waits and Decide on its own, counted nowhere, and the page is not reloaded.
+  // Past its time the link has nothing left to open, and its card stays where it waits, plainly expired, for a new link or a discard.
   await evaluate('location.hash = "#waiting"');
-  await until(async () => !(await queue()).includes('GitHub'));
-  assert.equal(await evaluate('document.getElementById("item-gh-login")'), null);
-  assert.equal(await evaluate('document.querySelectorAll(".decide-list .dl-row[data-group=signin]").length'), 1);
-  // The same key with a new link brings it back on the same card, open again.
+  await until(async () => /Expired/.test(await evaluate('document.getElementById("item-gh-login")?.textContent ?? ""')));
+  assert.equal(await evaluate('document.querySelectorAll(".decide-list .dl-row[data-group=signin]").length'), 2);
+  // The same key with a new link opens the same card again, its link good once more.
   assert.match(signin('gh-login', 'GitHub', 'https://example.com/device?code=one-time-3', '10m').out, /gh-login,new link,GitHub,/);
   await until(async () => (await queue()).includes('GitHub'));
   await evaluate('document.querySelector("#item-gh-login").click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/gh-login'
-    && /^Sign in to GitHub\|UnlocksPublish GitHub\|Expires in(10:00|9:\d\d)\|Whereexample\.com\|A https:\/\/example\.com\/device\?code=one-time-3 _blank noopener noreferrer $/.test(await card('gh-login')));
+    && /^Sign in to GitHub\|UnlocksPublish GitHub\|Expires\d\d:\d\d · (10:00|9:\d\d) left\|Whereexample\.com\|A https:\/\/example\.com\/device\?code=one-time-3 _blank noopener noreferrer $/.test(await card('gh-login')));
   // signin done closes a card: it leaves what waits and shows as done.
   assert.match(run('signin', 'done', file, '--key', 'npm-login').out, /npm-login,done,npm/);
   assert.match(run('signin', 'done', file, '--key', 'npm-login').out, /npm-login,already done,npm/);
@@ -1205,6 +1204,90 @@ test('a sign-in card: posted on top of what waits with its link and time left, t
   await until(async () => (await longEval('document.querySelector(".facts .cp").getAttribute("aria-label")')) === 'Copy Where');
   await longView.close();
   close();
+  proc.kill();
+});
+
+test('a sign-in card carries the poster\'s expiry as a live countdown in the person\'s own time, says plainly when the link has expired, reads Opened, waiting for approval once opened, and asks the poster for a new link', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'signin-expiry'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  const signin = (key, service, url, expires) => run('post', file, '--type', 'signin', '--key', key, '--service', service, '--link', url, '--unlocks', `Publish ${service}`, '--waits', 'Main', '--expires', expires);
+  assert.equal(signin('npm-login', 'npm', 'https://www.npmjs.com/login?next=/settings', '20m').code, 0);
+  assert.equal(signin('gh-login', 'GitHub', 'https://login.example-publisher.example.com/oauth/authorize?code=one-time-1', '4s').code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'live'), 390, 844);
+  // The end the poster set, in the person's own time, and under an hour the time left counting down.
+  const ends = JSON.parse(await (await fetch(`${url}api/decisions`)).text()).decisions.find((d) => d.key === 'npm-login').expires;
+  assert.ok(Date.parse(ends) > Date.now());
+  const clock = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' }).format(new Date(ends));
+  const ticking = new RegExp(`^${clock} · \\d{1,2}:\\d\\d left$`);
+  const sheet = () => evaluate(`(() => { const c = document.querySelector('.ask-sheet .signin-ask'); if (!c) return null;
+    return { facts: [...c.querySelectorAll('.fact')].map((f) => [f.querySelector('.fl')?.textContent ?? '', f.querySelector('b')?.textContent ?? '']),
+      bar: [...c.querySelectorAll('.decide-bar > *')].map((e) => e.tagName + ':' + e.textContent.trim()), hint: c.querySelector('.decide-bar .hint')?.textContent ?? '',
+      open: (() => { const o = c.querySelector('.open-link'); return o && [o.tagName, o.disabled, o.getAttribute('href')].join(' '); })() }; })()`);
+  const show = async (key) => {
+    await until(async () => evaluate(`location.hash = "#waiting"`).then(() => evaluate(`document.querySelector("#item-${key}")?.click() ?? true`))
+      .then(() => evaluate(`location.hash === "#decide/${key}" && !!document.querySelector(".ask-sheet .signin-ask")`)));
+    return sheet();
+  };
+  const row = (key) => evaluate(`document.getElementById("item-${key}")?.textContent ?? ""`);
+  const expiryOf = (s) => s.facts.find(([label]) => label === 'Expires')[1];
+  await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+  await until(async () => (await evaluate('!!document.getElementById("item-npm-login")')));
+  // The card carries the end time too, not only the time left.
+  assert.match(await row('npm-login'), new RegExp(`Main · until ${clock} · \\d{1,2}:\\d\\d left`));
+  const npm = await show('npm-login');
+  assert.match(expiryOf(npm), ticking);
+  // It counts down while the page sits there, without a reload.
+  const before = expiryOf(npm);
+  await until(async () => expiryOf(await sheet()) !== before);
+  // Opened, it reads as waiting for approval, on this page and after a reload, and it is not done.
+  await evaluate('document.addEventListener("click", (e) => e.target.closest?.(".open-link") && e.preventDefault(), true)');
+  await evaluate('document.querySelector(".ask-sheet .open-link").click()');
+  await until(async () => /Opened/.test((await sheet()).hint));
+  await evaluate('location.reload()');
+  await until(async () => (await evaluate('!!document.getElementById("item-npm-login")')));
+  const opened = await show('npm-login');
+  assert.match(opened.hint, /^Opened — waiting for approval\./);
+  assert.match(await row('npm-login'), /Main · Opened — waiting for approval/);
+  assert.doesNotMatch(run('answers', file).out, /npm-login,done/);
+  // Past the poster's time the card stays, plainly expired: Open is off, and what it unlocks and where stay readable.
+  await evaluate('location.hash = "#waiting"');
+  await until(async () => /Expired/.test(await row('gh-login')));
+  // The server's own answer, not only the page's clock: the card the board would refuse already says expired.
+  await until(async () => JSON.parse(await (await fetch(`${url}api/decisions`)).text()).decisions.find((d) => d.key === 'gh-login').expired === true);
+  const gone = await show('gh-login');
+  assert.equal(gone.open, 'BUTTON true ');
+  assert.deepEqual(gone.facts.filter(([label, value]) => ['Unlocks', 'Where'].includes(label) && value).map(([label]) => label), ['Unlocks', 'Where']);
+  // The value that cannot wrap stays readable beside its copy button, expired or not.
+  assert.deepEqual(await evaluate('(() => { const b = document.querySelector(".ask-sheet .facts .cp"); return b && [b.getAttribute("aria-label"), Math.round(b.getBoundingClientRect().width)]; })()'), ['Copy Where', 44]);
+  assert.equal(expiryOf(gone), 'Expired');
+  // One action asks the poster for a fresh link, and the poster reads it as a comment with poll or wait.
+  const ask = async (text) => {
+    const poll = spawn('node', [cli, 'poll', file, '--json', '--timeout', '20']);
+    let polled = '';
+    poll.stdout.on('data', (b) => (polled += b));
+    const exited = new Promise((ok) => poll.on('exit', ok));
+    await new Promise((ok) => setTimeout(ok, 300));
+    await until(async () => (await sheet()).bar.some((e) => e === 'BUTTON:Ask for a new link'));
+    await evaluate('[...document.querySelectorAll(".ask-sheet .decide-bar button")].find((b) => b.textContent === "Ask for a new link").click()');
+    assert.equal(await exited, 0);
+    assert.deepEqual(JSON.parse(polled).messages.map(({ kind, text }) => [kind, text]), [['comment', text]]);
+  };
+  await ask('Reissue the GitHub sign-in link: the one on the card has expired.');
+  // Asked, the card says so until its poster posts a new link.
+  await until(async () => (await sheet()).bar.some((e) => e === 'BUTTON:Asked for a new link'));
+  // The same action works while the link still does: a person may need a fresh one before the old one dies.
+  const valid = await show('npm-login');
+  assert.match(valid.open, /^A\s+https:\/\/www\.npmjs\.com\/login/);
+  await ask('Reissue the npm sign-in link: the one on the card expires at ' + clock + '.');
+  // A new link on the same key is a new sign-in: the card waits again, its old open does not count, and it never reads as done.
+  assert.equal(signin('npm-login', 'npm', 'https://www.npmjs.com/login?next=/settings&code=two', '20m').code, 0);
+  await until(async () => !/Opened/.test(await row('npm-login')));
+  assert.doesNotMatch(await row('npm-login'), /Acted/);
+  assert.doesNotMatch(run('answers', file).out, /npm-login,done/);
+  await close();
   proc.kill();
 });
 
@@ -2092,8 +2175,8 @@ test('Decide on a desk: the list beside its ask, J and K move the selection, a n
   await until(async () => (await evaluate('document.querySelector(".split-detail #ask-title")?.textContent')) === 'Sign in to npm');
   assert.equal(await evaluate(`(() => { const p = document.querySelector(".split-detail.decide, .split-detail .decide"), o = p.querySelector(".decide-bar .open-link");
     return [document.querySelector(".split-bar .crumb").textContent, [...p.querySelectorAll(".fact")].map((f) => f.textContent).join(","), o.textContent, o.getAttribute("href"), !!p.querySelector(".row"),
-      /Expires|left/.test(p.textContent), / left$/.test(document.querySelector('.dl-row[data-key="npm"] [data-left]').textContent), !!document.querySelector(".split-bar .dl-more")].join("|"); })()`),
-  'Sign in · Release agent|UnlocksPublishing the release,Whereexample.com|Open sign-in|https://example.com/login|false|false|true|true');
+      /Expires|left/.test(p.textContent), /^until \\d\\d:\\d\\d$/.test(document.querySelector('.dl-row[data-key="npm"] [data-left]').textContent), !!document.querySelector(".split-bar .dl-more")].join("|"); })()`),
+  `Sign in · Release agent|UnlocksPublishing the release,Expires${new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' }).format(new Date(board.items.find((i) => i.key === 'npm').expires))},Whereexample.com|Open sign-in|https://example.com/login|false|true|true|true`);
   // An ask with six answers: they stay pinned in view at the pane's foot, its bar after the last one, never over it.
   await evaluate('location.hash = "#decide/tall"');
   await until(async () => (await evaluate('document.querySelectorAll(".split-detail .pick-option:not(.own-option)").length')) === 6);

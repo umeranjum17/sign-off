@@ -60,7 +60,7 @@ Design output (screens a model made) goes in a `gallery` on the section: `report
   </tr>
 </table>
 
-A plan is what an agent wants to do before it starts. A report is an explanation you asked for. Both open over the board, and the board, not the agent's page, owns the answer buttons. A **sign-in card** goes to the top of Decide with the service, what it unlocks, who is waiting and the time left on the link; the agent closes it with `sign-off-axi signin done`.
+A plan is what an agent wants to do before it starts. A report is an explanation you asked for. Both open over the board, and the board, not the agent's page, owns the answer buttons. A **sign-in card** goes to the top of Decide with the service, what it unlocks, who is waiting and when the link ends, in your own clock, counting the time left down under the hour. Tap **Open** and the link opens in a new tab; the card then reads **Opened — waiting for approval** until the agent closes it with `sign-off-axi signin done`, which is the only thing that does. Once the link's time passes the card stays where it waits and reads **Expired**: Open is off, what it unlocks and where still read beside their copy button, and **Ask for a new link** asks the agent for a fresh one, as does the same button before the old one dies. The request reaches the agent as a comment on that card.
 
 ### It keeps only what matters
 

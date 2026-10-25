@@ -14,7 +14,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendKind, readKinds, appendSendBack, appendTicket, readTickets, rollUp, appendTicketComment, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendKind, readKinds, appendSendBack, appendTicket, readTickets, rollUp, appendTicketComment, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, downloadFiles, galleryFrames, guided, kitWarnings, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -263,7 +263,9 @@ The page must be filled (no FILL: line left), with a viewport tag, dark mode, a 
 Merges, PR outcomes, receipts and status notes are not reports: post proof of a change as evidence.
 A proof is never an ask: a new ask that offers Pass and Fail is refused. sign-off-axi refile <key> --media <file> re-files an old one as evidence.
 --type signin asks the user to sign in, at the top of what waits: the service, one Open button for the http(s) --link, what it unlocks,
-who waits, and the time left until --expires (an ISO date-time, or 90s, 15m, 2h, 1d from now). After that time the card leaves the board on its own.
+who waits, and when --expires ends the link (an ISO date-time, or 90s, 15m, 2h, 1d from now) in the user's own clock, with the time left while it is under an hour.
+Past that time the card stays where it waits, plainly Expired with Open off, until you post a new link: it never reads as done before you close it.
+The user can tap Ask for a new link on a sign-in card, while the link still works too; the request reaches you as a comment on that card, which poll and wait hand over.
 No output prints the link. Post again with the same --key and a new --link or --expires to put a new link on the same card; it waits again.
 When the sign-in is done, run \`sign-off-axi signin done [board.json] --key <key>\`: the card leaves the open list and shows as done.
 For a link that expires fast, give --start, the command that prints a new sign-in link, as a JSON list such as '["npm", "login", "--auth-type=web"]'.
@@ -295,7 +297,8 @@ A design shows under Designs for Main to review, never in the user's Decide or a
 `,
   signin: `usage: sign-off-axi signin done [board.json] --key <key>
 Closes a sign-in card that post --type signin made: the sign-in is done, so the card leaves the open list and shows as done.
-Run it when you see the sign-in worked. A card posted with --start also closes by itself when its command ends with exit 0. wait --key <key> also returns once it is done.
+Run it when you see the sign-in worked: until then the card reads Opened, waiting for approval, never done.
+A card posted with --start also closes by itself when its command ends with exit 0. wait --key <key> also returns once it is done.
 examples:
   sign-off-axi signin done --key npm-login
 `,
@@ -2721,7 +2724,7 @@ const state = () => {
     mockBase: `/mock/${loopback(bind) ? 'local' : mockPass(tokenOf(file))}/`,
     // Who filed an item stays in the file, except as `by`, the name a card's thread says posted it and took its answer: never a bare session id, which names nobody.
     // A sign-in's start command stays on this host too: the page only learns that a tap makes a new link, and how the last run went.
-    decisions: items.filter((d) => !fakeEvidence(d)).map(({ filer, start, ...d }) => ({ ...d, ...(d.kind === 'report' && kinds.has(d.key) && { purpose: d.purpose ?? kinds.get(d.key)!.purpose, project: d.project ?? kinds.get(d.key)!.project, kind_by: kinds.get(d.key)!.by }), ...(filer && !SESSION_ID.test(filer) && { by: filer }), ...(plainAsk(d) && guardOf(d) && { guard: guardOf(d) }), ...(d.type === 'design' && answers[d.key]?.answer === 'approve' && { status: 'approved' }), ...(d.type === 'design' && designState(d, answers[d.key], lines)), ...(start && { start: true, run: signinState(d.key) }), evidenceCard: d.evidence ? evidenceCard(d.evidence) : null,
+    decisions: items.filter((d) => !fakeEvidence(d)).map(({ filer, start, ...d }) => ({ ...d, ...(d.kind === 'report' && kinds.has(d.key) && { purpose: d.purpose ?? kinds.get(d.key)!.purpose, project: d.project ?? kinds.get(d.key)!.project, kind_by: kinds.get(d.key)!.by }), ...(filer && !SESSION_ID.test(filer) && { by: filer }), ...(plainAsk(d) && guardOf(d) && { guard: guardOf(d) }), ...(d.type === 'design' && answers[d.key]?.answer === 'approve' && { status: 'approved' }), ...(d.type === 'design' && designState(d, answers[d.key], lines)), ...(start && { start: true, run: signinState(d.key) }), ...(lapsed(d) && { expired: true }), evidenceCard: d.evidence ? evidenceCard(d.evidence) : null,
       ...(d.mocks && { mocks: d.mocks.map((m) => ({ ...m, hash: mockHash(m.path) })) }) })),
     readonly: extra.readonly === true,
     answers_only: extra.answers_only === true,
@@ -2732,6 +2735,8 @@ const state = () => {
     seen_at: Object.fromEntries(Object.values(answers).flatMap((a) => { const t = seenAt(file)(a); return t ? [[a.key, t]] : []; })),
     reads: readReads(file),
     opened: readOpened(file),
+    // A sign-in the person opened waits for approval until its poster runs `signin done`; a new link on that key is a new sign-in, so an earlier open does not count.
+    signin_opened: Object.fromEntries(Object.entries(readSigninOpened(file)).filter(([key, at]) => { const d = items.find((x) => x.key === key); return d?.type === 'signin' && !!d.filed && Date.parse(at) >= Date.parse(d.filed); })),
     deeper: readDeeper(file),
     ...((delivery) => ({ delivery, trail: readTrail(file, items, delivery) }))(deliveries(file)),
     rounds,
@@ -2748,16 +2753,19 @@ const state = () => {
 /** The board's state as the bytes a poll reads, built once per change of any file it is made from: a phone asks again every 20 seconds, and an
  * unchanged board costs the stats of its files (a 304 with no body) instead of five megabytes of rebuilding and serialising. Any answer, dismiss,
  * comment, ticket or proof that lands changes a file it was built from, so a read never shows a board older than the files it names. */
-let built: { stamps: Map<string, string>; body: ReturnType<typeof state>; json: Buffer; tag: string; sent: Map<string, { bytes: Buffer; encoding?: string }>; views: Map<string, { json: Buffer; tag: string; sent: Map<string, { bytes: Buffer; encoding?: string }> }> } | undefined;
-/** The state as it is now, rebuilt only when a file it was made from has changed; `tag` names the exact bytes for If-None-Match. */
+let built: { stamps: Map<string, string>; until: number; body: ReturnType<typeof state>; json: Buffer; tag: string; sent: Map<string, { bytes: Buffer; encoding?: string }>; views: Map<string, { json: Buffer; tag: string; sent: Map<string, { bytes: Buffer; encoding?: string }> }> } | undefined;
+/** The state as it is now, rebuilt only when a file it was made from has changed, or when a sign-in's link passes its time (no file changes then,
+ *  and the state's own `expired` must say so at once); `tag` names the exact bytes for If-None-Match. */
 function stateRead() {
-  if (built && [...built.stamps].every(([path, stamp]) => stampOf(path) === stamp)) return built;
+  if (built && Date.now() < built.until && [...built.stamps].every(([path, stamp]) => stampOf(path) === stamp)) return built;
   const before = new Map(stateSources().map((path) => [path, stampOf(path)] as const));
   building = new Map(before);
   let body: ReturnType<typeof state>, stamps: Map<string, string> | undefined;
   try { body = state(); } finally { stamps = building; building = undefined; }
   const json = Buffer.from(JSON.stringify(body!));
-  const made = { stamps: stamps!, body: body!, json, tag: `"${sha256(json).slice(0, 32)}"`, sent: new Map<string, { bytes: Buffer; encoding?: string }>(), views: new Map<string, { json: Buffer; tag: string; sent: Map<string, { bytes: Buffer; encoding?: string }> }>() };
+  // The next moment this body is out of date: the soonest sign-in link that has not passed yet. Until then no file can change it.
+  const until = Math.min(Infinity, ...body!.decisions.flatMap((d) => (d.type === 'signin' && d.expires && !d.expired ? [Date.parse(d.expires)] : [])));
+  const made = { stamps: stamps!, until, body: body!, json, tag: `"${sha256(json).slice(0, 32)}"`, sent: new Map<string, { bytes: Buffer; encoding?: string }>(), views: new Map<string, { json: Buffer; tag: string; sent: Map<string, { bytes: Buffer; encoding?: string }> }>() };
   // The board was written while it was read, so this body is of the older board: it is answered, but the next read builds again.
   built = stateSources().every((path) => stampOf(path) === before.get(path)) ? made : undefined;
   return made;
@@ -3046,12 +3054,12 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     } catch { return [404, { error: 'Attachment is unavailable' }]; }
   }
   if (req.method === 'GET' && req.url === '/api/board') return [200, { file, pid: process.pid }];
-  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/signin', '/api/leash', '/api/deeper', '/api/reads', '/api/trail', '/api/engagement', '/api/engagement/seen'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
+  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/signin', '/api/opened', '/api/leash', '/api/deeper', '/api/reads', '/api/trail', '/api/engagement', '/api/engagement/seen'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
   if (readOnly()) return [403, { error: 'This board is read-only' }];
   // The leash is the person's own setting in config.yaml, which the board applies to the answers it takes, so an answers-only board takes it too.
   // Dismiss only hides an item on this page and sends nothing to the feeding program, a reply opened (/api/trail) is only the person's own mark, and Go deeper and a comment
   // on a part of a guided page go to the page's own author through its wait, so an answers-only board takes them all; a comment on a mock, a round and a prompt are for the feeding program, below.
-  if (!['/api/answers', '/api/dismiss', '/api/signin', '/api/reads', '/api/trail', '/api/deeper', '/api/engagement', '/api/engagement/seen', '/api/annotations', '/api/leash'].includes(req.url!) && answersOnly()) return [403, { error: 'This board takes answers only' }];
+  if (!['/api/answers', '/api/dismiss', '/api/signin', '/api/opened', '/api/reads', '/api/trail', '/api/deeper', '/api/engagement', '/api/engagement/seen', '/api/annotations', '/api/leash'].includes(req.url!) && answersOnly()) return [403, { error: 'This board takes answers only' }];
   if (!req.headers['content-type']?.startsWith('application/json')) return [415, { error: 'Send JSON' }];
   let body = '';
   for await (const chunk of req) body += chunk;
@@ -3107,6 +3115,13 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
       // A run that ended with exit 0 before it printed a link was already signed in: the card is done, with no link to open.
       return board(file).find((x) => x.key === key)?.answer ? [200, { state: state() }] : [502, { error: e.message, state: state() }];
     }
+  }
+  if (req.url === '/api/opened') {
+    // The person opened a sign-in's link: the card reads Opened, waiting for approval, on every device until its poster marks the sign-in done.
+    const { key } = JSON.parse(body) ?? {}, d = board(file).find((x) => x.key === key);
+    if (d?.type !== 'signin') return [404, { error: 'No sign-in on this card' }];
+    appendSigninOpened(file, key);
+    return [200, state()];
   }
   if (req.url === '/api/leash') {
     const { leash } = JSON.parse(body) ?? {};

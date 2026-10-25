@@ -811,6 +811,15 @@ export function readOpened(decisionsPath: string): Record<string, boolean> {
   return last;
 }
 export const appendOpened = (decisionsPath: string, keys: string[], read: boolean) => keys.forEach((key) => appendLine(readsPath(decisionsPath), { key, read, by: 'captain', at: now() }));
+/** A sign-in's link the person opened, and when: the last line for a key wins, in the same file, and a new link on that key is a new sign-in (src/cli.ts state). */
+export function readSigninOpened(decisionsPath: string): Record<string, string> {
+  const last: Record<string, string> = {};
+  readRaw(readsPath(decisionsPath)).split('\n').forEach((line) => {
+    try { const r = line && JSON.parse(line); if (r && typeof r.key === 'string' && typeof r.opened === 'string' && !Number.isNaN(Date.parse(r.opened))) last[r.key] = r.opened; } catch {}
+  });
+  return last;
+}
+export const appendSigninOpened = (decisionsPath: string, key: string) => appendLine(readsPath(decisionsPath), { key, opened: now(), by: 'captain' });
 
 /** Go deeper: the person asks the agent about one part of a guided page; the agent answers in pieces that the board streams into that spot.
  * One line each: an ask (id, key, part, what it is about, an optional question), the agent reading it, a piece of the answer (`more` while it goes on), and its end. */
