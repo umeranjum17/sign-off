@@ -67,6 +67,8 @@ Harness: a browser (chrome-devtools-axi, one CHROME_DEVTOOLS_AXI_SESSION per cap
 
 shots.sh BASE <folder> captures every screen at 390, 820 and 1280, light and dark. An emulated tap can miss; click a button from the page (eval "() => document.querySelector('[aria-label^=\"Pass,\"]').click()") when a tap does not land.
 
+- Published ticket stage (`done-done run ticket-stage`): [Tickets](features/tickets.md#published-stage-and-last-event-068), all five words independent of progress, event-age warnings, legacy no-event and epic roll-up, rows and pages at 390 and 1280, light and dark.
+
 ## Evidence
 
 Capture terminal transcripts, exit codes and side effects (files written, rows inserted). Exercise the real user path, not internal setters; done-done's judge checks every capture in the run folder against the outcome, so save only captures of the resulting state there and keep any of earlier steps outside it; verify side effects alongside what is visible. Evidence goes to the run folder `done-done run` prints. Every drive uses these done-done primitives:
