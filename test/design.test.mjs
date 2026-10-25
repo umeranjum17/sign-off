@@ -157,8 +157,10 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
   const html = await (await fetch(url)).text();
   assert.match(html, /<title>Dashboard/);
-  assert.match(html, /mockCards/);
   assert.match(html, /<nav class="side" id="nav" aria-label="Board areas">/);
+  // The page is a small shell; its script is fetched beside it, and the renderers are in it.
+  const script = await (await fetch(`${url}app.js?v=1`)).text();
+  assert.match(script, /mockCards/);
   const api = await (await fetch(`${url}api/decisions`)).json();
   assert.equal(api.decisions[0].type, 'design');
   assert.equal(api.decisions[0].title, 'Pick the sign-in layout');
@@ -171,7 +173,7 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   assert.match(tour.media[0].path, /^evidence\/\d+\/1\.mp4$/);
   const played = await fetch(`${url}api/media?key=tour&i=0`, { headers: { range: 'bytes=0-3' } });
   assert.deepEqual([played.status, played.headers.get('content-type'), await played.text()], [206, 'video/mp4', '0123']);
-  assert.match(html, /function chapters/);
+  assert.match(script, /function chapters/);
   assert.equal((await post(url, 'api/answers', { key: 'tour', answer: 'unclear', note: 'Umer: step 2 is too fast.' })).status, 200);
   assert.equal(JSON.parse(run('answers', board, '--key', 'tour', '--json').out).tour.answer, 'unclear');
   appendFileSync(join(so, tour.media[0].path), 'x');
@@ -4071,7 +4073,7 @@ test('answer events: a filer takes only its own answers, once, the card shows it
   const took = as({}, 'wait', file, '--filer', 'agent-a', '--json', '--timeout', '5');
   assert.deepEqual([took.code, Object.keys(JSON.parse(took.out))], [0, ['a']]);
   assert.deepEqual((await read()).seen, ['a']);
-  assert.match(await (await fetch(url)).text(), /Seen by agent/);
+  assert.match(await (await fetch(`${url}app.js`)).text(), /Seen by agent/);
   // Taken once: nothing of agent-a is left.
   assert.match(as({}, 'wait', file, '--filer', 'agent-a', '--timeout', '1').out, /nothing posted by agent-a is waiting/);
   // agent-b's wait sleeps through answers to other filers' items and wakes on its own.
@@ -4217,8 +4219,14 @@ test('load budget: a board of 60 updates opens Evidence on a phone with at most 
     r.on('data', (b) => parts.push(b)).on('end', () => ok({ status: r.statusCode, headers: r.headers, bytes: Buffer.concat(parts).length }));
   }).on('error', no));
   const page = await raw('/'), state = await raw('/api/decisions'), plainPage = readFileSync(new URL('../web/index.html', import.meta.url)).length;
+  // The shell is small and goes compressed; the stylesheets and the script it names go compressed beside it.
   assert.equal(page.headers['content-encoding'], 'br');
-  assert.ok(page.bytes < plainPage / 3, `the page goes compressed: ${page.bytes} of ${plainPage} bytes`);
+  assert.ok(page.bytes < plainPage, `the page goes compressed: ${page.bytes} of ${plainPage} bytes`);
+  for (const name of ['tokens.css', 'ui.css', 'app.css', 'app.js']) {
+    const res = await raw(`/${name}`);
+    assert.equal(res.headers['content-encoding'], 'br', name);
+    assert.ok(res.bytes < readFileSync(new URL(`../web/${name}`, import.meta.url)).length, `${name} goes compressed`);
+  }
   assert.equal(state.headers['content-encoding'], 'br');
   // The page's 20-second poll of an unchanged board, and a reload of the page itself, answer 304 with no body.
   assert.deepEqual([(await raw('/api/decisions', { 'if-none-match': state.headers.etag })).status, (await raw('/', { 'if-none-match': page.headers.etag })).status], [304, 304]);
@@ -4635,8 +4643,8 @@ test('the feedback trail: what the person sends on a card goes Sent, Delivered, 
     // The badge is one 20px line at the end of the second line at 360, 390 and 445, whatever the title and the line before it say: the words before it take the ellipsis.
     // The page names its stylesheets by their content, so a phone holding the stylesheet of an older version (kept a day) never draws the badge without its rules.
     const hrefs = [...(await (await fetch(url)).text()).matchAll(/<link rel="stylesheet" href="(\S+\.css)\?v=[0-9a-f]{12}">/g)].map((m) => m[1]);
-    assert.deepEqual(hrefs, ['tokens.css', 'ui.css']);
-    assert.equal(await evaluate('[...document.querySelectorAll("link[rel=stylesheet]")].map((l) => l.getAttribute("href").replace(/[?]v=[0-9a-f]{12}$/, "")).join()'), 'tokens.css,ui.css');
+    assert.deepEqual(hrefs, ['tokens.css', 'ui.css', 'app.css']);
+    assert.equal(await evaluate('[...document.querySelectorAll("link[rel=stylesheet]")].map((l) => l.getAttribute("href").replace(/[?]v=[0-9a-f]{12}$/, "")).join()'), 'tokens.css,ui.css,app.css');
     assert.match((await (await fetch(`${url}ui.css?v=0123456789ab`)).text()), /\.ui-tb \{ display: inline-flex/);
     const wrap = () => evaluate(`JSON.stringify([...document.querySelectorAll(".ui-row")].filter((r) => r.querySelector(".ui-tb")).map((r) => { const b = r.querySelector(".ui-tb"), m = r.querySelector(".meta"), t = r.querySelector(".t");
       const x = b.getBoundingClientRect(), y = m.getBoundingClientRect(), z = r.getBoundingClientRect(); return { word: b.textContent, h: Math.round(x.height), lines: b.getClientRects().length, clear: y.right <= x.left + 0.5, inside: x.right <= z.right + 0.5 && x.bottom <= z.bottom, cut: m.scrollWidth > m.clientWidth, t: t.scrollWidth > t.clientWidth }; }))`);

@@ -1,7 +1,7 @@
 // The board's service worker: the page and its files load with no network, and the last state it read is read back, marked, until the board answers again.
 // Writes and answers are never cached or queued: a send with no network fails on the page as it does now. BUILD is put above this file by src/cli.ts.
 const SHELL = `shell-${BUILD}`, DATA = 'state', STATE = '/api/decisions', SAVED = 'x-sign-off-saved', OFFLINE = 'x-sign-off-offline';
-const FILES = /^\/(?:tokens\.css|ui\.css|pwa\.js|inter\.woff2|icon\.svg|apple-touch-icon\.png|icon-(?:192|512|maskable-512)\.png)$/;
+const FILES = /^\/(?:tokens\.css|ui\.css|app\.css|app\.js|app-more\.js|pwa\.js|inter\.woff2|icon\.svg|apple-touch-icon\.png|icon-(?:192|512|maskable-512)\.png)$/;
 
 self.addEventListener('install', (e) => e.waitUntil((async () => {
   const shell = await caches.open(SHELL), page = await fetch('/', { cache: 'reload' });

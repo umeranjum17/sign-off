@@ -1,9 +1,9 @@
-// The board's markdown renderer for authored text (web/index.html, between BEGIN markdown and END markdown), run on its own.
+// The board's markdown renderer for authored text (web/app.js, between BEGIN markdown and END markdown), run on its own.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const page = readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
+const page = readFileSync(new URL('../web/app.js', import.meta.url), 'utf8');
 const src = /\/\/ BEGIN markdown\n([\s\S]*?)\/\/ END markdown/.exec(page)[1].replace(/^\s*const (?:mdSpan|mdDiv|NOLINK) .*$/gm, '');
 const { mdInline, mdBlock, mdShort } = new Function(`${src}\nreturn { mdInline, mdBlock, mdShort };`)();
 
