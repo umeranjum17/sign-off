@@ -213,6 +213,11 @@ journeys:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/evidence-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "$EVIDENCE_PROTO"'
   today-evidence:
     command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/today-evidence.sh "$DONE_DONE_EVIDENCE_ROOT"'
+  # A sign-in card's expiry, opened state and reissue at 390, light and dark: the poster's own clock with the time left under the hour, the card past its
+  # --expires staying on the board plainly Expired with Open off, Opened — waiting for approval that survives a reload, a real reissue comment the poster
+  # reads with poll, and the poster's signin done taking the card off.
+  signin-expiry:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/signin-expiry-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" light,dark 390'
   # Card priority and project icons, CLI only (screen: none): --priority on posts, project --icon with its refusals, and the state and icon served back.
   priority-icon:
     command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/priority-icon.sh "$DONE_DONE_EVIDENCE_ROOT"'

@@ -138,15 +138,21 @@ works is evidence, and a merge or a status note is neither.
 `post --type signin` asks the person to sign in, for example with the link
 `npm login` prints. The card sits on top of Waiting on you, because someone
 waits on it now: the service, one big **Open** for the link (a new tab),
-what it unlocks, who waits, and the time left until `--expires` (an ISO
-date-time, or `90s`, `15m`, `2h`, `1d` from now), counting down on the open
-page. When the time is past, the card leaves Waiting on you and Decide on
-its own, as it has nothing left to open. Post again with the same `--key` and a new
-`--link` or `--expires` to put a new link on the same card; it waits again,
-also after it was done. The poster runs `signin done --key <key>` once it
-sees the sign-in worked: the card leaves Waiting on you and shows as
-**Signed in** under Answered; the open page picks that up within 20 seconds,
-with no reload. For a card posted with a link, the board runs no check of
+what it unlocks, who waits, and when `--expires` ends the link (an ISO
+date-time, or `90s`, `15m`, `2h`, `1d` from now) in the person's own clock,
+on the card and on the open page, counting the time left down while it is
+under an hour. When that time passes the card stays where it waits and reads
+**Expired**: Open is off, what it unlocks and where still read beside their
+copy button, and the countdown stops. **Ask for a new link** on any sign-in
+card, expired or not, writes a request the poster reads as a comment on that
+card (`wait --key <key>` and `poll` hand it over), and the button reads
+**Asked for a new link** until the poster posts one. Post again with the same
+`--key` and a new `--link` or `--expires` to put a new link on the same card;
+it waits again, also after it was done. Tapping **Open** marks the card
+**Opened — waiting for approval**: opening the link is not the sign-in, so it
+reads that way, never done, until the poster runs `signin done --key <key>`,
+which leaves Waiting on you and shows it as **Signed in** under Answered; the
+open page picks that up within 20 seconds, with no reload. For a card posted with a link, the board runs no check of
 its own. The link must be `http(s)` with no user name or password in it, and
 no output prints it, because it can hold a one-time code. When links expire
 fast (an `npm login --auth-type=web` link lasts about 5 minutes), post

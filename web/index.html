@@ -1747,12 +1747,13 @@
   .decide-bar { position: sticky; z-index: 1; bottom: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0 -1rem; padding: 1.5rem 1rem calc(1.5rem + env(safe-area-inset-bottom));
     background: linear-gradient(to bottom, transparent, var(--tk-card) 1.25rem); }
   .decide-bar > * { white-space: nowrap; }
-  .decide-bar :is(.answer, .open-link, .later-btn) { position: relative; display: inline-flex; flex: 1 1 0; align-items: center; justify-content: center; gap: 0.5rem; min-width: 0; min-height: 3.25rem; padding: 0 1rem;
+  .decide-bar :is(.answer, .open-link, .later-btn, .reissue-btn) { position: relative; display: inline-flex; flex: 1 1 0; align-items: center; justify-content: center; gap: 0.5rem; min-width: 0; min-height: 3.25rem; padding: 0 1rem;
     overflow: hidden; border-radius: 1.625rem; font-size: var(--tk-fs-secondary); font-weight: 500; letter-spacing: 0; text-decoration: none; transition: transform 260ms var(--spring), background-color 160ms linear; }
   .decide-bar :is(.answer, .open-link) { background: var(--tk-ink); color: var(--tk-canvas); box-shadow: none; }
-  .decide-bar .later-btn { background: var(--tk-raised); color: var(--tk-ink); box-shadow: var(--tk-elev-raised); }
-  @media (prefers-color-scheme: dark) { .decide-bar .later-btn { background: var(--tk-on); } }
-  .decide-bar :is(.answer, .open-link, .later-btn):active { transform: scale(0.97); transition-duration: 90ms; }
+  .decide-bar :is(.later-btn, .reissue-btn) { background: var(--tk-raised); color: var(--tk-ink); box-shadow: var(--tk-elev-raised); }
+  @media (prefers-color-scheme: dark) { .decide-bar :is(.later-btn, .reissue-btn) { background: var(--tk-on); } }
+  .decide-bar :is(.answer, .open-link, .later-btn, .reissue-btn):active { transform: scale(0.97); transition-duration: 90ms; }
+  .decide-bar .reissue-btn:disabled { opacity: 0.4; cursor: default; }
   .decide-bar .answer:disabled:not(.done) { background: var(--tk-ink); color: var(--tk-canvas); opacity: 0.35; cursor: default; }
   .decide-bar .hint { flex-basis: 100%; margin: 0.25rem 0 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: 1.125rem; text-align: center; white-space: normal; }
   .open-link .spin { width: 1.25rem; height: 1.25rem; border: 2.2px solid var(--tk-on-ink-press); border-top-color: var(--tk-canvas); border-radius: 50%; animation: spin 700ms linear infinite; }
@@ -1888,7 +1889,7 @@
     .ask2 .decide-bar { position: static; flex-wrap: nowrap; align-items: center; gap: 0.75rem; margin: 0.75rem 0 0; padding: 0; background: none; }
     .ask2 .decide-bar .note-field { flex: 1; min-width: 0; }
     .ask2 .decide-bar .note-box { height: 3rem; margin: 0; padding: 0.875rem 1rem; border-radius: 1.5rem; white-space: nowrap; overflow: hidden; }
-    .ask2 .decide-bar :is(.answer, .later-btn, .open-link) { flex: none; min-height: 3rem; padding: 0 1.5rem; border-radius: 1.5rem; }
+    .ask2 .decide-bar :is(.answer, .later-btn, .open-link, .reissue-btn) { flex: none; min-height: 3rem; padding: 0 1.5rem; border-radius: 1.5rem; }
     .ask2 .decide-bar:not(:has(.note-field)) .answer { flex: 1; }
     .ui-pane > .decide { max-width: none; margin: 0.5rem 0 0; }
     /* The report an ask is about: what it says, its numbers as small tiles two across, and Open report in ink. */
@@ -2401,26 +2402,66 @@
   }
   /** A span of minutes: whole minutes under the hour, hours and the rest over it. */
   const mins = (m) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`);
-  /** The time left on a sign-in link, in whole minutes. */
-  const expiry = (at) => {
-    const m = Math.ceil((Date.parse(at) - Date.now()) / 60_000);
-    return m <= 0 ? 'Link expired. Ask for a new link.' : `Expires in ${mins(m)}`;
+  /** The clock a sign-in's link ends at, in the person's own time, and under an hour the time left counting down: 19:35 · 04:12 left.
+   *  It ends on the same comparison expiredLink uses, so a card never reads expired while its Open still works. */
+  const endsAt = (at) => {
+    const left = Date.parse(at) - Date.now();
+    return left <= 0 ? 'Expired' : `${HHMM.format(new Date(at))}${left < 3600_000 ? ` · ${countdown(at)} left` : ''}`;
   };
-  /** A sign-in: the service, what it unlocks, who waits, the time left and one Open for its link. Its poster closes it with signin done. */
+  /** The same on a card's own line, in words; and short, for a list row beside the poster's name, where a bare time would read as when it was filed. */
+  const validUntil = (at) => (endsAt(at) === 'Expired' ? 'Link expired' : `Link valid until ${endsAt(at)}`);
+  const endsWords = (at) => (endsAt(at) === 'Expired' ? 'Expired' : `until ${endsAt(at)}`);
+  /** A sign-in whose link the board would refuse already: the server says so (state's expired) and the page's own clock agrees, whichever comes first. */
+  const expiredLink = (d) => d.type === 'signin' && (d.expired === true || (!!d.expires && Date.parse(d.expires) <= Date.now()));
+  const findCard = (key) => state.decisions.find((d) => d.key === key);
+  /** A sign-in's row says the one thing that matters about it: that the person opened it and it waits for approval, or when its link ends (and the countdown keeps it live). */
+  const signinRow = (d) => {
+    const opened = !!openedAt(d) && !expiredLink(d), live = !opened && !expiredLink(d) && !!d.expires;
+    return el('span', live ? { 'data-left': d.expires } : {}, opened ? 'Opened — waiting for approval' : d.expires ? endsWords(d.expires) : '');
+  };
+  // The person's own marks, kept here so the page answers the tap at once: the sign-ins they opened, and the ones they asked a new link for on which link.
+  const openedNow = new Set(), reissued = new Map();
+  const openedAt = (d) => (state.signin_opened ?? {})[d.key] ?? (openedNow.has(d.key) ? 'now' : undefined);
+  /** Opening the link is the person's own mark: the card then reads as waiting for approval, on every device, until its poster says the sign-in is done. */
+  const markOpened = (key) => {
+    if (openedNow.has(key) || state.readonly || FROZEN) return;
+    openedNow.add(key); render();
+    postJson('/api/opened', { key }).then(() => render()).catch(() => { openedNow.delete(key); render(); });
+  };
+  /** The one action that asks a sign-in's poster for a fresh link, by the comment its poll or wait reads; it works while the link still does, too.
+   *  Asked, it says so until the poster posts a new link on that key, which is the card's new filed time. */
+  function reissue(d, err) {
+    const asked = reissued.get(d.key) === d.filed && d.filed !== undefined, button = el('button', { class: 'reissue-btn', type: 'button', ...(asked && { disabled: '' }) }, asked ? 'Asked for a new link' : 'Ask for a new link');
+    if (asked || state.readonly || FROZEN) return button;
+    button.onclick = async () => {
+      reissued.set(d.key, d.filed);
+      button.disabled = true;
+      button.textContent = 'Asked for a new link';
+      const text = `Reissue the ${d.title} sign-in link: ${expiredLink(d) ? 'the one on the card has expired' : `the one on the card expires at ${HHMM.format(new Date(d.expires))}`}.`;
+      try { await postJson('/api/messages', { kind: 'comment', key: d.key, text }); render(); } catch (e) {
+        reissued.delete(d.key); render(); shown(err).textContent = `The request did not reach the agent: ${e.message}`;
+      }
+    };
+    return button;
+  }
+  /** A sign-in: the service, what it unlocks, who waits, the time left and one Open for its link (and one ask for a new one). Its poster closes it with signin done. */
   function signin(d, lead, saved, err) {
     const { open, line } = signinOpen(d, saved, err);
     return el('article', { class: 'row signin', id: `item-${d.key}` }, el('div', {}, lead,
-      el('p', { class: 'line', dir: 'auto' }, `Unlocks: ${d.unlocks}`), el('p', { class: 'line', dir: 'auto' }, `Waits: ${d.waits}`), line), open, err);
+      el('p', { class: 'line', dir: 'auto' }, `Unlocks: ${d.unlocks}`), el('p', { class: 'line', dir: 'auto' }, `Waits: ${d.waits}`),
+      saved || !openedAt(d) ? '' : el('p', { class: 'meta' }, 'Opened — waiting for approval'), line), open, saved ? '' : reissue(d, err), err);
   }
   /** A sign-in's one Open and the line under it, for its card and its desk page alike. */
   function signinOpen(d, saved, err) {
     if (d.start) return started(d, saved, err);
-    const gone = !!d.expires && Date.parse(d.expires) <= Date.now();
+    const gone = expiredLink(d);
     const open = saved ? '' : gone ? el('button', { class: 'open-link', disabled: '' }, 'Open')
       : el('a', { class: 'open-link', href: d.link, target: '_blank', rel: 'noopener noreferrer', 'aria-label': `Open the ${d.title} sign-in` }, 'Open');
-    // The time left counts down on the page (data-expires); an expired link is drawn once more, with Open off.
+    // The link opens in its own tab first, so the mark is made after the click, not in its way.
+    if (open && !gone && open.tagName === 'A') open.addEventListener('click', () => setTimeout(() => markOpened(d.key), 0));
+    // The end time counts down on the page (data-expires); a link past its time is drawn once more, with Open off and the countdown stopped.
     const line = saved ? el('p', { class: 'meta' }, `Signed in at ${when(saved.at)}.`) : d.expires
-      ? el('p', { class: gone ? 'expiry gone' : 'expiry', ...(!gone && { 'data-expires': d.expires }) }, expiry(d.expires)) : '';
+      ? el('p', { class: gone ? 'expiry gone' : 'expiry', ...(!gone && { 'data-expires': d.expires }) }, validUntil(d.expires)) : '';
     return { open, line };
   }
   /** What a tap-time sign-in did last, in plain words. */
@@ -2459,15 +2500,16 @@
     if (!FROZEN && state.decisions.some((d) => d.run === 'live' || d.run === 'starting')) refresh();
     for (const p of document.querySelectorAll('[data-expires]')) {
       if (Date.parse(p.dataset.expires) <= Date.now()) return render();
-      p.textContent = expiry(p.dataset.expires);
-    }
-    for (const p of document.querySelectorAll('[data-left]')) {
-      if (Date.parse(p.dataset.left) <= Date.now()) return render();
-      p.textContent = left(p.dataset.left);
+      p.textContent = validUntil(p.dataset.expires);
     }
   }, 5000);
-  // Up next's sign-in counts down every second, as a timer does.
+  // A sign-in's end time counts down each second while its link has under an hour left, and the card redraws as expired once it is past.
   setInterval(() => {
+    for (const p of document.querySelectorAll('[data-ends], [data-left]')) {
+      const at = p.dataset.ends ?? p.dataset.left;
+      if (Date.parse(at) <= Date.now()) return render();
+      p.textContent = p.dataset.ends ? endsAt(at) : endsWords(at);
+    }
     for (const p of document.querySelectorAll('[data-clock]')) {
       if (Date.parse(p.dataset.clock) <= Date.now()) return render();
       p.textContent = clock(p.dataset.clock);
@@ -2475,10 +2517,9 @@
   }, 1000);
   /** The time left on a sign-in's page, as a clock that counts down each second: 11:40, or 1:05:00 over the hour. */
   const countdown = (at) => {
-    const s = Math.max(0, Math.round((Date.parse(at) - Date.now()) / 1000)), two = (n) => String(n).padStart(2, '0');
+    const s = Math.max(0, Math.ceil((Date.parse(at) - Date.now()) / 1000)), two = (n) => String(n).padStart(2, '0');
     return s >= 3600 ? `${Math.floor(s / 3600)}:${two(Math.floor(s / 60) % 60)}:${two(s % 60)}` : `${Math.floor(s / 60)}:${two(s % 60)}`;
   };
-  setInterval(() => document.querySelectorAll('[data-ends]').forEach((p) => (p.textContent = countdown(p.dataset.ends))), 1000);
 
   /** Boxes the person unfolded, kept open across redraws. */
   const unfolded = new Set();
@@ -2752,7 +2793,7 @@
       a && !d.earlier_answer && { at: a.at, text: `${a.replaces ? 'Changed to' : takenOf(a) === 'default' ? 'Taken by default' : takenOf(a) ? `${by} picked` : 'Your answer'}: ${said(a)}`,
         note: takenOf(a) === 'default' ? 'No answer by its deadline' : takenOf(a) ? d.recommend_reason : a.note || a.notes?.map((n) => n.note).filter(Boolean).join(' · ') },
       ...trailOf(d.key).flatMap((t) => [t.delivered && { at: t.delivered, text: `Delivered to ${by}` }, t.read && { at: t.read, text: `${by} read it` },
-        t.reply && !t.reply.acted && { at: t.reply.at, text: `${by} ${t.reply.text ? 'replied' : 'acted on it'}`, note: t.reply.text, link: t.reply.link && [linkName(t.reply.link), t.reply.link] }]),
+        t.reply && (!t.reply.acted || d.type === 'signin') && { at: t.reply.at, text: `${by} ${t.reply.text ? 'replied' : t.reply.acted ? 'posted a new link' : 'acted on it'}`, note: t.reply.text, link: t.reply.link && [linkName(t.reply.link), t.reply.link] }]),
       ...(state.rounds ?? []).filter((r) => r.key === d.key).map((r) => ({ at: r.at, text: 'You asked for a new round', note: r.note })),
       ...trailOf(d.key, 'discard').map((t) => ({ at: t.at, text: `Discarded: ${reasonOf(t.reason)}` })),
       ...(state.comments ?? []).filter((c) => c.key === d.key && c.text).map((c) => ({ at: c.at, text: 'Your comment', note: c.text })),
@@ -2770,7 +2811,8 @@
   const trailOf = (key, kind) => (state.trail ?? []).filter((t) => t.key === key && (kind ? t.kind === kind : t.kind !== 'ticket')).sort(bySecond);
   /** How far a send got: 1 sent, 2 delivered, 3 read, 4 replied (or acted on, when the agent sent a link or posted the card again with no words). */
   const stepOf = (t) => (t.reply ? 4 : t.read ? 3 : t.delivered ? 2 : 1);
-  const stepWord = (t, n) => (n === 0 && t.taken ? (t.taken === 'default' ? 'Taken' : 'Picked') : n === 3 && t.reply && !t.reply.text ? 'Acted' : TRAIL[n]);
+  // A re-posted sign-in is a new link to open, never a card acted on and done: its poster still runs `signin done` when the person signs in.
+  const stepWord = (t, n) => (n === 0 && t.taken ? (t.taken === 'default' ? 'Taken' : 'Picked') : n === 3 && t.reply && !t.reply.text ? (findCard(t.key)?.type === 'signin' ? 'New link' : 'Acted') : TRAIL[n]);
   const stepAt = (t, n) => [t.at, t.delivered, t.read, t.reply?.at][n];
   /** A reply the person has not opened yet: it waits in Today, and its badge is ink. */
   const unseen = (t) => !!t?.reply && !t.seen;
@@ -3320,8 +3362,6 @@
   }
   // A design with only screen notes (answer 'screens') still waits for its design-wide verdict.
   const isAnswered = (d) => Object.hasOwn(state.answers, d.key) && !(d.type === 'design' && state.answers[d.key].answer === 'screens');
-  /** A sign-in whose link has expired has nothing left to open: it leaves the board until its poster posts a new link on the same key. */
-  const lapsed = (d) => d.type === 'signin' && !d.start && !!d.expires && Date.parse(d.expires) <= Date.now() && !isAnswered(d);
   /** A design review a lead posts is Main's to pass first: it lives under Designs, never in Decide, Answered or any count of asks, until Main promotes it (sign-off-axi promote). */
   const promoted = (d) => (state.promoted ?? []).includes(d.key);
   /** Each item lives in one area: a design review Main has not promoted under Designs, then answered items, then the area the item names, then evidence updates (never an ask, whatever their result),
@@ -3429,7 +3469,7 @@
   function cardRow(d) {
     const t = ticketOf(d), what = projectName(d) ?? (area(d) === 'waiting' ? kind(d) : NAMES[d.type] ?? 'Report');
     const link = el('a', { class: 'ui-row', href: hrefOf(d), ...(t && { 'aria-label': `${title(d)}, ticket ${t.title}, ${t.progress}% done` }) }, ...uiRow({ tile: cardTile(d), title: d.type === 'signin' ? `Sign in to ${d.title}` : d.type === 'evidence' ? headline(d) : title(d), priority: d.priority, badge: trailBadge(d.key),
-      meta: [what, d.type === 'signin' && d.expires ? left(d.expires) : d.filed && filedAt(d.filed)].filter(Boolean).join(' · '), progress: progressOf(t?.progress) }));
+      meta: d.type === 'signin' ? el('span', {}, what, d.expires || openedAt(d) ? ' · ' : '', signinRow(d)) : [what, d.filed && filedAt(d.filed)].filter(Boolean).join(' · '), progress: progressOf(t?.progress) }));
     link.onclick = () => (jump = d.key);
     return el('li', {}, link);
   }
@@ -3447,9 +3487,9 @@
     const btn = (cls, words, href) => el(href ? 'a' : 'button', { class: `t-btn ${cls}`, ...(href && { href }) }, el('span', { class: 'lbl' }, words));
     let go, soft = btn('white', 'Other answer', askHref(d));
     if (d.type === 'signin') {
-      go = signinOpen(d, undefined, err).open;
+      go = expiredLink(d) ? reissue(d, err) : signinOpen(d, undefined, err).open;
       go.className = 't-btn ink';
-      go.replaceChildren(el('span', { class: 'lbl' }, 'Open sign-in'));
+      if (!expiredLink(d)) go.replaceChildren(el('span', { class: 'lbl' }, 'Open sign-in'));
       soft = btn('white', 'Details', askHref(d));
     } else if (rec) {
       go = btn('ink', `Answer ${rec.label}`);
@@ -3463,7 +3503,7 @@
     for (const a of [go, soft]) if (a?.tagName === 'A' && a.getAttribute('href')?.startsWith('#')) a.onclick = () => (jump = d.key);
     const fresh = upKey !== undefined && upKey !== d.key;
     upKey = d.key;
-    const when = d.type === 'signin' ? (d.expires ? el('span', { 'data-clock': d.expires }, clock(d.expires)) : '') : d.filed && filedAt(d.filed);
+    const when = d.type === 'signin' ? (d.expires ? el('span', { ...(!expiredLink(d) && { 'data-left': d.expires }) }, endsWords(d.expires)) : '') : d.filed && filedAt(d.filed);
     return el('section', { class: `ui-card ui-hero t-up${fresh ? ' next' : ''}`, 'aria-label': 'Up next' },
       el('div', { class: 'hl' }, el('span', { class: 'lab' }, `Up next · 1 of ${queue.length}`), d.priority ? el('span', { class: `ui-pc ${d.priority.toLowerCase()}` }, d.priority) : ''),
       el('h2', { class: 'q', dir: 'auto' }, d.type === 'signin' ? `Sign in to ${d.title}` : title(d)),
@@ -5455,7 +5495,7 @@
    *  the swipe actions sit under it, and on a desk a hover shows the same two as round buttons. */
   function decideRow(d, i, gone) {
     const g = gone?.group ?? sideOf(d), rec = recOf(d), t = ticketOf(d);
-    const meta = d.type === 'signin' && d.expires ? el('span', {}, `${whoOf(d)} · `, el('span', { 'data-left': d.expires }, left(d.expires))) : `${whoOf(d)}${d.filed ? ` · ${filedAt(d.filed)}` : ''}`;
+    const meta = d.type === 'signin' ? el('span', {}, `${whoOf(d)} · `, signinRow(d)) : `${whoOf(d)}${d.filed ? ` · ${filedAt(d.filed)}` : ''}`;
     const sel = deskSel === d.key && !gone, opens = askHref(d).startsWith('#decide/');
     const face = el('a', { class: 'dl-face ui-row', href: askHref(d), draggable: 'false', ...(!(gone && gone.how === 'later') && { id: `item-${d.key}` }), ...(opens && { 'data-row': '' }), ...(sel && { 'aria-current': 'true' }) },
       ...uiRow({ tile: cardTile(d), title: d.type === 'signin' ? `Sign in to ${d.title}` : title(d), priority: priOf(d), badge: trailBadge(d.key), ...(t?.progress > 0 ? { progress: t.progress } : { meta }) }), selMark(d.key));
@@ -5721,8 +5761,8 @@
   const phone = () => matchMedia('(max-width: 63.999rem)').matches;
   /** Where E (and a swipe left) goes from the ask on screen: the next ask, round to the first after the last. */
   let skipTo = '';
-  /** Asks the person chose to answer in their own words, and sign-ins whose link they opened, kept across redraws. */
-  const own = new Set(), signingIn = new Set();
+  /** Asks the person chose to answer in their own words, kept across redraws. */
+  const own = new Set();
   /** The answered ask whose cards are back for a change. */
   const changing = new Set();
   /** The ask whose sheet is up on a phone ('' for none), so a redraw keeps it in place and only a newly opened one rises. */
@@ -5770,19 +5810,16 @@
   };
   function signinPage(d, desk) {
     const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` }), { open, line } = signinOpen(d, undefined, err);
-    const gone = !!d.expires && Date.parse(d.expires) <= Date.now(), host = /^https?:\/\/(?:www\.)?([^/?#]+)/.exec(d.link ?? '')?.[1];
-    const waits = () => open.replaceChildren(el('span', { class: 'spin', 'aria-hidden': 'true' }), 'Waiting for you to sign in');
-    if (open) {
-      open.textContent = 'Open sign-in';
-      if (desk) open.dataset.kbd = '↵';
-      if (open.tagName === 'A') { if (signingIn.has(d.key)) waits(); open.addEventListener('click', () => { signingIn.add(d.key); waits(); }); }
-    }
-    const hint = d.start || gone ? line : el('p', {}, `Opens ${d.title} in a new tab. This card closes itself once you are in.`);
+    const gone = expiredLink(d), host = /^https?:\/\/(?:www\.)?([^/?#]+)/.exec(d.link ?? '')?.[1], opened = !d.start && !gone && !!openedAt(d);
+    if (open) { open.textContent = 'Open sign-in'; if (desk) open.dataset.kbd = '↵'; }
+    // Opened, the card waits for approval on the poster's side, and it says so; it never reads as done until `signin done`.
+    const hint = d.start || gone ? line
+      : el('p', {}, opened ? 'Opened — waiting for approval. It stays until the agent says the sign-in is done.' : `Opens ${d.title} in a new tab. It stays until the agent says the sign-in is done.`);
     if (hint) hint.classList.add('hint');
     return el('section', { class: 'decide signin-ask g-signin' }, icon('key'), el('div', { class: 'lead' }, el('h2', { id: 'ask-title', tabindex: '-1', dir: 'auto' }, `Sign in to ${d.title}`)), askProps(d),
       d.about ? el('p', { class: 'why', dir: 'auto' }, d.about) : '',
-      el('div', { class: 'facts' }, fact('bolt', 'Unlocks', el('b', { dir: 'auto' }, d.unlocks)), d.expires && !gone && !desk ? fact('clock', 'Expires in', el('b', { 'data-ends': d.expires }, countdown(d.expires))) : '',
-        host ? fact('lock', 'Where', el('b', {}, host)) : ''), thread(d), err, el('div', { class: 'decide-bar' }, open, hint));
+      el('div', { class: 'facts' }, fact('bolt', 'Unlocks', el('b', { dir: 'auto' }, d.unlocks)), d.expires ? fact('clock', 'Expires', el('b', { ...(!gone && { 'data-ends': d.expires }) }, endsAt(d.expires))) : '',
+        host ? fact('lock', 'Where', el('b', {}, host)) : ''), thread(d), err, el('div', { class: 'decide-bar' }, open, d.start ? '' : reissue(d, err), hint));
   }
   /** An ask, as the approved prototype lays it out: its kind, who asked and when over the question (on a desk that line is the bar's), why, the proof it rests on, the answers as cards
    *  ending in Your own answer, one optional note, what happens if you stay quiet, and one button. Nothing is picked until the person picks: Recommended is only a tag, and the button
@@ -6138,7 +6175,7 @@
     const gone = new Set(state.dismissed ?? []), open = state.decisions.filter((d) => !gone.has(d.key) && !isAnswered(d));
     const openKeys = new Set(open.map((d) => d.key));
     const merged = new Set(open.flatMap((d) => d.merges ?? []).filter((k) => openKeys.has(k)));
-    for (const d of [...state.decisions].reverse()) if (!gone.has(d.key) && !merged.has(d.key) && !lapsed(d)) by[area(d)].push(d);
+    for (const d of [...state.decisions].reverse()) if (!gone.has(d.key) && !merged.has(d.key)) by[area(d)].push(d);
     // Evidence keeps every proof that is not dismissed, answered or not, newest first, however old: a passed check, a capture with no run to check (it says Not run) or one that could not be checked.
     // A failed run or one that did not finish is no proof, so it is left off; its own screen still opens, and a verdict moves it to Answered.
     // Today's Proof tile counts the same list, and says how many runs failed.

@@ -201,9 +201,9 @@ A plan, and a report that explains a design or an architecture, needs at least o
 
 When your work needs the user to sign in (for example a login link from `npm login`), post one sign-in card. It goes to the top of what waits.
 
-1. Post it: `npx -y sign-off-axi post --type signin --key <key> --service "<service>" --link <sign-in URL> --unlocks "<what it unlocks>" --waits "<who waits>" --expires 15m`. `--expires` is when the link stops working: an ISO date-time, or a time from now such as 15m. Post only an http(s) link, never a password or a token.
-2. When you see the sign-in worked, close the card: `npx -y sign-off-axi signin done --key <key>`. `wait --key <key>` returns once it is done.
-3. When the link expires, the card says so. Get a new link and post again with the same `--key`: the card shows the new link and waits again.
+1. Post it: `npx -y sign-off-axi post --type signin --key <key> --service "<service>" --link <sign-in URL> --unlocks "<what it unlocks>" --waits "<who waits>" --expires 15m`. `--expires` is when the link stops working: an ISO date-time, or a time from now such as 15m. The card shows that end time in the user's own clock, counts the time left down while it is under an hour, and stops opening the link once it passes. Post only an http(s) link, never a password or a token.
+2. When you see the sign-in worked, close the card: `npx -y sign-off-axi signin done --key <key>`. `wait --key <key>` returns once it is done. Until then the card reads Opened, waiting for approval: opening the link never closes it.
+3. Get a new link before or after the old one dies and post again with the same `--key`: the card shows the new link and waits again. The user asks for one with **Ask for a new link** on the card, which reaches you as a comment on that card: `wait` or `poll` hands it over.
 4. When links expire fast (an `npm login --auth-type=web` link lasts about 5 minutes), post `--start '["npm", "login", "--auth-type=web"]'` in place of `--link` and `--expires`: each tap on Open runs that command on the board's computer and opens the new link it prints. When the command ends with exit 0, the card closes by itself.
 
 ## Design decisions: show A/B/C mocks, not words
