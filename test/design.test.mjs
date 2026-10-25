@@ -1159,6 +1159,51 @@ test('a sign-in card: posted on top of what waits with its link and time left, t
   await evaluate('location.hash = "#waiting"');
   await until(async () => /fresh,done,/.test(run('answers', file).out) && !(await queue()).includes('fresh'));
   assert.equal(await evaluate('window.stillHere'), true);
+  // A long sign-in link and a long Unlocks value: the label keeps its own word, the value takes the free width and wraps inside it, and nothing runs past the
+  // sheet's right edge. A value that cannot wrap cleanly (the link's host) keeps one line with an ellipsis beside a 44px copy button that hands over all of it.
+  const longLink = 'https://login.byokit-publisher.example.com/oauth/authorize?client_id=sign-off-axi&state=4f9c2a7e1b&code_challenge=Zx9Qm2Lp7Rt4Wv1Ny6Kc3Hb8Jd5Fg0Sa2De4Ui7Ol9Pq&code_challenge_method=S256';
+  const longUnlocks = "npm 2FA approval for the 7 BYOKit packages (tick 'skip 2FA for 5 minutes' if offered)";
+  assert.deepEqual([longLink.length, longUnlocks.length], [185, 85]);
+  assert.equal(run('post', file, '--type', 'signin', '--key', 'long-link', '--service', 'npm', '--link', longLink, '--unlocks', longUnlocks, '--waits', 'Main', '--expires', '15m').code, 0);
+  // On a phone-sized screen of its own, so the sheet's copy button sits where a thumb reaches it.
+  const longView = await browse(join(dir, 'long'), 390, 844);
+  const longEval = longView.evaluate;
+  await longEval(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+  await until(async () => (await longEval('!!document.getElementById("item-long-link")')));
+  await longEval('document.querySelector("#item-long-link").click()');
+  await until(async () => (await longEval('!!document.querySelector(".ask-sheet .signin-ask .facts .fact")')));
+  // The sheet rises into place: wait for its rows to stop moving before measuring them or tapping one.
+  const boxNow = () => longEval('(() => { const r = document.querySelector(".facts .cp").getBoundingClientRect(); return [Math.round(r.x), Math.round(r.y), Math.round(r.width)].join(); })()');
+  await until(async () => { const was = await boxNow(); await new Promise((ok) => setTimeout(ok, 150)); return was === await boxNow(); });
+  const long = await longEval(`(() => {
+    const lines = (e) => { const r = document.createRange(); r.selectNodeContents(e); return new Set([...r.getClientRects()].filter((b) => b.width > 0.5).map((b) => Math.round(b.top))).size; };
+    const sheet = document.querySelector('.ask-sheet'), right = sheet.getBoundingClientRect().right;
+    const rows = [...sheet.querySelectorAll('.facts .fact')].map((r) => { const label = r.querySelector('.fl'), value = r.querySelector('b'), cp = r.querySelector('.cp');
+      return { label: label.textContent, labelLines: lines(label), labelWidth: Math.round(label.getBoundingClientRect().width),
+        value: value.textContent, valueLines: lines(value), valueRight: Math.round(value.getBoundingClientRect().right), clipped: value.scrollWidth > value.clientWidth + 1,
+        copy: cp ? [Math.round(cp.getBoundingClientRect().width), Math.round(cp.getBoundingClientRect().height), cp.getAttribute('aria-label')] : null }; });
+    return { right: Math.round(right), pageScrollWidth: document.documentElement.scrollWidth, past: [...sheet.querySelectorAll('*')].filter((e) => e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().right > right + 1).length, rows }; })()`);
+  // Its right edge is the phone's, and nothing inside the sheet is past it or past the page.
+  assert.deepEqual([long.past, long.pageScrollWidth], [0, 390]);
+  // Every label keeps its word on one line, and the long value wraps inside the room the label leaves it.
+  for (const r of long.rows) assert.deepEqual([r.labelLines, r.labelWidth > 30], [1, true], r.label);
+  const [unlocks, where] = [long.rows.find((r) => r.label === 'Unlocks'), long.rows.find((r) => r.label === 'Where')];
+  assert.deepEqual([unlocks.value, unlocks.valueLines > 1, unlocks.clipped, unlocks.valueRight <= long.right], [longUnlocks, true, false, true]);
+  // The link's host cannot wrap cleanly: one line, an ellipsis, and the whole host behind a 44px copy button.
+  assert.deepEqual([where.value, where.clipped, where.copy], ['login.byokit-publisher.example.com', true, [44, 44, 'Copy Where']]);
+  // Tapped where it is, as a person taps it: a real click at the middle of its 44px box, with the clipboard allowed and the page focused, as a tab in front is.
+  await longView.send('Browser.grantPermissions', { permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'], origin: url.replace(/\/$/, '') });
+  await longView.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+  // What reaches the clipboard, watched through the browser's own write: the whole value, never the ellipsis the row shows.
+  await longEval('window.copied = null; const w = navigator.clipboard.writeText.bind(navigator.clipboard); navigator.clipboard.writeText = (t) => (window.copied = t, w(t))');
+  await longView.click(await longEval('(() => { const r = document.querySelector(".facts .cp").getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()'));
+  await until(async () => (await longEval('document.querySelector(".facts .cp").getAttribute("aria-label")')) === 'Copied');
+  assert.equal(await longEval('window.copied'), 'login.byokit-publisher.example.com');
+  // The board says so too, in its own toast.
+  assert.equal(await longEval('document.getElementById("toast-text").textContent'), 'Copied');
+  // It says Copied for a moment and then returns to its own name.
+  await until(async () => (await longEval('document.querySelector(".facts .cp").getAttribute("aria-label")')) === 'Copy Where');
+  await longView.close();
   close();
   proc.kill();
 });
