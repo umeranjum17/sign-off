@@ -1878,6 +1878,7 @@
     .ui-pane .vl small { color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); line-height: 1rem; }
     .ui-pane .vb { height: 0.5rem; overflow: hidden; border-radius: 0.25rem; background: var(--tk-track); } .ui-pane .vb i { display: block; height: 100%; border-radius: 0.25rem; background: var(--tk-fill); }
     .tk-stuck { color: var(--tk-warn); white-space: nowrap; font-size: 11px; }
+    .tk-status { display: inline-flex; align-items: center; gap: 6px; }
     .tk-stage { flex-shrink: 0; }
     .ui-pane .vb i.bad { background: var(--tk-critical); } .ui-pane .vb i.warn { background: var(--tk-warning); }
     .ui-pane .vn { color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); line-height: 1.125rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -3396,7 +3397,7 @@
   function tkRow(t) {
     const kids = tkUnder(t), done = kids.filter((x) => tkStateOf(x) === 'done').length, s = tkStateOf(t);
     const link = el('a', { class: 'ui-row tk-row', href: `#ticket/${t.id}`, ...(t.id === tkShown && { 'aria-current': 'true' }), 'aria-label': `${t.title}, ${TK_WORDS[s].toLowerCase()}${t.progress ? `, ${t.progress}% done` : ''}` },
-      ...uiRow({ tile: tkTile(t), title: t.title, priority: t.priority, progress: t.stage && !kids.length ? t.progress : progressOf(t.progress), lead: tkStatus(t),
+      ...uiRow({ tile: tkTile(t), title: t.title, priority: t.priority, progress: t.stage && !kids.length ? t.progress : progressOf(t.progress), lead: el('span', { class: 'tk-status' }, ...tkStatus(t)),
         meta: [TK_WORDS[s], kids.length ? `${done} of ${plural(kids.length, tkKids(kids[0]))} done` : tkWhen(t.at)].join(' · ') }));
     if (t.release) link.querySelector('.l1').append(el('span', { class: 'ui-pc tk-release', title: t.release }, t.release));
     return el('li', {}, link);

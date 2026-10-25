@@ -27,8 +27,9 @@ try {
     browser('open', `${base}#tickets`);
     browser('resize', String(width), width === 390 ? '844' : '800');
     browser('eval', `() => { localStorage.setItem('so-theme', '${theme}'); location.reload(); }`);
-    browser('wait', titles[0]);
+    browser('wait', 'Tickets');
     browser('eval', `() => { for (const b of document.querySelectorAll('.tk-card button')) if (b.textContent.includes('See all')) b.click(); }`);
+    browser('wait', titles[0]);
     const facts = evaluate(`() => ({ stages: [...document.querySelectorAll('.tk-row .tk-stage')].map(e => e.textContent), stuck: [...document.querySelectorAll('.tk-row .tk-stuck')].map(e => e.textContent), overflow: document.documentElement.scrollWidth > innerWidth, monograms: document.querySelectorAll('.mono').length, scroll_containers: [...document.querySelectorAll('body *')].filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight).length })`);
     assert.deepEqual([...facts.stages].sort(), [...stages].sort());
     assert.deepEqual(facts.stuck.sort(), ['stuck 2d', 'stuck 7h']);
