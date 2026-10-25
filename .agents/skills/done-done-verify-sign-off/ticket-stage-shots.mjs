@@ -1,12 +1,12 @@
 // CLI-authored sync facts, read through the state API and the real Tickets UI.
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import assert from 'node:assert/strict';
 const out = resolve(process.argv[2]);
 mkdirSync(out, { recursive: true });
 const dir = mkdtempSync('/tmp/so-stage-'), board = join(dir, 'board.json');
-const env = { ...process.env, HOME: dir, XDG_CONFIG_HOME: dir, XDG_DATA_HOME: dir, XDG_STATE_HOME: dir, XDG_CACHE_HOME: dir };
+const env = { ...process.env, PATH: `${dirname(process.execPath)}:${process.env.PATH}`, HOME: dir, XDG_CONFIG_HOME: dir, XDG_DATA_HOME: dir, XDG_STATE_HOME: dir, XDG_CACHE_HOME: dir };
 const browserEnv = { ...process.env, CHROME_DEVTOOLS_AXI_SESSION: `stage-${process.pid}` };
 const cli = (...a) => execFileSync(process.execPath, ['dist/cli.js', ...a], { env, encoding: 'utf8' });
 const browser = (...a) => execFileSync('chrome-devtools-axi', a, { env: browserEnv, encoding: 'utf8', timeout: 60000 });
