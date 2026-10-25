@@ -38,16 +38,16 @@ for (const d of seed.decisions) {
 
 const esc = (v) => JSON.stringify(v).replace(/</g, '\\u003c');
 // The seed and the shim load just before the board's own script, which reads them as it starts.
-const marker = /<script src="app\.js[^"]*" defer><\/script>/;
+const marker = /<script src="app\.js[^"]*" defer data-more="app-more\.js" data-css="app\.css"><\/script>/;
 if (!marker.test(page)) throw new Error('web/index.html changed: demo injection marker not found');
 const built = page.replace(marker, () => [
   `<script>window.SIGN_OFF_DEMO_SEED = ${esc(seed)}; window.SIGN_OFF_DEMO_FILES = ${esc(files)}; window.SIGN_OFF_DEMO_DIGEST = ${esc(digest)};</script>`,
   '<script src="./demo-shim.js"></script>',
-  '<script src="app.js" defer></script>',
+  '<script src="app.js" defer data-more="app-more.js" data-css="app.css"></script>',
 ].join('\n'));
 writeFileSync(join(out, 'index.html'), built);
 copyFileSync(join(demo, 'shim.js'), join(out, 'demo-shim.js'));
-for (const f of ['tokens.css', 'ui.css', 'app.css', 'app.js', 'inter.woff2', 'icon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'manifest.webmanifest']) copyFileSync(join(web, f), join(out, f));
+for (const f of ['tokens.css', 'ui.css', 'app.css', 'app.js', 'app-more.js', 'inter.woff2', 'icon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'manifest.webmanifest']) copyFileSync(join(web, f), join(out, f));
 // The landing page, with the pictures and icons it shows.
 mkdirSync(join(site, 'media'), { recursive: true });
 copyFileSync(join(root, 'site', 'index.html'), join(site, 'index.html'));

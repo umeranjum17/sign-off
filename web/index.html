@@ -10,10 +10,122 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="sign-off">
-<link rel="preload" href="inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="ui.css">
-<link rel="stylesheet" href="app.css">
+<!-- The first screen's rules, measured on Today in Chrome's CSS coverage at 390 and 1280, light and dark. app.css holds every rule and
+     loads right after the first paint, so a screen beyond this one draws with all of them and the phone reads the small sheet first. -->
+<!-- The first page of the board starts with the shell, so it travels beside the script rather than a round trip behind it. -->
+<script>window.__asks = fetch("/api/decisions?view=asks&limit=20");</script>
+<style id="first">
+:root {
+    --page: var(--tk-grouped); --tile: var(--tk-surface); --desk: var(--tk-canvas); --desk-tile: var(--tk-card); --bar: var(--tk-surface-high); --sunk: var(--tk-surface-selected); --line: var(--tk-rail);
+    --text: var(--tk-text); --muted: var(--tk-text-secondary); --border: var(--tk-text-tertiary); --accent: var(--tk-ink); --action: var(--tk-ink); --on-accent: var(--tk-canvas); --danger: var(--tk-critical); --bezel: var(--tk-text);
+    --c-waiting: var(--action); --c-evidence: var(--tk-fill); --c-reports: var(--tk-warn); --c-answered: var(--muted); --c-gate: var(--tk-warn);
+    --ok: var(--c-evidence); --warn: var(--c-reports); --badge: var(--tk-critical); --faint: var(--tk-text-tertiary);
+    --bg: var(--page); --surface: var(--tile); --seg-on: var(--tk-on); --gutter: var(--tk-gutter); }
+:root { --t-xl: 1.75rem; --t-l: 1.25rem; --t-m: var(--tk-fs-title); --t-b: var(--tk-fs-body); --t-s: var(--tk-fs-secondary); --t-xs: var(--tk-fs-footnote); --t-xxs: 0.75rem; --r-ctl: var(--tk-r-ctl); --r-card: var(--tk-r-card); --ctl: 2.75rem; }
+@media (min-width: 64rem) {
+:root { --t-xl: 2rem; --t-l: 1.375rem; }
+}
+:root { --ground: var(--tk-grouped); --card: var(--tk-surface); --side: var(--tk-canvas); --tabbar: var(--tk-card); --tab-on: var(--tk-on); --hairline: var(--tk-line); --fill-2: var(--tk-track);
+    --shadow-card: var(--tk-elev-card); --shot-edge: 0 0 0 1px var(--tk-line), var(--tk-elev-card); }
+@media (prefers-color-scheme: dark) {
+:root { --ground: var(--tk-canvas); --sunk: var(--tk-input); --bezel: var(--tk-rail); }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { margin: 0; padding-bottom: calc(8.75rem + env(safe-area-inset-bottom)); background: var(--bg); color: var(--text); overflow-wrap: anywhere;
+    -webkit-font-smoothing: antialiased; font: var(--t-b)/1.5 var(--tk-font); letter-spacing: -0.011em; }
+main { max-width: 72rem; margin: 0 auto; padding: 0 max(var(--gutter), env(safe-area-inset-right)) 0 max(var(--gutter), env(safe-area-inset-left)); }
+.banner { margin: 1rem 0 0; padding: 0.75rem 1rem; border: 1px solid var(--danger); border-radius: 0.5rem; color: var(--danger); }
+h2 { font-size: 1.375rem; line-height: 1.25; margin: 0 0 0.75rem; }
+.icon { flex: none; display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 0.5rem; background: var(--area, var(--muted)); }
+.icon svg { width: 1.125rem; height: 1.125rem; fill: none; stroke: var(--surface); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.t-up .lab { flex: 1; min-width: 0; }
+.t-up .q { display: -webkit-box; overflow: hidden; margin: 0.25rem 0 0; color: var(--tk-ink); font-size: var(--tk-fs-head); line-height: 1.5rem; font-weight: 500; letter-spacing: -0.014em;
+    -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.t-up .meta { display: flex; align-items: center; gap: 0.5rem; height: 1.25rem; margin: 0.5rem 0 0; overflow: hidden; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: 1.25rem; white-space: nowrap; }
+.t-up .meta > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.t-up .err { margin-top: 0.5rem; }
+.t-btns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0.5rem; margin-top: 1rem; }
+.t-btn { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; height: 2.75rem; padding: 0 1rem; border: 0; border-radius: 1.375rem; font: inherit;
+    font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 500; letter-spacing: -0.006em; text-decoration: none; white-space: nowrap; -webkit-tap-highlight-color: transparent; transition: transform 120ms var(--ease); }
+.t-btn > .lbl { overflow: hidden; text-overflow: ellipsis; }
+.t-btn.ink { background: var(--tk-ink); color: var(--tk-canvas); }
+.t-btn.white { background: var(--tk-raised); color: var(--tk-ink); box-shadow: var(--tk-elev-raised); }
+@media (prefers-color-scheme: dark) {
+.t-btn.white, .t-btn.white:disabled { background: var(--tk-on); }
+}
+.t-up.next > * { animation: lead-in 260ms var(--ease); }
+.t-tiles .si svg { fill: currentColor; stroke: none; }
+.t-tiles .ui-stat { -webkit-tap-highlight-color: transparent; transition: transform 120ms var(--ease); }
+.t-sheet { width: 100%; max-width: 26.875rem; max-height: calc(100dvh - 3rem); margin: auto auto 0; padding: 0; border: 0; border-radius: 1.75rem 1.75rem 0 0; background: var(--tk-card); color: var(--tk-text);
+    box-shadow: var(--tk-elev-sheet); overscroll-behavior: contain; }
+:is(.t-wait, .t-sheet) .ui-row .meta { margin: 0; }
+.ui-top > .ui-rb { min-height: 0; padding: 0; }
+.ui-top > .ui-rb .glyph { width: 1.25rem; height: 1.25rem; stroke-width: 1.6; }
+.t-more-line, .decide-more { display: flex; align-items: center; justify-content: center; gap: 0.25rem; width: 100%; min-height: 2.75rem; margin-top: 1rem; padding: 0 1rem; border: 0; border-radius: 1.375rem;
+    background: none; color: var(--tk-text-tertiary); font: inherit; font-size: var(--tk-fs-meta); line-height: 1.25rem; -webkit-tap-highlight-color: transparent; }
+.t-more-line > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.t-more-line .glyph, .decide-more .glyph { width: 1rem; height: 1rem; }
+#reader { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; background: var(--bg); }
+#reader[hidden] { display: none; }
+h1[tabindex="-1"] { outline: none; }
+.glyph { width: 1.125rem; height: 1.125rem; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+@media (max-width: 63.999rem) {
+body::after { content: ''; position: fixed; z-index: 1; right: 0; bottom: 0; left: 0; height: calc(6.5rem + env(safe-area-inset-bottom)); pointer-events: none;
+    background: linear-gradient(to bottom, transparent, var(--tk-canvas) 1.5rem); }
+main .ui-list { isolation: isolate; }
+}
+.meta { color: var(--muted); font-size: 0.875rem; margin: 0.5rem 0 0; }
+.err:empty { display: none; }
+#toast { position: fixed; z-index: 3; left: 1rem; right: 1rem; bottom: calc(5.375rem + env(safe-area-inset-bottom)); max-width: 30rem; margin: 0 auto;
+    display: flex; align-items: center; gap: 0.875rem; padding: 0.5rem 0.5rem 0.5rem 1.125rem; border-radius: 0.875rem;
+    background: var(--text); color: var(--bg); font-size: 1rem; }
+#toast[hidden] { display: none; }
+button { min-height: var(--ctl); padding: 0 1rem; border: 0; border-radius: var(--r-ctl); cursor: pointer;
+    background: var(--sunk); color: var(--text); font: inherit; font-size: var(--t-s); font-weight: 500; }
+@media (min-width: 45rem) {
+main { padding: 0 2rem; }
+}
+@media (min-width: 64rem) {
+:root { --bg: var(--desk); --surface: var(--desk-tile); }
+body { display: grid; grid-template-columns: 15rem minmax(0, 1fr); padding-bottom: 3rem; }
+#toast { bottom: 1.75rem; }
+main { width: 100%; padding: 0 3rem; }
+body.today main { max-width: 61rem; margin: 0; padding: 0 2.5rem 2.5rem 1rem; }
+.t-cols { display: grid; grid-template-columns: 25rem minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+.t-cols > * > :first-child { margin-top: 1rem; }
+.t-sheet { margin: auto; border-radius: 1.75rem; max-height: calc(100dvh - 6rem); }
+:is(.t-wait, .t-sheet) .ui-row { height: auto; min-height: 4.25rem; padding: 0.75rem 0; }
+:is(.t-wait, .t-sheet) .ui-row .l1 { align-items: flex-start; height: auto; }
+:is(.t-wait, .t-sheet) .ui-row .l1 .t { display: -webkit-box; white-space: normal; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+}
+:root { --ease: cubic-bezier(0.22, 1, 0.36, 1); --spring: var(--ease); --skel: var(--tk-track); --skel-hi: var(--tk-light); }
+main { overflow-x: clip; }
+.ui-icon img.design-thumb { width: 2.5rem; height: 2.5rem; object-position: top; }
+.skel { padding: 1.5rem 0 0; }
+.sk { display: block; border-radius: 0.375rem; background: linear-gradient(90deg, var(--skel) 0%, var(--skel-hi) 50%, var(--skel) 100%); background-size: 200% 100%; animation: shimmer 1.1s linear infinite; }
+.sk-kicker { width: 9rem; height: 0.8125rem; }
+.sk-title { width: 8.5rem; height: 2.125rem; margin: 0.5rem 0; border-radius: 0.5rem; }
+.skel > .sk-line { margin-bottom: 1.75rem; }
+.sk-row { display: flex; align-items: center; gap: 0.875rem; padding: 1rem 0; }
+.sk-ic { flex: none; width: 2rem; height: 2rem; border-radius: 0.5625rem; }
+.sk-lines { display: grid; flex: 1; gap: 0.5rem; }
+.sk-line { height: 0.8125rem; border-radius: 0.4375rem; }
+#sheet { width: 100%; max-width: none; max-height: 92dvh; margin: auto 0 0; padding: 0; border: 0; border-radius: 1.375rem 1.375rem 0 0; background: var(--bg); color: var(--text); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); }
+#toast { overflow: hidden; gap: 0.75rem; min-height: 3.375rem; padding: 0 0.375rem 0 0.875rem; border-radius: 1.125rem; background: var(--tk-ink); color: var(--tk-canvas); font-size: var(--t-s); line-height: 1.25rem;
+    box-shadow: var(--tk-elev-float); animation: toast-in 300ms var(--spring); }
+#keys { width: min(44rem, calc(100vw - 2rem)); max-height: calc(100dvh - 3rem); padding: 0; border: 0; border-radius: 1.25rem; background: var(--tile); color: var(--text);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2), 0 0 0 0.5px var(--line); }
+@media (min-width: 64rem) {
+main .theme { display: none; }
+}
+  /* The first screen paints at once in the phone's own typeface: Inter swaps in when the rest of the styles arrive, so a phone never holds the
+     first screen for a font file. */
+  :root { --tk-font: -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif; }
+</style>
+<!-- app.css holds every other rule and arrives after the first screen has drawn, started by the page's own script: see restStyle in web/app.js. -->
 <meta name="theme-color" content="#E8E4E0" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#131210" media="(prefers-color-scheme: dark)">
 
@@ -28,6 +140,6 @@
 <a class="dock-find" id="dock-find" href="#find" aria-label="Search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></a>
 <div id="reader" role="dialog" aria-modal="true" aria-labelledby="reader-title" hidden></div>
 <div id="toast" role="status" hidden><span class="tk" aria-hidden="true"><svg class="ok" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><svg class="later" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><svg class="undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><svg class="dismiss" viewBox="0 0 24 24"><path d="M3 7h18M5 7l1 13h12l1-13M9 7V4h6v3"/></svg><svg class="error" viewBox="0 0 24 24"><path d="M12 7v6M12 17h.01"/></svg></span><span id="toast-text"></span><button id="undo" hidden>Undo</button><span class="bar" aria-hidden="true"></span></div>
-<script src="app.js" defer></script>
+<script src="app.js" defer data-more="app-more.js" data-css="app.css"></script>
 </body>
 </html>

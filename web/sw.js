@@ -6,10 +6,12 @@ const FILES = /^\/(?:tokens\.css|ui\.css|app\.css|app\.js|app-more\.js|pwa\.js|i
 self.addEventListener('install', (e) => e.waitUntil((async () => {
   const shell = await caches.open(SHELL), page = await fetch('/', { cache: 'reload' });
   if (!page.ok) throw new Error(`The board answered ${page.status}`);
-  // The page names its files, with their content hashes: keep exactly those.
-  const names = [...(await page.clone().text()).matchAll(/(?:href|src)="([^"#]+)"/g)].map((m) => m[1]).filter((n) => FILES.test(`/${n.split('?')[0]}`));
+  // The page names its files, with their content hashes, its late stylesheet and script included: keep exactly those.
+  const names = [...(await page.clone().text()).matchAll(/(?:href|src|data-more|data-css)="([^"#]+)"/g)].map((m) => m[1]).filter((n) => FILES.test(`/${n.split('?')[0]}`));
   await shell.put('/', page);
-  await shell.addAll(names.map((n) => new Request(n, { cache: 'reload' })));
+  // One copy of each: the page names its stylesheet twice (once for the first screen, once inside its noscript line), and addAll refuses a repeat. The
+  // typeface is kept too, though the page names it only once the rest of the styles arrive and a phone offline would otherwise fall back.
+  await shell.addAll([...new Set([...names, 'inter.woff2'])].map((n) => new Request(n, { cache: 'reload' })));
   await self.skipWaiting();
 })()));
 

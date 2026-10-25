@@ -4276,6 +4276,58 @@ test('load budget: a board of 60 updates opens Evidence on a phone with at most 
   proc.kill();
 });
 
+test('the first screen arrives as a small shell beside its own styles and script, and the rest of both only after it has painted', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  // Two asks: the first screen needs the shell, its two base sheets, the state and the small sheet inside the page, and none of the code or rules the
+  // screens beyond Today draw with.
+  const dir = join(scratch, 'shell'), file = join(dir, 'board.json'), at = new Date().toISOString();
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [1, 2].map((n) => ({ key: `ask-${n}`, type: 'decision', number: n, title: `Ship the sign-in change ${n}?`,
+    filed: at, options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }] })) }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const raw = (path, headers = {}) => new Promise((ok, no) => get(`${url}${path.slice(1)}`, { agent: false, headers: { 'accept-encoding': 'gzip, deflate, br', ...headers } }, (r) => {
+    const parts = [];
+    r.on('data', (b) => parts.push(b)).on('end', () => ok({ status: r.statusCode, headers: r.headers, bytes: Buffer.concat(parts).length, body: Buffer.concat(parts).toString() }));
+  }).on('error', no));
+  const page = await raw('/'), shell = await (await fetch(url)).text();
+  // The shell is a shell: it goes compressed, it is far under 16 KB, and it carries none of the app's code.
+  assert.equal(page.headers['content-encoding'], 'br');
+  assert.ok(page.bytes < 16 * 1024, `the shell is small: ${page.bytes} bytes`);
+  assert.match(shell, /<style id="first">/);
+  assert.doesNotMatch(shell, /function render\(|function el\(/, 'the shell carries no app code');
+  assert.match(shell, /data-css="app\.css\?v=[0-9a-f]{12}"/);
+  assert.match(shell, /data-more="app-more\.js\?v=[0-9a-f]{12}"/);
+  // The first screen's files are named in the answer itself, so they start with the page rather than two round trips behind it.
+  assert.deepEqual([...String(page.headers.link).matchAll(/<\/(\S+?)\?v=[0-9a-f]{12}>; rel=preload; as=(\w+)/g)].map((m) => `${m[1]} ${m[2]}`),
+    ['tokens.css style', 'ui.css style', 'app.js script']);
+  // Each file beside it is there, compressed, and a file of its own rather than part of the page.
+  for (const name of ['app.css', 'app.js', 'app-more.js']) {
+    const res = await raw(`/${name}`);
+    assert.equal(res.headers['content-encoding'], 'br', name);
+    assert.ok(res.bytes > 1024 && res.bytes < 100 * 1024, `${name}: ${res.bytes} B`);
+  }
+  const { evaluate, send, close } = await browse(join(dir, 'b'), 390, 844, true);
+  try {
+    // The page goes round the worker's own copy, so what is held back below is held from the page itself.
+    await send('Network.enable');
+    await send('Network.setBypassServiceWorker', { bypass: true });
+    // Hold the rest of the styles and the rest of the script back: the first screen must still draw, from the small sheet alone and in the phone's own typeface.
+    await send('Fetch.enable', { patterns: [{ urlPattern: '*app.css*' }, { urlPattern: '*app-more.js*' }] });
+    await evaluate(`location.href = ${JSON.stringify(url)}`);
+    await until(() => evaluate('document.querySelectorAll("#board .t-wait .ui-row").length > 0 && !document.querySelector("#board .skel")'));
+    assert.equal(await evaluate('document.getElementById("first") !== null'), true, 'the small sheet is still the only one');
+    assert.equal(await evaluate('/inter/i.test(getComputedStyle(document.body).fontFamily)'), false, 'the typeface waits with the rest of the styles');
+    // Let it go: the small sheet steps aside, the full rules and the rest of the script land, and a screen beyond Today draws with them.
+    await send('Fetch.disable');
+    await until(() => evaluate('document.getElementById("first") === null'));
+    await until(() => evaluate('/inter/i.test(getComputedStyle(document.body).fontFamily)'));
+    await evaluate(`location.hash = '#waiting'`);
+    await until(() => evaluate('document.querySelectorAll("#board .ui-row").length === 2 && !document.querySelector("#board .skel") && !document.getElementById("banner")?.textContent.trim()'));
+  } finally { close(); }
+  proc.kill();
+});
+
 test('the board paints its first screen from one page of asks, and never asks for the whole board', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   // A board shaped like a long-running one: 1,600 proofs and 20 plans, whose report bodies are what a first screen must never carry.
   const dir = join(scratch, 'first-screen'), file = join(dir, 'board.json');
@@ -4642,8 +4694,11 @@ test('the feedback trail: what the person sends on a card goes Sent, Delivered, 
       [['Keep the weekly digest?', 'Sent', 1, false], ['Open the beta to every team?', 'Replied', 4, true], ['Turn on the CSV export?', 'Delivered', 2, false]]);
     // The badge is one 20px line at the end of the second line at 360, 390 and 445, whatever the title and the line before it say: the words before it take the ellipsis.
     // The page names its stylesheets by their content, so a phone holding the stylesheet of an older version (kept a day) never draws the badge without its rules.
-    const hrefs = [...(await (await fetch(url)).text()).matchAll(/<link rel="stylesheet" href="(\S+\.css)\?v=[0-9a-f]{12}">/g)].map((m) => m[1]);
-    assert.deepEqual(hrefs, ['tokens.css', 'ui.css', 'app.css']);
+    // The page names the base sheets it is read with, and the stylesheet it asks for after the first paint by its content too, so a phone never draws a
+    // screen with half an upgrade's rules.
+    const served = await (await fetch(url)).text();
+    assert.deepEqual([...served.matchAll(/<link rel="stylesheet" href="(\S+\.css)\?v=[0-9a-f]{12}">/g)].map((m) => m[1]), ['tokens.css', 'ui.css']);
+    assert.match(served, /data-css="app\.css\?v=[0-9a-f]{12}"|data-css="app\.css"/);
     assert.equal(await evaluate('[...document.querySelectorAll("link[rel=stylesheet]")].map((l) => l.getAttribute("href").replace(/[?]v=[0-9a-f]{12}$/, "")).join()'), 'tokens.css,ui.css,app.css');
     assert.match((await (await fetch(`${url}ui.css?v=0123456789ab`)).text()), /\.ui-tb \{ display: inline-flex/);
     const wrap = () => evaluate(`JSON.stringify([...document.querySelectorAll(".ui-row")].filter((r) => r.querySelector(".ui-tb")).map((r) => { const b = r.querySelector(".ui-tb"), m = r.querySelector(".meta"), t = r.querySelector(".t");
