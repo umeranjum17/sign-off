@@ -790,17 +790,23 @@
   .kb-btn.go { border-color: transparent; background: var(--tk-go); color: var(--tk-on-go); box-shadow: var(--tk-elev-go); }
   .kb-btn:disabled { opacity: 0.6; box-shadow: none; }
   @media (min-width: 43.75rem) { .kb-stage { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 1.5rem; align-items: start; } .kb-nav { grid-template-columns: auto auto; justify-content: start; } }
+  .kt-image { margin: 0; display: grid; gap: 0.375rem; }
+  .kt-image img { display: block; width: 100%; height: auto; }
+  .kt-file { display: block; padding: 0.75rem 0; color: var(--tk-ink); text-decoration: underline; text-underline-offset: 0.2em; }
+  .kt-scroll { overflow-x: auto; min-width: 0; }
+  .kt-table.kt-wide { min-width: 48rem; }
+  .kt-wide :is(th, td) { min-width: 7rem; max-width: 20rem; overflow-wrap: anywhere; }
   .kt-table { width: 100%; border-collapse: collapse; font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
   .kt-table th { padding: 0 0.75rem 0.5rem 0; border-bottom: 1px solid var(--tk-line); color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); font-weight: 500; text-align: left; }
   .kt-table td { padding: 0.75rem 0.75rem 0.75rem 0; border-bottom: 1px solid var(--tk-line); vertical-align: top; font-variant-numeric: tabular-nums; }
   .kt-table td:first-child { color: var(--tk-ink); font-weight: 600; }
   .kt-table :is(th, td):last-child { padding-right: 0; }
   @media (max-width: 30rem) {
-    .kt-table thead { display: none; }
-    .kt-table tr { display: grid; grid-template-columns: 1fr 1fr; gap: 0.125rem 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--tk-line); }
-    .kt-table td { padding: 0; border: 0; }
-    .kt-table td:first-child { grid-column: 1 / -1; margin-bottom: 0.125rem; }
-    .kt-table td[data-h]::before { content: attr(data-h); display: block; color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); line-height: var(--tk-lh-small); font-weight: 500; }
+    .kt-table:not(.kt-wide) thead { display: none; }
+    .kt-table:not(.kt-wide) tr { display: grid; grid-template-columns: 1fr 1fr; gap: 0.125rem 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--tk-line); }
+    .kt-table:not(.kt-wide) td { padding: 0; border: 0; }
+    .kt-table:not(.kt-wide) td:first-child { grid-column: 1 / -1; margin-bottom: 0.125rem; }
+    .kt-table:not(.kt-wide) td[data-h]::before { content: attr(data-h); display: block; color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); line-height: var(--tk-lh-small); font-weight: 500; }
   }
   .kt-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
   .kt-compare figure { display: grid; gap: 0.375rem; align-content: start; margin: 0; }
@@ -4578,7 +4584,14 @@
       if (b.type === 'callout') return E('div', `kt kt-callout ${b.tone ?? 'note'}`, E('span', 'tile', gic(b.tone === 'warn' ? 'warn' : b.tone === 'ask' ? 'deeper' : 'info')), E('div', '', mdSpan('b', '', b.title, NOLINK), mdSpan('span', '', b.text)));
       if (b.type === 'beats') return beatsFig(s, b);
       if (b.type === 'video') return videoFig(s, b);
-      if (b.type === 'table') return E('div', 'kt', el('table', { class: 'kt-table' }, el('thead', {}, el('tr', {}, ...b.columns.map((c) => el('th', { scope: 'col' }, c)))), el('tbody', {}, ...b.rows.map((r) => el('tr', {}, ...r.map((c, i) => el('td', i ? { 'data-h': b.columns[i] } : {}, c)))))));
+      if (b.type === 'image') return E('figure', 'kt kt-image', el('img', { src: kitUrl(s, b.src, true), alt: b.alt ?? b.caption, loading: 'lazy', decoding: 'async' }), E('figcaption', 'kt-cap', b.caption));
+      if (b.type === 'file') return el('a', { class: 'kt kt-file', href: kitUrl(s, b.src), download: '' }, b.caption);
+      if (b.type === 'table') {
+        const wide = b.columns.length > 5 || [...b.columns, ...b.rows.flat()].some((c) => typeof c === 'object') || b.rows.some((r) => r.length !== b.columns.length);
+        const cell = (c, tag, i) => el(tag, { ...(tag === 'th' ? { scope: 'col' } : !wide && i ? { 'data-h': b.columns[i] } : {}), ...(typeof c === 'object' ? { colspan: c.colspan ?? 1, rowspan: c.rowspan ?? 1 } : {}) }, typeof c === 'object' ? c.text : c);
+        const table = el('table', { class: `kt-table${wide ? ' kt-wide' : ''}` }, el('thead', {}, el('tr', {}, ...b.columns.map((c, i) => cell(c, 'th', i)))), el('tbody', {}, ...b.rows.map((r) => el('tr', {}, ...r.map((c, i) => cell(c, 'td', i))))));
+        return el('div', { class: `kt${wide ? ' kt-scroll' : ''}`, ...(wide ? { tabindex: '0', role: 'region', 'aria-label': 'Table' } : {}) }, table);
+      }
       if (b.type === 'compare') return E('div', 'kt kt-compare', ...[['Before', b.before], ['After', b.after]].map(([w, x]) => E('figure', '', el('img', { src: kitUrl(s, x.image, true), alt: `${w}: ${x.caption}`, loading: 'lazy', decoding: 'async' }), E('figcaption', '', E('b', '', w), x.caption))));
       return el('ul', { class: 'kt kt-evid' }, ...b.rows.map((r) => E('li', '', ...(r.image ? [el('img', { src: kitUrl(s, r.image, true), alt: '', loading: 'lazy', decoding: 'async' })] : []), E('div', '', E('b', '', r.title), ...(r.note ? [E('small', '', r.note)] : [])), E('span', `kt-status ${r.status}`, KT_STATUS[r.status]))));
     }

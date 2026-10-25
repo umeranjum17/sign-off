@@ -2852,7 +2852,9 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     const frame = value?.startsWith('gallery.') && d?.guided ? galleryFrames(d)[Number(value.slice(8))] : undefined;
     const mock = diagram || frame ? (diagram ?? frame)!.src : value ? d?.mocks?.find((m) => m.value === value)?.path : value === '' && d?.view;
     try {
-      const path = rest.map(decodeURIComponent).join('/'), type = assetTypes[extname(path).toLowerCase()];
+      const path = rest.map(decodeURIComponent).join('/');
+      const download = frame && d?.sections?.some((s: any) => s.blocks?.some((b: any) => b.type === 'file' && b.src === frame.src));
+      const type = download ? 'application/octet-stream' : assetTypes[extname(path).toLowerCase()];
       if (!mock || !type) return [404, { error: 'Mock is unavailable' }];
       const actual = under(dirname(under(dirname(file), mockFile(mock))), path);
       if (statSync(actual).size > (type.startsWith('video/') && frame ? MEDIA_BYTES : MOCK_BYTES)) return [404, { error: 'Mock is unavailable' }];
@@ -2860,6 +2862,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
       // A diagram is its one pinned page: the file the plan posted, or nothing. A plan posted before the pin carries none and is served as it was.
       const pinned = diagram ?? frame;
       if (pinned?.sha256 && (actual !== under(dirname(file), mockFile(mock)) || bytes.length !== pinned.bytes || sha256(bytes) !== pinned.sha256)) return [404, { error: 'Diagram file changed since it was posted' }];
+      if (download) return [200, { attachment: { path: actual, name: basename(path).replace(/[^a-z0-9._ -]/gi, '_'), bytes: bytes.length, type } }];
       if (frame && new URL(req.url, 'http://localhost').searchParams.get('v') === 'light' && type.startsWith('image/')) {
         const light = galleryLight(pinned!.sha256 ?? sha256(bytes), bytes, extname(path));
         if (light) return [200, { media: light.bytes, type: mediaTypes[light.ext] }];
