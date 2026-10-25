@@ -1640,7 +1640,7 @@
   .sh-x .glyph { width: 1.125rem; height: 1.125rem; stroke-width: 2; }
   .decide { --ring: var(--tk-mid); max-width: 42.5rem; margin: 0 auto; color: var(--tk-text); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
   .decide .lead h2 { margin: 0.5rem 0 0; color: var(--tk-ink); font-size: 1.25rem; line-height: 1.75rem; font-weight: 500; letter-spacing: -0.017em; text-wrap: pretty; outline: none; }
-  .decide .since, .decide .why { margin: 0.5rem 0 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 400; }
+  .decide .since, .decide .why { margin: 0.5rem 0 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 400; overflow-wrap: anywhere; }
   .decide .lead .st { display: inline-block; margin-top: 0.5rem; }
   .decide .ui-props { margin-top: 0.5rem; }
   .decide-preview { display: grid; place-items: center; min-height: 8rem; margin: 1rem 0 0; padding: 0.75rem; overflow: hidden; border-radius: 1rem; background: var(--tk-inset); }
@@ -1735,7 +1735,14 @@
   .decide .fact { display: flex; align-items: center; gap: 0.75rem; min-height: 3rem; }
   .decide .fact + .fact { box-shadow: inset 0 1px 0 var(--tk-line); }
   .decide .fact .glyph { width: 1.125rem; height: 1.125rem; color: var(--tk-text-secondary); }
-  .decide .fact > span:nth-child(2) { flex: 1; color: var(--tk-text-secondary); } .decide .fact b { color: var(--tk-ink); font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; }
+  /* The label keeps its word; the value takes the rest of the row and wraps inside it, so a long value never squeezes the label into a column of letters. */
+  .decide .fact > span.fl { flex: none; color: var(--tk-text-secondary); white-space: nowrap; } .decide .fact b { flex: 1 1 0; min-width: 0; color: var(--tk-ink); font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  /* A value that cannot wrap cleanly (a link or one long word) keeps one line with an ellipsis and a copy button beside it, which takes its tap area from the space around it. */
+  .decide .fact b.clip { overflow: hidden; white-space: nowrap; overflow-wrap: normal; text-overflow: ellipsis; }
+  .decide .fact .cp { position: relative; display: grid; flex: none; place-items: center; width: 2.75rem; height: 2.75rem; padding: 0; border-radius: 50%; background: none; color: var(--tk-text-secondary); }
+  .decide .fact .cp::before { content: ""; position: absolute; inset: 0.5rem; border-radius: 50%; background: var(--tk-raised); box-shadow: var(--tk-elev-raised); }
+  .decide .fact .cp .glyph { position: relative; width: 1rem; height: 1rem; }
+  .decide .fact .cp:active { opacity: 0.6; }
   /* The bar: Ask me later in white beside one ink button, 52px pills; the button is faint until a pick and then names it. On a phone it stays at the sheet's foot. */
   .decide-bar { position: sticky; z-index: 1; bottom: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0 -1rem; padding: 1.5rem 1rem calc(1.5rem + env(safe-area-inset-bottom));
     background: linear-gradient(to bottom, transparent, var(--tk-card) 1.25rem); }
@@ -3252,7 +3259,7 @@
   // The drawings are fixed strings from this page, never text from the board file.
   // Small stroke drawings the plan page puts beside a button label or in a section badge; fixed strings from this page.
   const GLYPHS = { link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
-    users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>', left: '<path d="m15 18-6-6 6-6"/>', up: '<path d="m18 15-6-6-6 6"/>', down: '<path d="m6 9 6 6 6-6"/>', more: '<path d="M5 12h.01M12 12h.01M19 12h.01"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', right: '<path d="m9 18 6-6-6-6"/>', check: '<path d="M20 6 9 17l-5-5"/>', pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
+    users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>', left: '<path d="m15 18-6-6 6-6"/>', up: '<path d="m18 15-6-6-6 6"/>', down: '<path d="m6 9 6 6 6-6"/>', more: '<path d="M5 12h.01M12 12h.01M19 12h.01"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', right: '<path d="m9 18 6-6-6-6"/>', check: '<path d="M20 6 9 17l-5-5"/>', copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>', pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
     archive: '<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/>', dot: '<circle cx="12" cy="12" r="4.5" fill="currentColor"/>',
     send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.112z"/><path d="m21.854 2.147-10.94 10.939"/>',
     sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>',
@@ -5735,6 +5742,32 @@
   const askKind = (d) => ({ signin: 'Sign in', 'yes-no': 'Yes or no' })[typeOf(d)] ?? TYPE_NAMES[typeOf(d)];
   /** A sign-in as a page of its own: its key, the headline, what it unlocks, how long the link lasts (on a phone; on a desk the row beside it counts that down) and where it signs in,
    *  with Open sign-in as the one button; once tapped it says it waits for you until the agent closes the card. */
+  /** Copies a fact's whole value: the clipboard API where the board is a secure context, else a hidden box the browser copies from. The button says Copied for a moment,
+   *  then returns to its own name, and the board's toast shows the word. */
+  async function copyValue(text, btn) {
+    const said = (label) => { btn.setAttribute('aria-label', label); btn.classList.toggle('ok', label === 'Copied'); clearTimeout(btn.said); btn.said = setTimeout(() => said(btn.dataset.name), 1600); };
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; }
+    catch {
+      // A board on a plain address has no clipboard API: a hidden box and the browser's own copy stand in.
+      try { const box = el('textarea', { 'aria-hidden': 'true', style: 'position: fixed; top: 0; left: -9999px; opacity: 0' }); box.value = text; document.body.append(box); box.select(); ok = document.execCommand('copy'); box.remove(); } catch {}
+    }
+    said(ok ? 'Copied' : 'Could not copy');
+    if (ok) say('Copied', 1600);
+  }
+  /** One row of a sign-in's facts: its icon, the label, which keeps its word, and the value, which takes the free width and wraps inside it. A value that cannot wrap cleanly
+   *  (a link, or one long word) keeps one line with an ellipsis beside a copy button that hands over the whole value. */
+  const fact = (mark, name, value) => {
+    const text = value.textContent ?? '', clip = /^https?:\/\//i.test(text) || !/\s/.test(text) && [...text].length > 24;
+    const row = el('div', { class: 'fact' }, glyph(mark), el('span', { class: 'fl' }, name), value);
+    if (!clip) return row;
+    value.classList.add('clip');
+    const btn = el('button', { class: 'cp', type: 'button', 'aria-label': `Copy ${name}` }, glyph('copy'));
+    btn.dataset.name = btn.getAttribute('aria-label');
+    btn.addEventListener('click', () => copyValue(text, btn));
+    row.append(btn);
+    return row;
+  };
   function signinPage(d, desk) {
     const err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` }), { open, line } = signinOpen(d, undefined, err);
     const gone = !!d.expires && Date.parse(d.expires) <= Date.now(), host = /^https?:\/\/(?:www\.)?([^/?#]+)/.exec(d.link ?? '')?.[1];
@@ -5744,7 +5777,6 @@
       if (desk) open.dataset.kbd = '↵';
       if (open.tagName === 'A') { if (signingIn.has(d.key)) waits(); open.addEventListener('click', () => { signingIn.add(d.key); waits(); }); }
     }
-    const fact = (mark, name, value) => el('div', { class: 'fact' }, glyph(mark), el('span', {}, name), value);
     const hint = d.start || gone ? line : el('p', {}, `Opens ${d.title} in a new tab. This card closes itself once you are in.`);
     if (hint) hint.classList.add('hint');
     return el('section', { class: 'decide signin-ask g-signin' }, icon('key'), el('div', { class: 'lead' }, el('h2', { id: 'ask-title', tabindex: '-1', dir: 'auto' }, `Sign in to ${d.title}`)), askProps(d),
