@@ -2770,11 +2770,22 @@ function stateRead() {
   built = stateSources().every((path) => stampOf(path) === before.get(path)) ? made : undefined;
   return made;
 }
-/** What a list row or the hero shows of an item: every field except the report body and the proof media a card links, which load with the card itself. */
-const HEAVY = ['sections', 'visual', 'understood', 'next', 'evidenceCard', 'mocks', 'steps'];
-const lightOf = (d: any) => Object.fromEntries(Object.entries(d).filter(([k]) => !HEAVY.includes(k)));
-/** The part of the board one request asks for: the asks waiting on the person, the items a page at a time, or one card in full. */
-type View = { name: 'asks' | 'items' | 'card'; offset: number; limit: number; key: string };
+/** What a row leaves out: a proof's media and the writing of a report are what a card links, and they load with the card itself. Everything else a
+ * card shows at a glance (its option mocks, a guided page's own steps) stays in the row, so a list drawn from rows is the same list the board draws. */
+const HEAVY = ['evidenceCard'];
+/** A row draws what a report is made of (its parts and where each stands, its sources' links) and never its words: those come with the card. */
+const slimSections = (sections: any[]) => sections.map((s) => ({ ...Object.fromEntries(['id', 'stage', 'heading', 'part'].filter((k) => s[k] !== undefined).map((k) => [k, s[k]])),
+  ...(s.items?.length && { items: s.items.filter((it: any) => it.link).map((it: any) => ({ link: it.link, ...(it.source && { source: it.source }) })) }) }));
+const lightOf = (d: any) => ({ ...Object.fromEntries(Object.entries(d).filter(([k]) => !HEAVY.includes(k))), ...(d.sections && { sections: slimSections(d.sections) }) });
+/** A list row: what the list itself says of a proof, which is done-done's word and its first capture, never the whole proof. Without this a row
+ * could not tell a pass from a failure, and a list built from rows would call a checked proof unchecked. */
+/** A list row says it is one, so a client knows the card behind it is still to come; the proof's card keeps its first shot, for the row's thumbnail. */
+const rowOf = (d: any) => {
+  const row = { ...lightOf(d), row: true }, card = d.evidenceCard;
+  return card ? { ...row, evidenceCard: { ...card, media: (card.media ?? []).filter((m: any) => m.type?.startsWith('image/')).slice(0, 1) } } : row;
+};
+/** The part of the board one request asks for: the asks waiting on the person, the items a page at a time, one card in full, or the ticket roll-up. */
+type View = { name: 'asks' | 'items' | 'card' | 'tickets'; offset: number; limit: number; key: string };
 /** The view a request names, or undefined for the whole board; a view or page it cannot answer is refused in plain words. */
 function viewOf(url: string): View | undefined {
   const q = new URL(url, 'http://board').searchParams, name = q.get('view');
@@ -2782,8 +2793,8 @@ function viewOf(url: string): View | undefined {
   const count = (at: string, fallback: number) => { const v = Number(q.get(at)); return q.get(at) === null || !Number.isInteger(v) || v < 0 ? fallback : v; };
   const offset = count('offset', 0), limit = Math.min(count('limit', 20), 200);
   if (name === 'card') return { name, offset: 0, limit: 1, key: q.get('key') ?? '' };
-  if (name === 'asks' || name === 'items') return { name, offset, limit, key: '' };
-  throw new InputError(`unknown view ${name}: use asks, items or card`);
+  if (name === 'asks' || name === 'items' || name === 'tickets') return { name, offset, limit, key: '' };
+  throw new InputError(`unknown view ${name}: use asks, items, card or tickets`);
 }
 /** The kept read as one view of it: built once per view and unchanged board, so a phone's first screen costs one page of one board. The
  * body keeps the state's own shape, so a page of it is read by the same client as the whole board; the parts a first screen does not show
@@ -2794,20 +2805,40 @@ function viewRead(read: NonNullable<typeof built>, view: View) {
   const s = read.body as any, answers = (s.answers ?? {}) as Record<string, unknown>, gone = new Set<string>((s.dismissed ?? []) as string[]);
   const items = (s.decisions ?? []) as any[], open = (d: any) => d.type !== 'evidence' && !answers[d.key] && !gone.has(d.key);
   const kind = (type: string) => items.filter((d) => d.type === type).length;
+  // Today's own two numbers, so a first screen can show them before it holds the cards they count.
+  const today = (at: unknown) => typeof at === 'string' && new Date(at).toDateString() === new Date().toDateString();
   const counts = { asks: items.filter(open).length, items: items.length, answered: items.filter((d) => answers[d.key]).length, evidence: kind('evidence'), designs: kind('design'),
     // A report is a guided report's kind and a plan is its own type: both are what the board calls a report.
-    reports: items.filter((d) => d.kind === 'report' || d.type === 'plan').length, tickets: (s.tickets ?? []).length };
+    reports: items.filter((d) => d.kind === 'report' || d.type === 'plan').length, tickets: (s.tickets ?? []).length,
+    // Cleared is what the person answered and the board counts as answered: a design review Main has not passed yet still sits under Designs.
+    cleared_today: items.filter((d) => today((answers[d.key] as any)?.at) && !gone.has(d.key) && !(d.kind === 'design' && !d.promoted)).length,
+    proofs_today: items.filter((d) => d.type === 'evidence' && today(d.filed) && !gone.has(d.key) && !['RUN FAIL', 'INCONCLUSIVE'].includes(d.evidenceCard?.result)).length };
+  const mine = (list: any[]) => (list ?? []).filter((x) => x.key === view.key);
   let body: any;
   if (view.name === 'card') {
     const card = items.find((d) => d.key === view.key);
     if (!card) return undefined;
-    // One card whole: the report body and the proof media it links come with it, and nothing of the board around it.
-    body = { card, counts, version: s.version, answers: answers[card.key] ? { [card.key]: answers[card.key] } : {}, dismissed: gone.has(card.key) ? [card.key] : [] };
+    // One card whole: the report body, the proof media it links and the card's own activity come with it, and nothing of the board around it.
+    body = { card, counts, version: s.version, answers: answers[card.key] ? { [card.key]: answers[card.key] } : {}, dismissed: gone.has(card.key) ? [card.key] : [],
+      trail: mine(s.trail), rounds: mine(s.rounds), messages: mine(s.messages), annotations: mine(s.annotations), comments: mine(s.comments),
+      ...(s.seen_at?.[card.key] && { seen_at: { [card.key]: s.seen_at[card.key] } }), page: { view: 'card', offset: 0, limit: 1, total: 1 } };
+  } else if (view.name === 'tickets') {
+    // The Tickets screen's own read: its roll-up is the largest part of the board and no other screen shows it.
+    body = { ...s, decisions: [], counts, tickets: s.tickets ?? [], trail: [], rounds: [], messages: [], annotations: [], comments: [],
+      page: { view: 'tickets', offset: 0, limit: (s.tickets ?? []).length, total: (s.tickets ?? []).length } };
   } else {
     const all = view.name === 'asks' ? items.filter(open) : items, page = all.slice(view.offset, view.offset + view.limit);
-    body = { ...s, decisions: page.map(lightOf), counts, more: view.offset + view.limit < all.length,
+    // A row carries the ticket it links, so its chip says how far that ticket is, without the whole roll-up.
+    const linked = new Set(page.map((d) => d.ticket).filter(Boolean)), shown = new Set(page.map((d) => d.key));
+    // A reply on a ticket is a row of its own on Today, so the board's ticket threads come with the first screen too, with the tickets they name.
+    const threads = ((s.trail ?? []) as any[]).filter((t) => t.kind === 'ticket');
+    for (const t of threads) linked.add(t.key);
+    // The activity a row shows at a glance (an answer's reply, a note left on a mock) comes with the page that shows it, never the whole board's.
+    const forRow = (list: any[]) => ((list ?? []) as any[]).filter((x) => shown.has(x.key) || x.kind === 'ticket');
+    body = { ...s, decisions: page.map(rowOf), counts, more: view.offset + view.limit < all.length,
       page: { view: view.name, offset: view.offset, limit: view.limit, total: all.length },
-      tickets: [], trail: [], rounds: [], messages: [], annotations: [], comments: [] };
+      tickets: ((s.tickets ?? []) as any[]).filter((t) => linked.has(t.id)),
+      trail: forRow(s.trail), rounds: forRow(s.rounds), messages: forRow(s.messages), annotations: forRow(s.annotations), comments: forRow(s.comments) };
   }
   const json = Buffer.from(JSON.stringify(body));
   const made = { json, tag: `"${sha256(json).slice(0, 32)}"`, sent: new Map<string, { bytes: Buffer; encoding?: string }>() };

@@ -2070,17 +2070,95 @@
   })());
 
   /** sent runs only once the server saved the request, so a draft is dropped only then; the redraw waits for it (an answer's check plays out before the list comes back). */
+  /** What the person typed on this board, read once its file is known: a draft outlives a reload. */
+  function loadDrafts() {
+    if (loaded) return;
+    loaded = true;
+    try { for (const [k, v] of JSON.parse(localStorage.getItem(stored())) ?? []) drafts.set(k, v); } catch {}
+  }
   async function call(path, init, sent) {
     const res = await fetch(path, init);
     const body = await res.json().catch(() => ({ error: `The server replied ${res.status}` }));
     if (!res.ok) throw Object.assign(new Error(body.error), { status: res.status });
-    state = body;
-    if (!loaded) {
-      loaded = true;
-      try { for (const [k, v] of JSON.parse(localStorage.getItem(stored())) ?? []) drafts.set(k, v); } catch {}
-    }
+    // An answer, a round or a dismiss answers with the whole board: the board on screen is all of it, so no page is read over it.
+    (state = body), (wholeBoard = true);
+    loadDrafts();
     await sent?.();
     renderKeepingFocus();
+  }
+
+  /** A part of the board as it comes back: rows with the counts and the page they are, one card whole, or the ticket roll-up. */
+  const view = (path) => fetch(path).then(async (res) => {
+    const body = await res.json().catch(() => ({ error: `The server replied ${res.status}` }));
+    if (!res.ok) throw Object.assign(new Error(body.error), { status: res.status });
+    return body;
+  });
+  /** Whether the board on screen is all of it, not the pages gathered so far: a whole-board read or an answer brings it all at once, so the
+   * pages are not read again over it. */
+  let wholeBoard = false;
+  /** A part of the board joined to the board on screen. Rows replace or add, one card whole replaces its row and brings its own activity,
+   * and a part is read for what it carries, never emptied for what it leaves out: nothing a person can see is cleared by a later read. */
+  function mergeView(body) {
+    // The whole board (an answer's own reply, or an older client reading it whole) is the board: it replaces what the parts had gathered.
+    if (!body.page) return void ((state = body), (wholeBoard = true));
+    // Everything a part says about the board itself is the board's: its address, its counts, who may answer it, its ticket roll-up outside the rows.
+    const { decisions = [], tickets: rolled = [], trail = [], rounds = [], messages = [], annotations = [], comments = [], page = state.page, ...board } = body;
+    const rows = new Map(state.decisions.map((d) => [d.key, d]));
+    if (body.card) rows.set(body.card.key, { ...body.card, whole: true });
+    // A page brings each row as the board has it now, a card already open included: its card is read again under the same key when the address names it.
+    for (const d of decisions) rows.set(d.key, d);
+    const roll = new Map((state.tickets ?? []).map((t) => [t.id, t]));
+    for (const t of rolled) roll.set(t.id, t);
+    // A card's own activity joins the board's lists, each entry once, so opening a card never doubles its thread.
+    const joined = (name) => { const have = new Set((state[name] ?? []).map((x) => JSON.stringify(x))); return [...(state[name] ?? []), ...(body[name] ?? []).filter((x) => !have.has(JSON.stringify(x)))]; };
+    state = { ...state, ...board, decisions: [...rows.values()], page,
+      tickets: page.view === 'tickets' ? rolled : roll.size ? [...roll.values()] : state.tickets,
+      // A part carries its own answers and dismissals; the whole board's own are the board's.
+      ...(body.card ? { answers: { ...state.answers, ...body.answers }, seen_at: { ...state.seen_at, ...board.seen_at }, dismissed: [...new Set([...(state.dismissed ?? []), ...(body.dismissed ?? [])])] } : {}),
+      ...Object.fromEntries(['trail', 'rounds', 'messages', 'annotations', 'comments'].map((name) => [name, joined(name)])) };
+  }
+  /** A card whole for the screen that opens it: its body, its proof and its own activity come with it, never with the list it was found in. */
+  const fetching = new Set();
+  function whole(key) {
+    // A row read from a page is filled in with its card; a card the board holds whole, or one already coming, is left alone.
+    const row = state.decisions.find((d) => d.key === key);
+    if (!key || wholeBoard || fetching.has(key) || (row && (row.whole || !row.row))) return;
+    fetching.add(key);
+    view(`/api/decisions?view=card&key=${encodeURIComponent(key)}`).then((body) => {
+      if (!body.card) return;
+      // A card arriving under the address that names it opens a reader that was waiting for it, and takes the focus as an opened card does.
+      const opening = location.hash.endsWith(`/${key}`) && reader.dataset.key !== key;
+      mergeView(body);
+      renderKeepingFocus();
+      if (opening && !reader.hidden) reader.querySelector('h1')?.focus({ preventScroll: true });
+    }, () => {}).finally(() => fetching.delete(key));
+  }
+  /** The rest of the board a page at a time, after the first screen is painted: each page merges in and the board is drawn when the pages are
+   * done (or as they arrive on a screen the person has opened), so no read ever clears what is on screen for a skeleton. */
+  let resting;
+  async function rest() {
+    if (resting || wholeBoard) return;
+    resting = true;
+    try {
+      for (let offset = 0; ;) {
+        const page = await view(`/api/decisions?view=items&offset=${offset}&limit=200`);
+        mergeView(page);
+        // Today already shows what the first page carries; another screen fills as its pages arrive.
+        if (location.hash) renderKeepingFocus();
+        if (page.more !== true || !page.decisions?.length) break;
+        offset += page.decisions.length;
+      }
+    } catch { /* the first screen is on screen: a page that fails leaves it there, and the next poll reads it again */ } finally {
+      resting = false;
+      renderKeepingFocus();
+    }
+  }
+  /** The ticket roll-up is the largest part of the board and only the Tickets screen shows it: it is read when that screen first opens. */
+  let ticketsRead = false;
+  function readTickets() {
+    if (ticketsRead || wholeBoard) return;
+    ticketsRead = true;
+    view('/api/decisions?view=tickets').then((body) => { mergeView(body); renderKeepingFocus(); }, () => (ticketsRead = false));
   }
 
   // A response can arrive after the person has started typing on the next card.
@@ -2088,9 +2166,12 @@
   function renderKeepingFocus() {
     const typing = (document.activeElement?.tagName === 'TEXTAREA' || document.activeElement?.id === 'find') && document.activeElement;
     const start = typing && typing.selectionStart, end = typing && typing.selectionEnd, direction = typing && typing.selectionDirection;
+    // A part of the board arriving redraws the list around its row: the row the person is on keeps the focus, as it does across a poll.
+    const onRow = !typing && document.activeElement?.closest?.('.dl-row[data-key]')?.dataset.key;
     render();
     const box = typing && document.getElementById(typing.id);
     if (box) box.focus(), box.setSelectionRange(start, end, direction);
+    else if (onRow) document.getElementById(`item-${onRow}`)?.focus?.({ preventScroll: true });
   }
 
   const clearIfSaved = (key, sent) => () => { if (drafts.get(key) === sent) drafts.delete(key); keep(); };
@@ -2919,7 +3000,7 @@
     const label = [title, judgedWord(d), prio(d), meta].filter(Boolean).join(', ');
     const row = desk ? el('a', { class: `ui-row ev-card${evRich ? ' rich' : ''}`, href: `#evidence/${d.key}`, id: `item-${d.key}`, 'data-row': '', 'aria-label': label }, ...parts, th)
       : el('button', { class: `ui-row ev-card${evRich ? ' rich' : ''}`, id: `item-${d.key}`, 'data-row': '', 'aria-expanded': String(open), 'aria-label': label }, ...parts, th);
-    if (!desk) row.onclick = () => { evOpen = open ? '' : d.key; reshow(`#item-${CSS.escape(d.key)}`); };
+    if (!desk) row.onclick = () => { evOpen = open ? '' : d.key; if (evOpen) whole(d.key); reshow(`#item-${CSS.escape(d.key)}`); };
     return el('li', { class: open ? 'open' : '' }, row, open ? evOpened(d) : '');
   }
   /** A proof opened in its row: its captures in a strip that snaps one to a swipe (each its own shape, as tall as the strip), what it says in full, its panel and Open proof. */
@@ -3514,7 +3595,8 @@
   const fill = (d) => { const s = el('span', { class: 'si', 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 20 20"><path d="${d}"/></svg>`; return s; };
   /** Cleared today (answered today, of that and what still waits), which opens Answered, and Proofs today (proof filed today), which opens Evidence. */
   function todayTiles(by) {
-    const cleared = by.answered.filter((d) => isToday(state.answers[d.key].at)).length, proofs = state.decisions.filter((d) => d.type === 'evidence' && d.filed && isToday(d.filed) && !(state.dismissed ?? []).includes(d.key)).length;
+    // A first screen does not hold the answered cards or the proofs yet, so today's two numbers come with the page that painted it.
+    const cleared = state.counts?.cleared_today ?? by.answered.filter((d) => isToday(state.answers[d.key].at)).length, proofs = state.counts?.proofs_today ?? state.decisions.filter((d) => d.type === 'evidence' && d.filed && isToday(d.filed) && !(state.dismissed ?? []).includes(d.key)).length;
     const stat = (href, mark, lab, n, of) => el('a', { class: 'ui-card ui-stat', href, 'aria-label': `${lab}: ${n}${of === undefined ? '' : ` of ${of}`}` }, fill(mark), el('span', { class: 'lab' }, lab), el('b', {}, String(n), of === undefined ? '' : el('small', {}, ` of ${of}`)));
     return el('div', { class: 'ui-tiles t-tiles' }, stat('#answered', 'M10 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm3.4 5.1-4.3 4.4-2-2-1.2 1.2 3.2 3.2 5.5-5.6z', 'Cleared today', cleared, cleared + by.waiting.length),
       stat('#evidence', 'M10 1.8l6.8 2.7v5c0 4.4-2.9 7.4-6.8 8.9-3.9-1.5-6.8-4.5-6.8-8.9v-5zm3.6 5.6-1.1-1.1-3.4 3.5-1.6-1.6-1.1 1.1 2.7 2.7z', 'Proofs today', proofs));
@@ -5211,6 +5293,8 @@
     return out;
   }
   function readPage(d, from = 'reports') {
+    // A card opens whole or not at all: a row from a page of the board carries what a list shows, and a card that is still coming is no card to read.
+    if (d?.row && !d.whole) { if (reader.dataset.key !== d.key) readPage(undefined, from); return; }
     // A design or a report takes the board's place beside the sidebar on a desk; a plan, and anything on a phone, opens over the whole board.
     const pane = !!d && d.type !== 'plan' && !d.guided, inline = pane && matchMedia('(min-width: 64rem)').matches;
     document.body.classList.toggle('reading', !!d);
@@ -5224,8 +5308,9 @@
     reader.hidden = !d;
     // A report opened from Reports (and not beside a desk's list) reads as a sheet over the list. A guided one tapped in the list shows its parts there until
     // Read the report opens it in full; reached by a link (Today's card, the CLI's open) it opens in full at once.
-    if (rpGuide !== d?.key) rpGuide = '';
-    if (rpListed !== d?.key) rpListed = '';
+    // A card still coming is no card to read yet: the reader waits for it, and remembers how it was opened (a report tapped in the list, a guided one in full).
+    if (d && rpGuide !== d.key) rpGuide = '';
+    if (d && rpListed !== d.key) rpListed = '';
     const sheet = !!d && from === 'reports' && !inline, summary = sheet && d.guided && rpListed === d.key && rpGuide !== d.key;
     reader.classList.toggle('rp-sheet', sheet && (summary || !d.guided));
     const url = summary ? `sheet:${d.key}:${unread(d)}:${kindParts(d).filter(([p]) => partRead(d, p)).length}` : d?.guided ? `guide:${d.key}` : d?.kind === 'design' ? `design:${d.key}` : d?.type === 'evidence' ? `evidence:${d.key}` : d ? src(mockUrl(d.key, '', d.view)) : '';
@@ -6192,6 +6277,7 @@
     decideCtx = { all: decideOrder(by.waiting), hidden };
     by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
     const [, at, key] = /^#(waiting|decide|designs|evidence|reports|answered|tickets|ticket)(?:\/([\w.-]+))?$/.exec(location.hash) ?? [];
+    if (at === 'tickets') readTickets();
     // The asks Decide steps through, in the list's order, Later last.
     const decideQueue = decideCtx.all.filter((d) => d.type === 'signin' || (d.type !== 'plan' && d.kind !== 'design'));
     // Answered asks it opens again, newest first in its list; the arrows step through them oldest first, then through the open asks.
@@ -6219,6 +6305,9 @@
     document.body.classList.toggle('split-view', deskSplit);
     const askAt = decideQueue.findIndex((d) => d.key === key), decideAt = key ? askAt : 0, doneAt = key && askAt < 0 ? walk.findIndex((d) => d.key === key && isAnswered(d)) : -1;
     const shownAsk = doneAt >= 0 ? walk[doneAt] : decideQueue[decideAt];
+    // The address of a card opens it whole: a row from the first screen is filled in with its body and its proof as it opens.
+    const opened = /^#(?:waiting|decide|designs|evidence|reports|ticket)\/([\w.-]+)$/.exec(location.hash)?.[1];
+    whole(opened);
     for (const k of changing) if (k !== shownAsk?.key) changing.delete(k);
     // A decision lives under Decide; Designs has its own place in the sidebar, and on a phone, as the prototype's dock has it, Designs and Answered light Today, whose More opens them.
     const active = at === 'decide' ? 'waiting' : at === 'answered' ? '' : at === 'ticket' ? 'tickets' : at ?? '';
@@ -6391,21 +6480,47 @@
     banner.textContent = `Can't read the board file: ${e.message}`;
     banner.hidden = false;
   };
-  // Another program can change the board file (a feed, a new sign-in, signin done), so the page checks it every 20 seconds and redraws only on a change.
+  // Another program can change the board file (a feed, a new sign-in, signin done), so the page checks it every 20 seconds. The check is the
+  // first screen's own page, tagged as last read: an unchanged board is a 304 with no body and no redraw, and a changed one is 15 KB, not five.
+  let seenTag = '';
   async function refresh() {
     try {
-      const res = await fetch('/api/decisions'), body = await res.json().catch(() => ({ error: `The server replied ${res.status}` }));
-      if (!res.ok) throw new Error(body.error);
-      banner.hidden = true;
-      if (JSON.stringify(body) === JSON.stringify(state)) return;
-      state = body;
+      const open = /^#(?:waiting|decide|designs|evidence|reports|ticket)\/([\w.-]+)$/.exec(location.hash)?.[1];
+      const res = await fetch('/api/decisions?view=asks&limit=20', { headers: seenTag ? { 'if-none-match': seenTag } : {} });
+      let changed = false;
+      if (res.status !== 304) {
+        const body = await res.json().catch(() => ({ error: `The server replied ${res.status}` }));
+        if (!res.ok) throw new Error(body.error);
+        banner.hidden = true;
+        seenTag = res.headers.get('etag') ?? '';
+        mergeView(body);
+        changed = true;
+      }
+      // The card on screen is read with the page: the board changes under an open card without changing the page that painted the first screen.
+      if (open) {
+        const card = await view(`/api/decisions?view=card&key=${encodeURIComponent(open)}`).catch(() => undefined);
+        if (card?.card) mergeView(card), (changed = true);
+      }
+      if (!changed) return;
       renderKeepingFocus();
+      rest();
     } catch (e) { failed(e); }
   }
+  /** The first screen: one page of the asks waiting on the person, painted before the rest of the board is read. */
+  const first = () => fetch('/api/decisions?view=asks&limit=20').then(async (res) => {
+    const body = await res.json().catch(() => ({ error: `The server replied ${res.status}` }));
+    if (!res.ok) throw new Error(body.error);
+    seenTag = res.headers.get('etag') ?? '';
+    // The first page names the board's file, so its drafts are read after it, never before.
+    mergeView(body);
+    loadDrafts();
+    renderKeepingFocus();
+  });
   if (FROZEN) (state = FROZEN), render();
-  else call('/api/decisions').then(() => {
+  else first().then(() => {
     banner.hidden = true;
     setInterval(refresh, 20_000);
+    rest();
   }, failed);
 </script>
 </body>

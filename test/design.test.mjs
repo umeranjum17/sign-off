@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync, spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { createServer as createHttpServer, get, request } from 'node:http';
 import { createServer } from 'node:net';
@@ -4266,6 +4266,61 @@ test('load budget: a board of 60 updates opens Evidence on a phone with at most 
     console.log(`Evidence on a phone: ${first.captures} of 60 captures, ${first.kb} KB; reload ${again.kb} KB`);
   } finally { close(); }
   proc.kill();
+});
+
+test('the board paints its first screen from one page of asks, and never asks for the whole board', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  // A board shaped like a long-running one: 1,600 proofs and 20 plans, whose report bodies are what a first screen must never carry.
+  const dir = join(scratch, 'first-screen'), file = join(dir, 'board.json');
+  mkdirSync(dir, { recursive: true });
+  copyFileSync(new URL('../fixtures/sample-decisions.json', import.meta.url), file);
+  const board = JSON.parse(readFileSync(file, 'utf8')), at = (n) => new Date(Date.UTC(2026, 9, 11, 12, n)).toISOString();
+  const capture = readFileSync(new URL('../fixtures/evidence/product-board.png', import.meta.url)), sha = createHash('sha256').update(capture).digest('hex');
+  mkdirSync(join(dir, 'evidence', '1'), { recursive: true });
+  writeFileSync(join(dir, 'evidence', '1', '1.png'), capture);
+  for (let i = 0; i < 1600; i++) board.decisions.push({ key: `proof-${i}`, type: 'evidence', number: i + 1, title: `Proof ${i}`, about: 'Umer checked the sign-in on a phone. '.repeat(20),
+    filed: at(i % 60), media: [{ path: 'evidence/1/1.png', sha256: sha, bytes: capture.length }] });
+  for (let i = 0; i < 20; i++) board.decisions.push({ key: `plan-${i}`, type: 'plan', kind: 'plan', view: `plan-${i}.html`, title: `Plan ${i} to approve`, filed: at(i),
+    sections: [{ id: 's1', stage: 'overview', heading: 'Detail', body: `plan body ${i} `.repeat(700), blocks: [] }] });
+  for (let i = 0; i < 20; i++) board.decisions.push({ key: `ask-${i}`, type: 'decision', title: `Ship the sign-in change ${i}?`, filed: at(i), options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }] });
+
+  writeFileSync(file, JSON.stringify(board));
+  const whole = Buffer.byteLength(JSON.stringify(JSON.parse(readFileSync(file, 'utf8'))));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, click, send, close } = await browse(join(dir, 'b'), 390, 844, true);
+  // What the page asked the board for, as the browser recorded it: the address and the bytes it took.
+  const reads = () => evaluate(`performance.getEntriesByType('resource').filter((e) => e.name.includes('/api/decisions'))
+    .map((e) => [e.name.slice(e.name.indexOf('/api')), e.transferSize])`);
+  try {
+    await send('Network.enable');
+    await send('Network.setBypassServiceWorker', { bypass: true });
+    await evaluate(`location.href = ${JSON.stringify(url)}`);
+    // The asks are on screen, drawn, with the skeleton gone.
+    await until(() => evaluate('!!document.querySelector("#board .t-wait .ui-row, #board .t-up") && !document.querySelector("#board .skel")'));
+    const first = await reads();
+    assert.match(first[0][0], /^\/api\/decisions\?view=asks&limit=20$/, `the first board read is one page of asks: ${first[0][0]}`);
+    assert.ok(first[0][1] < 100_000, `the first screen is under 100 KB: ${first[0][1]} bytes, on a board of ${whole}`);
+    // The whole board is never asked for, before or after the paint: not once, on any screen this journey opens.
+    const asked = async () => (await reads()).filter(([path]) => path === '/api/decisions' || path === '/api/state');
+    assert.deepEqual(await asked(), [], 'no read of the whole board');
+    assert.ok(!(await reads()).some(([path]) => path.startsWith('/api/decisions?view=items') === false && !path.startsWith('/api/decisions?view=asks') && path !== '/api/decisions'), 'every read is a part of the board');
+    // The board fills in from pages: the Evidence screen lists proofs, and each row still says what done-done says of it.
+    await evaluate('location.hash = "#evidence"');
+    await until(() => evaluate('document.querySelectorAll("#board .ev-card").length > 0'));
+    assert.ok((await reads()).some(([path]) => path.startsWith('/api/decisions?view=items')), 'the rest of the board comes a page at a time');
+    assert.equal(await evaluate('document.querySelectorAll("#board .skel").length'), 0, 'a painted board never falls back to the skeleton');
+    // A proof opens where it is tapped, and the proof itself comes whole: its captures and its panel are not in the row it was listed in.
+    const box = await evaluate('(() => { const r = document.querySelector("#board .ev-card").getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()');
+    await click(box);
+    await until(() => evaluate('!!document.querySelector("#board .ev-open .ev-go")'));
+    await until(async () => (await reads()).some(([path]) => path.startsWith('/api/decisions?view=card&key=')));
+    // The Tickets screen asks for its own roll-up, which no page carries.
+    await evaluate('location.hash = "#tickets"');
+    await until(() => evaluate('(performance.getEntriesByType("resource") ?? []).some((e) => e.name.includes("view=tickets"))'));
+    assert.deepEqual(await asked(), [], 'still no read of the whole board');
+    console.log(`first screen: ${first[0][1]} B of a ${whole} B board; reads: ${(await reads()).map(([p, b]) => `${p} ${b}B`).join(', ')}`);
+  } finally { close(); proc.kill(); }
 });
 
 test('installable app: a valid manifest, a service worker that keeps the page and the last state, and the board read offline with a clear line, nothing written', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
