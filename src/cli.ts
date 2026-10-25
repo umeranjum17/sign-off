@@ -2930,7 +2930,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     } catch { return [404, { error: 'Attachment is unavailable' }]; }
   }
   if (req.method === 'GET' && req.url === '/api/board') return [200, { file, pid: process.pid }];
-  if (req.method === 'GET' && req.url === '/api/decisions') {
+  if (req.method === 'GET' && ['/api/decisions', '/api/state'].includes(req.url ?? '')) {
     let timer: NodeJS.Timeout | undefined;
     await Promise.race([guardReady, new Promise<void>((ok) => { timer = setTimeout(ok, GUARD_WAIT); })]);
     clearTimeout(timer);
