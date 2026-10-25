@@ -127,17 +127,17 @@ try {
     await shoot(shot, theme, 390, setup);
     if (desk) await shoot(shot, theme, 1280, setup);
   }
-  for (const theme of ['light']) {
-    const movie = join(out, `answer-${theme}.mp4`);
-    sh(process.execPath, [join(repo, '.agents/skills/done-done-verify-sign-off/decide-record.mjs'), base, theme, movie, 'today', 'readme']);
-    assert.match(so('answers', board, '--key', 'ship-settings'), /ship-settings,friday/, 'the recorded answer was saved');
-    sh('ffmpeg', ['-loglevel', 'error', '-y', '-i', movie, '-vf', 'fps=8,scale=390:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64[p];[b][p]paletteuse=dither=bayer', '-loop', '0', join(out, `answer-${theme}.gif`)]);
-    assert.ok(readFileSync(join(out, `answer-${theme}.gif`)).length < 1500000, 'README loop under 1.5 MB');
-  }
+  const movie = join(out, 'answer-light.mp4');
+  sh(process.execPath, [join(repo, '.agents/skills/done-done-verify-sign-off/decide-record.mjs'), base, 'light', movie, 'today', 'readme']);
+  const answer = so('answers', board, '--key', 'ship-settings');
+  writeFileSync(join(out, 'answer.txt'), answer);
+  assert.match(answer, /ship-settings,friday/, 'the recorded answer was saved');
+  sh('ffmpeg', ['-loglevel', 'error', '-y', '-ss', '2', '-i', movie, '-vf', 'fps=8,scale=390:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64[p];[b][p]paletteuse=dither=bayer', '-loop', '0', join(out, 'answer-light.gif')]);
+  assert.ok(readFileSync(join(out, 'answer-light.gif')).length < 1500000, 'README loop under 1.5 MB');
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ commit: sh('git', ['rev-parse', 'HEAD'], { cwd: repo }).trim(), target: { version: so('--version').trim() },
     start: 'An isolated board for Umer: three projects with their own icons, an epic with tickets and tasks, asks (one taken by default, one picked by the agent), a design, a report and proof with done-done runs.',
     steps: ['Open each README screen at 390 (phone, 2x) and 1280 (desk), light and dark, in a headless Chromium: Today, Decide, a report in the reader, Evidence with Previews on, a ticket of the epic E-1 in Tickets, Designs and Today\'s More with Install app.',
-      'Answer the next ask on Today in light; read the saved Friday answer with the CLI and encode each real recording as a GIF under 1.5 MB.',
+      'Open the release ask from Today and answer it in light; read the saved Friday answer with the CLI and encode each real recording as a GIF under 1.5 MB.',
       'Check every frame: no sideways overflow, no letter tile in a list, no token in the text or address, no console error, no failed request.'],
     result: `${frames.length} frames saved and checked: ${frames.join(', ')}` }, null, 2) + '\n');
   console.log(`${out}: ${frames.length} frames`);

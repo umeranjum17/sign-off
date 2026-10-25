@@ -19,7 +19,7 @@
 // the next ask), Answer turning into a check (Cleared today counting it, Decide's badge counting down, the next ask rising in), Undo, the light-or-dark button tapped twice, More opened from the line under the tiles and closed,
 // the dock's Search with words typed and closed, and a Waiting on you row opening its ask.
 // Usage: node decide-record.mjs <board url> <light|dark> <out.mp4> today
-// Add readme to record only Today's real answer, then save the resulting API state.
+// Add readme to open the demo release ask from Today, pick Friday, and answer it.
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -99,11 +99,6 @@ try {
     const r = act && (await act());
     if (r === 'missing') throw new Error(`step ${i + 1} found nothing to tap at ${await evaluate('location.hash')}: ${act}`);
     await wait(ms);
-  }
-  if (modes.includes('readme')) {
-    const answer = await evaluate("fetch('/api/decisions').then(r => r.json()).then(x => JSON.stringify(x))");
-    writeFileSync(out + '.state.json', answer);
-    if (!answer.includes('ship-settings')) throw new Error('Demo ask missing after answer');
   }
   await send('Page.stopScreencast');
   await wait(300);
