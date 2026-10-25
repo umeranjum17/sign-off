@@ -4588,7 +4588,10 @@
       if (b.type === 'callout') return E('div', `kt kt-callout ${b.tone ?? 'note'}`, E('span', 'tile', gic(b.tone === 'warn' ? 'warn' : b.tone === 'ask' ? 'deeper' : 'info')), E('div', '', mdSpan('b', '', b.title, NOLINK), mdSpan('span', '', b.text)));
       if (b.type === 'beats') return beatsFig(s, b);
       if (b.type === 'video') return videoFig(s, b);
-      if (b.type === 'image') return E('figure', 'kt kt-image', el('img', { src: kitUrl(s, b.src, true), alt: b.alt ?? b.caption ?? '', loading: 'lazy', decoding: 'async' }), ...(b.caption ? [E('figcaption', 'kt-cap', b.caption)] : []));
+      if (b.type === 'image') {
+        const img = el('img', { src: kitUrl(s, b.src, true), alt: b.alt ?? b.caption ?? '', loading: 'lazy', decoding: 'async' });
+        return E('figure', 'kt kt-image', b.full ? el('a', { href: kitUrl(s, b.full), target: '_blank', rel: 'noopener' }, img) : img, ...(b.caption ? [E('figcaption', 'kt-cap', b.caption)] : []));
+      }
       if (b.type === 'file') return el('a', { class: 'kt kt-file', href: local(b.src), download: '' }, b.caption);
       if (b.type === 'table') {
         const wide = b.columns.length > 5 || [...b.columns, ...b.rows.flat()].some((c) => typeof c === 'object') || b.rows.some((r) => r.length !== b.columns.length);

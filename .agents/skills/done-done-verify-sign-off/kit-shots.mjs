@@ -44,7 +44,7 @@ const blocks = [
 const flow = process.env.KIT_FLOW === '1';
 const documents = process.env.KIT_DOCUMENTS === '1' || flow;
 if (documents) blocks.push(
-  { type: 'image', src: 'kit/one.png', caption: 'The original reference screen', alt: 'The board with example questions' },
+  { type: 'image', src: 'kit/one.png', full: 'kit/two.png', caption: 'The original reference screen', alt: 'The board with example questions' },
   { type: 'file', src: 'kit/report.md', caption: 'Read the full report' },
   { type: 'table', columns: ['Repo', 'Score', 'R1–R10', 'Top 3 gaps', 'First screen'], rows: [
     [{ text: 'sign-off', rowspan: 2 }, '7', { text: 'The original cells, with their span', colspan: 2 }, 'Desktop', 'Phone', 'Light'],
@@ -115,6 +115,9 @@ try {
         rowspan: table.querySelector('[rowspan="2"]')?.rowSpan, head: getComputedStyle(table.querySelector('thead')).display,
         scroll: getComputedStyle(box).overflowX, wide: box.scrollWidth > box.clientWidth, scrollContainers: [...document.querySelectorAll('body *')].filter((e) => e.scrollHeight > e.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(e).overflowY)).length };
     });
+    const fullImage = ask(() => document.querySelector('.kt-image a').href);
+    const fullResponse = await fetch(fullImage); assert.equal(fullResponse.status, 200);
+    assert.deepEqual(Buffer.from(await fullResponse.arrayBuffer()), readFileSync(join(dir, 'kit/two.png')));
     assert.ok(documentState.loaded); assert.ok(Math.abs(documentState.ratio - documentState.naturalRatio) < 0.02, 'the whole image, no crop');
     assert.deepEqual(documentState.cells, [6, 3]); assert.equal(documentState.colspan, 2); assert.equal(documentState.rowspan, 2);
     assert.equal(documentState.head, 'table-header-group'); assert.equal(documentState.scroll, 'auto');

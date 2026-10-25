@@ -242,7 +242,7 @@ test('document layout preserves authored text, inline local links and block orde
   writeFileSync(join(dir, 'frame.png'), readFileSync(new URL('../fixtures/evidence/product-board.png', import.meta.url)));
   const base = JSON.parse(readFileSync(join(fixtures, 'report.v5', 'valid-full.json')));
   const report = { ...base, key: 'original-document', schema: 4, layout: 'document', purpose: 'other', sections: [
-    { id: 'original', stage: 'found', heading: '', body: '', blocks: [{ type: 'text', level: 2, text: 'The answer' }, { type: 'text', text: 'The [full report](original.md), unchanged.' }, { type: 'image', src: 'frame.png' }] },
+    { id: 'original', stage: 'found', heading: '', body: '', blocks: [{ type: 'text', level: 2, text: 'The answer' }, { type: 'text', text: 'The [full report](original.md), unchanged.' }, { type: 'image', src: 'frame.png', full: 'frame.png' }] },
   ] };
   for (const field of ['understood', 'visual', 'next']) delete report[field];
   const post = (m) => spawnSync('node', [cli, 'post', board, '--kind', 'report', '--from', '-'], { encoding: 'utf8', env, cwd: dir, input: JSON.stringify(m) });

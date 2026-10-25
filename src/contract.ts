@@ -254,9 +254,10 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
         if (Object.hasOwn(o, 'length')) text(`${at}.length`, o.length, 12, 'the film\'s length, such as "0:10", in 12 characters or fewer');
         if (o.caption !== undefined) text(`${at}.caption`, o.caption, 280, 'what the film shows, in 280 characters or fewer');
       } else if (o.type === 'image' || o.type === 'file') {
-        only(['src', 'caption', ...(o.type === 'image' ? ['alt'] : [])], '{"type":"image","src":"frame.png","caption":"The reference"}');
+        only(['src', 'caption', ...(o.type === 'image' ? ['alt', 'full'] : [])], '{"type":"image","src":"frame.png","caption":"The reference"}');
         kitFile(`${at}.src`, o.src, o.type === 'image' ? KIT_IMAGE : /./, o.type === 'image' ? 'a .png, .jpg, .jpeg or .webp' : 'file', 'report.md');
         if (o.type === 'file' || o.caption !== undefined) text(`${at}.caption`, o.caption, 280, 'the original caption or link text, in 280 characters or fewer');
+        if (o.full !== undefined) kitFile(`${at}.full`, o.full, KIT_IMAGE, 'a .png, .jpg, .jpeg or .webp', 'full.png');
         if (Object.hasOwn(o, 'alt')) text(`${at}.alt`, o.alt, 280, 'what the image shows, in 280 characters or fewer');
       } else if (o.type === 'table') {
         only(['columns', 'rows'], '{"type":"table","columns":["Measured","App promo"],"rows":[["AI calls","3"]]}');
@@ -753,7 +754,7 @@ export const diagramViews = (m: any): { label: string; src: string; sha256?: str
 /** The gallery frames of a guided report or plan, in the order the board counts them for `gallery.<n>`: each section's options, each option's frames. */
 export const galleryFrames = (m: any): { device?: string; src: string; sha256?: string; bytes?: number }[] => [...(m?.sections ?? []).flatMap((s: any) => (s.gallery ?? []).flatMap((o: any) => o.frames)), ...(m?.sections ?? []).flatMap((s: any) => s.pins ?? [])];
 /** The files a section's blocks name, each once, in the order the blocks use them. */
-export const blockFiles = (s: any): string[] => [...new Set<string>((s?.blocks ?? []).flatMap((b: any) => b.type === 'text' ? localLinks(b.text) : b.type === 'table' ? localLinks(JSON.stringify([b.columns, b.rows])) : ['image', 'file'].includes(b.type) ? [b.src] : b.type === 'beats' ? b.beats.map((x: any) => x.image).filter(Boolean) : b.type === 'video' ? [b.poster, b.src] : b.type === 'compare' ? [b.before.image, b.after.image] : b.type === 'evidence' ? b.rows.map((r: any) => r.image).filter(Boolean) : []))];
+export const blockFiles = (s: any): string[] => [...new Set<string>((s?.blocks ?? []).flatMap((b: any) => b.type === 'text' ? localLinks(b.text) : b.type === 'table' ? localLinks(JSON.stringify([b.columns, b.rows])) : ['image', 'file'].includes(b.type) ? [b.src, ...(b.full ? [b.full] : [])] : b.type === 'beats' ? b.beats.map((x: any) => x.image).filter(Boolean) : b.type === 'video' ? [b.poster, b.src] : b.type === 'compare' ? [b.before.image, b.after.image] : b.type === 'evidence' ? b.rows.map((r: any) => r.image).filter(Boolean) : []))];
 const SAME_WORDS = 0.75;
 /** What the kit warns about, never refuses: a lead whose first sentence says again (most of its words are in) what the report's summary already said, so the reader reads it twice. */
 export function kitWarnings(m: any): string[] {

@@ -368,3 +368,5 @@ A project may have its own icon, which the board draws on the project's rows. Li
 - The name is the project as cards give it (a report's or design's `group`, a plan's `project`, the app of a `verify-<app>` proof), text of 1-40, matched without regard to case.
 - The icon is a picture in the board file's folder, named by its path from that folder: no `..`, `?`, `#` or `\`, and its real path, links followed, stays inside the folder. It is a `.png`, `.jpg`, `.jpeg`, `.webp` or `.svg` file whose content is that type (an SVG holds no script, `foreignObject` or event attribute), 500,000 bytes or fewer. `project` pins it by its `sha256` and `bytes`; the board serves only that file, and a file changed since is not served.
 - Both are optional. A project with no icon, a project not on the board and an icon that cannot be served all show a monogram tile, the project's initials. No icon ships with sign-off: each board brings its own.
+
+An image block may keep a separate full-resolution original as `full`; both `src` and `full` are local images pinned by hash. Tapping the reference opens that original.
