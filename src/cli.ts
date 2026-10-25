@@ -2473,6 +2473,8 @@ async function serve(args: string[]) {
     await sweep('startup');
     [file, evidenceRoot] = [parsed.file, parsed.values['evidence-root'] ? resolve(parsed.values['evidence-root']) : ''];
     guardReady = warmGuard();
+    // A card posted before the guard leaves the board once the warm pass reports it: the read built before then is dropped here, so the next poll shows it gone.
+    void guardReady.then(() => { built = undefined; }).catch(() => {});
     await new Promise<void>((ok, no) => server.once('error', no).listen(port, bind, ok)).catch((e) => {
       throw fail(e.code === 'EADDRINUSE' ? `port ${port} is in use; pass --port` : e.code === 'EADDRNOTAVAIL' ? `${bind} is not an address of this machine; pass another --bind` : e.message, 'SERVE_FAILED', 'Run `sign-off-axi --help` for the flags, then start it again');
     });
@@ -2569,11 +2571,16 @@ const page = readFileSync(new URL('../web/index.html', import.meta.url));
 /** Text a browser fetches is sent compressed when it takes that: the page and the board's state are mostly text and shrink 4-8x, which on a
  * phone's network is most of the wait. Brotli at a fast level for each reply; the page itself is squeezed once, on its first request. */
 const COMPRESSIBLE = /^(text\/|application\/(json|javascript|manifest\+json)|image\/svg)/;
-const squeeze = (req: IncomingMessage, bytes: Buffer): { bytes: Buffer; encoding?: string } => {
+/** The compression a reply can take: brotli, else gzip, else none; a reply of a kilobyte or less goes as it is. */
+const encodingOf = (req: IncomingMessage, size: number): 'br' | 'gzip' | undefined => {
   const takes = String(req.headers['accept-encoding'] ?? '');
-  if (bytes.length < 1024) return { bytes };
-  if (/\bbr\b/.test(takes)) return { bytes: brotliCompressSync(bytes, { params: { [zlib.BROTLI_PARAM_QUALITY]: 5, [zlib.BROTLI_PARAM_SIZE_HINT]: bytes.length } }), encoding: 'br' };
-  if (/\bgzip\b/.test(takes)) return { bytes: gzipSync(bytes, { level: 6 }), encoding: 'gzip' };
+  if (size < 1024) return undefined;
+  return /\bbr\b/.test(takes) ? 'br' : /\bgzip\b/.test(takes) ? 'gzip' : undefined;
+};
+const squeeze = (req: IncomingMessage, bytes: Buffer): { bytes: Buffer; encoding?: string } => {
+  const encoding = encodingOf(req, bytes.length);
+  if (encoding === 'br') return { bytes: brotliCompressSync(bytes, { params: { [zlib.BROTLI_PARAM_QUALITY]: 5, [zlib.BROTLI_PARAM_SIZE_HINT]: bytes.length } }), encoding };
+  if (encoding === 'gzip') return { bytes: gzipSync(bytes, { level: 6 }), encoding };
   return { bytes };
 };
 /** The board's design tokens, shared parts and typeface, favicon, home-screen icon and install manifest, served beside the page; see web/tokens.css, web/ui.css and web/icon.svg. */
@@ -2601,6 +2608,16 @@ const unchanged = (req: IncomingMessage, tag: string) => req.headers['if-none-ma
 /** Added to each design mock page and plan page so the person can point at a part of it; see web/point.js. */
 const pointer = Buffer.from(`<script>${readFileSync(new URL('../web/point.js', import.meta.url), 'utf8')}</script>`);
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
+/** A file's identity for the board's kept read: inode, size and change time, so a rewrite that keeps its size still counts as a change. */
+const stampOf = (path: string) => { try { const st = statSync(path); return `${st.ino}:${st.size}:${st.mtimeMs}`; } catch { return ''; } };
+/** The files beside the board that hold what it shows: every answer, comment, ticket, read and handed-over reply changes the board's state. */
+const SIDECARS = ['answers', 'rounds', 'seen', 'dismissed', 'kinds', 'promoted', 'tickets', 'projects', 'messages', 'annotations', 'reads', 'deeper', 'trail', 'ticket-comments', 'delivery'];
+/** The files a board read is made from that are named without reading the board: the board itself, its sidecars, and the config and token beside it. */
+const stateSources = () => [file, config, tokenFile(file), ...SIDECARS.map((side) => `${file.replace(/\.json$/, '')}.${side}.jsonl`)];
+/** The files a read was built from beyond those, with the stamp each had: a run's proof or a mock replaced on disk is a new read. */
+let building: Map<string, string> | undefined;
+/** Note a file the state is made from, so a poll of a board that has not changed costs stats instead of the whole board. */
+const builtFrom = (path: string) => { const stamp = stampOf(path); building?.set(path, stamp); return stamp; };
 /** Added to each diagram page: on the page opened by itself, a way back to its plan or report, and a phone's drawing-alone page sized to the drawing; see web/diagram-page.js. */
 const diagramPage = (back: string, label: string) => Buffer.from(`<script data-back="${back}" data-label="${label}">${readFileSync(new URL('../web/diagram-page.js', import.meta.url), 'utf8')}</script>`);
 /** A card whose picture is a colour-bar test card or a placeholder is not shown: a card posted before the guard can hold one. Read by the
@@ -2728,12 +2745,37 @@ const state = () => {
     projects: readProjects(file, warn),
   };
 };
+/** The board's state as the bytes a poll reads, built once per change of any file it is made from: a phone asks again every 20 seconds, and an
+ * unchanged board costs the stats of its files (a 304 with no body) instead of five megabytes of rebuilding and serialising. Any answer, dismiss,
+ * comment, ticket or proof that lands changes a file it was built from, so a read never shows a board older than the files it names. */
+let built: { stamps: Map<string, string>; json: Buffer; tag: string; sent: Map<string, { bytes: Buffer; encoding?: string }> } | undefined;
+/** The state as it is now, rebuilt only when a file it was made from has changed; `tag` names the exact bytes for If-None-Match. */
+function stateRead() {
+  if (built && [...built.stamps].every(([path, stamp]) => stampOf(path) === stamp)) return built;
+  const before = new Map(stateSources().map((path) => [path, stampOf(path)] as const));
+  building = new Map(before);
+  let body: ReturnType<typeof state>, stamps: Map<string, string> | undefined;
+  try { body = state(); } finally { stamps = building; building = undefined; }
+  const json = Buffer.from(JSON.stringify(body!));
+  const made = { stamps: stamps!, json, tag: `"${sha256(json).slice(0, 32)}"`, sent: new Map<string, { bytes: Buffer; encoding?: string }>() };
+  // The board was written while it was read, so this body is of the older board: it is answered, but the next read builds again.
+  built = stateSources().every((path) => stampOf(path) === before.get(path)) ? made : undefined;
+  return made;
+}
+/** The kept read as this request can take it: squeezed once for each encoding, so a phone's 20-second poll compresses nothing. */
+const stateSent = (read: NonNullable<typeof built>, req: IncomingMessage) => {
+  const key = encodingOf(req, read.json.length) ?? '';
+  let sent = read.sent.get(key);
+  if (!sent) read.sent.set(key, (sent = squeeze(req, read.json)));
+  return sent;
+};
 /** A mock file's sha256 now, or null when it is gone: a comment shows only on the exact file it was made on.
  * Kept per file while its size, change time and inode stay the same, so a state read does not rehash every mock. */
 const mockHashes = new Map<string, { at: string; hash: string }>();
 const mockHash = (path: string) => {
   try {
     const actual = under(dirname(file), mockFile(path)), st = statSync(actual), at = `${st.ino}:${st.size}:${st.mtimeMs}:${st.ctimeMs}`, kept = mockHashes.get(actual);
+    builtFrom(actual);
     if (kept?.at === at) return kept.hash;
     const hash = sha256(readFileSync(actual));
     mockHashes.set(actual, { at, hash });
@@ -2787,11 +2829,24 @@ function under(root: string, rel: string): string {
   if (actual !== base && !actual.startsWith(base + sep)) throw new EvidenceError('mock path escapes the board folder');
   return actual;
 }
+/** done-done's app folders, listed again only when that folder itself changes, and the folder each run was found in: a board of thousands of
+ * proof cards looks each run's folder up once instead of listing the store for every card. A run found nowhere is looked for again (the proof may
+ * land after its card), so only a folder that was found is kept. */
+const appFolders = { at: 'init', dirs: [] as string[] }, foundRoots = new Map<string, string>();
 /** The folder holding a run's record: --evidence-root, else the app folder done-done keeps it in (~/.done-done/evidence/<app>); '' when no folder holds it. */
 function rootOf(runId: string): string {
   if (evidenceRoot) return evidenceRoot;
-  const store = join(homedir(), '.done-done', 'evidence');
-  try { return readdirSync(store).map((app) => join(store, app)).find((dir) => existsSync(join(dir, '.done-done', 'runs', `${runId}.json`))) ?? ''; } catch { return ''; }
+  const store = join(homedir(), '.done-done', 'evidence'), at = builtFrom(store);
+  if (appFolders.at !== at) {
+    let dirs: string[] = [];
+    try { dirs = readdirSync(store).map((app) => join(store, app)); } catch {}
+    Object.assign(appFolders, { at, dirs });
+  }
+  const kept = foundRoots.get(runId);
+  if (kept) return kept;
+  const hit = appFolders.dirs.find((dir) => existsSync(join(dir, '.done-done', 'runs', `${runId}.json`)));
+  if (hit) foundRoots.set(runId, hit);
+  return hit ?? '';
 }
 function contained(evidence: string, path: string, missing = 'A picture or recording of the proof is missing.'): string {
   let root: string, actual: string;
@@ -2802,35 +2857,50 @@ function contained(evidence: string, path: string, missing = 'A picture or recor
   if (!actual.startsWith(root + sep)) throw new EvidenceError('A picture or recording is outside the proof folder.');
   return actual;
 }
+/** A run's record checked against the board's link, and every picture it names read and hashed: the card the page draws, or the sentence saying
+ * why it cannot be checked. */
+function checkProof(link: NonNullable<Decision['evidence']>, root: string, recordPath: string) {
+  if (statSync(recordPath).size > 1_000_000) throw new EvidenceError('The proof for this run is too large to read.');
+  const run = JSON.parse(readFileSync(recordPath, 'utf8'));
+  if (!run || typeof run !== 'object' || Array.isArray(run)) throw new EvidenceError('The proof for this run cannot be read.');
+  if (run.schema !== 1 || run.run_id !== link.run_id || run.commit !== link.commit || !/^[a-f0-9]{40}$/.test(run.tree ?? '')
+    || typeof run.dirty !== 'boolean' || !(run.exit === null || Number.isInteger(run.exit)) || !Array.isArray(run.files)
+    || run.files.some((f: any) => !f || typeof f !== 'object' || typeof f.path !== 'string' || !/^[a-f0-9]{64}$/.test(f.sha256 ?? '') || !Number.isInteger(f.bytes) || f.bytes < 0)) {
+    throw new EvidenceError('The proof does not match this change.');
+  }
+  const media: { path: string; url: string; type: string }[] = run.files.flatMap((f: any) => {
+    const type = mediaTypes[extname(f.path ?? '').toLowerCase()];
+    if (!type) return [];
+    const path = contained(root, f.path);
+    builtFrom(path);
+    if (statSync(path).size > 20_000_000) throw new EvidenceError('A picture or recording of the proof is too large.');
+    const bytes = readFileSync(path);
+    if (bytes.length !== f.bytes || sha256(bytes) !== f.sha256) throw new EvidenceError('A picture or recording changed after the run.');
+    return [{ path: f.path, url: `/api/evidence?run=${encodeURIComponent(link.run_id)}&file=${encodeURIComponent(f.path)}`, type }];
+  });
+  const result = !Number.isInteger(run.exit) ? 'INCONCLUSIVE' : run.exit !== 0 || run.dirty || !run.files.length ? 'RUN FAIL' : 'RUN PASS';
+  return { status: 'verified' as const, result, commit: run.commit, media };
+}
+/** A run's card, kept beside the stamp of its record and of each picture: checking one hashes every picture once, and every board read after that
+ * pays for the stats. A kept card says what a fresh check would while those files are unchanged; a changed one is checked again from its record. */
+const proofCards = new Map<string, { record: string; media: { path: string; stamp: string }[]; card: ReturnType<typeof checkProof> }>();
 /** A linked run as the board checked it; the reason a check failed is a plain sentence for the card.
  * With no --evidence-root the board looks in done-done's own folder for the app; a run it finds nowhere cannot be checked, so the card shows no result rather than one that blames the run. */
 function evidenceCard(link: NonNullable<Decision['evidence']>) {
   const root = rootOf(link.run_id);
   if (!root) return null;
   try {
-    const recordPath = contained(root, `.done-done/runs/${link.run_id}.json`, 'The proof for this run is missing.');
-    if (statSync(recordPath).size > 1_000_000) throw new EvidenceError('The proof for this run is too large to read.');
-    const run = JSON.parse(readFileSync(recordPath, 'utf8'));
-    if (!run || typeof run !== 'object' || Array.isArray(run)) throw new EvidenceError('The proof for this run cannot be read.');
-    if (run.schema !== 1 || run.run_id !== link.run_id || run.commit !== link.commit || !/^[a-f0-9]{40}$/.test(run.tree ?? '')
-      || typeof run.dirty !== 'boolean' || !(run.exit === null || Number.isInteger(run.exit)) || !Array.isArray(run.files)
-      || run.files.some((f: any) => !f || typeof f !== 'object' || typeof f.path !== 'string' || !/^[a-f0-9]{64}$/.test(f.sha256 ?? '') || !Number.isInteger(f.bytes) || f.bytes < 0)) {
-      throw new EvidenceError('The proof does not match this change.');
-    }
-    const media: { path: string; url: string; type: string }[] = run.files.flatMap((f: any) => {
-      const type = mediaTypes[extname(f.path ?? '').toLowerCase()];
-      if (!type) return [];
-      const path = contained(root, f.path);
-      if (statSync(path).size > 20_000_000) throw new EvidenceError('A picture or recording of the proof is too large.');
-      const bytes = readFileSync(path);
-      if (bytes.length !== f.bytes || sha256(bytes) !== f.sha256) throw new EvidenceError('A picture or recording changed after the run.');
-      return [{ path: f.path, url: `/api/evidence?run=${encodeURIComponent(link.run_id)}&file=${encodeURIComponent(f.path)}`, type }];
+    const recordPath = contained(root, `.done-done/runs/${link.run_id}.json`, 'The proof for this run is missing.'), record = builtFrom(recordPath);
+    const kept = proofCards.get(link.run_id);
+    if (kept && kept.record === record && kept.media.every((m) => builtFrom(m.path) === m.stamp)) return kept.card;
+    const card = checkProof(link, root, recordPath), media = card.media.flatMap((m) => {
+      try { const path = contained(root, m.path); return [{ path, stamp: stampOf(path) }]; } catch { return []; }
     });
-    const result = !Number.isInteger(run.exit) ? 'INCONCLUSIVE' : run.exit !== 0 || run.dirty || !run.files.length ? 'RUN FAIL' : 'RUN PASS';
-    return { status: 'verified', result, commit: run.commit, media };
+    proofCards.set(link.run_id, { record, media, card });
+    return card;
   } catch (e: any) {
     const reason = e instanceof EvidenceError ? e.message : 'The proof for this run cannot be read.';
-    return { status: 'unverified', result: 'UNVERIFIED', reason, commit: '', media: [] };
+    return { status: 'unverified' as const, result: 'UNVERIFIED', reason, commit: '', media: [] };
   }
 }
 
@@ -2932,12 +3002,6 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     } catch { return [404, { error: 'Attachment is unavailable' }]; }
   }
   if (req.method === 'GET' && req.url === '/api/board') return [200, { file, pid: process.pid }];
-  if (req.method === 'GET' && ['/api/decisions', '/api/state'].includes(req.url ?? '')) {
-    let timer: NodeJS.Timeout | undefined;
-    await Promise.race([guardReady, new Promise<void>((ok) => { timer = setTimeout(ok, GUARD_WAIT); })]);
-    clearTimeout(timer);
-    return [200, state()];
-  }
   if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/signin', '/api/leash', '/api/deeper', '/api/reads', '/api/trail', '/api/engagement', '/api/engagement/seen'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
   if (readOnly()) return [403, { error: 'This board is read-only' }];
   // The leash is the person's own setting in config.yaml, which the board applies to the answers it takes, so an answers-only board takes it too.
@@ -3220,6 +3284,23 @@ const server = createServer(async (req, res) => {
     if (unchanged(req, pageTag)) return res.writeHead(304, headers).end();
     const takes = String(req.headers['accept-encoding'] ?? ''), encoding = /\bbr\b/.test(takes) ? 'br' : /\bgzip\b/.test(takes) ? 'gzip' : undefined, bytes = encoding ? pageAs(encoding) : served;
     return res.writeHead(200, { ...headers, ...(encoding && { 'content-encoding': encoding }), 'content-length': bytes.length }).end(bytes);
+  }
+  // The board's read is kept as one body: a poll of an unchanged board is a 304 that rebuilds and re-encodes nothing, and a phone's 20-second
+  // check costs a few stats. It waits for the warm pass at most GUARD_WAIT, as every board read always has.
+  if (req.method === 'GET' && (req.url === '/api/decisions' || req.url === '/api/state')) {
+    let timer: NodeJS.Timeout | undefined;
+    await Promise.race([guardReady, new Promise<void>((ok) => { timer = setTimeout(ok, GUARD_WAIT); })]);
+    clearTimeout(timer);
+    try {
+      const kept = stateRead(), headers = { etag: kept.tag, 'cache-control': 'no-cache', vary: 'accept-encoding' };
+      if (unchanged(req, kept.tag)) return res.writeHead(304, headers).end();
+      const sent = stateSent(kept, req);
+      return res.writeHead(200, { 'content-type': 'application/json', 'content-length': sent.bytes.length, ...(sent.encoding && { 'content-encoding': sent.encoding }), ...headers }).end(sent.bytes);
+    } catch (e: any) {
+      // A board that cannot be read answers like every other route: the reason in plain words, never a dropped connection.
+      return res.writeHead(e instanceof InputError ? 422 : e instanceof SyntaxError ? 400 : 500, { 'content-type': 'application/json', 'cache-control': 'no-cache' })
+        .end(JSON.stringify({ error: e.message }));
+    }
   }
   let status: number, body: unknown;
   try {
