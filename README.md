@@ -19,6 +19,10 @@
   </picture>
 </p>
 
+<p align="center"><img src="docs/media/answer-light.gif" width="300" alt="Real demo board: Umer answers the release question and Today updates"></p>
+
+A real ask answered on the demo board. The capture journey checks that the CLI reads back **Friday**. The projects and work shown are demo data.
+
 ## Quick start
 
 Requires Node.js 22.5 or newer. Run in your project folder. This example installs the Codex skill; [choose another agent](docs/commands.md#agent-setup) if needed.
@@ -46,10 +50,6 @@ When several agents need you, questions get spread across terminals. sign-off co
 | Read “done” in chat | Open screenshots and recordings in Evidence |
 | Explain which part needs changing | Comment on the part of a plan or report in view |
 | Ask whether feedback arrived | See Sent, Delivered, Read, and Replied |
-
-<p align="center"><img src="docs/media/answer-light.gif" width="300" alt="Real demo board: Umer answers the release question and Today updates"></p>
-
-A real ask answered on the demo board. The capture journey checks that the CLI reads back **Friday**. The projects and work shown are demo data.
 
 ## What you get
 
