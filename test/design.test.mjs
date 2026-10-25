@@ -4816,6 +4816,7 @@ test('detail sequence follows the originating list across phone sheets, desk pan
       await evaluate(`document.querySelector('.rp-page a.dl-face, .split-list a.dl-face').click()`);
       await until(async () => (await evaluate('document.querySelector(".detail-sequence .position")?.textContent')) === '1 of 2');
       assert.equal(await metadataFits(), true, 'phone report metadata fits beside navigation');
+      if (width === 390) assert.equal(await evaluate(`document.querySelector('.rp-sheet-body .detail-sequence').getBoundingClientRect().bottom <= document.querySelector('.rp-sheet-body h1').getBoundingClientRect().top`), true, 'the pager sits above the report title, not over it');
       await key('j'); await until(async () => (await evaluate('location.hash')) === filtered[1]);
       assert.equal(await evaluate('document.querySelector(".detail-sequence button:last-child").disabled'), true);
     } finally { await close(); }
