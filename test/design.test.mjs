@@ -4205,6 +4205,23 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
   }
   assert.equal(run('ticket', file, '--id', 'T-29', '--release', '', '--state', '', '--pr', '').code, 0);
   assert.deepEqual([getTicket().release, getTicket().state, getTicket().prs], [undefined, undefined, undefined]);
+  // Stage and last event are sync facts, independent of the percentage and legacy state.
+  assert.equal(run('ticket', file, '--stage', 'review').code, 2);
+  assert.equal(run('ticket', file, '--last-event-at', '1792820000').code, 2);
+  for (const stage of ['queued', 'building', 'review', 'merging', 'done']) {
+    assert.equal(run('ticket', file, '--id', 'T-29', '--stage', stage, '--last-event-at', '1792820000').code, 0);
+    assert.deepEqual([getTicket().stage, getTicket().last_event_at, getTicket().progress], [stage, 1792820000, 60]);
+  }
+  assert.equal(run('ticket', file, '--id', 'T-29', '--last-event-at', '2026-10-24T06:53:20Z').code, 0);
+  assert.equal(getTicket().last_event_at, 1792824800);
+  assert.match(run('ticket', file, '--id', 'T-29', '--stage', 'done').out, /status: unchanged/);
+  for (const bad of [['--stage', 'started'], ['--last-event-at', 'yesterday'], ['--last-event-at', '-1'], ['--last-event-at', 'Infinity'], ['--last-event-at', '2026-02-30T00:00:00Z'], ['--last-event-at', '2026-10-24T00:00:00+04:00'], ['--last-event-at', '99999999999999999'], ['--comment', '{}', '--stage', 'done']]) {
+    const before = readFileSync(join(dir, 'board.tickets.jsonl'), 'utf8');
+    assert.equal(run('ticket', file, '--id', 'T-29', ...bad).code, 2, bad.join(' '));
+    assert.equal(readFileSync(join(dir, 'board.tickets.jsonl'), 'utf8'), before);
+  }
+  assert.equal(run('ticket', file, '--id', 'T-29', '--stage', '', '--last-event-at', '').code, 0);
+  assert.deepEqual([getTicket().stage, getTicket().last_event_at], [undefined, undefined]);
   const lines = readFileSync(join(dir, 'board.tickets.jsonl'), 'utf8');
   for (const bad of [['--priority', 'P7'], ['--hold', 'maybe'], ['--asked', '1'], ['--project', 'x'.repeat(41)]]) assert.equal(run('ticket', file, '--id', 'T-31', ...bad).code, 2, bad.join(' '));
   assert.equal(readFileSync(join(dir, 'board.tickets.jsonl'), 'utf8'), lines);
@@ -4656,8 +4673,8 @@ test('the new look draws only the approved prototype\'s colours: Today, Decide, 
   const fileOf = (name, m) => (writeFileSync(join(dir, name), JSON.stringify(m)), join(dir, name));
   // A board with every kind of card on it: asks with and without a priority, a pick-one, a plan, a guided report, a design on a ticket, a proof and a sign-in,
   // an epic with a ticket under it, a ticket on hold and a system one, so each screen draws its chips, bars, dots and rows.
-  for (const args of [['--id', 'T-9', '--title', 'The new settings page', '--priority', 'P1', '--project', 'Settings', '--asked', 'yes'], ['--id', 'T-29', '--title', 'Ship the new settings page', '--progress', '60', '--parent', 'T-9', '--priority', 'P0'],
-    ['--id', 'T-31', '--title', 'Write the release notes', '--priority', 'P2', '--hold', 'yes', '--asked', 'yes'], ['--id', 'T-40', '--title', 'Rotate the nightly logs', '--priority', 'P3', '--progress', '100']]) assert.equal(run('ticket', file, ...args).code, 0, args.join(' '));
+  for (const args of [['--id', 'T-9', '--title', 'The new settings page', '--priority', 'P1', '--project', 'Settings', '--asked', 'yes'], ['--id', 'T-29', '--title', 'Ship the new settings page', '--progress', '60', '--parent', 'T-9', '--priority', 'P0', '--stage', 'review', '--last-event-at', '1790000000'],
+    ['--id', 'T-31', '--title', 'Write the release notes', '--priority', 'P2', '--hold', 'yes', '--asked', 'yes', '--stage', 'building', '--last-event-at', '1790000000'], ['--id', 'T-40', '--title', 'Rotate the nightly logs', '--priority', 'P3', '--progress', '100']]) assert.equal(run('ticket', file, ...args).code, 0, args.join(' '));
   for (const args of [
     ['raise', file, '--ticket', 'T-29', '--priority', 'P0', '--key', 'ask-linked', '--title', 'Ship the settings page on Friday?'],
     ['raise', file, '--priority', 'P1', '--key', 'ask-plain', '--title', 'Keep the old settings link for a week?'],

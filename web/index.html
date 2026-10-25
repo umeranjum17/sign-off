@@ -1949,6 +1949,11 @@
   @keyframes tk-fade { from { opacity: 0; } }
   body:has(.tk-sheet) { overflow: hidden; }
   .tk-sheet .grab { width: 2.25rem; height: 0.25rem; margin: 0.5rem auto; border-radius: 2px; background: var(--tk-line); }
+  .tk-stuck { flex: none; color: var(--tk-warn); white-space: nowrap; font-size: 11px; line-height: 1rem; }
+  .tk-status { display: inline-flex; flex: none; align-items: center; gap: 6px; margin-right: 6px; }
+  .tk-stage { display: inline-flex; width: auto; height: 1rem; padding: 0 4px; white-space: nowrap; line-height: 1rem; background: var(--tk-inset); }
+  :is(.tk-sheet, .tk-pane) .ui-pr:has(.tk-stage) .v { flex-wrap: wrap; gap: 6px; padding: 8px 0; }
+  :is(.tk-sheet, .tk-pane) .ui-pr .v > span:is(.tk-stage, .tk-stuck) { white-space: nowrap; overflow: visible; }
   .tk-release { display: inline-block; width: auto; max-width: 110px; padding: 0 6px; background: var(--tk-inset); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* The ticket: its project and state (with Close on a phone), its title in full, its properties, the tickets under it, Linked and Activity. */
   .tk-shd { display: flex; align-items: center; gap: 0.5rem; min-height: 2.5rem; }
@@ -3372,6 +3377,14 @@
   const tkAll = () => state.tickets ?? [];
   const tkById = (id) => tkAll().find((t) => t.id === id);
   const tkStateOf = (t) => ({ queued: 'todo', 'in progress': 'moving', 'on hold': 'hold', done: 'done' }[t.state] ?? (t.progress >= 100 ? 'done' : t.hold ? 'hold' : t.progress > 0 ? 'moving' : 'todo'));
+  const TICKET_STUCK_SECONDS = 6 * 60 * 60;
+  const tkStatus = (t) => {
+    if (tkUnder(t).length) return [];
+    const age = Date.now() / 1000 - t.last_event_at;
+    return [t.stage ? el('span', { class: 'ui-pc tk-stage' }, t.stage) : '',
+      t.last_event_at !== undefined && t.stage !== 'done' && age > TICKET_STUCK_SECONDS
+        ? el('span', { class: 'tk-stuck' }, `stuck ${age < 86400 ? Math.floor(age / 3600) + 'h' : Math.floor(age / 86400) + 'd'}`) : ''];
+  };
   const tkUnder = (t) => tkAll().filter((x) => x.parent === t.id);
   /** The tickets a ticket sits under, nearest first; a parent not on the board, or a loop of parents, ends the line. */
   const tkAbove = (t) => { const up = []; for (let x = tkById(t.parent); x && x !== t && !up.includes(x); x = tkById(x.parent)) up.push(x); return up; };
@@ -3388,7 +3401,7 @@
   function tkRow(t) {
     const kids = tkUnder(t), done = kids.filter((x) => tkStateOf(x) === 'done').length, s = tkStateOf(t);
     const link = el('a', { class: 'ui-row tk-row', href: `#ticket/${t.id}`, ...(t.id === tkShown && { 'aria-current': 'true' }), 'aria-label': `${t.title}, ${TK_WORDS[s].toLowerCase()}${t.progress ? `, ${t.progress}% done` : ''}` },
-      ...uiRow({ tile: tkTile(t), title: t.title, priority: t.priority, progress: progressOf(t.progress),
+      ...uiRow({ tile: tkTile(t), title: t.title, priority: t.priority, progress: t.stage && !kids.length ? t.progress : progressOf(t.progress), lead: el('span', { class: 'tk-status' }, ...tkStatus(t)),
         meta: [TK_WORDS[s], kids.length ? `${done} of ${plural(kids.length, tkKids(kids[0]))} done` : tkWhen(t.at)].join(' · ') }));
     if (t.release) link.querySelector('.l1').append(el('span', { class: 'ui-pc tk-release', title: t.release }, t.release));
     return el('li', {}, link);
@@ -3509,7 +3522,7 @@
       el('h2', { class: 'tk-dt', tabindex: '-1', dir: 'auto' }, t.title),
       t.release ? el('span', { class: 'ui-pc tk-release', title: t.release }, t.release) : '',
       el('div', { class: 'ui-props' }, t.priority ? prop('flag', 'Priority', el('span', { class: `ui-pc ${t.priority.toLowerCase()}` }, t.priority)) : '',
-        prop('half', 'Progress', ...(t.progress > 0 && t.progress < 100 ? [el('span', { class: 'ui-bar' }, el('i', { style: `width: ${t.progress}%` })), el('span', { class: 'n' }, `${t.progress}%`)] : [el('span', {}, t.progress >= 100 ? 'All done' : 'Not started')])),
+        prop('half', 'Progress', ...tkStatus(t), ...((t.stage && !kids.length) || (t.progress > 0 && t.progress < 100) ? [el('span', { class: 'ui-bar' }, el('i', { style: `width: ${t.progress}%` })), el('span', { class: 'n' }, `${t.progress}%`)] : [el('span', {}, t.progress >= 100 ? 'All done' : 'Not started')])),
         up ? prop('layers', 'Part of', el('a', { href: `#ticket/${up.id}`, dir: 'auto' }, up.title)) : '',
         prop('clock', 'Last update', el('span', {}, stamp(t.at)))),
       ...(kids.length ? [el('p', { class: 'ui-dl' }, `${tkAbove(t).length ? 'Sub-tasks' : 'Tickets in this epic'} · ${done} of ${kids.length} done`), el('ul', { class: 'ui-list tk-in' }, ...kids.map(tkRow))] : []),
