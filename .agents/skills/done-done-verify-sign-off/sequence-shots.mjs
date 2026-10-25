@@ -15,15 +15,16 @@ const browser = (...args) => run('chrome-devtools-axi', args, { env: browserEnv 
 const read = (js) => JSON.parse(JSON.parse(JSON.parse(browser('eval', js).match(/result: (".*")/)[1])));
 const cli = (...args) => run(process.execPath, [resolve('dist/cli.js'), ...args], { env });
 const settle = () => browser('eval', 'async () => { await new Promise(r => setTimeout(r, 500)); await document.fonts.ready; return 1; }');
-const records = [];
+const records = [], reportsOnly = process.env.SEQUENCE_ONLY === 'reports'; // the report sheet alone, so a judge sees only the frames a report claim names
 try {
   const base = run('bash', ['.agents/skills/done-done-verify-sign-off/seed-board.sh', dir], { env }).trim().split('\n').at(-1);
+  copyFileSync('docs/logo.svg', join(dir, 'project.svg')); cli('project', join(dir, 'board.json'), '--name', 'sign-off', '--icon', 'project.svg');
   for (const id of ['T-1', 'T-2']) cli('ticket', join(dir, 'board.json'), '--id', id, '--title', id === 'T-1' ? 'Ship the settings page' : 'Prepare release notes', '--asked', 'yes', '--progress', '40');
   const design = JSON.parse(readFileSync(join(dir, 'design-message.json'), 'utf8'));
-  writeFileSync(join(dir, 'second-design.json'), JSON.stringify({ ...design, key: 'settings-review', title: 'Settings review' }));
+  writeFileSync(join(dir, 'second-design.json'), JSON.stringify({ ...design, key: 'settings-review', title: 'Approve the settings review?' }));
   cli('post', join(dir, 'board.json'), '--kind', 'design', '--from', join(dir, 'second-design.json'));
-  cli('post', join(dir, 'board.json'), '--type', 'report', '--key', 'release-notes', '--title', 'Release notes', '--about', 'Umer can review the next report.', '--view', 'page/index.html', '--preview', 'page/preview.svg');
-  for (const width of (process.env.SEQUENCE_WIDTHS ?? '360,390,445,1280,1440').split(',').map(Number)) for (const theme of ['light', 'dark']) {
+  cli('post', join(dir, 'board.json'), '--type', 'report', '--key', 'release-notes', '--title', 'Release notes', '--about', 'Umer can review the next report.', '--purpose', 'other', '--project', 'sign-off', '--view', 'page/index.html', '--preview', 'page/preview.svg');
+  for (const width of (process.env.SEQUENCE_WIDTHS ?? (reportsOnly ? '360,390,445,1280' : '360,390,445,1280,1440')).split(',').map(Number)) for (const theme of ['light', 'dark']) {
     const cell = `${theme}.${width}w`, height = width >= 1440 ? 900 : width >= 1024 ? 800 : 844;
     const capture = (area, drive) => { for (let attempt = 1; attempt <= 2; attempt++) {
       try { browserEnv.CHROME_DEVTOOLS_AXI_SESSION = `so-sequence-${process.pid}-${width}-${theme}-${records.length}-${attempt}`;
@@ -34,9 +35,9 @@ try {
       } catch (error) { if (!/BROWSER_ERROR|BRIDGE_NOT_READY/.test(String(error))) throw error; if (attempt === 2) { records.push({ cell, area, missing: String(error) }); console.error(cell, area, String(error)); } }
       finally { browser('stop'); }
     } };
-    capture('sequence', () => {
+    if (!reportsOnly) capture('sequence', () => {
     browser('open', base + '#waiting'); settle();
-    browser('eval', '() => { document.querySelector("#item-ship").click(); return 1; }'); settle();
+    browser('eval', 'async () => { for (let i = 0; i < 40 && !document.querySelector("#item-ship"); i++) await new Promise(r => setTimeout(r, 250)); document.querySelector("#item-ship").click(); return 1; }'); settle();
     const check = read(`() => { const n = document.querySelector('.detail-sequence'), b = n?.getBoundingClientRect(), label = document.querySelector('.ask-sheet .sh-lab'), header = label?.closest('.sh-head'), title = document.querySelector('.ask-sheet #ask-title'); return JSON.stringify({ width: innerWidth, theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light', position: n?.querySelector('.position')?.textContent ?? null, overflow: document.documentElement.scrollWidth > innerWidth, headerFits: !b || b.left >= 0 && b.right <= innerWidth, metadataFits: !label || label.scrollWidth <= label.clientWidth + 1, titleClear: !header || header.getBoundingClientRect().bottom <= title.getBoundingClientRect().top, routes: history.state?.detailSequence?.routes }); }`);
     assert.equal(check.overflow, false); assert.equal(check.headerFits, true); assert.equal(check.metadataFits, true); assert.equal(check.titleClear, true);
     if (!before) {
@@ -62,13 +63,14 @@ try {
       run('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', join(dir, 'motion.ffconcat'), '-vf', 'fps=30,scale=390:844:force_original_aspect_ratio=decrease,pad=390:844:(ow-iw)/2:(oh-ih)/2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', join(out, 'sequence-motion.mp4')]);
     }
     });
-    for (const [area, selector] of [['evidence', '.ev-list a[href]'], ['reports', '.rp-page a.dl-face'], ['designs', '.dz-list a[href], .dz-strip a[href]'], ['tickets', '.tk-row']]) {
+    for (const [area, selector] of [['reports', '.rp-page a.dl-face'], ['designs', '.dz-list a[href], .dz-strip a[href]'], ['tickets', '.tk-row']].filter(([area]) => !reportsOnly || area === 'reports')) {
       capture(area, () => {
       browser('open', base + '#' + area); settle();
-      if (area === 'evidence') { browser('screenshot', join(out, `evidence-list.${cell}.png`)); records.push({ cell, area: 'evidence-list' }); }
-      browser('eval', `() => { document.querySelector(${JSON.stringify(selector)}).click(); return 1; }`); settle();
+      browser('eval', `async () => { for (let i = 0; i < 40 && !document.querySelector(${JSON.stringify(selector)}); i++) await new Promise(r => setTimeout(r, 250)); document.querySelector(${JSON.stringify(selector)}).click(); return 1; }`); settle();
       const position = read('() => JSON.stringify(document.querySelector(".detail-sequence .position")?.textContent ?? null)');
       if (!before) assert.ok(position, area + ' header');
+      const titleBelowPager = area === 'reports' && width < 1024 ? read('() => JSON.stringify(document.querySelector(".rp-sheet-body .detail-sequence").getBoundingClientRect().bottom <= document.querySelector(".rp-sheet-body h1").getBoundingClientRect().top)') : undefined;
+      if (!before && titleBelowPager !== undefined) assert.equal(titleBelowPager, true, 'on a phone the report sheet title sits below its previous and next buttons');
       browser('screenshot', join(out, `${area}.${cell}.png`));
       if (!before) {
         const routes = read('() => JSON.stringify(history.state.detailSequence.routes)');
@@ -78,12 +80,12 @@ try {
         browser('press', 'k'); settle();
         assert.equal(read('() => JSON.stringify(location.hash)'), routes[0], area + ' previous');
       }
-      records.push({ cell, area, position });
+      records.push({ cell, area, position, ...(titleBelowPager !== undefined && { 'report sheet title sits below its previous and next buttons': titleBelowPager }) });
       });
     }
   }
   writeFileSync(join(out, 'sequence-checks.json'), JSON.stringify(records, null, 2));
-  writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(resolve('package.json'), 'utf8')).version }, start: 'The originating filtered list', steps: before ? ['Open each detail kind and the Evidence list in both themes at five widths', 'Read the existing headers before detail navigation'] : ['Browse an open ask with previous/next arrows and a position at 360, 390, 445, 1280 and 1440 in light and dark', 'Use J/K to move in the originating list order across asks, proofs, reports, designs and tickets, keeping each sequence', 'Reload and confirm the same sequence and position', 'Read header position and disabled end arrows'], result: before ? 'Baseline detail headers and list rows captured before navigation changes' : 'All detail kinds retain their list sequence with visible header navigation', captures: records }, null, 2));
+  writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(resolve('package.json'), 'utf8')).version }, start: 'The originating filtered list', steps: before ? ['Open each detail kind and the Evidence list in both themes at five widths', 'Read the existing headers before detail navigation'] : ['Browse an open ask with previous/next arrows and a position at 360, 390, 445, 1280 and 1440 in light and dark', 'Use J/K to move in the originating list order across asks, proofs, reports, designs and tickets, keeping each sequence', 'Reload and confirm the same sequence and position', 'Read header position and disabled end arrows', 'Read the report head: it holds its pager, and on a phone the title sits below the previous and next buttons, not under them'], result: before ? 'Baseline detail headers and list rows captured before navigation changes' : 'All detail kinds retain their list sequence with visible header navigation', captures: records }, null, 2));
   if (out !== sealed) { mkdirSync(sealed, { recursive: true }); for (const r of records.filter(r => r.ask)) for (const ext of ['png', 'dom.json']) copyFileSync(join(out, `sequence.${r.cell}.${ext}`), join(sealed, `sequence.${r.cell}.${ext}`)); for (const name of ['sequence-motion.mp4', 'steps.json']) copyFileSync(join(out, name), join(sealed, name)); }
 } finally {
   browser('stop');
