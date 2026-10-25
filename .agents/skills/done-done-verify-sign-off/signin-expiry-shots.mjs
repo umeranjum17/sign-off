@@ -6,11 +6,12 @@
 // Every capture is measured in the browser (signin-expiry.<state>.<theme>.<width>w.json): the sheet's right edge and what is past it, the fact rows, the bar's
 // buttons and the disabled Open, the list rows, and the countdown read twice so a frozen clock fails. The reissue request is checked in the board's own
 // messages file, which is what `poll` and `wait` hand to the poster.
-// It exits 1 on any failed measure. Usage: node .agents/skills/done-done-verify-sign-off/signin-expiry-shots.mjs <output> [light|dark] [390|1280]
+// It exits 1 on any failed measure. Usage: node .agents/skills/done-done-verify-sign-off/signin-expiry-shots.mjs <output> [light|dark|light,dark] [390|1280]
+// A comma list runs each theme in turn into the same folder and merges their step records into one steps.json, as the journey asks for.
 // SIGN_OFF_CLI points the board at another build's CLI (a base checkout) for the before captures.
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
@@ -18,6 +19,17 @@ const out = resolve(process.argv[2] ?? process.env.DONE_DONE_EVIDENCE_ROOT);
 const theme = process.argv[3] ?? 'light', width = +(process.argv[4] ?? 390), phone = width < 1024, height = phone ? 844 : 860;
 const repo = resolve(process.env.SIGN_OFF_REPO ?? '.'), cliPath = resolve(process.env.SIGN_OFF_CLI ?? join(repo, 'dist/cli.js'));
 mkdirSync(out, { recursive: true });
+if (theme.includes(',')) {
+  const each = theme.split(',').map((t) => {
+    const r = spawnSync(process.execPath, [process.argv[1], out, t, String(width)], { stdio: 'inherit' });
+    if (r.status !== 0) process.exit(r.status ?? 1);
+    renameSync(join(out, 'steps.json'), join(out, `steps.${t}.json`));
+    return [t, JSON.parse(readFileSync(join(out, `steps.${t}.json`), 'utf8'))];
+  });
+  writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: each[0][1].target, start: each[0][1].start,
+    steps: each.flatMap(([t, x]) => x.steps.map((step) => `In ${t}: ${step}`)), result: `In light and in dark: ${each[0][1].result.replace(/^In \w+: /, '')}` }, null, 2) + '\n');
+  process.exit(0);
+}
 // The board and its CLI live in a temp folder with their own HOME and XDG_*, so no board on this host is read or written.
 const dir = mkdtempSync(join(tmpdir(), 'so-signin-expiry-')), board = join(dir, 'board.json'), made = [dir];
 const env = { ...process.env, PATH: dirname(process.execPath) + ':' + process.env.PATH, HOME: dir, XDG_CONFIG_HOME: join(dir, '.config'),
@@ -160,6 +172,15 @@ cli('signin', 'done', board, '--key', 'gh-login');
 await evaluate('location.hash = "#waiting"');
 await waitFor('!document.getElementById("item-gh-login")');
 if (errors.length) fail.push('console: ' + errors.join('; '));
+writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
+  start: `A throwaway board with its own HOME holding three sign-in cards posted with post --type signin --expires (npm in 90 minutes, GitHub in 20, AWS in 3 seconds with a long host), served by sign-off-axi serve, at ${width}px in ${theme}`,
+  steps: ['Open Decide: each sign-in row carries the poster\'s end time and the time left while it has under an hour',
+    'Open one whose link still has hours: Expires reads the clock the poster gave and the countdown ticks',
+    'Open one with minutes left and press Open sign-in: the card reads Opened, waiting for approval, and still does after a reload',
+    'Press Ask for a new link: the board holds the request as a comment on that card and the button reads Asked for a new link',
+    'Wait for the third link to pass: the card stays on the board, Expires reads Expired, Open is off, and what it unlocks and where still read beside the copy button',
+    'The poster runs signin done: the card leaves the board'],
+  result: `In ${theme}: every sign-in card shows the link\'s end in the poster\'s own clock with the time left under the hour, reads Expired with Open off and its value and copy button still there once that time passes, marks Opened — waiting for approval on a tap and never reads Acted, hands the poster a real reissue comment with Ask for a new link, and leaves only when the poster runs signin done.` }, null, 2) + '\n');
 writeFileSync(join(out, `signin-expiry.summary.${theme}.${width}w.json`), JSON.stringify({ theme, width, states: Object.keys(wrote), reissue, fail }, null, 2) + '\n');
 console.log(`${theme} ${width}w`, fail.length ? `FAIL ${fail.join('; ')}` : 'ok');
 
