@@ -2665,10 +2665,12 @@
         node = el('video', { src: url, controls: '', playsinline: '', preload: 'metadata', 'aria-label': name });
         node.addEventListener('click', (e) => { if (e.target === node) { e.preventDefault(); openMediaViewer(items, i, node); } });
       } else {
-        node = el('button', { type: 'button', class: 'media-open', 'aria-label': `Open ${name}` }, shot(light, name));
-        node.onclick = () => openMediaViewer(items, i, node);
+        // Keep the pinned link targets (phone: live board hash; desk: raw /api/media in a new tab) and open the shared viewer on tap.
+        const live = pageHref(d);
+        node = el('a', { href: live || url, class: 'media-open', ...(!live && { target: '_blank', rel: 'noopener' }), 'aria-label': `Open ${name}` }, shot(light, name));
+        node.onclick = (e) => { e.preventDefault(); openMediaViewer(items, i, node); };
       }
-      (node.tagName === 'BUTTON' ? node.querySelector('img') : node).onerror = () => node.replaceWith(el('p', { class: 'gone' }, `${name} can't be shown: the file is missing, changed since it was posted, or in a format this browser can't play.`));
+      (node.tagName === 'A' ? node.querySelector('img') : node).onerror = () => node.replaceWith(el('p', { class: 'gone' }, `${name} can't be shown: the file is missing, changed since it was posted, or in a format this browser can't play.`));
       return d.captions?.[i] ? el('figure', { class: 'cap' }, node, el('figcaption', { dir: 'auto' }, d.captions[i])) : node;
     }));
   }
@@ -2875,10 +2877,11 @@
   function evOpened(d) {
     const stills = evStills(d), said = plain((d.about ?? '').replace(HELD, '').replace(UNCONFIRMED, '')), name = plain(headline(d)), items = mediaItemsOf(d).filter((m) => !m.video);
     const strip = stills.length ? el('div', { class: 'ev-strip', role: 'group', 'aria-label': `${plural(stills.length, 'capture')}, swipe for the next` },
-      ...stills.map(([, , light], i) => {
-        const b = el('button', { type: 'button', class: 'media-open', 'aria-label': `Open capture ${i + 1} of ${stills.length} full size` }, el('img', { src: src(light), alt: '', loading: 'lazy', decoding: 'async' }));
-        b.onclick = (e) => { e.stopPropagation(); openMediaViewer(items, i, b); };
-        return b;
+      ...stills.map(([path, , light], i) => {
+        // Keep the pinned raw-file link target; a tap opens the shared viewer instead of navigating away.
+        const a = el('a', { href: src(path), target: '_blank', rel: 'noopener', class: 'media-open', 'aria-label': `Open capture ${i + 1} of ${stills.length} full size` }, el('img', { src: src(light), alt: '', loading: 'lazy', decoding: 'async' }));
+        a.onclick = (e) => { e.preventDefault(); e.stopPropagation(); openMediaViewer(items, i, a); };
+        return a;
       }))
       : el('div', { class: 'ev-hero none' }, evGlyph('image'), (d.status ? 'Frame pending' : 'Text only: no capture was filed'));
     const dots = stills.length > 1 ? el('div', { class: 'ev-dots-n', 'aria-hidden': 'true' }, ...stills.map((_, i) => el('i', { class: i ? '' : 'on' }))) : '';
