@@ -1042,6 +1042,53 @@ test('standalone owner registration preserves queued failures and separates deli
   } finally { await new Promise(ok => server.once('close', ok).kill()); }
 });
 
+test('owner dispatch takes the pool account, moves on a forced limit and falls over to the pool route', async () => {
+  const dir = join(scratch, 'pool-owner'), board = join(dir, 'board.json'), bin = join(dir, 'bin'), poolLog = join(dir, 'pool.log'), calls = join(dir, 'calls.log');
+  mkdirSync(bin, { recursive: true }); symlinkSync(process.execPath, join(bin, 'node'));
+  const account = join(dir, 'account-a'), poolFile = join(dir, 'account-pool'), refuse = join(dir, 'refuse');
+  writeFileSync(poolFile, `state=${join(dir, 'pool')}\ncommand=byokit-accounts\n`);
+  const env = { ...process.env, SIGN_OFF_HOME: dir, HOME: join(dir, 'home'), PATH: bin, SIGN_OFF_ACCOUNT_POOL: poolFile, ANTHROPIC_API_KEY: 'never-kept', FM_HOME: join(dir, 'no-fleet'), FM_ADDONS_DIR: join(dir, 'no-addons') };
+  for (const name of ['SIGN_OFF_FILER', 'CLAUDE_CODE_SESSION_ID', 'SIGN_OFF_OWNER_SESSION', 'SIGN_OFF_MODEL_POOL']) delete env[name];
+  const run = (...args) => spawnSync(process.execPath, [cli, ...args], { env, encoding: 'utf8' });
+  // The helper's own JSON protocol, stood in for: account A first, then Cursor auto once A is at its limit.
+  const shim = (name, body) => { writeFileSync(join(bin, name), `#!/usr/bin/env node\n${body}`); chmodSync(join(bin, name), 0o755); };
+  shim('fm-model-pool', `const { appendFileSync, existsSync, readFileSync } = require('node:fs');\nconst req = JSON.parse(readFileSync(0, 'utf8'));\nappendFileSync(${JSON.stringify(poolLog)}, JSON.stringify({ verb: process.argv[2], req }) + '\\n');\nconst out = (o) => { process.stdout.write(JSON.stringify(o)); process.exit(0); };\nif (existsSync(${JSON.stringify(refuse)})) { process.stderr.write('credits-check refuse id=acct_a usage_credits_or_overage=enabled\\n'); out({ ok: false, v: 1, reason: 'every account enables usage credits; no free account is eligible' }); }\nif (process.argv[2] === 'pick') out({ ok: true, v: 1, selection_id: 'acct_a', provider: 'claude', harness: 'claude', model: 'claude-haiku-5-5', set: { CLAUDE_CONFIG_DIR: ${JSON.stringify(account)} }, unset: ['ANTHROPIC_API_KEY', 'not a name'] });\nif (req.cause !== 'quota') { process.stderr.write('moved for ' + req.cause); process.exit(3); }\nout({ ok: true, v: 1, selection_id: 'route:cursor/auto', provider: 'cursor', harness: 'cursor', model: 'auto', set: {}, unset: [] });\n`);
+  shim('claude', `const { appendFileSync } = require('node:fs');\nappendFileSync(${JSON.stringify(calls)}, JSON.stringify({ command: 'claude', config: process.env.CLAUDE_CONFIG_DIR ?? null, key: process.env.ANTHROPIC_API_KEY ?? null, session: process.env.SIGN_OFF_OWNER_SESSION ?? null }) + '\\n');\nprocess.stderr.write("You've hit your usage limit for your plan; try again in 3h\\n");\nprocess.exit(1);\n`);
+  shim('cursor-agent', `const { appendFileSync } = require('node:fs');\nconst { execFileSync } = require('node:child_process');\nconst id = /Request id: ([^ .]+)\\./.exec(process.argv[3])[1];\nappendFileSync(${JSON.stringify(calls)}, JSON.stringify({ command: 'cursor-agent', args: process.argv.slice(2, 3), session: process.env.SIGN_OFF_OWNER_SESSION ?? null, id }) + '\\n');\nconst cli = [${JSON.stringify(cli)}, 'owner', ${JSON.stringify(board)}, '--ack', id];\nexecFileSync(process.execPath, cli, { env: process.env });\nexecFileSync(process.execPath, [${JSON.stringify(cli)}, 'deeper', ${JSON.stringify(board)}, '--id', id, '--text', 'Every Claude account is at its limit, so Cursor answered.'], { env: process.env });\n`);
+  const item = { ...JSON.parse(readFileSync(join(fixtures, 'plan.v2/valid-full.json'))), filer: 'umer', key: 'pool-plan' };
+  assert.equal(spawnSync(process.execPath, [cli, 'post', board, '--kind', 'plan', '--from', '-'], { env, encoding: 'utf8', input: JSON.stringify(item) }).status, 0);
+  const session = '3e26877a-e588-4313-a26e-7543f9847911';
+  assert.equal(run('owner', board, '--filer', 'umer', '--host', 'claude', '--session', session, '--cwd', dir).status, 0);
+  const server = spawn(process.execPath, [cli, 'serve', board, '--port', '0'], { env });
+  const url = await new Promise(ok => server.stdout.once('data', b => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+  const deeper = async (part) => (await (await fetch(url + 'api/deeper', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: item.key, part }) })).json()).deeper.filter((x) => x.part === part).at(-1).id;
+  try {
+    const id = await deeper('this');
+    assert.equal(run('owner', board, '--dispatch', '--filer', 'umer').status, 0);
+    const asked = readFileSync(poolLog, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+    assert.deepEqual(asked.map((call) => call.verb), ['pick', 'next'], 'one pick, then one move: a limited account is never retried');
+    assert.equal(asked[0].req.v, 1); assert.equal(asked[0].req.purpose, 'work'); assert.equal(asked[0].req.pool_config, poolFile);
+    assert.ok(asked[0].req.deadline > Math.floor(Date.now() / 1000), 'the whole attempt chain carries one future deadline');
+    assert.equal(asked[1].req.cause, 'quota'); assert.deepEqual(asked[1].req.attempted, ['acct_a']); assert.equal(asked[1].req.selection.selection_id, 'acct_a');
+    const ran = readFileSync(calls, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+    assert.deepEqual(ran.map((call) => call.command), ['claude', 'cursor-agent']);
+    assert.equal(ran[0].config, account, 'the picked folder reaches the Claude call');
+    assert.equal(ran[0].key, null, 'a credential variable named in unset never reaches the call');
+    assert.equal(ran[0].session, session);
+    assert.equal(ran[1].session, session, 'the fallover route answers as the registered owner');
+    const answered = JSON.parse(run('deeper', board, '--json', '--all').stdout).deeper.find((x) => x.id === id);
+    assert.equal(answered.done, true); assert.match(answered.text, /Cursor answered/);
+    assert.ok(['delivered', 'owner-read'].includes(JSON.parse(run('owner', board).stdout).delivery[id].state));
+    // A refused pool fails the request closed with its own words instead of taking the ambient login.
+    const blocked = await deeper('next');
+    writeFileSync(refuse, '');
+    assert.equal(run('owner', board, '--dispatch', '--filer', 'umer').status, 0);
+    const queued = JSON.parse(run('owner', board).stdout).delivery[blocked];
+    assert.equal(queued.state, 'queued'); assert.match(queued.error, /usage credits/);
+    assert.equal(readFileSync(calls, 'utf8').trim().split('\n').length, 2, 'no account was tried after the pool refused');
+  } finally { await new Promise(ok => server.once('close', ok).kill()); }
+});
+
 test('installed standalone Claude owner authors, idles and resumes to finish only its own Go deeper request', { skip: !process.env.SIGN_OFF_LIVE_OWNER, timeout: 240000 }, async () => {
   const dir = join(scratch, 'installed-owner'); mkdirSync(dir); mkdirSync(join(dir, 'tmp'));
   const evidence = process.env.SIGN_OFF_LIVE_OWNER;

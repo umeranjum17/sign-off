@@ -216,6 +216,10 @@ journeys:
   # Card priority and project icons, CLI only (screen: none): --priority on posts, project --icon with its refusals, and the state and icon served back.
   priority-icon:
     command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/priority-icon.sh "$DONE_DONE_EVIDENCE_ROOT"'
+  # The owner dispatcher on an account pool, CLI only (screen: none): the pool's pick reaches the Claude call with its credential names dropped,
+  # a forced usage limit moves the request and the pool's fallover route answers as the registered owner, and a refused pool fails closed.
+  owner-pool:
+    command: 'npm run build > /dev/null && node --test --test-name-pattern="owner dispatch takes the pool account" test/contract.test.mjs > "$DONE_DONE_EVIDENCE_ROOT/owner-pool.log" 2>&1'
   install:
     command: "npm ci > $DONE_DONE_EVIDENCE_ROOT/install.log 2>&1"
   test:

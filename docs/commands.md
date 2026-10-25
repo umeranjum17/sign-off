@@ -155,7 +155,27 @@ The separate dispatcher polls for that many seconds (once without `--timeout`),
 so start it before leaving the author idle and restart it after it exits. Do not
 run an active `wait` consumer for that owner at the same time. It uses installed
 `claude --resume <UUID> -p`, normal HOME/credentials, and argv without a shell.
-There is no Firstmate dependency, callback script or substitute answering session.
+There is no required Firstmate dependency, callback script or substitute answering
+session: the account pool below is opt-in.
+
+### Account pool (optional)
+
+On a machine whose tools share an account pool, the dispatcher asks that pool's
+shared model helper (`fm-model-pool`, protocol v1: request JSON on stdin, selection
+JSON on stdout) for the account with the most room before every call, and runs the
+call with only that selection's named folders set and its named credential variables
+dropped. A usage limit moves the same request to the next selection: another pool
+account, then one of the pool's own fallover routes (its Codex, DeepSeek Goat and
+Cursor auto entries, named by the helper), whose own CLI answers as the registered
+owner. At most three selections run under one deadline, and a limited account is
+never retried.
+
+The pool file is `SIGN_OFF_ACCOUNT_POOL`, else a fleet home's own
+`config/account-pool` when it has one; the helper is `SIGN_OFF_MODEL_POOL`, else the
+add-on checkout's `account-pool/bin/fm-model-pool`, else one on `PATH`. With no pool
+file the dispatcher is unchanged. A pool that refuses leaves the request queued with
+the pool's own words: dispatch never falls back to the ambient login, and a pool
+account that enables usage credits or overage is refused by the helper, not used.
 
 The dispatcher records process handoff as `delivered`, not read. The resumed
 owner inspects `deeper <board.json> --json --all` and the original document with
