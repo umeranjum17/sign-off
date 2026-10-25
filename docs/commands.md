@@ -165,9 +165,10 @@ shared model helper (`fm-model-pool`, protocol v1: request JSON on stdin, select
 JSON on stdout) for the account with the most room before every call, and runs the
 call with only that selection's named folders set and its named credential variables
 dropped. A usage limit moves the same request to the next selection: another pool
-account, then the pool's own fallover routes (Codex Sol, DeepSeek Goat, Cursor auto),
-whose own CLI answers as the registered owner. At most three selections run under one
-deadline, and a limited account is never retried.
+account, then one of the pool's own fallover routes (its Codex, DeepSeek Goat and
+Cursor auto entries, named by the helper), whose own CLI answers as the registered
+owner. At most three selections run under one deadline, and a limited account is
+never retried.
 
 The pool file is `SIGN_OFF_ACCOUNT_POOL`, else a fleet home's own
 `config/account-pool` when it has one; the helper is `SIGN_OFF_MODEL_POOL`, else the
