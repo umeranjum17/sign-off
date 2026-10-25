@@ -14,8 +14,8 @@
   <picture>
     <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/media/phone-today-dark.webp">
     <source media="(max-width: 600px)" srcset="docs/media/phone-today.webp">
-    <source media="(prefers-color-scheme: dark)" srcset="docs/media/desk-today-dark.webp">
-    <img src="docs/media/desk-today.webp" width="880" alt="Today on the real board: a hosting question with answer buttons, waiting work, and proof">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/media/hero-dark.webp">
+    <img src="docs/media/hero-light.webp" width="880" alt="Today on the real board: a hosting question with answer buttons, waiting work, and proof">
   </picture>
 </p>
 
