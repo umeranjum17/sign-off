@@ -2748,7 +2748,7 @@ const state = () => {
 /** The board's state as the bytes a poll reads, built once per change of any file it is made from: a phone asks again every 20 seconds, and an
  * unchanged board costs the stats of its files (a 304 with no body) instead of five megabytes of rebuilding and serialising. Any answer, dismiss,
  * comment, ticket or proof that lands changes a file it was built from, so a read never shows a board older than the files it names. */
-let built: { stamps: Map<string, string>; json: Buffer; tag: string; sent: Map<string, { bytes: Buffer; encoding?: string }> } | undefined;
+let built: { stamps: Map<string, string>; body: ReturnType<typeof state>; json: Buffer; tag: string; sent: Map<string, { bytes: Buffer; encoding?: string }>; views: Map<string, { json: Buffer; tag: string; sent: Map<string, { bytes: Buffer; encoding?: string }> }> } | undefined;
 /** The state as it is now, rebuilt only when a file it was made from has changed; `tag` names the exact bytes for If-None-Match. */
 function stateRead() {
   if (built && [...built.stamps].every(([path, stamp]) => stampOf(path) === stamp)) return built;
@@ -2757,13 +2757,57 @@ function stateRead() {
   let body: ReturnType<typeof state>, stamps: Map<string, string> | undefined;
   try { body = state(); } finally { stamps = building; building = undefined; }
   const json = Buffer.from(JSON.stringify(body!));
-  const made = { stamps: stamps!, json, tag: `"${sha256(json).slice(0, 32)}"`, sent: new Map<string, { bytes: Buffer; encoding?: string }>() };
+  const made = { stamps: stamps!, body: body!, json, tag: `"${sha256(json).slice(0, 32)}"`, sent: new Map<string, { bytes: Buffer; encoding?: string }>(), views: new Map<string, { json: Buffer; tag: string; sent: Map<string, { bytes: Buffer; encoding?: string }> }>() };
   // The board was written while it was read, so this body is of the older board: it is answered, but the next read builds again.
   built = stateSources().every((path) => stampOf(path) === before.get(path)) ? made : undefined;
   return made;
 }
-/** The kept read as this request can take it: squeezed once for each encoding, so a phone's 20-second poll compresses nothing. */
-const stateSent = (read: NonNullable<typeof built>, req: IncomingMessage) => {
+/** What a list row or the hero shows of an item: every field except the report body and the proof media a card links, which load with the card itself. */
+const HEAVY = ['sections', 'visual', 'understood', 'next', 'evidenceCard', 'mocks', 'steps'];
+const lightOf = (d: any) => Object.fromEntries(Object.entries(d).filter(([k]) => !HEAVY.includes(k)));
+/** The part of the board one request asks for: the asks waiting on the person, the items a page at a time, or one card in full. */
+type View = { name: 'asks' | 'items' | 'card'; offset: number; limit: number; key: string };
+/** The view a request names, or undefined for the whole board; a view or page it cannot answer is refused in plain words. */
+function viewOf(url: string): View | undefined {
+  const q = new URL(url, 'http://board').searchParams, name = q.get('view');
+  if (name === null) return undefined;
+  const count = (at: string, fallback: number) => { const v = Number(q.get(at)); return q.get(at) === null || !Number.isInteger(v) || v < 0 ? fallback : v; };
+  const offset = count('offset', 0), limit = Math.min(count('limit', 20), 200);
+  if (name === 'card') return { name, offset: 0, limit: 1, key: q.get('key') ?? '' };
+  if (name === 'asks' || name === 'items') return { name, offset, limit, key: '' };
+  throw new InputError(`unknown view ${name}: use asks, items or card`);
+}
+/** The kept read as one view of it: built once per view and unchanged board, so a phone's first screen costs one page of one board. The
+ * body keeps the state's own shape, so a page of it is read by the same client as the whole board; the parts a first screen does not show
+ * (the ticket roll-up and the activity) come with the page that asks for them. */
+function viewRead(read: NonNullable<typeof built>, view: View) {
+  const id = `${view.name}:${view.offset}:${view.limit}:${view.key}`, kept = read.views.get(id);
+  if (kept) return kept;
+  const s = read.body as any, answers = (s.answers ?? {}) as Record<string, unknown>, gone = new Set<string>((s.dismissed ?? []) as string[]);
+  const items = (s.decisions ?? []) as any[], open = (d: any) => d.type !== 'evidence' && !answers[d.key] && !gone.has(d.key);
+  const kind = (type: string) => items.filter((d) => d.type === type).length;
+  const counts = { asks: items.filter(open).length, items: items.length, answered: items.filter((d) => answers[d.key]).length, evidence: kind('evidence'), designs: kind('design'),
+    // A report is a guided report's kind and a plan is its own type: both are what the board calls a report.
+    reports: items.filter((d) => d.kind === 'report' || d.type === 'plan').length, tickets: (s.tickets ?? []).length };
+  let body: any;
+  if (view.name === 'card') {
+    const card = items.find((d) => d.key === view.key);
+    if (!card) return undefined;
+    // One card whole: the report body and the proof media it links come with it, and nothing of the board around it.
+    body = { card, counts, version: s.version, answers: answers[card.key] ? { [card.key]: answers[card.key] } : {}, dismissed: gone.has(card.key) ? [card.key] : [] };
+  } else {
+    const all = view.name === 'asks' ? items.filter(open) : items, page = all.slice(view.offset, view.offset + view.limit);
+    body = { ...s, decisions: page.map(lightOf), counts, more: view.offset + view.limit < all.length,
+      page: { view: view.name, offset: view.offset, limit: view.limit, total: all.length },
+      tickets: [], trail: [], rounds: [], messages: [], annotations: [], comments: [] };
+  }
+  const json = Buffer.from(JSON.stringify(body));
+  const made = { json, tag: `"${sha256(json).slice(0, 32)}"`, sent: new Map<string, { bytes: Buffer; encoding?: string }>() };
+  read.views.set(id, made);
+  return made;
+}
+/** A read as this request can take it: squeezed once for each encoding, so a phone's 20-second poll compresses nothing. */
+const bodySent = (read: { json: Buffer; sent: Map<string, { bytes: Buffer; encoding?: string }> }, req: IncomingMessage) => {
   const key = encodingOf(req, read.json.length) ?? '';
   let sent = read.sent.get(key);
   if (!sent) read.sent.set(key, (sent = squeeze(req, read.json)));
@@ -3286,15 +3330,18 @@ const server = createServer(async (req, res) => {
     return res.writeHead(200, { ...headers, ...(encoding && { 'content-encoding': encoding }), 'content-length': bytes.length }).end(bytes);
   }
   // The board's read is kept as one body: a poll of an unchanged board is a 304 that rebuilds and re-encodes nothing, and a phone's 20-second
-  // check costs a few stats. It waits for the warm pass at most GUARD_WAIT, as every board read always has.
-  if (req.method === 'GET' && (req.url === '/api/decisions' || req.url === '/api/state')) {
+  // check costs a few stats. It waits for the warm pass at most GUARD_WAIT, as every board read always has. A `view` answers part of the board
+  // (the asks waiting on the person, a page of items, one card) as one body of its own, so a first screen is small and a poll of it is still a 304.
+  if (req.method === 'GET' && ['/api/decisions', '/api/state'].includes((req.url ?? '').split('?')[0])) {
     let timer: NodeJS.Timeout | undefined;
     await Promise.race([guardReady, new Promise<void>((ok) => { timer = setTimeout(ok, GUARD_WAIT); })]);
     clearTimeout(timer);
     try {
-      const kept = stateRead(), headers = { etag: kept.tag, 'cache-control': 'no-cache', vary: 'accept-encoding' };
-      if (unchanged(req, kept.tag)) return res.writeHead(304, headers).end();
-      const sent = stateSent(kept, req);
+      const kept = stateRead(), view = viewOf(req.url ?? ''), read = view ? viewRead(kept, view) : kept;
+      if (!read) return res.writeHead(404, { 'content-type': 'application/json', 'cache-control': 'no-cache' }).end(JSON.stringify({ error: 'No card with that key' }));
+      const headers = { etag: read.tag, 'cache-control': 'no-cache', vary: 'accept-encoding' };
+      if (unchanged(req, read.tag)) return res.writeHead(304, headers).end();
+      const sent = bodySent(read, req);
       return res.writeHead(200, { 'content-type': 'application/json', 'content-length': sent.bytes.length, ...(sent.encoding && { 'content-encoding': sent.encoding }), ...headers }).end(sent.bytes);
     } catch (e: any) {
       // A board that cannot be read answers like every other route: the reason in plain words, never a dropped connection.
