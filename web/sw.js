@@ -18,7 +18,8 @@ self.addEventListener('activate', (e) => e.waitUntil((async () => {
   await self.clients.claim();
 })()));
 
-/** The state, from the board when it answers; the last good copy, marked, when it cannot be reached. A refused token empties the copy: it is not for this person any more. */
+/** The state, from the board when it answers; the last good copy, marked, when it cannot be reached. A part of the board answers a part of it; the copy is the
+ * last answer, whichever part it was (a whole board answers every part of it). A refused token empties the copy: it is not for this person any more. */
 async function state(request) {
   const store = await caches.open(DATA);
   try {
@@ -49,7 +50,8 @@ self.addEventListener('fetch', (e) => {
   const { request } = e, url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
   if (request.mode === 'navigate' && url.pathname === '/' && !url.search) return e.respondWith(page(request));
-  if (url.pathname === STATE && !url.search) return e.respondWith(state(request));
+  // The board's state, whatever part of it a page asks for: kept as the last good copy, and read back offline for whatever part comes asking.
+  if (url.pathname === STATE) return e.respondWith(state(request));
   if (FILES.test(url.pathname)) e.respondWith(caches.match(request, { cacheName: SHELL }).then((kept) => kept ?? fetch(request).then((res) => {
     if (res.ok) caches.open(SHELL).then((c) => c.put(request, res.clone()));
     return res;
