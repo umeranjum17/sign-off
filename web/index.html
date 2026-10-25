@@ -1877,9 +1877,6 @@
     .ui-pane .vl { display: flex; flex-direction: column; min-width: 0; } .ui-pane .vl b { color: var(--tk-text); font-size: var(--tk-fs-meta); line-height: 1.125rem; font-weight: 500; }
     .ui-pane .vl small { color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); line-height: 1rem; }
     .ui-pane .vb { height: 0.5rem; overflow: hidden; border-radius: 0.25rem; background: var(--tk-track); } .ui-pane .vb i { display: block; height: 100%; border-radius: 0.25rem; background: var(--tk-fill); }
-    .tk-stuck { color: var(--tk-warn); white-space: nowrap; font-size: 11px; }
-    .tk-status { display: inline-flex; align-items: center; gap: 6px; }
-    .tk-stage { flex-shrink: 0; }
     .ui-pane .vb i.bad { background: var(--tk-critical); } .ui-pane .vb i.warn { background: var(--tk-warning); }
     .ui-pane .vn { color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); line-height: 1.125rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .ui-pane .rp-kp { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.5rem 0 0; padding: 0; list-style: none; }
@@ -1950,6 +1947,11 @@
   @keyframes tk-fade { from { opacity: 0; } }
   body:has(.tk-sheet) { overflow: hidden; }
   .tk-sheet .grab { width: 2.25rem; height: 0.25rem; margin: 0.5rem auto; border-radius: 2px; background: var(--tk-line); }
+  .tk-stuck { flex: none; color: var(--tk-warn); white-space: nowrap; font-size: 11px; line-height: 1rem; }
+  .tk-status { display: inline-flex; flex: none; align-items: center; gap: 6px; margin-right: 6px; }
+  .tk-stage { display: inline-flex; width: auto; height: 1rem; padding: 0 4px; white-space: nowrap; line-height: 1rem; background: var(--tk-inset); }
+  :is(.tk-sheet, .tk-pane) .ui-pr:has(.tk-stage) .v { flex-wrap: wrap; gap: 6px; padding: 8px 0; }
+  :is(.tk-sheet, .tk-pane) .ui-pr .v > span:is(.tk-stage, .tk-stuck) { white-space: nowrap; overflow: visible; }
   .tk-release { display: inline-block; width: auto; max-width: 110px; padding: 0 6px; background: var(--tk-inset); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* The ticket: its project and state (with Close on a phone), its title in full, its properties, the tickets under it, Linked and Activity. */
   .tk-shd { display: flex; align-items: center; gap: 0.5rem; min-height: 2.5rem; }

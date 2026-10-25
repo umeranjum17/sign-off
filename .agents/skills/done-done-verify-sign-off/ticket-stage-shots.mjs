@@ -11,6 +11,7 @@ const browserEnv = { ...process.env, CHROME_DEVTOOLS_AXI_SESSION: `stage-${proce
 const cli = (...a) => execFileSync(process.execPath, ['dist/cli.js', ...a], { env, encoding: 'utf8' });
 const browser = (...a) => execFileSync('chrome-devtools-axi', a, { env: browserEnv, encoding: 'utf8', timeout: 60000 });
 const evaluate = (code) => JSON.parse(JSON.parse(browser('eval', code).split('\n')[0].slice('result: '.length)));
+const statusGeometry = `() => [...document.querySelectorAll('.tk-stage, .tk-stuck')].filter(e => { const r = document.createRange(); r.selectNodeContents(e); return e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1 || new Set([...r.getClientRects()].map(b => Math.round(b.top))).size > 1; }).map(e => e.textContent)`;
 const now = Math.floor(Date.now() / 1000), stages = ['queued', 'building', 'review', 'merging', 'done'];
 const titles = ['Sync queued work', 'Build the owner board', 'Review the ticket sync', 'Merge the approved sync', 'Finish the release notes'];
 try {
@@ -23,9 +24,9 @@ try {
   assert.deepEqual(state.tickets.map(t => t.stage), stages);
   writeFileSync(join(out, 'state.json'), JSON.stringify(state.tickets, null, 2));
   writeFileSync(join(out, 'cli.json'), cli('ticket', board, '--json'));
-  for (const width of [390, 1280]) for (const theme of ['light', 'dark']) {
+  for (const width of [360, 390, 445, 1280, 1440]) for (const theme of ['light', 'dark']) {
     browser('open', `${base}#tickets`);
-    browser('resize', String(width), width === 390 ? '844' : '800');
+    browser('resize', String(width), width < 1024 ? '844' : '800');
     browser('eval', `() => { localStorage.setItem('so-theme', '${theme}'); location.reload(); }`);
     browser('wait', 'Tickets');
     browser('eval', `() => { for (const b of document.querySelectorAll('main section .see')) if (b.textContent.includes('See all')) b.click(); }`);
@@ -35,10 +36,13 @@ try {
     assert.deepEqual(facts.stuck.sort(), ['stuck 2d', 'stuck 7h']);
     assert.equal(facts.overflow, false); assert.equal(facts.monograms, 0);
     writeFileSync(join(out, `tickets.${theme}.${width}.dom.json`), JSON.stringify(facts, null, 2));
+    assert.deepEqual(evaluate(statusGeometry), [], 'status words fit on one line');
     browser('screenshot', join(out, `tickets.${theme}.${width}.png`));
     for (const stage of stages) {
       browser('open', `${base}#ticket/${stage}`); browser('wait', titles[stages.indexOf(stage)]);
       const page = evaluate(`() => { const p = document.querySelector('.tk-sheet, .tk-pane'); return { stage: p.querySelector('.tk-stage')?.textContent, stuck: p.querySelector('.tk-stuck')?.textContent ?? '', overflow: document.documentElement.scrollWidth > innerWidth }; }`);
+      assert.deepEqual(evaluate(statusGeometry), [], 'ticket page status words fit');
+      if (stage === 'queued') browser('screenshot', join(out, `page.${theme}.${width}.png`));
       assert.equal(page.stage, stage); assert.equal(page.stuck, stage === 'queued' ? 'stuck 7h' : stage === 'merging' ? 'stuck 2d' : ''); assert.equal(page.overflow, false);
     }
     const errors = browser('console', '--type', 'error');
