@@ -75,7 +75,7 @@ Every card has Previous and Next through its list. Feedback keeps its delivery t
 
 ## Agent setup and limits
 
-The CLI and skill work without a supervisor. Agents post cards and wait for their own answers. Ordinary commands call no model. The optional Claude Code owner dispatcher resumes the author for follow-up questions.
+The CLI and skill work without a supervisor. Agents post cards and wait for their own answers. Each ordinary command calls no model. The optional Claude Code owner dispatcher resumes the author for follow-up questions.
 
 The board runs on your machine. A phone needs a reachable address; [private network setup](docs/commands.md) explains binding and access tokens. Installing the app requires HTTPS or localhost. Offline mode shows the last update; sends fail and are not queued.
 

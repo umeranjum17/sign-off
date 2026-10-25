@@ -76,7 +76,7 @@ try {
   const type = (words) => inPage(`const t = document.activeElement; if (!['TEXTAREA', 'INPUT'].includes(t?.tagName)) return 'missing'; for (const c of ${JSON.stringify(words)}) { t.value += c; t.dispatchEvent(new Event('input')); await s(45); } return 'ok';`);
   await send('Page.startScreencast', { format: 'jpeg', quality: 90, everyNthFrame: 1 });
   await send('Page.navigate', { url: `${url}${{ reports: '#reports', decide: '#waiting', today: '' }[screen]}` });
-  const steps = modes.includes('readme') ? [[2600], [() => tap('.t-up .t-btn.ink'), 3000]] : modes.includes('load') ? [[2600], [() => inPage("document.getElementById('decide-more-now').scrollIntoView({ block: 'center', behavior: 'smooth' }); return 'ok';"), 1000],
+  const steps = modes.includes('readme') ? [[2600], [() => tap('a[href="#decide/ship-settings"]'), 900], [() => tap('.pick-list li:first-child .pick-option'), 700], [() => tap('.decide-bar .answer'), 2200]] : modes.includes('load') ? [[2600], [() => inPage("document.getElementById('decide-more-now').scrollIntoView({ block: 'center', behavior: 'smooth' }); return 'ok';"), 1000],
     [() => tap('#decide-more-now'), 1600], [() => tap('.decide-list ul[aria-label=Asks] li:nth-child(25) a'), 1600], [() => tap('.sh-x'), 1000]] : screen === 'reports' && desk ? [[2600], [() => key('j'), 1100], [() => key('j'), 1100], [() => key('k'), 1100], [() => key('u'), 1600], [() => key('u'), 1400],
     [() => inPage("const b = document.querySelector('.split-list .dl-row:not(.sel) .dl-hover .read-q'); if (!b) return 'missing'; b.focus(); return 'ok';"), 1400],
     [() => inPage("document.querySelector('.split-list [data-row][aria-current]').focus(); return 'ok';"), 300], [() => key('e'), 1800], [() => key('z', true), 1600],
