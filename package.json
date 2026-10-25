@@ -1,7 +1,7 @@
 {
   "name": "sign-off-axi",
   "version": "0.6.8",
-  "description": "One review board for evidence, quick yes/no decisions and retro changes.",
+  "description": "Answer your coding agents’ questions and review their work from one board.",
   "type": "module",
   "bin": { "sign-off-axi": "dist/cli.js" },
   "files": ["dist", "!dist/skill.js", "web", "fixtures/contract", "fixtures/engagement-v1.json", "skills/sign-off-axi"],
@@ -9,7 +9,7 @@
   "license": "MIT",
   "homepage": "https://umeranjum17.github.io/sign-off/",
   "repository": { "type": "git", "url": "git+https://github.com/umeranjum17/sign-off.git" },
-  "keywords": ["axi", "agent", "cli", "toon", "decisions", "review"],
+  "keywords": ["coding-agents", "ai-agents", "human-in-the-loop", "approvals", "decisions", "code-review", "cli", "plans", "reports", "evidence"],
   "scripts": {
     "build": "tsc",
     "build:skill": "tsc && node dist/skill.js",
