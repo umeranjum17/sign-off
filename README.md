@@ -53,23 +53,48 @@ When several agents need you, questions get spread across terminals. sign-off co
 
 ## What you get
 
-<table>
-<tr>
-<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-decide-dark.webp"><img src="docs/media/phone-decide.webp" width="260" alt="Decide with waiting asks and the Leash setting"></picture><br><b>Answer what needs you.</b><br>Pick an answer, add a note, or ask for it later. The leash sets when agents may take a default; guarded asks always wait.</td>
-<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-reader-dark.webp"><img src="docs/media/phone-reader.webp" width="260" alt="Report reader with Agree, Disagree, Comment, and Ask"></picture><br><b>Review the work in place.</b><br>Plans and report kinds have one action bar for the part in view. Ask the author to simplify a part. The report kit supports tables, video, comparisons, and a design gallery.</td>
-</tr>
-<tr>
-<td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-evidence-dark.webp"><img src="docs/media/phone-evidence.webp" width="260" alt="Evidence with inline captures and check results"></picture><br><b>Check the proof.</b><br>Open captures inline, or turn on Previews to see them all. Each proof carries its check result.</td>
-<td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-tickets-dark.webp"><img src="docs/media/phone-tickets.webp" width="260" alt="A ticket with its epic, tasks, progress, and linked work"></picture><br><b>Keep the task together.</b><br>Epics, tickets, and tasks roll up progress. Open their linked cards and Activity.</td>
-</tr>
-</table>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-decide-dark.webp">
+    <img src="docs/media/phone-decide.webp" width="300" alt="Decide with waiting asks and the Leash setting">
+  </picture>
+</p>
+
+<p align="center"><b>Answer what needs you.</b><br>Pick an answer, add a note, or ask for it later. The leash sets when agents may take a default; guarded asks always wait.</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-reader-dark.webp">
+    <img src="docs/media/phone-reader.webp" width="300" alt="Report reader with Agree, Disagree, Comment, and Ask">
+  </picture>
+</p>
+
+<p align="center"><b>Review the work in place.</b><br>Plans and report kinds have one action bar for the part in view. Ask the author to simplify a part. The report kit supports tables, video, comparisons, and a design gallery.</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-evidence-dark.webp">
+    <img src="docs/media/phone-evidence.webp" width="300" alt="Evidence with inline captures and check results">
+  </picture>
+</p>
+
+<p align="center"><b>Check the proof.</b><br>Open captures inline, or turn on Previews to see them all. Each proof carries its check result.</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/media/phone-tickets-dark.webp">
+    <img src="docs/media/phone-tickets.webp" width="300" alt="A ticket with its epic, tasks, progress, and linked work">
+  </picture>
+</p>
+
+<p align="center"><b>Keep the task together.</b><br>Epics, tickets, and tasks roll up progress. Open their linked cards and Activity.</p>
 
 Every card has Previous and Next through its list. Feedback keeps its delivery trail. Discard asks for a reason and offers Undo; Archived keeps cards available to restore. The board installs as an app and reads its last update offline.
 
 ## Proof you can inspect
 
 - [Live demo](https://umeranjum17.github.io/sign-off/demo/): the real board with demo data. No install; demo answers stay in your browser.
-- [Published package](https://www.npmjs.com/package/sign-off-axi): version **0.6.8**. The quick start above was run against the published package in an empty scratch folder.
+- [Published package](https://www.npmjs.com/package/sign-off-axi): version **0.6.9**. The quick start above was run against the published package in an empty scratch folder.
 - [Capture recipe](.agents/skills/done-done-verify-sign-off/SKILL.md): the README pictures come from the real board at 390 and 1280 pixels, light and dark. The answer loop also checks the saved answer through the CLI.
 - [Integration journeys](test/) and [CI runs](https://github.com/umeranjum17/sign-off/actions/workflows/ci.yml): checks you can inspect and rerun.
 
