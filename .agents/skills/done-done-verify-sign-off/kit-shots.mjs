@@ -122,6 +122,7 @@ try {
     assert.deepEqual(documentState.cells, [6, 3]); assert.equal(documentState.colspan, 2); assert.equal(documentState.rowspan, 2);
     assert.equal(documentState.head, 'table-header-group'); assert.equal(documentState.scroll, 'auto');
     if (phone) assert.ok(documentState.wide, 'the table scrolls inside its block');
+    assert.equal(ask(() => getComputedStyle(document.querySelector('.kt-wide tbody td:first-child')).position), 'sticky', 'first column stays put while the table scrolls');
     const download = await fetch(documentState.href);
     assert.equal(download.status, 200); assert.match(download.headers.get('content-disposition'), /attachment/);
     assert.equal(await download.text(), '# The original report\n');

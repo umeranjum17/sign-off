@@ -69,7 +69,7 @@ Every card has Previous and Next through its list. Feedback keeps its delivery t
 ## Proof you can inspect
 
 - [Live demo](https://umeranjum17.github.io/sign-off/demo/): the real board with demo data. No install; demo answers stay in your browser.
-- [Published package](https://www.npmjs.com/package/sign-off-axi): version **0.6.8**. The quick start above was run against the published package in an empty scratch folder.
+- [Published package](https://www.npmjs.com/package/sign-off-axi): version **0.6.9**. The quick start above was run against the published package in an empty scratch folder.
 - [Capture recipe](.agents/skills/done-done-verify-sign-off/SKILL.md): the README pictures come from the real board at 390 and 1280 pixels, light and dark. The answer loop also checks the saved answer through the CLI.
 - [Integration journeys](test/) and [CI runs](https://github.com/umeranjum17/sign-off/actions/workflows/ci.yml): checks you can inspect and rerun.
 
