@@ -60,6 +60,7 @@ if (flow) {
     { type: 'text', level: 2, text: 'The original words, in order' },
     { type: 'text', text: 'Read [the original document](kit/report.md), with no added summary or next step.' },
     ...blocks.slice(-3),
+    { type: 'beats', beats: [{ title: 'First original step', text: 'An original step without a picture.' }, { title: 'Second original step' }] },
   ] }];
 }
 const post = (m) => spawnSync(process.execPath, [join(repo, 'dist/cli.js'), 'post', board, '--kind', 'report', '--from', '-'], { encoding: 'utf8', env, cwd: dir, input: JSON.stringify(m) });
@@ -126,6 +127,9 @@ try {
     if (!phone) toTop('.kt-file');
     if (flow) {
       assert.equal(ask(() => !!document.querySelector('.gd-uq')), false);
+      assert.equal(ask(() => document.querySelector('.kb-stage').classList.contains('no-image')), true);
+      drive('await page.eval(() => document.querySelector(".kb-btn.go").click());');
+      assert.equal(ask(() => document.querySelector('.kb-words h3').textContent), 'Second original step');
       assert.deepEqual(ask(() => [...document.querySelectorAll('.gd-sec > h2')].map((e) => e.textContent)), ['The original words, in order']);
     }
     capture(flow ? 'flow' : 'documents', phone ? 'A neutral reference image with its caption and a pinned file link, above an original ragged table that scrolls inside its block.' : 'The reference caption and pinned file link, above the original ragged table with spans.');

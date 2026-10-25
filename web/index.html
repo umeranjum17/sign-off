@@ -4560,12 +4560,13 @@
       const dots = b.beats.map((x, i) => { const t = el('button', { type: 'button', 'aria-label': `Beat ${i + 1} of ${n}: ${x.title}` }); t.onclick = () => show(i); return t; });
       segs.append(...dots);
       const back = el('button', { class: 'kb-btn', type: 'button' }, 'Back'), next = el('button', { class: 'kb-btn go', type: 'button' });
+      const stage = E('div', 'kb-stage', img, E('div', 'kb-words', count, title, words));
       let at = 0;
       function show(i) {
         at = i; const x = b.beats[i];
         dots.forEach((t, k) => { t.classList.toggle('on', k <= i); if (k === i) t.setAttribute('aria-current', 'step'); else t.removeAttribute('aria-current'); });
         segs.setAttribute('aria-label', `Beat ${i + 1} of ${n}`);
-        img.hidden = !x.image; img.parentElement.classList.toggle('no-image', !x.image); if (x.image) img.src = kitUrl(s, x.image, true); img.alt = x.title;
+        img.hidden = !x.image; stage.classList.toggle('no-image', !x.image); if (x.image) img.src = kitUrl(s, x.image, true); img.alt = x.title;
         count.textContent = `Beat ${i + 1} of ${n}`;
         title.replaceChildren(...(x.time ? [E('span', '', x.time)] : []), document.createTextNode(x.title));
         words.textContent = x.text ?? '';
@@ -4573,7 +4574,7 @@
       }
       back.onclick = () => show(Math.max(0, at - 1)); next.onclick = () => show(at === n - 1 ? 0 : at + 1);
       show(0);
-      return E('div', 'kt kt-beats', segs, E('div', 'kb-stage', img, E('div', 'kb-words', count, title, words)), E('div', 'kb-nav', back, next));
+      return E('div', 'kt kt-beats', segs, stage, E('div', 'kb-nav', back, next));
     }
     function videoFig(s, b) {
       const frame = E('div', 'frame'), play = el('button', { class: 'play', type: 'button', 'aria-label': b.caption ? `Play the film: ${b.caption}` : 'Play the film' }, E('i', '', gic('play')));
