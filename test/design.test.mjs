@@ -4276,6 +4276,33 @@ test('load budget: a board of 60 updates opens Evidence on a phone with at most 
   proc.kill();
 });
 
+test('a report opened before its own file arrives draws the moment it does', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  // The screen app-more.js draws, opened cold and while that file is held back: the reader must draw on its own once the file lands, without a second tap.
+  const dir = join(scratch, 'late-more'), file = join(dir, 'board.json');
+  mkdirSync(dir, { recursive: true });
+  const report = { ...JSON.parse(readFileSync(new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url))), filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+  writeFileSync(join(dir, 'report.json'), JSON.stringify(report));
+  const posted = run('post', file, '--kind', 'report', '--from', join(dir, 'report.json'));
+  assert.equal(posted.code, 0, posted.out);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, send, close } = await browse(join(dir, 'b'), 390, 844, true);
+  try {
+    await send('Network.enable');
+    await send('Network.setBypassServiceWorker', { bypass: true });
+    await send('Fetch.enable', { patterns: [{ urlPattern: '*app-more.js*' }] });
+    await evaluate(`location.href = ${JSON.stringify(`${url}#reports/${report.key}`)}`);
+    // The page is loaded and the file is still held: the reader is not drawn yet.
+    await until(() => evaluate('document.readyState === "complete"'));
+    assert.equal(await evaluate('!!document.querySelector(".ra-bar .ra-b.agree")'), false, 'the reader is not drawn before its file');
+    await send('Fetch.disable');
+    await until(() => evaluate('!!document.querySelector(".ra-bar .ra-b.agree")?.getClientRects().length'));
+    assert.equal(await evaluate('!!document.querySelector(".gd-main .gd-foot")'), false, 'the parts carry no buttons of their own');
+  } finally { close(); }
+  proc.kill();
+});
+
 test('the first screen arrives as a small shell beside its own styles and script, and the rest of both only after it has painted', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   // Two asks: the first screen needs the shell, its two base sheets, the state and the small sheet inside the page, and none of the code or rules the
   // screens beyond Today draw with.

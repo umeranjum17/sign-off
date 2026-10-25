@@ -149,10 +149,9 @@
     const s = el('script', { src });
     s.addEventListener('load', () => {
       moreReady = true;
-      // A tap that found its screen missing draws it now: the card the person opened, or the list they went to. A card is read again from the top, so
-      // its body draws where the small file left only the frame.
-      if (moreAsked && reader.hidden) renderKeepingFocus();
-      else if (moreAsked) { reader.dataset.url = ''; readPage(state.decisions.find((d) => d.key === reader.dataset.key), reader.dataset.from); }
+      // A screen or a card that found its file missing draws now, in one redraw of the board: the screen the person went to, or the card they opened,
+      // which render reads again from the top so its body fills where the small file left only the frame. One redraw, whatever asked first.
+      if (moreAsked) renderKeepingFocus();
       ok(true);
     }, { once: true });
     s.addEventListener('error', () => ok(false), { once: true });
