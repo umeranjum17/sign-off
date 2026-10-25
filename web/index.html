@@ -1792,6 +1792,8 @@
   .mv-nav.prev { left: max(0.5rem, env(safe-area-inset-left)); }
   .mv-nav.next { right: max(0.5rem, env(safe-area-inset-right)); }
   .mv-nav .glyph { width: 1.125rem; height: 1.125rem; }
+  /* Phones: swipe only — big prev/next circles sit on the image and hide content. Desk (1280/1440) keeps them. */
+  @media (max-width: 63.999rem) { .mv-nav { display: none; } }
   .ev-strip .media-open { display: block; height: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; flex: none; scroll-snap-align: start; }
   .ev-hero .media-open { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; border-radius: 1rem; overflow: hidden; }
   .kt-evid .media-open { display: block; padding: 0; border: 0; background: none; cursor: zoom-in; border-radius: 0.625rem; }

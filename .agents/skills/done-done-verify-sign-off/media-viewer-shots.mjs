@@ -164,6 +164,9 @@ try {
       await wait(300);
       await js(`document.querySelector('.kt-scroll')?.scrollIntoView({ block: 'center' })`);
       await wait(400);
+      // Nudge horizontal scroll so the sticky first column is visible in the frame (not only when the whole table fits).
+      await js(`(() => { const box = document.querySelector('.kt-scroll'); if (box && box.scrollWidth > box.clientWidth + 1) box.scrollLeft = Math.min(160, Math.floor((box.scrollWidth - box.clientWidth) / 2)); })()`);
+      await wait(200);
       const table = await js(`(() => {
         const t = document.querySelector('.kt-table.kt-wide'), box = t?.closest('.kt-scroll');
         if (!t || !box) return null;
