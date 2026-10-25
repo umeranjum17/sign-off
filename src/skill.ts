@@ -160,6 +160,8 @@ You hand the board words, files and rows; the board draws them in its own type a
 2. Show a part with a block instead of a paragraph: add \`blocks\` (1 to 12, in the order given) to the section. Save each picture or film next to \`report.json\` and name it by path; post pins the files.
 3. Post: \`post --kind report --from .sign-off/reports/<key>/report.json --filer <id>\`. Open the board at 390 px wide, light and dark, and look before you say it is there.
 
+For a filed document whose exact words and order must stay, use \`layout: "document"\` on a guided report: omit \`understood\`, \`visual\` and \`next\`, and keep the original flow in its sections (up to 80). A section may have empty heading/body when its ordered blocks carry those words. A \`text\` block holds original markdown; optional \`level\` 1–6 makes it a heading. Local markdown links in text or table cells pin their named files and download them. Never add or rewrite an owner's words to fill a workflow. Keep its original visual content; a document still needs a picture, diagram or structured block. A beat may omit its image or description when the original sequence has none, and an image or video may omit a caption that was not authored.
+
 Pick the block by what the reader must see:
 
 | Block | Use it for | Fields |
@@ -167,7 +169,7 @@ Pick the block by what the reader must see:
 | \`callout\` | one thing set apart: a caveat, a warning, a question | \`tone\` (\`note\`, \`warn\` or \`ask\`), \`title\` (60), \`text\` (280) |
 | \`beats\` | a sequence the reader steps through: a film's scenes, a flow | \`beats\`, 2 to 12, each \`image\`, \`time\`, \`title\` (80), \`text\` (280) |
 | \`video\` | a short film | \`src\` (.mp4 or .webm, 50 MB), \`poster\`, \`length\`, \`caption\` |
-| \`image\` | a neutral reference image, without a verdict | \`src\`, \`caption\` (280), optional \`alt\` (280); the whole image keeps its aspect ratio |
+| \`image\` | a neutral reference image, without a verdict | \`src\`, \`caption\` (280), optional \`alt\` (280) and \`full\` (the original full-resolution local image, opened by tapping); the whole image keeps its aspect ratio |
 | \`file\` | a local file to download | \`src\` (any file up to 5 MB), \`caption\` (280), pinned like media; downloaded as an attachment |
 | \`table\` | original measures, including irregular tables | \`columns\` (1 to 20), \`rows\` (up to 30); cells are text (120) or \`{text, colspan, rowspan}\`; keep empty cells and ragged rows as authored. Wide or irregular tables scroll inside the block on a phone |
 | \`compare\` | before and after | \`before\` and \`after\`, each \`image\` and \`caption\` (80) |

@@ -41,9 +41,10 @@ const blocks = [
   { type: 'compare', before: { image: 'kit/one.png', caption: 'A line wrapped badly' }, after: { image: 'kit/two.png', caption: 'Clean after two fix rounds' } },
   { type: 'evidence', rows: [{ image: 'kit/one.png', title: 'Line wrapped, notch hid a heading', note: 'Version 1', status: 'fixed' }, { image: 'kit/two.png', title: 'Words on the floating cards', note: 'Version 2', status: 'progress' }, { title: 'Sound is still missing', note: 'Version 3', status: 'waiting' }] },
 ];
-const documents = process.env.KIT_DOCUMENTS === '1';
+const flow = process.env.KIT_FLOW === '1';
+const documents = process.env.KIT_DOCUMENTS === '1' || flow;
 if (documents) blocks.push(
-  { type: 'image', src: 'kit/one.png', caption: 'The original reference screen', alt: 'The board with example questions' },
+  { type: 'image', src: 'kit/one.png', full: 'kit/two.png', caption: 'The original reference screen', alt: 'The board with example questions' },
   { type: 'file', src: 'kit/report.md', caption: 'Read the full report' },
   { type: 'table', columns: ['Repo', 'Score', 'R1–R10', 'Top 3 gaps', 'First screen'], rows: [
     [{ text: 'sign-off', rowspan: 2 }, '7', { text: 'The original cells, with their span', colspan: 2 }, 'Desktop', 'Phone', 'Light'],
@@ -52,6 +53,16 @@ if (documents) blocks.push(
 );
 const sample = { ...report, key: 'sample-kit', title: 'TakeOne can already render launch films like these', about: 'A sample report with every block of the kit, drawn by the board.', filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z'),
   sections: report.sections.map((s, n) => n ? s : documents ? { ...s, heading: 'Original reference, file and table', body: 'The source image, its document and its original table.', blocks: blocks.slice(-3) } : { ...s, blocks, gallery: [{ label: 'App promo', model: 'Sonnet 5.5', ran: '2026-10-24T20:12:00Z', frames: [{ device: 'phone', src: 'kit/one.png', caption: 'Today on a phone' }, { device: 'desktop', src: 'kit/two.png', caption: 'The promo on a desk' }] }] }) };
+if (flow) {
+  sample.schema = 4; sample.layout = 'document'; sample.purpose = 'other';
+  for (const field of ['understood', 'visual', 'next']) delete sample[field];
+  sample.sections = [{ id: 'original', stage: 'found', heading: '', body: '', blocks: [
+    { type: 'text', level: 2, text: 'The original words, in order' },
+    { type: 'text', text: 'Read [the original document](kit/report.md), with no added summary or next step.' },
+    ...blocks.slice(-3),
+    { type: 'beats', beats: [{ title: 'First original step', text: 'An original step without a picture.' }, { title: 'Second original step' }] },
+  ] }];
+}
 const post = (m) => spawnSync(process.execPath, [join(repo, 'dist/cli.js'), 'post', board, '--kind', 'report', '--from', '-'], { encoding: 'utf8', env, cwd: dir, input: JSON.stringify(m) });
 // Colour, CSS and an unknown block are refused with the field named.
 for (const [what, patch, error] of [['css', { colour: 'blue' }, /blocks\[1\]\.colour is not a field there/], ['type', { type: 'banner' }, /blocks\[1\]\.type \\"banner\\" is not one of callout, beats/]]) {
@@ -104,6 +115,9 @@ try {
         rowspan: table.querySelector('[rowspan="2"]')?.rowSpan, head: getComputedStyle(table.querySelector('thead')).display,
         scroll: getComputedStyle(box).overflowX, wide: box.scrollWidth > box.clientWidth, scrollContainers: [...document.querySelectorAll('body *')].filter((e) => e.scrollHeight > e.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(e).overflowY)).length };
     });
+    const fullImage = ask(() => document.querySelector('.kt-image a').href);
+    const fullResponse = await fetch(fullImage); assert.equal(fullResponse.status, 200);
+    assert.deepEqual(Buffer.from(await fullResponse.arrayBuffer()), readFileSync(join(dir, 'kit/two.png')));
     assert.ok(documentState.loaded); assert.ok(Math.abs(documentState.ratio - documentState.naturalRatio) < 0.02, 'the whole image, no crop');
     assert.deepEqual(documentState.cells, [6, 3]); assert.equal(documentState.colspan, 2); assert.equal(documentState.rowspan, 2);
     assert.equal(documentState.head, 'table-header-group'); assert.equal(documentState.scroll, 'auto');
@@ -114,7 +128,14 @@ try {
     documentState.href = 'pinned local file (download verified)';
     writeFileSync(join(records, `documents.${theme}.${width}w.json`), JSON.stringify(documentState));
     if (!phone) toTop('.kt-file');
-    capture('documents', phone ? 'A neutral reference image with its caption and a pinned file link, above an original ragged table that scrolls inside its block.' : 'The reference caption and pinned file link, above the original ragged table with spans.');
+    if (flow) {
+      assert.equal(ask(() => !!document.querySelector('.gd-uq')), false);
+      assert.equal(ask(() => document.querySelector('.kb-stage').classList.contains('no-image')), true);
+      drive('await page.eval(() => document.querySelector(".kb-btn.go").click());');
+      assert.equal(ask(() => document.querySelector('.kb-words h3').textContent), 'Second original step');
+      assert.deepEqual(ask(() => [...document.querySelectorAll('.gd-sec > h2')].map((e) => e.textContent)), ['The original words, in order']);
+    }
+    capture(flow ? 'flow' : 'documents', phone ? 'A neutral reference image with its caption and a pinned file link, above an original ragged table that scrolls inside its block.' : 'The reference caption and pinned file link, above the original ragged table with spans.');
     if (phone) {
       drive('await page.eval(() => { const e = document.querySelector(".kt-scroll"); e.scrollLeft = e.scrollWidth; });');
       assert.ok(ask(() => document.querySelector('.kt-scroll').scrollLeft) > 0);

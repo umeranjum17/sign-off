@@ -62,7 +62,7 @@ export type Decision = {
   /** Plans: the sections to approve or change and the decisions to answer, all sent back as one answer. */
   sections?: PlanSection[]; decisions?: PlanDecision[]; project?: string;
   /** A guided plan or report (plan 2, report 3): the board draws it as one page from these fields, with no page of the agent's own. */
-  engagement?: { kind: string; schema: number; filer: string; revision: string }; guided?: boolean; understood?: { label: string; text: string }[]; visual?: GuideVisual; next?: { heading: string; lines: string[] };
+  layout?: 'document'; engagement?: { kind: string; schema: number; filer: string; revision: string }; guided?: boolean; understood?: { label: string; text: string }[]; visual?: GuideVisual; next?: { heading: string; lines: string[] };
   /** Designs: project, date, review status, preview and screen views. An evidence update's `status` is one of EVIDENCE_STATUSES and its `captions` name each capture, in order. */
   status?: 'draft' | 'in_review' | 'approved' | 'Fixed' | 'In progress' | 'Waiting on you'; captions?: string[]; journeys?: DesignJourney[]; recommend?: string;
   /** Design 2: the frame role Yes approves, and the reviewer's note shown as Main reviewed. */
@@ -322,7 +322,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       ...(d.kind === 'finding' && { finding: { cause: d.cause, incidents: d.incidents, days: d.days, evidence_ids: d.evidence_ids, change_kind: d.change_kind, proposal: d.proposal } }),
       ...(plan && { sections: d.sections, decisions: d.decisions }), ...((plan || report) && d.project && { project: d.project }),
       ...(engagement && { engagement: { kind: d.kind, schema: d.schema, filer: d.filer, revision: documentRevision(d) } }),
-      ...(guided && { guided: true, understood: d.understood, visual: d.visual, next: d.next, ...(report && { sections: d.sections }) }),
+      ...(guided && { guided: true, layout: d.layout, understood: d.understood, visual: d.visual, next: d.next, ...(report && { sections: d.sections }) }),
       ...(design && { kind: 'design', type: 'design', group: d.group, filed: d.filed, status: d.status, preview: d.preview, journeys: d.journeys, ...(d.accepts && { accepts: d.accepts }), ...(d.reviewed && { reviewed: d.reviewed }), ...(d.options && { options: d.options, recommend_value: d.recommend }) }),
       ...(d.type === 'explainer' && d.chapters && { chapters: d.chapters.map(({ at, title }: Chapter) => ({ at, title })) }),
     };
@@ -782,13 +782,13 @@ export const appendAnnotation = (decisionsPath: string, a: Omit<Annotation, 'id'
 export function guidePart(d: Decision, part: string): string | undefined {
   if (!d.guided) return undefined;
   if (part === 'this') return d.visual?.heading;
-  if (part === 'understood') return 'What I understood';
+  if (part === 'understood') return d.understood?.length ? 'What I understood' : undefined;
   if (part === 'next') return d.next?.heading;
   const dec = /^d:(.+)$/.exec(part)?.[1];
   if (dec) return d.decisions?.find((q) => q.key === dec)?.question;
   const [id, i] = part.split(':'), sec = d.sections?.find((x) => x.id === id);
   if (!sec) return undefined;
-  return i === undefined ? sec.heading : /^\d+$/.test(i) ? sec.items?.[+i]?.title : undefined;
+  return i === undefined ? sec.heading || (d.layout === 'document' ? d.title : undefined) : /^\d+$/.test(i) ? sec.items?.[+i]?.title : undefined;
 }
 /** Read receipts: the first time the person had a part of a guided page on screen, one line per key and part. */
 export const readsPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.reads.jsonl';
@@ -842,7 +842,7 @@ export const answerDeeper = (decisionsPath: string, id: string, text: string, mo
 /** Hash only authored fields, independent of JSON property order and board-added metadata. */
 const canonical = (v: any): any => Array.isArray(v) ? v.map(canonical) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canonical(v[k])])) : v;
 export function documentRevision(m: any): string {
-  const fields = ['contract', 'kind', 'schema', 'key', 'filer', 'title', 'link', 'about', 'filed', 'group', 'decided', 'asked_by', 'purpose', 'project', 'understood', 'visual', 'sections', 'decisions', 'next'];
+  const fields = ['contract', 'kind', 'schema', 'key', 'filer', 'title', 'link', 'about', 'filed', 'group', 'decided', 'asked_by', 'purpose', 'project', 'layout', 'understood', 'visual', 'sections', 'decisions', 'next'];
   return createHash('sha256').update(JSON.stringify(canonical(Object.fromEntries(fields.filter(k => m[k] !== undefined).map(k => [k, m[k]]))))).digest('hex');
 }
 /** Target field paths are relative to exactly one authored part, never UI/control text. */
