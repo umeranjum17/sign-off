@@ -1478,6 +1478,24 @@
     stageEl.forEach((s) => io2.observe(s));
     parts.forEach((c) => c.dataset.stage = stageOf.get(c.dataset.part));
     parts.forEach((c) => io2.observe(c));
+    // The part in view is measured as well as observed: a flick, a font swap or a reflow can carry a part past a band between two frames, and the bar
+    // must name the part the person is looking at rather than the one that was there before they moved.
+    const onScroll = () => requestAnimationFrame(() => {
+      if (!scroll.isConnected) return;
+      // The band is the middle of what the person can see: the report's own scroller where it scrolls, the screen where the page carries it.
+      const box = scroll.getBoundingClientRect();
+      const top = Math.max(box.top, 0), bottom = Math.min(box.bottom, innerHeight || box.bottom);
+      if (bottom - top < 40) return;
+      const mid = (top + bottom) / 2;
+      const hit = [...parts].find((c) => { const r = c.getBoundingClientRect(); return r.top <= mid && r.bottom >= mid; });
+      if (!hit) return;
+      setStage(hit.dataset.stage);
+      if (!plan && hit.dataset.part && hit.dataset.part !== curPart) { curPart = hit.dataset.part; paintBar(); }
+    });
+    // A scroll of either kind counts, wherever it happened in the reader.
+    document.addEventListener('scroll', onScroll, { passive: true, capture: true });
+    document.fonts?.ready.then(onScroll);
+    onScroll();
 
     // ---- keeping the page true to the board
     let timer;

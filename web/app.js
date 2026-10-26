@@ -169,7 +169,15 @@
     const start = typing && typing.selectionStart, end = typing && typing.selectionEnd, direction = typing && typing.selectionDirection;
     // A part of the board arriving redraws the list around its row: the row the person is on keeps the focus, as it does across a poll.
     const onRow = !typing && document.activeElement?.closest?.('.dl-row[data-key]')?.dataset.key;
+    // A part of the board arriving redraws the report the person is reading too: the place they had scrolled to is kept, as the row they are on keeps
+    // the focus, so a poll never sends a reader back to the top of what they were reading.
+    const open = document.getElementById('reader');
+    const places = open && !open.hidden ? [...open.querySelectorAll('.gd-scroll')].map((s) => s.scrollTop) : null;
     render();
+    if (places?.length) {
+      const now = document.getElementById('reader');
+      if (now && !now.hidden) [...now.querySelectorAll('.gd-scroll')].forEach((s, i) => { if (places[i]) s.scrollTop = places[i]; });
+    }
     const box = typing && document.getElementById(typing.id);
     if (box) box.focus(), box.setSelectionRange(start, end, direction);
     else if (onRow) document.getElementById(`item-${onRow}`)?.focus?.({ preventScroll: true });
