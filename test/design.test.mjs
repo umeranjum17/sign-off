@@ -1510,6 +1510,33 @@ test('a guided report acts from one place: the parts carry no buttons or receipt
   proc.kill();
 });
 
+test('a report names the part in view as its reader scrolls it, and the page keeps no error of its own', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'reader-measure'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  const report = { ...JSON.parse(readFileSync(new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url))), filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+  report.sections.push({ id: 'steps', stage: 'found', heading: 'Two steps', body: 'The second one opens.', items: [{ title: 'Close the input', text: 'One line.' }] });
+  writeFileSync(join(dir, 'report.json'), JSON.stringify(report));
+  const posted = run('post', file, '--kind', 'report', '--from', join(dir, 'report.json'));
+  assert.equal(posted.code, 0, posted.out);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, send, close } = await browse(join(dir, 'b'), 390, 844, true);
+  try {
+    // The page keeps its own errors: a throw inside a redraw or a scroll leaves a screen half drawn, and no screenshot or click can see that.
+    await send('Page.enable');
+    await send('Page.addScriptToEvaluateOnNewDocument', { source: "globalThis.__errors = []; addEventListener('error', (e) => globalThis.__errors.push(String(e && e.message))); addEventListener('unhandledrejection', (e) => globalThis.__errors.push(String(e && e.reason)));" });
+    await evaluate(`location.href = ${JSON.stringify(`${url}#reports/${report.key}`)}`);
+    await until(() => evaluate(`!!document.querySelector('.ra-bar .ra-b.agree')?.getClientRects().length`));
+    // The reader is scrolled by hand, the typeface swaps in under it, and the bar names the part the person has in front of them.
+    await evaluate(`document.querySelector('.gd-scroll').style.scrollBehavior = 'auto'; document.querySelector('[data-part="steps"]').scrollIntoView({ block: 'center' })`);
+    await until(async () => (await evaluate(`document.querySelector('.ra-ont').textContent`)) === 'Two steps');
+    await evaluate(`document.fonts.ready.then(() => document.querySelector('[data-part="this"]').scrollIntoView({ block: 'center' }))`);
+    await until(async () => (await evaluate(`document.querySelector('.ra-ont').textContent`)) !== 'Two steps');
+    assert.deepEqual(await evaluate('globalThis.__errors'), []);
+  } finally { close(); proc.kill(); }
+});
+
 test('a capture opens the raw file on a desk and its own live screen on a phone', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'raw-capture'), file = join(dir, '.sign-off', 'decisions.json');
   mkdirSync(dir);

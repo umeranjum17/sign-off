@@ -1487,7 +1487,10 @@
       const top = Math.max(box.top, 0), bottom = Math.min(box.bottom, innerHeight || box.bottom);
       if (bottom - top < 40) return;
       const mid = (top + bottom) / 2;
-      const hit = [...parts].find((c) => { const r = c.getBoundingClientRect(); return r.top <= mid && r.bottom >= mid; });
+      const hit = [...parts.values()].find((c) => {
+        const r = c?.getBoundingClientRect?.();
+        return !!r && r.top <= mid && r.bottom >= mid;
+      });
       if (!hit) return;
       setStage(hit.dataset.stage);
       if (!plan && hit.dataset.part && hit.dataset.part !== curPart) { curPart = hit.dataset.part; paintBar(); }
