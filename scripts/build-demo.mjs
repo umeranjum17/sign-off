@@ -1,5 +1,5 @@
 // Builds the GitHub Pages site: the landing page (site/index.html) at the root and the real board on demo data at /demo/.
-// One source: web/index.html is copied verbatim, then the demo seed and the
+// One source: web/index.html, its stylesheet and its script are copied verbatim, then the demo seed and the
 // demo shim are added only in this build. The local server never serves them.
 import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -37,16 +37,17 @@ for (const d of seed.decisions) {
 }
 
 const esc = (v) => JSON.stringify(v).replace(/</g, '\\u003c');
-const marker = '<script>\n  let state = { decisions: [], answers: {} };';
-if (!page.includes(marker)) throw new Error('web/index.html changed: demo injection marker not found');
+// The seed and the shim load just before the board's own script, which reads them as it starts.
+const marker = /<script src="app\.js[^"]*" defer data-more="app-more\.js" data-css="app\.css"><\/script>/;
+if (!marker.test(page)) throw new Error('web/index.html changed: demo injection marker not found');
 const built = page.replace(marker, () => [
   `<script>window.SIGN_OFF_DEMO_SEED = ${esc(seed)}; window.SIGN_OFF_DEMO_FILES = ${esc(files)}; window.SIGN_OFF_DEMO_DIGEST = ${esc(digest)};</script>`,
   '<script src="./demo-shim.js"></script>',
-  marker,
+  '<script src="app.js" defer data-more="app-more.js" data-css="app.css"></script>',
 ].join('\n'));
 writeFileSync(join(out, 'index.html'), built);
 copyFileSync(join(demo, 'shim.js'), join(out, 'demo-shim.js'));
-for (const f of ['tokens.css', 'ui.css', 'inter.woff2', 'icon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'manifest.webmanifest']) copyFileSync(join(web, f), join(out, f));
+for (const f of ['tokens.css', 'ui.css', 'app.css', 'app.js', 'app-more.js', 'inter.woff2', 'icon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'manifest.webmanifest']) copyFileSync(join(web, f), join(out, f));
 // The landing page, with the pictures and icons it shows.
 mkdirSync(join(site, 'media'), { recursive: true });
 copyFileSync(join(root, 'site', 'index.html'), join(site, 'index.html'));

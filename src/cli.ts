@@ -2562,8 +2562,14 @@ async function exportBoard(args: string[]) {
   if (!/\.html?$/i.test(out)) throw fail(`--out ${tilde(out)} does not end in .html`, 'VALIDATION_ERROR', 'Pass --out <file.html>');
   const data = JSON.stringify({ ...frozen, files, exported: `${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC` }).replace(/</g, '\\u003c');
   const csp = "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; media-src data:; frame-src data:";
-  // The design tokens and shared parts go inside the one file, as nothing beside it is served.
-  const html = page.toString().replace(/<link rel="stylesheet" href="(tokens|ui)\.css">/g, (_, name) => `<style>${readFileSync(new URL(`../web/${name}.css`, import.meta.url), 'utf8')}</style>`);
+  // The design tokens, shared parts, page styles and its script go inside the one file, as nothing beside it is served.
+  const beside = (name: string) => readFileSync(new URL(`../web/${name}`, import.meta.url), 'utf8');
+  // The one file needs no small sheet, no lazy rest and no early read, which only a served board has: the first screen's rules and all the others go
+  // inside it at once.
+  const html = page.toString().replace(/<script>window\.__asks[^<]*<\/script>\n/, '')
+    .replace(/<style id="first">[\s\S]*?<\/style>/, () => `<style>${beside('app.css')}</style>`)
+    .replace(/<link rel="stylesheet" href="(tokens|ui)\.css">/g, (_, name) => `<style>${beside(`${name}.css`)}</style>`)
+    .replace(/<script src="app\.js" defer data-more="app-more\.js" data-css="app\.css"><\/script>/, () => `<script>${beside('app.js')}</script>\n<script>${beside('app-more.js')}</script>`);
   writeFileSync(out, html.replace('</head>', () => `<meta http-equiv="content-security-policy" content="${csp}">\n<script>window.FROZEN = ${data};</script>\n</head>`), { mode: 0o600 });
   return toon({ board: tilde(parsed.file), exported: tilde(out), items: frozen.decisions.length, inlined: Object.keys(files).length, ...(missing && { missing }) },
     [`Open ${tilde(out)} in a browser: one read-only file, no server needed`]);
@@ -2586,9 +2592,10 @@ const squeeze = (req: IncomingMessage, bytes: Buffer): { bytes: Buffer; encoding
   if (encoding === 'gzip') return { bytes: gzipSync(bytes, { level: 6 }), encoding };
   return { bytes };
 };
-/** The board's design tokens, shared parts and typeface, favicon, home-screen icon and install manifest, served beside the page; see web/tokens.css, web/ui.css and web/icon.svg. */
+/** The board's design tokens, shared parts, page styles and script, typeface, favicon, home-screen icon and install manifest, served beside the page; see web/tokens.css, web/ui.css, web/app.css, web/app.js and web/icon.svg. */
 const ICONS: Record<string, { type: string; bytes: Buffer }> = Object.fromEntries(
-  [['tokens.css', 'text/css; charset=utf-8'], ['ui.css', 'text/css; charset=utf-8'], ['inter.woff2', 'font/woff2'], ['icon.svg', 'image/svg+xml'], ['apple-touch-icon.png', 'image/png'], ['icon-192.png', 'image/png'], ['icon-512.png', 'image/png'], ['icon-maskable-512.png', 'image/png'], ['manifest.webmanifest', 'application/manifest+json']]
+  [['tokens.css', 'text/css; charset=utf-8'], ['ui.css', 'text/css; charset=utf-8'], ['app.css', 'text/css; charset=utf-8'], ['app.js', 'text/javascript; charset=utf-8'], ['app-more.js', 'text/javascript; charset=utf-8'],
+    ['inter.woff2', 'font/woff2'], ['icon.svg', 'image/svg+xml'], ['apple-touch-icon.png', 'image/png'], ['icon-192.png', 'image/png'], ['icon-512.png', 'image/png'], ['icon-maskable-512.png', 'image/png'], ['manifest.webmanifest', 'application/manifest+json']]
     .map(([name, type]) => [`/${name}`, { type, bytes: readFileSync(new URL(`../web/${name}`, import.meta.url)) }]));
 /** The board as an app: pwa.js (the install row and the offline line, named by its content like the stylesheets) and sw.js (the service worker, which must sit at the root and is asked again each time). */
 const APP = { pwa: readFileSync(new URL('../web/pwa.js', import.meta.url)), worker: readFileSync(new URL('../web/sw.js', import.meta.url)) };
@@ -2596,8 +2603,12 @@ const APP = { pwa: readFileSync(new URL('../web/pwa.js', import.meta.url)), work
 const SPLASH = readdirSync(new URL('../web/', import.meta.url)).flatMap((f) => { const m = /^splash-(\d+)x(\d+)-(light|dark)\.png$/.exec(f); return m ? [{ file: f, w: +m[1]!, h: +m[2]!, theme: m[3]! }] : []; });
 for (const { file } of SPLASH) ICONS[`/${file}`] = { type: 'image/png', bytes: readFileSync(new URL(`../web/${file}`, import.meta.url)) };
 const splashLinks = SPLASH.map(({ file, w, h, theme }) => `<link rel="apple-touch-startup-image" href="${file}" media="(device-width: ${w}px) and (device-height: ${h}px) and (-webkit-device-pixel-ratio: 2) and (orientation: ${w < h ? 'portrait' : 'landscape'}) and (prefers-color-scheme: ${theme})">`).join('\n');
-/** The page names its two stylesheets by their content, so a phone holding an older copy (kept a day) fetches the new one with the new page: a row's badge is never drawn by half of an upgrade. */
-const served = Buffer.from(page.toString().replace(/href="(tokens|ui)\.css"/g, (_, name) => `href="${name}.css?v=${createHash('sha256').update(ICONS[`/${name}.css`]!.bytes).digest('hex').slice(0, 12)}"`)
+/** The page names its stylesheets and script by their content, so a phone holding an older copy (kept a day) fetches the new one with the new page: a row's badge is never drawn by half of an upgrade. */
+const stamp = (name: string) => createHash('sha256').update(ICONS[`/${name}`]!.bytes).digest('hex').slice(0, 12);
+const served = Buffer.from(page.toString().replace(/href="(tokens|ui|app)\.css"/g, (_, name) => `href="${name}.css?v=${stamp(`${name}.css`)}"`)
+  .replace(/ src="(app)\.js"/g, (_, name) => ` src="${name}.js?v=${stamp(`${name}.js`)}"`)
+  .replace(/data-more="(app-more)\.js"/g, (_, name) => `data-more="${name}.js?v=${stamp(`${name}.js`)}"`)
+  .replace(/data-css="(app)\.css"/g, (_, name) => `data-css="${name}.css?v=${stamp(`${name}.css`)}"`)
   .replace('</head>', () => `${splashLinks}\n<script src="pwa.js?v=${createHash('sha256').update(APP.pwa).digest('hex').slice(0, 12)}" defer></script>\n</head>`));
 /** The worker's cache is named by the whole build, so a changed page, stylesheet or worker replaces the kept copy at the next visit and never mixes two. */
 const worker = Buffer.from(`const BUILD = ${JSON.stringify(createHash('sha256').update(served).update(APP.worker).update(APP.pwa).digest('hex').slice(0, 16))};\n${APP.worker}`);
@@ -3367,10 +3378,21 @@ const server = createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/sw.js') return res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' }).end(worker);
   if (req.method === 'GET' && (req.url ?? '').split('?')[0] === '/pwa.js') return res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=86400' }).end(APP.pwa);
   const icon = req.method === 'GET' ? ICONS[(req.url ?? '').split('?')[0]!] : undefined;
-  if (icon) return res.writeHead(200, { 'content-type': icon.type, 'cache-control': 'public, max-age=86400' }).end(icon.bytes);
+  if (icon) {
+    // A stylesheet or a script is mostly text and shrinks 4-8x: the phone fetches it compressed, and asks again with its tag, so an unchanged file
+    // costs a 304 and no body.
+    const etag = `"${createHash('sha256').update(icon.bytes).digest('hex').slice(0, 32)}"`;
+    const headers = { 'content-type': icon.type, 'cache-control': 'public, max-age=86400', etag, vary: 'accept-encoding' };
+    if (unchanged(req, etag)) return res.writeHead(304, headers).end();
+    const sent = COMPRESSIBLE.test(icon.type) ? squeeze(req, icon.bytes) : { bytes: icon.bytes };
+    return res.writeHead(200, { ...headers, ...(sent.encoding && { 'content-encoding': sent.encoding }), 'content-length': sent.bytes.length }).end(sent.bytes);
+  }
   if (req.method === 'GET' && req.url === '/favicon.ico') return res.writeHead(204).end();
   if (req.method === 'GET' && req.url === '/') {
-    const headers = { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'self' 'unsafe-inline'", etag: pageTag, 'cache-control': 'no-cache', vary: 'accept-encoding' };
+    // The three files the first screen needs are named by the answer that carries the shell, so a phone starts reading them with the page itself
+    // instead of after its two round trips. The stylesheet the later screens use is left out on purpose: it is asked for after the first paint.
+    const early = [['tokens.css', 'style'], ['ui.css', 'style'], ['app.js', 'script']].map(([name, as]) => `</${name}?v=${stamp(name!)}>; rel=preload; as=${as}`).join(', ');
+    const headers = { link: early, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'self' 'unsafe-inline'", etag: pageTag, 'cache-control': 'no-cache', vary: 'accept-encoding' };
     if (unchanged(req, pageTag)) return res.writeHead(304, headers).end();
     const takes = String(req.headers['accept-encoding'] ?? ''), encoding = /\bbr\b/.test(takes) ? 'br' : /\bgzip\b/.test(takes) ? 'gzip' : undefined, bytes = encoding ? pageAs(encoding) : served;
     return res.writeHead(200, { ...headers, ...(encoding && { 'content-encoding': encoding }), 'content-length': bytes.length }).end(bytes);

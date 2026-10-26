@@ -157,8 +157,10 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
   const html = await (await fetch(url)).text();
   assert.match(html, /<title>Dashboard/);
-  assert.match(html, /mockCards/);
   assert.match(html, /<nav class="side" id="nav" aria-label="Board areas">/);
+  // The page is a small shell; its script is fetched beside it, and the renderers are in it.
+  const script = await (await fetch(`${url}app.js?v=1`)).text();
+  assert.match(script, /mockCards/);
   const api = await (await fetch(`${url}api/decisions`)).json();
   assert.equal(api.decisions[0].type, 'design');
   assert.equal(api.decisions[0].title, 'Pick the sign-in layout');
@@ -171,7 +173,7 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   assert.match(tour.media[0].path, /^evidence\/\d+\/1\.mp4$/);
   const played = await fetch(`${url}api/media?key=tour&i=0`, { headers: { range: 'bytes=0-3' } });
   assert.deepEqual([played.status, played.headers.get('content-type'), await played.text()], [206, 'video/mp4', '0123']);
-  assert.match(html, /function chapters/);
+  assert.match(script, /function chapters/);
   assert.equal((await post(url, 'api/answers', { key: 'tour', answer: 'unclear', note: 'Umer: step 2 is too fast.' })).status, 200);
   assert.equal(JSON.parse(run('answers', board, '--key', 'tour', '--json').out).tour.answer, 'unclear');
   appendFileSync(join(so, tour.media[0].path), 'x');
@@ -1506,6 +1508,33 @@ test('a guided report acts from one place: the parts carry no buttons or receipt
     }
   } finally { close(); }
   proc.kill();
+});
+
+test('a report names the part in view as its reader scrolls it, and the page keeps no error of its own', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'reader-measure'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  const report = { ...JSON.parse(readFileSync(new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url))), filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+  report.sections.push({ id: 'steps', stage: 'found', heading: 'Two steps', body: 'The second one opens.', items: [{ title: 'Close the input', text: 'One line.' }] });
+  writeFileSync(join(dir, 'report.json'), JSON.stringify(report));
+  const posted = run('post', file, '--kind', 'report', '--from', join(dir, 'report.json'));
+  assert.equal(posted.code, 0, posted.out);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, send, close } = await browse(join(dir, 'b'), 390, 844, true);
+  try {
+    // The page keeps its own errors: a throw inside a redraw or a scroll leaves a screen half drawn, and no screenshot or click can see that.
+    await send('Page.enable');
+    await send('Page.addScriptToEvaluateOnNewDocument', { source: "globalThis.__errors = []; addEventListener('error', (e) => globalThis.__errors.push(String(e && e.message))); addEventListener('unhandledrejection', (e) => globalThis.__errors.push(String(e && e.reason)));" });
+    await evaluate(`location.href = ${JSON.stringify(`${url}#reports/${report.key}`)}`);
+    await until(() => evaluate(`!!document.querySelector('.ra-bar .ra-b.agree')?.getClientRects().length`));
+    // The reader is scrolled by hand, the typeface swaps in under it, and the bar names the part the person has in front of them.
+    await evaluate(`document.querySelector('.gd-scroll').style.scrollBehavior = 'auto'; document.querySelector('[data-part="steps"]').scrollIntoView({ block: 'center' })`);
+    await until(async () => (await evaluate(`document.querySelector('.ra-ont').textContent`)) === 'Two steps');
+    await evaluate(`document.fonts.ready.then(() => document.querySelector('[data-part="this"]').scrollIntoView({ block: 'center' }))`);
+    await until(async () => (await evaluate(`document.querySelector('.ra-ont').textContent`)) !== 'Two steps');
+    assert.deepEqual(await evaluate('globalThis.__errors'), []);
+  } finally { close(); proc.kill(); }
 });
 
 test('a capture opens the raw file on a desk and its own live screen on a phone', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
@@ -4071,7 +4100,7 @@ test('answer events: a filer takes only its own answers, once, the card shows it
   const took = as({}, 'wait', file, '--filer', 'agent-a', '--json', '--timeout', '5');
   assert.deepEqual([took.code, Object.keys(JSON.parse(took.out))], [0, ['a']]);
   assert.deepEqual((await read()).seen, ['a']);
-  assert.match(await (await fetch(url)).text(), /Seen by agent/);
+  assert.match(await (await fetch(`${url}app.js`)).text(), /Seen by agent/);
   // Taken once: nothing of agent-a is left.
   assert.match(as({}, 'wait', file, '--filer', 'agent-a', '--timeout', '1').out, /nothing posted by agent-a is waiting/);
   // agent-b's wait sleeps through answers to other filers' items and wakes on its own.
@@ -4217,8 +4246,14 @@ test('load budget: a board of 60 updates opens Evidence on a phone with at most 
     r.on('data', (b) => parts.push(b)).on('end', () => ok({ status: r.statusCode, headers: r.headers, bytes: Buffer.concat(parts).length }));
   }).on('error', no));
   const page = await raw('/'), state = await raw('/api/decisions'), plainPage = readFileSync(new URL('../web/index.html', import.meta.url)).length;
+  // The shell is small and goes compressed; the stylesheets and the script it names go compressed beside it.
   assert.equal(page.headers['content-encoding'], 'br');
-  assert.ok(page.bytes < plainPage / 3, `the page goes compressed: ${page.bytes} of ${plainPage} bytes`);
+  assert.ok(page.bytes < plainPage, `the page goes compressed: ${page.bytes} of ${plainPage} bytes`);
+  for (const name of ['tokens.css', 'ui.css', 'app.css', 'app.js']) {
+    const res = await raw(`/${name}`);
+    assert.equal(res.headers['content-encoding'], 'br', name);
+    assert.ok(res.bytes < readFileSync(new URL(`../web/${name}`, import.meta.url)).length, `${name} goes compressed`);
+  }
   assert.equal(state.headers['content-encoding'], 'br');
   // The page's 20-second poll of an unchanged board, and a reload of the page itself, answer 304 with no body.
   assert.deepEqual([(await raw('/api/decisions', { 'if-none-match': state.headers.etag })).status, (await raw('/', { 'if-none-match': page.headers.etag })).status], [304, 304]);
@@ -4264,6 +4299,85 @@ test('load budget: a board of 60 updates opens Evidence on a phone with at most 
     assert.ok(again.page < 1024 && again.state.every((b) => b < 1024), `reload: page ${again.page} B, state ${again.state} B`);
     assert.ok(again.media.every((b) => b === 0), `reload refetched a capture: ${again.media}`);
     console.log(`Evidence on a phone: ${first.captures} of 60 captures, ${first.kb} KB; reload ${again.kb} KB`);
+  } finally { close(); }
+  proc.kill();
+});
+
+test('a report opened before its own file arrives draws the moment it does', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  // The screen app-more.js draws, opened cold and while that file is held back: the reader must draw on its own once the file lands, without a second tap.
+  const dir = join(scratch, 'late-more'), file = join(dir, 'board.json');
+  mkdirSync(dir, { recursive: true });
+  const report = { ...JSON.parse(readFileSync(new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url))), filed: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+  writeFileSync(join(dir, 'report.json'), JSON.stringify(report));
+  const posted = run('post', file, '--kind', 'report', '--from', join(dir, 'report.json'));
+  assert.equal(posted.code, 0, posted.out);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, send, close } = await browse(join(dir, 'b'), 390, 844, true);
+  try {
+    await send('Network.enable');
+    await send('Network.setBypassServiceWorker', { bypass: true });
+    await send('Fetch.enable', { patterns: [{ urlPattern: '*app-more.js*' }] });
+    await evaluate(`location.href = ${JSON.stringify(`${url}#reports/${report.key}`)}`);
+    // The page is loaded and the file is still held: the reader is not drawn yet.
+    await until(() => evaluate('document.readyState === "complete"'));
+    assert.equal(await evaluate('!!document.querySelector(".ra-bar .ra-b.agree")'), false, 'the reader is not drawn before its file');
+    await send('Fetch.disable');
+    await until(() => evaluate('!!document.querySelector(".ra-bar .ra-b.agree")?.getClientRects().length'));
+    assert.equal(await evaluate('!!document.querySelector(".gd-main .gd-foot")'), false, 'the parts carry no buttons of their own');
+  } finally { close(); }
+  proc.kill();
+});
+
+test('the first screen arrives as a small shell beside its own styles and script, and the rest of both only after it has painted', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  // Two asks: the first screen needs the shell, its two base sheets, the state and the small sheet inside the page, and none of the code or rules the
+  // screens beyond Today draw with.
+  const dir = join(scratch, 'shell'), file = join(dir, 'board.json'), at = new Date().toISOString();
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [1, 2].map((n) => ({ key: `ask-${n}`, type: 'decision', number: n, title: `Ship the sign-in change ${n}?`,
+    filed: at, options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }] })) }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const raw = (path, headers = {}) => new Promise((ok, no) => get(`${url}${path.slice(1)}`, { agent: false, headers: { 'accept-encoding': 'gzip, deflate, br', ...headers } }, (r) => {
+    const parts = [];
+    r.on('data', (b) => parts.push(b)).on('end', () => ok({ status: r.statusCode, headers: r.headers, bytes: Buffer.concat(parts).length, body: Buffer.concat(parts).toString() }));
+  }).on('error', no));
+  const page = await raw('/'), shell = await (await fetch(url)).text();
+  // The shell is a shell: it goes compressed, it is far under 16 KB, and it carries none of the app's code.
+  assert.equal(page.headers['content-encoding'], 'br');
+  assert.ok(page.bytes < 16 * 1024, `the shell is small: ${page.bytes} bytes`);
+  assert.match(shell, /<style id="first">/);
+  assert.doesNotMatch(shell, /function render\(|function el\(/, 'the shell carries no app code');
+  assert.match(shell, /data-css="app\.css\?v=[0-9a-f]{12}"/);
+  assert.match(shell, /data-more="app-more\.js\?v=[0-9a-f]{12}"/);
+  // The first screen's files are named in the answer itself, so they start with the page rather than two round trips behind it.
+  assert.deepEqual([...String(page.headers.link).matchAll(/<\/(\S+?)\?v=[0-9a-f]{12}>; rel=preload; as=(\w+)/g)].map((m) => `${m[1]} ${m[2]}`),
+    ['tokens.css style', 'ui.css style', 'app.js script']);
+  // Each file beside it is there, compressed, and a file of its own rather than part of the page.
+  for (const name of ['app.css', 'app.js', 'app-more.js']) {
+    const res = await raw(`/${name}`);
+    assert.equal(res.headers['content-encoding'], 'br', name);
+    assert.ok(res.bytes > 1024 && res.bytes < 100 * 1024, `${name}: ${res.bytes} B`);
+  }
+  const { evaluate, send, close } = await browse(join(dir, 'b'), 390, 844, true);
+  try {
+    // The page goes round the worker's own copy, so what is held back below is held from the page itself.
+    await send('Network.enable');
+    await send('Network.setBypassServiceWorker', { bypass: true });
+    // Hold the rest of the styles and the rest of the script back: the first screen must still draw, from the small sheet alone and in the phone's own typeface.
+    await send('Fetch.enable', { patterns: [{ urlPattern: '*app.css*' }, { urlPattern: '*app-more.js*' }] });
+    await evaluate(`location.href = ${JSON.stringify(url)}`);
+    await until(() => evaluate('document.querySelectorAll("#board .t-wait .ui-row").length > 0 && !document.querySelector("#board .skel")'));
+    assert.equal(await evaluate('document.getElementById("first") !== null'), true, 'the small sheet is still the only one');
+    assert.equal(await evaluate('/inter/i.test(getComputedStyle(document.body).fontFamily)'), false, 'the typeface waits with the rest of the styles');
+    // Let it go: the small sheet steps aside, the full rules and the rest of the script land, and a screen beyond Today draws with them.
+    await send('Fetch.disable');
+    await until(() => evaluate('document.getElementById("first") === null'));
+    await until(() => evaluate('/inter/i.test(getComputedStyle(document.body).fontFamily)'));
+    await evaluate(`location.hash = '#waiting'`);
+    await until(() => evaluate('document.querySelectorAll("#board .ui-row").length === 2 && !document.querySelector("#board .skel") && !document.getElementById("banner")?.textContent.trim()'));
   } finally { close(); }
   proc.kill();
 });
@@ -4634,9 +4748,12 @@ test('the feedback trail: what the person sends on a card goes Sent, Delivered, 
       [['Keep the weekly digest?', 'Sent', 1, false], ['Open the beta to every team?', 'Replied', 4, true], ['Turn on the CSV export?', 'Delivered', 2, false]]);
     // The badge is one 20px line at the end of the second line at 360, 390 and 445, whatever the title and the line before it say: the words before it take the ellipsis.
     // The page names its stylesheets by their content, so a phone holding the stylesheet of an older version (kept a day) never draws the badge without its rules.
-    const hrefs = [...(await (await fetch(url)).text()).matchAll(/<link rel="stylesheet" href="(\S+\.css)\?v=[0-9a-f]{12}">/g)].map((m) => m[1]);
-    assert.deepEqual(hrefs, ['tokens.css', 'ui.css']);
-    assert.equal(await evaluate('[...document.querySelectorAll("link[rel=stylesheet]")].map((l) => l.getAttribute("href").replace(/[?]v=[0-9a-f]{12}$/, "")).join()'), 'tokens.css,ui.css');
+    // The page names the base sheets it is read with, and the stylesheet it asks for after the first paint by its content too, so a phone never draws a
+    // screen with half an upgrade's rules.
+    const served = await (await fetch(url)).text();
+    assert.deepEqual([...served.matchAll(/<link rel="stylesheet" href="(\S+\.css)\?v=[0-9a-f]{12}">/g)].map((m) => m[1]), ['tokens.css', 'ui.css']);
+    assert.match(served, /data-css="app\.css\?v=[0-9a-f]{12}"|data-css="app\.css"/);
+    assert.equal(await evaluate('[...document.querySelectorAll("link[rel=stylesheet]")].map((l) => l.getAttribute("href").replace(/[?]v=[0-9a-f]{12}$/, "")).join()'), 'tokens.css,ui.css,app.css');
     assert.match((await (await fetch(`${url}ui.css?v=0123456789ab`)).text()), /\.ui-tb \{ display: inline-flex/);
     const wrap = () => evaluate(`JSON.stringify([...document.querySelectorAll(".ui-row")].filter((r) => r.querySelector(".ui-tb")).map((r) => { const b = r.querySelector(".ui-tb"), m = r.querySelector(".meta"), t = r.querySelector(".t");
       const x = b.getBoundingClientRect(), y = m.getBoundingClientRect(), z = r.getBoundingClientRect(); return { word: b.textContent, h: Math.round(x.height), lines: b.getClientRects().length, clear: y.right <= x.left + 0.5, inside: x.right <= z.right + 0.5 && x.bottom <= z.bottom, cut: m.scrollWidth > m.clientWidth, t: t.scrollWidth > t.clientWidth }; }))`);
