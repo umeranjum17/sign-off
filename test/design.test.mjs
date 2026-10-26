@@ -1420,7 +1420,37 @@ test('Not quite with a note and Tell the agent, on a phone on an answers-only bo
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const { evaluate, tap, insertText, close } = await browse(join(dir, 'b'), 390, 844, true);
-  const centre = (sel) => evaluate(`(() => { const b = document.querySelector(${JSON.stringify(sel)}); b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`);
+  // The middle of an element, as a finger would find it: scrolled to, then waited out. The page reflows under a point that was measured too
+  // soon (a font swapping in, a picture above arriving and taking its room), and a tap at the old point lands on whatever moved there: this
+  // one waited 60 seconds for a note box that a tap had missed by 77 pixels. So the point is only returned once the element holds still.
+  const centre = (sel) => evaluate(`(async () => { const b = document.querySelector(${JSON.stringify(sel)}); b.scrollIntoView({ block: 'center' });
+    const at = () => { const r = b.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; };
+    await document.fonts?.ready;
+    let last = at().join();
+    for (let i = 0; i < 20; i++) { await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok))); const now = at();
+      if (now.join() === last) return now; last = now.join(); }
+    return at(); })()`);
+  // A point over an element, or nothing while the element is not under it: the layout still moves under a point measured a moment ago (a font
+  // swapping in, a picture above taking its room, a caret scrolling into view after typing), and a phone's tap at the stale point lands on
+  // whatever moved there. Measured here as the "Not quite" tap landing on the understood text, 77 pixels lower, and the card never told.
+  const pointAt = (sel) => evaluate(`(async () => { const b = document.querySelector(${JSON.stringify(sel)}); if (!b) return null;
+    const at = () => { const r = b.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; };
+    const under = () => { const p = at(); return document.elementFromPoint(p[0], p[1])?.closest(${JSON.stringify(sel)}) === b ? p : null; };
+    b.scrollIntoView({ block: 'center' }); await document.fonts?.ready;
+    for (let i = 0; i < 30; i++) { const p = under(); await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
+      const q = under(); if (p && q && p.join() === q.join()) return q; }
+    return under(); })()`);
+  // A tap that lands and is taken: the point is read again whenever the page has moved the button out from under it, and the press is given
+  // the seconds a send takes to come back before it counts as missed. A press the button felt that the card ignored fails here.
+  const tapOn = async (sel, took) => {
+    for (let i = 0; i < 3; i++) {
+      const point = await pointAt(sel);
+      if (!point) continue;
+      await tap(point);
+      for (let n = 0; n < 30; n++) { if (await evaluate(took)) return; await new Promise((r) => setTimeout(r, 100)); }
+    }
+    assert.fail(`the card never felt the tap on ${sel}`);
+  };
   const card = '[data-part="understood"]';
   // Each note in Activity: what was said, its part, the words, and the step its track has reached (Sent, Delivered, Read, Replied).
   const status = `[...document.querySelectorAll('.gd-act .ra-e')].filter((e) => e.querySelector('.ra-say')).map((c) => c.querySelector('.ra-eh b').textContent + '|' + c.querySelector('.ra-chip').textContent + '|' + c.querySelector('.ra-say').textContent + '|' + c.querySelector('.ui-trail')?.getAttribute('aria-label').split(':')[0]).join('#')`;
@@ -1428,12 +1458,12 @@ test('Not quite with a note and Tell the agent, on a phone on an answers-only bo
     await evaluate(`location.href = ${JSON.stringify(`${url}#reports/${report.key}`)}`);
     await until(() => evaluate(`!!document.querySelector('${card} .gd-choice[data-u="no"]')?.getClientRects().length`));
     await evaluate(`document.querySelector('.gd-scroll').style.scrollBehavior = 'auto'`);
-    await tap(await centre(`${card} .gd-choice[data-u="no"]`));
+    await tapOn(`${card} .gd-choice[data-u="no"]`, `document.querySelector('${card} .gd-choice[data-u="no"]').getAttribute('aria-pressed') === 'true'`);
     await until(() => evaluate(`!document.querySelector('${card} .gd-note').hidden`));
     await evaluate(`document.querySelector('${card} .gd-note').focus()`);
     await insertText(note);
     await until(() => evaluate(`!document.querySelector('${card} .gd-tell').hidden`));
-    await tap(await centre(`${card} .gd-tell`));
+    await tapOn(`${card} .gd-tell`, `document.querySelector('${card} .gd-tell').hidden`);
     // Accepted, no "takes answers only": the note is in Activity as sent, and the note box and Tell the agent make way for it.
     const shown = (state) => `You said Not quite|What I understood|“${note}”|${state}`;
     await until(async () => (await evaluate(status)) === shown('Sent'));
