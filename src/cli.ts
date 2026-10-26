@@ -2609,7 +2609,13 @@ const served = Buffer.from(page.toString().replace(/href="(tokens|ui|app)\.css"/
   .replace(/ src="(app)\.js"/g, (_, name) => ` src="${name}.js?v=${stamp(`${name}.js`)}"`)
   .replace(/data-more="(app-more)\.js"/g, (_, name) => `data-more="${name}.js?v=${stamp(`${name}.js`)}"`)
   .replace(/data-css="(app)\.css"/g, (_, name) => `data-css="${name}.css?v=${stamp(`${name}.css`)}"`)
-  .replace('</head>', () => `${splashLinks}\n<script src="pwa.js?v=${createHash('sha256').update(APP.pwa).digest('hex').slice(0, 12)}" defer></script>\n</head>`));
+  // The app's own machinery (the service worker, the offline line, the install row) waits for the first screen: named but not asked for, so its
+  // bytes are not part of what a phone moves before it can see the board. app.js asks for it once the first screen has drawn.
+  .replace('</head>', () => `${splashLinks}\n<script data-pwa="pwa.js?v=${createHash('sha256').update(APP.pwa).digest('hex').slice(0, 12)}"></script>\n</head>`)
+  // The tab's mark and the install manifest wait the same way: a phone asks for an icon the moment it reads the page, and the six kilobytes of a
+  // home-screen icon are not what the person came for. app.js names both once the first screen has drawn.
+  .replace(/<link rel="icon" href="icon\.svg"([^>]*)>/, '<link data-icon="icon.svg" rel="icon"$1>')
+  .replace(/<link rel="manifest" href="manifest\.webmanifest"([^>]*)>/, '<link data-manifest="manifest.webmanifest" rel="manifest"$1>'));
 /** The worker's cache is named by the whole build, so a changed page, stylesheet or worker replaces the kept copy at the next visit and never mixes two. */
 const worker = Buffer.from(`const BUILD = ${JSON.stringify(createHash('sha256').update(served).update(APP.worker).update(APP.pwa).digest('hex').slice(0, 16))};\n${APP.worker}`);
 const pageTag = `"${createHash('sha256').update(served).digest('hex').slice(0, 32)}"`;
@@ -2787,7 +2793,11 @@ const HEAVY = ['evidenceCard'];
 /** A row draws what a report is made of (its parts and where each stands, its sources' links) and never its words: those come with the card. */
 const slimSections = (sections: any[]) => sections.map((s) => ({ ...Object.fromEntries(['id', 'stage', 'heading', 'part'].filter((k) => s[k] !== undefined).map((k) => [k, s[k]])),
   ...(s.items?.length && { items: s.items.filter((it: any) => it.link).map((it: any) => ({ link: it.link, ...(it.source && { source: it.source }) })) }) }));
-const lightOf = (d: any) => ({ ...Object.fromEntries(Object.entries(d).filter(([k]) => !HEAVY.includes(k))), ...(d.sections && { sections: slimSections(d.sections) }) });
+/** A guided page's parts as a row says them: that a page has a What this is, an understood part and a next step, and the numbers its picture
+ *  shows, which an ask about it draws beside the ask. The writing inside each, and the diagram, are what the card that opens the page draws. */
+const slimParts = (d: any) => ({ ...(d.visual && { visual: Object.fromEntries(Object.entries(d.visual).filter(([k]) => k !== 'details' && k !== 'diagram')) }),
+  ...(d.understood && { understood: d.understood.map((u: any) => ({ label: u.label })) }), ...(d.next && { next: { ...(d.next.heading !== undefined && { heading: d.next.heading }) } }) });
+const lightOf = (d: any) => ({ ...Object.fromEntries(Object.entries(d).filter(([k]) => !HEAVY.includes(k))), ...(d.sections && { sections: slimSections(d.sections) }), ...slimParts(d) });
 /** A list row: what the list itself says of a proof, which is done-done's word and its first capture, never the whole proof. Without this a row
  * could not tell a pass from a failure, and a list built from rows would call a checked proof unchecked. */
 /** A list row says it is one, so a client knows the card behind it is still to come; the proof's card keeps its first shot, for the row's thumbnail. */
@@ -2796,7 +2806,7 @@ const rowOf = (d: any) => {
   return card ? { ...row, evidenceCard: { ...card, media: (card.media ?? []).filter((m: any) => m.type?.startsWith('image/')).slice(0, 1) } } : row;
 };
 /** The part of the board one request asks for: the asks waiting on the person, the items a page at a time, one card in full, or the ticket roll-up. */
-type View = { name: 'asks' | 'items' | 'card' | 'tickets'; offset: number; limit: number; key: string };
+type View = { name: 'asks' | 'items' | 'card' | 'tickets' | 'lists'; offset: number; limit: number; key: string };
 /** The view a request names, or undefined for the whole board; a view or page it cannot answer is refused in plain words. */
 function viewOf(url: string): View | undefined {
   const q = new URL(url, 'http://board').searchParams, name = q.get('view');
@@ -2804,8 +2814,8 @@ function viewOf(url: string): View | undefined {
   const count = (at: string, fallback: number) => { const v = Number(q.get(at)); return q.get(at) === null || !Number.isInteger(v) || v < 0 ? fallback : v; };
   const offset = count('offset', 0), limit = Math.min(count('limit', 20), 200);
   if (name === 'card') return { name, offset: 0, limit: 1, key: q.get('key') ?? '' };
-  if (name === 'asks' || name === 'items' || name === 'tickets') return { name, offset, limit, key: '' };
-  throw new InputError(`unknown view ${name}: use asks, items, card or tickets`);
+  if (name === 'asks' || name === 'items' || name === 'tickets' || name === 'lists') return { name, offset, limit, key: '' };
+  throw new InputError(`unknown view ${name}: use asks, items, card, tickets or lists`);
 }
 /** The kept read as one view of it: built once per view and unchanged board, so a phone's first screen costs one page of one board. The
  * body keeps the state's own shape, so a page of it is read by the same client as the whole board; the parts a first screen does not show
@@ -2833,6 +2843,12 @@ function viewRead(read: NonNullable<typeof built>, view: View) {
     body = { card, counts, version: s.version, answers: answers[card.key] ? { [card.key]: answers[card.key] } : {}, dismissed: gone.has(card.key) ? [card.key] : [],
       trail: mine(s.trail), rounds: mine(s.rounds), messages: mine(s.messages), annotations: mine(s.annotations), comments: mine(s.comments),
       ...(s.seen_at?.[card.key] && { seen_at: { [card.key]: s.seen_at[card.key] } }), page: { view: 'card', offset: 0, limit: 1, total: 1 } };
+  } else if (view.name === 'lists') {
+    // The board's own lists, read once the first screen has painted: every answer, dismissal and read mark is the board's truth about cards a page
+    // of rows may not name, and the screens that list those (Answered, Archived) need all of it. No rows: those come with their own pages.
+    body = { answers: s.answers, seen: s.seen, seen_at: s.seen_at, opened: s.opened, signin_opened: s.signin_opened, reads: s.reads, discarded: s.discarded,
+      dismissed: s.dismissed, promoted: s.promoted, deeper: s.deeper, delivery: s.delivery, counts, version: s.version,
+      decisions: [], page: { view: 'lists', offset: 0, limit: 0, total: 0 } };
   } else if (view.name === 'tickets') {
     // The Tickets screen's own read: its roll-up is the largest part of the board and no other screen shows it.
     body = { ...s, decisions: [], counts, tickets: s.tickets ?? [], trail: [], rounds: [], messages: [], annotations: [], comments: [],
@@ -2846,9 +2862,19 @@ function viewRead(read: NonNullable<typeof built>, view: View) {
     for (const t of threads) linked.add(t.key);
     // The activity a row shows at a glance (an answer's reply, a note left on a mock) comes with the page that shows it, never the whole board's.
     const forRow = (list: any[]) => ((list ?? []) as any[]).filter((x) => shown.has(x.key) || x.kind === 'ticket');
+    // The board's own lists (every answer, every dismissal, what was read and restored) come with the page that names their rows: a first screen
+    // carries the open asks and their own activity, never the history of the thousands of cards behind them, which is what made an open 381 KB.
+    const byKey = (map: Record<string, unknown> | undefined) => Object.fromEntries(Object.entries(map ?? {}).filter(([k]) => shown.has(k)));
+    const ofKeys = (list: unknown[] | undefined) => ((list ?? []) as unknown[]).filter((x) => shown.has(x as string));
+    const ofRows = (list: any[] | undefined) => ((list ?? []) as any[]).filter((x) => shown.has(x.key));
+    const deeper = ofRows(s.deeper), askIds = new Set(deeper.map((a) => a.id));
     body = { ...s, decisions: page.map(rowOf), counts, more: view.offset + view.limit < all.length,
       page: { view: view.name, offset: view.offset, limit: view.limit, total: all.length },
       tickets: ((s.tickets ?? []) as any[]).filter((t) => linked.has(t.id)),
+      answers: byKey(answers), seen: ofKeys(s.seen), seen_at: byKey(s.seen_at), opened: byKey(s.opened), signin_opened: byKey(s.signin_opened),
+      reads: Object.fromEntries(Object.entries((s.reads ?? {}) as Record<string, string>).filter(([k]) => shown.has(k.split('/')[0]))),
+      discarded: byKey(s.discarded), dismissed: ofKeys(s.dismissed), promoted: ofKeys(s.promoted), deeper,
+      delivery: Object.fromEntries(Object.entries((s.delivery ?? {}) as Record<string, unknown>).filter(([id]) => askIds.has(id))),
       trail: forRow(s.trail), rounds: forRow(s.rounds), messages: forRow(s.messages), annotations: forRow(s.annotations), comments: forRow(s.comments) };
   }
   const json = Buffer.from(JSON.stringify(body));

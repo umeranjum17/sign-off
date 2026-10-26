@@ -208,6 +208,10 @@ journeys:
   # The board's load budget: Evidence on a phone with 60 updates loads at most 12 captures and 1.5 MB, text goes compressed, a reload and a poll are 304s.
   load-budget:
     command: 'npm run build > /dev/null && node --test --test-name-pattern="load budget" test/design.test.mjs > "$DONE_DONE_EVIDENCE_ROOT/load-budget.log" 2>&1'
+  # The cold first open on a board the size of a live one (3.4 MB, a thousand answered and nine hundred dismissed cards, guided plans), at 390 px in
+  # light and dark on slow 4G: the bytes that land before the board's own first paint, that paint, and the whole open, each with its per-request table.
+  first-open:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/first-open-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   # Evidence in the new look (list and one proof) on the approved prototype's own proof, at 390 in light and dark beside the prototype's frames (EVIDENCE_PROTO=<its index.html>), and at 1280, measured in the browser.
   evidence-newlook:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/evidence-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "$EVIDENCE_PROTO"'
