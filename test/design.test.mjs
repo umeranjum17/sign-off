@@ -4418,7 +4418,7 @@ test('the board paints its first screen from one page of asks, and never asks fo
     // The whole board is never asked for, before or after the paint: not once, on any screen this journey opens.
     const asked = async () => (await reads()).filter(([path]) => path === '/api/decisions' || path === '/api/state');
     assert.deepEqual(await asked(), [], 'no read of the whole board');
-    assert.ok(!(await reads()).some(([path]) => path.startsWith('/api/decisions?view=items') === false && !path.startsWith('/api/decisions?view=asks') && path !== '/api/decisions'), 'every read is a part of the board');
+    assert.ok(!(await reads()).some(([path]) => !/^\/api\/decisions\?view=(asks|items|lists|card|tickets)\b/.test(path)), 'every read is a part of the board');
     // The board fills in from pages: the Evidence screen lists proofs, and each row still says what done-done says of it.
     await evaluate('location.hash = "#evidence"');
     await until(() => evaluate('document.querySelectorAll("#board .ev-card").length > 0'));

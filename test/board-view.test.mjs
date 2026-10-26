@@ -26,7 +26,10 @@ const ASKS = 30;
 copyFileSync(new URL('../fixtures/sample-decisions.json', import.meta.url), file);
 const board = JSON.parse(readFileSync(file, 'utf8'));
 const at = (n) => new Date(Date.UTC(2026, 9, 11, 12, n)).toISOString();
-for (let i = 0; i < ASKS; i++) board.decisions.push({ key: `plan-${i}`, title: `Plan ${i} to approve`, type: 'plan', kind: 'plan', view: `plan-${i}.html`, filed: at(i), by: 'agent',
+for (let i = 0; i < ASKS; i++) board.decisions.push({ key: `plan-${i}`, title: `Plan ${i} to approve`, type: 'plan', kind: 'plan', view: `plan-${i}.html`, filed: at(i), by: 'agent', ...(i ? {} : {
+  // The writing a guided page's card draws: its picture's details and diagram, its understood lines and its next step's lines.
+  schema: 2, guided: true, visual: { heading: 'What this is', text: 'The sign-in, one step.', unit: '%', rows: [{ label: 'Steps', value: 2 }], details: 'd'.repeat(2_000), diagram: { nodes: ['a'.repeat(2_000)] } },
+  understood: [{ label: 'You asked', text: 'u'.repeat(2_000) }], next: { heading: 'Ship it', lines: ['n'.repeat(2_000)] } }),
   sections: [{ id: 's1', stage: 'overview', heading: 'Detail', body: 'x'.repeat(9_000), blocks: [] }],
   decisions: [{ key: 'q1', title: 'Which way?', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] }] });
 board.decisions.find((d) => d.key === 'plan-0').evidence = { run_id: runId, commit, outcome: 'Umer can see the updated sign-in screen.', repro: 'repro: n/a: no bug', proof: 'done-done: real browser journey', evidence: 'after.png' };
@@ -60,6 +63,13 @@ test('a first screen is one small page of the board, paging covers the rest, one
   assert.equal(first.body.page.total, waiting.length);
   assert.equal(first.body.more, waiting.length > 20);
   assert.ok(first.body.decisions.every((d) => (d.sections ?? []).every((s) => !('body' in s) && !('blocks' in s))), 'no row carries a report body, only the parts it is made of');
+  // A row keeps what a list draws of a guided page: the numbers its picture shows, its parts and that it has an understood part and a next step.
+  const rows = (await get('api/decisions?view=items&offset=0&limit=200')).body.decisions, plan = rows.find((d) => d.key === 'plan-0');
+  assert.deepEqual([plan.visual.heading, plan.visual.unit, plan.visual.rows], ['What this is', '%', [{ label: 'Steps', value: 2 }]], 'a row keeps the numbers its picture shows');
+  assert.deepEqual([plan.visual.details, plan.visual.diagram, plan.understood, plan.next], [undefined, undefined, [{ label: 'You asked' }], { heading: 'Ship it' }], 'and never the writing inside them');
+  // The board's own lists come with the page that names their rows: the answers and dismissals of the thousands of cards behind them stay home.
+  assert.deepEqual(first.body.answers, {}, 'the first screen carries no answer for a card it does not show');
+  assert.deepEqual(first.body.dismissed, [], 'and no dismissal of a card it does not show');
   assert.ok(first.body.decisions.every((d) => d.row === true), 'a row says it is one, so a client knows its card is still to come');
   assert.equal(first.body.decisions[0].key, waiting[0].key, "the board's own order decides what waits on you first");
   const whole = all.body.decisions.filter((d) => first.body.decisions.some((r) => r.key === d.key));
@@ -89,9 +99,10 @@ test('a first screen is one small page of the board, paging covers the rest, one
   assert.deepEqual([tickets.body.decisions.length, Array.isArray(tickets.body.tickets)], [0, true]);
   assert.equal(tickets.body.counts.tickets, all.body.tickets.length);
 
-  // One card whole: the report body and the proof as checked, for the screen that opens it.
+  // One card whole: the report body, the guided page's writing and the proof as checked, for the screen that opens it.
   const card = await get('api/decisions?view=card&key=plan-0');
   assert.equal(card.body.card.sections[0].body.length, 9_000);
+  assert.deepEqual([card.body.card.visual.details.length, card.body.card.understood[0].text.length, card.body.card.next.lines[0].length], [2_000, 2_000, 2_000], 'the card brings the writing a row leaves out');
   assert.equal(card.body.card.evidenceCard.result, 'RUN PASS');
   assert.equal(card.body.counts.asks, waiting.length);
   assert.equal((await fetch(url + 'api/decisions?view=card&key=nope')).status, 404);
@@ -111,5 +122,13 @@ test('a first screen is one small page of the board, paging covers the rest, one
   const moved = await get('api/decisions?view=asks&limit=20');
   assert.notEqual(moved.res.headers.get('etag'), etag, 'an answer is a new page');
   assert.equal(moved.body.counts.asks, waiting.length - 1, 'the answered ask leaves the waiting count');
-  assert.equal(moved.body.answers['short-question'].answer, 'yes');
+  // The answered card is no longer on the page, so its answer no longer comes with it: an answer arrives with the card that shows it.
+  assert.equal(moved.body.answers['short-question'], undefined, 'the page carries no answer for a card it no longer shows');
+  assert.equal((await get('api/decisions')).body.answers['short-question'].answer, 'yes', 'and the whole board still holds it');
+  // The lists a page leaves out come in one read of their own, after the first screen: every answer and dismissal the board holds, and no rows.
+  const everything = (await get('api/decisions')).body, lists = await get('api/decisions?view=lists');
+  assert.deepEqual(lists.body.answers, everything.answers, 'the lists read carries every answer the board holds');
+  assert.deepEqual([...lists.body.dismissed].sort(), [...everything.dismissed].sort(), 'and every dismissal');
+  assert.deepEqual(lists.body.decisions, [], 'with no rows: those come with their own pages');
+  assert.equal(lists.body.page.view, 'lists');
 });

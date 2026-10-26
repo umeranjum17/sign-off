@@ -70,11 +70,23 @@
     for (const t of rolled) roll.set(t.id, t);
     // A card's own activity joins the board's lists, each entry once, so opening a card never doubles its thread.
     const joined = (name) => { const have = new Set((state[name] ?? []).map((x) => JSON.stringify(x))); return [...(state[name] ?? []), ...(body[name] ?? []).filter((x) => !have.has(JSON.stringify(x)))]; };
+    // A page names the cards it read last, and the board's own lists (an answer, a dismissal, what was read or restored) come with it for those
+    // cards only: a card it names with no answer (a link posted again under the same key clears one) has lost it, and a card it does not name keeps
+    // what an earlier page brought.
+    const mine = new Set([...decisions.map((d) => d.key), ...(body.card ? [body.card.key] : [])]);
+    const had = (name) => Object.hasOwn(body, name);
+    // The lists read on their own carry all of every list: they are the board's truth about cards no page names, so they replace it, never join it.
+    const full = page.view === 'lists';
+    const kept = (name, of = (k) => k) => ({ ...Object.fromEntries(Object.entries(state[name] ?? {}).filter(([k]) => !mine.has(of(k)))), ...body[name] });
+    const listed = (name) => (full ? body[name] : [...(state[name] ?? []).filter((x) => !mine.has(x?.key ?? x)), ...(body[name] ?? [])]);
     state = { ...state, ...board, decisions: [...rows.values()], page,
       tickets: page.view === 'tickets' ? rolled : roll.size ? [...roll.values()] : state.tickets,
-      // A part carries its own answers and dismissals; the whole board's own are the board's.
-      ...(body.card ? { answers: { ...state.answers, ...body.answers }, seen_at: { ...state.seen_at, ...board.seen_at }, dismissed: [...new Set([...(state.dismissed ?? []), ...(body.dismissed ?? [])])] } : {}),
-      ...Object.fromEntries(['trail', 'rounds', 'messages', 'annotations', 'comments'].map((name) => [name, joined(name)])) };
+      ...Object.fromEntries(['trail', 'rounds', 'messages', 'annotations', 'comments'].map((name) => [name, joined(name)])),
+      // A part that says nothing of a list leaves it alone: a card brings its own answer and nobody else's, and a list it never mentions stays as it was.
+      ...Object.fromEntries(['dismissed', 'promoted', 'seen', 'deeper'].filter(had).map((name) => [name, listed(name)])),
+      ...Object.fromEntries(['answers', 'seen_at', 'opened', 'discarded', 'signin_opened'].filter(had).map((name) => [name, kept(name)])),
+      ...(had('reads') && { reads: kept('reads', (k) => k.split('/')[0]) }),
+      ...(had('delivery') && { delivery: { ...state.delivery, ...body.delivery } }) };
   }
   /** A card whole for the screen that opens it: its body, its proof and its own activity come with it, never with the list it was found in. */
   const fetching = new Set();
@@ -95,6 +107,9 @@
   /** The rest of the board a page at a time, after the first screen is painted: each page merges in and the board is drawn when the pages are
    * done (or as they arrive on a screen the person has opened), so no read ever clears what is on screen for a skeleton. */
   let resting;
+  /** The board's own lists, read once the first screen has painted: a page names the rows it shows, and the screens that list a card no page names
+   * (Answered, Archived) need every answer and dismissal the board holds. Nothing of it is asked for before the first screen is on screen. */
+  const readLists = () => view('/api/decisions?view=lists').then((body) => { mergeView(body); renderKeepingFocus(); }, () => {});
   async function rest() {
     if (resting || wholeBoard) return;
     resting = true;
@@ -2781,6 +2796,7 @@
         if (card?.card) mergeView(card), (changed = true);
       }
       if (!changed) return;
+      await readLists();
       renderKeepingFocus();
       rest();
     } catch (e) { failed(e); }
@@ -2800,8 +2816,15 @@
   else first().then(() => {
     banner.hidden = true;
     setInterval(refresh, 20_000);
+    // The board as an app (its service worker, the offline line, the install row) is armed once the first screen is on screen: those bytes are
+    // not part of what a phone moves before it can see the board, and the worker is in place long before anyone closes the tab.
+    const app = document.querySelector('script[data-pwa]');
+    if (app) app.src = app.dataset.pwa;
+    // The tab's mark and the install manifest are named now too: a phone asks for both the moment it reads the page, and neither is what it came for.
+    for (const l of document.querySelectorAll('link[data-icon], link[data-manifest]')) l.href = l.dataset.icon ?? l.dataset.manifest;
     // The screens beyond the first start here, with the read that paints the first screen: a tap that lands on one of them waits for a file already on
     // its way, never for one that has not been asked for. A link that opens one of those screens draws it once the file is in.
     loadMore().then(() => { if (MORE_SCREENS.test(location.hash)) renderKeepingFocus(); });
     rest();
+    readLists();
   }, failed);
