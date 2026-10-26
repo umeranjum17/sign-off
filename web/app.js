@@ -53,6 +53,8 @@
   /** Whether the board on screen is all of it, not the pages gathered so far: a whole-board read or an answer brings it all at once, so the
    * pages are not read again over it. */
   let wholeBoard = false;
+  /** Every page of the board has merged: what the whole board's own counts are made from, while a card is still read whole. */
+  let paged = false;
   /** A part of the board joined to the board on screen. Rows replace or add, one card whole replaces its row and brings its own activity,
    * and a part is read for what it carries, never emptied for what it leaves out: nothing a person can see is cleared by a later read. */
   function mergeView(body) {
@@ -100,14 +102,14 @@
       for (let offset = 0; ;) {
         const page = await view(`/api/decisions?view=items&offset=${offset}&limit=200`);
         mergeView(page);
-        // The board's own data goes first; the rest of the styles and the screens the first one does not hold follow, once this page is in.
+        // The board's own data goes first; the rest of the styles follows once this page is in.
         restSoon();
-        loadMore();
         // Today already shows what the first page carries; another screen fills as its pages arrive.
         if (location.hash) renderKeepingFocus();
         if (page.more !== true || !page.decisions?.length) break;
         offset += page.decisions.length;
       }
+      paged = true;
     } catch { /* the first screen is on screen: a page that fails leaves it there, and the next poll reads it again */ } finally {
       resting = false;
       loadMore();
@@ -823,6 +825,9 @@
     for (const t of [...(state.trail ?? [])].filter((x) => x.kind !== 'ticket').sort(bySecond)) last.set(t.key, t);
     // A reply on a ticket comment opens its ticket.
     const asCard = (t) => { const k = tkById(t.key); return k && { key: `ticket:${k.id}`, onTicket: k }; };
+    // Replies counts the whole board — a reply can sit on a card no page has reached yet — so the section waits for the board's pages and counts them
+    // once, rather than showing one reply and then two a moment later.
+    if (!paged && !wholeBoard) return '';
     for (const t of [...(state.trail ?? [])].filter((x) => x.kind === 'ticket').sort(bySecond)) last.set(`ticket:${t.key}`, t);
     const rows = [...last.entries()].filter(([, t]) => unseen(t)).map(([k, t]) => [k.startsWith('ticket:') ? asCard(t) : state.decisions.find((d) => d.key === t.key), t])
       .filter(([d]) => d && !gone.has(d.key)).sort(([, x], [, y]) => Date.parse(y.reply.at) - Date.parse(x.reply.at));
@@ -2512,8 +2517,9 @@
 
   function render() {
     if (designSession?.open) return (boardStale = true);
-    // Every screen but the first lives in app-more.js: asked for before it lands, the board keeps the first screen's place and draws that screen when it does.
-    if (!moreReady && MORE_SCREENS.test(location.hash)) return void waitMore();
+    // Every screen but the first lives in app-more.js, and the route for it waits for that file (see the hashchange handler) before it draws: a render
+    // that reaches here first, from a page merging in or a poll, leaves the screen to that route.
+    if (!moreReady && MORE_SCREENS.test(location.hash)) return;
     const by = { waiting: [], designs: [], evidence: [], reports: [], answered: [], notes: [] };
     // The board file appends new items at the end, so each list reads newest first; answers sort by their time.
     // One decision is one card: a card an open ask merges is not shown; that ask's answer closes it.
@@ -2668,6 +2674,8 @@
     if (location.hash === '#reports' && !/^#reports\//.test(from)) rpRisen = false;
     selecting = false, picked.clear();
     // On a desk the new detail slides in from the side the selection moved.
+    // A route whose screen lives in app-more.js loads that file first and draws the screen itself, so a screen is never left waiting on a later redraw.
+    const settle = () => {
     const rowsOf = () => [...document.querySelectorAll('.split-list [data-row]')], order = rowsOf().map((r) => r.getAttribute('href')), was = rowsOf().findIndex((r) => r.matches('[aria-current]'));
     render();
     swapDir = 0;
@@ -2689,6 +2697,9 @@
     // An ask's sheet takes the focus on its question; closed, the focus goes back to the row it was opened from.
     ((back && (item?.matches('a.dl-face') ? item : item?.querySelector('h3 a, .open-link, a.compact'))) || document.querySelector('.ask-sheet #ask-title') || document.querySelector('.tk-sheet .tk-dt')
       || (overList && ask.test(from) && document.getElementById(`item-${from.slice(8)}`)) || document.querySelector('.split-list [data-row][aria-current]') || document.querySelector('#board h1')).focus({ preventScroll: true });
+    };
+    if (!moreReady && MORE_SCREENS.test(location.hash)) waitMore().then(settle);
+    else settle();
   });
   // An interactive page may post its own height, `{ height: <px> }`, and its frame then fits it with no blank below.
   // Only a frame's own message sizes it. Document readers must fit even long pages; previews stay capped.
@@ -2781,5 +2792,8 @@
   else first().then(() => {
     banner.hidden = true;
     setInterval(refresh, 20_000);
+    // The screens beyond the first start here, with the read that paints the first screen: a tap that lands on one of them waits for a file already on
+    // its way, never for one that has not been asked for. A link that opens one of those screens draws it once the file is in.
+    loadMore().then(() => { if (MORE_SCREENS.test(location.hash)) renderKeepingFocus(); });
     rest();
   }, failed);
