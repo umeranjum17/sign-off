@@ -8,6 +8,7 @@
 //   It always ends within ~60 s: a watchdog closes the browser and exits 2 rather than wait on a page that never paints.
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const [url, out, tag, mode = 'cold', theme = 'light'] = process.argv.slice(2);
@@ -17,7 +18,8 @@ const downloadThroughput = (1.6 * 1024 * 1024) / 8, uploadThroughput = (750 * 10
 setTimeout(() => { console.error('first-open: the board did not settle within 60 s'); process.exit(2); }, 60_000).unref();
 
 mkdirSync(out, { recursive: true });
-const profile = join(out, `profile-${tag}-${mode}-${theme}`);
+// The browser's own profile is scratch, never evidence: it sits in the temp folder and is gone with the run.
+const profile = join(tmpdir(), `first-open-${process.pid}-${tag}-${mode}-${theme}`);
 rmSync(profile, { recursive: true, force: true });
 mkdirSync(profile, { recursive: true });
 const chrome = spawn(process.env.CHROME_PATH ?? 'chromium', ['--headless=new', '--remote-debugging-port=0', '--no-first-run', '--no-default-browser-check',
@@ -112,3 +114,4 @@ writeFileSync(join(out, `${tag}-${mode}-${theme}.json`), JSON.stringify(report, 
 console.log(JSON.stringify({ tag, mode, theme, paintMs: report.paintMs, bytesBeforePaint: report.bytesBeforePaint, requestsBeforePaint: report.requestsBeforePaint, bytesWhole: report.bytesWhole }));
 ws.close();
 chrome.kill();
+rmSync(profile, { recursive: true, force: true });
