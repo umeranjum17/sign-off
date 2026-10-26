@@ -37,7 +37,7 @@ Open the printed link. Tell your agent to use the installed sign-off skill when 
 
 [Try the demo](https://umeranjum17.github.io/sign-off/demo/) · [Website](https://umeranjum17.github.io/sign-off/) · [Commands](docs/commands.md) · [Agent skill](skills/sign-off-axi/SKILL.md)
 
-[![npm version](https://img.shields.io/npm/v/sign-off-axi)](https://www.npmjs.com/package/sign-off-axi) [![CI](https://github.com/umeranjum17/sign-off/actions/workflows/ci.yml/badge.svg)](https://github.com/umeranjum17/sign-off/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/sign-off-axi)](https://www.npmjs.com/package/sign-off-axi) [![CI](https://github.com/umeranjum17/sign-off/actions/workflows/ci.yml/badge.svg)](https://github.com/umeranjum17/sign-off/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![X: @umership](https://img.shields.io/badge/X-%40umership-black?logo=x&logoColor=white)](https://x.com/umership)
 
 ## Why sign-off
 
