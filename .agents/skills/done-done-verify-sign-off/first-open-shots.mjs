@@ -2,7 +2,7 @@
 // guided plans whose writing a first screen must not carry), serves it on loopback, and measures the first open at 390 px in light and dark.
 // usage: node first-open-shots.mjs <evidence folder>     (writes first-open-<theme>.png/.json, first-open-numbers.txt; fails over the gate)
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -56,11 +56,12 @@ const url = await new Promise((ok, no) => {
   proc.once('exit', (code) => { clearTimeout(timer); no(new Error(`the board exited ${code} before serving`)); });
 });
 const lines = [`board: ${bytes} B, ${items.length} cards (7 open, 1000 answered, 900 dismissed, 240 guided plans)`];
-const failures = [];
+const failures = [], measured = {};
 try {
   for (const theme of ['light', 'dark']) {
     const printed = execFileSync(process.execPath, [join(here, 'first-open.mjs'), url, out, 'first-open', 'cold', theme], { env, encoding: 'utf8', timeout: 300_000 }).trim();
     const one = JSON.parse(printed.split('\n').pop());
+    measured[theme] = one;
     lines[0] += `\n${theme}: ${one.bytesBeforePaint} B before the first paint in ${one.requestsBeforePaint} requests, first paint ${one.paintMs} ms, whole open ${one.bytesWhole} B`;
     if (one.bytesBeforePaint >= 100_000) failures.push(`FAIL: ${one.bytesBeforePaint} B before the first paint in ${theme} (gate: under 100,000)`);
   }
@@ -69,6 +70,13 @@ try {
   try { execFileSync(process.execPath, [cli, 'stop', board], { env, stdio: 'pipe' }); } catch (e) { console.error(`stop: ${e.stderr ?? e.message}`); }
   proc.kill();
   writeFileSync(join(out, 'first-open-numbers.txt'), lines[0] + '\n');
+  // What was driven and what it showed, for the run record a reviewer reads beside the frames.
+  writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(here, '..', '..', '..', 'package.json'), 'utf8')).version },
+    start: `A throwaway board the size of a live one (${bytes} B, ${items.length} cards: 7 open asks, 1000 answered, 900 dismissed, 240 guided plans), served by sign-off-axi serve on loopback with its own HOME`,
+    steps: ['Open Today at 390x844 at 2x with the cache cold, on Lighthouse mobile slow 4G (1.6 Mbps, 150 ms RTT) and 4x CPU, in light',
+      'the same in dark', "Read the run's own paint mark and request table: every request, its bytes, and whether its last byte landed before the board's first paint"],
+    result: Object.entries(measured).map(([theme, one]) => `${theme}: ${one.bytesBeforePaint} B before the first paint in ${one.requestsBeforePaint} requests, first paint ${one.paintMs} ms, whole open ${one.bytesWhole} B`).join('; ')
+      + '; the gate is under 100,000 B before the first paint, and this journey fails over it' }, null, 2) + '\n');
   rmSync(dir, { recursive: true, force: true });
 }
 console.log(lines[0]);
