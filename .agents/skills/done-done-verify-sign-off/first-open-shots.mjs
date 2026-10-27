@@ -1,16 +1,17 @@
 // The board's cold first open, measured on a board the size of a live one: seeds a throwaway board (thousands of answered and dismissed cards,
 // guided plans whose writing a first screen must not carry), serves it on loopback, and measures the first open at 390 px in light and dark.
 // usage: node first-open-shots.mjs <evidence folder>     (writes first-open-<theme>.png/.json, first-open-numbers.txt; fails over the gate)
+// FIRST_OPEN_THEMES=light measures one theme (test/first-open-budget.test.mjs); the default is light and dark.
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const out = process.argv[2];
 if (!out) { console.error('usage: node first-open-shots.mjs <evidence folder>'); process.exit(64); }
 mkdirSync(out, { recursive: true });
 const cli = join(process.cwd(), 'dist/cli.js'), here = new URL('.', import.meta.url).pathname;
-const dir = mkdtempSync(join(tmpdir(), 'so-first-open-')), board = join(dir, 'board.json'), home = join(dir, 'home');
+// The board's path is a field of every read of it, so a longer temp folder would move the byte counts: the board always sits at the same depth.
+const dir = mkdtempSync('/tmp/so-first-open-'), board = join(dir, 'board.json'), home = join(dir, 'home');
 mkdirSync(home, { recursive: true });
 const env = { ...process.env, HOME: home, XDG_CONFIG_HOME: join(home, '.config'), XDG_DATA_HOME: join(home, '.local/share'), XDG_CACHE_HOME: join(home, '.cache') };
 
@@ -58,7 +59,7 @@ const url = await new Promise((ok, no) => {
 const lines = [`board: ${bytes} B, ${items.length} cards (7 open, 1000 answered, 900 dismissed, 240 guided plans)`];
 const failures = [], measured = {};
 try {
-  for (const theme of ['light', 'dark']) {
+  for (const theme of (process.env.FIRST_OPEN_THEMES ?? 'light,dark').split(',')) {
     const printed = execFileSync(process.execPath, [join(here, 'first-open.mjs'), url, out, 'first-open', 'cold', theme], { env, encoding: 'utf8', timeout: 300_000 }).trim();
     const one = JSON.parse(printed.split('\n').pop());
     measured[theme] = one;

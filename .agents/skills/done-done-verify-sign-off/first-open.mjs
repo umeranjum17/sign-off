@@ -22,7 +22,7 @@ mkdirSync(out, { recursive: true });
 const profile = join(tmpdir(), `first-open-${process.pid}-${tag}-${mode}-${theme}`);
 rmSync(profile, { recursive: true, force: true });
 mkdirSync(profile, { recursive: true });
-const chrome = spawn(process.env.CHROME_PATH ?? 'chromium', ['--headless=new', '--remote-debugging-port=0', '--no-first-run', '--no-default-browser-check',
+const chrome = spawn(process.env.CHROME_PATH ?? 'chromium', ['--headless=new', '--remote-debugging-port=0', '--no-first-run', '--no-default-browser-check', '--no-sandbox',
   `--user-data-dir=${profile}`, '--window-size=390,844', 'about:blank'], { stdio: ['ignore', 'ignore', 'ignore'] });
 const portFile = join(profile, 'DevToolsActivePort');
 for (let i = 0; i < 200 && !(existsSync(portFile) && readFileSync(portFile, 'utf8').includes('\n')); i++) await new Promise((ok) => setTimeout(ok, 50));
@@ -113,5 +113,8 @@ const report = { mode, theme, tag, throttled: '4G 1.6Mbps/750kbps/150ms RTT/4x C
 writeFileSync(join(out, `${tag}-${mode}-${theme}.json`), JSON.stringify(report, null, 2));
 console.log(JSON.stringify({ tag, mode, theme, paintMs: report.paintMs, bytesBeforePaint: report.bytesBeforePaint, requestsBeforePaint: report.requestsBeforePaint, bytesWhole: report.bytesWhole }));
 ws.close();
+// Chrome is still writing its profile until it has exited; removing it sooner can fail with ENOTEMPTY.
+const exited = new Promise((ok) => chrome.once('exit', ok));
 chrome.kill();
-rmSync(profile, { recursive: true, force: true });
+await exited;
+rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });

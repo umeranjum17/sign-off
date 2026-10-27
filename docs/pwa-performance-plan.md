@@ -53,6 +53,19 @@ The first hard slice now bounds phone Decide rendering to 24 rows each in Asks, 
 
 The project lead can start PWA and static-compression builders independently (both touch `src/cli.ts`, so assign distinct route branches and reconcile before proof); contrast should avoid the PWA worker's manifest files. Lead retains screen splitting and producer-side state pagination as later hard slices. PWA proof must include a manifest/installability check beside Lighthouse: valid name/icons/start URL, service-worker control, successful offline navigation and loaded data, native Android install eligibility/prompt and iPad Add to Home Screen. Lighthouse 13 has no PWA category, so do not invent a numeric PWA score.
 
+## First open budgets
+
+Recorded 27 October 2026 on 0.8.0 (`5e0b6a7`). Board: 2,147 cards, 3.4 MB (7 open asks, 1,000 answered, 900 dismissed, 240 guided plans), seeded by `.agents/skills/done-done-verify-sign-off/first-open-shots.mjs`. Profile: cold cache, 390×844 at DPR 2, slow 4G (1.6 Mbps down, 750 kbps up, 150 ms RTT), CPU 4x, headless Chromium over CDP, light theme. `test/first-open-budget.test.mjs` runs this open in the suite and fails on any of:
+
+| Number | Baseline | Allowed |
+| --- | ---: | --- |
+| Requests before the first paint | 5 | exactly 5 |
+| Bytes before the first paint | 91,837 B | ±32 B |
+| Bytes of the whole open (25 requests) | 279,760 B | ±32 B |
+| First paint | 900 ms | up to 1,350 ms (1.5×, for a loaded host) |
+
+Bytes are exact to within the response headers' jitter (19–24 B over the recorded runs; a real change is kilobytes); the board's file path is a field of every read, so the journey seeds it at a fixed depth under `/tmp`. Paint over twelve runs on the recording host: 856–1,065 ms. A budget is never widened to pass a run: a lower number is a reason to lower the baseline here and in the test, a higher one is a regression to fix.
+
 ## Repeat the measurement
 
 Build first (`npm run build`). Install pinned Lighthouse 13.0.1 into task-owned external tooling/cache with npm/npx, never globally. Set `LIGHTHOUSE_CLI` to that package's `cli/index.js`, `CHROME_PATH=/usr/bin/chromium`, and run through the host memory gate:
