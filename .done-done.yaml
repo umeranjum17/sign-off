@@ -194,7 +194,7 @@ journeys:
   tickets-seeall:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/tickets-seeall-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${SEEALL_THEME:-light}" "${SEEALL_WIDTH:-390}"'
   # Tickets: a card of each kind linked and unlinked, an unknown ticket, polling, hold paths and lifecycle Activity across 390/1280 and light/dark.
-  # Keep the full matrix in the authorized task evidence directory; copy the eight Activity frames, two collapsed phone-board frames and step record into the sealed run.
+  # Keep the full matrix in the authorized task evidence directory; copy eight Activity frames, two collapsed phone frames and two desktop polling frames, plus factual state text and steps, into the sealed run.
   ticket:
     command: 'npm run build > /dev/null && export TICKET_REVIEW_ROOT="${SIGNOFF_TICKET_ACTIVITY_ROOT:?set SIGNOFF_TICKET_ACTIVITY_ROOT to the authorized data/signoff-ticket-activity directory}/ticket-matrix-$DONE_DONE_RUN_ID" && for w in 390 1280; do for t in light dark; do TICKET_WIDTH=$w node .agents/skills/done-done-verify-sign-off/ticket-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t || exit 1; done; done'
   # Evidence's inline previews on a throwaway board of eight proofs: the list at 390 in light and dark (each row's project icon, done-done's word and first capture), one row opened in place with its captures in a strip, Previews on, and the list on a 1280 desk.
