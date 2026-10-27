@@ -1,0 +1,5 @@
+design-linked dark 1280w #designs/settings-screens
+title: Designs
+no Activity thread
+Ticket row: "Ticket Ship the new settings page 60%" -> #ticket/T-29, 240x96px, 976px from the left and 64px from the right
+horizontal overflow 0

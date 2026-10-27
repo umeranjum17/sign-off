@@ -2002,6 +2002,8 @@
     .tk-rows.fades:not(.at-end) { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fz)), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fz)), transparent); }
     .tk-rows::-webkit-scrollbar { display: none; }
   .tk-activity { flex: none; max-height: 20rem; overflow: auto; scrollbar-width: thin; }
+    .tk-activity > summary { list-style: none; cursor: pointer; }
+    .tk-activity > summary::-webkit-details-marker { display: none; }
     .tk-desk .ui-row { z-index: 0; height: 5.5rem; }
     .tk-desk .ui-row .rm { gap: 0.375rem; }
     .tk-desk .ui-row .l1 { align-items: flex-start; height: auto; }
@@ -2011,5 +2013,11 @@
     .tk-pane .tk-dt { font-size: 1.5rem; line-height: 2rem; }
     .tk-desk .tk-in .ui-row { height: auto; min-height: 4.25rem; padding: 0.75rem 0; }
     .tk-desk .tk-empty { width: 25rem; margin: 0; }
+  }
+  @media (max-width: 63.999rem) {
+    .tk-activity > summary { min-height: 2.5rem; list-style: none; cursor: pointer; }
+    .tk-activity > summary::-webkit-details-marker { display: none; }
+    .tk-activity[open] { max-height: 20rem; overflow: hidden; }
+    .tk-activity[open] .ui-act { max-height: 16rem; overflow: auto; overscroll-behavior: contain; }
   }
   @media (prefers-reduced-motion: reduce) { .tk-over.up .tk-sheet, .tk-over.up .tk-scrim { animation: none; } }

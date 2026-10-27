@@ -618,7 +618,7 @@ export function readTickets(decisionsPath: string, warn: (msg: string) => void =
   });
   return [...latest.values()];
 }
-export type TicketActivity = { ticket: string; title: string; kind: 'created' | 'stage' | 'progress' | 'merged' | 'hold' | 'release'; text: string; at: string };
+export type TicketActivity = { ticket: string; title: string; kind: 'created' | 'stage' | 'progress' | 'state' | 'merged' | 'hold' | 'release'; text: string; at: string };
 /** Ticket history is already append-only; derive the small activity feed from each ticket's successive public records. */
 export function readTicketActivity(decisionsPath: string): TicketActivity[] {
   const previous = new Map<string, Ticket>(), events: { event: TicketActivity; order: number }[] = [];
@@ -632,9 +632,14 @@ export function readTicketActivity(decisionsPath: string): TicketActivity[] {
     else {
       if (had.stage !== t.stage) add('stage', t.stage ? `Stage moved to ${t.stage}` : 'Stage cleared');
       if (had.progress !== t.progress) add('progress', `Progress changed to ${t.progress}%`);
-      if ((had.stage !== 'done' && t.stage === 'done') || (had.state !== 'done' && t.state === 'done')) add('merged', 'Ticket merged');
+      const merged = had.stage !== 'done' && t.stage === 'done';
+      if (merged) add('merged', 'Ticket merged');
       const wasHeld = had.hold === true || had.state === 'on hold', isHeld = t.hold === true || t.state === 'on hold';
-      if (wasHeld !== isHeld) add(isHeld ? 'hold' : 'release', isHeld ? 'Put on hold' : 'Hold released');
+      const holdChanged = wasHeld !== isHeld;
+      if (holdChanged) add(isHeld ? 'hold' : 'release', isHeld ? 'Put on hold' : 'Hold released');
+      const stateChanged = had.state !== t.state;
+      if (stateChanged && !(merged && t.state === 'done') && !(holdChanged && (had.state === 'on hold' || t.state === 'on hold')))
+        add('state', t.state ? `State changed to ${t.state}` : 'State cleared');
     }
     previous.set(t.id, t);
   });

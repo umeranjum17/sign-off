@@ -117,8 +117,8 @@ The card then shows a **Ticket** row (on an ask, **Its ask**), the title and pro
 ticket: the tickets under it, its cards (asks, designs, proof, reports and plans),
 newest first, and their Activity. A card whose ticket is not on the board shows no row.
 The board's **Tickets** tab lists the tickets that sit under none: Your asks or
-System, how many are done, then In progress, On hold and To do. It also shows a newest-first Activity feed for ticket creation, stage and progress changes, merges, holds and releases; each event opens its ticket. A reply to a ticket comment or an answer to a linked ask releases an on-hold ticket and records that release.
-The file format is in [file-formats.md](file-formats.md), under **Tickets**.
+System, how many are done, then In progress, On hold and To do. See [file-formats.md](file-formats.md#tickets)
+for its Activity feed and hold-release behavior.
 
 ### Reading tickets over HTTP
 

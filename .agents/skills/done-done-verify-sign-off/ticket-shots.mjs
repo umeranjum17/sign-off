@@ -114,6 +114,15 @@ try {
     browser('open', 'about:blank');
     browser('open', `${base}${hash}`);
     wait(900);
+    if (state === 'tickets-activity' && width === 390) browser('eval', `() => {
+      const feed = document.querySelector('details.tk-activity');
+      if (!feed || feed.open) throw new Error('phone board Activity must start collapsed');
+      feed.querySelector('summary').click();
+      return new Promise((resolve) => setTimeout(() => {
+        if (!feed.open || !feed.querySelector('ol')) throw new Error('phone board Activity did not expand');
+        resolve(true);
+      }, 250));
+    }`);
     if (anchor) browser('eval', `() => { document.querySelector(${JSON.stringify(anchor)})?.scrollIntoView({ block: ${JSON.stringify(state === 'tickets-activity' ? 'start' : 'center')} }); return new Promise((ok) => setTimeout(ok, 400)); }`);
     const name = `${state}.${cell}`;
     browser('screenshot', join(out, `${name}.png`));
@@ -134,7 +143,7 @@ try {
   // The ticket's Activity: its cards' steps newest first, each naming its card.
   assert.deepEqual(seen['ticket-activity'].thread, ['Turn on search in the settings page? Your answer: No', 'Turn on search in the settings page? Changed to: Yes',
     'Turn on search in the settings page? Delivered to verify', 'Turn on search in the settings page? verify read it', 'Turn on search in the settings page? You asked for a new round', 'Update 3 · The settings page on a phone Your answer: Pass', 'Update 3 · The settings page on a phone Your comment'].reverse().concat('Ticket created'), JSON.stringify(seen['ticket-activity'].thread));
-  assert.deepEqual(seen['ticket-release'].thread, ['Hold released', 'Stage cleared', 'Stage moved to done', 'Progress changed to 100%', 'Ticket merged', 'Put on hold', 'Stage moved to review', 'Progress changed to 60%', 'Stage moved to building', 'Progress changed to 25%', 'Ticket created'], JSON.stringify(seen['ticket-release'].thread));
+  assert.deepEqual(seen['ticket-release'].thread, ['Hold released', 'State changed to in progress', 'Stage cleared', 'Stage moved to done', 'Progress changed to 100%', 'Ticket merged', 'Put on hold', 'Stage moved to review', 'Progress changed to 60%', 'Stage moved to building', 'Progress changed to 25%', 'Ticket created'], JSON.stringify(seen['ticket-release'].thread));
   assert.deepEqual(seen['ticket-lifecycle'].thread, ['Stage moved to done', 'Progress changed to 100%', 'Ticket merged', 'Hold released', 'Put on hold', 'Stage moved to building', 'Ticket created'], JSON.stringify(seen['ticket-lifecycle'].thread));
   assert.ok(seen['ticket-answer-release'].thread.some((line) => line === 'Hold released'), JSON.stringify(seen['ticket-answer-release'].thread));
   for (const state of ['ask-unlinked', 'ask-linked', 'design-unlinked']) assert.equal(seen[state].thread.length, 0, `${state} has only its posting: no thread`);

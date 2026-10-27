@@ -1,0 +1,5 @@
+plan-unlinked light 1280w #waiting/plan-kind-board
+title: Show plans on the board
+no Activity thread
+no Ticket row
+horizontal overflow 0

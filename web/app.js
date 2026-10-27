@@ -571,7 +571,7 @@
     if (d.start) return started(d, saved, err);
     const gone = expiredLink(d);
     const open = saved ? '' : gone ? el('button', { class: 'open-link', disabled: '' }, 'Open')
-      : el('a', { class: 'open-link', href: d.link, target: '_blank', rel: 'noopener noreferrer', 'aria-label': `Open the ${d.title} sign-in` }, 'Open');
+      : el('a', { class: 'open-link', href: d.link, target: '_blank', rel: 'noopener noreferrer', 'aria-label': `Open sign-in, ${d.title}` }, 'Open');
     // The link opens in its own tab first, so the mark is made after the click, not in its way.
     if (open && !gone && open.tagName === 'A') open.addEventListener('click', () => setTimeout(() => markOpened(d.key), 0));
     // The end time counts down on the page (data-expires); a link past its time is drawn once more, with Open off and the countdown stopped.
@@ -585,7 +585,7 @@
   function started(d, saved, err) {
     const failed = d.run?.startsWith('failed: ') && d.run.slice(8);
     const open = saved ? '' : FROZEN || state.readonly ? el('button', { class: 'open-link', disabled: '' }, 'Open')
-      : el('button', { class: 'open-link', 'aria-label': `Open the ${d.title} sign-in` }, 'Open');
+      : el('button', { class: 'open-link', 'aria-label': `Open sign-in, ${d.title}` }, 'Open');
     if (open && !open.disabled) open.onclick = async () => {
       // The tab opens on the tap itself, so a browser does not block it; it goes to the link once this host has made one.
       const tab = window.open('', '_blank');
@@ -938,7 +938,7 @@
     const th = first ? el('span', { class: 'ev-th', 'aria-hidden': 'true' }, lazyImg(src(first[4])))
       : evRich ? el('span', { class: 'ev-th none', 'aria-hidden': 'true' }, projectTile(project)) : '';
     const parts = uiRow({ tile: evTile(project, judgedMark(d)), title, priority: prio(d), meta: d.status && !judged(d) && !d.evidenceCard ? meta : frag(evVerdict(d), meta ? ` · ${meta}` : '') });
-    const label = [title, judgedWord(d), prio(d), meta].filter(Boolean).join(', ');
+    const label = [title, prio(d), judgedWord(d), meta].filter(Boolean).join(', ');
     const row = desk ? el('a', { class: `ui-row ev-card${evRich ? ' rich' : ''}`, href: `#evidence/${d.key}`, id: `item-${d.key}`, 'data-row': '', 'aria-label': label }, ...parts, th)
       : el('button', { class: `ui-row ev-card${evRich ? ' rich' : ''}`, id: `item-${d.key}`, 'data-row': '', 'aria-expanded': String(open), 'aria-label': label }, ...parts, th);
     if (!desk) row.onclick = () => { evOpen = open ? '' : d.key; if (evOpen) whole(d.key); reshow(`#item-${CSS.escape(d.key)}`); };
@@ -1141,22 +1141,22 @@
   /** The new look's row (ui.css), as the parts of a link or button: the icon tile, the title with what follows it and a P0-P3 chip only when one is set,
    * then one second line (project and time) or, where there is progress, a bar with its percent (and what leads it, such as a report's kind, or a bar of its own). */
   const uiRow = ({ tile, title, after = '', priority, meta, progress, badge = '', lead = '', bar }) => [tile, el('span', { class: 'rm' },
-    el('span', { class: 'l1' }, el('span', { class: 't', dir: 'auto' }, title), after, progress === undefined ? '' : badge, priority ? el('span', { class: `ui-pc ${priority.toLowerCase()}` }, priority) : ''),
+    el('span', { class: 'l1' }, el('span', { class: 't', dir: 'auto' }, title), ' ', after, progress === undefined ? '' : badge, ' ', priority ? el('span', { class: `ui-pc ${priority.toLowerCase()}` }, priority) : ''), ' ',
     progress === undefined ? (badge ? el('span', { class: 'l2' }, el('span', { class: 'meta', dir: 'auto' }, meta), badge) : el('span', { class: 'l2 meta', dir: 'auto' }, meta)) : el('span', { class: 'l2' }, lead, bar ?? el('span', { class: 'ui-bar' }, el('i', { style: `width: ${progress}%` })), el('span', { class: 'pct' }, `${progress}%`)))];
   /** The property panel (ui.css): one sunk group whose rows are each a mark and a name at the left and a value at the right; a row with an address opens it.
    *  A panel with no row is left out, as a card with no priority, ticket or change shows nothing more. */
   const uiProps = (...rows) => ((rows = rows.filter(Boolean)).length ? el('div', { class: 'ui-props' }, ...rows) : '');
   const uiProp = ({ mark, name, value, href, label, cls = '' }) => el(href ? 'a' : 'div', { class: `ui-pr ${cls}`.trim(), ...(href && { href, ...(/^https?:/.test(href) && { target: '_blank', rel: 'noopener' }) }),
-    ...(label && { 'aria-label': label }) }, el('span', { class: 'k' }, glyph(mark), name), el('span', { class: 'v' }, ...[value].flat()));
+    ...(label && { 'aria-label': label }) }, el('span', { class: 'k' }, glyph(mark), name), ' ', el('span', { class: 'v' }, ...[value].flat()));
   /** A card's priority as its chip, only where one is set. */
   const priorityProp = (p) => p && uiProp({ mark: 'flag', name: 'Priority', value: el('span', { class: `ui-pc ${p.toLowerCase()}` }, p) });
   /** The ticket a card belongs to: its title in full, then a bar with its percent once work on it has begun (full at 100%). The row opens the ticket's page. */
   const ticketProp = (t, name = 'Ticket') => t && uiProp({ mark: 'layers', name, cls: 'tall', href: `#ticket/${t.id}`, label: `${name}: ${t.title}, ${t.progress}% done`,
-    value: [el('span', { class: 'wt', dir: 'auto' }, t.title), el('span', { class: 'bp' }, ...(t.progress > 0 ? [el('span', { class: 'ui-bar', 'aria-hidden': 'true' }, el('i', { style: `width: ${t.progress}%` })),
+    value: [el('span', { class: 'wt', dir: 'auto' }, t.title), ' ', el('span', { class: 'bp' }, ...(t.progress > 0 ? [el('span', { class: 'ui-bar', 'aria-hidden': 'true' }, el('i', { style: `width: ${t.progress}%` })),
       el('span', { class: 'n' }, `${t.progress}%`)] : [el('span', { class: 'n' }, 'Not started')]))] });
   /** The change a card links: a pull request by its number, any other link by the site it opens. */
   const changeProp = (d) => { const c = changeHref(d), pr = /\/(?:pull|pulls|merge_requests)\/(\d+)/.exec(c)?.[1];
-    return c && uiProp({ mark: 'pr', name: pr ? 'Pull request' : 'Change', href: c, label: `Open the change for ${headline(d)}`, value: el('span', {}, pr ? `#${pr}` : new URL(c).host) }); };
+    return c && uiProp({ mark: 'pr', name: pr ? 'Pull request' : 'Change', href: c, label: `${pr ? 'Pull request' : 'Change'} ${pr ? `#${pr}` : new URL(c).host}, ${headline(d)}`, value: el('span', {}, pr ? `#${pr}` : new URL(c).host) }); };
   /** The phone's tab bar is drawn once, so its pill slides from the area left to the one opened; each redraw marks the area on screen and sets the badges, and a badge whose count changed bumps. */
   const tabPill = el('span', { class: 'hl', 'aria-hidden': 'true' }), tabLinks = TABS.map(([a, name]) => el('a', { href: `#${a}`, 'aria-label': name }, icon(`tab-${a || 'today'}`)));
   document.documentElement.style.setProperty('--dock-n', TABS.length);
@@ -1290,8 +1290,9 @@
   /** A card as the new look's row, a link to where it opens: its tile, its title and priority, then its ticket's progress once it has some (a full bar when done), or else its project (or what it is) and when. */
   const progressOf = (n) => (n > 0 ? Math.min(n, 100) : undefined);
   function cardRow(d) {
-    const t = ticketOf(d), what = projectName(d) ?? (area(d) === 'waiting' ? kind(d) : NAMES[d.type] ?? 'Report');
-    const link = el('a', { class: 'ui-row', href: hrefOf(d), ...(t && { 'aria-label': `${title(d)}, ticket ${t.title}, ${t.progress}% done` }) }, ...uiRow({ tile: cardTile(d), title: d.type === 'signin' ? `Sign in to ${d.title}` : d.type === 'evidence' ? headline(d) : title(d), priority: d.priority, badge: trailBadge(d.key),
+    const t = ticketOf(d), what = projectName(d) ?? (area(d) === 'waiting' ? kind(d) : NAMES[d.type] ?? 'Report'), shown = d.type === 'signin' ? `Sign in to ${d.title}` : d.type === 'evidence' ? headline(d) : title(d);
+    // The name leads with the words the row shows (title, priority, percent), then says what the percent is of.
+    const link = el('a', { class: 'ui-row', href: hrefOf(d), ...(t?.progress > 0 && { 'aria-label': `${shown}${d.priority ? ` ${d.priority}` : ''} ${t.progress}% done, ticket ${t.title}` }) }, ...uiRow({ tile: cardTile(d), title: shown, priority: d.priority, badge: trailBadge(d.key),
       meta: d.type === 'signin' ? el('span', {}, what, d.expires || openedAt(d) ? ' · ' : '', signinRow(d)) : [what, d.filed && filedAt(d.filed)].filter(Boolean).join(' · '), progress: progressOf(t?.progress) }));
     link.onclick = () => (jump = d.key);
     return el('li', {}, link);
@@ -1339,7 +1340,7 @@
   function todayTiles(by) {
     // A first screen does not hold the answered cards or the proofs yet, so today's two numbers come with the page that painted it.
     const cleared = state.counts?.cleared_today ?? by.answered.filter((d) => isToday(state.answers[d.key].at)).length, proofs = state.counts?.proofs_today ?? state.decisions.filter((d) => d.type === 'evidence' && d.filed && isToday(d.filed) && !(state.dismissed ?? []).includes(d.key)).length;
-    const stat = (href, mark, lab, n, of) => el('a', { class: 'ui-card ui-stat', href, 'aria-label': `${lab}: ${n}${of === undefined ? '' : ` of ${of}`}` }, fill(mark), el('span', { class: 'lab' }, lab), el('b', {}, String(n), of === undefined ? '' : el('small', {}, ` of ${of}`)));
+    const stat = (href, mark, lab, n, of) => el('a', { class: 'ui-card ui-stat', href, 'aria-label': `${lab}: ${n}${of === undefined ? '' : ` of ${of}`}` }, fill(mark), el('span', { class: 'lab' }, lab), ' ', el('b', {}, String(n), of === undefined ? '' : el('small', {}, ` of ${of}`)));
     return el('div', { class: 'ui-tiles t-tiles' }, stat('#answered', 'M10 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm3.4 5.1-4.3 4.4-2-2-1.2 1.2 3.2 3.2 5.5-5.6z', 'Cleared today', cleared, cleared + by.waiting.length),
       stat('#evidence', 'M10 1.8l6.8 2.7v5c0 4.4-2.9 7.4-6.8 8.9-3.9-1.5-6.8-4.5-6.8-8.9v-5zm3.6 5.6-1.1-1.1-3.4 3.5-1.6-1.6-1.1 1.1 2.7 2.7z', 'Proofs today', proofs));
   }
@@ -1428,10 +1429,11 @@
   /** A ticket's row: its tile, its title and priority, then a bar with its percent once it has progress (a full bar when done), or else where it stands and when it last moved,
    * with how many of what sits under it are done. On a desk the open ticket is marked. */
   function tkRow(t) {
-    const kids = tkUnder(t), done = kids.filter((x) => tkStateOf(x) === 'done').length, s = tkStateOf(t);
-    const link = el('a', { class: 'ui-row tk-row', href: `#ticket/${t.id}`, ...(t.id === tkShown && { 'aria-current': 'true' }), 'aria-label': `${t.title}, ${TK_WORDS[s].toLowerCase()}${t.progress ? `, ${t.progress}% done` : ''}` },
-      ...uiRow({ tile: tkTile(t), title: t.title, priority: t.priority, progress: t.stage && !kids.length ? t.progress : progressOf(t.progress), lead: el('span', { class: 'tk-status' }, ...tkStatus(t)),
-        meta: [TK_WORDS[s], kids.length ? `${done} of ${plural(kids.length, tkKids(kids[0]))} done` : tkWhen(t.at)].join(' · ') }));
+    const kids = tkUnder(t), done = kids.filter((x) => tkStateOf(x) === 'done').length, s = tkStateOf(t), progress = t.stage && !kids.length ? t.progress : progressOf(t.progress);
+    const meta = [TK_WORDS[s], kids.length ? `${done} of ${plural(kids.length, tkKids(kids[0]))} done` : tkWhen(t.at)].join(' · ');
+    // The name leads with the words the row shows (title, priority, release, then the percent or the line), as the label rule reads them in that order.
+    const link = el('a', { class: 'ui-row tk-row', href: `#ticket/${t.id}`, ...(t.id === tkShown && { 'aria-current': 'true' }), 'aria-label': `${[t.title, t.priority, t.release].filter(Boolean).join(' ')}, ${progress === undefined ? meta : `${progress}% done, ${TK_WORDS[s].toLowerCase()}`}` },
+      ...uiRow({ tile: tkTile(t), title: t.title, priority: t.priority, progress, lead: el('span', { class: 'tk-status' }, ...tkStatus(t)), meta }));
     if (t.release) link.querySelector('.l1').append(el('span', { class: 'ui-pc tk-release', title: t.release }, t.release));
     return el('li', {}, link);
   }
@@ -1989,7 +1991,7 @@
   /** A design as a row: its tile (a thumbnail of its first screen), the title, its state and day (or its ticket's bar); it opens the design's review. */
   function designRow(d) {
     const t = ticketOf(d);
-    return el('li', { id: `item-${d.key}` }, el('a', { class: 'ui-row', href: `#designs/${d.key}`, 'aria-label': `Open design, ${d.title}${t?.progress > 0 ? `, ticket ${t.title}, ${t.progress}% done` : ''}` },
+    return el('li', { id: `item-${d.key}` }, el('a', { class: 'ui-row', href: `#designs/${d.key}` },
       ...uiRow({ tile: cardTile(d), title: d.title, priority: d.priority, badge: trailBadge(d.key), meta: [designStatus(d), d.filed && day(d.filed)].filter(Boolean).join(' · '), progress: progressOf(t?.progress) }), selMark(d.key)));
   }
 

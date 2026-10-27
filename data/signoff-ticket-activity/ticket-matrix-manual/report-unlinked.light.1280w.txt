@@ -1,0 +1,5 @@
+report-unlinked light 1280w #reports/digest-ran
+title: The weekly digest ran
+no Activity thread
+no Ticket row
+horizontal overflow 0

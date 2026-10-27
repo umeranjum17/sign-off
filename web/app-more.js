@@ -296,7 +296,7 @@
 
   function ticketActivity(events = state.ticketActivity ?? []) {
     if (!events.length) return '';
-    return el('section', { class: 'ui-card tk-card tk-activity', 'aria-label': 'Activity' }, el('h2', { class: 'tk-ch' }, 'Activity'),
+    return el('details', { class: 'ui-card tk-card tk-activity', 'aria-label': 'Activity', ...(!phone() && { open: true }) }, el('summary', { class: 'tk-ch' }, 'Activity'),
       el('ol', { class: 'ui-props ui-act' }, ...events.map((e) => el('li', { class: 'ui-pr' },
         el('span', { class: 'aw' }, el('b', {}, e.text, ' · ', el('a', { href: `#ticket/${e.ticket}` }, e.title)), el('time', { datetime: e.at }, stamp(e.at)))))) );
   }
@@ -317,7 +317,7 @@
         el('div', { class: 'ui-col s4' }, tkGroup('hold', 'On hold', L.hold, true, 'half'), tkGroup('todo', 'To do', L.todo, true, 'grow')),
         open ? el('section', { class: 'ui-card ui-pane s4 tk-pane', 'aria-label': open.title }, ...ticketPage(open)) : el('section', { class: 'ui-card ui-pane s4 tk-pane' }, el('p', { class: 'tk-none' }, 'No ticket here.'))))];
     }
-    const stat = (href, mark, lab, n) => el(href ? 'a' : 'div', { class: 'ui-card ui-stat', ...(href && { href }), 'aria-label': `${lab}: ${n}` }, fill(mark), el('span', { class: 'lab' }, lab), el('b', {}, String(n)));
+    const stat = (href, mark, lab, n) => el(href ? 'a' : 'div', { class: 'ui-card ui-stat', ...(href && { href }), 'aria-label': `${lab}: ${n}` }, fill(mark), el('span', { class: 'lab' }, lab), ' ', el('b', {}, String(n)));
     const p0 = L.shown.filter((t) => t.priority === 'P0' && tkStateOf(t) !== 'done').length;
     return [el('header', { class: 'ui-top tk-top' }, el('h1', { tabindex: '-1' }, 'Tickets'), tkFilter(L), themeButton()), tkSeg(L), pick,
       ...(empty ? [none] : [tkHero(L), ticketActivity(), tkGroup('mv', 'In progress', L.moving), tkGroup('hold', 'On hold', L.hold), tkGroup('todo', 'To do', L.todo), tkGroup('done', 'Done', L.done),

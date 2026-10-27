@@ -1,0 +1,36 @@
+tickets dark 1280w #tickets
+title: Ship the settings release
+Activity, newest first:
+  Hold released
+  State changed to in progress
+  Stage cleared
+  Stage moved to done
+  Progress changed to 100%
+  Ticket merged
+  Put on hold
+  Stage moved to review
+  Progress changed to 60%
+  Stage moved to building
+  Progress changed to 25%
+  Ticket created
+no Ticket row
+kicker: In progress
+progress: Progress All done
+Linked:
+
+Your comments:
+
+Activity:
+  Hold released Today, 16:02
+  State changed to in progress Today, 16:02
+  Stage cleared Today, 16:02
+  Stage moved to done Today, 16:02
+  Progress changed to 100% Today, 16:02
+  Ticket merged Today, 16:02
+  Put on hold Today, 16:02
+  Stage moved to review Today, 16:02
+  Progress changed to 60% Today, 16:02
+  Stage moved to building Today, 16:02
+  Progress changed to 25% Today, 16:02
+  Ticket created Today, 16:02
+horizontal overflow 0

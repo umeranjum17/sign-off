@@ -1,0 +1,11 @@
+ask-thread dark 390w #decide/settings-search
+title: Turn on search in the settings page?
+Activity, oldest first:
+  Posted by verify Today, 15:59
+  Your answer: No “Not this week.” Today, 15:59
+  Changed to: Yes “After the Friday stand-up.” Today, 15:59
+  Delivered to verify Today, 15:59
+  verify read it Today, 15:59
+  You asked for a new round “Show it on a phone first.” Today, 15:59
+Ticket row: "Its ask Ship the new settings page 60%" -> #ticket/T-29, 326x76px, 32px from the left and 32px from the right
+horizontal overflow 0
