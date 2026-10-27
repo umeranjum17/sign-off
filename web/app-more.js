@@ -296,9 +296,12 @@
 
   function ticketActivity(events = state.ticketActivity ?? []) {
     if (!events.length) return '';
-    return el('details', { class: 'ui-card tk-card tk-activity', 'aria-label': 'Activity', ...(!phone() && { open: true }) }, el('summary', { class: 'tk-ch' }, 'Activity'),
-      el('ol', { class: 'ui-props ui-act' }, ...events.map((e) => el('li', { class: 'ui-pr' },
-        el('span', { class: 'aw' }, el('b', {}, e.text, ' · ', el('a', { href: `#ticket/${e.ticket}` }, e.title)), el('time', { datetime: e.at }, stamp(e.at)))))) );
+    return el('details', { class: 'ui-card tk-card tk-activity', 'aria-label': 'Activity', ...(document.querySelector('.tk-activity')?.open && { open: true }) }, el('summary', { class: 'tk-ch' }, 'Activity'),
+      el('ol', { class: 'ui-props ui-act' }, ...ticketActivityRows(events)));
+  }
+  function ticketActivityRows(events) {
+    return events.map((e) => el('li', { class: 'ui-pr' },
+      el('span', { class: 'aw' }, el('b', {}, e.text, ' · ', el('a', { href: `#ticket/${e.ticket}` }, e.title)), el('time', { datetime: e.at }, stamp(e.at)))));
   }
   function ticketActivityButton() {
     if (!(state.ticketActivity ?? []).length) return '';
@@ -307,15 +310,16 @@
       const title = el('h2', { id: 'tk-activity-title', tabindex: '-1' }, 'Board Activity');
       const close = el('button', { type: 'button', class: 'x', 'aria-label': 'Close board Activity' }, '×');
       const dialog = el('dialog', { class: 'tk-activity-dialog', 'aria-labelledby': title.id }, el('header', {}, title, close),
-        el('ol', { class: 'ui-props ui-act' }, ...(state.ticketActivity ?? []).map((e) => el('li', { class: 'ui-pr' },
-          el('span', { class: 'aw' }, el('b', {}, e.text, ' · ', el('a', { href: `#ticket/${e.ticket}` }, e.title)), el('time', { datetime: e.at }, stamp(e.at)))))));
+        el('ol', { class: 'ui-props ui-act' }, ...ticketActivityRows(state.ticketActivity ?? [])));
       close.onclick = () => dialog.close();
-      dialog.onclose = () => dialog.remove();
+      dialog.onclose = () => { dialog.remove(); document.querySelector('.tk-activity-open')?.focus({ preventScroll: true }); };
       document.body.append(dialog); dialog.showModal(); title.focus({ preventScroll: true });
     };
     return button;
   }
   function tickets(by, id) {
+    const dialogFeed = document.querySelector('.tk-activity-dialog[open] .ui-act');
+    if (dialogFeed) dialogFeed.replaceChildren(...ticketActivityRows(state.ticketActivity ?? []));
     const L = tkLists(), desk = !phone(), picked = id && tkById(id);
     const open = picked || (desk ? L.moving[0] ?? L.hold[0] ?? L.todo[0] ?? L.done[0] : undefined);
     tkShown = open?.id ?? '';

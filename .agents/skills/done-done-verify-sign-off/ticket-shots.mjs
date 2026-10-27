@@ -150,6 +150,9 @@ try {
     browser('screenshot', join(out, `${name}.png`));
     const m = seen[state] = value(browser('eval', probe));
     if (state === 'tickets-activity' && width >= 1024) {
+      so('ticket', board, '--id', 'T-34', '--title', 'Polling update for board Activity');
+      wait(21000);
+      browser('eval', `() => { if (!document.querySelector('.tk-activity-dialog')?.innerText.includes('Ticket created · Polling update for board Activity')) throw new Error('desktop Activity did not refresh with polled ticket state'); return true; }`);
       browser('press', 'Escape');
       browser('eval', `() => new Promise((resolve, reject) => setTimeout(() => {
         const button = document.querySelector('.tk-activity-open');

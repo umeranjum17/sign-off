@@ -4671,9 +4671,9 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     const oldEvent = Math.floor(Date.now() / 1000) - 18 * 3600;
     const reply = JSON.stringify({ id: 'hold-reply', at: oldEvent, text: 'What should I choose?', picked: oldEvent, replies: [{ at: oldEvent, text: 'Squad Lead' }] });
     assert.equal(run('ticket', file, '--id', 'T-31', '--comment', reply).code, 0);
-    const inspectRelease = `(async () => { const fresh = await fetch('/api/decisions?view=tickets').then((r) => r.json()); return { ticket: fresh.tickets.find((t) => t.id === 'T-31'), client: state.tickets.find((t) => t.id === 'T-31'), rows: [...document.querySelectorAll('.tk-row')].map((a) => (a.closest('section[aria-label]')?.getAttribute('aria-label') ?? '') + ' ' + a.getAttribute('href')) }; })()`;
+    const inspectRelease = `(async () => { const fresh = await fetch('/api/decisions?view=tickets').then((r) => r.json()), feed = document.querySelector('.tk-activity'); return { ticket: fresh.tickets.find((t) => t.id === 'T-31'), client: state.tickets.find((t) => t.id === 'T-31'), rows: [...document.querySelectorAll('.tk-row')].map((a) => (a.closest('section[aria-label]')?.getAttribute('aria-label') ?? '') + ' ' + a.getAttribute('href')), activityOpen: feed?.open, activityText: feed?.innerText ?? '' }; })()`;
     // The next poll must clear the held row and paint its release event without a reload or manual refresh.
-    await until(async () => { const r = await evaluate(inspectRelease); return !r.ticket.hold && !r.client.hold && r.rows.includes('To do #ticket/T-31'); });
+    await until(async () => { const r = await evaluate(inspectRelease); return !r.ticket.hold && !r.client.hold && r.rows.includes('To do #ticket/T-31') && r.activityOpen && r.activityText.includes('Hold released'); });
     const releaseCheck = await evaluate(inspectRelease);
     const released = releaseCheck;
     assert.equal(released.ticket.hold, false, JSON.stringify(releaseCheck));
@@ -4681,8 +4681,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     assert.equal(released.client.hold, false, JSON.stringify(releaseCheck));
     assert.ok(released.rows.includes('To do #ticket/T-31'), JSON.stringify(releaseCheck));
     assert.ok(!released.rows.includes('On hold #ticket/T-31'), JSON.stringify(releaseCheck));
-    await evaluate('document.querySelector(".tk-activity > summary")?.click()');
-    await until(() => evaluate('document.querySelector(".tk-activity").innerText.includes("Hold released")'));
+    await until(() => evaluate('document.querySelector(".tk-activity").open && document.querySelector(".tk-activity").innerText.includes("Hold released")'));
     assert.match(await evaluate('document.querySelector(".tk-activity").innerText'), /Hold released/);
     await evaluate(`location.href = ${JSON.stringify(`${url}#ticket/T-31`)}`);
     await until(() => evaluate('!!document.querySelector(".tk-sheet") && !document.querySelector(".tk-sheet .tk-stuck")'));
