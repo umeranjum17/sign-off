@@ -4517,7 +4517,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
   for (const bad of [['--progress', '101'], ['--progress', '4.5'], ['--parent', 'T-29'], ['--title', ' '], ['--id', 'bad id']]) assert.equal(run('ticket', file, '--id', 'T-29', ...bad).code, 2, bad.join(' '));
   // A ticket may carry a priority, a project, whether it is on hold and whether the user asked for it; an empty value takes one off, and a bad one is refused.
   assert.equal(run('ticket', file, '--id', 'T-9', '--priority', 'P1', '--project', 'Settings', '--asked', 'yes').code, 0);
-  assert.equal(run('ticket', file, '--id', 'T-31', '--title', 'Write the release notes', '--priority', 'P2', '--hold', 'yes').code, 0);
+  assert.equal(run('ticket', file, '--id', 'T-31', '--title', 'Write the release notes', '--priority', 'P2', '--hold', 'yes', '--stage', 'building', '--last-event-at', String(Math.floor(Date.now() / 1000) - 18 * 3600)).code, 0);
   assert.equal(run('ticket', file, '--id', 'T-31', '--priority', '').code, 0);
   // Sync fields round-trip through the public CLI, preserve old flags and clear independently.
   const getTicket = () => JSON.parse(run('ticket', file, '--id', 'T-29', '--json').out).ticket;
@@ -4617,7 +4617,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     await evaluate('document.querySelector(".decide .ui-props a[href^=\'#ticket/\']").click()');
     await until(async () => (await evaluate('location.hash')) === '#ticket/T-29' && (await evaluate('document.querySelectorAll(".tk-sheet .tk-in li").length')) === 7);
     const page = JSON.parse(await evaluate(`JSON.stringify({ head: document.querySelector('.tk-sheet .tk-shd p > span:last-child').textContent, title: document.querySelector('.tk-sheet .tk-dt').textContent,
-      props: [...document.querySelectorAll('.tk-sheet .ui-props .ui-pr')].map((p) => p.innerText.replace(/\\s+/g, ' ').trim()).filter((p) => !p.startsWith('Last update')),
+      props: [...document.querySelectorAll('.tk-sheet > .ui-props > .ui-pr')].map((p) => p.innerText.replace(/\\s+/g, ' ').trim()).filter((p) => !p.startsWith('Last update')),
       rows: [...document.querySelectorAll('.tk-sheet .tk-in a')].map((a) => [a.querySelector('.t').textContent.replace(/^Update \\d+ · /, ''), a.getAttribute('href')]),
       tab: document.querySelector('#tabs a[aria-current]')?.getAttribute('href'), wide: document.documentElement.scrollWidth > 390 })`));
     assert.deepEqual({ ...page, rows: page.rows.map(([t]) => t) }, { head: 'Settings · In progress', title: 'Ship the new settings page', props: ['Progress 60%', 'Part of The new settings page'], rows: shown.cards.map((c) => c.title), tab: '#tickets', wide: false });
@@ -4640,17 +4640,39 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     // The ticket above it lists the ticket under it, and no card names it.
     await evaluate(`location.href = ${JSON.stringify(`${url}#ticket/T-9`)}`);
     await until(async () => (await evaluate('[...document.querySelectorAll(".tk-sheet a.tk-row")].map((a) => a.getAttribute("href")).join()')) === '#ticket/T-29');
-    assert.equal(await evaluate('[...document.querySelectorAll(".tk-sheet .ui-dl, .tk-sheet .tk-none")].map((p) => p.textContent).join(" | ")'), 'Tickets in this epic · 0 of 1 done | Linked | No card names this ticket yet.');
+    assert.equal(await evaluate('[...document.querySelectorAll(".tk-sheet > .ui-dl, .tk-sheet > .tk-none")].map((p) => p.textContent).join(" | ")'), 'Tickets in this epic · 0 of 1 done | Linked | No card names this ticket yet.');
     assert.equal(await evaluate('!!document.querySelector(".tk-sheet .tk-shd .ui-icon img")?.naturalWidth && !!document.querySelector(".tk-sheet .tk-in .tk-row .ui-icon img")?.naturalWidth && !document.querySelector(".tk-sheet .mono")'), true);
     // The Tickets tab lists the tickets under no other: Your asks (T-9, which the user asked for, moving) or System (T-31, on hold). T-29 sits under T-9, so it is not listed on its own.
     const tab = `JSON.stringify({ seg: [...document.querySelectorAll('.tk-seg button')].map((b) => b.textContent + (b.getAttribute('aria-pressed') === 'true' ? ' on' : '')), hero: document.querySelector('.tk-hero').innerText.replace(/\\s+/g, ' ').trim(),
-      lists: [...document.querySelectorAll('main section[aria-label]')].map((x) => x.getAttribute('aria-label') + ' ' + [...x.querySelectorAll('a.tk-row')].map((a) => a.getAttribute('href')).join()) })`;
+      lists: [...document.querySelectorAll('main section[aria-label]:not(.tk-activity)')].map((x) => x.getAttribute('aria-label') + ' ' + [...x.querySelectorAll('a.tk-row')].map((a) => a.getAttribute('href')).join()) })`;
     await evaluate(`location.href = ${JSON.stringify(`${url}#tickets`)}`);
     await until(() => evaluate('!!document.querySelector(".tk-hero")'));
     assert.equal(await evaluate('!!document.querySelector("main .tk-row .ui-icon img")?.naturalWidth && !document.querySelector("main .tk-row .mono")'), true);
     assert.deepEqual(JSON.parse(await evaluate(tab)), { seg: ['Your asks1 on', 'System1'], hero: 'Your asks done 0 of 1 1 moving', lists: ['In progress #ticket/T-9'] });
     await evaluate('document.querySelector(".tk-seg button:last-child").click()');
     await until(async () => JSON.parse(await evaluate(tab)).lists.join() === 'On hold #ticket/T-31');
+    assert.equal(run('ticket', file, '--id', 'new-arrival', '--title', 'A newly synced ticket').code, 0);
+    // No manual refresh: the open Tickets page finds this standalone ticket on its next 20-second poll.
+    await until(async () => JSON.parse(await evaluate(tab)).lists.includes('To do #ticket/new-arrival'));
+    const feed = await evaluate('JSON.stringify([...document.querySelectorAll(".tk-activity .ui-act li")].map((li) => li.innerText.replace(/\\s+/g, " ").trim()))');
+    assert.match(feed, /Ticket created/); assert.match(feed, /Stage moved to done/); assert.match(feed, /Progress changed to 60%/); assert.match(feed, /Ticket merged/); assert.match(feed, /Put on hold/);
+    const oldEvent = Math.floor(Date.now() / 1000) - 18 * 3600;
+    const reply = JSON.stringify({ id: 'hold-reply', at: oldEvent, text: 'What should I choose?', picked: oldEvent, replies: [{ at: oldEvent, text: 'Squad Lead' }] });
+    assert.equal(run('ticket', file, '--id', 'T-31', '--comment', reply).code, 0);
+    const inspectRelease = `(async () => { const fresh = await fetch('/api/decisions?view=tickets').then((r) => r.json()); return { ticket: fresh.tickets.find((t) => t.id === 'T-31'), client: state.tickets.find((t) => t.id === 'T-31'), rows: [...document.querySelectorAll('.tk-row')].map((a) => (a.closest('section[aria-label]')?.getAttribute('aria-label') ?? '') + ' ' + a.getAttribute('href')) }; })()`;
+    // The next poll must clear the held row and paint its release event without a reload or manual refresh.
+    await until(async () => { const r = await evaluate(inspectRelease); return !r.ticket.hold && !r.client.hold && r.rows.includes('To do #ticket/T-31'); });
+    const releaseCheck = await evaluate(inspectRelease);
+    const released = releaseCheck;
+    assert.equal(released.ticket.hold, false, JSON.stringify(releaseCheck));
+    assert.equal(released.client.hold, false, JSON.stringify(releaseCheck));
+    assert.ok(released.rows.includes('To do #ticket/T-31'), JSON.stringify(releaseCheck));
+    assert.ok(!released.rows.includes('On hold #ticket/T-31'), JSON.stringify(releaseCheck));
+    assert.match(await evaluate('document.querySelector(".tk-activity").innerText'), /Hold released/);
+    await evaluate(`location.href = ${JSON.stringify(`${url}#ticket/T-31`)}`);
+    await until(() => evaluate('!!document.querySelector(".tk-sheet") && !document.querySelector(".tk-sheet .tk-stuck")'));
+    assert.equal(await evaluate('document.querySelector(".tk-sheet .tk-shd").innerText.includes("On hold")'), false);
+    assert.match(await evaluate('document.querySelector(".tk-sheet .ui-act").innerText'), /Hold released/);
     assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
     // A card's Activity: nothing while its posting is all there is; then each answer with its note, the change, its agent taking it and a new round, oldest first.
     // The agent posted under a session id, which names nobody, so it reads Agent. The ticket's page shows those steps under the card's name.
@@ -4666,7 +4688,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     await until(async () => (await evaluate(thread('#decide/ask-linked'))) === ['Posted by Agent', ...steps].join(' | '));
     // The ticket shows its cards' steps newest first, each naming its card.
     const tkThread = `(async () => { location.hash = '#ticket/T-29'; await new Promise((ok) => setTimeout(ok, 50));
-      return [...document.querySelectorAll('.ui-act li')].map((li) => [li.querySelector('b').textContent, li.querySelector('.th-n')?.textContent, li.querySelector('.on').textContent].filter(Boolean).join(' ')).join(' | '); })()`;
+      return [...document.querySelectorAll('.ui-act li')].filter((li) => li.querySelector('.on')).map((li) => [li.querySelector('b').textContent, li.querySelector('.th-n')?.textContent, li.querySelector('.on').textContent].filter(Boolean).join(' ')).join(' | '); })()`;
     assert.equal(await evaluate(tkThread), [...steps].reverse().map((x) => `${x} Ship the settings page on Friday?`).join(' | '));
     assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
   } finally { close(); }
@@ -4687,7 +4709,7 @@ test('Tickets on a phone: with one section expanded, See all on each other secti
     const names = ['In progress', 'On hold', 'To do', 'Done'];
     const see = (name) => `main section[aria-label="${name}"] .ui-sec .see`;
     const where = (name) => evaluate(`(() => { const e = document.querySelector(${JSON.stringify(see(name))}); e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
-    const lists = () => evaluate(`JSON.stringify({ hash: location.hash, rows: Object.fromEntries([...document.querySelectorAll('main section[aria-label]')].map((s) => [s.getAttribute('aria-label'), s.querySelectorAll('a.tk-row').length])) })`).then((v) => JSON.parse(v));
+    const lists = () => evaluate(`JSON.stringify({ hash: location.hash, rows: Object.fromEntries([...document.querySelectorAll('main section[aria-label]:not(.tk-activity)')].map((s) => [s.getAttribute('aria-label'), s.querySelectorAll('a.tk-row').length])) })`).then((v) => JSON.parse(v));
     await evaluate(`location.href = ${JSON.stringify(`${url}#tickets`)}`);
     const fresh = async () => { await until(async () => (await evaluate('!!document.querySelector("main section[aria-label] .see")')) === true); await evaluate('window.old = true, location.reload()'); await until(async () => (await evaluate('!window.old && document.querySelectorAll("main section[aria-label] .see").length')) === 4); };
     const sizes = { 'In progress': 7, 'On hold': 8, 'To do': 6, Done: 7 };

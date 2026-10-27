@@ -2001,6 +2001,7 @@
     .tk-rows > li { scroll-snap-align: start; }
     .tk-rows.fades:not(.at-end) { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fz)), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fz)), transparent); }
     .tk-rows::-webkit-scrollbar { display: none; }
+  .tk-activity { flex: none; max-height: 20rem; overflow: auto; scrollbar-width: thin; }
     .tk-desk .ui-row { z-index: 0; height: 5.5rem; }
     .tk-desk .ui-row .rm { gap: 0.375rem; }
     .tk-desk .ui-row .l1 { align-items: flex-start; height: auto; }

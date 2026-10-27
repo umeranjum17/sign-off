@@ -14,7 +14,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendKind, readKinds, appendSendBack, appendTicket, readTickets, rollUp, appendTicketComment, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendKind, readKinds, appendSendBack, appendTicket, readTickets, readTicketActivity, rollUp, appendTicketComment, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, downloadFiles, galleryFrames, guided, kitWarnings, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -1337,6 +1337,11 @@ function ticketComment(file: string, values: Record<string, any>, on: string) {
   return locked(`${file}.lock`, () => {
     if (!readTickets(file, warn).some((t) => t.id === id)) throw fail(`no ticket ${id} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi ticket${on} --id ${id} --title "<what the work is>"\` to add it`);
     appendTicketComment(file, id, c);
+    if (c.replies?.length) {
+      const ticket = readTickets(file, warn).find((x) => x.id === id);
+      if (ticket && (ticket.hold || ticket.state === 'on hold')) appendTicket(file, { ...ticket, hold: false,
+        ...(ticket.state === 'on hold' && { state: ticket.progress ? 'in progress' : 'queued' }), last_event_at: Math.floor(Date.now() / 1000) });
+    }
     const t = readTrail(file, loadDecisions(file)).find((x) => x.kind === 'ticket' && x.id === c.id)!;
     return toon({ board: tilde(file), ticket: id, comment: c.id, shows: t.reply ? 'Replied' : t.read ? 'Read' : t.delivered ? 'Delivered' : 'Sent' }, ['Send the comment again with --comment as the lead picks it up and answers']);
   });
@@ -2779,6 +2784,7 @@ const state = () => {
     discarded: Object.fromEntries(readDiscards(file).filter((x) => x.last).map(({ key, reason, at }) => [key, { reason, at }])),
     promoted: readPromoted(file, warn),
     tickets: rollUp(readTickets(file, warn)),
+    ticketActivity: readTicketActivity(file),
     projects: readProjects(file, warn),
   };
 };
@@ -2866,7 +2872,7 @@ function viewRead(read: NonNullable<typeof built>, view: View) {
       decisions: [], page: { view: 'lists', offset: 0, limit: 0, total: 0 } };
   } else if (view.name === 'tickets') {
     // The Tickets screen's own read: its roll-up is the largest part of the board and no other screen shows it.
-    body = { ...s, decisions: [], counts, tickets: s.tickets ?? [], trail: [], rounds: [], messages: [], annotations: [], comments: [],
+    body = { ...s, decisions: [], counts, tickets: s.tickets ?? [], ticketActivity: s.ticketActivity ?? [], trail: [], rounds: [], messages: [], annotations: [], comments: [],
       page: { view: 'tickets', offset: 0, limit: (s.tickets ?? []).length, total: (s.tickets ?? []).length } };
   } else {
     const all = view.name === 'asks' ? items.filter(open) : items, page = all.slice(view.offset, view.offset + view.limit);
@@ -2885,7 +2891,7 @@ function viewRead(read: NonNullable<typeof built>, view: View) {
     const deeper = ofRows(s.deeper), askIds = new Set(deeper.map((a) => a.id));
     body = { ...s, decisions: page.map(rowOf), counts, more: view.offset + view.limit < all.length,
       page: { view: view.name, offset: view.offset, limit: view.limit, total: all.length },
-      tickets: ((s.tickets ?? []) as any[]).filter((t) => linked.has(t.id)),
+      tickets: ((s.tickets ?? []) as any[]).filter((t) => linked.has(t.id)), ticketActivity: [],
       answers: byKey(answers), seen: ofKeys(s.seen), seen_at: byKey(s.seen_at), opened: byKey(s.opened), signin_opened: byKey(s.signin_opened),
       reads: Object.fromEntries(Object.entries((s.reads ?? {}) as Record<string, string>).filter(([k]) => shown.has(k.split('/')[0]))),
       discarded: byKey(s.discarded), dismissed: ofKeys(s.dismissed), promoted: ofKeys(s.promoted), deeper,
