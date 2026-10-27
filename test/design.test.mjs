@@ -4723,6 +4723,13 @@ test('Tickets on a phone: with one section expanded, See all on each other secti
     await evaluate(`location.href = ${JSON.stringify(`${url}#tickets`)}`);
     const fresh = async () => { await until(async () => (await evaluate('!!document.querySelector("main section[aria-label] .see")')) === true); await evaluate('window.old = true, location.reload()'); await until(async () => (await evaluate('!window.old && document.querySelectorAll("main section[aria-label] .see").length')) === 4); };
     const sizes = { 'In progress': 7, 'On hold': 8, 'To do': 6, Done: 7 };
+    const activity = await evaluate(`(() => { const feed = document.querySelector('.tk-activity'), lists = [...document.querySelectorAll('main section[aria-label]:not(.tk-activity)')]; return JSON.stringify({ collapsed: !feed.open, listsVisible: lists.length === 4 && lists.every((s) => s.getBoundingClientRect().height > 0), summary: feed.querySelector('summary')?.textContent.trim() }); })()`);
+    assert.deepEqual(JSON.parse(activity), { collapsed: true, listsVisible: true, summary: 'Activity' });
+    await evaluate('document.querySelector(".tk-activity > summary").click()');
+    await until(() => evaluate('document.querySelector(".tk-activity").open'));
+    assert.equal(await evaluate('document.querySelectorAll(".tk-activity .ui-act li").length > 0'), true);
+    assert.equal(await evaluate('document.querySelector(".tk-activity .ui-act").scrollHeight > document.querySelector(".tk-activity .ui-act").clientHeight'), true);
+    assert.equal(await evaluate('[...document.querySelectorAll("main section[aria-label]:not(.tk-activity)")].every((s) => s.getBoundingClientRect().height > 0)'), true);
     // Each section expanded in turn, then See all on every other one: it expands, and no ticket opens.
     for (const open of names) for (const other of names.filter((n) => n !== open)) {
       await fresh();

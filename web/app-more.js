@@ -296,7 +296,7 @@
 
   function ticketActivity(events = state.ticketActivity ?? []) {
     if (!events.length) return '';
-    return el('section', { class: 'ui-card tk-card tk-activity', 'aria-label': 'Activity' }, el('h2', { class: 'tk-ch' }, 'Activity'),
+    return el('details', { class: 'ui-card tk-card tk-activity', 'aria-label': 'Activity', ...(!phone() && { open: true }) }, el('summary', { class: 'tk-ch' }, 'Activity'),
       el('ol', { class: 'ui-props ui-act' }, ...events.map((e) => el('li', { class: 'ui-pr' },
         el('span', { class: 'aw' }, el('b', {}, e.text, ' · ', el('a', { href: `#ticket/${e.ticket}` }, e.title)), el('time', { datetime: e.at }, stamp(e.at)))))) );
   }
