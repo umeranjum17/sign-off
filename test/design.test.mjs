@@ -4663,6 +4663,9 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     assert.equal(run('ticket', file, '--id', 'new-arrival', '--title', 'A newly synced ticket').code, 0);
     // No manual refresh: the open Tickets page finds this standalone ticket on its next 20-second poll.
     await until(async () => JSON.parse(await evaluate(tab)).lists.includes('To do #ticket/new-arrival'));
+    // Activity is collapsed by default on a phone; open it before checking its entries.
+    await evaluate('document.querySelector(".tk-activity > summary").click()');
+    await until(() => evaluate('document.querySelector(".tk-activity").open'));
     const feed = await evaluate('JSON.stringify([...document.querySelectorAll(".tk-activity .ui-act li")].map((li) => li.innerText.replace(/\\s+/g, " ").trim()))');
     assert.match(feed, /Ticket created/); assert.match(feed, /Stage moved to done/); assert.match(feed, /Progress changed to 60%/); assert.match(feed, /Ticket merged/); assert.match(feed, /Put on hold/);
     const oldEvent = Math.floor(Date.now() / 1000) - 18 * 3600;
@@ -4678,6 +4681,8 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     assert.equal(released.client.hold, false, JSON.stringify(releaseCheck));
     assert.ok(released.rows.includes('To do #ticket/T-31'), JSON.stringify(releaseCheck));
     assert.ok(!released.rows.includes('On hold #ticket/T-31'), JSON.stringify(releaseCheck));
+    await evaluate('document.querySelector(".tk-activity > summary")?.click()');
+    await until(() => evaluate('document.querySelector(".tk-activity").innerText.includes("Hold released")'));
     assert.match(await evaluate('document.querySelector(".tk-activity").innerText'), /Hold released/);
     await evaluate(`location.href = ${JSON.stringify(`${url}#ticket/T-31`)}`);
     await until(() => evaluate('!!document.querySelector(".tk-sheet") && !document.querySelector(".tk-sheet .tk-stuck")'));
@@ -4723,6 +4728,7 @@ test('Tickets on a phone: with one section expanded, See all on each other secti
     await evaluate(`location.href = ${JSON.stringify(`${url}#tickets`)}`);
     const fresh = async () => { await until(async () => (await evaluate('!!document.querySelector("main section[aria-label] .see")')) === true); await evaluate('window.old = true, location.reload()'); await until(async () => (await evaluate('!window.old && document.querySelectorAll("main section[aria-label] .see").length')) === 4); };
     const sizes = { 'In progress': 7, 'On hold': 8, 'To do': 6, Done: 7 };
+    await until(() => evaluate('!!document.querySelector(".tk-activity > summary") && document.querySelectorAll("main section[aria-label]:not(.tk-activity)").length === 4'));
     const activity = await evaluate(`(() => { const feed = document.querySelector('.tk-activity'), lists = [...document.querySelectorAll('main section[aria-label]:not(.tk-activity)')]; return JSON.stringify({ collapsed: !feed.open, listsVisible: lists.length === 4 && lists.every((s) => s.getBoundingClientRect().height > 0), summary: feed.querySelector('summary')?.textContent.trim() }); })()`);
     assert.deepEqual(JSON.parse(activity), { collapsed: true, listsVisible: true, summary: 'Activity' });
     await evaluate('document.querySelector(".tk-activity > summary").click()');
