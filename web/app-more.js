@@ -303,13 +303,12 @@
     return events.map((e) => {
       const link = el('a', { href: `#ticket/${e.ticket}` }, e.title);
       if (onTicketNavigate) link.onclick = onTicketNavigate;
-      return el('li', { class: 'ui-pr' },
-        el('span', { class: 'aw' }, el('b', {}, e.text, ' · ', link), el('time', { datetime: e.at }, stamp(e.at))));
+      return el('li', { class: 'ui-pr' }, el('span', { class: 'aw' }, el('b', {}, e.text, ' · ', link), el('time', { datetime: e.at }, stamp(e.at))));
     });
   }
   function ticketActivityButton() {
     if (!(state.ticketActivity ?? []).length) return '';
-    const button = el('button', { type: 'button', class: 'ui-rb tk-activity-open', 'aria-label': 'Open board Activity', 'aria-haspopup': 'dialog' }, 'Activity');
+    const button = el('button', { type: 'button', class: 'ui-rb tk-activity-open' }, 'Activity');
     button.onclick = () => {
       const title = el('h2', { id: 'tk-activity-title', tabindex: '-1' }, 'Board Activity');
       const close = el('button', { type: 'button', class: 'x', 'aria-label': 'Close board Activity' }, '×');

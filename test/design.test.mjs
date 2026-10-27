@@ -4598,7 +4598,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
   assert.ok(askReleased.last_event_at >= askReleaseBefore && askReleased.last_event_at <= Math.floor(Date.now() / 1000), JSON.stringify(askReleased));
   const askActivity = await (await fetch(`${url}api/state?view=tickets`)).json();
   assert.ok(Array.isArray(askActivity.ticketActivity) && askActivity.ticketActivity.some((e) => e.ticket === 'T-32' && e.kind === 'release' && e.text === 'Hold released'), JSON.stringify(askActivity));
-  const { evaluate, close } = await browse(dir, 390, 844, true);
+  const { evaluate, send, close } = await browse(dir, 390, 844, true);
   try {
     // Each linked card's screen shows one Ticket row of its panel (on an ask, Its ask), the ticket's title and progress, opening its page; a card with no ticket, or one not on the board, shows none.
     const row = `(() => { const top = document.querySelector('#reader:not([hidden])') ?? document; const r = [...top.querySelectorAll('.ui-props a.ui-pr[href^="#ticket/"]')];
@@ -4709,14 +4709,14 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     await evaluate(`location.hash = '#tickets'`);
     await until(() => evaluate('!!document.querySelector(".tk-activity-open")'));
     await evaluate('document.querySelector(".tk-activity-open").click()');
-    await until(() => evaluate('!!document.querySelector(".tk-activity-dialog[open] a[href^=\"#ticket/\"]")'));
+    await until(() => evaluate('!!document.querySelector(".tk-activity-dialog[open] a")'));
     assert.equal(await evaluate(`(() => { const link = document.querySelector('.tk-activity-dialog[open] a[href^="#ticket/"]');
       for (const key of ['ctrlKey', 'metaKey', 'shiftKey', 'altKey']) { const event = new MouseEvent('click', { bubbles: true, cancelable: true, [key]: true });
         link.addEventListener('click', (e) => e.preventDefault(), { once: true }); link.dispatchEvent(event);
         if (!document.querySelector('.tk-activity-dialog[open]')) return false; }
       return true; })()`), true);
-    await evaluate('document.querySelector(".tk-activity-dialog[open] a[href^=\"#ticket/\"]").click()');
-    await until(() => evaluate('location.hash.startsWith("#ticket/") && !!document.querySelector(".tk-sheet") && !document.querySelector(".tk-activity-dialog")'));
+    await evaluate(`document.querySelector('.tk-activity-dialog[open] a[href^="#ticket/"]').click()`);
+    await until(() => evaluate(`location.hash.startsWith('#ticket/') && !!document.querySelector('.tk-pane') && !document.querySelector('.tk-activity-dialog')`));
   } finally { close(); }
   proc.kill();
 });
