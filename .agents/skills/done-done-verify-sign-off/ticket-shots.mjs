@@ -45,7 +45,7 @@ const STATES = [
   ['report-linked', '#reports/settings-saves', '.ui-props a.ui-pr[href^="#ticket/"]'], ['report-unlinked', '#reports/digest-ran', '.gd-top .sub'],
   ['plan-linked', '#waiting/faster-sign-in', '.ui-props a.ui-pr[href^="#ticket/"]'], ['plan-unlinked', '#waiting/plan-kind-board', '.plan-main h2'],
   ['ask-thread', '#decide/settings-search', '.thread'], ['proof-thread', '#evidence/settings-proof', '.thread'],
-  ['tickets', '#tickets', ''], ['tickets-activity', '#tickets', '.tk-activity'], ['ticket', '#ticket/T-29', ''], ['ticket-activity', '#ticket/T-29', '.ui-act'], ['ticket-release', '#ticket/T-31', '.tk-sheet .ui-act, .tk-pane .ui-act'], ['ticket-lifecycle', '#ticket/T-33', '.tk-sheet .ui-act, .tk-pane .ui-act'], ['ticket-parent', '#ticket/T-9', ''],
+  ['tickets', '#tickets', ''], ['tickets-activity', '#tickets', '.tk-activity'], ['ticket', '#ticket/T-29', ''], ['ticket-activity', '#ticket/T-29', '.ui-act'], ['ticket-release', '#ticket/T-31', '.tk-sheet .ui-act, .tk-pane .ui-act'], ['ticket-answer-release', '#ticket/T-32', '.tk-sheet .ui-act, .tk-pane .ui-act'], ['ticket-lifecycle', '#ticket/T-33', '.tk-sheet .ui-act, .tk-pane .ui-act'], ['ticket-parent', '#ticket/T-9', ''],
 ];
 try {
   const base = sh('bash', [join(repo, '.agents/skills/done-done-verify-sign-off/seed-board.sh'), dir], { cwd: repo, env: seedEnv }).trim().split('\n').pop();
@@ -84,10 +84,16 @@ try {
   // Each goes through the board's own API, as a tap does, a second apart so the times read in order.
   so('raise', board, '--ticket', 'T-29', '--key', 'settings-search', '--title', 'Turn on search in the settings page?', '--why', 'Umer asked for it twice this week.', ...ask);
   const api = async (path, body) => { const r = await fetch(`${base}api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); assert.equal(r.status, 200, `${path} ${await r.text()}`); await new Promise((ok) => setTimeout(ok, 1100)); };
+  const askReleaseBefore = Math.floor(Date.now() / 1000);
   await api('answers', { key: 'hold-answer', answer: 'no', note: 'Not this week.' });
-  const asksHold = JSON.parse(so('ticket', board, '--id', 'T-32', '--json')).ticket.hold;
-  assert.equal(asksHold, true, 'answering a linked ask must not release a ticket hold');
-  writeFileSync(join(out, `hold-asks-answer.${cell}.json`), JSON.stringify({ path: 'asks-page answer', theme, width, ticket: 'T-32', hold: asksHold }, null, 2) + '\n');
+  const asksTicket = JSON.parse(so('ticket', board, '--id', 'T-32', '--json')).ticket;
+  assert.equal(asksTicket.hold, false, 'answering a linked ask must release its ticket hold');
+  assert.equal(asksTicket.state, 'queued');
+  assert.ok(asksTicket.last_event_at >= askReleaseBefore, JSON.stringify(asksTicket));
+  const asksActivity = await (await fetch(`${base}api/state?view=tickets`)).json();
+  const askReleased = asksActivity.ticketActivity.some((e) => e.ticket === 'T-32' && e.kind === 'release' && e.text === 'Hold released');
+  assert.equal(askReleased, true, JSON.stringify(asksActivity.ticketActivity));
+  writeFileSync(join(out, `hold-asks-answer.${cell}.json`), JSON.stringify({ path: 'asks-page answer', theme, width, ticket: 'T-32', hold: asksTicket.hold, state: asksTicket.state, last_event_at: asksTicket.last_event_at, release_activity: askReleased }, null, 2) + '\n');
   const oldEvent = Math.floor(Date.now() / 1000) - 3600;
   so('ticket', board, '--id', 'T-31', '--comment', JSON.stringify({ id: 'hold-comment', at: oldEvent, text: 'What should I choose?', picked: oldEvent, replies: [{ at: oldEvent, text: 'Friday.' }] }));
   const commentHold = JSON.parse(so('ticket', board, '--id', 'T-31', '--json')).ticket.hold;
@@ -130,6 +136,7 @@ try {
     'Turn on search in the settings page? Delivered to verify', 'Turn on search in the settings page? verify read it', 'Turn on search in the settings page? You asked for a new round', 'Update 3 · The settings page on a phone Your answer: Pass', 'Update 3 · The settings page on a phone Your comment'].reverse().concat('Ticket created'), JSON.stringify(seen['ticket-activity'].thread));
   assert.deepEqual(seen['ticket-release'].thread, ['Hold released', 'Stage cleared', 'Stage moved to done', 'Progress changed to 100%', 'Ticket merged', 'Put on hold', 'Stage moved to review', 'Progress changed to 60%', 'Stage moved to building', 'Progress changed to 25%', 'Ticket created'], JSON.stringify(seen['ticket-release'].thread));
   assert.deepEqual(seen['ticket-lifecycle'].thread, ['Stage moved to done', 'Progress changed to 100%', 'Ticket merged', 'Hold released', 'Put on hold', 'Stage moved to building', 'Ticket created'], JSON.stringify(seen['ticket-lifecycle'].thread));
+  assert.ok(seen['ticket-answer-release'].thread.some((line) => line === 'Hold released'), JSON.stringify(seen['ticket-answer-release'].thread));
   for (const state of ['ask-unlinked', 'ask-linked', 'design-unlinked']) assert.equal(seen[state].thread.length, 0, `${state} has only its posting: no thread`);
   assert.deepEqual([seen['ticket-parent'].done, ...seen['ticket-parent'].lists.map((l) => `${l.head} ${l.rows.length}`)], ['Progress 80%', 'Tickets in this epic · 1 of 2 done 2', 'Linked 0', 'Activity 1'], JSON.stringify(seen['ticket-parent']));
   // A tap on the ask's Ticket row opens the ticket; Close (a phone) or the browser's Back (a desk) returns to the ask.
@@ -145,19 +152,20 @@ try {
   }`));
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board seeded with one card of each kind and no tickets, then T-9, T-29 (under T-9), T-30, held T-31 and T-32, and lifecycle T-33, a card of each kind posted with --ticket T-29, and an ask naming T-404.',
     steps: ['Open the Tickets tab and a ticket on a phone and at 1280 px, in light and dark; inspect the board-wide and per-ticket Activity feeds.',
-      'Answer a linked ask on held T-32 and verify it stays on hold; reply to a comment on held T-31 and verify it releases.',
+      'Answer a linked ask on held T-32 and verify it releases to To do with a Hold released event; reply to a comment on held T-31 and verify it releases.',
       'Open each linked card (an ask, an update, a design review, a guided report, a guided plan), the same kind with no ticket, and the ask naming T-404.',
       'Answer an ask No with a note, change it to Yes with a note, let its agent take it, ask for a new round; give the update Pass with a note and a comment.',
       'Open each card\'s Activity, tap the ask\'s Its ask row to open T-29, read its Linked list and Activity, close it, then open T-9.'],
-    result: 'Each linked card shows a Ticket row with the ticket title, T-29 and 60% that opens the ticket; unlinked cards and the T-404 ask show none; held T-32 stays held after its ask is answered and held T-31 releases after its comment is answered; board and per-ticket feeds show lifecycle events newest first; the ticket lists its six cards newest first, in progress at 60%, with card activity newest first; T-9 lists its two tickets at 80%; each card lists its answers, notes, pickup and new round oldest first.' }, null, 2) + '\n');
+    result: 'Each linked card shows a Ticket row with the ticket title, T-29 and 60% that opens the ticket; unlinked cards and the T-404 ask show none; held T-32 releases after its linked ask is answered, held T-31 releases after its comment is answered, and both release events appear in Activity; board and per-ticket feeds show lifecycle events newest first; the ticket lists its six cards newest first, in progress at 60%, with card activity newest first; T-9 lists its two tickets at 80%; each card lists its answers, notes, pickup and new round oldest first.' }, null, 2) + '\n');
   writeFileSync(join(out, `walk.${cell}.txt`), `${theme} ${width}w: tap the ask's Its ask row on #decide/settings-friday: the page is ${walk.at}, the ticket "${walk.title}".\n${width < 1024 ? 'Tap Close' : 'Go back'}: the page is ${walk.back} again.\n`);
   assert.deepEqual(walk, { at: '#ticket/T-29', title: 'Ship the new settings page', back: '#decide/settings-friday' });
-  if (process.env.TICKET_REVIEW_ROOT && width === 1280 && theme === 'dark') {
-    mkdirSync(sealedOut, { recursive: true });
-    for (const file of ['tickets-activity.light.390w.png', 'ticket-release.dark.390w.png', 'ticket-release.light.390w.png', 'ticket-lifecycle.light.1280w.png', 'ticket-lifecycle.dark.1280w.png', 'steps.json']) copyFileSync(join(out, file), join(sealedOut, file));
-  }
 } finally {
   try { browser('stop'); } catch {}
   try { so('stop', board); } catch {}
   rmSync(dir, { recursive: true, force: true });
+}
+if (process.env.TICKET_REVIEW_ROOT && width === 1280 && theme === 'dark') {
+  mkdirSync(sealedOut, { recursive: true });
+  for (const file of ['tickets-activity.light.390w.png', 'tickets-activity.dark.390w.png', 'tickets-activity.light.1280w.png', 'tickets-activity.dark.1280w.png',
+    'ticket-answer-release.light.390w.png', 'ticket-answer-release.dark.390w.png', 'ticket-answer-release.light.1280w.png', 'ticket-answer-release.dark.1280w.png', 'steps.json']) copyFileSync(join(out, file), join(sealedOut, file));
 }

@@ -1324,6 +1324,11 @@ function ticket(args: string[]) {
   });
 }
 
+function releaseTicketHold(file: string, id: string) {
+  const ticket = readTickets(file, warn).find((t) => t.id === id);
+  if (ticket && (ticket.hold || ticket.state === 'on hold')) appendTicket(file, { ...ticket, hold: false,
+    state: ticket.progress ? 'in progress' : 'queued', last_event_at: Math.floor(Date.now() / 1000) });
+}
 /** ticket --id <id> --comment '<json>': the fleet dashboard hands over a comment the person made on a ticket, in its own thread record, again each time it moves
  * (picked up, answered), so the board shows how far it got and a reply lands in Today. */
 function ticketComment(file: string, values: Record<string, any>, on: string) {
@@ -1337,11 +1342,7 @@ function ticketComment(file: string, values: Record<string, any>, on: string) {
   return locked(`${file}.lock`, () => {
     if (!readTickets(file, warn).some((t) => t.id === id)) throw fail(`no ticket ${id} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi ticket${on} --id ${id} --title "<what the work is>"\` to add it`);
     appendTicketComment(file, id, c);
-    if (c.replies?.length) {
-      const ticket = readTickets(file, warn).find((x) => x.id === id);
-      if (ticket && (ticket.hold || ticket.state === 'on hold')) appendTicket(file, { ...ticket, hold: false,
-        ...(ticket.state === 'on hold' && { state: ticket.progress ? 'in progress' : 'queued' }), last_event_at: Math.floor(Date.now() / 1000) });
-    }
+    if (c.replies?.length) releaseTicketHold(file, id);
     const t = readTrail(file, loadDecisions(file)).find((x) => x.kind === 'ticket' && x.id === c.id)!;
     return toon({ board: tilde(file), ticket: id, comment: c.id, shows: t.reply ? 'Replied' : t.read ? 'Read' : t.delivered ? 'Delivered' : 'Sent' }, ['Send the comment again with --comment as the lead picks it up and answers']);
   });
@@ -3304,7 +3305,12 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   // Every item that asks something takes an Other answer: the words, saved as the answer `text`, unless an option is named text.
   const other = d.reply || d.options.length ? [REPLY] : [], option = d.options.find((o) => o.value === answer) ?? other.find((o) => o.value === answer);
   if (!option) return [400, { error: `The answer must be one of: ${[...d.options, ...other].map((o) => o.label).join(', ') || 'none, this item is only shown'}` }];
-  answered(appendAnswer(file, d, option, note.trim(), unsent(d)), d);
+  const save = () => {
+    const a = appendAnswer(file, d, option, note.trim(), unsent(d));
+    if (a && d.ticket && plainAsk(d)) releaseTicketHold(file, d.ticket);
+    return a;
+  };
+  answered(d.ticket && plainAsk(d) ? await locked(`${file}.lock`, save) : save(), d);
   return [200, state()];
 }
 
