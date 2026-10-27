@@ -1250,6 +1250,23 @@ function feedback(args: string[]) {
   return toon({ board: tilde(file), key, shows: now.reply ? 'Replied' : now.read ? 'Read' : 'Delivered', covers: sent.length }, [values.read || values.delivered ? `Run \`sign-off-axi feedback ${key}${on} --reply "<what you did>"\` once you act on it` : `Run \`sign-off-axi wait${on}${filer ? ` --filer ${filer}` : ''}\` for the next answer`]);
 }
 
+/** A card that names a ticket, in the words its page uses: what it is, and its answer, waiting (a design Main has not promoted is in review) or shown when it asks nothing.
+ * `ticket --json` and the board's /api/tickets say it the same way. */
+const ticketCard = (d: ReturnType<typeof board>[number]) => ({ key: d.key, kind: d.type === 'evidence' ? 'proof' : d.kind === 'design' || d.type === 'design' ? 'design' : d.type === 'plan' ? 'plan' : asks(d) ? 'ask' : 'report',
+  status: d.answer && !awaitsVerdict(d.type, d.answer) ? d.answer.answer : waits(d) ? (d.kind === 'design' && !d.promoted ? 'in review' : 'waiting') : 'shown', title: d.title, filed: d.filed ?? '' });
+/** The open ticket API, GET /api/tickets and /api/tickets/<id>: the same tickets and cards `ticket --json` prints, with the board file's path left out. Undefined for any other path. */
+function ticketsApi(path: string): [number, unknown] | undefined {
+  const one = /^\/api\/tickets\/([^/]+)$/.exec(path);
+  if (path !== '/api/tickets' && !one) return undefined;
+  const all = rollUp(readTickets(file, warn)), rows = board(file).filter((d) => d.ticket !== undefined && !d.dismissed);
+  // Newest card first, as the CLI and the ticket's page list them.
+  const cardsOf = (id: string) => rows.filter((d) => d.ticket === id).reverse().sort((x, y) => (Date.parse(y.filed ?? '') || 0) - (Date.parse(x.filed ?? '') || 0));
+  if (!one) return [200, { tickets: all.map((t) => ({ ...t, cards: cardsOf(t.id).map((d) => d.key) })) }];
+  let id: string;
+  try { id = decodeURIComponent(one[1]!); } catch { return [404, { error: 'No ticket with that id' }]; }
+  const t = all.find((x) => x.id === id);
+  return t ? [200, { ticket: { ...t, cards: cardsOf(id).map(ticketCard) } }] : [404, { error: 'No ticket with that id' }];
+}
 /** ticket [board.json] [--id <id> [--title <text>] [--progress <0-100>] [--parent <id>] [--priority P0-P3] [--project <name>] [--hold yes|no] [--asked yes|no]]: lists the tickets,
  * shows one with the cards that name it, or writes one. A ticket stands alone in <board>.tickets.jsonl: cards name it with --ticket, and nothing else reads it.
  * What it prints carries the roll-up: a ticket with tickets under it is as far along as they are on average. */
@@ -1278,9 +1295,7 @@ function ticket(args: string[]) {
   if (!write) {
     const t = rollUp(readTickets(file, warn)).find((x) => x.id === id);
     if (!t) throw fail(`no ticket ${id} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi ticket${on} --id ${id} --title "<what the work is>"\` to add it`);
-    // Each card in the words its page uses: what it is, and its answer, waiting (a design Main has not promoted is in review) or shown when it asks nothing.
-    const cards = cardsOf(t).map((d) => ({ key: d.key, kind: d.type === 'evidence' ? 'proof' : d.kind === 'design' || d.type === 'design' ? 'design' : d.type === 'plan' ? 'plan' : asks(d) ? 'ask' : 'report',
-      status: d.answer && !awaitsVerdict(d.type, d.answer) ? d.answer.answer : waits(d) ? (d.kind === 'design' && !d.promoted ? 'in review' : 'waiting') : 'shown', title: d.title, filed: d.filed ?? '' }));
+    const cards = cardsOf(t).map(ticketCard);
     if (values.json) return JSON.stringify({ board: file, ticket: { ...t, cards } });
     return toon({ board: tilde(file), ticket: row(t), cards: cards.length ? cards : '0 cards name this ticket' }, [`Pass --ticket ${id} to raise or post, so the card shows this ticket`]);
   }
@@ -3122,6 +3137,8 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     } catch { return [404, { error: 'Attachment is unavailable' }]; }
   }
   if (req.method === 'GET' && req.url === '/api/board') return [200, { file, pid: process.pid }];
+  const tickets = req.method === 'GET' ? ticketsApi((req.url ?? '').split('?')[0]!) : undefined;
+  if (tickets) return tickets;
   if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/signin', '/api/opened', '/api/leash', '/api/deeper', '/api/reads', '/api/trail', '/api/engagement', '/api/engagement/seen'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
   if (readOnly()) return [403, { error: 'This board is read-only' }];
   // The leash is the person's own setting in config.yaml, which the board applies to the answers it takes, so an answers-only board takes it too.
