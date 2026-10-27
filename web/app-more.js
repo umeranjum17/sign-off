@@ -294,6 +294,12 @@
       ...[...old].map(([m, n]) => el('p', { class: 'meta' }, `${n} comment${n > 1 ? 's' : ''} on an earlier version of “${name(m)}” ${n > 1 ? 'are' : 'is'} hidden`)), err);
   }
 
+  function ticketActivity(events = state.ticketActivity ?? []) {
+    if (!events.length) return '';
+    return el('section', { class: 'ui-card tk-card tk-activity', 'aria-label': 'Activity' }, el('h2', { class: 'tk-ch' }, 'Activity'),
+      el('ol', { class: 'ui-props ui-act' }, ...events.map((e) => el('li', { class: 'ui-pr' },
+        el('span', { class: 'aw' }, el('b', {}, e.text, ' · ', el('a', { href: `#ticket/${e.ticket}` }, e.title)), el('time', { datetime: e.at }, stamp(e.at)))))) );
+  }
   function tickets(by, id) {
     const L = tkLists(), desk = !phone(), picked = id && tkById(id);
     const open = picked || (desk ? L.moving[0] ?? L.hold[0] ?? L.todo[0] ?? L.done[0] : undefined);
@@ -307,14 +313,14 @@
       const head = el('header', { class: 'ui-dhead tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets'), el('p', {}, empty ? 'Nothing tracked yet' : say)),
         el('div', { class: 'acts' }, pick, tkSeg(L), tkFilter(L), themeButton()));
       if (empty) return [el('div', { class: 'ui-desk tk-desk' }, head, none)];
-      return [el('div', { class: 'ui-desk tk-desk' }, head, el('div', { class: 'ui-dgrid' }, el('div', { class: 'ui-col s4' }, tkHero(L), tkGroup('mv', 'In progress', L.moving, true, 'grow')),
+      return [el('div', { class: 'ui-desk tk-desk' }, head, el('div', { class: 'ui-dgrid' }, el('div', { class: 'ui-col s4' }, tkHero(L), tkGroup('mv', 'In progress', L.moving, true, 'grow'), ticketActivity()),
         el('div', { class: 'ui-col s4' }, tkGroup('hold', 'On hold', L.hold, true, 'half'), tkGroup('todo', 'To do', L.todo, true, 'grow')),
         open ? el('section', { class: 'ui-card ui-pane s4 tk-pane', 'aria-label': open.title }, ...ticketPage(open)) : el('section', { class: 'ui-card ui-pane s4 tk-pane' }, el('p', { class: 'tk-none' }, 'No ticket here.'))))];
     }
     const stat = (href, mark, lab, n) => el(href ? 'a' : 'div', { class: 'ui-card ui-stat', ...(href && { href }), 'aria-label': `${lab}: ${n}` }, fill(mark), el('span', { class: 'lab' }, lab), ' ', el('b', {}, String(n)));
     const p0 = L.shown.filter((t) => t.priority === 'P0' && tkStateOf(t) !== 'done').length;
     return [el('header', { class: 'ui-top tk-top' }, el('h1', { tabindex: '-1' }, 'Tickets'), tkFilter(L), themeButton()), tkSeg(L), pick,
-      ...(empty ? [none] : [tkHero(L), tkGroup('mv', 'In progress', L.moving), tkGroup('hold', 'On hold', L.hold), tkGroup('todo', 'To do', L.todo), tkGroup('done', 'Done', L.done),
+      ...(empty ? [none] : [tkHero(L), ticketActivity(), tkGroup('mv', 'In progress', L.moving), tkGroup('hold', 'On hold', L.hold), tkGroup('todo', 'To do', L.todo), tkGroup('done', 'Done', L.done),
         el('div', { class: 'ui-tiles tk-tiles' }, stat('#waiting', 'M5 3h10a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-4.5L6 18.2V15H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3zm1.5 4.2v1.6h7V7.2zm0 3v1.6h5v-1.6z', 'Wait on you', by.waiting.length),
           stat('', 'M4 2.5h1.6v1h9.9l-2.1 3.75 2.1 3.75H5.6v6.5H4z', 'Open at P0', p0))]),
       picked ? tkSheet(picked) : (tkUp = '')];
@@ -327,7 +333,8 @@
     const linked = (d) => { const a = el('a', { class: 'ui-row', href: hrefOf(d) }, ...uiRow({ tile: cardTile(d), title: title(d), priority: d.priority, badge: trailBadge(d.key), meta: [tkKind(d), tkState(d), d.filed && tkWhen(d.filed)].filter(Boolean).join(' · ') }));
       a.onclick = () => (jump = d.key); return el('li', {}, a); };
     // Its cards' steps after their postings (Linked shows those), newest first, each naming its card.
-    const steps = cards.flatMap((d) => threadOf(d).filter((e) => !e.posted).map((e) => ({ ...e, card: d }))).sort(bySecond).reverse(), said = trailOf(t.id, 'ticket');
+    const steps = [...(state.ticketActivity ?? []).filter((e) => e.ticket === t.id), ...cards.flatMap((d) => threadOf(d).filter((e) => !e.posted).map((e) => ({ ...e, card: d })).reverse())]
+      .sort((x, y) => bySecond(y, x)), said = trailOf(t.id, 'ticket');
     seeReply(t.id, 'ticket');
     return [el('div', { class: 'tk-shd' }, el('p', {}, tkTile(t), el('span', {}, [proj, TK_WORDS[s]].filter(Boolean).join(' · '))), close),
       el('h2', { class: 'tk-dt', tabindex: '-1', dir: 'auto' }, t.title),

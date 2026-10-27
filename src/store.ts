@@ -618,6 +618,28 @@ export function readTickets(decisionsPath: string, warn: (msg: string) => void =
   });
   return [...latest.values()];
 }
+export type TicketActivity = { ticket: string; title: string; kind: 'created' | 'stage' | 'progress' | 'merged' | 'hold' | 'release'; text: string; at: string };
+/** Ticket history is already append-only; derive the small activity feed from each ticket's successive public records. */
+export function readTicketActivity(decisionsPath: string): TicketActivity[] {
+  const previous = new Map<string, Ticket>(), events: { event: TicketActivity; order: number }[] = [];
+  readRaw(ticketsPath(decisionsPath)).split('\n').forEach((line, order) => {
+    let t: Ticket;
+    try { t = line && JSON.parse(line); } catch { return; }
+    if (!t || ticketFault(t) || !Number.isFinite(Date.parse(t.at))) return;
+    const had = previous.get(t.id), at = t.at;
+    const add = (kind: TicketActivity['kind'], text: string) => events.push({ event: { ticket: t.id, title: t.title, kind, text, at }, order });
+    if (!had) add('created', 'Ticket created');
+    else {
+      if (had.stage !== t.stage) add('stage', t.stage ? `Stage moved to ${t.stage}` : 'Stage cleared');
+      if (had.progress !== t.progress) add('progress', `Progress changed to ${t.progress}%`);
+      if ((had.stage !== 'done' && t.stage === 'done') || (had.state !== 'done' && t.state === 'done')) add('merged', 'Ticket merged');
+      const wasHeld = had.hold === true || had.state === 'on hold', isHeld = t.hold === true || t.state === 'on hold';
+      if (wasHeld !== isHeld) add(isHeld ? 'hold' : 'release', isHeld ? 'Put on hold' : 'Hold released');
+    }
+    previous.set(t.id, t);
+  });
+  return events.sort((a, b) => Date.parse(b.event.at) - Date.parse(a.event.at) || b.order - a.order).map(({ event }) => event);
+}
 /** The progress roll-up: a ticket with tickets under it on the board is as far along as they are on average (each of them rolled up the same way), and one with none keeps its own.
  * A loop of parents stops where it would come back round. */
 export function rollUp(tickets: Ticket[]): Ticket[] {
