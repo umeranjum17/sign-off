@@ -7,7 +7,7 @@
   color-scheme: light dark;
   /* The new look's surfaces and ink: the canvas, a card on it, a white raised part (an icon tile), the pressed segment, a field sunk into a card. */
   --tk-canvas: #E8E4E0; --tk-card: #F3F3F0; --tk-raised: #FFFFFF; --tk-on: #FBFBFA; --tk-inset: #EAE7E3;
-  --tk-ink: #121210; --tk-text: #21211E; --tk-text-secondary: #6E6E6B; --tk-text-tertiary: #8A8A86; --tk-idle: #AAAAAA;
+  --tk-ink: #121210; --tk-text: #21211E; --tk-text-secondary: #5C5C59; --tk-text-tertiary: #666663; --tk-idle: #AAAAAA;
   /* A progress bar's track and fill, the dot grid's middle tone and empty cell, and the hairline between rows in a card. */
   --tk-track: #E5E3DE; --tk-fill: #2D2D2A; --tk-mid: #D3CCC9; --tk-light: #E6E2DE; --tk-line: #DCD8D4;
   /* The board's older names, on the new surfaces. */
@@ -19,7 +19,7 @@
   /* The dim behind a sheet, and the light ground of a button on an ink pill (the toast's Undo). */
   --tk-scrim: rgba(30, 24, 18, 0.28); --tk-on-ink-press: rgba(255, 255, 255, 0.14);
   /* The priority chip: P0 and P1 tinted, P2 and P3 quiet; each a ground and its text. */
-  --tk-p0: #F6DCD8; --tk-p0-text: #B42318; --tk-p1: #F5E6CF; --tk-p1-text: #8F4E08; --tk-p2: #E6E3DE; --tk-p2-text: #4F4B46; --tk-p3: #ECEAE6; --tk-p3-text: #85817B;
+  --tk-p0: #F6DCD8; --tk-p0-text: #B42318; --tk-p1: #F5E6CF; --tk-p1-text: #8F4E08; --tk-p2: #E6E3DE; --tk-p2-text: #4F4B46; --tk-p3: #ECEAE6; --tk-p3-text: #6B6761;
   /* Type: Inter. A page title, a section head, a big number, a row's title, its second line and a small label, with their line heights (each a multiple of 4).
      The older title, body, secondary and footnote sizes stay for the screens not yet in the new look. */
   --tk-font: Inter, -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif;
@@ -44,9 +44,9 @@
 }
 @media (prefers-color-scheme: dark) { :root {
   --tk-canvas: #131210; --tk-card: #1E1D1A; --tk-raised: #2A2825; --tk-on: #34322E; --tk-inset: #262421;
-  --tk-ink: #F4F2EE; --tk-text: #E9E6E1; --tk-text-secondary: #A9A49D; --tk-text-tertiary: #827D76; --tk-idle: #6C6863;
+  --tk-ink: #F4F2EE; --tk-text: #E9E6E1; --tk-text-secondary: #BDB8B1; --tk-text-tertiary: #A59F98; --tk-idle: #6C6863;
   --tk-track: #2F2D2A; --tk-fill: #ECE9E4; --tk-mid: #55514C; --tk-light: #2B2926; --tk-line: #2E2C29;
-  --tk-critical: #FF6B5E; --tk-go: var(--tk-ink); --tk-on-go: var(--tk-canvas);
+  --tk-critical: #FF6B5E; --tk-on-critical: var(--tk-canvas); --tk-go: var(--tk-ink); --tk-on-go: var(--tk-canvas);
   --tk-scrim: rgba(0, 0, 0, 0.5); --tk-on-ink-press: rgba(0, 0, 0, 0.1);
   --tk-p0: rgba(255, 107, 94, 0.16); --tk-p0-text: #FF8E84; --tk-p1: rgba(242, 166, 72, 0.15); --tk-p1-text: #F2B262; --tk-p2: #34322E; --tk-p2-text: #CFCAC3; --tk-p3: #2C2A27; --tk-p3-text: #9C978F;
   --tk-hl: rgba(255, 255, 255, 0.05);

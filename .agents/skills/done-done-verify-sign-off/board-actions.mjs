@@ -141,7 +141,7 @@ const PAGES = [
   ...[['npm', 'signin', []], ['ship', 'ask', ['^Friday', '^Next week']], ['look', 'design', ['^A: one column', '^B: two columns']]].map(([key, kind, options]) => ({
     name: `decide-${key}`, hash: `#decide/${key}`, ready: '.decide', stages: [{ data: { options, key, kind }, run: async (h, { options, key, kind }) => {
       const bar = () => h.board().querySelector('.decide-bar'), more = () => h.board().querySelector('.sh-head .dl-more, .split-bar .dl-more');
-      if (kind === 'signin') await h.need('Open the npm sign-in', h.find(/^Open the npm sign-in$/, h.board()));
+      if (kind === 'signin') await h.need('Open sign-in, npm', h.find(/^Open sign-in, npm$/, h.board()));
       // Nothing is picked until a pick: the one button waits, off, then names the pick.
       if (options.length) h.has('Pick an answer (off until a pick)', bar()?.querySelector('.answer:disabled'));
       for (const o of options) await h.press(`option ${o}`, h.find(new RegExp(o), h.board().querySelector('.pick-list, .choices, .decide')), () => true);
@@ -170,7 +170,7 @@ const PAGES = [
     await h.nav('Back to Waiting on you', h.find(/Waiting on you$/, r, 'a'), /^#waiting$/);
   } }] },
   { name: 'designs', hash: '#designs', ready: '[id="item-chat-journeys"]', stages: [{ run: async (h) => {
-    await h.nav('Open design', h.find(/^Open design,/), /^#designs\/chat-journeys$/);
+    await h.nav('Open design', h.find(/^Approve the chat app journeys\?/), /^#designs\/chat-journeys$/);
     // Select and Discard all are in the title row's More; Discard is on the design's own page too. Each Discard asks for a reason and is taken back with Undo.
     const sheet = () => document.getElementById('dz-sheet'), bar = () => h.board().querySelector('.sel-bar');
     const more = async (re) => { await h.press('More', h.board().querySelector('.dz-more'), () => sheet().open); return h.find(re, sheet(), 'button'); };

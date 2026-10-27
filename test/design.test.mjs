@@ -4943,13 +4943,14 @@ test('Discard: every card offers three reasons, one tap each; the card moves to 
 });
 
 // The approved prototype's palette (mocks/signoff-proto-3/index.html): every colour its :root and dark blocks define, and the few it writes in place
-// (the dock's Search, a count's white, the toast button's tint, the up arrow's green, the warn amber), each theme its own.
+// (the dock's Search, a count's white, the toast button's tint, the up arrow's green, the warn amber), each theme its own. Its secondary and tertiary text, the quiet
+// P3 chip's text and, in dark, the words on a red count are set to tones that read at 4.5:1 on every surface they sit on (the accessibility floor), not the prototype's own.
 const PROTO = {
-  light: ['#E8E4E0', '#F3F3F0', '#FFFFFF', '#FBFBFA', '#EAE7E3', '#121210', '#21211E', '#6E6E6B', '#8A8A86', '#AAAAAA', '#E5E3DE', '#2D2D2A', '#D3CCC9', '#E6E2DE', '#DCD8D4',
-    'rgba(255,255,255,0.75)', '#D7372B', '#F6DCD8', '#B42318', '#F5E6CF', '#8F4E08', '#E6E3DE', '#4F4B46', '#ECEAE6', '#85817B', 'rgba(30,24,18,0.28)',
+  light: ['#E8E4E0', '#F3F3F0', '#FFFFFF', '#FBFBFA', '#EAE7E3', '#121210', '#21211E', '#5C5C59', '#666663', '#AAAAAA', '#E5E3DE', '#2D2D2A', '#D3CCC9', '#E6E2DE', '#DCD8D4',
+    'rgba(255,255,255,0.75)', '#D7372B', '#F6DCD8', '#B42318', '#F5E6CF', '#8F4E08', '#E6E3DE', '#4F4B46', '#ECEAE6', '#6B6761', 'rgba(30,24,18,0.28)',
     'rgba(60,40,20,0.05)', 'rgba(60,40,20,0.045)', 'rgba(40,30,20,0.1)', 'rgba(40,30,20,0.06)', 'rgba(40,30,20,0.08)', 'rgba(40,30,20,0.05)', 'rgba(30,20,10,0.12)',
     'rgba(20,16,12,0.25)', 'rgba(0,0,0,0.2)', 'rgba(255,255,255,0.14)', '#262624', '#2BB673', '#C8841A'],
-  dark: ['#131210', '#1E1D1A', '#2A2825', '#34322E', '#262421', '#F4F2EE', '#E9E6E1', '#A9A49D', '#827D76', '#6C6863', '#2F2D2A', '#ECE9E4', '#55514C', '#2B2926', '#2E2C29',
+  dark: ['#131210', '#1E1D1A', '#2A2825', '#34322E', '#262421', '#F4F2EE', '#E9E6E1', '#BDB8B1', '#A59F98', '#6C6863', '#2F2D2A', '#ECE9E4', '#55514C', '#2B2926', '#2E2C29',
     'rgba(255,255,255,0.05)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.45)', 'rgba(0,0,0,0.5)', '#FF6B5E', 'rgba(255,107,94,0.16)', '#FF8E84', 'rgba(242,166,72,0.15)', '#F2B262', '#CFCAC3',
     '#2C2A27', '#9C978F', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.2)', 'rgba(30,20,10,0.12)', 'rgba(20,16,12,0.25)', '#FFFFFF', '#2BB673', '#C8841A'],
 };
