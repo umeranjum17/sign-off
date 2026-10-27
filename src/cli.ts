@@ -14,7 +14,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendKind, readKinds, appendSendBack, appendTicket, readTickets, rollUp, appendTicketComment, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendKind, readKinds, appendSendBack, appendTicket, readTickets, readTicketActivity, rollUp, appendTicketComment, readTicketComments, ticketCommentFault, ticketFault, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, downloadFiles, galleryFrames, guided, kitWarnings, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -1324,6 +1324,11 @@ function ticket(args: string[]) {
   });
 }
 
+function releaseTicketHold(file: string, id: string) {
+  const tickets = readTickets(file, warn), ticket = tickets.find((t) => t.id === id);
+  if (ticket && (ticket.hold || ticket.state === 'on hold')) appendTicket(file, { ...ticket, hold: false,
+    state: (rollUp(tickets).find((t) => t.id === id)?.progress ?? ticket.progress) ? 'in progress' : 'queued', last_event_at: Math.floor(Date.now() / 1000) });
+}
 /** ticket --id <id> --comment '<json>': the fleet dashboard hands over a comment the person made on a ticket, in its own thread record, again each time it moves
  * (picked up, answered), so the board shows how far it got and a reply lands in Today. */
 function ticketComment(file: string, values: Record<string, any>, on: string) {
@@ -1336,7 +1341,11 @@ function ticketComment(file: string, values: Record<string, any>, on: string) {
   if (fault) throw fail(`--comment: ${fault}`, 'VALIDATION_ERROR', EXAMPLE);
   return locked(`${file}.lock`, () => {
     if (!readTickets(file, warn).some((t) => t.id === id)) throw fail(`no ticket ${id} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi ticket${on} --id ${id} --title "<what the work is>"\` to add it`);
+    const previous = readTicketComments(file).find((x) => x.id === c.id);
+    const replies = c.replies ?? [];
+    const hasNewReply = replies.length > (previous?.replies?.length ?? 0);
     appendTicketComment(file, id, c);
+    if (hasNewReply) releaseTicketHold(file, id);
     const t = readTrail(file, loadDecisions(file)).find((x) => x.kind === 'ticket' && x.id === c.id)!;
     return toon({ board: tilde(file), ticket: id, comment: c.id, shows: t.reply ? 'Replied' : t.read ? 'Read' : t.delivered ? 'Delivered' : 'Sent' }, ['Send the comment again with --comment as the lead picks it up and answers']);
   });
@@ -2866,7 +2875,7 @@ function viewRead(read: NonNullable<typeof built>, view: View) {
       decisions: [], page: { view: 'lists', offset: 0, limit: 0, total: 0 } };
   } else if (view.name === 'tickets') {
     // The Tickets screen's own read: its roll-up is the largest part of the board and no other screen shows it.
-    body = { ...s, decisions: [], counts, tickets: s.tickets ?? [], trail: [], rounds: [], messages: [], annotations: [], comments: [],
+    body = { ...s, decisions: [], counts, tickets: s.tickets ?? [], ticketActivity: readTicketActivity(file), trail: [], rounds: [], messages: [], annotations: [], comments: [],
       page: { view: 'tickets', offset: 0, limit: (s.tickets ?? []).length, total: (s.tickets ?? []).length } };
   } else {
     const all = view.name === 'asks' ? items.filter(open) : items, page = all.slice(view.offset, view.offset + view.limit);
@@ -3298,7 +3307,12 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   // Every item that asks something takes an Other answer: the words, saved as the answer `text`, unless an option is named text.
   const other = d.reply || d.options.length ? [REPLY] : [], option = d.options.find((o) => o.value === answer) ?? other.find((o) => o.value === answer);
   if (!option) return [400, { error: `The answer must be one of: ${[...d.options, ...other].map((o) => o.label).join(', ') || 'none, this item is only shown'}` }];
-  answered(appendAnswer(file, d, option, note.trim(), unsent(d)), d);
+  const save = () => {
+    const a = appendAnswer(file, d, option, note.trim(), unsent(d));
+    if (a && d.ticket && plainAsk(d)) releaseTicketHold(file, d.ticket);
+    return a;
+  };
+  answered(d.ticket && plainAsk(d) ? await locked(`${file}.lock`, save) : save(), d);
   return [200, state()];
 }
 

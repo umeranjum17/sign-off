@@ -63,6 +63,37 @@ test('the ticket API lists every ticket with its roll-up and reads one with its 
   assert.equal((await fetch(`http://127.0.0.1:${port}/api/tickets`, { method: 'POST', body: '{}' })).status, 404);
 });
 
+test('ticket lifecycle activity and hold release use effective progress', async () => {
+  axi('ticket', board, '--id', 'E-2', '--title', 'Release epic', '--hold', 'yes', '--state', 'on hold');
+  axi('ticket', board, '--id', 'T-3', '--title', 'Release child', '--progress', '40', '--parent', 'E-2');
+  const comment = JSON.stringify({ id: 'release-reply', at: 1792820000, text: 'Which date?', picked: 1792820100, replies: [{ at: 1792820200, text: 'Friday' }] });
+  axi('ticket', board, '--id', 'E-2', '--comment', comment);
+  const released = JSON.parse(axi('ticket', board, '--id', 'E-2', '--json')).ticket;
+  assert.deepEqual([released.hold, released.state], [false, 'in progress']);
+
+  axi('ticket', board, '--id', 'T-6', '--title', 'Reply to the release note', '--hold', 'yes');
+  const replayComment = { id: 'reply-once', at: 1792820000, text: 'Which date?', replies: [] };
+  axi('ticket', board, '--id', 'T-6', '--comment', JSON.stringify({ ...replayComment, picked: 1792820100 }));
+  const reply = { at: 1792820200, text: 'Friday' };
+  axi('ticket', board, '--id', 'T-6', '--comment', JSON.stringify({ ...replayComment, picked: 1792820300, replies: [reply] }));
+  assert.equal(JSON.parse(axi('ticket', board, '--id', 'T-6', '--json')).ticket.hold, false);
+  axi('ticket', board, '--id', 'T-6', '--hold', 'yes');
+  axi('ticket', board, '--id', 'T-6', '--comment', JSON.stringify({ ...replayComment, picked: 1792820400, replies: [reply] }));
+  assert.equal(JSON.parse(axi('ticket', board, '--id', 'T-6', '--json')).ticket.hold, true);
+
+  axi('ticket', board, '--id', 'T-4', '--title', 'State completion');
+  axi('ticket', board, '--id', 'T-4', '--state', 'done');
+  axi('ticket', board, '--id', 'T-5', '--title', 'State transition', '--state', 'queued');
+  axi('ticket', board, '--id', 'T-5', '--state', 'in progress');
+  const port = await serve(), response = await fetch(`http://127.0.0.1:${port}/api/state?view=tickets`);
+  const state = await response.json(), events = state.ticketActivity.filter((event) => event.ticket === 'T-4');
+  assert.equal(state.ticketActivity.filter((event) => event.ticket === 'T-6' && event.kind === 'release').length, 1);
+  assert.ok(events.some((event) => event.kind === 'state' && event.text === 'State changed to done'));
+  assert.ok(!events.some((event) => event.kind === 'merged'));
+  const moving = state.ticketActivity.filter((event) => event.ticket === 'T-5' && event.kind === 'state');
+  assert.deepEqual(moving.map((event) => event.text), ['State changed to in progress']);
+});
+
 // Beyond loopback the board needs its token on every route; the board refuses to bind all interfaces, so this uses the machine's private address.
 const mine = Object.values(networkInterfaces()).flat().find((i) => i.family === 'IPv4' && !i.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.)/.test(i.address));
 test('the ticket API needs the access token beyond loopback, like the rest of the board', { skip: !mine && 'this machine has no private IPv4 address' }, async () => {

@@ -73,7 +73,7 @@ A board that fills up with noise stops being read, so the rules sit at the door.
 
 ### One ticket ties a task's cards together
 
-A ticket is one piece of work, with a title and how far along it is, and optionally its priority, its project, its release, its state and its pull requests. Tickets nest as **epics > tickets > tasks**, and each is as far along as the average of what is under it (a roll-up from the tasks up). The **Tickets** tab shows your asks (and the system's own work) done, in progress, on hold and to do; a ticket's page shows its release, its state, each linked pull request and every card on it. Post any card with `--ticket <id>` (an ask, a design, proof, a report or a plan) and its screen shows a **Ticket** row (on an ask, **Its ask** in the panel under the question) with the ticket's title and progress; tap it for the ticket, which lists the tickets under it and every card on it, newest first, with their Activity. It is optional and only a link: a card without one, or naming a ticket the board has not got, works exactly as before.
+A ticket is one piece of work, with a title and how far along it is, and optionally its priority, its project, its release, its state and its pull requests. Tickets nest as **epics > tickets > tasks**, and each is as far along as the average of what is under it (a roll-up from the tasks up). The **Tickets** tab shows your asks (and the system's own work) done, in progress, on hold and to do, with newest-first Activity above the lists on a phone (collapsed by default) and from the Activity control in the desktop header (an overlay that preserves the three-column board); a ticket's page shows its release, its state, each linked pull request and every card on it. Post any card with `--ticket <id>` (an ask, a design, proof, a report or a plan) and its screen shows a **Ticket** row (on an ask, **Its ask** in the panel under the question) with the ticket's title and progress; tap it for the ticket, which lists the tickets under it and every card on it, newest first, with their Activity. It is optional and only a link: a card without one, or naming a ticket the board has not got, works exactly as before. See [file-formats.md](file-formats.md#tickets) for the Activity feed and hold-release details.
 
 ```sh
 sign-off-axi ticket --id E-1 --title "Settings, start to finish" --release 0.6.5
@@ -94,7 +94,7 @@ sign-off-axi project --name Beacon --icon icons/beacon.png
 
 Agents pass `--priority` when they know it, and set their project's icon when it ships one; the shipped skill tells them so.
 
-Every card's screen also keeps its **Activity**, oldest first, from what the board already saved: who posted it, your answer and note (and the one a change replaced), when the agent picked it up, a new round you asked for and your comments. A ticket's page shows its cards' activity together.
+Every card's screen also keeps its **Activity**, oldest first, from what the board already saved: who posted it, your answer and note (and the one a change replaced), when the agent picked it up, a new round you asked for and your comments. A ticket's Activity combines its lifecycle events with its cards' updates; see [file-formats.md](file-formats.md#tickets) for the details.
 
 ### The leash: what agents may do without you
 

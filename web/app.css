@@ -2011,4 +2011,13 @@
     .tk-desk .tk-in .ui-row { height: auto; min-height: 4.25rem; padding: 0.75rem 0; }
     .tk-desk .tk-empty { width: 25rem; margin: 0; }
   }
+  .tk-activity-dialog { width: min(42rem, calc(100vw - 2rem)); max-height: min(42rem, calc(100dvh - 2rem)); border: 0; }
+  .tk-activity-dialog::backdrop { background: var(--tk-scrim); }
+  .tk-activity-open { white-space: nowrap; }
+  @media (max-width: 63.999rem) {
+    .tk-activity > summary { min-height: 2.5rem; list-style: none; cursor: pointer; }
+    .tk-activity > summary::-webkit-details-marker { display: none; }
+    .tk-activity[open] { max-height: 20rem; overflow: hidden; }
+    .tk-activity[open] .ui-act { max-height: 16rem; overflow: auto; overscroll-behavior: contain; }
+  }
   @media (prefers-reduced-motion: reduce) { .tk-over.up .tk-sheet, .tk-over.up .tk-scrim { animation: none; } }
