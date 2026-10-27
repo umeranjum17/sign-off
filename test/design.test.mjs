@@ -4518,6 +4518,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
   // A ticket may carry a priority, a project, whether it is on hold and whether the user asked for it; an empty value takes one off, and a bad one is refused.
   assert.equal(run('ticket', file, '--id', 'T-9', '--priority', 'P1', '--project', 'Settings', '--asked', 'yes').code, 0);
   assert.equal(run('ticket', file, '--id', 'T-31', '--title', 'Write the release notes', '--priority', 'P2', '--hold', 'yes', '--stage', 'building', '--last-event-at', String(Math.floor(Date.now() / 1000) - 18 * 3600)).code, 0);
+  assert.equal(run('ticket', file, '--id', 'T-32', '--title', 'Choose the rollout date', '--progress', '25', '--state', 'on hold', '--asked', 'yes').code, 0);
   assert.equal(run('ticket', file, '--id', 'T-31', '--priority', '').code, 0);
   // Sync fields round-trip through the public CLI, preserve old flags and clear independently.
   const getTicket = () => JSON.parse(run('ticket', file, '--id', 'T-29', '--json').out).ticket;
@@ -4561,6 +4562,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
   const report = JSON.parse(readFileSync(join(fx, 'report.v4/valid-minimal.json'), 'utf8'));
   const posts = [
     ['raise', file, '--ticket', 'T-29', '--key', 'ask-linked', '--title', 'Ship the settings page on Friday?', '--filer', session],
+    ['raise', file, '--ticket', 'T-32', '--key', 'ask-hold-release', '--title', 'Can the rollout proceed now?'],
     ['raise', file, '--key', 'ask-plain', '--title', 'Keep the old settings link for a week?'],
     ['raise', file, '--ticket', 'T-404', '--key', 'ask-unknown', '--title', 'Move the theme switch to the top?'],
     ['post', file, '--type', 'evidence', '--ticket', 'T-29', '--title', 'Settings on a phone', '--about', 'Umer changes the theme in one tap.', '--media', join(dir, 'shot.png')],
@@ -4573,7 +4575,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
   ];
   for (const args of posts) assert.equal(run(...args).code, 0, args.join(' '));
   const stored = Object.fromEntries(JSON.parse(readFileSync(file, 'utf8')).items.map((i) => [i.key, i.ticket]));
-  assert.deepEqual(stored, { 'ask-linked': 'T-29', 'ask-plain': undefined, 'ask-unknown': 'T-404', 'update-1': 'T-29', 'chat-journeys': 'T-29', 'digest-ran': 'T-29', 'faster-sign-in': 'T-29', 'from-linked': 'T-29', npm: 'T-29' });
+  assert.deepEqual(stored, { 'ask-linked': 'T-29', 'ask-hold-release': 'T-32', 'ask-plain': undefined, 'ask-unknown': 'T-404', 'update-1': 'T-29', 'chat-journeys': 'T-29', 'digest-ran': 'T-29', 'faster-sign-in': 'T-29', 'from-linked': 'T-29', npm: 'T-29' });
   // A bad id, a message naming another ticket than --ticket, and a --replace feed with --ticket are refused, and nothing is written.
   const before = readFileSync(file, 'utf8');
   for (const args of [['raise', file, '--ticket', 'T 29', '--key', 'bad-ticket', '--title', 'Ship the settings help page now?'],
@@ -4589,6 +4591,13 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const askReleaseBefore = Math.floor(Date.now() / 1000);
+  assert.equal((await post(url, 'api/answers', { key: 'ask-hold-release', answer: 'yes' })).status, 200);
+  const askReleased = JSON.parse(run('ticket', file, '--id', 'T-32', '--json').out).ticket;
+  assert.deepEqual([askReleased.hold, askReleased.state], [false, 'in progress']);
+  assert.ok(askReleased.last_event_at >= askReleaseBefore && askReleased.last_event_at <= Math.floor(Date.now() / 1000), JSON.stringify(askReleased));
+  const askActivity = await (await fetch(`${url}api/state?view=tickets`)).json();
+  assert.ok(Array.isArray(askActivity.ticketActivity) && askActivity.ticketActivity.some((e) => e.ticket === 'T-32' && e.kind === 'release' && e.text === 'Hold released'), JSON.stringify(askActivity));
   const { evaluate, close } = await browse(dir, 390, 844, true);
   try {
     // Each linked card's screen shows one Ticket row of its panel (on an ask, Its ask), the ticket's title and progress, opening its page; a card with no ticket, or one not on the board, shows none.
@@ -4648,7 +4657,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     await evaluate(`location.href = ${JSON.stringify(`${url}#tickets`)}`);
     await until(() => evaluate('!!document.querySelector(".tk-hero")'));
     assert.equal(await evaluate('!!document.querySelector("main .tk-row .ui-icon img")?.naturalWidth && !document.querySelector("main .tk-row .mono")'), true);
-    assert.deepEqual(JSON.parse(await evaluate(tab)), { seg: ['Your asks1 on', 'System1'], hero: 'Your asks done 0 of 1 1 moving', lists: ['In progress #ticket/T-9'] });
+    assert.deepEqual(JSON.parse(await evaluate(tab)), { seg: ['Your asks2 on', 'System1'], hero: 'Your asks done 0 of 2 2 moving', lists: ['In progress #ticket/T-9,#ticket/T-32'] });
     await evaluate('document.querySelector(".tk-seg button:last-child").click()');
     await until(async () => JSON.parse(await evaluate(tab)).lists.join() === 'On hold #ticket/T-31');
     assert.equal(run('ticket', file, '--id', 'new-arrival', '--title', 'A newly synced ticket').code, 0);
@@ -4665,6 +4674,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     const releaseCheck = await evaluate(inspectRelease);
     const released = releaseCheck;
     assert.equal(released.ticket.hold, false, JSON.stringify(releaseCheck));
+    assert.equal(released.ticket.state, 'queued', JSON.stringify(releaseCheck));
     assert.equal(released.client.hold, false, JSON.stringify(releaseCheck));
     assert.ok(released.rows.includes('To do #ticket/T-31'), JSON.stringify(releaseCheck));
     assert.ok(!released.rows.includes('On hold #ticket/T-31'), JSON.stringify(releaseCheck));
