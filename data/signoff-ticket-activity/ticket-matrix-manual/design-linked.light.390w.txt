@@ -1,5 +1,0 @@
-design-linked light 390w #designs/settings-screens
-title: Approve the settings page screens?
-no Activity thread
-Ticket row: "Ticket Ship the new settings page 60%" -> #ticket/T-29, 326x76px, 32px from the left and 32px from the right
-horizontal overflow 0

@@ -1,5 +1,0 @@
-ask-linked light 1280w #decide/settings-friday
-title: Ship the settings page on Friday?
-no Activity thread
-Ticket row: "Its ask Ship the new settings page 60%" -> #ticket/T-29, 576x76px, 640px from the left and 64px from the right
-horizontal overflow 0

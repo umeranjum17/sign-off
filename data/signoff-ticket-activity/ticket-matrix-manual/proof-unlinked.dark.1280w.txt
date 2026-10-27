@@ -1,5 +1,0 @@
-proof-unlinked dark 1280w #evidence/update-2
-title: Umer sees the whole screen without scrolling sideways.
-no Activity thread
-no Ticket row
-horizontal overflow 0

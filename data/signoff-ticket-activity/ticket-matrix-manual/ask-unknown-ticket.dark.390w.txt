@@ -1,5 +1,0 @@
-ask-unknown-ticket dark 390w #decide/settings-copy
-title: Keep the old settings link for a week?
-no Activity thread
-no Ticket row
-horizontal overflow 0

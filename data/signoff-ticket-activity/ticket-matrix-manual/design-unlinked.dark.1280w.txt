@@ -1,5 +1,0 @@
-design-unlinked dark 1280w #designs/chat-journeys
-title: Designs
-no Activity thread
-no Ticket row
-horizontal overflow 0

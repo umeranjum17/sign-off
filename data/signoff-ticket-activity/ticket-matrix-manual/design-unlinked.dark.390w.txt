@@ -1,5 +1,0 @@
-design-unlinked dark 390w #designs/chat-journeys
-title: Approve the chat app journeys?
-no Activity thread
-no Ticket row
-horizontal overflow 0

@@ -1,5 +1,0 @@
-report-linked dark 1280w #reports/settings-saves
-title: How the settings page saves
-no Activity thread
-Ticket row: "Ticket Ship the new settings page 60%" -> #ticket/T-29, 592x76px, 288px from the left and 400px from the right
-horizontal overflow 0

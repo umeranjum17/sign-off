@@ -1,5 +1,0 @@
-plan-linked dark 1280w #waiting/faster-sign-in
-title: Cut sign-in from 4.5 to 2.8 minutes
-no Activity thread
-Ticket row: "Ticket Ship the new settings page 60%" -> #ticket/T-29, 688x76px, 456px from the left and 136px from the right
-horizontal overflow 0

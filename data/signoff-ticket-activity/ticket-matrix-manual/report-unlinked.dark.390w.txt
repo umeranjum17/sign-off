@@ -1,5 +1,0 @@
-report-unlinked dark 390w #reports/digest-ran
-title: The weekly digest ran
-no Activity thread
-no Ticket row
-horizontal overflow 0

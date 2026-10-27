@@ -1,5 +1,0 @@
-plan-unlinked dark 390w #waiting/plan-kind-board
-title: Show plans on the board
-no Activity thread
-no Ticket row
-horizontal overflow 0
