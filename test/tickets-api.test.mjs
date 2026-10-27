@@ -73,10 +73,14 @@ test('ticket lifecycle activity and hold release use effective progress', async 
 
   axi('ticket', board, '--id', 'T-4', '--title', 'State completion');
   axi('ticket', board, '--id', 'T-4', '--state', 'done');
+  axi('ticket', board, '--id', 'T-5', '--title', 'State transition', '--state', 'queued');
+  axi('ticket', board, '--id', 'T-5', '--state', 'in progress');
   const port = await serve(), response = await fetch(`http://127.0.0.1:${port}/api/state?view=tickets`);
   const state = await response.json(), events = state.ticketActivity.filter((event) => event.ticket === 'T-4');
   assert.ok(events.some((event) => event.kind === 'state' && event.text === 'State changed to done'));
   assert.ok(!events.some((event) => event.kind === 'merged'));
+  const moving = state.ticketActivity.filter((event) => event.ticket === 'T-5' && event.kind === 'state');
+  assert.deepEqual(moving.map((event) => event.text), ['State changed to in progress']);
 });
 
 // Beyond loopback the board needs its token on every route; the board refuses to bind all interfaces, so this uses the machine's private address.
