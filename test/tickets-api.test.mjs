@@ -71,12 +71,23 @@ test('ticket lifecycle activity and hold release use effective progress', async 
   const released = JSON.parse(axi('ticket', board, '--id', 'E-2', '--json')).ticket;
   assert.deepEqual([released.hold, released.state], [false, 'in progress']);
 
+  axi('ticket', board, '--id', 'T-6', '--title', 'Reply to the release note', '--hold', 'yes');
+  const replayComment = { id: 'reply-once', at: 1792820000, text: 'Which date?', replies: [] };
+  axi('ticket', board, '--id', 'T-6', '--comment', JSON.stringify({ ...replayComment, picked: 1792820100 }));
+  const reply = { at: 1792820200, text: 'Friday' };
+  axi('ticket', board, '--id', 'T-6', '--comment', JSON.stringify({ ...replayComment, picked: 1792820300, replies: [reply] }));
+  assert.equal(JSON.parse(axi('ticket', board, '--id', 'T-6', '--json')).ticket.hold, false);
+  axi('ticket', board, '--id', 'T-6', '--hold', 'yes');
+  axi('ticket', board, '--id', 'T-6', '--comment', JSON.stringify({ ...replayComment, picked: 1792820400, replies: [reply] }));
+  assert.equal(JSON.parse(axi('ticket', board, '--id', 'T-6', '--json')).ticket.hold, true);
+
   axi('ticket', board, '--id', 'T-4', '--title', 'State completion');
   axi('ticket', board, '--id', 'T-4', '--state', 'done');
   axi('ticket', board, '--id', 'T-5', '--title', 'State transition', '--state', 'queued');
   axi('ticket', board, '--id', 'T-5', '--state', 'in progress');
   const port = await serve(), response = await fetch(`http://127.0.0.1:${port}/api/state?view=tickets`);
   const state = await response.json(), events = state.ticketActivity.filter((event) => event.ticket === 'T-4');
+  assert.equal(state.ticketActivity.filter((event) => event.ticket === 'T-6' && event.kind === 'release').length, 1);
   assert.ok(events.some((event) => event.kind === 'state' && event.text === 'State changed to done'));
   assert.ok(!events.some((event) => event.kind === 'merged'));
   const moving = state.ticketActivity.filter((event) => event.ticket === 'T-5' && event.kind === 'state');
