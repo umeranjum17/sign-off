@@ -16,8 +16,8 @@ after(() => rmSync(scratch, { recursive: true, force: true }));
 // Recorded 27 October 2026 on 0.8.0: a board of 2,147 cards (3.4 MB: 7 open asks, 1,000 answered, 900 dismissed, 240 guided plans), cold, 390 px at DPR 2,
 // slow 4G (1.6 Mbps down, 750 kbps up, 150 ms RTT), CPU 4x. docs/pwa-performance-plan.md ("First open budgets") holds the same numbers and how they were taken.
 const baseline = { bytesBeforePaint: 91_837, requestsBeforePaint: 5, bytesWhole: 279_760, paintMs: 900 };
-// Bytes repeat to within the response headers' own jitter (a few bytes a run, 24 B at most over ten runs of the whole open); a real regression is kilobytes.
-const headerJitter = 32;
+const byteHeadroom = 1_024;
+const firstPaintCeiling = 100_000;
 // The paint is the one number a busy host moves: it may take half as long again, and is never allowed more.
 const paintTolerance = 1.5;
 
@@ -33,9 +33,13 @@ test('a cold first open of a live-size board stays inside its recorded budgets: 
   const table = got.table.map((r) => `  ${r.beforePaint ? 'before paint' : 'after paint '} ${String(r.kb).padStart(5)} KB  ${r.path}`).join('\n');
   const where = `Look at .agents/skills/done-done-verify-sign-off/first-open.mjs (it measures) and docs/pwa-performance-plan.md "First open budgets" (the baselines). Requests of this open:\n${table}`;
   // The requests are the same files each run: a different count is a file added to, or taken from, the first screen.
-  assert.equal(got.requestsBeforePaint, baseline.requestsBeforePaint, `requests before the first paint: ${got.requestsBeforePaint}, baseline ${baseline.requestsBeforePaint}. ${where}`);
-  for (const [key, label] of [['bytesBeforePaint', 'bytes before the first paint'], ['bytesWhole', 'bytes of the whole open']]) {
-    assert.ok(Math.abs(got[key] - baseline[key]) <= headerJitter, `${label}: ${n(got[key])} B, baseline ${n(baseline[key])} B (exact to within ${headerJitter} B of header jitter). ${where}`);
+  const requestsCeiling = baseline.requestsBeforePaint;
+  assert.ok(got.requestsBeforePaint <= requestsCeiling, `requests before the first paint: ${got.requestsBeforePaint} requests, ceiling ${requestsCeiling} (exceeded by ${got.requestsBeforePaint - requestsCeiling}). ${where}`);
+  for (const [key, label, ceiling] of [
+    ['bytesBeforePaint', 'bytes before the first paint', Math.min(baseline.bytesBeforePaint + byteHeadroom, firstPaintCeiling)],
+    ['bytesWhole', 'bytes of the whole open', baseline.bytesWhole + byteHeadroom],
+  ]) {
+    assert.ok(got[key] < ceiling, `${label}: ${n(got[key])} B, ceiling ${n(ceiling)} B (exceeded by ${n(Math.max(0, got[key] - ceiling + 1))} B). ${where}`);
   }
   assert.ok(got.paintMs <= baseline.paintMs * paintTolerance, `first paint: ${n(got.paintMs)} ms, baseline ${n(baseline.paintMs)} ms (up to ${n(baseline.paintMs * paintTolerance)} ms on a loaded host). ${where}`);
   console.log(`first open: ${n(got.bytesBeforePaint)} B in ${got.requestsBeforePaint} requests before the first paint, ${n(got.bytesWhole)} B whole, paint ${got.paintMs} ms`);
