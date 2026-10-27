@@ -1325,9 +1325,9 @@ function ticket(args: string[]) {
 }
 
 function releaseTicketHold(file: string, id: string) {
-  const ticket = readTickets(file, warn).find((t) => t.id === id);
+  const tickets = readTickets(file, warn), ticket = tickets.find((t) => t.id === id);
   if (ticket && (ticket.hold || ticket.state === 'on hold')) appendTicket(file, { ...ticket, hold: false,
-    state: ticket.progress ? 'in progress' : 'queued', last_event_at: Math.floor(Date.now() / 1000) });
+    state: (rollUp(tickets).find((t) => t.id === id)?.progress ?? ticket.progress) ? 'in progress' : 'queued', last_event_at: Math.floor(Date.now() / 1000) });
 }
 /** ticket --id <id> --comment '<json>': the fleet dashboard hands over a comment the person made on a ticket, in its own thread record, again each time it moves
  * (picked up, answered), so the board shows how far it got and a reply lands in Today. */
