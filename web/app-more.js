@@ -299,9 +299,13 @@
     return el('details', { class: 'ui-card tk-card tk-activity', 'aria-label': 'Activity', ...(document.querySelector('.tk-activity')?.open && { open: true }) }, el('summary', { class: 'tk-ch' }, 'Activity'),
       el('ol', { class: 'ui-props ui-act' }, ...ticketActivityRows(events)));
   }
-  function ticketActivityRows(events) {
-    return events.map((e) => el('li', { class: 'ui-pr' },
-      el('span', { class: 'aw' }, el('b', {}, e.text, ' · ', el('a', { href: `#ticket/${e.ticket}` }, e.title)), el('time', { datetime: e.at }, stamp(e.at)))));
+  function ticketActivityRows(events, onTicketNavigate) {
+    return events.map((e) => {
+      const link = el('a', { href: `#ticket/${e.ticket}` }, e.title);
+      if (onTicketNavigate) link.onclick = onTicketNavigate;
+      return el('li', { class: 'ui-pr' },
+        el('span', { class: 'aw' }, el('b', {}, e.text, ' · ', link), el('time', { datetime: e.at }, stamp(e.at))));
+    });
   }
   function ticketActivityButton() {
     if (!(state.ticketActivity ?? []).length) return '';
@@ -309,8 +313,9 @@
     button.onclick = () => {
       const title = el('h2', { id: 'tk-activity-title', tabindex: '-1' }, 'Board Activity');
       const close = el('button', { type: 'button', class: 'x', 'aria-label': 'Close board Activity' }, '×');
-      const dialog = el('dialog', { class: 'tk-activity-dialog', 'aria-labelledby': title.id }, el('header', {}, title, close),
-        el('ol', { class: 'ui-props ui-act' }, ...ticketActivityRows(state.ticketActivity ?? [])));
+      let dialog;
+      dialog = el('dialog', { class: 'tk-activity-dialog', 'aria-labelledby': title.id }, el('header', {}, title, close),
+        el('ol', { class: 'ui-props ui-act' }, ...ticketActivityRows(state.ticketActivity ?? [], () => dialog.close())));
       close.onclick = () => dialog.close();
       dialog.onclose = () => { dialog.remove(); document.querySelector('.tk-activity-open')?.focus({ preventScroll: true }); };
       document.body.append(dialog); dialog.showModal(); title.focus({ preventScroll: true });

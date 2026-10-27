@@ -4705,6 +4705,13 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
       return [...document.querySelectorAll('.ui-act li')].filter((li) => li.querySelector('.on')).map((li) => [li.querySelector('b').textContent, li.querySelector('.th-n')?.textContent, li.querySelector('.on').textContent].filter(Boolean).join(' ')).join(' | '); })()`;
     assert.equal(await evaluate(tkThread), [...steps].reverse().map((x) => `${x} Ship the settings page on Friday?`).join(' | '));
     assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
+    await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+    await evaluate(`location.hash = '#tickets'`);
+    await until(() => evaluate('!!document.querySelector(".tk-activity-open")'));
+    await evaluate('document.querySelector(".tk-activity-open").click()');
+    await until(() => evaluate('!!document.querySelector(".tk-activity-dialog[open] a[href^=\"#ticket/\"]")'));
+    await evaluate('document.querySelector(".tk-activity-dialog[open] a[href^=\"#ticket/\"]").click()');
+    await until(() => evaluate('location.hash.startsWith("#ticket/") && !!document.querySelector(".tk-sheet") && !document.querySelector(".tk-activity-dialog")'));
   } finally { close(); }
   proc.kill();
 });
