@@ -4683,6 +4683,14 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     assert.ok(!released.rows.includes('On hold #ticket/T-31'), JSON.stringify(releaseCheck));
     await until(() => evaluate('document.querySelector(".tk-activity").open && document.querySelector(".tk-activity").innerText.includes("Hold released")'));
     assert.match(await evaluate('document.querySelector(".tk-activity").innerText'), /Hold released/);
+    for (let i = 0; i < 51; i++) assert.equal(run('ticket', file, '--id', `feed-cap-${i}`, '--title', `Feed cap ${i}`).code, 0);
+    await evaluate('refresh()');
+    await until(() => evaluate('document.querySelectorAll(".tk-activity .ui-act li").length === 50'));
+    await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+    await evaluate('document.querySelector(".tk-activity-open").click()');
+    await until(() => evaluate('document.querySelectorAll(".tk-activity-dialog .ui-act li").length === 50'));
+    await evaluate('document.querySelector(".tk-activity-dialog .x").click()');
+    await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
     await evaluate(`location.href = ${JSON.stringify(`${url}#ticket/T-31`)}`);
     await until(() => evaluate('!!document.querySelector(".tk-sheet") && !document.querySelector(".tk-sheet .tk-stuck")'));
     assert.equal(await evaluate('document.querySelector(".tk-sheet .tk-shd").innerText.includes("On hold")'), false);

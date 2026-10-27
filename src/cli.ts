@@ -2844,6 +2844,7 @@ function viewOf(url: string): View | undefined {
 /** The kept read as one view of it: built once per view and unchanged board, so a phone's first screen costs one page of one board. The
  * body keeps the state's own shape, so a page of it is read by the same client as the whole board; the parts a first screen does not show
  * (the ticket roll-up and the activity) come with the page that asks for them. */
+const TICKET_ACTIVITY_LIMIT = 200;
 function viewRead(read: NonNullable<typeof built>, view: View) {
   const id = `${view.name}:${view.offset}:${view.limit}:${view.key}`, kept = read.views.get(id);
   if (kept) return kept;
@@ -2875,7 +2876,7 @@ function viewRead(read: NonNullable<typeof built>, view: View) {
       decisions: [], page: { view: 'lists', offset: 0, limit: 0, total: 0 } };
   } else if (view.name === 'tickets') {
     // The Tickets screen's own read: its roll-up is the largest part of the board and no other screen shows it.
-    body = { ...s, decisions: [], counts, tickets: s.tickets ?? [], ticketActivity: readTicketActivity(file), trail: [], rounds: [], messages: [], annotations: [], comments: [],
+    body = { ...s, decisions: [], counts, tickets: s.tickets ?? [], ticketActivity: readTicketActivity(file).slice(0, TICKET_ACTIVITY_LIMIT), trail: [], rounds: [], messages: [], annotations: [], comments: [],
       page: { view: 'tickets', offset: 0, limit: (s.tickets ?? []).length, total: (s.tickets ?? []).length } };
   } else {
     const all = view.name === 'asks' ? items.filter(open) : items, page = all.slice(view.offset, view.offset + view.limit);
