@@ -61,7 +61,7 @@
     // The whole board (an answer's own reply, or an older client reading it whole) is the board: it replaces what the parts had gathered.
     if (!body.page) return void ((state = body), (wholeBoard = true));
     // Everything a part says about the board itself is the board's: its address, its counts, who may answer it, its ticket roll-up outside the rows.
-    const { decisions = [], tickets: rolled = [], ticketActivity, trail = [], rounds = [], messages = [], annotations = [], comments = [], page = state.page, ...board } = body;
+    const { decisions = [], tickets: rolled = [], trail = [], rounds = [], messages = [], annotations = [], comments = [], page = state.page, ...board } = body;
     const rows = new Map(state.decisions.map((d) => [d.key, d]));
     if (body.card) rows.set(body.card.key, { ...body.card, whole: true });
     // A page brings each row as the board has it now, a card already open included: its card is read again under the same key when the address names it.
@@ -79,7 +79,7 @@
     const full = page.view === 'lists';
     const kept = (name, of = (k) => k) => ({ ...Object.fromEntries(Object.entries(state[name] ?? {}).filter(([k]) => !mine.has(of(k)))), ...body[name] });
     const listed = (name) => (full ? body[name] : [...(state[name] ?? []).filter((x) => !mine.has(x?.key ?? x)), ...(body[name] ?? [])]);
-    state = { ...state, ...board, ...(page.view === 'tickets' && { ticketActivity }), decisions: [...rows.values()], page,
+    state = { ...state, ...board, decisions: [...rows.values()], page,
       tickets: page.view === 'tickets' ? rolled : roll.size ? [...roll.values()] : state.tickets,
       ...Object.fromEntries(['trail', 'rounds', 'messages', 'annotations', 'comments'].map((name) => [name, joined(name)])),
       // A part that says nothing of a list leaves it alone: a card brings its own answer and nobody else's, and a list it never mentions stays as it was.

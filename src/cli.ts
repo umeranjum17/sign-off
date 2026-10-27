@@ -2788,7 +2788,6 @@ const state = () => {
     discarded: Object.fromEntries(readDiscards(file).filter((x) => x.last).map(({ key, reason, at }) => [key, { reason, at }])),
     promoted: readPromoted(file, warn),
     tickets: rollUp(readTickets(file, warn)),
-    ticketActivity: readTicketActivity(file),
     projects: readProjects(file, warn),
   };
 };
@@ -2876,7 +2875,7 @@ function viewRead(read: NonNullable<typeof built>, view: View) {
       decisions: [], page: { view: 'lists', offset: 0, limit: 0, total: 0 } };
   } else if (view.name === 'tickets') {
     // The Tickets screen's own read: its roll-up is the largest part of the board and no other screen shows it.
-    body = { ...s, decisions: [], counts, tickets: s.tickets ?? [], ticketActivity: s.ticketActivity ?? [], trail: [], rounds: [], messages: [], annotations: [], comments: [],
+    body = { ...s, decisions: [], counts, tickets: s.tickets ?? [], ticketActivity: readTicketActivity(file), trail: [], rounds: [], messages: [], annotations: [], comments: [],
       page: { view: 'tickets', offset: 0, limit: (s.tickets ?? []).length, total: (s.tickets ?? []).length } };
   } else {
     const all = view.name === 'asks' ? items.filter(open) : items, page = all.slice(view.offset, view.offset + view.limit);
@@ -2895,7 +2894,7 @@ function viewRead(read: NonNullable<typeof built>, view: View) {
     const deeper = ofRows(s.deeper), askIds = new Set(deeper.map((a) => a.id));
     body = { ...s, decisions: page.map(rowOf), counts, more: view.offset + view.limit < all.length,
       page: { view: view.name, offset: view.offset, limit: view.limit, total: all.length },
-      tickets: ((s.tickets ?? []) as any[]).filter((t) => linked.has(t.id)), ticketActivity: [],
+      tickets: ((s.tickets ?? []) as any[]).filter((t) => linked.has(t.id)),
       answers: byKey(answers), seen: ofKeys(s.seen), seen_at: byKey(s.seen_at), opened: byKey(s.opened), signin_opened: byKey(s.signin_opened),
       reads: Object.fromEntries(Object.entries((s.reads ?? {}) as Record<string, string>).filter(([k]) => shown.has(k.split('/')[0]))),
       discarded: byKey(s.discarded), dismissed: ofKeys(s.dismissed), promoted: ofKeys(s.promoted), deeper,

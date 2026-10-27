@@ -2011,14 +2011,10 @@
     .tk-desk .tk-in .ui-row { height: auto; min-height: 4.25rem; padding: 0.75rem 0; }
     .tk-desk .tk-empty { width: 25rem; margin: 0; }
   }
-  .tk-activity-dialog { width: min(42rem, calc(100vw - 2rem)); max-height: min(42rem, calc(100dvh - 2rem)); padding: 1.25rem 1.5rem; overflow: auto; border: 0; border-radius: 1rem; background: var(--tk-card); color: var(--tk-text); box-shadow: var(--tk-elev-sheet); }
+  .tk-activity-dialog { width: min(42rem, calc(100vw - 2rem)); max-height: min(42rem, calc(100dvh - 2rem)); border: 0; }
   .tk-activity-dialog::backdrop { background: var(--tk-scrim); }
-  .tk-activity-dialog > header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-  .tk-activity-dialog h2 { margin: 0; color: var(--tk-ink); font-size: var(--tk-fs-head); font-weight: 500; }
-  .tk-activity-dialog .ui-act { max-height: 32rem; overflow: auto; }
   .tk-activity-open { white-space: nowrap; }
   @media (max-width: 63.999rem) {
-    .tk-activity-open { display: none; }
     .tk-activity > summary { min-height: 2.5rem; list-style: none; cursor: pointer; }
     .tk-activity > summary::-webkit-details-marker { display: none; }
     .tk-activity[open] { max-height: 20rem; overflow: hidden; }
