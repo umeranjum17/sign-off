@@ -315,7 +315,9 @@
       const close = el('button', { type: 'button', class: 'x', 'aria-label': 'Close board Activity' }, '×');
       let dialog;
       dialog = el('dialog', { class: 'tk-activity-dialog', 'aria-labelledby': title.id }, el('header', {}, title, close),
-        el('ol', { class: 'ui-props ui-act' }, ...ticketActivityRows(state.ticketActivity ?? [], () => dialog.close())));
+        el('ol', { class: 'ui-props ui-act' }, ...ticketActivityRows(state.ticketActivity ?? [], (event) => {
+          if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) dialog.close();
+        })));
       close.onclick = () => dialog.close();
       dialog.onclose = () => { dialog.remove(); document.querySelector('.tk-activity-open')?.focus({ preventScroll: true }); };
       document.body.append(dialog); dialog.showModal(); title.focus({ preventScroll: true });

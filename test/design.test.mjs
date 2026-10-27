@@ -4710,6 +4710,11 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     await until(() => evaluate('!!document.querySelector(".tk-activity-open")'));
     await evaluate('document.querySelector(".tk-activity-open").click()');
     await until(() => evaluate('!!document.querySelector(".tk-activity-dialog[open] a[href^=\"#ticket/\"]")'));
+    assert.equal(await evaluate(`(() => { const link = document.querySelector('.tk-activity-dialog[open] a[href^="#ticket/"]');
+      for (const key of ['ctrlKey', 'metaKey', 'shiftKey', 'altKey']) { const event = new MouseEvent('click', { bubbles: true, cancelable: true, [key]: true });
+        link.addEventListener('click', (e) => e.preventDefault(), { once: true }); link.dispatchEvent(event);
+        if (!document.querySelector('.tk-activity-dialog[open]')) return false; }
+      return true; })()`), true);
     await evaluate('document.querySelector(".tk-activity-dialog[open] a[href^=\"#ticket/\"]").click()');
     await until(() => evaluate('location.hash.startsWith("#ticket/") && !!document.querySelector(".tk-sheet") && !document.querySelector(".tk-activity-dialog")'));
   } finally { close(); }
