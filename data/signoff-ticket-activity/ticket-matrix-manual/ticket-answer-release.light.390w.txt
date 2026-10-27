@@ -1,0 +1,18 @@
+ticket-answer-release light 390w #ticket/T-32
+title: Choose the rollout date
+Activity, newest first:
+  Hold released
+  State changed to queued
+  When should the rollout ship? Your answer: No
+  Ticket created
+no Ticket row
+kicker: To do
+progress: Progress Not started
+Linked:
+  When should the rollout ship? Ask · Answered: No · 15:57 Sent
+Activity:
+  Hold released Today, 15:57
+  State changed to queued Today, 15:57
+  Your answer: No Today, 15:57 “Not this week.” When should the rollout ship?
+  Ticket created Today, 15:57
+horizontal overflow 0

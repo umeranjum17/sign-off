@@ -1,0 +1,5 @@
+ask-unlinked light 1280w #decide/ship
+title: When should the new settings page ship?
+no Activity thread
+no Ticket row
+horizontal overflow 0
