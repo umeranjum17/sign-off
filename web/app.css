@@ -2016,6 +2016,7 @@
   .tk-activity-dialog > header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
   .tk-activity-dialog h2 { margin: 0; color: var(--tk-ink); font-size: var(--tk-fs-head); font-weight: 500; }
   .tk-activity-dialog .ui-act { max-height: 32rem; overflow: auto; }
+  .tk-activity-open { flex: none; white-space: nowrap; }
   @media (max-width: 63.999rem) {
     .tk-activity-open { display: none; }
     .tk-activity > summary { min-height: 2.5rem; list-style: none; cursor: pointer; }
