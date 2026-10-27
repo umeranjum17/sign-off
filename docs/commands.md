@@ -120,6 +120,26 @@ The board's **Tickets** tab lists the tickets that sit under none: Your asks or
 System, how many are done, then In progress, On hold and To do.
 The file format is in [file-formats.md](file-formats.md), under **Tickets**.
 
+### Reading tickets over HTTP
+
+A running board serves its tickets to other tools, read only, as JSON. Beyond `127.0.0.1` a request
+needs the board's access token like every other route (a cookie from the link, see `open`); one
+without it gets the same `401` as the rest.
+
+| Request | Answers |
+|---|---|
+| `GET /api/tickets` | `{"tickets": [...]}`: every ticket, in the order each was first written |
+| `GET /api/tickets/<id>` | `{"ticket": {...}}`: that ticket and the cards that name it; `404` for an id not on the board |
+
+Each ticket carries the fields of its line in the file: `id`, `title`, `progress` (rolled up: an
+epic is as far along as the tickets under it, on average), `at`, and, when set, `parent`,
+`priority`, `project`, `hold`, `asked`, `release`, `state`, `prs`, `stage` and `last_event_at`.
+In the list, `cards` is the keys of the cards that name the ticket. On one ticket, `cards` is the
+cards themselves, newest first, each with `key`, `kind` (`ask`, `design`, `proof`, `report` or
+`plan`), `status` (the answer, `waiting`, `in review` or `shown`), `title` and `filed`. It is the
+same JSON as `sign-off-axi ticket --json` and `ticket --id <id> --json`, without the board's file path.
+There is no write over HTTP: use `sign-off-axi ticket --id ...`.
+
 ## Priority and project icons
 
 A card may say how urgent it is: `--priority P0` (most) to `P3` (least) on `raise`
