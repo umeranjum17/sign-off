@@ -170,7 +170,7 @@ const PAGES = [
     await h.nav('Back to Waiting on you', h.find(/Waiting on you$/, r, 'a'), /^#waiting$/);
   } }] },
   { name: 'designs', hash: '#designs', ready: '[id="item-chat-journeys"]', stages: [{ run: async (h) => {
-    await h.nav('Open design', h.find(/^Approve the chat app journeys\?/), /^#designs\/chat-journeys$/);
+    await h.nav('Open design', h.find(/^(Open design, )?Approve the chat app journeys\?/), /^#designs\/chat-journeys$/);
     // Select and Discard all are in the title row's More; Discard is on the design's own page too. Each Discard asks for a reason and is taken back with Undo.
     const sheet = () => document.getElementById('dz-sheet'), bar = () => h.board().querySelector('.sel-bar');
     const more = async (re) => { await h.press('More', h.board().querySelector('.dz-more'), () => sheet().open); return h.find(re, sheet(), 'button'); };
