@@ -134,10 +134,29 @@ try {
         }, 250));
       }`);
     }
+    if (state === 'tickets-activity' && width >= 1024) {
+      browser('eval', `() => {
+        const board = document.querySelector('.tk-desk'), grid = board?.querySelector('.ui-dgrid'), before = grid?.getBoundingClientRect().width;
+        const open = document.querySelector('.tk-activity-open');
+        if (!open || !before) throw new Error('desktop board Activity control is missing');
+        open.click();
+        const dialog = document.querySelector('.tk-activity-dialog[open]');
+        if (!dialog || document.activeElement !== dialog.querySelector('h2') || grid.getBoundingClientRect().width !== before || grid.querySelectorAll(':scope > .ui-col').length !== 3) throw new Error('desktop Activity dialog failed or board reflowed');
+        return true;
+      }`);
+    }
     if (anchor) browser('eval', `() => { document.querySelector(${JSON.stringify(anchor)})?.scrollIntoView({ block: ${JSON.stringify(state === 'tickets-activity' ? 'start' : 'center')} }); return new Promise((ok) => setTimeout(ok, 400)); }`);
     const name = `${state}.${cell}`;
     browser('screenshot', join(out, `${name}.png`));
     const m = seen[state] = value(browser('eval', probe));
+    if (state === 'tickets-activity' && width >= 1024) {
+      browser('press', 'Escape');
+      browser('eval', `() => new Promise((resolve, reject) => setTimeout(() => {
+        const button = document.querySelector('.tk-activity-open');
+        if (document.querySelector('.tk-activity-dialog') || document.activeElement !== button) reject(new Error('Escape did not close Activity and return focus'));
+        else resolve(true);
+      }, 0))`);
+    }
     writeFileSync(join(out, `${name}.txt`), `${state} ${theme} ${width}w ${hash}\ntitle: ${m.h1}\n${m.thread.length ? `Activity, ${state.startsWith('ticket') ? 'newest' : 'oldest'} first:\n${m.thread.map((t) => `  ${t}`).join('\n')}\n` : 'no Activity thread\n'}${m.rows.length ? m.rows.map((r) => `Ticket row: "${r.text}" -> ${r.href}, ${r.w}x${r.h}px, ${r.left}px from the left and ${r.right}px from the right`).join('\n') : 'no Ticket row'}\n`
       + (m.kicker ? `kicker: ${m.kicker}\nprogress: ${m.done}\n` : '') + m.lists.map((l) => `${l.head}:\n${l.rows.map((r) => `  ${r}`).join('\n')}`).join('\n') + `${m.lists.length ? '\n' : ''}horizontal overflow ${m.overflow ? 1 : 0}${m.wide.length ? ` (${m.wide.join(', ')})` : ''}\n`);
     assert.equal(m.overflow, false, `${state}: wider than the screen: ${m.wide.join(', ')}`);

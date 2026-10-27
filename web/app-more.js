@@ -300,6 +300,21 @@
       el('ol', { class: 'ui-props ui-act' }, ...events.map((e) => el('li', { class: 'ui-pr' },
         el('span', { class: 'aw' }, el('b', {}, e.text, ' · ', el('a', { href: `#ticket/${e.ticket}` }, e.title)), el('time', { datetime: e.at }, stamp(e.at)))))) );
   }
+  function ticketActivityButton() {
+    if (!(state.ticketActivity ?? []).length) return '';
+    const button = el('button', { type: 'button', class: 'ui-rb tk-activity-open', 'aria-label': 'Open board Activity', 'aria-haspopup': 'dialog' }, 'Activity');
+    button.onclick = () => {
+      const title = el('h2', { id: 'tk-activity-title', tabindex: '-1' }, 'Board Activity');
+      const close = el('button', { type: 'button', class: 'x', 'aria-label': 'Close board Activity' }, '×');
+      const dialog = el('dialog', { class: 'tk-activity-dialog', 'aria-labelledby': title.id }, el('header', {}, title, close),
+        el('ol', { class: 'ui-props ui-act' }, ...(state.ticketActivity ?? []).map((e) => el('li', { class: 'ui-pr' },
+          el('span', { class: 'aw' }, el('b', {}, e.text, ' · ', el('a', { href: `#ticket/${e.ticket}` }, e.title)), el('time', { datetime: e.at }, stamp(e.at)))))));
+      close.onclick = () => dialog.close();
+      dialog.onclose = () => dialog.remove();
+      document.body.append(dialog); dialog.showModal(); title.focus({ preventScroll: true });
+    };
+    return button;
+  }
   function tickets(by, id) {
     const L = tkLists(), desk = !phone(), picked = id && tkById(id);
     const open = picked || (desk ? L.moving[0] ?? L.hold[0] ?? L.todo[0] ?? L.done[0] : undefined);
@@ -311,9 +326,9 @@
     const none = el('section', { class: 'ui-card tk-empty' }, el('h2', {}, 'No tickets yet'), el('p', {}, 'Agents add tickets as they plan work. Each one shows here with how far along it is.'));
     if (desk) {
       const head = el('header', { class: 'ui-dhead tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets'), el('p', {}, empty ? 'Nothing tracked yet' : say)),
-        el('div', { class: 'acts' }, pick, tkSeg(L), tkFilter(L), themeButton()));
+        el('div', { class: 'acts' }, pick, tkSeg(L), tkFilter(L), ticketActivityButton(), themeButton()));
       if (empty) return [el('div', { class: 'ui-desk tk-desk' }, head, none)];
-      return [el('div', { class: 'ui-desk tk-desk' }, head, el('div', { class: 'ui-dgrid' }, el('div', { class: 'ui-col s4' }, tkHero(L), tkGroup('mv', 'In progress', L.moving, true, 'grow'), ticketActivity()),
+      return [el('div', { class: 'ui-desk tk-desk' }, head, el('div', { class: 'ui-dgrid' }, el('div', { class: 'ui-col s4' }, tkHero(L), tkGroup('mv', 'In progress', L.moving, true, 'grow')),
         el('div', { class: 'ui-col s4' }, tkGroup('hold', 'On hold', L.hold, true, 'half'), tkGroup('todo', 'To do', L.todo, true, 'grow')),
         open ? el('section', { class: 'ui-card ui-pane s4 tk-pane', 'aria-label': open.title }, ...ticketPage(open)) : el('section', { class: 'ui-card ui-pane s4 tk-pane' }, el('p', { class: 'tk-none' }, 'No ticket here.'))))];
     }
