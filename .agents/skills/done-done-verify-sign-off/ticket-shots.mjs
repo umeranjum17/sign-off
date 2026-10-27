@@ -141,7 +141,7 @@ try {
         if (!open || !before) throw new Error('desktop board Activity control is missing');
         open.click();
         const dialog = document.querySelector('.tk-activity-dialog[open]');
-        if (!dialog || document.activeElement !== dialog.querySelector('h2') || grid.getBoundingClientRect().width !== before || grid.querySelectorAll(':scope > .ui-col').length !== 3) throw new Error('desktop Activity dialog failed or board reflowed');
+        if (!dialog || document.activeElement !== dialog.querySelector('h2') || grid.getBoundingClientRect().width !== before || grid.querySelectorAll(':scope > .ui-col').length !== 2 || !grid.querySelector(':scope > .ui-pane')) throw new Error('desktop Activity dialog failed or board reflowed');
         return true;
       }`);
     }
@@ -151,7 +151,7 @@ try {
     const m = seen[state] = value(browser('eval', probe));
     if (state === 'tickets-activity' && width >= 1024) {
       so('ticket', board, '--id', 'T-34', '--title', 'Polling update for board Activity');
-      wait(21000);
+      await wait(25000);
       browser('eval', `() => { if (!document.querySelector('.tk-activity-dialog')?.innerText.includes('Ticket created · Polling update for board Activity')) throw new Error('desktop Activity did not refresh with polled ticket state'); return true; }`);
       browser('press', 'Escape');
       browser('eval', `() => new Promise((resolve, reject) => setTimeout(() => {
