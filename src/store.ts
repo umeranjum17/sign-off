@@ -632,7 +632,7 @@ export function readTicketActivity(decisionsPath: string): TicketActivity[] {
     else {
       if (had.stage !== t.stage) add('stage', t.stage ? `Stage moved to ${t.stage}` : 'Stage cleared');
       if (had.progress !== t.progress) add('progress', `Progress changed to ${t.progress}%`);
-      if ((had.stage !== 'done' && t.stage === 'done') || (had.state !== 'done' && t.state === 'done')) add('merged', 'Ticket merged');
+      if (had.stage !== 'done' && t.stage === 'done') add('merged', 'Ticket merged');
       const wasHeld = had.hold === true || had.state === 'on hold', isHeld = t.hold === true || t.state === 'on hold';
       if (wasHeld !== isHeld) add(isHeld ? 'hold' : 'release', isHeld ? 'Put on hold' : 'Hold released');
     }
