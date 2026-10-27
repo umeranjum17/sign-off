@@ -114,15 +114,26 @@ try {
     browser('open', 'about:blank');
     browser('open', `${base}${hash}`);
     wait(900);
-    if (state === 'tickets-activity' && width === 390) browser('eval', `() => {
-      const feed = document.querySelector('details.tk-activity');
-      if (!feed || feed.open) throw new Error('phone board Activity must start collapsed');
-      feed.querySelector('summary').click();
-      return new Promise((resolve) => setTimeout(() => {
-        if (!feed.open || !feed.querySelector('ol')) throw new Error('phone board Activity did not expand');
-        resolve(true);
-      }, 250));
-    }`);
+    if (state === 'tickets-activity' && width === 390) {
+      browser('eval', `() => {
+        const feed = document.querySelector('details.tk-activity');
+        const lists = [...document.querySelectorAll('main section[aria-label]:not(.tk-activity)')];
+        const details = { feed: !!feed, open: feed?.open, summary: feed?.querySelector('summary')?.textContent.trim(), lists: lists.length, heights: lists.map((s) => s.getBoundingClientRect().height) };
+        if (!feed || feed.open || details.summary !== 'Activity' || lists.length < 3 || !lists.every((s) => s.getBoundingClientRect().height > 0) || !lists.some((s) => s.querySelector('a.tk-row')))
+          throw new Error('phone board Activity must start collapsed above visible ticket lists: ' + JSON.stringify(details));
+        feed.scrollIntoView({ block: 'start' });
+        return new Promise((resolve) => setTimeout(resolve, 250));
+      }`);
+      browser('screenshot', join(out, `tickets-collapsed.${cell}.png`));
+      browser('eval', `() => {
+        const feed = document.querySelector('details.tk-activity');
+        feed.querySelector('summary').click();
+        return new Promise((resolve, reject) => setTimeout(() => {
+          if (!feed.open || !feed.querySelector('ol')) reject(new Error('phone board Activity did not expand'));
+          else resolve(true);
+        }, 250));
+      }`);
+    }
     if (anchor) browser('eval', `() => { document.querySelector(${JSON.stringify(anchor)})?.scrollIntoView({ block: ${JSON.stringify(state === 'tickets-activity' ? 'start' : 'center')} }); return new Promise((ok) => setTimeout(ok, 400)); }`);
     const name = `${state}.${cell}`;
     browser('screenshot', join(out, `${name}.png`));
@@ -160,7 +171,7 @@ try {
     return JSON.stringify({ at, title, back: location.hash });
   }`));
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board seeded with one card of each kind and no tickets, then T-9, T-29 (under T-9), T-30, held T-31 and T-32, and lifecycle T-33, a card of each kind posted with --ticket T-29, and an ask naming T-404.',
-    steps: ['Open the Tickets tab and a ticket on a phone and at 1280 px, in light and dark; inspect the board-wide and per-ticket Activity feeds.',
+    steps: ['Open the Tickets tab and a ticket on a phone and at 1280 px, in light and dark; inspect the collapsed phone board Activity above visible lists, its expanded feed, and per-ticket Activity.',
       'Answer a linked ask on held T-32 and verify it releases to To do with a Hold released event; reply to a comment on held T-31 and verify it releases.',
       'Open each linked card (an ask, an update, a design review, a guided report, a guided plan), the same kind with no ticket, and the ask naming T-404.',
       'Answer an ask No with a note, change it to Yes with a note, let its agent take it, ask for a new round; give the update Pass with a note and a comment.',
@@ -175,6 +186,6 @@ try {
 }
 if (process.env.TICKET_REVIEW_ROOT && width === 1280 && theme === 'dark') {
   mkdirSync(sealedOut, { recursive: true });
-  for (const file of ['tickets-activity.light.390w.png', 'tickets-activity.dark.390w.png', 'tickets-activity.light.1280w.png', 'tickets-activity.dark.1280w.png',
+  for (const file of ['tickets-collapsed.light.390w.png', 'tickets-collapsed.dark.390w.png', 'tickets-activity.light.390w.png', 'tickets-activity.dark.390w.png', 'tickets-activity.light.1280w.png', 'tickets-activity.dark.1280w.png',
     'ticket-answer-release.light.390w.png', 'ticket-answer-release.dark.390w.png', 'ticket-answer-release.light.1280w.png', 'ticket-answer-release.dark.1280w.png', 'steps.json']) copyFileSync(join(out, file), join(sealedOut, file));
 }
