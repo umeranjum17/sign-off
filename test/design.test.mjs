@@ -4578,6 +4578,11 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
   for (const args of posts) assert.equal(run(...args).code, 0, args.join(' '));
   const stored = Object.fromEntries(JSON.parse(readFileSync(file, 'utf8')).items.map((i) => [i.key, i.ticket]));
   assert.deepEqual(stored, { 'ask-linked': 'T-29', 'ask-hold-release': 'T-32', 'ask-plain': undefined, 'ask-unknown': 'T-404', 'update-1': 'T-29', 'chat-journeys': 'T-29', 'digest-ran': 'T-29', 'faster-sign-in': 'T-29', 'from-linked': 'T-29', npm: 'T-29' });
+  // The captain's own words sit on an ask card as its body, longer than its short title: the board keeps them as written.
+  const askBody = 'Make the settings page ship on Friday, but only if the theme switch is done.\n\nIf it slips, say so on Thursday and move the date. Do not drop the theme switch to make the day.';
+  const filed = JSON.parse(readFileSync(file, 'utf8'));
+  for (const i of filed.items) if (['ask-linked', 'from-linked', 'chat-journeys'].includes(i.key)) i.body = askBody;
+  writeFileSync(file, JSON.stringify(filed));
   // A bad id, a message naming another ticket than --ticket, and a --replace feed with --ticket are refused, and nothing is written.
   const before = readFileSync(file, 'utf8');
   for (const args of [['raise', file, '--ticket', 'T 29', '--key', 'bad-ticket', '--title', 'Ship the settings help page now?'],
@@ -4752,7 +4757,8 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     assert.equal(await evaluate(`[...document.querySelectorAll('.tk-day .tk-ev')].filter((b) => b.getAttribute('aria-label').startsWith('Ship the new settings page')).length`), 1);
     const burstView = JSON.parse(await evaluate(`JSON.stringify({ changes: [...document.querySelectorAll('dialog.tk-evs[open] .tk-chg li')].map((li) => li.textContent), ask: document.querySelector('dialog.tk-evs[open] .tk-ask')?.innerText.replace(/\\s+/g, ' ') })`));
     assert.ok(burstView.changes.length >= 3 && burstView.changes.some((c) => /Ticket created/.test(c)) && burstView.changes.some((c) => /Progress changed to 60%/.test(c)) && /Progress changed to 75% \(60% → 75%\)/.test(burstView.changes.at(-1)), burstView.changes.join(' | '));
-    assert.match(burstView.ask, /^[A-Z][^\n]+\? \d{1,2} \w{3} \d{4}, \d{2}:\d{2}:\d{2}$/);
+    assert.equal(burstView.ask, `${askBody.replace(/\s+/g, ' ')} ${burstView.ask.slice(-21)}`); assert.match(burstView.ask, /\d{1,2} \w{3} \d{4}, \d{2}:\d{2}:\d{2}$/);
+    assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
     assert.equal(seen.ticket, '#ticket/T-29'); assert.deepEqual(seen.prs, prs); assert.match(seen.time, /^\d{1,2} \w{3} \d{4}, \d{2}:\d{2}:\d{2}$/);
     // Escape closes it and the focus is back on the row that opened it.
     await key('Escape', 'Escape', 27);

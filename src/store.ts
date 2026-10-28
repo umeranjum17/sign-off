@@ -644,7 +644,7 @@ export type TicketActivity = { ticket: string; title: string; kind: 'created' | 
   project?: string; priority?: string; stage?: string; state?: string; prs?: string[]; from?: string; to?: string; by?: string;
   /** The earlier changes of the same ticket within BURST_MS of this one, oldest first: a burst is one row that carries the newest change's headline. */
   earlier?: Omit<TicketActivity, 'earlier' | 'ask'>[];
-  /** For a ticket the owner asked for: the words of the ask card that names it, as stored, and when it was filed. */
+  /** For a ticket the owner asked for: the captain's words from the ask card that names it (its full body, else its title), as stored, and when it was filed. */
   ask?: { text: string; at: string } };
 /** Changes of one ticket this close together are one burst. */
 const BURST_MS = 120_000;
@@ -689,14 +689,14 @@ export function readTicketActivity(decisionsPath: string): TicketActivity[] {
   for (const e of rows) if (words.has(e.ticket)) e.ask = words.get(e.ticket);
   return rows;
 }
-/** What the ask card naming each ticket says, as stored, and when it was filed: the earliest such card. A board that cannot be read, or a ticket with no card, gives nothing. */
+/** What the ask card naming each ticket says, as stored (its body, the captain's full words, else its title), and when it was filed: the earliest such card. A board that cannot be read, or a ticket with no card, gives nothing. */
 function askWords(decisionsPath: string, ids: Set<string>): Map<string, { text: string; at: string }> {
   const out = new Map<string, { text: string; at: string }>();
   if (!ids.size) return out;
   let items: any[] = [];
   try { items = readItems(decisionsPath).items; } catch {}
   for (const d of items) if (ids.has(d?.ticket) && (d.type ?? 'decision') === 'decision' && isText(d.title) && d.title.trim() && isText(d.filed) && Number.isFinite(Date.parse(d.filed))
-    && !(out.has(d.ticket) && Date.parse(out.get(d.ticket)!.at) <= Date.parse(d.filed))) out.set(d.ticket, { text: d.title, at: d.filed });
+    && !(out.has(d.ticket) && Date.parse(out.get(d.ticket)!.at) <= Date.parse(d.filed))) out.set(d.ticket, { text: isText(d.body) && d.body.trim() ? d.body : d.title, at: d.filed });
   return out;
 }
 /** The progress roll-up: a ticket with tickets under it on the board is as far along as they are on average (each of them rolled up the same way), and one with none keeps its own.
