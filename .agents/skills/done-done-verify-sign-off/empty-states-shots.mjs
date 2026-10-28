@@ -125,10 +125,10 @@ try {
   const capture = async (state, allow = false) => {
     await wait(450);
     if (!process.env.EMPTY_CITE || cited.has(state)) { await png(join(out, `${name(state)}.png`)); shots.push(`${name(state)}.png`); }
-    const m = await js(MEASURE); m.frame = state;
-    writeFileSync(join(out, `${name(state)}.dom.json`), JSON.stringify({ frame: state, ...m.dom, console_errors: [...errors], failed_requests: [...failed] }, null, 2) + '\n');
+    const m = await js(MEASURE); m.frame = state; const keep = !process.env.EMPTY_CITE || cited.has(state);
+    if (keep) writeFileSync(join(out, `${name(state)}.dom.json`), JSON.stringify({ frame: state, ...m.dom, console_errors: [...errors], failed_requests: [...failed] }, null, 2) + '\n');
     delete m.dom;
-    writeFileSync(join(out, `${name(state)}.measure.json`), JSON.stringify(m, null, 2) + '\n');
+    if (keep) writeFileSync(join(out, `${name(state)}.measure.json`), JSON.stringify(m, null, 2) + '\n');
     report.push(`${name(state)}: ${m.states.map((s) => `${s.kind} "${s.words}" ${s.width}x${s.height}${s.mark ? ` mark ${s.mark}` : ''}${s.action ? ` [${s.action}]` : ''}${s.skeleton ? ` ${s.skeleton} skeleton bars` : ''}`).join(' | ') || 'no empty state'}${m.activity ? `; Activity card ${m.activity.open ? 'open' : 'closed'} ${m.activity.height}px, summary "${m.activity.words}"` : ''}; failures ${m.fail.length}${m.fail.length ? ': ' + m.fail.join('; ') : ''}`);
     const bad = errors.filter((e) => !(allow && /500|404|did not answer|Failed to load resource/.test(e))), badReq = failed.filter(() => !allow);
     if (m.fail.length || bad.length || badReq.length) problems.push(`${name(state)}: ${JSON.stringify({ fail: m.fail, errors: bad, failed: badReq })}`);
