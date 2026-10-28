@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 # One run per pull request, or per branch for pushes, so a superseded PR run is cancelled while
 # a push to main always finishes.
@@ -13,6 +14,7 @@ concurrency:
 
 jobs:
   test:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,39 +41,39 @@ jobs:
           echo "Changed files:"; echo "$files"; echo "docs_only=$docs_only"
           echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@v4
-        if: steps.changes.outputs.docs_only != 'true'
+        if: github.event_name == 'pull_request' && steps.changes.outputs.docs_only != 'true'
         with:
           node-version: 24
           cache: npm
-      - if: steps.changes.outputs.docs_only != 'true'
+      - if: github.event_name == 'pull_request' && steps.changes.outputs.docs_only != 'true'
         run: npm install -g done-done-axi@0.3.0
-      - if: steps.changes.outputs.docs_only != 'true'
+      - if: github.event_name == 'pull_request' && steps.changes.outputs.docs_only != 'true'
         run: done-done run install
-      - if: steps.changes.outputs.docs_only != 'true'
+      - if: github.event_name == 'pull_request' && steps.changes.outputs.docs_only != 'true'
         run: |
           if done-done run test; then exit 0; fi
           for log in "$HOME/.done-done/evidence/sign-off"/*/test.log; do
             if [ -f "$log" ]; then cat "$log"; fi
           done
           exit 1
-      - if: steps.changes.outputs.docs_only != 'true'
+      - if: github.event_name == 'pull_request' && steps.changes.outputs.docs_only != 'true'
         run: done-done run skill
       # Every card kind x action x tab x width x theme, with done-done's look step. The look step needs done-done-axi 0.6.9, whose
       # look no longer calls a one-line ellipsized title clipped (the plan-review records test still runs on 0.3.0, whose check needs no judge), so it has its own install.
-      - if: steps.changes.outputs.docs_only != 'true'
+      - if: github.event_name == 'pull_request' && steps.changes.outputs.docs_only != 'true'
         run: npm install -g chrome-devtools-axi@0.1.34 && npm install -g --prefix "$RUNNER_TEMP/dd" done-done-axi@0.6.9
-      - if: steps.changes.outputs.docs_only != 'true'
+      - if: github.event_name == 'pull_request' && steps.changes.outputs.docs_only != 'true'
         env:
           CHROME_DEVTOOLS_AXI_CHROME_ARGS: --no-sandbox
         run: PATH="$RUNNER_TEMP/dd/bin:$PATH" done-done run board-actions
       - name: Install comment capture encoder
-        if: steps.changes.outputs.docs_only != 'true'
+        if: github.event_name == 'pull_request' && steps.changes.outputs.docs_only != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y ffmpeg
           ffmpeg -version
       - name: Report section comment and note send regression
-        if: steps.changes.outputs.docs_only != 'true'
+        if: github.event_name == 'pull_request' && steps.changes.outputs.docs_only != 'true'
         env:
           CHROME_DEVTOOLS_AXI_CHROME_ARGS: --no-sandbox
         run: SEND_FEEDBACK_ONLY=1 node .agents/skills/done-done-verify-sign-off/part-comment-shots.mjs "$RUNNER_TEMP/comment-send" light 390
