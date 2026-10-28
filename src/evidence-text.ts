@@ -2,13 +2,15 @@ import { spawn, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
 
-/** A picture of text (a log, receipt or summary) is a few colours: paper, ink and their anti-aliased blends, with no large flat block of a
- * third colour. A real capture of the product has colour, images and icons off that line, or a grey panel covering a good part of the
- * picture. Measured on the calibration set in the PR: text renders, lossy ones too, have at most 0.01% of pixels off the line and a flat
- * third colour of 1.7% at most; real captures have 1.5% or more off the line and a flat third colour of 8.9% or more. */
+/** Text renders: text-log.png has 0% off-line and 0.23% flat third colour; the rendered full-suite log has 261 runs of rows with >1% dark pixels.
+ * The supplied light board frames have 0.70% or more flat third colour and at most 52 such row runs; repo captures product-board.png
+ * and sparse-screen.png have 41.57% and 2.17% flat third colour. The colour-share gap is 0.47 points, so 0.465% leaves 0.23 points
+ * on either side. The row-run gap is 209, so 156 leaves at least 104 runs of margin. Together these admit the paper-like UI and
+ * retain both text refusals. */
+const TEXT_SOLID_MAX = 0.00465;
+const TEXT_ROW_RUNS_MIN = 156;
+/** The share of pixels allowed off the paper-ink line for a text render. */
 const OFF_LINE_MAX = 0.005;
-/** The largest flat area in a third colour (any colour but the paper or the ink), as a share of the picture. */
-const SOLID_MAX = 0.04;
 export type Fault = 'text' | 'colour bars' | 'placeholder';
 /** A saturated colour is at least this far between its brightest and dimmest channel; a colour band must cover this share of the picture.
  * A colour-bar card has at least five such bands, together most of the picture; the real captures measured have one at most. */
@@ -18,8 +20,9 @@ const BARS_MIN = 5;
 const BARS_SHARE_MIN = 0.6;
 /** A placeholder is one flat colour over this share of the picture, with almost nothing drawn on it. A real screen can be as empty (a chat
  * with no messages is 90% paper) but its header, message, composer and tab bar draw 7% or more of the picture in other colours; a flat card
- * with a label or icon draws under 1%. */
-const PLACEHOLDER_MIN = 0.9;
+ * with a label or icon draws under 1%. Light board frames are up to 96.34% paper, versus 99.72% for the placeholder fixture; the 98% cutoff
+ * leaves 1.7 percentage points of separation on each side. */
+const PLACEHOLDER_MIN = 0.98;
 const PLACEHOLDER_DETAIL_MAX = 0.05;
 /** A picture with no ink at all (a flat colour) is not text, so it passes. */
 const INK_MIN = 0.005;
@@ -34,8 +37,8 @@ const WHOLE = [[0, 0, 1, 1]];
 
 /** The share of pixels that are ink (a colour off the paper), of pixels off the paper-ink line, and of the largest flat area in any other colour,
  * or undefined when the file cannot be decoded. */
-type Share = { ink: number; off: number; solid: number; top: number; bars: number; barShare: number };
-const shareOf = (rgb: Buffer): Share => {
+type Share = { ink: number; off: number; solid: number; top: number; bars: number; barShare: number; rowRuns: number };
+const shareOf = ({ data: rgb, width, height }: { data: Buffer; width: number; height: number }): Share => {
   const total = rgb.length / 3, bins = new Uint32Array(32768);
   const centre = (b: number) => [(b >> 10) * 8 + 4, ((b >> 5) & 31) * 8 + 4, (b & 31) * 8 + 4];
   for (let i = 0; i < rgb.length; i += 3) bins[(rgb[i] >> 3) << 10 | (rgb[i + 1] >> 3) << 5 | (rgb[i + 2] >> 3)]++;
@@ -55,10 +58,12 @@ const shareOf = (rgb: Buffer): Share => {
     if (Math.max(...c) - Math.min(...c) >= SATURATED && share >= BAND_MIN) bars++, (barShare += share);
   });
   const top = bins[paperBin] / total;
-  if (inkBin < 0) return { ink: 0, off: 0, solid: 0, top, bars, barShare };
+  if (inkBin < 0) return { ink: 0, off: 0, solid: 0, top, bars, barShare, rowRuns: 0 };
   const [pr, pg, pb] = paper, [ar, ag, ab] = centre(inkBin).map((c, i) => c - paper[i]), len2 = ar * ar + ag * ag + ab * ab;
   let ink = 0, off = 0;
+  const rowDark = new Uint32Array(height);
   for (let i = 0; i < rgb.length; i += 3) {
+    if (rgb[i] < 230 || rgb[i + 1] < 230 || rgb[i + 2] < 230) rowDark[Math.floor(i / 3 / width)]++;
     const dr = rgb[i] - pr, dg = rgb[i + 1] - pg, db = rgb[i + 2] - pb;
     if (dr * dr + dg * dg + db * db <= NEAR * NEAR) continue;
     const t = Math.min(1, Math.max(0, (dr * ar + dg * ag + db * ab) / len2));
@@ -66,12 +71,18 @@ const shareOf = (rgb: Buffer): Share => {
     if (er * er + eg * eg + eb * eb <= NEAR * NEAR) ink++;
     else off++;
   }
-  return { ink: ink / total, off: off / total, solid, top, bars, barShare };
+  let rowRuns = 0, inRun = false;
+  for (const n of rowDark) {
+    const active = n / width > 0.01;
+    if (active && !inRun) rowRuns++;
+    inRun = active;
+  }
+  return { ink: ink / total, off: off / total, solid, top, bars, barShare, rowRuns };
 };
 
 export function palette(file: string): Share | undefined {
-  const rgb = decode(file);
-  return rgb && shareOf(rgb);
+  const pixels = decode(file);
+  return pixels && shareOf(pixels);
 }
 
 /** The still formats this guard measures. A recording is never measured: it is not a still, and decoding it would push a video through
@@ -85,7 +96,7 @@ export const isStill = (file: string) => STILL.test(file);
  * standing in for a picture). Anything that is not a still, and a file that cannot be decoded, has no faults: it is not refused. */
 function faultsOf(share: Share | undefined): Fault[] {
   if (!share) return [];
-  const text = share.ink >= INK_MIN && share.off <= OFF_LINE_MAX && share.solid <= SOLID_MAX;
+  const text = share.ink >= INK_MIN && (share.off <= OFF_LINE_MAX && share.solid <= TEXT_SOLID_MAX || share.top >= 0.9 && share.rowRuns >= TEXT_ROW_RUNS_MIN);
   return [
     ...(text ? ['text' as const] : []),
     ...(share.bars >= BARS_MIN && share.barShare >= BARS_SHARE_MIN ? ['colour bars' as const] : []),
@@ -107,25 +118,25 @@ export async function faultsAsync(file: string): Promise<Fault[]> {
 const dist = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 /** The picture as packed 8-bit RGB. PNG is decoded here; JPEG, WebP and any PNG this decoder refuses go through ImageMagick, when it is installed. */
-function decode(file: string): Buffer | undefined {
+function decode(file: string): { width: number; height: number; data: Buffer } | undefined {
   const bytes = readFileSync(file);
   if (bytes.subarray(0, 8).equals(PNG_SIGNATURE)) {
-    const own = pngRgb(bytes);
+    const own = pngPixels(bytes, 3);
     if (own) return own;
   }
   const out = spawnSync('convert', [file, 'png24:-'], { maxBuffer: 1 << 30, timeout: 30_000, killSignal: 'SIGKILL' });
-  return out.status === 0 && out.stdout.subarray(0, 8).equals(PNG_SIGNATURE) ? pngRgb(out.stdout) : undefined;
+  return out.status === 0 && out.stdout.subarray(0, 8).equals(PNG_SIGNATURE) ? pngPixels(out.stdout, 3) : undefined;
 }
 
 /** ImageMagick's output, bounded in time and size: the child, and anything it delegated to, is killed when either is passed. */
 async function paletteAsync(file: string): Promise<Share | undefined> {
   const bytes = readFileSync(file);
   if (bytes.subarray(0, 8).equals(PNG_SIGNATURE)) {
-    const own = pngRgb(bytes);
+    const own = pngPixels(bytes, 3);
     if (own) return shareOf(own);
   }
-  const out = await convert(file), rgb = out && out.subarray(0, 8).equals(PNG_SIGNATURE) ? pngRgb(out) : undefined;
-  return rgb && shareOf(rgb);
+  const out = await convert(file), pixels = out && out.subarray(0, 8).equals(PNG_SIGNATURE) ? pngPixels(out, 3) : undefined;
+  return pixels && shareOf(pixels);
 }
 
 const CONVERT_WAIT = 30_000, CONVERT_BYTES = 1 << 30;
@@ -147,9 +158,6 @@ function convert(file: string): Promise<Buffer | undefined> {
     child.on('close', () => finish(code === 0 ? Buffer.concat(chunks) : undefined));
   });
 }
-
-/** Packed 8-bit RGB of a PNG, every colour type and bit depth, interlaced or not. undefined for a PNG it does not read. */
-const pngRgb = (buf: Buffer) => pngPixels(buf, 3)?.data;
 
 /** A PNG's pixels as packed 8-bit RGB (3 channels) or RGBA (4, with its alpha channel or palette transparency), and its size. */
 export function pngPixels(buf: Buffer, out: 3 | 4): { width: number; height: number; data: Buffer } | undefined {
