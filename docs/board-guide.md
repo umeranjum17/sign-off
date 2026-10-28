@@ -94,7 +94,7 @@ sign-off-axi project --name Beacon --icon icons/beacon.png
 
 Agents pass `--priority` when they know it, and set their project's icon when it ships one; the shipped skill tells them so.
 
-Every card's screen also keeps its **Activity**, oldest first, from what the board already saved: who posted it, your answer and note (and the one a change replaced), when the agent picked it up, a new round you asked for and your comments. A ticket's Activity combines its lifecycle events with its cards' updates; see [file-formats.md](file-formats.md#tickets) for the details.
+Every card's screen also keeps its **Activity**, oldest first, from what the board already saved: who posted it, your answer and note (and the one a change replaced), when the agent picked it up, a new round you asked for and your comments. A ticket's Activity combines its lifecycle events with its cards' updates; the board-wide feed sends the newest 200 events and each feed view renders at most 50. Older events stay in the ticket records; they are simply not sent in the feed. See [file-formats.md](file-formats.md#tickets) for the details.
 
 ### The leash: what agents may do without you
 

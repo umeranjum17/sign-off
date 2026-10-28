@@ -6,6 +6,7 @@ import { networkInterfaces, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
+const { readTicketActivity } = await import('../dist/store.js');
 const scratch = mkdtempSync(join(tmpdir(), 'sign-off-tickets-api-'));
 const env = { ...process.env, HOME: scratch, XDG_CONFIG_HOME: scratch, XDG_DATA_HOME: scratch, XDG_CACHE_HOME: scratch, SIGN_OFF_HOME: scratch };
 delete env.CLAUDE_CODE_SESSION_ID; delete env.SIGN_OFF_FILER;
@@ -92,6 +93,22 @@ test('ticket lifecycle activity and hold release use effective progress', async 
   assert.ok(!events.some((event) => event.kind === 'merged'));
   const moving = state.ticketActivity.filter((event) => event.ticket === 'T-5' && event.kind === 'state');
   assert.deepEqual(moving.map((event) => event.text), ['State changed to in progress']);
+});
+
+test('Tickets read caps a live-shape activity feed at 200 newest events without losing ticket-local activity', async () => {
+  for (let i = 0; i < 205; i++) axi('ticket', board, '--id', `CAP-${i}`, '--title', `Activity ticket ${i}`);
+  axi('ticket', board, '--id', 'CAP-204', '--state', 'in progress');
+  const port = await serve(), response = await fetch(`http://127.0.0.1:${port}/api/state?view=tickets`);
+  const text = await response.text(), state = JSON.parse(text);
+  const all = readTicketActivity(board), events = state.ticketActivity;
+  assert.ok(all.length > 200, `expected live-shape history, got ${all.length} events`);
+  assert.equal(events.length, 200);
+  assert.deepEqual(events, all.slice(0, 200));
+  assert.equal(events[0].ticket, 'CAP-204');
+  assert.ok(events.every((event, i) => !i || Date.parse(events[i - 1].at) >= Date.parse(event.at)));
+  assert.ok(events.some((event) => event.ticket === 'CAP-204' && event.kind === 'state'));
+  const fullBytes = Buffer.byteLength(JSON.stringify({ ...state, ticketActivity: all }));
+  console.log(`ticket activity response: ${Buffer.byteLength(text)} B after cap; ${fullBytes} B before cap (${all.length} events)`);
 });
 
 // Beyond loopback the board needs its token on every route; the board refuses to bind all interfaces, so this uses the machine's private address.

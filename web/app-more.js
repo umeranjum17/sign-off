@@ -295,7 +295,7 @@
   }
 
   function ticketActivityList(events, dialog) {
-    const list = thread(null, events.map((e) => ({ ...e, link: [e.title, `#ticket/${e.ticket}`] })), 1).querySelector('ol');
+    const list = thread(null, events.slice(0, 50).map((e) => ({ ...e, link: [e.title, `#ticket/${e.ticket}`] })), 1).querySelector('ol');
     if (dialog) list.onclick = (event) => { if (event.target.closest('a') && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) dialog.close(); };
     return list;
   }
