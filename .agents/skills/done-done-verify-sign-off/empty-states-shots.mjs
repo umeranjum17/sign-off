@@ -124,7 +124,7 @@ try {
     await wait(450);
     await png(join(out, `${name(state)}.png`)); shots.push(`${name(state)}.png`);
     const m = await js(MEASURE);
-    writeFileSync(join(out, `${name(state)}.dom.json`), JSON.stringify({ ...m.dom, console_errors: [...errors], failed_requests: [...failed] }, null, 2) + '\n');
+    writeFileSync(join(out, `${name(state)}.dom.json`), JSON.stringify({ frame: state, ...m.dom, console_errors: [...errors], failed_requests: [...failed] }, null, 2) + '\n');
     delete m.dom;
     writeFileSync(join(out, `${name(state)}.measure.json`), JSON.stringify(m, null, 2) + '\n');
     report.push(`${name(state)}: ${m.states.map((s) => `${s.kind} "${s.words}" ${s.width}x${s.height}${s.mark ? ` mark ${s.mark}` : ''}${s.action ? ` [${s.action}]` : ''}${s.skeleton ? ` ${s.skeleton} skeleton bars` : ''}`).join(' | ') || 'no empty state'}${m.activity ? `; Activity card ${m.activity.open ? 'open' : 'closed'} ${m.activity.height}px, summary "${m.activity.words}"` : ''}; failures ${m.fail.length}${m.fail.length ? ': ' + m.fail.join('; ') : ''}`);
