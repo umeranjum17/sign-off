@@ -322,52 +322,116 @@
       : load === 'error' ? emptyState('error', { title: `Couldn’t load ${what}`, text: ticketsFailed, act: ['Try again', tkRetry], small })
       : emptyState('empty', { mark, title, text, small, act });
   };
-  /** The Activity feed, in the card, the desk's dialog and a ticket's own page: its events, or the one state that says why there are none. */
-  function ticketActivityList(events, dialog, small = true) {
-    if (!events.length) return el('div', { class: 'tk-feed' }, tkNote('activity', 'clock', 'No activity yet', 'Moves, stage changes and merges on tickets show here as they happen.', small));
-    const list = thread(null, events.slice(0, 50).map((e) => ({ ...e, link: [e.title, `#ticket/${e.ticket}`] })), 1).querySelector('ol');
-    list.classList.add('tk-feed');
-    if (dialog) list.onclick = (event) => { if (event.target.closest('a') && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) dialog.close(); };
-    return list;
+  /* ---- Activity: a row wears the In progress cards' own tags (the project's tile, the P0-P3 chip, the stage chip) and opens its event in a sheet (a dialog on a desk). ---- */
+  const EV_KIND = { created: 'Created', stage: 'Stage', progress: 'Progress', state: 'State', merged: 'Merged', hold: 'On hold', release: 'Released' };
+  const EV_FIELD = { stage: 'Stage', merged: 'Stage', progress: 'Progress', state: 'State', hold: 'Hold', release: 'Hold' };
+  const EV_STATE = { queued: 'todo', 'in progress': 'moving', 'on hold': 'hold', done: 'done' };
+  const EXACT = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const actProject = (e) => e.project ?? (tkById(e.ticket) ? tkProject(tkById(e.ticket)) : undefined);
+  /** What moved, in few words for a row; the sheet says it in full. */
+  const actShort = (e) => ({ created: 'Created', stage: 'Moved', merged: 'Merged', progress: `To ${e.to}`, state: TK_WORDS[EV_STATE[e.to]] ?? 'State', hold: 'Held', release: 'Released' })[e.kind] ?? e.text;
+  const actKey = (e) => `${e.ticket}|${e.at}|${e.kind}|${e.text}`;
+  /** One event as a row of the In progress cards' own build: the project's tile, the title and its priority, then the stage chip, what moved and when. */
+  function actRow(e, time = tkWhen) {
+    const proj = actProject(e), row = el('button', { type: 'button', class: 'ui-row tk-ev', 'data-ev': actKey(e), 'aria-haspopup': 'dialog',
+      'aria-label': `${[e.title, e.priority].filter(Boolean).join(' ')}, ${[e.stage, e.text, proj, stamp(e.at)].filter(Boolean).join(', ')}` },
+      projectTile(proj, () => icon('pick')), el('span', { class: 'rm' },
+        el('span', { class: 'l1' }, el('span', { class: 't', dir: 'auto' }, e.title), ' ', e.priority ? el('span', { class: `ui-pc ${e.priority.toLowerCase()}` }, e.priority) : ''), ' ',
+        el('span', { class: 'l2' }, e.stage ? el('span', { class: 'tk-status' }, el('span', { class: 'ui-pc tk-stage' }, e.stage)) : '', el('span', { class: 'meta', dir: 'auto' }, [proj, actShort(e)].filter(Boolean).join(' · ')),
+          el('time', { class: 'pct', datetime: e.at }, time(e.at)))));
+    row.onclick = () => openEvent(e, row);
+    return row;
   }
+  const actSheet = sheetOf('tk-ev');
+  actSheet.classList.add('tk-evs');
+  let evFrom = null, evGo = false;
+  // Closed, the focus goes back to the row that opened it (or the same event's row, when a redraw replaced it); a tap on the ticket leaves for the ticket instead.
+  actSheet.addEventListener('close', () => {
+    const row = evFrom?.isConnected ? evFrom : [...document.querySelectorAll('.tk-ev')].find((r) => r.dataset.ev === actSheet.dataset.ev && r.offsetParent);
+    if (evGo) evGo = false; else row?.focus({ preventScroll: true });
+  });
+  /** One event whole: its ticket's title in full, what changed from and to, who made it, the ticket and each pull request it links, and the exact time. */
+  function openEvent(e, from) {
+    const proj = actProject(e), close = el('button', { type: 'button', class: 'x', 'aria-label': 'Close' }, glyph('x')), name = TK_WORDS[EV_STATE[e.state]];
+    close.onclick = () => actSheet.close();
+    const ticket = el('a', { class: 'ui-pr', href: `#ticket/${e.ticket}`, 'aria-label': `Open ticket ${e.ticket}, ${e.title}` }, el('span', { class: 'k' }, tkMark('layers'), 'Ticket'), ' ', el('span', { class: 'v' }, el('span', { dir: 'auto' }, e.ticket), glyph('right')));
+    ticket.onclick = (ev) => { if (ev.button === 0 && !ev.metaKey && !ev.ctrlKey && !ev.shiftKey && !ev.altKey) evGo = true; else ev.stopPropagation(); };
+    const rows = [e.from === undefined ? '' : tkProp('half', EV_FIELD[e.kind], el('span', {}, e.from === 'none' ? 'not set' : e.from), el('span', { 'aria-hidden': 'true' }, '→'), el('span', { class: 'sr-only' }, 'to'), el('span', {}, e.to === 'none' ? 'not set' : e.to)),
+      e.priority ? tkProp('flag', 'Priority', el('span', { class: `ui-pc ${e.priority.toLowerCase()}` }, e.priority)) : '', e.stage && !/^(stage|merged)$/.test(e.kind) ? tkProp('half', 'Stage', el('span', { class: 'ui-pc tk-stage' }, e.stage)) : '',
+      name && e.kind !== 'state' ? tkProp('half', 'State', el('span', {}, name)) : '', e.by ? tkProp('person', 'Made by', el('span', { dir: 'auto' }, e.by)) : '', ticket, tkProp('clock', 'Time', el('time', { datetime: e.at }, EXACT.format(new Date(e.at))))].filter(Boolean);
+    actSheet.dataset.ev = actKey(e); evFrom = from; evGo = false;
+    actSheet.replaceChildren(el('div', {}, el('div', { class: 'tk-shd' }, el('p', {}, projectTile(proj, () => icon('pick')), el('span', {}, [proj, EV_KIND[e.kind]].filter(Boolean).join(' · '))), close),
+      el('h2', { id: 'tk-ev-h', class: 'tk-dt', tabindex: '-1', dir: 'auto' }, e.title), el('p', { class: 'tk-evt', dir: 'auto' }, e.text), el('div', { class: 'ui-props' }, ...rows),
+      ...(e.prs?.length ? [el('p', { class: 'ui-dl' }, e.prs.length > 1 ? 'Pull requests' : 'Pull request'), el('ul', { class: 'ui-list tk-in' }, ...e.prs.map(tkPr))] : [])));
+    actSheet.showModal();
+    actSheet.querySelector('#tk-ev-h').focus({ preventScroll: true });
+  }
+  /** The Activity feed, in the phone's card: its latest events as rows, or the one state that says why there are none. */
+  function ticketActivityList(events, small = true) {
+    if (!events.length) return el('div', { class: 'tk-feed' }, tkNote('activity', 'clock', 'No activity yet', 'Moves, stage changes and merges on tickets show here as they happen.', small));
+    return el('ul', { class: 'ui-list tk-feed' }, ...events.slice(0, 50).map((e) => el('li', {}, actRow(e))));
+  }
+  const seeAll = () => el('a', { class: 'tk-all', href: '#activity' }, 'See all', glyph('right'));
   /** The board-wide Activity card on a phone: always there, closed to its title, how many events it holds and the newest, so it is never a bare title. */
   function ticketActivity(events = state.ticketActivity ?? []) {
     const last = events[0], sum = el('summary', { class: 'tk-ch' }, el('span', {}, 'Activity'), events.length ? el('small', {}, String(events.length)) : '', events.length ? glyph('down') : '',
       last ? el('span', { class: 'tk-last', dir: 'auto' }, `${last.title}: ${last.text}`) : '');
-    return el('details', { class: 'ui-card tk-card tk-activity', 'aria-label': 'Activity', ...((document.querySelector('.tk-activity')?.open || !events.length) && { open: true }) }, sum, ticketActivityList(events));
+    return el('details', { class: 'ui-card tk-card tk-activity', 'aria-label': 'Activity', ...((document.querySelector('.tk-activity')?.open || (state.ticketActivity && !events.length)) && { open: true }) }, sum, ticketActivityList(events), events.length ? seeAll() : '');
   }
-  function ticketActivityButton() {
-    const button = el('button', { type: 'button', class: 'ui-rb tk-activity-open' }, 'Activity');
-    button.onclick = () => {
-      const title = el('h2', { id: 'tk-activity-title', class: 'tk-ch', tabindex: '-1' }, 'Activity');
-      const close = el('button', { type: 'button', class: 'x', 'aria-label': 'Close Activity' }, '×');
-      let dialog;
-      dialog = el('dialog', { class: 'ui-card ui-pane tk-activity-dialog', 'aria-labelledby': title.id }, el('header', { class: 'ui-shd' }, title, close));
-      dialog.append(ticketActivityList(state.ticketActivity ?? [], dialog));
-      close.onclick = () => dialog.close();
-      dialog.onclose = () => { dialog.remove(); document.querySelector('.tk-activity-open')?.focus({ preventScroll: true }); };
-      document.body.append(dialog); dialog.showModal(); title.focus({ preventScroll: true });
+  /** The Activity tab (#activity), which the phone's Activity card links to with See all: every event the board sent, newest first, grouped by day under a day heading with a time rail down each group;
+   *  a row is the same row, and the filters (project, priority, type) narrow the list in place. */
+  let acFilter = { project: '', priority: '', kind: '' };
+  const dayHead = (at) => {
+    const d = new Date(at), now = new Date(), days = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 864e5);
+    return days === 0 ? 'Today' : days === 1 ? 'Yesterday' : new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'short' }).format(d);
+  };
+  function activityPage() {
+    const all = state.ticketActivity ?? [], desk = !phone();
+    const opts = { project: [...new Set(all.map(actProject).filter(Boolean))].sort((x, y) => x.localeCompare(y)), priority: [...new Set(all.map((e) => e.priority).filter(Boolean))].sort(), kind: Object.keys(EV_KIND).filter((k) => all.some((e) => e.kind === k)) };
+    // A filter whose value the feed no longer holds is let go, so a select never shows a blank.
+    for (const k of Object.keys(acFilter)) if (acFilter[k] && !opts[k].includes(acFilter[k])) acFilter[k] = '';
+    const out = el('div', { class: 'tk-acts' }), count = el('p', { class: 'tk-count', role: 'status' });
+    const sels = [['project', 'project', 'Project', opts.project.map((v) => [v, v])], ['priority', 'priority', 'Priority', opts.priority.map((v) => [v, v])], ['kind', 'type', 'Type', opts.kind.map((v) => [v, EV_KIND[v]])]].map(([k, what, any, list]) => {
+      const s = el('select', { class: 'tk-sel', 'aria-label': `Filter by ${what}` }, el('option', { value: '' }, any), ...list.map(([v, w]) => el('option', { value: v }, w)));
+      s.value = acFilter[k]; s.onchange = () => { acFilter[k] = s.value; paint(); };
+      return s;
+    });
+    const paint = () => {
+      const shown = all.filter((e) => (!acFilter.project || actProject(e) === acFilter.project) && (!acFilter.priority || e.priority === acFilter.priority) && (!acFilter.kind || e.kind === acFilter.kind));
+      count.textContent = !all.length ? 'Nothing yet' : shown.length === all.length ? `${all.length} events` : `${shown.length} of ${all.length} events`;
+      if (!all.length) return out.replaceChildren(tkNote('activity', 'clock', 'No activity yet', 'Moves, stage changes and merges on tickets show here as they happen.'));
+      if (!shown.length) return out.replaceChildren(emptyState('empty', { mark: 'list', title: 'No activity matches', text: 'Nothing matches these filters right now.',
+        act: ['Clear filters', () => { acFilter = { project: '', priority: '', kind: '' }; sels.forEach((s) => (s.value = '')); paint(); }] }));
+      const days = new Map();
+      for (const e of shown) { const k = new Date(e.at).toDateString(); days.set(k, [...(days.get(k) ?? []), e]); }
+      out.replaceChildren(...[...days.values()].map((list) => el('section', { class: 'tk-day', 'aria-label': dayHead(list[0].at) }, el('h2', { class: 'ui-sec' }, dayHead(list[0].at), el('small', {}, String(list.length))),
+        el('ul', { class: 'ui-card ui-list tk-feed tk-tl' }, ...list.map((e) => el('li', {}, actRow(e, hhmm)))))));
     };
-    return button;
+    paint();
+    const filters = all.length ? el('div', { class: 'tk-filters', role: 'group', 'aria-label': 'Filter activity' }, ...sels) : '';
+    if (!desk) return [el('header', { class: 'ui-top tk-top' }, el('h1', { tabindex: '-1' }, 'Tickets'), themeButton()), tkTabs('activity'), filters, count, out];
+    return [el('div', { class: 'ui-desk tk-desk' }, el('header', { class: 'ui-dhead tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets'), count), el('div', { class: 'acts' }, tkTabs('activity'), filters, themeButton())),
+      el('div', { class: 'ui-dgrid' }, el('div', { class: 'ui-col s12' }, out)))];
   }
-  function tickets(by, id) {
-    const dialogFeed = document.querySelector('.tk-activity-dialog[open] .tk-feed');
-    if (dialogFeed) dialogFeed.replaceWith(ticketActivityList(state.ticketActivity ?? [], dialogFeed.closest('dialog')));
+  function tickets(by, id, subpage) {
+    if (subpage) return activityPage();
     const L = tkLists(), desk = !phone(), picked = id && tkById(id);
     const open = picked || (desk ? L.moving[0] ?? L.hold[0] ?? L.todo[0] ?? L.done[0] : undefined);
     tkShown = open?.id ?? '';
     const empty = !tkAll().length;
-    const say = `${L.kind === 'asks' ? 'Your asks: ' : L.kind === 'system' ? 'System work: ' : ''}${L.done.length} of ${L.shown.length} done · ${L.moving.length} moving · ${L.hold.length} on hold · ${L.todo.length} to do`;
+    const say = `${L.done.length} of ${L.shown.length} done · ${L.moving.length} moving · ${L.hold.length} on hold · ${L.todo.length} to do`;
     const pick = tkProj ? el('button', { class: 'tk-fpill' }, el('span', { class: 'tk-pt', 'aria-hidden': 'true' }, projectPic(tkProj)), tkProj, glyph('x')) : '';
     if (pick) pick.onclick = () => { tkProj = ''; render(); }, pick.setAttribute('aria-label', `Show every project, not only ${tkProj}`);
+    const whose = L.kind ? el('button', { class: 'tk-fpill', 'aria-label': `Show everyone's tickets, not only ${TK_WHO[L.kind]}` }, TK_WHO[L.kind], glyph('x')) : '';
+    if (whose) whose.onclick = () => { tkWhose = ''; render(); };
     const none = tkNote('tickets', 'pick', 'No tickets yet', 'Agents add tickets as they plan work. Each one shows here with how far along it is.'), nothing = !empty && !L.shown.length;
     none.classList.add('tk-empty');
     // A project that holds no ticket (any more) leaves the lists with nothing: the filter is named, and one step clears it.
-    const nomatch = emptyState('empty', { mark: 'list', title: 'No tickets match', text: tkProj ? `Nothing in ${tkProj} right now.` : 'Nothing here right now.', ...(tkProj && { act: ['Show every project', () => { tkProj = ''; render(); }] }) });
+    const nomatch = emptyState('empty', { mark: 'list', title: 'No tickets match', text: tkProj ? `Nothing in ${tkProj} right now.` : 'Nothing here right now.', ...((tkProj || L.kind) && { act: ['Clear filters', () => { tkProj = ''; tkWhose = ''; render(); }] }) });
     nomatch.classList.add('tk-empty');
     if (desk) {
       const head = el('header', { class: 'ui-dhead tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets'), el('p', {}, empty ? { loading: 'Loading tickets…', error: 'Couldn’t load tickets', ready: 'Nothing tracked yet' }[tkLoad()] : say)),
-        el('div', { class: 'acts' }, pick, tkSeg(L), tkFilter(L), ticketActivityButton(), themeButton()));
+        el('div', { class: 'acts' }, pick, whose, tkTabs('tickets'), tkFilter(L), themeButton()));
       if (empty || nothing) return [el('div', { class: 'ui-desk tk-desk' }, head, empty ? none : nomatch)];
       return [el('div', { class: 'ui-desk tk-desk' }, head, el('div', { class: 'ui-dgrid' }, el('div', { class: 'ui-col s4' }, tkHero(L), tkGroup('mv', 'In progress', L.moving, true, 'grow')),
         el('div', { class: 'ui-col s4' }, tkGroup('hold', 'On hold', L.hold, true, 'half'), tkGroup('todo', 'To do', L.todo, true, 'grow')),
@@ -375,17 +439,21 @@
     }
     const stat = (href, mark, lab, n) => el(href ? 'a' : 'div', { class: 'ui-card ui-stat', ...(href && { href }), 'aria-label': `${lab}: ${n}` }, fill(mark), el('span', { class: 'lab' }, lab), ' ', el('b', {}, String(n)));
     const p0 = L.shown.filter((t) => t.priority === 'P0' && tkStateOf(t) !== 'done').length;
-    return [el('header', { class: 'ui-top tk-top' }, el('h1', { tabindex: '-1' }, 'Tickets'), tkFilter(L), themeButton()), tkSeg(L), pick,
+    return [el('header', { class: 'ui-top tk-top' }, el('h1', { tabindex: '-1' }, 'Tickets'), tkFilter(L), themeButton()), tkTabs('tickets'), pick, whose,
       ...(empty ? [none] : nothing ? [nomatch, ticketActivity()] : [tkHero(L), ticketActivity(), tkGroup('mv', 'In progress', L.moving), tkGroup('hold', 'On hold', L.hold), tkGroup('todo', 'To do', L.todo), tkGroup('done', 'Done', L.done),
         el('div', { class: 'ui-tiles tk-tiles' }, stat('#waiting', 'M5 3h10a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-4.5L6 18.2V15H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3zm1.5 4.2v1.6h7V7.2zm0 3v1.6h5v-1.6z', 'Wait on you', by.waiting.length),
           stat('', 'M4 2.5h1.6v1h9.9l-2.1 3.75 2.1 3.75H5.6v6.5H4z', 'Open at P0', p0))]),
       picked ? tkSheet(picked) : (tkUp = '')];
   }
   /** On a phone the ticket rises over the list as a sheet: a grab handle, its project and state with a close, then the ticket. Close (or Escape, or a tap above it) goes back. */
+  /** A property row of a ticket or an event: a mark and a name at the left, the value at the right. */
+  const tkProp = (draw, k, ...v) => el('div', { class: 'ui-pr' }, el('span', { class: 'k' }, tkMark(draw), k), el('span', { class: 'v' }, ...v));
+  /** A linked pull request, a row that opens it: its number and the repository it is in. */
+  const tkPr = (url) => { const pr = /\/pull\/(\d+)\/?$/.exec(new URL(url).pathname); return el('li', {}, el('a', { class: 'ui-row', href: url, title: url, target: '_blank', rel: 'noopener noreferrer' }, ...uiRow({ tile: el('span', { class: 'ui-icon', 'aria-hidden': 'true' }, glyph('link')), title: pr ? `Pull request #${pr[1]}` : url, meta: pr ? new URL(url).pathname.replace(/\/pull\/.*$/, '').slice(1) : 'Pull request' }))); };
   function ticketPage(t, close = '') {
     const gone = new Set(state.dismissed ?? []), cards = state.decisions.filter((d) => d.ticket === t.id && !gone.has(d.key)).reverse().sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
     const kids = tkUnder(t), done = kids.filter((x) => tkStateOf(x) === 'done').length, s = tkStateOf(t), up = tkAbove(t)[0], proj = tkProject(t);
-    const prop = (draw, k, ...v) => el('div', { class: 'ui-pr' }, el('span', { class: 'k' }, tkMark(draw), k), el('span', { class: 'v' }, ...v));
+    const prop = tkProp;
     const linked = (d) => { const a = el('a', { class: 'ui-row', href: hrefOf(d) }, ...uiRow({ tile: cardTile(d), title: title(d), priority: d.priority, badge: trailBadge(d.key), meta: [tkKind(d), tkState(d), d.filed && tkWhen(d.filed)].filter(Boolean).join(' · ') }));
       a.onclick = () => (jump = d.key); return el('li', {}, a); };
     // Its cards' steps after their postings (Linked shows those), newest first, each naming its card.
@@ -400,7 +468,7 @@
         up ? prop('layers', 'Part of', el('a', { href: `#ticket/${up.id}`, dir: 'auto' }, up.title)) : '',
         prop('clock', 'Last update', el('span', {}, stamp(t.at)))),
       ...(kids.length ? [el('p', { class: 'ui-dl' }, `${tkAbove(t).length ? 'Sub-tasks' : 'Tickets in this epic'} · ${done} of ${kids.length} done`), el('ul', { class: 'ui-list tk-in' }, ...kids.map(tkRow))] : []),
-      el('p', { class: 'ui-dl' }, 'Linked'), cards.length || t.prs?.length ? el('ul', { class: 'ui-list tk-in' }, ...(t.prs ?? []).map((url) => { const pr = /\/pull\/(\d+)\/?$/.exec(new URL(url).pathname); return el('li', {}, el('a', { class: 'ui-row', href: url, title: url, target: '_blank', rel: 'noopener noreferrer' }, ...uiRow({ tile: el('span', { class: 'ui-icon', 'aria-hidden': 'true' }, glyph('link')), title: pr ? `Pull request #${pr[1]}` : url, meta: pr ? new URL(url).pathname.replace(/\/pull\/.*$/, '').slice(1) : 'Pull request' }))); }), ...cards.map(linked)) : emptyState('empty', { mark: 'plan', title: 'No cards yet', text: 'Cards that name this ticket show here.', small: true }),
+      el('p', { class: 'ui-dl' }, 'Linked'), cards.length || t.prs?.length ? el('ul', { class: 'ui-list tk-in' }, ...(t.prs ?? []).map(tkPr), ...cards.map(linked)) : emptyState('empty', { mark: 'plan', title: 'No cards yet', text: 'Cards that name this ticket show here.', small: true }),
       // The person's comments on it (made in the fleet dashboard), oldest first, each with how far it got and the lead's reply.
       ...(said.length ? [el('p', { class: 'ui-dl' }, 'Your comments'), ...said.map((c) => el('div', { class: 'tk-said' }, el('p', { dir: 'auto' }, c.said), trailTrack(c)))] : []),
       steps.length ? thread(t, steps, 1) : el('div', { class: 'thread' }, el('p', { class: 'ui-dl' }, 'Activity'), emptyState('empty', { mark: 'clock', title: 'No activity yet', text: 'Moves on this ticket and answers on its cards show here.', small: true }))];

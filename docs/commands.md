@@ -116,8 +116,7 @@ sign-off-axi ticket --id T-29          # the ticket and its cards, newest first
 The card then shows a **Ticket** row (on an ask, **Its ask**), the title and progress, that opens the
 ticket: the tickets under it, its cards (asks, designs, proof, reports and plans),
 newest first, and their Activity. A card whose ticket is not on the board shows no row.
-The board's **Tickets** tab lists the tickets that sit under none: Your asks or
-System, how many are done, then In progress, On hold and To do. See [file-formats.md](file-formats.md#tickets)
+The board's **Tickets** screen has two tabs, All tickets and Activity. All tickets lists the tickets that sit under none: how many are done, then In progress, On hold and To do, with a filter by who asked (From you or Fleet upkeep) and by project. Activity is the timeline of what happened to them, newest first by day, each entry tagged like the cards and opening to its full title, before and after, who made it, its ticket and pull requests. See [file-formats.md](file-formats.md#tickets)
 for its Activity feed and hold-release behavior.
 
 ### Reading tickets over HTTP

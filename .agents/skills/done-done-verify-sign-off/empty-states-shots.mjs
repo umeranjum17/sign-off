@@ -177,15 +177,15 @@ try {
     await tap('.tk-activity > summary'); await until(`document.querySelector('.tk-activity').open`, 'opened');
     await capture('tickets-activity-open');
   } else {
-    await tap('.tk-activity-open'); await until(`!!document.querySelector('.tk-activity-dialog[open] .ui-act li')`, 'dialog');
+    await go(richUrl + '#activity'); await until(`!!document.querySelector('.tk-day .tk-ev')`, 'Activity tab');
     await capture('tickets-activity-open');
   }
   if (side === 'after') {
   const noEvents = { match: /view=tickets/, kind: 'reshape', fn: (b) => ({ ...b, ticketActivity: [] }) };
-  await go(richUrl + '#tickets', noEvents);
-  await until(`!!document.querySelector('.tk-hero')`, 'Tickets drawn');
-  if (phone) { await until(only('', 'empty', 'No activity yet'), 'Activity card empty'); await js(`document.querySelector('.tk-activity').scrollIntoView({ block: 'center' })`); }
-  else { await tap('.tk-activity-open'); await until(`!!document.querySelector('.tk-activity-dialog[open] .es-empty')`, 'dialog empty'); }
+  await go(richUrl + (phone ? '#tickets' : '#activity'), noEvents);
+  await until(phone ? `!!document.querySelector('.tk-hero')` : `!!document.querySelector('.tk-seg')`, 'Tickets drawn');
+  await until(only('', 'empty', 'No activity yet'), 'Activity empty');
+  if (phone) await js(`document.querySelector('.tk-activity').scrollIntoView({ block: 'center' })`);
   await capture('tickets-activity-empty');
   await go(richUrl + '#ticket/old-1');
   await until(`!!document.querySelector('.tk-sheet, .tk-pane') && document.body.innerText.includes('No activity yet')`, 'old ticket page');

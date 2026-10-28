@@ -112,13 +112,13 @@ try {
   const seen = {};
   for (const [state, hash, anchor] of STATES) {
     browser('open', 'about:blank');
-    browser('open', `${base}${hash}`);
+    browser('open', `${base}${state === 'tickets-activity' && width >= 1024 ? '#activity' : hash}`);
     wait(900);
     if (state === 'tickets-activity' && width === 390) {
       const collapsed = value(browser('eval', `() => {
         const feed = document.querySelector('details.tk-activity');
         const lists = [...document.querySelectorAll('main section[aria-label]:not(.tk-activity)')];
-        const details = { feed: !!feed, open: feed?.open, summary: feed?.querySelector('summary')?.textContent.trim(), lists: lists.length, heights: lists.map((s) => s.getBoundingClientRect().height) };
+        const details = { feed: !!feed, open: feed?.open, summary: feed?.querySelector('summary > span:first-child')?.textContent.trim(), lists: lists.length, heights: lists.map((s) => s.getBoundingClientRect().height) };
         if (!feed || feed.open || details.summary !== 'Activity' || lists.length < 3 || !lists.every((s) => s.getBoundingClientRect().height > 0) || !lists.some((s) => s.querySelector('a.tk-row')))
           throw new Error('phone board Activity must start collapsed above visible ticket lists: ' + JSON.stringify(details));
         feed.scrollIntoView({ block: 'start' });
@@ -131,39 +131,22 @@ try {
         const feed = document.querySelector('details.tk-activity');
         feed.querySelector('summary').click();
         return new Promise((resolve, reject) => setTimeout(() => {
-          if (!feed.open || !feed.querySelector('ol')) reject(new Error('phone board Activity did not expand'));
+          if (!feed.open || !feed.querySelector('ul.tk-feed')) reject(new Error('phone board Activity did not expand'));
           else resolve(true);
         }, 250));
       }`);
     }
-    if (state === 'tickets-activity' && width >= 1024) {
-      browser('eval', `() => {
-        const board = document.querySelector('.tk-desk'), grid = board?.querySelector('.ui-dgrid'), before = grid?.getBoundingClientRect().width;
-        const open = document.querySelector('.tk-activity-open');
-        if (!open || !before) throw new Error('desktop board Activity control is missing');
-        open.click();
-        const dialog = document.querySelector('.tk-activity-dialog[open]');
-        if (!dialog || document.activeElement !== dialog.querySelector('h2') || grid.getBoundingClientRect().width !== before || grid.querySelectorAll(':scope > .ui-col').length !== 2 || !grid.querySelector(':scope > .ui-pane')) throw new Error('desktop Activity dialog failed or board reflowed');
-        return true;
-      }`);
-    }
-    if (anchor) browser('eval', `() => { document.querySelector(${JSON.stringify(anchor)})?.scrollIntoView({ block: ${JSON.stringify(state === 'tickets-activity' ? 'start' : 'center')} }); return new Promise((ok) => setTimeout(ok, 400)); }`);
+    if (anchor) browser('eval', `() => { document.querySelector(${JSON.stringify(state === 'tickets-activity' && width >= 1024 ? '.tk-day' : anchor)})?.scrollIntoView({ block: ${JSON.stringify(state === 'tickets-activity' ? 'start' : 'center')} }); return new Promise((ok) => setTimeout(ok, 400)); }`);
     const name = `${state}.${cell}`;
     browser('screenshot', join(out, `${name}.png`));
     const m = seen[state] = value(browser('eval', probe));
     if (state === 'tickets-activity' && width >= 1024) {
       so('ticket', board, '--id', 'T-34', '--title', 'Polling update for board Activity');
       await wait(25000);
-      const polled = value(browser('eval', `() => JSON.stringify([...document.querySelectorAll('.tk-activity-dialog .ui-act li')].map((li) => li.innerText.replace(/\\s+/g, ' ').trim()))`));
-      assert.ok(polled.some((line) => line.includes('Ticket created · Polling update for board Activity')), 'desktop Activity did not refresh with polled ticket state');
+      const polled = value(browser('eval', `() => JSON.stringify([...document.querySelectorAll('.tk-day .tk-ev')].map((b) => b.getAttribute('aria-label')))`));
+      assert.ok(polled.some((line) => line.includes('Polling update for board Activity, ') && line.includes('Ticket created')), 'desktop Activity did not refresh with polled ticket state');
       browser('screenshot', join(out, `tickets-polling.${cell}.png`));
-      writeFileSync(join(out, `tickets-polling.${cell}.txt`), `While the desktop Activity dialog remained open, a CLI-created ticket appeared without refresh:\n${polled.join('\n')}\n`);
-      browser('press', 'Escape');
-      browser('eval', `() => new Promise((resolve, reject) => setTimeout(() => {
-        const button = document.querySelector('.tk-activity-open');
-        if (document.querySelector('.tk-activity-dialog') || document.activeElement !== button) reject(new Error('Escape did not close Activity and return focus'));
-        else resolve(true);
-      }, 0))`);
+      writeFileSync(join(out, `tickets-polling.${cell}.txt`), `While the Activity tab stayed open, a CLI-created ticket appeared without refresh:\n${polled.slice(0, 5).join('\n')}\n`);
     }
     writeFileSync(join(out, `${name}.txt`), `${state} ${theme} ${width}w ${hash}\ntitle: ${m.h1}\n${m.thread.length ? `Activity, ${state.startsWith('ticket') ? 'newest' : 'oldest'} first:\n${m.thread.map((t) => `  ${t}`).join('\n')}\n` : 'no Activity thread\n'}${m.rows.length ? m.rows.map((r) => `Ticket row: "${r.text}" -> ${r.href}, ${r.w}x${r.h}px, ${r.left}px from the left and ${r.right}px from the right`).join('\n') : 'no Ticket row'}\n`
       + (m.kicker ? `kicker: ${m.kicker}\nprogress: ${m.done}\n` : '') + m.lists.map((l) => `${l.head}:\n${l.rows.map((r) => `  ${r}`).join('\n')}`).join('\n') + `${m.lists.length ? '\n' : ''}horizontal overflow ${m.overflow ? 1 : 0}${m.wide.length ? ` (${m.wide.join(', ')})` : ''}\n`);
@@ -199,7 +182,7 @@ try {
   }`));
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version }, start: 'A throwaway board seeded with one card of each kind and no tickets, then T-9, T-29 (under T-9), T-30, held T-31 and T-32, and lifecycle T-33, a card of each kind posted with --ticket T-29, and an ask naming T-404.',
     steps: ['Open the Tickets tab on a phone and at 1280 px, in light and dark; capture the phone disclosure before tapping, then capture its expanded newest-first feed and per-ticket Activity.',
-      'Create a ticket while the desktop Activity dialog stays open; capture its polled Ticket created event without refreshing. Answer a linked ask on held T-32 and verify it releases to To do with a Hold released event; reply to a comment on held T-31 and verify it releases.',
+      'Create a ticket while the desktop Activity tab stays open; capture its polled Ticket created event without refreshing. Answer a linked ask on held T-32 and verify it releases to To do with a Hold released event; reply to a comment on held T-31 and verify it releases.',
       'Open each linked card (an ask, an update, a design review, a guided report, a guided plan), the same kind with no ticket, and the ask naming T-404.',
       'Answer an ask No with a note, change it to Yes with a note, let its agent take it, ask for a new round; give the update Pass with a note and a comment.',
       'Open each card\'s Activity, tap the ask\'s Its ask row to open T-29, read its Linked list and Activity, close it, then open T-9.'],

@@ -95,6 +95,26 @@ test('ticket lifecycle activity and hold release use effective progress', async 
   assert.deepEqual(moving.map((event) => event.text), ['State changed to in progress']);
 });
 
+test('Activity events carry the cards\' tags and the change, and a writer only where the line names one', async () => {
+  const pr = 'https://github.com/example/app/pull/7';
+  axi('ticket', board, '--id', 'ACT-1', '--title', 'Tag every row', '--project', 'Beacon', '--stage', 'building', '--state', 'in progress');
+  axi('ticket', board, '--id', 'ACT-1', '--stage', 'review', '--priority', 'P1', '--pr', pr, '--filer', 'crew-7');
+  axi('ticket', board, '--id', 'ACT-1', '--progress', '50');
+  axi('ticket', board, '--id', 'ACT-1', '--progress', '60', '--filer', '11111111-2222-3333-4444-555555555555');
+  assert.throws(() => axi('ticket', board, '--id', 'ACT-1', '--progress', '70', '--filer', 'not a name'));
+  const port = await serve(), { ticketActivity } = await (await fetch(`http://127.0.0.1:${port}/api/state?view=tickets`)).json();
+  const mine = ticketActivity.filter((e) => e.ticket === 'ACT-1'), by = (kind, to) => mine.find((e) => e.kind === kind && (to === undefined || e.to === to));
+  // The priority and the pull request came on a later line, and are on every event of the ticket, the first too.
+  const tags = { ticket: 'ACT-1', title: 'Tag every row', project: 'Beacon', priority: 'P1' };
+  assert.deepEqual(by('stage', 'review'), { ...tags, kind: 'stage', text: 'Stage moved to review', at: by('stage', 'review').at, stage: 'review', state: 'in progress', prs: [pr], from: 'building', to: 'review', by: 'crew-7' });
+  assert.deepEqual([by('progress', '50%').from, by('progress', '50%').by], ['0%', undefined], 'a later write does not inherit the writer');
+  assert.deepEqual([by('progress', '60%').from, by('progress', '60%').by], ['50%', undefined], 'a bare session id names nobody');
+  assert.deepEqual(by('created'), { ...tags, kind: 'created', text: 'Ticket created', at: by('created').at, stage: 'building', state: 'in progress', prs: [pr] });
+  assert.equal(mine.filter((e) => e.kind === 'progress').length, 2);
+  const full = by('stage', 'review'), { project, priority, stage, state, prs, from, to, by: who, ...old } = full;
+  console.log(`ticket activity event: ${Buffer.byteLength(JSON.stringify(full))} B with its tags, ${Buffer.byteLength(JSON.stringify(old))} B with the five fields it had`);
+});
+
 test('Tickets read caps a live-shape activity feed at 200 newest events without losing ticket-local activity', async () => {
   for (let i = 0; i < 205; i++) axi('ticket', board, '--id', `CAP-${i}`, '--title', `Activity ticket ${i}`);
   axi('ticket', board, '--id', 'CAP-204', '--state', 'in progress');

@@ -1925,7 +1925,7 @@
     .answer .okmark .glyph { stroke-dashoffset: 0; }
     .dl-face, .dl-act > *, .leaving .ui-icon, .decide .pick-option, .decide .own-field, .decide-bar > *, .dl-more > summary > span, .tabs .hl, .tabs .icon, .side .icon, .t-btn, .t-tiles .ui-stat { transition: none !important; }
   }
-  /* ---- Tickets, as the approved prototype draws them from ui.css's parts: the title row (the project filter and light or dark), Your asks or System, the hero with its done
+  /* ---- Tickets, as the approved prototype draws them from ui.css's parts: the title row (the project filter and light or dark), the Tickets and Activity tabs, the hero with its done
      dot grid, then In progress, On hold, To do and Done, and two tiles. A ticket rises over the list as a sheet on a phone; a desk is one filled screen of three columns,
      the open ticket in the third, each list ending on a whole row. ---- */
   body.tickets .ui-row .meta, body.tickets .ui-row .l2 { margin: 0; }
@@ -1942,6 +1942,7 @@
   .tk-pt img, .tk-pt .mono { width: 1.25rem; height: 1.25rem; border-radius: 0.3125rem; object-fit: cover; }
   .tk-shd .ui-icon { width: 1.25rem; height: 1.25rem; border-radius: 0.3125rem; box-shadow: none; }
   .tk-shd .ui-icon :is(img, svg) { width: 1.25rem; height: 1.25rem; }
+  .tk-shd .ui-icon .icon { width: 1.25rem; height: 1.25rem; }
   /* The hero: its label and how many were done this week, the big count, how many move, and one square per ticket. */
   .tk-hero { container-type: inline-size; }
   /* The shared hero chip (ui.css), with the prototype's green rise before its count. */
@@ -1971,8 +1972,8 @@
   .tk-stuck { flex: none; color: var(--tk-warn); white-space: nowrap; font-size: 11px; line-height: 1rem; }
   .tk-status { display: inline-flex; flex: none; align-items: center; gap: 6px; margin-right: 6px; }
   .tk-stage { display: inline-flex; width: auto; height: 1rem; padding: 0 4px; white-space: nowrap; line-height: 1rem; background: var(--tk-inset); }
-  :is(.tk-sheet, .tk-pane) .ui-pr:has(.tk-stage) .v { flex-wrap: wrap; gap: 6px; padding: 8px 0; }
-  :is(.tk-sheet, .tk-pane) .ui-pr .v > span:is(.tk-stage, .tk-stuck) { white-space: nowrap; overflow: visible; }
+  :is(.tk-sheet, .tk-pane, .tk-evs) .ui-pr:has(.tk-stage) .v { flex-wrap: wrap; gap: 6px; padding: 8px 0; }
+  :is(.tk-sheet, .tk-pane, .tk-evs) .ui-pr .v > span:is(.tk-stage, .tk-stuck) { white-space: nowrap; overflow: visible; }
   .tk-release { display: inline-block; width: auto; max-width: 110px; padding: 0 6px; background: var(--tk-inset); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* The ticket: its project and state (with Close on a phone), its title in full, its properties, the tickets under it, Linked and Activity. */
   .tk-shd { display: flex; align-items: center; gap: 0.5rem; min-height: 2.5rem; }
@@ -1982,8 +1983,8 @@
   .tk-dt { margin: 0.5rem 0 0; color: var(--tk-ink); font-size: 1.25rem; line-height: 1.75rem; font-weight: 500; letter-spacing: -0.017em; outline: none; }
   .tk-k { display: inline-grid; flex: none; place-items: center; width: 1.125rem; height: 1.125rem; }
   .tk-k svg { width: 1.125rem; height: 1.125rem; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-  :is(.tk-sheet, .tk-pane) .ui-props { margin-top: 0.5rem; }
-  :is(.tk-sheet, .tk-pane) .ui-pr .v > span:not(.ui-bar) { white-space: normal; }
+  :is(.tk-sheet, .tk-pane, .tk-evs) .ui-props { margin-top: 0.5rem; }
+  :is(.tk-sheet, .tk-pane, .tk-evs) .ui-pr .v > span:not(.ui-bar) { white-space: normal; }
   .tk-in { margin-top: 0.5rem; border-radius: 1rem; background: var(--tk-inset); } .tk-in .ui-icon { box-shadow: none; }
   /* A desk: one filled screen with no page scroll. The head across (where you are, the 32px title, one line of what it holds, the controls at its right), then three columns:
      the hero over In progress, On hold over To do, and the open ticket. A list scrolls inside its card with no scrollbar and comes to rest on whole rows; 88px rows, titles on two lines. */
@@ -2007,9 +2008,32 @@
     .tk-desk .tk-in .ui-row { height: auto; min-height: 4.25rem; padding: 0.75rem 0; }
     .tk-desk .tk-empty { width: 25rem; margin: 0; }
   }
-  .tk-activity-dialog { width: min(42rem, calc(100vw - 2rem)); max-height: min(42rem, calc(100dvh - 2rem)); border: 0; }
-  .tk-activity-dialog::backdrop { background: var(--tk-scrim); }
-  .tk-activity-open { white-space: nowrap; }
+  /* The Activity feed's row is a button built as the In progress cards' row: the same tile, title, priority chip and stage chip. */
+  button.tk-ev { padding: 0; border: 0; border-radius: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
+  .tk-ev:focus-visible { outline-offset: -2px; border-radius: 0.75rem; }
+  .tk-ev:active .rm { opacity: 0.7; }
+  .tk-all { display: flex; align-items: center; justify-content: center; gap: 0.25rem; min-height: 2.75rem; border-top: 1px solid var(--tk-line); color: var(--tk-ink); font-size: var(--tk-fs-row); font-weight: 500; text-decoration: none; }
+  .tk-all .glyph { width: 1rem; height: 1rem; }
+  .tk-evs .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .tk-evs .tk-evt { margin: 0.25rem 0 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
+  .tk-evs .ui-dl { margin-top: 1rem; }
+  /* The Activity tab: the filters (project, priority, type), how many events they leave, then each day under its heading with a rail down it and a dot at each event. */
+  .tk-filters { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+  .tk-sel { flex: 1 1 0; min-width: 0; height: 2.5rem; padding: 0 1.5rem 0 0.75rem; border: 0; border-radius: 1.25rem; appearance: none; text-overflow: ellipsis; color: var(--tk-ink); font: inherit; font-size: var(--tk-fs-row); font-weight: 500;
+    background-color: var(--tk-card); box-shadow: var(--tk-elev-card), inset 0 1px 0 var(--tk-hl); background-repeat: no-repeat; background-size: 0.3125rem 0.3125rem; background-position: calc(100% - 0.9375rem) 50%, calc(100% - 0.625rem) 50%;
+    background-image: linear-gradient(45deg, transparent 50%, var(--tk-text-tertiary) 50%), linear-gradient(135deg, var(--tk-text-tertiary) 50%, transparent 50%); }
+  .tk-sel:focus-visible { outline: 2px solid var(--tk-ink); outline-offset: 2px; }
+  .tk-count { margin: 0.5rem 0.25rem 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: var(--tk-lh-meta); font-variant-numeric: tabular-nums; }
+  .tk-tl { position: relative; --half: 2.125rem; padding-left: 2rem; }
+  .tk-tl::before { content: ''; position: absolute; top: calc(0.25rem + var(--half)); bottom: calc(0.25rem + var(--half)); left: calc(1rem - 1px); width: 2px; border-radius: 1px; background: var(--tk-line); }
+  .tk-tl > li::after { content: ''; position: absolute; z-index: 3; top: 50%; left: -1rem; width: 0.625rem; height: 0.625rem; margin: -0.3125rem 0 0 -0.3125rem; border-radius: 50%; background: var(--tk-fill); box-shadow: 0 0 0 3px var(--tk-card); }
+  .tk-day .ui-sec { margin-top: 1.25rem; }
+  @media (min-width: 64rem) {
+    .tk-desk .tk-tl { --half: 2.25rem; } .tk-desk .tk-tl .ui-row { height: 4.5rem; }
+    .tk-desk .tk-day:first-child .ui-sec { margin-top: 0; }
+    .ui-dhead .acts .tk-filters { margin: 0; } .ui-dhead .acts .tk-sel { flex: none; width: 9.5rem; }
+    .tk-desk .tk-acts .tk-feed { margin-bottom: 0.5rem; }
+  }
   @media (max-width: 63.999rem) {
     .tk-activity { min-width: 0; margin-top: 1rem; padding: 0.25rem 1rem; }
     .tk-activity > summary { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 0 0.5rem; min-height: 2.75rem; padding: 0.5rem 0; list-style: none; cursor: pointer; color: var(--tk-ink);
@@ -2020,8 +2044,8 @@
     .tk-last { flex: none; width: 0; min-width: 100%; overflow: hidden; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 400; letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
     .tk-activity[open] .tk-last { display: none; }
     .tk-activity > summary::-webkit-details-marker { display: none; }
-    .tk-activity[open] { max-height: 20rem; overflow: hidden; }
-    .tk-activity[open] .ui-act { max-height: 16rem; overflow: auto; overscroll-behavior: contain; }
+    .tk-activity[open] { max-height: 21rem; overflow: hidden; }
+    .tk-activity[open] .tk-feed { max-height: 15rem; padding: 0; overflow: auto; overscroll-behavior: contain; }
   }
   @media (prefers-reduced-motion: reduce) { .tk-over.up .tk-sheet, .tk-over.up .tk-scrim { animation: none; } }
 

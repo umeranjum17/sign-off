@@ -154,7 +154,7 @@
   const tkLoad = () => (FROZEN || ticketsRead ? 'ready' : ticketsFailed ? 'error' : 'loading');
 
   /** The addresses whose screens live in app-more.js: Decide, Designs, Evidence, Reports, Answered, Tickets. Today is the first screen and waits for nothing. */
-  const MORE_SCREENS = /^#(?:waiting|decide|designs|evidence|reports|answered|tickets|ticket)(?:\/|$)/;
+  const MORE_SCREENS = /^#(?:waiting|decide|designs|evidence|reports|answered|tickets|ticket|activity)(?:\/|$)/;
   // A response can arrive after the person has started typing on the next card.
   // Keep the active editor and its selection across that redraw, just as a poll does.
   // The screens beyond the first screen's own (the guide, the plan and design reviews, the tickets, the evidence and decide desks, the report and
@@ -1404,9 +1404,9 @@
   const TK_WORDS = { done: 'Done', hold: 'On hold', moving: 'In progress', todo: 'To do' };
   // The property rows' marks, as the prototype draws them: a flag, a half-filled circle, two stacked sheets and a clock; fixed strings from this page.
   const TK_MARKS = { flag: '<path d="M5 21V4h11l-2 4 2 4H5"/>', half: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/>',
-    layers: '<rect x="3" y="3" width="12" height="12" rx="2"/><path d="M9 21h10a2 2 0 0 0 2-2V9"/>', clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>' };
+    layers: '<rect x="3" y="3" width="12" height="12" rx="2"/><path d="M9 21h10a2 2 0 0 0 2-2V9"/>', clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>', person: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/>' };
   const tkMark = (a) => { const s = el('span', { class: 'tk-k', 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24">${TK_MARKS[a]}</svg>`; return s; };
-  let tkWhose = 'asks', tkProj = '', tkShown = '';
+  let tkWhose = '', tkProj = '', tkShown = '';
   const tkMore = new Set();
   const tkAll = () => state.tickets ?? [];
   const tkById = (id) => tkAll().find((t) => t.id === id);
@@ -1449,7 +1449,6 @@
     const of = (s) => shown.filter((t) => tkStateOf(t) === s).sort(byPrio);
     return { roots, both, kind, asked: asked.length, ofKind, shown, done: of('done'), moving: of('moving'), hold: of('hold'), todo: of('todo') };
   }
-  const tkHeroLabel = (kind) => (kind === 'asks' ? 'Your asks done' : kind === 'system' ? 'System work done' : 'Tickets done');
   /** The done dot grid: one square per ticket, done in ink, moving in the middle tone, the rest light; as many columns (24 to 30) as leave the fewest empty squares. */
   function tkDots(L) {
     const n = L.shown.length;
@@ -1461,26 +1460,32 @@
   }
   function tkHero(L) {
     const week = L.done.filter((t) => Date.now() - Date.parse(t.at) < 7 * 864e5).length;
-    return el('section', { class: 'ui-card ui-hero tk-hero' }, el('div', { class: 'hl' }, el('span', { class: 'lab' }, tkHeroLabel(L.kind)), week ? el('span', { class: 'chip' }, el('i', { class: 'up', 'aria-hidden': 'true' }), `${week} this week`) : ''),
+    return el('section', { class: 'ui-card ui-hero tk-hero' }, el('div', { class: 'hl' }, el('span', { class: 'lab' }, 'Tickets done'), week ? el('span', { class: 'chip' }, el('i', { class: 'up', 'aria-hidden': 'true' }), `${week} this week`) : ''),
       el('div', { class: 'hv' }, el('span', { class: 'big' }, String(L.done.length), el('small', {}, ` of ${L.shown.length}`)), L.moving.length ? el('span', { class: 'vs' }, el('i', { 'aria-hidden': 'true' }), `${L.moving.length} moving`) : ''), tkDots(L));
   }
-  /** Your asks or System, each with how many it holds. */
-  function tkSeg(L) {
-    const b = (v, name, n) => { const x = el('button', { 'aria-pressed': String(L.kind === v) }, name, el('small', {}, String(n))); x.onclick = () => { tkWhose = v; tkProj = ''; buzz('tick'); render(); }; return x; };
-    return L.both ? el('div', { class: 'ui-seg tk-seg', role: 'group', 'aria-label': 'Whose tickets' }, b('asks', 'Your asks', L.asked), b('system', 'System', L.roots.length - L.asked)) : '';
+  /** The two tabs at the top of Tickets: every ticket, and Activity, the timeline of what moved on them. */
+  function tkTabs(on) {
+    const b = (v, name) => { const x = el('button', { type: 'button', 'aria-pressed': String(on === v) }, name); x.onclick = () => { if (on !== v) buzz('tick'), location.hash = `#${v}`; }; return x; };
+    return el('div', { class: 'ui-seg tk-seg', role: 'group', 'aria-label': 'Tickets view' }, b('tickets', 'All tickets'), b('activity', 'Activity'));
   }
-  /** The project filter: a round button in the header (marked while one is picked) that opens a sheet of the projects with tickets, and Every project. */
+  /** Who asked for a ticket: the ones the board's owner asked for, and the fleet's own upkeep. */
+  const TK_WHO = { asks: 'From you', system: 'Fleet upkeep' };
+  /** The filter: a round button in the header (marked while one is picked) that opens a sheet of who asked (while the board has both) and of the projects with tickets, each with Every one. */
   const tkFilterSheet = sheetOf('tk-filter');
   function tkFilter(L) {
     const names = [...new Set(L.ofKind.map(tkProject).filter(Boolean))].sort((x, y) => x.localeCompare(y));
-    if (!names.length) return '';
-    const b = el('button', { class: `ui-rb tk-rb${tkProj ? ' on' : ''}`, 'aria-label': tkProj ? `Filter by project: ${tkProj}` : 'Filter by project', 'aria-haspopup': 'dialog' });
+    if (!names.length && !L.both) return '';
+    const b = el('button', { class: `ui-rb tk-rb${tkProj || L.kind ? ' on' : ''}`, 'aria-label': tkProj || L.kind ? `Filter tickets: ${[TK_WHO[L.kind], tkProj].filter(Boolean).join(', ')}` : 'Filter tickets', 'aria-haspopup': 'dialog' });
     b.innerHTML = '<svg class="glyph" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 6h13M6 10h8M8.5 14h3"/></svg>';
     b.onclick = () => {
       const pick = (name, n, tile) => { const x = el('button', { class: 'ui-pr tk-pick', ...(tkProj === name && { 'aria-current': 'true' }) }, el('span', { class: 'k' }, tile, name || 'Every project'), el('span', { class: 'v' }, el('span', { class: 'n' }, String(n)), tkProj === name ? glyph('check') : ''));
         x.onclick = () => { tkProj = name; tkFilterSheet.close(); render(); }; return x; };
-      tkFilterSheet.replaceChildren(el('div', {}, sheetHead('tk-filter', 'Filter by project'), el('div', { class: 'ui-props' }, pick('', L.ofKind.length, ''),
-        ...names.map((p) => pick(p, L.ofKind.filter((t) => tkProject(t) === p).length, el('span', { class: 'tk-pt', 'aria-hidden': 'true' }, projectPic(p)))))));
+      const who = (v, n) => { const x = el('button', { class: 'ui-pr tk-pick', ...(L.kind === v && { 'aria-current': 'true' }) }, el('span', { class: 'k' }, TK_WHO[v] ?? 'Everyone'), el('span', { class: 'v' }, el('span', { class: 'n' }, String(n)), L.kind === v ? glyph('check') : ''));
+        x.onclick = () => { tkWhose = v; tkProj = ''; tkFilterSheet.close(); render(); }; return x; };
+      tkFilterSheet.replaceChildren(el('div', {}, sheetHead('tk-filter', 'Filter tickets'),
+        ...(L.both ? [el('p', { class: 'ui-dl' }, 'Who asked'), el('div', { class: 'ui-props' }, who('', L.roots.length), who('asks', L.asked), who('system', L.roots.length - L.asked))] : []),
+        ...(names.length ? [el('p', { class: 'ui-dl' }, 'Project'), el('div', { class: 'ui-props' }, pick('', L.ofKind.length, ''),
+          ...names.map((p) => pick(p, L.ofKind.filter((t) => tkProject(t) === p).length, el('span', { class: 'tk-pt', 'aria-hidden': 'true' }, projectPic(p)))))] : [])));
       tkFilterSheet.showModal();
       tkFilterSheet.querySelector('h2').focus();
     };
@@ -2581,8 +2586,8 @@
     const hidden = state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'waiting');
     decideCtx = { all: decideOrder(by.waiting), hidden };
     by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
-    const [, at, key] = /^#(waiting|decide|designs|evidence|reports|answered|tickets|ticket)(?:\/([\w.-]+))?$/.exec(location.hash) ?? [];
-    const showingTickets = at === 'tickets' || at === 'ticket';
+    const [, at, key] = /^#(waiting|decide|designs|evidence|reports|answered|tickets|ticket|activity)(?:\/([\w.-]+))?$/.exec(location.hash) ?? [];
+    const showingTickets = at === 'tickets' || at === 'ticket' || at === 'activity';
     if (showingTickets && !ticketScreen) readTickets(true);
     ticketScreen = showingTickets;
     // The asks Decide steps through, in the list's order, Later last.
@@ -2617,7 +2622,7 @@
     whole(opened);
     for (const k of changing) if (k !== shownAsk?.key) changing.delete(k);
     // A decision lives under Decide; Designs has its own place in the sidebar, and on a phone, as the prototype's dock has it, Designs and Answered light Today, whose More opens them.
-    const active = at === 'decide' ? 'waiting' : at === 'answered' ? '' : at === 'ticket' ? 'tickets' : at ?? '';
+    const active = at === 'decide' ? 'waiting' : at === 'answered' ? '' : at === 'ticket' || at === 'activity' ? 'tickets' : at ?? '';
     // Tickets, as the prototype draws its place, carries no count.
     const count = (a) => (a === 'reports' && !state.readonly ? by.reports.filter(unread).length : a && a !== 'tickets' ? by[a].length : undefined);
     // Decide's count is a red badge and new Reports' an ink one, in the sidebar and the tab bar alike; Evidence's is a plain number.
@@ -2635,7 +2640,7 @@
     const ro = state.readonly ? 'Read only' : FROZEN ? `Read-only copy, ${FROZEN.exported}` : '';
     const pageTitle = head === 'decide' || head === 'waiting' ? 'Decide' : head === 'reports' ? 'Reports' : AREAS[head];
     document.body.classList.toggle('today', !at);
-    document.body.classList.toggle('tickets', at === 'tickets' || at === 'ticket');
+    document.body.classList.toggle('tickets', showingTickets);
     const bulk = { waiting: by.waiting, designs: by.designs, evidence: by.evidence, reports: [...by.reports, ...by.notes], answered: by.answered }[at] ?? [];
     const answeredToday = by.answered.filter((d) => isToday(state.answers[d.key].at)).length;
     // Decide's head, as ui.css draws it: the title and the light-or-dark button at its right edge; More sits under the list.
@@ -2660,7 +2665,7 @@
       notes(by.notes), archived(state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && ['reports', 'notes'].includes(area(d)))),
       !selecting && !state.readonly && !FROZEN && bulk.length ? reportsMore(by.reports, bulk) : '');
     const update = at === 'evidence' && ((key && state.decisions.find((d) => d.key === key && !gone.has(d.key) && d.type === 'evidence')) || by.evidence.find((d) => d.type === 'evidence'));
-    const content = at === 'tickets' || at === 'ticket' ? tickets(by, at === 'ticket' ? key : '') : [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, archived(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence')), update)
+    const content = showingTickets ? tickets(by, at === 'ticket' ? key : '', at === 'activity') : [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, archived(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence')), update)
       : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0, by.reports) : decideDesk(top, by.waiting, hidden, decideQueue, key, decideDone, answeredToday)] : at === 'designs' && !phone() && by.designs.length ? [] : [top]), ...(deskSplit ? [] : (at === 'waiting' || at === 'decide') && !state.readonly ? [at === 'decide' && !shownAsk ? emptyState('empty', { mark: 'waiting', title: 'That question isn’t waiting', text: 'It may already be answered. Pick another from the list.' }) : '', decideList(by.waiting, hidden, decideDone, answeredToday), at === 'decide' && shownAsk ? askSheet(shownAsk) : '']
       : at === 'designs' ? designGroups(by.designs, top, key, state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'designs')) : at === 'evidence' ? [...evidenceList(by.evidence, top), archived(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'))] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? emptyState('empty', { mark: 'answered', title: 'All done items cleared' }) : screenEmpty(at)] : today(by))];
@@ -2813,7 +2818,7 @@
         const card = await view(`/api/decisions?view=card&key=${encodeURIComponent(open)}`).catch(() => undefined);
         if (card?.card) mergeView(card), (changed = true);
       }
-      if (/^#tickets?(?:\/|$)/.test(location.hash) && await readTickets(true)) changed = true;
+      if (/^#(?:tickets?|activity)(?:\/|$)/.test(location.hash) && await readTickets(true)) changed = true;
       if (!changed) return;
       await readLists();
       renderKeepingFocus();

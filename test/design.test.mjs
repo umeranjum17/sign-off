@@ -4653,14 +4653,21 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     await until(async () => (await evaluate('[...document.querySelectorAll(".tk-sheet a.tk-row")].map((a) => a.getAttribute("href")).join()')) === '#ticket/T-29');
     assert.equal(await evaluate('[...document.querySelectorAll(".tk-sheet > .ui-dl, .tk-sheet > .es b")].map((p) => p.textContent).join(" | ")'), 'Tickets in this epic · 0 of 1 done | Linked | No cards yet');
     assert.equal(await evaluate('!!document.querySelector(".tk-sheet .tk-shd .ui-icon img")?.naturalWidth && !!document.querySelector(".tk-sheet .tk-in .tk-row .ui-icon img")?.naturalWidth && !document.querySelector(".tk-sheet .mono")'), true);
-    // The Tickets tab lists the tickets under no other: Your asks (T-9, which the user asked for, moving) or System (T-31, on hold). T-29 sits under T-9, so it is not listed on its own.
+    // The Tickets tab lists the tickets under no other, all of them unless the filter's Who asked says From you (T-9 and T-32, which the user asked for) or Fleet upkeep (T-31, on hold). T-29 sits under T-9, so it is not listed on its own.
     const tab = `JSON.stringify({ seg: [...document.querySelectorAll('.tk-seg button')].map((b) => b.textContent + (b.getAttribute('aria-pressed') === 'true' ? ' on' : '')), hero: document.querySelector('.tk-hero').innerText.replace(/\\s+/g, ' ').trim(),
       lists: [...document.querySelectorAll('main section[aria-label]:not(.tk-activity)')].map((x) => x.getAttribute('aria-label') + ' ' + [...x.querySelectorAll('a.tk-row')].map((a) => a.getAttribute('href')).join()) })`;
     await evaluate(`location.href = ${JSON.stringify(`${url}#tickets`)}`);
     await until(() => evaluate('!!document.querySelector(".tk-hero")'));
     assert.equal(await evaluate('!!document.querySelector("main .tk-row .ui-icon img")?.naturalWidth && !document.querySelector("main .tk-row .mono")'), true);
-    assert.deepEqual(JSON.parse(await evaluate(tab)), { seg: ['Your asks2 on', 'System1'], hero: 'Your asks done 0 of 2 2 moving', lists: ['In progress #ticket/T-9,#ticket/T-32'] });
-    await evaluate('document.querySelector(".tk-seg button:last-child").click()');
+    assert.deepEqual(JSON.parse(await evaluate(tab)), { seg: ['All tickets on', 'Activity'], hero: 'Tickets done 0 of 3 2 moving', lists: ['In progress #ticket/T-9,#ticket/T-32', 'On hold #ticket/T-31'] });
+    const who = (word) => evaluate(`document.querySelector('.tk-rb').click(), [...document.querySelectorAll('#tk-filter .tk-pick')].find((b) => b.textContent.startsWith(${JSON.stringify(word)})).click()`);
+    await who('Fleet upkeep');
+    await until(async () => JSON.parse(await evaluate(tab)).lists.join() === 'On hold #ticket/T-31');
+    await who('From you');
+    await until(async () => JSON.parse(await evaluate(tab)).lists.join() === 'In progress #ticket/T-9,#ticket/T-32');
+    await who('Everyone');
+    await until(async () => JSON.parse(await evaluate(tab)).lists.join() === 'In progress #ticket/T-9,#ticket/T-32,On hold #ticket/T-31');
+    await who('Fleet upkeep');
     await until(async () => JSON.parse(await evaluate(tab)).lists.join() === 'On hold #ticket/T-31');
     assert.equal(run('ticket', file, '--id', 'new-arrival', '--title', 'A newly synced ticket').code, 0);
     // No manual refresh: the open Tickets page finds this standalone ticket on its next 20-second poll.
@@ -4668,12 +4675,12 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     // Activity is collapsed by default on a phone; open it before checking its entries.
     await evaluate('document.querySelector(".tk-activity > summary").click()');
     await until(() => evaluate('document.querySelector(".tk-activity").open'));
-    const feed = await evaluate('JSON.stringify([...document.querySelectorAll(".tk-activity .ui-act li")].map((li) => li.innerText.replace(/\\s+/g, " ").trim()))');
+    const feed = await evaluate('JSON.stringify([...document.querySelectorAll(".tk-activity .tk-ev")].map((b) => b.getAttribute("aria-label")))');
     assert.match(feed, /Ticket created/); assert.match(feed, /Stage moved to done/); assert.match(feed, /Progress changed to 60%/); assert.match(feed, /Ticket merged/); assert.match(feed, /Put on hold/);
     const oldEvent = Math.floor(Date.now() / 1000) - 18 * 3600;
     const reply = JSON.stringify({ id: 'hold-reply', at: oldEvent, text: 'What should I choose?', picked: oldEvent, replies: [{ at: oldEvent, text: 'Squad Lead' }] });
     assert.equal(run('ticket', file, '--id', 'T-31', '--comment', reply).code, 0);
-    const inspectRelease = `(async () => { const fresh = await fetch('/api/decisions?view=tickets').then((r) => r.json()), feed = document.querySelector('.tk-activity'); return { ticket: fresh.tickets.find((t) => t.id === 'T-31'), client: state.tickets.find((t) => t.id === 'T-31'), rows: [...document.querySelectorAll('.tk-row')].map((a) => (a.closest('section[aria-label]')?.getAttribute('aria-label') ?? '') + ' ' + a.getAttribute('href')), activityOpen: feed?.open, activityText: feed?.innerText ?? '' }; })()`;
+    const inspectRelease = `(async () => { const fresh = await fetch('/api/decisions?view=tickets').then((r) => r.json()), feed = document.querySelector('.tk-activity'); return { ticket: fresh.tickets.find((t) => t.id === 'T-31'), client: state.tickets.find((t) => t.id === 'T-31'), rows: [...document.querySelectorAll('.tk-row')].map((a) => (a.closest('section[aria-label]')?.getAttribute('aria-label') ?? '') + ' ' + a.getAttribute('href')), activityOpen: feed?.open, activityText: [...(feed?.querySelectorAll('.tk-ev') ?? [])].map((b) => b.getAttribute('aria-label')).join(' | ') }; })()`;
     // The next poll must clear the held row and paint its release event without a reload or manual refresh.
     await until(async () => { const r = await evaluate(inspectRelease); return !r.ticket.hold && !r.client.hold && r.rows.includes('To do #ticket/T-31') && r.activityOpen && r.activityText.includes('Hold released'); });
     const releaseCheck = await evaluate(inspectRelease);
@@ -4683,15 +4690,15 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     assert.equal(released.client.hold, false, JSON.stringify(releaseCheck));
     assert.ok(released.rows.includes('To do #ticket/T-31'), JSON.stringify(releaseCheck));
     assert.ok(!released.rows.includes('On hold #ticket/T-31'), JSON.stringify(releaseCheck));
-    await until(() => evaluate('document.querySelector(".tk-activity").open && document.querySelector(".tk-activity").innerText.includes("Hold released")'));
-    assert.match(await evaluate('document.querySelector(".tk-activity").innerText'), /Hold released/);
+    await until(() => evaluate('document.querySelector(".tk-activity").open && !!document.querySelector(".tk-activity .tk-ev[aria-label*=\\"Hold released\\"]")'));
     for (let i = 0; i < 51; i++) assert.equal(run('ticket', file, '--id', `feed-cap-${i}`, '--title', `Feed cap ${i}`).code, 0);
     await evaluate('refresh()');
-    await until(() => evaluate('document.querySelectorAll(".tk-activity .ui-act li").length === 50'));
-    await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-    await evaluate('document.querySelector(".tk-activity-open").click()');
-    await until(() => evaluate('document.querySelectorAll(".tk-activity-dialog .ui-act li").length === 50'));
-    await evaluate('document.querySelector(".tk-activity-dialog .x").click()');
+    await until(() => evaluate('document.querySelectorAll(".tk-activity .tk-ev").length === 50'));
+    // A row of the phone's card opens the same view as a sheet over the board; Escape closes it and the focus is back on that row.
+    await evaluate('document.querySelector(".tk-activity .tk-ev").click()');
+    await until(() => evaluate('!!document.querySelector("dialog.tk-evs[open]")'));
+    for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+    await until(() => evaluate('!document.querySelector("dialog.tk-evs[open]") && document.activeElement === document.querySelector(".tk-activity .tk-ev")'));
     await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
     await evaluate(`location.href = ${JSON.stringify(`${url}#ticket/T-31`)}`);
     await until(() => evaluate('!!document.querySelector(".tk-sheet") && !document.querySelector(".tk-sheet .tk-stuck")'));
@@ -4715,18 +4722,75 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
       return [...document.querySelectorAll('.ui-act li')].filter((li) => li.querySelector('.on')).map((li) => [li.querySelector('b').textContent, li.querySelector('.th-n')?.textContent, li.querySelector('.on').textContent].filter(Boolean).join(' ')).join(' | '); })()`;
     assert.equal(await evaluate(tkThread), [...steps].reverse().map((x) => `${x} Ship the settings page on Friday?`).join(' | '));
     assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
+    // The Activity tab: every row carries the cards' tags and opens an expanded view, by tap and by key; Escape puts the focus back on the row; the ticket opens from the view.
+    assert.equal(run('ticket', file, '--id', 'T-29', '--progress', '75', '--pr', prs.join(','), '--filer', 'firstmate-crew').code, 0);
     await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
     await evaluate(`location.hash = '#tickets'`);
-    await until(() => evaluate('!!document.querySelector(".tk-activity-open")'));
-    await evaluate('document.querySelector(".tk-activity-open").click()');
-    await until(() => evaluate('!!document.querySelector(".tk-activity-dialog[open] a")'));
-    assert.equal(await evaluate(`(() => { const link = document.querySelector('.tk-activity-dialog[open] a[href^="#ticket/"]');
+    await until(() => evaluate('document.querySelectorAll(".tk-seg button").length === 2'));
+    assert.equal(await evaluate('[...document.querySelectorAll(".tk-seg button")].map((b) => b.textContent + (b.getAttribute("aria-pressed") === "true" ? " on" : "")).join()'), 'All tickets on,Activity');
+    await evaluate('document.querySelector(".tk-seg button:last-child").click()');
+    await evaluate('refresh()');
+    const evRow = (text) => `[...document.querySelectorAll('.tk-day .tk-ev')].find((b) => b.getAttribute('aria-label').includes(${JSON.stringify(text)}))`;
+    await until(() => evaluate(`location.hash === '#activity' && !!${evRow('Progress changed to 75%')}`));
+    // Tags as on the In progress cards: the project's icon and name, the priority chip, the stage chip.
+    const tagged = JSON.parse(await evaluate(`JSON.stringify({ days: document.querySelectorAll('.tk-day h2').length > 0, chips: [...document.querySelectorAll('.tk-ev .ui-pc')].map((c) => c.textContent),
+      meta: ${evRow('The new settings page P1, ')}.querySelector('.meta').textContent, icon: !!${evRow('The new settings page P1, ')}.querySelector('.ui-icon img'), button: ${evRow('The new settings page P1, ')}.tagName,
+      bare: [...document.querySelectorAll('.tk-ev')].filter((r) => !r.querySelector('.ui-pc.p0, .ui-pc.p1, .ui-pc.p2, .ui-pc.p3') && r.getAttribute('aria-label').includes('The new settings page')).length })`));
+    assert.deepEqual([tagged.days, tagged.meta, tagged.icon, tagged.button, tagged.bare], [true, 'Settings · Created', true, 'BUTTON', 0]);
+    assert.ok(tagged.chips.includes('P1') && tagged.chips.includes('building'), tagged.chips.join());
+    const open = () => until(() => evaluate('!!document.querySelector("dialog.tk-evs[open]")'));
+    const key = (name, code, vk, text) => send('Input.dispatchKeyEvent', { type: 'keyDown', key: name, code, windowsVirtualKeyCode: vk, ...(text && { text }) }).then(() => send('Input.dispatchKeyEvent', { type: 'keyUp', key: name, code, windowsVirtualKeyCode: vk }));
+    const sheet = `JSON.stringify((() => { const d = document.querySelector('dialog.tk-evs[open]'); return { title: d.querySelector('h2').textContent, text: d.querySelector('.ui-props').innerText.replace(/\\s+/g, ' '), ticket: d.querySelector('a[href^="#ticket/"]').getAttribute('href'),
+      prs: [...d.querySelectorAll('.tk-in a')].map((a) => a.href), time: d.querySelector('time').textContent }; })())`;
+    // Tap.
+    await evaluate(`${evRow('Progress changed to 75%')}.click()`);
+    await open();
+    const seen = JSON.parse(await evaluate(sheet));
+    assert.equal(seen.title, 'Ship the new settings page');
+    assert.match(seen.text, /Progress 60% → to 75%/); assert.match(seen.text, /Made by firstmate-crew/);
+    assert.equal(seen.ticket, '#ticket/T-29'); assert.deepEqual(seen.prs, prs); assert.match(seen.time, /^\d{1,2} \w{3} \d{4}, \d{2}:\d{2}:\d{2}$/);
+    // Escape closes it and the focus is back on the row that opened it.
+    await key('Escape', 'Escape', 27);
+    await until(() => evaluate('!document.querySelector("dialog.tk-evs[open]")'));
+    assert.equal(await evaluate(`document.activeElement === ${evRow('Progress changed to 75%')}`), true);
+    // Keys: Enter and Space on the focused row open it too.
+    for (const [name, code, vk, text] of [['Enter', 'Enter', 13, '\r'], [' ', 'Space', 32, ' ']]) {
+      await evaluate(`${evRow('Progress changed to 75%')}.focus()`);
+      await key(name, code, vk, text);
+      await open();
+      assert.equal(JSON.parse(await evaluate(sheet)).title, 'Ship the new settings page');
+      await key('Escape', 'Escape', 27);
+      await until(() => evaluate('!document.querySelector("dialog.tk-evs[open]")'));
+      assert.equal(await evaluate(`document.activeElement === ${evRow('Progress changed to 75%')}`), true);
+    }
+    // An event written before a writer was named shows no Made by.
+    await evaluate(`${evRow('Ticket created')}.click()`);
+    await open();
+    assert.doesNotMatch(JSON.parse(await evaluate(sheet)).text, /Made by/);
+    await key('Escape', 'Escape', 27);
+    await until(() => evaluate('!document.querySelector("dialog.tk-evs[open]")'));
+    // The ticket opens from the view; a modified click stays on the board.
+    await evaluate(`${evRow('Progress changed to 75%')}.click()`);
+    await open();
+    assert.equal(await evaluate(`(() => { const link = document.querySelector('dialog.tk-evs[open] a[href^="#ticket/"]');
       for (const key of ['ctrlKey', 'metaKey', 'shiftKey', 'altKey']) { const event = new MouseEvent('click', { bubbles: true, cancelable: true, [key]: true });
         link.addEventListener('click', (e) => e.preventDefault(), { once: true }); link.dispatchEvent(event);
-        if (!document.querySelector('.tk-activity-dialog[open]')) return false; }
+        if (!document.querySelector('dialog.tk-evs[open]')) return false; }
       return true; })()`), true);
-    await evaluate(`document.querySelector('.tk-activity-dialog[open] a[href^="#ticket/"]').click()`);
-    await until(() => evaluate(`location.hash.startsWith('#ticket/') && !!document.querySelector('.tk-pane') && !document.querySelector('.tk-activity-dialog')`));
+    await evaluate(`document.querySelector('dialog.tk-evs[open] a[href^="#ticket/"]').click()`);
+    await until(() => evaluate(`location.hash === '#ticket/T-29' && !!document.querySelector('.tk-pane') && !document.querySelector('dialog.tk-evs[open]')`));
+    // Filters narrow the timeline; one that matches nothing says so and clears.
+    await evaluate(`location.hash = '#activity'`);
+    await until(() => evaluate('!!document.querySelector(".tk-sel")'));
+    const pick = (i, v) => evaluate(`(() => { const s = document.querySelectorAll('.tk-sel')[${i}]; s.value = ${JSON.stringify(v)}; s.dispatchEvent(new Event('change')); })()`);
+    await pick(1, 'P1');
+    assert.equal(await evaluate('[...document.querySelectorAll(".tk-ev")].every((b) => b.querySelector(".ui-pc.p1"))'), true);
+    assert.match(await evaluate('document.querySelector(".tk-count").textContent'), /^\d+ of \d+ events$/);
+    await pick(1, '');
+    await evaluate(`(() => { const s = document.querySelectorAll('.tk-sel')[0]; s.add(new Option('Nowhere', 'Nowhere')); s.value = 'Nowhere'; s.dispatchEvent(new Event('change')); })()`);
+    await until(() => evaluate('document.querySelector(".es")?.textContent.includes("No activity matches")'));
+    await evaluate('[...document.querySelectorAll(".es button")].find((b) => b.textContent === "Clear filters").click()');
+    await until(() => evaluate('document.querySelectorAll(".tk-ev").length > 0'));
   } finally { close(); }
   proc.kill();
 });
@@ -4754,8 +4818,8 @@ test('Tickets on a phone: with one section expanded, See all on each other secti
     assert.deepEqual(JSON.parse(activity), { collapsed: true, listsVisible: true, summary: 'Activity' });
     await evaluate('document.querySelector(".tk-activity > summary").click()');
     await until(() => evaluate('document.querySelector(".tk-activity").open'));
-    assert.equal(await evaluate('document.querySelectorAll(".tk-activity .ui-act li").length > 0'), true);
-    assert.equal(await evaluate('document.querySelector(".tk-activity .ui-act").scrollHeight > document.querySelector(".tk-activity .ui-act").clientHeight'), true);
+    assert.equal(await evaluate('document.querySelectorAll(".tk-activity .tk-ev").length > 0'), true);
+    assert.equal(await evaluate('document.querySelector(".tk-activity .tk-feed").scrollHeight > document.querySelector(".tk-activity .tk-feed").clientHeight'), true);
     assert.equal(await evaluate('[...document.querySelectorAll("main section[aria-label]:not(.tk-activity)")].every((s) => s.getBoundingClientRect().height > 0)'), true);
     // Each section expanded in turn, then See all on every other one: it expands, and no ticket opens.
     for (const open of names) for (const other of names.filter((n) => n !== open)) {

@@ -61,7 +61,7 @@ Recorded 27 October 2026 on 0.8.0 (`5e0b6a7`). Board: 2,147 cards, 3.4 MB (7 ope
 | --- | ---: | --- |
 | Requests before the first paint | 5 | ≤5 requests |
 | Bytes before the first paint | 91,837 B | < min(baseline + 1,024 B, 100,000 B) |
-| Bytes of the whole open (25 requests) | 282,955 B (279,760 B before the shared empty states, re-recorded in the change that added them: about 2.4 KB of screen code and rules that every state reuses) | < baseline + 1,024 B |
+| Bytes of the whole open (25 requests) | 285,907 B (282,955 B before the Activity tab, re-recorded on 28 October 2026 in the change that added it: about 3 KB of screen code and rules for the tab, its filters and the expanded row, all loaded after the first paint; 279,760 B before the shared empty states) | < baseline + 1,024 B |
 | First paint | 900 ms | up to 1,350 ms (1.5×, for a loaded host) |
 
 The 1,024 B absolute headroom accommodates small honest changes (including accessibility labels) without making the recorded baseline an equality check; the strict 100,000 B first-paint ceiling preserves the under-100-KB promise. The request count and whole-open transfer are also ceilings with the same 1,024 B byte headroom, while first paint remains capped at 1,350 ms. The board's file path is a field of every read, so the journey seeds it at a fixed depth under `/tmp`. Paint over twelve runs on the recording host: 856–1,065 ms. A lower number is a reason to lower the baseline here and in the test; a higher number beyond the stated ceiling is a regression to fix.
