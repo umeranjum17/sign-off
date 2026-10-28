@@ -7,6 +7,8 @@ import { join } from 'node:path';
 
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
 const { readTicketActivity } = await import('../dist/store.js');
+// A burst is one row; its earlier changes are events of their own, so a test of what each change says reads them all.
+const unfold = (feed) => feed.flatMap(({ earlier = [], ask, ...e }) => [...earlier, e]);
 const scratch = mkdtempSync(join(tmpdir(), 'sign-off-tickets-api-'));
 const env = { ...process.env, HOME: scratch, XDG_CONFIG_HOME: scratch, XDG_DATA_HOME: scratch, XDG_CACHE_HOME: scratch, SIGN_OFF_HOME: scratch };
 delete env.CLAUDE_CODE_SESSION_ID; delete env.SIGN_OFF_FILER;
@@ -87,11 +89,11 @@ test('ticket lifecycle activity and hold release use effective progress', async 
   axi('ticket', board, '--id', 'T-5', '--title', 'State transition', '--state', 'queued');
   axi('ticket', board, '--id', 'T-5', '--state', 'in progress');
   const port = await serve(), response = await fetch(`http://127.0.0.1:${port}/api/state?view=tickets`);
-  const state = await response.json(), events = state.ticketActivity.filter((event) => event.ticket === 'T-4');
-  assert.equal(state.ticketActivity.filter((event) => event.ticket === 'T-6' && event.kind === 'release').length, 1);
+  const state = await response.json(), events = unfold(state.ticketActivity).filter((event) => event.ticket === 'T-4');
+  assert.equal(unfold(state.ticketActivity).filter((event) => event.ticket === 'T-6' && event.kind === 'release').length, 1);
   assert.ok(events.some((event) => event.kind === 'state' && event.text === 'State changed to done'));
   assert.ok(!events.some((event) => event.kind === 'merged'));
-  const moving = state.ticketActivity.filter((event) => event.ticket === 'T-5' && event.kind === 'state');
+  const moving = unfold(state.ticketActivity).filter((event) => event.ticket === 'T-5' && event.kind === 'state');
   assert.deepEqual(moving.map((event) => event.text), ['State changed to in progress']);
 });
 
@@ -103,7 +105,7 @@ test('Activity events carry the cards\' tags and the change, and a writer only w
   axi('ticket', board, '--id', 'ACT-1', '--progress', '60', '--filer', '11111111-2222-3333-4444-555555555555');
   assert.throws(() => axi('ticket', board, '--id', 'ACT-1', '--progress', '70', '--filer', 'not a name'));
   const port = await serve(), { ticketActivity } = await (await fetch(`http://127.0.0.1:${port}/api/state?view=tickets`)).json();
-  const mine = ticketActivity.filter((e) => e.ticket === 'ACT-1'), by = (kind, to) => mine.find((e) => e.kind === kind && (to === undefined || e.to === to));
+  const mine = unfold(ticketActivity).filter((e) => e.ticket === 'ACT-1'), by = (kind, to) => mine.find((e) => e.kind === kind && (to === undefined || e.to === to));
   // The priority and the pull request came on a later line, and are on every event of the ticket, the first too.
   const tags = { ticket: 'ACT-1', title: 'Tag every row', project: 'Beacon', priority: 'P1' };
   assert.deepEqual(by('stage', 'review'), { ...tags, kind: 'stage', text: 'Stage moved to review', at: by('stage', 'review').at, stage: 'review', state: 'in progress', prs: [pr], from: 'building', to: 'review', by: 'crew-7' });
