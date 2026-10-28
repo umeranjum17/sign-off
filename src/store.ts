@@ -651,14 +651,14 @@ const BURST_MS = 120_000;
 /** Ticket history is already append-only; derive the small activity feed from each ticket's successive public records. */
 export function readTicketActivity(decisionsPath: string): TicketActivity[] {
   const previous = new Map<string, Ticket>(), events: { event: TicketActivity; order: number }[] = [];
-  readRaw(ticketsPath(decisionsPath)).split('\n').forEach((line, order) => {
+  readRaw(ticketsPath(decisionsPath)).split('\n').forEach((line) => {
     let t: Ticket;
     try { t = line && JSON.parse(line); } catch { return; }
     if (!t || ticketFault(t) || !Number.isFinite(Date.parse(t.at))) return;
     const had = previous.get(t.id), at = t.at;
     const add = (kind: TicketActivity['kind'], text: string, change?: [string | undefined, string | undefined]) => events.push({ event: { ticket: t.id, title: t.title, kind, text, at,
       ...(t.stage && { stage: t.stage }), ...(t.state && { state: t.state }),
-      ...(change && { from: change[0] ?? 'none', to: change[1] ?? 'none' }), ...(t.by && { by: t.by }) }, order });
+      ...(change && { from: change[0] ?? 'none', to: change[1] ?? 'none' }), ...(t.by && { by: t.by }) }, order: events.length });
     if (!had) add('created', 'Ticket created');
     else {
       if (had.stage !== t.stage) add('stage', t.stage ? `Stage moved to ${t.stage}` : 'Stage cleared', [had.stage, t.stage]);
@@ -695,7 +695,7 @@ function askWords(decisionsPath: string, ids: Set<string>): Map<string, { text: 
   if (!ids.size) return out;
   let items: any[] = [];
   try { items = readItems(decisionsPath).items; } catch {}
-  for (const d of items) if (ids.has(d?.ticket) && (d.type === 'decision' || d.kind === 'ask') && isText(d.title) && d.title.trim() && isText(d.filed) && Number.isFinite(Date.parse(d.filed))
+  for (const d of items) if (ids.has(d?.ticket) && (d.type ?? 'decision') === 'decision' && isText(d.title) && d.title.trim() && isText(d.filed) && Number.isFinite(Date.parse(d.filed))
     && !(out.has(d.ticket) && Date.parse(out.get(d.ticket)!.at) <= Date.parse(d.filed))) out.set(d.ticket, { text: d.title, at: d.filed });
   return out;
 }
