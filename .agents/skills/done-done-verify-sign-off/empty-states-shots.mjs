@@ -15,7 +15,9 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 const out = resolve(process.argv[2] ?? process.env.DONE_DONE_EVIDENCE_ROOT), theme = process.argv[3] ?? 'light', width = +(process.argv[4] ?? 390), phone = width < 1024;
 const side = process.env.TICKETS_SIDE ?? 'after', here = resolve('.'), repo = resolve(process.env.SIGN_OFF_REPO ?? '.');
-mkdirSync(out, { recursive: true });
+// EMPTY_CITE=1 (the sealed run): the evidence folder holds only the pictures the claim names and steps.json; every page record and measure goes beside it in <out>.records.
+const rec = process.env.EMPTY_CITE ? out + '.records' : out;
+mkdirSync(out, { recursive: true }); mkdirSync(rec, { recursive: true });
 const dir = mkdtempSync(join(tmpdir(), 'so-es-')), bare = join(dir, 'bare'), rich = join(dir, 'rich');
 const env = { ...process.env, PATH: dirname(process.execPath) + ':' + process.env.PATH, HOME: dir, XDG_CONFIG_HOME: join(dir, '.config'), XDG_DATA_HOME: join(dir, '.local/share'),
   XDG_STATE_HOME: join(dir, '.local/state'), XDG_CACHE_HOME: join(dir, '.cache'), SIGN_OFF_FILER: 'verify' };
@@ -60,7 +62,7 @@ const MEASURE = `(async () => {
 })()`;
 
 let ws, fault = null, held = [];
-// A sealed run's judge reads at most ten captures, the measure text among them: EMPTY_CITE=1 keeps the five the sealed claim names (the page records and measures of every state are still written).
+// A sealed run's judge reads at most ten captures, the measure text among them: EMPTY_CITE=1 keeps the five the sealed claim names (its records go to <out>.records).
 const cited = new Set(['tickets-loading', 'tickets-error', 'tickets-none', 'tickets-populated', 'tickets-activity-empty']);
 const errors = [], failed = [], report = [], problems = [], shots = [], facts = {};
 const b64 = (s) => Buffer.from(s).toString('base64');
@@ -125,10 +127,10 @@ try {
   const capture = async (state, allow = false) => {
     await wait(450);
     if (!process.env.EMPTY_CITE || cited.has(state)) { await png(join(out, `${name(state)}.png`)); shots.push(`${name(state)}.png`); }
-    const m = await js(MEASURE); m.frame = state; const keep = !process.env.EMPTY_CITE || cited.has(state);
-    if (keep) writeFileSync(join(out, `${name(state)}.dom.json`), JSON.stringify({ frame: state, ...m.dom, console_errors: [...errors], failed_requests: [...failed] }, null, 2) + '\n');
+    const m = await js(MEASURE); m.frame = state; 
+    writeFileSync(join(rec, `${name(state)}.dom.json`), JSON.stringify({ frame: state, ...m.dom, console_errors: [...errors], failed_requests: [...failed] }, null, 2) + '\n');
     delete m.dom;
-    if (keep) writeFileSync(join(out, `${name(state)}.measure.json`), JSON.stringify(m, null, 2) + '\n');
+    writeFileSync(join(rec, `${name(state)}.measure.json`), JSON.stringify(m, null, 2) + '\n');
     report.push(`${name(state)}: ${m.states.map((s) => `${s.kind} "${s.words}" ${s.width}x${s.height}${s.mark ? ` mark ${s.mark}` : ''}${s.action ? ` [${s.action}]` : ''}${s.skeleton ? ` ${s.skeleton} skeleton bars` : ''}`).join(' | ') || 'no empty state'}${m.activity ? `; Activity card ${m.activity.open ? 'open' : 'closed'} ${m.activity.height}px, summary "${m.activity.words}"` : ''}; failures ${m.fail.length}${m.fail.length ? ': ' + m.fail.join('; ') : ''}`);
     const bad = errors.filter((e) => !(allow && /500|404|did not answer|Failed to load resource/.test(e))), badReq = failed.filter(() => !allow);
     if (m.fail.length || bad.length || badReq.length) problems.push(`${name(state)}: ${JSON.stringify({ fail: m.fail, errors: bad, failed: badReq })}`);
@@ -208,8 +210,8 @@ try {
   }
   }
   console.log(report.join('\n'));
-  writeFileSync(join(out, `${name('facts')}.json`), JSON.stringify(facts, null, 2) + '\n');
-  writeFileSync(join(out, `measure.${side}.${theme}.${width}w.txt`), report.join('\n') + '\n');
+  writeFileSync(join(rec, `${name('facts')}.json`), JSON.stringify(facts, null, 2) + '\n');
+  writeFileSync(join(rec, `measure.${side}.${theme}.${width}w.txt`), report.join('\n') + '\n');
   if (side === 'after') writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
     start: 'Two throwaway boards: a bare one with no cards and no tickets, and feel-board.sh\'s with tickets written through sign-off-axi ticket (a Juggernaut migration ticket, billing and docs tickets, 205 newer ones after an old one).',
     steps: [`Open Tickets on the bare board at ${metrics.width}x${metrics.height} (2x), ${theme}, with its read held, then failed, and ${phone ? 'tap' : 'click'} Try again.`,
