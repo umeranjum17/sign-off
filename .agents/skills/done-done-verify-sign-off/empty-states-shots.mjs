@@ -60,8 +60,8 @@ const MEASURE = `(async () => {
 })()`;
 
 let ws, fault = null, held = [];
-// A sealed run's judge reads at most ten pictures: EMPTY_CITE=1 keeps these ten (the page records and measures of every state are still written).
-const cited = new Set(['tickets-loading', 'tickets-error', 'tickets-none', 'tickets-populated', 'tickets-activity-open', 'tickets-activity-empty', 'ticket-no-activity', 'tickets-nomatch', 'evidence-error', 'designs-none']);
+// A sealed run's judge reads at most ten captures, the measure text among them: EMPTY_CITE=1 keeps these nine (the page records and measures of every state are still written).
+const cited = new Set(['tickets-loading', 'tickets-error', 'tickets-none', 'tickets-populated', 'tickets-activity-open', 'tickets-activity-empty', 'ticket-no-activity', 'tickets-nomatch', 'evidence-error']);
 const errors = [], failed = [], report = [], problems = [], shots = [], facts = {};
 const b64 = (s) => Buffer.from(s).toString('base64');
 try {
