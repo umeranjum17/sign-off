@@ -5,7 +5,7 @@ import { appendFileSync, copyFileSync, existsSync, mkdtempSync, mkdirSync, readF
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { decode } from '@toon-format/toon';
-import { asked } from './ask.mjs';
+import { asked } from './support/ask.mjs';
 
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
 const fixtures = new URL('../fixtures/contract/', import.meta.url).pathname;

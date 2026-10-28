@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { get } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { asked } from './ask.mjs';
+import { asked } from './support/ask.mjs';
 
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
 const scratch = mkdtempSync(join(tmpdir(), 'sign-off-'));

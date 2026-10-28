@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { createReadStream, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, truncateSync, writeFileSync } from 'node:fs';
 import { networkInterfaces, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { asked } from './ask.mjs';
+import { asked } from './support/ask.mjs';
 
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
 const scratch = mkdtempSync(join(tmpdir(), 'sign-off-attach-'));
