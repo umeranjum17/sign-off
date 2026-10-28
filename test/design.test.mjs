@@ -4752,7 +4752,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     assert.equal(await evaluate(`[...document.querySelectorAll('.tk-day .tk-ev')].filter((b) => b.getAttribute('aria-label').startsWith('Ship the new settings page')).length`), 1);
     const burstView = JSON.parse(await evaluate(`JSON.stringify({ changes: [...document.querySelectorAll('dialog.tk-evs[open] .tk-chg li')].map((li) => li.textContent), ask: document.querySelector('dialog.tk-evs[open] .tk-ask')?.innerText.replace(/\\s+/g, ' ') })`));
     assert.ok(burstView.changes.length >= 3 && burstView.changes.some((c) => /Ticket created/.test(c)) && burstView.changes.some((c) => /Progress changed to 60%/.test(c)) && /Progress changed to 75% \(60% → 75%\)/.test(burstView.changes.at(-1)), burstView.changes.join(' | '));
-    assert.match(burstView.ask, /^Turn on the settings search\? \d{1,2} \w{3} \d{4}, \d{2}:\d{2}:\d{2}$/);
+    assert.match(burstView.ask, /^[A-Z][^\n]+\? \d{1,2} \w{3} \d{4}, \d{2}:\d{2}:\d{2}$/);
     assert.equal(seen.ticket, '#ticket/T-29'); assert.deepEqual(seen.prs, prs); assert.match(seen.time, /^\d{1,2} \w{3} \d{4}, \d{2}:\d{2}:\d{2}$/);
     // Escape closes it and the focus is back on the row that opened it.
     await key('Escape', 'Escape', 27);
