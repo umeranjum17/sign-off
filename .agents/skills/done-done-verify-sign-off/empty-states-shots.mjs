@@ -123,7 +123,7 @@ try {
   const capture = async (state, allow = false) => {
     await wait(450);
     await png(join(out, `${name(state)}.png`)); shots.push(`${name(state)}.png`);
-    const m = await js(MEASURE);
+    const m = await js(MEASURE); m.frame = state;
     writeFileSync(join(out, `${name(state)}.dom.json`), JSON.stringify({ frame: state, ...m.dom, console_errors: [...errors], failed_requests: [...failed] }, null, 2) + '\n');
     delete m.dom;
     writeFileSync(join(out, `${name(state)}.measure.json`), JSON.stringify(m, null, 2) + '\n');
@@ -167,11 +167,9 @@ try {
   await capture('tickets-populated');
   if (phone && side === 'before') {
     await until(`!!document.querySelector('.tk-activity')`, 'Activity card');
-    await capture('tickets-activity-closed');
   } else if (side === 'before') {} else if (phone) {
     await until(`!!document.querySelector('.tk-activity')`, 'Activity card');
     await js(`document.querySelector('.tk-activity').scrollIntoView({ block: 'center' })`);
-    await capture('tickets-activity-closed');
     await tap('.tk-activity > summary'); await until(`document.querySelector('.tk-activity').open`, 'opened');
     await capture('tickets-activity-open');
   } else {
