@@ -9,7 +9,7 @@ import { networkInterfaces, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { crc32, deflateSync } from 'node:zlib';
 import jpeg from 'jpeg-js';
-import { asked } from './ask.mjs';
+import { asked } from './support/ask.mjs';
 
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
 const scratch = mkdtempSync(join(tmpdir(), 'sign-off-design-'));
@@ -1319,6 +1319,7 @@ test('a guided report: item detail keeps its line breaks, same-axis options read
   const dir = join(scratch, 'compare'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const report = JSON.parse(readFileSync(new URL('../fixtures/contract/report.v4/valid-full.json', import.meta.url)));
+  report.about += ' <img src=x onerror=alert(1)> [unsafe](javascript:alert(1))';
   const option = (title, tone, text, models, safety) => ({ title, tone, text, more: `Models: ${models}.\nScripted: yes, with JSON output (github.com/example-org/example-agent/issues/10415).\nSafety: ${safety}.` });
   report.sections.push({ id: 'compare', stage: 'found', heading: 'Three engines on the same 3 points', body: 'Each option on the same points.', items: [
     option('pi: the pick', 'ok', 'Pros: any model. Cons: one open hang.', 'any, through providers', 'no leak reported'),
@@ -1351,6 +1352,7 @@ test('a guided report: item detail keeps its line breaks, same-axis options read
       // Options run across on a desk; on a phone each point lists every option under it, named in its cell.
       assert.deepEqual([table.tableLayout, table.headShown, table.optionInCell], width === 1280 ? ['table', true, false] : ['block', false, true], `${width}: ${JSON.stringify(table)}`);
       assert.deepEqual([table.wide, table.outside], [false, 0], `${width}: ${JSON.stringify(table)}`);
+      assert.equal(await evaluate(`document.querySelectorAll('#board img[onerror], #board a[href^="javascript:"]').length`), 0, 'report text cannot become executable HTML or a javascript link');
       // The stacked table at 390 reads at the 16 px body size; with room for columns it is the 13 px table.
       assert.equal(await evaluate(`getComputedStyle(document.querySelector('#gd-compare .gd-ct td')).fontSize`), width === 1280 ? '13px' : '16px', `${width}`);
       // Detail that is not a table keeps one line per point.
