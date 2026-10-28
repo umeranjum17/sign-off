@@ -4723,7 +4723,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     assert.equal(await evaluate(tkThread), [...steps].reverse().map((x) => `${x} Ship the settings page on Friday?`).join(' | '));
     assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
     // The Activity tab: every row carries the cards' tags and opens an expanded view, by tap and by key; Escape puts the focus back on the row; the ticket opens from the view.
-    assert.equal(run('ticket', file, '--id', 'T-29', '--progress', '75', '--pr', prs.join(','), '--filer', 'firstmate-crew').code, 0);
+    assert.equal(run('ticket', file, '--id', 'T-29', '--progress', '75', '--pr', prs.join(','), '--asked', 'yes', '--filer', 'firstmate-crew').code, 0);
     await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
     await evaluate(`location.hash = '#tickets'`);
     await until(() => evaluate('document.querySelectorAll(".tk-seg button").length === 2'));
@@ -4747,7 +4747,12 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     await open();
     const seen = JSON.parse(await evaluate(sheet));
     assert.equal(seen.title, 'Ship the new settings page');
-    assert.match(seen.text, /Progress 60% → to 75%/); assert.match(seen.text, /Made by firstmate-crew/);
+    assert.match(seen.text, /Progress 60% → to 75%/); assert.match(seen.text, /Made by worker/); assert.doesNotMatch(seen.text, /firstmate/);
+    // T-29 changed many times within a minute: one row for the burst, and the view names every change and the captain's own words with their date.
+    assert.equal(await evaluate(`[...document.querySelectorAll('.tk-day .tk-ev')].filter((b) => b.getAttribute('aria-label').startsWith('Ship the new settings page')).length`), 1);
+    const burstView = JSON.parse(await evaluate(`JSON.stringify({ changes: [...document.querySelectorAll('dialog.tk-evs[open] .tk-chg li')].map((li) => li.textContent), ask: document.querySelector('dialog.tk-evs[open] .tk-ask')?.innerText.replace(/\\s+/g, ' ') })`));
+    assert.ok(burstView.changes.length >= 3 && burstView.changes.some((c) => /Ticket created/.test(c)) && burstView.changes.some((c) => /Progress changed to 60%/.test(c)) && /Progress changed to 75% \(60% → 75%\)/.test(burstView.changes.at(-1)), burstView.changes.join(' | '));
+    assert.match(burstView.ask, /^[A-Z][^\n]+\? \d{1,2} \w{3} \d{4}, \d{2}:\d{2}:\d{2}$/);
     assert.equal(seen.ticket, '#ticket/T-29'); assert.deepEqual(seen.prs, prs); assert.match(seen.time, /^\d{1,2} \w{3} \d{4}, \d{2}:\d{2}:\d{2}$/);
     // Escape closes it and the focus is back on the row that opened it.
     await key('Escape', 'Escape', 27);
@@ -4763,10 +4768,11 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
       await until(() => evaluate('!document.querySelector("dialog.tk-evs[open]")'));
       assert.equal(await evaluate(`document.activeElement === ${evRow('Progress changed to 75%')}`), true);
     }
-    // An event written before a writer was named shows no Made by.
-    await evaluate(`${evRow('Ticket created')}.click()`);
+    // An event written before a writer was named shows no Made by, and a ticket the captain did not ask for shows no words.
+    await evaluate(`${evRow('A newly synced ticket')}.click()`);
     await open();
     assert.doesNotMatch(JSON.parse(await evaluate(sheet)).text, /Made by/);
+    assert.equal(await evaluate(`document.querySelector('dialog.tk-evs[open] .tk-ask, dialog.tk-evs[open] .tk-chg')`), null);
     await key('Escape', 'Escape', 27);
     await until(() => evaluate('!document.querySelector("dialog.tk-evs[open]")'));
     // The ticket opens from the view; a modified click stays on the board.

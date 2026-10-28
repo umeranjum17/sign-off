@@ -2017,6 +2017,9 @@
   .tk-evs .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .tk-evs .tk-evt { margin: 0.25rem 0 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
   .tk-evs .ui-dl { margin-top: 1rem; }
+  .tk-evs .tk-chg { margin: 0.25rem 0 0; padding-left: 1.25rem; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
+  .tk-evs .tk-ask { margin: 0.25rem 0 0; padding: 0.5rem 0 0.5rem 0.75rem; border-left: 2px solid var(--tk-mid); color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); overflow-wrap: anywhere; white-space: pre-wrap; }
+  .tk-evs .tk-ask time { display: block; margin-top: 0.25rem; color: var(--tk-text-tertiary); }
   /* The Activity tab: the filters (project, priority, type), how many events they leave, then each day under its heading with a rail down it and a dot at each event. */
   .tk-filters { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
   .tk-sel { flex: 1 1 0; min-width: 0; height: 2.5rem; padding: 0 1.5rem 0 0.75rem; border: 0; border-radius: 1.25rem; appearance: none; text-overflow: ellipsis; color: var(--tk-ink); font: inherit; font-size: var(--tk-fs-row); font-weight: 500;

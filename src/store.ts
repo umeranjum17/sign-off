@@ -641,18 +641,24 @@ export function readTickets(decisionsPath: string, warn: (msg: string) => void =
 /** One move on a ticket. Beside what the feed always said it carries what a row and its expanded view show: the ticket's project, priority and pull requests as it has them now
  *  (so every row has its tags), its stage and state as that line wrote them, the changed field's before and after (stage, progress, state, hold) and, only when the line named one, who wrote it. */
 export type TicketActivity = { ticket: string; title: string; kind: 'created' | 'stage' | 'progress' | 'state' | 'merged' | 'hold' | 'release'; text: string; at: string;
-  project?: string; priority?: string; stage?: string; state?: string; prs?: string[]; from?: string; to?: string; by?: string };
+  project?: string; priority?: string; stage?: string; state?: string; prs?: string[]; from?: string; to?: string; by?: string;
+  /** The earlier changes of the same ticket within BURST_MS of this one, oldest first: a burst is one row that carries the newest change's headline. */
+  earlier?: Omit<TicketActivity, 'earlier' | 'ask'>[];
+  /** For a ticket the owner asked for: the words of the ask card that names it, as stored, and when it was filed. */
+  ask?: { text: string; at: string } };
+/** Changes of one ticket this close together are one burst. */
+const BURST_MS = 120_000;
 /** Ticket history is already append-only; derive the small activity feed from each ticket's successive public records. */
 export function readTicketActivity(decisionsPath: string): TicketActivity[] {
   const previous = new Map<string, Ticket>(), events: { event: TicketActivity; order: number }[] = [];
-  readRaw(ticketsPath(decisionsPath)).split('\n').forEach((line, order) => {
+  readRaw(ticketsPath(decisionsPath)).split('\n').forEach((line) => {
     let t: Ticket;
     try { t = line && JSON.parse(line); } catch { return; }
     if (!t || ticketFault(t) || !Number.isFinite(Date.parse(t.at))) return;
     const had = previous.get(t.id), at = t.at;
     const add = (kind: TicketActivity['kind'], text: string, change?: [string | undefined, string | undefined]) => events.push({ event: { ticket: t.id, title: t.title, kind, text, at,
       ...(t.stage && { stage: t.stage }), ...(t.state && { state: t.state }),
-      ...(change && { from: change[0] ?? 'none', to: change[1] ?? 'none' }), ...(t.by && { by: t.by }) }, order });
+      ...(change && { from: change[0] ?? 'none', to: change[1] ?? 'none' }), ...(t.by && { by: t.by }) }, order: events.length });
     if (!had) add('created', 'Ticket created');
     else {
       if (had.stage !== t.stage) add('stage', t.stage ? `Stage moved to ${t.stage}` : 'Stage cleared', [had.stage, t.stage]);
@@ -671,7 +677,27 @@ export function readTicketActivity(decisionsPath: string): TicketActivity[] {
   // The ticket's own tags, as its cards show them now: a priority or a project given on a later line is on every event of the ticket, so a row always carries them.
   for (const { event } of events) { const now = previous.get(event.ticket)!; Object.assign(event, { ...(now.project && { project: now.project }), ...(now.priority && { priority: now.priority }), ...(now.prs?.length && { prs: now.prs }) }); }
   const live = new Set(readTickets(decisionsPath).map((t) => t.id));
-  return events.filter(({ event }) => live.has(event.ticket)).sort((a, b) => Date.parse(b.event.at) - Date.parse(a.event.at) || b.order - a.order).map(({ event }) => event);
+  const newest = events.filter(({ event }) => live.has(event.ticket)).sort((a, b) => Date.parse(b.event.at) - Date.parse(a.event.at) || b.order - a.order).map(({ event }) => event);
+  // Folded newest first: an older change of a ticket joins that ticket's open row while it is within BURST_MS of the row's oldest change.
+  const rows: TicketActivity[] = [], open = new Map<string, TicketActivity>();
+  for (const e of newest) {
+    const head = open.get(e.ticket);
+    if (head && Date.parse(head.earlier?.[0]?.at ?? head.at) - Date.parse(e.at) <= BURST_MS) (head.earlier ??= []).unshift(e);
+    else { rows.push(e); open.set(e.ticket, e); }
+  }
+  const words = askWords(decisionsPath, new Set([...previous.values()].filter((t) => t.asked).map((t) => t.id)));
+  for (const e of rows) if (words.has(e.ticket)) e.ask = words.get(e.ticket);
+  return rows;
+}
+/** What the ask card naming each ticket says, as stored, and when it was filed: the earliest such card. A board that cannot be read, or a ticket with no card, gives nothing. */
+function askWords(decisionsPath: string, ids: Set<string>): Map<string, { text: string; at: string }> {
+  const out = new Map<string, { text: string; at: string }>();
+  if (!ids.size) return out;
+  let items: any[] = [];
+  try { items = readItems(decisionsPath).items; } catch {}
+  for (const d of items) if (ids.has(d?.ticket) && (d.type ?? 'decision') === 'decision' && isText(d.title) && d.title.trim() && isText(d.filed) && Number.isFinite(Date.parse(d.filed))
+    && !(out.has(d.ticket) && Date.parse(out.get(d.ticket)!.at) <= Date.parse(d.filed))) out.set(d.ticket, { text: d.title, at: d.filed });
+  return out;
 }
 /** The progress roll-up: a ticket with tickets under it on the board is as far along as they are on average (each of them rolled up the same way), and one with none keeps its own.
  * A loop of parents stops where it would come back round. */

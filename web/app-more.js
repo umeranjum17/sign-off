@@ -330,14 +330,18 @@
   const actProject = (e) => e.project ?? (tkById(e.ticket) ? tkProject(tkById(e.ticket)) : undefined);
   /** What moved, in few words for a row; the sheet says it in full. */
   const actShort = (e) => ({ created: 'Created', stage: 'Moved', merged: 'Merged', progress: `To ${e.to}`, state: TK_WORDS[EV_STATE[e.to]] ?? 'State', hold: 'Held', release: 'Released' })[e.kind] ?? e.text;
+  /** Who made it, as a plain role or worker name: an old product prefix goes and crew reads worker. */
+  const plainWho = (by) => by.replace(/^(firstmate|juggernaut)-/i, '').replace(/^crew$/i, 'worker');
+  /** Every change in a row's burst, oldest first: the earlier ones, then the row's own. */
+  const burst = (e) => [...(e.earlier ?? []), e];
   const actKey = (e) => `${e.ticket}|${e.at}|${e.kind}|${e.text}`;
   /** One event as a row of the In progress cards' own build: the project's tile, the title and its priority, then the stage chip, what moved and when. */
   function actRow(e, time = tkWhen) {
     const proj = actProject(e), row = el('button', { type: 'button', class: 'ui-row tk-ev', 'data-ev': actKey(e), 'aria-haspopup': 'dialog',
-      'aria-label': `${[e.title, e.priority].filter(Boolean).join(' ')}, ${[e.stage, e.text, proj, stamp(e.at)].filter(Boolean).join(', ')}` },
+      'aria-label': `${[e.title, e.priority].filter(Boolean).join(' ')}, ${[e.stage, e.text, ...(e.earlier ?? []).map((c) => c.text).reverse(), proj, stamp(e.at)].filter(Boolean).join(', ')}` },
       projectTile(proj, () => icon('pick')), el('span', { class: 'rm' },
         el('span', { class: 'l1' }, el('span', { class: 't', dir: 'auto' }, e.title), ' ', e.priority ? el('span', { class: `ui-pc ${e.priority.toLowerCase()}` }, e.priority) : ''), ' ',
-        el('span', { class: 'l2' }, e.stage ? el('span', { class: 'tk-status' }, el('span', { class: 'ui-pc tk-stage' }, e.stage)) : '', el('span', { class: 'meta', dir: 'auto' }, [proj, actShort(e)].filter(Boolean).join(' · ')),
+        el('span', { class: 'l2' }, e.stage ? el('span', { class: 'tk-status' }, el('span', { class: 'ui-pc tk-stage' }, e.stage)) : '', el('span', { class: 'meta', dir: 'auto' }, [proj, actShort(e) + (e.earlier?.length ? ` +${e.earlier.length}` : '')].filter(Boolean).join(' · ')),
           el('time', { class: 'pct', datetime: e.at }, time(e.at)))));
     row.onclick = () => openEvent(e, row);
     return row;
@@ -358,10 +362,12 @@
     ticket.onclick = (ev) => { if (ev.button === 0 && !ev.metaKey && !ev.ctrlKey && !ev.shiftKey && !ev.altKey) evGo = true; else ev.stopPropagation(); };
     const rows = [e.from === undefined ? '' : tkProp('half', EV_FIELD[e.kind], el('span', {}, e.from === 'none' ? 'not set' : e.from), el('span', { 'aria-hidden': 'true' }, '→'), el('span', { class: 'sr-only' }, 'to'), el('span', {}, e.to === 'none' ? 'not set' : e.to)),
       e.priority ? tkProp('flag', 'Priority', el('span', { class: `ui-pc ${e.priority.toLowerCase()}` }, e.priority)) : '', e.stage && !/^(stage|merged)$/.test(e.kind) ? tkProp('half', 'Stage', el('span', { class: 'ui-pc tk-stage' }, e.stage)) : '',
-      name && e.kind !== 'state' ? tkProp('half', 'State', el('span', {}, name)) : '', e.by ? tkProp('person', 'Made by', el('span', { dir: 'auto' }, e.by)) : '', ticket, tkProp('clock', 'Time', el('time', { datetime: e.at }, EXACT.format(new Date(e.at))))].filter(Boolean);
+      name && e.kind !== 'state' ? tkProp('half', 'State', el('span', {}, name)) : '', e.by ? tkProp('person', 'Made by', el('span', { dir: 'auto' }, plainWho(e.by))) : '', ticket, tkProp('clock', 'Time', el('time', { datetime: e.at }, EXACT.format(new Date(e.at))))].filter(Boolean);
     actSheet.dataset.ev = actKey(e); evFrom = from; evGo = false;
     actSheet.replaceChildren(el('div', {}, el('div', { class: 'tk-shd' }, el('p', {}, projectTile(proj, () => icon('pick')), el('span', {}, [proj, EV_KIND[e.kind]].filter(Boolean).join(' · '))), close),
       el('h2', { id: 'tk-ev-h', class: 'tk-dt', tabindex: '-1', dir: 'auto' }, e.title), el('p', { class: 'tk-evt', dir: 'auto' }, e.text), el('div', { class: 'ui-props' }, ...rows),
+      ...(e.earlier?.length ? [el('p', { class: 'ui-dl' }, 'Changes'), el('ul', { class: 'tk-chg' }, ...burst(e).map((c) => el('li', { dir: 'auto' }, c.text, c.from === undefined ? '' : ` (${c.from === 'none' ? 'not set' : c.from} → ${c.to === 'none' ? 'not set' : c.to})`)))] : []),
+      ...(e.ask ? [el('p', { class: 'ui-dl' }, 'Asked'), el('blockquote', { class: 'tk-ask', dir: 'auto' }, e.ask.text, el('time', { datetime: e.ask.at }, EXACT.format(new Date(e.ask.at))))] : []),
       ...(e.prs?.length ? [el('p', { class: 'ui-dl' }, e.prs.length > 1 ? 'Pull requests' : 'Pull request'), el('ul', { class: 'ui-list tk-in' }, ...e.prs.map(tkPr))] : [])));
     actSheet.showModal();
     actSheet.querySelector('#tk-ev-h').focus({ preventScroll: true });
@@ -387,7 +393,7 @@
   };
   function activityPage() {
     const all = state.ticketActivity ?? [], desk = !phone();
-    const opts = { project: [...new Set(all.map(actProject).filter(Boolean))].sort((x, y) => x.localeCompare(y)), priority: [...new Set(all.map((e) => e.priority).filter(Boolean))].sort(), kind: Object.keys(EV_KIND).filter((k) => all.some((e) => e.kind === k)) };
+    const opts = { project: [...new Set(all.map(actProject).filter(Boolean))].sort((x, y) => x.localeCompare(y)), priority: [...new Set(all.map((e) => e.priority).filter(Boolean))].sort(), kind: Object.keys(EV_KIND).filter((k) => all.some((e) => burst(e).some((c) => c.kind === k))) };
     // A filter whose value the feed no longer holds is let go, so a select never shows a blank.
     for (const k of Object.keys(acFilter)) if (acFilter[k] && !opts[k].includes(acFilter[k])) acFilter[k] = '';
     const out = el('div', { class: 'tk-acts' }), count = el('p', { class: 'tk-count', role: 'status' });
@@ -397,7 +403,7 @@
       return s;
     });
     const paint = () => {
-      const shown = all.filter((e) => (!acFilter.project || actProject(e) === acFilter.project) && (!acFilter.priority || e.priority === acFilter.priority) && (!acFilter.kind || e.kind === acFilter.kind));
+      const shown = all.filter((e) => (!acFilter.project || actProject(e) === acFilter.project) && (!acFilter.priority || e.priority === acFilter.priority) && (!acFilter.kind || burst(e).some((c) => c.kind === acFilter.kind)));
       count.textContent = !all.length ? 'Nothing yet' : shown.length === all.length ? `${all.length} events` : `${shown.length} of ${all.length} events`;
       if (!all.length) return out.replaceChildren(tkNote('activity', 'clock', 'No activity yet', 'Moves, stage changes and merges on tickets show here as they happen.'));
       if (!shown.length) return out.replaceChildren(emptyState('empty', { mark: 'list', title: 'No activity matches', text: 'Nothing matches these filters right now.',
@@ -457,7 +463,7 @@
     const linked = (d) => { const a = el('a', { class: 'ui-row', href: hrefOf(d) }, ...uiRow({ tile: cardTile(d), title: title(d), priority: d.priority, badge: trailBadge(d.key), meta: [tkKind(d), tkState(d), d.filed && tkWhen(d.filed)].filter(Boolean).join(' · ') }));
       a.onclick = () => (jump = d.key); return el('li', {}, a); };
     // Its cards' steps after their postings (Linked shows those), newest first, each naming its card.
-    const steps = [...(state.ticketActivity ?? []).filter((e) => e.ticket === t.id), ...cards.flatMap((d) => threadOf(d).filter((e) => !e.posted).map((e) => ({ ...e, card: d })).reverse())]
+    const steps = [...(state.ticketActivity ?? []).filter((e) => e.ticket === t.id).flatMap((e) => [e, ...[...(e.earlier ?? [])].reverse()]), ...cards.flatMap((d) => threadOf(d).filter((e) => !e.posted).map((e) => ({ ...e, card: d })).reverse())]
       .sort((x, y) => bySecond(y, x)), said = trailOf(t.id, 'ticket');
     seeReply(t.id, 'ticket');
     return [el('div', { class: 'tk-shd' }, el('p', {}, tkTile(t), el('span', {}, [proj, TK_WORDS[s]].filter(Boolean).join(' · '))), close),
