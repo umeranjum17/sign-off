@@ -582,7 +582,7 @@ export function readPromoted(decisionsPath: string, warn: (msg: string) => void 
 }
 /** A ticket: a standalone record of work, its percent done and the ticket it sits under, and optionally its priority, its project, whether it is on hold and whether the board's owner asked for it.
  * Cards name one by id; nothing else reads or needs it. */
-export type Ticket = { id: string; title: string; progress: number; parent?: string; priority?: string; project?: string; hold?: boolean; asked?: boolean; release?: string; state?: 'queued' | 'in progress' | 'on hold' | 'done'; prs?: string[]; stage?: 'queued' | 'building' | 'review' | 'merging' | 'done'; last_event_at?: number; at: string };
+export type Ticket = { id: string; title: string; progress: number; parent?: string; priority?: string; project?: string; hold?: boolean; asked?: boolean; release?: string; state?: 'queued' | 'in progress' | 'on hold' | 'done'; prs?: string[]; stage?: 'queued' | 'building' | 'review' | 'merging' | 'done'; last_event_at?: number; /** Who wrote this line (a tool or agent id passed with --filer), kept only when one was given. */ by?: string; at: string };
 /** Tickets, one line per write (`ticket <id> --title`), the latest line per id wins. A board without the file has no tickets, and every card works as before. */
 export const ticketsPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.tickets.jsonl';
 /** The ticket rules, shared by the writer and the reader: a line that breaks one is skipped, never shown half-valid. */
@@ -597,6 +597,7 @@ export const ticketFault = (t: any) => (!isKey(t?.id) ? 'id must be 1-128 of A-Z
   : t.stage !== undefined && !['queued', 'building', 'review', 'merging', 'done'].includes(t.stage) ? 'stage must be queued, building, review, merging or done'
   : t.last_event_at !== undefined && !(Number.isSafeInteger(t.last_event_at) && t.last_event_at >= 0 && t.last_event_at <= 8640000000000) ? 'last_event_at must be nonnegative whole epoch seconds in the date range'
   : t.prs !== undefined && (!Array.isArray(t.prs) || !t.prs.every((u: any) => { try { return typeof u === 'string' && /^https?:\/\//.test(u) && !!new URL(u).hostname; } catch { return false; } })) ? 'prs must be an array of full HTTP or HTTPS URLs'
+  : t.by !== undefined && !isKey(t.by) ? 'by must be 1-128 of A-Z a-z 0-9 . _ -'
   : t.hold !== undefined && typeof t.hold !== 'boolean' ? 'hold must be true or false'
   : t.asked !== undefined && typeof t.asked !== 'boolean' ? 'asked must be true or false' : '');
 /** A release names what ships (v1.4, 2026-11), never when: a word like "later" beside a priority reads as a contradiction, and priority is where urgency goes. */
@@ -618,7 +619,7 @@ function oneOfEach(tickets: Ticket[]): Ticket[] {
   }
   return [...first.values()];
 }
-const TICKET_FIELDS = ['parent', 'priority', 'project', 'hold', 'asked', 'release', 'state', 'prs', 'stage', 'last_event_at'] as const;
+const TICKET_FIELDS = ['parent', 'priority', 'project', 'hold', 'asked', 'release', 'state', 'prs', 'stage', 'last_event_at', 'by'] as const;
 /** A ticket's fields in the file's order, leaving out each optional one it does not carry. */
 const ticketLine = (t: any): Ticket => ({ id: t.id, title: t.title, progress: t.progress, ...Object.fromEntries(TICKET_FIELDS.filter((k) => t[k] !== undefined && !(k === 'release' && releaseIsWhen(t[k]))).map((k) => [k, t[k]])), at: t.at });
 export function appendTicket(decisionsPath: string, t: Omit<Ticket, 'at'>): Ticket {
@@ -637,7 +638,10 @@ export function readTickets(decisionsPath: string, warn: (msg: string) => void =
   });
   return oneOfEach([...latest.values()]);
 }
-export type TicketActivity = { ticket: string; title: string; kind: 'created' | 'stage' | 'progress' | 'state' | 'merged' | 'hold' | 'release'; text: string; at: string };
+/** One move on a ticket. Beside what the feed always said it carries what a row and its expanded view show: the ticket's project, priority and pull requests as it has them now
+ *  (so every row has its tags), its stage and state as that line wrote them, the changed field's before and after (stage, progress, state, hold) and, only when the line named one, who wrote it. */
+export type TicketActivity = { ticket: string; title: string; kind: 'created' | 'stage' | 'progress' | 'state' | 'merged' | 'hold' | 'release'; text: string; at: string;
+  project?: string; priority?: string; stage?: string; state?: string; prs?: string[]; from?: string; to?: string; by?: string };
 /** Ticket history is already append-only; derive the small activity feed from each ticket's successive public records. */
 export function readTicketActivity(decisionsPath: string): TicketActivity[] {
   const previous = new Map<string, Ticket>(), events: { event: TicketActivity; order: number }[] = [];
@@ -646,22 +650,26 @@ export function readTicketActivity(decisionsPath: string): TicketActivity[] {
     try { t = line && JSON.parse(line); } catch { return; }
     if (!t || ticketFault(t) || !Number.isFinite(Date.parse(t.at))) return;
     const had = previous.get(t.id), at = t.at;
-    const add = (kind: TicketActivity['kind'], text: string) => events.push({ event: { ticket: t.id, title: t.title, kind, text, at }, order });
+    const add = (kind: TicketActivity['kind'], text: string, change?: [string | undefined, string | undefined]) => events.push({ event: { ticket: t.id, title: t.title, kind, text, at,
+      ...(t.stage && { stage: t.stage }), ...(t.state && { state: t.state }),
+      ...(change && { from: change[0] ?? 'none', to: change[1] ?? 'none' }), ...(t.by && { by: t.by }) }, order });
     if (!had) add('created', 'Ticket created');
     else {
-      if (had.stage !== t.stage) add('stage', t.stage ? `Stage moved to ${t.stage}` : 'Stage cleared');
-      if (had.progress !== t.progress) add('progress', `Progress changed to ${t.progress}%`);
+      if (had.stage !== t.stage) add('stage', t.stage ? `Stage moved to ${t.stage}` : 'Stage cleared', [had.stage, t.stage]);
+      if (had.progress !== t.progress) add('progress', `Progress changed to ${t.progress}%`, [`${had.progress}%`, `${t.progress}%`]);
       const merged = had.stage !== 'done' && t.stage === 'done';
-      if (merged) add('merged', 'Ticket merged');
+      if (merged) add('merged', 'Ticket merged', [had.stage, t.stage]);
       const wasHeld = had.hold === true || had.state === 'on hold', isHeld = t.hold === true || t.state === 'on hold';
       const holdChanged = wasHeld !== isHeld;
-      if (holdChanged) add(isHeld ? 'hold' : 'release', isHeld ? 'Put on hold' : 'Hold released');
+      if (holdChanged) add(isHeld ? 'hold' : 'release', isHeld ? 'Put on hold' : 'Hold released', [wasHeld ? 'on hold' : 'not on hold', isHeld ? 'on hold' : 'not on hold']);
       const stateChanged = had.state !== t.state;
       if (stateChanged && !(merged && t.state === 'done') && !(holdChanged && (had.state === 'on hold' || t.state === 'on hold')))
-        add('state', t.state ? `State changed to ${t.state}` : 'State cleared');
+        add('state', t.state ? `State changed to ${t.state}` : 'State cleared', [had.state, t.state]);
     }
     previous.set(t.id, t);
   });
+  // The ticket's own tags, as its cards show them now: a priority or a project given on a later line is on every event of the ticket, so a row always carries them.
+  for (const { event } of events) { const now = previous.get(event.ticket)!; Object.assign(event, { ...(now.project && { project: now.project }), ...(now.priority && { priority: now.priority }), ...(now.prs?.length && { prs: now.prs }) }); }
   const live = new Set(readTickets(decisionsPath).map((t) => t.id));
   return events.filter(({ event }) => live.has(event.ticket)).sort((a, b) => Date.parse(b.event.at) - Date.parse(a.event.at) || b.order - a.order).map(({ event }) => event);
 }

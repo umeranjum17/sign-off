@@ -325,10 +325,10 @@ Brings back a card that dismiss hid. See \`sign-off-axi dismiss --help\`.
 `,
   ticket: `usage: sign-off-axi ticket [board.json] [--json]
        sign-off-axi ticket [board.json] --id <id> [--json]
-       sign-off-axi ticket [board.json] --id <id> [--title <text>] [--progress <0-100>] [--parent <id>] [--priority P0-P3] [--project <name>] [--hold yes|no] [--asked yes|no] [--release <text>] [--state <state>] [--pr <url>]... [--stage queued|building|review|merging|done] [--last-event-at <epoch seconds or ISO UTC>]
+       sign-off-axi ticket [board.json] --id <id> [--title <text>] [--progress <0-100>] [--parent <id>] [--priority P0-P3] [--project <name>] [--hold yes|no] [--asked yes|no] [--release <text>] [--state <state>] [--pr <url>]... [--stage queued|building|review|merging|done] [--last-event-at <epoch seconds or ISO UTC>] [--filer <id>]
        sign-off-axi ticket [board.json] --id <id> --comment '<json>'
 A ticket is one piece of work: its id, title, percent done and, optionally, the ticket it sits under, its priority, its project (whose icon its rows show),
-whether it is on hold and whether you asked for it (the board's Tickets tab then lists it under Your asks). It stands alone: nothing else needs it.
+whether it is on hold and whether you asked for it (the board's Tickets screen then marks it From you in its filter). It stands alone: nothing else needs it.
 An epic is a ticket with tickets under it, and those may have sub-tasks under them (--parent): a ticket with tickets under it is as far along as they are on average.
 With no --id, lists every ticket with how many cards name it. With --id alone, shows that ticket and its cards, newest first.
 With any other flag, writes it: a new ticket needs --title (progress starts at 0); a later write changes only the fields given, and an empty value ("") takes one off.
@@ -336,6 +336,7 @@ A card names its ticket with --ticket <id> on raise and post (every --type and -
 its screen then shows a Ticket row, the title and progress, that opens the ticket, which lists its asks, designs, proof and reports.
 A card whose ticket is not on the board shows no row; a ticket with no cards shows an empty page.
 --stage is the sync-published stage, independent of progress. --last-event-at takes whole epoch seconds or an ISO UTC time ending in Z; stored as epoch seconds. Empty values clear either field.
+--filer (or SIGN_OFF_FILER) names who writes the line, as on post; the board's Activity then says who moved the ticket. A line written without one shows no who, and a bare session id names nobody, so it is not kept.
 --release labels the release (up to 40 characters). --state is queued, "in progress", "on hold" or done; it takes precedence over progress/hold for grouping.
 --pr takes full HTTP(S) URLs, repeatable or comma separated; it replaces the linked PR list. Empty --release, --state or --pr clears that field.
 Without --state, grouping stays Done at 100%, else On hold with --hold yes, else In progress above 0%, else To do.
@@ -1274,7 +1275,7 @@ function ticketsApi(path: string): [number, unknown] | undefined {
  * What it prints carries the roll-up: a ticket with tickets under it is as far along as they are on average. */
 function ticket(args: string[]) {
   const { file, values, on } = parse('ticket', args, { id: { type: 'string' }, title: { type: 'string' }, progress: { type: 'string' }, parent: { type: 'string' }, priority: { type: 'string' },
-    project: { type: 'string' }, hold: { type: 'string' }, asked: { type: 'string' }, release: { type: 'string' }, state: { type: 'string' }, stage: { type: 'string' }, 'last-event-at': { type: 'string' }, pr: { type: 'string', multiple: true }, comment: { type: 'string' }, json: { type: 'boolean' } });
+    project: { type: 'string' }, hold: { type: 'string' }, asked: { type: 'string' }, release: { type: 'string' }, state: { type: 'string' }, stage: { type: 'string' }, 'last-event-at': { type: 'string' }, pr: { type: 'string', multiple: true }, comment: { type: 'string' }, filer: { type: 'string' }, json: { type: 'boolean' } });
   if (values.comment !== undefined) return ticketComment(file, values, on);
   const { id, title, parent } = values, write = [title, values.progress, parent, values.priority, values.project, values.hold, values.asked, values.release, values.state, values.pr, values.stage, values['last-event-at']].some((v) => v !== undefined);
   if (id === undefined && write) throw fail('--title, --progress, --parent, --priority, --project, --hold, --asked, --release, --state, --pr, --stage and --last-event-at need --id <ticket id>', 'VALIDATION_ERROR', 'sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40');
@@ -1317,9 +1318,13 @@ function ticket(args: string[]) {
     if (!had && title === undefined) throw fail(`no ticket ${id} on ${tilde(file)} yet: a new ticket needs --title`, 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id ${id} --title "<what the work is>" --progress 0`);
     // A later write changes only what it gives; an empty --parent, --priority, --project, --hold or --asked takes that field off.
     const next: any = { ...had, id, title: title ?? had!.title, progress: progress ?? had?.progress ?? 0 };
+    // Who wrote this line is this write's own: a later write without a filer does not inherit the earlier writer.
+    const filer = values.filer ?? (process.env.SIGN_OFF_FILER || undefined);
+    delete next.by;
+    if (filer && !SESSION_ID.test(filer)) next.by = filer;
     for (const [k, v] of Object.entries({ parent, priority: values.priority, project: values.project, hold: yesNo(values.hold), asked: yesNo(values.asked), release: values.release, state: values.state, stage: values.stage, last_event_at: lastEvent, prs: values.pr === undefined ? undefined : values.pr.every((v: string) => v === '') ? '' : [...new Set(values.pr.flatMap((v: string) => v.split(',').map((u: string) => u.trim())))] })) if (v === '') delete next[k]; else if (v !== undefined) next[k] = v;
     const fault = ticketFault(next);
-    if (fault) throw fail(`ticket ${id}: ${fault.replace(/^(title|progress|parent|priority|project|hold|asked|release|state|stage|last_event_at|prs)/, '--$1').replace(/^--prs\b/, '--pr').replace(/^--last_event_at\b/, '--last-event-at').replace('must be true or false', 'must be yes or no')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi ticket --help`');
+    if (fault) throw fail(`ticket ${id}: ${fault.replace(/^(title|progress|parent|priority|project|hold|asked|release|state|stage|last_event_at|prs|by)/, '--$1').replace(/^--prs\b/, '--pr').replace(/^--by\b/, '--filer').replace(/^--last_event_at\b/, '--last-event-at').replace('must be true or false', 'must be yes or no')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi ticket --help`');
     // A release names what ships, not when: a word like "later" would sit beside the priority and read as a contradiction.
     if (values.release && releaseIsWhen(values.release)) throw fail(`ticket ${id}: --release names a release such as v1.4 or 2026-11, not when; set --priority P0-P3 for how soon it matters`, 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id ${id} --priority P1`);
     // The same open work under another id is one ticket, not two: write to the one that has it.
@@ -1333,7 +1338,7 @@ function ticket(args: string[]) {
 
 function releaseTicketHold(file: string, id: string) {
   const tickets = readTickets(file, warn), ticket = tickets.find((t) => t.id === id);
-  if (ticket && (ticket.hold || ticket.state === 'on hold')) appendTicket(file, { ...ticket, hold: false,
+  if (ticket && (ticket.hold || ticket.state === 'on hold')) appendTicket(file, { ...ticket, by: undefined, hold: false,
     state: (rollUp(tickets).find((t) => t.id === id)?.progress ?? ticket.progress) ? 'in progress' : 'queued', last_event_at: Math.floor(Date.now() / 1000) });
 }
 /** ticket --id <id> --comment '<json>': the fleet dashboard hands over a comment the person made on a ticket, in its own thread record, again each time it moves

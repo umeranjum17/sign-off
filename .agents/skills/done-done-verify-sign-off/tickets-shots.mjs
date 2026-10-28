@@ -256,11 +256,13 @@ try {
   facts.tickets = await read();
   await capture('tickets');
   await pair('tickets', proto, 'v=tickets');
-  // System: the segment, by a tap.
+  // Fleet upkeep: the filter's Who asked group, by a tap.
   await go(start);
-  await until(`!!document.querySelector('.tk-seg')`, 'Tickets drawn again');
-  await tap('.tk-seg button:nth-child(2)');
-  await until(`document.querySelector('.tk-seg button:nth-child(2)').getAttribute('aria-pressed') === 'true'`, 'System on');
+  await until(`!!document.querySelector('.tk-rb')`, 'Tickets drawn again');
+  await tap('.tk-rb');
+  await until(`document.getElementById('tk-filter').open`, 'the filter open');
+  await js(`[...document.querySelectorAll('#tk-filter .tk-pick')].find((b) => b.textContent.includes('Fleet upkeep')).click()`);
+  await until(`!document.getElementById('tk-filter').open && !!document.querySelector('.tk-fpill')`, 'Fleet upkeep on');
   facts.system = await read();
   await capture('tickets-system');
   await pair('tickets-system', proto, 'v=tickets&kind=system');
@@ -316,7 +318,7 @@ try {
   if (side === 'after') writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
     start: 'A throwaway board (feel-board.sh) with tickets written through sign-off-axi ticket: 24 of your asks (one an epic with three tickets, one of them with four sub-tasks) and 15 system tickets (one with three sub-tasks), with priorities, projects (two with their own icons) and holds, and seven cards naming tickets.',
     steps: [`Open Tickets at ${metrics.width}x${metrics.height} (2x), ${theme}, in a headless Chromium of its own, and measure every block, row and button in the browser.`,
-      `${phone ? 'Tap' : 'Click'} System in the segmented control and read the lists.`,
+      `${phone ? 'Tap' : 'Click'} Fleet upkeep in the filter's Who asked group and read the lists.`,
       `${phone ? 'Tap' : 'Click'} the epic's row: it opens ${phone ? 'over the list as a sheet' : 'in the third column'} with its three tickets; then ${phone ? 'tap' : 'click'} the publishing ticket: its four sub-tasks, its linked cards and their Activity.`,
       ...(phone ? ['Scroll the ticket to its end, close it and land on the list.', 'Tap the filter button, read the projects, pick one, then clear it.', 'Scroll Tickets to its end and measure the last block against the dock.']
         : ['Nudge each list that holds more than it shows by 50px: it rests on a whole row; scrolled to its end its fade goes.']),
