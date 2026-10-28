@@ -632,7 +632,7 @@ export function rollUp(tickets: Ticket[]): Ticket[] {
 /** A project's own icon: a picture in the board's folder, pinned by its hash so the board serves only the file that was set. */
 export type IconRef = { path: string; sha256: string; bytes: number };
 /** A project as the board draws it: its name and, optionally, its icon. A project with no icon shows a project outline. */
-export type Project = { name: string; icon?: IconRef; at: string };
+export type Project = { name: string; icon?: IconRef; terminalApp?: boolean; at: string };
 /** Projects, one line per write (`project --name`), the latest line per name wins, names matched without regard to case. A board without the file has none. */
 export const projectsPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.projects.jsonl';
 /** What an icon may be: a small picture of one of these types. */
@@ -645,6 +645,7 @@ export const iconPathFault = (p: unknown) => (!isText(p) || !(p as string).trim(
   : !Object.hasOwn(ICON_TYPES, iconExt(p as string)) ? `must end in ${Object.keys(ICON_TYPES).join(', ')}` : '');
 /** The project rules, shared by the writer and the reader: a line that breaks one is skipped, never shown half-valid. */
 export const projectFault = (p: any) => (!isText(p?.name) || !p.name.trim() || /[\0-\x1f\x7f-\x9f]/.test(p.name) || [...p.name].length > 40 ? 'name must be text of 40 characters or fewer'
+  : p.terminalApp !== undefined && p.terminalApp !== true ? 'terminalApp must be true when set'
   : p.icon === undefined ? ''
   : iconPathFault(p.icon?.path) ? `icon ${iconPathFault(p.icon?.path)}`
   : !/^[a-f0-9]{64}$/.test(p.icon.sha256 ?? '') || !(Number.isInteger(p.icon.bytes) && p.icon.bytes > 0 && p.icon.bytes <= ICON_BYTES) ? `icon must carry its sha256 and bytes, ${ICON_BYTES} or fewer` : '');
@@ -659,8 +660,8 @@ export function iconContentFault(path: string, bytes: Buffer): string {
   if (!/<svg[\s>]/i.test(text)) return 'is not an SVG picture';
   return /<script\b|<foreignObject\b|\son[a-z]+\s*=/i.test(text) ? 'holds a script, and an icon is only a picture' : '';
 }
-export function appendProject(decisionsPath: string, { name, icon }: Omit<Project, 'at'>): Project {
-  const p = { name, ...(icon && { icon }), at: now() };
+export function appendProject(decisionsPath: string, { name, icon, terminalApp }: Omit<Project, 'at'>): Project {
+  const p = { name, ...(icon && { icon }), ...(terminalApp && { terminalApp: true }), at: now() };
   appendLine(projectsPath(decisionsPath), p);
   return p;
 }
@@ -671,7 +672,7 @@ export function readProjects(decisionsPath: string, warn: (msg: string) => void 
     let p;
     try { p = line && JSON.parse(line); } catch {}
     if (line && (!p || projectFault(p))) return warn(`skipped unreadable line ${n + 1} in ${projectsPath(decisionsPath)}`);
-    if (p) latest.set(p.name.toLowerCase(), { name: p.name, ...(p.icon && { icon: { path: p.icon.path, sha256: p.icon.sha256, bytes: p.icon.bytes } }), at: p.at });
+    if (p) latest.set(p.name.toLowerCase(), { name: p.name, ...(p.icon && { icon: { path: p.icon.path, sha256: p.icon.sha256, bytes: p.icon.bytes } }), ...(p.terminalApp && { terminalApp: true }), at: p.at });
   });
   return [...latest.values()];
 }

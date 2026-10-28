@@ -49,6 +49,20 @@ test('evidence journey: post numbered updates with media, serve them hash-checke
   assert.equal(refused.code, 2);
   assert.match(refused.out, /is mostly text: a picture of a log, receipt or summary is not evidence/);
   assert.match(refused.out, /Post a real capture of the running product/);
+  assert.match(refused.out, /project .*--name <project> --terminal-app/);
+  // The board owner declares this product surface once; the declaration is persisted and readable.
+  const terminalBoard = join(so, 'terminal', 'board.json');
+  assert.equal(run('project', terminalBoard, '--name', 'Muxr', '--terminal-app').code, 0);
+  assert.match(run('project', terminalBoard, '--json').out, /\"terminalApp\":true/);
+  const terminalLog = run('post', terminalBoard, '--type', 'evidence', '--title', 'Terminal output', '--about', 'A terminal screen.', '--media', textLog);
+  assert.equal(terminalLog.code, 0, terminalLog.out);
+  assert.match(terminalLog.out, /update-1,1,1/);
+  // Other refusal checks stay active after the declaration.
+  const terminalBars = run('post', terminalBoard, '--type', 'evidence', '--title', 'Test card', '--about', 'Note.', '--media', colourBars);
+  assert.match(terminalBars.out, /is a colour-bar test card, not evidence/);
+  const terminalPlaceholder = run('post', terminalBoard, '--type', 'evidence', '--title', 'Placeholder', '--about', 'Note.', '--media', placeholderCard);
+  assert.match(terminalPlaceholder.out, /is a placeholder card, not evidence/);
+  assert.deepEqual(readdirSync(join(so, 'terminal', 'evidence')), ['1']);
   // A colour-bar test card is refused the same way, not posted as evidence.
   assert.match(evidence('--title', 'Test card', '--about', 'Note.', '--media', colourBars).out, /is a colour-bar test card, not evidence/);
   // A flat placeholder card is refused; a real screen that is mostly empty is not.

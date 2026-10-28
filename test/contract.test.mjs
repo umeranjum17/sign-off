@@ -1560,6 +1560,8 @@ test('a card carries a priority and a project its own icon: every post takes --p
   assert.equal(set.status, 0, set.stdout);
   assert.match(set.stdout, /status: created/);
   assert.match(run('project', board, '--name', 'Beacon', '--icon', 'icons/beacon.png').stdout, /status: unchanged/);
+  assert.equal(run('project', board, '--name', 'Beacon', '--terminal-app').status, 0);
+  assert.equal(JSON.parse(run('project', board, '--json').stdout).projects.find((p) => p.name === 'Beacon').icon.path, 'icons/beacon.png');
   // Invalid icons are refused, and nothing is written: a path out of the folder, a link that leads out, a file that is not its type, a script, too big, missing.
   writeFileSync(join(scratch, 'outside.png'), png);
   symlinkSync(join(scratch, 'outside.png'), join(dir, 'icons', 'link.png'));
@@ -1572,7 +1574,7 @@ test('a card carries a priority and a project its own icon: every post takes --p
     assert.equal(r.status, icon === 'icons/none.png' ? 1 : 2, icon);
     assert.match(r.stdout, error, icon);
   }
-  assert.equal(readFileSync(join(dir, 'board.projects.jsonl'), 'utf8').trim().split('\n').length, 1);
+  assert.equal(readFileSync(join(dir, 'board.projects.jsonl'), 'utf8').trim().split('\n').length, 2);
   // An SVG with no script is a picture too; --clear-icon takes the icon away again.
   writeFileSync(join(dir, 'icons', 'tern.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4"/></svg>');
   assert.equal(run('project', board, '--name', 'Tern', '--icon', 'icons/tern.svg').status, 0);
