@@ -18,11 +18,13 @@ const evaluate = (code) => { let v = JSON.parse(browser('eval', code).match(/res
 const pause = (ms) => browser('eval', `() => new Promise((ok) => setTimeout(ok, ${ms}))`);
 const shot = (name) => browser('screenshot', join(out, `${name}.${theme}.${width}.png`));
 const server = { child: null };
+// The captain's full words on the ask card: far longer than its short title, in two paragraphs.
+const ASK = 'I want the digest to go out once a week, on Monday morning, not every day. Readers told me the daily one felt like noise, and I would rather they open one good one.\n\nKeep the daily send ready behind a switch in case I change my mind, and tell me in the digest itself what changed so nobody wonders where the other six went.';
 try {
   // A board needs one post to exist; the tickets then carry their own history: one line per write, as the CLI appends them, with the time each was written.
   cli('post', board, '--ask-ref', 'message-demo', '--title', 'Keep the weekly digest?', '--why', 'Open rate held.', '--outcome', 'yes=Keep', '--outcome', 'no=Stop', '--recommend', 'yes', '--recommend-reason', 'Readers open it.', '--default', 'yes');
   // The captain's own ask for T-5: the board's ask card names the ticket, filed three days ago.
-  const items = JSON.parse(readFileSync(board, 'utf8')); Object.assign(items.items[0], { title: 'Make the digest weekly, not daily', ticket: 'T-5', filed: new Date(Math.floor(Date.now() / 1000) * 1000 - 72 * 3600e3).toISOString().replace('.000Z', 'Z') });
+  const items = JSON.parse(readFileSync(board, 'utf8')); Object.assign(items.items[0], { title: 'Make the digest weekly, not daily', body: ASK, ticket: 'T-5', filed: new Date(Math.floor(Date.now() / 1000) * 1000 - 72 * 3600e3).toISOString().replace('.000Z', 'Z') });
   writeFileSync(board, JSON.stringify(items, null, 2) + '\n');
   writeFileSync(join(dir, 'config.yaml'), 'board: board.json\nname: Umer\n');
   mkdirSync(join(dir, 'icons'));
@@ -96,7 +98,7 @@ try {
   browser('eval', `() => ${rowsOf}.find((r) => r.getAttribute('aria-label').startsWith('Send the digest every Monday')).click()`); pause(700);
   facts.burst = evaluate(`() => { const d = document.querySelector('dialog.tk-evs[open]'); return JSON.stringify({ changes: [...d.querySelectorAll('.tk-chg li')].map((l) => l.textContent), ask: d.querySelector('.tk-ask').innerText.replace(/\\s+/g, ' '), props: d.querySelector('.ui-props').innerText.replace(/\\s+/g, ' '), within: d.getBoundingClientRect().right <= innerWidth + 1 }); }`);
   assert.equal(facts.burst.changes.length, 6, facts.burst.changes.join(' | ')); assert.ok(facts.burst.changes[0].startsWith('Ticket created') && facts.burst.changes.at(-1).startsWith('Progress changed to 40%'));
-  assert.match(facts.burst.ask, /^Make the digest weekly, not daily \d{1,2} \w{3} \d{4}, \d{2}:\d{2}:\d{2}$/); assert.match(facts.burst.props, /Made by worker/); assert.equal(facts.burst.within, true);
+  assert.equal(facts.burst.ask.replace(/ \d{1,2} \w{3} \d{4}, \d{2}:\d{2}:\d{2}$/, ''), ASK.replace(/\s+/g, ' ')); assert.match(facts.burst.ask, /\d{1,2} \w{3} \d{4}, \d{2}:\d{2}:\d{2}$/); assert.match(facts.burst.props, /Made by worker/); assert.equal(facts.burst.within, true);
   // On a desk the dialog is shorter than the view: scroll it so the changes and the quoted words are both in the frame.
   browser('eval', `() => { const d = document.querySelector('dialog.tk-evs[open]'); d.querySelector('.tk-ask').scrollIntoView({ block: 'end' }); }`); pause(300);
   facts.burst.askVisible = evaluate(`() => { const a = document.querySelector('dialog.tk-evs[open] .tk-ask').getBoundingClientRect(); return a.bottom <= innerHeight && a.top >= 0; }`); assert.equal(facts.burst.askVisible, true);
