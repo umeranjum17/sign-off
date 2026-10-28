@@ -354,14 +354,16 @@ examples:
   project: `usage: sign-off-axi project [board.json] [--json]
        sign-off-axi project [board.json] --name <name> --icon <path>
        sign-off-axi project [board.json] --name <name> --clear-icon
+       sign-off-axi project [board.json] --name <name> --terminal-app
 A project's own icon: the board draws it on the project's rows. A project with no icon shows a tile with its initials, so an icon is optional.
 --name is the project name as its cards give it (a report's or design's group, a plan's project, the app of a verify-<app> proof), 40 characters or fewer; case does not matter.
 --icon is a picture in the board file's folder, as a path from that folder: .png, .jpg, .jpeg, .webp or .svg (no script), ${ICON_BYTES} bytes or fewer.
-The board pins the file by its hash and serves only that file: change the picture and run project --icon again. With no --name, lists every project.
+The board pins the file by its hash and serves only that file: change the picture and run project --icon again. A terminal application can declare that product surface with --terminal-app; this accepts text-heavy still evidence on the board. With no --name, lists every project.
 It writes one line to <board>.projects.jsonl beside the board (${FORMAT}).
 examples:
   sign-off-axi project --name Beacon --icon icons/beacon.png
   sign-off-axi project --name Beacon --clear-icon
+  sign-off-axi project --name Muxr --terminal-app
   sign-off-axi project --json
 `,
   promote: `usage: sign-off-axi promote <key> [board.json] [--undo]
@@ -1354,16 +1356,16 @@ function ticketComment(file: string, values: Record<string, any>, on: string) {
 /** project [board.json] [--name <name> --icon <path> | --clear-icon]: lists the projects, or sets or clears one project's icon.
  * A project stands alone in <board>.projects.jsonl; its icon is a picture in the board's folder, pinned by its hash. */
 function project(args: string[]) {
-  const { file, values, on } = parse('project', args, { name: { type: 'string' }, icon: { type: 'string' }, 'clear-icon': { type: 'boolean' }, json: { type: 'boolean' } });
-  const { name, icon } = values, clear = values['clear-icon'] === true, EXAMPLE = 'sign-off-axi project --name Beacon --icon icons/beacon.png';
-  const row = (p: Project) => ({ name: p.name, icon: p.icon?.path ?? '' });
+  const { file, values, on } = parse('project', args, { name: { type: 'string' }, icon: { type: 'string' }, 'clear-icon': { type: 'boolean' }, 'terminal-app': { type: 'boolean' }, json: { type: 'boolean' } });
+  const { name, icon } = values, clear = values['clear-icon'] === true, terminalApp = values['terminal-app'] === true, EXAMPLE = 'sign-off-axi project --name Beacon --icon icons/beacon.png';
+  const row = (p: Project) => ({ name: p.name, icon: p.icon?.path ?? '', ...(p.terminalApp && { terminalApp: true }) });
   if (name === undefined) {
-    if (icon !== undefined || clear) throw fail(`--${clear ? 'clear-icon' : 'icon'} needs --name <project>`, 'VALIDATION_ERROR', EXAMPLE);
+    if (icon !== undefined || clear || terminalApp) throw fail(`--${clear ? 'clear-icon' : terminalApp ? 'terminal-app' : 'icon'} needs --name <project>`, 'VALIDATION_ERROR', EXAMPLE);
     const all = readProjects(file, warn);
     if (values.json) return JSON.stringify({ board: file, projects: all });
     return toon({ board: tilde(file), projects: all.length ? all.map(row) : '0 projects' }, [`Run \`sign-off-axi project${on} --name <project> --icon <picture>\` to give a project its icon`]);
   }
-  if ((icon === undefined) === !clear) throw fail(`project --name needs ${clear ? 'either --icon or --clear-icon, not both' : '--icon <path> or --clear-icon'}`, 'VALIDATION_ERROR', EXAMPLE);
+  if (Number(icon !== undefined) + Number(clear) + Number(terminalApp) !== 1) throw fail('project --name needs exactly one of --icon, --clear-icon or --terminal-app', 'VALIDATION_ERROR', EXAMPLE);
   let ref: Project['icon'];
   if (icon !== undefined) {
     const bad = (rule: string, help: string) => fail(`--icon ${icon} ${rule}`, 'VALIDATION_ERROR', help), fault = iconPathFault(icon);
@@ -1385,15 +1387,17 @@ function project(args: string[]) {
     if (content) throw bad(content, 'Save the picture again as the type its name gives');
     ref = { path: icon, sha256: sha256(bytes), bytes: bytes.length };
   }
-  const fault = projectFault({ name, ...(ref && { icon: ref }) });
+  const fault = projectFault({ name, ...(ref && { icon: ref }), ...(terminalApp && { terminalApp: true }) });
   if (fault) throw fail(`project ${name}: --${fault}`, 'VALIDATION_ERROR', 'Pass the project name as its cards give it, such as --name Beacon');
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
     const had = readProjects(file, warn).find((p) => p.name.toLowerCase() === name.toLowerCase());
-    const same = !!had && had.name === name && JSON.stringify(had.icon ?? null) === JSON.stringify(ref ?? null);
-    const next = same ? had! : appendProject(file, { name, ...(ref && { icon: ref }) });
+    const declaredTerminalApp = terminalApp || !!had?.terminalApp;
+    const nextIcon = ref ?? (terminalApp ? had?.icon : undefined);
+    const same = !!had && had.name === name && JSON.stringify(had.icon ?? null) === JSON.stringify(nextIcon ?? null) && !!had.terminalApp === declaredTerminalApp;
+    const next = same ? had! : appendProject(file, { name, ...(nextIcon && { icon: nextIcon }), ...(declaredTerminalApp && { terminalApp: true }) });
     return toon({ board: tilde(file), project: row(next), status: same ? 'unchanged' : had ? 'updated' : 'created' },
-      [ref ? 'The board shows this icon on the project\'s rows; run project --icon again after you change the picture' : 'The board shows the project\'s initials in place of an icon']);
+      [terminalApp ? 'This board accepts text-heavy still evidence for its terminal application' : ref ? 'The board shows this icon on the project\'s rows; run project --icon again after you change the picture' : 'The board shows the project\'s initials in place of an icon']);
   });
 }
 
@@ -1474,7 +1478,7 @@ function replace(file: string, named: string, on: string, from?: string, filer?:
 /** Copies the media into evidence/<n>/ next to the board and adds the item, numbered under the board lock: update-<n>, or an explainer under its own key.
  * `message` is a checked contract evidence message (post --kind evidence): its key, if any, takes only the same message again, and its run is stored as `evidence`. */
 const UNFIT: Record<Fault, (path: string) => string> = {
-  text: (path) => `--media ${path} is mostly text: a picture of a log, receipt or summary is not evidence`,
+  text: (path) => `--media ${path} is mostly text: a picture of a log, receipt or summary is not evidence (declare a terminal application with \`sign-off-axi project <board.json> --name <project> --terminal-app\` to accept text-heavy stills)`,
   'colour bars': (path) => `--media ${path} is a colour-bar test card, not evidence`,
   placeholder: (path) => `--media ${path} is a placeholder card, not evidence`,
 };
@@ -1530,7 +1534,8 @@ function postMedia(file: string, named: string, on: string, values: Record<strin
   });
   const attached = (values.attach ?? []).map((a: string) => attachment(a));
   // A still that is not a picture of the product (text, colour bars or a placeholder) is measured before anything is copied.
-  const [unfit] = explainer ? [] : sources.flatMap((src) => isStill(src) ? faults(src).map((f) => ({ src, f })) : []);
+  const terminalApp = readProjects(file).some((p) => p.terminalApp);
+  const [unfit] = explainer ? [] : sources.flatMap((src) => isStill(src) ? faults(src).filter((f) => !(terminalApp && f === 'text')).map((f) => ({ src, f })) : []);
   if (unfit) throw fail(UNFIT[unfit.f](tilde(unfit.src)), 'VALIDATION_ERROR', 'Post a real capture of the running product instead: a screenshot or recording of the screen the user sees');
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {

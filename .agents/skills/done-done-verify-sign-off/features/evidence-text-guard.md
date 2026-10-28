@@ -15,6 +15,8 @@ Accepted: post a real capture of the running product, such as a screenshot of th
 
 Placeholder versus empty screen: `fixtures/evidence/placeholder-card.png` (one flat colour with a small label) is refused with `is a placeholder card, not evidence`; `fixtures/evidence/sparse-screen.png` (a real chat screen with header, message, composer and tab bar, 90% empty thread) is accepted.
 
+Terminal applications: `sign-off-axi project <board.json> --name <product> --terminal-app` declares the board's product surface in `<board>.projects.jsonl`, readable with `project <board.json> --json`. On that board only the `text` still refusal is disabled; colour bars and placeholders remain refused. Without the declaration, text stills are refused and the message names this command. Prove with `node --test --test-global-setup=test/temp-folder.mjs test/evidence.test.mjs`, then on disposable live boards post a plain text still before and after declaration and inspect the CLI output and board media. Also post a real screenshot of a running terminal application and a plain log dump to the declared board.
+
 Journey: `done-done run evidence-guard` (`evidence-guard-journey.mjs`) posts the sparse screen on a throwaway board, screenshots its Evidence card at 390 and 1280 and saves the placeholder refusal output.
 
 Board: a card that already holds a colour-bar or placeholder picture (posted before the guard, so the board file holds it) does not appear on the Evidence page; the real cards around it still do.
