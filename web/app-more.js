@@ -1,4 +1,24 @@
 // The screens beyond the first screen's own. app.js asks for this file once the board has drawn; until then a phone reads only the first screen.
+  /** The one empty state (app.css .es) for every list, feed and card that can hold nothing: never a bare title or an empty box. Three states, never mixed: loading (a quiet
+   *  skeleton and a line), empty (a mark, what goes here, one next step where there is one) and error (what failed, and Try again). */
+  function emptyState(kind, { mark = 'list', title, text, act, small } = {}) {
+    const mk = el('span', { class: 'es-mark', 'aria-hidden': 'true' });
+    mk.innerHTML = `<svg viewBox="0 0 24 24"><path d="${kind === 'error' ? 'M4 12a8 8 0 0 1 13.7-5.6L20 8.7M20 4v4.7h-4.7M20 12a8 8 0 0 1-13.7 5.6L4 15.3M4 20v-4.7h4.7' : ICONS[mark]}"/></svg>`;
+    const go = act && el('button', { type: 'button', class: 'es-act' }, act[0]);
+    if (go) go.onclick = act[1];
+    return el('div', { class: `es es-${kind}${small ? ' es-s' : ' ui-card'}`, ...(kind !== 'empty' && { role: kind === 'error' ? 'alert' : 'status' }) },
+      ...(kind === 'loading' ? [el('span', { class: 'sk es-sk', 'aria-hidden': 'true' }), el('span', { class: 'sk es-sk short', 'aria-hidden': 'true' }), el('span', {}, title)] : [mk, el('b', {}, title), text ? el('span', {}, text) : '', go || '']));
+  }
+  const EMPTY_TEXT = { waiting: 'Agents will ask when they need you.', designs: 'A design an agent posts for review shows here.', evidence: 'Proof an agent files for a change shows here.', reports: 'What an agent writes up for you shows here.', answered: 'Asks you answer show here, newest first.' };
+  /** Whether the board's rows are all in: the first page holds the asks that wait, so only the other screens wait on the rest of the pages (and name one that failed). */
+  const boardLoad = (key) => (key === 'waiting' || FROZEN || wholeBoard || paged ? 'ready' : restFailed ? 'error' : 'loading');
+  /** A screen's list with nothing in it: still on its way, failed, or truly empty, each said as itself. */
+  function screenEmpty(key, small) {
+    const load = boardLoad(key);
+    return load === 'loading' ? emptyState('loading', { title: 'Loading the board', small })
+      : load === 'error' ? emptyState('error', { title: 'Couldn’t load the rest of the board', text: restFailed, act: ['Try again', () => { restFailed = ''; resting = false; renderKeepingFocus(); rest(); }], small })
+      : emptyState('empty', { mark: key, title: EMPTY[key], text: EMPTY_TEXT[key], small });
+  }
   function openMediaViewer(items, start = 0, returnFocus) {
     if (!items?.length) return;
     // One viewer at a time: drop any sheet still open from another card or an earlier tap.
@@ -111,7 +131,7 @@
       top.replaceChildren(h1, fb, themeButton());
     } else top.replaceChildren(h1, themeButton());
     top.className = 'ui-top ev-top';
-    if (!proofs.length) return [...(ro ? [ro] : []), el('p', { class: 'empty' }, EMPTY.evidence), ...items.map((d) => row(d))];
+    if (!proofs.length) return [...(ro ? [ro] : []), screenEmpty('evidence'), ...items.map((d) => row(d))];
     const seg = el('div', { class: 'ui-seg ev-seg', role: 'group', 'aria-label': 'Order' }, ...[['new', 'Newest'], ['prio', 'By priority']].map(([v, n]) => {
       const b = el('button', { 'aria-pressed': String(evSort === v) }, n);
       b.onclick = () => { evSort = v; redraw('.ev-seg [aria-pressed="true"]'); };
@@ -149,7 +169,7 @@
       return b;
     })));
     return [...(ro ? [ro] : []), ...(selecting ? [bulk] : []), seg, head, el('h2', { class: 'ui-sec ev-sec' }, el('span', { class: 'ev-st' }, evSort === 'prio' ? 'By priority' : 'Latest proof'), pv, see),
-      sorted.length ? el('ul', { class: 'ui-card ui-list ev-list' }, ...(all ? sorted : sorted.slice(0, 6)).map(evRow)) : el('p', { class: 'empty' }, 'No proof for this project.'),
+      sorted.length ? el('ul', { class: 'ui-card ui-list ev-list' }, ...(all ? sorted : sorted.slice(0, 6)).map(evRow)) : emptyState('empty', { mark: 'evidence', title: 'No proof for this project', text: 'Proof an agent files for it shows here.' }),
       ...items.filter((d) => d.type !== 'evidence').map((d) => row(d)), ...(selecting ? [] : [bulk])];
   }
   /** An update's verdict: Fail, Needs work and Pass on one row, Pass in ink until one is saved, then the saved one; a read-only board takes none. */
@@ -294,17 +314,29 @@
       ...[...old].map(([m, n]) => el('p', { class: 'meta' }, `${n} comment${n > 1 ? 's' : ''} on an earlier version of “${name(m)}” ${n > 1 ? 'are' : 'is'} hidden`)), err);
   }
 
-  function ticketActivityList(events, dialog) {
+  /** The Tickets screen's own read, said as an empty state's words: what is on its way, what failed, and the step that tries again. */
+  const tkRetry = () => { ticketsFailed = ''; render(); readTickets(true); };
+  const tkNote = (what, mark, title, text, small, act) => {
+    const load = tkLoad();
+    return load === 'loading' ? emptyState('loading', { title: `Loading ${what}`, small })
+      : load === 'error' ? emptyState('error', { title: `Couldn’t load ${what}`, text: ticketsFailed, act: ['Try again', tkRetry], small })
+      : emptyState('empty', { mark, title, text, small, act });
+  };
+  /** The Activity feed, in the card, the desk's dialog and a ticket's own page: its events, or the one state that says why there are none. */
+  function ticketActivityList(events, dialog, small = true) {
+    if (!events.length) return el('div', { class: 'tk-feed' }, tkNote('activity', 'clock', 'No activity yet', 'Moves, stage changes and merges on tickets show here as they happen.', small));
     const list = thread(null, events.slice(0, 50).map((e) => ({ ...e, link: [e.title, `#ticket/${e.ticket}`] })), 1).querySelector('ol');
+    list.classList.add('tk-feed');
     if (dialog) list.onclick = (event) => { if (event.target.closest('a') && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) dialog.close(); };
     return list;
   }
+  /** The board-wide Activity card on a phone: always there, closed to its title, how many events it holds and the newest, so it is never a bare title. */
   function ticketActivity(events = state.ticketActivity ?? []) {
-    if (!events.length) return '';
-    return el('details', { class: 'ui-card tk-card tk-activity', 'aria-label': 'Activity', ...(document.querySelector('.tk-activity')?.open && { open: true }) }, el('summary', { class: 'tk-ch' }, 'Activity'), ticketActivityList(events));
+    const last = events[0], sum = el('summary', { class: 'tk-ch' }, el('span', {}, 'Activity'), events.length ? el('small', {}, String(events.length)) : '', events.length ? glyph('down') : '',
+      last ? el('span', { class: 'tk-last', dir: 'auto' }, `${last.title}: ${last.text}`) : '');
+    return el('details', { class: 'ui-card tk-card tk-activity', 'aria-label': 'Activity', ...((document.querySelector('.tk-activity')?.open || !events.length) && { open: true }) }, sum, ticketActivityList(events));
   }
   function ticketActivityButton() {
-    if (!(state.ticketActivity ?? []).length) return '';
     const button = el('button', { type: 'button', class: 'ui-rb tk-activity-open' }, 'Activity');
     button.onclick = () => {
       const title = el('h2', { id: 'tk-activity-title', class: 'tk-ch', tabindex: '-1' }, 'Activity');
@@ -319,7 +351,7 @@
     return button;
   }
   function tickets(by, id) {
-    const dialogFeed = document.querySelector('.tk-activity-dialog[open] .ui-act');
+    const dialogFeed = document.querySelector('.tk-activity-dialog[open] .tk-feed');
     if (dialogFeed) dialogFeed.replaceWith(ticketActivityList(state.ticketActivity ?? [], dialogFeed.closest('dialog')));
     const L = tkLists(), desk = !phone(), picked = id && tkById(id);
     const open = picked || (desk ? L.moving[0] ?? L.hold[0] ?? L.todo[0] ?? L.done[0] : undefined);
@@ -328,19 +360,23 @@
     const say = `${L.kind === 'asks' ? 'Your asks: ' : L.kind === 'system' ? 'System work: ' : ''}${L.done.length} of ${L.shown.length} done · ${L.moving.length} moving · ${L.hold.length} on hold · ${L.todo.length} to do`;
     const pick = tkProj ? el('button', { class: 'tk-fpill' }, el('span', { class: 'tk-pt', 'aria-hidden': 'true' }, projectPic(tkProj)), tkProj, glyph('x')) : '';
     if (pick) pick.onclick = () => { tkProj = ''; render(); }, pick.setAttribute('aria-label', `Show every project, not only ${tkProj}`);
-    const none = el('section', { class: 'ui-card tk-empty' }, el('h2', {}, 'No tickets yet'), el('p', {}, 'Agents add tickets as they plan work. Each one shows here with how far along it is.'));
+    const none = tkNote('tickets', 'pick', 'No tickets yet', 'Agents add tickets as they plan work. Each one shows here with how far along it is.'), nothing = !empty && !L.shown.length;
+    none.classList.add('tk-empty');
+    // A project that holds no ticket (any more) leaves the lists with nothing: the filter is named, and one step clears it.
+    const nomatch = emptyState('empty', { mark: 'list', title: 'No tickets match', text: tkProj ? `Nothing in ${tkProj} right now.` : 'Nothing here right now.', ...(tkProj && { act: ['Show every project', () => { tkProj = ''; render(); }] }) });
+    nomatch.classList.add('tk-empty');
     if (desk) {
-      const head = el('header', { class: 'ui-dhead tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets'), el('p', {}, empty ? 'Nothing tracked yet' : say)),
+      const head = el('header', { class: 'ui-dhead tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets'), el('p', {}, empty ? { loading: 'Loading tickets…', error: 'Couldn’t load tickets', ready: 'Nothing tracked yet' }[tkLoad()] : say)),
         el('div', { class: 'acts' }, pick, tkSeg(L), tkFilter(L), ticketActivityButton(), themeButton()));
-      if (empty) return [el('div', { class: 'ui-desk tk-desk' }, head, none)];
+      if (empty || nothing) return [el('div', { class: 'ui-desk tk-desk' }, head, empty ? none : nomatch)];
       return [el('div', { class: 'ui-desk tk-desk' }, head, el('div', { class: 'ui-dgrid' }, el('div', { class: 'ui-col s4' }, tkHero(L), tkGroup('mv', 'In progress', L.moving, true, 'grow')),
         el('div', { class: 'ui-col s4' }, tkGroup('hold', 'On hold', L.hold, true, 'half'), tkGroup('todo', 'To do', L.todo, true, 'grow')),
-        open ? el('section', { class: 'ui-card ui-pane s4 tk-pane', 'aria-label': open.title }, ...ticketPage(open)) : el('section', { class: 'ui-card ui-pane s4 tk-pane' }, el('p', { class: 'tk-none' }, 'No ticket here.'))))];
+        open ? el('section', { class: 'ui-card ui-pane s4 tk-pane', 'aria-label': open.title }, ...ticketPage(open)) : el('section', { class: 'ui-card ui-pane s4 tk-pane' }, emptyState('empty', { mark: 'pick', title: id ? 'Ticket not found' : 'No ticket open', text: id ? 'It may have been removed. Pick another from the list.' : 'Pick a ticket from the list to read it here.', small: true }))))];
     }
     const stat = (href, mark, lab, n) => el(href ? 'a' : 'div', { class: 'ui-card ui-stat', ...(href && { href }), 'aria-label': `${lab}: ${n}` }, fill(mark), el('span', { class: 'lab' }, lab), ' ', el('b', {}, String(n)));
     const p0 = L.shown.filter((t) => t.priority === 'P0' && tkStateOf(t) !== 'done').length;
     return [el('header', { class: 'ui-top tk-top' }, el('h1', { tabindex: '-1' }, 'Tickets'), tkFilter(L), themeButton()), tkSeg(L), pick,
-      ...(empty ? [none] : [tkHero(L), ticketActivity(), tkGroup('mv', 'In progress', L.moving), tkGroup('hold', 'On hold', L.hold), tkGroup('todo', 'To do', L.todo), tkGroup('done', 'Done', L.done),
+      ...(empty ? [none] : nothing ? [nomatch, ticketActivity()] : [tkHero(L), ticketActivity(), tkGroup('mv', 'In progress', L.moving), tkGroup('hold', 'On hold', L.hold), tkGroup('todo', 'To do', L.todo), tkGroup('done', 'Done', L.done),
         el('div', { class: 'ui-tiles tk-tiles' }, stat('#waiting', 'M5 3h10a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-4.5L6 18.2V15H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3zm1.5 4.2v1.6h7V7.2zm0 3v1.6h5v-1.6z', 'Wait on you', by.waiting.length),
           stat('', 'M4 2.5h1.6v1h9.9l-2.1 3.75 2.1 3.75H5.6v6.5H4z', 'Open at P0', p0))]),
       picked ? tkSheet(picked) : (tkUp = '')];
@@ -364,10 +400,10 @@
         up ? prop('layers', 'Part of', el('a', { href: `#ticket/${up.id}`, dir: 'auto' }, up.title)) : '',
         prop('clock', 'Last update', el('span', {}, stamp(t.at)))),
       ...(kids.length ? [el('p', { class: 'ui-dl' }, `${tkAbove(t).length ? 'Sub-tasks' : 'Tickets in this epic'} · ${done} of ${kids.length} done`), el('ul', { class: 'ui-list tk-in' }, ...kids.map(tkRow))] : []),
-      el('p', { class: 'ui-dl' }, 'Linked'), cards.length || t.prs?.length ? el('ul', { class: 'ui-list tk-in' }, ...(t.prs ?? []).map((url) => { const pr = /\/pull\/(\d+)\/?$/.exec(new URL(url).pathname); return el('li', {}, el('a', { class: 'ui-row', href: url, title: url, target: '_blank', rel: 'noopener noreferrer' }, ...uiRow({ tile: el('span', { class: 'ui-icon', 'aria-hidden': 'true' }, glyph('link')), title: pr ? `Pull request #${pr[1]}` : url, meta: pr ? new URL(url).pathname.replace(/\/pull\/.*$/, '').slice(1) : 'Pull request' }))); }), ...cards.map(linked)) : el('p', { class: 'tk-none' }, 'No card names this ticket yet.'),
+      el('p', { class: 'ui-dl' }, 'Linked'), cards.length || t.prs?.length ? el('ul', { class: 'ui-list tk-in' }, ...(t.prs ?? []).map((url) => { const pr = /\/pull\/(\d+)\/?$/.exec(new URL(url).pathname); return el('li', {}, el('a', { class: 'ui-row', href: url, title: url, target: '_blank', rel: 'noopener noreferrer' }, ...uiRow({ tile: el('span', { class: 'ui-icon', 'aria-hidden': 'true' }, glyph('link')), title: pr ? `Pull request #${pr[1]}` : url, meta: pr ? new URL(url).pathname.replace(/\/pull\/.*$/, '').slice(1) : 'Pull request' }))); }), ...cards.map(linked)) : emptyState('empty', { mark: 'plan', title: 'No cards yet', text: 'Cards that name this ticket show here.', small: true }),
       // The person's comments on it (made in the fleet dashboard), oldest first, each with how far it got and the lead's reply.
       ...(said.length ? [el('p', { class: 'ui-dl' }, 'Your comments'), ...said.map((c) => el('div', { class: 'tk-said' }, el('p', { dir: 'auto' }, c.said), trailTrack(c)))] : []),
-      thread(t, steps, 1)];
+      steps.length ? thread(t, steps, 1) : el('div', { class: 'thread' }, el('p', { class: 'ui-dl' }, 'Activity'), emptyState('empty', { mark: 'clock', title: 'No activity yet', text: 'Moves on this ticket and answers on its cards show here.', small: true }))];
   }
   /** On a desk every list ends on a whole row: with 40px or more left under its whole rows, the next row fades out there (and the list's end is padded the same, so scrolled
    * to its end it shows whole rows); with less, the list ends on its last whole row. The open ticket fades at its foot while it holds more than it shows. */
@@ -1459,7 +1495,7 @@
         return li;
       };
       actBox.replaceChildren(E('div', 'ra-ah', E('h2', '', 'Activity', ...(total ? [E('span', '', ` ${total}`)] : [])), x),
-        ...(days.length ? days.flatMap(([g, list]) => [E('p', 'ra-day', g), el('ol', { class: 'ra-list' }, ...list.map(item))]) : [E('p', 'ra-none', 'Nothing yet. Your notes, asks and the agent’s replies show here.')]));
+        ...(days.length ? days.flatMap(([g, list]) => [E('p', 'ra-day', g), el('ol', { class: 'ra-list' }, ...list.map(item))]) : [emptyState('empty', { mark: 'clock', title: 'Nothing yet', text: 'Your notes, asks and the agent’s replies show here.', small: true })]));
     }
     function paintActOpen() {
       actBox.hidden = !actOn; cols.classList.toggle('act', actOn); actBtn.setAttribute('aria-expanded', String(actOn)); root.classList.toggle('ra-actopen', actOn);
@@ -1634,7 +1670,7 @@
   }
   /** After a redraw, a row on its way out keeps its height for a moment, then folds to nothing; a redraw midway picks up where it was. */
   function decidePage(d, next, desk = false, sink = {}) {
-    if (!d) return el('p', { class: 'empty' }, EMPTY.waiting);
+    if (!d) return screenEmpty('waiting');
     const to = next ? `#decide/${next.key}` : '#waiting';
     skipTo = next && !state.readonly ? to : '';
     const who = d.type === 'signin' ? d.waits : d.by || 'Agent', at = d.filed ? ` · ${filedAt(d.filed)}` : '';
@@ -1750,7 +1786,7 @@
     return page;
   }
   function evidenceDesk(top, items, archived, d) {
-    const view = split(top, `${plural(items.length, 'proof')} on your board, newest first`, [...evidenceList(items, top, d?.key), archived], d ? proofPane(d) : pane('', el('p', { class: 'empty' }, EMPTY.evidence)));
+    const view = split(top, `${plural(items.length, 'proof')} on your board, newest first`, [...evidenceList(items, top, d?.key), archived], d ? proofPane(d) : pane('', screenEmpty('evidence', true)));
     if (d) view.querySelector(`#item-${CSS.escape(d.key)}`)?.setAttribute('aria-current', 'true');
     return view;
   }
@@ -1759,8 +1795,8 @@
    *  A guided report, which reads in stages, opens over the board from Read the report or a part. */
   function reportsDesk(top, page, d, any, items) {
     const sub = `${items.filter(unread).length} of ${items.length} still to read`;
-    if (!d) return split(top, sub, [page], pane('', any ? el('p', { class: 'empty' }, 'Open a report from the list.')
-      : el('div', { class: 'all-clear-big' }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, 'Nothing to read'), el('p', {}, EMPTY.reports))));
+    if (!d) return split(top, sub, [page], pane('', any ? emptyState('empty', { mark: 'reports', title: 'No report open', text: 'Pick one from the list to read it here.', small: true })
+      : boardLoad('reports') === 'ready' ? el('div', { class: 'all-clear-big' }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, 'Nothing to read'), el('p', {}, EMPTY.reports)) : screenEmpty('reports', true)));
     // A read-only copy keeps no read marks.
     const read = FROZEN ? '' : el('button', { class: 'rp-read', 'data-kbd': 'U', 'aria-keyshortcuts': 'U' }, glyph(unread(d) ? 'check' : 'dot'), unread(d) ? 'Mark read' : 'Mark unread');
     if (read) read.onclick = () => readToggle(d);

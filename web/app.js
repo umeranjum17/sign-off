@@ -54,7 +54,9 @@
    * pages are not read again over it. */
   let wholeBoard = false;
   /** Every page of the board has merged: what the whole board's own counts are made from, while a card is still read whole. */
-  let paged = false;
+  let paged = false, restFailed = '';
+  /** What a failed read says to a person: the board's own words, or that it could not be reached (a browser's own wording is not for them). */
+  const why = (e) => (e instanceof TypeError ? 'The board could not be reached.' : e.message);
   /** A part of the board joined to the board on screen. Rows replace or add, one card whole replaces its row and brings its own activity,
    * and a part is read for what it carries, never emptied for what it leaves out: nothing a person can see is cleared by a later read. */
   function mergeView(body) {
@@ -124,15 +126,15 @@
         if (page.more !== true || !page.decisions?.length) break;
         offset += page.decisions.length;
       }
-      paged = true;
-    } catch { /* the first screen is on screen: a page that fails leaves it there, and the next poll reads it again */ } finally {
+      paged = true; restFailed = '';
+    } catch (e) { restFailed = why(e); /* the first screen is on screen: a page that fails leaves it there, and the next poll reads it again */ } finally {
       resting = false;
       loadMore();
       renderKeepingFocus();
     }
   }
   /** The ticket roll-up is the largest part of the board and only the Tickets screen shows it: it is read when that screen first opens. */
-  let ticketsRead = false, ticketTag = '', ticketRequest, ticketScreen = false;
+  let ticketsRead = false, ticketsFailed = '', ticketTag = '', ticketRequest, ticketScreen = false;
   function readTickets(force = false) {
     if (!force && ticketsRead) return Promise.resolve(false);
     if (ticketRequest) return ticketRequest;
@@ -141,13 +143,15 @@
       const body = await res.json().catch(() => ({ error: `The server replied ${res.status}` }));
       if (!res.ok) throw new Error(body.error);
       ticketTag = res.headers.get('etag') ?? '';
-      ticketsRead = true;
+      ticketsRead = true; ticketsFailed = '';
       mergeView(body);
       renderKeepingFocus();
       return true;
-    }).catch(() => { ticketsRead = false; return false; }).finally(() => { ticketRequest = undefined; });
+    }).catch((e) => { ticketsRead = false; ticketsFailed = why(e); renderKeepingFocus(); return false; }).finally(() => { ticketRequest = undefined; });
     return ticketRequest;
   }
+  /** Where the ticket roll-up stands, so a screen never calls a read still on its way, or one that failed, an empty board. A frozen copy holds it already. */
+  const tkLoad = () => (FROZEN || ticketsRead ? 'ready' : ticketsFailed ? 'error' : 'loading');
 
   /** The addresses whose screens live in app-more.js: Decide, Designs, Evidence, Reports, Answered, Tickets. Today is the first screen and waits for nothing. */
   const MORE_SCREENS = /^#(?:waiting|decide|designs|evidence|reports|answered|tickets|ticket)(?:\/|$)/;
@@ -1380,7 +1384,7 @@
       const tickets = q ? (state.tickets ?? []).filter((t) => hit(t.title, t.id)).slice(0, 4).map((t) => el('li', {}, el('a', { class: 'ui-row', href: `#ticket/${t.id}` }, ...uiRow({ tile: tkTile(t), title: t.title, progress: progressOf(t.progress), meta: 'Not started' })))) : [];
       const groups = [group('Asks', 'waiting'), group('Proof', 'evidence'), group('Reports', 'reports', 'notes'), group('Answered', 'answered'), group('Designs', 'designs'), ['Tickets', tickets]].filter(([, rows]) => rows.length);
       out.replaceChildren(...(!q ? [el('p', { class: 't-grp' }, 'Type to search the whole board.')] : groups.length ? groups.flatMap(([name, rows]) => [el('p', { class: 't-grp' }, name), el('ul', { class: 'ui-card ui-list' }, ...rows)])
-        : [el('p', { class: 't-grp' }, `Nothing matches “${query.trim()}”.`)]));
+        : [typeof emptyState === 'function' ? emptyState('empty', { mark: 'list', title: `Nothing matches “${query.trim()}”`, text: 'Try another word, or a shorter one.', small: true }) : el('p', { class: 't-grp' }, `Nothing matches “${query.trim()}”.`)]));
     };
     box.value = query;
     box.oninput = () => { query = box.value; show(); };
@@ -1485,7 +1489,7 @@
   /** One list of tickets under its head: on a phone the first three with See all, on a desk a card whose rows scroll inside it. */
   function tkGroup(key, name, list, desk, cls = '') {
     if (desk) return el('section', { class: `ui-card tk-card ${cls}`, 'aria-label': name }, el('h2', { class: 'tk-ch' }, name, el('small', {}, String(list.length))),
-      list.length ? el('ul', { class: 'ui-list tk-rows' }, ...list.map(tkRow)) : el('p', { class: 'tk-none' }, 'None.'));
+      list.length ? el('ul', { class: 'ui-list tk-rows' }, ...list.map(tkRow)) : emptyState('empty', { mark: 'list', title: `Nothing ${name.toLowerCase()}`, small: true }));
     if (!list.length) return '';
     const all = tkMore.has(key), see = el('button', { class: 'see' }, all ? 'Show fewer' : 'See all');
     see.onclick = () => { all ? tkMore.delete(key) : tkMore.add(key); render(); };
@@ -1971,7 +1975,7 @@
    *  While selecting, the title counts the picks with Select all, and Cancel and Discard N sit where the dock is (phone) or at the row's right (desk). */
   function designGroups(items, top, key, gone = []) {
     const head = designsHead(items, top, gone);
-    if (!items.length) return phone() ? [...head, el('p', { class: 'empty' }, EMPTY.designs), archived(gone)] : head;
+    if (!items.length) return phone() ? [...head, screenEmpty('designs'), archived(gone)] : [...head, screenEmpty('designs')];
     if (!phone()) {
       const cur = items.find((d) => d.key === key) ?? items[0], [open, info] = designReview(cur, el('h2', { class: 'dz-t', dir: 'auto' }, cur.title), true);
       const card = (d) => el('a', { class: 'dz-card', id: `item-${d.key}`, href: `#designs/${d.key}`, 'aria-label': `Open design, ${d.title}`, ...(d === cur && { 'aria-current': 'true' }) },
@@ -2396,7 +2400,7 @@
     const old = done.find((x) => x.key === key), i = Math.max(0, queue.findIndex((d) => d.key === key)), d = old ?? queue[i], next = !old && queue.length > 1 ? queue[(i + 1) % queue.length] : undefined;
     deskSel = d?.key ?? '';
     const list = [decideList(items, hidden, done, today)], sub = [`${plural(queue.length, 'ask')} ${queue.length === 1 ? 'waits' : 'wait'} on you · ${today} answered today`, leashChip()];
-    if (!d) return split(top, sub, list, pane('', items.length ? el('p', { class: 'empty' }, 'Open a review from the list.') : allClear(true)));
+    if (!d) return split(top, sub, list, pane('', items.length ? emptyState('empty', { mark: 'waiting', title: 'No review open', text: 'Pick one from the list to answer it here.', small: true }) : allClear(true)));
     const bar = {}, page = decidePage(d, next, true, bar);
     return split(top, sub, list, page.matches('.ui-pane') ? page : pane(askHead(d, bar), page));
   }
@@ -2652,14 +2656,14 @@
     // on a desk an empty board says so in the pane beside it.
     const listed = ofKind(by.reports);
     const rpPage = () => el('div', { class: `rp-page${rpRisen ? '' : ' rise'}` }, ...(by.reports.length ? reportsHead(listed, by.reports) : []), listed.some((d) => d.steps && !reads(d)) ? el('p', { class: 'card legend' }, ...Object.keys(MARKS).map((m) => el('span', {}, el('span', { class: `mk mk-${m}` }), MARKS[m]))) : '',
-      ...(by.reports.length ? reportGroups(listed) : rpSel !== null ? [] : [el('div', { class: 'all-clear-big' }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, 'Nothing to read'), el('p', {}, EMPTY.reports))]),
+      ...(by.reports.length ? reportGroups(listed) : rpSel !== null ? [] : [boardLoad('reports') === 'ready' ? el('div', { class: 'all-clear-big' }, el('span', { class: 'big' }, glyph('check')), el('h2', {}, 'Nothing to read'), el('p', {}, EMPTY.reports)) : screenEmpty('reports')]),
       notes(by.notes), archived(state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && ['reports', 'notes'].includes(area(d)))),
       !selecting && !state.readonly && !FROZEN && bulk.length ? reportsMore(by.reports, bulk) : '');
     const update = at === 'evidence' && ((key && state.decisions.find((d) => d.key === key && !gone.has(d.key) && d.type === 'evidence')) || by.evidence.find((d) => d.type === 'evidence'));
     const content = at === 'tickets' || at === 'ticket' ? tickets(by, at === 'ticket' ? key : '') : [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, archived(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence')), update)
-      : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0, by.reports) : decideDesk(top, by.waiting, hidden, decideQueue, key, decideDone, answeredToday)] : at === 'designs' && !phone() && by.designs.length ? [] : [top]), ...(deskSplit ? [] : (at === 'waiting' || at === 'decide') && !state.readonly ? [at === 'decide' && !shownAsk ? el('p', { class: 'empty' }, 'Nothing to decide for that question.') : '', decideList(by.waiting, hidden, decideDone, answeredToday), at === 'decide' && shownAsk ? askSheet(shownAsk) : '']
+      : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0, by.reports) : decideDesk(top, by.waiting, hidden, decideQueue, key, decideDone, answeredToday)] : at === 'designs' && !phone() && by.designs.length ? [] : [top]), ...(deskSplit ? [] : (at === 'waiting' || at === 'decide') && !state.readonly ? [at === 'decide' && !shownAsk ? emptyState('empty', { mark: 'waiting', title: 'That question isn’t waiting', text: 'It may already be answered. Pick another from the list.' }) : '', decideList(by.waiting, hidden, decideDone, answeredToday), at === 'decide' && shownAsk ? askSheet(shownAsk) : '']
       : at === 'designs' ? designGroups(by.designs, top, key, state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'designs')) : at === 'evidence' ? [...evidenceList(by.evidence, top), archived(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'))] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
-      : el('p', { class: 'empty' }, at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? 'All done items cleared.' : EMPTY[at])] : today(by))];
+      : at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? emptyState('empty', { mark: 'answered', title: 'All done items cleared' }) : screenEmpty(at)] : today(by))];
     if (!(at === 'decide' && shownAsk && !deskSplit)) sheetUp = '';
     // The report shown on a desk stays in place under a new list and bar while it is the same report, so its frame is not loaded again.
     const keptRead = document.querySelector('#board .split-detail > .read'), newRead = content[0]?.querySelector?.('.split-detail > .read');

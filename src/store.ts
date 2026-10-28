@@ -599,9 +599,28 @@ export const ticketFault = (t: any) => (!isKey(t?.id) ? 'id must be 1-128 of A-Z
   : t.prs !== undefined && (!Array.isArray(t.prs) || !t.prs.every((u: any) => { try { return typeof u === 'string' && /^https?:\/\//.test(u) && !!new URL(u).hostname; } catch { return false; } })) ? 'prs must be an array of full HTTP or HTTPS URLs'
   : t.hold !== undefined && typeof t.hold !== 'boolean' ? 'hold must be true or false'
   : t.asked !== undefined && typeof t.asked !== 'boolean' ? 'asked must be true or false' : '');
+/** A release names what ships (v1.4, 2026-11), never when: a word like "later" beside a priority reads as a contradiction, and priority is where urgency goes. */
+export const releaseIsWhen = (release: unknown) => typeof release === 'string' && /^(later|soon|now|next|someday|eventually|asap|urgent|tbd|tba|backlog|never)$/i.test(release.trim());
+/** Whether a ticket is still open work: not marked done by state, stage or progress. */
+const ticketOpen = (t: Ticket) => t.state !== 'done' && t.stage !== 'done' && t.progress < 100;
+/** The work a ticket names, for telling the same work filed twice: its project, what it sits under and its title, without regard to case or spacing. */
+export const ticketWork = (t: Pick<Ticket, 'title' | 'project' | 'parent'>) => [t.project?.toLowerCase() ?? '', t.parent ?? '', t.title.trim().replace(/\s+/g, ' ').toLowerCase()].join('\0');
+/** The open ticket that already tracks this work under another id, if any: a second one is the same work filed twice. */
+export const ticketTwin = (tickets: Ticket[], t: Pick<Ticket, 'id' | 'title' | 'project' | 'parent'>) => tickets.find((x) => x.id !== t.id && ticketOpen(x) && ticketWork(x) === ticketWork(t));
+const STAGES = ['queued', 'building', 'review', 'merging', 'done'];
+/** Open tickets that are the same work keep one record: the first id written, with the furthest stage and progress either one reached. */
+function oneOfEach(tickets: Ticket[]): Ticket[] {
+  const first = new Map<string, Ticket>(), far = (t: Ticket) => STAGES.indexOf(t.stage ?? '') * 1000 + t.progress;
+  for (const t of tickets) {
+    const key = ticketOpen(t) ? ticketWork(t) : t.id, had = first.get(key);
+    if (!had) first.set(key, t);
+    else first.set(key, { ...(far(t) > far(had) ? t : had), id: had.id, at: Date.parse(t.at) > Date.parse(had.at) ? t.at : had.at });
+  }
+  return [...first.values()];
+}
 const TICKET_FIELDS = ['parent', 'priority', 'project', 'hold', 'asked', 'release', 'state', 'prs', 'stage', 'last_event_at'] as const;
 /** A ticket's fields in the file's order, leaving out each optional one it does not carry. */
-const ticketLine = (t: any): Ticket => ({ id: t.id, title: t.title, progress: t.progress, ...Object.fromEntries(TICKET_FIELDS.filter((k) => t[k] !== undefined).map((k) => [k, t[k]])), at: t.at });
+const ticketLine = (t: any): Ticket => ({ id: t.id, title: t.title, progress: t.progress, ...Object.fromEntries(TICKET_FIELDS.filter((k) => t[k] !== undefined && !(k === 'release' && releaseIsWhen(t[k]))).map((k) => [k, t[k]])), at: t.at });
 export function appendTicket(decisionsPath: string, t: Omit<Ticket, 'at'>): Ticket {
   const line = ticketLine({ ...t, at: now() });
   appendLine(ticketsPath(decisionsPath), line);
@@ -616,7 +635,7 @@ export function readTickets(decisionsPath: string, warn: (msg: string) => void =
     if (line && (!t || ticketFault(t))) return warn(`skipped unreadable line ${n + 1} in ${ticketsPath(decisionsPath)}`);
     if (t) latest.set(t.id, ticketLine(t));
   });
-  return [...latest.values()];
+  return oneOfEach([...latest.values()]);
 }
 export type TicketActivity = { ticket: string; title: string; kind: 'created' | 'stage' | 'progress' | 'state' | 'merged' | 'hold' | 'release'; text: string; at: string };
 /** Ticket history is already append-only; derive the small activity feed from each ticket's successive public records. */
@@ -643,7 +662,8 @@ export function readTicketActivity(decisionsPath: string): TicketActivity[] {
     }
     previous.set(t.id, t);
   });
-  return events.sort((a, b) => Date.parse(b.event.at) - Date.parse(a.event.at) || b.order - a.order).map(({ event }) => event);
+  const live = new Set(readTickets(decisionsPath).map((t) => t.id));
+  return events.filter(({ event }) => live.has(event.ticket)).sort((a, b) => Date.parse(b.event.at) - Date.parse(a.event.at) || b.order - a.order).map(({ event }) => event);
 }
 /** The progress roll-up: a ticket with tickets under it on the board is as far along as they are on average (each of them rolled up the same way), and one with none keeps its own.
  * A loop of parents stops where it would come back round. */
