@@ -75,6 +75,7 @@ Harness: a browser (chrome-devtools-axi, one CHROME_DEVTOOLS_AXI_SESSION per cap
 
 shots.sh BASE <folder> captures every screen at 390, 820 and 1280, light and dark. An emulated tap can miss; click a button from the page (eval "() => document.querySelector('[aria-label^=\"Pass,\"]').click()") when a tap does not land.
 
+- Empty, loading and error states (`done-done run empty-states`, one theme and width per run: `EMPTY_THEME`, `EMPTY_WIDTH`): [Tickets](features/tickets.md#empty-loading-and-error-states), every list, feed and card with nothing in it at 390 and 1280, light and dark, Activity on a phone, the duplicate and the release word at the CLI.
 - Published ticket stage (`done-done run ticket-stage`): [Tickets](features/tickets.md#published-stage-and-last-event-068), all five words independent of progress, event-age warnings, legacy no-event and epic roll-up, rows and pages at 390 and 1280, light and dark.
 
 ## Evidence

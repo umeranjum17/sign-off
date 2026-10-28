@@ -1060,7 +1060,7 @@ test('each card has one place to type: Add a comment holds the note sent with th
   assert.deepEqual(cards(left).map(([key]) => key), ['ship']);
   assert.match(await dump(''), /<a class="ui-card ui-stat" href="#answered" aria-label="Cleared today: 1 of 1">/);
   writeFileSync(file.replace(/\.json$/, '.dismissed.jsonl'), ['look', 'ship'].map((key) => JSON.stringify({ key, dismissed: true, at: new Date(Date.now() + 1000).toISOString() })).join('\n') + '\n');
-  assert.match(await dump('#answered'), /<p class="empty">All done items cleared\.<\/p>/);
+  assert.match(await dump('#answered'), /<b>All done items cleared<\/b>/);
   proc.kill();
 });
 
@@ -1105,7 +1105,7 @@ test('a sign-in card: posted on top of what waits with its link and time left, t
   await evaluate('document.querySelector(".sh-head .dis").click()');
   await evaluate('document.querySelector("#dc-sheet [data-reason=done-elsewhere]").click()');
   await until(async () => (await evaluate('location.hash')) === '#waiting' && !(await queue()).includes('Tmp'));
-  assert.equal(await evaluate('document.querySelector("#board .empty")?.textContent'), undefined);
+  assert.equal(await evaluate('document.querySelector("#board .es")?.textContent'), undefined);
   // Past its time the link has nothing left to open, and its card stays where it waits, plainly expired, for a new link or a discard.
   await evaluate('location.hash = "#waiting"');
   await until(async () => /Expired/.test(await evaluate('document.getElementById("item-gh-login")?.textContent ?? ""')));
@@ -1719,7 +1719,7 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await evaluate("location.hash = '#decide/release'");
   await until(async () => (await evaluate('document.querySelector(".decide .ans-card b")?.textContent + "|" + document.querySelector(".decide-bar .answer")?.textContent')) === 'today|Change answer');
   await evaluate("location.hash = '#decide/nope'");
-  await until(async () => (await evaluate('document.querySelector("#board .empty")?.textContent')) === 'Nothing to decide for that question.');
+  await until(async () => (await evaluate('document.querySelector("#board .es b")?.textContent')) === 'That question isn’t waiting');
   await evaluate("location.hash = '#waiting'");
   await until(async () => (await evaluate('location.hash')) === '#waiting');
   // A posted plan waits with the asks: its card gives the title, its counts and one Open plan, which opens its page over the board with the pointing script.
@@ -2222,7 +2222,7 @@ test('Decide on a desk: the list beside its ask, J and K move the selection, a n
   assert.equal(await evaluate('document.getElementById("keys").open + "|" + document.querySelector("#keys h2").textContent + "|" + document.querySelectorAll("#keys li").length'), 'true|Keyboard shortcuts|18');
   await evaluate('document.querySelector("#keys header button").click()');
   await key('g'), await key('e');
-  await until(async () => (await evaluate('location.hash + "|" + !!document.querySelector(".split-list") + "|" + document.querySelector(".split-detail")?.textContent')) === '#evidence|true|No evidence updates.');
+  await until(async () => (await evaluate('location.hash + "|" + !!document.querySelector(".split-list") + "|" + document.querySelector(".split-detail")?.textContent')) === '#evidence|true|No evidence updates.Proof an agent files for a change shows here.');
   await key('g'), await key('d');
   await until(async () => (await evaluate('location.hash + "|" + !!document.querySelector(".split")')) === '#waiting|true');
   // A sign-in reads like any ask beside the list: who waits, its headline, what it unlocks and Open as the bar's one button, with its time left only on its row.
@@ -3556,7 +3556,7 @@ test('Clear all done on 201 answered items, one grouped list on a wide screen: t
   // On a wide screen the rows stay one grouped list: the second row sits under the first, at the same left edge.
   assert.ok(await evaluate('(([a, b]) => b.top >= a.bottom && b.left === a.left)([...document.querySelectorAll(".rows.i-answered > li")].map((li) => li.getBoundingClientRect()))'));
   await evaluate('document.querySelector(".clear").click()');
-  await until(async () => (await evaluate(`${rows} === 0 && document.querySelector(".empty")?.textContent === "All done items cleared."`)));
+  await until(async () => (await evaluate(`${rows} === 0 && document.querySelector(".es b")?.textContent === "All done items cleared"`)));
   await evaluate('document.getElementById("undo").click()');
   await until(async () => (await evaluate(`${rows} === 201`)));
   close();
@@ -4649,7 +4649,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     // The ticket above it lists the ticket under it, and no card names it.
     await evaluate(`location.href = ${JSON.stringify(`${url}#ticket/T-9`)}`);
     await until(async () => (await evaluate('[...document.querySelectorAll(".tk-sheet a.tk-row")].map((a) => a.getAttribute("href")).join()')) === '#ticket/T-29');
-    assert.equal(await evaluate('[...document.querySelectorAll(".tk-sheet > .ui-dl, .tk-sheet > .tk-none")].map((p) => p.textContent).join(" | ")'), 'Tickets in this epic · 0 of 1 done | Linked | No card names this ticket yet.');
+    assert.equal(await evaluate('[...document.querySelectorAll(".tk-sheet > .ui-dl, .tk-sheet > .es b")].map((p) => p.textContent).join(" | ")'), 'Tickets in this epic · 0 of 1 done | Linked | No cards yet');
     assert.equal(await evaluate('!!document.querySelector(".tk-sheet .tk-shd .ui-icon img")?.naturalWidth && !!document.querySelector(".tk-sheet .tk-in .tk-row .ui-icon img")?.naturalWidth && !document.querySelector(".tk-sheet .mono")'), true);
     // The Tickets tab lists the tickets under no other: Your asks (T-9, which the user asked for, moving) or System (T-31, on hold). T-29 sits under T-9, so it is not listed on its own.
     const tab = `JSON.stringify({ seg: [...document.querySelectorAll('.tk-seg button')].map((b) => b.textContent + (b.getAttribute('aria-pressed') === 'true' ? ' on' : '')), hero: document.querySelector('.tk-hero').innerText.replace(/\\s+/g, ' ').trim(),
@@ -4748,7 +4748,7 @@ test('Tickets on a phone: with one section expanded, See all on each other secti
     const fresh = async () => { await until(async () => (await evaluate('!!document.querySelector("main section[aria-label] .see")')) === true); await evaluate('window.old = true, location.reload()'); await until(async () => (await evaluate('!window.old && document.querySelectorAll("main section[aria-label] .see").length')) === 4); };
     const sizes = { 'In progress': 7, 'On hold': 8, 'To do': 6, Done: 7 };
     await until(() => evaluate('!!document.querySelector(".tk-activity > summary") && document.querySelectorAll("main section[aria-label]:not(.tk-activity)").length === 4'));
-    const activity = await evaluate(`(() => { const feed = document.querySelector('.tk-activity'), lists = [...document.querySelectorAll('main section[aria-label]:not(.tk-activity)')]; return JSON.stringify({ collapsed: !feed.open, listsVisible: lists.length === 4 && lists.every((s) => s.getBoundingClientRect().height > 0), summary: feed.querySelector('summary')?.textContent.trim() }); })()`);
+    const activity = await evaluate(`(() => { const feed = document.querySelector('.tk-activity'), lists = [...document.querySelectorAll('main section[aria-label]:not(.tk-activity)')]; return JSON.stringify({ collapsed: !feed.open, listsVisible: lists.length === 4 && lists.every((s) => s.getBoundingClientRect().height > 0), summary: feed.querySelector('summary > span:first-child')?.textContent.trim() }); })()`);
     assert.deepEqual(JSON.parse(activity), { collapsed: true, listsVisible: true, summary: 'Activity' });
     await evaluate('document.querySelector(".tk-activity > summary").click()');
     await until(() => evaluate('document.querySelector(".tk-activity").open'));

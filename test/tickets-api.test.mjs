@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { networkInterfaces, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -109,6 +109,23 @@ test('Tickets read caps a live-shape activity feed at 200 newest events without 
   assert.ok(events.some((event) => event.ticket === 'CAP-204' && event.kind === 'state'));
   const fullBytes = Buffer.byteLength(JSON.stringify({ ...state, ticketActivity: all }));
   console.log(`ticket activity response: ${Buffer.byteLength(text)} B after cap; ${fullBytes} B before cap (${all.length} events)`);
+});
+
+test('one open ticket per piece of work, and a release names a release, not a time', async () => {
+  const run = (...args) => { try { return { code: 0, out: axi(...args) }; } catch (e) { return { code: e.status, out: String(e.stdout) }; } };
+  assert.equal(run('ticket', board, '--id', 'DUP-1', '--title', 'Migration runbook', '--project', 'Juggernaut', '--priority', 'P0', '--release', 'v1.4').code, 0);
+  assert.notEqual(run('ticket', board, '--id', 'DUP-2', '--title', 'migration  Runbook', '--project', 'juggernaut').code, 0, 'a second open ticket for the same work is refused');
+  assert.notEqual(run('ticket', board, '--id', 'REL-1', '--title', 'Tidy the docs', '--release', 'later').code, 0, 'a time word is not a release');
+  assert.equal(run('ticket', board, '--id', 'REL-1', '--title', 'Tidy the docs', '--release', '2026-11').code, 0);
+  // A twin that the fleet's own sync wrote before this check: one ticket is read, with the furthest stage and progress.
+  const file = board.replace(/\.json$/, '') + '.tickets.jsonl';
+  const first = readFileSync(file, 'utf8').trim().split('\n').map((l) => JSON.parse(l)).find((t) => t.id === 'DUP-1');
+  appendFileSync(file, JSON.stringify({ ...first, id: 'DUP-3', progress: 60, stage: 'review', release: 'later', at: new Date().toISOString() }) + '\n');
+  const port = await serve(), { tickets } = await (await fetch(`http://127.0.0.1:${port}/api/state?view=tickets`)).json();
+  const mine = tickets.filter((t) => /migration runbook/i.test(t.title));
+  assert.equal(mine.length, 1);
+  assert.deepEqual([mine[0].id, mine[0].progress, mine[0].stage], ['DUP-1', 60, 'review']);
+  assert.ok(tickets.every((t) => !/^later$/i.test(t.release ?? '')));
 });
 
 // Beyond loopback the board needs its token on every route; the board refuses to bind all interfaces, so this uses the machine's private address.
