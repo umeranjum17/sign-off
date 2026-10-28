@@ -60,6 +60,8 @@ const MEASURE = `(async () => {
 })()`;
 
 let ws, fault = null, held = [];
+// A sealed run's judge reads at most ten pictures: EMPTY_CITE=1 keeps these ten (the page records and measures of every state are still written).
+const cited = new Set(['tickets-loading', 'tickets-error', 'tickets-none', 'tickets-populated', 'tickets-activity-open', 'tickets-activity-empty', 'ticket-no-activity', 'tickets-nomatch', 'evidence-error', 'designs-none']);
 const errors = [], failed = [], report = [], problems = [], shots = [], facts = {};
 const b64 = (s) => Buffer.from(s).toString('base64');
 try {
@@ -122,7 +124,7 @@ try {
   // `allow` names the one request a state holds on purpose, so its failure is not counted against the frame.
   const capture = async (state, allow = false) => {
     await wait(450);
-    await png(join(out, `${name(state)}.png`)); shots.push(`${name(state)}.png`);
+    if (!process.env.EMPTY_CITE || cited.has(state)) { await png(join(out, `${name(state)}.png`)); shots.push(`${name(state)}.png`); }
     const m = await js(MEASURE); m.frame = state;
     writeFileSync(join(out, `${name(state)}.dom.json`), JSON.stringify({ frame: state, ...m.dom, console_errors: [...errors], failed_requests: [...failed] }, null, 2) + '\n');
     delete m.dom;
