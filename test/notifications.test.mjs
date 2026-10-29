@@ -253,11 +253,26 @@ test('notify check: off until the config turns it on, and a link that will not o
   setup(dir, muxrBlock('http://127.0.0.1:8793/v1/notify', 'http://127.0.0.1:4410/'));
   assert.match(await cli(dir, ['notify', dir]).catch((e) => e.message), /https:\/\/ or a tailnet address/);
   setup(dir, muxrBlock('http://127.0.0.1:8793/v1/notify', 'http://100.101.102.103:4410/'));
+  assert.match(await cli(dir, ['notify', dir]).catch((e) => e.message), /a \.ts\.net name/);
+  setup(dir, muxrBlock('http://127.0.0.1:8793/v1/notify', 'http://box.tail1234.ts.net:4410/'));
   const env = muxrHome('muxr-check', 'x');
   const out = await cli(dir, ['notify', dir], env);
   assert.match(out, /notifications: on/);
   assert.match(out, /receiver: muxr/);
   assert.ok(!out.includes('x\n') && !/token: x\b/.test(out));
+});
+
+test('notify test fails when muxr accepts the notice but sends it to 0 devices', { timeout: 15_000 }, async (t) => {
+  const dir = join(scratch, 'muxr-zero'); mkdirSync(dir);
+  let delivered = 0;
+  const server = createServer((req, res) => { req.resume(); req.on('end', () => { res.statusCode = 202; res.end(JSON.stringify({ id: 'sign-off-test', delivered_to: delivered })); }); });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => server.close());
+  setup(dir, muxrBlock(`http://127.0.0.1:${server.address().port}/notify`));
+  const env = muxrHome('muxr-zero', 'tok');
+  assert.match(await cli(dir, ['notify', 'test', dir], env).catch((e) => e.message), /sent it to 0 devices/);
+  delivered = 2;
+  assert.match(await cli(dir, ['notify', 'test', dir], env), /delivered_to: 2/);
 });
 
 test('notify test says so when the receiver refuses the token or is not running', { timeout: 15_000 }, async (t) => {

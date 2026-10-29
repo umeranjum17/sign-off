@@ -2094,8 +2094,9 @@ function readSetup(so: string) {
     && ['http:', 'https:'].includes(base.protocol) && (notify.token_env === undefined || /^[A-Za-z_]\w*$/.test(notify.token_env));
   if (notifyBlock && !usable) problems.push('notify needs url (https://, or http:// on this machine) and link_base (http:// or https://) lines, and token_env must name an environment variable');
   // A phone or iPad opens the link, so a muxr notice's link is https or a tailnet address: 127.0.0.1 or a LAN name would be dead there.
-  const reachable = !!base && (base.protocol === 'https:' || /\.ts\.net$/i.test(base.hostname) || (isIP(base.hostname) === 4 && /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(base.hostname)));
-  if (notifyBlock && usable && muxr && !reachable) problems.push('notify link_base must be https:// or a tailnet address (a .ts.net name or 100.x address) so the link opens on the iPad');
+  // muxr itself refuses a bare 100.x address ("https, or http to localhost or a tailnet host"), so only a .ts.net name counts.
+  const reachable = !!base && (base.protocol === 'https:' || /\.ts\.net$/i.test(base.hostname));
+  if (notifyBlock && usable && muxr && !reachable) problems.push('notify link_base must be https:// or a tailnet address (a .ts.net name) so the link opens on the iPad');
   return { board: join(so, goodBoard ? config.board : 'decisions.json'), port: goodPort ? Number(port) : 4410, bind, hosts, onAnswer, goodBoard, problems,
     notify: notifyBlock && usable && (!muxr || reachable) ? { url: notify.url, token_env: notify.token_env, link_base: notify.link_base, muxr } : undefined };
 }
@@ -2332,14 +2333,18 @@ async function notify(args: string[]) {
   if (why) throw fail(`notifications are on but cannot send: ${why}`, 'NOT_FOUND', n.muxr ? 'Update the muxr host so it writes its notify-token file, then run `sign-off-axi notify test`' : `Export ${n.token_env} with the receiver's token`);
   if (mode === 'check') return toon({ notifications: 'on', receiver: n.muxr ? 'muxr' : 'webhook', url: n.url, link_base: n.link_base, token: n.muxr ? tilde(muxrTokenFile()) : `$${n.token_env ?? '(none)'}` }, ['Run `sign-off-axi notify test` to send one real test notice']);
   const probe = { key: 'sign-off-test', title: 'sign-off test', about: 'Device notifications from sign-off work.', type: 'decision', options: [] } as unknown as Decision;
-  let status: number;
+  let status: number, delivered: unknown;
   try {
     const token = n.muxr ? readFileSync(muxrTokenFile(), 'utf8').trim() : n.token_env ? process.env[n.token_env] : undefined;
-    status = (await fetch(n.url, { method: 'POST', headers: { 'content-type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) }, body: JSON.stringify(noticeBody(n, probe)), signal: AbortSignal.timeout(10000) })).status;
+    const res = await fetch(n.url, { method: 'POST', headers: { 'content-type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) }, body: JSON.stringify(noticeBody(n, probe)), signal: AbortSignal.timeout(10000) });
+    status = res.status;
+    delivered = (await res.json().catch(() => undefined))?.delivered_to;
   } catch { throw fail(`nothing answered at ${n.url}`, 'NOT_FOUND', n.muxr ? 'Start the muxr host on this machine, then run `sign-off-axi notify test` again' : 'Check the url: line, then run `sign-off-axi notify test` again'); }
   if ([401, 403].includes(status)) throw fail(`the receiver refused the token (HTTP ${status})`, 'VALIDATION_ERROR', n.muxr ? `Check that ${tilde(muxrTokenFile())} holds the token the muxr host expects` : `Check ${n.token_env}`);
   if (status >= 300) throw fail(`the receiver answered HTTP ${status}, so the test notice was not accepted`, 'VALIDATION_ERROR', 'Check the receiver is the notification endpoint');
-  return toon({ notifications: 'on', test: 'sent', http: status }, ['Check the device for the "sign-off test" notice']);
+  // muxr answers 202 even when it picked no phone to push to: only delivered_to above zero means a device was sent the notice.
+  if (delivered === 0) throw fail(`the receiver accepted the test notice (HTTP ${status}) but sent it to 0 devices`, 'NOT_DELIVERED', 'Check muxr: `muxr doctor`, the host relay connected, and a paired phone with notifications on');
+  return toon({ notifications: 'on', test: 'sent', http: status, ...(typeof delivered === 'number' && { delivered_to: delivered }) }, ['Check the device for the "sign-off test" notice']);
 }
 
 async function doctor(args: string[]) {
