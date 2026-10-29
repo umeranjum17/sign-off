@@ -2095,12 +2095,14 @@
         : a === 'waiting' || (a === 'evidence' && (d.options.length || d.reply)) ? 'turn'
         // A design review a lead posted is Main's until promoted: it waits on its agents, never in Decide.
         : (last && !last.reply) || (a === 'designs' && dzOpen(d)) ? 'agent' : 'done';
-      out.push({ id: d.key, d, kind, st, last, at: last?.reply?.at ?? last?.at ?? d.filed ?? '' });
+      // It needs the person when Decide holds it, or when an agent wrote on it and they have not opened it; a report or proof only not read yet is New but asks nothing of them.
+      out.push({ id: d.key, d, kind, st, last, needs: st === 'turn' || (st === 'new' && sent.length > 0), at: last?.reply?.at ?? last?.at ?? d.filed ?? '' });
     }
     // A ticket is a thread too: its comments from the fleet dashboard and the lead's replies; open while the ticket is.
     for (const t of state.tickets ?? []) {
       const sent = trailOf(t.id, 'ticket'), last = sent.at(-1);
-      out.push({ id: `~${t.id}`, tk: t, kind: 'ticket', st: sent.some(unseen) ? 'new' : (last && !last.reply) || tkStateOf(t) !== 'done' ? 'agent' : 'done', last, at: last?.reply?.at ?? last?.at ?? t.at ?? '' });
+      const st = sent.some(unseen) ? 'new' : (last && !last.reply) || tkStateOf(t) !== 'done' ? 'agent' : 'done';
+      out.push({ id: `~${t.id}`, tk: t, kind: 'ticket', st, needs: st === 'new' && tkStateOf(t) !== 'done', last, at: last?.reply?.at ?? last?.at ?? t.at ?? '' });
     }
     return out;
   }
@@ -2155,6 +2157,8 @@
     document.body.append(a);
     setTimeout(() => a.remove(), 9000);
   }
+  /** The threads that need the person now, the number on the Inbox badge: the same ask Decide holds, and a thread an agent wrote on that they have not opened. Answered, acted on, archived and closed ones never count. */
+  const inboxNeeds = (all) => all.filter((t) => t.needs).length;
   /** The head's count: what is new and what waits on you, as the tab's title says it too. */
   const inboxSub = (all) => { const n = all.filter((t) => t.st === 'new').length, w = all.filter((t) => t.st === 'turn').length; return `${n} new · ${w} waiting on you`; };
   /** The inbox. A phone shows the list, and a thread over it once a row is opened; a desk shows the list beside the open thread (the first, until a row is picked),

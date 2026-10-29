@@ -102,7 +102,7 @@ const MEASURE = `(async () => { await document.fonts.ready; const fail = [], w =
   if (document.documentElement.scrollWidth > w) fail.push('sideways overflow');
   const words = document.body.innerText, bad = words.match(/\\b(?:answer|round|comment):[\\w.-]+:|\\btrail\\.jsonl\\b|undefined|NaN|\\[object/g) ?? [];
   if (bad.length) fail.push('raw words: ' + bad.join(', '));
-  return { url: location.href, viewport_width: window.innerWidth, title: document.title, menu, search, sections, chips, thread: thread?.querySelector('.ib-ttl')?.textContent ?? '', status: thread?.querySelector('.ib-state')?.textContent ?? '', pairs, follow, closed: document.querySelector('.ib-closed')?.innerText.replace(/\\n+/g, ' / ') ?? '', notice, thread_answers, fail }; })()`;
+  return { url: location.href, viewport_width: window.innerWidth, title: document.title, menu, search, sections, chips, thread: thread?.querySelector('.ib-ttl')?.textContent ?? '', status: thread?.querySelector('.ib-state')?.textContent ?? '', pairs, follow, closed: document.querySelector('.ib-closed')?.innerText.replace(/\\n+/g, ' / ') ?? '', badge: [...document.querySelectorAll('#tabs a[href="#inbox"] .bd, #nav a[href="#inbox"] .n')].filter(vis).map((b) => b.textContent).join(''), notice, thread_answers, fail }; })()`;
 const results = [];
 const capture = async (state, hash, before, check) => {
   errors.length = 0;
@@ -126,6 +126,13 @@ try {
     assert.deepEqual(heads(m), ['New', 'Decide', 'Waiting on agents'], 'sections in order: ' + heads(m).join(', '));
     assert.ok(m.sections[0].rows.every((r) => r.startsWith('* ')), 'every New row is unread');
     assert.deepEqual(m.chips.map((c) => c.replace(/\d+(\]?)$/, '$1')), ['[All]', 'Decisions', 'Plans', 'Reports', 'Tickets'], 'kind chips: ' + m.chips.join(', '));
+  });
+  // The Inbox badge counts the threads that need the person, the same ones Decide counts and the New replies: with the report read (it asks nothing), the badge is every row under New and Decide.
+  await api('/api/reads', { keys: ['sign-in-faster'], read: true });
+  await capture('badge', '#inbox', '', (m) => {
+    const rows = (head) => m.sections.find((s) => s.head.replace(/\s*\d+$/, '') === head)?.rows.length ?? 0;
+    assert.equal(rows('New'), 3, 'three New replies: ' + JSON.stringify(m.sections));
+    assert.equal(m.badge, String(rows('New') + rows('Decide')), `the Inbox badge ${m.badge} is not the New and Decide rows: ` + JSON.stringify(m.sections));
   });
   // Answered and acted on (the digest on Mondays): not under New though its reply was never opened; it is under Archived, behind the fold.
   await capture('archived', '#inbox', `(() => { [...document.querySelectorAll('.ib-fold')].find((b) => /archived/.test(b.textContent)).click(); document.querySelector('.ib-sec[aria-label=Archived]').scrollIntoView({ block: 'end' }); })()`, (m) => {
