@@ -14,8 +14,8 @@ mkdirSync(temp);
 after(() => rmSync(scratch, { recursive: true, force: true }));
 
 // Recorded 27 October 2026 on 0.8.0: a board of 2,147 cards (3.4 MB: 7 open asks, 1,000 answered, 900 dismissed, 240 guided plans), cold, 390 px at DPR 2,
-// slow 4G (1.6 Mbps down, 750 kbps up, 150 ms RTT), CPU 4x; the whole open re-recorded on 28 October 2026 in the change that added the Activity tab (+2,952 B, all after the first paint) and again on 29 October 2026 in the change that threads replies under what they answer (+1,687 B of screen code and rules, all after the first paint). docs/pwa-performance-plan.md ("First open budgets") holds the same numbers and how they were taken.
-const baseline = { bytesBeforePaint: 91_837, requestsBeforePaint: 5, bytesWhole: 287_594, paintMs: 900 };
+// slow 4G (1.6 Mbps down, 750 kbps up, 150 ms RTT), CPU 4x; the whole open re-recorded on 28 October 2026 in the change that added the Activity tab (+2,952 B, all after the first paint) and again on 29 October 2026 in the change that threads replies under what they answer (+1,687 B of screen code and rules, all after the first paint), and again that day in the change that makes the inbox the first screen (+3,213 B of inbox and thread code, all after the first paint; the bytes before the paint fell). docs/pwa-performance-plan.md ("First open budgets") holds the same numbers and how they were taken.
+const baseline = { bytesBeforePaint: 91_837, requestsBeforePaint: 5, bytesWhole: 290_807, paintMs: 900 };
 const byteHeadroom = 1_024;
 const firstPaintCeiling = 100_000;
 // The paint is the one number a busy host moves: it may take half as long again, and is never allowed more.

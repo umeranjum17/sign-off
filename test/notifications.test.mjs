@@ -285,3 +285,28 @@ test('notify test says so when the receiver refuses the token or is not running'
   await new Promise((resolve) => server.close(resolve));
   assert.match(await cli(dir, ['notify', 'test', dir], env).catch((e) => e.message), /nothing answered at/);
 });
+
+test('a reply that lands sends one notice that opens its thread in the inbox; a replayed earlier step sends none', { timeout: 20_000 }, async (t) => {
+  const dir = join(scratch, 'reply'); mkdirSync(dir);
+  const { server, hits, url } = await listen();
+  t.after(() => server.close());
+  setup(dir, notifyBlock(url));
+  const proc = spawn('node', [join(root, 'dist/cli.js'), 'serve', board(dir), '--port', '0'], { cwd: dir, env: { ...process.env, ...TOKEN } });
+  t.after(() => proc.kill());
+  const base = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
+  await raise(dir, TOKEN);
+  await until(() => hits.length === 1);
+  const answer = (body) => fetch(`${base}api/answers`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  assert.equal((await answer({ key: 'review-this', answer: 'yes' })).status, 200);
+  await cli(dir, ['feedback', 'review-this', board(dir), '--read'], TOKEN);
+  await cli(dir, ['feedback', 'review-this', board(dir), '--reply', 'Done, it is live.', '--link', 'https://example.com/pr/7'], TOKEN);
+  await until(() => hits.length === 2);
+  const { body } = hits[1];
+  assert.match(body.id, /^review-this:reply:\d{4}-/);
+  // The title names the card's filer, which an agent's own session can set, so only its end is fixed here.
+  assert.match(body.title, / replied: Review this\?$/);
+  assert.deepEqual({ ...body, id: '', title: '', at: '' }, { v: 1, source: 'sign-off', id: '', kind: 'ask', title: '', text: 'Done, it is live.', url: 'https://board.example/board#inbox/review-this', at: '' });
+  await cli(dir, ['feedback', 'review-this', board(dir), '--reply', 'An earlier word.', '--at', String(Math.floor(Date.now() / 1000))], TOKEN);
+  await sleep(600);
+  assert.equal(hits.length, 2, 'a step replayed with --at is history, not news');
+});

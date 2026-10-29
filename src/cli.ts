@@ -1225,7 +1225,7 @@ function promote(args: string[]) {
 function feedback(args: string[]) {
   const at = args.findIndex((a, i) => !a.startsWith('-') && !existsSync(a) && !a.endsWith('.json') && !['--reply', '--link', '--filer', '--at'].includes(args[i - 1])), key = args[at];
   if (at < 0 || !isKey(key)) throw fail('feedback needs the key of a card', 'VALIDATION_ERROR', 'sign-off-axi feedback <key> [board.json] --read');
-  const { file, values, on } = parse('feedback', args.filter((_, i) => i !== at), { read: { type: 'boolean' }, delivered: { type: 'boolean' }, reply: { type: 'string' }, acted: { type: 'boolean' }, link: { type: 'string' }, option: { type: 'string', multiple: true }, filer: { type: 'string' }, at: { type: 'string' } });
+  const { file, named, values, on } = parse('feedback', args.filter((_, i) => i !== at), { read: { type: 'boolean' }, delivered: { type: 'boolean' }, reply: { type: 'string' }, acted: { type: 'boolean' }, link: { type: 'string' }, option: { type: 'string', multiple: true }, filer: { type: 'string' }, at: { type: 'string' } });
   const ops = [values.read && 'read', values.delivered && 'delivered', values.reply !== undefined && 'reply', values.acted && 'acted'].filter(Boolean);
   if (ops.length !== 1) throw fail('feedback takes one of --delivered, --read, --reply <text> or --acted --link <url>', 'VALIDATION_ERROR', `sign-off-axi feedback ${key}${on} --read`);
   const text = typeof values.reply === 'string' ? values.reply.trim() : undefined, link = values.link;
@@ -1252,6 +1252,8 @@ function feedback(args: string[]) {
   }
   appendMark(file, { op, key, ...(text && { text }), ...(link && { link }), ...(options && { options }) }, values.at !== undefined ? new Date(+values.at * 1000).toISOString().replace(/\.\d+Z$/, 'Z') : undefined);
   const now = readTrail(file, loadDecisions(file)).filter((t) => t.key === key && t.kind !== 'ticket').at(-1)!;
+  // A reply lands: the person hears of it, and the notice opens its thread. A replayed step (--at) is history, never news.
+  if (op === 'reply' && values.at === undefined && now.reply) notifyReply(named, d, now.reply);
   return toon({ board: tilde(file), key, shows: now.reply ? 'Replied' : now.read ? 'Read' : 'Delivered', covers: sent.length }, [values.read || values.delivered ? `Run \`sign-off-axi feedback ${key}${on} --reply "<what you did>"\` once you act on it` : `Run \`sign-off-axi wait${on}${filer ? ` --filer ${filer}` : ''}\` for the next answer`]);
 }
 
@@ -2137,18 +2139,27 @@ function notifyEntered(file: string, named: string, before: Set<string> | undefi
   } catch {}
 }
 
-/** The JSON one card sends: sign-off's own shape, or muxr's {title (1-80 chars), body, url, id}. */
-function noticeBody(notify: Notify, d: Decision) {
-  const kind = d.kind ?? ({ decision: 'ask', explainer: d.options.length ? 'ask' : 'report' } as Record<string, string>)[d.type] ?? d.type;
-  const text = [...(d.about ?? d.detail ?? d.why ?? d.title).replace(/[\r\n]+/g, ' ')].slice(0, 200).join(''), route = ({ plan: 'waiting', design: 'designs', evidence: 'evidence', report: 'reports' } as Record<string, string>)[kind] ?? 'decide', url = `${notify.link_base.replace(/\/$/, '')}#${route}/${encodeURIComponent(d.key)}`;
-  if (notify.muxr) return { title: [...d.title].slice(0, 80).join('') || d.key, body: text, url, id: d.key };
-  return { v: 1, source: 'sign-off', id: d.key, kind: ['ask', 'plan', 'design', 'evidence', 'report'].includes(kind) ? kind : 'ask',
-    title: [...d.title].slice(0, 120).join(''), text, url, at: d.filed ?? new Date().toISOString() };
+/** Tells the person a reply landed on a card, once per reply. The reply is already stored, so nothing here fails the command. */
+function notifyReply(named: string, d: Decision, reply: { at: string; text?: string; link?: string }) {
+  try {
+    const so = dirname(named), notify = readSetup(so).notify;
+    if (notify && !tokenMissing(notify)) sendNotice(so, notify, d, reply);
+  } catch {}
 }
 
-function sendNotice(so: string, notify: Notify, d: Decision) {
+/** The JSON one card sends: sign-off's own shape, or muxr's {title (1-80 chars), body, url, id}. A reply's notice opens the card's thread in the inbox and has an id of its own. */
+function noticeBody(notify: Notify, d: Decision, reply?: { at: string; text?: string; link?: string }) {
+  const kind = d.kind ?? ({ decision: 'ask', explainer: d.options.length ? 'ask' : 'report' } as Record<string, string>)[d.type] ?? d.type;
+  const text = [...(reply ? reply.text ?? reply.link ?? 'Replied' : d.about ?? d.detail ?? d.why ?? d.title).replace(/[\r\n]+/g, ' ')].slice(0, 200).join(''), route = reply ? 'inbox' : ({ plan: 'waiting', design: 'designs', evidence: 'evidence', report: 'reports' } as Record<string, string>)[kind] ?? 'decide', url = `${notify.link_base.replace(/\/$/, '')}#${route}/${encodeURIComponent(d.key)}`;
+  const title = reply ? `${d.filer || 'The agent'} replied: ${d.title}` : d.title, id = reply ? `${d.key}:reply:${reply.at}` : d.key;
+  if (notify.muxr) return { title: [...title].slice(0, 80).join('') || d.key, body: text, url, id };
+  return { v: 1, source: 'sign-off', id, kind: ['ask', 'plan', 'design', 'evidence', 'report'].includes(kind) ? kind : 'ask',
+    title: [...title].slice(0, 120).join(''), text, url, at: reply?.at ?? d.filed ?? new Date().toISOString() };
+}
+
+function sendNotice(so: string, notify: Notify, d: Decision, reply?: { at: string; text?: string; link?: string }) {
   const token = notify.token_env ? process.env[notify.token_env] : undefined;
-  const child = spawn(process.execPath, ['-e', NOTIFY_SENDER], { detached: true, stdio: 'ignore', env: { ...process.env, SIGN_OFF_NOTIFY_URL: notify.url, SIGN_OFF_NOTIFY_BODY: JSON.stringify(noticeBody(notify, d)), SIGN_OFF_NOTIFY_TOKEN: notify.muxr ? '' : token ?? '', SIGN_OFF_NOTIFY_TOKEN_FILE: notify.muxr ? muxrTokenFile() : '', SIGN_OFF_NOTIFY_ID: d.key, SIGN_OFF_NOTIFY_LOG: join(so, 'notify.log') } });
+  const child = spawn(process.execPath, ['-e', NOTIFY_SENDER], { detached: true, stdio: 'ignore', env: { ...process.env, SIGN_OFF_NOTIFY_URL: notify.url, SIGN_OFF_NOTIFY_BODY: JSON.stringify(noticeBody(notify, d, reply)), SIGN_OFF_NOTIFY_TOKEN: notify.muxr ? '' : token ?? '', SIGN_OFF_NOTIFY_TOKEN_FILE: notify.muxr ? muxrTokenFile() : '', SIGN_OFF_NOTIFY_ID: d.key, SIGN_OFF_NOTIFY_LOG: join(so, 'notify.log') } });
   child.on('error', () => warn(`notification sender could not start for card ${d.key}`));
   child.unref();
 }
@@ -2871,11 +2882,14 @@ function viewRead(read: NonNullable<typeof built>, view: View) {
   const id = `${view.name}:${view.offset}:${view.limit}:${view.key}`, kept = read.views.get(id);
   if (kept) return kept;
   const s = read.body as any, answers = (s.answers ?? {}) as Record<string, unknown>, gone = new Set<string>((s.dismissed ?? []) as string[]);
-  const items = (s.decisions ?? []) as any[], open = (d: any) => d.type !== 'evidence' && !answers[d.key] && !gone.has(d.key);
+  const items = (s.decisions ?? []) as any[], waiting = (d: any) => d.type !== 'evidence' && !answers[d.key] && !gone.has(d.key);
+  // A thread still in play comes with the asks too, so the inbox and its poll see a reply land: a reply not yet seen, or an answer whose reply asks for a next step.
+  const trail = ((s.trail ?? []) as any[]).filter((t) => t.kind !== 'ticket'), last = new Map(trail.filter((t) => t.kind === 'answer').map((t) => [t.key, t]));
+  const live = new Set([...trail.filter((t) => t.reply && !t.seen), ...[...last.values()].filter((t) => t.reply?.options?.length)].map((t) => t.key)), open = (d: any) => waiting(d) || live.has(d.key);
   const kind = (type: string) => items.filter((d) => d.type === type).length;
   // Today's own two numbers, so a first screen can show them before it holds the cards they count.
   const today = (at: unknown) => typeof at === 'string' && new Date(at).toDateString() === new Date().toDateString();
-  const counts = { asks: items.filter(open).length, items: items.length, answered: items.filter((d) => answers[d.key]).length, evidence: kind('evidence'), designs: kind('design'),
+  const counts = { asks: items.filter(waiting).length, items: items.length, answered: items.filter((d) => answers[d.key]).length, evidence: kind('evidence'), designs: kind('design'),
     // A report is a guided report's kind and a plan is its own type: both are what the board calls a report.
     reports: items.filter((d) => d.kind === 'report' || d.type === 'plan').length, tickets: (s.tickets ?? []).length,
     // Cleared is what the person answered and the board counts as answered: a design review Main has not passed yet still sits under Designs.
@@ -3299,7 +3313,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     appendRound(file, key, note.trim(), comments);
     return [200, state()];
   }
-  const { key, answer, note = '', notes, decisions, verdict, pick, requested } = JSON.parse(body) ?? {};
+  const { key, answer, note = '', notes, decisions, verdict, pick, requested, follow } = JSON.parse(body) ?? {};
   if (typeof note !== 'string' || [...note.trim()].length > NOTE_MAX) return [400, { error: `The note must be text of ${NOTE_MAX} characters or fewer` }];
   const d = loadDecisions(file).find((x) => x.key === key);
   if (answer === REPLY.value && !note.trim() && !d?.options.some((o) => o.value === answer)) return [400, { error: 'Write the reply first' }];
@@ -3331,7 +3345,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   const other = d.reply || d.options.length ? [REPLY] : [], option = d.options.find((o) => o.value === answer) ?? other.find((o) => o.value === answer);
   if (!option) return [400, { error: `The answer must be one of: ${[...d.options, ...other].map((o) => o.label).join(', ') || 'none, this item is only shown'}` }];
   const save = () => {
-    const a = appendAnswer(file, d, option, note.trim(), unsent(d));
+    const a = appendAnswer(file, d, option, note.trim(), unsent(d), undefined, follow === true);
     if (a && d.ticket && plainAsk(d)) releaseTicketHold(file, d.ticket);
     return a;
   };
