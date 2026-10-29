@@ -1,4 +1,35 @@
 // The screens beyond the first screen's own. app.js asks for this file once the board has drawn; until then a phone reads only the first screen.
+  /** Reopen's sheet and buttons (the rest of it, `reopened`, is in app.js beside the thread that reads it). */
+  const reopened = (key) => (state.reopened || []).filter((r) => r.key === key);
+  /** An answer the agent reopened stays in the card's Activity, then the reopen: answered, then asked again. */
+  const reopenSteps = (d, by, said) => reopened(d.key).flatMap((r) => [{ at: r.was.at, text: `Your answer: ${said(r.was)}`, note: r.was.note }, { at: r.at, text: `${by} reopened this question` }]);
+  const canReopen = (d) => canDismiss() && !state.answers_only && isAnswered(d);
+  function reopenSheet(d) {
+    const by = d.by || 'The agent', go = el('button', { class: 'ui-pr', type: 'button', 'data-act': 'reopen' }, el('span', { class: 'k' }, glyph('newer'), 'Reopen this question'));
+    const keep = el('button', { class: 'ui-pr', type: 'button', 'data-act': 'keep' }, el('span', { class: 'k' }, glyph('check'), 'Keep my answer'));
+    keep.onclick = () => dcSheet.close();
+    go.onclick = () => {
+      go.disabled = keep.disabled = true;
+      call('/api/reopen', post({ key: d.key })).then(() => {
+        dcSheet.close();
+        const now = state.decisions.find((x) => x.key === d.key) ?? d;
+        say([el('b', {}, 'Reopened'), ' · your answer stays in its thread'], 4000);
+        if (/^#(answered|decide|designs|waiting)\//.test(location.hash)) location.hash = askHref(now);
+      }, (e) => { go.disabled = keep.disabled = false; say(`Couldn't reopen: ${e.message}`, 8000); });
+    };
+    dcSheet.replaceChildren(el('div', {}, sheetHead('dc-sheet', 'Reopen this question'), el('p', { class: 'dc-t', dir: 'auto' }, title(d)),
+      el('p', { class: 't-line' }, `${by} asks again, and the card goes back to ${d.kind === 'design' ? 'Designs' : 'Decide'}. Your answer stays in its thread. This can\u2019t be undone from here: answer it again to settle it.`), el('div', { class: 'ui-props' }, go, keep)));
+    dcSheet.showModal();
+    dcSheet.querySelector('h2').focus();
+  }
+  /** The Reopen row for a card's More menu, or a button where a card has none. */
+  const reopenItem = (d) => ['Reopen this question', () => reopenSheet(d), 'reopen', 'newer'];
+  function reopenBtn(d) {
+    if (!canReopen(d)) return '';
+    const b = el('button', { class: 'dis', type: 'button', 'aria-haspopup': 'dialog', 'aria-label': `Reopen this question, ${title(d)}` }, 'Reopen this question');
+    b.onclick = () => reopenSheet(d);
+    return b;
+  }
   /** The one empty state (app.css .es) for every list, feed and card that can hold nothing: never a bare title or an empty box. Three states, never mixed: loading (a quiet
    *  skeleton and a line), empty (a mark, what goes here, one next step where there is one) and error (what failed, and Try again). */
   function emptyState(kind, { mark = 'list', title, text, act, small } = {}) {
@@ -741,10 +772,11 @@
     // Where it stands: its state, the direction picked and when it was answered, then what was said on this round.
     const mark = (path) => { const m = el('span', { class: 'dz-mk', 'aria-hidden': 'true' }); m.innerHTML = `<svg viewBox="0 0 20 20">${path}</svg>`; return m; };
     const prop = (path, k, v) => el('div', { class: 'ui-pr' }, el('span', { class: 'k' }, mark(path), k), el('span', { class: 'v' }, v));
-    const option = d.options?.find((o) => o.value === saved?.pick)?.label ?? saved?.pick;
+    const option = d.options?.find((o) => o.value === saved?.pick)?.label ?? saved?.pick, back = !saved && reopened(d.key).find((r) => r.held);
     const stands = el('div', { class: 'ui-props dz-props' }, prop('<circle cx="10" cy="10" r="6.5"/><path d="M10 3.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/>', 'State', status),
       option ? prop('<path d="M5 10.4l3.2 3.1L15 6.6"/>', 'Your pick', el('span', { dir: 'auto' }, option)) : '',
       d.reviewed ? prop('<path d="M5 10.4l3.2 3.1L15 6.6"/>', 'Main reviewed', el('span', { dir: 'auto' }, d.reviewed)) : '',
+      back ? prop('<path d="M4 10a6 6 0 0 1 10.3-4.2L16 7.5M16 4v3.5h-3.5M16 10a6 6 0 0 1-10.3 4.2L4 12.5M4 16v-3.5h3.5"/>', 'Reopened', el('span', { dir: 'auto' }, `Before: ${saidOf(d, back.was)} · ${day(back.was.at)}`)) : '',
       saved?.at && saved.answer !== 'screens' ? prop('<circle cx="10" cy="10" r="7"/><path d="M10 6.2V10l2.6 1.8"/>', 'Answered', el('span', {}, day(saved.at))) : '');
     const said = roundNotes().filter((n) => n.note);
     const screenName = (n) => screens.length > 1 && screenFor(`${n.journey}/${n.screen}`)?.screen.title;
@@ -761,16 +793,16 @@
       root = [el('section', { class: 'dz-open', 'aria-labelledby': h1.id }, el('div', { class: 'dz-oh' }, lab), h1, el('div', { class: 'dz-fill' }, preview)),
         el('section', { class: 'dz-info', 'aria-label': 'Your answer' }, el('div', { class: 'dz-ib' }, el('h2', {}, 'Your answer'), controls, err, about ? el('p', { class: 'ui-dl' }, 'What changed') : '', about,
           el('p', { class: 'ui-dl' }, 'Where it stands'), stands, ticketRow(d), ...told,
-          thread(d), original, xBtn(d, 'Discard')), yesLine, foot)];
+          thread(d), original, reopenBtn(d), xBtn(d, 'Discard')), yesLine, foot)];
     } else if (asked) root = el('div', { class: 'design-review' }, lab, h1, about, preview, el('p', { class: 'ui-dl' }, 'Your answer'), controls, foot, yesLine, err,
-      el('p', { class: 'ui-dl' }, 'Where it stands'), stands, ticketRow(d), ...told, thread(d), original, xBtn(d, 'Discard'));
+      el('p', { class: 'ui-dl' }, 'Where it stands'), stands, ticketRow(d), ...told, thread(d), original, reopenBtn(d), xBtn(d, 'Discard'));
     else if (desk) {
       h1.id = 'dz-open-title';
       root = [el('section', { class: 'dz-open', 'aria-labelledby': h1.id }, el('div', { class: 'dz-oh' }, lab, fullPreview, screens.length ? open : ''), h1, el('div', { class: 'dz-fill' }, preview || '')),
         el('section', { class: 'dz-info', 'aria-label': 'Where it stands' }, el('div', { class: 'dz-ib' }, el('h2', {}, 'Where it stands'), stands, ticketRow(d), ...told,
-          el('p', { class: 'ui-dl' }, 'Your review'), screenPick, controls, err, about ? el('p', { class: 'ui-dl' }, 'What it shows') : '', about, thread(d), original, xBtn(d, 'Discard')), foot)];
+          el('p', { class: 'ui-dl' }, 'Your review'), screenPick, controls, err, about ? el('p', { class: 'ui-dl' }, 'What it shows') : '', about, thread(d), original, reopenBtn(d), xBtn(d, 'Discard')), foot)];
     } else root = el('div', { class: 'design-review' }, lab, h1, about, preview, fullPreview, screens.length ? open : '', el('p', { class: 'ui-dl' }, 'Where it stands'), stands, ticketRow(d), ...told,
-      el('p', { class: 'ui-dl' }, 'Your review'), screenPick, controls, foot, err, thread(d), original, xBtn(d, 'Discard'));
+      el('p', { class: 'ui-dl' }, 'Your review'), screenPick, controls, foot, err, thread(d), original, reopenBtn(d), xBtn(d, 'Discard'));
     if (!screens.length || asked) return root;
     const heading = el('h2', { id: 'design-screen-title', dir: 'auto' }), count = el('p', { class: 'meta', 'aria-live': 'polite' });
     const stage = el('div', { class: 'design-stage' }), screenStatus = el('p', { class: 'meta', role: 'status' });
@@ -1812,7 +1844,8 @@
     };
     answer.onclick = () => (isOwn() ? ownBox.value.trim() && answerWith({ value: 'text' }, ownKey) : chosen() && answerWith(chosen()));
     sync();
-    sink.more = given ? '' : more();
+    // An answered ask's More holds Reopen this question; an open one's holds Discard.
+    sink.more = given ? (canReopen(d) ? moreSheet('More', [reopenItem(d)]) : '') : more();
     if (done) seeReply(d.key);
     // The answer given: when, what with its note or words, whether the agent has read it, and the answer it replaced. Its one button brings the cards back.
     const took = done ? takenOf(given) : undefined;
@@ -1822,7 +1855,12 @@
     // An answer taken without the person (the deadline's default, or the agent's pick on the leash Act, then tell me) says so in its head, in its card and on its trail's first step.
     const tookCard = took && el('div', { class: 'ans-card took' }, el('span', { class: 'donek', 'aria-hidden': 'true' }, glyph(took === 'default' ? 'clock' : 'picked')), el('div', {},
       el('b', { dir: 'auto' }, given.label), el('span', { dir: 'auto' }, took === 'default' ? `No answer by ${when(given.at)}, so the board took the default this ask showed.` : `Its pick: ${d.recommend_reason ?? 'the answer it recommended.'}`)));
-    const said = took ? [el('p', { class: 'ui-dl' }, 'Answer'), el('p', { class: 'took-line', dir: 'auto' }, tookWord(given)), tookCard,
+    // A reopened ask still shows what the person said before, with the note and when the agent reopened it.
+    const earlier = !given && reopened(d.key).find((r) => r.held);
+    const said = earlier ? [el('p', { class: 'ui-dl' }, 'Your earlier answer'), el('p', { class: 'ans-meta' }, `Reopened by ${d.by || 'the agent'} · ${when(earlier.at)}`),
+      el('div', { class: 'ans-card' }, el('span', { class: 'donek', 'aria-hidden': 'true' }, glyph('check')), el('div', {}, el('b', { dir: 'auto' }, saidOf(d, { ...earlier.was, note: '' })),
+        earlier.was.note ? el('q', { dir: 'auto' }, earlier.was.note) : '')), el('p', { class: 'ans-was' }, `Answered ${when(earlier.was.at)}`)]
+      : took ? [el('p', { class: 'ui-dl' }, 'Answer'), el('p', { class: 'took-line', dir: 'auto' }, tookWord(given)), tookCard,
       sent ? trailTrack({ ...sent, taken: took }) : '', el('p', { class: 'ans-was' }, took === 'default' ? 'Still yours to answer: Change sends your answer in its place.' : 'Tell me if wrong: Change sends your answer in its place.')]
       : done ? [el('p', { class: 'ui-dl' }, 'Your action'), el('p', { class: 'ans-meta' }, el('span', { class: 'res ok' }, exchanging(d) ? 'Your turn' : was ? 'Changed' : 'Answered'), ` · ${when(given.at)}`),
       el('div', { class: 'ans-card' }, el('span', { class: 'donek', 'aria-hidden': 'true' }, glyph('check')), el('div', {}, el('b', { dir: 'auto' }, saidOf(d, { ...given, note: '' })),
@@ -1964,7 +2002,10 @@
       simple ? askOpts(d) : th.st === 'turn' && !beside ? el('a', { class: 'ib-open', href: open }, `Answer it in the ${name}`) : '')] : [el('div', { class: 'ib-turn' }, ibLab('Posted', who, tk.at), el('p', { class: 'ib-say q', dir: 'auto' }, tk.title))];
     // A pair whose reply the person has not opened yet is marked New.
     const pairs = [first], fresh = new Set();
-    sent.forEach((t, i) => {
+    // An answer the agent reopened is followed by the reopen, in the order they happened: the person answered, then the agent asked again.
+    const steps = [...sent.map((t) => ({ t, at: t.at })), ...(d ? reopened(key) : []).map((r) => ({ r, at: r.at }))].sort((x, y) => Math.floor(Date.parse(x.at) / 1000) - Math.floor(Date.parse(y.at) / 1000));
+    steps.forEach(({ t, r }, i) => {
+      if (r) { pairs.push([el('div', { class: 'ib-turn' }, ibLab('Reopened', who, r.at), el('p', { class: 'ib-say q', dir: 'auto' }, `${who} reopened this question to ask again. Your answer above stays.`))]); return; }
       if (i === 0 && t.kind === 'answer' && t.said === undefined) first.push(el('div', { class: 'ib-turn' }, ibLab('Your answer', '', t.at), el('p', { class: 'ib-say', dir: 'auto' }, youSaid(t, d))), trailTrack(t, true, '', !beside));
       else pairs.push([trailTrack(t, true, youSaid(t, d), !beside)]);
       if (unseen(t)) fresh.add(pairs.length - 1);

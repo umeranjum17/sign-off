@@ -813,6 +813,7 @@
       was && { at: was.at, text: `Your answer on the earlier round: ${was.label}${wrote.length === 1 && on(wrote[0]) ? ` (${on(wrote[0])})` : ''}`,
         note: wrote.length === 1 ? wrote[0].note : wrote.map((n) => (on(n) ? `${on(n)}: ${n.note}` : n.note)).join(' · ') },
       a?.replaces?.at && { at: a.replaces.at, text: `Your answer: ${said(a.replaces)}`, note: a.replaces.note },
+      ...(moreReady ? reopenSteps(d, by, said) : []),
       a && !d.earlier_answer && { at: a.at, text: `${a.replaces ? 'Changed to' : takenOf(a) === 'default' ? 'Taken by default' : takenOf(a) ? `${by} picked` : 'Your answer'}: ${said(a)}`,
         note: takenOf(a) === 'default' ? 'No answer by its deadline' : takenOf(a) ? d.recommend_reason : a.note || a.notes?.map((n) => n.note).filter(Boolean).join(' · ') },
       ...trailOf(d.key).flatMap((t) => [t.delivered && { at: t.delivered, text: `Delivered to ${by}` }, t.read && { at: t.read, text: `${by} read it` },

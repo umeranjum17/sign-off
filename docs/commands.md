@@ -28,6 +28,7 @@ Guided plan 3 / report 4 and 5 add **Simplify this**. Inspect version-1 action/t
 | `signin` | close a sign-in card as done |
 | `dismiss` | hide a card; `--reason not-relevant\|replaced\|done-elsewhere` discards it like its Discard button and tells its agent; `--filer <id>` hides every card of a finished task |
 | `restore` | bring a dismissed or discarded card back |
+| `reopen` | take an answer back to ask again: `reopen <key>` puts an answered card back in Decide (a design review back under Designs) and keeps the person's answer in its thread; refused for an open card, an unknown key and a card no longer on the board |
 | `promote` | Main only: put a design review it passed in Decide (`--undo` takes it back to Designs); a lead's design never counts as an ask without it |
 | `feedback` | tell the person how far what they sent on a card got: `--delivered`, `--read`, or `--reply <text>` / `--acted` with `--link` to the new version, each with `--at <epoch seconds>` to record a step that happened earlier; the board shows Sent, Delivered, Read, Replied |
 | `ticket` | list tickets, show one with its cards, or write one (`--id`, `--title`, `--progress`, `--parent`, `--priority`, `--project`, `--hold`, `--asked`) |
