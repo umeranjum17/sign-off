@@ -102,17 +102,21 @@ function helpers(home, readySel) {
 // Every card kind on every tab, with the actions it must offer. A stage with `shot` is captured and looked at before the next one.
 const KEYS = { plan: 'plan-kind-board', signin: 'npm', ask: 'ship', ask2: 'keep-the-weekly-digest', evidence: 'update-1', design: 'look', review: 'chat-journeys', passed: 'update-2', report: 'new-sign-in', answered: 'digest-old' };
 const PAGES = [
-  { name: 'today', hash: '', ready: '.t-up', stages: [{ run: async (h) => {
-    // Each tile opens what it counts; Up next's Details opens the sign-in ask; See all opens Decide and a Waiting on you row its ask; More links Answered and Designs.
-    await h.nav('Today tile: Cleared today', h.board().querySelector('.t-tiles a[href="#answered"]'), /^#answered$/);
-    await h.nav('Today tile: Proofs today', h.board().querySelector('.t-tiles a[href="#evidence"]'), /^#evidence$/);
-    await h.nav('Today Up next Details', h.board().querySelector('.t-up a[href="#decide/npm"]'), /^#decide\/npm$/);
-    await h.nav('Today See all', h.board().querySelector('.t-wait .see'), /^#waiting$/);
-    await h.nav('Today Waiting on you row', h.board().querySelector('.t-wait .ui-row'), /^#(decide|waiting|designs)\/[\w.-]+$/);
-    for (const [what, href] of [['Answered', '#answered'], ['Designs', '#designs']]) {
-      h.board().querySelector('.t-more-line')?.click();
-      await h.nav(`Today More: ${what}`, document.querySelector(`#t-more a[href="${href}"]`), new RegExp(`^${href}$`));
-    }
+  { name: 'inbox', hash: '', ready: '.ib-row', stages: [{ run: async (h) => {
+    // A Decide row opens its thread; the thread's own link opens the item (beside the list on a desk, over the thread on a phone). The kind chips filter the list,
+    // the answered fold opens, and More opens its sheet: the leash, Ask the agent and the version, which hold no links.
+    const row = h.need('Decide row', h.board().querySelector('.ib-sec[aria-label="Decide"] a.ib-row'));
+    if (row) { row.click(); await h.until('the Decide row thread', () => /^#inbox\/[\w.~-]+$/.test(location.hash) && h.board().querySelector('.ib-thread .ib-open')); h.did.push('Inbox Decide row'); }
+    await h.nav('thread Open the item', h.board().querySelector('.ib-thread .ib-open'), /^#inbox\/[\w.~-]+\/open$/);
+    const chip = (name) => h.find(new RegExp(`^${name}`), h.board(), 'button'), on = (name) => () => h.board().querySelector('.ib-chip[aria-pressed="true"]')?.textContent.startsWith(name);
+    await h.press('Decisions chip', chip('Decisions'), on('Decisions'));
+    await h.press('All chip', chip('All'), on('All'));
+    const fold = await h.until('the answered fold', () => h.find(/^Show \d+ answered and done$/, h.board(), 'button'));
+    await h.press('Show answered and done', fold, () => h.board().querySelector('.ib-sec[aria-label="Answered and done"]'));
+    await h.press('More', [...document.querySelectorAll('button[aria-label="More"]')].find((e) => e.getBoundingClientRect().width > 0), () => document.getElementById('t-more')?.open);
+    h.has('Leash in More', document.querySelector('#t-more [aria-label="Leash"]'));
+    h.has('Version in More', [...document.querySelectorAll('#t-more .ui-pr .k')].find((e) => e.textContent === 'Version'));
+    await h.press('Close More', document.querySelector('#t-more .x'), () => !document.getElementById('t-more').open);
   } }] },
   { name: 'waiting', hash: '#waiting', ready: '[id="item-npm"]', stages: [
     { run: async (h) => {
@@ -123,7 +127,7 @@ const PAGES = [
       const heads = () => [...h.board().querySelectorAll('.decide-list .ui-sec')].map((e) => e.firstChild.textContent).join('|');
       h.has('Asks, then Answered', heads() === 'Asks|Answered' && h.board().querySelector('.decide-list .ui-sec'));
       await h.nav('open an answered ask', h.board().querySelector('.g-done .dl-face'), /^#decide\/[\w-]+$/);
-      // More, the line under the list as Today's: its sheet holds Answer all recommended and Move all to later, each taken back with Undo.
+      // More, the quiet line under the list: its sheet holds Answer all recommended and Move all to later, each taken back with Undo.
       const item = (act) => { h.board().querySelector('.decide-list .t-more-line')?.click(); return document.querySelector(`#d-more[open] [data-act="${act}"]`); };
       await h.cycle('More: Answer all recommended', item('answer-all'), () => !h.card('ship') && !h.card('keep-the-weekly-digest'), () => h.card('ship') && h.card('keep-the-weekly-digest'), /answered with the recommended pick/);
       await h.cycle('More: Move all to later', item('later-all'), () => heads() === 'Asks|Later|Answered', () => !h.board().querySelector('.dl-row[data-group=later]'), /to later/);
@@ -215,7 +219,7 @@ const PAGES = [
     const more = () => h.board().querySelector('.rp-more-line'), bar = () => h.board().querySelector('.bulk');
     const item = async (act) => { more().click(); await h.until('the More sheet', () => document.getElementById('rp-more').open); return document.querySelector(`#rp-more [data-act="${act}"]`); };
     const isNew = () => h.box(h.card('new-sign-in'))?.querySelector('.pct')?.textContent === '0%';
-    // Opening it from Today read it: a finger's swipe right marks it unread again, and its bar empties.
+    // Opening a report reads it: a finger's swipe right marks it unread again, and its bar empties.
     const swipe = async (key, dx) => { const f = h.card(key), r = f.getBoundingClientRect(), y = r.top + 30, o = (x) => ({ bubbles: true, pointerId: 7, isPrimary: true, pointerType: 'touch', clientX: x, clientY: y });
       f.dispatchEvent(new PointerEvent('pointerdown', o(r.left + 40))); for (let i = 1; i <= 8; i++) { await h.sleep(16); f.dispatchEvent(new PointerEvent('pointermove', o(r.left + 40 + dx * i / 8))); } f.dispatchEvent(new PointerEvent('pointerup', o(r.left + 40 + dx))); };
     if (!more()?.textContent.includes('Mark all as read')) { await swipe('new-sign-in', 300); await h.until('swipe right to mark it unread', isNew); h.did.push('Swipe right: mark unread'); }
@@ -231,6 +235,8 @@ const PAGES = [
   // On a phone a report opens in a sheet over the list with Close and Discard; on a desk it reads beside the list, with Mark read or unread and Archive in its bar.
   { name: 'report', hash: '#reports/new-sign-in', ready: '#reader iframe, .split-detail .read iframe', stages: [{ run: async (h) => {
     const bar = h.board().querySelector('.rp-bar'), dot = () => h.box(h.card('new-sign-in'))?.querySelector('.pct')?.textContent === '0%';
+    // Opening the report read it (it is read on the page's own load, before this step).
+    if (dot()) h.missing.push(location.hash + ': a report is still new once it is opened');
     if (bar) {
       await h.cycle('Mark unread', h.find(/^Mark unread$/, bar), dot, () => !dot(), /Marked unread/);
       await h.cycle('Archive report', h.find(/^Archive$/, bar), () => !h.card('new-sign-in'), () => h.card('new-sign-in'), /Archived/);

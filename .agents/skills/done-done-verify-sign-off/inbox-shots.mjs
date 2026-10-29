@@ -96,10 +96,11 @@ const MEASURE = `(async () => { await document.fonts.ready; const fail = [], w =
   const pairs = thread ? [...thread.querySelectorAll('.ib-pair')].filter(vis).map((p) => [...p.querySelectorAll('.ib-lab, .tr-lab')].map((l) => l.textContent.trim()).join(' > ')) : [];
   const follow = [...document.querySelectorAll('.tr-opt')].filter(vis).map((b) => b.textContent);
   const notice = [...document.querySelectorAll('.ib-note')].filter(vis).map((n) => n.innerText.replace(/\\n+/g, ' / '));
+  const thread_answers = thread ? thread.querySelectorAll('.tr-opt, .tr-opts, [role=radio], input[type=radio], .pick-option, .answer').length : 0;
   if (document.documentElement.scrollWidth > w) fail.push('sideways overflow');
   const words = document.body.innerText, bad = words.match(/\\b(?:answer|round|comment):[\\w.-]+:|\\btrail\\.jsonl\\b|undefined|NaN|\\[object/g) ?? [];
   if (bad.length) fail.push('raw words: ' + bad.join(', '));
-  return { url: location.href, viewport_width: window.innerWidth, title: document.title, sections, chips, thread: thread?.querySelector('.ib-ttl')?.textContent ?? '', status: thread?.querySelector('.ib-state')?.textContent ?? '', pairs, follow, closed: document.querySelector('.ib-closed')?.innerText.replace(/\\n+/g, ' / ') ?? '', notice, fail }; })()`;
+  return { url: location.href, viewport_width: window.innerWidth, title: document.title, sections, chips, thread: thread?.querySelector('.ib-ttl')?.textContent ?? '', status: thread?.querySelector('.ib-state')?.textContent ?? '', pairs, follow, closed: document.querySelector('.ib-closed')?.innerText.replace(/\\n+/g, ' / ') ?? '', notice, thread_answers, fail }; })()`;
 const results = [];
 const capture = async (state, hash, before, check) => {
   errors.length = 0;
@@ -141,7 +142,14 @@ try {
   await capture('notice', null, `new Promise((ok) => { const t = Date.now(), f = () => document.querySelector('.ib-note') || Date.now() - t > 26000 ? ok() : setTimeout(f, 200); f(); })`, (m) => {
     assert.ok(m.notice.some((n) => /replied/.test(n) && /Turn on the CSV export/.test(n)), 'a notice names the reply: ' + m.notice.join(' | '));
   });
-  if (!phone) await capture('beside', '#inbox/digest/open', '', (m) => assert.ok(m.thread, 'the thread sits beside the ask'));
+  // The ask's agent replies with its own choices: the thread beside the ask must not answer them a second time (the ask's panel does).
+  await api('/api/answers', { key: 'digest', answer: 'text', note: 'Which plan renews?' });
+  cli('wait', board, '--filer', 'release-agent', '--timeout', '5');
+  cli('feedback', 'digest', board, '--reply', 'The paid plan renews Monday. Keep the digest?', '--option', 'yes=Keep it', '--option', 'no=Stop it');
+  if (!phone) await capture('beside', '#inbox/digest/open', '', (m) => {
+    assert.ok(m.thread, 'the thread sits beside the ask');
+    assert.equal(m.thread_answers, 0, 'the thread beside the ask shows answer buttons: ' + m.thread_answers);
+  });
 } finally {
   ws.close(); chrome.kill(); server.kill(); await wait(300);
   rmSync(prof, { recursive: true, force: true }); rmSync(dir, { recursive: true, force: true });

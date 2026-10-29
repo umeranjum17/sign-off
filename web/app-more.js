@@ -1904,13 +1904,13 @@
   // History owns the sequence so Back, reload and a change between sheet and desk keep it.
   /** The trail on a card: four steps on one track, each its word and time once reached; under it the agent's reply and the link to what changed,
    *  unless the place it sits already shows the reply (an ask or a comment on a part of a guided page). */
-  function trailTrack(t, said = true, you = '') {
+  function trailTrack(t, said = true, you = '', follow = true) {
     const n = stepOf(t), r = t.reply, acts = (['answer', 'round', 'discard'].includes(t.kind) && t.said === undefined) || (t.kind === 'part' && !you), done = acts || (!r?.text && (r?.link || r?.acted));
     return el('div', { class: 'ui-trail', role: 'group', 'aria-label': `${stepWord(t, n - 1)}: ${TRAIL.slice(0, n).map((w, i) => `${stepWord(t, i)} ${trailWhen(stepAt(t, i))}`).join(', ')}` },
       you ? el('div', { class: 'tr-you' }, el('span', { class: 'tr-lab' }, acts ? 'Your action' : 'Your question'), el('p', { dir: 'auto' }, you)) : '',
       el('ol', { 'aria-hidden': 'true' }, ...TRAIL.map((_, i) => el('li', { class: i < n ? 'on' : '' }, el('i', {}), el('b', {}, stepWord(t, i)), el('time', {}, i < n ? trailWhen(stepAt(t, i)) : '')))),
       ...(said ? (t.replies ?? (r ? [r] : [])).filter((x) => x.text || x.link || x.acted).map((x, i, all) => el('div', { class: 'tr-said' }, el('span', { class: 'tr-lab' }, done && !x.options?.length ? 'What was done' : 'Reply'), x.text ? el('p', { dir: 'auto' }, x.text) : x.acted ? el('p', {}, 'Posted a new version') : '',
-        x.link ? el('a', { href: x.link, target: '_blank', rel: 'noopener', dir: 'auto' }, linkName(x.link)) : '', i === all.length - 1 ? followUp(t) : '')) : []));
+        x.link ? el('a', { href: x.link, target: '_blank', rel: 'noopener', dir: 'auto' }, linkName(x.link)) : '', i === all.length - 1 && follow ? followUp(t) : '')) : []));
   }
   /** A reply that asks for a next step carries its answers as buttons right under it: one tap sends the choice as a comment on the card, which the agent takes like any other. */
   function followUp(t) {
@@ -1965,8 +1965,8 @@
     // A pair whose reply the person has not opened yet is marked New.
     const pairs = [first], fresh = new Set();
     sent.forEach((t, i) => {
-      if (i === 0 && t.kind === 'answer' && t.said === undefined) first.push(el('div', { class: 'ib-turn' }, ibLab('Your answer', '', t.at), el('p', { class: 'ib-say', dir: 'auto' }, youSaid(t, d))), trailTrack(t, true, ''));
-      else pairs.push([trailTrack(t, true, youSaid(t, d))]);
+      if (i === 0 && t.kind === 'answer' && t.said === undefined) first.push(el('div', { class: 'ib-turn' }, ibLab('Your answer', '', t.at), el('p', { class: 'ib-say', dir: 'auto' }, youSaid(t, d))), trailTrack(t, true, '', !beside));
+      else pairs.push([trailTrack(t, true, youSaid(t, d), !beside)]);
       if (unseen(t)) fresh.add(pairs.length - 1);
     });
     if (mark) seeThread(th, sent);

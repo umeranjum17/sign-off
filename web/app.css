@@ -2100,7 +2100,7 @@
   .ib-fold:hover, .ib-open:hover { color: var(--tk-ink); }
   /* From an item back to its thread. */
   .ib-tlink { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.75rem; padding: 0.75rem 1rem; border-radius: var(--tk-r-tile); background: var(--tk-raised); color: var(--tk-ink); text-decoration: none; box-shadow: var(--tk-elev-raised); }
-  .ib-tlink > span { flex: 1; min-width: 0; font-size: var(--tk-fs-row); }
+  .ib-tlink > span:not([aria-hidden]) { flex: 1; min-width: 0; font-size: var(--tk-fs-row); }
   .ib-tlink b { font-weight: 600; }
   .ib-tlink .glyph { width: 1.25rem; height: 1.25rem; }
   @media (min-width: 64rem) {
