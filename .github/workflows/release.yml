@@ -14,7 +14,26 @@ permissions:
   id-token: write
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      needed: ${{ steps.version.outputs.needed }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        run: |
+          name=$(node -p 'require("./package.json").name')
+          version=$(node -p 'require("./package.json").version')
+          if [ "$(npm view "$name@$version" version 2>/dev/null)" = "$version" ]; then
+            echo "$name@$version already on npm"
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$name@$version not on npm"
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
   release:
+    needs: check
+    if: needs.check.outputs.needed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

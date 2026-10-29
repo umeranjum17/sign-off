@@ -5462,15 +5462,16 @@ test('the inbox: one list of every kind with new replies first, then Decide, the
     await evaluate(`location.href = ${JSON.stringify(`${url}#inbox`)}`);
     await until(() => evaluate('!!document.querySelector(".ib-sec")'));
     // New replies first and unread, newest first; then what waits on the person; then what waits on an agent; archived folded.
-    assert.deepEqual(await list(), [['New', '* Ship the settings page Friday?', '* Open the beta to every team?'], ['Decide', 'Keep the weekly digest?'], ['Waiting on agents', 'Turn on the CSV export?']]);
+    assert.deepEqual(await list(), [['New', '* Ship the settings page Friday?', '* Open the beta to every team?'], ['Waiting on agents', 'Turn on the CSV export?']]);
     assert.equal(await evaluate('document.querySelector(".ib-fold").textContent'), 'Show 1 archived');
     assert.equal(await evaluate('[...document.querySelectorAll(".ib-row")].find((r) => r.textContent.includes("Turn on the CSV")).querySelector(".l2").textContent'), 'You: Yes · Read');
     // Every place stays, the inbox one more.
     assert.deepEqual(await evaluate('[...new Set([...document.querySelectorAll(".side a, .tabs a")].map((a) => a.getAttribute("href")))]'), ['#find', '#', '#inbox', '#waiting', '#evidence', '#reports', '#designs', '#tickets']);
     // The kind chips, each with what is still open; Tickets reads the board's ticket roll-up when picked. A pick filters the list, and search narrows it.
-    assert.deepEqual(await evaluate('[...document.querySelectorAll(".ib-chip")].map((c) => c.textContent)'), ['All4', 'Decisions4', 'Tickets']);
+    assert.deepEqual(await evaluate('[...document.querySelectorAll(".ib-chip")].map((c) => c.textContent)'), ['All3', 'Decisions3', 'Tickets']);
+    // A ticket nobody commented on is not a thread: it stays in Tickets.
     await evaluate('[...document.querySelectorAll(".ib-chip")].find((c) => c.textContent.startsWith("Tickets")).click()');
-    await until(async () => JSON.stringify(await list()) === JSON.stringify([['Waiting on agents', 'Ship the CSV export']]));
+    await until(() => evaluate('document.querySelector(".ib-empty")?.textContent === "Nothing here."'));
     await evaluate('[...document.querySelectorAll(".ib-chip")].find((c) => c.textContent.startsWith("All")).click()');
     await evaluate('{ const b = document.getElementById("ib-find"); b.value = "beta"; b.dispatchEvent(new Event("input")); }');
     await until(async () => JSON.stringify(await list()) === JSON.stringify([['New', '* Open the beta to every team?']]));
@@ -5562,6 +5563,50 @@ test('the inbox: a thread whose question is answered and whose card is marked ac
   } finally { await close(); }
 });
 
+test('the inbox holds only the threads the person took part in: an ask they never touched and an unread report are absent, an answered one and a comment are present, the badge ignores the untouched, and a thread shows sent, read, acted and its named result', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'inbox-members'), file = join(dir, 'board.json'), pause = () => new Promise((ok) => setTimeout(ok, 1100));
+  mkdirSync(dir);
+  const link = 'https://github.com/example/digest/pull/9';
+  for (const [key, title] of [['untouched', 'Keep the weekly digest?'], ['answered', 'Send the digest on Mondays?'], ['chatted', 'Open the beta to every team?'], ['unread', 'Turn on the CSV export?']]) assert.equal(run('raise', file, '--key', key, '--title', title, '--filer', 'member-agent').code, 0);
+  writeFileSync(join(dir, 'report.html'), '<!doctype html><title>Weekly digest</title><p>Open rate held steady.</p>');
+  writeFileSync(join(dir, 'preview.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><rect width="4" height="3" fill="#ccc"/></svg>');
+  const stored = JSON.parse(readFileSync(file, 'utf8'));
+  stored.items.push({ contract: 1, kind: 'report', schema: 2, key: 'digest', title: 'Weekly digest', group: 'Settings', view: 'report.html', preview: 'preview.svg', purpose: 'other', filed: new Date().toISOString() });
+  writeFileSync(file, JSON.stringify(stored));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  // answered: the person answered and the agent acted with a link. chatted: the person only commented. untouched, unread: never touched, and the report: not read.
+  assert.equal((await post(url, 'api/answers', { key: 'answered', answer: 'yes' })).status, 200);
+  assert.equal((await post(url, 'api/messages', { kind: 'comment', key: 'chatted', text: 'Which teams first?' })).status, 200);
+  assert.equal(run('wait', file, '--filer', 'member-agent', '--timeout', '5').code, 0);
+  await pause();
+  assert.equal(run('feedback', 'answered', file, '--acted', '--link', link, '--filer', 'member-agent').code, 0);
+  const { evaluate, close } = await browse(join(dir, 'b'), 390, 844, true);
+  try {
+    const rows = () => evaluate('JSON.stringify([...document.querySelectorAll(".ib-row .t")].map((t) => t.textContent).sort())').then(JSON.parse);
+    const badge = () => evaluate('document.querySelector("#tabs a[href=\\"#inbox\\"] .bd")?.textContent ?? ""');
+    await evaluate(`location.href = ${JSON.stringify(`${url}#inbox`)}`);
+    await until(() => evaluate('!!document.querySelector(".ib-sec")'));
+    await evaluate('document.querySelector(".ib-fold")?.click()');
+    // Present: the one answered and the one commented on. Absent: the ask, the unread report and the other ask nobody touched.
+    assert.deepEqual(await rows(), ['Open the beta to every team?', 'Send the digest on Mondays?']);
+    assert.equal(await badge(), '');
+    // The other places keep what the inbox does not hold.
+    const decide = await (await fetch(`${url}api/decisions`)).json();
+    assert.ok(['untouched', 'unread', 'digest'].every((k) => decide.decisions.some((d) => d.key === k)));
+    // The answered thread's life: sent, read, acted, and its result named.
+    await evaluate('location.hash = "#inbox/answered"');
+    await until(() => evaluate('!!document.querySelector(".ib-thread .ui-trail")'));
+    assert.deepEqual(await evaluate('JSON.stringify([...document.querySelectorAll(".ib-thread .ui-trail li")].map((l) => [l.textContent.replace(/\\d\\d:\\d\\d$|\\d+ \\w+$/, ""), l.classList.contains("on")]))').then(JSON.parse), [['Sent', true], ['Read', true], ['Acted', true], ['PR 9', true]]);
+    // A comment the agent has not read reaches only the first step; nothing past it is shown as reached.
+    await evaluate('location.hash = "#inbox/chatted"');
+    await until(() => evaluate('!!document.querySelector(".ib-thread .ui-trail")'));
+    assert.deepEqual(await evaluate('JSON.stringify([...document.querySelectorAll(".ib-thread .ui-trail li")].map((l) => l.classList.contains("on")))').then(JSON.parse), [true, false, false, false]);
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
+  } finally { await close(); }
+});
+
 test('the inbox badge counts only the threads that need the person: an answered, an acted on and an archived thread leave it, a new message brings its thread back, and it equals the rows that ask for them', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'inbox-badge'), file = join(dir, 'board.json'), pause = () => new Promise((ok) => setTimeout(ok, 1100));
   mkdirSync(dir);
@@ -5576,7 +5621,7 @@ test('the inbox badge counts only the threads that need the person: an answered,
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
-  // quiet: answered, nothing back yet. acted: answered, and the agent marked it acted. gone: archived. open: still waiting on the person.
+  // quiet: answered, nothing back yet. acted: answered, and the agent marked it acted. gone: archived. open: still waiting on the person, who never touched it.
   for (const key of ['quiet', 'acted', 'gone']) assert.equal((await post(url, 'api/answers', { key, answer: 'yes' })).status, 200);
   assert.equal(run('wait', file, '--filer', 'badge-agent', '--timeout', '5').code, 0);
   await pause();
@@ -5589,15 +5634,16 @@ test('the inbox badge counts only the threads that need the person: an answered,
     const asking = () => evaluate('[...document.querySelectorAll(".ib-sec")].filter((s) => ["New", "Decide"].includes(s.getAttribute("aria-label"))).reduce((n, s) => n + [...s.querySelectorAll(".ib-row")].filter((r) => !/Weekly digest/.test(r.textContent)).length, 0)');
     await evaluate(`location.href = ${JSON.stringify(`${url}#inbox`)}`);
     await until(() => evaluate('!!document.querySelector(".ib-sec")'));
-    // One ask waits on the person; the answered, the acted on the archived and an unread report do not add to it.
-    await until(async () => (await badge()) === '1').catch(async (e) => assert.fail(`${e.message}: ${await badge()}`));
-    assert.equal(await asking(), 1);
-    assert.equal(await evaluate('[...document.querySelectorAll(".ib-sec[aria-label=New] .ib-row")].some((r) => /Weekly digest/.test(r.textContent))'), true, 'the unread report is still listed under New');
+    // Nothing new has been written to the person: the open ask they never touched, the answered, the acted on, the archived and an unread report are none of them a reply to read.
+    await until(() => evaluate('!!document.querySelector(".ib-sec")'));
+    assert.equal(await badge(), '');
+    assert.equal(await asking(), 0);
+    assert.equal(await evaluate('[...document.querySelectorAll(".ib-row")].some((r) => /Weekly digest|digest on Mondays/.test(r.textContent))'), false, 'a report and an ask the person never touched are not threads');
     // The agent writes on the acted thread: it returns, and the count goes up by one.
     await pause();
     assert.equal(run('feedback', 'acted', file, '--reply', 'Beta is open to ten teams.', '--filer', 'badge-agent').code, 0);
     await evaluate('location.reload()');
-    await until(async () => (await badge()) === '2').catch(async (e) => assert.fail(`${e.message}: ${await badge()}`));
-    assert.equal(await asking(), 2);
+    await until(async () => (await badge()) === '1').catch(async (e) => assert.fail(`${e.message}: ${await badge()}`));
+    assert.equal(await asking(), 1);
   } finally { await close(); }
 });
