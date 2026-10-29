@@ -56,7 +56,7 @@ test('notification sender posts once per new waiting card and retries failures w
   assert.match(output, /raised/);
   await until(() => hits.length === 2);
   assert.equal(hits.length, 2, 'the failed attempt is retried');
-  assert.deepEqual(hits[0].body, { v: 1, source: 'sign-off', id: 'review-this', kind: 'ask', title: 'Review this?', text: 'Umer: one line.', url: 'https://board.example/board#waiting/review-this', at: hits[0].body.at });
+  assert.deepEqual(hits[0].body, { v: 1, source: 'sign-off', id: 'review-this', kind: 'ask', title: 'Review this?', text: 'Umer: one line.', url: 'https://board.example/board#decide/review-this', at: hits[0].body.at });
   assert.equal(hits[0].path, '/notify?private-query=1,2');
   assert.equal(hits[0].auth, 'Bearer private-token');
   await raise(dir, TOKEN);
@@ -76,6 +76,7 @@ test('an evidence post with notify configured stores the card and sends it once'
   await sleep(200);
   assert.equal(hits.length, 1);
   assert.equal(hits[0].body.kind, 'evidence');
+  assert.match(hits[0].body.url, /#evidence\/[^/]+$/);
   assert.equal(hits[0].body.title, 'Sign-in screen');
   assert.equal(JSON.parse(await cli(dir, ['list', board(dir), '--json'])).decisions.length, 1);
 });
@@ -223,7 +224,7 @@ test('muxr receiver: a raised card posts title, body, url and id with the bearer
   assert.deepEqual(Object.keys(hits[0].body).sort(), ['body', 'id', 'title', 'url']);
   assert.equal([...hits[0].body.title].length, 80);
   assert.equal(hits[0].body.body, 'Umer: one line.');
-  assert.match(hits[0].body.url, /^https:\/\/board\.tail1234\.ts\.net#waiting\//);
+  assert.match(hits[0].body.url, /^https:\/\/board\.tail1234\.ts\.net#decide\//);
   assert.ok(!output.includes('file-token-123'));
 });
 
