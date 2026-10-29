@@ -467,7 +467,7 @@
       .sort((x, y) => bySecond(y, x)), said = trailOf(t.id, 'ticket');
     seeReply(t.id, 'ticket');
     return [el('div', { class: 'tk-shd' }, el('p', {}, tkTile(t), el('span', {}, [proj, TK_WORDS[s]].filter(Boolean).join(' · '))), close),
-      el('h2', { class: 'tk-dt', tabindex: '-1', dir: 'auto' }, t.title),
+      el('h2', { class: 'tk-dt', tabindex: '-1', dir: 'auto' }, t.title), threadLink(t.id, 'ticket'),
       t.release ? el('span', { class: 'ui-pc tk-release', title: t.release }, t.release) : '',
       el('div', { class: 'ui-props' }, t.priority ? prop('flag', 'Priority', el('span', { class: `ui-pc ${t.priority.toLowerCase()}` }, t.priority)) : '',
         prop('half', 'Progress', ...tkStatus(t), ...((t.stage && !kids.length) || (t.progress > 0 && t.progress < 100) ? [el('span', { class: 'ui-bar' }, el('i', { style: `width: ${t.progress}%` })), el('span', { class: 'n' }, `${t.progress}%`)] : [el('span', {}, t.progress >= 100 ? 'All done' : 'Not started')])),
@@ -1672,7 +1672,7 @@
   /** A report's parts as one panel, each with a check once read, under a strip of them and the next one to read, then for a guided report Read the report:
    *  a part or the button opens it in full (at that part). A report 5's parts are its kind's. */
   function designsHead(items, top, gone) {
-    const h1 = top.querySelector('h1'), ro = top.querySelector(':scope > .meta') ?? '', [, theme] = todayHead(), flip = theme.onclick, sel = selecting && canDismiss() && items.length && selectHead(items);
+    const h1 = top.querySelector('h1'), ro = top.querySelector(':scope > .meta') ?? '', theme = themeButton(), flip = theme.onclick, sel = selecting && canDismiss() && items.length && selectHead(items);
     theme.classList.add('dz-theme');
     theme.onclick = () => { flip(); document.querySelector('.dz-theme')?.focus({ preventScroll: true }); };
     let more = '';
@@ -1856,9 +1856,9 @@
     // A desk sets the ask out as the prototype's open item: its head and the ask with what it carries scroll on the left, its Activity beside them, and the answers
     // pinned under a hairline at the foot, as cards side by side over one line of the note, Ask me later and Answer.
     const page = desk ? el('section', { class: `${kind} ui-card ui-pane ask2 s8 split-detail`, 'aria-labelledby': 'ask-title' },
-      el('div', { class: 'pbody' }, askHead(d, sink), el('div', { class: 'pmain' }, lead, ...about, ...said, ...comments, quietLine), el('div', { class: 'pside' }, ...askReport(d), thread(d))),
+      el('div', { class: 'pbody' }, askHead(d, sink), el('div', { class: 'pmain' }, lead, ...about, ...said, ...comments, quietLine, threadLink(d.key)), el('div', { class: 'pside' }, ...askReport(d), thread(d))),
       el('div', { class: 'ppin' }, ...picks, ...words, sendLine(`card:${d.key}`), err, bar(noteField)))
-      : el('section', { class: kind }, lead, ...about, ...said, ...comments, ...picks, ...words, noteField, quietLine, thread(d), sendLine(`card:${d.key}`), err, bar());
+      : el('section', { class: kind }, lead, ...about, ...said, ...comments, ...picks, ...words, noteField, quietLine, threadLink(d.key), thread(d), sendLine(`card:${d.key}`), err, bar());
     return page;
   }
   function evidenceDesk(top, items, archived, d) {
@@ -1904,13 +1904,13 @@
   // History owns the sequence so Back, reload and a change between sheet and desk keep it.
   /** The trail on a card: four steps on one track, each its word and time once reached; under it the agent's reply and the link to what changed,
    *  unless the place it sits already shows the reply (an ask or a comment on a part of a guided page). */
-  function trailTrack(t, said = true, you = '') {
-    const n = stepOf(t), r = t.reply, acts = ['answer', 'round', 'discard'].includes(t.kind) || (t.kind === 'part' && !you), done = acts || (!r?.text && (r?.link || r?.acted));
+  function trailTrack(t, said = true, you = '', follow = true) {
+    const n = stepOf(t), r = t.reply, acts = (['answer', 'round', 'discard'].includes(t.kind) && t.said === undefined) || (t.kind === 'part' && !you), done = acts || (!r?.text && (r?.link || r?.acted));
     return el('div', { class: 'ui-trail', role: 'group', 'aria-label': `${stepWord(t, n - 1)}: ${TRAIL.slice(0, n).map((w, i) => `${stepWord(t, i)} ${trailWhen(stepAt(t, i))}`).join(', ')}` },
       you ? el('div', { class: 'tr-you' }, el('span', { class: 'tr-lab' }, acts ? 'Your action' : 'Your question'), el('p', { dir: 'auto' }, you)) : '',
       el('ol', { 'aria-hidden': 'true' }, ...TRAIL.map((_, i) => el('li', { class: i < n ? 'on' : '' }, el('i', {}), el('b', {}, stepWord(t, i)), el('time', {}, i < n ? trailWhen(stepAt(t, i)) : '')))),
       ...(said ? (t.replies ?? (r ? [r] : [])).filter((x) => x.text || x.link || x.acted).map((x, i, all) => el('div', { class: 'tr-said' }, el('span', { class: 'tr-lab' }, done && !x.options?.length ? 'What was done' : 'Reply'), x.text ? el('p', { dir: 'auto' }, x.text) : x.acted ? el('p', {}, 'Posted a new version') : '',
-        x.link ? el('a', { href: x.link, target: '_blank', rel: 'noopener', dir: 'auto' }, linkName(x.link)) : '', i === all.length - 1 ? followUp(t) : '')) : []));
+        x.link ? el('a', { href: x.link, target: '_blank', rel: 'noopener', dir: 'auto' }, linkName(x.link)) : '', i === all.length - 1 && follow ? followUp(t) : '')) : []));
   }
   /** A reply that asks for a next step carries its answers as buttons right under it: one tap sends the choice as a comment on the card, which the agent takes like any other. */
   function followUp(t) {
@@ -1924,7 +1924,7 @@
     const err = el('span', { class: 'err', role: 'alert' }), row = el('div', { class: 'tr-opts', role: 'group', 'aria-label': 'Answer this reply' });
     for (const o of opts) {
       const b = el('button', { type: 'button', class: 'tr-opt' }, o.label);
-      b.onclick = async () => { row.querySelectorAll('button').forEach((x) => (x.disabled = true)); try { await (final ? postJson('/api/answers', card?.options?.some((x) => x.value === o.value) ? { key: t.key, answer: o.value, note: '' } : { key: t.key, answer: 'text', note: o.label }) : postJson('/api/messages', { kind: 'comment', key: t.key, text: o.label })); render(); } catch (e) { row.querySelectorAll('button').forEach((x) => (x.disabled = false)); err.textContent = `Could not send: ${e.message}`; } };
+      b.onclick = async () => { row.querySelectorAll('button').forEach((x) => (x.disabled = true)); try { await (final ? call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: t.key, follow: true, ...(card?.options?.some((x) => x.value === o.value) ? { answer: o.value, note: '' } : { answer: 'text', note: o.label }) }) }) : postJson('/api/messages', { kind: 'comment', key: t.key, text: o.label })); if (final) say(`Answered: ${o.label}. The card moved to Answered.`, 3200); render(); } catch (e) { row.querySelectorAll('button').forEach((x) => (x.disabled = false)); err.textContent = `Could not send: ${e.message}`; } };
       row.append(b);
     }
     return el('div', { class: 'tr-follow' }, row, err);
@@ -1933,3 +1933,95 @@
   const sentPairs = (d) => { const a = trailOf(d.key, 'answer').at(-1); seeReply(d.key); return [...(a ? [trailTrack(a, true, saidOf(d, state.answers[d.key] ?? {}))] : []), ...commentPairs(d.key)]; };
   /** The comments the person made on a card, each as a pair: their words, then the agent's reply, with how far it got. */
   const commentPairs = (key) => trailOf(key, 'comment').map((t) => trailTrack(t, true, (state.messages ?? []).find((m) => m.id === t.id)?.text ?? ''));
+  /* ---- One thread: everything the person and an agent said on a card (or a ticket), oldest first, in pairs: Asked then Your answer, Your action then What was done,
+     Your question then Reply, each with how far it got. Only the last three pairs show until Show earlier. ---- */
+  const inEarlier = new Set();
+  /** Opening a thread marks every reply on it seen with one mark, and a report or proof not read yet as read. */
+  function seeThread(th, sent) {
+    const key = th.d?.key ?? th.tk.id, fresh = sent.filter(unseen);
+    if (th.d && unread(th.d) && ['report', 'proof'].includes(th.kind) && !FROZEN && !state.readonly) setTimeout(() => markRead([key], true));
+    if (!fresh.length || FROZEN || state.readonly) return;
+    const at = new Date().toISOString();
+    fresh.forEach((t) => (t.seen = at));
+    postJson('/api/trail', { key }).catch(() => fresh.forEach((t) => (t.seen = undefined)));
+  }
+  const ibLab = (what, who, at, isNew) => el('p', { class: 'ib-lab' }, el('b', {}, what), who ? ` · ${who}` : '', isNew ? el('span', { class: 'ib-new' }, 'New') : '', at ? el('time', { datetime: at }, trailWhen(at)) : '');
+  /** An open ask with up to four answers is answered in its thread, one tap, the first answer set apart; anything else is answered in its own place. */
+  function askOpts(d) {
+    const err = el('span', { class: 'err', role: 'alert' }), row = el('div', { class: 'tr-opts', role: 'group', 'aria-label': 'Answer this' });
+    for (const o of d.options) { const b = el('button', { type: 'button', class: 'tr-opt' }, o.label); b.onclick = () => save(d, o, [b], err); row.append(b); }
+    return el('div', { class: 'tr-follow' }, row, el('p', { class: 'ib-final' }, 'A tap is your final answer: the card moves to Answered. Writing back keeps it in Decide.'), err);
+  }
+  /** beside: the item is open next to the thread, so the thread leaves answering and opening it to the item. */
+  function threadView(th, desk, mark = true, beside = false) {
+    const { d, tk } = th, key = d?.key ?? tk.id, sent = d ? trailOf(key) : trailOf(key, 'ticket');
+    const who = d ? d.by || 'Agent' : 'Lead', name = KIND_NAMES[th.kind].toLowerCase(), open = `#inbox/${th.id}/open`;
+    const word = { new: 'New', turn: 'Waiting on you', agent: th.last ? `With ${who} · ${stepWord(th.last, stepOf(th.last) - 1)}` : `With ${who}`, done: d && Object.hasOwn(state.answers, key) ? 'Answered' : 'Done' }[th.st];
+    const simple = !beside && d && th.st !== 'done' && area(d) === 'waiting' && inPlace(d) && d.type !== 'signin' && !exchanging(d) && !Object.hasOwn(state.answers, key) && d.options.length && d.options.length <= 4 && !FROZEN && !state.readonly;
+    // The card's own words first: what it asks (or says), and, when the first thing sent on it was the answer, that answer and what came of it.
+    const first = d ? [el('div', { class: 'ib-turn' }, ibLab(d.options.length || d.reply || d.type === 'plan' || d.type === 'signin' ? 'Asked' : 'Posted', who, d.filed),
+      el('p', { class: 'ib-say q', dir: 'auto' }, plain(d.type === 'evidence' ? headline(d) : d.about ?? d.detail ?? title(d))),
+      simple ? askOpts(d) : th.st === 'turn' && !beside ? el('a', { class: 'ib-open', href: open }, `Answer it in the ${name}`) : '')] : [el('div', { class: 'ib-turn' }, ibLab('Posted', who, tk.at), el('p', { class: 'ib-say q', dir: 'auto' }, tk.title))];
+    // A pair whose reply the person has not opened yet is marked New.
+    const pairs = [first], fresh = new Set();
+    sent.forEach((t, i) => {
+      if (i === 0 && t.kind === 'answer' && t.said === undefined) first.push(el('div', { class: 'ib-turn' }, ibLab('Your answer', '', t.at), el('p', { class: 'ib-say', dir: 'auto' }, youSaid(t, d))), trailTrack(t, true, '', !beside));
+      else pairs.push([trailTrack(t, true, youSaid(t, d), !beside)]);
+      if (unseen(t)) fresh.add(pairs.length - 1);
+    });
+    if (mark) seeThread(th, sent);
+    const hide = inEarlier.has(key) ? 0 : Math.max(0, pairs.length - 3), shown = pairs.slice(hide);
+    const earlier = el('button', { type: 'button', class: 'ib-fold' }, `Show ${hide} earlier`);
+    earlier.onclick = () => { inEarlier.add(key); render(); };
+    const answered = d && isAnswered(d) && state.answers[key];
+    return el('article', { class: `ib-thread${desk ? ' desk' : ''}`, 'aria-labelledby': 'ib-title' },
+      el('div', { class: 'ib-head' }, desk && !beside ? '' : el('a', { class: 'ui-rb', href: beside ? `#inbox/${th.id}` : '#inbox', 'aria-label': 'Back to the inbox' }, glyph('left')),
+        el('span', { class: 'ib-crumb' }, el('span', { class: 'ib-kind' }, KIND_NAMES[th.kind]), el('span', { dir: 'auto' }, [d ? projectName(d) : tkProject(tk), who].filter(Boolean).join(' · ')))),
+      el('h1', { class: 'ib-ttl', id: 'ib-title', tabindex: '-1', dir: 'auto' }, d ? (d.type === 'evidence' ? headline(d) : title(d)) : tk.title),
+      el('div', { class: 'ib-meta' }, el('span', { class: `ib-state ${th.st}` }, word), beside ? '' : el('a', { class: 'ib-open', href: open }, `Open the ${name}`)),
+      hide ? earlier : '', ...shown.map((p, i) => el('section', { class: 'ib-pair' }, fresh.has(hide + i) ? el('span', { class: 'ib-new' }, 'New') : '', ...p)),
+      answered ? el('p', { class: 'ib-closed' }, el('b', {}, 'Answered'), ` · ${saidOf(d, answered)}`, el('br'), 'Writing below goes to the agent; your answer stands.') : '',
+      d && talks() ? composer(th) : '');
+  }
+  /** Writing back: a comment on the card, which never answers it. An open ask stays in Decide until a final pick; an answered one keeps its answer. */
+  function composer(th) {
+    const key = th.d.key, k = `thread:${key}`, box = el('textarea', { id: `ib-say-${key}`, rows: 1, 'aria-label': 'Write back', placeholder: `Write to ${th.d.by || 'the agent'}…`, dir: 'auto' });
+    const send = el('button', { type: 'button', class: 'ib-send', 'aria-label': 'Send' }, glyph('send')), err = el('p', { class: 'err', role: 'alert' });
+    box.value = drafts.get(k) ?? '';
+    send.disabled = !box.value.trim();
+    box.oninput = () => { drafts.set(k, box.value); keep(); send.disabled = !box.value.trim(); };
+    send.onclick = async () => {
+      const text = box.value.trim();
+      if (!text) return;
+      send.disabled = true;
+      try {
+        await postJson('/api/messages', { kind: 'comment', key, text });
+        drafts.delete(k); keep();
+        say(th.st === 'turn' ? 'Sent. The card stays in Decide until you pick.' : isAnswered(th.d) ? 'Sent. Your answer stands.' : 'Sent.', 3200);
+        render();
+      } catch (e) { send.disabled = false; err.textContent = `Could not send: ${e.message}`; }
+    };
+    return el('div', {}, el('div', { class: 'ib-compose' }, box, send), err);
+  }
+  /** From an item back to its thread: how many replies on it are new, else how many things were said. */
+  function threadLink(key, kind) {
+    const sent = trailOf(key, kind), n = sent.filter(unseen).length;
+    return el('a', { class: 'ib-tlink', href: `#inbox/${kind ? '~' : ''}${key}` }, glyph('msg'), el('span', {}, el('b', {}, n ? `Thread · ${n} new` : `Thread · ${sent.length + 1} ${sent.length ? 'messages' : 'message'}`)), glyph('right'));
+  }
+  /** A thread on a phone, with its item over it once opened: an ask in its sheet, a ticket in its own; the reader opens the rest (render). */
+  function threadScreen(th, open) {
+    if (open && th.tk) ticketBack = `#inbox/${th.id}`;
+    return [threadView(th, false), open && th.d && inPlace(th.d) ? askSheet(th.d, `#inbox/${th.id}`) : open && th.tk ? tkSheet(th.tk) : ''];
+  }
+  /** The inbox on a desk: the list beside the open thread; with an item opened from its thread, the thread takes the list's place and the item sits beside it. */
+  function threadDesk(top, sub, list, th, open) {
+    if (!th) return split(top, sub, list, pane('', emptyState('empty', { mark: 'answered', title: 'Nothing to answer', text: 'Replies and asks land here.', small: true })));
+    if (!open) return split(top, sub, list, pane('', threadView(th, true, location.hash.startsWith('#inbox/'))));
+    const { d, tk } = th, side = [threadView(th, true, true, true)];
+    // A page to read sits in the reader beside the thread (render opens it there).
+    if (d && !inPlace(d) && d.type !== 'evidence') return el('div', { class: 'ib-beside' }, ...side);
+    if (tk) return split(top, sub, side, pane('', ...ticketPage(tk, '')));
+    if (d.type === 'evidence') return split(top, sub, side, proofPane(d));
+    const bar = {}, page = decidePage(d, undefined, true, bar);
+    return split(top, sub, side, page.matches('.ui-pane') ? page : pane(askHead(d, bar), page));
+  }

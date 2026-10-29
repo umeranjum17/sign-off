@@ -1,5 +1,7 @@
 # Today
 
+Replaced by the [Inbox](inbox.md): the board no longer draws Today. What follows is the record of the screen it replaced.
+
 The board's first screen, in the new look as the approved prototype draws it (`signoff-restyle-board/proto/index.html`, the Today frames): built from `web/ui.css`'s parts.
 
 ## What it shows

@@ -363,8 +363,8 @@ function lastTaken(decisionsPath: string, key: string): Answer | undefined {
 export const CLEARED: Option = { value: '', label: '' };
 /** Appends one answer line unless it equals the current answer and note, and returns the saved answer. Starts a new line after a torn fragment.
  * One decision is one card: the answer also goes, as its own line, to each card on the board this ask merges, under that card's close mode. */
-export function appendAnswer(decisionsPath: string, d: Decision, option: Option, note = '', comments: Sent[] = [], took?: Took): Answer | undefined {
-  const answer = saveAnswer(decisionsPath, d, option, note, comments, undefined, took);
+export function appendAnswer(decisionsPath: string, d: Decision, option: Option, note = '', comments: Sent[] = [], took?: Took, follow = false): Answer | undefined {
+  const answer = saveAnswer(decisionsPath, d, option, note, comments, undefined, took, follow);
   const on = loadDecisions(decisionsPath), answers = readAnswers(decisionsPath);
   // An open ask on the same decision leaves Decide with this one: it takes the answer too (an answered or dismissed one is left alone).
   const hidden = new Set(readDismissed(decisionsPath, answers, readRounds(decisionsPath)));
@@ -392,11 +392,12 @@ export function sameDecision(a: Decision, b: Decision): boolean {
   const x = new Set(a.title.toLowerCase().match(/[a-z0-9]+/g)), y = new Set(b.title.toLowerCase().match(/[a-z0-9]+/g)), both = [...x].filter((w) => y.has(w)).length;
   return both / (x.size + y.size - both) >= 0.8;
 }
-function saveAnswer(decisionsPath: string, d: Decision, option: Option, note: string, comments: Sent[] = [], by?: string, took?: Took): Answer | undefined {
+/** `follow`: a tap on a follow-up button under the agent's reply. It answers that reply, so it is a new line even when it repeats the answer, and it changes nothing. */
+function saveAnswer(decisionsPath: string, d: Decision, option: Option, note: string, comments: Sent[] = [], by?: string, took?: Took, follow = false): Answer | undefined {
   const current = readAnswers(decisionsPath)[d.key];
   // The person giving the answer the leash took makes it theirs: a new line.
-  if (option === CLEARED ? !current : current?.answer === option.value && (current.note ?? '') === note && !comments.length && current.taken === took?.taken) return;
-  const was = option === CLEARED ? undefined : current ?? lastTaken(decisionsPath, d.key);
+  if (!follow && (option === CLEARED ? !current : current?.answer === option.value && (current.note ?? '') === note && !comments.length && current.taken === took?.taken)) return;
+  const was = option === CLEARED || follow ? undefined : current ?? lastTaken(decisionsPath, d.key);
   const answer: Answer = { key: d.key, answer: option.value, label: option.label, close: d.close, at: now(), ...(note && { note }), ...(comments.length && { comments }), ...(by && { merged_by: by }), ...took,
     ...(was && { replaces: { answer: was.answer, label: was.label, at: was.at, ...(was.note && { note: was.note }), ...(was.taken && { taken: was.taken }) } }) };
   appendLine(answersPath(decisionsPath), answer);
@@ -984,7 +985,7 @@ export function markEngagementSeen(file: string, id: string, revision: number) {
  * The agent's marks are one line each in <board>.trail.jsonl: a mark names a key and covers every send on it up to its time. The person opening a reply, or an answer the leash took, marks it seen. */
 export type TrailMark = { op: 'delivered' | 'read' | 'reply' | 'seen'; key: string; id?: string; text?: string; link?: string; /** Follow-up buttons under a reply that asks for a next step: one tap answers. */ options?: Option[]; at: string };
 export type Reply = { at: string; text?: string; link?: string; options?: Option[]; acted?: true };
-export type Trail = { id: string; key: string; kind: 'answer' | 'round' | 'comment' | 'ask' | 'part' | 'ticket' | 'discard'; part?: string; /** An answer the leash took: its first step reads Taken or Picked, and `opened` is when the person first opened the card after it. */ taken?: Took['taken']; opened?: string; reason?: DiscardReason; /** A ticket comment's words: the board keeps them nowhere else. */ said?: string; at: string; delivered?: string; read?: string; reply?: Reply; /** Every reply when the agent answered the same send more than once, oldest first; `reply` is the last. */ replies?: Reply[]; seen?: string };
+export type Trail = { id: string; key: string; kind: 'answer' | 'round' | 'comment' | 'ask' | 'part' | 'ticket' | 'discard'; part?: string; /** An answer the leash took: its first step reads Taken or Picked, and `opened` is when the person first opened the card after it. */ taken?: Took['taken']; opened?: string; reason?: DiscardReason; /** A ticket comment's words (the board keeps them nowhere else), or the words of an answer written instead of picked. */ said?: string; at: string; delivered?: string; read?: string; reply?: Reply; /** Every reply when the agent answered the same send more than once, oldest first; `reply` is the last. */ replies?: Reply[]; seen?: string };
 export const trailPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.trail.jsonl';
 export const appendMark = (decisionsPath: string, mark: Omit<TrailMark, 'at'>, at = now()) => appendLine(trailPath(decisionsPath), { ...mark, at });
 /** `delivery` is the owner dispatch's record per Go deeper ask (src/owner.ts deliveries): handed to the author's session, then acknowledged by it. */
@@ -995,7 +996,7 @@ export function readTrail(decisionsPath: string, items: Decision[], delivery: Re
   const taken = seenAt(decisionsPath), filed = new Map(items.map((d) => [d.key, d.filed]));
   const first = (...at: (string | undefined)[]) => at.filter((x): x is string => !!x).sort((x, y) => Date.parse(x) - Date.parse(y))[0];
   const sends: Trail[] = [
-    ...answerLines(decisionsPath).filter((a) => a.answer !== '' && !a.merged_by).map((a): Trail => ({ id: `answer:${a.key}:${a.at}`, key: a.key, kind: 'answer', at: a.at, read: taken(a) === '' ? a.at : taken(a), ...(a.taken && { taken: a.taken }) })),
+    ...answerLines(decisionsPath).filter((a) => a.answer !== '' && !a.merged_by).map((a): Trail => ({ id: `answer:${a.key}:${a.at}`, key: a.key, kind: 'answer', at: a.at, read: taken(a) === '' ? a.at : taken(a), ...(a.taken && { taken: a.taken }), ...(a.answer === 'text' && { said: a.note }) })),
     ...readRounds(decisionsPath).map((r): Trail => ({ id: `round:${r.key}:${r.at}`, key: r.key, kind: 'round', at: r.at })),
     ...readDiscards(decisionsPath).map((x): Trail => ({ id: `discard:${x.key}:${x.at}`, key: x.key, kind: 'discard', reason: x.reason, at: x.at })),
     ...readMessages(decisionsPath).flatMap((m): Trail[] => (m.kind === 'comment' && m.key ? [{ id: m.id, key: m.key, kind: 'comment', at: m.at, delivered: m.delivered }] : [])),
