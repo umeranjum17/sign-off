@@ -1974,6 +1974,15 @@
   .tk-stage { display: inline-flex; width: auto; height: 1rem; padding: 0 4px; white-space: nowrap; line-height: 1rem; background: var(--tk-inset); }
   :is(.tk-sheet, .tk-pane, .tk-evs) .ui-pr:has(.tk-stage) .v { flex-wrap: wrap; gap: 6px; padding: 8px 0; }
   :is(.tk-sheet, .tk-pane, .tk-evs) .ui-pr .v > span:is(.tk-stage, .tk-stuck) { white-space: nowrap; overflow: visible; }
+  /* Who works on a ticket: a line under a row and the Assigned block. */
+  .tk-logo { flex: none; display: inline-block; width: 0.875rem; height: 0.875rem; background: currentColor; -webkit-mask: var(--logo) center / contain no-repeat; mask: var(--logo) center / contain no-repeat; }
+  .tk-as { display: flex; align-items: center; gap: 6px; min-width: 0; height: 1rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: var(--tk-lh-meta); white-space: nowrap; }
+  .tk-aw { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .tk-live { display: inline-flex; flex: none; align-items: center; gap: 4px; color: var(--tk-text-secondary); }
+  .tk-live i { width: 6px; height: 6px; border-radius: 50%; background: var(--tk-up); }
+  .tk-none { color: var(--tk-text-tertiary); }
+  .tk-av { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+  .tk-worker { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tk-release { display: inline-block; width: auto; max-width: 110px; padding: 0 6px; background: var(--tk-inset); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* The ticket: its project and state (with Close on a phone), its title in full, its properties, the tickets under it, Linked and Activity. */
   .tk-shd { display: flex; align-items: center; gap: 0.5rem; min-height: 2.5rem; }
@@ -2005,6 +2014,7 @@
     .tk-desk .ui-row:hover:not([aria-current]) { opacity: 0.85; }
     .tk-row[aria-current]::after { content: ""; position: absolute; z-index: -1; inset: 0.25rem -0.5rem; border-radius: 0.875rem; background: var(--tk-inset); }
     .tk-pane .tk-dt { font-size: 1.5rem; line-height: 2rem; }
+    .tk-pane > * { flex-shrink: 0; }
     .tk-desk .tk-in .ui-row { height: auto; min-height: 4.25rem; padding: 0.75rem 0; }
     .tk-desk .tk-empty { width: 25rem; margin: 0; }
   }

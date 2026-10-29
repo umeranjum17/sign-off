@@ -4636,7 +4636,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
       props: [...document.querySelectorAll('.tk-sheet > .ui-props > .ui-pr')].map((p) => p.innerText.replace(/\\s+/g, ' ').trim()).filter((p) => !p.startsWith('Last update')),
       rows: [...document.querySelectorAll('.tk-sheet .tk-in a')].map((a) => [a.querySelector('.t').textContent.replace(/^Update \\d+ · /, ''), a.getAttribute('href')]),
       tab: document.querySelector('#tabs a[aria-current]')?.getAttribute('href'), wide: document.documentElement.scrollWidth > 390 })`));
-    assert.deepEqual({ ...page, rows: page.rows.map(([t]) => t) }, { head: 'Settings · In progress', title: 'Ship the new settings page', props: ['Progress 60%', 'Part of The new settings page'], rows: shown.cards.map((c) => c.title), tab: '#tickets', wide: false });
+    assert.deepEqual({ ...page, rows: page.rows.map(([t]) => t) }, { head: 'Settings · In progress', title: 'Ship the new settings page', props: ['Progress 60%', 'Part of The new settings page', 'Assignee Unassigned'], rows: shown.cards.map((c) => c.title), tab: '#tickets', wide: false });
     assert.deepEqual(['Ship the settings page on Friday?', 'Settings on a phone', 'Approve the chat app journeys?', 'The weekly digest ran'].map((t) => Object.fromEntries(page.rows)[t]), ['#decide/ask-linked', '#evidence/update-1', '#designs/chat-journeys', '#reports/digest-ran']);
     assert.equal(run('ticket', file, '--id', 'T-29', '--release', '0.6.1', '--state', 'on hold', '--pr', prs[0], '--pr', prs[1]).code, 0);
     await evaluate('refresh()');
@@ -4656,7 +4656,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     // The ticket above it lists the ticket under it, and no card names it.
     await evaluate(`location.href = ${JSON.stringify(`${url}#ticket/T-9`)}`);
     await until(async () => (await evaluate('[...document.querySelectorAll(".tk-sheet a.tk-row")].map((a) => a.getAttribute("href")).join()')) === '#ticket/T-29');
-    assert.equal(await evaluate('[...document.querySelectorAll(".tk-sheet > .ui-dl, .tk-sheet > .es b")].map((p) => p.textContent).join(" | ")'), 'Tickets in this epic · 0 of 1 done | Linked | No cards yet');
+    assert.equal(await evaluate('[...document.querySelectorAll(".tk-sheet > .ui-dl, .tk-sheet > .es b")].map((p) => p.textContent).join(" | ")'), 'Assigned | Tickets in this epic · 0 of 1 done | Linked | No cards yet');
     assert.equal(await evaluate('!!document.querySelector(".tk-sheet .tk-shd .ui-icon img")?.naturalWidth && !!document.querySelector(".tk-sheet .tk-in .tk-row .ui-icon img")?.naturalWidth && !document.querySelector(".tk-sheet .mono")'), true);
     // The Tickets tab lists the tickets under no other, all of them unless the filter's Who asked says From you (T-9 and T-32, which the user asked for) or Fleet upkeep (T-31, on hold). T-29 sits under T-9, so it is not listed on its own.
     const tab = `JSON.stringify({ seg: [...document.querySelectorAll('.tk-seg button')].map((b) => b.textContent + (b.getAttribute('aria-pressed') === 'true' ? ' on' : '')), hero: document.querySelector('.tk-hero').innerText.replace(/\\s+/g, ' ').trim(),
@@ -4805,6 +4805,59 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     await until(() => evaluate('document.querySelectorAll(".tk-ev").length > 0'));
   } finally { close(); }
   proc.kill();
+});
+
+test('a ticket says who works on it: the tool\'s mark, the model and the lead on its row and in a block on its page, Live for a running worker, a finished task without one, and Unassigned with no Juggernaut home', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'assignee'), file = join(dir, 'board.json'), home = join(dir, 'fleet'), state = join(home, 'state');
+  mkdirSync(state, { recursive: true });
+  assert.equal(run('raise', file, '--title', 'Ship the page on Friday?', '--why', 'The page is ready.', '--outcome', 'yes=It ships.', '--outcome', 'no=It waits.', '--recommend', 'yes', '--recommend-reason', 'Every check passed.', '--default', 'no', '--ask-ref', 'assignee-test').code, 0);
+  // Three tickets: a running Claude Code worker, a Pi task that finished, and one no task record names.
+  for (const [id, title, progress] of [['A-1', 'Build the page', '40'], ['A-2', 'Publish it', '70'], ['A-3', 'Write the notes', '10']]) assert.equal(run('ticket', file, '--id', id, '--title', title, '--progress', progress).code, 0);
+  writeFileSync(join(state, 'A-1.meta'), 'window=default:w1:p1\nendpoint_task_id=A-1\ntitle=Build the page\nproject=~/fleet/projects/web-app\nharness=claude\nmodel=claude-opus-5-5\n');
+  writeFileSync(join(state, 'A-1.status'), 'working [at=1]: building\n');
+  writeFileSync(join(state, 'A-2.meta'), 'window=default:w1:p2\nproject=~/fleet/projects/notes\nharness=pi\nmodel=ollama-cloud/deepseek-v4.1-flash\n');
+  writeFileSync(join(state, 'A-2.status'), 'done [at=2]: shipped\n');
+  const open = async (withHome, width, mobile) => {
+    const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env: { ...env, ...(withHome && { SIGN_OFF_FLEET_HOME: home }) }, stdio: ['ignore', 'pipe', 'ignore'] });
+    procs.push(proc);
+    const url = /url: "(\S+)"/.exec(await served(proc))[1], page = await browse(dir, width, 900, mobile);
+    return { url, proc, ...page };
+  };
+  const line = (id) => `(() => { const r = [...document.querySelectorAll('a.tk-row')].find((a) => a.getAttribute('href') === '#ticket/${id}'); const w = r?.querySelector('.tk-as');
+    return w && JSON.stringify({ text: w.innerText.replace(/\\s+/g, ' ').trim(), cls: w.className, logo: w.querySelector('.tk-logo:nth-of-type(2)')?.getAttribute('aria-label') ?? null, vendor: w.querySelector('.tk-logo')?.getAttribute('aria-label') ?? null, vmask: w.querySelector('.tk-logo') ? getComputedStyle(w.querySelector('.tk-logo')).maskImage || getComputedStyle(w.querySelector('.tk-logo')).webkitMaskImage : null, live: !!w.querySelector('.tk-live'),
+      mask: w.querySelector('.tk-logo:nth-of-type(2)') ? getComputedStyle(w.querySelector('.tk-logo:nth-of-type(2)')).maskImage || getComputedStyle(w.querySelector('.tk-logo:nth-of-type(2)')).webkitMaskImage : null }); })()`;
+  const block = (id) => `(async () => { location.hash = '#ticket/${id}'; await new Promise((ok) => setTimeout(ok, 80)); const b = document.querySelector('.tk-assigned'); return b && JSON.stringify([...b.querySelectorAll('.ui-pr')].map((r) => r.innerText.replace(/\\s+/g, ' ').trim())); })()`;
+  for (const [width, mobile] of [[390, true], [1280, false]]) {
+    const { url, proc, evaluate, close } = await open(true, width, mobile);
+    try {
+      await evaluate(`location.href = ${JSON.stringify(`${url}#tickets`)}`);
+      await until(async () => !!(await evaluate(line('A-1'))));
+      const a1 = JSON.parse(await evaluate(line('A-1'))), a2 = JSON.parse(await evaluate(line('A-2'))), a3 = JSON.parse(await evaluate(line('A-3')));
+      // The model shows its vendor's mark and the tool its own, not one mark for both.
+      assert.deepEqual([a1.vendor, /logos\/anthropic\.svg/.test(a1.vmask), /logos\/pi\.svg/.test(a2.mask), a2.vendor, /logos\/deepseek\.svg/.test(a2.vmask)], ['Opus 5.5', true, true, 'DeepSeek V4.1 Flash', true]);
+      assert.deepEqual([a1.text, a1.logo, a1.live, /logos\/claude-code\.svg/.test(a1.mask)], ['Opus 5.5 · web-app Live', 'Claude Code', true, true]);
+      // A finished task names its model and tool but shows no Live.
+      assert.deepEqual([a2.text, a2.logo, a2.live, /logos\/pi\.svg/.test(a2.mask)], ['DeepSeek V4.1 Flash · notes', 'Pi', false, true]);
+      // No record: a quiet word, no mark and no empty box.
+      assert.deepEqual([a3.text, a3.cls, a3.logo], ['Unassigned', 'tk-as none', null]);
+      // The page of a ticket: one labelled block with the lead, worker, model, tool and whether the worker is live.
+      await until(async () => !!(await evaluate(block('A-1'))));
+      assert.deepEqual(JSON.parse(await evaluate(block('A-1'))), ['Lead web-app', 'Worker Build the page', 'Model Opus 5.5', 'Tool Claude Code', 'Worker live Live']);
+      assert.deepEqual(JSON.parse(await evaluate(block('A-2'))), ['Lead notes', 'Worker None running', 'Model DeepSeek V4.1 Flash', 'Tool Pi', 'Worker live Not running']);
+      assert.deepEqual(JSON.parse(await evaluate(block('A-3'))), ['Assignee Unassigned']);
+      assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
+      // The row keeps its project icon or kind icon: no monogram tile came with the line.
+      assert.equal(await evaluate('!document.querySelector(".tk-row .mono")'), true);
+    } finally { await close(); await new Promise((ok) => (proc.exitCode !== null ? ok() : (proc.once('exit', ok), proc.kill()))); }
+  }
+  // With no home named the same board reads every ticket as unassigned, and nothing breaks.
+  const { url, proc, evaluate, close } = await open(false, 390, true);
+  try {
+    await evaluate(`location.href = ${JSON.stringify(`${url}#tickets`)}`);
+    await until(async () => !!(await evaluate(line('A-1'))));
+    for (const id of ['A-1', 'A-2', 'A-3']) assert.equal(JSON.parse(await evaluate(line(id))).text, 'Unassigned');
+    assert.equal(await evaluate('document.querySelectorAll(".tk-logo").length'), 0);
+  } finally { await close(); proc.kill(); }
 });
 
 test('Tickets on a phone: with one section expanded, See all on each other section expands it, and a list that moves under the finger before the tap lands does not open a ticket', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {

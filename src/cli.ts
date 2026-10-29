@@ -19,6 +19,7 @@ import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plain
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, downloadFiles, galleryFrames, guided, kitWarnings, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
 import { copiesOf, differs, type Copy } from './images.js';
+import { homeOf, readAssignee, type Assignee } from './fleet.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
 
 /** The version this copy runs, read from package.json once: a pre-release version says so, and a git checkout whose HEAD carries no tag
@@ -1294,6 +1295,17 @@ function feedback(args: string[]) {
   return toon({ board: tilde(file), key, shows: now.reply ? 'Replied' : now.read ? 'Read' : 'Delivered', covers: sent.length }, [values.read || values.delivered ? `Run \`sign-off-axi feedback ${key}${on} --reply "<what you did>"\` once you act on it` : `Run \`sign-off-axi wait${on}${filer ? ` --filer ${filer}` : ''}\` for the next answer`]);
 }
 
+/** The Juggernaut home whose task records say who works on a ticket: SIGN_OFF_FLEET_HOME, else the fleet_home: line of the config.yaml beside the board. Undefined when neither names one. */
+function fleetHomeOf(board: string) {
+  let line: string | undefined;
+  try { line = /^[ \t]*fleet_home[ \t]*:[ \t]*(.*?)[ \t]*(?:\s#.*)?$/m.exec(readFileSync(join(dirname(board), 'config.yaml'), 'utf8'))?.[1]; } catch {}
+  return homeOf(process.env.SIGN_OFF_FLEET_HOME || line?.replace(/^(['"])(.*)\1$/, '$2'));
+}
+/** The tickets with an `assignee` on each one a task record names (see fleet.ts); with no home configured, or no record, a ticket is unchanged and reads as unassigned. */
+const withAssignees = <T extends { id: string }>(tickets: T[], board: string): (T & { assignee?: Assignee })[] => {
+  const home = fleetHomeOf(board);
+  return home ? tickets.map((t) => { const assignee = readAssignee(home, t.id); return assignee ? { ...t, assignee } : t; }) : tickets;
+};
 /** A card that names a ticket, in the words its page uses: what it is, and its answer, waiting (a design Main has not promoted is in review) or shown when it asks nothing.
  * `ticket --json` and the board's /api/tickets say it the same way. */
 const ticketCard = (d: ReturnType<typeof board>[number]) => ({ key: d.key, kind: d.type === 'evidence' ? 'proof' : d.kind === 'design' || d.type === 'design' ? 'design' : d.type === 'plan' ? 'plan' : asks(d) ? 'ask' : 'report',
@@ -1302,7 +1314,7 @@ const ticketCard = (d: ReturnType<typeof board>[number]) => ({ key: d.key, kind:
 function ticketsApi(path: string): [number, unknown] | undefined {
   const one = /^\/api\/tickets\/([^/]+)$/.exec(path);
   if (path !== '/api/tickets' && !one) return undefined;
-  const all = rollUp(readTickets(file, warn)), rows = board(file).filter((d) => d.ticket !== undefined && !d.dismissed);
+  const all = withAssignees(rollUp(readTickets(file, warn)), file), rows = board(file).filter((d) => d.ticket !== undefined && !d.dismissed);
   // Newest card first, as the CLI and the ticket's page list them.
   const cardsOf = (id: string) => rows.filter((d) => d.ticket === id).reverse().sort((x, y) => (Date.parse(y.filed ?? '') || 0) - (Date.parse(x.filed ?? '') || 0));
   if (!one) return [200, { tickets: all.map((t) => ({ ...t, cards: cardsOf(t.id).map((d) => d.key) })) }];
@@ -1331,13 +1343,13 @@ function ticket(args: string[]) {
   };
   const row = (t: Ticket) => ({ id: t.id, title: t.title, progress: t.progress, parent: t.parent ?? '', priority: t.priority ?? '', project: t.project ?? '', hold: t.hold ? 'yes' : 'no', asked: t.asked ? 'yes' : 'no', release: t.release ?? '', state: t.state ?? '', prs: t.prs ?? [], stage: t.stage ?? '', last_event_at: t.last_event_at ?? '' });
   if (id === undefined) {
-    const all = rollUp(readTickets(file, warn));
+    const all = withAssignees(rollUp(readTickets(file, warn)), file);
     if (values.json) return JSON.stringify({ board: file, tickets: all.map((t) => ({ ...t, cards: cardsOf(t).map((d) => d.key) })) });
     return toon({ board: tilde(file), tickets: all.length ? all.map((t) => ({ ...row(t), cards: cardsOf(t).length })) : '0 tickets' }, [`Run \`sign-off-axi ticket${on} --id <id> --title "<what the work is>" --progress <0-100>\` to add one`, 'Pass --ticket <id> to raise or post, so the card shows its ticket']);
   }
   if (!isKey(id)) throw fail(`--id ${id} must be 1-128 of A-Z a-z 0-9 . _ -`, 'VALIDATION_ERROR', 'Pass a short id such as --id T-29');
   if (!write) {
-    const t = rollUp(readTickets(file, warn)).find((x) => x.id === id);
+    const t = withAssignees(rollUp(readTickets(file, warn)), file).find((x) => x.id === id);
     if (!t) throw fail(`no ticket ${id} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi ticket${on} --id ${id} --title "<what the work is>"\` to add it`);
     const cards = cardsOf(t).map(ticketCard);
     if (values.json) return JSON.stringify({ board: file, ticket: { ...t, cards } });
@@ -2702,6 +2714,8 @@ const APP = { pwa: readFileSync(new URL('../web/pwa.js', import.meta.url)), work
 const SPLASH = readdirSync(new URL('../web/', import.meta.url)).flatMap((f) => { const m = /^splash-(\d+)x(\d+)-(light|dark)\.png$/.exec(f); return m ? [{ file: f, w: +m[1]!, h: +m[2]!, theme: m[3]! }] : []; });
 for (const { file } of SPLASH) ICONS[`/${file}`] = { type: 'image/png', bytes: readFileSync(new URL(`../web/${file}`, import.meta.url)) };
 const splashLinks = SPLASH.map(({ file, w, h, theme }) => `<link rel="apple-touch-startup-image" href="${file}" media="(device-width: ${w}px) and (device-height: ${h}px) and (-webkit-device-pixel-ratio: 2) and (orientation: ${w < h ? 'portrait' : 'landscape'}) and (prefers-color-scheme: ${theme})">`).join('\n');
+/** The tool and provider marks a ticket's assignee shows (web/logos), served from the board itself: no mark is fetched from another site. */
+for (const f of readdirSync(new URL('../web/logos/', import.meta.url))) if (f.endsWith('.svg')) ICONS[`/logos/${f}`] = { type: 'image/svg+xml', bytes: readFileSync(new URL(`../web/logos/${f}`, import.meta.url)) };
 /** The page names its stylesheets and script by their content, so a phone holding an older copy (kept a day) fetches the new one with the new page: a row's badge is never drawn by half of an upgrade. */
 const stamp = (name: string) => createHash('sha256').update(ICONS[`/${name}`]!.bytes).digest('hex').slice(0, 12);
 const served = Buffer.from(page.toString().replace(/href="(tokens|ui|app)\.css"/g, (_, name) => `href="${name}.css?v=${stamp(`${name}.css`)}"`)
@@ -2864,13 +2878,15 @@ const state = () => {
     promoted: readPromoted(file, warn),
     // `held`: the card has not been answered since, so it is open again and its page says what it was answered before.
     reopened: ((held) => readReopened(file).map((r) => ({ ...r, ...(held.get(r.key)?.at === r.at && held.get(r.key)?.seq === r.seq && { held: true }) })))(reopenedNow(file)),
-    tickets: rollUp(readTickets(file, warn)),
+    tickets: withAssignees(rollUp(readTickets(file, warn)), file),
     projects: readProjects(file, warn),
   };
 };
 /** The board's state as the bytes a poll reads, built once per change of any file it is made from: a phone asks again every 20 seconds, and an
  * unchanged board costs the stats of its files (a 304 with no body) instead of five megabytes of rebuilding and serialising. Any answer, dismiss,
  * comment, ticket or proof that lands changes a file it was built from, so a read never shows a board older than the files it names. */
+/** With a fleet home configured, a task record can change with no board file changing: the state is read again after this many milliseconds. */
+const FLEET_REREAD = 10000;
 let built: { stamps: Map<string, string>; until: number; body: ReturnType<typeof state>; json: Buffer; tag: string; sent: Map<string, { bytes: Buffer; encoding?: string }>; views: Map<string, { json: Buffer; tag: string; sent: Map<string, { bytes: Buffer; encoding?: string }> }> } | undefined;
 /** The state as it is now, rebuilt only when a file it was made from has changed, or when a sign-in's link passes its time (no file changes then,
  *  and the state's own `expired` must say so at once); `tag` names the exact bytes for If-None-Match. */
@@ -2882,7 +2898,7 @@ function stateRead() {
   try { body = state(); } finally { stamps = building; building = undefined; }
   const json = Buffer.from(JSON.stringify(body!));
   // The next moment this body is out of date: the soonest sign-in link that has not passed yet. Until then no file can change it.
-  const until = Math.min(Infinity, ...body!.decisions.flatMap((d) => (d.type === 'signin' && d.expires && !d.expired ? [Date.parse(d.expires)] : [])));
+  const until = Math.min(fleetHomeOf(file) ? Date.now() + FLEET_REREAD : Infinity, ...body!.decisions.flatMap((d) => (d.type === 'signin' && d.expires && !d.expired ? [Date.parse(d.expires)] : [])));
   const made = { stamps: stamps!, until, body: body!, json, tag: `"${sha256(json).slice(0, 32)}"`, sent: new Map<string, { bytes: Buffer; encoding?: string }>(), views: new Map<string, { json: Buffer; tag: string; sent: Map<string, { bytes: Buffer; encoding?: string }> }>() };
   // The board was written while it was read, so this body is of the older board: it is answered, but the next read builds again.
   built = stateSources().every((path) => stampOf(path) === before.get(path)) ? made : undefined;

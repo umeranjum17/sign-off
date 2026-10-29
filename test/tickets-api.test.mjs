@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { appendFileSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { networkInterfaces, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -163,4 +163,59 @@ test('the ticket API needs the access token beyond loopback, like the rest of th
   const got = await fetch(`${origin}/api/tickets/T-1`, { headers: { cookie } });
   assert.equal(got.status, 200);
   assert.equal((await got.json()).ticket.id, 'T-1');
+});
+
+test('a ticket carries who works on it when a Juggernaut home has its task record, and reads as unassigned with no home, no config line or no record', async () => {
+  // The task records of a home: a live Claude Code worker, a Pi task that finished, a tool the board does not know, and no record at all for E-1.
+  const home = join(scratch, 'fleet'), state = join(home, 'state');
+  mkdirSync(state, { recursive: true });
+  writeFileSync(join(state, 'T-1.meta'), 'window=default:w1:p1\nendpoint_task_id=T-1\nproject=~/fleet/projects/web-app/\nharness=claude\nmodel=claude-sonnet-5-5\neffort=medium\n');
+  writeFileSync(join(state, 'T-1.status'), 'working [at=1]: building\n');
+  writeFileSync(join(state, 'T-2.meta'), 'window=default:w1:p2\nlead=notes\nharness=pi\nmodel=ollama-cloud/deepseek-v4.1-flash\n');
+  writeFileSync(join(state, 'T-2.status'), 'working [at=1]: building\ndone [at=2]: shipped\n');
+  writeFileSync(join(state, 'S-1.meta'), 'window=default:w1:p3\nharness=mystery\nmodel=weird-model\n'),
+  writeFileSync(join(state, 'S-2.meta'), 'window=default:w1:p4\nendpoint_task_id=fix-menu-spacing-a0\ntitle=Fix the menu spacing\nharness=opencode\nmodel=ollama/qwen3-coder\n');
+  axi('ticket', board, '--id', 'S-2', '--title', 'Tidy the menu', '--progress', '5');
+  const assignees = async (port) => Object.fromEntries((await (await fetch(`http://127.0.0.1:${port}/api/tickets`)).json()).tickets.map((t) => [t.id, t.assignee]));
+  const without = JSON.parse(axi('ticket', board, '--json')).tickets;
+
+  // No home named: every ticket reads as unassigned, and the fields it had are as before.
+  let port = await serve();
+  assert.ok(Object.values(await assignees(port)).every((a) => a === undefined));
+
+  env.SIGN_OFF_FLEET_HOME = home;
+  port = await serve();
+  const found = await assignees(port);
+  assert.deepEqual(found['T-1'], { lead: 'web-app', worker: 'T 1', worker_id: 'T-1', model: 'Sonnet 5.5', model_logo: '/logos/anthropic.svg', tool: 'Claude Code', tool_logo: '/logos/claude-code.svg', live: true });
+  // A finished task is assigned but has no worker.
+  assert.deepEqual(found['T-2'], { lead: 'notes', model: 'DeepSeek V4.1 Flash', model_logo: '/logos/deepseek.svg', tool: 'Pi', tool_logo: '/logos/pi.svg', live: false });
+  // A harness and a model the board does not know are shown as written, with the plain mark.
+  assert.deepEqual(found['S-1'], { lead: 'fleet', worker: 'S 1', worker_id: 'S-1', model: 'weird-model', model_logo: '/logos/generic.svg', tool: 'mystery', tool_logo: '/logos/generic.svg', live: true });
+  // A provider's prefix gives its mark when the model is not one the board knows; a record's own title= names the worker, its id kept apart.
+  assert.deepEqual(found['S-2'], { lead: 'fleet', worker: 'Fix the menu spacing', worker_id: 'fix-menu-spacing-a0', model: 'ollama/qwen3-coder', model_logo: '/logos/ollama.svg', tool: 'OpenCode', tool_logo: '/logos/opencode.svg', live: true });
+  assert.equal(found['E-1'], undefined);
+  const list = (await (await fetch(`http://127.0.0.1:${port}/api/tickets`)).json()).tickets;
+  assert.deepEqual(list.map(({ assignee, ...t }) => t), without);
+  assert.deepEqual(list, JSON.parse(axi('ticket', board, '--json')).tickets);
+  const one = (await (await fetch(`http://127.0.0.1:${port}/api/tickets/T-1`)).json()).ticket;
+  assert.equal(one.assignee.live, true);
+  assert.deepEqual(one, JSON.parse(axi('ticket', board, '--id', 'T-1', '--json')).ticket);
+  // The board's own state carries it too, and its marks are files the board serves itself.
+  assert.equal((await (await fetch(`http://127.0.0.1:${port}/api/state`)).json()).tickets.find((t) => t.id === 'T-1').assignee.tool, 'Claude Code');
+  const mark = await fetch(`http://127.0.0.1:${port}/logos/claude-code.svg`);
+  assert.deepEqual([mark.status, mark.headers.get('content-type')], [200, 'image/svg+xml']);
+  assert.equal((await fetch(`http://127.0.0.1:${port}/logos/nope.svg`)).status, 404);
+  // The reader writes nothing: the records are as they were.
+  assert.equal(readFileSync(join(state, 'T-1.meta'), 'utf8').split('\n')[0], 'window=default:w1:p1');
+
+  // The board's config names the home with fleet_home:, and the environment overrides it, even to a home with no records.
+  delete env.SIGN_OFF_FLEET_HOME;
+  writeFileSync(join(scratch, 'config.yaml'), `fleet_home: ${home}\n`);
+  port = await serve();
+  assert.equal((await assignees(port))['T-1'].live, true);
+  env.SIGN_OFF_FLEET_HOME = join(scratch, 'no-such-home');
+  port = await serve();
+  assert.ok(Object.values(await assignees(port)).every((a) => a === undefined));
+  delete env.SIGN_OFF_FLEET_HOME;
+  rmSync(join(scratch, 'config.yaml'));
 });

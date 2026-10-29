@@ -36,7 +36,7 @@ if (theme.includes(',')) {
 }
 const dir = mkdtempSync(join(tmpdir(), 'so-tickets-')), board = join(dir, 'board.json');
 const env = { ...process.env, PATH: dirname(process.execPath) + ':' + process.env.PATH, HOME: dir, XDG_CONFIG_HOME: join(dir, '.config'), XDG_DATA_HOME: join(dir, '.local/share'),
-  XDG_STATE_HOME: join(dir, '.local/state'), XDG_CACHE_HOME: join(dir, '.cache'), SIGN_OFF_FILER: 'verify' };
+  XDG_STATE_HOME: join(dir, '.local/state'), XDG_CACHE_HOME: join(dir, '.cache'), SIGN_OFF_FILER: 'verify', SIGN_OFF_FLEET_HOME: join(dir, 'fleet') };
 const sh = (bin, args, options = {}) => { const r = spawnSync(bin, args, { encoding: 'utf8', timeout: 120000, env, ...options }); assert.equal(r.status, 0, r.stdout + r.stderr); return r.stdout; };
 const cli = (...args) => sh(process.execPath, [join(repo, 'dist/cli.js'), ...args]);
 const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
@@ -54,7 +54,7 @@ const MEASURE = `(async () => {
   const main = document.querySelector('main'), edgeL = box(main).left + parseFloat(getComputedStyle(main).paddingLeft), edgeR = box(main).right - parseFloat(getComputedStyle(main).paddingRight);
   const tag = (e) => e.className.split(' ').filter((c) => /^(ui|tk)-/.test(c)).slice(-1)[0] ?? e.tagName.toLowerCase();
   // A phone's blocks share the gutter's two edges and sit on the 4px grid.
-  const blocks = desk || dialog || sheet ? [] : [...document.querySelectorAll('main .ui-top, main .tk-seg, main .ui-hero, main .ui-sec, main .ui-list, main .tk-tiles, main .tk-empty')].filter(vis)
+  const blocks = desk || dialog || sheet ? [] : [...document.querySelectorAll('main .ui-top, main .tk-seg, main .ui-hero, main .ui-sec, main .ui-list:not(.tk-feed), main .tk-tiles, main .tk-empty')].filter(vis)
     .map((e) => { const r = box(e); return { el: tag(e), left: r2(r.left), right: r2(r.right), top: r2(r.top + y), height: r2(r.height) }; });
   for (const b of blocks) {
     if (Math.abs(b.left - edgeL) > 0.5) fail.push('left edge ' + b.el + ' ' + b.left + ' not ' + r2(edgeL));
@@ -63,7 +63,7 @@ const MEASURE = `(async () => {
   }
   // Rows: 68px on a phone, 88px on a desk's lists (a sheet's or panel's inset list lets a two-line title grow it), a 40px tile 12px in, the title 12px after it.
   const lines = (e) => Math.round(box(e).height / parseFloat(getComputedStyle(e).lineHeight));
-  const rows = [...scope.querySelectorAll('.ui-row')].filter(vis).filter((e) => box(e).bottom > 0 && box(e).top < H).map((e) => { const r = box(e), t = box(e.querySelector('.ui-icon')), title = e.querySelector('.t'), card = box(e.closest('.tk-card') ?? e.closest('.ui-list')), pad = e.closest('.tk-card') ? 24 : 12, meta = e.querySelector('.meta');
+  const rows = [...scope.querySelectorAll('.ui-row:not(.tk-feed .ui-row)')].filter(vis).filter((e) => box(e).bottom > 0 && box(e).top < H).map((e) => { const r = box(e), t = box(e.querySelector('.ui-icon')), title = e.querySelector('.t'), card = box(e.closest('.tk-card') ?? e.closest('.ui-list')), pad = e.closest('.tk-card') ? 24 : 12, meta = e.querySelector('.meta');
     return { title: title.textContent.slice(0, 40), height: r2(r.height), inset: !!e.closest('.tk-in'), tile: r2(t.width) + 'x' + r2(t.height), pad, tileIn: r2(t.left - card.left), titleGap: r2(box(title).left - t.right), rightIn: r2(card.right - box(e.querySelector('.rm')).right),
       lines: lines(title), cut: title.scrollHeight > title.clientHeight + 1 || title.scrollWidth > title.clientWidth + 1, metaCut: meta ? meta.scrollWidth > meta.clientWidth + 1 : false, meta: meta?.textContent ?? null,
       chip: e.querySelector('.ui-pc')?.textContent ?? null, icon: e.querySelector('.ui-icon img') ? 'picture' : e.querySelector('.ui-icon .mono') ? 'initials' : 'drawing', bar: e.querySelector('.ui-bar i')?.style.width ?? null }; });
@@ -84,9 +84,9 @@ const MEASURE = `(async () => {
   const tabs = document.querySelector('.tabs'), find = document.querySelector('.dock-find'), dock = tabs && vis(tabs) ? (() => { const p = box(tabs), f = box(find);
     return { pill: r2(p.width) + 'x' + r2(p.height), bottom: r2(innerHeight - p.bottom), find: r2(f.width) + 'x' + r2(f.height), gap: r2(f.left - p.right), top: r2(p.top), tabs: tabs.querySelectorAll('a').length,
       current: tabs.querySelector('a[aria-current]')?.getAttribute('aria-label') ?? null }; })() : null;
-  if (dock && (dock.pill.split('x')[1] !== '56' || dock.bottom !== 24 || dock.find !== '56x56' || dock.gap !== 12 || dock.tabs !== 5)) fail.push('dock ' + JSON.stringify(dock));
+  if (dock && (dock.pill.split('x')[1] !== '56' || dock.bottom !== 24 || dock.find !== '56x56' || dock.gap !== 12 || dock.tabs !== 6)) fail.push('dock ' + JSON.stringify(dock));
   const atEnd = Math.ceil(scrollY + innerHeight) >= document.documentElement.scrollHeight - 1;
-  const last = [...document.querySelectorAll('main .tk-tiles, main .ui-list, main .ui-hero')].filter(vis).map((e) => box(e).bottom).sort((a, b) => b - a)[0];
+  const last = [...document.querySelectorAll('main .tk-tiles, main .ui-list:not(.tk-feed), main .ui-hero')].filter(vis).map((e) => box(e).bottom).sort((a, b) => b - a)[0];
   const clear = dock && !sheet && !dialog && atEnd && last !== undefined ? r2(dock.top - last) : undefined;
   if (clear !== undefined && clear < 16) fail.push('the last block is ' + clear + 'px from the dock');
   // A desk: one screen with no page scroll, the head, then three columns sharing one top and one bottom; every list ends on a whole row or fades its next one; the panel's foot.
@@ -133,6 +133,12 @@ const MEASURE = `(async () => {
 
 const prof = mkdtempSync(join(tmpdir(), 'so-tickets-chrome-'));
 // A desk runs with the classic scrollbars a Linux or Windows viewer has, so a list's scrollbar taking a row's room would show; a phone's are overlays.
+// The task records of a fleet home (state/<ticket id>.meta), as Juggernaut writes them: three running workers and one finished task; every other ticket has none.
+mkdirSync(join(dir, 'fleet', 'state'), { recursive: true });
+for (const [id, harness, model, last, lead] of [['settings-epic', 'codex', 'openai-codex/gpt-6.1-sol', 'working', 'web-app'], ['settings-publish', 'claude', 'claude-opus-5-5', 'working', 'web-app'], ['export-label', 'opencode', 'ollama/qwen3-coder', 'paused', 'notes'], ['settings-theme', 'pi', 'ollama-cloud/deepseek-v4.1-flash', 'done', 'notes']]) {
+  writeFileSync(join(dir, 'fleet', 'state', `${id}.meta`), `window=default:w1:p1\nendpoint_task_id=${id}\nproject=~/fleet/projects/${lead}\nharness=${harness}\nmodel=${model}\n`);
+  writeFileSync(join(dir, 'fleet', 'state', `${id}.status`), `${last} [at=1]: on it\n`);
+}
 const chrome = spawn(chromium, ['--headless=new', '--no-sandbox', `--user-data-dir=${prof}`, '--remote-debugging-port=0', ...(phone ? ['--hide-scrollbars'] : []), 'about:blank'], { stdio: 'ignore' });
 process.on('exit', () => { try { chrome.kill(); } catch {} });
 let ws;
@@ -201,12 +207,12 @@ try {
   ws.onmessage = (m) => { const x = JSON.parse(m.data); if (x.id && pending.has(x.id)) { pending.get(x.id)(x); pending.delete(x.id); }
     if (x.method === 'Runtime.exceptionThrown') errors.push(x.params.exceptionDetails.exception?.description?.split('\n')[0] ?? 'exception');
     if (x.method === 'Runtime.consoleAPICalled' && x.params.type === 'error') errors.push(x.params.args.map((a) => a.value ?? a.description).join(' '));
-    if (x.method === 'Network.responseReceived' && x.params.response.status >= 400 && !x.params.response.url.startsWith('file:')) failed.push({ url: x.params.response.url, status: x.params.response.status }); };
+    if (x.method === 'Network.responseReceived' && x.params.response.status >= 400 && !x.params.response.url.startsWith('file:') && !/\/api\/decisions\?view=card&key=[a-z-]+$/.test(x.params.response.url)) failed.push({ url: x.params.response.url, status: x.params.response.status }); };
   const cdp = (method, params = {}) => new Promise((ok, no) => { const n = ++id; pending.set(n, (x) => (x.error ? no(new Error(`${method}: ${x.error.message}`)) : ok(x.result))); ws.send(JSON.stringify({ id: n, method, params })); });
   const js = async (expression) => { const r = await cdp('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }); assert.ok(!r.exceptionDetails, `${expression.slice(0, 80)}: ${r.exceptionDetails?.exception?.description}`); return r.result.value; };
   const until = async (expression, what) => { for (let i = 0; i < 60; i++) { if (await js(expression)) return; await wait(100); } assert.fail(`timed out: ${what}${errors.length ? `; page errors: ${errors.join(' | ')}` : ''}`); };
   // A real tap or click on an element's centre, as a finger or mouse sends it.
-  const tap = async (sel) => { const [x, y] = await js(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.scrollIntoView({ block: 'nearest' }); const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+  const tap = async (sel) => { const [x, y] = await js(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.scrollIntoView({ block: 'nearest', behavior: 'instant' }); const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
     if (phone) { await cdp('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] }); await cdp('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); }
     else { for (const type of ['mousePressed', 'mouseReleased']) await cdp('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 }); } };
   await cdp('Page.enable'); await cdp('Runtime.enable'); await cdp('Network.enable');
@@ -272,6 +278,8 @@ try {
   await tap(rowOf('settings-epic'));
   await until(`location.hash === '#ticket/settings-epic' && !!document.querySelector('${phone ? '.tk-sheet' : '.tk-pane'} .tk-dt')`, 'the epic open');
   facts.epic = await read();
+  facts.epicAssigned = await js(`[...document.querySelectorAll('${phone ? '.tk-sheet' : '.tk-pane'} .tk-assigned .ui-pr')].map((r) => r.innerText.replace(/\\s+/g, ' ').trim())`);
+  assert.deepEqual(facts.epicAssigned, ['Lead web-app', 'Worker Settings epic', 'Model gpt-6.1-sol', 'Tool Codex', 'Worker live Live'], 'the epic names its assignee');
   await capture('epic');
   await pair('epic', tree, 'tickets/T-9');
   await go(url + '#ticket/settings-epic');
@@ -279,6 +287,11 @@ try {
   await tap(`${phone ? '.tk-sheet' : '.tk-pane'} a.tk-row[href="#ticket/settings-publish"]`);
   await until(`location.hash === '#ticket/settings-publish' && document.querySelector('.tk-dt')?.textContent.startsWith('Publish')`, 'the ticket open');
   facts.ticket = await read();
+  // Who works on it: the Assigned block of this ticket (lead, worker, model, tool, live), and the quiet line on each row, Unassigned where no task record names one.
+  facts.assigned = await js(`[...document.querySelectorAll('${phone ? '.tk-sheet' : '.tk-pane'} .tk-assigned .ui-pr')].map((r) => r.innerText.replace(/\\s+/g, ' ').trim())`);
+  assert.deepEqual(facts.assigned, ['Lead web-app', 'Worker Settings publish', 'Model Opus 5.5', 'Tool Claude Code', 'Worker live Live'], 'the ticket page names its assignee');
+  facts.assigneeLines = await js(`[...document.querySelectorAll('a.tk-row')].map((a) => a.getAttribute('href').slice(8) + ': ' + a.querySelector('.tk-as')?.innerText.replace(/\\s+/g, ' ').trim()).slice(0, 12)`);
+  assert.ok(facts.assigneeLines.every((l) => !/undefined$/.test(l)), 'every row has an assignee line');
   await capture('ticket');
   await pair('ticket', proto, 'v=tickets&t=firstmate-addons/addons-epics-prototype');
   if (phone) {
@@ -319,7 +332,7 @@ try {
     start: 'A throwaway board (feel-board.sh) with tickets written through sign-off-axi ticket: 24 of your asks (one an epic with three tickets, one of them with four sub-tasks) and 15 system tickets (one with three sub-tasks), with priorities, projects (two with their own icons) and holds, and seven cards naming tickets.',
     steps: [`Open Tickets at ${metrics.width}x${metrics.height} (2x), ${theme}, in a headless Chromium of its own, and measure every block, row and button in the browser.`,
       `${phone ? 'Tap' : 'Click'} Fleet upkeep in the filter's Who asked group and read the lists.`,
-      `${phone ? 'Tap' : 'Click'} the epic's row: it opens ${phone ? 'over the list as a sheet' : 'in the third column'} with its three tickets; then ${phone ? 'tap' : 'click'} the publishing ticket: its four sub-tasks, its linked cards and their Activity.`,
+      `${phone ? 'Tap' : 'Click'} the epic's row: it opens ${phone ? 'over the list as a sheet' : 'in the third column'} with its three tickets and an Assigned block (Codex, gpt-6.1-sol, the worker live); rows with no task record say Unassigned; then ${phone ? 'tap' : 'click'} the publishing ticket: its four sub-tasks, its linked cards and their Activity.`,
       ...(phone ? ['Scroll the ticket to its end, close it and land on the list.', 'Tap the filter button, read the projects, pick one, then clear it.', 'Scroll Tickets to its end and measure the last block against the dock.']
         : ['Nudge each list that holds more than it shows by 50px: it rests on a whole row; scrolled to its end its fade goes.']),
       ...(proto ? ['Capture the approved prototype at the same size and theme for each state and save each pair.'] : [])],

@@ -1399,7 +1399,7 @@
      An epic is a ticket with tickets under it, and those may have sub-tasks: the lists hold the tickets that sit under none, each as far along as what is under it (the server rolls it up). */
   const TK_WORDS = { done: 'Done', hold: 'On hold', moving: 'In progress', todo: 'To do' };
   // The property rows' marks, as the prototype draws them: a flag, a half-filled circle, two stacked sheets and a clock; fixed strings from this page.
-  const TK_MARKS = { flag: '<path d="M5 21V4h11l-2 4 2 4H5"/>', half: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/>',
+  const TK_MARKS = { chip: '<rect x="6.5" y="6.5" width="11" height="11" rx="2"/><path d="M9.5 3v3.5M14.5 3v3.5M9.5 17.5V21M14.5 17.5V21M3 9.5h3.5M3 14.5h3.5M17.5 9.5H21M17.5 14.5H21"/>', flag: '<path d="M5 21V4h11l-2 4 2 4H5"/>', half: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/>',
     layers: '<rect x="3" y="3" width="12" height="12" rx="2"/><path d="M9 21h10a2 2 0 0 0 2-2V9"/>', clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>', person: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/>' };
   const tkMark = (a) => { const s = el('span', { class: 'tk-k', 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24">${TK_MARKS[a]}</svg>`; return s; };
   let tkWhose = '', tkProj = '', tkShown = '';
@@ -1426,15 +1426,25 @@
   const tkKids = (t) => (tkAbove(t).length ? 'sub-task' : 'ticket');
   /** A ticket uses the same project tile as every card list. */
   const tkTile = (t) => projectTile(tkProject(t), () => icon('pick'));
+  /** A mark from web/logos, drawn as a mask in the text colour. */
+  const logoMark = (src, name) => el('span', { class: 'tk-logo', role: 'img', 'aria-label': name, style: `--logo: url("${/^\/logos\/[\w-]+\.svg$/.test(src ?? '') ? src : '/logos/generic.svg'}")` });
+  /** Who works on a ticket: model and tool marks, model, lead and Live. */
+  function tkWho(t) {
+    const a = t.assignee;
+    if (!a) return el('span', { class: 'tk-as none' }, 'Unassigned');
+    return el('span', { class: `tk-as${a.live ? ' live' : ''}` }, a.model ? logoMark(a.model_logo, a.model) : '', a.tool ? logoMark(a.tool_logo, a.tool) : '', el('span', { class: 'tk-aw', dir: 'auto' }, [a.model ?? a.tool, a.lead].filter(Boolean).join(' · ')),
+      a.live ? el('span', { class: 'tk-live' }, el('i', { 'aria-hidden': 'true' }), 'Live') : '');
+  }
   /** A ticket's row: its tile, its title and priority, then a bar with its percent once it has progress (a full bar when done), or else where it stands and when it last moved,
    * with how many of what sits under it are done. On a desk the open ticket is marked. */
   function tkRow(t) {
     const kids = tkUnder(t), done = kids.filter((x) => tkStateOf(x) === 'done').length, s = tkStateOf(t), progress = t.stage && !kids.length ? t.progress : progressOf(t.progress);
     const meta = [TK_WORDS[s], kids.length ? `${done} of ${plural(kids.length, tkKids(kids[0]))} done` : tkWhen(t.at)].join(' · ');
     // The name leads with the words the row shows (title, priority, release, then the percent or the line), as the label rule reads them in that order.
-    const link = el('a', { class: 'ui-row tk-row', href: `#ticket/${t.id}`, ...(t.id === tkShown && { 'aria-current': 'true' }), 'aria-label': `${[t.title, t.priority, t.release].filter(Boolean).join(' ')}, ${progress === undefined ? meta : `${progress}% done, ${TK_WORDS[s].toLowerCase()}`}` },
+    const link = el('a', { class: 'ui-row tk-row', href: `#ticket/${t.id}`, ...(t.id === tkShown && { 'aria-current': 'true' }), 'aria-label': `${[t.title, t.priority, t.release].filter(Boolean).join(' ')}, ${progress === undefined ? meta : `${progress}% done, ${TK_WORDS[s].toLowerCase()}`}, ${t.assignee ? [t.assignee.model ?? t.assignee.tool, t.assignee.lead, t.assignee.live && 'live'].filter(Boolean).join(' ') : 'unassigned'}` },
       ...uiRow({ tile: tkTile(t), title: t.title, priority: t.priority, progress, lead: el('span', { class: 'tk-status' }, ...tkStatus(t)), meta }));
     if (t.release) link.querySelector('.l1').append(el('span', { class: 'ui-pc tk-release', title: t.release }, t.release));
+    link.querySelector('.rm').append(tkWho(t));
     return el('li', {}, link);
   }
   /** The tickets the lists hold (those under no ticket on the board), of the kind and project picked. The kinds show only while the board has both. */
