@@ -122,7 +122,7 @@ test('an undone answer puts the card back in Waiting without another notice', { 
   t.after(() => server.close());
   setup(dir, notifyBlock(url));
   const proc = spawn('node', [join(root, 'dist/cli.js'), 'serve', board(dir), '--port', '0'], { cwd: dir, env: { ...process.env, ...TOKEN } });
-  t.after(() => proc.kill());
+  t.after(() => new Promise((ok) => { if (proc.exitCode !== null || proc.signalCode) return ok(); proc.once('exit', ok); proc.kill(); }));
   const base = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
   await raise(dir, TOKEN);
   await until(() => hits.length === 1);
@@ -292,7 +292,7 @@ test('a reply that lands sends one notice that opens its thread in the inbox; a 
   t.after(() => server.close());
   setup(dir, notifyBlock(url));
   const proc = spawn('node', [join(root, 'dist/cli.js'), 'serve', board(dir), '--port', '0'], { cwd: dir, env: { ...process.env, ...TOKEN } });
-  t.after(() => proc.kill());
+  t.after(() => new Promise((ok) => { if (proc.exitCode !== null || proc.signalCode) return ok(); proc.once('exit', ok); proc.kill(); }));
   const base = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
   await raise(dir, TOKEN);
   await until(() => hits.length === 1);
