@@ -121,8 +121,8 @@
         mergeView(page);
         // The board's own data goes first; the rest of the styles follows once this page is in.
         restSoon();
-        // The inbox lists every kind, so each page that arrives fills it, as it fills every other screen.
-        renderKeepingFocus();
+        // Today already shows what the first page carries; another screen fills as its pages arrive.
+        if (location.hash) renderKeepingFocus();
         if (page.more !== true || !page.decisions?.length) break;
         offset += page.decisions.length;
       }
@@ -153,8 +153,8 @@
   /** Where the ticket roll-up stands, so a screen never calls a read still on its way, or one that failed, an empty board. A frozen copy holds it already. */
   const tkLoad = () => (FROZEN || ticketsRead ? 'ready' : ticketsFailed ? 'error' : 'loading');
 
-  /** The addresses whose screens live in app-more.js: Decide, Designs, Evidence, Reports, Answered, Tickets. The inbox is the first screen and waits for nothing. */
-  const MORE_SCREENS = /^#(?:waiting|decide|designs|evidence|reports|answered|tickets|ticket|activity|inbox\/)(?:\/|$)/;
+  /** The addresses whose screens live in app-more.js: Decide, Designs, Evidence, Reports, Answered, Tickets. Today is the first screen and waits for nothing. */
+  const MORE_SCREENS = /^#(?:waiting|decide|designs|evidence|reports|answered|tickets|ticket|activity|inbox)(?:\/|$)/;
   // A response can arrive after the person has started typing on the next card.
   // Keep the active editor and its selection across that redraw, just as a poll does.
   // The screens beyond the first screen's own (the guide, the plan and design reviews, the tickets, the evidence and decide desks, the report and
@@ -291,6 +291,7 @@
     say([el('b', {}, headline(d)), ` · ${before ? 'changed to ' : ''}${now.answer === 'text' ? 'your reply' : now.label}${now.note && now.answer !== 'text' ? ' · with your comment' : ''}`], 5000, () => {
       undoBtn.disabled = true;
       // On the Decide list the row comes back in place, with a flash; anywhere else the ask opens again.
+      // On Today it comes back as Up next.
       const list = location.hash === '#waiting', home = !location.hash.slice(1);
       if ((list || !phone()) && !before) returned(d.key);
       call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' },
@@ -837,7 +838,7 @@
   // A re-posted sign-in is a new link to open, never a card acted on and done: its poster still runs `signin done` when the person signs in.
   const stepWord = (t, n) => (n === 0 && t.taken ? (t.taken === 'default' ? 'Taken' : 'Picked') : n === 3 && t.reply && !t.reply.text ? (findCard(t.key)?.type === 'signin' ? 'New link' : 'Acted') : TRAIL[n]);
   const stepAt = (t, n) => [t.at, t.delivered, t.read, t.reply?.at][n];
-  /** A reply the person has not opened yet: it is New in the inbox, and its badge is ink. */
+  /** A reply the person has not opened yet: it waits in Today, and its badge is ink. */
   const unseen = (t) => !!t?.reply && !t.seen;
   /** A link the agent sent names the pull request it is, or else says it opens the new version. */
   const linkName = (url) => (/\/(?:pull|pulls|merge_requests)\/\d+/.test(url) ? changeName(url) : 'Open the new version');
@@ -845,8 +846,25 @@
   /** A card's badge in a list: where the last thing sent on it stands, four marks and a word; a reply not opened yet is ink. */
   const trailBadge = (key) => { const t = trailOf(key).at(-1); if (!t) return ''; const n = stepOf(t);
     return el('span', { class: `ui-tb${unseen(t) ? ' new' : ''}`, title: `${stepWord(t, n - 1)} ${trailWhen(stepAt(t, n - 1))}` }, el('span', { class: 'tb-d', 'aria-hidden': 'true' }, ...TRAIL.map((_, i) => el('i', { class: i < n ? 'on' : '' }))), stepWord(t, n - 1)); };
-  /** Opening a card with a reply not opened yet marks it seen, once: it then leaves New. */
+  /** Opening a card with a reply not opened yet marks it seen, once: it then leaves Today. */
   const seeReply = (key, kind) => { const t = trailOf(key, kind).at(-1); if (!unseen(t) || FROZEN || state.readonly) return; t.seen = new Date().toISOString(); postJson('/api/trail', { key }).catch(() => (t.seen = undefined)); };
+  /** Replies: each card whose agent replied to what the person sent and the person has not opened it yet, newest first, the reply's words as its second line. */
+  function repliesOn() {
+    const gone = new Set(state.dismissed ?? []), last = new Map();
+    for (const t of [...(state.trail ?? [])].filter((x) => x.kind !== 'ticket').sort(bySecond)) last.set(t.key, t);
+    // A reply on a ticket comment opens its ticket.
+    const asCard = (t) => { const k = tkById(t.key); return k && { key: `ticket:${k.id}`, onTicket: k }; };
+    // Replies counts the whole board — a reply can sit on a card no page has reached yet — so the section waits for the board's pages and counts them
+    // once, rather than showing one reply and then two a moment later.
+    if (!paged && !wholeBoard) return '';
+    for (const t of [...(state.trail ?? [])].filter((x) => x.kind === 'ticket').sort(bySecond)) last.set(`ticket:${t.key}`, t);
+    const rows = [...last.entries()].filter(([, t]) => unseen(t)).map(([k, t]) => [k.startsWith('ticket:') ? asCard(t) : state.decisions.find((d) => d.key === t.key), t])
+      .filter(([d]) => d && !gone.has(d.key)).sort(([, x], [, y]) => Date.parse(y.reply.at) - Date.parse(x.reply.at));
+    if (!rows.length) return '';
+    return el('section', { class: 't-wait t-replies', 'aria-label': 'Replies' }, el('h2', { class: 'ui-sec' }, 'Replies', el('span', { class: 'n' }, String(rows.length))),
+      el('ul', { class: 'ui-card ui-list' }, ...rows.map(([d, t]) => { const k = d.onTicket, a = el('a', { class: 'ui-row', href: k ? `#ticket/${k.id}` : hrefOf(d) }, ...uiRow({ tile: k ? tkTile(k) : cardTile(d), title: k ? k.title : title(d),
+        meta: [trailWhen(t.reply.at), t.reply.text ?? (t.reply.link ? linkName(t.reply.link) : 'Posted a new version')].join(' · ') })); a.onclick = () => (jump = d.key); return el('li', {}, a); })));
+  }
   /** A result's mark: the pass tick only for passed proof, a cross for failed, an alert for not finished or unchecked. */
   const mark = (kind) => { const s = el('span', { 'aria-hidden': 'true' }); s.innerHTML = kind === 'ok'
     ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>'
@@ -959,7 +977,7 @@
       el('div', { class: 'ui-shd split-bar' }, projectTile(project), el('span', { class: 'pt', dir: 'auto' }, [project || 'No project', d.filed && (isToday(d.filed) ? hhmm(d.filed) : stamp(d.filed))].filter(Boolean).join(' · '))),
       el('div', { class: 'pmain' }, el('h1', { class: `dt ev-title${name.length > 160 ? ' long' : ''}`, id: 'reader-title', tabindex: '-1', dir: 'auto' }, name),
         captures(d, 'ev-hero pv-cap') || el('div', { class: 'ev-hero none' }, evGlyph('image'), (d.status ? 'Frame pending' : 'Text only: no capture was filed')), attachments(d)),
-      el('div', { class: 'pside' }, threadLink(d.key), evProps(d), said && said !== name ? el('p', { class: 'dp ev-about', dir: 'auto' }, said) : '', why ? el('p', { class: 'dp ev-why', dir: 'auto' }, why) : '',
+      el('div', { class: 'pside' }, evProps(d), said && said !== name ? el('p', { class: 'dp ev-about', dir: 'auto' }, said) : '', why ? el('p', { class: 'dp ev-why', dir: 'auto' }, why) : '',
         state.readonly || FROZEN || !(d.options.length || d.reply) ? '' : verdicts(d), ...sentPairs(d), thread(d)));
   }
 
@@ -1071,9 +1089,10 @@
   const forget = (key) => { editing.delete(key); for (const k of unsaved.keys()) if (k.startsWith(`${key}~`)) unsaved.delete(k); };
   const redraw = (d) => document.querySelectorAll('.ann').forEach((n) => n.dataset.ann === d.key && n.replaceWith(annotations(d)));
   const AREAS = { waiting: 'Waiting on you', designs: 'Designs', evidence: 'Evidence', reports: 'Reports and explainers', answered: 'Answered' };
-  // One place: the inbox. Decide, Evidence, Reports, Designs and Tickets are its sections and kind chips, never places of their own; their old addresses still open.
-  const TABS = [['', 'Inbox']];
-  const SIDE = TABS;
+  // The tab bar holds six places: Today, Inbox, Decide (what waits on you, a design Main promoted too), Evidence, Reports and Tickets.
+  // The sidebar holds those and Designs, after Reports, as the approved prototype's desk draws it. Designs and Answered are not tabs: both are links on Today's More.
+  const TABS = [['', 'Today'], ['inbox', 'Inbox'], ['waiting', 'Decide'], ['evidence', 'Evidence'], ['reports', 'Reports'], ['tickets', 'Tickets']];
+  const SIDE = [...TABS.slice(0, 5), ['designs', 'Designs'], TABS[5]];
   const EMPTY = { waiting: 'Nothing is waiting on you.', designs: 'No designs yet.', evidence: 'No evidence updates.', reports: 'No reports or explainers.', answered: 'Nothing answered yet.' };
   const ICONS = { designs: 'M3 3h18v18H3zM3 9h18M9 21V9',
     waiting: 'M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z',
@@ -1091,8 +1110,14 @@
     // Decide's other kinds, as the approved prototype draws them: a question for yes or no, a bubble for a reply.
     yesno: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01',
     reply: 'M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z', done: 'M20 6 9 17l-5-5',
-    // The sidebar's filled drawing of the inbox, its one place (a 20px grid scaled to this 24px one).
-    'tab-inbox': 'M5.4 3.6h13.2a1.8 1.8 0 0 1 1.75 1.37L21.6 11.4v7.2a1.8 1.8 0 0 1-1.8 1.8H4.2a1.8 1.8 0 0 1-1.8-1.8v-7.2l1.25-6.43A1.8 1.8 0 0 1 5.4 3.6zM4.56 12.6v5.64h14.88V12.6h-3.9a3.54 3.54 0 0 1-7.08 0z' };
+    // The dock's and the sidebar's filled drawings, as the approved prototype draws them (its 20px grid scaled to this 24px one), one per place by its address.
+    'tab-today': 'M3.6 10.32 10.92 4.08a1.68 1.68 0 0 1 2.16 0L20.4 10.32V19.2a1.8 1.8 0 0 1-1.8 1.8h-13.2A1.8 1.8 0 0 1 3.6 19.2zM9 16.08v1.92h6v-1.92z',
+    'tab-inbox': 'M5.4 3.6h13.2l2.4 8.4v7.2a1.8 1.8 0 0 1-1.8 1.8H4.8A1.8 1.8 0 0 1 3 19.2V12zM5.4 12v5.4h13.2V12h-4.2a2.4 2.4 0 0 1-4.8 0z',
+    'tab-waiting': 'M5.4 3.6h13.2A3 3 0 0 1 21.6 6.6v8.4a3 3 0 0 1-3 3H12.6L7.2 21.84V18H5.4A3 3 0 0 1 2.4 15v-8.4A3 3 0 0 1 5.4 3.6zM7.2 8.64v1.92h9.6V8.64zm0 3.6v1.92h6v-1.92z',
+    'tab-evidence': 'M12 2.16l8.16 3.24v6c0 5.28-3.48 8.88-8.16 10.68-4.68-1.8-8.16-5.4-8.16-10.68v-6zm4.32 6.72-1.32-1.32-4.08 4.2-1.92-1.92-1.32 1.32 3.24 3.24z',
+    'tab-reports': 'M6.6 2.4h7.56L19.2 7.44v12.36a1.8 1.8 0 0 1-1.8 1.8h-10.8A1.8 1.8 0 0 1 4.8 19.8v-15.6A1.8 1.8 0 0 1 6.6 2.4zM8.4 11.76v1.8h7.2V11.76zm0 3.6v1.8h4.8v-1.8z',
+    'tab-designs': 'M5.4 3.6h13.2A1.8 1.8 0 0 1 20.4 5.4v13.2a1.8 1.8 0 0 1-1.8 1.8h-13.2A1.8 1.8 0 0 1 3.6 18.6v-13.2A1.8 1.8 0 0 1 5.4 3.6zM6 6v4.8h12V6zm0 7.2v4.8h4.8v-4.8zm7.2 0v4.8h4.8v-4.8z',
+    'tab-tickets': 'M4.2 5.4h15.6A1.8 1.8 0 0 1 21.6 7.2v2.76a2.16 2.16 0 0 0 0 4.08V16.8a1.8 1.8 0 0 1-1.8 1.8h-15.6A1.8 1.8 0 0 1 2.4 16.8v-2.76a2.16 2.16 0 0 0 0-4.08V7.2a1.8 1.8 0 0 1 1.8-1.8zm10.44 2.4v2.4h1.92v-2.4zm0 6v2.4h1.92v-2.4z' };
   // The drawings are fixed strings from this page, never text from the board file.
   // Small stroke drawings the plan page puts beside a button label or in a section badge; fixed strings from this page.
   const GLYPHS = { link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
@@ -1130,7 +1155,7 @@
   const changeProp = (d) => { const c = changeHref(d), pr = /\/(?:pull|pulls|merge_requests)\/(\d+)/.exec(c)?.[1];
     return c && uiProp({ mark: 'pr', name: pr ? 'Pull request' : 'Change', href: c, label: `${pr ? 'Pull request' : 'Change'} ${pr ? `#${pr}` : new URL(c).host}, ${headline(d)}`, value: el('span', {}, pr ? `#${pr}` : new URL(c).host) }); };
   /** The phone's tab bar is drawn once, so its pill slides from the area left to the one opened; each redraw marks the area on screen and sets the badges, and a badge whose count changed bumps. */
-  const tabPill = el('span', { class: 'hl', 'aria-hidden': 'true' }), tabLinks = TABS.map(([a, name]) => el('a', { href: `#${a}`, 'aria-label': name }, icon(`tab-${a || 'inbox'}`)));
+  const tabPill = el('span', { class: 'hl', 'aria-hidden': 'true' }), tabLinks = TABS.map(([a, name]) => el('a', { href: `#${a}`, 'aria-label': name }, icon(`tab-${a || 'today'}`)));
   document.documentElement.style.setProperty('--dock-n', TABS.length);
   tabLinks.forEach((t) => t.addEventListener('click', () => buzz('tick')));
   document.getElementById('tabs').append(tabPill, ...tabLinks);
@@ -1218,7 +1243,7 @@
     t.opened = new Date().toISOString();
     postJson('/api/trail', { key }).catch(() => (t.opened = undefined));
   };
-  /** The Leash, in the inbox's More and from Decide's leash chip: three segments that save the leash: line of config.yaml, and what the chosen one means under them.
+  /** The Leash, in Today's More and from Decide's leash chip: three segments that save the leash: line of config.yaml, and what the chosen one means under them.
    *  A board that takes no changes shows it without them working; an answers-only board takes it, as it is the person's own setting. */
   function leash() {
     const err = el('div', { class: 'err', role: 'alert' }), still = FROZEN || state.readonly;
@@ -1239,6 +1264,9 @@
   }
   const hrefOf = (d) => (area(d) === 'reports' && reads(d) ? `#reports/${d.key}` : area(d) === 'evidence' ? `#evidence/${d.key}` : askHref(d));
 
+  /* Today, as the approved prototype draws it: the title row with light or dark, Up next with one main action, the next three asks waiting on you, then Cleared today and Proofs today,
+     and under them one quiet line into More, which holds what the screen leaves off. A phone stacks them; a desk sets Up next and the tiles beside what else waits.
+     Search is the dock's round button (the sidebar's on a desk). */
   /** The project a card is for: a plan names it, a report or design names its group, proof names the app its done-done check verified, and an ask takes the project of the proof it rests on,
    *  or, filed by a tool that is itself a project on the board (its icon set with project --icon), that project. */
   const projectName = (d) => d.project || d.group || (d.type === 'evidence' ? projectOf(d) : d.proof && projectOf(state.decisions.find((x) => x.key === d.proof) ?? {}))
@@ -1269,9 +1297,55 @@
     return el('li', {}, link);
   }
 
+  /** Up next leads with a sign-in (someone is blocked now), then an ask with a recommended answer, then one to review; Later comes last. */
+  const lead = (d) => (groupOf(d) === 'later' ? 3 : d.type === 'signin' ? 0 : recOf(d) ? 1 : 2);
+  let upKey;
+  /** Up next: the one ask that matters most, how many wait, its priority, its question, its project, time and the answer recommended, then one main action in ink
+   * (answer with the pick, open the sign-in, or review) beside Other answer (or Details), which opens the ask. */
+  function upNext(queue) {
+    const d = queue[0];
+    if (!d) return el('section', { class: 'ui-card ui-hero t-up clear', 'aria-label': 'Up next' }, el('div', { class: 'hl' }, el('span', { class: 'lab' }, 'Up next')),
+      el('h2', { class: 'q' }, 'Nothing waits on you'), el('p', { class: 'meta' }, el('span', {}, 'Agents will ask when they need you.')));
+    const rec = recOf(d), err = el('div', { class: 'err', role: 'alert', id: 'up-err' }), name = projectName(d);
+    const btn = (cls, words, href) => el(href ? 'a' : 'button', { class: `t-btn ${cls}`, ...(href && { href }) }, el('span', { class: 'lbl' }, words));
+    let go, soft = btn('white', 'Other answer', askHref(d));
+    if (d.type === 'signin') {
+      go = expiredLink(d) ? reissue(d, err) : signinOpen(d, undefined, err).open;
+      go.className = 't-btn ink';
+      if (!expiredLink(d)) go.replaceChildren(el('span', { class: 'lbl' }, 'Open sign-in'));
+      soft = btn('white', 'Details', askHref(d));
+    } else if (rec) {
+      go = btn('ink', `Answer ${rec.label}`);
+      go.setAttribute('aria-label', `Answer ${rec.label}, ${d.title}`);
+      go.append(el('span', { class: 'okmark', 'aria-hidden': 'true' }, glyph('check')));
+      go.onclick = () => { go.classList.add('done'); save(d, rec, [go], err); };
+    } else {
+      go = btn('ink', groupOf(d) === 'review' || reviewed(d) ? 'Review' : 'Answer', askHref(d));
+      soft = '';
+    }
+    for (const a of [go, soft]) if (a?.tagName === 'A' && a.getAttribute('href')?.startsWith('#')) a.onclick = () => (jump = d.key);
+    const fresh = upKey !== undefined && upKey !== d.key;
+    upKey = d.key;
+    const when = d.type === 'signin' ? (d.expires ? el('span', { ...(!expiredLink(d) && { 'data-left': d.expires }) }, endsWords(d.expires)) : '') : d.filed && filedAt(d.filed);
+    return el('section', { class: `ui-card ui-hero t-up${fresh ? ' next' : ''}`, 'aria-label': 'Up next' },
+      el('div', { class: 'hl' }, el('span', { class: 'lab' }, `Up next · 1 of ${queue.length}`), d.priority ? el('span', { class: `ui-pc ${d.priority.toLowerCase()}` }, d.priority) : ''),
+      el('h2', { class: 'q', dir: 'auto' }, d.type === 'signin' ? `Sign in to ${d.title}` : title(d)),
+      el('p', { class: 'meta' }, name ? projectPic(name) : '', el('span', { dir: 'auto' }, name ?? (d.type === 'signin' ? d.waits : kind(d)), ...[when, rec && `Recommended ${rec.label}`].filter(Boolean).flatMap((x) => [' · ', x]))),
+      el('div', { class: 't-btns' }, go, soft), err);
+  }
   /** A filled 20px mark for a tile, as the prototype draws them. */
   const fill = (d) => { const s = el('span', { class: 'si', 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 20 20"><path d="${d}"/></svg>`; return s; };
-
+  /** Cleared today (answered today, of that and what still waits), which opens Answered, and Proofs today (proof filed today), which opens Evidence. */
+  function todayTiles(by) {
+    // A first screen does not hold the answered cards or the proofs yet, so today's two numbers come with the page that painted it.
+    const cleared = state.counts?.cleared_today ?? by.answered.filter((d) => isToday(state.answers[d.key].at)).length, proofs = state.counts?.proofs_today ?? state.decisions.filter((d) => d.type === 'evidence' && d.filed && isToday(d.filed) && !(state.dismissed ?? []).includes(d.key)).length;
+    const stat = (href, mark, lab, n, of) => el('a', { class: 'ui-card ui-stat', href, 'aria-label': `${lab}: ${n}${of === undefined ? '' : ` of ${of}`}` }, fill(mark), el('span', { class: 'lab' }, lab), ' ', el('b', {}, String(n), of === undefined ? '' : el('small', {}, ` of ${of}`)));
+    return el('div', { class: 'ui-tiles t-tiles' }, stat('#answered', 'M10 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm3.4 5.1-4.3 4.4-2-2-1.2 1.2 3.2 3.2 5.5-5.6z', 'Cleared today', cleared, cleared + by.waiting.length),
+      stat('#evidence', 'M10 1.8l6.8 2.7v5c0 4.4-2.9 7.4-6.8 8.9-3.9-1.5-6.8-4.5-6.8-8.9v-5zm3.6 5.6-1.1-1.1-3.4 3.5-1.6-1.6-1.1 1.1 2.7 2.7z', 'Proofs today', proofs));
+  }
+  /** Waiting on you: the next three asks after Up next, with See all into Decide. */
+  const waitingOn = (rest) => (rest.length ? el('section', { class: 't-wait', 'aria-label': 'Waiting on you' }, el('h2', { class: 'ui-sec' }, 'Waiting on you', el('a', { class: 'see', href: '#waiting' }, 'See all')),
+    el('ul', { class: 'ui-card ui-list' }, ...rest.slice(0, 3).map(cardRow))) : '');
 
   /** A sheet from the bottom (in the middle on a desk): a modal dialog, so the keyboard stays in it and Escape or a tap outside closes it; a link in it closes it as it opens. */
   function sheetOf(id) {
@@ -1281,14 +1355,17 @@
     return s;
   }
   const sheetHead = (id, name) => { const x = el('button', { class: 'x', 'aria-label': 'Close' }, glyph('x')); x.onclick = () => x.closest('dialog').close(); return el('div', { class: 't-shd' }, el('h2', { id: `${id}-h`, tabindex: '-1' }, name), x); };
-  /** More: the Leash and Ask the agent, the install row, and last the version the board runs. */
+  /** More: what Today leaves off, Answered and Designs with their counts, the Leash and Ask the agent, and last the version the board runs. */
   const todayMore = sheetOf('t-more');
-  function fillMore() {
-    todayMore.replaceChildren(el('div', {}, sheetHead('t-more', 'More'),
+  function fillMore(by) {
+    const go = (href, name, n) => el('a', { class: 'ui-pr', href }, el('span', { class: 'k' }, name), el('span', { class: 'v' }, el('span', { class: 'n' }, String(n)), glyph('right')));
+    const links = [['#answered', 'Answered', by.answered], ['#designs', 'Designs', by.designs]].filter(([, , l]) => l.length);
+    todayMore.replaceChildren(el('div', {}, sheetHead('t-more', 'More'), links.length ? el('div', { class: 'ui-props' }, ...links.map(([h, name, l]) => go(h, name, l.length))) : '',
       ...(state.leash ? leash() : []), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()]),
       FROZEN ? '' : window.signOffInstall?.() ?? '',
       state.version ? el('div', { class: 'ui-props' }, el('div', { class: 'ui-pr' }, el('span', { class: 'k' }, 'Version'), el('span', { class: 'v' }, el('span', {}, state.version)))) : ''));
   }
+  const hasMore = (by) => by.answered.length || by.designs.length || state.leash || state.version || !(FROZEN || state.readonly || state.answers_only);
   /** Search: each card's title and what it says, matched as typed, in groups (Asks, Proof, Reports, Answered, Designs, Tickets) of the first four rows each. */
   const searchSheet = sheetOf('t-search');
   let query = '';
@@ -1311,7 +1388,7 @@
     searchSheet.showModal();
     box.focus();
   }
-  // Closed from the address #find, the sheet leaves the inbox at its own address.
+  // Closed from the address #find, the sheet leaves Today at its own address.
   searchSheet.addEventListener('close', () => location.hash === '#find' && history.replaceState(null, '', location.pathname + location.search));
   // Search, the dock's round button or the sidebar's, opens over the screen it is tapped on.
   addEventListener('click', (e) => { if (e.target.closest?.('a[href="#find"]')) e.preventDefault(), openSearch(); });
@@ -1495,112 +1572,29 @@
     b.onclick = () => { try { localStorage.setItem('so-theme', dark ? 'light' : 'dark'); } catch {} applyTheme(); render(); document.querySelector('#board .theme')?.focus({ preventScroll: true }); };
     return b;
   }
+  /** Today's head: its title and the light-or-dark button. */
+  function todayHead() { return [el('h1', { tabindex: '-1' }, 'Today'), themeButton()]; }
   sysDark.addEventListener('change', () => loaded && render());
-  /** More, a round button at the inbox's head: the Leash, Ask the agent, the install row and the version the board runs. */
-  function moreButton() {
-    if (!(state.leash || state.version || !(FROZEN || state.readonly || state.answers_only))) return '';
-    const b = el('button', { class: 'ui-rb', 'aria-label': 'More', 'aria-haspopup': 'dialog' }, glyph('more'));
-    b.onclick = () => { fillMore(); todayMore.showModal(); todayMore.querySelector('h2').focus(); };
+  /** The one quiet line under the tiles into More, naming what it holds. */
+  function moreLine(by) {
+    if (!hasMore(by)) return '';
+    const held = [by.answered.length && 'Answered', by.designs.length && 'Designs', state.leash && 'Leash', !(FROZEN || state.readonly || state.answers_only) && 'Ask the agent'].filter(Boolean);
+    // The version is named only when More holds nothing else.
+    const names = held.length ? held : ['Version'];
+    const b = el('button', { class: 't-more-line', 'aria-haspopup': 'dialog' }, el('span', {}, names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]), glyph('right'));
+    b.onclick = () => { fillMore(by); todayMore.showModal(); todayMore.querySelector('h2').focus(); };
     return b;
   }
-
-  /* ---- The inbox: the one place for every exchange with an agent. Each card (and each ticket) is one thread, in four sections: new (a reply not opened yet, or a report
-     or proof not read yet), what waits on you (Decide), what waits on its agent, with how far it got, and what is answered or done, folded. Each kind is a chip, never a place. ---- */
-  const KIND_NAMES = { decision: 'Decision', plan: 'Plan', report: 'Report', design: 'Design', ticket: 'Ticket', proof: 'Proof' };
-  const FILTERS = [['all', 'All'], ['decision', 'Decisions'], ['plan', 'Plans'], ['report', 'Reports'], ['design', 'Designs'], ['ticket', 'Tickets'], ['proof', 'Proofs']];
-  const SECTIONS = [['new', 'New'], ['turn', 'Decide'], ['agent', 'Waiting on agents'], ['done', 'Answered and done']];
-  let inKind = 'all', inFind = '', inDone = false;
-  const inMore = new Set();
-  const threadKind = (d) => (d.type === 'evidence' ? 'proof' : d.kind === 'design' || d.type === 'design' ? 'design' : d.type === 'plan' ? 'plan' : d.kind === 'report' || ['reports', 'notes'].includes(area(d)) ? 'report' : 'decision');
-  /** What the person sent, in their words: an answer as it reads, a comment's text, else what it was. */
-  const youSaid = (t, d) => (t.kind === 'answer' ? t.said ?? (state.answers[t.key]?.at === t.at ? saidOf(d, state.answers[t.key]) : 'Answered') : t.kind === 'comment' ? (state.messages ?? []).find((m) => m.id === t.id)?.text ?? 'A comment'
-    : t.said ?? { round: 'Another round', discard: 'Discarded', ask: 'Go deeper', part: 'A comment on a part' }[t.kind]);
-  /** Every thread on the board with where it stands (st) and when it last moved (at). A card an open ask merges is that ask's thread. */
-  function inboxThreads(merged = new Set()) {
-    const gone = new Set(state.dismissed ?? []), out = [];
-    for (const d of state.decisions) {
-      if (gone.has(d.key) || merged.has(d.key) || (d.type === 'evidence' && ['RUN FAIL', 'INCONCLUSIVE'].includes(d.evidenceCard?.result))) continue;
-      const sent = trailOf(d.key), last = sent.at(-1), a = area(d), kind = threadKind(d);
-      const st = sent.some(unseen) || (!sent.length && (['report', 'proof'].includes(kind) || a === 'reports') && unread(d)) ? 'new'
-        : a === 'waiting' || (a === 'evidence' && (d.options.length || d.reply)) ? 'turn'
-        // A design review a lead posted is Main's until promoted: it waits on its agents, never in Decide.
-        : (last && !last.reply) || (a === 'designs' && dzOpen(d)) ? 'agent' : 'done';
-      out.push({ id: d.key, d, kind, st, last, at: last?.reply?.at ?? last?.at ?? d.filed ?? '' });
-    }
-    // A ticket is a thread too: its comments from the fleet dashboard and the lead's replies; open while the ticket is.
-    for (const t of state.tickets ?? []) {
-      const sent = trailOf(t.id, 'ticket'), last = sent.at(-1);
-      out.push({ id: `~${t.id}`, tk: t, kind: 'ticket', st: sent.some(unseen) ? 'new' : (last && !last.reply) || tkStateOf(t) !== 'done' ? 'agent' : 'done', last, at: last?.reply?.at ?? last?.at ?? t.at ?? '' });
-    }
-    return out;
-  }
-  /** A thread's second line: the agent's last words, else what the person sent and how far it got, else what the card says. */
-  const inboxLine = ({ d, tk, last }) => { const r = last?.reply;
-    return r ? `${d ? d.by || 'Agent' : 'Lead'}: ${r.text ?? (r.link ? linkName(r.link) : 'Posted a new version')}` : last ? `You: ${youSaid(last, d)} · ${stepWord(last, stepOf(last) - 1)}` : d ? plain(d.about ?? kind(d)) : TK_WORDS[tkStateOf(tk)]; };
-  function inboxRow(th, sel) {
-    const { d, tk } = th, a = el('a', { class: `ui-row ib-row${th.st === 'new' ? ' unread' : ''}`, href: `#inbox/${th.id}`, 'data-row': '', ...(sel && { 'aria-current': 'true' }) },
-      el('span', { class: 'ib-tile' }, d ? cardTile(d) : tkTile(tk), th.st === 'new' || th.st === 'turn' ? el('i', { class: `dot${th.st === 'turn' ? ' red' : ''}` }) : ''),
-      el('span', { class: 'rm' }, el('span', { class: 't', dir: 'auto' }, d ? (d.type === 'evidence' ? headline(d) : title(d)) : tk.title), el('span', { class: 'l2 meta', dir: 'auto' }, inboxLine(th))),
-      el('span', { class: 'ib-side' }, th.at ? el('time', { datetime: th.at }, trailWhen(th.at)) : '', el('span', { class: 'ib-kind' }, KIND_NAMES[th.kind])));
-    return el('li', {}, a);
-  }
-  /** The inbox's list: the search box, a chip per kind with what is open of it, then the sections; Answered and done is folded until asked for. */
-  function inboxList(all, key) {
-    const q = inFind.trim().toLowerCase(), time = (t) => Date.parse(t.at) || 0, out = [];
-    const shown = all.filter((t) => (inKind === 'all' || t.kind === inKind) && (!q || [t.d ? title(t.d) : t.tk.title, t.d?.about ?? '', (t.d && projectName(t.d)) ?? ''].join(' ').toLowerCase().includes(q)));
-    const count = (k) => all.filter((t) => t.st !== 'done' && (k === 'all' || t.kind === k)).length;
-    const box = el('input', { type: 'search', id: 'ib-find', 'aria-label': 'Search the inbox', placeholder: 'Search', autocomplete: 'off', enterkeyhint: 'search' });
-    box.value = inFind;
-    box.oninput = () => { inFind = box.value; const at = box.selectionStart; render(); const b = document.getElementById('ib-find'); b?.focus(); b?.setSelectionRange(at, at); };
-    const chips = el('div', { class: 'ib-chips', role: 'group', 'aria-label': 'Show one kind' }, ...FILTERS.filter(([k]) => k === 'all' || k === inKind || k === 'ticket' || all.some((t) => t.kind === k)).map(([k, w]) => {
-      const b = el('button', { type: 'button', class: 'ib-chip', 'aria-pressed': String(inKind === k) }, w, count(k) ? el('b', {}, String(count(k))) : '');
-      // The ticket roll-up is the board's largest part: it is read when Tickets is picked.
-      b.onclick = () => { inKind = k; if (k === 'ticket') readTickets(); render(); };
-      return b;
-    }));
-    for (const [s, name] of SECTIONS) {
-      const mine = shown.filter((t) => t.st === s).sort((x, y) => time(y) - time(x));
-      if (!mine.length) continue;
-      if (s === 'done' && !inDone && !q) { const b = el('button', { type: 'button', class: 'ib-fold' }, `Show ${mine.length} answered and done`); b.onclick = () => { inDone = true; render(); }; out.push(b); continue; }
-      const cap = inMore.has(s) || mine.some((t) => t.id === key) ? Infinity : 8, more = el('button', { type: 'button', class: 'ib-fold' }, `Show ${mine.length - 8} more`);
-      more.onclick = () => { inMore.add(s); render(); };
-      out.push(el('section', { class: 'ib-sec', 'aria-label': name }, el('h2', { class: 'ui-sec' }, name, el('span', { class: 'n' }, String(mine.length))),
-        el('ul', { class: 'ui-card ui-list ib-list' }, ...mine.slice(0, cap).map((t) => inboxRow(t, t.id === key))), mine.length > cap ? more : ''));
-    }
-    return [el('label', { class: 'ib-find', role: 'search' }, document.getElementById('dock-find').firstChild.cloneNode(true), box), chips,
-      ...(out.length ? out : [el('p', { class: 'ib-empty' }, q ? `Nothing matches “${inFind.trim()}”` : inKind === 'ticket' && tkLoad() === 'loading' ? 'Reading the tickets…' : 'Nothing here.')])];
-  }
-  /** An item answered in its thread's own place (an ask in its sheet, or in the pane beside its thread on a desk); a plan, a design, a page to read and a proof open in the reader. */
-  const inPlace = (d) => d.type !== 'plan' && d.kind !== 'design' && !reads(d) && d.type !== 'evidence';
-  /** Every reply not opened yet, oldest first. */
-  const replies = () => [...new Map((state.trail ?? []).map((t) => [t.id, t])).values()].filter(unseen).sort((x, y) => Date.parse(x.reply.at) - Date.parse(y.reply.at));
-  /** A reply landed: a notice at the top of the board, as the phone's own would show it, that opens the thread; it goes by itself after a while. */
-  function notice(t) {
-    const id = t.kind === 'ticket' ? `~${t.key}` : t.key, d = t.kind === 'ticket' ? undefined : findCard(t.key), name = d ? title(d) : tkById(t.key)?.title ?? t.key;
-    document.querySelector('.ib-note')?.remove();
-    const a = el('a', { class: 'ib-note', href: `#inbox/${id}`, role: 'status', 'aria-label': `New reply from ${d?.by || 'the agent'}: ${name}. Open it.` },
-      el('span', { class: 'ib-nh' }, glyph('check'), el('b', {}, 'sign-off'), ` · ${d?.by || 'Agent'} replied`, el('time', {}, 'now')),
-      el('span', { class: 'ib-nt', dir: 'auto' }, el('b', {}, name), t.reply.text ?? (t.reply.link ? linkName(t.reply.link) : 'Posted a new version')));
-    a.onclick = () => a.remove();
-    document.body.append(a);
-    setTimeout(() => a.remove(), 9000);
-  }
-  /** The head's count: what is new and what waits on you, as the tab's title says it too. */
-  const inboxSub = (all) => { const n = all.filter((t) => t.st === 'new').length, w = all.filter((t) => t.st === 'turn').length; return `${n} new · ${w} waiting on you`; };
-  /** The inbox. A phone shows the list, and a thread over it once a row is opened; a desk shows the list beside the open thread (the first, until a row is picked),
-   *  and an item opened from its thread beside that thread. The thread and the item draw from app-more.js. */
-  function inboxScreen(all, key, open) {
-    const th = all.find((t) => t.id === key);
-    // A redraw keeps an open More current; the address #find opens Search over the inbox.
-    if (todayMore.open) fillMore();
+  /** Today itself. A redraw keeps an open More current; the address #find opens Search over it. */
+  function today(by) {
+    const queue = [...by.waiting].sort((x, y) => lead(x) - lead(y)), up = upNext(queue), rest = waitingOn(queue.slice(1)), tiles = todayTiles(by), more = moreLine(by), replies = repliesOn();
+    if (todayMore.open) fillMore(by);
     if (location.hash === '#find' && !searchSheet.open) openSearch();
-    if (phone()) return th && moreReady ? threadScreen(th, open) : [el('header', { class: 'ui-top' }, el('h1', { tabindex: '-1' }, 'Inbox'), moreButton(), themeButton()), ...inboxList(all, key)];
-    const order = SECTIONS.map(([s]) => s), first = [...all].filter((t) => t.st !== 'done').sort((x, y) => order.indexOf(x.st) - order.indexOf(y.st) || (Date.parse(y.at) || 0) - (Date.parse(x.at) || 0))[0];
-    const shown = th ?? first;
-    deskSel = shown?.id ?? '';
-    const top = el('header', { class: 'ui-top' }, el('h1', { tabindex: '-1' }, 'Inbox'), moreButton());
-    return [moreReady ? threadDesk(top, inboxSub(all), inboxList(all, shown?.id), shown, open && th) : split(top, inboxSub(all), inboxList(all, shown?.id), pane('', ''))];
+    const open = by.designs.filter(dzOpen), designs = open.length ? el('section', { class: 't-wait', 'aria-label': 'Designs to review' }, el('h2', { class: 'ui-sec' }, 'Designs to review', el('a', { class: 'see', href: '#designs' }, 'See all')),
+      el('ul', { class: 'ui-card ui-list' }, ...open.slice(0, 2).map(designRow))) : '';
+    return phone() ? [up, replies, rest, designs, tiles, more] : [el('div', { class: 't-cols' }, el('div', {}, up, tiles, more), el('div', {}, replies, rest, designs))];
   }
+
 
   /** A short row's second line: what changed, unless the headline already says it. */
   const sub = (d) => (d.type === 'signin' ? `Unlocks: ${d.unlocks}` : d.about && d.about !== headline(d) ? d.about : area(d) === 'waiting' ? kind(d) : NAMES[d.type] ?? d.type);
@@ -1847,7 +1841,6 @@
     // A card's body comes from app-more.js: a card opened before it lands opens, whole, when it does.
     if (d && !moreReady) return void waitMore();
     // A design or a report takes the board's place beside the sidebar on a desk; a plan, and anything on a phone, opens over the whole board.
-    // Opened from its thread on a desk, any item sits beside that thread.
     const desk = matchMedia('(min-width: 64rem)').matches, beside = !!d && desk && from.startsWith('inbox/'), pane = beside || (!!d && d.type !== 'plan' && !d.guided), inline = pane && desk;
     document.body.classList.toggle('reading', !!d && !beside);
     document.body.classList.toggle('pane-reading', pane);
@@ -2516,8 +2509,9 @@
   }, { passive: true });
   /** Every key, in one sheet behind ?. A desk hints each where it works; they work at any width with a keyboard. */
   const MOD = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
-  const KEYS = [['Anywhere', [['Go to the inbox', 'G', 'I'], ['Undo', MOD, 'Z'], ['This list', '?']]],
+  const KEYS = [['Anywhere', [['Go to Today', 'G', 'T'], ['Go to the inbox', 'G', 'I'], ['Go to Decide', 'G', 'D'], ['Go to Evidence', 'G', 'E'], ['Go to Reports', 'G', 'R'], ['Undo', MOD, 'Z'], ['This list', '?']]],
     ['Lists', [['Next', 'J'], ['Previous', 'K']]],
+    ['Today', [['Up next', '↵']]],
     ['Decide', [['Answer', '↵'], ['Pick option 1 to 9', '1', '–', '9'], ['Note', 'C'], ['Answer from the note', MOD, '↵'], ['Later', 'L'], ['Next ask', 'E']]],
     ['Reports', [['Read or unread', 'U'], ['Archive', 'E'], ['Open a guided report', '↵']]]];
   const shut = el('button', { 'aria-label': 'Close' }, '✕');
@@ -2526,7 +2520,7 @@
   shut.onclick = () => keysSheet.close();
   keysSheet.onclick = (e) => e.target === keysSheet && keysSheet.close();
   document.body.append(keysSheet);
-  const GO = { i: '#', t: '#' };
+  const GO = { t: '#', i: '#inbox', d: '#waiting', e: '#evidence', r: '#reports' };
   let gAt = 0;
   addEventListener('keydown', (e) => {
     const typing = e.target.closest?.('textarea, input, select'), mod = e.metaKey || e.ctrlKey;
@@ -2551,6 +2545,8 @@
     // On a desk's Reports, U reads or unreads the report shown, E archives it, Enter opens a guided one.
     const rp = document.querySelector('.split-bar.rp-bar')?.parentElement, rpKey = rp && { u: '.rp-read', e: '.rp-archive', Enter: '.rp-open' }[k];
     if (rpKey && !(k === 'Enter' && e.target.closest?.('a:not([aria-current]), button, summary'))) { const b = rp.querySelector(rpKey); if (b) e.preventDefault(), b.click(); return; }
+    // On Today, Enter takes Up next's main action: open the sign-in, answer with the pick, or start the review.
+    if (k === 'Enter' && !location.hash.slice(1) && !e.target.closest?.('a, button, summary')) { const go = document.querySelector('.t-up .t-btn.ink:not(:disabled)'); if (go) e.preventDefault(), go.click(); return; }
     if (!onDecide) return;
     // Enter answers (or opens a sign-in), C goes to the note, L moves the ask to Later.
     if (k === 'Enter' && !e.target.closest?.('a:not([aria-current]), button, summary')) { const go = document.querySelector('.decide-bar .answer:not(:disabled), .decide .open-link:not(:disabled)'); if (go) e.preventDefault(), go.click(); }
@@ -2558,6 +2554,8 @@
     if (k === 'l') { const b = document.querySelector('.decide .later-btn'); if (b) e.preventDefault(), b.click(); }
   });
   const reshow = (control) => { render(); document.querySelector(control)?.focus({ preventScroll: true }); };
+  /** Today's small title shows in its bar once the large one has scrolled under it. */
+
   function render() {
     if (designSession?.open) return (boardStale = true);
     // Every screen but the first lives in app-more.js, and the route for it waits for that file (see the hashchange handler) before it draws: a render
@@ -2572,6 +2570,7 @@
     for (const d of [...state.decisions].reverse()) if (!gone.has(d.key) && !merged.has(d.key)) by[area(d)].push(d);
     // Evidence keeps every proof that is not dismissed, answered or not, newest first, however old: a passed check, a capture with no run to check (it says Not run) or one that could not be checked.
     // A failed run or one that did not finish is no proof, so it is left off; its own screen still opens, and a verdict moves it to Answered.
+    // Today's Proof tile counts the same list, and says how many runs failed.
     const shownProof = state.decisions.filter((d) => d.type === 'evidence' && !['RUN FAIL', 'INCONCLUSIVE'].includes(d.evidenceCard?.result) && !gone.has(d.key));
     by.evidence = [...by.evidence.filter((d) => d.type !== 'evidence'), ...shownProof].sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
     by.failedProof = state.decisions.filter((d) => d.type === 'evidence' && d.evidenceCard?.result === 'RUN FAIL' && !gone.has(d.key));
@@ -2585,8 +2584,7 @@
     decideCtx = { all: decideOrder(by.waiting), hidden };
     by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
     const [, at, key, opening] = /^#(waiting|decide|designs|evidence|reports|answered|tickets|ticket|activity|inbox)(?:\/([\w.~-]+)(\/open)?)?$/.exec(location.hash) ?? [];
-    const inboxAt = !at || at === 'inbox', all = inboxThreads(merged), needs = all.filter((t) => t.st === 'new' || t.st === 'turn').length;
-    document.title = needs ? `(${needs}) Inbox · sign-off` : 'Inbox · sign-off';
+    const inboxAt = at === 'inbox', all = moreReady ? inboxThreads(merged) : [], needs = all.filter((t) => t.st === 'new' || t.st === 'turn').length;
     const showingTickets = at === 'tickets' || at === 'ticket' || at === 'activity';
     if (showingTickets && !ticketScreen) readTickets(true);
     ticketScreen = showingTickets;
@@ -2622,11 +2620,12 @@
     whole(opened);
     for (const k of changing) if (k !== shownAsk?.key) changing.delete(k);
     // A decision lives under Decide; Designs has its own place in the sidebar, and on a phone, as the prototype's dock has it, Designs and Answered light Today, whose More opens them.
-    // The inbox is lit on its own screens; an old address (Decide, Reports, a ticket) lights nothing.
-    const active = inboxAt ? '' : undefined;
-    // The inbox's count is a red badge of what is new and what waits on you.
-    const count = (a) => (a === '' ? needs : undefined), badge = (a) => (a === '' ? 'red' : '');
-    const link = ([a, name]) => el('a', { href: `#${a}`, ...(a === active && { 'aria-current': 'page' }) }, icon(`tab-${a || 'inbox'}`), name,
+    const active = at === 'decide' ? 'waiting' : at === 'answered' ? '' : at === 'ticket' || at === 'activity' ? 'tickets' : at ?? '';
+    // Tickets, as the prototype draws its place, carries no count.
+    const count = (a) => (a === 'reports' && !state.readonly ? by.reports.filter(unread).length : a === 'inbox' ? needs : a && a !== 'tickets' ? by[a].length : undefined);
+    // Decide's and the inbox's count is a red badge and new Reports' an ink one, in the sidebar and the tab bar alike; Evidence's is a plain number.
+    const badge = (a) => (a === 'waiting' || a === 'inbox' ? 'red' : a === 'reports' && !state.readonly ? 'ink' : '');
+    const link = ([a, name]) => el('a', { href: `#${a}`, ...(a === active && { 'aria-current': 'page' }) }, icon(`tab-${a || 'today'}`), name,
       count(a) === undefined || (badge(a) && !count(a)) ? '' : el('span', { class: `n ${badge(a)}`.trim() }, String(count(a))));
     // The sidebar as the prototype draws it: the board's mark and name, Search, the areas, and at its foot whose board it is with the light-or-dark button
     // (on a desk the one place it sits), then the version the board runs (0.6.1-dev on a dev build). Every key stays in the ? sheet.
@@ -2638,7 +2637,7 @@
     paintTabs(active === 'designs' ? 'waiting' : active, count, badge);
     const ro = state.readonly ? 'Read only' : FROZEN ? `Read-only copy, ${FROZEN.exported}` : '';
     const pageTitle = head === 'decide' || head === 'waiting' ? 'Decide' : head === 'reports' ? 'Reports' : AREAS[head];
-    document.body.classList.toggle('inbox', inboxAt);
+    document.body.classList.toggle('today', !at);
     document.body.classList.toggle('tickets', showingTickets);
     const bulk = { waiting: by.waiting, designs: by.designs, evidence: by.evidence, reports: [...by.reports, ...by.notes], answered: by.answered }[at] ?? [];
     const answeredToday = by.answered.filter((d) => isToday(state.answers[d.key].at)).length;
@@ -2646,8 +2645,8 @@
     const sel = selecting && canDismiss() && bulk.length && ['waiting', 'designs'].includes(head) && selectHead(bulk);
     const top = head === 'waiting' && !state.readonly ? el('header', { class: 'ui-top' }, el('h1', { tabindex: '-1', 'data-crumb': pageTitle }, sel ? sel.title : pageTitle), ro ? el('p', { class: 'meta' }, ro) : '', ...(sel ? [sel.all, sel.bar] : [phone() ? decideSortButton() : '', themeButton()]))
       : el('header', { class: head === 'reports' && !state.readonly ? 'top ui-top rp-top' : head ? 'top' : 'ui-top today-top' }, head && !TABS.some(([a]) => a === head)
-      ? el('a', { class: 'back', href: '#' }, '‹ Inbox') : '',
-    head ? el('h1', { tabindex: '-1' }, pageTitle) : '',
+      ? el('a', { class: 'back', href: '#' }, '‹ Today') : '',
+    ...(head ? [el('h1', { tabindex: '-1' }, pageTitle)] : todayHead()),
     ro ? el('p', { class: 'meta' }, ro) : '',
     head === 'answered' && by.answered.length ? el('p', { class: 'lede' }, (() => { const n = by.answered.filter((d) => isToday(state.answers[d.key].at)).length; return `${n} ${n === 1 ? 'answer' : 'answers'} today. Each one has gone back to its agent.`; })())
       : head === 'designs' && by.designs.length ? el('p', { class: 'lede' }, 'Designs to look over. Approve one, or say what should change.') : '',
@@ -2697,7 +2696,7 @@
   }
   function freeze() {
     // Answers stay as they are, but nothing in the copy can be sent.
-    document.querySelectorAll('#board .choices button, #board .pick-list button, #board .decide-bar .answer, #board .mock button, #board .note button, #board .note textarea').forEach((e) => (e.disabled = true));
+    document.querySelectorAll('#board .choices button, #board .pick-list button, #board .decide-bar .answer, #board .t-up button, #board .mock button, #board .note button, #board .note textarea').forEach((e) => (e.disabled = true));
     // A browser will not open a data: link in a new tab; the inline preview is the copy.
     document.querySelectorAll('#board a[href^="data:"]').forEach((a) => a.removeAttribute('href'));
   }
@@ -2803,8 +2802,7 @@
   async function refresh() {
     try {
       const open = /^#(?:waiting|decide|designs|evidence|reports|ticket|inbox)\/([\w.-]+)(?:\/open)?$/.exec(location.hash)?.[1];
-      // A reply that lands while the board is open rises in the inbox and says so in a notice at the top; a tap on it opens its thread.
-      const heard = new Set(replies().map((t) => t.id + t.reply.at));
+      const heard = moreReady && heardReplies();
       const res = await fetch('/api/decisions?view=asks&limit=20', { headers: seenTag ? { 'if-none-match': seenTag } : {} });
       let changed = false;
       if (res.status !== 304) {
@@ -2824,8 +2822,7 @@
       if (!changed) return;
       await readLists();
       renderKeepingFocus();
-      const landed = replies().filter((t) => !heard.has(t.id + t.reply.at)).at(-1);
-      if (landed) notice(landed);
+      if (heard) noticeNew(heard);
       rest();
     } catch (e) { failed(e); }
   }
@@ -2853,7 +2850,7 @@
     for (const l of document.querySelectorAll('link[data-icon], link[data-manifest]')) l.href = l.dataset.icon ?? l.dataset.manifest;
     // The screens beyond the first start here, with the read that paints the first screen: a tap that lands on one of them waits for a file already on
     // its way, never for one that has not been asked for. A link that opens one of those screens draws it once the file is in.
-    loadMore().then(() => { if (MORE_SCREENS.test(location.hash) || !phone()) renderKeepingFocus(); });
+    loadMore().then(() => renderKeepingFocus());
     rest();
     readLists();
   }, failed);

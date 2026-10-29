@@ -44,7 +44,7 @@ const post = (url, body) => fetch(`${url}api/answers`, { method: 'POST', headers
 test('answer journey: save, survive a torn line and a restart, read back', async () => {
   let { proc, url } = await serve();
   const html = await (await fetch(url)).text();
-  assert.match(html, /<title>Inbox/);
+  assert.match(html, /<title>Dashboard/);
   assert.ok(!html.includes('claim-check'), 'the proof card uses plain words, not "claim-check"');
   const board = await (await fetch(`${url}api/decisions`)).json();
   assert.equal(board.decisions[0].evidenceCard.result, 'RUN PASS');
