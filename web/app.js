@@ -803,7 +803,7 @@
   const bySecond = (x, y) => Math.floor(Date.parse(x.at) / 1000) - Math.floor(Date.parse(y.at) / 1000);
   /** A card's thread, oldest first, from what the board keeps: when it was posted (and the change it links), the answer it replaced,
    *  the answer and its note, when its agent took it, each new round asked for and each comment. Nothing is made up: a step the board has no record of is left out. */
-  const threadOf = (d) => {
+  const threadOf = (d, all = false) => {
     const a = state.answers[d.key], by = d.by ?? 'Agent', change = changeHref(d);
     const said = (x) => (x.answer === 'text' ? 'in your own words' : x.label);
     // A design's answer on an earlier round with its notes, each named by its screen when the design has more than one: one note's screen goes in the step.
@@ -816,11 +816,11 @@
       a && !d.earlier_answer && { at: a.at, text: `${a.replaces ? 'Changed to' : takenOf(a) === 'default' ? 'Taken by default' : takenOf(a) ? `${by} picked` : 'Your answer'}: ${said(a)}`,
         note: takenOf(a) === 'default' ? 'No answer by its deadline' : takenOf(a) ? d.recommend_reason : a.note || a.notes?.map((n) => n.note).filter(Boolean).join(' · ') },
       ...trailOf(d.key).flatMap((t) => [t.delivered && { at: t.delivered, text: `Delivered to ${by}` }, t.read && { at: t.read, text: `${by} read it` },
-        t.reply && (!t.reply.acted || d.type === 'signin') && { at: t.reply.at, text: `${by} ${t.reply.text ? 'replied' : t.reply.acted ? 'posted a new link' : 'acted on it'}`, note: t.reply.text, link: t.reply.link && [linkName(t.reply.link), t.reply.link] }]),
+        all && t.reply && (!t.reply.acted || d.type === 'signin') && { at: t.reply.at, text: `${by} ${t.reply.text ? 'replied' : t.reply.acted ? 'posted a new link' : 'acted on it'}`, note: t.reply.text, link: t.reply.link && [linkName(t.reply.link), t.reply.link] }]),
       ...(state.rounds ?? []).filter((r) => r.key === d.key).map((r) => ({ at: r.at, text: 'You asked for a new round', note: r.note })),
       ...trailOf(d.key, 'discard').map((t) => ({ at: t.at, text: `Discarded: ${reasonOf(t.reason)}` })),
       ...(state.comments ?? []).filter((c) => c.key === d.key && c.text).map((c) => ({ at: c.at, text: 'Your comment', note: c.text })),
-      ...(state.messages ?? []).filter((m) => m.kind === 'comment' && m.key === d.key).map((m) => ({ at: m.at, text: 'Your comment', note: m.text }))]
+      ...(all ? (state.messages ?? []).filter((m) => m.kind === 'comment' && m.key === d.key) : []).map((m) => ({ at: m.at, text: 'Your comment', note: m.text }))]
       .filter((e, i, all) => e && !Number.isNaN(Date.parse(e.at)) && all.findIndex((x) => x && x.text === e.text && x.note === e.note && bySecond(x, e) === 0) === i).sort(bySecond);
   };
   /** A card's Activity (ui.css): its steps as one sunk group, each in plain words with its time, the note that went with it, and the card it is on where the steps
@@ -831,7 +831,8 @@
     e.note ? el('span', { class: 'th-n', dir: 'auto' }, `“${e.note}”`) : '', e.card ? el('a', { class: 'on', href: hrefOf(e.card), dir: 'auto' }, title(e.card)) : '')))));
   /* ---- The feedback trail: each answer, note, new round and comment the person sent on a card, and how far it got with its agent (src/store.ts readTrail). ---- */
   const TRAIL = ['Sent', 'Delivered', 'Read', 'Replied'];
-  const trailOf = (key, kind) => (state.trail ?? []).filter((t) => t.key === key && (kind ? t.kind === kind : t.kind !== 'ticket')).sort(bySecond);
+  // A card read again brings its trail as it is now beside the earlier read of it, so a send is taken once by its id, the latest.
+  const trailOf = (key, kind) => [...new Map((state.trail ?? []).map((t) => [t.id, t])).values()].filter((t) => t.key === key && (kind ? t.kind === kind : t.kind !== 'ticket')).sort(bySecond);
   /** How far a send got: 1 sent, 2 delivered, 3 read, 4 replied (or acted on, when the agent sent a link or posted the card again with no words). */
   const stepOf = (t) => (t.reply ? 4 : t.read ? 3 : t.delivered ? 2 : 1);
   // A re-posted sign-in is a new link to open, never a card acted on and done: its poster still runs `signin done` when the person signs in.
@@ -842,15 +843,6 @@
   /** A link the agent sent names the pull request it is, or else says it opens the new version. */
   const linkName = (url) => (/\/(?:pull|pulls|merge_requests)\/\d+/.test(url) ? changeName(url) : 'Open the new version');
   const trailWhen = (at) => (isToday(at) ? hhmm(at) : day(at));
-  /** The trail on a card: four steps on one track, each its word and time once reached; under it the agent's reply and the link to what changed,
-   *  unless the place it sits already shows the reply (an ask or a comment on a part of a guided page). */
-  function trailTrack(t, said = true) {
-    const n = stepOf(t), r = t.reply;
-    return el('div', { class: 'ui-trail', role: 'group', 'aria-label': `${stepWord(t, n - 1)}: ${TRAIL.slice(0, n).map((w, i) => `${stepWord(t, i)} ${trailWhen(stepAt(t, i))}`).join(', ')}` },
-      el('ol', { 'aria-hidden': 'true' }, ...TRAIL.map((_, i) => el('li', { class: i < n ? 'on' : '' }, el('i', {}), el('b', {}, stepWord(t, i)), el('time', {}, i < n ? trailWhen(stepAt(t, i)) : '')))),
-      said && r && (r.text || r.link || r.acted) ? el('div', { class: 'tr-said' }, r.text ? el('p', { dir: 'auto' }, r.text) : r.acted ? el('p', {}, 'Posted a new version') : '',
-        r.link ? el('a', { href: r.link, target: '_blank', rel: 'noopener', dir: 'auto' }, linkName(r.link)) : '') : '');
-  }
   /** A card's badge in a list: where the last thing sent on it stands, four marks and a word; a reply not opened yet is ink. */
   const trailBadge = (key) => { const t = trailOf(key).at(-1); if (!t) return ''; const n = stepOf(t);
     return el('span', { class: `ui-tb${unseen(t) ? ' new' : ''}`, title: `${stepWord(t, n - 1)} ${trailWhen(stepAt(t, n - 1))}` }, el('span', { class: 'tb-d', 'aria-hidden': 'true' }, ...TRAIL.map((_, i) => el('i', { class: i < n ? 'on' : '' }))), stepWord(t, n - 1)); };
@@ -986,7 +978,7 @@
       el('div', { class: 'pmain' }, el('h1', { class: `dt ev-title${name.length > 160 ? ' long' : ''}`, id: 'reader-title', tabindex: '-1', dir: 'auto' }, name),
         captures(d, 'ev-hero pv-cap') || el('div', { class: 'ev-hero none' }, evGlyph('image'), (d.status ? 'Frame pending' : 'Text only: no capture was filed')), attachments(d)),
       el('div', { class: 'pside' }, evProps(d), said && said !== name ? el('p', { class: 'dp ev-about', dir: 'auto' }, said) : '', why ? el('p', { class: 'dp ev-why', dir: 'auto' }, why) : '',
-        state.readonly || FROZEN || !(d.options.length || d.reply) ? '' : verdicts(d), thread(d)));
+        state.readonly || FROZEN || !(d.options.length || d.reply) ? '' : verdicts(d), ...sentPairs(d), thread(d)));
   }
 
   /** An explainer's chapter list: each button starts the video at that chapter. */
@@ -1188,7 +1180,9 @@
     });
   }
   // A design with only screen notes (answer 'screens') still waits for its design-wide verdict.
-  const isAnswered = (d) => Object.hasOwn(state.answers, d.key) && !(d.type === 'design' && state.answers[d.key].answer === 'screens');
+  /** An answer whose agent reply asks for a next step (it carries follow-up buttons) is not final: the card stays in Decide until the person taps one. */
+  const exchanging = (d) => !!trailOf(d.key, 'answer').at(-1)?.reply?.options?.length;
+  const isAnswered = (d) => Object.hasOwn(state.answers, d.key) && !(d.type === 'design' && state.answers[d.key].answer === 'screens') && !exchanging(d);
   /** A design review a lead posts is Main's to pass first: it lives under Designs, never in Decide, Answered or any count of asks, until Main promotes it (sign-off-axi promote). */
   const promoted = (d) => (state.promoted ?? []).includes(d.key);
   /** Each item lives in one area: a design review Main has not promoted under Designs, then answered items, then the area the item names, then evidence updates (never an ask, whatever their result),

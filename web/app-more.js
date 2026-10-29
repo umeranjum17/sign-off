@@ -181,7 +181,7 @@
       el('h1', { class: 'ev-title', id: 'reader-title', tabindex: '-1', dir: 'auto' }, name),
       captures(d, 'ev-hero') || el('div', { class: 'ev-hero none' }, evGlyph('image'), (d.status ? 'Frame pending' : 'Text only: no capture was filed')), attachments(d),
       evProps(d),
-      said && said !== name ? el('p', { class: 'ev-about', dir: 'auto' }, said) : '', why ? el('p', { class: 'ev-why', dir: 'auto' }, why) : '', thread(d),
+      said && said !== name ? el('p', { class: 'ev-about', dir: 'auto' }, said) : '', why ? el('p', { class: 'ev-why', dir: 'auto' }, why) : '', ...sentPairs(d), thread(d),
       state.readonly || FROZEN || !(d.options.length || d.reply) ? '' : verdicts(d)));
   }
 
@@ -463,7 +463,7 @@
     const linked = (d) => { const a = el('a', { class: 'ui-row', href: hrefOf(d) }, ...uiRow({ tile: cardTile(d), title: title(d), priority: d.priority, badge: trailBadge(d.key), meta: [tkKind(d), tkState(d), d.filed && tkWhen(d.filed)].filter(Boolean).join(' · ') }));
       a.onclick = () => (jump = d.key); return el('li', {}, a); };
     // Its cards' steps after their postings (Linked shows those), newest first, each naming its card.
-    const steps = [...(state.ticketActivity ?? []).filter((e) => e.ticket === t.id).flatMap((e) => [e, ...[...(e.earlier ?? [])].reverse()]), ...cards.flatMap((d) => threadOf(d).filter((e) => !e.posted).map((e) => ({ ...e, card: d })).reverse())]
+    const steps = [...(state.ticketActivity ?? []).filter((e) => e.ticket === t.id).flatMap((e) => [e, ...[...(e.earlier ?? [])].reverse()]), ...cards.flatMap((d) => threadOf(d, true).filter((e) => !e.posted).map((e) => ({ ...e, card: d })).reverse())]
       .sort((x, y) => bySecond(y, x)), said = trailOf(t.id, 'ticket');
     seeReply(t.id, 'ticket');
     return [el('div', { class: 'tk-shd' }, el('p', {}, tkTile(t), el('span', {}, [proj, TK_WORDS[s]].filter(Boolean).join(' · '))), close),
@@ -476,7 +476,7 @@
       ...(kids.length ? [el('p', { class: 'ui-dl' }, `${tkAbove(t).length ? 'Sub-tasks' : 'Tickets in this epic'} · ${done} of ${kids.length} done`), el('ul', { class: 'ui-list tk-in' }, ...kids.map(tkRow))] : []),
       el('p', { class: 'ui-dl' }, 'Linked'), cards.length || t.prs?.length ? el('ul', { class: 'ui-list tk-in' }, ...(t.prs ?? []).map(tkPr), ...cards.map(linked)) : emptyState('empty', { mark: 'plan', title: 'No cards yet', text: 'Cards that name this ticket show here.', small: true }),
       // The person's comments on it (made in the fleet dashboard), oldest first, each with how far it got and the lead's reply.
-      ...(said.length ? [el('p', { class: 'ui-dl' }, 'Your comments'), ...said.map((c) => el('div', { class: 'tk-said' }, el('p', { dir: 'auto' }, c.said), trailTrack(c)))] : []),
+      ...(said.length ? [el('p', { class: 'ui-dl' }, 'Your comments'), ...said.map((c) => el('div', { class: 'tk-said' }, trailTrack(c, true, c.said)))] : []),
       steps.length ? thread(t, steps, 1) : el('div', { class: 'thread' }, el('p', { class: 'ui-dl' }, 'Activity'), emptyState('empty', { mark: 'clock', title: 'No activity yet', text: 'Moves on this ticket and answers on its cards show here.', small: true }))];
   }
   /** On a desk every list ends on a whole row: with 40px or more left under its whole rows, the next row fades out there (and the list's end is padded the same, so scrolled
@@ -901,10 +901,10 @@
         const delivery = state.delivery?.[a.id];
         const waiting = !a.read, writing = !!a.text && !a.done, late = waiting && Date.now() - Date.parse(a.at) > 60_000;
         const head = [E('i', 'dot'), again.get(a.id) > Date.now() ? `Already sent ${hhmm(a.at)}` : a.done ? `Agent replied ${hhmm(a.answered)}` : writing ? 'Agent is answering' : waiting ? `Sent to the agent ${hhmm(a.at)}` : `Agent got it ${hhmm(a.read)}, working on it`];
-        const block = el('div', { class: `gask${a.done ? '' : ' live'}${again.get(a.id) > Date.now() ? ' again' : ''}`, 'data-ask': a.id }, E('div', 'hd', ...head, ...(a.version === 1 && a.text && a.seen !== a.answerRevision ? [E('b', 'gd-chip', 'New')] : [])), E('p', 'q', `${actionLabels[a.action] ?? 'Go deeper'}: ${a.q ?? a.about}`),
+        const block = el('div', { class: `gask${a.done ? '' : ' live'}${again.get(a.id) > Date.now() ? ' again' : ''}`, 'data-ask': a.id }, E('div', 'hd', ...head, ...(a.version === 1 && a.text && a.seen !== a.answerRevision ? [E('b', 'gd-chip', 'New')] : [])), E('span', 'tr-lab', 'Your question'), E('p', 'q', `${actionLabels[a.action] ?? 'Go deeper'}: ${a.q ?? a.about}`),
           ...(a.selection ? [E('blockquote', '', a.selection.quote)] : []),
           ...(a.version === 1 && delivery?.error ? [E('p', 'gd-err', `Delivery pending: ${delivery.error}`)] : []),
-          ...(a.text ? a.text.split(/\n+/).map((t, i, all) => E('p', '', t, ...(writing && i === all.length - 1 ? [E('span', 'caret')] : []))) : [E('div', 'shim', ''), E('div', 'shim', '')]),
+          ...(a.text ? [E('span', 'tr-lab', 'Reply')] : []), ...(a.text ? a.text.split(/\n+/).map((t, i, all) => E('p', '', t, ...(writing && i === all.length - 1 ? [E('span', 'caret')] : []))) : [E('div', 'shim', ''), E('div', 'shim', '')]),
           sentOf(a.id) ? trailTrack(sentOf(a.id), false) : '',
           ...(late ? [E('p', 'slow', 'The agent has not picked this up yet. It answers the next time it checks the board.')] : []));
         if (a.version === 1 && a.text && a.seen !== a.answerRevision) { block.dataset.answerId = a.id; block.dataset.answerRevision = a.answerRevision; answerIO.observe(block); }
@@ -988,8 +988,8 @@
       box.dataset.sig = sig;
       box.replaceChildren(...mine.flatMap((c) => [E('div', 'gd-cmt', E('span', 'av', 'Y'),
         E('div', 'hd', E('b', '', 'You'), ...(c.verdict ? [E('span', 'verdict ' + c.verdict, c.verdict === 'agree' ? 'Agree' : 'Disagree')] : []), E('span', '', hhmm(c.at))),
-        E('p', '', c.text), sentOf(c.id) ? trailTrack(sentOf(c.id), false) : ''),
-        ...(c.reply ? [E('div', 'gd-cmt agent', E('span', 'av', 'A'), E('div', 'hd', E('b', '', 'Agent'), E('span', '', hhmm(c.replied))), E('p', '', c.reply))] : [])]));
+        sentOf(c.id) ? trailTrack(sentOf(c.id), true, c.text) : E('p', '', c.text)),
+        ...(c.reply && !sentOf(c.id) ? [E('div', 'gd-cmt agent', E('span', 'av', 'A'), E('div', 'hd', E('b', '', 'Agent'), E('span', '', hhmm(c.replied))), E('p', '', c.reply))] : [])]));
     }
     const acts = (part, rows, inItem) => {
       // A report's parts carry no buttons: its one bar and its Activity do the acting (reportBar). What stays is content, the numbers.
@@ -1527,8 +1527,8 @@
       const out = [], mine = (state.comments ?? []).filter((c) => c.key === key);
       for (const c of mine) {
         const u = c.part === 'understood', what = c.verdict === 'agree' ? 'You agreed' : c.verdict === 'disagree' ? (u ? 'You said Not quite' : 'You disagreed') : 'You commented';
-        out.push({ at: c.at, icon: c.verdict === 'agree' ? 'up' : c.verdict === 'disagree' ? 'down' : 'cmt', title: what, part: c.part, text: c.text ? [c.text] : [], quote: !!c.text, trail: sentOf(c.id), you: true });
-        if (c.reply) out.push({ at: c.replied ?? c.at, icon: 'spark', title: 'Agent replied to your note', part: c.part, text: c.reply.split(/\n+/), agent: true });
+        out.push({ at: c.at, icon: c.verdict === 'agree' ? 'up' : c.verdict === 'disagree' ? 'down' : 'cmt', title: what, part: c.part, text: c.text && !sentOf(c.id) ? [c.text] : [], quote: !!c.text, trail: sentOf(c.id), pair: !!sentOf(c.id), say: c.text, you: true });
+        if (c.reply && !sentOf(c.id)) out.push({ at: c.replied ?? c.at, icon: 'spark', title: 'Agent replied to your note', part: c.part, text: c.reply.split(/\n+/), agent: true });
       }
       for (const a of (state.deeper ?? []).filter((x) => x.key === key)) {
         const label = actionLabels[a.action] ?? 'Go deeper', writing = !!a.text && !a.done, waiting = !a.read, again1 = again.get(a.id) > Date.now(), delivery = state.delivery?.[a.id];
@@ -1560,10 +1560,10 @@
       for (const e of es) { const g = isToday(e.at) ? 'Today' : day(e.at); (days.at(-1)?.[0] === g ? days.at(-1)[1] : days[days.push([g, []]) - 1][1]).push(e); }
       const item = (e) => {
         const li = el('li', { class: `ra-e${e.agent ? ' agent' : ''}`, ...(e.id && { 'data-ask': e.id }) }, E('span', 'ra-i', gic(e.icon)), E('div', 'ra-eb', E('div', 'ra-eh', E('b', '', e.title), E('time', '', hhmm(e.at)), ...(e.fresh ? [E('span', 'gd-chip', 'New')] : [])),
-          ...(e.part ? [E('span', 'ra-chip', partName(e.part))] : []), ...(e.status ? [E('p', 'ra-st', e.status)] : []), ...(e.ask ? [E('p', 'ra-q', e.ask)] : []), ...(e.selection ? [E('blockquote', '', e.selection)] : []),
+          ...(e.part ? [E('span', 'ra-chip', partName(e.part))] : []), ...(e.status ? [E('p', 'ra-st', e.status)] : []), ...(e.ask ? [E('span', 'tr-lab', 'Your question'), E('p', 'ra-q', e.ask)] : []), ...(e.selection ? [E('blockquote', '', e.selection)] : []),
           ...(e.err ? [E('p', 'gd-err', e.err)] : []),
-          ...(e.shim && e.id ? [E('div', 'shim', ''), E('div', 'shim', '')] : e.text.map((t, i, all) => E(e.quote ? 'blockquote' : 'p', e.quote ? 'ra-say' : 'ra-tx', e.quote ? `“${t}”` : t, ...(e.writing && i === all.length - 1 ? [E('span', 'caret')] : [])))),
-          ...(e.trail ? [trailTrack(e.trail, false)] : []), ...(e.slow ? [E('p', 'slow', 'The agent has not picked this up yet. It answers the next time it checks the board.')] : []),
+          ...(e.agent && e.id && e.text.length ? [E('span', 'tr-lab', 'Reply')] : []), ...(e.shim && e.id ? [E('div', 'shim', ''), E('div', 'shim', '')] : e.text.map((t, i, all) => E(e.quote ? 'blockquote' : 'p', e.quote ? 'ra-say' : 'ra-tx', e.quote ? `“${t}”` : t, ...(e.writing && i === all.length - 1 ? [E('span', 'caret')] : [])))),
+          ...(e.trail ? [trailTrack(e.trail, !!e.pair, e.say)] : []), ...(e.slow ? [E('p', 'slow', 'The agent has not picked this up yet. It answers the next time it checks the board.')] : []),
           ...(e.agent && e.part && parts.has(e.part) ? [(() => { const b = el('button', { type: 'button', class: 'ra-show' }, 'Show in the report'); b.onclick = () => toPart(e.part); return b; })()] : [])));
         if (e.fresh) { li.dataset.answerId = e.id; li.dataset.answerRevision = e.rev; answerIO.observe(li); }
         return li;
@@ -1817,17 +1817,19 @@
     // The answer given: when, what with its note or words, whether the agent has read it, and the answer it replaced. Its one button brings the cards back.
     const took = done ? takenOf(given) : undefined;
     if (took) openTook(d.key);
-    const was = given?.replaces, sent = done && trailOf(d.key).filter((t) => t.kind !== 'discard').at(-1), change = done && el('button', { class: 'answer', 'data-kbd': '↵', 'aria-keyshortcuts': 'Enter' }, el('span', { class: 'lbl' }, took ? 'Change' : 'Change answer'));
+    const was = given?.replaces, sent = done && trailOf(d.key).filter((t) => t.kind !== 'discard' && t.kind !== 'comment').at(-1), change = done && el('button', { class: 'answer', 'data-kbd': '↵', 'aria-keyshortcuts': 'Enter' }, el('span', { class: 'lbl' }, took ? 'Change' : 'Change answer'));
     if (change) change.onclick = () => { changing.add(d.key); selected.delete(d.key); own.delete(d.key); render(); document.querySelector('.decide .pick-list')?.scrollIntoView({ block: 'nearest', behavior: calm.matches ? 'auto' : 'smooth' }); };
     // An answer taken without the person (the deadline's default, or the agent's pick on the leash Act, then tell me) says so in its head, in its card and on its trail's first step.
     const tookCard = took && el('div', { class: 'ans-card took' }, el('span', { class: 'donek', 'aria-hidden': 'true' }, glyph(took === 'default' ? 'clock' : 'picked')), el('div', {},
       el('b', { dir: 'auto' }, given.label), el('span', { dir: 'auto' }, took === 'default' ? `No answer by ${when(given.at)}, so the board took the default this ask showed.` : `Its pick: ${d.recommend_reason ?? 'the answer it recommended.'}`)));
     const said = took ? [el('p', { class: 'ui-dl' }, 'Answer'), el('p', { class: 'took-line', dir: 'auto' }, tookWord(given)), tookCard,
       sent ? trailTrack({ ...sent, taken: took }) : '', el('p', { class: 'ans-was' }, took === 'default' ? 'Still yours to answer: Change sends your answer in its place.' : 'Tell me if wrong: Change sends your answer in its place.')]
-      : done ? [el('p', { class: 'ui-dl' }, 'Your answer'), el('p', { class: 'ans-meta' }, el('span', { class: 'res ok' }, was ? 'Changed' : 'Answered'), ` · ${when(given.at)}`),
+      : done ? [el('p', { class: 'ui-dl' }, 'Your action'), el('p', { class: 'ans-meta' }, el('span', { class: 'res ok' }, exchanging(d) ? 'Your turn' : was ? 'Changed' : 'Answered'), ` · ${when(given.at)}`),
       el('div', { class: 'ans-card' }, el('span', { class: 'donek', 'aria-hidden': 'true' }, glyph('check')), el('div', {}, el('b', { dir: 'auto' }, saidOf(d, { ...given, note: '' })),
         given.note ? el('q', { dir: 'auto' }, given.note) : '')), sent ? trailTrack(sent) : '',
       was ? el('p', { class: 'ans-was', dir: 'auto' }, `Before: ${saidOf(d, was)} · ${when(was.at)}`) : ''] : [];
+    const comments = commentPairs(d.key).length ? [el('p', { class: 'ui-dl' }, 'Your comments'), ...commentPairs(d.key)] : [];
+    seeReply(d.key, 'comment');
     const cards = d.mocks?.length && d.options?.length ? mockCards(d, []) : null, proofLine = cards || d.view ? '' : proofRow(d);
     const preview = cards ?? (d.view ? rung(d) : proofLine ? '' : proof(d));
     const quiet = opts.find((o) => o.value === d.default_if_silent);
@@ -1854,9 +1856,9 @@
     // A desk sets the ask out as the prototype's open item: its head and the ask with what it carries scroll on the left, its Activity beside them, and the answers
     // pinned under a hairline at the foot, as cards side by side over one line of the note, Ask me later and Answer.
     const page = desk ? el('section', { class: `${kind} ui-card ui-pane ask2 s8 split-detail`, 'aria-labelledby': 'ask-title' },
-      el('div', { class: 'pbody' }, askHead(d, sink), el('div', { class: 'pmain' }, lead, ...about, ...said, quietLine), el('div', { class: 'pside' }, ...askReport(d), thread(d))),
+      el('div', { class: 'pbody' }, askHead(d, sink), el('div', { class: 'pmain' }, lead, ...about, ...said, ...comments, quietLine), el('div', { class: 'pside' }, ...askReport(d), thread(d))),
       el('div', { class: 'ppin' }, ...picks, ...words, sendLine(`card:${d.key}`), err, bar(noteField)))
-      : el('section', { class: kind }, lead, ...about, ...said, ...picks, ...words, noteField, quietLine, thread(d), sendLine(`card:${d.key}`), err, bar());
+      : el('section', { class: kind }, lead, ...about, ...said, ...comments, ...picks, ...words, noteField, quietLine, thread(d), sendLine(`card:${d.key}`), err, bar());
     return page;
   }
   function evidenceDesk(top, items, archived, d) {
@@ -1900,3 +1902,34 @@
   }
   // Capture the actual visible list, after its filters and sorting, before opening any detail.
   // History owns the sequence so Back, reload and a change between sheet and desk keep it.
+  /** The trail on a card: four steps on one track, each its word and time once reached; under it the agent's reply and the link to what changed,
+   *  unless the place it sits already shows the reply (an ask or a comment on a part of a guided page). */
+  function trailTrack(t, said = true, you = '') {
+    const n = stepOf(t), r = t.reply, acts = ['answer', 'round', 'discard'].includes(t.kind) || (t.kind === 'part' && !you), done = acts || (!r?.text && (r?.link || r?.acted));
+    return el('div', { class: 'ui-trail', role: 'group', 'aria-label': `${stepWord(t, n - 1)}: ${TRAIL.slice(0, n).map((w, i) => `${stepWord(t, i)} ${trailWhen(stepAt(t, i))}`).join(', ')}` },
+      you ? el('div', { class: 'tr-you' }, el('span', { class: 'tr-lab' }, acts ? 'Your action' : 'Your question'), el('p', { dir: 'auto' }, you)) : '',
+      el('ol', { 'aria-hidden': 'true' }, ...TRAIL.map((_, i) => el('li', { class: i < n ? 'on' : '' }, el('i', {}), el('b', {}, stepWord(t, i)), el('time', {}, i < n ? trailWhen(stepAt(t, i)) : '')))),
+      ...(said ? (t.replies ?? (r ? [r] : [])).filter((x) => x.text || x.link || x.acted).map((x, i, all) => el('div', { class: 'tr-said' }, el('span', { class: 'tr-lab' }, done && !x.options?.length ? 'What was done' : 'Reply'), x.text ? el('p', { dir: 'auto' }, x.text) : x.acted ? el('p', {}, 'Posted a new version') : '',
+        x.link ? el('a', { href: x.link, target: '_blank', rel: 'noopener', dir: 'auto' }, linkName(x.link)) : '', i === all.length - 1 ? followUp(t) : '')) : []));
+  }
+  /** A reply that asks for a next step carries its answers as buttons right under it: one tap sends the choice as a comment on the card, which the agent takes like any other. */
+  function followUp(t) {
+    const r = t.reply, opts = r?.options;
+    if (!opts?.length || !['answer', 'round', 'comment'].includes(t.kind)) return '';
+    const sec = (at) => Math.floor(Date.parse(at) / 1000), card = findCard(t.key), final = t.kind === 'answer';
+    const later = (state.trail ?? []).find((x) => x.key === t.key && x.id !== t.id && x.kind === (final ? 'answer' : 'comment') && sec(x.at) >= sec(r.at));
+    if (later && final) return '';
+    if (later) return el('p', { class: 'tr-picked' }, `You answered: ${(state.messages ?? []).find((m) => m.id === later.id)?.text ?? ''}`);
+    if (FROZEN || state.readonly) return '';
+    const err = el('span', { class: 'err', role: 'alert' }), row = el('div', { class: 'tr-opts', role: 'group', 'aria-label': 'Answer this reply' });
+    for (const o of opts) {
+      const b = el('button', { type: 'button', class: 'tr-opt' }, o.label);
+      b.onclick = async () => { row.querySelectorAll('button').forEach((x) => (x.disabled = true)); try { await (final ? postJson('/api/answers', card?.options?.some((x) => x.value === o.value) ? { key: t.key, answer: o.value, note: '' } : { key: t.key, answer: 'text', note: o.label }) : postJson('/api/messages', { kind: 'comment', key: t.key, text: o.label })); render(); } catch (e) { row.querySelectorAll('button').forEach((x) => (x.disabled = false)); err.textContent = `Could not send: ${e.message}`; } };
+      row.append(b);
+    }
+    return el('div', { class: 'tr-follow' }, row, err);
+  }
+  /** What the person sent on a card, as pairs: its last answer or verdict, then each comment. */
+  const sentPairs = (d) => { const a = trailOf(d.key, 'answer').at(-1); seeReply(d.key); return [...(a ? [trailTrack(a, true, saidOf(d, state.answers[d.key] ?? {}))] : []), ...commentPairs(d.key)]; };
+  /** The comments the person made on a card, each as a pair: their words, then the agent's reply, with how far it got. */
+  const commentPairs = (key) => trailOf(key, 'comment').map((t) => trailTrack(t, true, (state.messages ?? []).find((m) => m.id === t.id)?.text ?? ''));

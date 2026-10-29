@@ -982,14 +982,15 @@ export function markEngagementSeen(file: string, id: string, revision: number) {
 /** The trail of what the person sent: each answer (a pick, a note, a design's change notes, a plan's send-back), each new round, each comment and each discard with its reason, and how far it got:
  * delivered (handed over by a wait, a poll or the on_answer hook), read (taken by the agent itself) and replied (its words, a link to what it made, or the card posted again).
  * The agent's marks are one line each in <board>.trail.jsonl: a mark names a key and covers every send on it up to its time. The person opening a reply, or an answer the leash took, marks it seen. */
-export type TrailMark = { op: 'delivered' | 'read' | 'reply' | 'seen'; key: string; id?: string; text?: string; link?: string; at: string };
-export type Trail = { id: string; key: string; kind: 'answer' | 'round' | 'comment' | 'ask' | 'part' | 'ticket' | 'discard'; part?: string; /** An answer the leash took: its first step reads Taken or Picked, and `opened` is when the person first opened the card after it. */ taken?: Took['taken']; opened?: string; reason?: DiscardReason; /** A ticket comment's words: the board keeps them nowhere else. */ said?: string; at: string; delivered?: string; read?: string; reply?: { at: string; text?: string; link?: string; acted?: true }; seen?: string };
+export type TrailMark = { op: 'delivered' | 'read' | 'reply' | 'seen'; key: string; id?: string; text?: string; link?: string; /** Follow-up buttons under a reply that asks for a next step: one tap answers. */ options?: Option[]; at: string };
+export type Reply = { at: string; text?: string; link?: string; options?: Option[]; acted?: true };
+export type Trail = { id: string; key: string; kind: 'answer' | 'round' | 'comment' | 'ask' | 'part' | 'ticket' | 'discard'; part?: string; /** An answer the leash took: its first step reads Taken or Picked, and `opened` is when the person first opened the card after it. */ taken?: Took['taken']; opened?: string; reason?: DiscardReason; /** A ticket comment's words: the board keeps them nowhere else. */ said?: string; at: string; delivered?: string; read?: string; reply?: Reply; /** Every reply when the agent answered the same send more than once, oldest first; `reply` is the last. */ replies?: Reply[]; seen?: string };
 export const trailPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.trail.jsonl';
 export const appendMark = (decisionsPath: string, mark: Omit<TrailMark, 'at'>, at = now()) => appendLine(trailPath(decisionsPath), { ...mark, at });
 /** `delivery` is the owner dispatch's record per Go deeper ask (src/owner.ts deliveries): handed to the author's session, then acknowledged by it. */
 export function readTrail(decisionsPath: string, items: Decision[], delivery: Record<string, { state: string; at: string }> = {}): Trail[] {
   const marks: TrailMark[] = readRaw(trailPath(decisionsPath)).split('\n').flatMap((line) => {
-    try { const m = line && JSON.parse(line); return m && ['delivered', 'read', 'reply', 'seen'].includes(m.op) && typeof m.key === 'string' && !Number.isNaN(Date.parse(m.at)) ? [m] : []; } catch { return []; }
+    try { const m = line && JSON.parse(line); return m && ['delivered', 'read', 'reply', 'seen'].includes(m.op) && typeof m.key === 'string' && !Number.isNaN(Date.parse(m.at)) ? [{ ...m, options: Array.isArray(m.options) ? m.options.filter((o: any) => isText(o?.value) && isText(o?.label)).slice(0, 4) : undefined }] : []; } catch { return []; }
   });
   const taken = seenAt(decisionsPath), filed = new Map(items.map((d) => [d.key, d.filed]));
   const first = (...at: (string | undefined)[]) => at.filter((x): x is string => !!x).sort((x, y) => Date.parse(x) - Date.parse(y))[0];
@@ -1010,15 +1011,23 @@ export function readTrail(decisionsPath: string, items: Decision[], delivery: Re
       ...(c.replies?.length && { reply: { at: iso(c.replies.at(-1)!.at ?? c.at), text: c.replies.at(-1)!.text } }) })),
     ...readPartComments(decisionsPath).map((c): Trail => ({ id: c.id, key: c.key, kind: 'part', part: c.part, at: c.at, read: c.read, ...(c.reply !== undefined && c.replied && { reply: { at: c.replied, text: c.reply } }) })),
   ];
+  // Each reply mark belongs to the latest send on its key at or before it, so a send answered more than once lists every reply and no reply shows under two sends.
+  const asReply = (m: TrailMark): Reply => ({ at: m.at, ...(m.text && { text: m.text }), ...(m.link && { link: m.link }), ...(m.options?.length && { options: m.options }) });
+  const owns = new Map<Trail, TrailMark[]>();
+  for (const m of marks.filter((x) => x.op === 'reply')) {
+    const mine = sends.filter((x) => x.kind !== 'ticket' && !x.reply && x.key === m.key && (!m.id || m.id === x.id) && second(x.at) <= second(m.at)).sort((x, y) => second(y.at) - second(x.at))[0];
+    if (mine) owns.set(mine, [...(owns.get(mine) ?? []), m]);
+  }
   return sends.map((s) => {
     // A mark covers a send made at or before it (to the second: a post's time may carry milliseconds, a send's does not).
     const mark = (...ops: string[]) => marks.find((m) => ops.includes(m.op) && m.key === s.key && (!m.id || m.id === s.id) && second(m.at) >= second(s.at));
     const said = s.reply ? undefined : marks.filter((m) => m.op === 'reply' && m.key === s.key && (!m.id || m.id === s.id) && second(m.at) >= second(s.at)).sort((x, y) => second(y.at) - second(x.at))[0], again = filed.get(s.key), posted = again && second(again) > second(s.at) ? again : undefined;
-    const reply = s.reply ?? (said ? { at: said.at, ...(said.text && { text: said.text }), ...(said.link && { link: said.link }) } : posted ? { at: posted, acted: true as const } : undefined);
+    const all = s.kind === 'ticket' ? undefined : (owns.get(s) ?? []).sort((x, y) => Date.parse(x.at) - Date.parse(y.at)).map(asReply), replies = all && all.length > 1 ? all : undefined;
+    const reply = s.reply ?? all?.at(-1) ?? (said ? { at: said.at, ...(said.text && { text: said.text }), ...(said.link && { link: said.link }), ...(said.options?.length && { options: said.options }) } : posted ? { at: posted, acted: true as const } : undefined);
     const read = first(mark('read')?.at, s.read, reply?.at), delivered = first(mark('delivered')?.at, s.delivered, read);
     const seen = reply && marks.find((m) => m.op === 'seen' && m.key === s.key && second(m.at) >= second(reply.at))?.at;
     const opened = s.taken && marks.find((m) => m.op === 'seen' && m.key === s.key && second(m.at) >= second(s.at))?.at;
-    return { ...s, ...(delivered && { delivered }), ...(read && { read }), ...(reply && { reply }), ...(seen && { seen }), ...(opened && { opened }) };
+    return { ...s, ...(delivered && { delivered }), ...(read && { read }), ...(reply && { reply }), ...(replies && { replies }), ...(seen && { seen }), ...(opened && { opened }) };
   });
 }
 
