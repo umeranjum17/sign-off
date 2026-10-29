@@ -2078,7 +2078,9 @@
     for (const d of state.decisions) {
       if (gone.has(d.key) || merged.has(d.key) || (d.type === 'evidence' && ['RUN FAIL', 'INCONCLUSIVE'].includes(d.evidenceCard?.result))) continue;
       const sent = trailOf(d.key), last = sent.at(-1), a = area(d), kind = threadKind(d);
-      const st = sent.some(unseen) || (!sent.length && (['report', 'proof'].includes(kind) || a === 'reports') && unread(d)) ? 'new'
+      // On an answered card a reply with no words (the link, or the card posted again) is the card acted on, not news: only the agent's words, or a send it has not answered, are.
+      const answered = d.type !== 'signin' && sent.some((t) => t.kind === 'answer');
+      const st = sent.some((t) => unseen(t) && !(answered && !t.reply.text)) || (!sent.length && (['report', 'proof'].includes(kind) || a === 'reports') && unread(d)) ? 'new'
         : a === 'waiting' || (a === 'evidence' && (d.options.length || d.reply)) ? 'turn'
         // A design review a lead posted is Main's until promoted: it waits on its agents, never in Decide.
         : (last && !last.reply) || (a === 'designs' && dzOpen(d)) ? 'agent' : 'done';

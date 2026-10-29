@@ -127,6 +127,12 @@ try {
     assert.ok(m.sections[0].rows.every((r) => r.startsWith('* ')), 'every New row is unread');
     assert.deepEqual(m.chips.map((c) => c.replace(/\d+(\]?)$/, '$1')), ['[All]', 'Decisions', 'Plans', 'Reports', 'Tickets'], 'kind chips: ' + m.chips.join(', '));
   });
+  // Answered and acted on (the digest on Mondays): not under New though its reply was never opened; it is under Archived, behind the fold.
+  await capture('archived', '#inbox', `(() => { [...document.querySelectorAll('.ib-fold')].find((b) => /archived/.test(b.textContent)).click(); document.querySelector('.ib-sec[aria-label=Archived]').scrollIntoView({ block: 'end' }); })()`, (m) => {
+    const rows = (head) => m.sections.find((s) => s.head.replace(/\s*\d+$/, '') === head)?.rows ?? [];
+    assert.ok(!rows('New').some((r) => r.includes('Send the digest on Mondays?')), 'the acted thread is still under New');
+    assert.ok(rows('Archived').some((r) => r.includes('Send the digest on Mondays?')), 'the acted thread is not under Archived: ' + JSON.stringify(m.sections));
+  });
   await capture('thread', '#inbox/ship', `document.querySelector('.tr-opts')?.scrollIntoView({ block: 'center' })`, (m) => {
     assert.deepEqual(m.follow, ['Ship Friday', 'Wait a week']);
     assert.ok(m.pairs.some((p) => /Your question > .*Reply/.test(p)), 'a question then its reply: ' + m.pairs.join(' | '));
