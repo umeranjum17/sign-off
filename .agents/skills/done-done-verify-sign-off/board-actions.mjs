@@ -108,9 +108,17 @@ const PAGES = [
     const row = h.need('Decide row', h.board().querySelector('.ib-sec[aria-label="Decide"] a.ib-row'));
     if (row) { row.click(); await h.until('the Decide row thread', () => /^#inbox\/[\w.~-]+$/.test(location.hash) && h.board().querySelector('.ib-thread .ib-open')); h.did.push('Inbox Decide row'); }
     await h.nav('thread Open the item', h.board().querySelector('.ib-thread .ib-open'), /^#inbox\/[\w.~-]+\/open$/);
+    // Back on the list: an item opened from its thread fills the screen, so the chips and the fold are the inbox's own.
+    location.hash = '#inbox';
+    await h.until('the inbox list', () => !/\/open$/.test(location.hash) && h.board().querySelector('.ib-chip'));
     const chip = (name) => h.find(new RegExp(`^${name}`), h.board(), 'button'), on = (name) => () => h.board().querySelector('.ib-chip[aria-pressed="true"]')?.textContent.startsWith(name);
     await h.press('Decisions chip', chip('Decisions'), on('Decisions'));
     await h.press('All chip', chip('All'), on('All'));
+    // Everything on the seed board is filed now, so nothing is done yet: a report read leaves New for the answered and done fold.
+    location.hash = "#inbox/new-sign-in/open";
+    await h.until('the report read', () => /\/open$/.test(location.hash) && h.reader()?.textContent.trim());
+    location.hash = '#inbox';
+    await h.until('the inbox list again', () => !/\/open$/.test(location.hash) && h.board().querySelector('.ib-chip'));
     const fold = await h.until('the answered fold', () => h.find(/^Show \d+ answered and done$/, h.board(), 'button'));
     await h.press('Show answered and done', fold, () => h.board().querySelector('.ib-sec[aria-label="Answered and done"]'));
     await h.press('More', [...document.querySelectorAll('button[aria-label="More"]')].find((e) => e.getBoundingClientRect().width > 0), () => document.getElementById('t-more')?.open);
@@ -311,7 +319,7 @@ try {
         for (const [i, stage] of page.stages.entries()) {
           const src = `async () => { const h = (${helpers})(${JSON.stringify(page.hash)}, ${JSON.stringify(page.ready)}); try { await (${stage.run})(h, ${JSON.stringify(stage.data ?? null)}); } catch (e) { h.missing.push(location.hash + ': ' + e.message); } return h.done(); }`;
           const r = evalIn(src);
-          console.log(`${theme} ${width}w ${page.name}${i ? `/${i}` : ''}: ${r.did.length} clicked${r.missing.length ? `, ${r.missing.length} MISSING` : ''}`);
+          console.log(`${theme} ${width}w ${page.name}${i ? `/${i}` : ''}: ${r.did.length} clicked${r.missing.length ? `, ${r.missing.length} MISSING: ${r.missing.join('; ')}` : ''}`);
           failures.push(...r.missing.map((m) => `${theme} ${width}w ${m}`));
           if (stage.shot) capture(stage.shot, /toast/.test(stage.shot));
         }
