@@ -5392,7 +5392,9 @@ test('the inbox: one list of every kind with new replies first, then Decide, the
     await until(async () => (await state()).answers.asked.answer === 'yes');
     assert.equal(JSON.parse(readFileSync(join(dir, 'board.answers.jsonl'), 'utf8').trim().split('\n').at(-1)).replaces, undefined);
     await evaluate('location.hash = "#inbox"');
-    await until(async () => (await list()).find((s) => s[0] === 'Waiting on agents')?.includes('Ship the settings page Friday?'));
+    // On a timeout, say where the card is and what its trail holds.
+    await until(async () => (await list()).find((s) => s[0] === 'Waiting on agents')?.includes('Ship the settings page Friday?'))
+      .catch(async (e) => assert.fail(`${e.message}: ${JSON.stringify(await list())} ${await evaluate('JSON.stringify([state.answers.asked, (state.trail ?? []).filter((t) => t.key === "asked")])')}`));
     assert.ok(!(await list()).find((s) => s[0] === 'Decide')?.includes('Ship the settings page Friday?'));
     assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
   } finally { await close(); }
