@@ -1924,7 +1924,7 @@
     const err = el('span', { class: 'err', role: 'alert' }), row = el('div', { class: 'tr-opts', role: 'group', 'aria-label': 'Answer this reply' });
     for (const o of opts) {
       const b = el('button', { type: 'button', class: 'tr-opt' }, o.label);
-      b.onclick = async () => { row.querySelectorAll('button').forEach((x) => (x.disabled = true)); try { await (final ? postJson('/api/answers', { key: t.key, follow: true, ...(card?.options?.some((x) => x.value === o.value) ? { answer: o.value, note: '' } : { answer: 'text', note: o.label }) }) : postJson('/api/messages', { kind: 'comment', key: t.key, text: o.label })); if (final) say(`Answered: ${o.label}. The card moved to Answered.`, 3200); render(); } catch (e) { row.querySelectorAll('button').forEach((x) => (x.disabled = false)); err.textContent = `Could not send: ${e.message}`; } };
+      b.onclick = async () => { row.querySelectorAll('button').forEach((x) => (x.disabled = true)); try { await (final ? call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: t.key, follow: true, ...(card?.options?.some((x) => x.value === o.value) ? { answer: o.value, note: '' } : { answer: 'text', note: o.label }) }) }) : postJson('/api/messages', { kind: 'comment', key: t.key, text: o.label })); if (final) say(`Answered: ${o.label}. The card moved to Answered.`, 3200); render(); } catch (e) { row.querySelectorAll('button').forEach((x) => (x.disabled = false)); err.textContent = `Could not send: ${e.message}`; } };
       row.append(b);
     }
     return el('div', { class: 'tr-follow' }, row, err);
