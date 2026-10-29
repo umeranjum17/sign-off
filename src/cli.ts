@@ -14,7 +14,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendKind, readKinds, appendSendBack, appendTicket, readTickets, readTicketActivity, rollUp, appendTicketComment, readTicketComments, ticketCommentFault, ticketFault, ticketTwin, releaseIsWhen, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendReopened, readReopened, reopenedNow, ReopenError, appendKind, readKinds, appendSendBack, appendTicket, readTickets, readTicketActivity, rollUp, appendTicketComment, readTicketComments, ticketCommentFault, ticketFault, ticketTwin, releaseIsWhen, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, downloadFiles, galleryFrames, guided, kitWarnings, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -44,8 +44,8 @@ const AGENTS: Record<string, { bin: string; dir: string; home: string }> = {
 };
 const TOP_HELP = `version: ${VERSION.label}
 usage: sign-off-axi [command] [board.json] [flags]
-commands[26]:
-  (none)=list, raise, post, answers, wait, poll, deeper, owner, open, status, stop, serve, export, init, report, signin, dismiss, restore, promote, feedback, ticket, project, refile, doctor, notify, validate, help
+commands[27]:
+  (none)=list, raise, post, answers, wait, poll, deeper, owner, open, status, stop, serve, export, init, report, signin, dismiss, restore, reopen, promote, feedback, ticket, project, refile, doctor, notify, validate, help
 board: the nearest .sign-off/ board (the walk's bounds and SIGN_OFF_HOME: README, "Test runs never touch your board"), else ~/.sign-off/decisions.json; a board file given always wins
 flags: --full and --json on list, answers and wait, --events on wait, --json on status, ticket and project, --filer on post, raise and wait, --ticket and --priority on post and raise, --help on every command, -v/--version
 examples:
@@ -366,6 +366,14 @@ examples:
   sign-off-axi project --name Beacon --clear-icon
   sign-off-axi project --name Muxr --terminal-app
   sign-off-axi project --json
+`,
+  reopen: `usage: sign-off-axi reopen <key> [board.json]
+Reopens a card the person already answered, so you can ask again on the same key. The card goes back to the list it belongs to (a question to Decide, a design review to Designs) and waits for a new answer.
+The person's answer and note are not erased: they stay in the answers log and in the card's thread, followed by a line that you reopened it, and the new answer shows what it replaced.
+It writes one line to <board>.reopened.jsonl beside the board. Refused when the card is already open, when the key is unknown, and when the card is no longer on the board.
+After it, post the question again under the same key to change it (new options, a new round), or just wait for the person to answer the same question once more.
+examples:
+  sign-off-axi reopen ship-the-new-sign-in-screen-this-week
 `,
   promote: `usage: sign-off-axi promote <key> [board.json] [--undo]
 For Main only, never a lead. A design review a lead posts (post --kind design) shows under Designs, where Main reviews it; it never waits in Decide or counts as the user's ask.
@@ -1205,6 +1213,35 @@ function dismiss(restoring: boolean) {
   };
 }
 
+/** Reopens the answered card `key`: the one rule the CLI and the board's Reopen both follow. The answer stays in the log and the card waits again; a card the board hides
+ * (dismissed, discarded) comes back with it, as it is answered or waiting only on the list it belongs to. Throws ReopenError for a key nothing knows, a card that is
+ * no longer on the board and a card that is already open. */
+function reopenCard(file: string, key: unknown) {
+  const d = isKey(key) ? board(file).find((x) => x.key === key) : undefined;
+  const reopened = appendReopened(file, String(key), d, d?.answer);
+  if (d?.dismissed) appendDismissed(file, [d.key], false);
+  return { reopened, d: d! };
+}
+
+/** reopen <key> [board.json]: the lead takes an answer back to ask again; the person's answer stays as history. */
+function reopen(args: string[]) {
+  const at = args.findIndex((a) => !a.startsWith('-') && !existsSync(a) && !a.endsWith('.json')), key = args[at];
+  if (at < 0) throw fail('reopen needs a card key', 'VALIDATION_ERROR', 'sign-off-axi reopen <key> [board.json]');
+  const { file, on } = parse('reopen', args.filter((_, i) => i !== at), {});
+  ready(file, on);
+  return locked(`${file}.lock`, () => {
+    try {
+      const { reopened: { was }, d } = reopenCard(file, key);
+      const lane = d.kind === 'design' ? 'Designs' : 'Decide';
+      return toon({ board: tilde(file), reopened: [{ key, title: d.title, was: was.answer === 'text' ? 'in their own words' : was.label, answered: was.at }] },
+        [`${key} waits in ${lane} again; the answer it had stays in its thread`, `Run \`sign-off-axi wait${on} --key ${key}\` to block until the person answers`]);
+    } catch (e) {
+      if (e instanceof ReopenError) throw fail(e.message, e.code, e.code === 'NOT_FOUND' ? `Run \`sign-off-axi list${on} --full\` to see the keys` : `Run \`sign-off-axi wait${on} --key ${key}\` to wait for its answer`);
+      throw e;
+    }
+  });
+}
+
 /** promote <key> [board.json] [--undo]: Main puts a design review it passed in front of the user, in Decide; --undo takes it back to Designs. */
 function promote(args: string[]) {
   const at = args.findIndex((a) => !a.startsWith('-') && !existsSync(a) && !a.endsWith('.json')), key = args[at];
@@ -1834,7 +1871,7 @@ function checkAskRefs(incoming: Decision[], raw: any[], current: Decision[]) {
 function storeIncoming(file: string, named: string, on: string, { incoming, raw }: { incoming: Decision[]; raw: any[] }, filer?: string, exact = false) {
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
-    const current = board(file), items = existsSync(file) ? readItems(file).items : [], saved = readAnswers(file), now = new Date().toISOString();
+    const current = board(file), items = existsSync(file) ? readItems(file).items : [], saved = readAnswers(file), reopened = reopenedNow(file), now = new Date().toISOString();
     checkAskRefs(incoming, raw, current);
     checkMerges(incoming, [...current.filter((c) => !incoming.some((d) => d.key === c.key)), ...incoming], current);
     // Proof is evidence: a new ask that offers Pass and Fail would sit in Waiting on you as an ask, so it is refused.
@@ -1859,16 +1896,21 @@ function storeIncoming(file: string, named: string, on: string, { incoming, raw 
       const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, dismissed: undefined, filer: undefined, filed: undefined, ask_ref: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
       // A message that names no filed time matches the one the board stamped.
       const differs = () => exact ? canon({ ...items.find((x) => x?.key === d.key), ...(raw[i].filed === undefined && { filed: undefined }), announced: undefined }) !== canon(raw[i]) : same(had!) !== same(d);
-      if (had && differs()) throw refuse(`already holds a different ${contract ? 'message' : 'question'} on ${tilde(file)}`);
+      // A card the lead reopened (sign-off-axi reopen) may be asked again on its key: the new question or round replaces the old one, filed now, and its earlier answer stays in the thread.
+      const again = !!had && reopened.has(d.key) && differs();
+      if (had && !again && differs()) throw refuse(`already holds a different ${contract ? 'message' : 'question'} on ${tilde(file)}`);
       // Each new item records when it was raised, unless it names its own time.
       if (!had) {
         fits(d.title, d.key);
         items.push({ filed: now, ...raw[i] });
+      } else if (again) {
+        fits(d.title, d.key);
+        items[items.findIndex((x) => x?.key === d.key)] = { filed: now, ...raw[i] };
       }
-      return { key: d.key, status: !had ? 'raised' : had.answer && !awaitsVerdict(had.type, had.answer) ? `already answered ${had.answer.answer}` : waits({ ...had, dismissed: false }) ? 'already waiting' : 'already posted', title: d.title };
+      return { key: d.key, status: !had ? 'raised' : again ? 'raised again' : had.answer && !awaitsVerdict(had.type, had.answer) ? `already answered ${had.answer.answer}` : waits({ ...had, dismissed: false }) ? 'already waiting' : 'already posted', title: d.title };
     });
     let picked: Answer[] = [];
-    if (raised.some((r) => r.status === 'raised')) {
+    if (raised.some((r) => r.status === 'raised' || r.status === 'raised again')) {
       const before = waitingKeys(file);
       writeItems(file, items);
       // On the leash Act, then tell me, a new ask takes its agent's recommended pick at once: the person sees it and can still change it.
@@ -2054,7 +2096,7 @@ const skillInstalled = (dir: string, agent: string) => [join(dir, AGENTS[agent].
 const SKILL_ADD = ['-y', 'skills', 'add', 'umeranjum17/sign-off', '--skill', 'sign-off-axi', '-y', '-a'];
 const skillAdd = (agents: string[]) => `npx ${[...SKILL_ADD, ...agents].join(' ')}`;
 
-const GITIGNORE = 'mocks/\nevidence/\n*.answers.jsonl\n*.rounds.jsonl\n*.messages.jsonl\n*.annotations.jsonl\n*.seen.jsonl\n*.dismissed.jsonl\n*.promoted.jsonl\n*.reads.jsonl\n*.deeper.jsonl\n*.owners.json\n*.delivery.jsonl\n*.board.pid\n*.board.log\nnotify.log\n*.token\n*.export.html\n';
+const GITIGNORE = 'mocks/\nevidence/\n*.answers.jsonl\n*.rounds.jsonl\n*.messages.jsonl\n*.annotations.jsonl\n*.seen.jsonl\n*.dismissed.jsonl\n*.reopened.jsonl\n*.promoted.jsonl\n*.reads.jsonl\n*.deeper.jsonl\n*.owners.json\n*.delivery.jsonl\n*.board.pid\n*.board.log\nnotify.log\n*.token\n*.export.html\n';
 /** The board, port, bind and hosts in <so>/config.yaml (the `key: value` lines init writes). A bad line falls back on its own default
  * (decisions.json, 4410) and `problems` says what is wrong; a file that cannot be read throws. */
 function readSetup(so: string) {
@@ -2688,7 +2730,7 @@ const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex
 /** A file's identity for the board's kept read: inode, size and change time, so a rewrite that keeps its size still counts as a change. */
 const stampOf = (path: string) => { try { const st = statSync(path); return `${st.ino}:${st.size}:${st.mtimeMs}`; } catch { return ''; } };
 /** The files beside the board that hold what it shows: every answer, comment, ticket, read and handed-over reply changes the board's state. */
-const SIDECARS = ['answers', 'rounds', 'seen', 'dismissed', 'kinds', 'promoted', 'tickets', 'projects', 'messages', 'annotations', 'reads', 'deeper', 'trail', 'ticket-comments', 'delivery'];
+const SIDECARS = ['answers', 'rounds', 'seen', 'dismissed', 'reopened', 'kinds', 'promoted', 'tickets', 'projects', 'messages', 'annotations', 'reads', 'deeper', 'trail', 'ticket-comments', 'delivery'];
 /** The files a board read is made from that are named without reading the board: the board itself, its sidecars, and the config and token beside it. */
 const stateSources = () => [file, config, tokenFile(file), ...SIDECARS.map((side) => `${file.replace(/\.json$/, '')}.${side}.jsonl`)];
 /** The files a read was built from beyond those, with the stamp each had: a run's proof or a mock replaced on disk is a new read. */
@@ -2820,6 +2862,8 @@ const state = () => {
     dismissed: readDismissed(file, answers, rounds, warn, fed ? [] : items),
     discarded: Object.fromEntries(readDiscards(file).filter((x) => x.last).map(({ key, reason, at }) => [key, { reason, at }])),
     promoted: readPromoted(file, warn),
+    // `held`: the card has not been answered since, so it is open again and its page says what it was answered before.
+    reopened: ((held) => readReopened(file).map((r) => ({ ...r, ...(held.get(r.key)?.at === r.at && held.get(r.key)?.seq === r.seq && { held: true }) })))(reopenedNow(file)),
     tickets: rollUp(readTickets(file, warn)),
     projects: readProjects(file, warn),
   };
@@ -2902,13 +2946,13 @@ function viewRead(read: NonNullable<typeof built>, view: View) {
     if (!card) return undefined;
     // One card whole: the report body, the proof media it links and the card's own activity come with it, and nothing of the board around it.
     body = { card, counts, version: s.version, answers: answers[card.key] ? { [card.key]: answers[card.key] } : {}, dismissed: gone.has(card.key) ? [card.key] : [],
-      trail: mine(s.trail), rounds: mine(s.rounds), messages: mine(s.messages), annotations: mine(s.annotations), comments: mine(s.comments),
+      trail: mine(s.trail), rounds: mine(s.rounds), messages: mine(s.messages), annotations: mine(s.annotations), comments: mine(s.comments), reopened: mine(s.reopened),
       ...(s.seen_at?.[card.key] && { seen_at: { [card.key]: s.seen_at[card.key] } }), page: { view: 'card', offset: 0, limit: 1, total: 1 } };
   } else if (view.name === 'lists') {
     // The board's own lists, read once the first screen has painted: every answer, dismissal and read mark is the board's truth about cards a page
     // of rows may not name, and the screens that list those (Answered, Archived) need all of it. No rows: those come with their own pages.
     body = { answers: s.answers, seen: s.seen, seen_at: s.seen_at, opened: s.opened, signin_opened: s.signin_opened, reads: s.reads, discarded: s.discarded,
-      dismissed: s.dismissed, promoted: s.promoted, deeper: s.deeper, delivery: s.delivery, counts, version: s.version,
+      dismissed: s.dismissed, promoted: s.promoted, reopened: s.reopened, deeper: s.deeper, delivery: s.delivery, counts, version: s.version,
       decisions: [], page: { view: 'lists', offset: 0, limit: 0, total: 0 } };
   } else if (view.name === 'tickets') {
     // The Tickets screen's own read: its roll-up is the largest part of the board and no other screen shows it.
@@ -2934,7 +2978,7 @@ function viewRead(read: NonNullable<typeof built>, view: View) {
       tickets: ((s.tickets ?? []) as any[]).filter((t) => linked.has(t.id)),
       answers: byKey(answers), seen: ofKeys(s.seen), seen_at: byKey(s.seen_at), opened: byKey(s.opened), signin_opened: byKey(s.signin_opened),
       reads: Object.fromEntries(Object.entries((s.reads ?? {}) as Record<string, string>).filter(([k]) => shown.has(k.split('/')[0]))),
-      discarded: byKey(s.discarded), dismissed: ofKeys(s.dismissed), promoted: ofKeys(s.promoted), deeper,
+      discarded: byKey(s.discarded), dismissed: ofKeys(s.dismissed), promoted: ofKeys(s.promoted), reopened: ofRows(s.reopened), deeper,
       delivery: Object.fromEntries(Object.entries((s.delivery ?? {}) as Record<string, unknown>).filter(([id]) => askIds.has(id))),
       trail: forRow(s.trail), rounds: forRow(s.rounds), messages: forRow(s.messages), annotations: forRow(s.annotations), comments: forRow(s.comments) };
   }
@@ -3185,7 +3229,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   if (req.method === 'GET' && req.url === '/api/board') return [200, { file, pid: process.pid }];
   const tickets = req.method === 'GET' ? ticketsApi((req.url ?? '').split('?')[0]!) : undefined;
   if (tickets) return tickets;
-  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/signin', '/api/opened', '/api/leash', '/api/deeper', '/api/reads', '/api/trail', '/api/engagement', '/api/engagement/seen'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
+  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/reopen', '/api/signin', '/api/opened', '/api/leash', '/api/deeper', '/api/reads', '/api/trail', '/api/engagement', '/api/engagement/seen'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
   if (readOnly()) return [403, { error: 'This board is read-only' }];
   // The leash is the person's own setting in config.yaml, which the board applies to the answers it takes, so an answers-only board takes it too.
   // Dismiss only hides an item on this page and sends nothing to the feeding program, a reply opened (/api/trail) is only the person's own mark, and Go deeper and a comment
@@ -3271,6 +3315,12 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     const have = new Map(board(file).map((x) => [x.key, x]));
     if (!keys.every((k) => isKey(k) && have.has(k))) return [404, { error: 'This item is no longer in the file' }];
     appendDismissed(file, [...new Set<string>(keys)], dismissed, reason);
+    return [200, state()];
+  }
+  if (req.url === '/api/reopen') {
+    // The same rule as `sign-off-axi reopen`: the answer stays as history, the card waits again, and the same three cases are refused.
+    const { key } = JSON.parse(body) ?? {};
+    try { await locked(`${file}.lock`, () => reopenCard(file, key)); } catch (e) { if (e instanceof ReopenError) return [e.status, { error: e.message }]; throw e; }
     return [200, state()];
   }
   if (req.url === '/api/engagement' || req.url === '/api/engagement/seen') {
@@ -3565,7 +3615,7 @@ await runAxiCli({
   topLevelHelp: TOP_HELP,
   getCommandHelp: (cmd) => HELP[cmd],
   home: axi('list', list),
-  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), report: axi('report', report), owner: axi('owner', owner), deeper: axi('deeper', deeper), signin: axi('signin', signin), dismiss: axi('dismiss', dismiss(false)), restore: axi('restore', dismiss(true)), promote: axi('promote', promote), feedback: axi('feedback', feedback), ticket: axi('ticket', ticket), project: axi('project', project), refile: axi('refile', refile), doctor: axi('doctor', doctor), notify: axi('notify', notify), validate, help: ([name, ...rest]) => {
+  commands: { list: axi('list', list), raise: axi('raise', (args) => post(args, 'raise')), post: axi('post', post), answers: axi('answers', answers), wait: axi('wait', wait), poll: axi('poll', poll), open: axi('open', open), status: axi('status', status), stop: axi('stop', stop), serve: axi('serve', serve), export: axi('export', exportBoard), init: axi('init', init), report: axi('report', report), owner: axi('owner', owner), deeper: axi('deeper', deeper), signin: axi('signin', signin), dismiss: axi('dismiss', dismiss(false)), restore: axi('restore', dismiss(true)), reopen: axi('reopen', reopen), promote: axi('promote', promote), feedback: axi('feedback', feedback), ticket: axi('ticket', ticket), project: axi('project', project), refile: axi('refile', refile), doctor: axi('doctor', doctor), notify: axi('notify', notify), validate, help: ([name, ...rest]) => {
     if (rest.length || (name && !HELP[name])) throw fail(`unknown command or argument: ${[name, ...rest].join(' ')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi --help` to see the commands');
     return name ? HELP[name] : TOP_HELP;
   } },

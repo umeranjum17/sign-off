@@ -334,10 +334,11 @@ export const roundsPath = (decisionsPath: string) => decisionsPath.replace(/\.js
 const readRaw = (file: string) => (existsSync(file) ? readFileSync(file, 'utf8') : '');
 /** Latest answer per key; a line with an empty answer (an Undo with nothing to go back to) leaves the key unanswered. A torn line (a crash mid-write) is skipped and reported through warn. */
 export function readAnswers(decisionsPath: string, warn: (msg: string) => void = () => {}): Record<string, Answer> {
-  const latest = new Map<string, Answer>(), sent = new Map<string, Sent[]>();
+  const latest = new Map<string, Answer>(), sent = new Map<string, Sent[]>(), lines = new Map<string, number>();
   readRaw(answersPath(decisionsPath)).split('\n').forEach((line, n) => {
     try {
       const a = line && JSON.parse(line);
+      if (a?.key !== undefined) lines.set(a.key, (lines.get(a.key) ?? 0) + 1);
       if (a?.answer === '') latest.delete(a.key);
       else if (a) {
         latest.set(a.key, a);
@@ -347,7 +348,50 @@ export function readAnswers(decisionsPath: string, warn: (msg: string) => void =
       warn(`skipped unreadable line ${n + 1} in ${answersPath(decisionsPath)}`);
     }
   });
+  // An answer the agent reopened is history: its line stays in the log, but the card is open again until a line comes after it.
+  for (const r of readReopened(decisionsPath)) if (r.seq === lines.get(r.key)) latest.delete(r.key);
   return Object.fromEntries([...latest].map(([key, a]) => [key, sent.has(key) ? { ...a, comments: sent.get(key) } : a]));
+}
+
+/** An answer the agent took back to ask again, as its own line in <board>.reopened.jsonl: the person's answer stays in the answers log and is copied here whole
+ * (`was`), so the thread can say what they said and the card can say it was reopened. `seq` is how many lines the answers log held for the key when it was
+ * reopened: the reopen holds only while that line is still the last, so any answer, Undo or clear after it makes the card an ordinary one again. */
+export type Reopened = { key: string; seq: number; at: string; was: Pick<Answer, 'answer' | 'label' | 'at' | 'note' | 'notes' | 'decisions' | 'pick' | 'taken' | 'reason'> };
+export const reopenedPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.reopened.jsonl';
+/** Every reopen, oldest first, held or since answered again. A torn line is skipped. */
+export function readReopened(decisionsPath: string): Reopened[] {
+  return readRaw(reopenedPath(decisionsPath)).split('\n').flatMap((line) => {
+    try { const r = line && JSON.parse(line); return r && typeof r.key === 'string' && Number.isInteger(r.seq) && !Number.isNaN(Date.parse(r.at)) && typeof r.was?.answer === 'string' ? [r as Reopened] : []; } catch { return []; }
+  });
+}
+/** The reopens that still hold, one per key: the card has not been answered since. */
+export function reopenedNow(decisionsPath: string): Map<string, Reopened> {
+  const all = readReopened(decisionsPath);
+  if (!all.length) return new Map();
+  const lines = new Map<string, number>();
+  for (const a of answerLines(decisionsPath)) lines.set(a.key, (lines.get(a.key) ?? 0) + 1);
+  return new Map(all.filter((r) => r.seq === lines.get(r.key)).map((r) => [r.key, r]));
+}
+/** The answer a reopened card had, as a new answer on it names what it replaces. */
+const reopenedWas = (decisionsPath: string, key: string): Answer['replaces'] => {
+  const was = reopenedNow(decisionsPath).get(key)?.was;
+  return was && { answer: was.answer, label: was.label, at: was.at, ...(was.note && { note: was.note }), ...(was.taken && { taken: was.taken }) };
+};
+/** Why a card cannot be reopened, as the CLI and the board both say it. `code` is the CLI's error code and `status` the board's HTTP status. */
+export class ReopenError extends InputError {
+  constructor(message: string, readonly code: 'NOT_FOUND' | 'CONFLICT', readonly status: 404 | 409) { super(message); }
+}
+/** Reopens the answer a card holds. `d` is the card as the board has it (undefined when the key is not on the board), `answer` its current answer; refuses
+ * a key nothing knows, a card that is not on the board, and a card that is already open. */
+export function appendReopened(decisionsPath: string, key: string, d: { type?: string } | undefined, answer: Answer | undefined): Reopened {
+  const lines = answerLines(decisionsPath).filter((a) => a.key === key);
+  if (!d) throw new ReopenError(lines.length ? `${key} is no longer on the board, so there is no card to reopen` : `no card with key ${key}`, 'NOT_FOUND', 404);
+  if (!answer || awaitsVerdict(d.type, answer)) throw new ReopenError(`${key} is already open: nothing has been answered on it`, 'CONFLICT', 409);
+  const { key: _key, close: _close, comments: _comments, merged_by: _merged, replaces: _replaces, round: _round, ...was } = answer;
+  const joined = was.note || was.notes?.map((n) => n.note).filter(Boolean).join(' · ');
+  const r: Reopened = { key, seq: lines.length, at: now(), was: { ...was, ...(joined && { note: joined }) } };
+  appendLine(reopenedPath(decisionsPath), r);
+  return r;
 }
 
 /** Every answer line as saved, oldest first; a torn line is left out (readAnswers reports it). */
@@ -397,7 +441,7 @@ function saveAnswer(decisionsPath: string, d: Decision, option: Option, note: st
   const current = readAnswers(decisionsPath)[d.key];
   // The person giving the answer the leash took makes it theirs: a new line.
   if (!follow && (option === CLEARED ? !current : current?.answer === option.value && (current.note ?? '') === note && !comments.length && current.taken === took?.taken)) return;
-  const was = option === CLEARED || follow ? undefined : current ?? lastTaken(decisionsPath, d.key);
+  const was = option === CLEARED || follow ? undefined : current ?? reopenedWas(decisionsPath, d.key) ?? lastTaken(decisionsPath, d.key);
   const answer: Answer = { key: d.key, answer: option.value, label: option.label, close: d.close, at: now(), ...(note && { note }), ...(comments.length && { comments }), ...(by && { merged_by: by }), ...took,
     ...(was && { replaces: { answer: was.answer, label: was.label, at: was.at, ...(was.note && { note: was.note }), ...(was.taken && { taken: was.taken }) } }) };
   appendLine(answersPath(decisionsPath), answer);
@@ -440,7 +484,8 @@ export function appendDesignAnswer(decisionsPath: string, d: Decision, round: st
   const decided = current?.answer === 'approve' || current?.answer === 'change' ? current.answer : undefined;
   const kept = (verdict ?? (requested === true ? 'change' : decided ?? SCREENS_ONLY)) as string;
   const keptPick = (pick ?? (options.some(o => o.value === current?.pick) ? current?.pick : undefined)) as string | undefined;
-  const answer: Answer = { key: d.key, answer: kept, label: DESIGN_LABEL[kept], close: d.close ?? 'done', at: now(), notes, ...(keptPick !== undefined && { pick: keptPick }), round };
+  const was = saved ? undefined : reopenedWas(decisionsPath, d.key);
+  const answer: Answer = { key: d.key, answer: kept, label: DESIGN_LABEL[kept], close: d.close ?? 'done', at: now(), notes, ...(keptPick !== undefined && { pick: keptPick }), round, ...(was && { replaces: was }) };
   if (current?.answer === answer.answer && JSON.stringify([current.notes, current.pick]) === JSON.stringify([answer.notes, answer.pick])) return;
   appendLine(answersPath(decisionsPath), answer);
   return answer;
@@ -469,7 +514,8 @@ export function appendSendBack(decisionsPath: string, d: Decision, notes: unknow
   const note = typeof comment === 'string' ? comment.trim() : '';
   const answer: Answer = { key: d.key, answer: 'sent', label: 'Sent back', close: d.close, at: now(), ...(note && { note }),
     notes: named.flatMap((id) => notes.filter((n) => n.section === id)).map(({ section, verdict, note }) => ({ section, verdict, ...(note?.trim() && { note: note.trim() }) })), decisions: Object.fromEntries(keys.map((k) => [k, (p[k] as string).trim()])) };
-  const current = readAnswers(decisionsPath)[d.key];
+  const current = readAnswers(decisionsPath)[d.key], was = current ? undefined : reopenedWas(decisionsPath, d.key);
+  if (was) answer.replaces = was;
   if (current?.answer === answer.answer && JSON.stringify([current.note ?? '', current.notes, current.decisions]) === JSON.stringify([answer.note ?? '', answer.notes, answer.decisions])) return;
   appendLine(answersPath(decisionsPath), answer);
   return answer;

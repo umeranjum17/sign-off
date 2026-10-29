@@ -2041,8 +2041,8 @@ test('Decide on a phone: an ask is a sheet over the list with its bar at the foo
   await until(async () => (await evaluate('location.hash + "|" + !!document.querySelector(".ask-sheet")')) === '#waiting|false' && (await evaluate('!document.querySelector("#toast").hidden')) && (await heads()) === 'Asks|Answered1');
   await evaluate('document.querySelector(".g-done .dl-face").click()');
   await until(async () => (await evaluate('location.hash + "|" + document.querySelector(".decide .ans-card b")?.textContent')) === '#decide/alpha|A');
-  // There it shows the answer, when and that the agent has not read it, with Change answer as its one button and no ask's More.
-  assert.equal(await evaluate('[document.querySelector(".decide .ans-meta").textContent.split(" · ")[0], document.querySelector(".decide .ui-trail").getAttribute("aria-label").replace(/\\d\\d:\\d\\d/, "hh:mm"), document.querySelector(".decide-bar .answer").textContent, !!document.querySelector(".sh-head .dl-more")].join("|")'), 'Answered|Sent: Sent hh:mm|Change answer|false');
+  // There it shows the answer, when and that the agent has not read it, with Change answer as its one button and a More that holds only Reopen this question.
+  assert.equal(await evaluate('[document.querySelector(".decide .ans-meta").textContent.split(" · ")[0], document.querySelector(".decide .ui-trail").getAttribute("aria-label").replace(/\\d\\d:\\d\\d/, "hh:mm"), document.querySelector(".decide-bar .answer").textContent, !!document.querySelector(".sh-head .dl-more")].join("|")'), 'Answered|Sent: Sent hh:mm|Change answer|true');
   // Change answer brings the cards back with nothing picked and the answer given tagged; the button is off until another answer, then names the change.
   await evaluate('document.querySelector(".decide-bar .answer").click()');
   await until(async () => (await evaluate('document.querySelectorAll(".decide .pick-option").length')) === 4);
