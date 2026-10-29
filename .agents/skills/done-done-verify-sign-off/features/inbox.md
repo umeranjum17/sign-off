@@ -1,14 +1,14 @@
 # Inbox
 
-The board's first screen and its only place: every exchange with an agent, whatever its kind (decision, plan, report, design, ticket, proof), is one thread in one list. It replaces Today and the separate Decide, Designs, Reports, Evidence and Tickets entries in the dock and the sidebar; their old addresses still open.
+One more menu beside Today, Decide, Evidence, Reports and Tickets (dock and sidebar; address `#inbox`): the catch-up on every conversation with an agent or lead, whatever its kind (decision, plan, report, design, ticket, proof), one thread per row, each row showing where that thread stands now (new reply, waiting on you, waiting on an agent, archived). It does not replace any of those menus, and Today stays the first screen.
 
 ## What it shows
 
-- The list, in four sections: **New** (a reply not opened yet, and a report or proof not read), **Decide** (what waits on the person), **Waiting on agents** (each row says what the person sent and its step: Sent, Delivered, Read), and **Answered and done**, folded behind `Show N answered and done`. Newest first in each; eight rows until `Show N more`.
+- The list, in four sections: **New** (a reply not opened yet, and a report or proof not read), **Decide** (what waits on the person), **Waiting on agents** (each row says what the person sent and its step: Sent, Delivered, Read), and **Archived**, folded behind `Show N archived`. A thread archives itself once its question is answered and acted on, its work is merged or it is closed; it stays in search, and returns to the live list when a new message arrives on it. Newest first in each; eight rows until `Show N more`.
 - A search box and kind chips (All, Decisions, Plans, Reports, Designs, Tickets, Proofs; a kind shows only when the board holds one, with what is still open). Tickets reads the board's ticket roll-up when picked.
-- The tab's title counts New and Decide: `(3) Inbox · sign-off`.
+- The Inbox tab and sidebar entry carry a red count of New and Decide threads.
 - A row opens its thread (`#inbox/<key>`; a ticket is `#inbox/~<id>`): the card's words (Asked or Posted), then each exchange as a pair with its four-step track: Your answer, Your action then What was done with its link, Your question then Reply. A reply that asks for a next step carries up to four follow-up buttons, the first in ink; a tap is the final answer and moves the card to Answered. Writing back in the box under the thread is a comment: the card stays in Decide until a final pick.
-- `Open the <kind>` (`#inbox/<key>/open`) opens the item; each item links back with `Thread · N new`.
+- `Open the <kind>` (`#inbox/<key>/open`) opens the item, with its own back link to the thread.
 - A reply that lands while the board is open shows a notice at the top for 9 seconds; a tap opens its thread. The server sends the same notice to the configured receiver (`notify:`), linking `#inbox/<key>`.
 - On a phone the list is one page and a row opens its thread over it. On a desk (1024px and wider) the list sits beside the open thread, and an item opened from its thread sits beside that thread.
 

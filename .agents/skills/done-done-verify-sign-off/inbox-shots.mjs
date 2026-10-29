@@ -1,5 +1,5 @@
-// The inbox: every exchange with an agent as one thread in one list, whatever its kind. New replies first, then what waits on the person, then what waits
-// on an agent with its trail step, then answered and done folded away. Kind chips filter the list; a row opens its thread (beside the list on a desk).
+// The inbox, one more menu beside Today, Decide, Evidence, Reports and Tickets: every exchange with an agent as one thread in one list, whatever its kind. New replies first, then what waits on the person, then what waits
+// on an agent with its trail step, then archived threads folded away (a thread archives itself once it is answered and acted on). Kind chips filter the list; a row opens its thread (beside the list on a desk).
 // Driven the way it happens: the person answers in the board, the agents' own waits take the answers, and the agents run `feedback <key> --reply`.
 // A headless Chromium of its own over the DevTools protocol with exact device metrics (360, 390 or 445 x 844 on a phone; 1280 or 1440 x 800 on a desk; 2x), its profile in a temp folder.
 // States: inbox (unread first and the kind chips), thread (a reply that asks for a next step, its pair and its follow-up buttons), action (Your action, What was done and its link),
@@ -57,7 +57,7 @@ cli('feedback', 'beta', board, '--reply', 'Kept it to the ten teams. The import 
 await api('/api/answers', { key: 'ship', answer: 'text', note: 'What does Friday need from QA?' });
 cli('wait', board, '--filer', 'settings-agent', '--timeout', '5');
 cli('feedback', 'ship', board, '--reply', 'QA signs off Thursday, so Friday holds. Ship it Friday?', '--option', 'yes=Ship Friday', '--option', 'no=Wait a week');
-// Answered and done.
+// Answered and acted on: it archives itself.
 await api('/api/answers', { key: 'old', answer: 'yes', note: '' });
 cli('wait', board, '--filer', 'release-agent', '--timeout', '5');
 cli('feedback', 'old', board, '--acted', '--link', 'https://github.com/example/digest/pull/12');
@@ -97,10 +97,12 @@ const MEASURE = `(async () => { await document.fonts.ready; const fail = [], w =
   const follow = [...document.querySelectorAll('.tr-opt')].filter(vis).map((b) => b.textContent);
   const notice = [...document.querySelectorAll('.ib-note')].filter(vis).map((n) => n.innerText.replace(/\\n+/g, ' / '));
   const thread_answers = thread ? thread.querySelectorAll('.tr-opt, .tr-opts, [role=radio], input[type=radio], .pick-option, .answer').length : 0;
+  const menu = [...document.querySelectorAll('#tabs a, #nav a:not(.sfind)')].filter(vis).map((a) => (a.getAttribute('aria-label') || a.textContent).replace(/,.*$|\\d+$/g, '').trim()), search = [...document.querySelectorAll('a[href="#find"]')].some(vis);
+  for (const e of document.querySelectorAll('#tabs, .dock-find')) { const r = e.getBoundingClientRect(); if (r.width > 0 && (r.left < 0 || r.right > w)) fail.push('the dock leaves the screen'); }
   if (document.documentElement.scrollWidth > w) fail.push('sideways overflow');
   const words = document.body.innerText, bad = words.match(/\\b(?:answer|round|comment):[\\w.-]+:|\\btrail\\.jsonl\\b|undefined|NaN|\\[object/g) ?? [];
   if (bad.length) fail.push('raw words: ' + bad.join(', '));
-  return { url: location.href, viewport_width: window.innerWidth, title: document.title, sections, chips, thread: thread?.querySelector('.ib-ttl')?.textContent ?? '', status: thread?.querySelector('.ib-state')?.textContent ?? '', pairs, follow, closed: document.querySelector('.ib-closed')?.innerText.replace(/\\n+/g, ' / ') ?? '', notice, thread_answers, fail }; })()`;
+  return { url: location.href, viewport_width: window.innerWidth, title: document.title, menu, search, sections, chips, thread: thread?.querySelector('.ib-ttl')?.textContent ?? '', status: thread?.querySelector('.ib-state')?.textContent ?? '', pairs, follow, closed: document.querySelector('.ib-closed')?.innerText.replace(/\\n+/g, ' / ') ?? '', notice, thread_answers, fail }; })()`;
 const results = [];
 const capture = async (state, hash, before, check) => {
   errors.length = 0;
@@ -117,7 +119,10 @@ const capture = async (state, hash, before, check) => {
 const heads = (m) => m.sections.map((s) => s.head.replace(/\s*\d+$/, ''));
 const tap = (sel) => `(() => { const b = [...document.querySelectorAll(${JSON.stringify(sel)})].find((e) => e.getBoundingClientRect().width > 0); b.scrollIntoView({ block: 'center' }); b.click(); })()`;
 try {
-  await capture('inbox', '#', '', (m) => {
+  await capture('inbox', '#inbox', '', (m) => {
+    const want = phone ? ['Today', 'Inbox', 'Decide', 'Evidence', 'Reports', 'Tickets'] : ['Today', 'Inbox', 'Decide', 'Evidence', 'Reports', 'Designs', 'Tickets'];
+    assert.deepEqual(m.menu, want, 'every menu and the Inbox: ' + m.menu.join(', '));
+    assert.ok(m.search, 'Search is one tap away');
     assert.deepEqual(heads(m), ['New', 'Decide', 'Waiting on agents'], 'sections in order: ' + heads(m).join(', '));
     assert.ok(m.sections[0].rows.every((r) => r.startsWith('* ')), 'every New row is unread');
     assert.deepEqual(m.chips.map((c) => c.replace(/\d+(\]?)$/, '$1')), ['[All]', 'Decisions', 'Plans', 'Reports', 'Tickets'], 'kind chips: ' + m.chips.join(', '));
@@ -136,7 +141,7 @@ try {
   // The card is answered: the board's own asks page no longer lists it as open.
   const asks = await (await fetch(base + 'api/decisions?view=asks&limit=50')).json();
   if ((asks.decisions ?? asks.asks ?? []).some((d) => d.key === 'ship')) results.at(-1).fail.push('ship is still an open ask');
-  await go('#');
+  await go('#inbox');
   // A reply lands while the board is open: the page reads the board every 20 seconds, so the notice is waited for, then captured while it shows.
   cli('feedback', 'export', board, '--reply', 'The export is on for admins only; it ships Friday.', '--link', 'https://github.com/example/settings/pull/250');
   await capture('notice', null, `new Promise((ok) => { const t = Date.now(), f = () => document.querySelector('.ib-note') || Date.now() - t > 26000 ? ok() : setTimeout(f, 200); f(); })`, (m) => {

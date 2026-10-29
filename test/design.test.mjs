@@ -156,7 +156,7 @@ test('design journey: init, doctor, post A/B/C, pick in the browser, another rou
   procs.push(proc);
   const url = await new Promise((ok) => proc.stdout.once('data', (b) => ok(/http:\/\/127\.0\.0\.1:\d+\//.exec(b)[0])));
   const html = await (await fetch(url)).text();
-  assert.match(html, /<title>Inbox/);
+  assert.match(html, /<title>Dashboard/);
   assert.match(html, /<nav class="side" id="nav" aria-label="Board areas">/);
   // The page is a small shell; its script is fetched beside it, and the renderers are in it.
   const script = await (await fetch(`${url}app.js?v=1`)).text();
@@ -946,17 +946,20 @@ test('each card has one place to type: Add a comment holds the note sent with th
   assert.match(waiting, /<button class="t-more-line" type="button" aria-haspopup="dialog"><span>Select, answer all or move all to later<\/span>/);
   assert.doesNotMatch(waiting, /data-act="sort"|Oldest first/);
   assert.doesNotMatch(waiting, /<ol class="queue"|<p class="fhead"/);
-  // The inbox: its title, then both asks under Decide as rows that open their threads.
+  // Today: its title with the light-or-dark button, Up next (how many wait, the question, what it is, when and the answer recommended) with that answer as its main button beside Other answer,
+  // the next ask under Waiting on you with See all, and two tiles: Cleared today opening Answered and Proofs today opening Evidence.
   const home = await dump('');
-  assert.match(home, /<h1 tabindex="-1">Inbox<\/h1>/);
-  assert.match(home, /<section class="ib-sec" aria-label="Decide">(?:(?!<\/section>).)*href="#inbox\/ship"(?:(?!<\/section>).)*href="#inbox\/look"/s);
+  assert.match(home, /<header class="ui-top today-top"><h1 tabindex="-1">Today<\/h1><button class="ui-rb theme" aria-label="Switch to (dark|light)">/);
+  assert.match(home, /<section class="ui-card ui-hero t-up" aria-label="Up next"><div class="hl"><span class="lab">Up next · 1 of 2<\/span><\/div><h2 class="q" dir="auto">When should it ship\?<\/h2><p class="meta"><span dir="auto">Pick one · \d\d:\d\d · Recommended B<\/span><\/p><div class="t-btns"><button class="t-btn ink" aria-label="Answer B, When should it ship\?"><span class="lbl">Answer B<\/span>.*?<a class="t-btn white" href="#decide\/ship"><span class="lbl">Other answer<\/span><\/a>/s);
+  assert.match(home, /<section class="t-wait" aria-label="Waiting on you"><h2 class="ui-sec">Waiting on you<a class="see" href="#waiting">See all<\/a><\/h2><ul class="ui-card ui-list"><li><a class="ui-row" href="#decide\/look">.*?Pick the look/s);
+  assert.deepEqual([...home.matchAll(/<a class="ui-card ui-stat" href="([^"]*)" aria-label="([^"]*)"/g)].map((m) => `${m[1]} ${m[2]}`), ['#answered Cleared today: 0 of 2', '#evidence Proofs today: 0']);
   // An ask dismissed from Waiting on you is counted on the Archived line at its end; the line opens it in a sheet with Restore.
   const gone = file.replace(/\.json$/, '.dismissed.jsonl');
   writeFileSync(gone, JSON.stringify({ key: 'ship', dismissed: true, at: new Date().toISOString() }) + '\n');
   const pages = {};
   for (const hash of ['#waiting']) assert.match(pages[hash] = await dump(hash), /<button class="t-more-line ar-line" type="button" aria-haspopup="dialog"><span>Archived · 1<\/span>/, hash);
-  // Only the design ask waits now: the dismissed one leaves the inbox.
-  assert.doesNotMatch(await dump(''), /href="#inbox\/ship"/);
+  // Only the design ask waits now, and it is Up next.
+  assert.match(await dump(''), /<span class="lab">Up next · 1 of 1<\/span>.*?<span class="lbl">Review<\/span>/s);
   // Restore returns the dismissed ask to the grouped list.
   const { evaluate, close } = await browse(join(dir, 'live'));
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
@@ -970,8 +973,7 @@ test('each card has one place to type: Add a comment holds the note sent with th
   // Reports, as the approved prototype draws it: the title with the light-or-dark button at its right, Newest or By project, then how many are still to read of all listed and how many
   // were filed this week, and More as one quiet line under the list; its rows are the new look's, so a report with a page draws no steps in the list and no legend for them.
   const reports = await dump('#reports');
-  // An old address has no tab, so its header leads back to the inbox.
-  assert.match(reports, /<header class="top ui-top rp-top"><a class="back" href="#">‹ Inbox<\/a><h1 tabindex="-1">Reports<\/h1><button class="ui-rb theme" aria-label="Switch to (dark|light)">/);
+  assert.match(reports, /<header class="top ui-top rp-top"><h1 tabindex="-1">Reports<\/h1><button class="ui-rb theme" aria-label="Switch to (dark|light)">/);
   assert.match(reports, /<button class="t-more-line rp-more-line" aria-haspopup="dialog"><span>Mark all as read, Select and Archive all<\/span>/);
   assert.match(reports, /<div class="ui-seg rp-seg" role="group" aria-label="Order"><button aria-pressed="true">Newest<\/button><button aria-pressed="false">By project<\/button><\/div><section class="ui-card ui-hero rp-hero"><div class="hl"><span class="lab">Still to read<\/span><\/div><div class="hv"><span class="big">1<small> of 1<\/small><\/span><span class="vs">1 filed this week<\/span><\/div><\/section>/);
   assert.doesNotMatch(reports, /class="card legend"|class="flow"/);
@@ -984,6 +986,9 @@ test('each card has one place to type: Add a comment holds the note sent with th
   assert.match(reports, /<div class="dl-act yes" aria-hidden="true">.*?<span>Read<\/span><\/div><div class="dl-act later" aria-hidden="true">.*?<span>Archive<\/span><\/div>/s);
   // Only the report is a row and counted; the text-only one is folded under Notes, a short row with no page to open.
   assert.deepEqual([...reports.matchAll(/<li class="report dl-row" style="--n:\d+" data-key="(\w+)"/g)].map((m) => m[1]), ['how']);
+  // The sidebar counts what is new under its short name; the phone's tab bar marks Reports as the area on screen and carries an ink count.
+  assert.match(reports, /<\/svg><\/span>Reports<span class="n ink">1<\/span>/);
+  assert.match(reports, /<a href="#reports" aria-label="Reports, 1 new" aria-current="page"><span class="icon i-tab-reports" aria-hidden="true">.*?<\/span><span class="bd ink" aria-hidden="true">1<\/span><\/a>/);
   assert.match(reports, /<details class="other notes"><summary>Notes \(1\)<\/summary>.*<strong dir="auto">Merged: the sign-in fix<\/strong>/s);
   // On a phone, a tap on the card opens the report in a sheet over the list with the focus on its title; the board under it takes no taps.
   // Close goes back to the card with the focus on its link, and Escape closes it too.
@@ -1012,14 +1017,14 @@ test('each card has one place to type: Add a comment holds the note sent with th
     await until(async () => (await evaluate('reader.hidden')) === false);
     await evaluate('dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))');
     await until(async () => (await evaluate('location.hash + reader.hidden')) === '#reportstrue');
-    // Opening it read it, beside the board: back on the list its progress track is gone, and nothing is still to read.
+    // Opening it read it, beside the board: back on the list its progress track is gone, nothing is still to read and the tab bar's count is gone.
     const reads = () => readFileSync(file.replace(/\.json$/, '.reads.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).map(({ key, read }) => [key, read]);
-    await until(async () => (await evaluate('[document.querySelector("#item-how .pct")?.textContent ?? "read", document.querySelector(".rp-hero .big").textContent].join()')) === 'read,0 of 1');
+    await until(async () => (await evaluate('[document.querySelector("#item-how .pct")?.textContent ?? "read", document.querySelector(".rp-hero .big").textContent, !!document.querySelector(".tabs .bd.ink")].join()')) === 'read,0 of 1,false');
     assert.deepEqual(reads(), [['how', true]]);
-    // A swipe right marks it unread again (its bar empties); a swipe left archives it, and Undo puts it back.
+    // A swipe right marks it unread again (its bar empties and the count comes back); a swipe left archives it, and Undo puts it back.
     const y = await evaluate('(() => { const r = document.querySelector("#item-how").getBoundingClientRect(); return r.y + 30; })()');
     await swipe({ x: 40, y }, { x: 360, y });
-    await until(async () => (await evaluate('[document.querySelector("#item-how .pct").textContent, document.getElementById("toast-text").textContent].join()')) === '0%,Marked unread: How it ships');
+    await until(async () => (await evaluate('[document.querySelector("#item-how .pct").textContent, document.querySelector(".tabs .bd.ink")?.textContent, document.getElementById("toast-text").textContent].join()')) === '0%,1,Marked unread: How it ships');
     assert.deepEqual(reads(), [['how', true], ['how', false]]);
     await swipe({ x: 360, y }, { x: 30, y });
     await until(async () => (await evaluate('[!document.querySelector("#item-how"), document.getElementById("toast-text").textContent].join()')) === 'true,Archived: How it ships');
@@ -1030,10 +1035,11 @@ test('each card has one place to type: Add a comment holds the note sent with th
   }
   // Answered is Done today: a count under the title, Clear all beside it, and a short row per item with its answer and time under the title, beside its ×. Clear all sits at the right of the title.
   writeFileSync(file.replace(/\.json$/, '.answers.jsonl'), ['ship', 'look'].map((key) => JSON.stringify({ key, answer: 'a', label: 'A', close: 'done', at: new Date().toISOString() })).join('\n') + '\n');
-  // Once both are answered, nothing waits on you: the inbox has no Decide section.
+  // Once both are answered, nothing needs you: Up next says so, nothing is listed under Waiting on you, and Cleared today counts both and opens Answered.
   const after = await dump('');
-  assert.match(after, /<h1 tabindex="-1">Inbox<\/h1>/);
-  assert.doesNotMatch(after, /aria-label="Decide"/);
+  assert.match(after, /<section class="ui-card ui-hero t-up clear" aria-label="Up next">.*?<h2 class="q">Nothing waits on you<\/h2>/s);
+  assert.doesNotMatch(after, /class="t-wait"/);
+  assert.match(after, /<a class="ui-card ui-stat" href="#answered" aria-label="Cleared today: 2 of 2">/);
   const answered = await dump('#answered');
   assert.match(answered, /<p class="lede">2 answers today\. Each one has gone back to its agent\.<\/p><div class="bulk">.*?<\/div><\/header><div class="sec-head"><h2>Today<\/h2><\/div>/);
   const lines = [...answered.matchAll(/<summary class="compact">.*?<strong[^>]*>(.*?)<\/strong>.*?<span class="ans"><b[^>]*>(\w+)<\/b><time>\d\d:\d\d<\/time><\/span><\/span><\/summary>.*?<\/details><button class="x" aria-label="Discard, [^"]+" aria-haspopup="dialog">×<\/button>/gs)];
@@ -1052,8 +1058,7 @@ test('each card has one place to type: Add a comment holds the note sent with th
   writeFileSync(file.replace(/\.json$/, '.dismissed.jsonl'), JSON.stringify({ key: 'look', dismissed: true, at: new Date(Date.now() + 1000).toISOString() }) + '\n');
   const left = await dump('#answered');
   assert.deepEqual(cards(left).map(([key]) => key), ['ship']);
-  // The inbox has no tile for it: the dismissed design is gone from the list.
-  assert.doesNotMatch(await dump(''), /href="#inbox\/look"/);
+  assert.match(await dump(''), /<a class="ui-card ui-stat" href="#answered" aria-label="Cleared today: 1 of 1">/);
   writeFileSync(file.replace(/\.json$/, '.dismissed.jsonl'), ['look', 'ship'].map((key) => JSON.stringify({ key, dismissed: true, at: new Date(Date.now() + 1000).toISOString() })).join('\n') + '\n');
   assert.match(await dump('#answered'), /<b>All done items cleared<\/b>/);
   proc.kill();
@@ -1300,13 +1305,12 @@ test('Decide on the page: a guided plan with no decisions is read under Reports,
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const { evaluate, close } = await browse(join(dir, 'b'), 390);
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
-  await until(async () => (await evaluate('document.querySelectorAll(".dl-row[data-group=review] .dl-face[href^=\'#waiting/\']").length')) === 1);
+  const count = (tab) => evaluate(`[...document.querySelectorAll("#nav a")].find((a) => a.textContent.startsWith("${tab}"))?.querySelector(".n")?.textContent`);
+  await until(async () => (await count('Decide')) === '1');
+  assert.equal(await evaluate('document.querySelectorAll(".dl-row[data-group=review] .dl-face[href^=\'#waiting/\']").length'), 1);
   assert.equal(run('list', file).out.includes('for-reading'), false);
   await evaluate('location.hash = "#reports"');
-  await until(async () => (await evaluate('document.getElementById("board").textContent')).includes('A plan to read'));
-  // In the inbox the plan with a decision waits in Decide; the one to read is New.
-  await evaluate('location.hash = ""');
-  await until(async () => (await evaluate('JSON.stringify([...document.querySelectorAll(".ib-sec")].map((s) => [s.getAttribute("aria-label"), s.querySelectorAll(".ib-row").length]))')) === '[["New",1],["Decide",1]]');
+  await until(async () => (await count('Reports')) === '1' && (await evaluate('document.getElementById("board").textContent')).includes('A plan to read'));
   close();
   proc.kill();
 });
@@ -1397,11 +1401,11 @@ test('an ask on a guided report answers the tap on a phone: the bar\'s Ask sends
     await until(async () => /^Agent replied to your Go deeper\|\|1$/.test(await evaluate(entry)));
     assert.match(await evaluate(`document.querySelector('.gd-act .ra-e[data-ask]').textContent`), /The code now comes with the password/);
     // The feedback trail: under the entry its track reads Sent, Delivered, Read and Replied (a wait handed it over, so Delivered is the same moment),
-    // and once the report is left the reply waits in the inbox, the report's thread under New until the report is opened again.
+    // and once the report is left the reply waits in Today, the report's row on Reports carrying its badge until the report is opened again.
     const track = `[...document.querySelectorAll('.gd-act .ra-e[data-ask] .ui-trail li')].map((l) => l.querySelector('b').textContent + (l.classList.contains('on') ? '+' : '')).join(' ')`;
     await until(async () => (await evaluate(track)) === 'Sent+ Delivered+ Read+ Replied+');
     await evaluate(`location.href = ${JSON.stringify(url)}`);
-    await until(async () => (await evaluate('[...document.querySelectorAll(".ib-sec[aria-label=New] .ib-row .t")].map((t) => t.textContent).join()')) === report.title);
+    await until(async () => (await evaluate('[...document.querySelectorAll(".t-replies .ui-row .t")].map((t) => t.textContent).join()')) === report.title);
   } finally { close(); }
   proc.kill();
 });
@@ -1654,13 +1658,16 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   await evaluate('document.querySelector(".ui-top .theme").click()');
   await until(async () => (await scheme()).split('|')[0] === was.split('|')[0]);
   assert.equal(await evaluate('(() => { document.querySelector(".decide-list .t-more-line").click(); const acts = [...document.querySelectorAll("#d-more[open] [data-act]")].map((b) => b.dataset.act).join("|"); document.getElementById("d-more").close(); return acts; })()'), 'select|answer-all|later-all');
-  // In the inbox the ask waits under Decide; its row opens its thread, and the thread opens the ask.
+  // Today's Up next is the first ask Decide lists with a recommended answer, and Other answer opens it; Waiting on you's See all opens Decide.
   await evaluate('location.hash = ""');
-  await until(async () => await evaluate('!!document.querySelector(".ib-sec[aria-label=Decide] a[href=\'#inbox/release\']")'));
-  await evaluate('location.hash = "#inbox/release"');
-  await until(async () => await evaluate('document.querySelector(".ib-ttl")?.textContent === "Which day for release?"'));
-  await evaluate('document.querySelector(".ib-meta .ib-open").click()');
-  await until(async () => await evaluate('location.hash === "#inbox/release/open" && document.querySelector(".decide h2")?.textContent === "Which day for release?"'));
+  await until(async () => (await evaluate('document.querySelector(".t-up .q")?.textContent')) === 'Which day for release?');
+  assert.equal(await evaluate('document.querySelector(".t-up .t-btn.ink .lbl").textContent + "|" + document.querySelector(".t-up .t-btn.white").textContent'), 'Answer friday|Other answer');
+  await evaluate('document.querySelector(".t-up .t-btn.white").click()');
+  await until(async () => await evaluate('location.hash === "#decide/release" && document.querySelector(".decide h2")?.textContent === "Which day for release?"'));
+  await evaluate('location.hash = ""');
+  await until(async () => await evaluate('!!document.querySelector(".t-wait .see")'));
+  await evaluate('document.querySelector(".t-wait .see").click()');
+  await until(async () => (await evaluate('location.hash')) === '#waiting');
   await evaluate("location.hash = '#waiting'");
   await until(async () => (await evaluate('location.hash')) === '#waiting');
   // Decide shows the ask's context line when it carries no reason text of its own.
@@ -2023,9 +2030,10 @@ test('Decide on a phone: an ask is a sheet over the list with its bar at the foo
   await evaluate(`location.href = ${JSON.stringify(`${url}#decide/alpha`)}`);
   await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'Alpha question?');
   await evaluate('document.getElementById("board").getAnimations({ subtree: true }).forEach((a) => a.finish())'); // the sheet has risen
-  // The ask is a sheet over the list: its bar keeps to the foot of the screen.
+  // The ask is a sheet over the list: its bar keeps to the foot of the screen, and the dock sits dimmed under it.
   assert.equal(await evaluate('document.querySelector(".decide-bar").getBoundingClientRect().bottom <= innerHeight'), true);
   assert.equal(await evaluate('document.querySelector(".decide-bar").getBoundingClientRect().top > innerHeight / 2'), true);
+  assert.equal(await evaluate('(() => { const r = document.querySelector(".tabs").getBoundingClientRect(); return !!document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest(".ask-over"); })()'), true);
   await evaluate('document.querySelector(".decide .pick-option").click()');
   await evaluate('document.querySelector(".decide-bar .answer").click()');
   // The sheet closes back to the list with the toast; the answer is under Answered, whose row opens it.
@@ -2055,14 +2063,14 @@ test('Decide on a phone: an ask is a sheet over the list with its bar at the foo
   // Close goes back to the list, where the answer reads as changed.
   await evaluate('document.querySelector(".sh-x").click()');
   await until(async () => (await evaluate('location.hash + "|" + document.querySelector(".g-done .meta")?.textContent.split(" · ")[0]')) === '#waiting|Changed to A');
-  // From the list, an ask answered closes back to it; once the list is in place the toast sits over the list, on the screen.
+  // From the list, an ask answered closes back to it; once the list is in place the toast sits over the tab bar.
   await evaluate('document.querySelector(".dl-row[data-key=beta] .dl-face").click()');
   await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'Beta question?');
   await until(() => evaluate('!document.getElementById("board").getAnimations({ subtree: true }).length'));
   await evaluate('document.querySelectorAll(".decide .pick-option")[1].click()');
   await evaluate('document.querySelector(".decide-bar .answer").click()');
   await until(async () => (await evaluate('location.hash')) === '#waiting' && /beta,b,/.test(run('answers', file).out) && (await evaluate('!document.querySelector("#toast").hidden')));
-  assert.equal(await evaluate('Promise.all(document.querySelector("#toast").getAnimations().map((a) => a.finished)).then(() => document.querySelector("#toast").getBoundingClientRect().bottom <= innerHeight)'), true);
+  assert.equal(await evaluate('Promise.all(document.querySelector("#toast").getAnimations().map((a) => a.finished)).then(() => document.querySelector("#toast").getBoundingClientRect().bottom <= document.querySelector(".tabs").getBoundingClientRect().top)'), true);
   // On the next question the toast never covers its button.
   await evaluate('location.hash = "#decide/gamma"');
   await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'Gamma question?' && (await evaluate('!document.querySelector("#toast").hidden')));
@@ -2154,7 +2162,7 @@ test('Decide on a phone: an ask is a sheet over the list with its bar at the foo
   proc.kill();
 });
 
-test('Decide on a desk: the list beside its ask, J and K move the selection, a number picks and Enter answers and selects the next while the row folds, Cmd+Z, L, C with Cmd+Enter, a row\'s hover answer, the ? sheet, G then I to the inbox, a sign-in laid out as an ask, a tall ask\'s bar after its last option, and the phone layout under 1024px', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Decide on a desk: the list beside its ask, J and K move the selection, a number picks and Enter answers and selects the next while the row folds, Cmd+Z, L, C with Cmd+Enter, a row\'s hover answer, the ? sheet, G then a letter (Evidence on the same shell), a sign-in laid out as an ask, a tall ask\'s bar after its last option, and the phone layout under 1024px', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'decide-desk'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l }));
@@ -2211,12 +2219,14 @@ test('Decide on a desk: the list beside its ask, J and K move the selection, a n
   // An answered row opens its ask beside the list: the answer, Change answer and no Later.
   await evaluate('document.querySelector(\'.g-done[data-key="alpha"] .dl-face\').click()');
   await until(async () => (await evaluate('[location.hash, document.querySelector(".split-detail .ans-card b")?.textContent, document.querySelector(".split-detail .decide-bar .answer")?.textContent, !!document.querySelector(".split-bar .later")].join("|")')) === '#decide/alpha|B|Change answer|false');
-  // ? opens every key in one sheet; G then I goes to the inbox, the one area left with a key.
+  // ? opens every key in one sheet; G then a letter goes to an area.
   await key('?');
-  assert.equal(await evaluate('document.getElementById("keys").open + "|" + document.querySelector("#keys h2").textContent + "|" + document.querySelectorAll("#keys li").length'), 'true|Keyboard shortcuts|14');
+  assert.equal(await evaluate('document.getElementById("keys").open + "|" + document.querySelector("#keys h2").textContent + "|" + document.querySelectorAll("#keys li").length'), 'true|Keyboard shortcuts|19');
   await evaluate('document.querySelector("#keys header button").click()');
-  await key('g'), await key('i');
-  await until(async () => (await evaluate('location.hash + "|" + !!document.querySelector(".split-list") + "|" + document.querySelector(".ui-dhead h1")?.textContent')) === '|true|Inbox');
+  await key('g'), await key('e');
+  await until(async () => (await evaluate('location.hash + "|" + !!document.querySelector(".split-list") + "|" + document.querySelector(".split-detail")?.textContent')) === '#evidence|true|No evidence updates.Proof an agent files for a change shows here.');
+  await key('g'), await key('d');
+  await until(async () => (await evaluate('location.hash + "|" + !!document.querySelector(".split")')) === '#waiting|true');
   // A sign-in reads like any ask beside the list: who waits, its headline, what it unlocks and Open as the bar's one button, with its time left only on its row.
   const board = JSON.parse(readFileSync(file, 'utf8')), many = 'abcdef'.split('').map((l) => ({ value: l, label: `Option ${l}`, outcome: `What happens after option ${l}.` }));
   board.items.push({ key: 'npm', title: 'npm', type: 'signin', link: 'https://example.com/login', unlocks: 'Publishing the release', waits: 'Release agent', expires: new Date(Date.now() + 2 * 3600_000).toISOString() },
@@ -2242,7 +2252,7 @@ test('Decide on a desk: the list beside its ask, J and K move the selection, a n
   const narrow = await browse(join(dir, 'n'), 1000, 800);
   await narrow.evaluate(`location.href = ${JSON.stringify(`${url}#decide/gamma`)}`);
   await until(async () => (await narrow.evaluate('document.querySelector(".decide h2")?.textContent')) === 'Gamma question?');
-  assert.equal(await narrow.evaluate('!!document.querySelector(".split") + "|" + getComputedStyle(document.querySelector(".side")).display + "|" + !!document.querySelector(".ask-sheet .decide")'), 'false|none|true');
+  assert.equal(await narrow.evaluate('!!document.querySelector(".split") + "|" + getComputedStyle(document.querySelector(".tabs")).display + "|" + getComputedStyle(document.querySelector(".side")).display + "|" + !!document.querySelector(".ask-sheet .decide")'), 'false|flex|none|true');
   narrow.close();
   proc.kill();
 });
@@ -2302,7 +2312,7 @@ test('Reports on a desk: the list beside the newest report, J moves and reads, U
   const narrow = await browse(join(dir, 'n'), 1000, 800);
   await narrow.evaluate(`location.href = ${JSON.stringify(`${url}#reports/gamma`)}`);
   await until(() => narrow.evaluate('!document.getElementById("reader").hidden && document.querySelector("#reader h1")?.textContent === "Gamma report"'));
-  assert.equal(await narrow.evaluate('!!document.querySelector(".split")'), false);
+  assert.equal(await narrow.evaluate('!!document.querySelector(".split") + "|" + getComputedStyle(document.querySelector(".tabs")).display'), 'false|flex');
   narrow.close();
   proc.kill();
 });
@@ -2664,10 +2674,16 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const { evaluate, close } = await browse(join(dir, 'browser'));
-  // A lead's design is Main's to review: the inbox lists it waiting on its agents, never under Decide, and counts nothing waiting on you; Decide is all clear with no badge.
+  // A lead's design is Main's to review: Today counts no ask for it and links it under Designs in its More, and Decide is all clear with no badge.
   await evaluate(`location.href = ${JSON.stringify(url)}`);
-  await until(async () => await evaluate('!!document.querySelector(".ib-sec[aria-label=\'Waiting on agents\'] a[href=\'#inbox/d1-design\']")'));
-  assert.equal(await evaluate('!document.querySelector(".ib-sec[aria-label=Decide]") && document.title'), 'Inbox · sign-off');
+  await until(async () => await evaluate('!!document.querySelector(".t-more-line")'));
+  await evaluate('document.querySelector(".t-more-line").click()');
+  await until(async () => (await evaluate('[...document.querySelectorAll("#t-more a.ui-pr")].map((a) => a.getAttribute("href") + " " + a.textContent).join("|")')) === '#designs Designs1');
+  assert.equal(await evaluate('document.querySelector(".t-up .q").textContent + "|" + document.querySelector(".t-tiles .ui-stat").getAttribute("aria-label")'), 'Nothing waits on you|Cleared today: 0 of 0');
+  await evaluate('document.getElementById("t-more").close()');
+  // Today lists it under Designs to review, its tile a thumbnail of its first screen, one tap from its review.
+  assert.equal(await evaluate('(() => { const s = document.querySelector(".t-wait[aria-label=\'Designs to review\']"), a = s?.querySelector(".ui-row"); return [s?.querySelector(".see").getAttribute("href"), a?.getAttribute("href"), a?.querySelector(".t").textContent, decodeURIComponent(a?.querySelector(".ui-icon img.design-thumb")?.getAttribute("src") ?? "").split("/").pop()].join("|"); })()'),
+    `#designs|#designs/d1-design|${message.title}|welcome.webp`);
   await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
   await until(async () => (await evaluate('document.querySelector(".decide-list .ui-hero .big")?.textContent')) === '0');
   assert.equal(await evaluate('!document.querySelector("#item-d1-design") && !document.querySelector("#tabs a[href=\'#waiting\'] .bd, #nav a[href=\'#waiting\'] .n")'), true);
@@ -2716,16 +2732,20 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-design'].notes, [{ journey: 'account-setup', screen: 'security', verdict: 'change', note: 'Make the title clearer' }]);
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
   await until(async () => (await evaluate('document.querySelector(".dz-list .meta")?.textContent')).startsWith('Changes requested'));
-  // Main's verdict is no answer of the user's: nothing waits on the user in the inbox.
+  // Main's verdict is no answer of the user's: Today's More lists nothing under Answered for it, and Cleared today counts nothing.
   await evaluate(`location.href = ${JSON.stringify(url)}`);
-  await until(async () => await evaluate('!!document.querySelector(".ib-chips")'));
-  assert.equal(await evaluate('!document.querySelector(".ib-sec[aria-label=Decide]") && document.title'), 'Inbox · sign-off');
+  await until(async () => await evaluate('!!document.querySelector(".t-more-line")'));
+  await evaluate('document.querySelector(".t-more-line").click()');
+  await until(async () => (await evaluate('[...document.querySelectorAll("#t-more a.ui-pr")].map((a) => a.getAttribute("href") + " " + a.textContent).join("|")')) === '#designs Designs1');
+  assert.equal(await evaluate('document.querySelector(".t-tiles .ui-stat").getAttribute("aria-label")'), 'Cleared today: 0 of 0');
+  await evaluate('document.getElementById("t-more").close()');
   const desktop = await browse(join(dir, 'desktop-browser'), 1280);
   await desktop.evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
-  // The desk's sidebar holds the inbox alone; Designs still opens by its address.
-  await until(async () => (await desktop.evaluate('[...document.querySelectorAll("#nav a:not(.sfind)")].map((a) => [...a.childNodes].filter((n) => n.nodeType === 3).map((n) => n.data).join("")).join("|") + " " + !!document.querySelector(".dz-list, .dz-card")')) === 'Inbox true');
+  // The desk's sidebar holds Designs after Reports with its count, lit on Designs; Decide is not.
+  await until(async () => (await desktop.evaluate('[...document.querySelectorAll("#nav a:not(.sfind)")].map((a) => [...a.childNodes].filter((n) => n.nodeType === 3).map((n) => n.data).join("") + (a.hasAttribute("aria-current") ? "*" : "")).join("|") + " " + document.querySelector("#nav a[href=\\"#designs\\"] .n")?.textContent')) === 'Today|Inbox|Decide|Evidence|Reports|Designs*|Tickets 1');
   await desktop.evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
   await until(async () => (await desktop.evaluate('document.querySelector(".design-review .foot button")?.textContent')) === 'Approve');
+  assert.equal(await desktop.evaluate('document.querySelector("#nav a[href=\\"#designs\\"][aria-current=page]")?.getClientRects().length > 0'), true);
   assert.equal(await desktop.evaluate('document.querySelector(".design-review")?.getBoundingClientRect().bottom <= innerHeight'), true);
   // On a desk the design opens in the board, its card marked, beside where it stands; the reader stays shut.
   assert.equal(await desktop.evaluate('document.getElementById("reader").hidden && document.querySelector(".dz-card[aria-current]")?.id === "item-d1-design" && !!document.querySelector(".dz-open .dz-fill .design-preview-window") && !!document.querySelector(".dz-info .foot .dz-ink")'), true);
@@ -3361,7 +3381,7 @@ test('Evidence: with no --evidence-root a linked run is found in done-done\'s ow
   proc.kill();
 });
 
-test('the inbox on a phone: no dock, every thread in one list with nothing wider than the screen, More from the round button holds Ask the agent, the light-or-dark button holds across a reload, Evidence and Designs still open by their addresses, and #find opens Search over the inbox', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Today on a phone: the floating tab bar with its pill on Today, Up next with one main action in ink, Waiting on you as 68px rows with a long title on one line, two tiles side by side, nothing wider than the screen, a line under the tiles opening More with Ask the agent as one row, the last line clear of the tab bar, the title row\'s button switching light and dark, and the dock\'s Search a sheet over the screen it is opened on', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'summary-wide'), file = join(dir, 'board.json');
   mkdirSync(join(dir, 'page'), { recursive: true });
   // A capture as tall and thin as a phone screenshot (414 x 2262).
@@ -3386,33 +3406,45 @@ test('the inbox on a phone: no dock, every thread in one list with nothing wider
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const { evaluate, close } = await browse(join(dir, 'b'), 390, 844);
   await evaluate(`location.href = ${JSON.stringify(url)}`);
-  await until(async () => (await evaluate('document.querySelectorAll(".ib-sec .ib-row").length')) === 5);
+  await until(async () => (await evaluate('document.querySelectorAll(".t-wait .ui-row").length')) === 1);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= 390'));
-  // No dock: the inbox is the one place, and its rows are the plan, the ask and the three updates.
-  assert.deepEqual(await evaluate('[getComputedStyle(document.querySelector(".tabs")).display, getComputedStyle(document.querySelector(".dock-find")).display]'), ['none', 'none']);
+  // The dock floats 24px over the bottom edge: a 56px pill of six 48px tabs, then the round 56px Search 12px beside it, the two centred together; its pill sits on Today.
+  const rect = (sel) => `(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right), Math.round(r.top), Math.round(r.bottom)]; })()`;
+  const bar = await evaluate(rect('.tabs')), find = await evaluate(rect('.dock-find')), tab = await evaluate(rect('.tabs a')), [vw, vh] = await evaluate('[document.documentElement.clientWidth, innerHeight]');
+  assert.deepEqual([bar[1] - bar[0], bar[3] - bar[2], vh - bar[3], tab[1] - tab[0], find[1] - find[0], find[3] - find[2], vh - find[3], find[0] - bar[1], Math.abs(bar[0] - (vw - find[1])) <= 1], [306, 56, 24, 48, 56, 56, 24, 12, true]);
+  await until(async () => (await evaluate(rect('.tabs .hl')))[0] === (await evaluate(rect('.tabs a[href="#"]')))[0]);
+  // Up next is the plan, to review: one main action in ink that opens it, and no second.
   const plan = JSON.parse(readFileSync(join(fixture, 'valid-full.json'), 'utf8')).key;
-  assert.deepEqual(await evaluate('[...document.querySelectorAll(".ib-sec[aria-label=Decide] .ib-row")].map((a) => a.getAttribute("href")).sort()'), [`#inbox/${plan}`, '#inbox/a'].sort());
-  // The long title keeps to one line, cut with an ellipsis.
-  assert.deepEqual(await evaluate('(() => { const t = document.querySelector(".ib-row[href=\'#inbox/a\'] .t"); return [t.scrollWidth > t.clientWidth, getComputedStyle(t).textOverflow]; })()'), [true, 'ellipsis']);
-  // The round More button in the title row opens More, which holds Ask the agent: closed, one line of text in a 44px row with no box around it; a tap opens the prompt box.
-  await evaluate('document.querySelector(".ui-top .ui-rb[aria-label=More]").click()');
+  assert.deepEqual(await evaluate('(() => { const b = document.querySelectorAll(".t-up .t-btns > *"), c = getComputedStyle(b[0]); return [document.querySelector(".t-up .lab").textContent, b.length, b[0].textContent, b[0].getAttribute("href"), Math.round(b[0].getBoundingClientRect().height), c.backgroundColor === getComputedStyle(document.querySelector(".today-top h1")).color]; })()'),
+    ['Up next · 1 of 2', 1, 'Review', `#waiting/${plan}`, 44, true]);
+  // The other ask is one 68px row: its long title on one line, cut with an ellipsis, its kind and when under it.
+  assert.deepEqual(await evaluate('(() => { const r = document.querySelector(".t-wait .ui-row"), t = r.querySelector(".t"); return [Math.round(r.getBoundingClientRect().height), Math.round(t.getBoundingClientRect().height), t.scrollWidth > t.clientWidth, getComputedStyle(t).textOverflow, r.querySelector(".meta").textContent.split(" · ")[0], r.getAttribute("href")]; })()'),
+    [68, 20, true, 'ellipsis', 'Yes/No', '#decide/a']);
+  // Two tiles side by side, each 96px tall, as wide as each other and 8px apart.
+  const tiles = await evaluate('[...document.querySelectorAll(".t-tiles .ui-stat")].map((t) => { const r = t.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; })');
+  assert.ok(tiles.length === 2 && tiles[0][1] === tiles[1][1] && tiles[0][2] === tiles[1][2] && tiles.every((t) => t[3] === 96) && tiles[1][0] - (tiles[0][0] + tiles[0][2]) === 8, JSON.stringify(tiles));
+  // The line under the tiles opens More, which holds Ask the agent: closed, one line of text in a 44px row with no box around it; a tap opens the prompt box.
+  await evaluate('document.querySelector(".t-more-line").click()');
   await until(async () => await evaluate('document.getElementById("t-more").open'));
   const ask = await evaluate('(() => { const a = document.querySelector("#t-more details.ask"), s = a.querySelector("summary"), r = document.createRange(); r.selectNodeContents(s); const box = a.getBoundingClientRect(), t = r.getBoundingClientRect(), c = getComputedStyle(a); return [a.open, Math.round(box.height), Math.abs(Math.round((t.top + t.bottom) / 2 - (box.top + box.bottom) / 2)) <= 2, c.borderTopWidth, c.backgroundColor, Math.round(t.left)]; })()');
   assert.deepEqual(ask, [false, 44, true, '0px', 'rgba(0, 0, 0, 0)', 16]);
   await evaluate('document.querySelector("#t-more details.ask summary").click()');
   assert.ok(await evaluate('document.querySelector("#t-more details.ask").open && document.getElementById("prompt").getBoundingClientRect().height > 40'));
   await evaluate('document.getElementById("t-more").close()');
+  // The last thing on Today scrolls fully clear of the floating tab bar.
+  await evaluate('scrollTo(0, document.documentElement.scrollHeight)');
+  assert.ok(await evaluate('document.querySelector(".t-more-line").getBoundingClientRect().bottom <= document.querySelector(".tabs").getBoundingClientRect().top - 16'));
   // The round button in the title row switches light and dark: the page and its cards take the other theme, the button says so, the pick holds across a reload, and a second tap puts it back.
-  const look = () => evaluate('[document.querySelector(".ui-top .theme").getAttribute("aria-label"), getComputedStyle(document.body).backgroundColor, getComputedStyle(document.querySelector(".ib-list")).backgroundColor].join("|")');
+  const look = () => evaluate('[document.querySelector(".today-top .ui-rb").getAttribute("aria-label"), getComputedStyle(document.body).backgroundColor, getComputedStyle(document.querySelector(".t-up")).backgroundColor].join("|")');
   const first = await look(), other = first.startsWith('Switch to dark|') ? 'Switch to light|' : 'Switch to dark|';
   assert.match(first, /^Switch to (dark|light)\|/);
-  await evaluate('document.querySelector(".ui-top .theme").click()');
+  await evaluate('document.querySelector(".today-top .ui-rb").click()');
   await until(async () => (await look()).startsWith(other));
   const picked = await look();
   assert.ok(picked.split('|')[1] !== first.split('|')[1] && picked.split('|')[2] !== first.split('|')[2], `${first} -> ${picked}`);
   await evaluate('location.reload()');
-  await until(async () => (await evaluate('!!document.querySelector(".ib-list")')) && (await look()) === picked);
-  await evaluate('document.querySelector(".ui-top .theme").click()');
+  await until(async () => (await evaluate('!!document.querySelector(".t-up")')) && (await look()) === picked);
+  await evaluate('document.querySelector(".today-top .ui-rb").click()');
   await until(async () => (await look()) === first);
   await evaluate('localStorage.removeItem("so-theme")');
   // On Evidence the same proof is a row of its claim with done-done's check at its tile's corner, with no frame left empty.
@@ -3420,16 +3452,29 @@ test('the inbox on a phone: no dock, every thread in one list with nothing wider
   await until(async () => await evaluate('!!document.getElementById("item-u3")'));
   assert.deepEqual(await evaluate('(() => { const c = document.getElementById("item-u3"); return [c.classList.contains("ui-row"), c.querySelectorAll("img:not(.ui-icon img)").length, c.querySelector(".t").textContent, c.querySelector(".ev-ok")?.className]; })()'),
     [true, 0, 'It works.', 'ev-ok held']);
-  // With no designs filed, Designs still opens from Decide's Designs.
+  // With no designs filed, Designs still opens from Decide's Designs; the dock keeps its six and lights Decide, and the pill slides there.
   await evaluate('location.hash = "#waiting"');
   await until(async () => !!(await evaluate('document.querySelector(".dl-seg button[aria-pressed=false]")')));
   await evaluate('document.querySelector(".dl-seg button[aria-pressed=false]").click()');
   await until(async () => (await evaluate('location.hash + "|" + document.querySelector("#board h1").textContent + "|" + document.querySelector(".dl-seg [aria-pressed=true]")?.textContent')) === '#designs|Decide|Designs0');
-  // The address #find opens the inbox with Search over it, its box in hand; what is typed lists in groups that open where each card lives; closing it leaves the inbox at its own address.
-  await evaluate('location.hash = "#find"');
-  await until(async () => (await evaluate('[document.getElementById("t-search").open, document.querySelector("#board h1")?.textContent, document.activeElement?.id].join("|")')) === 'true|Inbox|find');
+  assert.deepEqual(await evaluate('[document.querySelectorAll(".tabs a").length, document.querySelector(".tabs [aria-current]").getAttribute("href")]'), [6, '#waiting']);
+  await until(async () => (await evaluate(rect('.tabs .hl')))[0] === (await evaluate(rect('.tabs a[href="#waiting"]')))[0]);
+  // The dock's round Search opens a sheet over the screen it is tapped on, its box in hand; what is typed lists in groups that open where each card lives, and Escape closes it there.
+  await evaluate('document.querySelector(".dock-find").click()');
+  await until(async () => (await evaluate('[location.hash, document.getElementById("t-search").open, document.activeElement?.id, document.querySelector("#board h1")?.textContent].join("|")')) === '#designs|true|find|Decide');
   await evaluate('(() => { const b = document.getElementById("find"); b.value = "update"; b.dispatchEvent(new Event("input")); })()');
-  assert.deepEqual(await evaluate('[...document.querySelectorAll("#t-search .t-grp")].map((g) => g.textContent).join()'), 'Proof');
+  assert.deepEqual(await evaluate('[[...document.querySelectorAll("#t-search .t-grp")].map((g) => g.textContent).join(), [...document.querySelectorAll("#t-search .ui-row")].map((a) => a.getAttribute("href")).join()]'), ['Proof', '#evidence/u3,#evidence/u2,#evidence/u1']);
+  // close() clears .open immediately, but its close event (and the route cleanup) is queued.
+  // Finish that event before opening #find, so the previous close cannot clear the new address.
+  await evaluate(`new Promise((ok) => {
+    const sheet = document.getElementById('t-search');
+    sheet.addEventListener('close', () => ok(true), { once: true });
+    sheet.dispatchEvent(new Event('cancel')); sheet.close();
+  })`);
+  assert.equal(await evaluate('location.hash + "|" + document.getElementById("t-search").open'), '#designs|false');
+  // The address #find opens Today with Search over it; closing it leaves Today at its own address.
+  await evaluate('location.hash = "#find"');
+  await until(async () => (await evaluate('[document.getElementById("t-search").open, document.querySelector("#board h1")?.textContent, document.querySelector(".tabs [aria-current]")?.getAttribute("href")].join("|")')) === 'true|Today|#');
   await evaluate('document.getElementById("t-search").close()');
   await until(async () => (await evaluate('location.hash')) === '');
   close();
@@ -3566,7 +3611,7 @@ test('a long answer at 390 px sits under its long title, which keeps most of the
   proc.kill();
 });
 
-test('Evidence: a row per proof ever filed, in one list, newest first, each with its project, done-done\'s check and its time; Held up today over the day\'s proofs; a project filter; a failed run is not listed; the row opens the proof, which shows its project and time, the whole shot, done-done\'s word, its change, its Activity and its verdict; at 1440 Evidence is a list beside the selected update; at 390 rows of 68px, a sheet 48px down and nothing squashed', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Evidence: a row per proof ever filed, in one list, newest first, each with its project, done-done\'s check and its time; Held up today over the day\'s proofs; a project filter; a failed run is not listed; the row opens the proof, which shows its project and time, the whole shot, done-done\'s word, its change, its Activity and its verdict; at 1440 Today sets its tiles under Up next and Evidence is a list beside the selected update; at 390 rows of 68px, a sheet 48px down and nothing squashed', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'updates'), file = join(dir, '.sign-off', 'decisions.json');
   mkdirSync(dir);
   run('init', dir);
@@ -3622,6 +3667,7 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
     ['item-update-3', outcome, 'ev-ok held', `Holds up · sign-off · ${when(3)}`, 0], ['item-update-2', outcome, 'ev-ok held', `Holds up · ${when(2)}`, 0], ['item-update-6', outcome, '', `Could not check · sign-off · ${when(6)}`, 0], ['item-update-7', 'Sign-in, last week', '', `Not checked · ${when(7)}`, 0]]);
   // One head over the list, Latest proof; no project or day headings break it.
   assert.deepEqual(await evaluate('[...document.querySelectorAll("#board h2, #board h3")].map((h) => h.firstChild.textContent)'), ['Latest proof']);
+  assert.equal(await evaluate('document.querySelector(\'#nav a[href="#evidence"] .n\').textContent'), '6');
   // The head: the title with the project filter, Newest and By priority, and Held up today over the proofs filed today, one square each, ink where the check passed.
   const today = doc.items.filter((d) => new Date(d.filed).toDateString() === new Date().toDateString()), held = today.filter((d) => ['update-2', 'update-3', 'update-4'].includes(d.key)).length;
   assert.deepEqual(await evaluate('[document.querySelector(":is(.ev-top, .ui-dhead) h1").textContent, !!document.querySelector(":is(.ev-top, .ui-dhead) .ev-fb"), [...document.querySelectorAll(".ev-seg button")].map((b) => b.textContent + " " + b.getAttribute("aria-pressed")), document.querySelector(".ev-held").innerText.replace(/\\s+/g, " ").trim(), document.querySelectorAll(".ev-dots i").length, document.querySelectorAll(".ev-dots i.held").length]'),
@@ -3637,13 +3683,20 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   assert.deepEqual((await pick('sign-off')).slice(1), ['sign-off', false, ['item-update-5', 'item-update-4', 'item-update-3', 'item-update-6']]);
   await evaluate('document.querySelector(".ev-pill .ev-unpick").click()');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
+  // Today's Proofs today counts each update filed today, the failed run too, and opens Evidence; on a desk its tiles sit under Up next in the left column.
+  const filedToday = `Proofs today: ${doc.items.filter((d) => d.type === 'evidence' && d.filed && new Date(d.filed).toDateString() === new Date().toDateString()).length}`;
+  await evaluate('location.hash = ""');
+  await until(async () => await evaluate('!!document.querySelector(".t-tiles .ui-stat[href=\'#evidence\']")'));
+  assert.equal(await evaluate('document.querySelector(".t-tiles .ui-stat[href=\'#evidence\']").getAttribute("aria-label")'), filedToday);
+  const box = (sel) => `(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { top: r.top, left: r.left, right: r.right, bottom: r.bottom }; })()`;
+  const [asks, tiles] = [await evaluate(box('.t-up')), await evaluate(box('.t-tiles'))];
+  assert.ok(tiles.left === asks.left && tiles.right === asks.right && tiles.top >= asks.bottom, 'the tiles sit under Up next, as wide');
   await evaluate('location.hash = "#evidence"');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
   // Evidence on a desk is one list beside the selected update: the rows stack in one column, newest first, and the newest is selected and open beside it.
   const boxes = `[5, 4, 3, 2].map((n) => { const r = document.getElementById(\`item-update-\${n}\`).getBoundingClientRect(); return { n, top: r.top, left: r.left, right: r.right, bottom: r.bottom }; })`;
   // Measured once the list has laid out its cards (a busy runner can still be drawing them when the sixth card arrives).
   const stacked = ([five, four, three, two]) => four.top >= five.bottom && three.top >= four.bottom && two.top >= three.bottom && [four, three, two].every((b) => b.left === five.left);
-  const box = (sel) => `(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { top: r.top, left: r.left, right: r.right, bottom: r.bottom }; })()`;
   let laid = [];
   await until(async () => stacked(laid = await evaluate(boxes))).catch(() => assert.fail(`one column, newest first, with no heading between: ${JSON.stringify(laid)}`));
   const [five] = laid;
@@ -3656,7 +3709,11 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   // No update is an ask, whatever its result: Decide counts none of them and Today says nothing needs you.
   await evaluate('location.hash = "#waiting"');
   await until(async () => (await evaluate('document.querySelector("#board :is(.top, .ui-top, .ui-dhead) h1")?.textContent')) === 'Waiting on you' || (await evaluate('document.querySelector("#board :is(.top, .ui-top, .ui-dhead) h1")?.textContent')) === 'Decide');
-  assert.equal(await evaluate('document.querySelectorAll("[id^=item-update-]").length'), 0);
+  // Decide's red count goes away at zero, as the tab bar's does.
+  assert.deepEqual(await evaluate('[!!document.querySelector(\'#nav a[href="#waiting"] .n\'), document.querySelectorAll("[id^=item-update-]").length]'), [false, 0]);
+  await evaluate('location.hash = ""');
+  await until(async () => (await evaluate('!!document.querySelector(".t-tiles")')));
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".t-tiles .ui-stat")].map((t) => t.getAttribute("aria-label")).join() + "|" + !!document.querySelector(".t-up.clear")'), `Cleared today: 0 of 0,${filedToday}|true`);
   // A failed or unchecked update still opens on Evidence with done-done's word, the reason a run could not be checked, and the verdicts, Pass last.
   for (const [k, result, why] of [['update-1', 'Failed', ''], ['update-6', 'Could not check', 'A picture or recording changed after the run. Ask the agent to run the check again.']]) {
     await evaluate(`location.hash = "#evidence/${k}"`);
@@ -3722,6 +3779,9 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   // Back on the list, that update is answered: it stays on Evidence and in Proofs today's count, since a verdict does not unprove it.
   await evaluate('location.hash = "#evidence"');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
+  await evaluate('location.hash = ""');
+  await until(async () => await evaluate('!!document.querySelector(".t-tiles")'));
+  assert.equal(await evaluate('document.querySelector(".t-tiles .ui-stat[href=\'#evidence\']").getAttribute("aria-label")'), filedToday);
   await evaluate('location.hash = "#evidence"');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
   close();
@@ -3795,13 +3855,14 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   await until(() => iphone.evaluate('[...document.querySelectorAll(".ev-hero img")].filter((i) => i.naturalWidth).length === 2'));
   assert.deepEqual(await iphone.evaluate(`(() => { const x = document.querySelector("#reader .ev-x").getBoundingClientRect(), shots = [...document.querySelectorAll("#reader .ev-hero img")].map((i) => i.getBoundingClientRect());
     return [x.bottom <= Math.min(...shots.map((s) => s.top)), shots.filter((s) => x.left < s.right && s.left < x.right && x.top < s.bottom && s.top < x.bottom).length]; })()`), [true, 0]);
-  // Discarded from its sheet, the proof goes under Archived; at the list's scroll end the last row, More and Archived all end on the screen, above the home bar.
+  // Discarded from its sheet, the proof goes under Archived; at the list's scroll end the last row, Select or clear all and Archived all end above the dock, which rises over the home bar.
   await iphone.evaluate('document.querySelector(".ev-verdict > .dis").click()');
   await iphone.evaluate('document.querySelector("#dc-sheet [data-reason=not-relevant]").click()');
   await until(async () => (await iphone.evaluate('document.querySelector("main .ar-line")?.textContent')) === 'Archived · 1' && (await iphone.evaluate('document.getElementById("reader").hidden && document.querySelectorAll(".ev-card").length')) === 5);
-  const end = await iphone.evaluate(`(() => { scrollTo(0, document.documentElement.scrollHeight); const bottom = (s) => Math.round(document.querySelector(s).getBoundingClientRect().bottom);
-    return { lastRow: bottom(".ev-list > li:last-child"), more: bottom(".ev-more"), archived: bottom("main .ar-line") }; })()`);
-  assert.ok([end.lastRow, end.more, end.archived].every((b) => b <= 844), `on the screen at the scroll end: ${JSON.stringify(end)}`);
+  const end = await iphone.evaluate(`(() => { scrollTo(0, document.documentElement.scrollHeight); const bottom = (s) => Math.round(document.querySelector(s).getBoundingClientRect().bottom), dock = document.querySelector(".tabs").getBoundingClientRect();
+    return { dockTop: Math.round(dock.top), dockBottom: Math.round(dock.bottom), lastRow: bottom(".ev-list > li:last-child"), more: bottom(".ev-more"), archived: bottom("main .ar-line") }; })()`);
+  assert.equal(end.dockBottom, 844 - 24 - 34, JSON.stringify(end));
+  assert.ok([end.lastRow, end.more, end.archived].every((b) => b <= end.dockTop), `under the dock at the scroll end: ${JSON.stringify(end)}`);
   iphone.close();
   proc.kill();
 });
@@ -4340,7 +4401,7 @@ test('the first screen arrives as a small shell beside its own styles and script
     // Hold the rest of the styles and the rest of the script back: the first screen must still draw, from the small sheet alone and in the phone's own typeface.
     await send('Fetch.enable', { patterns: [{ urlPattern: '*app.css*' }, { urlPattern: '*app-more.js*' }] });
     await evaluate(`location.href = ${JSON.stringify(url)}`);
-    await until(() => evaluate('document.querySelectorAll("#board .ib-row").length > 0 && !document.querySelector("#board .skel")'));
+    await until(() => evaluate('document.querySelectorAll("#board .t-wait .ui-row").length > 0 && !document.querySelector("#board .skel")'));
     assert.equal(await evaluate('document.getElementById("first") !== null'), true, 'the small sheet is still the only one');
     assert.equal(await evaluate('/inter/i.test(getComputedStyle(document.body).fontFamily)'), false, 'the typeface waits with the rest of the styles');
     // Let it go: the small sheet steps aside, the full rules and the rest of the script land, and a screen beyond Today draws with them.
@@ -4382,7 +4443,7 @@ test('the board paints its first screen from one page of asks, and never asks fo
     await send('Network.setBypassServiceWorker', { bypass: true });
     await evaluate(`location.href = ${JSON.stringify(url)}`);
     // The asks are on screen, drawn, with the skeleton gone.
-    await until(() => evaluate('!!document.querySelector("#board .ib-row") && !document.querySelector("#board .skel")'));
+    await until(() => evaluate('!!document.querySelector("#board .t-wait .ui-row, #board .t-up") && !document.querySelector("#board .skel")'));
     const first = await reads();
     assert.match(first[0][0], /^\/api\/decisions\?view=asks&limit=20$/, `the first board read is one page of asks: ${first[0][0]}`);
     assert.ok(first[0][1] < 100_000, `the first screen is under 100 KB: ${first[0][1]} bytes, on a board of ${whole}`);
@@ -4574,8 +4635,8 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     const page = JSON.parse(await evaluate(`JSON.stringify({ head: document.querySelector('.tk-sheet .tk-shd p > span:last-child').textContent, title: document.querySelector('.tk-sheet .tk-dt').textContent,
       props: [...document.querySelectorAll('.tk-sheet > .ui-props > .ui-pr')].map((p) => p.innerText.replace(/\\s+/g, ' ').trim()).filter((p) => !p.startsWith('Last update')),
       rows: [...document.querySelectorAll('.tk-sheet .tk-in a')].map((a) => [a.querySelector('.t').textContent.replace(/^Update \\d+ · /, ''), a.getAttribute('href')]),
-      tab: document.querySelector('#tabs a[aria-current]')?.getAttribute('href') ?? null, wide: document.documentElement.scrollWidth > 390 })`));
-    assert.deepEqual({ ...page, rows: page.rows.map(([t]) => t) }, { head: 'Settings · In progress', title: 'Ship the new settings page', props: ['Progress 60%', 'Part of The new settings page'], rows: shown.cards.map((c) => c.title), tab: null, wide: false });
+      tab: document.querySelector('#tabs a[aria-current]')?.getAttribute('href'), wide: document.documentElement.scrollWidth > 390 })`));
+    assert.deepEqual({ ...page, rows: page.rows.map(([t]) => t) }, { head: 'Settings · In progress', title: 'Ship the new settings page', props: ['Progress 60%', 'Part of The new settings page'], rows: shown.cards.map((c) => c.title), tab: '#tickets', wide: false });
     assert.deepEqual(['Ship the settings page on Friday?', 'Settings on a phone', 'Approve the chat app journeys?', 'The weekly digest ran'].map((t) => Object.fromEntries(page.rows)[t]), ['#decide/ask-linked', '#evidence/update-1', '#designs/chat-journeys', '#reports/digest-ran']);
     assert.equal(run('ticket', file, '--id', 'T-29', '--release', '0.6.1', '--state', 'on hold', '--pr', prs[0], '--pr', prs[1]).code, 0);
     await evaluate('refresh()');
@@ -4803,7 +4864,7 @@ test('Tickets on a phone: with one section expanded, See all on each other secti
   proc.kill();
 });
 
-test('the feedback trail: what the person sends on a card goes Sent, Delivered, Read, then Replied with the agent\'s words and link, on the card, in its Activity, as a badge in the lists and in the inbox until opened',{ skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('the feedback trail: what the person sends on a card goes Sent, Delivered, Read, then Replied with the agent\'s words and link, on the card, in its Activity, as a badge in the lists and in Today until opened', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'trail'), file = join(dir, 'board.json');
   mkdirSync(dir);
   // Two agents: the release agent's answers are only ever handed over, the settings agent takes its own.
@@ -4847,11 +4908,11 @@ test('the feedback trail: what the person sends on a card goes Sent, Delivered, 
     { id: '3f9a1c2e7b6d4a10', key: 'T-1', kind: 'ticket', said: 'Is the export in this release?', at: 'time', delivered: 'time', read: 'time', reply: { at: (await (await fetch(`${url}api/decisions`)).json()).trail.find((t) => t.kind === 'ticket').reply.at, text: 'Yes, it ships Friday with the release.' } });
   const { evaluate, send, close } = await browse(join(dir, 'b'), 390, 844, true);
   try {
-    // The inbox: the two replies not opened yet are New, each row's second line the agent's words.
+    // Today: the reply above Waiting on you, its words as the row's second line.
     await evaluate(`location.href = ${JSON.stringify(url)}`);
-    await until(() => evaluate('document.querySelectorAll(".ib-sec[aria-label=New] .ib-row").length === 2'));
-    assert.match(await evaluate('[...document.querySelectorAll(".ib-sec[aria-label=New] .ib-row")].map((r) => r.querySelector(".t").textContent + " / " + r.querySelector(".l2").textContent).join(" | ")'),
-      /^Open the beta to every team\? \/ .*Kept it to ten teams until the import fix lands\. \| Ship the CSV export \/ .*Yes, it ships Friday with the release\.$/);
+    await until(() => evaluate('!!document.querySelector(".t-replies")'));
+    assert.equal(await evaluate('[...document.querySelectorAll(".t-replies .ui-row")].map((r) => r.querySelector(".t").textContent + " / " + r.querySelector(".meta").textContent.replace(/^\\d\\d:\\d\\d · /, "")).join(" | ")'),
+      'Open the beta to every team? / Kept it to ten teams until the import fix lands. | Ship the CSV export / Yes, it ships Friday with the release.');
     // Decide: each answered row carries its badge, four marks and the step's word; the reply not opened yet is ink.
     await evaluate('location.hash = "#waiting"');
     await until(async () => (await evaluate('document.querySelectorAll(".ui-tb").length')) === 3);
@@ -4893,7 +4954,7 @@ test('the feedback trail: what the person sends on a card goes Sent, Delivered, 
     assert.equal(await evaluate('[document.querySelector(".tk-said .tr-you p").textContent, [...document.querySelectorAll(".tk-said .ui-trail li.on b")].map((b) => b.textContent).join(" "), document.querySelector(".tk-said .tr-said p").innerText.trim()].join(" | ")'),
       'Is the export in this release? | Sent Delivered Read Replied | Yes, it ships Friday with the release.');
     await evaluate(`location.href = ${JSON.stringify(url)}`);
-    await until(() => evaluate('!!document.querySelector(".ib-list") && !document.querySelector(".ib-sec[aria-label=New]")'));
+    await until(() => evaluate('!!document.querySelector(".t-up") && !document.querySelector(".t-replies")'));
     // Posting the card again after the answer is acting on it: the track reads Acted, with Posted a new version.
     assert.equal(run('feedback', 'export', file, '--read').code, 0);
     const items = JSON.parse(readFileSync(file, 'utf8'));
@@ -5077,7 +5138,7 @@ const focusColours = `(() => { const el = document.activeElement; if (!el || el 
   if (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0) out.push([s.outlineColor, 'outline']); if (s.boxShadow !== 'none') out.push([s.boxShadow, 'shadow']);
   return out.map(([v, p]) => v + '|' + el.tagName.toLowerCase() + [...el.classList].slice(0, 2).map((c) => '.' + c).join('') + ':focus-visible ' + p); })()`;
 
-test('the new look draws only the approved prototype\'s colours: the inbox, Decide, Designs, Reports, Evidence and Tickets, their sheets and keyboard focus, at 390 and 1280, light and dark', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('the new look draws only the approved prototype\'s colours: Today, Decide, Designs, Reports, Evidence and Tickets, their sheets and keyboard focus, at 390 and 1280, light and dark', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'palette'), file = join(dir, 'board.json'), fx = new URL('../fixtures/contract/', import.meta.url).pathname, now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   mkdirSync(join(dir, 'design'), { recursive: true });
   for (const f of readdirSync(join(fx, 'design.v1/design'))) writeFileSync(join(dir, 'design', f), readFileSync(join(fx, 'design.v1/design', f)));
@@ -5107,7 +5168,7 @@ test('the new look draws only the approved prototype\'s colours: the inbox, Deci
   for (const key of ['ask-linked', keys.report]) assert.equal((await post(url, 'api/messages', { kind: 'comment', key, text: 'Looks right on my phone.' })).status, 200);
   // Each state: its address and what is tapped on it, on a phone and on a desk; a report tapped in its list opens its own screen (a sheet on a phone, beside the list on a desk).
   const states = {
-    390: [['#', ''], ['#', '.ui-top .ui-rb[aria-label=More]'], ['#find', ''], ['#answered', ''], ['#waiting', ''], ['#decide/release-day', '.decide [role="radio"], .decide input[type="radio"]'], ['#decide/npm', ''],
+    390: [['#', ''], ['#', '.t-more-line'], ['#find', ''], ['#answered', ''], ['#waiting', ''], ['#decide/release-day', '.decide [role="radio"], .decide input[type="radio"]'], ['#decide/npm', ''],
       ['#reports', ''], ['#reports', '.rp-fb'], [`#reports/${keys.report}`, ''], ['#reports', `.rp-list a[data-row][href="#reports/${keys.report}"]`], ['#decide/ask-linked', ''], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#evidence', ''], ['#evidence', '.ev-more'], [`#evidence/${keys.evidence}`, ''], ['#tickets', ''], ['#ticket/T-29', ''],
       // Last, an answer and the toast it raises: a yes/no in light, the pick-one in dark.
       [(theme) => (theme === 'light' ? '#decide/ask-plain' : '#decide/release-day'), ['.decide .pick-option', '.decide-bar .answer']]],
@@ -5132,8 +5193,8 @@ test('the new look draws only the approved prototype\'s colours: the inbox, Deci
         if (hash === '#find') await evaluate('document.querySelector("#find").value = "settings", document.querySelector("#find").dispatchEvent(new Event("input"))');
         assert.deepEqual(await evaluate('[...document.querySelectorAll(".ui-row .ui-icon, .dz-shot, .t-up .meta")].filter(e => e.querySelector(".mono") || (!e.querySelector("img,svg") && /^[A-Z]{2}$/.test(e.textContent.trim()))).map(e => e.textContent)'), [], 'no monogram tiles in any list');
         const at = hash + (tap ? ` (${[tap].flat().map((t) => t.split(',')[0]).join(' then ')} tapped)` : '');
-        // An old address has no sidebar or dock place, so nothing is lit there; the inbox is lit only on its own screens.
-        if (hash.startsWith('#designs')) assert.deepEqual(await evaluate('[...document.querySelectorAll(".side [aria-current], .tabs [aria-current]")].filter((a) => a.getClientRects().length).map((a) => a.getAttribute("href"))'), [], at);
+        // On Designs the colours read include the sidebar's own Designs place, lit, on a desk, and the dock with Decide lit on a phone.
+        if (hash.startsWith('#designs')) assert.deepEqual(await evaluate('[...document.querySelectorAll(".side [aria-current], .tabs [aria-current]")].filter((a) => a.getClientRects().length).map((a) => a.getAttribute("href"))'), [width === 390 ? '#waiting' : '#designs'], at);
         check(await evaluate(drawnColours), at);
         // A keyboard user's first dozen stops on the screen.
         for (let i = 0; i < 12; i++) {
@@ -5317,7 +5378,7 @@ test('replies thread under what they answer: Your question or Your action, then 
   } finally { await close(); }
 });
 
-test('the inbox: one list of every kind with new replies first, then Decide, then Waiting on agents, answered and done folded; kind chips and search filter it; a row opens its thread in pairs; writing back keeps a card in Decide and a follow-up tap answers it', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('the inbox: one list of every kind with new replies first, then Decide, then Waiting on agents, archived folded; kind chips and search filter it; a row opens its thread in pairs; writing back keeps a card in Decide and a follow-up tap answers it', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'inbox'), file = join(dir, 'board.json'), pause = () => new Promise((ok) => setTimeout(ok, 1100));
   mkdirSync(dir);
   for (const [key, title] of [['open', 'Keep the weekly digest?'], ['asked', 'Ship the settings page Friday?'], ['built', 'Open the beta to every team?'], ['taken', 'Turn on the CSV export?'], ['old', 'Send the digest on Mondays?']]) assert.equal(run('raise', file, '--key', key, '--title', title, '--filer', 'inbox-agent').code, 0);
@@ -5345,15 +5406,14 @@ test('the inbox: one list of every kind with new replies first, then Decide, the
   const { evaluate, close } = await browse(join(dir, 'b'), 390, 844, true);
   try {
     const list = () => evaluate('JSON.stringify([...document.querySelectorAll(".ib-sec")].map((s) => [s.getAttribute("aria-label"), ...[...s.querySelectorAll(".ib-row")].map((r) => (r.classList.contains("unread") ? "* " : "") + r.querySelector(".t").textContent)]))').then(JSON.parse);
-    await evaluate(`location.href = ${JSON.stringify(url)}`);
+    await evaluate(`location.href = ${JSON.stringify(`${url}#inbox`)}`);
     await until(() => evaluate('!!document.querySelector(".ib-sec")'));
-    // New replies first and unread, newest first; then what waits on the person; then what waits on an agent; answered and done folded.
+    // New replies first and unread, newest first; then what waits on the person; then what waits on an agent; archived folded.
     assert.deepEqual(await list(), [['New', '* Ship the settings page Friday?', '* Open the beta to every team?'], ['Decide', 'Keep the weekly digest?'], ['Waiting on agents', 'Turn on the CSV export?']]);
-    assert.equal(await evaluate('document.querySelector(".ib-fold").textContent'), 'Show 1 answered and done');
-    assert.equal(await evaluate('document.title'), '(3) Inbox · sign-off');
+    assert.equal(await evaluate('document.querySelector(".ib-fold").textContent'), 'Show 1 archived');
     assert.equal(await evaluate('[...document.querySelectorAll(".ib-row")].find((r) => r.textContent.includes("Turn on the CSV")).querySelector(".l2").textContent'), 'You: Yes · Read');
-    // No separate places: one nav entry, the inbox.
-    assert.deepEqual(await evaluate('[...new Set([...document.querySelectorAll(".side a, .tabs a")].map((a) => a.getAttribute("href")))]'), ['#find', '#']);
+    // Every place stays, the inbox one more.
+    assert.deepEqual(await evaluate('[...new Set([...document.querySelectorAll(".side a, .tabs a")].map((a) => a.getAttribute("href")))]'), ['#find', '#', '#inbox', '#waiting', '#evidence', '#reports', '#designs', '#tickets']);
     // The kind chips, each with what is still open; Tickets reads the board's ticket roll-up when picked. A pick filters the list, and search narrows it.
     assert.deepEqual(await evaluate('[...document.querySelectorAll(".ib-chip")].map((c) => c.textContent)'), ['All4', 'Decisions4', 'Tickets']);
     await evaluate('[...document.querySelectorAll(".ib-chip")].find((c) => c.textContent.startsWith("Tickets")).click()');
@@ -5363,7 +5423,7 @@ test('the inbox: one list of every kind with new replies first, then Decide, the
     await until(async () => JSON.stringify(await list()) === JSON.stringify([['New', '* Open the beta to every team?']]));
     await evaluate('{ const b = document.getElementById("ib-find"); b.value = ""; b.dispatchEvent(new Event("input")); }');
     await evaluate('document.querySelector(".ib-fold").click()');
-    await until(async () => (await list()).at(-1)?.[0] === 'Answered and done');
+    await until(async () => (await list()).at(-1)?.[0] === 'Archived');
     // A row opens its thread: the action and what was done with its link, then the item it reaches.
     await evaluate('[...document.querySelectorAll(".ib-row")].find((r) => r.textContent.includes("Open the beta")).click()');
     await until(() => evaluate('!!document.querySelector(".ib-thread") && location.hash === "#inbox/built"'));
@@ -5388,6 +5448,8 @@ test('the inbox: one list of every kind with new replies first, then Decide, the
     // A follow-up tap is the final answer: the card leaves Decide, and the answer does not replace the written one.
     await evaluate('location.hash = "#inbox/asked"');
     await until(() => evaluate('!!document.querySelector(".ib-thread .tr-opt")'));
+    // Answers are stamped in whole seconds: the tap waits one out, so it is plainly after the reply it answers.
+    await pause();
     await evaluate('document.querySelector(".ib-thread .tr-opt").click()');
     await until(async () => (await state()).answers.asked.answer === 'yes');
     assert.equal(JSON.parse(readFileSync(join(dir, 'board.answers.jsonl'), 'utf8').trim().split('\n').at(-1)).replaces, undefined);

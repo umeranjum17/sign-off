@@ -467,7 +467,7 @@
       .sort((x, y) => bySecond(y, x)), said = trailOf(t.id, 'ticket');
     seeReply(t.id, 'ticket');
     return [el('div', { class: 'tk-shd' }, el('p', {}, tkTile(t), el('span', {}, [proj, TK_WORDS[s]].filter(Boolean).join(' · '))), close),
-      el('h2', { class: 'tk-dt', tabindex: '-1', dir: 'auto' }, t.title), threadLink(t.id, 'ticket'),
+      el('h2', { class: 'tk-dt', tabindex: '-1', dir: 'auto' }, t.title),
       t.release ? el('span', { class: 'ui-pc tk-release', title: t.release }, t.release) : '',
       el('div', { class: 'ui-props' }, t.priority ? prop('flag', 'Priority', el('span', { class: `ui-pc ${t.priority.toLowerCase()}` }, t.priority)) : '',
         prop('half', 'Progress', ...tkStatus(t), ...((t.stage && !kids.length) || (t.progress > 0 && t.progress < 100) ? [el('span', { class: 'ui-bar' }, el('i', { style: `width: ${t.progress}%` })), el('span', { class: 'n' }, `${t.progress}%`)] : [el('span', {}, t.progress >= 100 ? 'All done' : 'Not started')])),
@@ -1672,7 +1672,7 @@
   /** A report's parts as one panel, each with a check once read, under a strip of them and the next one to read, then for a guided report Read the report:
    *  a part or the button opens it in full (at that part). A report 5's parts are its kind's. */
   function designsHead(items, top, gone) {
-    const h1 = top.querySelector('h1'), ro = top.querySelector(':scope > .meta') ?? '', theme = themeButton(), flip = theme.onclick, sel = selecting && canDismiss() && items.length && selectHead(items);
+    const h1 = top.querySelector('h1'), ro = top.querySelector(':scope > .meta') ?? '', [, theme] = todayHead(), flip = theme.onclick, sel = selecting && canDismiss() && items.length && selectHead(items);
     theme.classList.add('dz-theme');
     theme.onclick = () => { flip(); document.querySelector('.dz-theme')?.focus({ preventScroll: true }); };
     let more = '';
@@ -1856,9 +1856,9 @@
     // A desk sets the ask out as the prototype's open item: its head and the ask with what it carries scroll on the left, its Activity beside them, and the answers
     // pinned under a hairline at the foot, as cards side by side over one line of the note, Ask me later and Answer.
     const page = desk ? el('section', { class: `${kind} ui-card ui-pane ask2 s8 split-detail`, 'aria-labelledby': 'ask-title' },
-      el('div', { class: 'pbody' }, askHead(d, sink), el('div', { class: 'pmain' }, lead, ...about, ...said, ...comments, quietLine, threadLink(d.key)), el('div', { class: 'pside' }, ...askReport(d), thread(d))),
+      el('div', { class: 'pbody' }, askHead(d, sink), el('div', { class: 'pmain' }, lead, ...about, ...said, ...comments, quietLine), el('div', { class: 'pside' }, ...askReport(d), thread(d))),
       el('div', { class: 'ppin' }, ...picks, ...words, sendLine(`card:${d.key}`), err, bar(noteField)))
-      : el('section', { class: kind }, lead, ...about, ...said, ...comments, ...picks, ...words, noteField, quietLine, threadLink(d.key), thread(d), sendLine(`card:${d.key}`), err, bar());
+      : el('section', { class: kind }, lead, ...about, ...said, ...comments, ...picks, ...words, noteField, quietLine, thread(d), sendLine(`card:${d.key}`), err, bar());
     return page;
   }
   function evidenceDesk(top, items, archived, d) {
@@ -2003,11 +2003,6 @@
     };
     return el('div', {}, el('div', { class: 'ib-compose' }, box, send), err);
   }
-  /** From an item back to its thread: how many replies on it are new, else how many things were said. */
-  function threadLink(key, kind) {
-    const sent = trailOf(key, kind), n = sent.filter(unseen).length;
-    return el('a', { class: 'ib-tlink', href: `#inbox/${kind ? '~' : ''}${key}` }, glyph('msg'), el('span', {}, el('b', {}, n ? `Thread · ${n} new` : `Thread · ${sent.length + 1} ${sent.length ? 'messages' : 'message'}`)), glyph('right'));
-  }
   /** A thread on a phone, with its item over it once opened: an ask in its sheet, a ticket in its own; the reader opens the rest (render). */
   function threadScreen(th, open) {
     if (open && th.tk) ticketBack = `#inbox/${th.id}`;
@@ -2025,3 +2020,102 @@
     const bar = {}, page = decidePage(d, undefined, true, bar);
     return split(top, sub, side, page.matches('.ui-pane') ? page : pane(askHead(d, bar), page));
   }
+  /* ---- The inbox: the one place for every exchange with an agent. Each card (and each ticket) is one thread, in four sections: new (a reply not opened yet, or a report
+     or proof not read yet), what waits on you (Decide), what waits on its agent, with how far it got, and what is answered, acted on, merged or closed: that archives itself, folded, and still turns up in search or when a new message lands on it. Each kind is a chip, never a place. ---- */
+  const KIND_NAMES = { decision: 'Decision', plan: 'Plan', report: 'Report', design: 'Design', ticket: 'Ticket', proof: 'Proof' };
+  const FILTERS = [['all', 'All'], ['decision', 'Decisions'], ['plan', 'Plans'], ['report', 'Reports'], ['design', 'Designs'], ['ticket', 'Tickets'], ['proof', 'Proofs']];
+  const SECTIONS = [['new', 'New'], ['turn', 'Decide'], ['agent', 'Waiting on agents'], ['done', 'Archived']];
+  let inKind = 'all', inFind = '', inDone = false;
+  const inMore = new Set();
+  const threadKind = (d) => (d.type === 'evidence' ? 'proof' : d.kind === 'design' || d.type === 'design' ? 'design' : d.type === 'plan' ? 'plan' : d.kind === 'report' || ['reports', 'notes'].includes(area(d)) ? 'report' : 'decision');
+  /** What the person sent, in their words: an answer as it reads, a comment's text, else what it was. */
+  const youSaid = (t, d) => (t.kind === 'answer' ? t.said ?? (state.answers[t.key]?.at === t.at ? saidOf(d, state.answers[t.key]) : 'Answered') : t.kind === 'comment' ? (state.messages ?? []).find((m) => m.id === t.id)?.text ?? 'A comment'
+    : t.said ?? { round: 'Another round', discard: 'Discarded', ask: 'Go deeper', part: 'A comment on a part' }[t.kind]);
+  /** Every thread on the board with where it stands (st) and when it last moved (at). A card an open ask merges is that ask's thread. */
+  function inboxThreads(merged = new Set()) {
+    const gone = new Set(state.dismissed ?? []), out = [];
+    for (const d of state.decisions) {
+      if (gone.has(d.key) || merged.has(d.key) || (d.type === 'evidence' && ['RUN FAIL', 'INCONCLUSIVE'].includes(d.evidenceCard?.result))) continue;
+      const sent = trailOf(d.key), last = sent.at(-1), a = area(d), kind = threadKind(d);
+      const st = sent.some(unseen) || (!sent.length && (['report', 'proof'].includes(kind) || a === 'reports') && unread(d)) ? 'new'
+        : a === 'waiting' || (a === 'evidence' && (d.options.length || d.reply)) ? 'turn'
+        // A design review a lead posted is Main's until promoted: it waits on its agents, never in Decide.
+        : (last && !last.reply) || (a === 'designs' && dzOpen(d)) ? 'agent' : 'done';
+      out.push({ id: d.key, d, kind, st, last, at: last?.reply?.at ?? last?.at ?? d.filed ?? '' });
+    }
+    // A ticket is a thread too: its comments from the fleet dashboard and the lead's replies; open while the ticket is.
+    for (const t of state.tickets ?? []) {
+      const sent = trailOf(t.id, 'ticket'), last = sent.at(-1);
+      out.push({ id: `~${t.id}`, tk: t, kind: 'ticket', st: sent.some(unseen) ? 'new' : (last && !last.reply) || tkStateOf(t) !== 'done' ? 'agent' : 'done', last, at: last?.reply?.at ?? last?.at ?? t.at ?? '' });
+    }
+    return out;
+  }
+  /** A thread's second line: the agent's last words, else what the person sent and how far it got, else what the card says. */
+  const inboxLine = ({ d, tk, last }) => { const r = last?.reply;
+    return r ? `${d ? d.by || 'Agent' : 'Lead'}: ${r.text ?? (r.link ? linkName(r.link) : 'Posted a new version')}` : last ? `You: ${youSaid(last, d)} · ${stepWord(last, stepOf(last) - 1)}` : d ? plain(d.about ?? kind(d)) : TK_WORDS[tkStateOf(tk)]; };
+  function inboxRow(th, sel) {
+    const { d, tk } = th, a = el('a', { class: `ui-row ib-row${th.st === 'new' ? ' unread' : ''}`, href: `#inbox/${th.id}`, 'data-row': '', ...(sel && { 'aria-current': 'true' }) },
+      el('span', { class: 'ib-tile' }, d ? cardTile(d) : tkTile(tk), th.st === 'new' || th.st === 'turn' ? el('i', { class: `dot${th.st === 'turn' ? ' red' : ''}` }) : ''),
+      el('span', { class: 'rm' }, el('span', { class: 't', dir: 'auto' }, d ? (d.type === 'evidence' ? headline(d) : title(d)) : tk.title), el('span', { class: 'l2 meta', dir: 'auto' }, inboxLine(th))),
+      el('span', { class: 'ib-side' }, th.at ? el('time', { datetime: th.at }, trailWhen(th.at)) : '', el('span', { class: 'ib-kind' }, KIND_NAMES[th.kind])));
+    return el('li', {}, a);
+  }
+  /** The inbox's list: the search box, a chip per kind with what is open of it, then the sections; Archived is folded until asked for. */
+  function inboxList(all, key) {
+    const q = inFind.trim().toLowerCase(), time = (t) => Date.parse(t.at) || 0, out = [];
+    const shown = all.filter((t) => (inKind === 'all' || t.kind === inKind) && (!q || [t.d ? title(t.d) : t.tk.title, t.d?.about ?? '', (t.d && projectName(t.d)) ?? ''].join(' ').toLowerCase().includes(q)));
+    const count = (k) => all.filter((t) => t.st !== 'done' && (k === 'all' || t.kind === k)).length;
+    const box = el('input', { type: 'search', id: 'ib-find', 'aria-label': 'Search the inbox', placeholder: 'Search', autocomplete: 'off', enterkeyhint: 'search' });
+    box.value = inFind;
+    box.oninput = () => { inFind = box.value; const at = box.selectionStart; render(); const b = document.getElementById('ib-find'); b?.focus(); b?.setSelectionRange(at, at); };
+    const chips = el('div', { class: 'ib-chips', role: 'group', 'aria-label': 'Show one kind' }, ...FILTERS.filter(([k]) => k === 'all' || k === inKind || k === 'ticket' || all.some((t) => t.kind === k)).map(([k, w]) => {
+      const b = el('button', { type: 'button', class: 'ib-chip', 'aria-pressed': String(inKind === k) }, w, count(k) ? el('b', {}, String(count(k))) : '');
+      // The ticket roll-up is the board's largest part: it is read when Tickets is picked.
+      b.onclick = () => { inKind = k; if (k === 'ticket') readTickets(); render(); };
+      return b;
+    }));
+    for (const [s, name] of SECTIONS) {
+      const mine = shown.filter((t) => t.st === s).sort((x, y) => time(y) - time(x));
+      if (!mine.length) continue;
+      if (s === 'done' && !inDone && !q) { const b = el('button', { type: 'button', class: 'ib-fold' }, `Show ${mine.length} archived`); b.onclick = () => { inDone = true; render(); }; out.push(b); continue; }
+      const cap = inMore.has(s) || mine.some((t) => t.id === key) ? Infinity : 8, more = el('button', { type: 'button', class: 'ib-fold' }, `Show ${mine.length - 8} more`);
+      more.onclick = () => { inMore.add(s); render(); };
+      out.push(el('section', { class: 'ib-sec', 'aria-label': name }, el('h2', { class: 'ui-sec' }, name, el('span', { class: 'n' }, String(mine.length))),
+        el('ul', { class: 'ui-card ui-list ib-list' }, ...mine.slice(0, cap).map((t) => inboxRow(t, t.id === key))), mine.length > cap ? more : ''));
+    }
+    return [el('label', { class: 'ib-find', role: 'search' }, document.getElementById('dock-find').firstChild.cloneNode(true), box), chips,
+      ...(out.length ? out : [el('p', { class: 'ib-empty' }, q ? `Nothing matches “${inFind.trim()}”` : inKind === 'ticket' && tkLoad() === 'loading' ? 'Reading the tickets…' : 'Nothing here.')])];
+  }
+  /** An item answered in its thread's own place (an ask in its sheet, or in the pane beside its thread on a desk); a plan, a design, a page to read and a proof open in the reader. */
+  const inPlace = (d) => d.type !== 'plan' && d.kind !== 'design' && !reads(d) && d.type !== 'evidence';
+  /** Every reply not opened yet, oldest first. */
+  const replies = () => [...new Map((state.trail ?? []).map((t) => [t.id, t])).values()].filter(unseen).sort((x, y) => Date.parse(x.reply.at) - Date.parse(y.reply.at));
+  /** A reply landed: a notice at the top of the board, as the phone's own would show it, that opens the thread; it goes by itself after a while. */
+  function notice(t) {
+    const id = t.kind === 'ticket' ? `~${t.key}` : t.key, d = t.kind === 'ticket' ? undefined : findCard(t.key), name = d ? title(d) : tkById(t.key)?.title ?? t.key;
+    document.querySelector('.ib-note')?.remove();
+    const a = el('a', { class: 'ib-note', href: `#inbox/${id}`, role: 'status', 'aria-label': `New reply from ${d?.by || 'the agent'}: ${name}. Open it.` },
+      el('span', { class: 'ib-nh' }, glyph('check'), el('b', {}, 'sign-off'), ` · ${d?.by || 'Agent'} replied`, el('time', {}, 'now')),
+      el('span', { class: 'ib-nt', dir: 'auto' }, el('b', {}, name), t.reply.text ?? (t.reply.link ? linkName(t.reply.link) : 'Posted a new version')));
+    a.onclick = () => a.remove();
+    document.body.append(a);
+    setTimeout(() => a.remove(), 9000);
+  }
+  /** The head's count: what is new and what waits on you, as the tab's title says it too. */
+  const inboxSub = (all) => { const n = all.filter((t) => t.st === 'new').length, w = all.filter((t) => t.st === 'turn').length; return `${n} new · ${w} waiting on you`; };
+  /** The inbox. A phone shows the list, and a thread over it once a row is opened; a desk shows the list beside the open thread (the first, until a row is picked),
+   *  and an item opened from its thread beside that thread. The thread and the item draw from app-more.js. */
+  function inboxScreen(all, key, open) {
+    const th = all.find((t) => t.id === key);
+    // The address #find opens Search over the inbox.
+    if (location.hash === '#find' && !searchSheet.open) openSearch();
+    if (phone()) return th && moreReady ? threadScreen(th, open) : [el('header', { class: 'ui-top' }, el('h1', { tabindex: '-1' }, 'Inbox'), themeButton()), ...inboxList(all, key)];
+    const order = SECTIONS.map(([s]) => s), first = [...all].filter((t) => t.st !== 'done').sort((x, y) => order.indexOf(x.st) - order.indexOf(y.st) || (Date.parse(y.at) || 0) - (Date.parse(x.at) || 0))[0];
+    const shown = th ?? first;
+    deskSel = shown?.id ?? '';
+    const top = el('header', { class: 'ui-top' }, el('h1', { tabindex: '-1' }, 'Inbox'));
+    return [moreReady ? threadDesk(top, inboxSub(all), inboxList(all, shown?.id), shown, open && th) : split(top, inboxSub(all), inboxList(all, shown?.id), pane('', ''))];
+  }
+
+  const heardReplies = () => new Set(replies().map((t) => t.id + t.reply.at));
+  const noticeNew = (heard) => { const landed = replies().filter((t) => !heard.has(t.id + t.reply.at)).at(-1); if (landed) notice(landed); };

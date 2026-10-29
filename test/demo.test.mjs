@@ -24,7 +24,7 @@ test('demo build carries the shim and seed; the server page does not', { timeout
 
   // The demo page is the real page plus the seed and the shim.
   const demo = readFileSync(join(out, 'index.html'), 'utf8');
-  assert.match(demo, /<title>Inbox/);
+  assert.match(demo, /<title>Dashboard/);
   assert.match(demo, /window\.SIGN_OFF_DEMO_SEED/);
   assert.match(demo, /demo-shim\.js/);
   for (const key of ['keep-the-weekly-digest', 'release-day', 'settings-layout', 'update-1', 'sign-in-tour']) {
@@ -71,6 +71,6 @@ test('demo build carries the shim and seed; the server page does not', { timeout
     req.setTimeout(15_000, () => req.destroy(new Error(`${url} did not answer within 15s`)));
     req.once('error', no);
   });
-  assert.match(html, /<title>Inbox/);
+  assert.match(html, /<title>Dashboard/);
   assert.ok(!html.includes('SIGN_OFF_DEMO'), 'the served page has no demo hooks');
 });
