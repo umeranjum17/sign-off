@@ -2157,8 +2157,6 @@
     document.body.append(a);
     setTimeout(() => a.remove(), 9000);
   }
-  /** The threads that need the person now, the number on the Inbox badge: the same ask Decide holds, and a thread an agent wrote on that they have not opened. Answered, acted on, archived and closed ones never count. */
-  const inboxNeeds = (all) => all.filter((t) => t.needs).length;
   /** The head's count: what is new and what waits on you, as the tab's title says it too. */
   const inboxSub = (all) => { const n = all.filter((t) => t.st === 'new').length, w = all.filter((t) => t.st === 'turn').length; return `${n} new · ${w} waiting on you`; };
   /** The inbox. A phone shows the list, and a thread over it once a row is opened; a desk shows the list beside the open thread (the first, until a row is picked),
