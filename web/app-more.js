@@ -2095,7 +2095,7 @@
         : a === 'waiting' || (a === 'evidence' && (d.options.length || d.reply)) ? 'turn'
         // A design review a lead posted is Main's until promoted: it waits on its agents, never in Decide.
         : (last && !last.reply) || (a === 'designs' && dzOpen(d)) ? 'agent' : 'done';
-      // It needs the person when Decide holds it, or when an agent wrote on it and they have not opened it; a report or proof only not read yet is New but asks nothing of them.
+      // needs (the Inbox badge): held in Decide, or an agent wrote on it and it is not opened; an unread report or proof alone asks nothing.
       out.push({ id: d.key, d, kind, st, last, needs: st === 'turn' || (st === 'new' && sent.length > 0), at: last?.reply?.at ?? last?.at ?? d.filed ?? '' });
     }
     // A ticket is a thread too: its comments from the fleet dashboard and the lead's replies; open while the ticket is.
