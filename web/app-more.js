@@ -487,6 +487,16 @@
   const tkProp = (draw, k, ...v) => el('div', { class: 'ui-pr' }, el('span', { class: 'k' }, tkMark(draw), k), el('span', { class: 'v' }, ...v));
   /** A linked pull request, a row that opens it: its number and the repository it is in. */
   const tkPr = (url) => { const pr = /\/pull\/(\d+)\/?$/.exec(new URL(url).pathname); return el('li', {}, el('a', { class: 'ui-row', href: url, title: url, target: '_blank', rel: 'noopener noreferrer' }, ...uiRow({ tile: el('span', { class: 'ui-icon', 'aria-hidden': 'true' }, glyph('link')), title: pr ? `Pull request #${pr[1]}` : url, meta: pr ? new URL(url).pathname.replace(/\/pull\/.*$/, '').slice(1) : 'Pull request' }))); };
+  /** The Assigned block of a ticket page, as its task record says it; no record reads Unassigned. */
+  function tkAssignee(t) {
+    const a = t.assignee, row = tkProp, none = (w) => el('span', { class: 'tk-none' }, w), av = (src, v, w) => v ? el('span', { class: 'tk-av' }, logoMark(src, v), el('span', { dir: 'auto' }, v)) : none(w);
+    return [el('p', { class: 'ui-dl' }, 'Assigned'), el('div', { class: 'ui-props tk-assigned' }, ...(a ? [
+      row('person', 'Lead', el('span', { dir: 'auto' }, a.lead)),
+      row('person', 'Worker', a.worker ? el('span', { class: 'tk-worker', dir: 'auto', title: a.worker_id }, a.worker) : 'None running'),
+      row('chip', 'Model', av(a.model_logo, a.model, 'Not recorded')),
+      row('layers', 'Tool', av(a.tool_logo, a.tool, 'Not recorded')),
+      row('clock', 'Worker live', a.live ? el('span', { class: 'tk-live' }, el('i', { 'aria-hidden': 'true' }), 'Live') : 'Not running')] : [row('person', 'Assignee', none('Unassigned'))]))];
+  }
   function ticketPage(t, close = '') {
     const gone = new Set(state.dismissed ?? []), cards = state.decisions.filter((d) => d.ticket === t.id && !gone.has(d.key)).reverse().sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
     const kids = tkUnder(t), done = kids.filter((x) => tkStateOf(x) === 'done').length, s = tkStateOf(t), up = tkAbove(t)[0], proj = tkProject(t);
@@ -504,6 +514,7 @@
         prop('half', 'Progress', ...tkStatus(t), ...((t.stage && !kids.length) || (t.progress > 0 && t.progress < 100) ? [el('span', { class: 'ui-bar' }, el('i', { style: `width: ${t.progress}%` })), el('span', { class: 'n' }, `${t.progress}%`)] : [el('span', {}, t.progress >= 100 ? 'All done' : 'Not started')])),
         up ? prop('layers', 'Part of', el('a', { href: `#ticket/${up.id}`, dir: 'auto' }, up.title)) : '',
         prop('clock', 'Last update', el('span', {}, stamp(t.at)))),
+      ...tkAssignee(t),
       ...(kids.length ? [el('p', { class: 'ui-dl' }, `${tkAbove(t).length ? 'Sub-tasks' : 'Tickets in this epic'} · ${done} of ${kids.length} done`), el('ul', { class: 'ui-list tk-in' }, ...kids.map(tkRow))] : []),
       el('p', { class: 'ui-dl' }, 'Linked'), cards.length || t.prs?.length ? el('ul', { class: 'ui-list tk-in' }, ...(t.prs ?? []).map(tkPr), ...cards.map(linked)) : emptyState('empty', { mark: 'plan', title: 'No cards yet', text: 'Cards that name this ticket show here.', small: true }),
       // The person's comments on it (made in the fleet dashboard), oldest first, each with how far it got and the lead's reply.

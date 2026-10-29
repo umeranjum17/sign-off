@@ -84,6 +84,18 @@ sign-off-axi post --type evidence --ticket T-29 --title "Settings on a phone" --
 
 Agents pass `--ticket` whenever they know the ticket their work belongs to, and move its `--progress` as the work goes; the shipped skill tells them so.
 
+### Who works on a ticket
+
+A ticket row shows who works on it: the model vendor's mark and the tool's own mark (Claude Code, Codex, OpenCode or Pi), the model, the lead, and **Live** while a worker runs. The ticket's page has an **Assigned** block with the lead, worker (a short readable title; the task id shows on hover), model, tool and whether the worker is live. A ticket nobody is recorded on says **Unassigned**.
+
+The board reads this from the task records of a Juggernaut home (`state/<ticket id>.meta`, read only), and never guesses a model or tool a record does not carry. The lead is the record's `lead=` or `owner=`, else the folder name of its `project=`, else the name of the Juggernaut home itself; the worker's title is its `title=`, else its task id read as words. Point it at a home with a `fleet_home:` line in the `config.yaml` beside the board, or with `SIGN_OFF_FLEET_HOME` (which wins):
+
+```yaml
+fleet_home: ~/firstmate
+```
+
+With no home named, or no record for a ticket, every ticket reads as Unassigned and nothing else changes. `ticket --json`, `/api/tickets` and `/api/tickets/<id>` add one optional `assignee` object, `{ lead, worker?, worker_id?, model?, tool?, live, tool_logo?, model_logo? }`.
+
 ### How urgent, and whose project
 
 A card may say how urgent it is with `--priority P0` (most urgent) to `P3` (least), on any `raise` or `post`; it shows as a chip, and a card without one shows none. A project may have its own icon: a picture in the board's folder (.png, .jpg, .webp or a script-free .svg, 500 KB or less), set once. The board serves only that exact file, and a project with no icon shows its initials.
