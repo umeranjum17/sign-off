@@ -2095,12 +2095,14 @@
         : a === 'waiting' || (a === 'evidence' && (d.options.length || d.reply)) ? 'turn'
         // A design review a lead posted is Main's until promoted: it waits on its agents, never in Decide.
         : (last && !last.reply) || (a === 'designs' && dzOpen(d)) ? 'agent' : 'done';
-      out.push({ id: d.key, d, kind, st, last, at: last?.reply?.at ?? last?.at ?? d.filed ?? '' });
+      // needs (the Inbox badge): held in Decide, or an agent wrote on it and it is not opened; an unread report or proof alone asks nothing.
+      out.push({ id: d.key, d, kind, st, last, needs: st === 'turn' || (st === 'new' && sent.length > 0), at: last?.reply?.at ?? last?.at ?? d.filed ?? '' });
     }
     // A ticket is a thread too: its comments from the fleet dashboard and the lead's replies; open while the ticket is.
     for (const t of state.tickets ?? []) {
       const sent = trailOf(t.id, 'ticket'), last = sent.at(-1);
-      out.push({ id: `~${t.id}`, tk: t, kind: 'ticket', st: sent.some(unseen) ? 'new' : (last && !last.reply) || tkStateOf(t) !== 'done' ? 'agent' : 'done', last, at: last?.reply?.at ?? last?.at ?? t.at ?? '' });
+      const st = sent.some(unseen) ? 'new' : (last && !last.reply) || tkStateOf(t) !== 'done' ? 'agent' : 'done';
+      out.push({ id: `~${t.id}`, tk: t, kind: 'ticket', st, needs: st === 'new' && tkStateOf(t) !== 'done', last, at: last?.reply?.at ?? last?.at ?? t.at ?? '' });
     }
     return out;
   }

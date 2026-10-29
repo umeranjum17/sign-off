@@ -2595,7 +2595,7 @@
     decideCtx = { all: decideOrder(by.waiting), hidden };
     by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
     const [, at, key, opening] = /^#(waiting|decide|designs|evidence|reports|answered|tickets|ticket|activity|inbox)(?:\/([\w.~-]+)(\/open)?)?$/.exec(location.hash) ?? [];
-    const inboxAt = at === 'inbox', all = moreReady ? inboxThreads(merged) : [], needs = all.filter((t) => t.st === 'new' || t.st === 'turn').length;
+    const inboxAt = at === 'inbox', all = moreReady ? inboxThreads(merged) : [], needs = all.filter((t) => t.needs).length;
     const showingTickets = at === 'tickets' || at === 'ticket' || at === 'activity';
     if (showingTickets && !ticketScreen) readTickets(true);
     ticketScreen = showingTickets;
