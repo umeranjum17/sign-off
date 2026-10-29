@@ -133,7 +133,7 @@ const PAGES = [
     const chip = (name) => h.find(new RegExp(`^${name}`), h.board(), 'button'), on = (name) => () => h.board().querySelector('.ib-chip[aria-pressed="true"]')?.textContent.startsWith(name);
     await h.press('Decisions chip', chip('Decisions'), on('Decisions'));
     await h.press('All chip', chip('All'), on('All'));
-    // Everything on the seed board is filed now, so nothing is archived yet: reading a report leaves New for the archived fold.
+    // The answered digest question was acted on, so its thread is archived: the fold opens. A report the person wrote on is read from its thread.
     location.hash = '#inbox/new-sign-in/open';
     await h.until('the report read', () => /\/open$/.test(location.hash) && h.reader()?.textContent.trim());
     location.hash = '#inbox';
@@ -312,6 +312,17 @@ try {
     mkdirSync(home);
     const base = run('bash', [resolve('.agents/skills/done-done-verify-sign-off/seed-board.sh'), home], { env: { ...process.env, SEED_SERVE_SECONDS: '900' } }).trim().split('\n').pop();
     assert.match(base, /^http:\/\/127\.0\.0\.1:\d+\/$/, base);
+    // The Inbox holds the threads the person took part in, so the seed becomes a conversation first: they write on the ask that waits in Decide and on the report,
+    // and the answered digest question is acted on by its agent, which archives that thread.
+    const sent = (body) => fetch(`${base}api/messages`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then((r) => assert.equal(r.status, 200));
+    await sent({ kind: 'comment', key: KEYS.ask, text: 'Can QA confirm first?' });
+    await sent({ kind: 'comment', key: KEYS.report, text: 'Does this cover the code step?' });
+    const cli = { env: { ...process.env, HOME: home, XDG_CONFIG_HOME: `${home}/.config`, XDG_DATA_HOME: `${home}/.local/share`, XDG_STATE_HOME: `${home}/.local/state`, XDG_CACHE_HOME: `${home}/.cache` } };
+    run('node', ['dist/cli.js', 'wait', join(home, 'board.json'), '--filer', 'verify', '--timeout', '5'], cli);
+    await new Promise((r) => setTimeout(r, 1100));
+    run('node', ['dist/cli.js', 'feedback', KEYS.answered, join(home, 'board.json'), '--acted', '--link', 'https://example.com/pr/9', '--filer', 'verify'], cli);
+    // The person opened that reply, so Today shows no Replies section ahead of its Waiting on you rows.
+    assert.equal((await fetch(`${base}api/trail`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: KEYS.answered }) })).status, 200);
     try {
       if (first) { await cliLook(base); first = false; }
       // A capture and its look: the page as a user sees it, measured by done-done's own look code.
