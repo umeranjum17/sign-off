@@ -428,9 +428,9 @@ export function appendAnswer(decisionsPath: string, d: Decision, option: Option,
   return answer;
 }
 const copyRef = ({ path, sha256, bytes, width, height }: CopyRef): CopyRef => ({ path, sha256, bytes, width, height });
-/** Two asks put one decision: plain asks that offer the same answers and whose titles share at least 80% of their words. */
+/** Two asks put one decision: plain asks, or design picks (a pick between mocks), that offer the same answers and whose titles share at least 80% of their words. */
 export function sameDecision(a: Decision, b: Decision): boolean {
-  const plain = (d: Decision) => d.type === 'decision' && (!d.kind || d.kind === 'ask') && !!d.options?.length;
+  const plain = (d: Decision) => (d.type === 'decision' || (d.type === 'design' && !d.kind)) && (!d.kind || d.kind === 'ask') && !!d.options?.length;
   const values = (d: Decision) => d.options.map((o) => o.value).sort().join();
   if (!plain(a) || !plain(b) || values(a) !== values(b)) return false;
   const x = new Set(a.title.toLowerCase().match(/[a-z0-9]+/g)), y = new Set(b.title.toLowerCase().match(/[a-z0-9]+/g)), both = [...x].filter((w) => y.has(w)).length;
