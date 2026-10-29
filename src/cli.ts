@@ -1221,16 +1221,18 @@ function promote(args: string[]) {
   });
 }
 
-/** feedback <key> [board.json] (--read | --reply <text> [--link <url>] | --acted --link <url>): the agent tells the person how far what they sent on a card got. */
+/** feedback <key> [board.json] (--read | --reply <text> [--link <url>] [--option <value>=<label> ...] | --acted --link <url>): the agent tells the person how far what they sent on a card got. */
 function feedback(args: string[]) {
   const at = args.findIndex((a, i) => !a.startsWith('-') && !existsSync(a) && !a.endsWith('.json') && !['--reply', '--link', '--filer', '--at'].includes(args[i - 1])), key = args[at];
   if (at < 0 || !isKey(key)) throw fail('feedback needs the key of a card', 'VALIDATION_ERROR', 'sign-off-axi feedback <key> [board.json] --read');
-  const { file, values, on } = parse('feedback', args.filter((_, i) => i !== at), { read: { type: 'boolean' }, delivered: { type: 'boolean' }, reply: { type: 'string' }, acted: { type: 'boolean' }, link: { type: 'string' }, filer: { type: 'string' }, at: { type: 'string' } });
+  const { file, values, on } = parse('feedback', args.filter((_, i) => i !== at), { read: { type: 'boolean' }, delivered: { type: 'boolean' }, reply: { type: 'string' }, acted: { type: 'boolean' }, link: { type: 'string' }, option: { type: 'string', multiple: true }, filer: { type: 'string' }, at: { type: 'string' } });
   const ops = [values.read && 'read', values.delivered && 'delivered', values.reply !== undefined && 'reply', values.acted && 'acted'].filter(Boolean);
   if (ops.length !== 1) throw fail('feedback takes one of --delivered, --read, --reply <text> or --acted --link <url>', 'VALIDATION_ERROR', `sign-off-axi feedback ${key}${on} --read`);
   const text = typeof values.reply === 'string' ? values.reply.trim() : undefined, link = values.link;
   if (text !== undefined && (!text || [...text].length > NOTE_MAX)) throw fail(`--reply must be text of ${NOTE_MAX} characters or fewer`, 'VALIDATION_ERROR', `sign-off-axi feedback ${key}${on} --reply "<what you did>"`);
   if (link !== undefined && (values.read || values.delivered || !/^https?:\/\/[^\s]{1,500}$/.test(link))) throw fail(values.read || values.delivered ? '--link goes with --reply or --acted' : '--link must be an http(s) address, such as the pull request', 'VALIDATION_ERROR', `sign-off-axi feedback ${key}${on} --acted --link <url>`);
+  const options = optionsOf(values);
+  if (options && (text === undefined || options.length > 4 || new Set(options.map((o: Option) => o.value)).size !== options.length)) throw fail('--option <value>=<label> goes with --reply, at most 4, each value once', 'VALIDATION_ERROR', `sign-off-axi feedback ${key}${on} --reply "Say yes to build" --option yes=Yes --option no=No`);
   if (values.acted && !link) throw fail('--acted needs --link <url> to what changed', 'VALIDATION_ERROR', `sign-off-axi feedback ${key}${on} --acted --link <url>`);
   ready(file, on);
   const d = board(file).find((x) => x.key === key), filer = filerOf(values);
@@ -1248,7 +1250,7 @@ function feedback(args: string[]) {
     const have = sent.some((t) => op === 'reply' ? t.reply : (t[op] ?? t.reply?.at) !== undefined);
     if (have) return toon({ board: tilde(file), key, shows: sent.at(-1)!.reply ? 'Replied' : sent.at(-1)!.read ? 'Read' : 'Delivered', covers: sent.length, unchanged: 'yes' }, [`${key} already shows that step; nothing was written`]);
   }
-  appendMark(file, { op, key, ...(text && { text }), ...(link && { link }) }, values.at !== undefined ? new Date(+values.at * 1000).toISOString().replace(/\.\d+Z$/, 'Z') : undefined);
+  appendMark(file, { op, key, ...(text && { text }), ...(link && { link }), ...(options && { options }) }, values.at !== undefined ? new Date(+values.at * 1000).toISOString().replace(/\.\d+Z$/, 'Z') : undefined);
   const now = readTrail(file, loadDecisions(file)).filter((t) => t.key === key && t.kind !== 'ticket').at(-1)!;
   return toon({ board: tilde(file), key, shows: now.reply ? 'Replied' : now.read ? 'Read' : 'Delivered', covers: sent.length }, [values.read || values.delivered ? `Run \`sign-off-axi feedback ${key}${on} --reply "<what you did>"\` once you act on it` : `Run \`sign-off-axi wait${on}${filer ? ` --filer ${filer}` : ''}\` for the next answer`]);
 }

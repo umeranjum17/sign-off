@@ -1455,7 +1455,7 @@ test('Not quite with a note and Tell the agent, on a phone on an answers-only bo
   };
   const card = '[data-part="understood"]';
   // Each note in Activity: what was said, its part, the words, and the step its track has reached (Sent, Delivered, Read, Replied).
-  const status = `[...document.querySelectorAll('.gd-act .ra-e')].filter((e) => e.querySelector('.ra-say')).map((c) => c.querySelector('.ra-eh b').textContent + '|' + c.querySelector('.ra-chip').textContent + '|' + c.querySelector('.ra-say').textContent + '|' + c.querySelector('.ui-trail')?.getAttribute('aria-label').split(':')[0]).join('#')`;
+  const status = `[...document.querySelectorAll('.gd-act .ra-e')].filter((e) => e.querySelector('.ra-say, .tr-you')).map((c) => c.querySelector('.ra-eh b').textContent + '|' + c.querySelector('.ra-chip').textContent + '|' + (c.querySelector('.ra-say') ?? { textContent: '“' + c.querySelector('.tr-you p').textContent + '”' }).textContent + '|' + c.querySelector('.ui-trail')?.getAttribute('aria-label').split(':')[0]).join('#')`;
   try {
     await evaluate(`location.href = ${JSON.stringify(`${url}#reports/${report.key}`)}`);
     await until(() => evaluate(`!!document.querySelector('${card} .gd-choice[data-u="no"]')?.getClientRects().length`));
@@ -3771,7 +3771,7 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   await evaluate('[...document.querySelectorAll(".ev-verdict button")].find((b) => b.textContent === "Send without answering").click()');
   await until(async () => (await evaluate('[...document.querySelectorAll(".ev-verdict .saved-note")].some((p) => p.textContent.includes("Looks right on my phone."))')));
   assert.equal(await evaluate('document.querySelector("#note-update-4").value'), '');
-  await until(async () => (await evaluate('[...document.querySelectorAll(".split-detail .ui-act li .aw b")].map((t) => t.textContent).at(-1)')) === 'Your comment');
+  await until(async () => (await evaluate('[...document.querySelectorAll(".split-detail .ui-act li .aw b")].map((t) => t.textContent).at(-1)')) === 'Your comment' || await evaluate('!![...document.querySelectorAll(".split-detail .tr-you p")].some((p) => p.textContent === "Looks right on my phone.")'));
   // A verdict is saved from the update's own screen, which stays open.
   await evaluate('[...document.querySelectorAll(".ev-verdict .choices button")].find((b) => b.textContent === "Pass").click()');
   await until(async () => (await evaluate('!document.querySelector("#toast").hidden && document.querySelector(".ev-verdict [aria-pressed=true]")?.textContent === "Pass"')));
@@ -4944,14 +4944,14 @@ test('the feedback trail: what the person sends on a card goes Sent, Delivered, 
       return JSON.parse(await evaluate('JSON.stringify({ track: [...document.querySelectorAll(".decide .ui-trail li")].map((l) => l.querySelector("b").textContent + (l.classList.contains("on") && /^\\d\\d:\\d\\d$/.test(l.querySelector("time").textContent) ? "+" : "")).join(" "), said: document.querySelector(".decide .tr-said")?.innerText.replace(/\\s+/g, " ") ?? "", link: document.querySelector(".decide .tr-said a")?.getAttribute("href") ?? "", act: [...document.querySelectorAll(".decide .ui-act li .aw b")].map((b) => b.textContent).filter((t) => !/^(Posted|Your answer)/.test(t)) })')); };
     assert.deepEqual(await card('digest'), { track: 'Sent+ Delivered Read Replied', said: '', link: '', act: [] });
     assert.deepEqual(await card('export'), { track: 'Sent+ Delivered+ Read Replied', said: '', link: '', act: ['Delivered to release-agent'] });
-    assert.deepEqual(await card('beta'), { track: 'Sent+ Delivered+ Read+ Replied+', said: 'Kept it to ten teams until the import fix lands. Pull request 245', link: 'https://github.com/example/settings/pull/245',
-      act: ['Delivered to settings-agent', 'settings-agent read it', 'settings-agent replied · Pull request 245'] });
+    assert.deepEqual(await card('beta'), { track: 'Sent+ Delivered+ Read+ Replied+', said: 'What was done Kept it to ten teams until the import fix lands. Pull request 245', link: 'https://github.com/example/settings/pull/245',
+      act: ['Delivered to settings-agent', 'settings-agent read it'] });
     assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
     // Opened, the reply is seen: it leaves Today, and its badge is no longer ink. The ticket shows the comment with its track and the lead's reply, and opening it is seeing that reply.
     await until(async () => !!(await trail('beta')).seen);
     await evaluate('location.hash = "#ticket/T-1"');
     await until(() => evaluate('!!document.querySelector(".tk-said .ui-trail")'));
-    assert.equal(await evaluate('[document.querySelector(".tk-said > p").textContent, [...document.querySelectorAll(".tk-said .ui-trail li.on b")].map((b) => b.textContent).join(" "), document.querySelector(".tk-said .tr-said").innerText.trim()].join(" | ")'),
+    assert.equal(await evaluate('[document.querySelector(".tk-said .tr-you p").textContent, [...document.querySelectorAll(".tk-said .ui-trail li.on b")].map((b) => b.textContent).join(" "), document.querySelector(".tk-said .tr-said p").innerText.trim()].join(" | ")'),
       'Is the export in this release? | Sent Delivered Read Replied | Yes, it ships Friday with the release.');
     await evaluate(`location.href = ${JSON.stringify(url)}`);
     await until(() => evaluate('!!document.querySelector(".t-up") && !document.querySelector(".t-replies")'));
@@ -4961,7 +4961,7 @@ test('the feedback trail: what the person sends on a card goes Sent, Delivered, 
     items.items.find((d) => d.key === 'export').filed = new Date(Date.now() + 2000).toISOString().replace(/\.\d+Z$/, 'Z');
     writeFileSync(file, JSON.stringify(items));
     await evaluate('location.reload()');
-    assert.deepEqual(await card('export'), { track: 'Sent+ Delivered+ Read+ Acted+', said: 'Posted a new version', link: '', act: ['Delivered to release-agent', 'release-agent read it'] });
+    assert.deepEqual(await card('export'), { track: 'Sent+ Delivered+ Read+ Acted+', said: 'What was done Posted a new version', link: '', act: ['Delivered to release-agent', 'release-agent read it'] });
   } finally { close(); }
   proc.kill();
 });
@@ -5311,4 +5311,69 @@ test('detail sequence follows the originating list across phone sheets, desk pan
       assert.equal(await evaluate('document.querySelector(".detail-sequence button:last-child").disabled'), true);
     } finally { await close(); }
   }
+});
+
+test('replies thread under what they answer: Your question or Your action, then Reply or What was done with its track; no reply, several replies, and a reply that asks for a next step keeps the card in Decide until a final tap', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'pairs'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  for (const [key, title] of [['quiet', 'Ship the quiet one?'], ['many', 'Ship the busy one?'], ['build', 'Build the export?'], ['chat', 'Ship the chatty one?']]) assert.equal(run('raise', file, '--key', key, '--title', title, '--filer', 'pair-agent').code, 0);
+  // The agent's follow-up buttons: at most four, each value once, and only with a reply.
+  assert.notEqual(run('feedback', 'quiet', file, '--read', '--option', 'yes=Yes').code, 0);
+  assert.notEqual(run('feedback', 'quiet', file, '--reply', 'Which?', '--option', 'a=A', '--option', 'a=B').code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1], state = async () => (await fetch(`${url}api/decisions`)).json();
+  // quiet: answered, no reply. many: two comments, each answered by its own reply. build: answered in words, the reply asks for a next step. chat: a comment whose reply asks.
+  assert.equal((await post(url, 'api/answers', { key: 'quiet', answer: 'yes' })).status, 200);
+  assert.equal((await post(url, 'api/messages', { kind: 'comment', key: 'many', text: 'Is the cache warm?' })).status, 200);
+  await new Promise((ok) => setTimeout(ok, 1100));
+  assert.equal(run('feedback', 'many', file, '--reply', 'Yes, it was warmed at nine.', '--filer', 'pair-agent').code, 0);
+  await new Promise((ok) => setTimeout(ok, 1100));
+  assert.equal((await post(url, 'api/messages', { kind: 'comment', key: 'many', text: 'And the CDN?' })).status, 200);
+  await new Promise((ok) => setTimeout(ok, 1100));
+  assert.equal(run('feedback', 'many', file, '--reply', 'The CDN is purged.', '--filer', 'pair-agent').code, 0);
+  assert.equal((await post(url, 'api/answers', { key: 'build', answer: 'text', note: 'What would it cost?' })).status, 200);
+  await new Promise((ok) => setTimeout(ok, 1100));
+  assert.equal(run('feedback', 'build', file, '--reply', 'About two days. Say yes to build.', '--option', 'yes=Yes', '--option', 'no=No', '--filer', 'pair-agent').code, 0);
+  assert.equal((await post(url, 'api/messages', { kind: 'comment', key: 'chat', text: 'Can it wait?' })).status, 200);
+  await new Promise((ok) => setTimeout(ok, 1100));
+  assert.equal(run('feedback', 'chat', file, '--reply', 'It can. Wait until Friday?', '--option', 'wait=Wait', '--option', 'now=Do it now', '--filer', 'pair-agent').code, 0);
+  const trail = (await state()).trail;
+  assert.deepEqual(trail.find((t) => t.key === 'build').reply.options, [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }]);
+  assert.equal(trail.find((t) => t.key === 'quiet').reply, undefined);
+  assert.deepEqual(trail.filter((t) => t.key === 'many').map((t) => t.reply.text), ['Yes, it was warmed at nine.', 'The CDN is purged.']);
+  const { evaluate, send, close } = await browse(join(dir, 'b'), 390, 844, true);
+  try {
+    await evaluate(`location.href = ${JSON.stringify(url)}`);
+    const card = async (key) => { await evaluate(`location.hash = "#decide/${key}"`); await until(() => evaluate(`!!document.querySelector(".decide") && location.hash === "#decide/${key}"`)); await new Promise((ok) => setTimeout(ok, 300)); };
+    const sides = () => evaluate('JSON.stringify([...document.querySelectorAll(".decide .tr-lab")].map((l) => l.textContent + ": " + (l.nextElementSibling?.textContent ?? "")))').then(JSON.parse);
+    // No reply: the track and nothing from the agent.
+    await card('quiet');
+    assert.equal(await evaluate('[!!document.querySelector(".decide .ui-trail"), !!document.querySelector(".decide .tr-said"), !!document.querySelector(".decide .tr-opt")].join()'), 'true,false,false');
+    // Several replies: each comment is a pair with its own reply, none twice.
+    await card('many');
+    assert.deepEqual(await sides(), ['Your question: Is the cache warm?', 'Reply: Yes, it was warmed at nine.', 'Your question: And the CDN?', 'Reply: The CDN is purged.']);
+    assert.equal(await evaluate('[...document.querySelectorAll(".decide .ui-act li .aw b")].filter((b) => /replied/.test(b.textContent)).length'), 0, 'the Activity does not repeat the replies');
+    // A comment whose reply asks: one tap answers it, and it shows what was answered.
+    await card('chat');
+    assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide .tr-opt")].map((b) => b.textContent).join()'), 'Wait,Do it now');
+    await evaluate('document.querySelector(".decide .tr-opt").click()');
+    await until(() => evaluate('!!document.querySelector(".decide .tr-picked")'));
+    assert.equal(await evaluate('document.querySelector(".decide .tr-picked").textContent'), 'You answered: Wait');
+    // A text answer whose reply asks: the card stays in Decide with its buttons, and moves to Answered on the final tap.
+    await evaluate('location.hash = "#waiting"');
+    await until(() => evaluate('!!document.querySelector(".ui-row")'));
+    assert.ok(await evaluate('[...document.querySelectorAll(".ui-row .t")].some((t) => t.textContent === "Build the export?" && !t.closest("[aria-label=Answered]"))'), 'the exchange keeps the card in Decide');
+    await card('build');
+    assert.deepEqual(await sides(), ['Reply: About two days. Say yes to build.']);
+    assert.ok(await evaluate('[...document.querySelectorAll(".decide .ui-dl")].some((p) => p.textContent === "Your action") && document.querySelector(".decide .ans-card").textContent.includes("What would it cost?")'));
+    assert.match(await evaluate('document.querySelector(".decide .tr-said").innerText'), /About two days\. Say yes to build\./);
+    assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide .tr-opt")].map((b) => b.textContent).join()'), 'Yes,No');
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
+    await evaluate('document.querySelector(".decide .tr-opt").click()');
+    await until(async () => (await state()).answers.build.answer === 'yes');
+    await evaluate('location.hash = "#waiting"');
+    await until(() => evaluate('!!document.querySelector(".ui-row")'));
+    await until(async () => !(await evaluate('[...document.querySelectorAll(".ui-row .t")].some((t) => t.textContent === "Build the export?" && !t.closest("[aria-label=Answered]"))')));
+  } finally { await close(); }
 });

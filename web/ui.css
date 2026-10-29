@@ -253,3 +253,14 @@ body::after { content: ''; position: fixed; z-index: 1; left: 0; right: 0; botto
 :is(.sh-head,.ui-pane .ui-shd,#reader .rp-shd):has(.detail-sequence) { height:auto; min-height:44px; flex-wrap:wrap; }
 .sh-head:has(.detail-sequence) .sh-lab, .ui-pane .ui-shd:has(.detail-sequence) > span:not(.ui-icon), #reader .rp-shd:has(.detail-sequence) .rp-what { flex:1 0 auto; flex-wrap:wrap; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
 @media(max-width:374px) { .ask-sheet .sh-head .detail-sequence { flex-basis:100%; justify-content:flex-end; } }
+/* A pair: what the person sent (Your question, Your action) and what the agent sent back (Reply, What was done), the track between them. */
+.ui-trail .tr-you { margin-bottom: 0.75rem; padding: 0.75rem 1rem; border-radius: 1rem; background: var(--tk-card); box-shadow: inset 0 0 0 1px var(--tk-line); }
+.ui-trail .tr-you p { margin: 0; color: var(--tk-ink); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
+.tr-lab { display: block; margin-bottom: 0.25rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: var(--tk-lh-meta); font-weight: 600; letter-spacing: 0.02em; }
+.tr-said .tr-lab { margin-bottom: 0; }
+/* A reply that asks for a next step: its answers as buttons under it, one tap each. */
+.tr-opts { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.25rem; }
+.tr-opt { min-height: 2.75rem; padding: 0 1.25rem; border: 0; border-radius: 1.375rem; background: var(--tk-ink); color: var(--tk-card); font: inherit; font-size: var(--tk-fs-row); font-weight: 600; cursor: pointer; }
+.tr-opt:disabled { opacity: 0.5; }
+.tr-picked { margin: 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); }
+.tr-follow .err { color: var(--tk-bad, #c0392b); font-size: var(--tk-fs-meta); }
