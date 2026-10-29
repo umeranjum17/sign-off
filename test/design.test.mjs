@@ -5461,3 +5461,50 @@ test('the inbox: one list of every kind with new replies first, then Decide, the
     assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
   } finally { await close(); }
 });
+
+test('the inbox: a thread whose question is answered and whose card is marked acted leaves New for the archived fold, stays searchable, and returns when a new message lands', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'inbox-acted'), file = join(dir, 'board.json'), pause = () => new Promise((ok) => setTimeout(ok, 1100));
+  mkdirSync(dir);
+  const link = 'https://github.com/example/digest/pull/9';
+  for (const [key, title] of [['acted', 'Send the digest on Mondays?'], ['worded', 'Keep the weekly digest?'], ['quiet', 'Turn on the CSV export?'], ['back', 'Open the beta to every team?'], ['again', 'Ship the settings page Friday?']]) assert.equal(run('raise', file, '--key', key, '--title', title, '--filer', 'acted-agent').code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  // acted: answered, and the agent marked it acted. worded: answered, and the agent wrote back. quiet: answered, nothing back yet.
+  // back: acted, then the agent wrote again. again: acted, then the person wrote on it.
+  for (const key of ['acted', 'worded', 'quiet', 'back', 'again']) assert.equal((await post(url, 'api/answers', { key, answer: 'yes' })).status, 200);
+  assert.equal(run('wait', file, '--filer', 'acted-agent', '--timeout', '5').code, 0);
+  await pause();
+  assert.equal(run('feedback', 'worded', file, '--reply', 'Moved to Mondays.', '--filer', 'acted-agent').code, 0);
+  for (const key of ['acted', 'back', 'again']) assert.equal(run('feedback', key, file, '--acted', '--link', link, '--filer', 'acted-agent').code, 0);
+  const { evaluate, close } = await browse(join(dir, 'b'), 390, 844, true);
+  try {
+    const list = () => evaluate('JSON.stringify([...document.querySelectorAll(".ib-sec")].map((s) => [s.getAttribute("aria-label"), ...[...s.querySelectorAll(".ib-row")].map((r) => (r.classList.contains("unread") ? "* " : "") + r.querySelector(".t").textContent)]))').then(JSON.parse);
+    const chips = () => evaluate('JSON.stringify([...document.querySelectorAll(".ib-chip")].map((c) => c.textContent))').then(JSON.parse);
+    await evaluate(`location.href = ${JSON.stringify(`${url}#inbox`)}`);
+    await until(() => evaluate('!!document.querySelector(".ib-sec")'));
+    // Answered and acted is archived, though its reply was never opened; answered and worded back, or not yet answered back, is not.
+    await until(async () => JSON.stringify(await list()) === JSON.stringify([['New', '* Keep the weekly digest?'], ['Waiting on agents', 'Turn on the CSV export?']]))
+      .catch(async (e) => assert.fail(`${e.message}: ${JSON.stringify(await list())}`));
+    assert.equal(await evaluate('document.querySelector(".ib-fold").textContent'), 'Show 3 archived');
+    // Every chip counts the rows it lists, and the archived ones are not among them.
+    assert.deepEqual(await chips(), ['All2', 'Decisions2', 'Tickets']);
+    // Search finds an archived thread without opening the fold; the fold lists them with the same rows.
+    await evaluate('{ const b = document.getElementById("ib-find"); b.value = "digest on mondays"; b.dispatchEvent(new Event("input")); }');
+    await until(async () => JSON.stringify(await list()) === JSON.stringify([['Archived', 'Send the digest on Mondays?']]));
+    await evaluate('{ const b = document.getElementById("ib-find"); b.value = ""; b.dispatchEvent(new Event("input")); }');
+    await evaluate('document.querySelector(".ib-fold").click()');
+    await until(async () => (await list()).at(-1)?.[0] === 'Archived');
+    assert.deepEqual((await list()).at(-1).slice(1).sort(), ['Open the beta to every team?', 'Send the digest on Mondays?', 'Ship the settings page Friday?']);
+    // A new message brings a thread back: the agent writes again (New), the person writes (waiting on the agent).
+    await pause();
+    assert.equal(run('feedback', 'back', file, '--reply', 'Beta is open to ten teams.', '--filer', 'acted-agent').code, 0);
+    assert.equal((await post(url, 'api/messages', { kind: 'comment', key: 'again', text: 'Can you also post the link in the channel?' })).status, 200);
+    await evaluate('location.hash = "#inbox"; location.reload()');
+    await until(async () => (await list()).some((s) => s[0] === 'New' && s.includes('* Open the beta to every team?')));
+    await evaluate('document.querySelector(".ib-fold").click()');
+    await until(async () => (await list()).at(-1)?.[0] === 'Archived');
+    assert.deepEqual(await list(), [['New', '* Open the beta to every team?', '* Keep the weekly digest?'], ['Waiting on agents', 'Ship the settings page Friday?', 'Turn on the CSV export?'], ['Archived', 'Send the digest on Mondays?']]);
+    assert.deepEqual(await chips(), ['All4', 'Decisions4', 'Tickets']);
+  } finally { await close(); }
+});
