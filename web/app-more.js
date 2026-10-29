@@ -1951,13 +1951,20 @@
   }
   // Capture the actual visible list, after its filters and sorting, before opening any detail.
   // History owns the sequence so Back, reload and a change between sheet and desk keep it.
+  /** The life of one send, from the record only: sent, read, acted on (a link, or the card posted again), and the result, named. Words alone are a reply, not an action. */
+  function lifeOf(t) {
+    const r = t.reply, did = !!(r && (r.link || r.acted)), card = t.kind === 'ticket' ? undefined : findCard(t.key), pr = /\/(?:pull|pulls|merge_requests)\/(\d+)/.exec(r?.link ?? '');
+    const outcome = pr ? `PR ${pr[1]}` : r?.link || card?.type === 'signin' ? 'New link' : card?.kind === 'design' || card?.type === 'design' ? 'New design' : card?.kind === 'report' ? 'New report' : 'New version';
+    return [{ word: 'Sent', at: t.at, on: true }, { word: 'Read', at: t.read ?? r?.at, on: !!(t.read || r) }, { word: 'Acted', at: r?.at, on: did }, { word: did ? outcome : 'Result', at: r?.at, on: did }];
+  }
   /** The trail on a card: four steps on one track, each its word and time once reached; under it the agent's reply and the link to what changed,
    *  unless the place it sits already shows the reply (an ask or a comment on a part of a guided page). */
-  function trailTrack(t, said = true, you = '', follow = true) {
-    const n = stepOf(t), r = t.reply, acts = (['answer', 'round', 'discard'].includes(t.kind) && t.said === undefined) || (t.kind === 'part' && !you), done = acts || (!r?.text && (r?.link || r?.acted));
-    return el('div', { class: 'ui-trail', role: 'group', 'aria-label': `${stepWord(t, n - 1)}: ${TRAIL.slice(0, n).map((w, i) => `${stepWord(t, i)} ${trailWhen(stepAt(t, i))}`).join(', ')}` },
+  function trailTrack(t, said = true, you = '', follow = true, life = false) {
+    const r = t.reply, acts = (['answer', 'round', 'discard'].includes(t.kind) && t.said === undefined) || (t.kind === 'part' && !you), done = acts || (!r?.text && (r?.link || r?.acted));
+    const steps = life ? lifeOf(t) : TRAIL.map((_, i) => ({ word: stepWord(t, i), at: stepAt(t, i), on: i < stepOf(t) })), reached = steps.filter((x) => x.on);
+    return el('div', { class: 'ui-trail', role: 'group', 'aria-label': `${reached.at(-1).word}: ${reached.map((x) => `${x.word} ${trailWhen(x.at)}`).join(', ')}` },
       you ? el('div', { class: 'tr-you' }, el('span', { class: 'tr-lab' }, acts ? 'Your action' : 'Your question'), el('p', { dir: 'auto' }, you)) : '',
-      el('ol', { 'aria-hidden': 'true' }, ...TRAIL.map((_, i) => el('li', { class: i < n ? 'on' : '' }, el('i', {}), el('b', {}, stepWord(t, i)), el('time', {}, i < n ? trailWhen(stepAt(t, i)) : '')))),
+      el('ol', { 'aria-hidden': 'true' }, ...steps.map((x) => el('li', { class: x.on ? 'on' : '' }, el('i', {}), el('b', {}, x.word), el('time', {}, x.on ? trailWhen(x.at) : '')))),
       ...(said ? (t.replies ?? (r ? [r] : [])).filter((x) => x.text || x.link || x.acted).map((x, i, all) => el('div', { class: 'tr-said' }, el('span', { class: 'tr-lab' }, done && !x.options?.length ? 'What was done' : 'Reply'), x.text ? el('p', { dir: 'auto' }, x.text) : x.acted ? el('p', {}, 'Posted a new version') : '',
         x.link ? el('a', { href: x.link, target: '_blank', rel: 'noopener', dir: 'auto' }, linkName(x.link)) : '', i === all.length - 1 && follow ? followUp(t) : '')) : []));
   }
@@ -2017,8 +2024,8 @@
     const steps = [...sent.map((t) => ({ t, at: t.at })), ...(d ? reopened(key) : []).map((r) => ({ r, at: r.at }))].sort((x, y) => Math.floor(Date.parse(x.at) / 1000) - Math.floor(Date.parse(y.at) / 1000));
     steps.forEach(({ t, r }, i) => {
       if (r) { pairs.push([el('div', { class: 'ib-turn' }, ibLab('Reopened', who, r.at), el('p', { class: 'ib-say q', dir: 'auto' }, `${who} reopened this question to ask again. Your answer above stays.`))]); return; }
-      if (i === 0 && t.kind === 'answer' && t.said === undefined) first.push(el('div', { class: 'ib-turn' }, ibLab('Your answer', '', t.at), el('p', { class: 'ib-say', dir: 'auto' }, youSaid(t, d))), trailTrack(t, true, '', !beside));
-      else pairs.push([trailTrack(t, true, youSaid(t, d), !beside)]);
+      if (i === 0 && t.kind === 'answer' && t.said === undefined) first.push(el('div', { class: 'ib-turn' }, ibLab('Your answer', '', t.at), el('p', { class: 'ib-say', dir: 'auto' }, youSaid(t, d))), trailTrack(t, true, '', !beside, true));
+      else pairs.push([trailTrack(t, true, youSaid(t, d), !beside, true)]);
       if (unseen(t)) fresh.add(pairs.length - 1);
     });
     if (mark) seeThread(th, sent);
@@ -2083,24 +2090,28 @@
   /** What the person sent, in their words: an answer as it reads, a comment's text, else what it was. */
   const youSaid = (t, d) => (t.kind === 'answer' ? t.said ?? (state.answers[t.key]?.at === t.at ? saidOf(d, state.answers[t.key]) : 'Answered') : t.kind === 'comment' ? (state.messages ?? []).find((m) => m.id === t.id)?.text ?? 'A comment'
     : t.said ?? { round: 'Another round', discard: 'Discarded', ask: 'Go deeper', part: 'A comment on a part' }[t.kind]);
-  /** Every thread on the board with where it stands (st) and when it last moved (at). A card an open ask merges is that ask's thread. */
+  /** The person took part when they sent something on it; an answer the leash took is not theirs. */
+  const tookPart = (sent) => sent.some((t) => !t.taken);
+  /** Every thread the person took part in, with where it stands (st) and when it last moved (at); a card or ticket they never touched is none. A card an open ask merges is that ask's thread. */
   function inboxThreads(merged = new Set()) {
     const gone = new Set(state.dismissed ?? []), out = [];
     for (const d of state.decisions) {
       if (gone.has(d.key) || merged.has(d.key) || (d.type === 'evidence' && ['RUN FAIL', 'INCONCLUSIVE'].includes(d.evidenceCard?.result))) continue;
       const sent = trailOf(d.key), last = sent.at(-1), a = area(d), kind = threadKind(d);
+      if (!tookPart(sent)) continue;
       // On an answered card a reply with no words (the link, or the card posted again) is the card acted on, not news: only the agent's words, or a send it has not answered, are.
       const answered = d.type !== 'signin' && sent.some((t) => t.kind === 'answer');
-      const st = sent.some((t) => unseen(t) && !(answered && !t.reply.text)) || (!sent.length && (['report', 'proof'].includes(kind) || a === 'reports') && unread(d)) ? 'new'
+      const st = sent.some((t) => unseen(t) && !(answered && !t.reply.text)) ? 'new'
         : a === 'waiting' || (a === 'evidence' && (d.options.length || d.reply)) ? 'turn'
         // A design review a lead posted is Main's until promoted: it waits on its agents, never in Decide.
         : (last && !last.reply) || (a === 'designs' && dzOpen(d)) ? 'agent' : 'done';
-      // needs (the Inbox badge): held in Decide, or an agent wrote on it and it is not opened; an unread report or proof alone asks nothing.
-      out.push({ id: d.key, d, kind, st, last, needs: st === 'turn' || (st === 'new' && sent.length > 0), at: last?.reply?.at ?? last?.at ?? d.filed ?? '' });
+      // needs (the Inbox badge): a reply to the person not opened yet.
+      out.push({ id: d.key, d, kind, st, last, needs: st === 'new', at: last?.reply?.at ?? last?.at ?? d.filed ?? '' });
     }
-    // A ticket is a thread too: its comments from the fleet dashboard and the lead's replies; open while the ticket is.
+    // A ticket is a thread once the person commented on it.
     for (const t of state.tickets ?? []) {
       const sent = trailOf(t.id, 'ticket'), last = sent.at(-1);
+      if (!sent.length) continue;
       const st = sent.some(unseen) ? 'new' : (last && !last.reply) || tkStateOf(t) !== 'done' ? 'agent' : 'done';
       out.push({ id: `~${t.id}`, tk: t, kind: 'ticket', st, needs: st === 'new' && tkStateOf(t) !== 'done', last, at: last?.reply?.at ?? last?.at ?? t.at ?? '' });
     }
