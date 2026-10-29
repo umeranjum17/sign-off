@@ -242,6 +242,9 @@ journeys:
     command: 'npm run build > /dev/null && node --test --test-name-pattern="owner dispatch takes the pool account" test/contract.test.mjs > "$DONE_DONE_EVIDENCE_ROOT/owner-pool.log" 2>&1'
   install:
     command: "npm ci > $DONE_DONE_EVIDENCE_ROOT/install.log 2>&1"
+  # notify test against a stub muxr answering 202: delivered_to 0 fails, 2 passes, a bare 100.x link_base is refused.
+  notify:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/notify-journey.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   test:
     command: "npm test > $DONE_DONE_EVIDENCE_ROOT/test.log 2>&1"
   skill:
