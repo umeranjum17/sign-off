@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { copyFileSync, mkdtempSync, mkdirSync, readdirSync, rmSync, symlinkSync, writeFileSync, readFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -103,7 +103,7 @@ test('a design review a lead posts sends the user no notice; Main promoting it s
   setup(dir, notifyBlock(url));
   const fixture = join(root, 'fixtures', 'contract', 'design.v1');
   mkdirSync(join(dir, '.sign-off', 'design'));
-  for (const f of readdirSync(join(fixture, 'design'))) copyFileSync(join(fixture, 'design', f), join(dir, '.sign-off', 'design', f));
+  cpSync(join(fixture, 'design'), join(dir, '.sign-off', 'design'), { recursive: true });
   await cli(dir, ['post', board(dir), '--kind', 'design', '--from', join(fixture, 'valid-basic.json')], TOKEN);
   await sleep(400);
   assert.equal(hits.length, 0, 'a design under review is not the user\'s ask');

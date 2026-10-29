@@ -14,6 +14,7 @@ fixtures/contract/<kind>.v<schema>/invalid-<field>-<rule>.json
 - Each kind has at least 2 valid files and 3 invalid ones: one with a required field missing, one over a limit, and one with an unknown field.
 - An invalid file breaks exactly one rule. Its name gives the field and the rule, such as `invalid-title-too-long.json`, and sign-off's own tests check that the refusal names that field.
 - Demo data uses the name Umer. No real names, paths or tokens.
+- `design.v1/design/inbox-layout-pick/` holds the three option pages of the Inbox layout pick (`a.html`, `b.html`, `c.html`, made with first-draft): pages that run with no script, each row a link to its thread. Copy the folder under the board's `mocks/` to post that pick again with `--mock a=mocks/inbox-layout-pick/a.html` and so on.
 
 ## Running them
 

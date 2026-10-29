@@ -224,6 +224,10 @@ journeys:
   # A design card whose options carry a demo recording (post --video and --score): the card plays it muted in place on a tap, opens it full screen with the option's round score, and the Designs row shows its first frame; at 390 and 1280, light and dark.
   design-demo:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/design-demo-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
+  # The Inbox layout pick: its three first-draft option pages (fixtures/contract/design.v1/design/inbox-layout-pick/) open full screen from the card, and a tap on a conversation
+  # inside each opens that thread, at 390 and 1280, light and dark; with LIVE_BOARD_URL_FILE also the live board's Designs list, and plain headless Chromium at 390.
+  inbox-pick:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/inbox-pick-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   board-actions:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/board-actions.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   attach:

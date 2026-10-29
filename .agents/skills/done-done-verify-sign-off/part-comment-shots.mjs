@@ -3,7 +3,7 @@
 // Usage: node .agents/skills/done-done-verify-sign-off/part-comment-shots.mjs <output> [light|dark] [360|390|445|1280|1440]
 // PART_COMMENT_BEFORE=1 SIGN_OFF_REPO=<base checkout, built> records only the same page without the new controls, under the same names.
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -40,7 +40,7 @@ if (process.env.SEND_FEEDBACK_ONLY) {
   cli('post', board, '--filer', 'Umer', '--key', 'send-answer', '--title', 'Ship the settings page?', '--ask-ref', 'message-demo', '--why', 'Umer needs the settings checked.', '--outcome', 'yes=The page ships.', '--outcome', 'no=The page waits.', '--recommend', 'yes', '--recommend-reason', 'The checks passed.', '--default', 'no');
   cli('post', board, '--filer', 'Umer', '--type', 'evidence', '--title', 'Umer checks the settings page', '--about', 'The settings fit.', '--media', join(repo, 'fixtures/evidence/product-small.png'));
   mkdirSync(join(dir, 'design'));
-  for (const f of readdirSync(join(repo, 'fixtures/contract/design.v1/design'))) writeFileSync(join(dir, 'design', f), readFileSync(join(repo, 'fixtures/contract/design.v1/design', f)));
+  cpSync(join(repo, 'fixtures/contract/design.v1/design'), join(dir, 'design'), { recursive: true });
   writeFileSync(join(dir, 'design.json'), JSON.stringify({ ...JSON.parse(readFileSync(join(repo, 'fixtures/contract/design.v1/valid-basic.json'))), filer: 'Umer' }));
   cli('post', board, '--kind', 'design', '--from', join(dir, 'design.json'));
 }

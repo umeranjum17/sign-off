@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en"><head>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; form-action 'none'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:" />
+
+
+
+
+
+
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Inbox C</title>
+<style>
+:root{
+--bg:#f3f4f7;--panel:#fff;--ink:#1a1d23;--muted:#555d6b;--faint:#6b7382;--line:#dfe2e8;--line2:#aab0bd;
+--accent:#2757d6;--on-accent:#fff;--sel:#e3e6ec;--sel-ink:#1a1d23;
+--you-b:#1f2430;--you-ink:#fff;--ag-b:#e8eaef;--reach:#1a1d23;
+--av-bg:#e3e6ec;--av-fg:#2b303a;
+--ok:#1b7a3e;--on-ok:#fff;--pend:#a15c00;
+--a-r-bg:#d3ede9;--a-r-fg:#0b5a52;
+--a-v-bg:#e6e0f7;--a-v-fg:#4a2e9a;
+--a-d-bg:#f8e6c3;--a-d-fg:#7a4a00;
+--a-t-bg:#d9e5fb;--a-t-fg:#1d4aa8;
+--a-g-bg:#d6efd9;--a-g-fg:#1d6130;
+--ring:0 0 0 2px var(--bg),0 0 0 4px var(--ink);
+}
+@media (prefers-color-scheme:dark){
+:root{
+--bg:#0e1014;--panel:#171a20;--ink:#e9ebef;--muted:#bac1ce;--faint:#9ba3b1;--line:#2a2f39;--line2:#566070;
+--accent:#8aa8ff;--on-accent:#0b1020;--sel:#262b35;--sel-ink:#e9ebef;
+--you-b:#2c3342;--you-ink:#eef1fa;--ag-b:#232832;--reach:#e9ebef;
+--av-bg:#2a303b;--av-fg:#dfe3ea;
+--ok:#6fd08c;--on-ok:#0b1a10;--pend:#f0b45a;
+--a-r-bg:#17403c;--a-r-fg:#8fe0d4;
+--a-v-bg:#2d2650;--a-v-fg:#c4b5f5;
+--a-d-bg:#46350f;--a-d-fg:#f2c775;
+--a-t-bg:#1d3258;--a-t-fg:#9dbcf5;
+--a-g-bg:#1d3d26;--a-g-fg:#98dca6;
+}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:inherit;text-decoration:none}
+a:focus-visible,input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.av{display:grid;place-items:center;flex:none;width:var(--s,40px);height:var(--s,40px);border-radius:50%;background:var(--av-bg);color:var(--av-fg);font-weight:600;font-size:calc(var(--s,40px)*.42);line-height:1}
+.a-r{background:var(--a-r-bg);color:var(--a-r-fg)}
+.a-v{background:var(--a-v-bg);color:var(--a-v-fg)}
+.a-d{background:var(--a-d-bg);color:var(--a-d-fg)}
+.a-t{background:var(--a-t-bg);color:var(--a-t-fg)}
+.a-g{background:var(--a-g-bg);color:var(--a-g-fg)}
+.dot{position:relative;display:inline-grid;place-items:center;width:12px;height:12px;border-radius:50%;flex:none;border:2px solid var(--muted)}
+.dot.done{background:var(--ok);border-color:var(--ok)}
+.dot.done::after{content:"✓";font-size:8px;font-weight:700;line-height:1;color:var(--on-ok)}
+.dot.live{border-color:var(--pend);background:linear-gradient(90deg,var(--pend) 50%,transparent 50%)}
+/* list */
+#list{background:var(--panel)}
+#list h1{margin:0;padding:16px 16px 8px;font-size:22px;line-height:32px}
+.row{display:flex;align-items:center;gap:12px;min-height:88px;padding:12px 16px;border-top:1px solid var(--line);transition:background .15s}
+.rb{display:block;flex:1;min-width:0}
+.r1{display:flex;justify-content:space-between;gap:8px}
+.t{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.tm{display:block;flex:none;font-size:13px;color:var(--muted)}
+.r2{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--muted)}
+.r2 .m{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.r2 .st{display:block;flex:none}
+.r3{display:block;font-size:15px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* thread */
+.thread{display:none;flex-direction:column;height:100dvh;min-height:0;background:var(--bg)}
+.topbar{display:flex;align-items:center;min-height:44px;padding:0 8px;background:var(--panel);border-bottom:1px solid var(--line)}
+.back{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 12px;font-weight:600;color:var(--ink);border-radius:8px}
+.th{display:flex;align-items:center;gap:12px;padding:8px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.th .av{--s:40px}
+.th div{min-width:0}
+.th h2{margin:0;font-size:17px;line-height:24px}
+.th p{margin:0;font-size:14px;line-height:20px;color:var(--muted)}
+.hs{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-top:0}
+.strip{display:flex;gap:4px;overflow-x:auto;padding:8px 12px 6px;background:var(--panel);border-bottom:1px solid var(--line);scroll-snap-type:x proximity}
+.si{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;flex:none;width:64px;min-height:44px;padding-top:4px;scroll-snap-align:start}
+.si .av{--s:40px}
+.sl{display:block;width:100%;text-align:center;font-size:12px;line-height:16px;color:var(--muted);white-space:nowrap}
+.si.cur .av{box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--ink)}
+.si.cur .sl{color:var(--ink);font-weight:600}
+.msgs{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:16px}
+.day{align-self:center;font-size:12px;color:var(--muted);padding:2px 12px;border:1px solid var(--line);border-radius:999px}
+.msg{display:flex;flex-direction:column;gap:4px}
+.msg.you{align-items:flex-end;align-self:flex-end;width:min(100%,320px);gap:0}
+.msg.ag{align-items:flex-start}
+.bub{max-width:72%;padding:8px 16px;border-radius:16px;overflow-wrap:anywhere}
+.you .bub{max-width:100%;background:var(--you-b);color:var(--you-ink);border-radius:16px 16px 0 16px}
+.ag .bub{background:var(--ag-b);border-bottom-left-radius:4px}
+.rcpt{width:100%;padding:6px 10px 8px;background:var(--panel);border:1px solid var(--line);border-radius:12px 0 12px 12px}
+.life{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.life li{min-width:0;position:relative}
+.life i{display:block;width:12px;height:12px;border-radius:50%;border:2px solid var(--line2);background:transparent}
+.life li.on i{background:var(--reach);border-color:var(--reach)}
+.life li.on:last-child i{background:var(--ok);border-color:var(--ok)}
+.life li::after{content:"";position:absolute;top:5px;left:16px;right:4px;border-top:2px dashed var(--line)}
+.life li:last-child::after{display:none}
+.life li.on:has(+ li.on)::after{border-top:2px solid var(--reach)}
+.life b{display:block;margin-top:2px;font-size:12px;line-height:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:clip}
+.life li:not(.on) b{color:var(--faint);font-weight:400}
+.life time{display:block;font-size:13px;line-height:16px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.res{display:flex;align-items:center;gap:6px;margin:6px 0 0;font-size:14px;line-height:20px;font-weight:600;color:var(--ok)}
+.res::before{content:"✓";display:grid;place-items:center;flex:none;width:16px;height:16px;border-radius:50%;background:var(--ok);color:var(--on-ok);font-size:11px;font-weight:700;line-height:1}
+.res.none{color:var(--muted);font-weight:400}
+.res.none::before{content:"";background:transparent;border:2px solid var(--pend)}
+.comp{display:flex;gap:8px;padding:12px 16px;background:var(--panel);border-top:1px solid var(--line)}
+.comp input{flex:1;min-width:0;min-height:44px;padding:0 16px;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line2);border-radius:22px}
+.comp input::placeholder{color:var(--faint)}
+.comp button{min-width:72px;min-height:44px;padding:0 16px;font:inherit;font-weight:600;color:var(--on-accent);background:var(--accent);border:0;border-radius:22px;cursor:pointer}
+@media (prefers-reduced-motion:reduce){.row{transition:none}}
+/* narrow */
+@media (max-width:759.98px){
+#list{display:none;min-height:100dvh}
+body:has(#list:target) #list{display:block}
+body:not(:has(:target)) #c1,#c1:target,#c2:target,#c3:target,#c4:target,#c5:target{display:flex}
+.row:active{background:var(--sel)}
+}
+/* tiny preview */
+@media (max-width:359.98px){
+.topbar{display:block;padding:0 4px}
+.back{display:flex;width:100%}
+.th{display:grid;grid-template-columns:32px minmax(0,1fr);align-items:start;gap:4px 8px;padding:8px 12px}
+.th .av{--s:32px}
+.th div{min-width:0;width:100%}
+.th h2{overflow-wrap:break-word;word-break:normal;hyphens:manual}
+.th p{overflow-wrap:break-word}
+.hs{grid-column:2;margin-left:0;flex-wrap:wrap}
+}
+/* wide */
+@media (min-width:760px){
+body{display:grid;grid-template-columns:232px 1fr;height:100dvh;overflow:hidden}
+#list{grid-column:1 / -1;grid-row:1;height:100dvh;overflow-y:auto;display:grid;grid-template-columns:232px 1fr;grid-auto-rows:min-content;align-content:start}
+#list{background-color:var(--panel);background-image:linear-gradient(var(--line),var(--line));background-repeat:no-repeat;background-size:1px 100%;background-position:231px 0}
+#list > *{grid-column:1;border-right:1px solid var(--line)}
+.thread{grid-column:2;grid-row:1;position:relative;z-index:1}
+body:not(:has(:target)) #c1,body:has(#list:target) #c1,#c1:target,#c2:target,#c3:target,#c4:target,#c5:target{display:flex}
+.topbar,.strip{display:none}
+.th{padding:16px 24px}
+.th h2{font-size:18px}
+.hs{margin-left:auto;flex:none}
+.msgs{padding:24px}
+.comp{padding:16px 24px}
+#list h1{font-size:16px;line-height:24px;padding:16px 16px 8px}
+.row{min-height:48px;padding:6px 10px 6px 12px;gap:8px;border-top:0}
+.row .av{--s:28px}
+.r2,.r3,.tm{display:none}
+.rb{order:0}
+.t{font-size:14px;font-weight:500;line-height:20px}
+.row .dot{margin-left:auto;width:10px;height:10px;border-width:2px}
+.row .dot.done::after{font-size:7px}
+.row:hover{background:var(--bg)}
+body:not(:has(:target)) [data-testid="row-1"],body:has(#list:target) [data-testid="row-1"],body:has(#c1:target) [data-testid="row-1"],body:has(#c2:target) [data-testid="row-2"],body:has(#c3:target) [data-testid="row-3"],body:has(#c4:target) [data-testid="row-4"],body:has(#c5:target) [data-testid="row-5"]{background:var(--sel);color:var(--sel-ink);box-shadow:inset 0 0 0 1px var(--line2)}
+body:not(:has(:target)) [data-testid="row-1"] .t,body:has(#list:target) [data-testid="row-1"] .t,body:has(#c1:target) [data-testid="row-1"] .t,body:has(#c2:target) [data-testid="row-2"] .t,body:has(#c3:target) [data-testid="row-3"] .t,body:has(#c4:target) [data-testid="row-4"] .t,body:has(#c5:target) [data-testid="row-5"] .t{font-weight:600}
+}
+</style>
+</head>
+<body>
+
+<section id="list" data-oc-screen="">
+<h1>Inbox</h1>
+<a class="row" href="#c1" data-testid="row-1"><span class="av a-r">R</span><span class="rb"><span class="r1"><span class="t">Release notes for 2.4</span><span class="tm">09:12</span></span><span class="r2"><span class="m">Release agent · Lighthouse</span><span class="st">Done</span></span><span class="r3">2.4 is out. Notes are live.</span></span><span class="dot done" aria-hidden="true"></span><span class="sr">Done</span></a>
+<a class="row" href="#c2" data-testid="row-2"><span class="av a-v">V</span><span class="rb"><span class="r1"><span class="t">Review the sign-in change</span><span class="tm">10:40</span></span><span class="r2"><span class="m">Review agent · Lighthouse</span><span class="st">In progress</span></span><span class="r3">You: Fix both, please.</span></span><span class="dot live" aria-hidden="true"></span><span class="sr">In progress</span></a>
+<a class="row" href="#c3" data-testid="row-3"><span class="av a-d">D</span><span class="rb"><span class="r1"><span class="t">Which date format?</span><span class="tm">11:15</span></span><span class="r2"><span class="m">Docs agent · Harbor</span><span class="st">Done</span></span><span class="r3">You: 30 Oct</span></span><span class="dot done" aria-hidden="true"></span><span class="sr">Done</span></a>
+<a class="row" href="#c4" data-testid="row-4"><span class="av a-t">T</span><span class="rb"><span class="r1"><span class="t">Nightly tests are slow</span><span class="tm">13:05</span></span><span class="r2"><span class="m">Test agent · Harbor</span><span class="st">In progress</span></span><span class="r3">Looking at it now.</span></span><span class="dot live" aria-hidden="true"></span><span class="sr">In progress</span></a>
+<a class="row" href="#c5" data-testid="row-5"><span class="av a-g">G</span><span class="rb"><span class="r1"><span class="t">Rename the settings page</span><span class="tm">Yesterday</span></span><span class="r2"><span class="m">Design agent · Lighthouse</span><span class="st">Done</span></span><span class="r3">You: Call it Preferences</span></span><span class="dot done" aria-hidden="true"></span><span class="sr">Done</span></a>
+</section>
+
+<section id="c1" class="thread" data-oc-screen="" data-testid="thread-1">
+<nav class="topbar"><a class="back" href="#list" data-testid="back-1"><span aria-hidden="true">←</span> Back</a></nav>
+<header class="th"><span class="av a-r">R</span><div><h2>Release notes for 2.4</h2><p>Release agent · Lighthouse</p></div><span class="hs"><span class="dot done" aria-hidden="true"></span>Done</span></header>
+<nav class="strip" aria-label="Switch conversation">
+<a class="si cur" href="#c1" data-testid="rail-1" aria-current="true"><span class="av a-r">R</span><span class="sl">Notes</span></a>
+<a class="si" href="#c2" data-testid="rail-2"><span class="av a-v">V</span><span class="sl">Sign-in</span></a>
+<a class="si" href="#c3" data-testid="rail-3"><span class="av a-d">D</span><span class="sl">Dates</span></a>
+<a class="si" href="#c4" data-testid="rail-4"><span class="av a-t">T</span><span class="sl">Tests</span></a>
+<a class="si" href="#c5" data-testid="rail-5"><span class="av a-g">G</span><span class="sl">Settings</span></a>
+</nav>
+<div class="msgs">
+<div class="day">Today</div>
+<div class="msg you"><div class="bub">Please drop the beta line from the notes.</div>
+<div class="rcpt"><ol class="life"><li class="on"><i></i><b>Sent</b><time>09:12</time></li><li class="on"><i></i><b>Read</b><time>09:13</time></li><li class="on"><i></i><b>Acted</b><time>09:20</time></li><li class="on"><i></i><b>Result</b><time>&nbsp;</time></li></ol><p class="res">Notes updated, 2.4 shipped</p></div></div>
+<div class="msg ag"><div class="bub">Dropped the beta line and moved the fixes up.</div></div>
+<div class="msg ag"><div class="bub">2.4 is out. Notes are live.</div></div>
+</div>
+<div class="comp"><input type="text" id="m1" aria-label="Message to Release agent" placeholder="Reply to Release agent" value=""><button type="button">Send</button></div>
+</section>
+
+<section id="c2" class="thread" data-oc-screen="" data-testid="thread-2">
+<nav class="topbar"><a class="back" href="#list" data-testid="back-2"><span aria-hidden="true">←</span> Back</a></nav>
+<header class="th"><span class="av a-v">V</span><div><h2>Review the sign-in change</h2><p>Review agent · Lighthouse</p></div><span class="hs"><span class="dot live" aria-hidden="true"></span>In progress</span></header>
+<nav class="strip" aria-label="Switch conversation">
+<a class="si" href="#c1" data-testid="rail-1"><span class="av a-r">R</span><span class="sl">Notes</span></a>
+<a class="si cur" href="#c2" data-testid="rail-2" aria-current="true"><span class="av a-v">V</span><span class="sl">Sign-in</span></a>
+<a class="si" href="#c3" data-testid="rail-3"><span class="av a-d">D</span><span class="sl">Dates</span></a>
+<a class="si" href="#c4" data-testid="rail-4"><span class="av a-t">T</span><span class="sl">Tests</span></a>
+<a class="si" href="#c5" data-testid="rail-5"><span class="av a-g">G</span><span class="sl">Settings</span></a>
+</nav>
+<div class="msgs">
+<div class="day">Today</div>
+<div class="msg you"><div class="bub">Can you review the new sign-in screen?</div>
+<div class="rcpt"><ol class="life"><li class="on"><i></i><b>Sent</b><time>10:02</time></li><li class="on"><i></i><b>Read</b><time>10:03</time></li><li class="on"><i></i><b>Acted</b><time>10:31</time></li><li class="on"><i></i><b>Result</b><time>&nbsp;</time></li></ol><p class="res">2 changes asked</p></div></div>
+<div class="msg ag"><div class="bub">Two things: the error text is cut off on small screens, and the code field accepts letters.</div></div>
+<div class="msg you"><div class="bub">Fix both, please.</div>
+<div class="rcpt"><ol class="life"><li class="on"><i></i><b>Sent</b><time>10:40</time></li><li class="on"><i></i><b>Read</b><time>10:41</time></li><li><i></i><b>Acted</b><time>&nbsp;</time></li><li><i></i><b>Result</b><time>&nbsp;</time></li></ol><p class="res none">Waiting for the agent to act</p></div></div>
+</div>
+<div class="comp"><input type="text" id="m2" aria-label="Message to Review agent" placeholder="Reply to Review agent" value=""><button type="button">Send</button></div>
+</section>
+
+<section id="c3" class="thread" data-oc-screen="" data-testid="thread-3">
+<nav class="topbar"><a class="back" href="#list" data-testid="back-3"><span aria-hidden="true">←</span> Back</a></nav>
+<header class="th"><span class="av a-d">D</span><div><h2>Which date format?</h2><p>Docs agent · Harbor</p></div><span class="hs"><span class="dot done" aria-hidden="true"></span>Done</span></header>
+<nav class="strip" aria-label="Switch conversation">
+<a class="si" href="#c1" data-testid="rail-1"><span class="av a-r">R</span><span class="sl">Notes</span></a>
+<a class="si" href="#c2" data-testid="rail-2"><span class="av a-v">V</span><span class="sl">Sign-in</span></a>
+<a class="si cur" href="#c3" data-testid="rail-3" aria-current="true"><span class="av a-d">D</span><span class="sl">Dates</span></a>
+<a class="si" href="#c4" data-testid="rail-4"><span class="av a-t">T</span><span class="sl">Tests</span></a>
+<a class="si" href="#c5" data-testid="rail-5"><span class="av a-g">G</span><span class="sl">Settings</span></a>
+</nav>
+<div class="msgs">
+<div class="day">Today</div>
+<div class="msg ag"><div class="bub">Should dates read 30 Oct or Oct 30?</div></div>
+<div class="msg you"><div class="bub">30 Oct</div>
+<div class="rcpt"><ol class="life"><li class="on"><i></i><b>Sent</b><time>11:15</time></li><li class="on"><i></i><b>Read</b><time>11:16</time></li><li class="on"><i></i><b>Acted</b><time>11:30</time></li><li class="on"><i></i><b>Result</b><time>&nbsp;</time></li></ol><p class="res">Applied on 14 pages</p></div></div>
+</div>
+<div class="comp"><input type="text" id="m3" aria-label="Message to Docs agent" placeholder="Reply to Docs agent" value=""><button type="button">Send</button></div>
+</section>
+
+<section id="c4" class="thread" data-oc-screen="" data-testid="thread-4">
+<nav class="topbar"><a class="back" href="#list" data-testid="back-4"><span aria-hidden="true">←</span> Back</a></nav>
+<header class="th"><span class="av a-t">T</span><div><h2>Nightly tests are slow</h2><p>Test agent · Harbor</p></div><span class="hs"><span class="dot live" aria-hidden="true"></span>In progress</span></header>
+<nav class="strip" aria-label="Switch conversation">
+<a class="si" href="#c1" data-testid="rail-1"><span class="av a-r">R</span><span class="sl">Notes</span></a>
+<a class="si" href="#c2" data-testid="rail-2"><span class="av a-v">V</span><span class="sl">Sign-in</span></a>
+<a class="si" href="#c3" data-testid="rail-3"><span class="av a-d">D</span><span class="sl">Dates</span></a>
+<a class="si cur" href="#c4" data-testid="rail-4" aria-current="true"><span class="av a-t">T</span><span class="sl">Tests</span></a>
+<a class="si" href="#c5" data-testid="rail-5"><span class="av a-g">G</span><span class="sl">Settings</span></a>
+</nav>
+<div class="msgs">
+<div class="day">Today</div>
+<div class="msg you"><div class="bub">Why does the nightly run take 40 minutes?</div>
+<div class="rcpt"><ol class="life"><li class="on"><i></i><b>Sent</b><time>13:05</time></li><li class="on"><i></i><b>Read</b><time>&nbsp;</time></li><li><i></i><b>Acted</b><time>&nbsp;</time></li><li><i></i><b>Result</b><time>&nbsp;</time></li></ol><p class="res none">Result to come</p></div></div>
+<div class="msg ag"><div class="bub">Looking at it now.</div></div>
+</div>
+<div class="comp"><input type="text" id="m4" aria-label="Message to Test agent" placeholder="Reply to Test agent" value=""><button type="button">Send</button></div>
+</section>
+
+<section id="c5" class="thread" data-oc-screen="" data-testid="thread-5">
+<nav class="topbar"><a class="back" href="#list" data-testid="back-5"><span aria-hidden="true">←</span> Back</a></nav>
+<header class="th"><span class="av a-g">G</span><div><h2>Rename the settings page</h2><p>Design agent · Lighthouse</p></div><span class="hs"><span class="dot done" aria-hidden="true"></span>Done</span></header>
+<nav class="strip" aria-label="Switch conversation">
+<a class="si" href="#c1" data-testid="rail-1"><span class="av a-r">R</span><span class="sl">Notes</span></a>
+<a class="si" href="#c2" data-testid="rail-2"><span class="av a-v">V</span><span class="sl">Sign-in</span></a>
+<a class="si" href="#c3" data-testid="rail-3"><span class="av a-d">D</span><span class="sl">Dates</span></a>
+<a class="si" href="#c4" data-testid="rail-4"><span class="av a-t">T</span><span class="sl">Tests</span></a>
+<a class="si cur" href="#c5" data-testid="rail-5" aria-current="true"><span class="av a-g">G</span><span class="sl">Settings</span></a>
+</nav>
+<div class="msgs">
+<div class="day">Yesterday</div>
+<div class="msg you"><div class="bub">Call it Preferences</div>
+<div class="rcpt"><ol class="life"><li class="on"><i></i><b>Sent</b><time>16:44</time></li><li class="on"><i></i><b>Read</b><time>&nbsp;</time></li><li class="on"><i></i><b>Acted</b><time>&nbsp;</time></li><li class="on"><i></i><b>Result</b><time>&nbsp;</time></li></ol><p class="res">Renamed in 6 places</p></div></div>
+</div>
+<div class="comp"><input type="text" id="m5" aria-label="Message to Design agent" placeholder="Reply to Design agent" value=""><button type="button">Send</button></div>
+</section>
+
+
+
+</body></html>

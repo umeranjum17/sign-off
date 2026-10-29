@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync, chmodSync } from 'node:fs';
+import { appendFileSync, copyFileSync, cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { decode } from '@toon-format/toon';
@@ -106,7 +106,7 @@ test('a design asked as one question: post takes the plain question with its fra
   }
   // A new design 1 is held to the question too; one already on the board (fed by a program) re-posts as it was.
   const old = { ...JSON.parse(readFileSync(join(fixtures, 'design.v1', 'valid-basic.json'))), key: 'old-design', title: 'Chat app journeys' };
-  for (const f of readdirSync(join(fixtures, 'design.v1', 'design'))) copyFileSync(join(fixtures, 'design.v1', 'design', f), join(dir, 'design', f));
+  cpSync(join(fixtures, 'design.v1', 'design'), join(dir, 'design'), { recursive: true });
   const fresh = post(old, 'design-old');
   assert.equal(fresh.status, 2); assert.match(fresh.stdout, /title must be one question/);
   assert.equal(run('post', board, '--from', message('design-feed.json', JSON.stringify({ schema: 2, items: [old] }))).status, 0);
@@ -424,7 +424,7 @@ test('a design review cannot put itself in Decide: no post, feed or stored field
   delete env.SIGN_OFF_FILER;
   const dir = join(scratch, 'design-promote'), board = join(dir, 'board.json'), cli2 = (...args) => spawnSync('node', [cli, ...asked(args)], { encoding: 'utf8', env });
   mkdirSync(join(dir, 'design'), { recursive: true });
-  for (const f of readdirSync(join(fixtures, 'design.v1', 'design'))) copyFileSync(join(fixtures, 'design.v1', 'design', f), join(dir, 'design', f));
+  cpSync(join(fixtures, 'design.v1', 'design'), join(dir, 'design'), { recursive: true });
   const design = JSON.parse(readFileSync(join(fixtures, 'design.v1', 'valid-basic.json')));
   const post = (m, ...flags) => cli2('post', board, '--kind', 'design', '--from', message('design-promote.json', JSON.stringify(m)), ...flags);
   // A lead's message that names an area or a promotion is refused before anything is stored.

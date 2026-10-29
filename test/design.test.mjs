@@ -1,7 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync, spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { createServer as createHttpServer, get, request } from 'node:http';
 import { createServer } from 'node:net';
@@ -4506,7 +4506,7 @@ test('installable app: a valid manifest, a service worker that keeps the page an
 test('a card names its ticket: --ticket on every post, a Ticket row that opens the ticket, the ticket lists its cards newest first, each card shows its Activity, and the Tickets tab lists the tickets', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'ticket'), file = join(dir, 'board.json'), fx = new URL('../fixtures/contract/', import.meta.url).pathname, now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   mkdirSync(join(dir, 'design'), { recursive: true });
-  for (const f of readdirSync(join(fx, 'design.v1/design'))) writeFileSync(join(dir, 'design', f), readFileSync(join(fx, 'design.v1/design', f)));
+  cpSync(join(fx, 'design.v1/design'), join(dir, 'design'), { recursive: true });
   writeFileSync(join(dir, 'shot.png'), png);
   writeFileSync(join(dir, 'settings.svg'), readFileSync(new URL('../docs/logo.svg', import.meta.url)));
   assert.equal(run('project', file, '--name', 'Settings', '--icon', 'settings.svg').code, 0);
@@ -5055,7 +5055,7 @@ test('feedback --at replays a step that happened earlier: Delivered, Read and Ac
 test('Discard: every card offers three reasons, one tap each; the card moves to Archived with its reason and Restore, Undo takes it back for 10 seconds before its agent hears, the agent\'s wait then hands the reason over, and Select in Designs and Decide discards several at once', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'discard'), file = join(dir, 'board.json'), fx = new URL('../fixtures/contract/', import.meta.url).pathname;
   mkdirSync(join(dir, 'design'), { recursive: true });
-  for (const f of readdirSync(join(fx, 'design.v1/design'))) writeFileSync(join(dir, 'design', f), readFileSync(join(fx, 'design.v1/design', f)));
+  cpSync(join(fx, 'design.v1/design'), join(dir, 'design'), { recursive: true });
   for (const [key, title, filer] of [['digest', 'Keep the weekly digest?', 'release-agent'], ['export', 'Turn on the CSV export?', 'release-agent']]) assert.equal(run('raise', file, '--key', key, '--title', title, '--filer', filer).code, 0);
   const design = JSON.parse(readFileSync(join(fx, 'design.v1/valid-basic.json'), 'utf8'));
   for (const [key, title] of [['dash-v1', 'Ship the first fleet dashboard?'], ['dash-v2', 'Ship the fleet dashboard redesign?']]) {
@@ -5194,7 +5194,7 @@ const focusColours = `(() => { const el = document.activeElement; if (!el || el 
 test('the new look draws only the approved prototype\'s colours: Today, Decide, Designs, Reports, Evidence and Tickets, their sheets and keyboard focus, at 390 and 1280, light and dark', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'palette'), file = join(dir, 'board.json'), fx = new URL('../fixtures/contract/', import.meta.url).pathname, now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   mkdirSync(join(dir, 'design'), { recursive: true });
-  for (const f of readdirSync(join(fx, 'design.v1/design'))) writeFileSync(join(dir, 'design', f), readFileSync(join(fx, 'design.v1/design', f)));
+  cpSync(join(fx, 'design.v1/design'), join(dir, 'design'), { recursive: true });
   writeFileSync(join(dir, 'shot.png'), png);
   const fileOf = (name, m) => (writeFileSync(join(dir, name), JSON.stringify(m)), join(dir, name));
   // A board with every kind of card on it: asks with and without a priority, a pick-one, a plan, a guided report, a design on a ticket, a proof and a sign-in,

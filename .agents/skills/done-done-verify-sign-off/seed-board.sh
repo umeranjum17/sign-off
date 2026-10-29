@@ -22,7 +22,7 @@ so post "$board" --ask-ref message-demo --title "Keep the weekly digest?" --abou
 # A design pick takes mocks and a tradeoff; the question standard (--why, --outcome) is for --type decision only.
 so post "$board" --type design --key look --title "Which settings layout should ship?" --option a="A: one column" --option b="B: two columns" \
   --mock a=mocks/a.webp --mock b=mocks/b.webp --link a=http://100.64.0.1:4430/#/o/1/play --link b=http://100.64.0.1:4430/#/o/2/play --tradeoff "B scans faster; A is simpler. Open in first-draft: One column http://100.64.0.1:4430/#/o/1/play · Two columns http://100.64.0.1:4430/#/o/2/play" --recommend b
-mkdir -p "$dir/design"; cp "$f/design.v1/design/"* "$dir/design/"; cp "$repo/docs/media/phone-light.webp" "$dir/design/preview.webp"
+mkdir -p "$dir/design"; cp -R "$f/design.v1/design/." "$dir/design/"; cp "$repo/docs/media/phone-light.webp" "$dir/design/preview.webp"
 sed 's#design/preview.png#design/preview.webp#' "$f/design.v1/valid-basic.json" > "$dir/design-message.json"
 so post "$board" --kind design --from "$dir/design-message.json"
 so post "$board" --type signin --key npm --service "npm" --link https://example.com/login --unlocks "Publishing the release" --waits "Release agent" --expires 2h
