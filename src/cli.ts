@@ -2138,7 +2138,7 @@ function notifyEntered(file: string, named: string, before: Set<string> | undefi
 /** The JSON one card sends: sign-off's own shape, or muxr's {title (1-80 chars), body, url, id}. */
 function noticeBody(notify: Notify, d: Decision) {
   const kind = d.kind ?? ({ decision: 'ask', explainer: d.options.length ? 'ask' : 'report' } as Record<string, string>)[d.type] ?? d.type;
-  const text = [...(d.about ?? d.detail ?? d.why ?? d.title).replace(/[\r\n]+/g, ' ')].slice(0, 200).join(''), url = `${notify.link_base.replace(/\/$/, '')}#waiting/${encodeURIComponent(d.key)}`;
+  const text = [...(d.about ?? d.detail ?? d.why ?? d.title).replace(/[\r\n]+/g, ' ')].slice(0, 200).join(''), route = ({ plan: 'waiting', design: 'designs', evidence: 'evidence', report: 'reports' } as Record<string, string>)[kind] ?? 'decide', url = `${notify.link_base.replace(/\/$/, '')}#${route}/${encodeURIComponent(d.key)}`;
   if (notify.muxr) return { title: [...d.title].slice(0, 80).join('') || d.key, body: text, url, id: d.key };
   return { v: 1, source: 'sign-off', id: d.key, kind: ['ask', 'plan', 'design', 'evidence', 'report'].includes(kind) ? kind : 'ask',
     title: [...d.title].slice(0, 120).join(''), text, url, at: d.filed ?? new Date().toISOString() };

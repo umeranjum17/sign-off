@@ -293,7 +293,7 @@ without posting.
   `token_env:` line naming the environment variable that holds a bearer token. Each notice is one JSON
   POST, `{"v":1,"source":"sign-off","id","kind","title","text","url","at"}`,
   where `kind` is `ask`, `plan`, `design`, `evidence` or `report`, and `url`
-  is `link_base` with `#waiting/<key>` added. The sender runs detached, so
+  is `link_base` with the card's own route added: `#decide/<key>` for a question, `#evidence/<key>`, `#designs/<key>`, `#reports/<key>`, or `#waiting/<key>` for a plan. The sender runs detached, so
   the card is stored whether or not the notice arrives. A failed notice is
   retried a few times, then logged to `notify.log` beside the board. The
   token is read only from the named variable; when that variable is unset,
