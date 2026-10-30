@@ -63,6 +63,17 @@ const MEASURE = `(async () => {
   const label = desk ? nav.find((x) => x.name === 'Designs')?.n : [...document.querySelectorAll('.dl-seg button')].map((b) => /^Designs(\\d+)$/.exec(b.textContent.trim())?.[1]).find(Boolean);
   const listed = desk ? document.querySelectorAll('.dz-strip .dz-card').length : document.querySelectorAll('.dz-list > li').length;
   if (!sheet && !open && label !== undefined && document.querySelector('.dz-list, .dz-strip') && Number(label) !== listed) fail.push('Designs label reads ' + label + ' but the list draws ' + listed + ' rows');
+  // A decoded file and a visible box are both required; sizing alone lets an empty tile pass.
+  for (const row of document.querySelectorAll('.dz-list > li')) {
+    const img = row.querySelector('img.design-thumb');
+    if (!img) { if (!row.querySelector('.pk-thumb :is(img, iframe), video.design-thumb')) fail.push('design row has no thumbnail'); continue; }
+    try { await img.decode(); } catch { fail.push('design thumbnail did not decode'); continue; }
+    if (!vis(img) || !img.naturalWidth || !img.naturalHeight) fail.push('design thumbnail has no visible image');
+  }
+  for (const h of document.querySelectorAll('header, .crumb, .dz-lab')) {
+    if (!vis(h)) continue;
+    for (const d of state.decisions) if (d.key.includes('-') && h.textContent.includes(d.key)) fail.push('screen header exposes raw id ' + d.key);
+  }
   if (!desk && (nav.length !== 6 || (!open && !sheet && lit !== 'Decide'))) fail.push('dock ' + JSON.stringify(nav));
   if (sheet) {}
   else if (!desk) {
