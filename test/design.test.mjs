@@ -5784,14 +5784,20 @@ test('the inbox: one list of every kind with new replies first, then Decide, the
     // A row opens its thread: the action and what was done with its link, then the item it reaches.
     await evaluate('[...document.querySelectorAll(".ib-row")].find((r) => r.textContent.includes("Open the beta")).click()');
     await until(() => evaluate('!!document.querySelector(".ib-thread") && location.hash === "#inbox/built"'));
-    const labs = () => evaluate('JSON.stringify([...document.querySelectorAll(".ib-thread .ib-pair")].map((p) => [...p.querySelectorAll(".ib-lab > b, .ib-lab > span:first-child, .tr-lab")].map((l) => l.textContent)))').then(JSON.parse);
-    assert.deepEqual((await labs()).flat().filter((l) => /^(Asked|Your|Reply|What)/.test(l)), ['Asked', 'Your answer', 'What was done']);
-    assert.equal(await evaluate('document.querySelector(".ib-thread .tr-said a").href'), 'https://github.com/example/settings/pull/245');
-    assert.equal(await evaluate('document.querySelector(".ib-meta .ib-open").getAttribute("href")'), '#inbox/built/open');
+    // The thread is a chat: the agent on the left, the person's words as a bubble on the right, time order, the pull request inline as a card.
+    const chat = () => evaluate('JSON.stringify([...document.querySelectorAll(".ib-thread .ib-msg")].map((m) => [m.classList.contains("you") ? "you" : "agent", m.querySelector(".ib-say")?.textContent ?? ""]))').then(JSON.parse);
+    assert.deepEqual((await chat()).map((m) => m[0]), ['agent', 'you', 'agent']);
+    assert.match((await chat())[1][1], /^No · .Wait for the import fix\./);
+    assert.equal((await chat())[2][1], 'Kept it to ten teams.');
+    assert.equal(await evaluate('(() => { const log = document.querySelector(".ib-chat").getBoundingClientRect(), you = document.querySelector(".ib-msg.you .ib-say").getBoundingClientRect(), art = document.querySelector(".ib-msg:not(.you) .ib-art").getBoundingClientRect(); return Math.abs(you.right - log.right) < 1 && Math.abs(art.left - log.left) < 1 && you.left > log.left; })()'), true);
+    assert.equal(await evaluate('[...document.querySelectorAll(".ib-thread .ib-art a")].map((a) => a.href).at(-1)'), 'https://github.com/example/settings/pull/245');
+    assert.equal(await evaluate('document.querySelector(".ib-thread .ib-art .ib-at b").textContent'), 'Open the beta to every team?');
+    assert.equal(await evaluate('document.querySelector(".ib-thread .ib-art .ib-open").getAttribute("href")'), '#inbox/built/open');
     // A written answer is the person's question, and the reply's follow-ups sit under it, the first one set apart.
     await evaluate('location.hash = "#inbox/asked"');
     await until(() => evaluate('!!document.querySelector(".ib-thread .tr-opt")'));
-    assert.deepEqual((await labs()).flat().filter((l) => /^(Asked|Your|Reply|What)/.test(l)), ['Asked', 'Your question', 'Reply']);
+    assert.deepEqual((await chat()).map((m) => m[0]), ['agent', 'you', 'agent']);
+    assert.equal((await chat())[1][1], 'What does Friday need?');
     assert.deepEqual(await evaluate('[...document.querySelectorAll(".ib-thread .tr-opt")].map((b) => b.textContent)'), ['Ship Friday', 'Wait a week']);
     assert.notEqual(await evaluate('getComputedStyle(document.querySelectorAll(".ib-thread .tr-opt")[0]).backgroundColor'), await evaluate('getComputedStyle(document.querySelectorAll(".ib-thread .tr-opt")[1]).backgroundColor'));
     // Opening the thread marked its reply seen: it is in Decide now, still waiting on a final pick.
@@ -5847,6 +5853,8 @@ test('the inbox rail: a row counts the replies not opened and says when the agen
     assert.deepEqual(all.find((r) => r[0] === 'Turn on the CSV export?'), ['Turn on the CSV export?', '', '']);
     // Each filter counts the threads it lists, and a second tap lets it go.
     assert.deepEqual(await flts(), [['Unread from agents1', 'false'], ['Not read by agents1', 'false']]);
+    // On a phone the kinds and both unread filters are one row that scrolls sideways, never two; Agents and Done are one short row right under it, above the first thread.
+    assert.deepEqual(await evaluate('JSON.stringify((() => { const bar = document.querySelector(".ib-bar"), tops = new Set([...document.querySelectorAll(".ib-chip, .ib-flt")].map((b) => Math.round(b.getBoundingClientRect().top))), foot = document.querySelector(".ib-foot").getBoundingClientRect(), ents = [...document.querySelectorAll(".ib-ent")].map((e) => Math.round(e.getBoundingClientRect().top)); return [tops.size, bar.scrollWidth > bar.clientWidth, getComputedStyle(bar).flexWrap, new Set(ents).size, foot.top >= bar.getBoundingClientRect().bottom && foot.bottom <= document.querySelector(".ib-row").getBoundingClientRect().top, foot.height < 56]; })())').then(JSON.parse), [1, true, 'nowrap', 1, true, true]);
     await evaluate('document.querySelectorAll(".ib-flt")[1].click()');
     await until(async () => (await flts())[1][1] === 'true');
     assert.deepEqual((await rows()).map((r) => r[0]), ['Keep the weekly digest?']);
@@ -5948,12 +5956,12 @@ test('the inbox holds only the threads the person took part in: an ask they neve
     assert.ok(['untouched', 'unread', 'digest'].every((k) => decide.decisions.some((d) => d.key === k)));
     // The answered thread's life: sent, read, acted, and its result named.
     await evaluate('location.hash = "#inbox/answered"');
-    await until(() => evaluate('!!document.querySelector(".ib-thread .ui-trail")'));
-    assert.deepEqual(await evaluate('JSON.stringify([...document.querySelectorAll(".ib-thread .ui-trail li")].map((l) => [l.textContent.replace(/\\d\\d:\\d\\d$|\\d+ \\w+$/, ""), l.classList.contains("on")]))').then(JSON.parse), [['Sent', true], ['Read', true], ['Acted', true], ['PR 9', true]]);
-    // A comment the agent has not read reaches only the first step; nothing past it is shown as reached.
+    await until(() => evaluate('!!document.querySelector(".ib-thread .ib-rcpt")'));
+    assert.deepEqual(await evaluate('JSON.stringify([[...document.querySelectorAll(".ib-thread .ib-rcpt time")].map((t) => t.textContent.replace(/\\d\\d:\\d\\d|\\d+ \\w+$/, "").trim()), [...document.querySelectorAll(".ib-thread .ib-art b")].map((b) => b.textContent), document.querySelectorAll(".ib-thread .ib-nr").length])').then(JSON.parse), [['Read'], ['Send the digest on Mondays?', 'Pull request 9'], 0]);
+    // A comment the agent has not read says Sent, and Not read beside it; nothing says Read.
     await evaluate('location.hash = "#inbox/chatted"');
-    await until(() => evaluate('!!document.querySelector(".ib-thread .ui-trail")'));
-    assert.deepEqual(await evaluate('JSON.stringify([...document.querySelectorAll(".ib-thread .ui-trail li")].map((l) => l.classList.contains("on")))').then(JSON.parse), [true, false, false, false]);
+    await until(() => evaluate('!!document.querySelector(".ib-thread .ib-rcpt")'));
+    assert.deepEqual(await evaluate('JSON.stringify([[...document.querySelectorAll(".ib-thread .ib-rcpt time")].map((t) => t.textContent.replace(/\\d\\d:\\d\\d|\\d+ \\w+$/, "").trim()), [...document.querySelectorAll(".ib-thread .ib-nr")].map((n) => n.textContent)])').then(JSON.parse), [['Sent'], ['Not read']]);
     assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
   } finally { await close(); }
 });

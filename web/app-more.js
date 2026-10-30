@@ -2157,12 +2157,13 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
         x.link ? el('a', { href: x.link, target: '_blank', rel: 'noopener', dir: 'auto' }, linkName(x.link)) : '', i === all.length - 1 && follow ? followUp(t) : '')) : []));
   }
   /** A reply that asks for a next step carries its answers as buttons right under it: one tap sends the choice as a comment on the card, which the agent takes like any other. */
-  function followUp(t) {
+  function followUp(t, chat = false) {
     const r = t.reply, opts = r?.options;
     if (!opts?.length || !['answer', 'round', 'comment'].includes(t.kind)) return '';
     const sec = (at) => Math.floor(Date.parse(at) / 1000), card = findCard(t.key), final = t.kind === 'answer';
     const later = (state.trail ?? []).find((x) => x.key === t.key && x.id !== t.id && x.kind === (final ? 'answer' : 'comment') && sec(x.at) >= sec(r.at));
     if (later && final) return '';
+    if (later && chat) return '';
     if (later) return el('p', { class: 'tr-picked' }, `You answered: ${(state.messages ?? []).find((m) => m.id === later.id)?.text ?? ''}`);
     if (FROZEN || state.readonly) return '';
     const err = el('span', { class: 'err', role: 'alert' }), row = el('div', { class: 'tr-opts', role: 'group', 'aria-label': 'Answer this reply' });
@@ -2189,12 +2190,35 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     fresh.forEach((t) => (t.seen = at));
     postJson('/api/trail', { key }).catch(() => fresh.forEach((t) => (t.seen = undefined)));
   }
-  const ibLab = (what, who, at, isNew) => el('p', { class: 'ib-lab' }, el('b', {}, what), who ? ` · ${who}` : '', isNew ? el('span', { class: 'ib-new' }, 'New') : '', at ? el('time', { datetime: at }, trailWhen(at)) : '');
   /** An open ask with up to four answers is answered in its thread, one tap, the first answer set apart; anything else is answered in its own place. */
   function askOpts(d) {
     const err = el('span', { class: 'err', role: 'alert' }), row = el('div', { class: 'tr-opts', role: 'group', 'aria-label': 'Answer this' });
     for (const o of d.options) { const b = el('button', { type: 'button', class: 'tr-opt' }, o.label); b.onclick = () => save(d, o, [b], err); row.append(b); }
     return el('div', { class: 'tr-follow' }, row, el('p', { class: 'ib-final' }, 'A tap is your final answer: the card moves to Answered. Writing back keeps it in Decide.'), err);
+  }
+  /** An artifact in the conversation: a pull request, a capture, a report, the card itself, as a small card with its Open button. */
+  const artCard = (tile, name, sub, href, ext, label = 'Open') => el('div', { class: 'ib-art' }, el('span', { class: 'ib-ai' }, tile), el('span', { class: 'ib-at' }, el('b', { dir: 'auto' }, name), el('span', { dir: 'auto' }, sub)),
+    el('a', { class: 'ib-open', href, ...(ext && { target: '_blank', rel: 'noopener' }), 'aria-label': `${label} ${name}` }, label));
+  /** A link an agent sent: the pull request it is, or else the new version. */
+  const linkCard = (url) => { const pr = /\/(?:pull|pulls|merge_requests)\/\d+/.test(url); let host = url; try { host = new URL(url).host; } catch {} return artCard(glyph(pr ? 'pr' : 'link'), pr ? changeName(url) : 'New version', pr ? `Pull request · ${host}` : host, url, /^https?:/.test(url)); };
+  /** What the person sent, on the right in a bubble, with how far it got under it: Sent, Delivered or Read with its time, and a quiet Not read until its agent has opened it. */
+  function youMsg(t, d, who) {
+    const r = t.reply, word = t.taken ? stepWord(t, 0) : t.read || r ? 'Read' : t.delivered ? 'Delivered' : 'Sent', at = t.taken ? t.at : t.read ?? r?.at ?? t.delivered ?? t.at;
+    return el('article', { class: 'ib-msg you' }, el('p', { class: 'ib-who' }, el('b', {}, 'You'), el('time', { datetime: t.at }, trailWhen(t.at))),
+      el('p', { class: 'ib-say', dir: 'auto' }, youSaid(t, d)),
+      el('p', { class: 'ib-rcpt' }, el('time', { datetime: at }, `${word} ${trailWhen(at)}`), unreadByAgent([t]) ? el('span', { class: 'ib-nr', title: `${who} has not read this` }, 'Not read') : ''));
+  }
+  /** What an agent said: its name and time, its words, then whatever it brought. */
+  const agentMsg = (who, at, isNew, ...body) => el('article', { class: 'ib-msg' }, el('p', { class: 'ib-who' }, el('b', { dir: 'auto' }, who), at ? el('time', { datetime: at }, trailWhen(at)) : '', isNew ? el('span', { class: 'ib-new' }, 'New') : ''), ...body);
+  const ibSec = (at) => Math.floor(Date.parse(at) / 1000) || 0;
+  let ibAt = '';
+  let ibWant = null;
+  /** After the board is drawn: put the open thread at its latest message, or back where it was (the draw patches the page in place, so this reads the live thread). */
+  function placeChat() {
+    const w = ibWant; ibWant = null;
+    if (!w) return;
+    if (w.desk) { const live = document.querySelector('.ib-thread.desk'); if (live) live.scrollTop = w.toEnd ? live.scrollHeight : w.top; }
+    else if (w.toEnd) { const end = () => scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }); end(); document.fonts?.ready.then(end); }
   }
   /** beside: the item is open next to the thread, so the thread leaves answering and opening it to the item. */
   function threadView(th, desk, mark = true, beside = false) {
@@ -2202,33 +2226,39 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     const who = d ? d.by || 'Agent' : 'Lead', name = KIND_NAMES[th.kind].toLowerCase(), open = `#inbox/${th.id}/open`;
     const word = { new: 'New', turn: 'Waiting on you', agent: th.last ? `With ${who} · ${stepWord(th.last, stepOf(th.last) - 1)}` : `With ${who}`, done: d && Object.hasOwn(state.answers, key) ? 'Answered' : 'Done' }[th.st];
     const simple = !beside && d && th.st !== 'done' && area(d) === 'waiting' && inPlace(d) && d.type !== 'signin' && !exchanging(d) && !Object.hasOwn(state.answers, key) && d.options.length && d.options.length <= 4 && !FROZEN && !state.readonly;
-    // The card's own words first: what it asks (or says), and, when the first thing sent on it was the answer, that answer and what came of it.
-    const first = d ? [el('div', { class: 'ib-turn' }, ibLab(d.options.length || d.reply || d.type === 'plan' || d.type === 'signin' ? 'Asked' : 'Posted', who, d.filed),
-      el('p', { class: 'ib-say q', dir: 'auto' }, plain(d.type === 'evidence' ? headline(d) : d.about ?? d.detail ?? title(d))),
-      simple ? askOpts(d) : th.st === 'turn' && !beside ? el('a', { class: 'ib-open', href: open }, `Answer it in the ${name}`) : '')] : [el('div', { class: 'ib-turn' }, ibLab('Posted', who, tk.at), el('p', { class: 'ib-say q', dir: 'auto' }, tk.title))];
-    // A pair whose reply the person has not opened yet is marked New.
-    const pairs = [first], fresh = new Set();
-    // An answer the agent reopened is followed by the reopen, in the order they happened: the person answered, then the agent asked again.
-    const steps = [...sent.map((t) => ({ t, at: t.at })), ...(d ? reopened(key) : []).map((r) => ({ r, at: r.at }))].sort((x, y) => Math.floor(Date.parse(x.at) / 1000) - Math.floor(Date.parse(y.at) / 1000));
-    steps.forEach(({ t, r }, i) => {
-      if (r) { pairs.push([el('div', { class: 'ib-turn' }, ibLab('Reopened', who, r.at), el('p', { class: 'ib-say q', dir: 'auto' }, `${who} reopened this question to ask again. Your answer above stays.`))]); return; }
-      if (i === 0 && t.kind === 'answer' && t.said === undefined) first.push(el('div', { class: 'ib-turn' }, ibLab('Your answer', '', t.at), el('p', { class: 'ib-say', dir: 'auto' }, youSaid(t, d))), trailTrack(t, true, '', !beside, true));
-      else pairs.push([trailTrack(t, true, youSaid(t, d), !beside, true)]);
-      if (unseen(t)) fresh.add(pairs.length - 1);
-    });
+    // A chat: everything said on the card in time order. The agent's first words are the card's own; each thing the person sent is a bubble on the right, and the agent's replies, links and follow-ups come back on the left.
+    const msgs = [], add = (at, rank, node) => msgs.push({ at: ibSec(at), rank, node });
+    const card = beside ? '' : artCard(d ? cardTile(d) : tkTypeTile(tk), d ? (d.type === 'evidence' ? headline(d) : title(d)) : tk.title, [KIND_NAMES[th.kind], th.st === 'turn' ? 'Waiting on you' : ''].filter(Boolean).join(' · '), open, false, th.st === 'turn' && !simple ? 'Answer' : 'Open');
+    // The agent's first words are the card's own; its title is already on the card, so only what the card says besides is a line of its own.
+    const said = d ? d.about ?? d.detail : '';
+    add(d ? d.filed : tk.at, -1, agentMsg(who, d ? d.filed : tk.at, false, said ? el('p', { class: 'ib-say', dir: 'auto' }, plain(said)) : '', card, simple ? askOpts(d) : ''));
+    msgs[0].at = -Infinity;
+    for (const t of sent) {
+      add(t.at, 1, youMsg(t, d, who));
+      const rs = (t.replies ?? (t.reply ? [t.reply] : [])).filter((x) => x.text || x.link || x.acted);
+      rs.forEach((x, i) => add(x.at, 2, agentMsg(x.by || who, x.at, unseen(t), x.text || x.acted ? el('p', { class: 'ib-say', dir: 'auto' }, x.text ?? 'Posted a new version') : '', x.link ? linkCard(x.link) : '', i === rs.length - 1 && !beside ? followUp(t, true) : '')));
+    }
+    // An answer the agent reopened is told in the order it happened: the person answered, then the agent asked again.
+    for (const r of d ? reopened(key) : []) add(r.at, 3, el('p', { class: 'ib-sys' }, `${who} reopened this question to ask again. Your answer above stays.`));
+    msgs.sort((x, y) => x.at - y.at || x.rank - y.rank);
     if (mark) seeThread(th, sent);
-    const hide = inEarlier.has(key) ? 0 : Math.max(0, pairs.length - 3), shown = pairs.slice(hide);
+    const hide = inEarlier.has(key) ? 0 : Math.max(0, msgs.length - 8), shown = msgs.slice(hide);
     const earlier = el('button', { type: 'button', class: 'ib-fold' }, `Show ${hide} earlier`);
     earlier.onclick = () => { inEarlier.add(key); render(); };
-    const answered = d && isAnswered(d) && state.answers[key];
-    return el('article', { class: `ib-thread${desk ? ' desk' : ''}`, 'aria-labelledby': 'ib-title' },
+    const answered = d && isAnswered(d) && state.answers[key], end = el('i', { class: 'ib-end' });
+    // A thread opens at its latest message, and a new message brings it back to the end; a redraw of the same thread on a desk (its scroller is the thread itself) keeps where it was, unless it was at the end.
+    const cur = desk && mark ? document.querySelector('.ib-thread.desk') : null, same = !!cur && cur.dataset.key === String(key), stamp = `${key}:${msgs.length}`, moved = mark && ibAt !== stamp;
+    if (mark) ibAt = stamp;
+    ibWant = mark ? { desk, toEnd: moved || (desk && (!same || cur.scrollHeight - cur.scrollTop - cur.clientHeight < 64)), top: same ? cur.scrollTop : 0 } : null;
+    const art = el('article', { class: `ib-thread${desk ? ' desk' : ''}`, 'data-key': key, 'aria-labelledby': 'ib-title' },
       el('div', { class: 'ib-head' }, desk && !beside ? '' : el('a', { class: 'ui-rb', href: beside ? `#inbox/${th.id}` : '#inbox', 'aria-label': 'Back to the inbox' }, glyph('left')),
         el('span', { class: 'ib-crumb' }, el('span', { class: 'ib-kind' }, KIND_NAMES[th.kind]), el('span', { dir: 'auto' }, [d ? projectName(d) : tkProject(tk), who].filter(Boolean).join(' · ')))),
       el('h1', { class: 'ib-ttl', id: 'ib-title', tabindex: '-1', dir: 'auto' }, d ? (d.type === 'evidence' ? headline(d) : title(d)) : tk.title),
-      el('div', { class: 'ib-meta' }, el('span', { class: `ib-state ${th.st}` }, word), beside ? '' : el('a', { class: 'ib-open', href: open }, `Open the ${name}`)),
-      hide ? earlier : '', ...shown.map((p, i) => el('section', { class: 'ib-pair' }, fresh.has(hide + i) ? el('span', { class: 'ib-new' }, 'New') : '', ...p)),
+      el('div', { class: 'ib-meta' }, el('span', { class: `ib-state ${th.st}` }, word)),
+      el('div', { class: 'ib-chat', role: 'log', 'aria-label': `Conversation with ${who}` }, hide ? earlier : '', ...shown.map((m) => m.node)),
       answered ? el('p', { class: 'ib-closed' }, el('b', {}, 'Answered'), ` · ${saidOf(d, answered)}`, el('br'), 'Writing below goes to the agent; your answer stands.') : '',
-      d && talks() ? composer(th) : '');
+      d && talks() ? composer(th) : '', end);
+    return art;
   }
   /** Writing back: a comment on the card, which never answers it. An open ask stays in Decide until a final pick; an answered one keeps its answer. */
   function composer(th) {
@@ -2248,7 +2278,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
         render();
       } catch (e) { send.disabled = false; err.textContent = `Could not send: ${e.message}`; }
     };
-    return el('div', {}, el('div', { class: 'ib-compose' }, box, send), err);
+    return el('div', { class: 'ib-cw' }, el('div', { class: 'ib-compose' }, box, send), err);
   }
   /** A thread on a phone, with its item over it once opened: an ask in its sheet, a ticket in its own; the reader opens the rest (render). */
   function threadScreen(th, open) {
@@ -2312,7 +2342,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     return r ? `${d ? d.by || 'Agent' : 'Lead'}: ${r.text ?? (r.link ? linkName(r.link) : 'Posted a new version')}` : last ? `You: ${youSaid(last, d)} · ${stepWord(last, stepOf(last) - 1)}` : d ? plain(d.about ?? kind(d)) : TK_WORDS[tkStateOf(tk)]; };
   function inboxRow(th, sel) {
     const { d, tk } = th, a = el('a', { class: `ui-row ib-row${th.st === 'new' ? ' unread' : ''}`, href: `#inbox/${th.id}`, 'data-row': '', ...(sel && { 'aria-current': 'true' }) },
-      el('span', { class: 'ib-tile' }, d ? cardTile(d) : tkTile(tk), th.st === 'turn' || (th.st === 'new' && !th.fresh) ? el('i', { class: `dot${th.st === 'turn' ? ' red' : ''}` }) : ''),
+      el('span', { class: 'ib-tile' }, d ? cardTile(d) : tkTypeTile(tk), th.st === 'turn' || (th.st === 'new' && !th.fresh) ? el('i', { class: `dot${th.st === 'turn' ? ' red' : ''}` }) : ''),
       el('span', { class: 'rm' }, el('span', { class: 't', dir: 'auto' }, d ? (d.type === 'evidence' ? headline(d) : title(d)) : tk.title), el('span', { class: 'l2 meta', dir: 'auto' }, inboxLine(th))),
       el('span', { class: 'ib-side' }, th.at ? el('time', { datetime: th.at }, trailWhen(th.at)) : '',
         th.fresh ? el('b', { class: 'ib-n', title: `${th.fresh} unread from ${d ? d.by || 'the agent' : 'the lead'}`, 'aria-label': `${th.fresh} unread from the agent` }, String(th.fresh)) : '',
@@ -2354,8 +2384,10 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     const doneN = all.filter((t) => t.st === 'done').length, doneB = el('button', { type: 'button', class: 'ib-ent ib-done', 'aria-pressed': String(inDone) }, el('span', {}, 'Done'), el('b', {}, String(doneN)));
     doneB.onclick = () => { inDone = !inDone; render(); if (inDone) document.querySelector('.ib-sec[aria-label="Done"]')?.scrollIntoView({ block: 'nearest' }); };
     const foot = el('nav', { class: 'ib-foot', 'aria-label': 'More in the inbox' }, el('a', { class: 'ib-ent ib-agents', href: '#channels' }, el('span', {}, 'Agents'), el('small', {}, 'read-only')), doneB);
-    return [el('label', { class: 'ib-find', role: 'search' }, document.getElementById('dock-find').firstChild.cloneNode(true), box), chips, flt,
-      ...(out.length ? out : [el('p', { class: 'ib-empty' }, q ? `Nothing matches “${inFind.trim()}”` : inFlt === 'fresh' ? 'No unread replies from agents.' : inFlt === 'unread' ? 'Every agent has read what you sent.' : inKind === 'ticket' && tkLoad() === 'loading' ? 'Reading the tickets…' : 'Nothing here.')]), foot];
+    // One row for every filter, kinds then the two unread sides, scrolling sideways rather than wrapping under itself. On a phone the rail's two entries sit right under it, so they are on the first screen.
+    const bar = el('div', { class: 'ib-bar' }, chips, flt);
+    return [el('label', { class: 'ib-find', role: 'search' }, document.getElementById('dock-find').firstChild.cloneNode(true), box), bar, ...(phone() ? [foot] : []),
+      ...(out.length ? out : [el('p', { class: 'ib-empty' }, q ? `Nothing matches “${inFind.trim()}”` : inFlt === 'fresh' ? 'No unread replies from agents.' : inFlt === 'unread' ? 'Every agent has read what you sent.' : inKind === 'ticket' && tkLoad() === 'loading' ? 'Reading the tickets…' : 'Nothing here.')]), ...(phone() ? [] : [foot])];
   }
   /** An item answered in its thread's own place (an ask in its sheet, or in the pane beside its thread on a desk); a plan, a design, a page to read and a proof open in the reader. */
   const inPlace = (d) => d.type !== 'plan' && d.kind !== 'design' && !reads(d) && d.type !== 'evidence';
@@ -2380,6 +2412,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     const th = all.find((t) => t.id === key);
     // The address #find opens Search over the inbox.
     if (location.hash === '#find' && !searchSheet.open) openSearch();
+    if (phone() && !th) ibAt = '';
     if (phone()) return th && moreReady ? threadScreen(th, open) : [el('header', { class: 'ui-top' }, el('h1', { tabindex: '-1' }, 'Inbox'), themeButton()), ...inboxList(all, key)];
     const order = SECTIONS.map(([s]) => s), first = [...all].filter((t) => t.st !== 'done' && (!inFlt || (inFlt === 'fresh' ? t.fresh : t.unread) > 0)).sort((x, y) => order.indexOf(x.st) - order.indexOf(y.st) || (Date.parse(y.at) || 0) - (Date.parse(x.at) || 0))[0];
     const shown = th ?? first;
