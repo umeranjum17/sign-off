@@ -66,6 +66,12 @@ jobs:
         env:
           CHROME_DEVTOOLS_AXI_CHROME_ARGS: --no-sandbox
         run: PATH="$RUNNER_TEMP/dd/bin:$PATH" done-done run board-actions
+      # The Evidence feed by name: a proof filed after the board was read whole lands on Evidence by the next poll, and the feed-stall alarm
+      # trips on a stale pair of timestamps and stays quiet on the board it drove.
+      - if: github.event_name == 'pull_request' && steps.changes.outputs.docs_only != 'true'
+        env:
+          CHROME_DEVTOOLS_AXI_CHROME_ARGS: --no-sandbox
+        run: PATH="$RUNNER_TEMP/dd/bin:$PATH" done-done run evidence-feed
       - name: Install comment capture encoder
         if: github.event_name == 'pull_request' && steps.changes.outputs.docs_only != 'true'
         run: |
