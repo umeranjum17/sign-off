@@ -9,11 +9,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const shots = new URL('../.agents/skills/done-done-verify-sign-off/flash-shots.mjs', import.meta.url).pathname;
-const browser = process.env.CHROME_PATH ?? '/usr/bin/chromium';
+// The browser the repo's other journeys use: CHROME_PATH, else the first of the usual names on the PATH (a CI runner has google-chrome, not chromium).
+const browser = process.env.CHROME_PATH ?? ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser']
+  .flatMap((b) => (process.env.PATH ?? '').split(':').map((d) => join(d, b))).find(existsSync);
 const out = mkdtempSync(join(tmpdir(), 'so-flash-'));
 after(() => rmSync(out, { recursive: true, force: true }));
 
-test('a poll and an answer never blank or rebuild the board, and a loader shows while it reads', { skip: !existsSync(browser) && 'no Chromium on this machine' }, () => {
+test('a poll and an answer never blank or rebuild the board, and a loader shows while it reads', { skip: !browser && 'no Chrome or Chromium on this machine' }, () => {
   // A phone and a desk: the same drive, the same checks, once each.
   for (const width of ['390', '1280']) {
     const run = spawnSync(process.execPath, [shots, out, 'light', width], { encoding: 'utf8', env: { ...process.env, CHROME_PATH: browser } });

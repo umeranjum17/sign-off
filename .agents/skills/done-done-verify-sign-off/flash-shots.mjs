@@ -35,13 +35,19 @@ const served = (() => {
 })();
 // The board is a fixture of this run: it is stopped by its own CLI, never by a shell kill, and this folder goes with the browser's.
 const stop = () => spawnSync(process.execPath, [cli, 'stop', join(board, 'board.json')], { env, encoding: 'utf8' });
-const chrome = spawn(process.env.CHROME_PATH ?? '/usr/bin/chromium', ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(scratch, 'profile')}`, `--window-size=${W},${H}`,
-  '--hide-scrollbars', '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: 'ignore', env: { ...process.env, TMPDIR: scratch } });
+// A Chrome on this machine, as the repo's other browser journeys find it: CHROME_PATH first, then the usual names on the PATH (a CI runner has
+// google-chrome and may have no chromium at all).
+const browser = process.env.CHROME_PATH ?? ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser']
+  .flatMap((b) => (process.env.PATH ?? '').split(':').map((d) => join(d, b))).find(existsSync);
+if (!browser || !existsSync(browser)) throw new Error('no Chrome or Chromium to drive: set CHROME_PATH or put one on the PATH');
+const chrome = spawn(browser, ['--headless=new', '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--remote-debugging-port=0', `--user-data-dir=${join(scratch, 'profile')}`,
+  `--window-size=${W},${H}`, '--hide-scrollbars', '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: 'ignore', env: { ...process.env, TMPDIR: scratch } });
 const failures = [];
 const check = (ok, what) => { if (!ok) failures.push(what); };
 try {
   const active = join(scratch, 'profile', 'DevToolsActivePort');
   for (let i = 0; i < 300 && !(existsSync(active) && readFileSync(active, 'utf8').includes('\n')); i++) await wait(100);
+  if (!existsSync(active)) throw new Error(`${browser} did not open its DevTools port in 30 seconds`);
   const port = readFileSync(active, 'utf8').split('\n')[0];
   const target = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find((t) => t.type === 'page');
   const ws = new WebSocket(target.webSocketDebuggerUrl);
