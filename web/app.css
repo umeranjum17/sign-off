@@ -2141,6 +2141,13 @@
     .ui-pane .ib-thread.desk { height: 100%; overflow: auto; padding: 0 1.5rem 1.5rem; }
     .ib-thread.desk .ib-head { margin-top: 1rem; }
     .split-list .ib-thread.desk { padding: 0 0.25rem 1.5rem; }
+    /* Layout C: the conversation is the page, the other threads sit in a narrow rail beside it. */
+    .ui-dgrid.ib-rail { grid-template-columns: 19rem minmax(0, 1fr); }
+    .ui-dgrid.ib-rail > .s4, .ui-dgrid.ib-rail > .s8 { grid-column: auto; }
+    .ib-rail .ui-pane .ib-thread.desk { max-width: 48rem; margin-inline: auto; }
+    /* The rail's two entries stay in view at its foot while its threads scroll. */
+    .ui-col.fades:has(> .ib-foot):not(.at-end) { -webkit-mask-image: none; mask-image: none; }
+    .split-list .ib-foot { position: sticky; bottom: 0; margin-top: 0.75rem; padding-bottom: 0.25rem; background: var(--tk-canvas); }
     /* An item opened from its thread on a desk: the thread in the middle, the item at the right. */
     body.thread-beside { grid-template-columns: 15rem minmax(22rem, 26rem) minmax(0, 1fr); }
     body.thread-beside main { display: block; height: 100vh; padding: 0 1rem; overflow: auto; }
@@ -2155,12 +2162,12 @@
   .ib-find input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: none; color: var(--tk-text); font: inherit; font-size: var(--tk-fs-row); outline: none; }
   .ib-find input::placeholder { color: var(--tk-text-tertiary); }
   .ib-find:focus-within { box-shadow: var(--tk-elev-card), inset 0 0 0 1.5px var(--tk-ink); }
-  .ib-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
-  .ib-chip { display: inline-flex; flex: none; align-items: center; gap: 0.5rem; height: 2rem; padding: 0 0.75rem; border: 0; border-radius: 1rem; background: var(--tk-card); color: var(--tk-text-secondary);
+  .ib-chips, .ib-flts { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+  .ib-chip, .ib-flt { display: inline-flex; flex: none; align-items: center; gap: 0.5rem; height: 2rem; padding: 0 0.75rem; border: 0; border-radius: 1rem; background: var(--tk-card); color: var(--tk-text-secondary);
     font: inherit; font-size: var(--tk-fs-meta); font-weight: 500; box-shadow: var(--tk-elev-card), inset 0 1px 0 var(--tk-hl); cursor: pointer; }
-  .ib-chip b { color: var(--tk-text-tertiary); font-weight: 500; font-variant-numeric: tabular-nums; }
-  .ib-chip[aria-pressed="true"] { background: var(--tk-ink); color: var(--tk-canvas); }
-  .ib-chip[aria-pressed="true"] b { color: inherit; opacity: 0.7; }
+  .ib-chip b, .ib-flt b { color: var(--tk-text-tertiary); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .ib-chip[aria-pressed="true"], .ib-flt[aria-pressed="true"] { background: var(--tk-ink); color: var(--tk-canvas); }
+  .ib-chip[aria-pressed="true"] b, .ib-flt[aria-pressed="true"] b { color: inherit; opacity: 0.7; }
   .ib-sec .ui-sec { margin-top: 1.25rem; }
   .ib-row { height: auto; min-height: 4.5rem; padding: 0.75rem 0; }
   .ib-row .t { overflow: hidden; color: var(--tk-text); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); white-space: nowrap; text-overflow: ellipsis; }
@@ -2173,6 +2180,16 @@
   .ib-side { display: grid; flex: none; justify-items: end; gap: 0.25rem; }
   .ib-side time { color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); line-height: var(--tk-lh-small); font-variant-numeric: tabular-nums; }
   .ib-kind { display: inline-flex; align-items: center; height: 1.25rem; padding: 0 0.4375rem; border-radius: 0.625rem; background: var(--tk-inset); color: var(--tk-text-secondary); font-size: 0.6875rem; font-weight: 500; line-height: 1.25rem; white-space: nowrap; }
+  .ib-flts { margin-top: 0.5rem; }
+  /* The two sides of unread on a row: the agents' words not opened (a count, ink) and yours they have not read (a quiet outline). */
+  .ib-n { display: inline-grid; place-items: center; min-width: 1.25rem; height: 1.25rem; padding: 0 0.375rem; border-radius: 0.625rem; background: var(--tk-ink); color: var(--tk-canvas); font-size: 0.75rem; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+  .ib-nr { display: inline-flex; align-items: center; height: 1.25rem; padding: 0 0.4375rem; border-radius: 0.625rem; box-shadow: inset 0 0 0 1px var(--tk-text-tertiary); color: var(--tk-text-secondary); font-size: 0.6875rem; font-weight: 500; line-height: 1; white-space: nowrap; }
+  .ib-side { justify-items: end; }
+  .ib-foot { display: grid; margin-top: 1.25rem; padding-top: 0.5rem; border-top: 1px solid var(--tk-line, rgba(127, 127, 127, 0.2)); }
+  .ib-ent { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%; min-height: 2.75rem; padding: 0 0.25rem; border: 0; background: none; color: var(--tk-text-secondary); font: inherit; font-size: var(--tk-fs-row); text-decoration: none; cursor: pointer; }
+  .ib-ent b, .ib-ent small { color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .ib-ent:hover, .ib-ent[aria-pressed="true"] { color: var(--tk-ink); }
+  .ib-ent[aria-pressed="true"] span { font-weight: 600; }
   .ib-fold { display: block; width: 100%; min-height: 2.75rem; margin-top: 0.5rem; border: 0; background: none; color: var(--tk-text-secondary); font: inherit; font-size: var(--tk-fs-row); font-weight: 500; cursor: pointer; }
   .ib-empty { padding: 1.5rem 1rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); text-align: center; }
   /* A reply that lands: a notice at the top of a phone, as its own would show, and at the top right of a desk; a tap opens its thread. */

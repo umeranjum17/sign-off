@@ -96,6 +96,12 @@ const go = async (hash) => { await cdp('Page.navigate', { url: 'about:blank' });
 const MEASURE = `(async () => { await document.fonts.ready; const fail = [], w = document.documentElement.clientWidth, vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   const sections = [...document.querySelectorAll('.ib-sec')].filter(vis).map((s) => ({ head: s.querySelector('h2, .ib-sh')?.textContent ?? '', rows: [...s.querySelectorAll('.ib-row')].map((r) => (r.classList.contains('unread') ? '* ' : '') + r.querySelector('.t').textContent + ' / ' + (r.querySelector('.ib-kind')?.textContent ?? '')) }));
   const chips = [...document.querySelectorAll('.ib-chip')].filter(vis).map((c) => (c.getAttribute('aria-pressed') === 'true' ? '[' + c.textContent + ']' : c.textContent));
+  const flts = [...document.querySelectorAll('.ib-flt')].filter(vis).map((b) => (b.getAttribute('aria-pressed') === 'true' ? '[' + b.textContent + ']' : b.textContent));
+  const entries = [...document.querySelectorAll('.ib-ent')].filter(vis).map((e) => e.textContent.trim().replace(/\\s+/g, ' '));
+  const marks = [...document.querySelectorAll('.ib-row')].filter(vis).map((r) => [r.querySelector('.t').textContent, r.querySelector('.ib-n')?.textContent ?? '', r.querySelector('.ib-nr')?.textContent ?? '']);
+  const rail = document.querySelector('.split-list')?.getBoundingClientRect().width ?? 0;
+  const dock = document.querySelector('#tabs')?.getBoundingClientRect(), foot = document.querySelector('.ib-ent:last-child');
+  if (dock && dock.width > 0 && foot) { foot.scrollIntoView({ block: 'end' }); window.scrollTo(0, document.documentElement.scrollHeight); await new Promise((ok) => setTimeout(ok, 200)); if (foot.getBoundingClientRect().bottom > dock.top + 1) fail.push('the last rail entry is under the dock at the scroll end'); window.scrollTo(0, 0); }
   const thread = document.querySelector('.ib-thread');
   const pairs = thread ? [...thread.querySelectorAll('.ib-pair')].filter(vis).map((p) => [...p.querySelectorAll('.ib-lab, .tr-lab')].map((l) => l.textContent.trim()).join(' > ')) : [];
   const steps = thread ? [...thread.querySelectorAll('.ui-trail li.on b')].map((b) => b.textContent) : [];
@@ -107,11 +113,12 @@ const MEASURE = `(async () => { await document.fonts.ready; const fail = [], w =
   if (document.documentElement.scrollWidth > w) fail.push('sideways overflow');
   const words = document.body.innerText, bad = words.match(/\\b(?:answer|round|comment):[\\w.-]+:|\\btrail\\.jsonl\\b|undefined|NaN|\\[object/g) ?? [];
   if (bad.length) fail.push('raw words: ' + bad.join(', '));
-  return { url: location.href, viewport_width: window.innerWidth, title: document.title, menu, search, sections, chips, thread: thread?.querySelector('.ib-ttl')?.textContent ?? '', status: thread?.querySelector('.ib-state')?.textContent ?? '', pairs, steps, follow, closed: document.querySelector('.ib-closed')?.innerText.replace(/\\n+/g, ' / ') ?? '', badge: [...document.querySelectorAll('#tabs a[href="#inbox"] .bd, #nav a[href="#inbox"] .n')].filter(vis).map((b) => b.textContent).join(''), notice, thread_answers, fail }; })()`;
+  return { url: location.href, viewport_width: window.innerWidth, flts, entries, marks, rail: Math.round(rail), title: document.title, menu, search, sections, chips, thread: thread?.querySelector('.ib-ttl')?.textContent ?? '', status: thread?.querySelector('.ib-state')?.textContent ?? '', pairs, steps, follow, closed: document.querySelector('.ib-closed')?.innerText.replace(/\\n+/g, ' / ') ?? '', badge: [...document.querySelectorAll('#tabs a[href="#inbox"] .bd, #nav a[href="#inbox"] .n')].filter(vis).map((b) => b.textContent).join(''), notice, thread_answers, fail }; })()`;
 const results = [];
 // RECEIPTS_ONLY=1 captures just the relayed answer's thread (journey `answer-receipts`).
 const capture = async (state, hash, before, check) => {
   if (process.env.RECEIPTS_ONLY && state !== 'relayed') return;
+  if (process.env.RAIL_ONLY && !['rail', 'unread'].includes(state)) return;
   errors.length = 0;
   if (hash !== null) await go(hash);
   if (before) { await evaluate(before); await wait(700); }
@@ -126,13 +133,34 @@ const capture = async (state, hash, before, check) => {
 const heads = (m) => m.sections.map((s) => s.head.replace(/\s*\d+$/, ''));
 const tap = (sel) => `(() => { const b = [...document.querySelectorAll(${JSON.stringify(sel)})].find((e) => e.getBoundingClientRect().width > 0); b.scrollIntoView({ block: 'center' }); b.click(); })()`;
 try {
-  await capture('inbox', '#inbox', '', (m) => {
-    const want = phone ? ['Today', 'Inbox', 'Decide', 'Evidence', 'Reports', 'Tickets'] : ['Today', 'Inbox', 'Decide', 'Evidence', 'Reports', 'Designs', 'Tickets'];
+  // RAIL_ONLY=1 (journey `inbox-rail`): the rail as the conversation's neighbour. One ask got a comment no agent has read; the rows carry the unread counts, the two unread filters count the threads, Agents and Done close the rail.
+  if (process.env.RAIL_ONLY) {
+    await api('/api/messages', { kind: 'comment', key: 'digest', text: 'Can you hold the digest until Monday?' });
+    const check = (m) => {
+      assert.deepEqual(m.flts.map((f) => f.replace(/^\[|\]$/g, '').replace(/\d+$/, '')), ['Unread from agents', 'Not read by agents'], 'both unread filters: ' + m.flts.join(', '));
+      assert.deepEqual(m.entries.map((e) => e.replace(/\d+$/, '').trim()), ['Agentsread-only', 'Done'], 'the rail ends with Agents and Done: ' + m.entries.join(', '));
+    };
+    await capture('rail', '#inbox', '', (m) => {
+      check(m);
+      assert.ok(m.marks.some((r) => r[1] === '1'), 'a row carries the count of replies not opened: ' + JSON.stringify(m.marks));
+      assert.ok(m.marks.some((r) => r[0].startsWith('Keep the weekly digest') && r[2] === 'Not read'), 'a row says the agent has not read it: ' + JSON.stringify(m.marks));
+      assert.deepEqual(m.flts.map((f) => f.replace(/\D/g, '')), ['3', '1'], 'filter counts: ' + m.flts.join(', '));
+      if (!phone) assert.ok(m.rail >= 290 && m.rail <= 330, 'the rail is about 304 px wide, not ' + m.rail);
+    });
+    await capture('unread', '#inbox', tap('.ib-flt[aria-pressed=false]:last-of-type'), (m) => {
+      check(m);
+      assert.ok(m.flts[1].startsWith('['), 'Not read by agents is on: ' + m.flts.join(', '));
+      assert.deepEqual(m.marks.map((r) => r[0]), ['Keep the weekly digest?'], 'only the thread its agent has not read: ' + JSON.stringify(m.marks));
+    });
+  }
+  if (!process.env.RAIL_ONLY) {
+  await capture('inbox', '#inbox', (m) => {
+    const want = phone ? ['Today', 'Inbox', 'Decide', 'Evidence', 'Reports', 'Tickets'] : ['Today', 'Inbox', 'Decide', 'Evidence', 'Reports', 'Designs', 'Tickets', 'Channels'];
     assert.deepEqual(m.menu, want, 'every menu and the Inbox: ' + m.menu.join(', '));
     assert.ok(m.search, 'Search is one tap away');
-    assert.deepEqual(heads(m), ['New', 'Decide', 'Waiting on agents'], 'sections in order: ' + heads(m).join(', '));
+    assert.deepEqual(heads(m), ['New', 'Waiting on agents'], 'sections in order: ' + heads(m).join(', '));
     assert.ok(m.sections[0].rows.every((r) => r.startsWith('* ')), 'every New row is unread');
-    assert.deepEqual(m.chips.map((c) => c.replace(/\d+(\]?)$/, '$1')), ['[All]', 'Decisions', 'Plans', 'Reports', 'Tickets'], 'kind chips: ' + m.chips.join(', '));
+    assert.deepEqual(m.chips.map((c) => c.replace(/\d+(\]?)$/, '$1')), ['[All]', 'Decisions', 'Tickets'], 'kind chips: ' + m.chips.join(', '));
   });
   // The Inbox badge counts the threads that need the person, the same ones Decide counts and the New replies: with the report read (it asks nothing), the badge is every row under New and Decide.
   await api('/api/reads', { keys: ['sign-in-faster'], read: true });
@@ -141,11 +169,11 @@ try {
     assert.equal(rows('New'), 3, 'three New replies: ' + JSON.stringify(m.sections));
     assert.equal(m.badge, String(rows('New') + rows('Decide')), `the Inbox badge ${m.badge} is not the New and Decide rows: ` + JSON.stringify(m.sections));
   });
-  // Answered and acted on (the digest on Mondays): not under New though its reply was never opened; it is under Archived, behind the fold.
-  await capture('archived', '#inbox', `(() => { [...document.querySelectorAll('.ib-fold')].find((b) => /archived/.test(b.textContent)).click(); document.querySelector('.ib-sec[aria-label=Archived]').scrollIntoView({ block: 'end' }); })()`, (m) => {
+  // Answered and acted on (the digest on Mondays): not under New though its reply was never opened; it is under Done, behind the Done entry.
+  await capture('archived', '#inbox', `(() => { document.querySelector('.ib-done').click(); document.querySelector('.ib-sec[aria-label=Done]').scrollIntoView({ block: 'end' }); })()`, (m) => {
     const rows = (head) => m.sections.find((s) => s.head.replace(/\s*\d+$/, '') === head)?.rows ?? [];
     assert.ok(!rows('New').some((r) => r.includes('Send the digest on Mondays?')), 'the acted thread is still under New');
-    assert.ok(rows('Archived').some((r) => r.includes('Send the digest on Mondays?')), 'the acted thread is not under Archived: ' + JSON.stringify(m.sections));
+    assert.ok(rows('Done').some((r) => r.includes('Send the digest on Mondays?')), 'the acted thread is not under Done: ' + JSON.stringify(m.sections));
   });
   await capture('thread', '#inbox/ship', `document.querySelector('.tr-opts')?.scrollIntoView({ block: 'center' })`, (m) => {
     assert.deepEqual(m.follow, ['Ship Friday', 'Wait a week']);
@@ -179,6 +207,7 @@ try {
     assert.ok(m.thread, 'the thread sits beside the ask');
     assert.equal(m.thread_answers, 0, 'the thread beside the ask shows answer buttons: ' + m.thread_answers);
   });
+  }
 } finally {
   ws.close(); chrome.kill(); server.kill(); await wait(300);
   rmSync(prof, { recursive: true, force: true }); rmSync(dir, { recursive: true, force: true });
@@ -187,7 +216,10 @@ try {
 const prior = existsSync(join(out, 'steps.json')) ? JSON.parse(readFileSync(join(out, 'steps.json'), 'utf8')) : null, cell = `On a ${phone ? `${width} px phone` : `${width} px desk`} in ${theme}`;
 const receipts = process.env.RECEIPTS_ONLY ? {
   steps: ['The person answers an ask from the lead; the lead reads the answer with sign-off-axi answers, with no wait and no feedback line', 'The person opens the ask\u2019s thread in the Inbox'],
-  result: 'the thread\u2019s track reads Sent and Read, each with its time, and Acted and Result stay empty because nothing more was recorded' } : null;
+  result: 'the thread\u2019s track reads Sent and Read, each with its time, and Acted and Result stay empty because nothing more was recorded' }
+  : process.env.RAIL_ONLY ? {
+  steps: ['The person answers two asks and writes on a third; the lead\u2019s wait takes the first answer and replies, and nobody reads the comment', 'The person opens the Inbox', 'The person taps Not read by agents'],
+  result: 'each thread row carries the count of replies not opened and a Not read mark where its agent has not read what was sent, the two filters count the threads they list, the rail ends on Agents (read-only) and Done, and Not read by agents narrows the rail to the one thread' } : null;
 writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
   start: 'A new board with five asks from two agents, a plan, a guided report and a ticket, served by sign-off-axi serve',
   steps: [...(prior?.steps ?? []), ...(receipts?.steps ?? [

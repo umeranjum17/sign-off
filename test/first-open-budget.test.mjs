@@ -21,7 +21,9 @@ after(() => rmSync(scratch, { recursive: true, force: true }));
 // Re-recorded on 30 October 2026 in the change that adds Channels, measured on main after #341, #342 and #344 landed:
 // +129 B before the first paint (its route in app.js) and +6,096 B of the whole open (the screen's code and rules in
 // app-more.js and app.css, after the first paint).
-const baseline = { bytesBeforePaint: 98_311, requestsBeforePaint: 5, bytesWhole: 310_230, paintMs: 900 };
+// Re-recorded on 30 October 2026 in the change that turns the Inbox into a rail of threads: +1,062 B of the whole open over main's 310,230 B (rows' counts, two filters and two entries
+// in app-more.js and app.css, all after the first paint).
+const baseline = { bytesBeforePaint: 98_311, requestsBeforePaint: 5, bytesWhole: 311_292, paintMs: 900 };
 const byteHeadroom = 1_024;
 const firstPaintCeiling = 100_000;
 // The paint is the one number a busy host moves: it may take half as long again, and is never allowed more.

@@ -2139,8 +2139,8 @@
      or proof not read yet), what waits on you (Decide), what waits on its agent, with how far it got, and what is answered, acted on, merged or closed: that archives itself, folded, and still turns up in search or when a new message lands on it. Each kind is a chip, never a place. ---- */
   const KIND_NAMES = { decision: 'Decision', plan: 'Plan', report: 'Report', design: 'Design', ticket: 'Ticket', proof: 'Proof' };
   const FILTERS = [['all', 'All'], ['decision', 'Decisions'], ['plan', 'Plans'], ['report', 'Reports'], ['design', 'Designs'], ['ticket', 'Tickets'], ['proof', 'Proofs']];
-  const SECTIONS = [['new', 'New'], ['turn', 'Decide'], ['agent', 'Waiting on agents'], ['done', 'Archived']];
-  let inKind = 'all', inFind = '', inDone = false;
+  const SECTIONS = [['new', 'New'], ['turn', 'Decide'], ['agent', 'Waiting on agents'], ['done', 'Done']];
+  let inKind = 'all', inFind = '', inDone = false, inFlt = '';
   const inMore = new Set();
   const threadKind = (d) => (d.type === 'evidence' ? 'proof' : d.kind === 'design' || d.type === 'design' ? 'design' : d.type === 'plan' ? 'plan' : d.kind === 'report' || ['reports', 'notes'].includes(area(d)) ? 'report' : 'decision');
   /** What the person sent, in their words: an answer as it reads, a comment's text, else what it was. */
@@ -2148,6 +2148,8 @@
     : t.said ?? { round: 'Another round', discard: 'Discarded', ask: 'Go deeper', part: 'A comment on a part' }[t.kind]);
   /** The person took part when they sent something on it; an answer the leash took is not theirs. */
   const tookPart = (sent) => sent.some((t) => !t.taken);
+  /** What the person sent that its agent has not read yet: no read mark, no reply, and not an answer the leash took for them. The agent's side of unread. */
+  const unreadByAgent = (sent) => sent.filter((t) => t.kind !== 'discard' && !t.taken && !t.read && !t.reply).length;
   /** Every thread the person took part in, with where it stands (st) and when it last moved (at); a card or ticket they never touched is none. A card an open ask merges is that ask's thread. */
   function inboxThreads(merged = new Set()) {
     const gone = new Set(state.dismissed ?? []), out = [];
@@ -2162,14 +2164,14 @@
         // A design review a lead posted is Main's until promoted: it waits on its agents, never in Decide.
         : (last && !last.reply) || (a === 'designs' && dzOpen(d)) ? 'agent' : 'done';
       // needs (the Inbox badge): a reply to the person not opened yet.
-      out.push({ id: d.key, d, kind, st, last, needs: st === 'new', at: last?.reply?.at ?? last?.at ?? d.filed ?? '' });
+      out.push({ id: d.key, d, kind, st, last, needs: st === 'new', fresh: sent.filter((t) => unseen(t) && !(answered && !t.reply.text)).length, unread: unreadByAgent(sent), at: last?.reply?.at ?? last?.at ?? d.filed ?? '' });
     }
     // A ticket is a thread once the person commented on it.
     for (const t of state.tickets ?? []) {
       const sent = trailOf(t.id, 'ticket'), last = sent.at(-1);
       if (!sent.length) continue;
       const st = sent.some(unseen) ? 'new' : (last && !last.reply) || tkStateOf(t) !== 'done' ? 'agent' : 'done';
-      out.push({ id: `~${t.id}`, tk: t, kind: 'ticket', st, needs: st === 'new' && tkStateOf(t) !== 'done', last, at: last?.reply?.at ?? last?.at ?? t.at ?? '' });
+      out.push({ id: `~${t.id}`, tk: t, kind: 'ticket', st, needs: st === 'new' && tkStateOf(t) !== 'done', fresh: sent.filter(unseen).length, unread: unreadByAgent(sent), last, at: last?.reply?.at ?? last?.at ?? t.at ?? '' });
     }
     return out;
   }
@@ -2178,15 +2180,18 @@
     return r ? `${d ? d.by || 'Agent' : 'Lead'}: ${r.text ?? (r.link ? linkName(r.link) : 'Posted a new version')}` : last ? `You: ${youSaid(last, d)} · ${stepWord(last, stepOf(last) - 1)}` : d ? plain(d.about ?? kind(d)) : TK_WORDS[tkStateOf(tk)]; };
   function inboxRow(th, sel) {
     const { d, tk } = th, a = el('a', { class: `ui-row ib-row${th.st === 'new' ? ' unread' : ''}`, href: `#inbox/${th.id}`, 'data-row': '', ...(sel && { 'aria-current': 'true' }) },
-      el('span', { class: 'ib-tile' }, d ? cardTile(d) : tkTile(tk), th.st === 'new' || th.st === 'turn' ? el('i', { class: `dot${th.st === 'turn' ? ' red' : ''}` }) : ''),
+      el('span', { class: 'ib-tile' }, d ? cardTile(d) : tkTile(tk), th.st === 'turn' || (th.st === 'new' && !th.fresh) ? el('i', { class: `dot${th.st === 'turn' ? ' red' : ''}` }) : ''),
       el('span', { class: 'rm' }, el('span', { class: 't', dir: 'auto' }, d ? (d.type === 'evidence' ? headline(d) : title(d)) : tk.title), el('span', { class: 'l2 meta', dir: 'auto' }, inboxLine(th))),
-      el('span', { class: 'ib-side' }, th.at ? el('time', { datetime: th.at }, trailWhen(th.at)) : '', el('span', { class: 'ib-kind' }, KIND_NAMES[th.kind])));
+      el('span', { class: 'ib-side' }, th.at ? el('time', { datetime: th.at }, trailWhen(th.at)) : '',
+        th.fresh ? el('b', { class: 'ib-n', title: `${th.fresh} unread from ${d ? d.by || 'the agent' : 'the lead'}`, 'aria-label': `${th.fresh} unread from the agent` }, String(th.fresh)) : '',
+        th.unread ? el('span', { class: 'ib-nr', title: `${d ? d.by || 'The agent' : 'The lead'} has not read ${th.unread === 1 ? 'your message' : `${th.unread} of your messages`}` }, 'Not read') : '',
+        th.fresh || th.unread ? '' : el('span', { class: 'ib-kind' }, KIND_NAMES[th.kind])));
     return el('li', {}, a);
   }
   /** The inbox's list: the search box, a chip per kind with what is open of it, then the sections; Archived is folded until asked for. */
   function inboxList(all, key) {
     const q = inFind.trim().toLowerCase(), time = (t) => Date.parse(t.at) || 0, out = [];
-    const shown = all.filter((t) => (inKind === 'all' || t.kind === inKind) && (!q || [t.d ? title(t.d) : t.tk.title, t.d?.about ?? '', (t.d && projectName(t.d)) ?? ''].join(' ').toLowerCase().includes(q)));
+    const shown = all.filter((t) => (inKind === 'all' || t.kind === inKind) && (!inFlt || (inFlt === 'fresh' ? t.fresh : t.unread) > 0) && (!q || [t.d ? title(t.d) : t.tk.title, t.d?.about ?? '', (t.d && projectName(t.d)) ?? ''].join(' ').toLowerCase().includes(q)));
     const count = (k) => all.filter((t) => t.st !== 'done' && (k === 'all' || t.kind === k)).length;
     const box = el('input', { type: 'search', id: 'ib-find', 'aria-label': 'Search the inbox', placeholder: 'Search', autocomplete: 'off', enterkeyhint: 'search' });
     box.value = inFind;
@@ -2197,17 +2202,28 @@
       b.onclick = () => { inKind = k; if (k === 'ticket') readTickets(); render(); };
       return b;
     }));
+    // The two sides of unread, each a count of threads and a filter: what agents wrote that is not opened, and what was sent that its agent has not read.
+    const flt = el('div', { class: 'ib-flts', role: 'group', 'aria-label': 'Show unread' }, ...[['fresh', 'Unread from agents', (t) => t.fresh], ['unread', 'Not read by agents', (t) => t.unread]].map(([k, w, of]) => {
+      const n = all.filter((t) => t.st !== 'done' && of(t) > 0).length, b = el('button', { type: 'button', class: 'ib-flt', 'aria-pressed': String(inFlt === k) }, w, el('b', {}, String(n)));
+      b.onclick = () => { inFlt = inFlt === k ? '' : k; render(); };
+      return b;
+    }));
     for (const [s, name] of SECTIONS) {
       const mine = shown.filter((t) => t.st === s).sort((x, y) => time(y) - time(x));
       if (!mine.length) continue;
-      if (s === 'done' && !inDone && !q) { const b = el('button', { type: 'button', class: 'ib-fold' }, `Show ${mine.length} archived`); b.onclick = () => { inDone = true; render(); }; out.push(b); continue; }
+      // Done stays out of the rail until its entry is picked or a search looks for it.
+      if (s === 'done' && !inDone && !q) continue;
       const cap = inMore.has(s) || mine.some((t) => t.id === key) ? Infinity : 8, more = el('button', { type: 'button', class: 'ib-fold' }, `Show ${mine.length - 8} more`);
       more.onclick = () => { inMore.add(s); render(); };
       out.push(el('section', { class: 'ib-sec', 'aria-label': name }, el('h2', { class: 'ui-sec' }, name, el('span', { class: 'n' }, String(mine.length))),
         el('ul', { class: 'ui-card ui-list ib-list' }, ...mine.slice(0, cap).map((t) => inboxRow(t, t.id === key))), mine.length > cap ? more : ''));
     }
-    return [el('label', { class: 'ib-find', role: 'search' }, document.getElementById('dock-find').firstChild.cloneNode(true), box), chips,
-      ...(out.length ? out : [el('p', { class: 'ib-empty' }, q ? `Nothing matches “${inFind.trim()}”` : inKind === 'ticket' && tkLoad() === 'loading' ? 'Reading the tickets…' : 'Nothing here.')])];
+    // The rail's two quiet entries: the agents' own talk (read-only, the Channels room) and the finished threads.
+    const doneN = all.filter((t) => t.st === 'done').length, doneB = el('button', { type: 'button', class: 'ib-ent ib-done', 'aria-pressed': String(inDone) }, el('span', {}, 'Done'), el('b', {}, String(doneN)));
+    doneB.onclick = () => { inDone = !inDone; render(); if (inDone) document.querySelector('.ib-sec[aria-label="Done"]')?.scrollIntoView({ block: 'nearest' }); };
+    const foot = el('nav', { class: 'ib-foot', 'aria-label': 'More in the inbox' }, el('a', { class: 'ib-ent ib-agents', href: '#channels' }, el('span', {}, 'Agents'), el('small', {}, 'read-only')), doneB);
+    return [el('label', { class: 'ib-find', role: 'search' }, document.getElementById('dock-find').firstChild.cloneNode(true), box), chips, flt,
+      ...(out.length ? out : [el('p', { class: 'ib-empty' }, q ? `Nothing matches “${inFind.trim()}”` : inFlt === 'fresh' ? 'No unread replies from agents.' : inFlt === 'unread' ? 'Every agent has read what you sent.' : inKind === 'ticket' && tkLoad() === 'loading' ? 'Reading the tickets…' : 'Nothing here.')]), foot];
   }
   /** An item answered in its thread's own place (an ask in its sheet, or in the pane beside its thread on a desk); a plan, a design, a page to read and a proof open in the reader. */
   const inPlace = (d) => d.type !== 'plan' && d.kind !== 'design' && !reads(d) && d.type !== 'evidence';
@@ -2233,11 +2249,13 @@
     // The address #find opens Search over the inbox.
     if (location.hash === '#find' && !searchSheet.open) openSearch();
     if (phone()) return th && moreReady ? threadScreen(th, open) : [el('header', { class: 'ui-top' }, el('h1', { tabindex: '-1' }, 'Inbox'), themeButton()), ...inboxList(all, key)];
-    const order = SECTIONS.map(([s]) => s), first = [...all].filter((t) => t.st !== 'done').sort((x, y) => order.indexOf(x.st) - order.indexOf(y.st) || (Date.parse(y.at) || 0) - (Date.parse(x.at) || 0))[0];
+    const order = SECTIONS.map(([s]) => s), first = [...all].filter((t) => t.st !== 'done' && (!inFlt || (inFlt === 'fresh' ? t.fresh : t.unread) > 0)).sort((x, y) => order.indexOf(x.st) - order.indexOf(y.st) || (Date.parse(y.at) || 0) - (Date.parse(x.at) || 0))[0];
     const shown = th ?? first;
     deskSel = shown?.id ?? '';
     const top = el('header', { class: 'ui-top' }, el('h1', { tabindex: '-1' }, 'Inbox'));
-    return [moreReady ? threadDesk(top, inboxSub(all), inboxList(all, shown?.id), shown, open && th) : split(top, inboxSub(all), inboxList(all, shown?.id), pane('', ''))];
+    const desk = moreReady ? threadDesk(top, inboxSub(all), inboxList(all, shown?.id), shown, open && th) : split(top, inboxSub(all), inboxList(all, shown?.id), pane('', ''));
+    desk.querySelector?.('.ui-dgrid')?.classList.add('ib-rail');
+    return [desk];
   }
 
   const heardReplies = () => new Set(replies().map((t) => t.id + t.reply.at));
