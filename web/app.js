@@ -491,7 +491,7 @@
     if (design) {
       return el('article', { class: 'row design', id: `item-${d.key}` }, lead,
         firstDraft(d).text ? el('p', { class: 'tradeoff', dir: 'auto' }, el('strong', {}, 'Trade-off '), firstDraft(d).text) : '', firstDraftLinks(d),
-        mockCards(d, ro ? [] : buttons), fullButton(d), annotations(d), silent ? el('p', { class: 'silent' }, silent) : '', ro ? '' : other(d, saved, err), err);
+        mockCards(d, ro ? [] : buttons), demoRow(d), fullButton(d), annotations(d), silent ? el('p', { class: 'silent' }, silent) : '', ro ? '' : other(d, saved, err), err);
     }
     // Yes/No rows keep the two fixed buttons they always had; any other choice set wraps; answers that say what they do stack.
     const many = d.options.some((o) => o.outcome) ? 'told' : d.options.map((o) => o.value).sort().join() !== 'no,yes' ? 'many' : '';
@@ -1042,6 +1042,16 @@
   const firstDraftLinks = (d) => { const { links } = firstDraft(d);
     return links.length ? el('p', { class: 'fd-links' }, 'Open in first-draft ', ...links.map((l) => el('a', { href: l.href, target: '_blank', rel: 'noopener' }, l.label))) : ''; };
 
+  /** An option's demo recording and its round score (post --video and --score). The address names the file's hash, so the browser keeps it. */
+  const demoOf = (d, value) => {
+    const v = d.mocks?.find((x) => x.value === value)?.video;
+    return v && { score: v.score, url: src(`/api/media?key=${encodeURIComponent(d.key)}&video=${encodeURIComponent(value)}${FROZEN ? '' : `&h=${v.sha256.slice(0, 16)}`}`) };
+  };
+  /** The first frame of a recording: the browser draws it from the file itself when asked to start a hair in. */
+  const still = (url) => `${url}#t=0.001`;
+  // The demo's card and full screen are app-more.js's: until it loads a card draws no demos.
+  function demoRow() { return ''; }
+
   /** One phone frame per option, the recommended one first: its label and Recommended badge, the mock (tap opens it full size) and its Pick button. */
   function mockCards(d, buttons) {
     const rec = (i) => d.options[i].value === d.recommend_value, order = d.options.map((_, i) => i).sort((a, b) => rec(b) - rec(a));
@@ -1225,6 +1235,14 @@
     return d.kind === 'design' && designFrame(d) ? designUrl(d, designFrame(d)) : i >= 0 ? filesOf(d)[i][3] : d.preview ? mockUrl(d.key, '', d.preview) : d.type === 'diagram' ? mockUrl(d.key, '', d.view)
       : m ? mockUrl(d.key, m.value, m.path) : d.evidenceCard?.media.find((x) => x.type.startsWith('image/'))?.url;
   };
+  /** A design pick with a demo shows the recording's own first frame as its row media, the recommended option's first, in place of a picture sheet. */
+  const demoThumb = (d) => {
+    if (!isPick(d) || !d.mocks?.some((m) => m.video)) return;
+    const o = [...d.options].sort((a, b) => (b.value === d.recommend_value) - (a.value === d.recommend_value)).find((x) => demoOf(d, x.value));
+    const v = o && el('video', { class: 'design-thumb', src: still(demoOf(d, o.value).url), muted: '', playsinline: '', preload: 'metadata', 'aria-hidden': 'true', tabindex: '-1' });
+    if (v) v.muted = true;
+    return v;
+  };
   const thumb = (a, url) => { if (!url) return icon(a); const img = el('img', { class: 'thumb', src: src(url), alt: '', loading: 'lazy', decoding: 'async' }); img.onerror = () => img.replaceWith(icon(a)); return img; };
 
   const LEASH = { ask: ['Ask me first', 'Ask first', 'Agents wait for you on every ask.'], matters: ['Ask when it matters', 'When it matters', 'At an ask\u2019s deadline the board takes its default. Money, deletes and security always wait for you.'],
@@ -1285,8 +1303,9 @@
   const projectTile = (name, fallback) => el('span', { class: 'ui-icon', role: 'img', 'aria-label': name || 'No project' }, projectPic(name, fallback));
   const cardTile = (d) => {
     const design = d.kind === 'design' || d.type === 'design', tile = projectTile(projectName(d), () => design ? icon('designs') : d.type === 'plan' ? icon('plan') : d.kind === 'report' || d.type === 'explainer' ? glyph('layers') : icon(d.type === 'evidence' ? 'evidence' : d.reply ? 'reply' : 'yesno'));
-    const frame = design && designFrame(d);
-    if (frame) { const img = el('img', { class: 'design-thumb', src: src(designUrl(d, frame)), alt: '' }); img.onerror = () => img.replaceWith(projectPic(projectName(d), () => icon('designs'))); tile.replaceChildren(img); }
+    const frame = design && designFrame(d), demo = isPick(d) && demoThumb(d);
+    if (demo) tile.replaceChildren(demo);
+    else if (frame) { const img = el('img', { class: 'design-thumb', src: src(designUrl(d, frame)), alt: '' }); img.onerror = () => img.replaceWith(projectPic(projectName(d), () => icon('designs'))); tile.replaceChildren(img); }
     return tile;
   };
   /** A card as the new look's row, a link to where it opens: its tile, its title and priority, then its ticket's progress once it has some (a full bar when done), or else its project (or what it is) and when. */
