@@ -1620,7 +1620,7 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   assert.equal(await evaluate('document.querySelector(".decide-list .ui-hero .big").textContent'), '3');
   assert.equal(await heads(), 'Asks');
   // Every row uses the shared project tile; an unlinked ask labels its project as absent.
-  assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-list .ui-icon")].map((p) => p.getAttribute("aria-label"))'), ["No project", "No project", "No project"]);
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-list .ui-icon")].map((p) => p.getAttribute("aria-label"))'), ["Sign-off", "No project", "No project"]);
   // With no project and no filed time, a row's second line says who asked.
   assert.equal(await evaluate('[...document.querySelectorAll(".decide-list .ui-row .meta")].map((s) => s.textContent).join("|")'), 'Agent|Agent|Agent');
   await evaluate('document.querySelector("#item-look").click()');
