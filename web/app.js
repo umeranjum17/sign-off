@@ -1010,6 +1010,15 @@
     return box;
   }
 
+  /** A preview frame that cannot load is never left as a blank box: its file is read once, and one that is gone or empty is replaced by a plain line and logged as a console error,
+   *  which the page's error record (and a proof's console_errors) carries. */
+  function guardFrame(frame, label) {
+    const url = frame.getAttribute('src');
+    if (FROZEN || !url) return frame;
+    fetch(url).then(async (r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); if (!(await r.text()).trim()) throw new Error('the file is empty'); })
+      .catch((e) => { console.error(`Preview of ${label} could not be shown (${url.split('?')[0]}): ${e.message}`); frame.replaceWith(el('p', { class: 'gone' }, 'This preview could not be shown: its file is missing or empty.')); });
+    return frame;
+  }
   /** A mock or view is served from inside its own folder, so the files beside it load by their relative names. */
   const mockUrl = (key, value, path) => `${state.mockBase}${key}~${value}/${encodeURIComponent(path.split('?')[0].split('/').pop())}`;
   /** A screen's views: its own (design 1), or on design 2 those of the frame Yes approves. */
@@ -1060,7 +1069,7 @@
       // A `page.html?variant=b` mock keeps its variant in the frame's query, where the page reads it.
       const [path, query] = m?.path.split('?') ?? [];
       const url = m && src(mockUrl(d.key, m.value, path) + (query ? `?${query}` : ''));
-      const view = m && (/\.html?$/i.test(path) ? el('iframe', { src: url, title: `Mock ${o.label}`, sandbox: 'allow-scripts', tabindex: '-1', 'aria-hidden': 'true', loading: 'lazy', 'data-mock': `${d.key}~${m.value}` })
+      const view = m && (/\.html?$/i.test(path) ? guardFrame(el('iframe', { src: url, title: `Mock ${o.label}`, sandbox: 'allow-scripts', tabindex: '-1', 'aria-hidden': 'true', loading: 'lazy', 'data-mock': `${d.key}~${m.value}` }), `option ${o.label}`)
         : el('img', { src: url, alt: `Mock: ${o.label}` }));
       return el('figure', { class: 'mock' },
         el('figcaption', {}, el('span', { class: 'label', dir: 'auto' }, o.label), rec(i) ? el('span', { class: 'badge' }, 'Recommended') : ''),
@@ -1290,7 +1299,9 @@
      Search is the dock's round button (the sidebar's on a desk). */
   /** The project a card is for: a plan names it, a report or design names its group, proof names the app its done-done check verified, and an ask takes the project of the proof it rests on,
    *  or, filed by a tool that is itself a project on the board (its icon set with project --icon), that project. */
-  const projectName = (d) => d.project || d.group || (d.type === 'evidence' ? projectOf(d) : d.proof && projectOf(state.decisions.find((x) => x.key === d.proof) ?? {}))
+  /** A design's group is what its filer typed: a project's name, or sometimes a raw key (fd-wrapper-design). A name no project has that reads as a key is not shown as one. */
+  const plainGroup = (d) => { const g = d.group; if (!g) return g; const known = (state.projects ?? []).find((p) => p.name.toLowerCase() === g.toLowerCase()); return known ? known.name : /^[\w.]+([-_.][\w.]+)+$/.test(g) && !/\s/.test(g) && g === g.toLowerCase() ? '' : g; };
+  const projectName = (d) => d.project || ((d.kind === 'design' || d.type === 'design') ? plainGroup(d) : d.group) || (d.type === 'evidence' ? projectOf(d) : d.proof && projectOf(state.decisions.find((x) => x.key === d.proof) ?? {}))
     || (ticketOf(d) && tkProject(ticketOf(d))) || (d.by && (state.projects ?? []).find((p) => p.name.toLowerCase() === d.by.toLowerCase())?.name) || undefined;
   /** One project picture and tile for every list; use the pinned record, with a neutral project icon when the project has none. */
   function projectPic(name, fallback = () => glyph('layers')) {
@@ -2018,7 +2029,7 @@
       const cur = reviews.find((d) => d.key === key) ?? reviews[0], [open, info] = designReview(cur, el('h2', { class: 'dz-t', dir: 'auto' }, cur.title), true);
       const card = (d) => el('a', { class: 'dz-card', id: `item-${d.key}`, href: designHref(d), 'aria-label': `Open design, ${d.title}`, ...(d === cur && { 'aria-current': 'true' }) },
         el('span', { class: 'dz-shot' }, pic(d) ? el('img', { src: src(pic(d)), alt: '', loading: 'lazy' }) : ''), el('span', { class: 'dz-ct', dir: 'auto' }, d.title),
-        el('span', { class: 'dz-cm' }, [d.group, d.filed && day(d.filed)].filter(Boolean).join(' · ')), el('span', { class: 'dz-tag' }, designStatus(d)), selMark(d.key));
+        el('span', { class: 'dz-cm' }, [plainGroup(d), d.filed && day(d.filed)].filter(Boolean).join(' · ')), el('span', { class: 'dz-tag' }, designStatus(d)), selMark(d.key));
       // Where it stands fades out at its foot while it holds more than it shows.
       const ib = info.querySelector('.dz-ib'), fade = () => ib.classList.toggle('fades', ib.scrollHeight - ib.scrollTop - ib.clientHeight > 1);
       ib.onscroll = fade; new ResizeObserver(fade).observe(ib);
@@ -2638,7 +2649,7 @@
     const decideDone = by.answered.filter(redo), walk = [...decideDone].reverse().concat(decideQueue);
     // On a desk, Decide's list and its ask share the screen, Evidence's list and its update, and Reports' list and its report.
     // On a phone an ask opens as a sheet over Decide's list, so the page under it keeps the list's head.
-    decideCounts = { asks: by.waiting.filter((d) => sideOf(d) === 'now').length, designs: by.designs.filter(dzOpen).length };
+    decideCounts = { asks: by.waiting.filter((d) => sideOf(d) === 'now').length, designs: by.designs.length };
     const deskSplit = !phone() && ((at === 'waiting' || at === 'decide' || at === 'reports') && !state.readonly || at === 'evidence' || inboxAt), head = at === 'decide' ? 'waiting' : at;
     deskSel = null;
     // A report in the address is shown (and read) beside the list; with none, the newest is shown, not yet marked read.

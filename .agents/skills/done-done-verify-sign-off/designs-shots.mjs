@@ -7,7 +7,7 @@
 // more (the title row's More), full (Review full screen). At 1280 and 1440: designs (the newest open beside where it stands), design-picked (another card clicked) and full.
 // Each capture is measured in the browser: on a phone every block on the 16px gutter's two edges and the 4px grid, 68px rows, the last row clear of the dock, no control under 44px;
 // on a desk every card on the 12-column grid's lines, shared tops, the 4px grid, no page scroll, the empty share of the viewport, no text cut but a card title past two lines,
-// the sidebar's places in the prototype's order with Designs lit and the Evidence and Designs counts the board's (a phone: the dock's five with Decide lit, Designs being Decide's second list there),
+// the sidebar's places in the prototype's order with Designs lit and the Evidence and Designs counts the board's (a phone: the dock's six with Decide lit, Designs being Decide's second list there),
 // no words drawn over other words; everywhere no file path or internal code in the words on screen, no sideways overflow and no console error.
 // Usage: node .agents/skills/done-done-verify-sign-off/designs-shots.mjs <output> [light|dark|light,dark] [390|1280|1440]
 // DESIGNS_PROTO=<the approved prototype's index.html (v3)> also captures the prototype at the same size and theme and saves each pair (vs-proto/): on a desk its Designs,
@@ -56,10 +56,14 @@ const MEASURE = `(async () => {
   const nav = desk ? [...document.querySelectorAll('#nav a:not(.sfind)')].filter(vis).map((a) => ({ name: [...a.childNodes].filter((n) => n.nodeType === 3).map((n) => n.data).join('').trim(), current: a.getAttribute('aria-current') === 'page', n: a.querySelector('.n')?.textContent ?? null }))
     : [...document.querySelectorAll('.tabs a')].map((a) => ({ name: a.getAttribute('aria-label').split(',')[0], current: a.getAttribute('aria-current') === 'page' }));
   const lit = nav.filter((x) => x.current).map((x) => x.name).join(',');
-  if (desk && nav.length && nav.map((x) => x.name).join(',') !== 'Today,Decide,Evidence,Reports,Designs,Tickets') fail.push('sidebar places ' + nav.map((x) => x.name));
+  if (desk && nav.length && nav.map((x) => x.name).join(',') !== 'Today,Inbox,Decide,Evidence,Reports,Designs,Tickets') fail.push('sidebar places ' + nav.map((x) => x.name));
   if (desk && nav.length && lit !== 'Designs') fail.push('sidebar lights ' + lit);
   if (desk && nav.length && (nav.find((x) => x.name === 'Designs')?.n !== '3' || nav.find((x) => x.name === 'Evidence')?.n !== '3')) fail.push('sidebar counts ' + JSON.stringify(nav));
-  if (!desk && (nav.length !== 5 || (!open && !sheet && lit !== 'Decide'))) fail.push('dock ' + JSON.stringify(nav));
+  // The Designs label's count (the sidebar's on a desk, the phone's Asks / Designs switch) must equal the rows the list draws; any difference fails the run.
+  const label = desk ? nav.find((x) => x.name === 'Designs')?.n : [...document.querySelectorAll('.dl-seg button')].map((b) => /^Designs(\\d+)$/.exec(b.textContent.trim())?.[1]).find(Boolean);
+  const listed = desk ? document.querySelectorAll('.dz-strip .dz-card').length : document.querySelectorAll('.dz-list > li').length;
+  if (!sheet && !open && label !== undefined && document.querySelector('.dz-list, .dz-strip') && Number(label) !== listed) fail.push('Designs label reads ' + label + ' but the list draws ' + listed + ' rows');
+  if (!desk && (nav.length !== 6 || (!open && !sheet && lit !== 'Decide'))) fail.push('dock ' + JSON.stringify(nav));
   if (sheet) {}
   else if (!desk) {
     // A phone: every block on the gutter's two edges and the 4px grid.
@@ -109,8 +113,8 @@ const MEASURE = `(async () => {
   // Words drawn over other words: two text leaves whose boxes overlap.
   const leaves = [...scope.querySelectorAll('*')].filter(vis).filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.data.trim())).filter((e) => !e.closest('iframe, svg, .design-preview-window, .dz-shot, .design-stage'))
     .map((e) => { const r = document.createRange(); r.selectNodeContents(e); let b = r.getBoundingClientRect(); b = { left: b.left, right: b.right, top: b.top, bottom: b.bottom };
-      // What shows of it: each ancestor that clips its overflow narrows the box.
-      for (let a = e.parentElement; a; a = a.parentElement) if (getComputedStyle(a).overflow !== 'visible') { const c = box(a); b = { left: Math.max(b.left, c.left), right: Math.min(b.right, c.right), top: Math.max(b.top, c.top), bottom: Math.min(b.bottom, c.bottom) }; }
+      // What shows of it: the element itself (an ellipsis) and each ancestor that clips its overflow narrows the box.
+      for (let a = e; a; a = a.parentElement) if (getComputedStyle(a).overflow !== 'visible') { const c = box(a); b = { left: Math.max(b.left, c.left), right: Math.min(b.right, c.right), top: Math.max(b.top, c.top), bottom: Math.min(b.bottom, c.bottom) }; }
       return { e, b: { ...b, width: b.right - b.left, height: b.bottom - b.top } }; }).filter((x) => x.b.width > 0 && x.b.height > 0);
   const over = [];
   for (let i = 0; i < leaves.length; i++) for (let j = i + 1; j < leaves.length; j++) { const a = leaves[i], b = leaves[j]; if (a.e.contains(b.e) || b.e.contains(a.e)) continue;
@@ -157,7 +161,7 @@ try {
     about: 'Two ways to lay out Today on a computer. One column reads top to bottom; two columns keep Up next beside what else waits.',
     options: [{ value: 'one', label: 'One column' }, { value: 'two', label: 'Two columns' }], recommend: 'two',
     journeys: [{ id: 'today', title: 'Today', screens: [{ id: 'desk', title: 'On a desk', views: views('desk-today', 'computer') }] }] });
-  post({ key: 'today-phone', title: 'Today on a phone, with Up next first?', group: 'Sign-off', filed: day(0), preview: 'design/phone-today.webp',
+  post({ key: 'today-phone', title: 'Today on a phone, with Up next first?', group: 'fd-today-design', filed: day(0), preview: 'design/phone-today.webp',
     about: 'Three screens a person sees each morning: Today with Up next, the ask it opens, and a sign-in that waits.',
     options: [{ value: 'up-next', label: 'Up next first' }, { value: 'waits', label: 'What waits first' }], recommend: 'up-next',
     journeys: [{ id: 'morning', title: 'Morning', screens: [['today', 'Today', 'phone-today'], ['ask', 'The ask', 'phone-decide'], ['signin', 'A sign-in', 'phone-signin']]
@@ -244,6 +248,15 @@ try {
   facts.designs = await js(`document.querySelector('main').innerText.replace(/\\s+/g, ' ').trim()`);
   await capture('designs');
   await pair('designs', phone ? 'v=reports' : 'v=designs');
+  if (phone) {
+    // Decide's Designs label counts the rows the Designs list drew, whatever state each design is in.
+    const rows = await js(`document.querySelectorAll('.dz-list > li').length`);
+    await go(`${base}#waiting`);
+    await until(`!!document.querySelector('.dl-seg')`, 'Decide drawn');
+    const seg = await js(`[...document.querySelectorAll('.dl-seg button')].map((b) => b.textContent).join()`);
+    await capture('decide');
+    if (!seg.endsWith(`Designs${rows}`)) problems.push(`decide: the Designs label reads "${seg}" but the Designs list draws ${rows} rows`);
+  }
   // The prototype's phone keeps its five tabs and draws Designs' address as Today; the board's dock on Designs (Decide lit) beside it.
   if (phone) await pair('designs-dock', 'v=designs', 0, 'designs');
   if (phone) {
@@ -254,6 +267,10 @@ try {
     await until(`!document.getElementById('reader').hidden && !!document.querySelector('#reader .design-review')`, 'the review open');
     await wait(400);
     facts.design = await js(`document.querySelector('#reader').innerText.replace(/\\s+/g, ' ').trim()`);
+    // The header names a project, never a raw key, and the preview is drawn, not a blank box or a failure line.
+    const head = await js(`({ lab: document.querySelector('#reader .dz-lab')?.textContent ?? '', gone: !!document.querySelector('#reader .design-preview-window .gone, #reader .design-fallback'), drawn: [...document.querySelectorAll('#reader .design-preview-window :is(img, iframe)')].some((e) => e.getBoundingClientRect().height > 40) })`);
+    if (/\bfd-/.test(head.lab) || !head.lab) problems.push(`design: the header reads "${head.lab}", not a plain project name`);
+    if (head.gone || !head.drawn) problems.push(`design: the preview is not drawn ${JSON.stringify(head)}`);
     await capture('design');
     await js(`document.querySelector('#reader .design-review').scrollTop = 1e5; scrollTo(0, 1e5)`);
     await capture('design-end');
@@ -314,7 +331,7 @@ try {
         : ['Click the Today on a desk card: it opens beside where it stands, its pick and answer shown.', 'Click Review full screen: the screen viewer opens over the page.']),
       ...(proto ? [`Capture the approved prototype at the same size and theme (${phone ? 'its Reports list, an open report and the filter sheet, the look Designs follows on a phone, and its Designs address' : 'its Designs, the first and second design open'}) and save each beside the board.`] : [])],
     result: phone
-      ? `${theme}, 390px: the dock keeps its five tabs with Decide lit on Designs, Decide's second list on a phone; Designs is drawn in the new look as Reports' list: the title Decide with More and the round light-or-dark button, Asks and Designs with their counts (Designs pressed), a To review card, and the designs as 68px rows in one card, each with a thumbnail of its first screen, its title on one line (cut with an ellipsis when long) and its state and day, or a finished ticket's full bar; a row opens its review with the project and day, the whole title, what it shows, the screen in its device's viewport, Review full screen, Where it stands (state, your pick, when answered) and what you said, then the note with Approve in ink beside Change; Change with a note saves the answer and the row reads Changes requested; More holds Select and Clear all; every block on one gutter, the last row clear of the dock, no control under 44px, no file path or code in the words, no sideways overflow, no console error.`
+      ? `${theme}, 390px: the dock keeps its six tabs with Decide lit on Designs, Decide's second list on a phone; Designs is drawn in the new look as Reports' list: the title Decide with More and the round light-or-dark button, Asks and Designs with their counts (Designs pressed), a To review card, and the designs as 68px rows in one card, each with a thumbnail of its first screen, its title on one line (cut with an ellipsis when long) and its state and day, or a finished ticket's full bar; a row opens its review with the project and day, the whole title, what it shows, the screen in its device's viewport, Review full screen, Where it stands (state, your pick, when answered) and what you said, then the note with Approve in ink beside Change; Change with a note saves the answer and the row reads Changes requested; More holds Select and Clear all; every block on one gutter, the last row clear of the dock, no control under 44px, no file path or code in the words, no sideways overflow, no console error.`
       : `${theme}, ${metrics.width}px: the sidebar lists Today, Decide, Evidence 3, Reports, Designs 3 (lit) and Tickets, the prototype's places in its order; Designs fills the window as the approved prototype's desk draws it: the crumb, the 32px title and what is on the board, then the designs as picture cards across the top (title, project and day, state) and the open design (its picture filling the card) beside Where it stands (state, your pick, when answered, what you said, what it shows; the newest open shows its pick, as the prototype's does) with the note and Approve in ink beside Change; a card clicked opens that design; every card on the 12-column lines and the 4px grid, no page scroll, under 15% of the window empty, no text cut but a card title past two lines, no words over words, no console error.` }, null, 2) + '\n');
   console.log(report.join('\n'));
   console.log(JSON.stringify(facts, null, 2));
