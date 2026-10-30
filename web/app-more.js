@@ -761,7 +761,7 @@
     const previewElement = ({ path, form }, cls = '') => {
       const boxed = (e) => (cls ? el('div', { class: cls, 'data-form': form }, e) : e);
       if (d.missing?.includes(path) && path !== d.preview) return boxed(fallback());
-      if (/\.html?$/i.test(path)) return deviceFit(el('iframe', { class: 'design-review-preview', src: src(designUrl(d, path)), title: `Design preview: ${d.title}`, sandbox: 'allow-scripts' }), form, cls);
+      if (/\.html?$/i.test(path)) return deviceFit(guardFrame(el('iframe', { class: 'design-review-preview', src: src(designUrl(d, path)), title: `Design preview: ${d.title}`, sandbox: 'allow-scripts' }), `design ${d.title}`), form, cls);
       const img = el('img', { class: 'design-review-preview', src: src(designUrl(d, path)), alt: `Design preview: ${d.title}` });
       if (path !== d.preview) img.onerror = () => img.replaceWith(fallback());
       return boxed(img);
@@ -835,7 +835,7 @@
     const told = [...(said.length ? [el('p', { class: 'ui-dl' }, 'What you said'), ...said.map((n) => el('blockquote', { class: 'dz-said', dir: 'auto' }, screenName(n) ? el('cite', {}, screenName(n)) : '', el('span', { class: 'q' }, n.note)))] : []),
       ...(sent ? [said.length ? '' : el('p', { class: 'ui-dl' }, 'What you sent'), trailTrack(sent)] : [])];
     seeReply(d.key);
-    const lab = el('p', { class: 'dz-lab' }, d.group ? el('span', { class: 'dz-pic' }, projectPic(d.group)) : '', el('span', {}, [d.group, d.filed && day(d.filed)].filter(Boolean).join(' · ')));
+    const lab = el('p', { class: 'dz-lab' }, plainGroup(d) ? el('span', { class: 'dz-pic' }, projectPic(plainGroup(d))) : '', el('span', {}, [plainGroup(d) || 'Sign-off', d.filed && day(d.filed)].filter(Boolean).join(' · ')));
     const about = d.about ? el('p', { class: 'about dz-about', dir: 'auto' }, d.about) : '', original = d.link ? el('a', { class: 'dz-link', href: d.link, target: '_blank', rel: 'noopener noreferrer' }, 'Open original design') : '';
     const screenPick = screenSelect ? el('label', {}, 'Screen for note', screenSelect) : '';
     let root;

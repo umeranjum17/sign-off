@@ -2734,6 +2734,8 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   assert.deepEqual(JSON.parse(run('answers', file, '--json').out)['d1-design'].notes, [{ journey: 'account-setup', screen: 'security', verdict: 'change', note: 'Make the title clearer' }]);
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
   await until(async () => (await evaluate('document.querySelector(".dz-list .meta")?.textContent')).startsWith('Changes requested'));
+  // Its Designs label counts the row the list draws, though the design is no longer open to review.
+  assert.equal(await evaluate('[...document.querySelectorAll(".dl-seg button")].map((b) => b.textContent).join() + "|" + document.querySelectorAll(".dz-list > li").length'), 'Asks0,Designs1|1');
   // Main's verdict is no answer of the user's: Today's More lists nothing under Answered for it, and Cleared today counts nothing.
   await evaluate(`location.href = ${JSON.stringify(url)}`);
   await until(async () => await evaluate('!!document.querySelector(".t-more-line")'));
