@@ -2241,6 +2241,12 @@
   let commsKey = '', commsQuery = '', commsKind = '', commsState = '', commsPending = [], commsBefore = 0, commsError = '';
   let commsTag = '', commsVisible = 60, commsWho = '', commsFrom = '', commsUntil = '', commsFiltersOpen = false;
   let commsSearchOpen = false;
+  const commsFullSheet = sheetOf('ch-message');
+  commsFullSheet.classList.add('ch-full', 'ch-card');
+  commsFullSheet.setAttribute('aria-label', 'Full message');
+  const commsClose = () => { const m = commsSelection().message; if (m) location.hash = commsHref(m.channel, m.thread); else commsFullSheet.close(); };
+  commsFullSheet.addEventListener('cancel', (e) => { e.preventDefault(); commsClose(); });
+  addEventListener('hashchange', () => { if (!location.hash.startsWith('#channels') && commsFullSheet.open) commsFullSheet.close(); });
   const commsToken = (s) => btoa(unescape(encodeURIComponent(s))).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
   const commsUntoken = (s) => { try { return decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/')))); } catch { return ''; } };
   const commsHref = (home, thread) => `#channels/${thread ? `t-${commsToken(home)}.${commsToken(thread)}` : `h-${commsToken(home)}`}`;
@@ -2349,15 +2355,19 @@
       !shown.length ? el('p', { class: 'ch-empty' }, commsReady ? query || commsKind || commsState ? 'No matching messages in the loaded history.' : 'No messages in this channel yet.' : 'Reading communications…') : '');
     const stream = el('section', { class: 'ch-stream ch-card', 'aria-label': home || 'Messages' }, el('header', { class: 'ch-stream-head' },
       el('a', { href: '#channels', class: 'ch-back' }, '‹ Channels'), el('div', {}, el('h2', {}, selected.thread || home || 'Messages'), el('p', {}, `${all.length} loaded messages · oldest first`))),
-      history, commsPending.length ? commsButton(`${commsPending.length} new messages ↓`, commsJump, 'ch-new') : '');
+      history, commsPending.length ? commsButton(`${commsPending.length} new ${commsPending.length === 1 ? 'message' : 'messages'} ↓`, commsJump, 'ch-new') : '');
     const note = commsError ? el('p', { class: 'ch-error', role: 'alert' }, commsError, ' ', commsButton('Retry', () => commsRead())) : comms.partial ? el('p', { class: 'ch-source' }, 'Status messages only. Steering and replies are not connected yet.') : '';
     commsRoot.replaceChildren(top, toggle, filters, note, el('div', { class: `ch-columns${phone() && home ? ' thread-open' : ''}` }, list, stream));
     if (selected.message) {
-      const m = selected.message, full = el('section', { class: 'ch-full ch-card', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Full message' },
+      const m = selected.message;
+      if (commsFullSheet.dataset.message !== m.id) {
+      commsFullSheet.replaceChildren(
         el('a', { href: commsHref(m.channel, m.thread), class: 'ch-close' }, 'Close'), el('span', { class: `ch-kind ${m.kind}` }, m.kind), el('h2', {}, `${m.from} → ${m.to}`),
         el('p', { class: 'ch-runtime' }, m.runtime), el('time', {}, commsAt(m.at)), el('p', { class: 'ch-full-text' }, commsText(m.text)), el('p', { class: 'ch-receipt' }, `${m.read} · ${m.handled}`), el('p', { class: 'ch-source' }, `${m.source} · Keys are hidden.`));
-      commsRoot.append(el('div', { class: 'ch-scrim' }, full));
-    }
+      commsFullSheet.dataset.message = m.id;
+      }
+      requestAnimationFrame(() => { if (!commsFullSheet.open && location.hash === `#channels/m-${commsToken(m.id)}`) commsFullSheet.showModal(); });
+    } else if (commsFullSheet.open) commsFullSheet.close();
     commsRoot.querySelector('.ch-history').scrollTop = saved;
     commsRoot.querySelector('.ch-list').scrollTop = listSaved;
     if (focused) { const field = commsRoot.querySelector('#ch-query'); field.focus({ preventScroll: true }); field.setSelectionRange?.(caret, caret); }

@@ -2209,3 +2209,5 @@
 @media(max-width:63.999rem){.channels:has(.thread-open) .ch-workspace{height:calc(100dvh - 1rem);display:flex;flex-direction:column}.ch-columns.thread-open{flex:1;min-height:0}.thread-open .ch-stream{height:100%;min-height:0}}
 .ch-filters[hidden]{display:none}.ch-filter-toggle{font-size:.8125rem;text-align:left;min-height:2.75rem;background:none;padding:0;margin-bottom:.25rem;color:var(--tk-text-secondary)}
 @media(max-width:63.999rem){.thread-open .ch-stream-head>.ch-back{display:none}.thread-open .ch-stream-head h2{display:none}.thread-open .ch-stream-head{padding:.5rem 1rem}.thread-open .ch-stream-head p{margin:0}.ch-top h1{overflow-wrap:anywhere}}
+dialog.ch-full{position:fixed;margin:auto 1rem auto auto;max-height:calc(100dvh - 2rem);border:0;color:var(--tk-text);background:var(--tk-card)}dialog.ch-full::backdrop{background:var(--tk-scrim)}
+@media(max-width:63.999rem){dialog.ch-full{width:100%;max-width:none;margin:auto 0 0;max-height:calc(100dvh - 3rem)}}
