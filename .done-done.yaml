@@ -274,4 +274,3 @@ approved_requirements:
     name: design-pick-listing
     requirement: A design pick is listed under Designs.
     capture: designs.1440.dark.png
-    journey: design-pick
