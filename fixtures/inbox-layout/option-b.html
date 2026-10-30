@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en"><head>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; form-action 'none'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:" />
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inbox · sign-off</title>
+<style>
+@layer od-layout{[hidden]:not([hidden="until-found" i]){display:none!important}.od-icon{width:var(--od-icon-size,1em);height:var(--od-icon-size,1em);flex:none;display:inline-block;vertical-align:middle;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}.od-truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}}
+:root{color-scheme:light dark;
+--bg:#F5F6F8;--surface:#FFFFFF;--raised:#FFFFFF;--sunk:#F1F3F6;--bubble:#EEF1F5;--line:#E4E7EC;--line-2:#D0D5DD;
+--text:#15171C;--text-2:#454B57;--text-3:#636A77;
+--accent:#3355DD;--accent-hover:#2A49C6;--accent-ink:#2945BF;--accent-tint:#EEF2FD;--accent-line:#B7C5F4;--on-accent:#FFFFFF;
+--chip:#EEF0F3;--shadow:0 1px 2px rgba(20,24,36,.05),0 8px 20px -10px rgba(20,24,36,.14);
+--f:Inter,-apple-system,"Segoe UI",system-ui,sans-serif;
+--fs-xl:22px;--fs-l:17px;--fs-m:15px;--fs-s:13px;--fs-btn:13px;
+--ease:cubic-bezier(.2,.7,.2,1);--dur:220ms}
+@media (prefers-color-scheme:dark){:root{
+--bg:#15171B;--surface:#1B1E23;--raised:#21252B;--sunk:#181A1E;--bubble:#2B2F37;--line:#2A2E35;--line-2:#3B414B;
+--text:#ECEEF2;--text-2:#B7BDC7;--text-3:#8F96A3;
+--accent:#4466EE;--accent-hover:#5677F3;--accent-ink:#A3B4FF;--accent-tint:rgba(68,102,238,.15);--accent-line:rgba(126,150,255,.5);
+--chip:#2A2E35;--shadow:0 0 0 1px rgba(255,255,255,.03),0 10px 28px -12px rgba(0,0,0,.7)}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:400 var(--fs-m)/1.5 var(--f);-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+.tnum,time{font-variant-numeric:tabular-nums}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+kbd{font:500 11px/1 var(--f);min-width:18px;height:18px;padding:0 4px;display:inline-grid;place-items:center;border:1px solid var(--line-2);border-bottom-width:2px;border-radius:4px;color:var(--text-2);background:var(--surface)}
+
+/* header */
+.top{position:sticky;top:0;z-index:10;background:var(--bg);background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1040px;margin:0 auto;padding:10px 24px;min-height:56px;display:grid;grid-template-columns:auto 1fr 220px;grid-template-areas:"b c s";align-items:center;gap:8px 24px}
+.brand{grid-area:b;display:flex;align-items:baseline;gap:12px}
+h1{margin:0;font-size:var(--fs-xl);font-weight:650;letter-spacing:-.015em;line-height:1.2}
+.counts{margin:0;font-size:var(--fs-s);color:var(--text-3);white-space:nowrap}
+.counts b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+.chips{grid-area:c;display:flex;gap:4px;min-width:0}
+.kchip{flex:none;height:30px;padding:0 12px;border-radius:15px;border:1px solid transparent;background:none;color:var(--text-2);font-size:var(--fs-s);font-weight:500;cursor:pointer;transition:background .15s,border-color .15s}
+.kchip[aria-pressed=true]{background:var(--surface);border-color:var(--line-2);color:var(--text)}
+.search{grid-area:s;position:relative;display:flex;align-items:center}
+.search .od-icon{position:absolute;left:10px;--od-icon-size:16px;color:var(--text-3);pointer-events:none}
+.search input{width:100%;height:34px;padding:0 34px 0 34px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font-size:var(--fs-s);outline:none;transition:border-color .15s,box-shadow .15s}
+.search input::placeholder{color:var(--text-3)}
+.search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-tint)}
+.search input::-webkit-search-cancel-button{display:none}
+.search kbd{position:absolute;right:8px}
+
+/* feed */
+.feed{max-width:728px;margin:0 auto;padding:16px 24px 96px}
+.sec{margin-top:32px}.sec:first-of-type{margin-top:8px}
+.sec-h{display:flex;align-items:baseline;gap:12px;margin:0 0 12px;padding:0 4px}
+.sec-h h2{margin:0;font-size:var(--fs-m);font-weight:600;display:flex;gap:8px;align-items:baseline}
+.sec-h .n{font-size:var(--fs-s);font-weight:500;color:var(--text-3);font-variant-numeric:tabular-nums}
+.sec-note{margin:0;font-size:var(--fs-s);color:var(--text-3)}
+.keys{margin:0 0 0 auto;display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text-3)}
+.keys span{margin-right:8px}.keys span:last-child{margin-right:0}
+.stack>*+*{margin-top:12px}
+.empty{margin:0;padding:16px 4px;font-size:var(--fs-s);color:var(--text-3)}
+
+/* shared thread parts */
+.item{position:relative}
+.item.is-focused{outline:2px solid var(--accent);outline-offset:3px}
+.card{border-radius:14px;padding:16px 20px}
+.it-head{display:flex;align-items:baseline;gap:12px;cursor:pointer}
+.it-title{margin:0;flex:1;min-width:0;font-size:var(--fs-l);font-weight:600;line-height:1.35;letter-spacing:-.005em;text-wrap:pretty}
+.it-open{all:unset;cursor:pointer}
+.it-open:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.it-time{flex:none;font-size:var(--fs-s);color:var(--text-3);white-space:nowrap}
+.it-meta{display:flex;align-items:center;gap:8px;margin:4px 0 0;font-size:var(--fs-s);color:var(--text-2)}
+.proj{color:var(--text-3)}
+.chip{display:inline-flex;align-items:center;flex:none;height:20px;padding:0 7px;border-radius:5px;background:var(--chip);color:var(--text-2);font-size:12px;font-weight:550;line-height:1}
+.unread{position:absolute;left:7px;top:25px;width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.ctx{display:flex;align-items:baseline;gap:8px;margin:12px 0 0;font-size:var(--fs-s);color:var(--text-2)}
+.ctx .od-icon{--od-icon-size:14px;color:var(--text-3);align-self:center}
+.ctx-txt{flex:1;min-width:0}
+.ctx-who{color:var(--text-3)}
+.state{display:inline-flex;align-items:center;gap:4px;margin:0;font-size:var(--fs-s);color:var(--text-2);white-space:nowrap;font-variant-numeric:tabular-nums}
+.state .od-icon{--od-icon-size:14px;color:var(--text-3)}
+.reply{margin-top:8px}
+.reply-who{display:none!important}
+.reply-body{margin:0;font-size:var(--fs-m);line-height:1.55;color:var(--text);max-width:62ch}
+.ref{display:flex;align-items:center;gap:8px;margin-top:12px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;color:var(--text);text-decoration:none;font-size:var(--fs-s);transition:background .15s}
+.ref .od-icon{--od-icon-size:16px;color:var(--text-3)}
+.ref-id{color:var(--text-3);font-variant-numeric:tabular-nums}
+.ref-t{flex:1;font-weight:500}
+.ref-s{color:var(--text-2);white-space:nowrap}
+.acts{display:flex;align-items:center;gap:8px;margin-top:16px}
+.spacer{flex:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;padding:0 14px;border-radius:8px;border:1px solid var(--line-2);background:var(--surface);color:var(--text);font-size:var(--fs-btn);font-weight:600;cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s,color .15s}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn:disabled{background:var(--surface);border-color:var(--line);color:var(--text-3);cursor:not-allowed}
+.ghost{display:grid;place-items:center;width:32px;height:32px;border:0;border-radius:8px;background:none;color:var(--text-3);cursor:pointer;transition:background .15s,color .15s}
+.ghost .od-icon{--od-icon-size:16px}
+.tog{display:inline-flex;align-items:center;gap:4px;height:32px;padding:0 8px;border:0;border-radius:8px;background:none;color:var(--text-2);font-size:var(--fs-btn);font-weight:500;cursor:pointer;white-space:nowrap}
+.tog .od-icon{--od-icon-size:16px;transition:transform var(--dur) var(--ease)}
+.is-open .tog .od-icon{transform:rotate(180deg)}
+.rbox{flex:1;min-width:0;display:flex;align-items:center;gap:8px;height:36px;padding:0 4px 0 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);transition:border-color .15s,box-shadow .15s}
+.rbox:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-tint)}
+.rb-input{flex:1;min-width:0;border:0;background:none;outline:none;font-size:var(--fs-m)}
+.rb-input::placeholder{color:var(--text-3)}
+.rbox .btn{height:28px;padding:0 10px}
+@media (hover:hover){.kchip:hover{color:var(--text);background:var(--sunk)}.btn:hover:not(:disabled){background:var(--sunk)}.btn.primary:hover{background:var(--accent-hover)}.ghost:hover,.tog:hover{background:var(--sunk);color:var(--text)}.ref:hover{background:var(--sunk)}.row:hover{background:var(--surface)}.opt:hover{border-color:var(--line-2)}.opt.rec:hover{border-color:var(--accent)}}
+
+/* expanding history */
+.hist{display:grid;grid-template-rows:0fr;transition:grid-template-rows var(--dur) var(--ease)}
+.hist-in{overflow:hidden;min-height:0}
+.is-open>.hist,.is-open .dec-top>.hist{grid-template-rows:1fr}
+.msgs{list-style:none;margin:0;padding:16px 0 4px;display:grid;gap:12px;opacity:0;transform:translateY(-6px);transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease)}
+.is-open .msgs{opacity:1;transform:none}
+.is-open .ctx{display:none}
+.is-open .reply-who{display:flex!important}
+.msg{max-width:88%}
+.m-who{display:flex;align-items:baseline;gap:8px;margin:0 0 2px;font-size:var(--fs-s);color:var(--text-3)}
+.m-who b{font-weight:600;color:var(--text-2)}
+.m-body{margin:0;font-size:var(--fs-m);color:var(--text)}
+.msg.you{justify-self:end;background:var(--bubble);border-radius:12px 12px 4px 12px;padding:8px 12px}
+.trail{display:flex;flex-wrap:wrap;gap:2px 12px;margin:4px 0 0;font-size:12px;color:var(--text-3);font-variant-numeric:tabular-nums}
+.trail .now{color:var(--text);font-weight:600}
+.hist-bar{display:none}
+
+/* New: dominant */
+.card-new{background:var(--raised);border:1px solid var(--line);box-shadow:var(--shadow)}
+
+/* Decide: actionable */
+.card-dec{padding:0;background:var(--surface);border:1px solid var(--line);overflow:hidden}
+.dec-top{padding:16px 20px}
+.dec-body{margin:8px 0 0;font-size:var(--fs-m);color:var(--text-2);max-width:62ch}
+.dec-body b{color:var(--text);font-weight:600}
+.dec-foot{padding:16px 20px;background:var(--sunk);border-top:1px solid var(--line)}
+.dec-foot .acts{margin-top:12px}
+fieldset{border:0;margin:0;padding:0;min-width:0}
+.opts{display:grid;gap:8px}
+.opt{display:flex;align-items:center;gap:12px;min-height:48px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);cursor:pointer;transition:border-color .15s,background .15s}
+.opt.rec{background:var(--accent-tint);border-color:var(--accent-line)}
+.opt:has(input:checked){border-color:var(--accent)}
+.opt-txt{flex:1;min-width:0}
+.opt-l{display:block;font-size:var(--fs-m);font-weight:500;color:var(--text);line-height:1.35}
+.opt-s{display:block;font-size:var(--fs-s);color:var(--text-2)}
+.rec-tag{flex:none;font-size:var(--fs-s);font-weight:600;color:var(--accent-ink)}
+input[type=radio]{appearance:none;-webkit-appearance:none;flex:none;width:18px;height:18px;margin:0;border:1.5px solid var(--line-2);border-radius:50%;background:transparent;cursor:pointer;transition:border-width .15s,border-color .15s}
+input[type=radio]:checked{border:5.5px solid var(--accent);background:#fff}
+
+/* layout picker */
+.los{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.lo{display:grid;gap:8px;padding:8px 8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);cursor:pointer;transition:border-color .15s,background .15s}
+.lo:has(input:checked){border-color:var(--accent);background:var(--accent-tint)}
+.lo-name{display:flex;align-items:center;gap:8px;padding:0 4px;font-size:var(--fs-s);font-weight:600}
+.lo-d{display:block;padding:0 4px;font-size:var(--fs-s);color:var(--text-2);line-height:1.4}
+.mini{display:grid;grid-template-rows:auto 1fr;aspect-ratio:16/10;border:1px solid var(--line);border-radius:6px;background:var(--raised);overflow:hidden;font-size:6px;line-height:1.35;color:var(--text-2);pointer-events:none}
+.mini span{display:block}
+.mt{display:flex!important;align-items:center;gap:4px;padding:3px 5px;border-bottom:1px solid var(--line);font-weight:650;color:var(--text)}
+.mt i{margin-left:auto;width:36%;height:7px;border:1px solid var(--line-2);border-radius:4px}
+.mb{min-height:0;overflow:hidden}
+.split{display:grid!important;grid-template-columns:42% 1fr}
+.ml{border-right:1px solid var(--line)}
+.ml span{padding:3px 5px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ml .on{background:var(--accent-tint);color:var(--text);font-weight:600}
+.md{display:grid!important;gap:3px;align-content:start;padding:4px 5px}
+.md b,.mcard b,.mcol b{color:var(--text);font-weight:650}
+.bub{padding:2px 4px;border-radius:4px;background:var(--bubble)}
+.bub.u{justify-self:end}
+.mrow{display:flex!important;gap:3px}
+.mbtn{padding:1px 5px;border-radius:3px;border:1px solid var(--line-2);color:var(--text)}
+.mbtn.p{background:var(--accent);border-color:var(--accent);color:#fff}
+.mfeed{display:grid!important;gap:4px;align-content:start;padding:4px 16%}
+.mcard{display:grid!important;gap:2px;padding:3px 4px;border:1px solid var(--line);border-radius:4px;background:var(--surface)}
+.mboard{display:grid!important;grid-template-columns:repeat(3,1fr);gap:3px;padding:4px}
+.mcol{display:grid!important;gap:3px;align-content:start;padding:3px;border-radius:4px;background:var(--sunk)}
+
+/* Waiting: compact, quiet */
+.list{border-top:1px solid var(--line)}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 16px;padding:12px 8px;border-bottom:1px solid var(--line);border-radius:8px;transition:background .15s}
+.row.is-focused{outline-offset:-2px}
+.row-main{min-width:0;cursor:pointer}
+.row-t{display:flex;align-items:center;gap:8px;margin:0;font-size:var(--fs-m);font-weight:550;line-height:1.4}
+.row-sub{margin:2px 0 0;font-size:var(--fs-s);color:var(--text-2)}
+.row-side{display:grid;gap:4px;justify-items:end;align-content:start}
+.row-agent{margin:0;font-size:var(--fs-s);color:var(--text-3)}
+.row .hist{grid-column:1/-1}
+.prog{display:flex;align-items:center;gap:8px;font-size:var(--fs-s);color:var(--text-2)}
+.bar{display:block;width:64px;height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:var(--p);background:var(--accent);border-radius:2px}
+.tid{font-size:var(--fs-s);font-weight:500;color:var(--text-3)}
+
+/* Archived */
+.fold{margin-left:auto;display:inline-flex;align-items:center;gap:4px;height:32px;padding:0 8px;border:0;border-radius:8px;background:none;color:var(--text-2);font-size:var(--fs-btn);font-weight:500;cursor:pointer}
+.fold .od-icon{--od-icon-size:16px;transition:transform var(--dur) var(--ease)}
+.fold[aria-expanded=true] .od-icon{transform:rotate(180deg)}
+.arch{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:12px;padding:10px 8px;border-bottom:1px solid var(--line)}
+.arch-t{margin:0;font-size:var(--fs-m);font-weight:500;color:var(--text-2)}
+.arch-d{font-size:var(--fs-s);color:var(--text-3)}
+.none{margin:24px 4px;font-size:var(--fs-m);color:var(--text-2)}
+.none .btn{margin-left:8px}
+
+@keyframes land{from{opacity:0;transform:translateY(-8px)}}
+@keyframes step{from{opacity:0;transform:translateY(3px)}}
+.landing{animation:land var(--dur) var(--ease)}
+.stepped{animation:step 180ms var(--ease)}
+
+@media (max-width:1023px){.top-in{grid-template-columns:1fr 260px;grid-template-areas:"b s" "c c"}}
+@media (max-width:767px){
+:root{--fs-s:14px;--fs-btn:15px}
+.top{position:static;backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--bg)}
+.top-in{grid-template-columns:minmax(0,1fr);grid-template-areas:"b" "s" "c";padding:12px 16px 0;gap:12px}
+.brand{justify-content:space-between}
+.search input{height:44px;font-size:16px}
+.search kbd,.keys,.sec-note,.proj,.acts .arch-x{display:none}
+.chips{overflow-x:auto;margin:0 -16px;padding:0 40px 12px 16px;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 40px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 40px),transparent)}
+.chips::-webkit-scrollbar{display:none}
+.kchip{height:40px;padding:0 16px;border-radius:20px;font-size:14px}
+.feed{padding:8px 8px 64px}
+.sec-h{padding:0 8px}
+.card{padding:16px 16px 16px 20px;border-radius:12px}
+.card-dec{padding:0}
+.dec-top,.dec-foot{padding:16px}
+.chip{height:22px;font-size:13px}
+.trail{font-size:13px}
+.btn{height:44px;padding:0 16px}
+.acts .btn{flex:1}
+.ghost,.tog{width:44px;height:44px;padding:0;justify-content:center}
+.tog .lbl{display:none}
+.rbox{height:44px}
+.rbox .btn{flex:none;height:36px}
+.hist-bar{display:flex;align-items:center;gap:8px;padding-top:12px}
+.back{display:inline-flex;align-items:center;gap:4px;height:44px;padding:0 12px 0 4px;border:0;border-radius:8px;background:var(--sunk);color:var(--text);font-size:15px;font-weight:600;cursor:pointer}
+.back .od-icon{--od-icon-size:18px}
+.hist-proj{flex:1;font-size:var(--fs-s);color:var(--text-3)}
+.los{grid-template-columns:1fr;gap:8px}
+.lo{grid-template-columns:120px minmax(0,1fr);align-items:center;column-gap:12px;padding:8px}
+.lo .mini{grid-row:span 2}
+.opt{min-height:52px}
+.row{padding:12px 8px}
+.fold{height:44px}
+.msg{max-width:92%}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></symbol>
+<symbol id="i-archive" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1"></rect><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"></path></symbol>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"></path></symbol>
+<symbol id="i-reply" viewBox="0 0 24 24"><path d="M4 5v6a4 4 0 0 0 4 4h12M15 10l5 5-5 5"></path></symbol>
+<symbol id="i-pr" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"></circle><circle cx="6" cy="18" r="2.5"></circle><circle cx="18" cy="18" r="2.5"></circle><path d="M6 8.5v7M18 15.5V9a3 3 0 0 0-3-3h-4M13 3.5 10.5 6 13 8.5"></path></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"></path></symbol>
+<symbol id="i-check2" viewBox="0 0 24 24"><path d="m2.5 12.5 4.5 4.5L16.5 7.5M12 16l1 1 9.5-9.5"></path></symbol>
+</svg>
+
+<header class="top">
+<div class="top-in">
+<div class="brand"><h1>Inbox</h1><p class="counts"><b id="c-new">2</b> new · <b id="c-dec">2</b> waiting on you</p></div>
+<div class="chips" role="group" aria-label="Filter by kind">
+<button class="kchip" type="button" data-kind="all" aria-pressed="true">All</button>
+<button class="kchip" type="button" data-kind="decision" aria-pressed="false">Decision</button>
+<button class="kchip" type="button" data-kind="plan" aria-pressed="false">Plan</button>
+<button class="kchip" type="button" data-kind="report" aria-pressed="false">Report</button>
+<button class="kchip" type="button" data-kind="design" aria-pressed="false">Design</button>
+<button class="kchip" type="button" data-kind="ticket" aria-pressed="false">Ticket</button>
+<button class="kchip" type="button" data-kind="proof" aria-pressed="false">Proof</button>
+</div>
+<label class="search"><span class="sr">Search threads</span><svg class="od-icon" aria-hidden="true"><use href="#i-search"></use></svg><input id="q" type="search" placeholder="Search threads" autocomplete="off" value=""><kbd aria-hidden="true">/</kbd></label>
+</div>
+</header>
+
+<main class="feed" id="feed">
+
+<section class="sec" id="s-new" aria-labelledby="h-new">
+<div class="sec-h"><h2 id="h-new">New <span class="n" id="n-new">2</span></h2><p class="sec-note">Replies you haven't opened</p>
+<p class="keys" aria-label="Keyboard: j and k move, Enter opens, e archives"><kbd>j</kbd><kbd>k</kbd><span>move</span><kbd>↵</kbd><span>open</span><kbd>e</kbd><span>archive</span></p></div>
+<div class="stack" id="l-new">
+
+<article class="item card card-new is-open is-focused" data-kind="decision" data-agent="settings-agent" data-rt="10:58">
+<span class="unread"><span class="sr">Unread</span></span>
+<header class="it-head"><h3 class="it-title"><button class="it-open" type="button" aria-expanded="true" aria-controls="h1x">Ship the new settings page Friday?</button></h3><time class="it-time">2 min ago</time></header>
+<p class="it-meta"><span class="chip">Decision</span><span>settings-agent</span><span class="proj">in Settings</span></p>
+<div class="hist" id="h1x"><div class="hist-in">
+<div class="hist-bar"><button class="back" type="button"><svg class="od-icon" aria-hidden="true"><use href="#i-back"></use></svg>Back</button><span class="hist-proj">Settings project</span><button class="ghost" type="button" data-archive="" aria-label="Archive"><svg class="od-icon" aria-hidden="true"><use href="#i-archive"></use></svg></button></div>
+<ol class="msgs">
+<li class="msg"><p class="m-who"><b>settings-agent</b><time>10:20</time></p><p class="m-body">The new settings page is ready behind a flag. Ship it to everyone Friday?</p></li>
+<li class="msg you"><p class="m-who"><b>You</b><time>10:40</time></p><p class="m-body">What does Friday need from QA?</p><p class="trail"><span>Sent 10:40</span><span>Delivered 10:40</span><span>Read 10:42</span><span class="now">Replied 10:58</span></p></li>
+</ol></div></div>
+<p class="ctx"><svg class="od-icon" aria-hidden="true"><use href="#i-reply"></use></svg><span class="ctx-txt"><span class="ctx-who">You asked:</span> What does Friday need from QA?</span><span class="state">Replied 10:58</span></p>
+<div class="reply"><p class="m-who reply-who"><b>settings-agent</b><time>10:58</time></p><p class="reply-body">QA signs off Thursday, so Friday holds. Ship it Friday?</p></div>
+<div class="acts"><button class="btn primary" type="button" data-answer="Ship Friday">Ship Friday</button><button class="btn" type="button" data-answer="Wait a week">Wait a week</button><span class="spacer"></span><button class="ghost arch-x" type="button" data-archive="" aria-label="Archive"><svg class="od-icon" aria-hidden="true"><use href="#i-archive"></use></svg></button><button class="tog" type="button" data-toggle="" aria-expanded="true" aria-label="Show or hide the whole exchange"><span class="lbl">Collapse</span><svg class="od-icon" aria-hidden="true"><use href="#i-chev"></use></svg></button></div>
+</article>
+
+<article class="item card card-new" data-kind="decision" data-agent="settings-agent" data-rt="10:42">
+<span class="unread"><span class="sr">Unread</span></span>
+<header class="it-head"><h3 class="it-title"><button class="it-open" type="button" aria-expanded="false" aria-controls="h2x">Open the beta to every team?</button></h3><time class="it-time">18 min ago</time></header>
+<p class="it-meta"><span class="chip">Decision</span><span>settings-agent</span><span class="proj">in Settings</span></p>
+<div class="hist" id="h2x" inert=""><div class="hist-in">
+<div class="hist-bar"><button class="back" type="button"><svg class="od-icon" aria-hidden="true"><use href="#i-back"></use></svg>Back</button><span class="hist-proj">Settings project</span><button class="ghost" type="button" data-archive="" aria-label="Archive"><svg class="od-icon" aria-hidden="true"><use href="#i-archive"></use></svg></button></div>
+<ol class="msgs">
+<li class="msg"><p class="m-who"><b>settings-agent</b><time>09:30</time></p><p class="m-body">The beta has been steady with ten teams for two weeks. Open it to every team?</p></li>
+<li class="msg you"><p class="m-who"><b>You</b><time>09:48</time></p><p class="m-body">No. Wait until the import bug is fixed.</p><p class="trail"><span>Sent 09:48</span><span>Delivered 09:48</span><span>Read 09:51</span><span class="now">Replied 10:42</span></p></li>
+</ol></div></div>
+<p class="ctx"><svg class="od-icon" aria-hidden="true"><use href="#i-reply"></use></svg><span class="ctx-txt"><span class="ctx-who">You said No:</span> Wait until the import bug is fixed.</span><span class="state">Replied 10:42</span></p>
+<div class="reply"><p class="m-who reply-who"><b>settings-agent</b><time>10:42</time></p><p class="reply-body">Kept it to the ten teams. The import fix is in review.</p>
+<a class="ref" href="#settings-245"><svg class="od-icon" aria-hidden="true"><use href="#i-pr"></use></svg><span class="ref-id">settings#245</span><span class="ref-t od-truncate">Fix CSV import encoding</span><span class="ref-s">In review</span></a></div>
+<div class="acts"><label class="rbox"><span class="sr">Reply to settings-agent</span><input class="rb-input" type="text" placeholder="Reply to settings-agent" value=""><button class="btn" type="button" data-send="">Send</button></label><button class="ghost arch-x" type="button" data-archive="" aria-label="Archive"><svg class="od-icon" aria-hidden="true"><use href="#i-archive"></use></svg></button><button class="tog" type="button" data-toggle="" aria-expanded="false" aria-label="Show or hide the whole exchange"><span class="lbl">Whole exchange</span><svg class="od-icon" aria-hidden="true"><use href="#i-chev"></use></svg></button></div>
+</article>
+
+</div>
+<p class="empty" id="e-new" hidden="">Nothing new. Agent replies land here.</p>
+</section>
+
+<section class="sec" id="s-dec" aria-labelledby="h-dec">
+<div class="sec-h"><h2 id="h-dec">Decide <span class="n" id="n-dec">2</span></h2><p class="sec-note">Agents are waiting on your answer</p></div>
+<div class="stack" id="l-dec">
+
+<article class="item card card-dec" data-kind="decision" data-agent="release-agent">
+<div class="dec-top">
+<header class="it-head"><h3 class="it-title"><button class="it-open" type="button" aria-expanded="false" aria-controls="h3x">Keep the weekly digest?</button></h3><time class="it-time">1 h ago</time></header>
+<p class="it-meta"><span class="chip">Decision</span><span>release-agent</span><span class="proj">in Releases</span></p>
+<div class="hist" id="h3x" inert=""><div class="hist-in">
+<div class="hist-bar"><button class="back" type="button"><svg class="od-icon" aria-hidden="true"><use href="#i-back"></use></svg>Back</button><span class="hist-proj">Releases project</span><button class="ghost" type="button" data-archive="" aria-label="Archive"><svg class="od-icon" aria-hidden="true"><use href="#i-archive"></use></svg></button></div>
+<ol class="msgs"><li class="msg"><p class="m-who"><b>release-agent</b><time>10:00</time></p><p class="m-body">The weekly digest is part of the paid plan. If you stop it, I'll cancel it before the renewal goes through.</p></li></ol>
+</div></div>
+<p class="dec-body"><b>Why:</b> The paid plan renews Monday.</p>
+</div>
+<div class="dec-foot">
+<fieldset class="opts"><legend class="sr">Your answer</legend>
+<label class="opt rec"><input type="radio" name="digest" value="Yes, it keeps going out" checked=""><span class="opt-txt"><span class="opt-l">Yes, it keeps going out</span><span class="opt-s">The safer pick</span></span><span class="rec-tag">Recommended</span></label>
+<label class="opt"><input type="radio" name="digest" value="No, it stops this week"><span class="opt-txt"><span class="opt-l">No, it stops this week</span></span></label>
+</fieldset>
+<div class="acts"><button class="btn primary" type="button" data-submit="">Send answer</button><span class="spacer"></span><button class="ghost arch-x" type="button" data-archive="" aria-label="Archive"><svg class="od-icon" aria-hidden="true"><use href="#i-archive"></use></svg></button><button class="tog" type="button" data-toggle="" aria-expanded="false" aria-label="Show or hide the whole exchange"><span class="lbl">Whole exchange</span><svg class="od-icon" aria-hidden="true"><use href="#i-chev"></use></svg></button></div>
+</div>
+</article>
+
+<article class="item card card-dec" data-kind="design" data-agent="Main">
+<div class="dec-top">
+<header class="it-head"><h3 class="it-title"><button class="it-open" type="button" aria-expanded="false" aria-controls="h4x">Inbox layout</button></h3><time class="it-time">3 h ago</time></header>
+<p class="it-meta"><span class="chip">Design</span><span>Main</span><span class="proj">in sign-off</span></p>
+<div class="hist" id="h4x" inert=""><div class="hist-in">
+<div class="hist-bar"><button class="back" type="button"><svg class="od-icon" aria-hidden="true"><use href="#i-back"></use></svg>Back</button><span class="hist-proj">sign-off project</span><button class="ghost" type="button" data-archive="" aria-label="Archive"><svg class="od-icon" aria-hidden="true"><use href="#i-archive"></use></svg></button></div>
+<ol class="msgs"><li class="msg"><p class="m-who"><b>Main</b><time>08:00</time></p><p class="m-body">I drew three layouts for the Inbox. Pick one and I'll build it.</p></li></ol>
+</div></div>
+<p class="dec-body">Three ways to hold your chats.</p>
+</div>
+<div class="dec-foot">
+<fieldset class="los"><legend class="sr">Pick a layout</legend>
+<label class="lo"><span class="mini" aria-hidden="true"><span class="mt">Inbox<i></i></span><span class="mb split"><span class="ml"><span class="on">Ship Friday?</span><span>Open the beta?</span><span>Weekly digest</span><span>CSV export</span><span>Inbox layout</span></span><span class="md"><b>Ship Friday?</b><span class="bub">QA signs off Thursday.</span><span class="bub u">Ship it.</span><span class="mrow"><span class="mbtn p">Ship</span><span class="mbtn">Wait</span></span></span></span></span><span class="lo-name"><input type="radio" name="layout" value="Split">Split</span><span class="lo-d">List on the left, the open thread on the right.</span></label>
+<label class="lo"><span class="mini" aria-hidden="true"><span class="mt">Inbox<i></i></span><span class="mb mfeed"><span class="mcard"><b>Ship Friday?</b><span>QA signs off Thursday.</span><span class="mrow"><span class="mbtn p">Ship</span><span class="mbtn">Wait</span></span></span><span class="mcard"><b>Open the beta?</b><span>Kept it to ten teams.</span></span><span class="mcard"><b>Weekly digest</b></span></span></span><span class="lo-name"><input type="radio" name="layout" value="Feed">Feed</span><span class="lo-d">Every thread in one column, answered in place.</span></label>
+<label class="lo"><span class="mini" aria-hidden="true"><span class="mt">Inbox<i></i></span><span class="mb mboard"><span class="mcol"><b>New</b><span class="mcard">Ship Friday?<span class="mrow"><span class="mbtn p">Ship</span></span></span><span class="mcard">Open the beta?</span></span><span class="mcol"><b>Decide</b><span class="mcard">Weekly digest</span><span class="mcard">Inbox layout</span></span><span class="mcol"><b>Waiting</b><span class="mcard">CSV export</span><span class="mcard">T-1 at 40%</span></span></span></span><span class="lo-name"><input type="radio" name="layout" value="Board">Board</span><span class="lo-d">A column each for New, Decide and Waiting.</span></label>
+</fieldset>
+<div class="acts"><button class="btn" type="button" data-pick="" disabled="">Pick a layout</button><span class="spacer"></span><button class="ghost arch-x" type="button" data-archive="" aria-label="Archive"><svg class="od-icon" aria-hidden="true"><use href="#i-archive"></use></svg></button><button class="tog" type="button" data-toggle="" aria-expanded="false" aria-label="Show or hide the whole exchange"><span class="lbl">Whole exchange</span><svg class="od-icon" aria-hidden="true"><use href="#i-chev"></use></svg></button></div>
+</div>
+</article>
+
+</div>
+<p class="empty" id="e-dec" hidden="">Nothing is waiting on you.</p>
+</section>
+
+<section class="sec" id="s-wait" aria-labelledby="h-wait">
+<div class="sec-h"><h2 id="h-wait">Waiting on agents <span class="n" id="n-wait">2</span></h2><p class="sec-note">How far your last message got</p></div>
+<div class="list" id="l-wait">
+
+<article class="item row" data-kind="decision">
+<div class="row-main"><h3 class="row-t"><button class="it-open" type="button" aria-expanded="false" aria-controls="h5x">Turn on the CSV export?</button><span class="chip">Decision</span></h3><p class="row-sub od-truncate">You answered Yes: Only the admin role should see it.</p></div>
+<div class="row-side"><p class="state"><svg class="od-icon" aria-hidden="true"><use href="#i-check2"></use></svg>Read 10:42</p><p class="row-agent">release-agent</p></div>
+<div class="hist" id="h5x" inert=""><div class="hist-in">
+<div class="hist-bar"><button class="back" type="button"><svg class="od-icon" aria-hidden="true"><use href="#i-back"></use></svg>Back</button><span class="hist-proj">Settings project</span></div>
+<ol class="msgs">
+<li class="msg"><p class="m-who"><b>release-agent</b><time>10:21</time></p><p class="m-body">The CSV export is ready behind a flag. Turn it on?</p></li>
+<li class="msg you"><p class="m-who"><b>You</b><time>10:38</time></p><p class="m-body">Yes. Only the admin role should see it.</p><p class="trail"><span>Sent 10:38</span><span>Delivered 10:38</span><span class="now">Read 10:42</span></p></li>
+</ol></div></div>
+</article>
+
+<article class="item row" data-kind="ticket">
+<div class="row-main"><h3 class="row-t"><button class="it-open" type="button" aria-expanded="false" aria-controls="h6x">Ship the CSV export</button><span class="chip">Ticket</span><span class="tid">T-1</span></h3><p class="row-sub od-truncate">You commented: Admins only, please.</p></div>
+<div class="row-side"><p class="state"><svg class="od-icon" aria-hidden="true"><use href="#i-check"></use></svg>Delivered 09:15</p><span class="prog"><span class="bar" role="progressbar" aria-label="T-1 progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="40" style="--p:40%"><i></i></span><span class="tnum">40%</span></span></div>
+<div class="hist" id="h6x" inert=""><div class="hist-in">
+<div class="hist-bar"><button class="back" type="button"><svg class="od-icon" aria-hidden="true"><use href="#i-back"></use></svg>Back</button><span class="hist-proj">Settings project</span></div>
+<ol class="msgs">
+<li class="msg"><p class="m-who"><b>release-agent</b><time>09:02</time></p><p class="m-body">Started T-1 in Settings. The export endpoint is done; the download button is next.</p></li>
+<li class="msg you"><p class="m-who"><b>You</b><time>09:15</time></p><p class="m-body">Admins only, please.</p><p class="trail"><span>Sent 09:15</span><span class="now">Delivered 09:15</span></p></li>
+</ol></div></div>
+</article>
+
+</div>
+</section>
+
+<section class="sec" id="s-arch" aria-labelledby="h-arch">
+<div class="sec-h"><h2 id="h-arch">Archived <span class="n" id="n-arch">3</span></h2><button class="fold" id="arch-btn" type="button" aria-expanded="false" aria-controls="l-arch"><span id="arch-lbl">Show 3 archived</span><svg class="od-icon" aria-hidden="true"><use href="#i-chev"></use></svg></button></div>
+<div class="list" id="l-arch" hidden="">
+<article class="item arch" data-kind="decision"><h3 class="arch-t">Send the digest on Mondays?</h3><span class="chip">Decision</span><time class="arch-d">Oct 24</time></article>
+<article class="item arch" data-kind="report"><h3 class="arch-t">Q3 release notes</h3><span class="chip">Report</span><time class="arch-d">Oct 21</time></article>
+<article class="item arch" data-kind="proof"><h3 class="arch-t">Settings page passes on a phone</h3><span class="chip">Proof</span><time class="arch-d">Oct 17</time></article>
+</div>
+</section>
+
+<p class="none" id="none" hidden="">No threads match these filters.<button class="btn" type="button" id="clear">Clear filters</button></p>
+<p class="sr" id="live" aria-live="polite"></p>
+</main>
+
+
+
+</body></html>

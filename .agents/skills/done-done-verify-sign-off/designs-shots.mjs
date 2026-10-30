@@ -1,5 +1,5 @@
-// Designs in the new look, at one theme and width per run (so a run's steps.json holds one claim), driven and measured in a headless Chromium of its own over the DevTools
-// protocol with exact device metrics (390x844, 1280x800 or 1440x900, 2x).
+// Designs in the new look, at one theme and width per run, driven through an isolated agent-browser session
+// at exact viewport metrics (390x844, 1280x800 or 1440x900, 2x).
 // The board holds three designs posted through the real CLI (Umer's demo data, under Designs, none promoted to Decide; their screens are the board's own docs/media shots):
 // Today on a phone (three screens and two directions; changes asked with a pick and a note on one screen), Today on a desk in one column or two (a pick, approved) and the Reports list on a phone (in review).
 // The Sign-off project has its own icon (sign-off-axi project --icon); the others show initials. Today on a desk sits on a finished ticket (its row's full bar). Three evidence updates give the sidebar's Evidence a count.
@@ -39,7 +39,6 @@ const env = { ...process.env, PATH: dirname(process.execPath) + ':' + process.en
 const sh = (bin, args, options = {}) => { const r = spawnSync(bin, args, { encoding: 'utf8', timeout: 120000, env, ...options }); assert.equal(r.status, 0, r.stdout + r.stderr); return r.stdout; };
 const cli = (...args) => sh(process.execPath, [join(repo, 'dist/cli.js'), ...args]);
 const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
-const chromium = ['/usr/lib/chromium/chromium', '/usr/bin/chromium', '/usr/bin/google-chrome'].find(existsSync);
 const metrics = { width, height: phone ? 844 : width === 1440 ? 900 : 800, deviceScaleFactor: 2, mobile: phone };
 const name = (state) => `${state}.${side}.${theme}.${width}w`;
 
@@ -150,11 +149,13 @@ const MEASURE = `(async () => {
     words: words.replace(/\\s+/g, ' ').trim().slice(0, 900), dom: { url: location.href, overflow: document.documentElement.scrollWidth > w, overflowing } };
 })()`;
 
-const prof = mkdtempSync(join(tmpdir(), 'so-designs-chrome-'));
-// A phone draws overlay scrollbars, so its captures hide them; a desk keeps the classic ones, so a list cut by a scrollbar shows.
-const chrome = spawn(chromium, ['--headless=new', '--no-sandbox', `--user-data-dir=${prof}`, '--remote-debugging-port=0', ...(phone ? ['--hide-scrollbars'] : []), 'about:blank'], { stdio: 'ignore' });
-process.on('exit', () => { try { chrome.kill(); } catch {} });
-let ws;
+const browserEnv = { ...process.env, AGENT_BROWSER_SESSION: `designs-${process.pid}`, AGENT_BROWSER_NAMESPACE: 'sign-off-designs',
+  ...(process.env.INBOX_LAYOUT_BROWSER_TMPDIR ? { TMPDIR: process.env.INBOX_LAYOUT_BROWSER_TMPDIR } : {}) };
+const browser = (args, options = {}) => {
+  const r = sh('agent-browser', ['--json', '--hide-scrollbars', String(phone), ...args], { env: browserEnv, maxBuffer: 4 * 1024 * 1024, ...options });
+  const reply = JSON.parse(r); assert.equal(reply.success, true, JSON.stringify(reply.error)); return reply.data;
+};
+let server;
 const errors = [], failed = [], report = [], problems = [], shots = [];
 try {
   // The board: three designs under Designs, newest last, as an agent posts them.
@@ -188,7 +189,7 @@ try {
   copyFileSync(join(repo, 'web/icon-192.png'), join(dir, 'sign-off.png'));
   cli('project', board, '--name', 'Sign-off', '--icon', 'sign-off.png');
   // The board in the foreground of this run: stopped with sign-off-axi stop at the end, like the seed scripts' boards.
-  const server = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'serve', board, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  server = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'serve', board, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let log = ''; server.stdout.on('data', (b) => (log += b)); server.stderr.on('data', (b) => (log += b));
   let base; for (let i = 0; i < 100 && !base; i++) { await wait(100); base = /http:\/\/127\.0\.0\.1:\d+\//.exec(log)?.[0]; }
   assert.ok(base, `the board answers: ${log}`);
@@ -197,34 +198,22 @@ try {
   await answer({ key: 'today-phone', verdict: 'change', pick: 'up-next', notes: [{ journey: 'morning', screen: 'ask', verdict: 'change', note: 'The ask cuts its last answer at the foot of a small phone; let the answers scroll above the button.' }] });
   await answer({ key: 'today-desk', verdict: 'approve', pick: 'two', notes: [] });
 
-  let port; for (let i = 0; i < 100 && !port; i++) { await wait(100); const f = join(prof, 'DevToolsActivePort'); if (existsSync(f)) port = readFileSync(f, 'utf8').split('\n')[0]; }
-  assert.ok(port, 'Chromium opened its DevTools port');
-  const target = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT' })).json();
-  ws = new WebSocket(target.webSocketDebuggerUrl);
-  await new Promise((ok, no) => { ws.onopen = ok; ws.onerror = no; });
-  let id = 0; const pending = new Map();
-  ws.onmessage = (m) => { const x = JSON.parse(m.data); if (x.id && pending.has(x.id)) { pending.get(x.id)(x); pending.delete(x.id); }
-    if (x.method === 'Runtime.exceptionThrown') errors.push(x.params.exceptionDetails.exception?.description?.split('\n')[0] ?? 'exception');
-    if (x.method === 'Runtime.consoleAPICalled' && x.params.type === 'error') errors.push(x.params.args.map((a) => a.value ?? a.description).join(' '));
-    if (x.method === 'Network.responseReceived' && x.params.response.status >= 400) failed.push({ url: x.params.response.url, status: x.params.response.status }); };
-  const cdp = (method, params = {}) => new Promise((ok, no) => { const n = ++id; pending.set(n, (x) => (x.error ? no(new Error(`${method}: ${x.error.message}`)) : ok(x.result))); ws.send(JSON.stringify({ id: n, method, params })); });
-  const js = async (expression) => { const r = await cdp('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }); assert.ok(!r.exceptionDetails, `${expression.slice(0, 80)}: ${r.exceptionDetails?.exception?.description}`); return r.result.value; };
+  browser(['open', 'about:blank']);
+  const js = async (expression) => browser(['eval', '--stdin'], { input: expression }).result;
   const until = async (expression, what) => { for (let i = 0; i < 60; i++) { if (await js(expression)) return; await wait(100); } assert.fail(`timed out: ${what}`); };
-  // A real tap or click on an element's centre, as a finger or mouse sends it.
-  const tap = async (sel) => { const [x, y] = await js(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.scrollIntoView({ block: 'nearest' }); const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
-    if (phone) { await cdp('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] }); await cdp('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); }
-    else { for (const type of ['mousePressed', 'mouseReleased']) await cdp('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 }); } };
-  await cdp('Page.enable'); await cdp('Runtime.enable'); await cdp('Network.enable');
-  const setup = async () => { await cdp('Emulation.setDeviceMetricsOverride', metrics); await cdp('Emulation.setTouchEmulationEnabled', phone ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
-    await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] }); };
+  // The selector is resolved by agent-browser and receives a real browser click.
+  const tap = async (sel) => browser(['click', sel]);
+  const setup = async () => { browser(['set', 'viewport', String(metrics.width), String(metrics.height), String(metrics.deviceScaleFactor)]); browser(['set', 'media', theme]); };
   await setup();
-  const png = async (file) => writeFileSync(file, Buffer.from((await cdp('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
-  const go = async (address, ms = 1200) => { await cdp('Page.navigate', { url: 'about:blank' }); await wait(150); await cdp('Page.navigate', { url: address }); await wait(ms); };
+  const png = async (file) => browser(['screenshot', file]);
+  const go = async (address, ms = 1200) => { browser(['open', 'about:blank']); browser(['open', address]); await wait(ms); };
   const capture = async (state) => {
     await wait(450);
     await js(`document.activeElement?.blur?.()`);
     await png(join(out, `${name(state)}.png`)); shots.push(`${name(state)}.png`);
     const m = await js(MEASURE);
+    errors.push(...browser(['errors']).errors, ...browser(['console']).messages.filter((m) => m.type === 'error').map((m) => m.text));
+    failed.push(...browser(['network', 'requests']).requests.filter((r) => r.status >= 400).map(({ url, status }) => ({ url, status })));
     writeFileSync(join(out, `${name(state)}.dom.json`), JSON.stringify({ ...m.dom, console_errors: [...errors], failed_requests: [...failed] }, null, 2) + '\n');
     delete m.dom;
     writeFileSync(join(out, `${name(state)}.measure.json`), JSON.stringify(m, null, 2) + '\n');
@@ -234,6 +223,7 @@ try {
       + `${m.clear !== undefined && m.clear !== null ? `; last block ${m.clear}px above the dock` : ''}; under 44px ${m.under.length}; failures ${m.fail.length}${m.fail.length ? ': ' + m.fail.join('; ') : ''}`);
     if ([m.fail, m.under, errors, failed].some((x) => x.length)) problems.push(`${name(state)}: ${JSON.stringify({ fail: m.fail, under: m.under, errors, failed })}`);
     errors.length = 0; failed.length = 0;
+    browser(['errors', '--clear']); browser(['console', '--clear']); browser(['network', 'requests', '--clear']);
     return m;
   };
   const pair = async (state, protoHash, scroll = 0, shot = state) => {
@@ -245,7 +235,7 @@ try {
     const html = `<body style="margin:0;padding:24px;display:flex;${phone ? '' : 'flex-direction:column;'}gap:24px;background:#888;font:600 26px system-ui;color:#fff">${[['Approved prototype', img(join(out, 'vs-proto', `${name(state)}.proto.png`))], ['Board, this build', img(join(out, `${name(shot)}.png`))]]
       .map(([t, s]) => `<figure style="margin:0"><figcaption style="margin:0 0 12px">${t}: ${state}, ${metrics.width} x ${metrics.height}, ${theme}</figcaption><img src="${s}" style="display:block;width:${metrics.width}px"></figure>`).join('')}</body>`;
     writeFileSync(join(dir, 'pair.html'), html);
-    await cdp('Emulation.setDeviceMetricsOverride', { width: phone ? metrics.width * 2 + 72 : metrics.width + 48, height: phone ? metrics.height + 96 : metrics.height * 2 + 144, deviceScaleFactor: 1, mobile: false });
+    browser(['set', 'viewport', String(phone ? metrics.width * 2 + 72 : metrics.width + 48), String(phone ? metrics.height + 96 : metrics.height * 2 + 144), '1']);
     await go(`file://${join(dir, 'pair.html')}`, 600);
     await png(join(out, 'vs-proto', `${name(state)}.pair.png`)); shots.push(`vs-proto/${name(state)}.pair.png`);
     await setup();
@@ -322,7 +312,7 @@ try {
     await go(`${base}#designs/reports-phone`);
     await until(`!!document.querySelector('#reader textarea')`, 'the note box drawn');
     await tap('#reader textarea');
-    await cdp('Input.insertText', { text: 'Put the day of each report on the right, as the desk does.' });
+    browser(['keyboard', 'inserttext', 'Put the day of each report on the right, as the desk does.']);
     await tap('#reader .dz-change');
     await until(`(() => { try { return document.querySelector('#reader .ui-props').textContent.includes('Changes requested'); } catch { return false; } })()`, 'the answer saved');
     facts.answers = readFileSync(join(dir, 'board.answers.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).map((a) => `${a.key}=${a.answer}${a.notes?.length ? ` "${a.notes.at(-1).note}"` : ''}`);
@@ -348,10 +338,8 @@ try {
   console.log(JSON.stringify(facts, null, 2));
   if (after) assert.deepEqual(problems, [], 'every capture measures clean');
 } finally {
-  try { ws?.close(); } catch {}
-  try { chrome.kill(); } catch {}
-  try { cli('stop', board); } catch {}
+  browser(['close']);
+  if (server) await new Promise((ok, no) => { const stop = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'stop', board], { env, stdio: ['ignore', 'pipe', 'pipe'] }); let log = ''; stop.stdout.on('data', (b) => log += b); stop.stderr.on('data', (b) => log += b); stop.once('error', no); stop.once('exit', (code) => code === 0 ? ok() : no(Error(log))); });
   await wait(300);
-  rmSync(prof, { recursive: true, force: true });
   rmSync(dir, { recursive: true, force: true });
 }

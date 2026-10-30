@@ -227,6 +227,13 @@ journeys:
   # A design card whose options carry a demo recording (post --video and --score): the card plays it muted in place on a tap, opens it full screen with the option's round score, and the Designs row shows its first frame; at 390 and 1280, light and dark.
   design-demo:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/design-demo-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
+  # The Inbox layout pick's three option pages (fixtures/inbox-layout) on a throwaway board, each at 390 and 1280, light and dark, and option A's Desktop layout full screen on a phone:
+  # at its own size with the stage scrolling sideways, then with Fit. SIGN_OFF_REPO=<base build> INBOX_LAYOUT_SIDE=before captures the base's viewer into before/.
+  inbox-layout:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/inbox-layout-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
+  # One sealed merge run includes the Inbox redo and the required Designs 1440 dark capture.
+  inbox-layout-redo:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/inbox-layout-merge-proof.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   board-actions:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/board-actions.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   # The board's own motion, one width per run (FLASH_WIDTH=390|1280, FLASH_THEME=light|dark): the first load with its read held (the skeleton and the
