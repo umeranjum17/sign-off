@@ -44,11 +44,13 @@ function commit(cwd) {
 
 // done-done 0.3.0 checks the records alone; later versions also ask a judge, which a host may not have set. The records rule runs first,
 // so a host with no judge still shows whether identical diagnostics were counted: the check then stops at "no judge is set", never at "byte-identical".
+// This repo's approved_requirements also want a live designs capture, which these journeys do not make, so that finding may stop the check first;
+// either way the check ran past the records rule and found nothing byte-identical.
 function assertRecordsAccepted(r) {
   const out = r.stdout + r.stderr;
   if (r.status === 0) return;
   assert.doesNotMatch(out, /byte-identical/, out);
-  assert.match(out, /no judge is set/, out);
+  assert.match(out, /no judge is set|approved design: spec design-pick-listing: no live capture \(designs\.1440\.dark\.png\)/, out);
 }
 
 const recordOf = (home, name, runId) => JSON.parse(readFileSync(join(home, 'evidence', name, '.done-done', 'runs', `${runId}.json`), 'utf8'));
