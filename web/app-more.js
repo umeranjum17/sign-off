@@ -2356,7 +2356,7 @@
       !shown.length ? el('p', { class: 'ch-empty' }, commsReady ? query || commsKind || commsState ? 'No matching messages in the loaded history.' : 'No messages in this channel yet.' : 'Reading communications…') : '');
     const stream = el('section', { class: 'ch-stream ch-card', 'aria-label': home || 'Messages' }, el('header', { class: 'ch-stream-head' },
       el('a', { href: '#channels', class: 'ch-back' }, '‹ Channels'), el('div', {}, el('h2', {}, selected.thread || home || 'Messages'), el('p', {}, `${all.length} loaded messages · oldest first`))),
-      history, all.some((m) => pending.has(m.id)) ? commsButton(`${all.filter((m) => pending.has(m.id)).length} new messages ↓`, commsJump, 'ch-new') : '');
+      history, all.some((m) => pending.has(m.id)) ? commsButton(`${(() => { const n = all.filter((m) => pending.has(m.id)).length; return `${n} new ${n === 1 ? 'message' : 'messages'}`; })()} ↓`, commsJump, 'ch-new') : '');
     const note = commsError ? el('p', { class: 'ch-error', role: 'alert' }, commsError, ' ', commsButton('Retry', () => commsRead())) : comms.partial ? el('p', { class: 'ch-source' }, 'Recent status and steering messages. Board questions and answers: not recorded.', comms.unavailable_homes ? ` Worker history unavailable for ${comms.unavailable_homes} channels.` : '') : '';
     commsRoot.replaceChildren(top, toggle, filters, note, el('div', { class: `ch-columns${phone() && home ? ' thread-open' : ''}` }, list, stream));
     if (selected.message) {

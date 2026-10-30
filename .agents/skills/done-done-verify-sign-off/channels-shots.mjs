@@ -167,7 +167,7 @@ try {
   await capture('new', (m) => {
     liveMarker(m);
     assert.ok(m.pill, 'the new-messages pill appeared without a reload');
-    assert.match(m.pill, /1 new message/, 'the pill counts the line that arrived');
+    assert.equal(m.pill, '1 new message \u2193', 'the pill counts the line that arrived, in the singular');
     assert.equal(m.messages.length, before, 'the newest line waits behind the pill until it is read');
   });
   assert.ok(results.every((r) => !r.fail.length && !r.console_errors.length), results.filter((r) => r.fail.length || r.console_errors.length).map((r) => `${r.state}: ${[...r.fail, ...r.console_errors].join('; ')}`).join(' | '));
