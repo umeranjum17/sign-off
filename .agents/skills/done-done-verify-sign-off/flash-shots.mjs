@@ -46,7 +46,7 @@ try {
   const target = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find((t) => t.type === 'page');
   const ws = new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((ok, no) => { ws.onopen = ok; ws.onerror = no; });
-  let id = 0, held = 0;
+  let id = 0;
   const replies = new Map(), frames = [];
   const send = (method, params = {}) => new Promise((ok) => { replies.set(++id, ok); ws.send(JSON.stringify({ id, method, params })); });
   ws.onmessage = (m) => {
@@ -59,16 +59,16 @@ try {
       send('Page.screencastFrameAck', { sessionId: msg.params.sessionId });
     }
     // The first read of the board is held a moment, as a phone's network holds it, so the loader and the skeleton are on screen long enough to be seen.
-    // Only the asks read is held (the first screen's and the poll's), so the loader is on screen long enough to be seen; the pages behind it come at once.
-    if (msg.method === 'Fetch.requestPaused') setTimeout(() => send('Fetch.continueRequest', { requestId: msg.params.requestId }),
-      /view=asks/.test(msg.params.request.url) && held++ < 2 ? 1500 : 0);
+
   };
   await send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: desk ? 1 : 2, mobile: !desk });
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] });
-  // The page's worker answers a read from its own copy, which a held request never sees: this run reads the board itself, as a first open does.
+  // The page's worker answers a read from its own copy, which a slow read never gets to see on a phone either: this run reads the board itself.
   await send('Network.enable');
   await send('Network.setBypassServiceWorker', { bypass: true });
-  await send('Fetch.enable', { patterns: [{ urlPattern: '*/api/decisions' }] });
+  // A phone's network, so a read takes long enough to be seen: the skeleton and the loader are on screen while the first page comes, and the loader
+  // shows for real on each poll.
+  await send('Network.emulateNetworkConditions', { offline: false, latency: 260, downloadThroughput: 1_200_000, uploadThroughput: 500_000 });
   await send('Page.enable');
   const evaluate = async (expression) => (await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }))?.result?.value;
   const inPage = (body) => evaluate(`(async () => { const s = (ms) => new Promise((z) => setTimeout(z, ms)); ${body} })()`);
@@ -142,13 +142,16 @@ try {
 
   // 1. The first load on Today, its read held: a loader and the skeleton while it comes, the board drawn once it has.
   await phase('first-load', async () => {
-    await wait(500);
+    // The skeleton and the loader, while the first page is still on its way.
+    check(await until('!!document.querySelector("#board .skel") && document.getElementById("net")?.hidden === false', 20000), 'first-load: the skeleton and the loader never showed together');
     await shot('loading');
     const ok = await until('!!document.querySelector("#board .ui-row, #board .t-up") && !document.querySelector("#board .skel")', 20000);
     check(ok, 'first-load: the board never drew');
     const frames = JSON.parse(await evaluate('JSON.stringify(window.__flash.frames)'));
     check(frames.some((f) => f.skel), 'first-load: no skeleton showed while the first read was in flight');
     check(frames.some((f) => f.net), 'first-load: no loader showed while the first read was in flight');
+    // The drawn board, painted: the still of it is taken a frame after the last part lands, never of the frame before.
+    await wait(300);
     await shot('first-load');
     return { rows: await evaluate('document.querySelectorAll("#board [data-key]").length') };
   });
