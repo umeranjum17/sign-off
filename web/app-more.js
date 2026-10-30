@@ -642,7 +642,8 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     // The quiet line under them: the slug (once a key names the ticket above) and its owner.
     const who = tkOwnerLine(t), chip = link.querySelector('.l1 .ui-pc');
     // The slug is the row's small secondary line, right under the key that names it; whoever owns the ticket and the priority chip follow on the line below.
-    if (t.key) l2.prepend(el('span', { class: 'tk-row-slug', dir: 'ltr' }, t.id));
+    // A held row's second line is the reason, which is worth more than the slug there; every other keyed row names its slug on that line.
+    if (t.key && s !== 'hold') l2.prepend(el('span', { class: 'tk-row-slug', dir: 'ltr' }, t.id));
     if (chip) who.append(chip);
     link.querySelector('.rm').append(who);
     return el('li', {}, link);

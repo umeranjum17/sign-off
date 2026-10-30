@@ -383,7 +383,7 @@ try {
     const r = a.getBoundingClientRect(), k = key?.getBoundingClientRect(), titleBox = title.getBoundingClientRect();
     // The key is the row's name and leads its title line in the title's own type; the slug is the small second line right under it.
     const slugBox = slugEl?.getBoundingClientRect();
-    return { key: key?.textContent ?? null, onTitleLine: !!k && Math.abs(k.top - titleBox.top) < 12, keySize: k ? getComputedStyle(k).fontSize : null,
+    return { key: key?.textContent ?? null, onTitleLine: !!k && Math.abs(k.top - titleBox.top) < 12, keySize: k ? getComputedStyle(key).fontSize : null,
       height: Math.round(r.height), titleWidth: Math.round(titleBox.width), titleClipped: title.scrollWidth > title.clientWidth + 1, rowWidth: Math.round(r.width),
       slug: slugEl?.textContent ?? null, slugOnSecondLine: !!slugBox && slugBox.top >= titleBox.bottom - 2 && !slugEl.closest('.l1') }; })()`);
   if (facts.keyRow?.key !== 'JG-101') problems.push(`the epic row does not carry its readable key: ${JSON.stringify(facts.keyRow)}`);
